@@ -55,6 +55,9 @@ npreghat <-
 
 .npreghat_solve_eval <- function(W, w.eval, k, ridge.base) {
   XtWX <- crossprod(W, W * k)
+  p <- nrow(XtWX)
+  diag.loc <- cbind(seq_len(p), seq_len(p))
+  XtWX.diag <- XtWX[diag.loc]
   ridge.grid <- npRidgeSequenceFromBase(
     n.train = nrow(W),
     ridge.base = max(0.0, as.double(ridge.base)),
@@ -67,7 +70,7 @@ npreghat <-
     ridge <- ridge.try
     A <- XtWX
     if (ridge > 0)
-      diag(A) <- diag(A) + ridge
+      A[diag.loc] <- XtWX.diag + ridge
 
     v <- tryCatch(
       drop(solve(t(A), matrix(w.eval, ncol = 1L))),
@@ -84,6 +87,34 @@ npreghat <-
     return(NULL)
 
   list(v = v, ridge = ridge)
+}
+
+.npreghat_exact_matrix_from_core <- function(bws, txdat, exdat = NULL) {
+  miss.ex <- is.null(exdat)
+  neval <- if (miss.ex) nrow(txdat) else nrow(exdat)
+  ntrain <- nrow(txdat)
+  H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+
+  fit_one <- function(ycol) {
+    direct.args <- list(
+      bws = bws,
+      txdat = txdat,
+      tydat = ycol,
+      exdat = exdat,
+      gradients = FALSE,
+      gradient.order = 1L
+    )
+    fit <- .npRmpi_with_local_regression(do.call(.np_regression_direct, direct.args))
+    fit$mean
+  }
+
+  for (j in seq_len(ntrain)) {
+    yj <- numeric(ntrain)
+    yj[j] <- 1.0
+    H[, j] <- fit_one(yj)
+  }
+
+  H
 }
 
 .np_kernel_weights_direct <- function(bws,
@@ -754,6 +785,13 @@ npreghat.rbandwidth <-
       !(identical(bws$type, "generalized_nn") &&
           identical(reg.spec$regtype.engine, "lp"))
 
+    exact.core.matrix <- identical(bws$regtype, "lp") &&
+      identical(reg.spec$regtype.engine, "lp") &&
+      any(degree > 1L) &&
+      !identical(bws$type, "fixed") &&
+      !isTRUE(leave.one.out) &&
+      (sum(s) == 0L)
+
     if (direct.apply) {
       direct.args <- list(
         bws = bws,
@@ -763,11 +801,7 @@ npreghat.rbandwidth <-
         gradients = any(s > 0L),
         gradient.order = 1L
       )
-      direct.out <- if (identical(bws$type, "generalized_nn")) {
-        .npRmpi_with_local_regression(do.call(.np_regression_direct, direct.args))
-      } else {
-        do.call(.np_regression_direct, direct.args)
-      }
+      direct.out <- .npRmpi_with_local_regression(do.call(.np_regression_direct, direct.args))
 
       if (!any(s > 0L))
         return(as.vector(direct.out$mean))
@@ -775,6 +809,47 @@ npreghat.rbandwidth <-
       target.cont <- which(s == 1L)
       target.col <- which(bws$icon)[target.cont]
       return(as.vector(direct.out$grad[, target.col]))
+    }
+
+    if (exact.core.matrix) {
+      H <- .npreghat_exact_matrix_from_core(
+        bws = bws,
+        txdat = txdat,
+        exdat = if (no.ex) NULL else exdat
+      )
+
+      if (identical(output, "apply")) {
+        if (is.null(y))
+          stop("argument 'y' is required when output='apply'")
+        out <- H %*% y
+        if (ncol(out) == 1L)
+          return(as.vector(out))
+        return(out)
+      }
+
+      class(H) <- c("npreghat", "matrix")
+      attr(H, "bws") <- bws
+      attr(H, "txdat") <- txdat
+      attr(H, "exdat") <- if (no.ex) txdat else exdat
+      attr(H, "trainiseval") <- no.ex
+      attr(H, "regtype") <- regtype
+      attr(H, "degree") <- degree
+      attr(H, "basis") <- basis
+      attr(H, "bernstein.basis") <- bernstein.basis
+      attr(H, "s") <- s
+      attr(H, "leave.one.out") <- leave.one.out
+      attr(H, "ridge.used") <- rep.int(0.0, nrow(H))
+      attr(H, "rows.omit") <- rows.omit
+      attr(H, "call") <- match.call(expand.dots = FALSE)
+
+      if (!is.null(y)) {
+        Hy <- H %*% y
+        if (ncol(Hy) == 1L)
+          Hy <- as.vector(Hy)
+        attr(H, "Hy") <- Hy
+      }
+
+      return(H)
     }
 
     if (any(s > degree))

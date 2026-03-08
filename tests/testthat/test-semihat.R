@@ -688,6 +688,98 @@ test_that("npindex generalized-nn ll gradients match npindexhat s=1 helper in se
   expect_equal(as.vector(fit$grad[, 1L]), as.vector(hy), tolerance = 1e-10)
 })
 
+test_that("npindexhat mean and derivative operators match core fits across bwtypes", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(20260308)
+  n <- 70
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(x1 + x2) + rnorm(n, sd = 0.06)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  ex <- tx[seq_len(20), , drop = FALSE]
+
+  cfgs <- list(
+    list(regtype = "lc", basis = NULL, degree = NULL, h = 0.85),
+    list(regtype = "ll", basis = NULL, degree = NULL, h = 0.85),
+    list(regtype = "lp", basis = "tensor", degree = 2L, h = 0.85)
+  )
+
+  for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
+    for (cfg in cfgs) {
+      bw.args <- list(
+        xdat = tx,
+        ydat = y,
+        bws = c(1, 1, cfg$h),
+        bandwidth.compute = FALSE,
+        regtype = cfg$regtype,
+        bwtype = bt
+      )
+      if (!is.null(cfg$basis)) {
+        bw.args$basis <- cfg$basis
+        bw.args$degree <- cfg$degree
+      }
+      bw <- do.call(npindexbw, bw.args)
+
+      fit.mean <- npindex(
+        bws = bw,
+        txdat = tx,
+        tydat = y,
+        exdat = ex,
+        gradients = FALSE
+      )
+      fit.grad <- npindex(
+        bws = bw,
+        txdat = tx,
+        tydat = y,
+        exdat = ex,
+        gradients = TRUE
+      )
+      H.mean <- npindexhat(
+        bws = bw,
+        txdat = tx,
+        exdat = ex,
+        output = "matrix",
+        s = 0L
+      )
+      a.mean <- npindexhat(
+        bws = bw,
+        txdat = tx,
+        exdat = ex,
+        y = y,
+        output = "apply",
+        s = 0L
+      )
+      H.grad <- npindexhat(
+        bws = bw,
+        txdat = tx,
+        exdat = ex,
+        output = "matrix",
+        s = 1L
+      )
+      a.grad <- npindexhat(
+        bws = bw,
+        txdat = tx,
+        exdat = ex,
+        y = y,
+        output = "apply",
+        s = 1L
+      )
+
+      expect_equal(as.vector(H.mean %*% y), as.vector(fit.mean$mean), tolerance = 1e-8, info = paste(bt, cfg$regtype, "mean matrix"))
+      expect_equal(as.vector(a.mean), as.vector(fit.mean$mean), tolerance = 1e-8, info = paste(bt, cfg$regtype, "mean apply"))
+      expect_equal(as.vector(H.mean %*% y), as.vector(a.mean), tolerance = 1e-10, info = paste(bt, cfg$regtype, "mean matrix/apply"))
+      expect_equal(as.vector(H.grad %*% y), as.vector(fit.grad$grad[, 1L]), tolerance = 1e-8, info = paste(bt, cfg$regtype, "grad matrix"))
+      expect_equal(as.vector(a.grad), as.vector(fit.grad$grad[, 1L]), tolerance = 1e-8, info = paste(bt, cfg$regtype, "grad apply"))
+      expect_equal(as.vector(H.grad %*% y), as.vector(a.grad), tolerance = 1e-10, info = paste(bt, cfg$regtype, "grad matrix/apply"))
+    }
+  }
+})
+
 test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
@@ -855,6 +947,18 @@ test_that("semihat validates class and scalar controls", {
   expect_error(npindexhat(bws = rbw, txdat = data.frame(x = x)), "sibandwidth")
   expect_error(npplreghat(bws = rbw, txdat = data.frame(x = x), tzdat = data.frame(z = z)), "plbandwidth")
   expect_error(npscoefhat(bws = rbw, txdat = data.frame(x = x), tzdat = data.frame(z = z)), "scbandwidth")
+
+  sibw <- npindexbw(
+    xdat = data.frame(x = x, x2 = x^2),
+    ydat = y,
+    bws = c(1, 1, 0.2),
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  expect_error(
+    npindexhat(bws = sibw, txdat = data.frame(x = x, x2 = x^2), s = 1L, fd.step = 0),
+    "argument 'fd.step' must be a positive finite scalar"
+  )
 
   scbw <- npscoefbw(
     xdat = x,

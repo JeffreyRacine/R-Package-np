@@ -52,7 +52,7 @@ npscoefhat(bws,
 
   \item{s}{For \code{npindexhat}, \code{s=0} returns fit operator and \code{s=1} returns index-derivative operator.}
 
-  \item{fd.step}{Finite-difference step used for \code{npindexhat(..., s=1)}; must be a positive finite scalar.}
+  \item{fd.step}{Compatibility argument for \code{npindexhat(..., s=1)}. If supplied it must be a positive finite scalar, but the current \code{s=1} route uses the canonical exact derivative operator rather than finite-differencing the fit operator.}
 
   \item{tzdat}{Training \code{z} data for partially linear and smooth-coefficient models.}
 
@@ -81,7 +81,7 @@ argument contracts are validated explicitly, and unsupported iterative
 object.
 
 Method-specific argument map:
-\code{npindexhat()} uses \code{s} and \code{fd.step};
+\code{npindexhat()} uses \code{s}; \code{fd.step} is accepted for compatibility but the current \code{s=1} route uses the canonical exact derivative operator;
 \code{npplreghat()} and \code{npscoefhat()} use \code{tzdat}/\code{ezdat};
 \code{npscoefhat()} additionally uses \code{ridge}, \code{iterate}, and
 \code{leave.one.out}.
