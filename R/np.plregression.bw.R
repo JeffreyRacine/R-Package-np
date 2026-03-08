@@ -114,8 +114,6 @@ npplregbw.NULL =
            zdat = stop("invoked without data `zdat'"),
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
@@ -158,8 +156,6 @@ npplregbw.plbandwidth =
     }
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
     
     xdat = toFrame(xdat)
     zdat = toFrame(zdat)
@@ -236,8 +232,6 @@ npplregbw.default =
            ...){
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)

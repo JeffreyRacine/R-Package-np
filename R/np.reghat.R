@@ -254,18 +254,36 @@ npreghat <-
                                 ncon = bws$ncon)
   bernstein.basis <- npValidateGlpBernstein(regtype = regtype,
                                             bernstein.basis = bws$bernstein.basis)
-  glp.gradient.order <- npValidateGlpGradientOrder(regtype = regtype,
-                                                   gradient.order = gradient.order,
-                                                   ncon = bws$ncon)
+  reg.spec <- npCanonicalConditionalRegSpec(
+    regtype = regtype,
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
+    ncon = bws$ncon,
+    where = ".np_regression_direct"
+  )
+  glp.gradient.order <- if (identical(reg.spec$regtype.engine, "lp")) {
+    if (identical(regtype, "lp")) {
+      npValidateGlpGradientOrder(regtype = regtype,
+                                 gradient.order = gradient.order,
+                                 ncon = bws$ncon)
+    } else if (bws$ncon > 0L) {
+      rep.int(1L, bws$ncon)
+    } else {
+      integer(0)
+    }
+  } else {
+    NULL
+  }
   if (isTRUE(gradients) &&
-      identical(regtype, "lp") &&
+      identical(reg.spec$regtype.engine, "lp") &&
       (bws$ncon > 0L) &&
-      all(degree == 0L)) {
+      all(reg.spec$degree.engine == 0L)) {
     stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
   }
 
-  reg.c <- npRegtypeToC(regtype = regtype,
-                        degree = degree,
+  reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
+                        degree = reg.spec$degree.engine,
                         ncon = bws$ncon,
                         context = ".np_regression_direct")
   degree.c <- if (bws$ncon > 0L) {
@@ -308,9 +326,9 @@ npreghat <-
 
   npCheckRegressionDesignCondition(reg.code = reg.c$code,
                                    xcon = tcon,
-                                   basis = basis,
-                                   degree = degree,
-                                   bernstein.basis = bernstein.basis,
+                                   basis = reg.spec$basis.engine,
+                                   degree = reg.spec$degree.engine,
+                                   bernstein.basis = reg.spec$bernstein.basis.engine,
                                    where = ".np_regression_direct")
 
   if (!no.ex) {
@@ -392,8 +410,8 @@ npreghat <-
     as.integer(myopti),
     as.integer(degree.c),
     as.integer(glp.gradient.order.c),
-    as.integer(isTRUE(bernstein.basis)),
-    as.integer(npLpBasisCode(basis)),
+    as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+    as.integer(npLpBasisCode(reg.spec$basis.engine)),
     as.integer(enrow),
     as.integer(ncol.x),
     as.logical(gradients),
@@ -501,6 +519,70 @@ npreghat.rbandwidth <-
            ...){
 
     no.ex <- missing(exdat)
+    regtype.raw <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    basis.raw <- npValidateLpBasis(regtype = regtype.raw, basis = bws$basis)
+    degree.raw <- npValidateGlpDegree(regtype = regtype.raw,
+                                      degree = bws$degree,
+                                      ncon = bws$ncon)
+    bernstein.raw <- npValidateGlpBernstein(regtype = regtype.raw,
+                                            bernstein.basis = bws$bernstein.basis)
+    reg.spec.raw <- npCanonicalConditionalRegSpec(
+      regtype = regtype.raw,
+      basis = basis.raw,
+      degree = degree.raw,
+      bernstein.basis = bernstein.raw,
+      ncon = bws$ncon,
+      where = "npreghat"
+    )
+    world.size <- .npRmpi_safe_int(mpi.comm.size(0))
+    world.size <- if (is.na(world.size)) 1L else as.integer(world.size)
+    use.spawn.local.exec <- .npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast() &&
+      (world.size <= 1L) &&
+      identical(bws$type, "generalized_nn") &&
+      identical(reg.spec.raw$regtype.engine, "lp") &&
+      identical(reg.spec.raw$basis.engine, "glp") &&
+      !isTRUE(reg.spec.raw$bernstein.basis.engine) &&
+      (bws$ncon > 0L) &&
+      all(reg.spec.raw$degree.engine == 1L)
+    if (use.spawn.local.exec) {
+      old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+      old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+      options(npRmpi.autodispatch.context = TRUE)
+      options(npRmpi.autodispatch.disable = TRUE)
+      on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+      on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+      if (no.ex) {
+        return(get("npreghat.rbandwidth", envir = asNamespace("npRmpi"), inherits = FALSE)(
+          bws = .npRmpi_autodispatch_untag(bws),
+          txdat = txdat,
+          y = y,
+          output = output,
+          s = s,
+          deriv = deriv,
+          degree = degree,
+          basis = basis,
+          bernstein.basis = bernstein.basis,
+          ridge = ridge,
+          leave.one.out = leave.one.out
+        ))
+      }
+      return(get("npreghat.rbandwidth", envir = asNamespace("npRmpi"), inherits = FALSE)(
+        bws = .npRmpi_autodispatch_untag(bws),
+        txdat = txdat,
+        exdat = exdat,
+        y = y,
+        output = output,
+        s = s,
+        deriv = deriv,
+        degree = degree,
+        basis = basis,
+        bernstein.basis = bernstein.basis,
+        ridge = ridge,
+        leave.one.out = leave.one.out
+      ))
+    }
     if (.npRmpi_has_active_slave_pool(comm = 1L) &&
         !.npRmpi_autodispatch_in_context() &&
         !.npRmpi_autodispatch_called_from_bcast()) {
@@ -655,12 +737,22 @@ npreghat.rbandwidth <-
     )
 
     s <- .npreghat_resolve_s(s = s, deriv = deriv, ncon = ncon, con.names = con.names)
+    reg.spec <- npCanonicalConditionalRegSpec(
+      regtype = regtype,
+      basis = basis,
+      degree = degree,
+      bernstein.basis = bernstein.basis,
+      ncon = ncon,
+      where = "npreghat"
+    )
 
     direct.apply <- identical(output, "apply") &&
       !is.null(y) &&
       !isTRUE(leave.one.out) &&
       (ncol(y) == 1L) &&
-      (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L))))
+      (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L)))) &&
+      !(identical(bws$type, "generalized_nn") &&
+          identical(reg.spec$regtype.engine, "lp"))
 
     if (direct.apply) {
       direct.args <- list(
@@ -701,8 +793,20 @@ npreghat.rbandwidth <-
     if (!no.ex)
       kw.args$exdat <- exdat
 
-    kw.obj <- do.call(npksum.default, kw.args)
-    kw <- kw.obj$kw
+    use.local.kw <- identical(bws$type, "generalized_nn") &&
+      identical(reg.spec$regtype.engine, "lp") &&
+      .npRmpi_has_active_slave_pool(comm = 1L)
+
+    kw <- if (use.local.kw) {
+      direct.kw.args <- kw.args[intersect(
+        names(kw.args),
+        c("bws", "txdat", "exdat", "leave.one.out", "bandwidth.divide")
+      )]
+      do.call(.np_kernel_weights_direct, direct.kw.args)
+    } else {
+      kw.obj <- do.call(npksum.default, kw.args)
+      kw.obj$kw
+    }
 
     if (is.null(kw))
       stop("kernel-weight extraction failed")

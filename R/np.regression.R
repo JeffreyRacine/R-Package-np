@@ -120,13 +120,66 @@ npreg.rbandwidth <-
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     .npRmpi_require_active_slave_pool(where = "npreg()")
+    dots <- list(...)
+    regtype.raw <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    basis.raw <- npValidateLpBasis(regtype = regtype.raw, basis = bws$basis)
+    degree.raw <- npValidateGlpDegree(regtype = regtype.raw,
+                                      degree = bws$degree,
+                                      ncon = bws$ncon)
+    bernstein.raw <- npValidateGlpBernstein(regtype = regtype.raw,
+                                            bernstein.basis = bws$bernstein.basis)
+    reg.spec.raw <- npCanonicalConditionalRegSpec(
+      regtype = regtype.raw,
+      basis = basis.raw,
+      degree = degree.raw,
+      bernstein.basis = bernstein.raw,
+      ncon = bws$ncon,
+      where = "npreg"
+    )
+    world.size <- .npRmpi_safe_int(mpi.comm.size(0))
+    world.size <- if (is.na(world.size)) 1L else as.integer(world.size)
+
+    use.spawn.local.exec <- .npRmpi_autodispatch_active() &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      (world.size <= 1L) &&
+      identical(bws$type, "generalized_nn") &&
+      identical(reg.spec.raw$regtype.engine, "lp") &&
+      identical(reg.spec.raw$basis.engine, "glp") &&
+      !isTRUE(reg.spec.raw$bernstein.basis.engine) &&
+      (bws$ncon > 0L) &&
+      all(reg.spec.raw$degree.engine == 1L) &&
+      !isTRUE(gradients) &&
+      !isTRUE(residuals) &&
+      missing(eydat)
+
     .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
+    if (use.spawn.local.exec) {
+      .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = FALSE)
+
+      old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+      options(npRmpi.autodispatch.disable = TRUE)
+      on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+
+      local.args <- c(
+        list(
+          bws = .npRmpi_autodispatch_untag(bws),
+          txdat = txdat,
+          tydat = tydat,
+          gradient.order = gradient.order,
+          gradients = gradients,
+          residuals = residuals
+        ),
+        if (!missing(exdat)) list(exdat = exdat) else NULL,
+        dots
+      )
+      result <- do.call(npreg, local.args)
+      return(.npRmpi_autodispatch_tag_result(result, mode = "auto"))
+    }
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)
-    dots <- list(...)
     npRejectLegacyLpArgs(names(dots), where = "npreg")
     warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
@@ -169,22 +222,40 @@ npreg.rbandwidth <-
     bws$basis <- npValidateLpBasis(regtype = bws$regtype,
                                    basis = bws$basis)
     bws$degree <- npValidateGlpDegree(regtype = bws$regtype,
-                                          degree = bws$degree,
-                                          ncon = bws$ncon)
+                                      degree = bws$degree,
+                                      ncon = bws$ncon)
     bws$bernstein.basis <- npValidateGlpBernstein(regtype = bws$regtype,
-                                                bernstein.basis = bws$bernstein.basis)
-    glp.gradient.order <- npValidateGlpGradientOrder(regtype = bws$regtype,
-                                                     gradient.order = gradient.order,
-                                                     ncon = bws$ncon)
+                                                  bernstein.basis = bws$bernstein.basis)
+    reg.spec <- npCanonicalConditionalRegSpec(
+      regtype = bws$regtype,
+      basis = bws$basis,
+      degree = bws$degree,
+      bernstein.basis = bws$bernstein.basis,
+      ncon = bws$ncon,
+      where = "npreg"
+    )
+    glp.gradient.order <- if (identical(reg.spec$regtype.engine, "lp")) {
+      if (identical(bws$regtype, "lp")) {
+        npValidateGlpGradientOrder(regtype = bws$regtype,
+                                   gradient.order = gradient.order,
+                                   ncon = bws$ncon)
+      } else if (bws$ncon > 0L) {
+        rep.int(1L, bws$ncon)
+      } else {
+        integer(0)
+      }
+    } else {
+      NULL
+    }
     if (isTRUE(gradients) &&
-        identical(bws$regtype, "lp") &&
+        identical(reg.spec$regtype.engine, "lp") &&
         (bws$ncon > 0L) &&
-        all(bws$degree == 0L)) {
+        all(reg.spec$degree.engine == 0L)) {
       stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
     }
 
-    reg.c <- npRegtypeToC(regtype = bws$regtype,
-                          degree = bws$degree,
+    reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
+                          degree = reg.spec$degree.engine,
                           ncon = bws$ncon,
                           context = "npreg")
     degree.c <- if (bws$ncon > 0) {
@@ -318,9 +389,9 @@ npreg.rbandwidth <-
 
     npCheckRegressionDesignCondition(reg.code = reg.c$code,
                                      xcon = tcon,
-                                     basis = bws$basis,
-                                     degree = bws$degree,
-                                     bernstein.basis = bws$bernstein.basis,
+                                     basis = reg.spec$basis.engine,
+                                     degree = reg.spec$degree.engine,
+                                     bernstein.basis = reg.spec$bernstein.basis.engine,
                                      where = "npreg")
 
     if (!no.ex){
@@ -386,7 +457,7 @@ npreg.rbandwidth <-
       integer(1)
     }
 
-    myout <-
+    call_regression <- function() {
       .Call("C_np_regression",
             asDouble(tuno), asDouble(tord), asDouble(tcon), asDouble(tydat),
             asDouble(euno), asDouble(eord), asDouble(econ), asDouble(eydat),
@@ -396,14 +467,32 @@ npreg.rbandwidth <-
             as.integer(myopti),
             as.integer(degree.c),
             as.integer(glp.gradient.order.c),
-            as.integer(isTRUE(bws$bernstein.basis)),
-            as.integer(npLpBasisCode(bws$basis)),
+            as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+            as.integer(npLpBasisCode(reg.spec$basis.engine)),
             as.integer(enrow),
             as.integer(ncol),
             as.logical(gradients),
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
             PACKAGE = "npRmpi")
+    }
+
+    use.local.regression <- identical(bws$type, "generalized_nn") &&
+      identical(reg.spec$regtype.engine, "lp") &&
+      identical(reg.spec$basis.engine, "glp") &&
+      !isTRUE(reg.spec$bernstein.basis.engine) &&
+      (bws$ncon > 0L) &&
+      all(reg.spec$degree.engine == 1L) &&
+      !isTRUE(gradients) &&
+      !isTRUE(residuals) &&
+      no.ey &&
+      .npRmpi_has_active_slave_pool(comm = 1L)
+
+    myout <- if (use.local.regression) {
+      .npRmpi_with_local_regression(call_regression())
+    } else {
+      call_regression()
+    }
 
     if (gradients){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 

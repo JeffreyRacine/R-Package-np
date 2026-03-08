@@ -149,6 +149,67 @@ test_that("session core trio smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session generalized-nn shared degree-1 route stays exact after public hats", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(20260308)",
+      "n <- 80L",
+      "z <- sort(runif(n))",
+      "x <- runif(n)",
+      "y <- sin(2*pi*z) + 0.5*x + rnorm(n, sd=0.03)",
+      "tx <- data.frame(x=x)",
+      "tz <- data.frame(z=z)",
+      "ez <- data.frame(z=seq(0.05, 0.95, length.out=24L))",
+      "bw.reg.ll <- npregbw(xdat=tz, ydat=y, regtype='ll', bwtype='generalized_nn', bws=9, bandwidth.compute=FALSE)",
+      "bw.reg.lp <- npregbw(xdat=tz, ydat=y, regtype='lp', basis='glp', degree=1L, bernstein.basis=FALSE, bwtype='generalized_nn', bws=9, bandwidth.compute=FALSE)",
+      "fit.reg.ll <- npreg(bws=bw.reg.ll, txdat=tz, tydat=y, exdat=ez, warn.glp.gradient=FALSE)",
+      "fit.reg.lp <- npreg(bws=bw.reg.lp, txdat=tz, tydat=y, exdat=ez, warn.glp.gradient=FALSE)",
+      "hat.reg.apply.ll <- npreghat(bws=bw.reg.ll, txdat=tz, exdat=ez, y=y, output='apply')",
+      "hat.reg.apply.lp <- npreghat(bws=bw.reg.lp, txdat=tz, exdat=ez, y=y, output='apply')",
+      "hat.reg.matrix.ll <- npreghat(bws=bw.reg.ll, txdat=tz, exdat=ez)",
+      "hat.reg.matrix.lp <- npreghat(bws=bw.reg.lp, txdat=tz, exdat=ez)",
+      "bws.pl <- matrix(c(1, 9), nrow=2L, ncol=1L)",
+      "bw.pl.ll <- npplregbw(xdat=tx, ydat=y, zdat=tz, regtype='ll', bwtype='generalized_nn', bws=bws.pl, bandwidth.compute=FALSE)",
+      "bw.pl.lp <- npplregbw(xdat=tx, ydat=y, zdat=tz, regtype='lp', basis='glp', degree=1L, bernstein.basis=FALSE, bwtype='generalized_nn', bws=bws.pl, bandwidth.compute=FALSE)",
+      "fit.pl.ll <- npplreg(bws=bw.pl.ll, txdat=tx, tzdat=tz, tydat=y)",
+      "fit.pl.lp <- npplreg(bws=bw.pl.lp, txdat=tx, tzdat=tz, tydat=y)",
+      "hat.pl.apply.ll <- npplreghat(bws=bw.pl.ll, txdat=tx, tzdat=tz, y=y, output='apply')",
+      "hat.pl.apply.lp <- npplreghat(bws=bw.pl.lp, txdat=tx, tzdat=tz, y=y, output='apply')",
+      "hat.pl.matrix.ll <- npplreghat(bws=bw.pl.ll, txdat=tx, tzdat=tz, output='matrix')",
+      "hat.pl.matrix.lp <- npplreghat(bws=bw.pl.lp, txdat=tx, tzdat=tz, output='matrix')",
+      "tol.direct <- 1e-9",
+      "tol.matrix <- 1e-9",
+      "checks <- c(",
+      "  max(abs(as.numeric(fit.reg.ll$mean) - as.numeric(fit.reg.lp$mean))),",
+      "  max(abs(as.numeric(hat.reg.apply.ll) - as.numeric(hat.reg.apply.lp))),",
+      "  max(abs(as.numeric(hat.reg.apply.ll) - as.numeric(hat.reg.matrix.ll %*% y))),",
+      "  max(abs(as.numeric(hat.reg.apply.lp) - as.numeric(hat.reg.matrix.lp %*% y))),",
+      "  max(abs(as.numeric(fit.pl.ll$mean) - as.numeric(fit.pl.lp$mean))),",
+      "  max(abs(as.numeric(fit.pl.ll$xcoef) - as.numeric(fit.pl.lp$xcoef))),",
+      "  max(abs(as.numeric(hat.pl.apply.ll) - as.numeric(hat.pl.apply.lp))),",
+      "  max(abs(as.numeric(hat.pl.apply.ll) - as.numeric(hat.pl.matrix.ll %*% y))),",
+      "  max(abs(as.numeric(hat.pl.apply.lp) - as.numeric(hat.pl.matrix.lp %*% y)))",
+      ")",
+      "stopifnot(all(checks <= tol.direct))",
+      "stopifnot(max(abs(as.numeric(hat.pl.matrix.ll %*% y) - as.numeric(hat.pl.matrix.lp %*% y))) <= tol.matrix)",
+      "cat('SESSION_SHARED_DEGREE1_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_SHARED_DEGREE1_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session smooth-coefficient ll coef plot-data route completes in subprocess", {
   skip_on_cran()
   env <- subprocess_env()

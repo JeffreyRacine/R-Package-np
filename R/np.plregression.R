@@ -266,8 +266,6 @@ npplreg.plbandwidth <-
     fit.start <- proc.time()[3]
     residuals <- npValidateScalarLogical(residuals, "residuals")
     .npRmpi_require_active_slave_pool(where = "npplreg()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     txdat = toFrame(txdat)
     tzdat = toFrame(tzdat)
@@ -436,8 +434,6 @@ npplreg.plbandwidth <-
 
 npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
   .npRmpi_require_active_slave_pool(where = "npplreg()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   sc <- sys.call()
   sc.names <- names(sc)

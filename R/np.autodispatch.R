@@ -96,6 +96,40 @@
   ref
 }
 
+.npRmpi_autodispatch_has_tmp_symbols <- function(x) {
+  if (is.symbol(x)) {
+    nm <- as.character(x)
+    return(grepl("^\\.__npRmpi_autod_", nm) || grepl("^\\.\\.[0-9]+$", nm))
+  }
+
+  if (is.call(x) || is.pairlist(x))
+    return(any(vapply(as.list(x), .npRmpi_autodispatch_has_tmp_symbols, logical(1))))
+
+  if (inherits(x, "formula"))
+    return(.npRmpi_autodispatch_has_tmp_symbols(as.list(x)))
+
+  FALSE
+}
+
+.npRmpi_autodispatch_can_reuse_bws_ref <- function(val, call.base) {
+  if (is.null(.npRmpi_autodispatch_remote_ref(val)))
+    return(FALSE)
+
+  if (!call.base %in% c("npreg", "npplreg"))
+    return(FALSE)
+
+  if (!(inherits(val, "rbandwidth") || inherits(val, "plbandwidth")))
+    return(FALSE)
+
+  if (!is.null(val$call) && .npRmpi_autodispatch_has_tmp_symbols(val$call))
+    return(FALSE)
+
+  if (!is.null(val$formula) && .npRmpi_autodispatch_has_tmp_symbols(val$formula))
+    return(FALSE)
+
+  TRUE
+}
+
 .npRmpi_autodispatch_large_arg_threshold <- function() {
   thr <- getOption("npRmpi.autodispatch.arg.broadcast.threshold", 4096L)
   if (!is.numeric(thr) || length(thr) != 1L || is.na(thr) || thr < 0)
@@ -1411,10 +1445,8 @@
       }
     }
     ref <- .npRmpi_autodispatch_remote_ref(val)
-    # `bws` objects can be post-processed locally (e.g. formula methods
-    # rewriting call/formula metadata). Reusing a stale remote reference can
-    # reintroduce unresolved temporary symbols during downstream plotting.
-    if (!is.null(ref) && !identical(nm, "bws")) {
+    if (!is.null(ref) &&
+        (!identical(nm, "bws") || .npRmpi_autodispatch_can_reuse_bws_ref(val, call.base))) {
       out[[i]] <- as.name(ref)
       next
     }
