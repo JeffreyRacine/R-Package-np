@@ -136,3 +136,90 @@ test_that("npreghat lp bernstein path matches predict semantics", {
   expect_equal(as.vector(hat.bern), as.vector(fit.bern$mean), tolerance = 1e-8)
   expect_equal(as.vector(fit.bern$mean), as.vector(fit.raw$mean), tolerance = 1e-8)
 })
+
+test_that("npreghat mean and supported gradients match npreg across bwtypes", {
+  set.seed(20260308)
+  n <- 90
+  x <- sort(runif(n))
+  y <- sin(2 * pi * x) + 0.25 * x + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+  ex <- data.frame(x = seq(0.05, 0.95, length.out = 25))
+
+  make_bw <- function(regtype, bwtype) {
+    bw_args <- list(
+      xdat = tx,
+      ydat = y,
+      regtype = regtype,
+      bwtype = bwtype,
+      bandwidth.compute = FALSE,
+      bws = if (identical(bwtype, "fixed")) 0.18 else 9
+    )
+    if (identical(regtype, "lp")) {
+      bw_args$degree <- 1L
+      bw_args$basis <- "glp"
+      bw_args$bernstein.basis <- FALSE
+    }
+    do.call(npregbw, bw_args)
+  }
+
+  for (regtype in c("lc", "ll", "lp")) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      bw <- make_bw(regtype, bwtype)
+
+      fit.in <- npreg(
+        bws = bw,
+        txdat = tx,
+        tydat = y,
+        gradients = TRUE,
+        warn.glp.gradient = FALSE
+      )
+      fit.ex <- npreg(
+        bws = bw,
+        txdat = tx,
+        tydat = y,
+        exdat = ex,
+        gradients = TRUE,
+        warn.glp.gradient = FALSE
+      )
+      pred.ex <- predict(fit.in, newdata = ex)
+
+      hat.in.mean <- npreghat(bws = bw, txdat = tx, y = y, output = "apply")
+      hat.ex.mean <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = "apply")
+
+      expect_equal(
+        as.vector(hat.in.mean),
+        as.vector(fit.in$mean),
+        tolerance = 1e-8,
+        info = paste("mean in-sample", regtype, bwtype)
+      )
+      expect_equal(
+        as.vector(hat.ex.mean),
+        as.vector(fit.ex$mean),
+        tolerance = 1e-8,
+        info = paste("mean exdat", regtype, bwtype)
+      )
+      expect_equal(
+        as.vector(hat.ex.mean),
+        as.vector(pred.ex),
+        tolerance = 1e-8,
+        info = paste("mean predict", regtype, bwtype)
+      )
+
+      hat.in.grad <- npreghat(bws = bw, txdat = tx, y = y, output = "apply", s = 1L)
+      hat.ex.grad <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = "apply", s = 1L)
+
+      expect_equal(
+        as.vector(hat.in.grad),
+        as.vector(fit.in$grad[, 1]),
+        tolerance = 1e-6,
+        info = paste("grad in-sample", regtype, bwtype)
+      )
+      expect_equal(
+        as.vector(hat.ex.grad),
+        as.vector(fit.ex$grad[, 1]),
+        tolerance = 1e-6,
+        info = paste("grad exdat", regtype, bwtype)
+      )
+    }
+  }
+})
