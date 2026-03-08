@@ -22,6 +22,26 @@ with_plot_device <- function(expr) {
   suppressWarnings(force(expr))
 }
 
+run_singleindex_bootstrap_plot <- function(bw,
+                                           xdat,
+                                           ydat,
+                                           boot_method,
+                                           gradients = FALSE,
+                                           plot.behavior = "data",
+                                           boot_num = 9L) {
+  suppressWarnings(plot(
+    bw,
+    xdat = xdat,
+    ydat = ydat,
+    plot.behavior = plot.behavior,
+    perspective = FALSE,
+    gradients = gradients,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = boot_method,
+    plot.errors.boot.num = boot_num
+  ))[[1]]
+}
+
 test_that("sibandwidth plot/helper route is free of public core re-entry", {
   skip_if_not_installed("np")
 
@@ -289,6 +309,123 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         out.plot.grad$grad,
         tolerance = 1e-12,
         info = paste(bt, cfg$label, "grad plot-data")
+      )
+    }
+  }
+})
+
+test_that("sibandwidth bootstrap helper routes work across bwtype, regtype, and method", {
+  skip_if_not_installed("np")
+
+  set.seed(20260307)
+  n <- 35
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(x1 + x2) + rnorm(n, sd = 0.08)
+  tx <- data.frame(x1 = x1, x2 = x2)
+
+  cfgs <- list(
+    list(regtype = "lc", basis = NULL, degree = NULL, label = "lc"),
+    list(regtype = "ll", basis = NULL, degree = NULL, label = "ll"),
+    list(regtype = "lp", basis = "tensor", degree = 2L, label = "lp")
+  )
+
+  for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
+    h <- if (identical(bt, "fixed")) 0.25 else 0.85
+    for (cfg in cfgs) {
+      bw.args <- list(
+        xdat = tx,
+        ydat = y,
+        bws = c(1, 1, h),
+        bandwidth.compute = FALSE,
+        regtype = cfg$regtype,
+        bwtype = bt
+      )
+      if (!is.null(cfg$basis)) {
+        bw.args$basis <- cfg$basis
+        bw.args$degree <- cfg$degree
+      }
+
+      bw <- do.call(npindexbw, bw.args)
+      for (boot_method in c("wild", "inid", "fixed", "geom")) {
+        out.data <- run_singleindex_bootstrap_plot(
+          bw = bw,
+          xdat = tx,
+          ydat = y,
+          boot_method = boot_method,
+          gradients = FALSE,
+          plot.behavior = "data"
+        )
+        out.plot <- with_plot_device(run_singleindex_bootstrap_plot(
+          bw = bw,
+          xdat = tx,
+          ydat = y,
+          boot_method = boot_method,
+          gradients = FALSE,
+          plot.behavior = "plot-data"
+        ))
+
+        expect_equal(
+          length(out.data$mean),
+          n,
+          info = paste(bt, cfg$label, boot_method, "mean length")
+        )
+        expect_equal(
+          dim(out.data$merr),
+          c(n, 2L),
+          info = paste(bt, cfg$label, boot_method, "merr shape")
+        )
+        expect_true(
+          all(is.finite(out.data$mean)),
+          info = paste(bt, cfg$label, boot_method, "mean finite")
+        )
+        expect_true(
+          all(is.finite(out.data$merr)),
+          info = paste(bt, cfg$label, boot_method, "merr finite")
+        )
+        expect_equal(
+          out.data$mean,
+          out.plot$mean,
+          tolerance = 1e-12,
+          info = paste(bt, cfg$label, boot_method, "plot-data center")
+        )
+      }
+    }
+  }
+})
+
+test_that("sibandwidth non-wild bootstrap helpers fail fast for gradients", {
+  skip_if_not_installed("np")
+
+  set.seed(20260307)
+  n <- 30
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(x1 + x2) + rnorm(n, sd = 0.08)
+  tx <- data.frame(x1 = x1, x2 = x2)
+
+  for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
+    h <- if (identical(bt, "fixed")) 0.25 else 0.85
+    bw <- npindexbw(
+      xdat = tx,
+      ydat = y,
+      bws = c(1, 1, h),
+      bandwidth.compute = FALSE,
+      regtype = "ll",
+      bwtype = bt
+    )
+
+    for (boot_method in c("inid", "fixed", "geom")) {
+      expect_error(
+        run_singleindex_bootstrap_plot(
+          bw = bw,
+          xdat = tx,
+          ydat = y,
+          boot_method = boot_method,
+          gradients = TRUE
+        ),
+        "requires helper mode with gradients=FALSE",
+        info = paste(bt, boot_method, "gradient bootstrap guard")
       )
     }
   }
