@@ -147,7 +147,14 @@
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_npdistribution <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
-.np_plot_qregression <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
+.np_plot_qregression <- function(object, ...) {
+  dots <- list(...)
+  if (is.null(dots$quantreg))
+    dots$quantreg <- TRUE
+  if (is.null(dots$tau) && !is.null(object$tau))
+    dots$tau <- object$tau
+  do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
+}
 .np_plot_singleindex <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
 .np_plot_smoothcoefficient <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
 .np_plot_plregression <- function(object, ...) .np_plot_from_slot(object, "bw", ...)
