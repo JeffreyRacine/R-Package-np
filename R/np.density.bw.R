@@ -113,6 +113,8 @@ npudensbw.bandwidth <-
            transform.bounds = FALSE,
            ...){
 
+    elapsed.start <- proc.time()[3]
+
     dat = toFrame(dat)
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     remin <- npValidateScalarLogical(remin, "remin")
@@ -212,19 +214,19 @@ npudensbw.bandwidth <-
       cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
       if (bws$method != "normal-reference"){
-        total.time <-
-          system.time(myout <-
-                        .Call("C_np_density_bw",
-                              as.double(duno), as.double(dord), as.double(dcon),
-                              as.double(mysd),
-                              as.integer(myopti), as.double(myoptd),
-                              as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-                              as.integer(max(1, nmulti)),
-                              as.integer(penalty_mode),
-                              as.double(penalty.multiplier),
-                              as.double(cker.bounds.c$lb),
-                              as.double(cker.bounds.c$ub),
-                              PACKAGE="np"))[1]
+        myout <-
+          .Call("C_np_density_bw",
+                as.double(duno), as.double(dord), as.double(dcon),
+                as.double(mysd),
+                as.integer(myopti), as.double(myoptd),
+                as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+                as.integer(max(1, nmulti)),
+                as.integer(penalty_mode),
+                as.double(penalty.multiplier),
+                as.double(cker.bounds.c$lb),
+                as.double(cker.bounds.c$ub),
+                PACKAGE="np")
+        total.time <- proc.time()[3] - elapsed.start
       } else {
         nbw = double(ncol)
         if (bws$ncon > 0){
