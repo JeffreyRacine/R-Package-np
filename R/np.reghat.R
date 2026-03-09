@@ -89,21 +89,37 @@ npreghat <-
   list(v = v, ridge = ridge)
 }
 
-.npreghat_exact_matrix_from_core <- function(bws, txdat, exdat = NULL) {
+.npreghat_exact_matrix_from_core <- function(bws, txdat, exdat = NULL, s = NULL) {
   miss.ex <- is.null(exdat)
   neval <- if (miss.ex) nrow(txdat) else nrow(exdat)
   ntrain <- nrow(txdat)
   H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+  if (is.null(s))
+    s <- integer(bws$ncon)
+
+  want.grad <- length(s) > 0L && any(s > 0L)
+  target.col <- NULL
+  if (want.grad) {
+    if (!(sum(s) == 1L && all(s %in% c(0L, 1L))))
+      stop("exact direct hat matrix supports only mean and first derivatives")
+    target.cont <- which(s == 1L)
+    target.col <- which(bws$icon)[target.cont]
+  }
 
   fit_one <- function(ycol) {
-    .np_regression_direct(
+    direct.out <- .np_regression_direct(
       bws = bws,
       txdat = txdat,
       tydat = ycol,
       exdat = exdat,
-      gradients = FALSE,
+      gradients = want.grad,
       gradient.order = 1L
-    )$mean
+    )
+    if (is.null(target.col)) {
+      direct.out$mean
+    } else {
+      direct.out$grad[, target.col]
+    }
   }
 
   for (j in seq_len(ntrain)) {
@@ -656,12 +672,16 @@ npreghat.rbandwidth <-
       !(identical(bws$type, "generalized_nn") &&
           identical(reg.spec$regtype.engine, "lp"))
 
-    exact.core.matrix <- identical(bws$regtype, "lp") &&
-      identical(reg.spec$regtype.engine, "lp") &&
-      any(degree > 1L) &&
+    exact.core.matrix <- identical(output, "matrix") &&
       !identical(bws$type, "fixed") &&
       !isTRUE(leave.one.out) &&
-      (sum(s) == 0L)
+      (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L)))) &&
+      (
+        identical(bws$type, "adaptive_nn") ||
+          (identical(bws$regtype, "lp") &&
+             identical(reg.spec$regtype.engine, "lp") &&
+             any(degree > 1L))
+      )
 
     if (direct.apply) {
       direct.out <- .np_regression_direct(
@@ -685,7 +705,8 @@ npreghat.rbandwidth <-
       H <- .npreghat_exact_matrix_from_core(
         bws = bws,
         txdat = txdat,
-        exdat = if (no.ex) NULL else exdat
+        exdat = if (no.ex) NULL else exdat,
+        s = s
       )
 
       if (identical(output, "apply")) {

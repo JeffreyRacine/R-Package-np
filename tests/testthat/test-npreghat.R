@@ -300,3 +300,104 @@ test_that("npreghat nonfixed higher-order lp operator matches npreg and matrix a
     expect_equal(case$H %*% case$Y, case$a.mat, tolerance = 1e-10, ignore_attr = TRUE)
   }
 })
+
+test_that("adaptive-nn npreghat matrix owner matches apply and npreg on manual bandwidth routes", {
+  set.seed(20260309)
+  n <- 40L
+  x <- sort(runif(n))
+  y <- sin(2 * pi * x) + 0.25 * x + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+  ex <- data.frame(x = seq(0.05, 0.95, length.out = 12L))
+
+  make_bw <- function(regtype) {
+    bw_args <- list(
+      xdat = tx,
+      ydat = y,
+      regtype = regtype,
+      bwtype = "adaptive_nn",
+      bandwidth.compute = FALSE,
+      bws = 9L
+    )
+    if (identical(regtype, "lp")) {
+      bw_args$degree <- 1L
+      bw_args$basis <- "glp"
+      bw_args$bernstein.basis <- FALSE
+    }
+    do.call(npregbw, bw_args)
+  }
+
+  for (regtype in c("lc", "ll", "lp")) {
+    bw <- make_bw(regtype)
+    fit <- npreg(
+      bws = bw,
+      txdat = tx,
+      tydat = y,
+      exdat = ex,
+      gradients = !identical(regtype, "lc"),
+      warn.glp.gradient = FALSE
+    )
+    hat.apply <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = "apply")
+    hat.matrix <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix")
+
+    expect_equal(as.vector(hat.matrix %*% y), as.vector(hat.apply), tolerance = 1e-8)
+    expect_equal(as.vector(hat.matrix %*% y), as.vector(fit$mean), tolerance = 1e-8)
+
+    if (!identical(regtype, "lc")) {
+      grad.apply <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = "apply", s = 1L)
+      grad.matrix <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix", s = 1L)
+
+      expect_equal(as.vector(grad.matrix %*% y), as.vector(grad.apply), tolerance = 1e-8)
+      expect_equal(as.vector(grad.matrix %*% y), as.vector(fit$grad[, 1]), tolerance = 1e-6)
+    }
+  }
+})
+
+test_that("adaptive-nn npreghat matrix owner matches apply and npreg on selected bandwidth routes", {
+  set.seed(20260309)
+  n <- 32L
+  x <- sort(runif(n))
+  y <- sin(2 * pi * x) + 0.25 * x + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+  ex <- data.frame(x = seq(0.05, 0.95, length.out = 10L))
+
+  make_bw <- function(regtype) {
+    bw_args <- list(
+      xdat = tx,
+      ydat = y,
+      regtype = regtype,
+      bwtype = "adaptive_nn",
+      nmulti = 1L
+    )
+    if (identical(regtype, "lp")) {
+      bw_args$degree <- 1L
+      bw_args$basis <- "glp"
+      bw_args$bernstein.basis <- FALSE
+    }
+    do.call(npregbw, bw_args)
+  }
+
+  for (regtype in c("lc", "ll", "lp")) {
+    bw <- make_bw(regtype)
+    fit <- npreg(
+      bws = bw,
+      txdat = tx,
+      tydat = y,
+      exdat = ex,
+      gradients = !identical(regtype, "lc"),
+      warn.glp.gradient = FALSE
+    )
+    hat.apply <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = "apply")
+    hat.matrix <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix")
+
+    expect_equal(as.vector(hat.matrix %*% y), as.vector(hat.apply), tolerance = 1e-8)
+    expect_equal(as.vector(hat.matrix %*% y), as.vector(fit$mean), tolerance = 1e-8)
+
+    if (!identical(regtype, "lc")) {
+      grad.apply <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = "apply", s = 1L)
+      grad.matrix <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix", s = 1L)
+
+      expect_equal(as.vector(grad.matrix %*% y), as.vector(grad.apply), tolerance = 1e-8)
+      expect_equal(as.vector(grad.matrix %*% y), as.vector(fit$grad[, 1]), tolerance = 1e-6)
+    }
+  }
+})
