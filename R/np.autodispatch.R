@@ -224,10 +224,15 @@
 }
 
 .npRmpi_autodispatch_warn_nested <- function() {
+  if (isTRUE(getOption("npRmpi.profile.active", FALSE)) &&
+      isTRUE(.npRmpi_manual_bcast_in_context())) {
+    return(invisible(FALSE))
+  }
   if (!isTRUE(getOption("npRmpi.autodispatch.warned.nested", FALSE))) {
     warning("detected active mpi.bcast.cmd context; skipping nested auto-dispatch for this call")
     options(npRmpi.autodispatch.warned.nested = TRUE)
   }
+  invisible(TRUE)
 }
 
 .npRmpi_has_active_slave_pool <- function(comm = 1L) {
