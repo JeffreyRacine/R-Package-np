@@ -182,10 +182,14 @@
       if (is.ordered(xdat[,2]))
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
-      tobj = npreg(txdat = xdat, tydat = ydat,
-        exdat = x.eval, bws = bws,
+      tobj <- .np_plot_regression_eval(
+        bws = bws,
+        xdat = xdat,
+        ydat = ydat,
+        exdat = x.eval,
         gradient.order = gradient.order,
-        warn.glp.gradient = FALSE)
+        need.asymptotic = identical(plot.errors.method, "asymptotic")
+      )
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
@@ -462,19 +466,15 @@
           ei[(xi.neval+1):maxneval] = NA
         }
         
-        tr <- if (gradients && identical(bws$regtype, "lp")) {
-          suppressWarnings(npreg(txdat = xdat, tydat = ydat,
-            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE], bws = bws,
-            gradients = gradients,
-            gradient.order = gradient.order,
-            warn.glp.gradient = FALSE))
-        } else {
-          npreg(txdat = xdat, tydat = ydat,
-            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE], bws = bws,
-            gradients = gradients,
-            gradient.order = gradient.order,
-            warn.glp.gradient = FALSE)
-        }
+        tr <- .np_plot_regression_eval(
+          bws = bws,
+          xdat = xdat,
+          ydat = ydat,
+          exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+          gradients = gradients,
+          gradient.order = gradient.order,
+          need.asymptotic = identical(plot.errors.method, "asymptotic")
+        )
 
         temp.mean[seq_len(xi.neval)] = if(gradients) tr$grad[,i] else tr$mean
 

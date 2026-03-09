@@ -150,7 +150,13 @@
       if (is.ordered(xdat[,2]))
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
-      tobj =  npudens(tdat = xdat, edat = x.eval, bws = bws)
+      tobj <- .np_plot_unconditional_eval(
+        xdat = xdat,
+        exdat = x.eval,
+        bws = bws,
+        cdf = FALSE,
+        need.asymptotic = identical(plot.errors.method, "asymptotic")
+      )
 
       tdens = matrix(data = tobj$dens,
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
@@ -421,7 +427,13 @@
         }
 
         eval.slice <- subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
-        tobj <- npudens(tdat = xdat, edat = eval.slice, bws = bws)
+        tobj <- .np_plot_unconditional_eval(
+          xdat = xdat,
+          exdat = eval.slice,
+          bws = bws,
+          cdf = FALSE,
+          need.asymptotic = identical(plot.errors.method, "asymptotic")
+        )
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){

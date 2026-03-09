@@ -2279,6 +2279,70 @@ plotFactor <- function(f, y, ...){
        ydat = ydat[goodrows])
 }
 
+.np_plot_regression_eval <- function(bws,
+                                     xdat,
+                                     ydat,
+                                     exdat,
+                                     gradients = FALSE,
+                                     gradient.order = 1L,
+                                     need.asymptotic = FALSE) {
+  if (isTRUE(need.asymptotic)) {
+    return(npreg(
+      txdat = xdat,
+      tydat = ydat,
+      exdat = exdat,
+      bws = bws,
+      gradients = gradients,
+      gradient.order = gradient.order,
+      warn.glp.gradient = FALSE
+    ))
+  }
+
+  fit <- .np_regression_direct(
+    bws = bws,
+    txdat = xdat,
+    tydat = ydat,
+    exdat = exdat,
+    gradients = gradients,
+    gradient.order = gradient.order,
+    local.mode = identical(bws$type, "generalized_nn")
+  )
+
+  neval <- length(fit$mean)
+  fit$merr <- rep(NA_real_, neval)
+  if (isTRUE(gradients))
+    fit$gerr <- matrix(NA_real_, nrow = neval, ncol = NCOL(fit$grad))
+
+  fit
+}
+
+.np_plot_unconditional_eval <- function(xdat,
+                                        exdat,
+                                        bws,
+                                        cdf = FALSE,
+                                        need.asymptotic = FALSE) {
+  if (isTRUE(need.asymptotic)) {
+    return(if (isTRUE(cdf)) {
+      npudist(tdat = xdat, edat = exdat, bws = bws)
+    } else {
+      npudens(tdat = xdat, edat = exdat, bws = bws)
+    })
+  }
+
+  est <- .np_ksum_unconditional_eval_exact(
+    xdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    operator = if (isTRUE(cdf)) "integral" else "normal"
+  )
+
+  if (isTRUE(cdf)) {
+    list(dist = est, derr = rep(NA_real_, length(est)))
+  } else {
+    list(dens = est, derr = rep(NA_real_, length(est)))
+  }
+}
+
 ## Rank-based simultaneous confidence set helper, vendored from
 ## MCPAN::SCSrank (MCPAN 1.1-21, GPL-2; Schaarschmidt, Gerhard, Sill).
 np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...) {
