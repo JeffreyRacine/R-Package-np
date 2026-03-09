@@ -1,8 +1,10 @@
+update_bw_name_metadata <- getFromNamespace("updateBwNameMetadata", "np")
+
 test_that("updateBwNameMetadata updates bandwidth metadata deterministically", {
   bws <- list(varnames = list(x = "oldx", y = "oldy"))
   names_in <- list(xnames = "x_new", ynames = "y_new")
 
-  out <- updateBwNameMetadata(nameList = names_in, bws = bws)
+  out <- update_bw_name_metadata(nameList = names_in, bws = bws)
 
   expect_equal(out$xnames, "x_new")
   expect_equal(out$ynames, "y_new")
@@ -14,6 +16,6 @@ test_that("updateBwNameMetadata updates bandwidth metadata deterministically", {
 
 test_that("updateBwNameMetadata is a no-op for empty metadata input", {
   bws <- list(varnames = list(x = "x0"))
-  out <- updateBwNameMetadata(nameList = list(), bws = bws)
+  out <- update_bw_name_metadata(nameList = list(), bws = bws)
   expect_equal(out, bws)
 })

@@ -1,3 +1,5 @@
+dim_basis <- getFromNamespace("dim_basis", "np")
+
 test_that("GLP validators handle non-numeric and missing inputs deterministically", {
   expect_null(np:::npValidateGlpDegree("lc", "a", 1L))
   expect_identical(np:::npValidateGlpDegree("lp", NULL, 0L), integer(0))

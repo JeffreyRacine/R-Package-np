@@ -1,9 +1,17 @@
+npcdens_conbandwidth <- getFromNamespace("npcdens.conbandwidth", "np")
+npcdist_condbandwidth <- getFromNamespace("npcdist.condbandwidth", "np")
+npqreg_condbandwidth <- getFromNamespace("npqreg.condbandwidth", "np")
+npindex_sibandwidth <- getFromNamespace("npindex.sibandwidth", "np")
+npscoef_scbandwidth <- getFromNamespace("npscoef.scbandwidth", "np")
+npplreg_plbandwidth <- getFromNamespace("npplreg.plbandwidth", "np")
+np_validate_scalar_logical <- getFromNamespace("npValidateScalarLogical", "np")
+
 test_that("npValidateScalarLogical enforces scalar logical flags", {
-  expect_identical(npValidateScalarLogical(TRUE, "x"), TRUE)
-  expect_identical(npValidateScalarLogical(1, "x"), TRUE)
-  expect_identical(npValidateScalarLogical(0, "x"), FALSE)
-  expect_error(npValidateScalarLogical(c(TRUE, FALSE), "x"), "'x' must be TRUE or FALSE")
-  expect_error(npValidateScalarLogical("foo", "x"), "'x' must be TRUE or FALSE")
+  expect_identical(np_validate_scalar_logical(TRUE, "x"), TRUE)
+  expect_identical(np_validate_scalar_logical(1, "x"), TRUE)
+  expect_identical(np_validate_scalar_logical(0, "x"), FALSE)
+  expect_error(np_validate_scalar_logical(c(TRUE, FALSE), "x"), "'x' must be TRUE or FALSE")
+  expect_error(np_validate_scalar_logical("foo", "x"), "'x' must be TRUE or FALSE")
 })
 
 test_that("core estimator methods reject non-scalar logical control flags", {
@@ -12,57 +20,57 @@ test_that("core estimator methods reject non-scalar logical control flags", {
   tydf <- data.frame(y = ty)
 
   expect_error(
-    npcdens.conbandwidth(structure(list(), class = "conbandwidth"),
+    npcdens_conbandwidth(structure(list(), class = "conbandwidth"),
                          txdat = tx, tydat = tydf, gradients = c(TRUE, FALSE)),
     "'gradients' must be TRUE or FALSE"
   )
   expect_error(
-    npcdist.condbandwidth(structure(list(), class = "condbandwidth"),
+    npcdist_condbandwidth(structure(list(), class = "condbandwidth"),
                           txdat = tx, tydat = tydf, gradients = c(TRUE, FALSE)),
     "'gradients' must be TRUE or FALSE"
   )
   expect_error(
-    npqreg.condbandwidth(structure(list(), class = "condbandwidth"),
+    npqreg_condbandwidth(structure(list(), class = "condbandwidth"),
                          txdat = tx, tydat = ty, gradients = c(TRUE, FALSE)),
     "'gradients' must be TRUE or FALSE"
   )
   expect_error(
-    npqreg.condbandwidth(structure(list(), class = "condbandwidth"),
+    npqreg_condbandwidth(structure(list(), class = "condbandwidth"),
                          txdat = tx, tydat = ty, itmax = 0),
     "'itmax' must be a positive integer"
   )
   expect_error(
-    npqreg.condbandwidth(structure(list(), class = "condbandwidth"),
+    npqreg_condbandwidth(structure(list(), class = "condbandwidth"),
                          txdat = tx, tydat = ty, ftol = 0),
     "'ftol' must be a positive finite numeric scalar"
   )
   expect_error(
-    npindex.sibandwidth(structure(list(), class = "sibandwidth"),
+    npindex_sibandwidth(structure(list(), class = "sibandwidth"),
                         txdat = tx, tydat = ty, gradients = c(TRUE, FALSE)),
     "'gradients' must be TRUE or FALSE"
   )
   expect_error(
-    npindex.sibandwidth(structure(list(), class = "sibandwidth"),
+    npindex_sibandwidth(structure(list(), class = "sibandwidth"),
                         txdat = tx, tydat = ty, boot.num = 0),
     "'boot.num' must be a positive integer"
   )
   expect_error(
-    npscoef.scbandwidth(structure(list(), class = "scbandwidth"),
+    npscoef_scbandwidth(structure(list(), class = "scbandwidth"),
                         txdat = tx, tydat = ty, iterate = c(TRUE, FALSE)),
     "'iterate' must be TRUE or FALSE"
   )
   expect_error(
-    npscoef.scbandwidth(structure(list(), class = "scbandwidth"),
+    npscoef_scbandwidth(structure(list(), class = "scbandwidth"),
                         txdat = tx, tydat = ty, maxiter = 0),
     "'maxiter' must be a positive integer"
   )
   expect_error(
-    npscoef.scbandwidth(structure(list(), class = "scbandwidth"),
+    npscoef_scbandwidth(structure(list(), class = "scbandwidth"),
                         txdat = tx, tydat = ty, tol = -1),
     "'tol' must be a finite numeric scalar >= 0"
   )
   expect_error(
-    npplreg.plbandwidth(structure(list(), class = "plbandwidth"),
+    npplreg_plbandwidth(structure(list(), class = "plbandwidth"),
                         txdat = tx, tydat = ty, tzdat = tx, residuals = c(TRUE, FALSE)),
     "'residuals' must be TRUE or FALSE"
   )

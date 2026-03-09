@@ -1,3 +1,5 @@
+to_matrix <- getFromNamespace("toMatrix", "np")
+
 test_that("helper constructors forward kernel options and normalize bwscaling", {
   set.seed(8310)
   n <- 50
@@ -92,7 +94,7 @@ test_that("semihat regbw args forward index LP/kernel options with bound collaps
     ckerlb = c(0, 0),
     ckerub = c(1, 1)
   )
-  idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bw$beta))
+  idx.train <- data.frame(index = as.vector(to_matrix(xdat) %*% bw$beta))
 
   make.args <- getFromNamespace(".np_semihat_make_regbw_args", "np")
   args <- make.args(
