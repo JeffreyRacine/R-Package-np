@@ -116,6 +116,55 @@ npindexbw.NULL <-
   )
 }
 
+.npindex_nn_candidate_bandwidth <- function(h, bwtype, nobs) {
+  if (identical(bwtype, "fixed")) {
+    return(list(ok = is.finite(h) && (h > 0), value = as.double(h)))
+  }
+
+  if (!is.finite(h)) {
+    return(list(ok = FALSE, value = NA_real_))
+  }
+
+  upper <- max(1L, as.integer(nobs) - 1L)
+  k <- .np_round_half_to_even(h)
+  list(ok = (k >= 1L) && (k <= upper), value = as.double(k))
+}
+
+.npindex_default_start_bandwidth <- function(fit, bwtype, nobs) {
+  if (identical(bwtype, "fixed")) {
+    return(1.059224 * EssDee(fit) * nobs^(-1 / 5))
+  }
+
+  max(1, min(max(1L, as.integer(nobs) - 1L), .np_round_half_to_even(sqrt(nobs))))
+}
+
+.npindex_random_start_bandwidth <- function(fit, bwtype, nobs) {
+  if (identical(bwtype, "fixed")) {
+    return(runif(1, min = 0.5, max = 1.5) * EssDee(fit) * nobs^(-1 / 5))
+  }
+
+  runif(1, min = 1, max = max(1L, as.integer(nobs) - 1L))
+}
+
+.npindex_finalize_bandwidth <- function(h, bwtype, nobs, where = "npindexbw") {
+  candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bwtype, nobs = nobs)
+  if (!candidate$ok) {
+    if (identical(bwtype, "fixed")) {
+      stop(sprintf("%s: bandwidth must be positive and finite", where), call. = FALSE)
+    }
+    stop(
+      sprintf(
+        "%s: nearest-neighbor bandwidth candidate must map to an integer in [1, %d]",
+        where,
+        max(1L, as.integer(nobs) - 1L)
+      ),
+      call. = FALSE
+    )
+  }
+
+  candidate$value
+}
+
 .npindex_lp_loo_fit <- function(index,
                                 ydat,
                                 h,
@@ -396,6 +445,10 @@ npindexbw.sibandwidth <-
             ## parameters in `param') and then let h denote the kth column.
             beta <- param[beta.idx]
             h <- param[p]
+            h.candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bws$type, nobs = nobs)
+            if (!h.candidate$ok)
+              return(ichimuraMaxPenalty)
+            h <- h.candidate$value
 
             ## Next we define the sum of squared leave-one-out residuals
 
@@ -423,7 +476,7 @@ npindexbw.sibandwidth <-
                          ckerub = bws$ckerub)$ksum,
                   error = function(e) NULL
                 )
-                if (is.null(tww))
+              if (is.null(tww))
                   return(rep.int(NA_real_, length(ydat)))
                 tww[1,2,]/NZD(tww[2,2,])
               } else {
@@ -486,6 +539,10 @@ npindexbw.sibandwidth <-
             ## parameters in `param') and then let h denote the kth column.
             beta <- param[beta.idx]
             h <- param[p]
+            h.candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bws$type, nobs = nobs)
+            if (!h.candidate$ok)
+              return(sqrt(.Machine$double.xmax))
+            h <- h.candidate$value
 
             ## Next we define the sum of logs
 
@@ -513,7 +570,7 @@ npindexbw.sibandwidth <-
                          ckerub = bws$ckerub)$ksum,
                   error = function(e) NULL
                 )
-                if (is.null(tww))
+              if (is.null(tww))
                   return(rep.int(NA_real_, length(ydat)))
                 tww[1,2,]/NZD(tww[2,2,])
               } else {
@@ -614,16 +671,16 @@ npindexbw.sibandwidth <-
               } else { beta = numeric(0) }
 
               if (bws$bw == 0)
-                h <- 1.059224*EssDee(fit)*nobs^(-1/5)
+                h <- .npindex_default_start_bandwidth(fit = fit, bwtype = bws$type, nobs = nobs)
               else
-                h <- bws$bw
+                h <- .npindex_finalize_bandwidth(h = bws$bw, bwtype = bws$type, nobs = nobs)
             } else {
               ## Random initialization used for remaining multistarts
 
               beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
               beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
               if (!only.optimize.beta)
-                h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*nobs^(-1/5)
+                h <- .npindex_random_start_bandwidth(fit = fit, bwtype = bws$type, nobs = nobs)
             }
 
             optim.parm <- if(only.optimize.beta) beta else c(beta,h)
@@ -647,7 +704,7 @@ npindexbw.sibandwidth <-
               beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
               beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
               if(!only.optimize.beta)
-                h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*nobs^(-1/5)
+                h <- .npindex_random_start_bandwidth(fit = fit, bwtype = bws$type, nobs = nobs)
 
               if(optim.return$convergence == 1){
                 if(optim.control$maxit < (2^32/10))
@@ -692,7 +749,7 @@ npindexbw.sibandwidth <-
           console <- printClear(console)
 
           bws$beta <- c(1.0, param[beta.idx])
-          bws$bw <- param[p]
+          bws$bw <- .npindex_finalize_bandwidth(h = param[p], bwtype = bws$type, nobs = nobs)
           bws$fval <- fval.min
           bws$ifval <- best
           bws$num.feval <- num.feval.overall
