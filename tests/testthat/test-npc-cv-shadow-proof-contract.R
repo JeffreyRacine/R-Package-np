@@ -460,6 +460,23 @@ test_that("generalized-nn cvls LP stream avoids dense row storage", {
   expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_obs|num_obs_train_extern)[^\\)]*(num_obs|num_obs_train_extern)", body))
 })
 
+test_that("conditional density cvls production bypasses shadow block helpers", {
+  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  start <- grep("^int np_conditional_density_cvls_lp_stream\\(", lines)
+  stop <- grep("^int np_conditional_distribution_cvls_lp_stream\\(", lines)
+
+  expect_length(start, 1L)
+  expect_gte(length(stop), 1L)
+  expect_lt(start, stop[1L])
+
+  body <- paste(lines[start:(stop[1L] - 1L)], collapse = "\n")
+
+  expect_false(grepl("np_shadow_proof_conditional_x_weight_block_stream\\s*\\(", body))
+  expect_false(grepl("np_shadow_conditional_y_block_stream_op\\s*\\(", body))
+  expect_true(grepl("np_conditional_x_weight_block_stream_core\\s*\\(", body))
+  expect_true(grepl("np_conditional_y_block_stream_op_core\\s*\\(", body))
+})
+
 test_that("fixed-bandwidth cvls LP stream avoids dense row storage", {
   lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
   start_matches <- grep("^int np_conditional_density_cvls_lp_stream\\(", lines)
