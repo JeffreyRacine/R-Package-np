@@ -141,3 +141,71 @@ test_that("object-fed quantile plots avoid public npqreg re-entry", {
 
   expect_identical(calls, 0L)
 })
+
+test_that("smooth coefficient coef/asymptotic plots avoid public npscoef re-entry", {
+  set.seed(9215)
+  n <- 52
+  xdat <- data.frame(x = runif(n))
+  zdat <- data.frame(z = runif(n))
+  ydat <- sin(2 * pi * zdat$z) + xdat$x * (1 + zdat$z) + rnorm(n, sd = 0.05)
+
+  bw <- npscoefbw(xdat = xdat, ydat = ydat, zdat = zdat, regtype = "ll", nmulti = 1)
+  fit <- npscoef(bws = bw, txdat = xdat, tydat = ydat, tzdat = zdat, errors = TRUE, betas = TRUE)
+
+  calls <- with_public_trace_counter("np", "npscoef", {
+    out.bw.coef <- suppressWarnings(
+      plot(
+        bw,
+        xdat = xdat,
+        ydat = ydat,
+        zdat = zdat,
+        coef = TRUE,
+        perspective = FALSE,
+        plot.behavior = "data",
+        plot.errors.method = "none"
+      )
+    )
+    out.fit.coef <- suppressWarnings(
+      plot(
+        fit,
+        xdat = xdat,
+        ydat = ydat,
+        zdat = zdat,
+        coef = TRUE,
+        perspective = FALSE,
+        plot.behavior = "data",
+        plot.errors.method = "none"
+      )
+    )
+    out.bw.asym <- suppressWarnings(
+      plot(
+        bw,
+        xdat = xdat,
+        ydat = ydat,
+        zdat = zdat,
+        coef = FALSE,
+        perspective = FALSE,
+        plot.behavior = "data",
+        plot.errors.method = "asymptotic"
+      )
+    )
+    out.fit.asym <- suppressWarnings(
+      plot(
+        fit,
+        xdat = xdat,
+        ydat = ydat,
+        zdat = zdat,
+        coef = FALSE,
+        perspective = FALSE,
+        plot.behavior = "data",
+        plot.errors.method = "asymptotic"
+      )
+    )
+    expect_type(out.bw.coef, "list")
+    expect_type(out.fit.coef, "list")
+    expect_type(out.bw.asym, "list")
+    expect_type(out.fit.asym, "list")
+  })
+
+  expect_identical(calls, 0L)
+})
