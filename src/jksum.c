@@ -15449,9 +15449,9 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
   return 0;
 }
 
-int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor,
-                                                    int eval_idx,
-                                                    double *row_out){
+static int np_conditional_x_weight_row_stream_core(double *vector_scale_factor,
+                                                   int eval_idx,
+                                                   double *row_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
@@ -15687,15 +15687,21 @@ cleanup_xweight_row:
   return status;
 }
 
-static int np_shadow_conditional_y_eval_row_stream_op(double *vector_scale_factor,
-                                                      int eval_idx,
-                                                      int operator_code,
-                                                      double **matrix_Y_unordered_eval,
-                                                      double **matrix_Y_ordered_eval,
-                                                      double **matrix_Y_continuous_eval,
-                                                      int num_eval,
-                                                      int map_train_tree_index,
-                                                      double *row_out){
+int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor,
+                                                    int eval_idx,
+                                                    double *row_out){
+  return np_conditional_x_weight_row_stream_core(vector_scale_factor, eval_idx, row_out);
+}
+
+static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
+                                                    int eval_idx,
+                                                    int operator_code,
+                                                    double **matrix_Y_unordered_eval,
+                                                    double **matrix_Y_ordered_eval,
+                                                    double **matrix_Y_continuous_eval,
+                                                    int num_eval,
+                                                    int map_train_tree_index,
+                                                    double *row_out){
   const int num_train = num_obs_train_extern;
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_eval;
@@ -15851,28 +15857,66 @@ cleanup_yweight_row:
   return status;
 }
 
+static int np_shadow_conditional_y_eval_row_stream_op(double *vector_scale_factor,
+                                                      int eval_idx,
+                                                      int operator_code,
+                                                      double **matrix_Y_unordered_eval,
+                                                      double **matrix_Y_ordered_eval,
+                                                      double **matrix_Y_continuous_eval,
+                                                      int num_eval,
+                                                      int map_train_tree_index,
+                                                      double *row_out){
+  return np_conditional_y_eval_row_stream_op_core(vector_scale_factor,
+                                                  eval_idx,
+                                                  operator_code,
+                                                  matrix_Y_unordered_eval,
+                                                  matrix_Y_ordered_eval,
+                                                  matrix_Y_continuous_eval,
+                                                  num_eval,
+                                                  map_train_tree_index,
+                                                  row_out);
+}
+
+static int np_conditional_y_row_stream_op_core(double *vector_scale_factor,
+                                               int eval_idx,
+                                               int operator_code,
+                                               double *row_out){
+  return np_conditional_y_eval_row_stream_op_core(vector_scale_factor,
+                                                  eval_idx,
+                                                  operator_code,
+                                                  matrix_Y_unordered_train_extern,
+                                                  matrix_Y_ordered_train_extern,
+                                                  matrix_Y_continuous_train_extern,
+                                                  num_obs_train_extern,
+                                                  1,
+                                                  row_out);
+}
+
 static int np_shadow_conditional_y_row_stream_op(double *vector_scale_factor,
                                                  int eval_idx,
                                                  int operator_code,
                                                  double *row_out){
-  return np_shadow_conditional_y_eval_row_stream_op(vector_scale_factor,
-                                                    eval_idx,
-                                                    operator_code,
-                                                    matrix_Y_unordered_train_extern,
-                                                    matrix_Y_ordered_train_extern,
-                                                    matrix_Y_continuous_train_extern,
-                                                    num_obs_train_extern,
-                                                    1,
-                                                    row_out);
+  return np_conditional_y_row_stream_op_core(vector_scale_factor,
+                                             eval_idx,
+                                             operator_code,
+                                             row_out);
+}
+
+static int np_conditional_y_row_stream_core(double *vector_scale_factor,
+                                            int eval_idx,
+                                            double *row_out){
+  return np_conditional_y_row_stream_op_core(vector_scale_factor,
+                                             eval_idx,
+                                             OP_NORMAL,
+                                             row_out);
 }
 
 static int np_shadow_conditional_y_row_stream(double *vector_scale_factor,
                                               int eval_idx,
                                               double *row_out){
-  return np_shadow_conditional_y_row_stream_op(vector_scale_factor,
-                                               eval_idx,
-                                               OP_NORMAL,
-                                               row_out);
+  return np_conditional_y_row_stream_core(vector_scale_factor,
+                                          eval_idx,
+                                          row_out);
 }
 
 static int np_conditional_lp_cvls_block_size(void){
@@ -16342,9 +16386,9 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
       if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
         goto cleanup_cvml_lp_stream;
     } else {
-      if(np_shadow_proof_conditional_x_weight_row_stream(vector_scale_factor, i, xrow) != 0)
+      if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xrow) != 0)
         goto cleanup_cvml_lp_stream;
-      if(np_shadow_conditional_y_row_stream(vector_scale_factor, i, yrow) != 0)
+      if(np_conditional_y_row_stream_core(vector_scale_factor, i, yrow) != 0)
         goto cleanup_cvml_lp_stream;
     }
 
