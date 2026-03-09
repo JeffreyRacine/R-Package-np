@@ -604,6 +604,55 @@ test_that("session adaptive-nn npreghat matrix owner stays exact in subprocess",
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session adaptive-nn npscoefhat selected owner preserves integer support in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(20260308)",
+      "n <- 50L",
+      "x <- runif(n)",
+      "z <- runif(n)",
+      "y <- (0.4 + x) * sin(2*pi*z) + rnorm(n, sd=0.04)",
+      "tx <- data.frame(x=x)",
+      "tz <- data.frame(z=z)",
+      "ex <- data.frame(x=seq(0.1, 0.9, length.out=12L))",
+      "ez <- data.frame(z=seq(0.1, 0.9, length.out=12L))",
+      "tol <- sqrt(.Machine$double.eps)",
+      "upper <- n - 1L",
+      "for (regtype in c('lc', 'll', 'lp')) {",
+      "  bw_args <- list(xdat=tx, zdat=tz, ydat=y, regtype=regtype, bwtype='adaptive_nn', nmulti=1L)",
+      "  if (identical(regtype, 'lp')) {",
+      "    bw_args$degree <- 1L",
+      "    bw_args$basis <- 'glp'",
+      "    bw_args$bernstein.basis <- FALSE",
+      "  }",
+      "  bw <- do.call(npscoefbw, bw_args)",
+      "  stopifnot(all(abs(bw$bw - round(bw$bw)) <= tol))",
+      "  stopifnot(all(bw$bw >= 1 & bw$bw <= upper))",
+      "  hat.apply <- npscoefhat(bws=bw, txdat=tx, tzdat=tz, exdat=ex, ezdat=ez, y=y, output='apply', iterate=FALSE)",
+      "  hat.matrix <- npscoefhat(bws=bw, txdat=tx, tzdat=tz, exdat=ex, ezdat=ez, output='matrix', iterate=FALSE)",
+      "  stopifnot(max(abs(as.vector(hat.apply) - as.vector(hat.matrix %*% y))) < 1e-8)",
+      "  cat(sprintf('SESSION_NPSCOEF_ADAPTIVE_OWNER regtype=%s bw=%s\\n', regtype, paste(bw$bw, collapse=',')))",
+      "}",
+      "err <- try(npscoefbw(xdat=tx, zdat=tz, ydat=y, regtype='lc', bwtype='adaptive_nn', bandwidth.compute=FALSE, bws=0.13), silent=TRUE)",
+      "stopifnot(inherits(err, 'try-error'))",
+      "cat('SESSION_NPSCOEF_ADAPTIVE_OWNER_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPSCOEF_ADAPTIVE_OWNER_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npindexhat adaptive-nn exact owner route completes in subprocess", {
   skip_on_cran()
   env <- subprocess_env()

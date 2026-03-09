@@ -1,3 +1,9 @@
+ .np_scbandwidth_manual_nn_validate <- function(bw, nobs, where = "scbandwidth") {
+  vapply(bw, function(h) {
+    .np_sibandwidth_manual_nn_validate(h = h, nobs = nobs, where = where)
+  }, numeric(1))
+}
+
 scbandwidth <-
   function(bw = stop("scbandwidth:argument 'bw' missing"),
            regtype = c("lc","ll","lp"),
@@ -76,6 +82,8 @@ scbandwidth <-
     argprefix = "cker")
   if (bwtype != "fixed" && cbounds$bound != "none")
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
+  if (bwtype != "fixed" && (!bandwidth.compute || any(bw != 0)))
+    bw <- .np_scbandwidth_manual_nn_validate(bw = bw, nobs = nobs, where = "scbandwidth")
   ncon <- sum(tdati$icon)
   degree <- npValidateGlpDegree(regtype = regtype,
                                 degree = degree,
