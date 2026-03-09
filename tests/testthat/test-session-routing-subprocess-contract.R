@@ -717,6 +717,45 @@ test_that("session npindexhat adaptive-nn manual owner control stays exact in su
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npindexhat adaptive-nn ll owner route stays exact in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(20260309)",
+      "n <- 60L",
+      "x1 <- runif(n)",
+      "x2 <- runif(n)",
+      "y <- sin(x1 + x2) + rnorm(n, sd=0.05)",
+      "tx <- data.frame(x1=x1, x2=x2)",
+      "ex <- tx[seq_len(20L), , drop=FALSE]",
+      "bw <- npindexbw(xdat=tx, ydat=y, regtype='ll', bwtype='adaptive_nn', nmulti=1L)",
+      "fit.mean <- npindex(bws=bw, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+      "fit.grad <- npindex(bws=bw, txdat=tx, tydat=y, exdat=ex, gradients=TRUE)",
+      "a.mean <- npindexhat(bws=bw, txdat=tx, exdat=ex, y=y, output='apply', s=0L)",
+      "H.mean <- npindexhat(bws=bw, txdat=tx, exdat=ex, output='matrix', s=0L)",
+      "a.grad <- npindexhat(bws=bw, txdat=tx, exdat=ex, y=y, output='apply', s=1L)",
+      "H.grad <- npindexhat(bws=bw, txdat=tx, exdat=ex, output='matrix', s=1L)",
+      "stopifnot(max(abs(as.vector(fit.mean$mean) - as.vector(a.mean))) < 1e-8)",
+      "stopifnot(max(abs(as.vector(a.mean) - as.vector(H.mean %*% y))) < 1e-8)",
+      "stopifnot(max(abs(as.vector(fit.grad$grad[,1L]) - as.vector(a.grad))) < 1e-8)",
+      "stopifnot(max(abs(as.vector(a.grad) - as.vector(H.grad %*% y))) < 1e-8)",
+      "cat('SESSION_NPINDEXHAT_LL_OWNER_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEXHAT_LL_OWNER_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npindex adaptive-nn public route preserves bwtype semantics in subprocess", {
   skip_on_cran()
   env <- subprocess_env()
@@ -1229,6 +1268,85 @@ test_that("attach npindexhat adaptive-nn exact owner route completes under mpiex
 
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("ATTACH_NPINDEXHAT_ADAPTIVE_EXACT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("attach npindexhat adaptive-nn ll owner route stays exact under mpiexec when enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
+              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  script <- tempfile("npRmpi-attach-npindexhat-ll-owner-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "is.master <- isTRUE(npRmpi.init(mode='attach', quiet=TRUE, autodispatch=TRUE))",
+    "on.exit({",
+    "  try(npRmpi.quit(mode='attach'), silent=TRUE)",
+    "  if (isTRUE(is.master)) try(Rmpi::mpi.quit(), silent=TRUE)",
+    "}, add=TRUE)",
+    "options(np.messages=FALSE)",
+    "if (isTRUE(is.master)) {",
+    "  set.seed(20260309)",
+    "  n <- 60L",
+    "  x1 <- runif(n)",
+    "  x2 <- runif(n)",
+    "  y <- sin(x1 + x2) + rnorm(n, sd=0.05)",
+    "  tx <- data.frame(x1=x1, x2=x2)",
+    "  ex <- tx[seq_len(20L), , drop=FALSE]",
+    "  bw <- npindexbw(xdat=tx, ydat=y, regtype='ll', bwtype='adaptive_nn', nmulti=1L)",
+    "  fit.mean <- npindex(bws=bw, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+    "  fit.grad <- npindex(bws=bw, txdat=tx, tydat=y, exdat=ex, gradients=TRUE)",
+    "  a.mean <- npindexhat(bws=bw, txdat=tx, exdat=ex, y=y, output='apply', s=0L)",
+    "  H.mean <- npindexhat(bws=bw, txdat=tx, exdat=ex, output='matrix', s=0L)",
+    "  a.grad <- npindexhat(bws=bw, txdat=tx, exdat=ex, y=y, output='apply', s=1L)",
+    "  H.grad <- npindexhat(bws=bw, txdat=tx, exdat=ex, output='matrix', s=1L)",
+    "  stopifnot(max(abs(as.vector(fit.mean$mean) - as.vector(a.mean))) < 1e-8)",
+    "  stopifnot(max(abs(as.vector(a.mean) - as.vector(H.mean %*% y))) < 1e-8)",
+    "  stopifnot(max(abs(as.vector(fit.grad$grad[,1L]) - as.vector(a.grad))) < 1e-8)",
+    "  stopifnot(max(abs(as.vector(a.grad) - as.vector(H.grad %*% y))) < 1e-8)",
+    "  cat('ATTACH_NPINDEXHAT_LL_OWNER_OK\\n')",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_cmd_subprocess(
+    mpiexec,
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+    timeout = 120L,
+    env = c(
+      env_common,
+      "R_PROFILE_USER=",
+      "R_PROFILE=",
+      "FI_TCP_IFACE=en0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=en0"
+    )
+  )
+  if (res$status != 0L) {
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = c(
+        env_common,
+        "R_PROFILE_USER=",
+        "R_PROFILE=",
+        "FI_TCP_IFACE=lo0",
+        "FI_PROVIDER=tcp",
+        "FI_SOCKETS_IFACE=lo0"
+      )
+    )
+  }
+
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for attach-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_NPINDEXHAT_LL_OWNER_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
 
@@ -1756,6 +1874,98 @@ test_that("profile npindexhat adaptive-nn exact owner route completes under mpie
 
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("PROFILE_NPINDEXHAT_ADAPTIVE_EXACT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("profile npindexhat adaptive-nn ll owner route stays exact under mpiexec when enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
+              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+
+  lib.path <- ensure_subprocess_npRmpi_lib()
+  skip_if(is.null(lib.path), "local npRmpi install unavailable for subprocess smoke")
+  profile.path <- file.path(lib.path, "npRmpi", "Rprofile")
+  skip_if(!file.exists(profile.path), "npRmpi profile template unavailable in subprocess lib")
+
+  script <- tempfile("npRmpi-profile-npindexhat-ll-owner-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "if (mpi.comm.rank(0L) == 0L) {",
+    "  mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(options(np.messages=FALSE), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(set.seed(20260309), caller.execute=TRUE)",
+    "  n <- 60L",
+    "  x1 <- runif(n)",
+    "  x2 <- runif(n)",
+    "  y <- sin(x1 + x2) + rnorm(n, sd=0.05)",
+    "  tx <- data.frame(x1=x1, x2=x2)",
+    "  ex <- tx[seq_len(20L), , drop=FALSE]",
+    "  mpi.bcast.Robj2slave(tx)",
+    "  mpi.bcast.Robj2slave(ex)",
+    "  mpi.bcast.Robj2slave(y)",
+    "  mpi.bcast.cmd({",
+    "    bw <- npindexbw(xdat=tx, ydat=y, regtype='ll', bwtype='adaptive_nn', nmulti=1L)",
+    "    fit.mean <- npindex(bws=bw, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+    "    fit.grad <- npindex(bws=bw, txdat=tx, tydat=y, exdat=ex, gradients=TRUE)",
+    "    a.mean <- npindexhat(bws=bw, txdat=tx, exdat=ex, y=y, output='apply', s=0L)",
+    "    H.mean <- npindexhat(bws=bw, txdat=tx, exdat=ex, output='matrix', s=0L)",
+    "    a.grad <- npindexhat(bws=bw, txdat=tx, exdat=ex, y=y, output='apply', s=1L)",
+    "    H.grad <- npindexhat(bws=bw, txdat=tx, exdat=ex, output='matrix', s=1L)",
+    "    stopifnot(max(abs(as.vector(fit.mean$mean) - as.vector(a.mean))) < 1e-8)",
+    "    stopifnot(max(abs(as.vector(a.mean) - as.vector(H.mean %*% y))) < 1e-8)",
+    "    stopifnot(max(abs(as.vector(fit.grad$grad[,1L]) - as.vector(a.grad))) < 1e-8)",
+    "    stopifnot(max(abs(as.vector(a.grad) - as.vector(H.grad %*% y))) < 1e-8)",
+    "  }, caller.execute=TRUE)",
+    "  cat('PROFILE_NPINDEXHAT_LL_OWNER_OK\\n')",
+    "  mpi.bcast.cmd(mpi.quit(), caller.execute=TRUE)",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_profile <- c(
+    env_common,
+    sprintf("R_PROFILE_USER=%s", profile.path),
+    "R_PROFILE=",
+    "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
+    "FI_TCP_IFACE=en0",
+    "FI_PROVIDER=tcp",
+    "FI_SOCKETS_IFACE=en0"
+  )
+
+  res <- run_cmd_subprocess(
+    mpiexec,
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+    timeout = 120L,
+    env = env_profile
+  )
+  if (res$status != 0L) {
+    env_profile_fallback <- c(
+      env_common,
+      sprintf("R_PROFILE_USER=%s", profile.path),
+      "R_PROFILE=",
+      "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
+      "FI_TCP_IFACE=lo0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=lo0"
+    )
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = env_profile_fallback
+    )
+  }
+
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for profile-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("PROFILE_NPINDEXHAT_LL_OWNER_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
 

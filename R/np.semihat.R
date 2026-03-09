@@ -449,14 +449,14 @@
         gradient.order = 1L
       ))
     } else {
-      .np_regression_direct(
+      .npRmpi_with_local_regression(.np_regression_direct(
         bws = rbw,
         txdat = idx.train,
         tydat = ycol,
         exdat = idx.eval,
         gradients = FALSE,
         gradient.order = 1L
-      )
+      ))
     }
     if (s == 1L)
       fit$grad[, 1L]
