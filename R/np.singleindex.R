@@ -223,6 +223,7 @@ npindex.sibandwidth <-
            residuals = FALSE, ...) {
 
     fit.start <- proc.time()[3]
+    dots <- list(...)
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     errors <- npValidateScalarLogical(errors, "errors")
@@ -231,6 +232,39 @@ npindex.sibandwidth <-
       stop("'boot.num' must be a positive integer")
     boot.num <- as.integer(boot.num)
     .npRmpi_require_active_slave_pool(where = "npindex()")
+    spec <- .npindex_resolve_spec(bws, where = "npindex")
+    use.local.exact.exec <- .npRmpi_autodispatch_active() &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      identical(spec$regtype.engine, "lc") &&
+      !identical(bws$type, "fixed") &&
+      !isTRUE(gradients) &&
+      !isTRUE(errors) &&
+      !isTRUE(residuals) &&
+      missing(eydat)
+    .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npindex()")
+    if (use.local.exact.exec) {
+      .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = FALSE)
+
+      old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+      options(npRmpi.autodispatch.disable = TRUE)
+      on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+
+      local.args <- c(
+        list(
+          bws = .npRmpi_autodispatch_untag(bws),
+          txdat = txdat,
+          tydat = tydat,
+          boot.num = boot.num,
+          errors = errors,
+          gradients = gradients,
+          residuals = residuals
+        ),
+        if (!missing(exdat)) list(exdat = exdat) else NULL,
+        dots
+      )
+      result <- do.call(npindex, local.args)
+      return(.npRmpi_autodispatch_tag_result(result, mode = "auto"))
+    }
     if (.npRmpi_autodispatch_active() &&
         !(isTRUE(gradients) && identical(bws$type, "generalized_nn")))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -360,7 +394,6 @@ npindex.sibandwidth <-
     index.df <- data.frame(index = as.vector(index))
     index.eval.df <- data.frame(index = as.vector(index.eval))
 
-    spec <- .npindex_resolve_spec(bws, where = "npindex")
     regtype <- spec$regtype.engine
     npreg.idx.args <- list(
       txdat = if (gradients) index.df else index,
@@ -382,16 +415,27 @@ npindex.sibandwidth <-
 
     if(gradients==FALSE) {
       if (identical(regtype, "lc")) {
-        tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
-                      tydat=as.matrix(data.frame(tydat,1)),
-                      weights=as.matrix(data.frame(tydat,1)),
-                      exdat=as.matrix(exdat) %*% as.matrix(bws$beta),
-                      bws=bws$bw,
-                      bwtype = bws$type,
-                      ckertype = bws$ckertype,
-                      ckerorder = bws$ckerorder)$ksum
+        if (identical(bws$type, "fixed")) {
+          tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
+                        tydat=as.matrix(data.frame(tydat,1)),
+                        weights=as.matrix(data.frame(tydat,1)),
+                        exdat=as.matrix(exdat) %*% as.matrix(bws$beta),
+                        bws=bws$bw,
+                        bwtype = bws$type,
+                        ckertype = bws$ckertype,
+                        ckerorder = bws$ckerorder)$ksum
 
-        index.mean <- tww[1,2,]/NZD(tww[2,2,])
+          index.mean <- tww[1,2,]/NZD(tww[2,2,])
+        } else {
+          index.mean <- .np_indexhat_exact(
+            bws = bws,
+            idx.train = index.df,
+            idx.eval = index.eval.df,
+            y = tydat,
+            output = "apply",
+            s = 0L
+          )
+        }
 
         if (!no.ex && (no.ey || residuals)) {
 
@@ -399,15 +443,26 @@ npindex.sibandwidth <-
           ## if evaluation x's are different from training but no y's
           ## are specified
 
-          tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
-                        tydat=as.matrix(data.frame(tydat,1)),
-                        weights=as.matrix(data.frame(tydat,1)),
-                        bws=bws$bw,
-                        bwtype = bws$type,
-                        ckertype = bws$ckertype,
-                        ckerorder = bws$ckerorder)$ksum
+          if (identical(bws$type, "fixed")) {
+            tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
+                          tydat=as.matrix(data.frame(tydat,1)),
+                          weights=as.matrix(data.frame(tydat,1)),
+                          bws=bws$bw,
+                          bwtype = bws$type,
+                          ckertype = bws$ckertype,
+                          ckerorder = bws$ckerorder)$ksum
 
-          index.tmean <- tww[1,2,]/NZD(tww[2,2,])
+            index.tmean <- tww[1,2,]/NZD(tww[2,2,])
+          } else {
+            index.tmean <- .np_indexhat_exact(
+              bws = bws,
+              idx.train = index.df,
+              idx.eval = index.df,
+              y = tydat,
+              output = "apply",
+              s = 0L
+            )
+          }
 
         }
       } else {

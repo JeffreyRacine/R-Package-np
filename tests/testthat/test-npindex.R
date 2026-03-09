@@ -91,15 +91,19 @@ test_that("npindexbw nearest-neighbor selection stores integer support and exact
 
   bw.gen <- npindexbw(xdat = tx, ydat = y, regtype = "lc", bwtype = "generalized_nn", nmulti = 1)
   fit.gen <- npindex(bws = bw.gen, txdat = tx, tydat = y, gradients = FALSE)
+  hat.gen <- npindexhat(bws = bw.gen, txdat = tx, exdat = tx, y = y, output = "apply", s = 0L)
   expect_true(bw.gen$bw >= 1, info = "generalized_nn")
   expect_equal(bw.gen$bw, as.double(as.integer(bw.gen$bw)), tolerance = 0, info = "generalized_nn")
   expect_true(all(is.finite(fit.gen$mean)), info = "generalized_nn")
+  expect_equal(as.vector(hat.gen), as.vector(fit.gen$mean), tolerance = 1e-8, info = "generalized_nn")
 
   bw.adp <- npindexbw(xdat = tx, ydat = y, regtype = "lc", bwtype = "adaptive_nn", nmulti = 1)
   fit.adp <- npindex(bws = bw.adp, txdat = tx, tydat = y, gradients = FALSE)
+  hat.adp <- npindexhat(bws = bw.adp, txdat = tx, exdat = tx, y = y, output = "apply", s = 0L)
   expect_true(bw.adp$bw >= 1, info = "adaptive_nn")
   expect_equal(bw.adp$bw, as.double(as.integer(bw.adp$bw)), tolerance = 0, info = "adaptive_nn")
   expect_true(all(is.finite(fit.adp$mean)), info = "adaptive_nn")
+  expect_equal(as.vector(hat.adp), as.vector(fit.adp$mean), tolerance = 1e-8, info = "adaptive_nn")
 })
 
 test_that("manual single-index nearest-neighbor bandwidths fail fast when not integer support", {

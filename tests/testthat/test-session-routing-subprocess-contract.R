@@ -1305,6 +1305,83 @@ test_that("attach npindex adaptive-nn public route preserves bwtype semantics un
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("attach npindex nearest-neighbor exact route stays green under mpiexec when enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
+              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  script <- tempfile("npRmpi-attach-npindex-nn-exact-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "is.master <- isTRUE(npRmpi.init(mode='attach', quiet=TRUE, autodispatch=TRUE))",
+    "on.exit({",
+    "  try(npRmpi.quit(mode='attach'), silent=TRUE)",
+    "  if (isTRUE(is.master)) try(Rmpi::mpi.quit(), silent=TRUE)",
+    "}, add=TRUE)",
+    "options(np.messages=FALSE)",
+    "if (isTRUE(is.master)) {",
+    "  set.seed(314163)",
+    "  n <- 70L",
+    "  x1 <- rnorm(n)",
+    "  x2 <- rnorm(n)",
+    "  y <- x1 - x2 + rnorm(n, sd=0.2)",
+    "  tx <- data.frame(x1=x1, x2=x2)",
+    "  bw.gen <- npindexbw(xdat=tx, ydat=y, regtype='lc', bwtype='generalized_nn', nmulti=1)",
+    "  fit.gen <- npindex(bws=bw.gen, txdat=tx, tydat=y, gradients=FALSE)",
+    "  hat.gen <- npindexhat(bws=bw.gen, txdat=tx, exdat=tx, y=y, output='apply', s=0L)",
+    "  stopifnot(all(is.finite(fit.gen$mean)))",
+    "  stopifnot(max(abs(as.vector(hat.gen) - as.vector(fit.gen$mean))) < 1e-8)",
+    "  bw.adp <- npindexbw(xdat=tx, ydat=y, regtype='lc', bwtype='adaptive_nn', nmulti=1)",
+    "  fit.adp <- npindex(bws=bw.adp, txdat=tx, tydat=y, gradients=FALSE)",
+    "  hat.adp <- npindexhat(bws=bw.adp, txdat=tx, exdat=tx, y=y, output='apply', s=0L)",
+    "  stopifnot(all(is.finite(fit.adp$mean)))",
+    "  stopifnot(max(abs(as.vector(hat.adp) - as.vector(fit.adp$mean))) < 1e-8)",
+    "  cat('ATTACH_NPINDEX_NN_EXACT_OK\\n')",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_cmd_subprocess(
+    mpiexec,
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+    timeout = 120L,
+    env = c(
+      env_common,
+      "R_PROFILE_USER=",
+      "R_PROFILE=",
+      "FI_TCP_IFACE=en0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=en0"
+    )
+  )
+  if (res$status != 0L) {
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = c(
+        env_common,
+        "R_PROFILE_USER=",
+        "R_PROFILE=",
+        "FI_TCP_IFACE=lo0",
+        "FI_PROVIDER=tcp",
+        "FI_SOCKETS_IFACE=lo0"
+      )
+    )
+  }
+
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for attach-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_NPINDEX_NN_EXACT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("attach smooth-coefficient ll coef plot-data route completes under mpiexec when enabled", {
   skip_on_cran()
   skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
@@ -1768,6 +1845,95 @@ test_that("profile npindex adaptive-nn public route preserves bwtype semantics u
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("profile npindex nearest-neighbor exact route stays green under mpiexec when enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
+              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+
+  lib.path <- ensure_subprocess_npRmpi_lib()
+  skip_if(is.null(lib.path), "local npRmpi install unavailable for subprocess smoke")
+  profile.path <- file.path(lib.path, "npRmpi", "Rprofile")
+  skip_if(!file.exists(profile.path), "npRmpi profile template unavailable in subprocess lib")
+
+  script <- tempfile("npRmpi-profile-npindex-nn-exact-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "if (mpi.comm.rank(0L) == 0L) {",
+    "  mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(options(np.messages=FALSE), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(set.seed(314163), caller.execute=TRUE)",
+    "  n <- 70L",
+    "  x1 <- rnorm(n)",
+    "  x2 <- rnorm(n)",
+    "  y <- x1 - x2 + rnorm(n, sd=0.2)",
+    "  tx <- data.frame(x1=x1, x2=x2)",
+    "  mpi.bcast.Robj2slave(tx)",
+    "  mpi.bcast.Robj2slave(y)",
+    "  mpi.bcast.cmd({",
+    "    bw.gen <- npindexbw(xdat=tx, ydat=y, regtype='lc', bwtype='generalized_nn', nmulti=1)",
+    "    fit.gen <- npindex(bws=bw.gen, txdat=tx, tydat=y, gradients=FALSE)",
+    "    hat.gen <- npindexhat(bws=bw.gen, txdat=tx, exdat=tx, y=y, output='apply', s=0L)",
+    "    stopifnot(all(is.finite(fit.gen$mean)))",
+    "    stopifnot(max(abs(as.vector(hat.gen) - as.vector(fit.gen$mean))) < 1e-8)",
+    "    bw.adp <- npindexbw(xdat=tx, ydat=y, regtype='lc', bwtype='adaptive_nn', nmulti=1)",
+    "    fit.adp <- npindex(bws=bw.adp, txdat=tx, tydat=y, gradients=FALSE)",
+    "    hat.adp <- npindexhat(bws=bw.adp, txdat=tx, exdat=tx, y=y, output='apply', s=0L)",
+    "    stopifnot(all(is.finite(fit.adp$mean)))",
+    "    stopifnot(max(abs(as.vector(hat.adp) - as.vector(fit.adp$mean))) < 1e-8)",
+    "  }, caller.execute=TRUE)",
+    "  cat('PROFILE_NPINDEX_NN_EXACT_OK\\n')",
+    "  mpi.bcast.cmd(mpi.quit(), caller.execute=TRUE)",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_profile <- c(
+    env_common,
+    sprintf("R_PROFILE_USER=%s", profile.path),
+    "R_PROFILE=",
+    "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
+    "FI_TCP_IFACE=en0",
+    "FI_PROVIDER=tcp",
+    "FI_SOCKETS_IFACE=en0"
+  )
+
+  res <- run_cmd_subprocess(
+    mpiexec,
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+    timeout = 120L,
+    env = env_profile
+  )
+  if (res$status != 0L) {
+    env_profile_fallback <- c(
+      env_common,
+      sprintf("R_PROFILE_USER=%s", profile.path),
+      "R_PROFILE=",
+      "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
+      "FI_TCP_IFACE=lo0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=lo0"
+    )
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = env_profile_fallback
+    )
+  }
+
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for profile-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("PROFILE_NPINDEX_NN_EXACT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npindex nearest-neighbor exact route selects integer support and stays green", {
   skip_on_cran()
   env <- subprocess_env()
@@ -1788,12 +1954,16 @@ test_that("session npindex nearest-neighbor exact route selects integer support 
       "stopifnot(bw.gen$bw >= 1)",
       "stopifnot(abs(bw.gen$bw - as.integer(bw.gen$bw)) < 1e-12)",
       "fit.gen <- npindex(bws=bw.gen, txdat=tx, tydat=y, gradients=FALSE)",
+      "hat.gen <- npindexhat(bws=bw.gen, txdat=tx, exdat=tx, y=y, output='apply', s=0L)",
       "stopifnot(all(is.finite(fit.gen$mean)))",
+      "stopifnot(max(abs(as.vector(hat.gen) - as.vector(fit.gen$mean))) < 1e-8)",
       "bw.adp <- npindexbw(xdat=tx, ydat=y, regtype='lc', bwtype='adaptive_nn', nmulti=1)",
       "stopifnot(bw.adp$bw >= 1)",
       "stopifnot(abs(bw.adp$bw - as.integer(bw.adp$bw)) < 1e-12)",
       "fit.adp <- npindex(bws=bw.adp, txdat=tx, tydat=y, gradients=FALSE)",
+      "hat.adp <- npindexhat(bws=bw.adp, txdat=tx, exdat=tx, y=y, output='apply', s=0L)",
       "stopifnot(all(is.finite(fit.adp$mean)))",
+      "stopifnot(max(abs(as.vector(hat.adp) - as.vector(fit.adp$mean))) < 1e-8)",
       "cat('SESSION_NPINDEX_NN_EXACT_OK\\n')"
     ),
     timeout = 120L,
