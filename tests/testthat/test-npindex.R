@@ -74,3 +74,49 @@ test_that("npindex public adaptive-nn lc route does not collapse to fixed semant
 
   expect_gt(max(abs(as.vector(fit.fixed$mean) - as.vector(fit.adaptive$mean))), 1e-6)
 })
+
+test_that("npindexbw nearest-neighbor selection stores integer support and exact fits stay public-green", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(314163)
+  n <- 70L
+  x1 <- rnorm(n)
+  x2 <- rnorm(n)
+  y <- x1 - x2 + rnorm(n, sd = 0.2)
+  tx <- data.frame(x1 = x1, x2 = x2)
+
+  bw.gen <- npindexbw(xdat = tx, ydat = y, regtype = "lc", bwtype = "generalized_nn", nmulti = 1)
+  fit.gen <- npindex(bws = bw.gen, txdat = tx, tydat = y, gradients = FALSE)
+  expect_true(bw.gen$bw >= 1, info = "generalized_nn")
+  expect_equal(bw.gen$bw, as.double(as.integer(bw.gen$bw)), tolerance = 0, info = "generalized_nn")
+  expect_true(all(is.finite(fit.gen$mean)), info = "generalized_nn")
+
+  bw.adp <- npindexbw(xdat = tx, ydat = y, regtype = "lc", bwtype = "adaptive_nn", nmulti = 1)
+  fit.adp <- npindex(bws = bw.adp, txdat = tx, tydat = y, gradients = FALSE)
+  expect_true(bw.adp$bw >= 1, info = "adaptive_nn")
+  expect_equal(bw.adp$bw, as.double(as.integer(bw.adp$bw)), tolerance = 0, info = "adaptive_nn")
+  expect_true(all(is.finite(fit.adp$mean)), info = "adaptive_nn")
+})
+
+test_that("manual single-index nearest-neighbor bandwidths fail fast when not integer support", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  tx <- data.frame(x1 = seq(0.1, 0.9, length.out = 8L), x2 = seq(0.9, 0.1, length.out = 8L))
+  y <- tx$x1 - tx$x2
+
+  expect_error(
+    npindexbw(
+      xdat = tx,
+      ydat = y,
+      bws = c(1, 1, 0.5),
+      bandwidth.compute = FALSE,
+      bwtype = "adaptive_nn"
+    ),
+    "nearest-neighbor bandwidth must be an integer"
+  )
+})

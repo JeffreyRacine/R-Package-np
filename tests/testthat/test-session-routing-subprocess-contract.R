@@ -1657,3 +1657,40 @@ test_that("profile npindex adaptive-nn public route preserves bwtype semantics u
   expect_true(any(grepl("PROFILE_NPINDEX_ADAPTIVE_PUBLIC_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
+
+test_that("session npindex nearest-neighbor exact route selects integer support and stays green", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(314163)",
+      "n <- 70L",
+      "x1 <- rnorm(n)",
+      "x2 <- rnorm(n)",
+      "y <- x1 - x2 + rnorm(n, sd=0.2)",
+      "tx <- data.frame(x1=x1, x2=x2)",
+      "bw.gen <- npindexbw(xdat=tx, ydat=y, regtype='lc', bwtype='generalized_nn', nmulti=1)",
+      "stopifnot(bw.gen$bw >= 1)",
+      "stopifnot(abs(bw.gen$bw - as.integer(bw.gen$bw)) < 1e-12)",
+      "fit.gen <- npindex(bws=bw.gen, txdat=tx, tydat=y, gradients=FALSE)",
+      "stopifnot(all(is.finite(fit.gen$mean)))",
+      "bw.adp <- npindexbw(xdat=tx, ydat=y, regtype='lc', bwtype='adaptive_nn', nmulti=1)",
+      "stopifnot(bw.adp$bw >= 1)",
+      "stopifnot(abs(bw.adp$bw - as.integer(bw.adp$bw)) < 1e-12)",
+      "fit.adp <- npindex(bws=bw.adp, txdat=tx, tydat=y, gradients=FALSE)",
+      "stopifnot(all(is.finite(fit.adp$mean)))",
+      "cat('SESSION_NPINDEX_NN_EXACT_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEX_NN_EXACT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})

@@ -1,3 +1,39 @@
+.np_round_half_to_even <- function(x) {
+  intpart <- trunc(x)
+  fracpart <- x - intpart
+
+  if (fracpart < 0.5) {
+    intpart
+  } else if (fracpart > 0.5) {
+    intpart + 1
+  } else if ((intpart %% 2) != 0) {
+    intpart + 1
+  } else {
+    intpart
+  }
+}
+
+.np_sibandwidth_manual_nn_validate <- function(h, nobs, where = "sibandwidth") {
+  if (!is.finite(h))
+    stop(sprintf("%s: nearest-neighbor bandwidth must be finite", where), call. = FALSE)
+
+  upper <- max(1L, as.integer(nobs) - 1L)
+  tol <- sqrt(.Machine$double.eps)
+  rounded <- .np_round_half_to_even(h)
+  if ((h < 1) || (h > upper) || (abs(h - rounded) > tol)) {
+    stop(
+      sprintf(
+        "%s: nearest-neighbor bandwidth must be an integer in [1, %d]",
+        where,
+        upper
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(as.double(rounded))
+}
+
 sibandwidth <-
   function(beta, h,
            method=c("ichimura","kleinspady"),
@@ -68,6 +104,8 @@ sibandwidth <-
     argprefix = "cker")
   if (bwtype != "fixed" && cbounds$bound != "none")
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
+  if (bwtype != "fixed" && (!bandwidth.compute || h != 0))
+    .np_sibandwidth_manual_nn_validate(h = h, nobs = nobs, where = "sibandwidth")
 
   sumNum <- sfactor
   ##idati <- NA

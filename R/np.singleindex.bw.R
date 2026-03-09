@@ -119,6 +119,67 @@ npindexbw.NULL <-
   )
 }
 
+.npindex_nn_candidate_bandwidth <- function(h, bwtype, nobs) {
+  if (identical(bwtype, "fixed")) {
+    return(list(ok = is.finite(h) && (h > 0), value = as.double(h)))
+  }
+
+  if (!is.finite(h)) {
+    return(list(ok = FALSE, value = NA_real_))
+  }
+
+  upper <- max(1L, as.integer(nobs) - 1L)
+  k <- .np_round_half_to_even(h)
+  list(ok = (k >= 1L) && (k <= upper), value = as.double(k))
+}
+
+.npindex_default_start_bandwidth <- function(fit, bwtype, nobs) {
+  if (identical(bwtype, "fixed")) {
+    return(1.059224 * EssDee(fit) * nobs^(-1 / 5))
+  }
+
+  max(1, min(max(1L, as.integer(nobs) - 1L), .np_round_half_to_even(sqrt(nobs))))
+}
+
+.npindex_random_start_bandwidth <- function(fit, bwtype, nobs) {
+  if (identical(bwtype, "fixed")) {
+    return(runif(1, min = 0.5, max = 1.5) * EssDee(fit) * nobs^(-1 / 5))
+  }
+
+  runif(1, min = 1, max = max(1L, as.integer(nobs) - 1L))
+}
+
+.npindex_finalize_bandwidth <- function(h, bwtype, nobs, where = "npindexbw") {
+  candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bwtype, nobs = nobs)
+  if (!candidate$ok) {
+    if (identical(bwtype, "fixed")) {
+      stop(sprintf("%s: bandwidth must be positive and finite", where), call. = FALSE)
+    }
+    stop(
+      sprintf(
+        "%s: nearest-neighbor bandwidth candidate must map to an integer in [1, %d]",
+        where,
+        max(1L, as.integer(nobs) - 1L)
+      ),
+      call. = FALSE
+    )
+  }
+
+  candidate$value
+}
+
+.npindex_selector_with_local_kernelsum <- function(expr) {
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  old.local <- getOption("npRmpi.local.regression.mode", FALSE)
+  options(npRmpi.autodispatch.disable = TRUE)
+  options(npRmpi.local.regression.mode = TRUE)
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+  on.exit(options(npRmpi.local.regression.mode = old.local), add = TRUE)
+  old.mode <- .Call("C_np_set_local_regression_mode", TRUE, PACKAGE = "npRmpi")
+  on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"), add = TRUE)
+  force(expr)
+}
+
 .npindex_lp_loo_fit <- function(index,
                                 ydat,
                                 h,
@@ -401,6 +462,10 @@ npindexbw.sibandwidth <-
             ## parameters in `param') and then let h denote the kth column.
             beta <- param[beta.idx]
             h <- param[p]
+            h.candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bws$type, nobs = nobs)
+            if (!h.candidate$ok)
+              return(ichimuraMaxPenalty)
+            h <- h.candidate$value
 
             ## Next we define the sum of squared leave-one-out residuals
 
@@ -413,17 +478,20 @@ npindexbw.sibandwidth <-
               fit.loo <- if (identical(spec$regtype.engine, "lc")) {
                 ## One call to npksum to avoid repeated computation of the
                 ## product kernel (the expensive part)
-                tww <- npksum(txdat=index,
-                              tydat=wmat,
-                              weights=wmat,
-                              leave.one.out=TRUE,
-                              bandwidth.divide=TRUE,
-                              bws=c(h),
-                              ckertype = bws$ckertype,
-                              ckerorder = bws$ckerorder,
-                              ckerbound = bws$ckerbound,
-                              ckerlb = bws$ckerlb,
-                              ckerub = bws$ckerub)$ksum
+                tww <- .npindex_selector_with_local_kernelsum(
+                  npksum(txdat=index,
+                         tydat=wmat,
+                         weights=wmat,
+                         leave.one.out=TRUE,
+                         bandwidth.divide=TRUE,
+                         bws=c(h),
+                         bwtype = bws$type,
+                         ckertype = bws$ckertype,
+                         ckerorder = bws$ckerorder,
+                         ckerbound = bws$ckerbound,
+                         ckerlb = bws$ckerlb,
+                         ckerub = bws$ckerub)
+                )$ksum
                 tww[1,2,]/NZD(tww[2,2,])
               } else {
                 ok.design <- tryCatch({
@@ -482,6 +550,10 @@ npindexbw.sibandwidth <-
             ## parameters in `param') and then let h denote the kth column.
             beta <- param[beta.idx]
             h <- param[p]
+            h.candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bws$type, nobs = nobs)
+            if (!h.candidate$ok)
+              return(sqrt(.Machine$double.xmax))
+            h <- h.candidate$value
 
             ## Next we define the sum of logs
 
@@ -494,17 +566,20 @@ npindexbw.sibandwidth <-
               ks.loo <- if (identical(spec$regtype.engine, "lc")) {
                 ## One call to npksum to avoid repeated computation of the
                 ## product kernel (the expensive part)
-                tww <- npksum(txdat=index,
-                              tydat=wmat,
-                              weights=wmat,
-                              leave.one.out=TRUE,
-                              bandwidth.divide=TRUE,
-                              bws=c(h),
-                              ckertype = bws$ckertype,
-                              ckerorder = bws$ckerorder,
-                              ckerbound = bws$ckerbound,
-                              ckerlb = bws$ckerlb,
-                              ckerub = bws$ckerub)$ksum
+                tww <- .npindex_selector_with_local_kernelsum(
+                  npksum(txdat=index,
+                         tydat=wmat,
+                         weights=wmat,
+                         leave.one.out=TRUE,
+                         bandwidth.divide=TRUE,
+                         bws=c(h),
+                         bwtype = bws$type,
+                         ckertype = bws$ckertype,
+                         ckerorder = bws$ckerorder,
+                         ckerbound = bws$ckerbound,
+                         ckerlb = bws$ckerlb,
+                         ckerub = bws$ckerub)
+                )$ksum
                 tww[1,2,]/NZD(tww[2,2,])
               } else {
                 ok.design <- tryCatch({
@@ -601,16 +676,16 @@ npindexbw.sibandwidth <-
               } else { beta = numeric(0) }
 
               if (bws$bw == 0)
-                h <- 1.059224*EssDee(fit)*nobs^(-1/5)
+                h <- .npindex_default_start_bandwidth(fit = fit, bwtype = bws$type, nobs = nobs)
               else
-                h <- bws$bw
+                h <- .npindex_finalize_bandwidth(h = bws$bw, bwtype = bws$type, nobs = nobs)
             } else {
               ## Random initialization used for remaining multistarts
 
               beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
               beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
               if (!only.optimize.beta)
-                h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*nobs^(-1/5)
+                h <- .npindex_random_start_bandwidth(fit = fit, bwtype = bws$type, nobs = nobs)
             }
 
             optim.parm <- if(only.optimize.beta) beta else c(beta,h)
@@ -634,7 +709,7 @@ npindexbw.sibandwidth <-
               beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
               beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
               if(!only.optimize.beta)
-                h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*nobs^(-1/5)
+                h <- .npindex_random_start_bandwidth(fit = fit, bwtype = bws$type, nobs = nobs)
 
               if(optim.return$convergence == 1){
                 if(optim.control$maxit < (2^32/10))
@@ -679,7 +754,7 @@ npindexbw.sibandwidth <-
           console <- printClear(console)
 
           bws$beta <- c(1.0, param[beta.idx])
-          bws$bw <- param[p]
+          bws$bw <- .npindex_finalize_bandwidth(h = param[p], bwtype = bws$type, nobs = nobs)
           bws$fval <- fval.min
           bws$ifval <- best
           bws$num.feval <- num.feval.overall
