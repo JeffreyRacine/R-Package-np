@@ -1477,15 +1477,13 @@
   ncon <- bws$ncon
 
   if (isTRUE(gradients)) {
-    fit0 <- .npRmpi_with_local_bootstrap(
-      .np_regression_direct(
-        bws = bws,
-        txdat = xdat,
-        tydat = ydat,
-        exdat = exdat,
-        gradients = TRUE,
-        gradient.order = gradient.order
-      )
+    fit0 <- .np_regression_direct(
+      bws = bws,
+      txdat = xdat,
+      tydat = ydat,
+      exdat = exdat,
+      gradients = TRUE,
+      gradient.order = gradient.order
     )
     t0 <- fit0$grad[, slice.index]
 
@@ -1502,22 +1500,20 @@
       counts.chunk <- as.matrix(counts.chunk)
       bsz <- ncol(counts.chunk)
       out <- matrix(NA_real_, nrow = bsz, ncol = nout)
-      out <- .npRmpi_with_local_bootstrap({
-        for (jj in seq_len(bsz)) {
-          idx <- rep.int(seq_len(n), as.integer(counts.chunk[, jj]))
-          fit.b <- .np_regression_direct(
-            bws = bws,
-            txdat = xdat[idx, , drop = FALSE],
-            tydat = ydat[idx],
-            exdat = exdat,
-            gradients = TRUE,
-            gradient.order = gradient.order,
-            local.mode = use.local.direct
-          )
-          out[jj, ] <- fit.b$grad[, slice.index]
-        }
-        out
-      })
+      for (jj in seq_len(bsz)) {
+        idx <- rep.int(seq_len(n), as.integer(counts.chunk[, jj]))
+        fit.b <- .np_regression_direct(
+          bws = bws,
+          txdat = xdat[idx, , drop = FALSE],
+          tydat = ydat[idx],
+          exdat = exdat,
+          gradients = TRUE,
+          gradient.order = gradient.order,
+          local.mode = use.local.direct
+        )
+        out[jj, ] <- fit.b$grad[, slice.index]
+      }
+      out
     }
 
     if (!is.null(counts)) {
@@ -3672,6 +3668,70 @@ plotFactor <- function(f, y, ...){
        ydat = ydat[goodrows])
 }
 
+.np_plot_regression_eval <- function(bws,
+                                     xdat,
+                                     ydat,
+                                     exdat,
+                                     gradients = FALSE,
+                                     gradient.order = 1L,
+                                     need.asymptotic = FALSE) {
+  if (isTRUE(need.asymptotic)) {
+    return(npreg(
+      txdat = xdat,
+      tydat = ydat,
+      exdat = exdat,
+      bws = bws,
+      gradients = gradients,
+      gradient.order = gradient.order,
+      warn.glp.gradient = FALSE
+    ))
+  }
+
+  fit <- .np_regression_direct(
+    bws = bws,
+    txdat = xdat,
+    tydat = ydat,
+    exdat = exdat,
+    gradients = gradients,
+    gradient.order = gradient.order,
+    local.mode = identical(bws$type, "generalized_nn")
+  )
+
+  neval <- length(fit$mean)
+  fit$merr <- rep(NA_real_, neval)
+  if (isTRUE(gradients))
+    fit$gerr <- matrix(NA_real_, nrow = neval, ncol = NCOL(fit$grad))
+
+  fit
+}
+
+.np_plot_unconditional_eval <- function(xdat,
+                                        exdat,
+                                        bws,
+                                        cdf = FALSE,
+                                        need.asymptotic = FALSE) {
+  if (isTRUE(need.asymptotic)) {
+    return(if (isTRUE(cdf)) {
+      npudist(tdat = xdat, edat = exdat, bws = bws)
+    } else {
+      npudens(tdat = xdat, edat = exdat, bws = bws)
+    })
+  }
+
+  est <- .np_ksum_unconditional_eval_exact(
+    xdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    operator = if (isTRUE(cdf)) "integral" else "normal"
+  )
+
+  if (isTRUE(cdf)) {
+    list(dist = est, derr = rep(NA_real_, length(est)))
+  } else {
+    list(dens = est, derr = rep(NA_real_, length(est)))
+  }
+}
+
 .npRmpi_with_local_bootstrap <- function(expr) {
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
@@ -4330,18 +4390,16 @@ compute.bootstrap.errors.rbandwidth =
         )
       )
 
-      boot.out <- .npRmpi_with_local_bootstrap({
-        list(
-          t = .np_wild_boot_t(
-            H = H,
-            fit.mean = fit.train$mean,
-            residuals = eps,
-            B = B,
-            wild = plot.errors.boot.wild
-          ),
-          t0 = t0
-        )
-      })
+      boot.out <- list(
+        t = .np_wild_boot_t(
+          H = H,
+          fit.mean = fit.train$mean,
+          residuals = eps,
+          B = B,
+          wild = plot.errors.boot.wild
+        ),
+        t0 = t0
+      )
       .npRmpi_bootstrap_transport_trace(
         what = "rbandwidth.wild",
         event = "wild.boot.done",

@@ -179,7 +179,12 @@
     plot.errors = (plot.errors.method != "none")
 
     if (coef) {
-      fit.coef <- npplreg(txdat = xdat, tydat = ydat, tzdat = zdat, bws = bws)
+      fit.coef <- .np_plot_plreg_local_fit(
+        bws = bws,
+        xdat = xdat,
+        ydat = ydat,
+        zdat = zdat
+      )
       cf <- as.double(fit.coef$xcoef)
       se <- as.double(fit.coef$xcoeferr)
       cf.names <- if (!is.null(names(fit.coef$xcoef))) names(fit.coef$xcoef) else bws$xnames
@@ -238,25 +243,14 @@
       if (bws$zdati$iord[1])
         z1.eval <- (bws$zdati$all.dlev[[1]])[as.integer(z1.eval)]
 
-      tobj <- if (identical(bws$type, "generalized_nn")) {
-        .np_plot_plreg_local_fit(
-          bws = bws,
-          xdat = xdat,
-          ydat = ydat,
-          zdat = zdat,
-          exdat = x.eval[,1, drop = FALSE],
-          ezdat = x.eval[,2, drop = FALSE]
-        )
-      } else {
-        npplreg(
-          txdat = xdat,
-          tydat = ydat,
-          tzdat = zdat,
-          exdat = x.eval[,1, drop = FALSE],
-          ezdat = x.eval[,2, drop = FALSE],
-          bws = bws
-        )
-      }
+      tobj <- .np_plot_plreg_local_fit(
+        bws = bws,
+        xdat = xdat,
+        ydat = ydat,
+        zdat = zdat,
+        exdat = x.eval[,1, drop = FALSE],
+        ezdat = x.eval[,2, drop = FALSE]
+      )
 
       terr = matrix(data = NA, nrow = nrow(x.eval), ncol = 3)
       
@@ -477,25 +471,14 @@
         }
 
 
-        tobj <- if (identical(bws$type, "generalized_nn")) {
-          .np_plot_plreg_local_fit(
-            bws = bws,
-            xdat = xdat,
-            ydat = ydat,
-            zdat = zdat,
-            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-            ezdat = ezdat[seq_len(xi.neval),, drop = FALSE]
-          )
-        } else {
-          npplreg(
-            txdat = xdat,
-            tydat = ydat,
-            tzdat = zdat,
-            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-            ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
-            bws = bws
-          )
-        }
+        tobj <- .np_plot_plreg_local_fit(
+          bws = bws,
+          xdat = xdat,
+          ydat = ydat,
+          zdat = zdat,
+          exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+          ezdat = ezdat[seq_len(xi.neval),, drop = FALSE]
+        )
 
         temp.mean[seq_len(xi.neval)] = tobj$mean
 
@@ -653,25 +636,14 @@
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        tobj <- if (identical(bws$type, "generalized_nn")) {
-          .np_plot_plreg_local_fit(
-            bws = bws,
-            xdat = xdat,
-            ydat = ydat,
-            zdat = zdat,
-            exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-            ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
-          )
-        } else {
-          npplreg(
-            txdat = xdat,
-            tydat = ydat,
-            tzdat = zdat,
-            exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-            ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-            bws = bws
-          )
-        }
+        tobj <- .np_plot_plreg_local_fit(
+          bws = bws,
+          xdat = xdat,
+          ydat = ydat,
+          zdat = zdat,
+          exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+          ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
+        )
 
         temp.mean[seq_len(xi.neval)] = tobj$mean
 

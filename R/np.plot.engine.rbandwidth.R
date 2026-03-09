@@ -201,7 +201,7 @@
       if (is.ordered(xdat[,2]))
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
-      if (plot.errors.method == "asymptotic" || !identical(bws$type, "fixed")) {
+      if (plot.errors.method == "asymptotic") {
         engine.trace(
           event = "npreg.start",
           fields = list(slice = 0L, gradients = gradients, n_eval = nrow(x.eval))
@@ -212,6 +212,23 @@
           warn.glp.gradient = FALSE)
         engine.trace(
           event = "npreg.done",
+          fields = list(slice = 0L, gradients = gradients, n_eval = length(tobj$mean))
+        )
+      } else if (!identical(bws$type, "fixed")) {
+        engine.trace(
+          event = "direct.fit.start",
+          fields = list(slice = 0L, gradients = gradients, n_eval = nrow(x.eval))
+        )
+        tobj <- .np_plot_regression_eval(
+          bws = bws,
+          xdat = xdat,
+          ydat = ydat,
+          exdat = x.eval,
+          gradient.order = gradient.order,
+          need.asymptotic = FALSE
+        )
+        engine.trace(
+          event = "direct.fit.done",
           fields = list(slice = 0L, gradients = gradients, n_eval = length(tobj$mean))
         )
       } else {
@@ -526,7 +543,7 @@
             event = "hat.apply.done",
             fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
           )
-        } else {
+        } else if (plot.errors.method == "asymptotic") {
           engine.trace(
             event = "npreg.start",
             fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
@@ -546,6 +563,24 @@
           }
           engine.trace(
             event = "npreg.done",
+            fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
+          )
+        } else {
+          engine.trace(
+            event = "direct.fit.start",
+            fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
+          )
+          tr <- .np_plot_regression_eval(
+            bws = bws,
+            xdat = xdat,
+            ydat = ydat,
+            exdat = eval.slice,
+            gradients = gradients,
+            gradient.order = gradient.order,
+            need.asymptotic = FALSE
+          )
+          engine.trace(
+            event = "direct.fit.done",
             fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
           )
         }

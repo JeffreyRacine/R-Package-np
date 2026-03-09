@@ -105,16 +105,42 @@
     }
 
     neval = maxneval = length(ydat)
-    
-    tobj = npindex(txdat = xdat, tydat = ydat,
-      bws = bws, gradients = gradients)
+
+    xdat <- toFrame(xdat)
+    index.eval <- as.vector(toMatrix(xdat) %*% bws$beta)
+    tobj <- list(index = index.eval)
+    if (gradients) {
+      idx.train <- data.frame(index = index.eval)
+      rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+      fit.grad <- .np_regression_direct(
+        bws = rbw,
+        txdat = idx.train,
+        tydat = ydat,
+        exdat = idx.train,
+        gradients = TRUE,
+        gradient.order = 1L
+      )
+      tobj$mean <- as.vector(fit.grad$mean)
+      grad.index <- as.vector(fit.grad$grad[, 1L])
+      tobj$grad.index <- grad.index
+      tobj$grad <- grad.index %o% as.vector(bws$beta)
+    } else {
+      tobj$mean <- as.vector(npindexhat(
+        bws = bws,
+        txdat = xdat,
+        exdat = xdat,
+        y = ydat,
+        output = "apply",
+        s = 0L
+      ))
+    }
     
     temp.err = matrix(data = NA, nrow = maxneval, ncol = 3)
     temp.mean = replicate(maxneval, NA)
     temp.all.err <- NULL
     
 
-    temp.mean[] = if(gradients) tobj$grad[,1] else tobj$mean
+    temp.mean[] = if(gradients) tobj$grad.index else tobj$mean
 
     if (plot.errors){
       if (plot.errors.method == "bootstrap") {
