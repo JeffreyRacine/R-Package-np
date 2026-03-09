@@ -787,7 +787,7 @@ npscoefbw.scbandwidth <-
           bws$numimp = numimp.overall
           bws$fval.vector = value.overall
         }
-      })[1]
+      })[["elapsed"]]
     
     bws$sfactor <- bws$bandwidth <- bws$bw
     nfactor <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))

@@ -104,6 +104,7 @@ npcdensbw.conbandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            ...){
+    elapsed.start <- proc.time()[3]
     ydat = toFrame(ydat)
     xdat = toFrame(xdat)
 
@@ -290,28 +291,28 @@ npcdensbw.conbandwidth <-
       cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
 
       if (bws$method != "normal-reference"){
-        total.time <-
-          system.time(myout <-
-                        .Call("C_np_density_conditional_bw",
-                              as.double(yuno), as.double(yord), as.double(ycon),
-                              as.double(xuno), as.double(xord), as.double(xcon),
-                              as.double(mysd),
-                              as.integer(myopti), as.double(myoptd),
-                              as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                                          bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                                          bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-                              as.integer(max(1, nmulti)),
-                              as.integer(penalty_mode),
-                              as.double(penalty.multiplier),
-                              as.integer(degree.code),
-                              as.integer(bernstein.engine),
-                              as.integer(basis.code),
-                              as.integer(reg.code),
-                              as.double(cxker.bounds.c$lb),
-                              as.double(cxker.bounds.c$ub),
-                              as.double(cyker.bounds.c$lb),
-                              as.double(cyker.bounds.c$ub),
-                              PACKAGE="npRmpi"))[1]
+        myout <-
+          .Call("C_np_density_conditional_bw",
+                as.double(yuno), as.double(yord), as.double(ycon),
+                as.double(xuno), as.double(xord), as.double(xcon),
+                as.double(mysd),
+                as.integer(myopti), as.double(myoptd),
+                as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                            bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                            bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+                as.integer(max(1, nmulti)),
+                as.integer(penalty_mode),
+                as.double(penalty.multiplier),
+                as.integer(degree.code),
+                as.integer(bernstein.engine),
+                as.integer(basis.code),
+                as.integer(reg.code),
+                as.double(cxker.bounds.c$lb),
+                as.double(cxker.bounds.c$ub),
+                as.double(cyker.bounds.c$lb),
+                as.double(cyker.bounds.c$ub),
+                PACKAGE="npRmpi")
+        total.time <- proc.time()[3] - elapsed.start
       } else {
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon

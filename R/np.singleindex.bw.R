@@ -686,7 +686,7 @@ npindexbw.sibandwidth <-
           bws$numimp <- numimp
           bws$fval.vector <- fval.value
         }
-      })[1]
+      })[["elapsed"]]
     ## Return a list with beta (we append the restricted value of
     ## beta_1=1), the bandwidth h, the value of the objective function at
     ## its minimum, the number of restarts that resulted in an improved
