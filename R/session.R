@@ -116,6 +116,13 @@
   as.integer(62000L + rank)
 }
 
+.npRmpi_attach_close_release_tag <- function(rank) {
+  rank <- suppressWarnings(as.integer(rank)[1L])
+  if (!is.finite(rank) || rank < 1L)
+    rank <- 1L
+  as.integer(62100L + rank)
+}
+
 .npRmpi_attach_close_ack_timeout <- function() {
   opt <- getOption("npRmpi.attach.close.ack.timeout", NULL)
   if (!is.null(opt)) {
@@ -145,6 +152,83 @@
     silent = TRUE
   )
   invisible(!inherits(sent, "try-error"))
+}
+
+.npRmpi_attach_send_close_release <- function(comm = 1L,
+                                              ranks,
+                                              session_id = getOption("npRmpi.attach.session.id", NA_integer_),
+                                              barrier = TRUE) {
+  ranks <- as.integer(ranks)
+  ranks <- sort(unique(ranks[is.finite(ranks) & ranks >= 1L]))
+  if (!length(ranks))
+    return(list(ok = TRUE, sent = integer(0), failed = integer(0)))
+
+  sid <- suppressWarnings(as.integer(session_id)[1L])
+  payload <- list(
+    kind = "attach_close_release",
+    session_id = sid,
+    barrier = isTRUE(barrier),
+    timestamp = as.numeric(Sys.time())
+  )
+
+  sent <- integer(0)
+  failed <- integer(0)
+  for (rk in ranks) {
+    ok <- try(
+      mpi.send.Robj(payload, dest = rk, tag = .npRmpi_attach_close_release_tag(rk), comm = comm),
+      silent = TRUE
+    )
+    if (inherits(ok, "try-error"))
+      failed <- c(failed, rk)
+    else
+      sent <- c(sent, rk)
+  }
+
+  list(
+    ok = !length(failed),
+    sent = sort(unique(as.integer(sent))),
+    failed = sort(unique(as.integer(failed)))
+  )
+}
+
+.npRmpi_attach_wait_close_release <- function(comm = 1L,
+                                              session_id = getOption("npRmpi.attach.session.id", NA_integer_),
+                                              timeout_sec = .npRmpi_attach_close_ack_timeout(),
+                                              poll_sleep = 0.01) {
+  rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
+  if (is.na(rank) || rank < 1L)
+    return(list(ok = FALSE, barrier = FALSE, payload = NULL))
+
+  timeout_sec <- if (is.numeric(timeout_sec) && length(timeout_sec) == 1L && is.finite(timeout_sec) && timeout_sec > 0)
+    as.numeric(timeout_sec) else 5
+  poll_sleep <- if (is.numeric(poll_sleep) && length(poll_sleep) == 1L && is.finite(poll_sleep) && poll_sleep > 0)
+    as.numeric(poll_sleep) else 0.01
+  deadline <- as.numeric(Sys.time()) + timeout_sec
+  tag <- .npRmpi_attach_close_release_tag(rank)
+  sid <- suppressWarnings(as.integer(session_id)[1L])
+
+  repeat {
+    if (isTRUE(.npRmpi_safe(mpi.iprobe(source = 0L, tag = tag, comm = comm), fallback = FALSE))) {
+      msg <- .npRmpi_safe(mpi.recv.Robj(source = 0L, tag = tag, comm = comm), fallback = NULL)
+      if (is.list(msg) &&
+          identical(as.character(msg$kind)[1L], "attach_close_release")) {
+        msg.sid <- suppressWarnings(as.integer(msg$session_id)[1L])
+        if (is.na(sid) || is.na(msg.sid) || identical(msg.sid, sid)) {
+          return(list(
+            ok = TRUE,
+            barrier = isTRUE(msg$barrier),
+            payload = msg
+          ))
+        }
+      }
+      return(list(ok = FALSE, barrier = FALSE, payload = msg))
+    }
+    if (as.numeric(Sys.time()) >= deadline)
+      break
+    Sys.sleep(poll_sleep)
+  }
+
+  list(ok = FALSE, barrier = FALSE, payload = NULL)
 }
 
 .npRmpi_attach_collect_close_acks <- function(comm = 1L,
@@ -308,6 +392,13 @@
     )
   )
   .npRmpi_attach_send_close_ack(comm = comm, session_id = session_id)
+  release <- .npRmpi_attach_wait_close_release(
+    comm = comm,
+    session_id = session_id,
+    timeout_sec = .npRmpi_attach_close_ack_timeout()
+  )
+  if (isTRUE(release$ok) && isTRUE(release$barrier))
+    .npRmpi_safe(mpi.barrier(0), fallback = NULL)
   .npRmpi_safe(if (comm != 0L) mpi.comm.free(comm), fallback = NULL)
   mpi.quit()
   invisible(FALSE)
@@ -517,6 +608,12 @@ npRmpi.quit <- function(force = FALSE,
       expected = expected,
       timeout_sec = .npRmpi_attach_close_ack_timeout()
     )
+    release.info <- .npRmpi_attach_send_close_release(
+      comm = comm,
+      ranks = ack.info$acked,
+      session_id = sid,
+      barrier = isTRUE(ack.info$ok)
+    )
     if (!isTRUE(ack.info$ok)) {
       warning(
         sprintf(
@@ -527,6 +624,18 @@ npRmpi.quit <- function(force = FALSE,
         call. = FALSE
       )
     }
+    if (!isTRUE(release.info$ok)) {
+      warning(
+        sprintf(
+          "attach-mode worker shutdown release incomplete for session %s; failed ranks: %s",
+          if (is.na(sid)) "NA" else as.character(sid),
+          paste(release.info$failed, collapse = ",")
+        ),
+        call. = FALSE
+      )
+    }
+    if (isTRUE(ack.info$ok))
+      .npRmpi_safe(mpi.barrier(0), fallback = NULL)
 
     if (comm != 0L) {
       .npRmpi_safe(mpi.comm.free(comm), fallback = NULL)
