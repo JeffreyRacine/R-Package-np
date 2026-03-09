@@ -14605,15 +14605,15 @@ finish_regression_estimation:
   return(0);
 }
 
-static int np_shadow_conditional_indicator_row(const int train_idx,
-                                               const int eval_idx,
-                                               const int cdfontrain,
-                                               double **matrix_Y_ordered_train,
-                                               double **matrix_Y_continuous_train,
-                                               double **matrix_Y_ordered_eval,
-                                               double **matrix_Y_continuous_eval,
-                                               const int num_var_ordered,
-                                               const int num_var_continuous){
+static int np_conditional_indicator_row_core(const int train_idx,
+                                             const int eval_idx,
+                                             const int cdfontrain,
+                                             double **matrix_Y_ordered_train,
+                                             double **matrix_Y_continuous_train,
+                                             double **matrix_Y_ordered_eval,
+                                             double **matrix_Y_continuous_eval,
+                                             const int num_var_ordered,
+                                             const int num_var_continuous){
   int l;
   int indy = 1;
 
@@ -14627,6 +14627,26 @@ static int np_shadow_conditional_indicator_row(const int train_idx,
     indy *= (matrix_Y_continuous_train[l][train_idx] <= matrix_Y_continuous_eval[l][eval_idx]);
 
   return indy;
+}
+
+static int np_shadow_conditional_indicator_row(const int train_idx,
+                                               const int eval_idx,
+                                               const int cdfontrain,
+                                               double **matrix_Y_ordered_train,
+                                               double **matrix_Y_continuous_train,
+                                               double **matrix_Y_ordered_eval,
+                                               double **matrix_Y_continuous_eval,
+                                               const int num_var_ordered,
+                                               const int num_var_continuous){
+  return np_conditional_indicator_row_core(train_idx,
+                                           eval_idx,
+                                           cdfontrain,
+                                           matrix_Y_ordered_train,
+                                           matrix_Y_continuous_train,
+                                           matrix_Y_ordered_eval,
+                                           matrix_Y_continuous_eval,
+                                           num_var_ordered,
+                                           num_var_continuous);
 }
 
 static int np_shadow_conditional_kernel_row(const int *kernel_c,
@@ -15857,26 +15877,6 @@ cleanup_yweight_row:
   return status;
 }
 
-static int np_shadow_conditional_y_eval_row_stream_op(double *vector_scale_factor,
-                                                      int eval_idx,
-                                                      int operator_code,
-                                                      double **matrix_Y_unordered_eval,
-                                                      double **matrix_Y_ordered_eval,
-                                                      double **matrix_Y_continuous_eval,
-                                                      int num_eval,
-                                                      int map_train_tree_index,
-                                                      double *row_out){
-  return np_conditional_y_eval_row_stream_op_core(vector_scale_factor,
-                                                  eval_idx,
-                                                  operator_code,
-                                                  matrix_Y_unordered_eval,
-                                                  matrix_Y_ordered_eval,
-                                                  matrix_Y_continuous_eval,
-                                                  num_eval,
-                                                  map_train_tree_index,
-                                                  row_out);
-}
-
 static int np_conditional_y_row_stream_op_core(double *vector_scale_factor,
                                                int eval_idx,
                                                int operator_code,
@@ -16540,30 +16540,30 @@ int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
 
   *cv = 0.0;
   for(i = 0; i < num_train; i++){
-    if(np_shadow_proof_conditional_x_weight_row_stream(vector_scale_factor, i, xrow) != 0)
+    if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xrow) != 0)
       goto cleanup_cdist_lp_stream;
 
     for(j = 0; j < num_eval; j++){
       double fit = 0.0;
-      const int indy = np_shadow_conditional_indicator_row(i,
-                                                           j,
-                                                           cdfontrain_extern,
-                                                           matrix_Y_ordered_train_extern,
-                                                           matrix_Y_continuous_train_extern,
-                                                           matrix_Y_ordered_eval_extern,
-                                                           matrix_Y_continuous_eval_extern,
-                                                           num_var_ordered_extern,
-                                                           num_var_continuous_extern);
+      const int indy = np_conditional_indicator_row_core(i,
+                                                         j,
+                                                         cdfontrain_extern,
+                                                         matrix_Y_ordered_train_extern,
+                                                         matrix_Y_continuous_train_extern,
+                                                         matrix_Y_ordered_eval_extern,
+                                                         matrix_Y_continuous_eval_extern,
+                                                         num_var_ordered_extern,
+                                                         num_var_continuous_extern);
 
-      if(np_shadow_conditional_y_eval_row_stream_op(vector_scale_factor,
-                                                    j,
-                                                    OP_INTEGRAL,
-                                                    matrix_Y_unordered_eval_extern,
-                                                    matrix_Y_ordered_eval_extern,
-                                                    matrix_Y_continuous_eval_extern,
-                                                    num_eval,
-                                                    cdfontrain_extern && (num_eval == num_train),
-                                                    yint) != 0)
+      if(np_conditional_y_eval_row_stream_op_core(vector_scale_factor,
+                                                  j,
+                                                  OP_INTEGRAL,
+                                                  matrix_Y_unordered_eval_extern,
+                                                  matrix_Y_ordered_eval_extern,
+                                                  matrix_Y_continuous_eval_extern,
+                                                  num_eval,
+                                                  cdfontrain_extern && (num_eval == num_train),
+                                                  yint) != 0)
         goto cleanup_cdist_lp_stream;
 
       if(cdfontrain_extern && (i == j))
