@@ -607,6 +607,39 @@ test_that("session npindexhat adaptive-nn manual owner control stays exact in su
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npindex adaptive-nn public route preserves bwtype semantics in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(314161)",
+      "n <- 70L",
+      "x1 <- runif(n)",
+      "x2 <- runif(n)",
+      "y <- sin(x1 + x2) + rnorm(n, sd=0.06)",
+      "tx <- data.frame(x1=x1, x2=x2)",
+      "ex <- tx[seq_len(20), , drop=FALSE]",
+      "bw.fixed <- npindexbw(xdat=tx, ydat=y, bws=c(1, 1, 0.85), bandwidth.compute=FALSE, regtype='lc', bwtype='fixed')",
+      "bw.adp <- npindexbw(xdat=tx, ydat=y, bws=c(1, 1, 0.85), bandwidth.compute=FALSE, regtype='lc', bwtype='adaptive_nn')",
+      "fit.fixed <- npindex(bws=bw.fixed, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+      "fit.adp <- npindex(bws=bw.adp, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+      "stopifnot(max(abs(as.vector(fit.fixed$mean) - as.vector(fit.adp$mean))) > 1e-6)",
+      "cat('SESSION_NPINDEX_ADAPTIVE_PUBLIC_OK\\n')"
+    ),
+    timeout = 90L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEX_ADAPTIVE_PUBLIC_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session wild selector plot smoke completes in subprocess", {
   skip_on_cran()
   env <- subprocess_env()
@@ -1089,6 +1122,79 @@ test_that("attach npindexhat adaptive-nn exact owner route completes under mpiex
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("attach npindex adaptive-nn public route preserves bwtype semantics under mpiexec when enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
+              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  script <- tempfile("npRmpi-attach-npindex-public-adaptive-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "is.master <- isTRUE(npRmpi.init(mode='attach', quiet=TRUE, autodispatch=TRUE))",
+    "on.exit({",
+    "  try(npRmpi.quit(mode='attach'), silent=TRUE)",
+    "  if (isTRUE(is.master)) try(Rmpi::mpi.quit(), silent=TRUE)",
+    "}, add=TRUE)",
+    "options(np.messages=FALSE)",
+    "if (isTRUE(is.master)) {",
+    "  set.seed(314161)",
+    "  n <- 70L",
+    "  x1 <- runif(n)",
+    "  x2 <- runif(n)",
+    "  y <- sin(x1 + x2) + rnorm(n, sd=0.06)",
+    "  tx <- data.frame(x1=x1, x2=x2)",
+    "  ex <- tx[seq_len(20), , drop=FALSE]",
+    "  bw.fixed <- npindexbw(xdat=tx, ydat=y, bws=c(1, 1, 0.85), bandwidth.compute=FALSE, regtype='lc', bwtype='fixed')",
+    "  bw.adp <- npindexbw(xdat=tx, ydat=y, bws=c(1, 1, 0.85), bandwidth.compute=FALSE, regtype='lc', bwtype='adaptive_nn')",
+    "  fit.fixed <- npindex(bws=bw.fixed, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+    "  fit.adp <- npindex(bws=bw.adp, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+    "  stopifnot(max(abs(as.vector(fit.fixed$mean) - as.vector(fit.adp$mean))) > 1e-6)",
+    "  cat('ATTACH_NPINDEX_ADAPTIVE_PUBLIC_OK\\n')",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_cmd_subprocess(
+    mpiexec,
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+    timeout = 120L,
+    env = c(
+      env_common,
+      "R_PROFILE_USER=",
+      "R_PROFILE=",
+      "FI_TCP_IFACE=en0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=en0"
+    )
+  )
+  if (res$status != 0L) {
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = c(
+        env_common,
+        "R_PROFILE_USER=",
+        "R_PROFILE=",
+        "FI_TCP_IFACE=lo0",
+        "FI_PROVIDER=tcp",
+        "FI_SOCKETS_IFACE=lo0"
+      )
+    )
+  }
+
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for attach-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_NPINDEX_ADAPTIVE_PUBLIC_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("attach smooth-coefficient ll coef plot-data route completes under mpiexec when enabled", {
   skip_on_cran()
   skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
@@ -1463,5 +1569,91 @@ test_that("profile npindexhat adaptive-nn exact owner route completes under mpie
 
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("PROFILE_NPINDEXHAT_ADAPTIVE_EXACT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("profile npindex adaptive-nn public route preserves bwtype semantics under mpiexec when enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
+              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+
+  lib.path <- ensure_subprocess_npRmpi_lib()
+  skip_if(is.null(lib.path), "local npRmpi install unavailable for subprocess smoke")
+  profile.path <- file.path(lib.path, "npRmpi", "Rprofile")
+  skip_if(!file.exists(profile.path), "npRmpi profile template unavailable in subprocess lib")
+
+  script <- tempfile("npRmpi-profile-npindex-public-adaptive-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "if (mpi.comm.rank(0L) == 0L) {",
+    "  mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(options(np.messages=FALSE), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(set.seed(314161), caller.execute=TRUE)",
+    "  n <- 70L",
+    "  x1 <- runif(n)",
+    "  x2 <- runif(n)",
+    "  y <- sin(x1 + x2) + rnorm(n, sd=0.06)",
+    "  tx <- data.frame(x1=x1, x2=x2)",
+    "  ex <- tx[seq_len(20), , drop=FALSE]",
+    "  mpi.bcast.Robj2slave(tx)",
+    "  mpi.bcast.Robj2slave(ex)",
+    "  mpi.bcast.Robj2slave(y)",
+    "  mpi.bcast.cmd({",
+    "    bw.fixed <- npindexbw(xdat=tx, ydat=y, bws=c(1, 1, 0.85), bandwidth.compute=FALSE, regtype='lc', bwtype='fixed')",
+    "    bw.adp <- npindexbw(xdat=tx, ydat=y, bws=c(1, 1, 0.85), bandwidth.compute=FALSE, regtype='lc', bwtype='adaptive_nn')",
+    "    fit.fixed <- npindex(bws=bw.fixed, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+    "    fit.adp <- npindex(bws=bw.adp, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+    "    stopifnot(max(abs(as.vector(fit.fixed$mean) - as.vector(fit.adp$mean))) > 1e-6)",
+    "  }, caller.execute=TRUE)",
+    "  cat('PROFILE_NPINDEX_ADAPTIVE_PUBLIC_OK\\n')",
+    "  mpi.bcast.cmd(mpi.quit(), caller.execute=TRUE)",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_profile <- c(
+    env_common,
+    sprintf("R_PROFILE_USER=%s", profile.path),
+    "R_PROFILE=",
+    "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
+    "FI_TCP_IFACE=en0",
+    "FI_PROVIDER=tcp",
+    "FI_SOCKETS_IFACE=en0"
+  )
+
+  res <- run_cmd_subprocess(
+    mpiexec,
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+    timeout = 120L,
+    env = env_profile
+  )
+  if (res$status != 0L) {
+    env_profile_fallback <- c(
+      env_common,
+      sprintf("R_PROFILE_USER=%s", profile.path),
+      "R_PROFILE=",
+      "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
+      "FI_TCP_IFACE=lo0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=lo0"
+    )
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = env_profile_fallback
+    )
+  }
+
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for profile-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("PROFILE_NPINDEX_ADAPTIVE_PUBLIC_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })

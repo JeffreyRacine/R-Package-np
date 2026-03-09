@@ -366,6 +366,7 @@ npindex.sibandwidth <-
       txdat = if (gradients) index.df else index,
       tydat = tydat,
       bws = bws$bw,
+      bwtype = bws$type,
       ckertype = bws$ckertype,
       ckerorder = bws$ckerorder,
       regtype = regtype,
@@ -386,6 +387,7 @@ npindex.sibandwidth <-
                       weights=as.matrix(data.frame(tydat,1)),
                       exdat=as.matrix(exdat) %*% as.matrix(bws$beta),
                       bws=bws$bw,
+                      bwtype = bws$type,
                       ckertype = bws$ckertype,
                       ckerorder = bws$ckerorder)$ksum
 
@@ -401,6 +403,7 @@ npindex.sibandwidth <-
                         tydat=as.matrix(data.frame(tydat,1)),
                         weights=as.matrix(data.frame(tydat,1)),
                         bws=bws$bw,
+                        bwtype = bws$type,
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
 
@@ -526,11 +529,13 @@ npindex.sibandwidth <-
                           tydat = rep(1,length(tydat)),
                           weights = W,
                           bws = bws$bw,
+                          bwtype = bws$type,
                           ckertype = bws$ckertype,
                           ckerorder = bws$ckerorder)$ksum
 
         tindex <- npksum(txdat = index,
                          bws = bws$bw,
+                         bwtype = bws$type,
                          ckertype = bws$ckertype,
                          ckerorder = bws$ckerorder)$ksum
       }
@@ -623,6 +628,7 @@ npindex.sibandwidth <-
                         weights = cbind(tydat[indices],1),
                         exdat = index.eval,
                         bws = bws$bw,
+                        bwtype = bws$type,
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
 
