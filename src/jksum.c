@@ -15789,10 +15789,10 @@ static int np_conditional_lp_cvls_block_size(void){
   return 64;
 }
 
-static int np_shadow_proof_conditional_x_weight_block_stream(double *vector_scale_factor,
-                                                             int eval_start,
-                                                             int block_rows,
-                                                             double **rows_out){
+static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor,
+                                                     int eval_start,
+                                                     int block_rows,
+                                                     double **rows_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
@@ -16045,11 +16045,11 @@ cleanup_xweight_block:
   return status;
 }
 
-static int np_shadow_conditional_y_block_stream_op(double *vector_scale_factor,
-                                                   int eval_start,
-                                                   int block_rows,
-                                                   int operator_code,
-                                                   double **rows_out){
+static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
+                                                 int eval_start,
+                                                 int block_rows,
+                                                 int operator_code,
+                                                 double **rows_out){
   const int num_train = num_obs_train_extern;
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : block_rows;
@@ -16360,9 +16360,9 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     double lin = 0.0;
     double quad = 0.0;
 
-    if(np_shadow_proof_conditional_x_weight_block_stream(vector_scale_factor, i0, ib, xblock) != 0)
+    if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
       goto cleanup_cvls_lp_block;
-    if(np_shadow_conditional_y_block_stream_op(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0)
+    if(np_conditional_y_block_stream_op_core(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0)
       goto cleanup_cvls_lp_block;
 
     for(ii = 0; ii < ib; ii++)
@@ -16372,7 +16372,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     for(j0 = 0; j0 < num_obs; j0 += block_size){
       const int jb = MIN(block_size, num_obs - j0);
 
-      if(np_shadow_conditional_y_block_stream_op(vector_scale_factor, j0, jb, OP_CONVOLUTION, yconvblock) != 0)
+      if(np_conditional_y_block_stream_op_core(vector_scale_factor, j0, jb, OP_CONVOLUTION, yconvblock) != 0)
         goto cleanup_cvls_lp_block;
 
       for(ii = 0; ii < ib; ii++){
