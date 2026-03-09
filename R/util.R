@@ -1450,8 +1450,9 @@ genBwSelStr <- function(x){
     fval.str <- if (is.null(x$ifval) || identical(x$ifval, NA)) {
       paste("\nObjective Function Value: ", format(x$fval), sep = "")
     } else {
+      ms.label <- if (x$ifval <= 0) 1L else x$ifval
       paste("\nObjective Function Value: ", format(x$fval),
-            " (achieved on multistart ", x$ifval, ")", sep = "")
+            " (achieved on multistart ", ms.label, ")", sep = "")
     }
   }
 

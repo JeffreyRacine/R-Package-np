@@ -680,7 +680,8 @@ void np_set_tgauss2(double * coefficients){
 void spinner(int num) {
   if(int_MINIMIZE_IO == IO_MIN_FALSE){
     const char spinney[] = { '|', '/', '-', '\\' };
-    Rprintf("\rMultistart %d of %d %c", imsnum+1, imstot, spinney[num%4]);
+    const int display_total = (imstot > 0) ? imstot : 1;
+    Rprintf("\rMultistart %d of %d %c", imsnum+1, display_total, spinney[num%4]);
     R_FlushConsole();
   }
 }
