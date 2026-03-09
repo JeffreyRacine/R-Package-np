@@ -507,7 +507,7 @@ npindex.sibandwidth <-
 
       index.grad <- as.matrix(model$grad)%*%t(as.vector(bws$beta))
 
-      if (!no.ex && (no.ey || residuals)) {
+      if (!no.ex) {
 
         ## Want to evaluate on training data for in sample errors even
         ## if evaluation x's are different from training but no y's

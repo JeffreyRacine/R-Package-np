@@ -284,6 +284,63 @@ test_that("session npsigtest fast-fail contract completes in installed-build sub
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npindex residual and evaluation-error branches complete in installed-build subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(20260309)",
+      "n <- 56L",
+      "x1 <- runif(n)",
+      "x2 <- runif(n)",
+      "y <- sin(x1 + x2) + rnorm(n, sd=0.05)",
+      "tx <- data.frame(x1=x1, x2=x2)",
+      "ex <- tx[seq_len(18L), , drop=FALSE]",
+      "ey <- sin(ex$x1 + ex$x2) + rnorm(nrow(ex), sd=0.05)",
+      "cfgs <- list(",
+      "  list(regtype='lc'),",
+      "  list(regtype='ll'),",
+      "  list(regtype='lp', basis='glp', degree=1L)",
+      ")",
+      "for (cfg in cfgs) {",
+      "  bw.args <- list(xdat=tx, ydat=y, regtype=cfg$regtype, bwtype='adaptive_nn', nmulti=1L)",
+      "  if (!is.null(cfg$basis)) {",
+      "    bw.args$basis <- cfg$basis",
+      "    bw.args$degree <- cfg$degree",
+      "    bw.args$bernstein.basis <- FALSE",
+      "  }",
+      "  bw <- do.call(npindexbw, bw.args)",
+      "  fit.is <- npindex(bws=bw, txdat=tx, tydat=y, gradients=FALSE, residuals=TRUE)",
+      "  stopifnot(length(fit.is$resid) == nrow(tx))",
+      "  stopifnot(max(abs(as.vector(fit.is$resid) - (y - as.vector(fit.is$mean)))) < 1e-8)",
+      "  fit.oos <- npindex(bws=bw, txdat=tx, tydat=y, exdat=ex, eydat=ey, gradients=FALSE, errors=TRUE)",
+      "  stopifnot(length(fit.oos$mean) == nrow(ex))",
+      "  stopifnot(length(fit.oos$merr) == nrow(ex))",
+      "  stopifnot(all(is.finite(fit.oos$mean)))",
+      "  stopifnot(all(is.finite(fit.oos$merr)))",
+      "  fit.grad <- npindex(bws=bw, txdat=tx, tydat=y, exdat=ex, eydat=ey, gradients=TRUE, errors=TRUE)",
+      "  stopifnot(identical(dim(fit.grad$grad), c(nrow(ex), ncol(tx))))",
+      "  stopifnot(identical(dim(fit.grad$gerr), c(nrow(ex), ncol(tx))))",
+      "  stopifnot(all(is.finite(fit.grad$grad)))",
+      "  stopifnot(all(is.finite(fit.grad$gerr)))",
+      "  cat(sprintf('SESSION_NPINDEX_BRANCH regtype=%s ok\\n', cfg$regtype))",
+      "}",
+      "cat('SESSION_NPINDEX_BRANCH_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEX_BRANCH_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session quit/init cycle resets SPMD sequence for LL CV calls", {
   skip_on_cran()
   env <- subprocess_env()
