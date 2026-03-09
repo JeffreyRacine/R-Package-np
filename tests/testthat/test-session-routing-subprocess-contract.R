@@ -543,6 +543,70 @@ test_that("session npreghat smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npindexhat adaptive-nn exact owner route completes in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(105)",
+      "n <- 60L",
+      "x <- runif(n)",
+      "x2 <- runif(n)",
+      "y <- x * exp(x2) * (1 + rnorm(n, sd=0.15))",
+      "idxdat <- data.frame(y=y, x=x, x2=x2)",
+      "fit <- npindex(y ~ x + x2, data=idxdat, method='ichimura', bwtype='adaptive_nn')",
+      "hy <- npindexhat(bws=fit$bws, txdat=idxdat[c('x','x2')], exdat=idxdat[c('x','x2')], y=y, output='apply', s=0L)",
+      "stopifnot(length(hy) == n)",
+      "stopifnot(max(abs(as.vector(hy) - as.vector(fit$mean))) < 1e-8)",
+      "cat('SESSION_NPINDEXHAT_ADAPTIVE_EXACT_OK\\n')"
+    ),
+    timeout = 90L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEXHAT_ADAPTIVE_EXACT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("session npindexhat adaptive-nn manual owner control stays exact in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(314161)",
+      "n <- 70L",
+      "x1 <- runif(n)",
+      "x2 <- runif(n)",
+      "y <- sin(x1 + x2) + rnorm(n, sd=0.06)",
+      "tx <- data.frame(x1=x1, x2=x2)",
+      "ex <- tx[seq_len(20), , drop=FALSE]",
+      "bw <- npindexbw(xdat=tx, ydat=y, bws=c(1, 1, 0.85), bandwidth.compute=FALSE, regtype='lc', bwtype='adaptive_nn')",
+      "fit <- npindex(bws=bw, txdat=tx, tydat=y, exdat=ex, gradients=FALSE)",
+      "hy <- npindexhat(bws=bw, txdat=tx, exdat=ex, y=y, output='apply', s=0L)",
+      "stopifnot(length(hy) == nrow(ex))",
+      "stopifnot(max(abs(as.vector(hy) - as.vector(fit$mean))) < 1e-8)",
+      "cat('SESSION_NPINDEXHAT_ADAPTIVE_MANUAL_OK\\n')"
+    ),
+    timeout = 90L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEXHAT_ADAPTIVE_MANUAL_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session wild selector plot smoke completes in subprocess", {
   skip_on_cran()
   env <- subprocess_env()
@@ -954,6 +1018,77 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("attach npindexhat adaptive-nn exact owner route completes under mpiexec when enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
+              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  script <- tempfile("npRmpi-attach-npindexhat-exact-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "is.master <- isTRUE(npRmpi.init(mode='attach', quiet=TRUE, autodispatch=TRUE))",
+    "on.exit({",
+    "  try(npRmpi.quit(mode='attach'), silent=TRUE)",
+    "  if (isTRUE(is.master)) try(Rmpi::mpi.quit(), silent=TRUE)",
+    "}, add=TRUE)",
+    "options(np.messages=FALSE)",
+    "if (isTRUE(is.master)) {",
+    "  set.seed(105)",
+    "  n <- 60L",
+    "  x <- runif(n)",
+    "  x2 <- runif(n)",
+    "  y <- x * exp(x2) * (1 + rnorm(n, sd=0.15))",
+    "  idxdat <- data.frame(y=y, x=x, x2=x2)",
+    "  fit <- npindex(y ~ x + x2, data=idxdat, method='ichimura', bwtype='adaptive_nn')",
+    "  hy <- npindexhat(bws=fit$bws, txdat=idxdat[c('x','x2')], exdat=idxdat[c('x','x2')], y=y, output='apply', s=0L)",
+    "  stopifnot(length(hy) == n)",
+    "  stopifnot(max(abs(as.vector(hy) - as.vector(fit$mean))) < 1e-8)",
+    "  cat('ATTACH_NPINDEXHAT_ADAPTIVE_EXACT_OK\\n')",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_cmd_subprocess(
+    mpiexec,
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+    timeout = 120L,
+    env = c(
+      env_common,
+      "R_PROFILE_USER=",
+      "R_PROFILE=",
+      "FI_TCP_IFACE=en0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=en0"
+    )
+  )
+  if (res$status != 0L) {
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = c(
+        env_common,
+        "R_PROFILE_USER=",
+        "R_PROFILE=",
+        "FI_TCP_IFACE=lo0",
+        "FI_PROVIDER=tcp",
+        "FI_SOCKETS_IFACE=lo0"
+      )
+    )
+  }
+
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for attach-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_NPINDEXHAT_ADAPTIVE_EXACT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("attach smooth-coefficient ll coef plot-data route completes under mpiexec when enabled", {
   skip_on_cran()
   skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
@@ -1246,5 +1381,87 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
   expect_true(any(grepl("PROFILE_NPCONMODE_ROUTE_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("PROFILE_NPCOPULA_ROUTE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("profile npindexhat adaptive-nn exact owner route completes under mpiexec when enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
+              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+
+  lib.path <- ensure_subprocess_npRmpi_lib()
+  skip_if(is.null(lib.path), "local npRmpi install unavailable for subprocess smoke")
+  profile.path <- file.path(lib.path, "npRmpi", "Rprofile")
+  skip_if(!file.exists(profile.path), "npRmpi profile template unavailable in subprocess lib")
+
+  script <- tempfile("npRmpi-profile-npindexhat-exact-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "if (mpi.comm.rank(0L) == 0L) {",
+    "  mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(options(np.messages=FALSE), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(set.seed(105), caller.execute=TRUE)",
+    "  n <- 60L",
+    "  x <- runif(n)",
+    "  x2 <- runif(n)",
+    "  y <- x * exp(x2) * (1 + rnorm(n, sd=0.15))",
+    "  idxdat <- data.frame(y=y, x=x, x2=x2)",
+    "  mpi.bcast.Robj2slave(idxdat)",
+    "  mpi.bcast.cmd({",
+    "    fit <- npindex(y ~ x + x2, data=idxdat, method='ichimura', bwtype='adaptive_nn')",
+    "    hy <- npindexhat(bws=fit$bws, txdat=idxdat[c('x','x2')], exdat=idxdat[c('x','x2')], y=idxdat$y, output='apply', s=0L)",
+    "    stopifnot(length(hy) == nrow(idxdat))",
+    "    stopifnot(max(abs(as.vector(hy) - as.vector(fit$mean))) < 1e-8)",
+    "  }, caller.execute=TRUE)",
+    "  cat('PROFILE_NPINDEXHAT_ADAPTIVE_EXACT_OK\\n')",
+    "  mpi.bcast.cmd(mpi.quit(), caller.execute=TRUE)",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_profile <- c(
+    env_common,
+    sprintf("R_PROFILE_USER=%s", profile.path),
+    "R_PROFILE=",
+    "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
+    "FI_TCP_IFACE=en0",
+    "FI_PROVIDER=tcp",
+    "FI_SOCKETS_IFACE=en0"
+  )
+
+  res <- run_cmd_subprocess(
+    mpiexec,
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+    timeout = 120L,
+    env = env_profile
+  )
+  if (res$status != 0L) {
+    env_profile_fallback <- c(
+      env_common,
+      sprintf("R_PROFILE_USER=%s", profile.path),
+      "R_PROFILE=",
+      "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
+      "FI_TCP_IFACE=lo0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=lo0"
+    )
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = env_profile_fallback
+    )
+  }
+
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for profile-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("PROFILE_NPINDEXHAT_ADAPTIVE_EXACT_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
