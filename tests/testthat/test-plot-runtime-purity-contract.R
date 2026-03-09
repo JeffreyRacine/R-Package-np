@@ -81,3 +81,40 @@ test_that("object-fed partially linear plots avoid public npplreg re-entry", {
 
   expect_identical(calls, 0L)
 })
+
+test_that("object-fed conditional density/distribution plots avoid public re-entry", {
+  set.seed(9213)
+  n <- 46
+  xdat <- data.frame(x = runif(n))
+  ydat <- data.frame(y = rnorm(n))
+
+  dens.bw <- npcdensbw(xdat = xdat, ydat = ydat, bws = c(0.22, 0.22), bandwidth.compute = FALSE)
+  dist.bw <- npcdistbw(xdat = xdat, ydat = ydat, bws = c(0.22, 0.22), bandwidth.compute = FALSE)
+  dens.fit <- npcdens(txdat = xdat, tydat = ydat, bws = dens.bw)
+  dist.fit <- npcdist(txdat = xdat, tydat = ydat, bws = dist.bw)
+
+  dens.calls <- with_public_trace_counter("np", "npcdens", {
+    out.grid.bw <- plot(dens.bw, xdat = xdat, ydat = ydat, plot.behavior = "data", view = "fixed")
+    out.grid.fit <- plot(dens.fit, plot.behavior = "data", view = "fixed")
+    out.slice.bw <- plot(dens.bw, xdat = xdat, ydat = ydat, plot.behavior = "data", perspective = FALSE, plot.errors.method = "asymptotic")
+    out.slice.fit <- plot(dens.fit, plot.behavior = "data", perspective = FALSE, plot.errors.method = "asymptotic")
+    expect_type(out.grid.bw, "list")
+    expect_type(out.grid.fit, "list")
+    expect_type(out.slice.bw, "list")
+    expect_type(out.slice.fit, "list")
+  })
+
+  dist.calls <- with_public_trace_counter("np", "npcdist", {
+    out.grid.bw <- plot(dist.bw, xdat = xdat, ydat = ydat, plot.behavior = "data", view = "fixed")
+    out.grid.fit <- plot(dist.fit, plot.behavior = "data", view = "fixed")
+    out.slice.bw <- plot(dist.bw, xdat = xdat, ydat = ydat, plot.behavior = "data", perspective = FALSE, plot.errors.method = "asymptotic")
+    out.slice.fit <- plot(dist.fit, plot.behavior = "data", perspective = FALSE, plot.errors.method = "asymptotic")
+    expect_type(out.grid.bw, "list")
+    expect_type(out.grid.fit, "list")
+    expect_type(out.slice.bw, "list")
+    expect_type(out.slice.fit, "list")
+  })
+
+  expect_identical(dens.calls, 0L)
+  expect_identical(dist.calls, 0L)
+})

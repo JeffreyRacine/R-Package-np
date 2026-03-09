@@ -2343,6 +2343,276 @@ plotFactor <- function(f, y, ...){
   }
 }
 
+.np_plot_conditional_eval <- function(bws,
+                                      xdat,
+                                      ydat,
+                                      exdat,
+                                      eydat,
+                                      cdf = FALSE,
+                                      gradients = FALSE,
+                                      proper = FALSE,
+                                      proper.method = NULL,
+                                      proper.control = list()) {
+  fit.start <- proc.time()[3]
+  proper <- npValidateScalarLogical(proper, "proper")
+
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+
+  if (nrow(xdat) != nrow(ydat))
+    stop("conditional plot helper requires aligned training rows")
+  if (nrow(exdat) != nrow(eydat))
+    stop("conditional plot helper requires aligned evaluation rows")
+  if (!xdat %~% exdat)
+    stop("'xdat' and 'exdat' are not similar data frames!")
+  if (!ydat %~% eydat)
+    stop("'ydat' and 'eydat' are not similar data frames!")
+
+  xdat <- adjustLevels(xdat, bws$xdati)
+  ydat <- adjustLevels(ydat, bws$ydati)
+  exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+  eydat <- adjustLevels(eydat, bws$ydati, allowNewCells = TRUE)
+  npKernelBoundsCheckEval(exdat, bws$ixcon, bws$cxkerlb, bws$cxkerub, argprefix = "cxker")
+  npKernelBoundsCheckEval(eydat, bws$iycon, bws$cykerlb, bws$cykerub, argprefix = "cyker")
+
+  txeval <- exdat
+  tyeval <- eydat
+  tnrow <- nrow(xdat)
+  enrow <- nrow(exdat)
+
+  ydat <- toMatrix(ydat)
+  tyuno <- ydat[, bws$iyuno, drop = FALSE]
+  tycon <- ydat[, bws$iycon, drop = FALSE]
+  tyord <- ydat[, bws$iyord, drop = FALSE]
+
+  xdat <- toMatrix(xdat)
+  txuno <- xdat[, bws$ixuno, drop = FALSE]
+  txcon <- xdat[, bws$ixcon, drop = FALSE]
+  txord <- xdat[, bws$ixord, drop = FALSE]
+
+  eydat <- toMatrix(eydat)
+  eyuno <- eydat[, bws$iyuno, drop = FALSE]
+  eycon <- eydat[, bws$iycon, drop = FALSE]
+  eyord <- eydat[, bws$iyord, drop = FALSE]
+
+  exdat <- toMatrix(exdat)
+  exuno <- exdat[, bws$ixuno, drop = FALSE]
+  excon <- exdat[, bws$ixcon, drop = FALSE]
+  exord <- exdat[, bws$ixord, drop = FALSE]
+
+  reg.engine <- if (is.null(bws$regtype.engine)) {
+    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  } else {
+    as.character(bws$regtype.engine)
+  }
+  basis.engine <- if (is.null(bws$basis.engine)) {
+    if (is.null(bws$basis)) "glp" else bws$basis
+  } else {
+    bws$basis.engine
+  }
+  degree.engine <- if (is.null(bws$degree.engine)) {
+    if (bws$xncon > 0L) {
+      if (identical(reg.engine, "lc")) rep.int(0L, bws$xncon) else npValidateGlpDegree(
+        regtype = "lp",
+        degree = bws$degree,
+        ncon = bws$xncon
+      )
+    } else {
+      integer(0)
+    }
+  } else {
+    as.integer(bws$degree.engine)
+  }
+  bernstein.engine <- if (is.null(bws$bernstein.basis.engine)) {
+    isTRUE(bws$bernstein.basis)
+  } else {
+    isTRUE(bws$bernstein.basis.engine)
+  }
+
+  reg.c <- npRegtypeToC(
+    regtype = if (identical(reg.engine, "lp")) "lp" else "lc",
+    degree = degree.engine,
+    ncon = bws$xncon,
+    context = if (isTRUE(cdf)) "npcdist" else "npcdens"
+  )
+  degree.c <- if (bws$xncon > 0L) {
+    as.integer(if (is.null(reg.c$degree)) rep.int(0L, bws$xncon) else reg.c$degree)
+  } else {
+    integer(0)
+  }
+  basis.code <- as.integer(npLpBasisCode(basis.engine))
+
+  myopti <- list(
+    num_obs_train = tnrow,
+    num_obs_eval = enrow,
+    int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
+    BANDWIDTH_den_extern = switch(bws$type,
+      fixed = BW_FIXED,
+      generalized_nn = BW_GEN_NN,
+      adaptive_nn = BW_ADAP_NN
+    ),
+    int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
+    xkerneval = switch(bws$cxkertype,
+      gaussian = CKER_GAUSS + bws$cxkerorder / 2 - 1,
+      epanechnikov = CKER_EPAN + bws$cxkerorder / 2 - 1,
+      uniform = CKER_UNI,
+      "truncated gaussian" = CKER_TGAUSS
+    ),
+    ykerneval = switch(bws$cykertype,
+      gaussian = CKER_GAUSS + bws$cykerorder / 2 - 1,
+      epanechnikov = CKER_EPAN + bws$cykerorder / 2 - 1,
+      uniform = CKER_UNI,
+      "truncated gaussian" = CKER_TGAUSS
+    ),
+    uxkerneval = switch(bws$uxkertype,
+      aitchisonaitken = UKER_AIT,
+      liracine = UKER_LR
+    ),
+    uykerneval = switch(bws$uykertype,
+      aitchisonaitken = UKER_AIT,
+      liracine = UKER_LR
+    ),
+    oxkerneval = switch(bws$oxkertype,
+      wangvanryzin = OKER_WANG,
+      liracine = OKER_NLR,
+      racineliyan = OKER_RLY
+    ),
+    oykerneval = switch(bws$oykertype,
+      wangvanryzin = OKER_WANG,
+      liracine = OKER_NLR,
+      racineliyan = OKER_RLY
+    ),
+    num_yuno = bws$ynuno,
+    num_yord = bws$ynord,
+    num_ycon = bws$yncon,
+    num_xuno = bws$xnuno,
+    num_xord = bws$xnord,
+    num_xcon = bws$xncon,
+    no.exy = FALSE,
+    gradients = gradients,
+    ymcv.numRow = attr(bws$ymcv, "num.row"),
+    xmcv.numRow = attr(bws$xmcv, "num.row"),
+    densOrDist = if (isTRUE(cdf)) NP_DO_DIST else NP_DO_DENS,
+    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO
+  )
+
+  cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
+  cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
+
+  myout <- .Call(
+    "C_np_density_conditional",
+    as.double(tyuno), as.double(tyord), as.double(tycon),
+    as.double(txuno), as.double(txord), as.double(txcon),
+    as.double(eyuno), as.double(eyord), as.double(eycon),
+    as.double(exuno), as.double(exord), as.double(excon),
+    as.double(c(
+      bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+      bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+      bws$xbw[bws$ixuno], bws$xbw[bws$ixord]
+    )),
+    as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
+    as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+    as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
+    as.integer(myopti),
+    as.integer(enrow),
+    as.integer(bws$xndim),
+    as.double(cxker.bounds.c$lb),
+    as.double(cxker.bounds.c$ub),
+    as.double(cyker.bounds.c$lb),
+    as.double(cyker.bounds.c$ub),
+    as.integer(reg.c$code),
+    as.integer(degree.c),
+    as.integer(bernstein.engine),
+    basis.code,
+    PACKAGE = "np"
+  )
+
+  if (isTRUE(cdf))
+    names(myout)[1L] <- "condist"
+
+  if (isTRUE(gradients)) {
+    xidx <- seq_len(bws$xndim)
+    rorder <- numeric(bws$xndim)
+    rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
+    myout$congrad <- matrix(data = myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
+    myout$congrad <- myout$congrad[, rorder, drop = FALSE]
+    myout$congerr <- matrix(data = myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
+    myout$congerr <- myout$congerr[, rorder, drop = FALSE]
+  } else {
+    myout$congrad <- NA
+    myout$congerr <- NA
+  }
+
+  fit.elapsed <- proc.time()[3] - fit.start
+  optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+  total.time <- fit.elapsed + if (is.na(optim.time)) 0.0 else optim.time
+
+  if (isTRUE(cdf)) {
+    out <- condistribution(
+      bws = bws,
+      xeval = txeval,
+      yeval = tyeval,
+      condist = myout$condist,
+      conderr = myout$conderr,
+      congrad = myout$congrad,
+      congerr = myout$congerr,
+      ntrain = tnrow,
+      trainiseval = FALSE,
+      gradients = gradients,
+      rows.omit = integer(0),
+      timing = bws$timing,
+      total.time = total.time,
+      optim.time = optim.time,
+      fit.time = fit.elapsed
+    )
+
+    if (isTRUE(proper)) {
+      .np_condist_finalize_proper_object(
+        object = out,
+        proper = TRUE,
+        proper.method = proper.method,
+        proper.control = proper.control,
+        where = "plot()"
+      )
+    } else {
+      out
+    }
+  } else {
+    out <- condensity(
+      bws = bws,
+      xeval = txeval,
+      yeval = tyeval,
+      condens = myout$condens,
+      conderr = myout$conderr,
+      congrad = myout$congrad,
+      congerr = myout$congerr,
+      ll = myout$log_likelihood,
+      ntrain = tnrow,
+      trainiseval = FALSE,
+      gradients = gradients,
+      rows.omit = integer(0),
+      timing = bws$timing,
+      total.time = total.time,
+      optim.time = optim.time,
+      fit.time = fit.elapsed
+    )
+
+    if (isTRUE(proper)) {
+      .np_condens_finalize_proper_object(
+        object = out,
+        proper = TRUE,
+        proper.method = proper.method,
+        proper.control = proper.control,
+        where = "plot()"
+      )
+    } else {
+      out
+    }
+  }
+}
+
 ## Rank-based simultaneous confidence set helper, vendored from
 ## MCPAN::SCSrank (MCPAN 1.1-21, GPL-2; Schaarschmidt, Gerhard, Sill).
 np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...) {

@@ -216,26 +216,32 @@
         else if (cdf) "dist"
         else "dens"
 
-      method.fun <- switch(tboo,
-                           "quant" = npqreg,
-                           "dist" = npcdist,
-                           "dens" = npcdens)
-      margs <- list(txdat = xdat, tydat = ydat, bws = bws)
       if (quantreg) {
-        margs$exdat <- x.eval
-        margs$tau <- tau
+        tobj <- npqreg(
+          txdat = xdat,
+          tydat = ydat,
+          exdat = x.eval,
+          tau = tau,
+          bws = bws
+        )
       } else {
-        margs$exdat <- x.eval[,1, drop = FALSE]
-        margs$eydat <- x.eval[,2, drop = FALSE]
         if (isTRUE(proper.args$proper.requested)) {
           if (plot.errors)
             stop("plot.errors.method != 'none' is unsupported when proper=TRUE is active on conditional density grids", call. = FALSE)
-          margs$proper <- TRUE
-          margs$proper.method <- proper.args$proper.method
-          margs$proper.control <- proper.args$proper.control
         }
+        tobj <- .np_plot_conditional_eval(
+          bws = bws,
+          xdat = xdat,
+          ydat = ydat,
+          exdat = x.eval[,1, drop = FALSE],
+          eydat = x.eval[,2, drop = FALSE],
+          cdf = FALSE,
+          gradients = FALSE,
+          proper = isTRUE(proper.args$proper.requested),
+          proper.method = proper.args$proper.method,
+          proper.control = proper.args$proper.control
+        )
       }
-      tobj <- do.call(method.fun, margs)
       tcomp <- switch(tboo,
                       "quant" = tobj$quantile,
                       "dist" = tobj$condist,
@@ -556,19 +562,26 @@
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        method.fun <- if (cdf) npcdist else if (quantreg) npqreg else npcdens
-        margs <- list(
-          txdat = xdat,
-          tydat = ydat,
-          exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-          gradients = gradients,
-          bws = bws
-        )
-        if (quantreg)
-          margs$tau <- tau
-        else
-          margs$eydat <- eydat[seq_len(xi.neval),, drop = FALSE]
-        tobj <- do.call(method.fun, margs)
+        if (quantreg) {
+          tobj <- npqreg(
+            txdat = xdat,
+            tydat = ydat,
+            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+            gradients = gradients,
+            tau = tau,
+            bws = bws
+          )
+        } else {
+          tobj <- .np_plot_conditional_eval(
+            bws = bws,
+            xdat = xdat,
+            ydat = ydat,
+            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+            eydat = eydat[seq_len(xi.neval),, drop = FALSE],
+            cdf = cdf,
+            gradients = gradients
+          )
+        }
         if (!quantreg && isTRUE(proper.args$proper.requested)) {
           tobj$proper.requested <- TRUE
           tobj$proper.applied <- FALSE
@@ -759,26 +772,33 @@
             ei[(xi.neval+1):maxneval] = NA
           }
 
-          method.fun <- if (cdf) npcdist else if (quantreg) npqreg else npcdens
-          margs <- list(
-            txdat = xdat,
-            tydat = ydat,
-            eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-            gradients = gradients,
-            bws = bws
-          )
-          if (quantreg)
-            margs$tau <- tau
-          else
-            margs$exdat <- exdat[seq_len(xi.neval),, drop = FALSE]
-          if (!quantreg && isTRUE(proper.args$proper.requested)) {
-            if (plot.errors)
-              stop("plot.errors.method != 'none' is unsupported when proper=TRUE is active on y-varying conditional density panels", call. = FALSE)
-            margs$proper <- TRUE
-            margs$proper.method <- proper.args$proper.method
-            margs$proper.control <- proper.args$proper.control
+          if (quantreg) {
+            tobj <- npqreg(
+              txdat = xdat,
+              tydat = ydat,
+              eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+              gradients = gradients,
+              tau = tau,
+              bws = bws
+            )
+          } else {
+            if (isTRUE(proper.args$proper.requested)) {
+              if (plot.errors)
+                stop("plot.errors.method != 'none' is unsupported when proper=TRUE is active on y-varying conditional density panels", call. = FALSE)
+            }
+            tobj <- .np_plot_conditional_eval(
+              bws = bws,
+              xdat = xdat,
+              ydat = ydat,
+              exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+              eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+              cdf = cdf,
+              gradients = gradients,
+              proper = isTRUE(proper.args$proper.requested),
+              proper.method = proper.args$proper.method,
+              proper.control = proper.args$proper.control
+            )
           }
-          tobj <- do.call(method.fun, margs)
 
           
           ## if there are gradients then we need to repeat the process for each component
