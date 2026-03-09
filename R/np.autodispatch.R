@@ -273,6 +273,8 @@
 .npRmpi_require_active_slave_pool <- function(comm = 1L,
                                               where = "this call") {
   .npRmpi_abort_if_rmpi_attached(where = where)
+  if (isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+    return(invisible(TRUE))
   if (.npRmpi_has_active_slave_pool(comm = comm))
     return(invisible(TRUE))
   stop(sprintf("%s requires an active MPI slave pool; call npRmpi.init(...) first", where))
