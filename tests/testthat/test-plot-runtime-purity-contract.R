@@ -118,3 +118,26 @@ test_that("object-fed conditional density/distribution plots avoid public re-ent
   expect_identical(dens.calls, 0L)
   expect_identical(dist.calls, 0L)
 })
+
+test_that("object-fed quantile plots avoid public npqreg re-entry", {
+  set.seed(9214)
+  n <- 46
+  xdat <- data.frame(x = runif(n))
+  ydat <- data.frame(y = rnorm(n))
+
+  bw <- npcdistbw(xdat = xdat, ydat = ydat, bws = c(0.22, 0.22), bandwidth.compute = FALSE)
+  fit <- npqreg(txdat = xdat, tydat = ydat, bws = bw, tau = 0.4)
+
+  calls <- with_public_trace_counter("np", "npqreg", {
+    out.grid.bw <- plot(bw, xdat = xdat, ydat = ydat, plot.behavior = "data", view = "fixed", quantreg = TRUE, tau = 0.4)
+    out.grid.fit <- plot(fit, plot.behavior = "data", view = "fixed")
+    out.slice.bw <- plot(bw, xdat = xdat, ydat = ydat, plot.behavior = "data", perspective = FALSE, quantreg = TRUE, tau = 0.4)
+    out.slice.fit <- plot(fit, plot.behavior = "data", perspective = FALSE)
+    expect_type(out.grid.bw, "list")
+    expect_type(out.grid.fit, "list")
+    expect_type(out.slice.bw, "list")
+    expect_type(out.slice.fit, "list")
+  })
+
+  expect_identical(calls, 0L)
+})
