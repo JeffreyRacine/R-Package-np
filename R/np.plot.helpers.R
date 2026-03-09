@@ -1919,134 +1919,6 @@
   list(t = tmat, t0 = t0)
 }
 
-.np_wild_boot_from_regression_exact <- function(xdat,
-                                                exdat,
-                                                bws,
-                                                ydat,
-                                                B,
-                                                wild = c("mammen", "rademacher"),
-                                                fit.mean.train = NULL,
-                                                gradients = FALSE,
-                                                gradient.order = 1L,
-                                                slice.index = 1L) {
-  xdat <- toFrame(xdat)
-  exdat <- toFrame(exdat)
-  ydat <- as.double(ydat)
-  B <- as.integer(B)
-
-  n <- nrow(xdat)
-  neval <- nrow(exdat)
-  if (length(ydat) != n)
-    stop("length of ydat must match training rows")
-  if (n < 1L || neval < 1L || B < 1L)
-    stop("invalid wild regression bootstrap dimensions")
-
-  local.mode <- identical(bws$type, "generalized_nn")
-  wild <- match.arg(if (length(wild) > 1L) wild[1L] else wild,
-                    c("mammen", "rademacher"))
-
-  fit0 <- .np_plot_with_local_compiled_eval(.np_regression_direct(
-    bws = bws,
-    txdat = xdat,
-    tydat = ydat,
-    exdat = exdat,
-    gradients = gradients,
-    gradient.order = gradient.order,
-    local.mode = local.mode
-  ))
-  t0 <- if (isTRUE(gradients)) {
-    as.vector(fit0$grad[, slice.index])
-  } else {
-    as.vector(fit0$mean)
-  }
-
-  if (is.null(fit.mean.train)) {
-    fit.train <- .np_plot_with_local_compiled_eval(.np_regression_direct(
-      bws = bws,
-      txdat = xdat,
-      tydat = ydat,
-      gradients = FALSE,
-      gradient.order = 1L,
-      local.mode = local.mode
-    ))
-    fit.mean.train <- as.double(fit.train$mean)
-  } else {
-    fit.mean.train <- as.double(fit.mean.train)
-    if (length(fit.mean.train) != n || any(!is.finite(fit.mean.train)))
-      stop("invalid fit.mean.train payload for wild regression bootstrap")
-  }
-
-  eps <- as.double(ydat - fit.mean.train)
-  nout <- length(t0)
-  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
-    B = B,
-    chunk.size = .np_wild_chunk_size(n = n, B = B),
-    comm = 1L,
-    include.master = TRUE
-  )
-
-  compute_wild_chunk <- function(seed, bsz) {
-    set.seed(as.integer(seed))
-    draws <- .np_wild_draws(n = n, B = as.integer(bsz), wild = wild)
-    out <- matrix(NA_real_, nrow = as.integer(bsz), ncol = nout)
-    for (jj in seq_len(as.integer(bsz))) {
-      fit.b <- .np_plot_with_local_compiled_eval(.np_regression_direct(
-        bws = bws,
-        txdat = xdat,
-        tydat = fit.mean.train + eps * draws[, jj],
-        exdat = exdat,
-        gradients = gradients,
-        gradient.order = gradient.order,
-        local.mode = local.mode
-      ))
-      out[jj, ] <- if (isTRUE(gradients)) {
-        fit.b$grad[, slice.index]
-      } else {
-        fit.b$mean
-      }
-    }
-    out
-  }
-
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-  worker <- function(task) {
-    compute_wild_chunk(seed = task$seed, bsz = task$bsz)
-  }
-
-  tmat <- .npRmpi_bootstrap_run_fanout(
-    tasks = tasks,
-    worker = worker,
-    ncol.out = nout,
-    what = if (isTRUE(gradients)) "wild-regression-grad" else "wild-regression",
-    profile.where = if (isTRUE(gradients)) {
-      "mpi.applyLB:wild-regression-grad"
-    } else {
-      "mpi.applyLB:wild-regression"
-    },
-    comm = 1L,
-    required.bindings = list(
-      n = n,
-      nout = nout,
-      xdat = xdat,
-      exdat = exdat,
-      bws = bws,
-      fit.mean.train = fit.mean.train,
-      eps = eps,
-      gradients = gradients,
-      gradient.order = gradient.order,
-      slice.index = slice.index,
-      local.mode = local.mode,
-      wild = wild,
-      compute_wild_chunk = compute_wild_chunk
-    )
-  )
-
-  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
-    stop("wild regression helper path produced non-finite values")
-
-  list(t = tmat, t0 = t0)
-}
-
 .np_inid_scoef_numeric_y <- function(ydat, bws) {
   if (is.factor(ydat)) {
     if (is.null(bws$ydati))
@@ -4737,30 +4609,6 @@ compute.bootstrap.errors.rbandwidth =
         )
       )
 
-      if (identical(bws$type, "adaptive_nn")) {
-        boot.out <- .np_wild_boot_from_regression_exact(
-          xdat = xdat,
-          exdat = exdat,
-          bws = bws,
-          ydat = ydat,
-          B = plot.errors.boot.num,
-          wild = plot.errors.boot.wild,
-          fit.mean.train = fit.mean.train,
-          gradients = gradients,
-          gradient.order = gradient.order,
-          slice.index = slice.index
-        )
-        .npRmpi_bootstrap_transport_trace(
-          what = "rbandwidth.wild",
-          event = "wild.boot.done",
-          fields = list(
-            slice = slice.index,
-            t_rows = nrow(boot.out$t),
-            t_cols = ncol(boot.out$t),
-            route = "exact"
-          )
-        )
-      } else {
       if (is.null(fit.mean.train)) {
         fit.train <- .npRmpi_with_local_regression(suppressWarnings(npreg.rbandwidth(
           txdat = xdat,
@@ -4853,7 +4701,6 @@ compute.bootstrap.errors.rbandwidth =
             t_cols = ncol(boot.out$t)
           )
         )
-      }
     }
 
     if (is.null(boot.out))

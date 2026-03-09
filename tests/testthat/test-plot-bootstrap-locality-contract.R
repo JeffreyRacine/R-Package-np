@@ -48,4 +48,5 @@ test_that("wild regression bootstrap stays on local regression wrappers", {
   expect_match(fn.body, "fit\\.mean\\.train")
   expect_match(fn.body, "\\.npRmpi_with_local_regression\\(suppressWarnings\\(npreg\\.rbandwidth\\(")
   expect_match(fn.body, "\\.npRmpi_with_local_regression\\(suppressWarnings\\(npreghat\\.rbandwidth\\(")
+  expect_no_match(fn.body, "\\.np_wild_boot_from_regression_exact\\(")
 })
