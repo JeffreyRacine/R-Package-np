@@ -118,6 +118,57 @@ npscoefbw.NULL <-
     tbw
   }
 
+.npscoef_nn_candidate_bandwidth <- function(param, bwtype, nobs) {
+  if (identical(bwtype, "fixed"))
+    return(as.double(param))
+
+  upper <- max(1L, as.integer(nobs) - 1L)
+  vapply(param, function(h) {
+    if (!is.finite(h))
+      return(NA_real_)
+    as.double(max(1L, min(upper, .np_round_half_to_even(h))))
+  }, numeric(1))
+}
+
+.npscoef_default_start_bandwidth <- function(param, bwtype, nobs) {
+  if (identical(bwtype, "fixed"))
+    return(as.double(param))
+
+  upper <- max(1L, as.integer(nobs) - 1L)
+  start <- max(1L, min(upper, .np_round_half_to_even(sqrt(nobs))))
+  rep.int(as.double(start), length(param))
+}
+
+.npscoef_random_start_bandwidth <- function(param, bwtype, nobs) {
+  if (identical(bwtype, "fixed"))
+    return(as.double(runif(length(param), min = 0.5, max = 1.5) * param))
+
+  upper <- max(1L, as.integer(nobs) - 1L)
+  .npscoef_nn_candidate_bandwidth(
+    param = runif(length(param), min = 1, max = upper),
+    bwtype = bwtype,
+    nobs = nobs
+  )
+}
+
+.npscoef_finalize_bandwidth <- function(param, bwtype, nobs, where = "npscoefbw") {
+  candidate <- .npscoef_nn_candidate_bandwidth(param = param, bwtype = bwtype, nobs = nobs)
+  if (any(!is.finite(candidate))) {
+    if (identical(bwtype, "fixed")) {
+      stop(sprintf("%s: bandwidth must be finite", where), call. = FALSE)
+    }
+    stop(
+      sprintf(
+        "%s: nearest-neighbor bandwidth must be an integer vector in [1, %d]",
+        where,
+        max(1L, as.integer(nobs) - 1L)
+      ),
+      call. = FALSE
+    )
+  }
+  as.double(candidate)
+}
+
 npscoefbw.scbandwidth <- 
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
@@ -270,6 +321,7 @@ npscoefbw.scbandwidth <-
       }
     }
     apply_bw_to_scbw <- function(scbw, param) {
+      param <- .npscoef_nn_candidate_bandwidth(param = param, bwtype = scbw$type, nobs = n)
       scbw$bw <- param
       if (scbw$scaling)
         scbw$bandwidth[[1]] <- scbw$bw * bw.scale.multiplier
@@ -634,11 +686,11 @@ npscoefbw.scbandwidth <-
             cv_state$console <- newLineConsole(console)
             
             if (i == 1) {
-              tbw <- x.scale
-              if(all(bws$bw != 0))
-                tbw <- bws$bw
+              tbw <- .npscoef_default_start_bandwidth(param = x.scale, bwtype = bws$type, nobs = n)
+              if (all(bws$bw != 0))
+                tbw <- .npscoef_finalize_bandwidth(param = bws$bw, bwtype = bws$type, nobs = n, where = "npscoefbw")
             } else {
-              tbw <- runif(bws$ndim, min=0.5, max=1.5)*x.scale
+              tbw <- .npscoef_random_start_bandwidth(param = x.scale, bwtype = bws$type, nobs = n)
             }
 
             suppressWarnings(optim.return <- optim(tbw,
@@ -649,7 +701,7 @@ npscoefbw.scbandwidth <-
             attempts <- 0
             while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
               attempts <- attempts + 1
-              tbw <- runif(bws$ndim, min=0.5, max=1.5)*x.scale
+              tbw <- .npscoef_random_start_bandwidth(param = x.scale, bwtype = bws$type, nobs = n)
               optim.control <- lapply(optim.control, '*', 10.0)
               suppressWarnings(optim.return <- optim(tbw,
                                                      fn = overall.cv.ls,
@@ -664,7 +716,12 @@ npscoefbw.scbandwidth <-
             value.overall[i] <- optim.return$value
 
             if(optim.return$value < fval.min) {
-              param <- optim.return$par
+              param <- .npscoef_finalize_bandwidth(
+                param = optim.return$par,
+                bwtype = bws$type,
+                nobs = n,
+                where = "npscoefbw"
+              )
               min.overall <- optim.return$value
               fval.min <- min.overall ## Added by jracine Jul 22 2010
               numimp.overall <- numimp + 1
@@ -677,7 +734,12 @@ npscoefbw.scbandwidth <-
               console <- printClear(console)
           }
 
-          param.overall <- bws$bw <- param
+          param.overall <- bws$bw <- .npscoef_finalize_bandwidth(
+            param = param,
+            bwtype = bws$type,
+            nobs = n,
+            where = "npscoefbw"
+          )
 
           if(cv.iterate){
             

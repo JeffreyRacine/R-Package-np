@@ -751,6 +751,87 @@ test_that("semihat apply mode matches core fits across bwtypes", {
   }
 })
 
+test_that("npscoefbw adaptive-nn manual bandwidth must be integer support", {
+  set.seed(20260309)
+  n <- 40L
+  x <- runif(n)
+  z <- runif(n)
+  y <- (0.4 + x) * sin(2 * pi * z) + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+  tz <- data.frame(z = z)
+
+  expect_error(
+    npscoefbw(
+      xdat = tx,
+      zdat = tz,
+      ydat = y,
+      regtype = "lc",
+      bwtype = "adaptive_nn",
+      bandwidth.compute = FALSE,
+      bws = 0.13
+    ),
+    "nearest-neighbor bandwidth must be an integer"
+  )
+})
+
+test_that("npscoefhat selected adaptive-nn owner preserves integer support and helper parity", {
+  set.seed(20260308)
+  n <- 50L
+  x <- runif(n)
+  z <- runif(n)
+  y <- (0.4 + x) * sin(2 * pi * z) + rnorm(n, sd = 0.04)
+
+  tx <- data.frame(x = x)
+  tz <- data.frame(z = z)
+  ex <- data.frame(x = seq(0.1, 0.9, length.out = 12L))
+  ez <- data.frame(z = seq(0.1, 0.9, length.out = 12L))
+
+  tol <- sqrt(.Machine$double.eps)
+  upper <- n - 1L
+
+  for (regtype in c("lc", "ll", "lp")) {
+    bw_args <- list(
+      xdat = tx,
+      zdat = tz,
+      ydat = y,
+      regtype = regtype,
+      bwtype = "adaptive_nn",
+      nmulti = 1L
+    )
+    if (identical(regtype, "lp")) {
+      bw_args$degree <- 1L
+      bw_args$basis <- "glp"
+      bw_args$bernstein.basis <- FALSE
+    }
+
+    bw <- do.call(npscoefbw, bw_args)
+    expect_true(all(abs(bw$bw - .np_round_half_to_even(bw$bw)) <= tol), info = regtype)
+    expect_true(all(bw$bw >= 1 & bw$bw <= upper), info = regtype)
+
+    hat.apply <- npscoefhat(
+      bws = bw,
+      txdat = tx,
+      tzdat = tz,
+      exdat = ex,
+      ezdat = ez,
+      y = y,
+      output = "apply",
+      iterate = FALSE
+    )
+    hat.matrix <- npscoefhat(
+      bws = bw,
+      txdat = tx,
+      tzdat = tz,
+      exdat = ex,
+      ezdat = ez,
+      output = "matrix",
+      iterate = FALSE
+    )
+
+    expect_equal(as.vector(hat.apply), as.vector(hat.matrix %*% y), tolerance = 1e-10, info = regtype)
+  }
+})
+
 test_that("npindexbw lc selection no longer collapses nearest-neighbor bwtypes to fixed", {
   set.seed(314163)
   n <- 70
