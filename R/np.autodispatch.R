@@ -183,8 +183,16 @@
 
 .npRmpi_with_manual_bcast_context <- function(expr) {
   old <- getOption("npRmpi.manual.bcast.context", FALSE)
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  disable.autodispatch <- isTRUE(getOption("npRmpi.profile.active", FALSE))
   options(npRmpi.manual.bcast.context = TRUE)
-  on.exit(options(npRmpi.manual.bcast.context = old), add = TRUE)
+  if (disable.autodispatch)
+    options(npRmpi.autodispatch.disable = TRUE)
+  on.exit({
+    if (disable.autodispatch)
+      options(npRmpi.autodispatch.disable = old.disable)
+    options(npRmpi.manual.bcast.context = old)
+  }, add = TRUE)
   force(expr)
 }
 
