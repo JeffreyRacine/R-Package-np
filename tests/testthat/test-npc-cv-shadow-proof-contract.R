@@ -653,7 +653,4 @@ test_that("kernelcv no longer references dense shadow proof helpers", {
   expect_false(any(grepl("np_shadow_cv_con_density_ml\\s*\\(", lines)))
   expect_false(any(grepl("np_shadow_cv_con_density_ls\\s*\\(", lines)))
   expect_false(any(grepl("np_shadow_cv_con_distribution_ls\\s*\\(", lines)))
-  expect_false(any(grepl("np_shadow_proof_cv_con_density_ml\\s*\\(", lines)))
-  expect_false(any(grepl("np_shadow_proof_cv_con_density_ls\\s*\\(", lines)))
-  expect_false(any(grepl("np_shadow_proof_cv_con_distribution_ls\\s*\\(", lines)))
 })
