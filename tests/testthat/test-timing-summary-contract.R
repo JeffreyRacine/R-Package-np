@@ -1,5 +1,11 @@
 library(np)
 
+quiet_eval <- function(expr) {
+  value <- NULL
+  capture.output(value <- force(expr))
+  value
+}
+
 expect_bw_timing_contract <- function(obj, summary_label = "Estimation Time:") {
   expect_true(is.finite(obj$total.time))
   txt <- paste(capture.output(summary(obj)), collapse = "\n")
@@ -24,17 +30,17 @@ test_that("direct density and distribution families report elapsed optimization 
   x <- runif(n)
   y <- x^2 + rnorm(n, sd = 0.1)
 
-  bw_udens <- npudensbw(~x, nmulti = 1)
-  fit_udens <- npudens(bws = bw_udens)
+  bw_udens <- quiet_eval(npudensbw(~x, nmulti = 1))
+  fit_udens <- quiet_eval(npudens(bws = bw_udens))
 
-  bw_udist <- npudistbw(~x, nmulti = 1)
-  fit_udist <- npudist(bws = bw_udist)
+  bw_udist <- quiet_eval(npudistbw(~x, nmulti = 1))
+  fit_udist <- quiet_eval(npudist(bws = bw_udist))
 
-  bw_cdens <- npcdensbw(y ~ x, regtype = "ll", bwtype = "adaptive_nn", nmulti = 1)
-  fit_cdens <- npcdens(bws = bw_cdens, txdat = data.frame(x = x), tydat = data.frame(y = y))
+  bw_cdens <- quiet_eval(npcdensbw(y ~ x, regtype = "ll", bwtype = "adaptive_nn", nmulti = 1))
+  fit_cdens <- quiet_eval(npcdens(bws = bw_cdens, txdat = data.frame(x = x), tydat = data.frame(y = y)))
 
-  bw_cdist <- npcdistbw(y ~ x, regtype = "ll", bwtype = "adaptive_nn", nmulti = 1)
-  fit_cdist <- npcdist(bws = bw_cdist, txdat = data.frame(x = x), tydat = data.frame(y = y))
+  bw_cdist <- quiet_eval(npcdistbw(y ~ x, regtype = "ll", bwtype = "adaptive_nn", nmulti = 1))
+  fit_cdist <- quiet_eval(npcdist(bws = bw_cdist, txdat = data.frame(x = x), tydat = data.frame(y = y)))
 
   for (obj in list(bw_udens, bw_udist, bw_cdens, bw_cdist))
     expect_bw_timing_contract(obj)
@@ -52,23 +58,52 @@ test_that("regression and quantile regression remain timing-contract compliant",
   x <- runif(n)
   y <- x^2 + rnorm(n, sd = 0.15)
 
-  bw_reg <- npregbw(xdat = data.frame(x = x), ydat = y, regtype = "ll", bwtype = "adaptive_nn", nmulti = 1)
-  fit_reg <- npreg(bws = bw_reg, txdat = data.frame(x = x), tydat = y)
+  bw_reg <- quiet_eval(npregbw(xdat = data.frame(x = x), ydat = y, regtype = "ll", bwtype = "adaptive_nn", nmulti = 1))
+  fit_reg <- quiet_eval(npreg(bws = bw_reg, txdat = data.frame(x = x), tydat = y))
 
-  bw_qreg <- npcdistbw(
+  bw_qreg <- quiet_eval(npcdistbw(
     xdat = data.frame(x = x),
     ydat = data.frame(y = y),
     regtype = "ll",
     bwtype = "adaptive_nn",
     nmulti = 1
-  )
-  fit_qreg <- npqreg(
+  ))
+  fit_qreg <- quiet_eval(npqreg(
     bws = bw_qreg,
     tau = 0.5
-  )
+  ))
 
   expect_bw_timing_contract(bw_reg)
   expect_bw_timing_contract(bw_qreg)
   expect_fit_timing_contract(fit_reg)
   expect_fit_timing_contract(fit_qreg)
+})
+
+test_that("composite core families remain timing-contract compliant", {
+  set.seed(123)
+
+  n <- 50L
+  x <- runif(n)
+  z <- runif(n)
+  y <- x^2 + 2 * z + rnorm(n, sd = 0.1)
+  bw_pl <- quiet_eval(npplregbw(xdat = z, zdat = x, ydat = y, regtype = "ll", nmulti = 1))
+  fit_pl <- quiet_eval(npplreg(bws = bw_pl))
+
+  x1 <- runif(40L)
+  x2 <- runif(40L)
+  y_si <- (x1 + x2)^2 + rnorm(40L, sd = 0.1)
+  bw_si <- quiet_eval(npindexbw(xdat = data.frame(x1 = x1, x2 = x2), ydat = y_si, method = "ichimura", nmulti = 1))
+  fit_si <- quiet_eval(npindex(bws = bw_si))
+
+  xs <- runif(n)
+  zs <- runif(n)
+  y_sc <- (0.5 + xs^2) * zs + rnorm(n, sd = 0.1)
+  bw_sc <- quiet_eval(npscoefbw(xdat = xs, zdat = zs, ydat = y_sc, regtype = "ll", nmulti = 1))
+  fit_sc <- quiet_eval(npscoef(bws = bw_sc))
+
+  for (obj in list(bw_pl, bw_si, bw_sc))
+    expect_bw_timing_contract(obj)
+
+  for (obj in list(fit_pl, fit_si, fit_sc))
+    expect_fit_timing_contract(obj)
 })
