@@ -543,6 +543,67 @@ test_that("session npreghat smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session adaptive-nn npreghat matrix owner stays exact in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "ns <- asNamespace('npRmpi')",
+      "reg_direct <- get('.np_regression_direct', envir=ns, inherits=FALSE)",
+      "with_local <- get('.npRmpi_with_local_regression', envir=ns, inherits=FALSE)",
+      "set.seed(20260309)",
+      "n <- 70L",
+      "x <- sort(runif(n))",
+      "y <- sin(2*pi*x) + 0.25*x + rnorm(n, sd=0.04)",
+      "tx <- data.frame(x=x)",
+      "ex <- data.frame(x=seq(0.05, 0.95, length.out=20L))",
+      "probe_one <- function(regtype, selected) {",
+      "  bw_args <- list(xdat=tx, ydat=y, regtype=regtype, bwtype='adaptive_nn')",
+      "  if (selected) {",
+      "    bw_args$nmulti <- 1L",
+      "  } else {",
+      "    bw_args$bandwidth.compute <- FALSE",
+      "    bw_args$bws <- 9L",
+      "  }",
+      "  if (identical(regtype, 'lp')) {",
+      "    bw_args$degree <- 1L",
+      "    bw_args$basis <- 'glp'",
+      "    bw_args$bernstein.basis <- FALSE",
+      "  }",
+      "  bw <- do.call(npregbw, bw_args)",
+      "  direct <- with_local(reg_direct(",
+      "    bws=bw, txdat=tx, tydat=y, exdat=ex,",
+      "    gradients=!identical(regtype, 'lc'), gradient.order=1L",
+      "  ))",
+      "  hat.apply <- npreghat(bws=bw, txdat=tx, exdat=ex, y=y, output='apply')",
+      "  hat.matrix <- npreghat(bws=bw, txdat=tx, exdat=ex, output='matrix')",
+      "  stopifnot(max(abs(as.vector(hat.apply) - as.vector(direct$mean))) < 1e-8)",
+      "  stopifnot(max(abs(as.vector(hat.matrix %*% y) - as.vector(hat.apply))) < 1e-8)",
+      "  if (!identical(regtype, 'lc')) {",
+      "    grad.apply <- npreghat(bws=bw, txdat=tx, exdat=ex, y=y, output='apply', s=1L)",
+      "    grad.matrix <- npreghat(bws=bw, txdat=tx, exdat=ex, output='matrix', s=1L)",
+      "    stopifnot(max(abs(as.vector(grad.apply) - as.vector(direct$grad[,1]))) < 1e-6)",
+      "    stopifnot(max(abs(as.vector(grad.matrix %*% y) - as.vector(grad.apply))) < 1e-6)",
+      "  }",
+      "  cat(sprintf('SESSION_NPREGHAT_ADAPTIVE_OWNER route=%s regtype=%s bw=%s\\n', if (selected) 'selected' else 'manual', regtype, paste(bw$bw, collapse=',')))",
+      "}",
+      "for (selected in c(FALSE, TRUE)) for (regtype in c('lc', 'll', 'lp')) probe_one(regtype, selected)",
+      "cat('SESSION_NPREGHAT_ADAPTIVE_OWNER_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPREGHAT_ADAPTIVE_OWNER_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npindexhat adaptive-nn exact owner route completes in subprocess", {
   skip_on_cran()
   env <- subprocess_env()
