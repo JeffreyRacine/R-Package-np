@@ -261,6 +261,54 @@ test_that("plot contract: remaining public plot families return plot-data payloa
     view = "fixed"
   )
 
+  fit.qr.alt <- npqreg(
+    bws = bw.cf,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    tau = 0.4
+  )
+  bw.qr.alt.fixed <- plot(
+    bw.cf,
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    plot.behavior = "data",
+    perspective = TRUE,
+    view = "fixed",
+    quantreg = TRUE,
+    tau = 0.4
+  )
+  fit.qr.alt.fixed <- plot(
+    fit.qr.alt,
+    plot.behavior = "data",
+    perspective = TRUE,
+    view = "fixed"
+  )
+  bw.qr.alt.slice <- plot(
+    bw.cf,
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    plot.behavior = "data",
+    perspective = FALSE,
+    quantreg = TRUE,
+    tau = 0.4
+  )
+  fit.qr.alt.slice <- plot(
+    fit.qr.alt,
+    plot.behavior = "data",
+    perspective = FALSE
+  )
+
+  expect_true(all(vapply(fit.qr.alt.fixed, inherits, logical(1), "qregression")))
+  expect_true(all(vapply(fit.qr.alt.slice, inherits, logical(1), "qregression")))
+  expect_true(all(vapply(fit.qr.alt.fixed, function(xi) identical(xi$tau, 0.4), logical(1))))
+  expect_true(all(vapply(fit.qr.alt.slice, function(xi) identical(xi$tau, 0.4), logical(1))))
+  expect_equal(fit.qr.alt.fixed[[1L]]$quantile, bw.qr.alt.fixed[[1L]]$quantile)
+  expect_equal(fit.qr.alt.fixed[[1L]]$xeval, bw.qr.alt.fixed[[1L]]$xeval)
+  expect_equal(fit.qr.alt.fixed[[1L]]$quanterr, bw.qr.alt.fixed[[1L]]$quanterr)
+  expect_equal(fit.qr.alt.slice[[1L]]$quantile, bw.qr.alt.slice[[1L]]$quantile)
+  expect_equal(fit.qr.alt.slice[[1L]]$xeval, bw.qr.alt.slice[[1L]]$xeval)
+  expect_equal(fit.qr.alt.slice[[1L]]$quanterr, bw.qr.alt.slice[[1L]]$quanterr)
+
   bw.si <- npindexbw(
     xdat = data.frame(x = x, x2 = x2),
     ydat = y,

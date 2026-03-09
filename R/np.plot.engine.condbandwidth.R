@@ -600,10 +600,10 @@
         eval.extract <- function(obj, jj){
           if (gradients) {
             if (quantreg) obj$quantgrad[,jj] else obj$congrad[,jj]
-          } else if (cdf) {
-            obj$condist
           } else if (quantreg) {
             obj$quantile
+          } else if (cdf) {
+            obj$condist
           } else {
             obj$condens
           }
@@ -809,10 +809,10 @@
           eval.extract <- function(obj, jj){
             if (gradients) {
               if (quantreg) obj$quantgrad[,jj] else obj$congrad[,jj]
-            } else if (cdf) {
-              obj$condist
             } else if (quantreg) {
               obj$quantile
+            } else if (cdf) {
+              obj$condist
             } else {
               obj$condens
             }
