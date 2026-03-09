@@ -15892,16 +15892,6 @@ static int np_conditional_y_row_stream_op_core(double *vector_scale_factor,
                                                   row_out);
 }
 
-static int np_shadow_conditional_y_row_stream_op(double *vector_scale_factor,
-                                                 int eval_idx,
-                                                 int operator_code,
-                                                 double *row_out){
-  return np_conditional_y_row_stream_op_core(vector_scale_factor,
-                                             eval_idx,
-                                             operator_code,
-                                             row_out);
-}
-
 static int np_conditional_y_row_stream_core(double *vector_scale_factor,
                                             int eval_idx,
                                             double *row_out){
@@ -15909,14 +15899,6 @@ static int np_conditional_y_row_stream_core(double *vector_scale_factor,
                                              eval_idx,
                                              OP_NORMAL,
                                              row_out);
-}
-
-static int np_shadow_conditional_y_row_stream(double *vector_scale_factor,
-                                              int eval_idx,
-                                              double *row_out){
-  return np_conditional_y_row_stream_core(vector_scale_factor,
-                                          eval_idx,
-                                          row_out);
 }
 
 static int np_conditional_lp_cvls_block_size(void){
@@ -16433,9 +16415,9 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
     double lin = 0.0;
     double quad = 0.0;
 
-    if(np_shadow_proof_conditional_x_weight_row_stream(vector_scale_factor, i, xrow) != 0)
+    if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xrow) != 0)
       goto cleanup_cvls_lp_stream;
-    if(np_shadow_conditional_y_row_stream(vector_scale_factor, i, yrow) != 0)
+    if(np_conditional_y_row_stream_core(vector_scale_factor, i, yrow) != 0)
       goto cleanup_cvls_lp_stream;
 
     for(j = 0; j < num_obs; j++)
@@ -16445,7 +16427,7 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
       double inner = 0.0;
       if(xrow[j] == 0.0)
         continue;
-      if(np_shadow_conditional_y_row_stream_op(vector_scale_factor, j, OP_CONVOLUTION, yconv) != 0)
+      if(np_conditional_y_row_stream_op_core(vector_scale_factor, j, OP_CONVOLUTION, yconv) != 0)
         goto cleanup_cvls_lp_stream;
       for(k = 0; k < num_obs; k++)
         inner += xrow[k]*yconv[k];
