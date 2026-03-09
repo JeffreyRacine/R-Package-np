@@ -95,6 +95,7 @@
       all(is.finite(object$resid))) {
     dots$xdat <- object$eval
     dots$ydat <- object$mean + object$resid
+    dots$fit.mean.train <- object$mean
   }
 
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))

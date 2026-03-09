@@ -2,6 +2,7 @@
   function(bws,
            xdat,
            ydat,
+           fit.mean.train = NULL,
            data = NULL,
            xq = 0.5,
            xtrim = 0.0,
@@ -261,6 +262,7 @@
       if (plot.errors.method == "bootstrap"){
         terr.obj <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = x.eval,
+          fit.mean.train = fit.mean.train,
           gradients = FALSE,
           gradient.order = gradient.order,
           slice.index = 0,
@@ -601,6 +603,7 @@
             temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat, ydat = ydat,
                       exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                      fit.mean.train = fit.mean.train,
                       gradients = gradients,
                       gradient.order = gradient.order,
                       slice.index = i,

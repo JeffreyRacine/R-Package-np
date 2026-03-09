@@ -62,10 +62,13 @@
 
 .npRmpi_with_local_regression <- function(expr) {
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
   old.local <- getOption("npRmpi.local.regression.mode", FALSE)
   options(npRmpi.autodispatch.disable = TRUE)
+  options(npRmpi.autodispatch.context = TRUE)
   options(npRmpi.local.regression.mode = TRUE)
   on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+  on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
   on.exit(options(npRmpi.local.regression.mode = old.local), add = TRUE)
   old.mode <- .Call("C_np_set_local_regression_mode", TRUE, PACKAGE = "npRmpi")
   on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"), add = TRUE)
