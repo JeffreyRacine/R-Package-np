@@ -491,6 +491,50 @@ test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
   }
 })
 
+test_that("npindexhat exact apply matches npindex on resampled nearest-neighbor lp fits", {
+  set.seed(3292)
+  n <- 45
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(x1 + x2) + rnorm(n, sd = 0.08)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  counts <- rmultinom(n = 3L, size = n, prob = rep.int(1 / n, n))
+
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    bw <- npindexbw(
+      xdat = tx,
+      ydat = y,
+      bws = c(1, 1, 0.85),
+      bandwidth.compute = FALSE,
+      regtype = "lp",
+      basis = "tensor",
+      degree = 2L,
+      bwtype = bt
+    )
+
+    for (b in seq_len(ncol(counts))) {
+      idx <- rep.int(seq_len(n), counts[, b])
+      fit <- npindex(
+        bws = bw,
+        txdat = tx[idx, , drop = FALSE],
+        tydat = y[idx],
+        exdat = tx,
+        gradients = FALSE
+      )
+      hy <- npindexhat(
+        bws = bw,
+        txdat = tx[idx, , drop = FALSE],
+        exdat = tx,
+        y = y[idx],
+        output = "apply",
+        s = 0L
+      )
+
+      expect_equal(as.vector(hy), as.vector(fit$mean), tolerance = 1e-8, info = paste(bt, "apply/public", b))
+    }
+  }
+})
+
 test_that("semihat apply mode matches core fits across bwtypes", {
   set.seed(20260308)
   n <- 70

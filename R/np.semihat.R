@@ -474,14 +474,14 @@
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
 
-    return(do.call(npreghat, list(
+    fit <- .np_regression_direct(
       bws = rbw,
       txdat = idx.train,
+      tydat = y,
       exdat = idx.eval,
-      y = y,
-      output = "apply",
-      s = s
-    )))
+      gradients = FALSE
+    )
+    return(fit$mean)
   }
 
   fit_one <- function(ycol) {
