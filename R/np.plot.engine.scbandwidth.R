@@ -276,7 +276,7 @@
           boot.args$exdat <- x.eval
         } else {
           boot.args$exdat <- x.eval[,1, drop = FALSE]
-          boot.args$ezdat <- x.eval[,1, drop = FALSE]
+          boot.args$ezdat <- x.eval[,2, drop = FALSE]
         }
         terr <- do.call(compute.bootstrap.errors, boot.args)[["boot.err"]]
 

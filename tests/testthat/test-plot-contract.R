@@ -460,6 +460,62 @@ test_that("plot contract: npplreg supports coef=TRUE plot-data payload", {
   expect_true(length(out$coefficients) >= 1L)
 })
 
+test_that("plot contract: scbandwidth perspective bootstrap uses z evaluation column", {
+  skip_if_not_installed("np")
+
+  set.seed(107)
+  n <- 50
+  x <- runif(n)
+  z <- runif(n)
+  y <- sin(2 * pi * z) + x * (1 + z) + rnorm(n, sd = 0.05)
+  xdat <- data.frame(x = x)
+  zdat <- data.frame(z = z)
+
+  bw <- npscoefbw(xdat = xdat, ydat = y, zdat = zdat, regtype = "lc", nmulti = 1)
+  neval <- 12L
+
+  np.ns <- asNamespace("np")
+  cap <- new.env(parent = emptyenv())
+  cap$exdat <- NULL
+  cap$ezdat <- NULL
+
+  tq <- getFromNamespace("trim.quantiles", "np")
+  x1.eval <- seq(tq(xdat[, 1L], 0.0)[1L], tq(xdat[, 1L], 0.0)[2L], length.out = neval)
+  x2.eval <- seq(tq(zdat[, 1L], 0.0)[1L], tq(zdat[, 1L], 0.0)[2L], length.out = neval)
+  x.eval <- expand.grid(x1.eval, x2.eval)
+
+  trace(
+    what = "compute.bootstrap.errors.scbandwidth",
+    where = np.ns,
+    tracer = bquote({
+      assign("exdat", exdat, envir = .(cap))
+      assign("ezdat", ezdat, envir = .(cap))
+    }),
+    print = FALSE
+  )
+  on.exit(try(untrace("compute.bootstrap.errors.scbandwidth", where = np.ns), silent = TRUE), add = TRUE)
+
+  suppressWarnings(
+    plot(
+      bw,
+      xdat = xdat,
+      ydat = y,
+      zdat = zdat,
+      perspective = TRUE,
+      view = "fixed",
+      plot.behavior = "data",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = "inid",
+      plot.errors.boot.num = 9,
+      plot.errors.type = "pointwise",
+      neval = neval
+    )
+  )
+
+  expect_equal(cap$exdat, x.eval[, 1, drop = FALSE])
+  expect_equal(cap$ezdat, x.eval[, 2, drop = FALSE])
+})
+
 test_that("plot contract: bootstrap defaults are wild for regression-class and inid for unsupervised engines", {
   skip_if_not_installed("np")
 
