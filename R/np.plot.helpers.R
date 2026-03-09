@@ -3784,7 +3784,7 @@ plotFactor <- function(f, y, ...){
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
 
-  myout <- .Call(
+  myout <- .np_plot_with_local_compiled_eval(.Call(
     "C_np_density_conditional",
     as.double(tyuno), as.double(tyord), as.double(tycon),
     as.double(txuno), as.double(txord), as.double(txcon),
@@ -3810,7 +3810,7 @@ plotFactor <- function(f, y, ...){
     as.integer(bernstein.engine),
     basis.code,
     PACKAGE = "npRmpi"
-  )
+  ))
 
   if (isTRUE(cdf))
     names(myout)[1L] <- "condist"
@@ -4009,6 +4009,18 @@ plotFactor <- function(f, y, ...){
   options(npRmpi.autodispatch.context = TRUE)
   on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
   on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+  force(expr)
+}
+
+.np_plot_with_local_compiled_eval <- function(expr) {
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  old.local <- getOption("npRmpi.local.regression.mode", FALSE)
+  options(npRmpi.autodispatch.disable = TRUE)
+  options(npRmpi.local.regression.mode = TRUE)
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+  on.exit(options(npRmpi.local.regression.mode = old.local), add = TRUE)
+  old.mode <- .Call("C_np_set_local_regression_mode", TRUE, PACKAGE = "npRmpi")
+  on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"), add = TRUE)
   force(expr)
 }
 
