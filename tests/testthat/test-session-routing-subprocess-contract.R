@@ -250,6 +250,37 @@ test_that("session smooth-coefficient ll coef plot-data route completes in subpr
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npindex ichimura plain plot-data returns gradient-bearing payload", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(20260310)",
+      "n <- 70L",
+      "x1 <- runif(n)",
+      "x2 <- runif(n)",
+      "y <- sin(x1 + x2) + rnorm(n, sd=0.1)",
+      "tx <- data.frame(x1=x1, x2=x2)",
+      "bw <- npindexbw(xdat=tx, ydat=y, method='ichimura', regtype='lc', bwtype='fixed', bws=c(1,1,0.85), bandwidth.compute=FALSE)",
+      "out <- suppressWarnings(plot(bw, xdat=tx, ydat=y, plot.behavior='data', plot.errors.method='none'))",
+      "stopifnot(length(out) == 1L)",
+      "stopifnot(all(c('index', 'mean', 'grad') %in% names(out[[1]])))",
+      "cat('SESSION_NPINDEX_ICH_PLAIN_PAYLOAD_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEX_ICH_PLAIN_PAYLOAD_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npsigtest fast-fail contract completes in installed-build subprocess", {
   skip_on_cran()
   env <- subprocess_env()

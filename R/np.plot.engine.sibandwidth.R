@@ -104,6 +104,21 @@
       if (is.null(value)) default else value
     }
 
+    make_singleindex_payload <- function(index,
+                                         mean,
+                                         grad = NA,
+                                         gradients.flag = FALSE) {
+      do.call(singleindex, list(
+        bws = bws,
+        index = index,
+        mean = mean,
+        grad = grad,
+        ntrain = nrow(xdat),
+        trainiseval = TRUE,
+        gradients = gradients.flag
+      ))
+    }
+
     neval = maxneval = length(ydat)
 
     xdat <- toFrame(xdat)
@@ -255,7 +270,11 @@
 
       if (plot.behavior != "plot") {
         plot.out[1] = NA
-        plot.out[[1]] = tobj
+        plot.out[[1]] <- make_singleindex_payload(
+          index = tobj$index,
+          mean = tobj$mean,
+          gradients.flag = FALSE
+        )
         if (plot.errors) {
           plot.out[[1]]$merr <- cbind(-temp.err[,1], temp.err[,2])
           if (plot.errors.center == "bias-corrected") {
