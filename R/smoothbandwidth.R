@@ -143,7 +143,7 @@ scbandwidth <-
     num.feval = num.feval,
     num.feval.fast = num.feval.fast,
     scaling = bwscaling,
-    pscaling = if (bwscaling) "Scale Factor(s)" else "Bandwidth(s)",
+    pscaling = npBandwidthSummaryLabel(bwtype = bwtype, bwscaling = bwscaling),
     type = bwtype,
     ptype = bwtToPrint(bwtype),
     ckertype = ckertype,    

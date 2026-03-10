@@ -1442,6 +1442,16 @@ npFormatRegressionType <- function(x){
           basis.family, paste(degree, collapse = ","))
 }
 
+npBandwidthSummaryLabel <- function(bwtype, bwscaling = FALSE){
+  if (isTRUE(bwscaling))
+    return("Scale Factor(s)")
+
+  if (identical(bwtype, "fixed"))
+    return("Bandwidth(s)")
+
+  "Bandwidth Nearest Neighbor(s)"
+}
+
 
 ## bandwidth-related report generating functions
 genBwSelStr <- function(x){
