@@ -127,14 +127,14 @@
     if (gradients) {
       idx.train <- data.frame(index = index.eval)
       rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-      fit.grad <- .np_regression_direct(
+      fit.grad <- .npRmpi_with_local_regression(.np_regression_direct(
         bws = rbw,
         txdat = idx.train,
         tydat = ydat,
         exdat = idx.train,
         gradients = TRUE,
         gradient.order = 1L
-      )
+      ))
       tobj$mean <- as.vector(fit.grad$mean)
       grad.index <- as.vector(fit.grad$grad[, 1L])
       tobj$grad.index <- grad.index
