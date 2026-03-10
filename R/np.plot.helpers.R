@@ -561,17 +561,17 @@
   out
 }
 
-.np_inid_boot_from_regression <- function(xdat,
-                                          exdat,
-                                          bws,
-                                          ydat,
-                                          B,
-                                          counts = NULL,
-                                          counts.drawer = NULL,
-                                          ridge = 1.0e-12,
-                                          gradients = FALSE,
-                                          gradient.order = 1L,
-                                          slice.index = 1L) {
+.np_inid_boot_from_regression_localpoly_fixed <- function(xdat,
+                                                          exdat,
+                                                          bws,
+                                                          ydat,
+                                                          B,
+                                                          counts = NULL,
+                                                          counts.drawer = NULL,
+                                                          ridge = 1.0e-12,
+                                                          gradients = FALSE,
+                                                          gradient.order = 1L,
+                                                          slice.index = 1L) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   ydat <- as.double(ydat)
@@ -583,96 +583,15 @@
     stop("length of ydat must match training rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid inid regression bootstrap dimensions")
-  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = ridge, cap = 1.0)
+  if (!identical(bws$type, "fixed"))
+    stop("local-polynomial fixed regression helper requires bwtype='fixed'")
 
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  if (identical(regtype, "lc"))
+    stop("local-polynomial fixed regression helper requires regtype='ll' or 'lp'")
+
   ncon <- bws$ncon
-
-  if (isTRUE(gradients)) {
-    fit0 <- .np_regression_direct(
-      bws = bws,
-      txdat = xdat,
-      tydat = ydat,
-      exdat = exdat,
-      gradients = TRUE,
-      gradient.order = gradient.order
-    )
-    t0 <- fit0$grad[, slice.index]
-
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
-    prob <- rep.int(1 / n, n)
-    tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
-    progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
-    progress <- .np_plot_progress_begin(total = B, label = progress.label)
-    on.exit({
-      .np_plot_progress_end(progress)
-    }, add = TRUE)
-
-    counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
-
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      counts.chunk <- if (!is.null(counts.mat)) {
-        counts.mat[, start:stopi, drop = FALSE]
-      } else if (!is.null(counts.drawer)) {
-        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
-      } else {
-        stats::rmultinom(n = bsz, size = n, prob = prob)
-      }
-
-      for (jj in seq_len(bsz)) {
-        idx <- rep.int(seq_len(n), as.integer(counts.chunk[, jj]))
-        fit.b <- .np_regression_direct(
-          bws = bws,
-          txdat = xdat[idx, , drop = FALSE],
-          tydat = ydat[idx],
-          exdat = exdat,
-          gradients = TRUE,
-          gradient.order = gradient.order
-        )
-        tmat[start + jj - 1L, ] <- fit.b$grad[, slice.index]
-      }
-
-      progress <- .np_plot_progress_tick(state = progress, done = stopi)
-      start <- stopi + 1L
-    }
-
-    return(list(t = tmat, t0 = as.vector(t0)))
-  }
-
-  if (identical(regtype, "lc")) {
-    H <- suppressWarnings(
-      tryCatch(
-        npreghat.rbandwidth(
-          bws = bws,
-          txdat = xdat,
-          exdat = exdat,
-          s = 0L,
-          output = "matrix"
-        ),
-        error = function(e) NULL
-      )
-    )
-    if (!is.null(H)) {
-      if (!is.matrix(H))
-        H <- matrix(as.double(H), nrow = neval, ncol = n)
-      if (nrow(H) == neval && ncol(H) == n) {
-        return(.np_inid_lc_boot_from_hat(
-          H = H,
-          ydat = ydat,
-          B = B,
-          counts = counts,
-          counts.drawer = counts.drawer
-        ))
-      }
-    }
-  }
-
-  degree <- if (identical(regtype, "lc")) {
-    rep.int(0L, ncon)
-  } else if (identical(regtype, "ll")) {
+  degree <- if (identical(regtype, "ll")) {
     rep.int(1L, ncon)
   } else {
     npValidateGlpDegree(
@@ -690,6 +609,32 @@
     regtype = "lp",
     bernstein.basis = isTRUE(bws$bernstein.basis)
   )
+
+  gradient.vec <- NULL
+  if (isTRUE(gradients)) {
+    cont.idx <- which(bws$icon)
+    cpos <- match(slice.index, cont.idx)
+    if (is.na(cpos))
+      stop("fixed regression gradient helper requires a continuous slice", call. = FALSE)
+
+    gradient.vec <- integer(ncon)
+    if (identical(regtype, "lp")) {
+      gradient.order <- npValidateGlpGradientOrder(
+        regtype = "lp",
+        gradient.order = gradient.order,
+        ncon = ncon
+      )
+      if (gradient.order[cpos] > degree[cpos]) {
+        return(list(
+          t = matrix(NA_real_, nrow = B, ncol = neval),
+          t0 = rep(NA_real_, neval)
+        ))
+      }
+      gradient.vec[cpos] <- gradient.order[cpos]
+    } else {
+      gradient.vec[cpos] <- 1L
+    }
+  }
 
   kw <- npksum(
     txdat = xdat,
@@ -714,6 +659,7 @@
     xdat = xdat,
     exdat = exdat,
     degree = degree,
+    gradient.vec = gradient.vec,
     basis = basis,
     bernstein.basis = bernstein.basis
   )
@@ -727,6 +673,7 @@
   mcols <- p * (p + 1L) / 2L
   rhs <- W.eval
   ones <- matrix(1.0, nrow = n, ncol = 1L)
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = ridge, cap = 1.0)
 
   Mfeat <- vector("list", neval)
   Zfeat <- vector("list", neval)
@@ -820,6 +767,119 @@
     stop("inid regression helper path produced non-finite values")
 
   list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_regression <- function(xdat,
+                                          exdat,
+                                          bws,
+                                          ydat,
+                                          B,
+                                          counts = NULL,
+                                          counts.drawer = NULL,
+                                          ridge = 1.0e-12,
+                                          gradients = FALSE,
+                                          gradient.order = 1L,
+                                          slice.index = 1L) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid inid regression bootstrap dimensions")
+
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  if (!identical(bws$type, "fixed")) {
+    return(.np_inid_boot_from_reghat_exact(
+      xdat = xdat,
+      exdat = exdat,
+      bws = bws,
+      ydat = ydat,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      gradients = gradients,
+      gradient.order = gradient.order,
+      slice.index = slice.index
+    ))
+  }
+
+  if (isTRUE(gradients)) {
+    if (!identical(regtype, "lc")) {
+      return(.np_inid_boot_from_regression_localpoly_fixed(
+        xdat = xdat,
+        exdat = exdat,
+        bws = bws,
+        ydat = ydat,
+        B = B,
+        counts = counts,
+        counts.drawer = counts.drawer,
+        ridge = ridge,
+        gradients = TRUE,
+        gradient.order = gradient.order,
+        slice.index = slice.index
+      ))
+    }
+
+    return(.np_inid_boot_from_reghat_exact(
+      xdat = xdat,
+      exdat = exdat,
+      bws = bws,
+      ydat = ydat,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      gradients = TRUE,
+      gradient.order = gradient.order,
+      slice.index = slice.index
+    ))
+  }
+
+  if (identical(regtype, "lc")) {
+    H <- suppressWarnings(
+      tryCatch(
+        npreghat.rbandwidth(
+          bws = bws,
+          txdat = xdat,
+          exdat = exdat,
+          s = 0L,
+          output = "matrix"
+        ),
+        error = function(e) NULL
+      )
+    )
+    if (!is.null(H)) {
+      if (!is.matrix(H))
+        H <- matrix(as.double(H), nrow = neval, ncol = n)
+      if (nrow(H) == neval && ncol(H) == n) {
+        return(.np_inid_lc_boot_from_hat(
+          H = H,
+          ydat = ydat,
+          B = B,
+          counts = counts,
+          counts.drawer = counts.drawer
+        ))
+      }
+    }
+  }
+
+  .np_inid_boot_from_regression_localpoly_fixed(
+    xdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    ydat = ydat,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    ridge = ridge,
+    gradients = FALSE,
+    gradient.order = gradient.order,
+    slice.index = slice.index
+  )
 }
 
 .np_inid_boot_from_reghat_exact <- function(xdat,
