@@ -102,12 +102,18 @@
   invisible(NULL)
 }
 
-.np_plot_restore_par <- function(oldpar) {
-  if (is.null(oldpar))
-    return(invisible(NULL))
-  if (is.list(oldpar) && !is.null(oldpar[["new"]]))
-    oldpar[["new"]] <- FALSE
-  suppressWarnings(try(par(oldpar), silent = TRUE))
+.np_plot_capture_par <- function(names = character()) {
+  names <- unique(as.character(names))
+  if (!length(names))
+    return(list())
+  par(names)
+}
+
+.np_plot_restore_par <- function(oldpar, reset.new = TRUE) {
+  if (isTRUE(reset.new))
+    suppressWarnings(try(par(new = FALSE), silent = TRUE))
+  if (!is.null(oldpar) && length(oldpar))
+    suppressWarnings(try(par(oldpar), silent = TRUE))
   invisible(NULL)
 }
 
