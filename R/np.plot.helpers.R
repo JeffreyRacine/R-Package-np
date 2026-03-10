@@ -100,6 +100,22 @@
   invisible(NULL)
 }
 
+.np_plot_activity_begin <- function(label) {
+  if (!.np_plot_progress_enabled())
+    return(NULL)
+
+  console <- newLineConsole()
+  console <- printPush(msg = as.character(label)[1L], console = console)
+  console
+}
+
+.np_plot_activity_end <- function(console) {
+  if (is.null(console))
+    return(invisible(NULL))
+  console <- printClear(console)
+  invisible(NULL)
+}
+
 .np_plot_capture_par <- function(names = character()) {
   names <- unique(as.character(names))
   if (!length(names))
@@ -3093,6 +3109,38 @@ compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type, warn.cov
   stop("'band.type' must be one of pointwise, bonferroni, simultaneous, all")
 }
 
+.np_plot_bootstrap_interval_summary <- function(boot.t, t0, alpha, band.type) {
+  if (!(band.type %in% c("pointwise", "bonferroni", "simultaneous", "all")))
+    stop("'band.type' must be one of pointwise, bonferroni, simultaneous, all")
+
+  activity <- .np_plot_activity_begin("Constructing bootstrap bands...")
+  on.exit(.np_plot_activity_end(activity), add = TRUE)
+
+  if (identical(band.type, "all")) {
+    all.bounds <- compute.bootstrap.quantile.bounds(
+      boot.t = boot.t,
+      alpha = alpha,
+      band.type = "all"
+    )
+    bounds <- all.bounds$pointwise
+    all.err <- lapply(all.bounds, function(bb) {
+      cbind(t0 - bb[, 1L], bb[, 2L] - t0)
+    })
+  } else {
+    bounds <- compute.bootstrap.quantile.bounds(
+      boot.t = boot.t,
+      alpha = alpha,
+      band.type = band.type
+    )
+    all.err <- NULL
+  }
+
+  list(
+    err = cbind(t0 - bounds[, 1L], bounds[, 2L] - t0),
+    all.err = all.err
+  )
+}
+
 .np_plot_asymptotic_error_from_se <- function(se, alpha, band.type, m = length(se)) {
   se <- as.numeric(se)
   n <- length(se)
@@ -3403,27 +3451,14 @@ compute.bootstrap.errors.rbandwidth =
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      if (plot.errors.type == "all") {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "pointwise",
-          warn.coverage = FALSE)
-        boot.all.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "all")
-        boot.all.err <- lapply(boot.all.bounds, function(bb) {
-          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
-        })
-      } else {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = plot.errors.type)
-      }
-      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
-      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+      interval.summary <- .np_plot_bootstrap_interval_summary(
+        boot.t = boot.out$t,
+        t0 = boot.out$t0,
+        alpha = plot.errors.alpha,
+        band.type = plot.errors.type
+      )
+      boot.err[,1:2] <- interval.summary$err
+      boot.all.err <- interval.summary$all.err
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
@@ -3559,27 +3594,14 @@ compute.bootstrap.errors.scbandwidth =
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      if (plot.errors.type == "all") {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "pointwise",
-          warn.coverage = FALSE)
-        boot.all.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "all")
-        boot.all.err <- lapply(boot.all.bounds, function(bb) {
-          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
-        })
-      } else {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = plot.errors.type)
-      }
-      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
-      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+      interval.summary <- .np_plot_bootstrap_interval_summary(
+        boot.t = boot.out$t,
+        t0 = boot.out$t0,
+        alpha = plot.errors.alpha,
+        band.type = plot.errors.type
+      )
+      boot.err[,1:2] <- interval.summary$err
+      boot.all.err <- interval.summary$all.err
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
@@ -3704,27 +3726,14 @@ compute.bootstrap.errors.plbandwidth =
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      if (plot.errors.type == "all") {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "pointwise",
-          warn.coverage = FALSE)
-        boot.all.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "all")
-        boot.all.err <- lapply(boot.all.bounds, function(bb) {
-          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
-        })
-      } else {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = plot.errors.type)
-      }
-      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
-      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+      interval.summary <- .np_plot_bootstrap_interval_summary(
+        boot.t = boot.out$t,
+        t0 = boot.out$t0,
+        alpha = plot.errors.alpha,
+        band.type = plot.errors.type
+      )
+      boot.err[,1:2] <- interval.summary$err
+      boot.all.err <- interval.summary$all.err
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
@@ -3804,27 +3813,14 @@ compute.bootstrap.errors.bandwidth =
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      if (plot.errors.type == "all") {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "pointwise",
-          warn.coverage = FALSE)
-        boot.all.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "all")
-        boot.all.err <- lapply(boot.all.bounds, function(bb) {
-          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
-        })
-      } else {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = plot.errors.type)
-      }
-      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
-      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+      interval.summary <- .np_plot_bootstrap_interval_summary(
+        boot.t = boot.out$t,
+        t0 = boot.out$t0,
+        alpha = plot.errors.alpha,
+        band.type = plot.errors.type
+      )
+      boot.err[,1:2] <- interval.summary$err
+      boot.all.err <- interval.summary$all.err
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
@@ -3959,27 +3955,14 @@ compute.bootstrap.errors.conbandwidth =
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      if (plot.errors.type == "all") {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "pointwise",
-          warn.coverage = FALSE)
-        boot.all.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "all")
-        boot.all.err <- lapply(boot.all.bounds, function(bb) {
-          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
-        })
-      } else {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = plot.errors.type)
-      }
-      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
-      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+      interval.summary <- .np_plot_bootstrap_interval_summary(
+        boot.t = boot.out$t,
+        t0 = boot.out$t0,
+        alpha = plot.errors.alpha,
+        band.type = plot.errors.type
+      )
+      boot.err[,1:2] <- interval.summary$err
+      boot.all.err <- interval.summary$all.err
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
@@ -4127,27 +4110,14 @@ compute.bootstrap.errors.sibandwidth =
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      if (plot.errors.type == "all") {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "pointwise",
-          warn.coverage = FALSE)
-        boot.all.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "all")
-        boot.all.err <- lapply(boot.all.bounds, function(bb) {
-          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
-        })
-      } else {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = plot.errors.type)
-      }
-      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
-      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+      interval.summary <- .np_plot_bootstrap_interval_summary(
+        boot.t = boot.out$t,
+        t0 = boot.out$t0,
+        alpha = plot.errors.alpha,
+        band.type = plot.errors.type
+      )
+      boot.err[,1:2] <- interval.summary$err
+      boot.all.err <- interval.summary$all.err
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
