@@ -48,3 +48,20 @@ test_that("bootstrap interval summary avoids recursive pointwise recomputation f
   expect_equal(out$all.err$bonferroni, cbind(t0 - bonferroni[, 1L], bonferroni[, 2L] - t0))
   expect_equal(out$all.err$simultaneous, cbind(t0 - simultaneous[, 1L], simultaneous[, 2L] - t0))
 })
+
+test_that("sibandwidth bootstrap route uses the shared interval summary helper", {
+  skip_if_not_installed("npRmpi")
+
+  fn <- getFromNamespace("compute.bootstrap.errors.sibandwidth", "npRmpi")
+  txt <- paste(deparse(body(fn), width.cutoff = 500L), collapse = "\n")
+
+  expect_match(txt, "\\.np_plot_bootstrap_interval_summary\\(", perl = TRUE)
+  expect_false(
+    grepl("boot\\.bounds <- compute\\.bootstrap\\.quantile\\.bounds\\(", txt, perl = TRUE),
+    info = "sibandwidth should not maintain a private pointwise/all interval path"
+  )
+  expect_false(
+    grepl("boot\\.all\\.bounds <- compute\\.bootstrap\\.quantile\\.bounds\\(", txt, perl = TRUE),
+    info = "sibandwidth should reuse the shared all-band summary path"
+  )
+})
