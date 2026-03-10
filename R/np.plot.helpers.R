@@ -1149,6 +1149,17 @@
     ))
   }
 
+  if (isTRUE(gradients)) {
+    return(.np_inid_boot_from_index_gradient_fixed(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bws,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer
+    ))
+  }
+
   xdat <- toFrame(xdat)
   B <- as.integer(B)
   n <- nrow(xdat)
@@ -1311,6 +1322,38 @@
   }
 
   list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_index_gradient_fixed <- function(xdat,
+                                                    ydat,
+                                                    bws,
+                                                    B,
+                                                    counts = NULL,
+                                                    counts.drawer = NULL) {
+  xdat <- toFrame(xdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in single-index fixed gradient helper")
+  if (n < 1L || B < 1L)
+    stop("invalid single-index fixed gradient helper dimensions")
+
+  idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+  rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+
+  .np_inid_boot_from_regression(
+    xdat = idx.train,
+    exdat = idx.train,
+    bws = rbw,
+    ydat = ydat,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    gradients = TRUE,
+    gradient.order = 1L,
+    slice.index = 1L
+  )
 }
 
 .np_inid_boot_from_index_exact <- function(xdat,
@@ -6129,7 +6172,7 @@ compute.bootstrap.errors.sibandwidth =
       })
     } else if (is.inid) {
       inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
-        !isTRUE(gradients)
+        ((!isTRUE(gradients)) || identical(bws$type, "fixed"))
     if (!isTRUE(inid.helper.ok)) {
       stop("inid single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     } else {
@@ -6140,7 +6183,7 @@ compute.bootstrap.errors.sibandwidth =
             ydat = ydat,
             bws = bws,
             B = plot.errors.boot.num,
-            gradients = FALSE
+            gradients = gradients
           )
         }, error = function(e) {
           stop(sprintf("inid single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
@@ -6151,7 +6194,7 @@ compute.bootstrap.errors.sibandwidth =
       }
     } else if (is.block) {
       block.helper.ok <- isTRUE(.np_plot_block_fastpath_enabled()) &&
-        !isTRUE(gradients)
+        ((!isTRUE(gradients)) || identical(bws$type, "fixed"))
       if (!isTRUE(block.helper.ok)) {
         stop("fixed/geom single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
       } else {
@@ -6169,7 +6212,7 @@ compute.bootstrap.errors.sibandwidth =
                   blocklen = plot.errors.boot.blocklen,
                   sim = plot.errors.boot.method
                 ),
-                gradients = FALSE
+                gradients = gradients
               )
             } else {
               tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
