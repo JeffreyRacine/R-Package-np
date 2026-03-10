@@ -3259,6 +3259,22 @@
     isTRUE(identical(bws$oxkertype, bws$oykertype))
 }
 
+.np_operator_matrix_from_ksum <- function(ksum, nrow.out, ncol.out, where) {
+  km <- as.matrix(ksum)
+
+  if (nrow(km) == nrow.out && ncol(km) == ncol.out)
+    return(km)
+  if (nrow(km) == ncol.out && ncol(km) == nrow.out)
+    return(t(km))
+
+  stop(sprintf("%s returned unexpected operator shape", where))
+}
+
+.np_con_xregtype <- function(bws) {
+  regtype <- if (is.null(bws$regtype.engine)) bws$regtype else bws$regtype.engine
+  if (is.null(regtype)) "lc" else as.character(regtype)
+}
+
 .np_con_make_kbandwidth_x <- function(bws, xdat) {
   xdat <- toFrame(xdat)
   kbandwidth.numeric(
@@ -3341,6 +3357,87 @@
   )) / nrow(xydat)
 
   num / pmax(den, .Machine$double.eps)
+}
+
+.np_inid_boot_from_conditional_localpoly_fixed <- function(xdat,
+                                                           ydat,
+                                                           exdat,
+                                                           eydat,
+                                                           bws,
+                                                           B,
+                                                           cdf,
+                                                           counts = NULL,
+                                                           counts.drawer = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  B <- as.integer(B)
+
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  if (nrow(ydat) != n || nrow(eydat) != neval)
+    stop("conditional localpoly bootstrap helper requires aligned x/y training and evaluation rows")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid conditional localpoly bootstrap dimensions")
+  if (!identical(bws$type, "fixed"))
+    stop("conditional localpoly bootstrap helper supports only fixed bandwidths")
+
+  xbw <- .npcdhat_make_xbw(bws = bws, txdat = xdat)
+  ybw <- .npcdhat_make_ybw(bws = bws, tydat = ydat)
+  Gy <- .npcdhat_make_kernel_matrix(
+    kbw = ybw,
+    txdat = ydat,
+    exdat = eydat,
+    operator = rep.int(if (cdf) "integral" else "normal", ncol(ydat))
+  )
+  Gy <- .np_operator_matrix_from_ksum(
+    ksum = Gy,
+    nrow.out = neval,
+    ncol.out = n,
+    where = "conditional localpoly y-operator"
+  )
+
+  counts.mat <- if (!is.null(counts)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  } else if (!is.null(counts.drawer)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts.drawer(1L, B))
+  } else {
+    .np_inid_counts_matrix(n = n, B = B)
+  }
+
+  t0 <- numeric(neval)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress <- .np_plot_progress_begin(total = neval, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  old.progress <- getOption("np.plot.progress", TRUE)
+  options(np.plot.progress = FALSE)
+  on.exit({
+    options(np.plot.progress = old.progress)
+  }, add = TRUE)
+
+  # Exact duplicate-sample refits for fixed conditional ll/lp reduce to
+  # reusing the fixed x-side local-polynomial bootstrap helper on y-kernel
+  # pseudo-responses, one evaluation row at a time.
+  for (i in seq_len(neval)) {
+    out <- .np_inid_boot_from_regression(
+      xdat = xdat,
+      exdat = exdat[i, , drop = FALSE],
+      bws = xbw,
+      ydat = as.numeric(Gy[i, ]),
+      B = B,
+      counts = counts.mat
+    )
+    t0[i] <- out$t0[1L]
+    tmat[, i] <- out$t[, 1L]
+    progress <- .np_plot_progress_tick(state = progress, done = i)
+  }
+
+  list(t = tmat, t0 = t0)
 }
 
 .np_inid_boot_from_ksum_conditional_exact <- function(xdat,
@@ -3587,8 +3684,24 @@
                                                 cdf,
                                                 counts = NULL,
                                                 counts.drawer = NULL) {
+  regtype <- .np_con_xregtype(bws)
+
   if (!identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_ksum_conditional_exact(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      B = B,
+      cdf = cdf,
+      counts = counts,
+      counts.drawer = counts.drawer
+    ))
+  }
+
+  if (!identical(regtype, "lc")) {
+    return(.np_inid_boot_from_conditional_localpoly_fixed(
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
