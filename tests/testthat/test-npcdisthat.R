@@ -1,9 +1,9 @@
 library(np)
 
-test_that("npcdenshat matches npcdens and preserves matrix/apply parity across supported bwtype/regtype cells", {
-  npcdenshat <- getFromNamespace("npcdenshat", "np")
+test_that("npcdisthat matches npcdist and preserves matrix/apply parity across supported bwtype/regtype cells", {
+  npcdisthat <- getFromNamespace("npcdisthat", "np")
 
-  set.seed(20260310)
+  set.seed(20260313)
   n <- 18
   x <- data.frame(x = sort(runif(n)))
   y <- data.frame(y = rnorm(n))
@@ -32,15 +32,15 @@ test_that("npcdenshat matches npcdens and preserves matrix/apply parity across s
       bw.args$degree <- 2L
     }
 
-    bw <- do.call(npcdensbw, bw.args)
-    fit <- npcdens(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey)
-    H <- npcdenshat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, output = "matrix")
-    hy <- npcdenshat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, y = iota, output = "apply")
+    bw <- do.call(npcdistbw, bw.args)
+    fit <- npcdist(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey)
+    H <- npcdisthat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, output = "matrix")
+    hy <- npcdisthat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, y = iota, output = "apply")
 
-    expect_s3_class(H, "npcdenshat")
+    expect_s3_class(H, "npcdisthat")
     expect_equal(
       as.vector(H %*% iota),
-      as.vector(fit$condens),
+      as.vector(fit$condist),
       tolerance = 1e-10,
       info = paste(cfg$bwtype, cfg$regtype)
     )
@@ -53,17 +53,17 @@ test_that("npcdenshat matches npcdens and preserves matrix/apply parity across s
   }
 })
 
-test_that("npcdenshat apply mode matches matrix RHS multiplication", {
-  npcdenshat <- getFromNamespace("npcdenshat", "np")
+test_that("npcdisthat apply mode matches matrix RHS multiplication", {
+  npcdisthat <- getFromNamespace("npcdisthat", "np")
 
-  set.seed(20260311)
+  set.seed(20260314)
   n <- 14
   x <- data.frame(x = sort(runif(n)))
   y <- data.frame(y = rnorm(n))
   ex <- data.frame(x = seq(0.15, 0.85, length.out = 6))
   ey <- data.frame(y = seq(min(y$y), max(y$y), length.out = 6))
 
-  bw <- npcdensbw(
+  bw <- npcdistbw(
     xdat = x,
     ydat = y,
     regtype = "lp",
@@ -74,21 +74,21 @@ test_that("npcdenshat apply mode matches matrix RHS multiplication", {
     bandwidth.compute = FALSE
   )
 
-  H <- npcdenshat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, output = "matrix")
+  H <- npcdisthat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, output = "matrix")
   rhs <- cbind(rep.int(1, n), seq_len(n) / n)
-  hy <- npcdenshat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, y = rhs, output = "apply")
+  hy <- npcdisthat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, y = rhs, output = "apply")
 
   expect_equal(hy, H %*% rhs, tolerance = 1e-12)
 })
 
-test_that("npcdenshat preserves bounded gaussian manual-bandwidth semantics", {
-  npcdenshat <- getFromNamespace("npcdenshat", "np")
+test_that("npcdisthat preserves bounded gaussian manual-bandwidth semantics", {
+  npcdisthat <- getFromNamespace("npcdisthat", "np")
 
   x <- data.frame(x = sort(c(5, 11, 21, 31, 46, 75, 98, 122, 145, 165, 195, 224)))
   y <- data.frame(y = sort(c(7, 15, 22, 35, 48, 59, 77, 95, 121, 141, 166, 188)))
   iota <- rep.int(1, nrow(x))
 
-  bw <- npcdensbw(
+  bw <- npcdistbw(
     xdat = x,
     ydat = y,
     regtype = "lc",
@@ -100,10 +100,10 @@ test_that("npcdenshat preserves bounded gaussian manual-bandwidth semantics", {
     cykerbound = "range"
   )
 
-  fit <- npcdens(bws = bw, txdat = x, tydat = y)
-  H <- npcdenshat(bws = bw, txdat = x, tydat = y, output = "matrix")
-  hy <- npcdenshat(bws = bw, txdat = x, tydat = y, y = iota, output = "apply")
+  fit <- npcdist(bws = bw, txdat = x, tydat = y)
+  H <- npcdisthat(bws = bw, txdat = x, tydat = y, output = "matrix")
+  hy <- npcdisthat(bws = bw, txdat = x, tydat = y, y = iota, output = "apply")
 
-  expect_equal(as.vector(H %*% iota), as.vector(fit$condens), tolerance = 1e-8)
-  expect_equal(as.vector(hy), as.vector(fit$condens), tolerance = 1e-8)
+  expect_equal(as.vector(H %*% iota), as.vector(fit$condist), tolerance = 1e-8)
+  expect_equal(as.vector(hy), as.vector(fit$condist), tolerance = 1e-8)
 })

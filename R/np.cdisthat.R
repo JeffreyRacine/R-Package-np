@@ -1,12 +1,12 @@
-npcdenshat <- function(bws,
+npcdisthat <- function(bws,
                        txdat = stop("training data 'txdat' missing"),
                        tydat = stop("training data 'tydat' missing"),
                        exdat,
                        eydat,
                        y = NULL,
                        output = c("matrix", "apply")) {
-  if (!inherits(bws, "conbandwidth")) {
-    stop("argument 'bws' must inherit from class 'conbandwidth' in npcdenshat()")
+  if (!inherits(bws, "condbandwidth")) {
+    stop("argument 'bws' must inherit from class 'condbandwidth' in npcdisthat()")
   }
 
   exdat.arg <- NULL
@@ -24,8 +24,8 @@ npcdenshat <- function(bws,
     eydat = eydat.arg,
     y = y,
     output = output,
-    operator = "normal",
-    class_name = "npcdenshat",
-    where = "npcdenshat"
+    operator = "integral",
+    class_name = "npcdisthat",
+    where = "npcdisthat"
   )
 }
