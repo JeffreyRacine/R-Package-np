@@ -105,7 +105,7 @@ test_that("npindex helpers match fitted and gradient outputs across regtype and 
   )
 
   for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
-    h <- if (identical(bt, "fixed")) 0.25 else 0.85
+    h <- if (identical(bt, "fixed")) 0.25 else 5L
     for (cfg in cfgs) {
       bw.args <- list(
         xdat = tx,
@@ -216,7 +216,7 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
   )
 
   for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
-    h <- if (identical(bt, "fixed")) 0.25 else 0.85
+    h <- if (identical(bt, "fixed")) 0.25 else 5L
     for (cfg in cfgs) {
       bw.args <- list(
         xdat = tx,
@@ -331,7 +331,7 @@ test_that("sibandwidth bootstrap helper routes work across bwtype, regtype, and 
   )
 
   for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
-    h <- if (identical(bt, "fixed")) 0.25 else 0.85
+    h <- if (identical(bt, "fixed")) 0.25 else 5L
     for (cfg in cfgs) {
       bw.args <- list(
         xdat = tx,
@@ -394,7 +394,7 @@ test_that("sibandwidth bootstrap helper routes work across bwtype, regtype, and 
   }
 })
 
-test_that("sibandwidth non-wild bootstrap helpers fail fast for gradients", {
+test_that("sibandwidth nonfixed bootstrap helpers fail fast for gradients", {
   skip_if_not_installed("np")
 
   set.seed(20260307)
@@ -404,8 +404,8 @@ test_that("sibandwidth non-wild bootstrap helpers fail fast for gradients", {
   y <- sin(x1 + x2) + rnorm(n, sd = 0.08)
   tx <- data.frame(x1 = x1, x2 = x2)
 
-  for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
-    h <- if (identical(bt, "fixed")) 0.25 else 0.85
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    h <- 5L
     bw <- npindexbw(
       xdat = tx,
       ydat = y,
