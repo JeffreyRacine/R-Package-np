@@ -1,4 +1,4 @@
-test_that("bootstrap interval summary reuses pointwise bounds for all-type requests", {
+test_that("bootstrap interval summary avoids recursive pointwise recomputation for all-type requests", {
   skip_if_not_installed("np")
 
   interval_summary <- getFromNamespace(".np_plot_bootstrap_interval_summary", "np")
@@ -9,24 +9,22 @@ test_that("bootstrap interval summary reuses pointwise bounds for all-type reque
   t0 <- colMeans(boot.t) + seq_len(ncol(boot.t)) / 10
   alpha <- 0.1
 
-  pointwise_calls <- 0L
-  assign("np_plot_pointwise_calls_test", pointwise_calls, envir = .GlobalEnv)
+  assign("np_plot_band_type_calls_test", character(), envir = .GlobalEnv)
   trace(
     "compute.bootstrap.quantile.bounds",
     where = asNamespace("np"),
     print = FALSE,
     tracer = quote({
-      if (identical(band.type, "pointwise"))
-        assign(
-          "np_plot_pointwise_calls_test",
-          get("np_plot_pointwise_calls_test", envir = .GlobalEnv, inherits = FALSE) + 1L,
-          envir = .GlobalEnv
-        )
+      assign(
+        "np_plot_band_type_calls_test",
+        c(get("np_plot_band_type_calls_test", envir = .GlobalEnv, inherits = FALSE), band.type),
+        envir = .GlobalEnv
+      )
     })
   )
   on.exit({
     untrace("compute.bootstrap.quantile.bounds", where = asNamespace("np"))
-    rm("np_plot_pointwise_calls_test", envir = .GlobalEnv)
+    rm("np_plot_band_type_calls_test", envir = .GlobalEnv)
   }, add = TRUE)
 
   out <- interval_summary(
@@ -36,7 +34,10 @@ test_that("bootstrap interval summary reuses pointwise bounds for all-type reque
     band.type = "all"
   )
 
-  expect_identical(get("np_plot_pointwise_calls_test", envir = .GlobalEnv, inherits = FALSE), 1L)
+  expect_identical(
+    get("np_plot_band_type_calls_test", envir = .GlobalEnv, inherits = FALSE),
+    c("all", "simultaneous")
+  )
 
   pointwise <- quantile_bounds(boot.t = boot.t, alpha = alpha, band.type = "pointwise", warn.coverage = FALSE)
   bonferroni <- quantile_bounds(boot.t = boot.t, alpha = alpha, band.type = "bonferroni", warn.coverage = FALSE)
