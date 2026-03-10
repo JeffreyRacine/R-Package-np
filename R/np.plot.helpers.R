@@ -6100,7 +6100,7 @@ compute.bootstrap.errors.sibandwidth =
       } else {
         boot.out <- .npRmpi_with_local_bootstrap({
           tryCatch({
-            if (identical(plot.errors.boot.method, "fixed")) {
+            if (is.element(plot.errors.boot.method, c("fixed", "geom"))) {
               .np_inid_boot_from_index(
                 xdat = xdat,
                 ydat = ydat,
@@ -6110,7 +6110,7 @@ compute.bootstrap.errors.sibandwidth =
                   n = nrow(xdat),
                   B = plot.errors.boot.num,
                   blocklen = plot.errors.boot.blocklen,
-                  sim = "fixed"
+                  sim = plot.errors.boot.method
                 ),
                 gradients = FALSE
               )
