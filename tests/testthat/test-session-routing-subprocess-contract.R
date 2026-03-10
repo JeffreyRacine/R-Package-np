@@ -345,6 +345,49 @@ test_that("session npindex ichimura gradient lc fixed plot-data completes locall
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npplreg plain fixed lc plot-data completes locally", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(20260310)",
+      "n <- 60L",
+      "x <- runif(n)",
+      "z <- runif(n)",
+      "y <- sin(2*pi*x) + 0.5*z + rnorm(n, sd=0.05)",
+      "tx <- data.frame(z=z)",
+      "tz <- data.frame(x=x)",
+      "bw.fix <- npplregbw(xdat=tx, zdat=tz, ydat=y, regtype='lc', bwmethod='cv.ls', bwtype='fixed', nmulti=1)",
+      "bw.ann <- npplregbw(xdat=tx, zdat=tz, ydat=y, regtype='lc', bwmethod='cv.ls', bwtype='adaptive_nn', nmulti=1)",
+      "data.out <- suppressWarnings(plot(bw.fix, xdat=tx, ydat=y, zdat=tz, plot.behavior='data', perspective=FALSE, plot.errors.method='none'))",
+      "plot.out <- suppressWarnings(plot(bw.fix, xdat=tx, ydat=y, zdat=tz, plot.behavior='plot-data', perspective=FALSE, plot.errors.method='none'))",
+      "ann.out <- suppressWarnings(plot(bw.ann, xdat=tx, ydat=y, zdat=tz, plot.behavior='data', perspective=FALSE, plot.errors.method='none'))",
+      "stopifnot(is.list(data.out), length(data.out) == 2L, identical(names(data.out), names(plot.out)))",
+      "for (i in seq_along(data.out)) {",
+      "  stopifnot(inherits(data.out[[i]], 'plregression'))",
+      "  stopifnot(inherits(plot.out[[i]], 'plregression'))",
+      "  stopifnot(isTRUE(all.equal(data.out[[i]]$mean, plot.out[[i]]$mean, check.attributes=FALSE)))",
+      "  stopifnot(isTRUE(all.equal(data.out[[i]]$merr, plot.out[[i]]$merr, check.attributes=FALSE)))",
+      "  stopifnot(all(is.na(data.out[[i]]$merr)))",
+      "}",
+      "stopifnot(identical(as.character(data.out[[1L]]$ptype), 'Fixed'))",
+      "stopifnot(identical(as.character(ann.out[[1L]]$ptype), 'Adaptive Nearest Neighbour'))",
+      "cat('SESSION_NPPLREG_PLAIN_FIXED_LC_OK\\n')"
+    ),
+    timeout = 90L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPPLREG_PLAIN_FIXED_LC_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npsigtest fast-fail contract completes in installed-build subprocess", {
   skip_on_cran()
   env <- subprocess_env()

@@ -180,7 +180,7 @@ npplreg.call <-
       )
       if (!is.null(zeval))
         args$exdat <- zeval
-      as.vector(do.call(.np_regression_direct, args)$mean)
+      as.vector(.npRmpi_with_local_regression(do.call(.np_regression_direct, args))$mean)
     }
 
     yhat.train <- reg_mean(regbw = bws$bw$yzbw, ytrain = ydat)
