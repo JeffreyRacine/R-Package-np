@@ -142,7 +142,7 @@ sibandwidth <-
     num.feval = num.feval,
     numimp = numimp,
     fval.vector = fval.vector,
-    pscaling = "Bandwidth(s)",
+    pscaling = npBandwidthSummaryLabel(bwtype = bwtype),
     type = bwtype,
     ptype = switch( bwtype,
       fixed = "Fixed",
