@@ -12,7 +12,7 @@ locate_r_source <- function(filename) {
   candidates <- unique(candidates[nzchar(candidates)])
   hits <- candidates[file.exists(candidates)]
   if (length(hits) == 0L)
-    return(NULL)
+    return("")
   hits[[1L]]
 }
 
@@ -39,9 +39,12 @@ test_that("timing producers avoid user CPU summaries for touched families", {
 
 test_that("reference regression bandwidth timing remains full-stage elapsed", {
   src_file <- locate_r_source("np.regression.bw.R")
-  skip_if(is.null(src_file), "R source file np.regression.bw.R unavailable in this test context")
+  skip_if(!nzchar(src_file) || !file.exists(src_file),
+          "R source file np.regression.bw.R unavailable in this test context")
 
   lines <- readLines(src_file, warn = FALSE)
+  if (!any(grepl("npregbw", lines, fixed = TRUE)))
+    skip("R source file np.regression.bw.R unavailable in this test context")
   expect_true(any(grepl("elapsed.start <- proc.time\\(\\)\\[3\\]", lines)), info = "np.regression.bw.R")
   expect_true(any(grepl("tbw\\$total.time <- proc.time\\(\\)\\[3\\] - elapsed.start", lines)),
               info = "np.regression.bw.R")

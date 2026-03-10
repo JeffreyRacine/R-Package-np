@@ -5,6 +5,9 @@
 # npregbw object, and a set of indices for the columns of X for which
 # the test is to be run (default = all).
 
+if (getRversion() >= "2.15.1")
+  utils::globalVariables(".npsig_worker")
+
 .npRmpi_npsig_extract_xy_from_npreg <- function(obj) {
   if (is.null(obj$bws$formula) || is.null(obj$bws$call))
     stop("unable to extract xdat/ydat from npreg object")

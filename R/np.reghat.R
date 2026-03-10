@@ -800,8 +800,7 @@ npreghat.rbandwidth <-
       !(identical(bws$type, "generalized_nn") &&
           identical(reg.spec$regtype.engine, "lp"))
 
-    exact.core.matrix <- identical(output, "matrix") &&
-      !identical(bws$type, "fixed") &&
+    exact.core.route <- !identical(bws$type, "fixed") &&
       !isTRUE(leave.one.out) &&
       (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L)))) &&
       (
@@ -830,7 +829,7 @@ npreghat.rbandwidth <-
       return(as.vector(direct.out$grad[, target.col]))
     }
 
-    if (exact.core.matrix) {
+    if (exact.core.route) {
       H <- .npreghat_exact_matrix_from_core(
         bws = bws,
         txdat = txdat,

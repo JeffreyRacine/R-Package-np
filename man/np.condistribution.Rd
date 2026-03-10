@@ -28,6 +28,9 @@ npcdist(bws, \dots)
         exdat,
         eydat,
         gradients = FALSE,
+        proper = FALSE,
+        proper.method = c("isotonic"),
+        proper.control = list(),
         \dots)
 
 \method{npcdist}{default}(bws, txdat, tydat, \dots)
@@ -90,6 +93,23 @@ npcdist(bws, \dots)
   \item{gradients}{
     a logical value specifying whether to return estimates of the
     gradients at the evaluation points. Defaults to \code{FALSE}.
+  }
+
+  \item{proper}{
+    a logical value specifying whether to post-process the estimated
+    conditional distribution so that it is monotone and bounded on the
+    evaluation grid. Defaults to \code{FALSE}.
+  }
+
+  \item{proper.method}{
+    the properization method. Currently only
+    \code{"isotonic"} is supported.
+  }
+
+  \item{proper.control}{
+    a named list of control parameters for properization. Supported
+    entries are \code{tol}, \code{grid.check}, \code{store.raw}, and
+    \code{fail.on.unsupported}.
   }
 
   
