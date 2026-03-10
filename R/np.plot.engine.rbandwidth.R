@@ -48,7 +48,7 @@
            ...,
            random.seed){
 
-    oldpar <- par(no.readonly = TRUE)
+    oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
     on.exit(.np_plot_restore_par(oldpar), add = TRUE)
 
     scalar_default <- function(value, default) {
