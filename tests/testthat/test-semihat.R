@@ -441,9 +441,9 @@ test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
   ex <- tx[seq_len(25), , drop = FALSE]
 
   cfgs <- list(
-    list(regtype = "lc", basis = NULL, degree = NULL, h = 0.85),
-    list(regtype = "ll", basis = NULL, degree = NULL, h = 0.85),
-    list(regtype = "lp", basis = "tensor", degree = 2L, h = 0.85)
+    list(regtype = "lc", basis = NULL, degree = NULL, h = 5L),
+    list(regtype = "ll", basis = NULL, degree = NULL, h = 5L),
+    list(regtype = "lp", basis = "tensor", degree = 2L, h = 5L)
   )
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
@@ -504,7 +504,7 @@ test_that("npindexhat exact apply matches npindex on resampled nearest-neighbor 
     bw <- npindexbw(
       xdat = tx,
       ydat = y,
-      bws = c(1, 1, 0.85),
+      bws = c(1, 1, 5L),
       bandwidth.compute = FALSE,
       regtype = "lp",
       basis = "tensor",

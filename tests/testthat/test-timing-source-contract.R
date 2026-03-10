@@ -12,7 +12,7 @@ locate_r_source <- function(filename) {
   candidates <- unique(candidates[nzchar(candidates)])
   hits <- candidates[file.exists(candidates)]
   if (length(hits) == 0L)
-    return(NULL)
+    return("")
   hits[[1L]]
 }
 

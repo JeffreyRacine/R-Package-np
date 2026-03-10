@@ -474,7 +474,7 @@ test_that("npindex plot bootstrap inid supports ll/lp basis variants", {
   }
 })
 
-test_that("npindex plot bootstrap inid fails fast for unsupported gradients", {
+test_that("npindex plot bootstrap inid fails fast for unsupported nonfixed gradients", {
   skip_if_not_installed("np")
 
   set.seed(32321)
@@ -483,24 +483,34 @@ test_that("npindex plot bootstrap inid fails fast for unsupported gradients", {
   x2 <- runif(n)
   y <- sin(x1 + x2) + rnorm(n, sd = 0.1)
   tx <- data.frame(x1 = x1, x2 = x2)
-  bw <- npindexbw(xdat = tx, ydat = y, bws = c(1, 1, 0.25), bandwidth.compute = FALSE)
 
-  expect_error(
-    suppressWarnings(
-      plot(
-        bw,
-        xdat = tx,
-        ydat = y,
-        plot.behavior = "data",
-        perspective = FALSE,
-        gradients = TRUE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 7
-      )
-    ),
-    "gradients=FALSE"
-  )
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    bw <- npindexbw(
+      xdat = tx,
+      ydat = y,
+      bws = c(1, 1, 5L),
+      bandwidth.compute = FALSE,
+      bwtype = bt
+    )
+
+    expect_error(
+      suppressWarnings(
+        plot(
+          bw,
+          xdat = tx,
+          ydat = y,
+          plot.behavior = "data",
+          perspective = FALSE,
+          gradients = TRUE,
+          plot.errors.method = "bootstrap",
+          plot.errors.boot.method = "inid",
+          plot.errors.boot.num = 7
+        )
+      ),
+      "gradients=FALSE",
+      info = bt
+    )
+  }
 })
 
 test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {
@@ -1361,7 +1371,7 @@ test_that("npindex plot bootstrap inid supports nearest-neighbor bwtypes", {
     bw.lc <- npindexbw(
       xdat = tx,
       ydat = y,
-      bws = c(1, 1, 0.85),
+      bws = c(1, 1, 5L),
       bandwidth.compute = FALSE,
       bwtype = bt,
       regtype = "lc"
@@ -1373,7 +1383,7 @@ test_that("npindex plot bootstrap inid supports nearest-neighbor bwtypes", {
     bw.ll <- npindexbw(
       xdat = tx,
       ydat = y,
-      bws = c(1, 1, 0.85),
+      bws = c(1, 1, 5L),
       bandwidth.compute = FALSE,
       bwtype = bt,
       regtype = "ll"
@@ -1398,9 +1408,9 @@ test_that("npindex nearest-neighbor inid helper matches explicit resample refits
   fast.fun <- getFromNamespace(".np_inid_boot_from_index", "np")
 
   cfgs <- list(
-    list(regtype = "lc", basis = NULL, degree = NULL, h = 0.85),
-    list(regtype = "ll", basis = NULL, degree = NULL, h = 0.85),
-    list(regtype = "lp", basis = "tensor", degree = 2L, h = 0.85)
+    list(regtype = "lc", basis = NULL, degree = NULL, h = 5L),
+    list(regtype = "ll", basis = NULL, degree = NULL, h = 5L),
+    list(regtype = "lp", basis = "tensor", degree = 2L, h = 5L)
   )
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
