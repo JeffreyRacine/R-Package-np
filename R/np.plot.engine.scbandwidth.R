@@ -186,14 +186,6 @@
       plot.errors <- FALSE
     }
 
-    if (identical(plot.errors.method, "bootstrap") &&
-        identical(plot.errors.boot.method, "wild")) {
-      stop(
-        "plot.errors.boot.method='wild' is unsupported for smooth coefficient bootstrap in npRmpi canonical SPMD mode; use 'inid', 'fixed', or 'geom'",
-        call. = FALSE
-      )
-    }
-
     if ((sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord))== 2) && (sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0) && perspective && !gradients &&
         !any(xor(c(bws$xdati$iord, bws$zdati$iord), c(bws$xdati$inumord, bws$zdati$inumord)))){
 
