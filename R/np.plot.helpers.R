@@ -6100,21 +6100,37 @@ compute.bootstrap.errors.sibandwidth =
       } else {
         boot.out <- .npRmpi_with_local_bootstrap({
           tryCatch({
-            tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
-            rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
-            .np_inid_boot_from_regression(
-              xdat = tx.index,
-              exdat = tx.index,
-              bws = rbw,
-              ydat = ydat,
-              B = plot.errors.boot.num,
-              counts.drawer = .np_block_counts_drawer(
-                n = nrow(tx.index),
+            if (identical(plot.errors.boot.method, "fixed")) {
+              .np_inid_boot_from_index(
+                xdat = xdat,
+                ydat = ydat,
+                bws = bws,
                 B = plot.errors.boot.num,
-                blocklen = plot.errors.boot.blocklen,
-                sim = plot.errors.boot.method
+                counts.drawer = .np_block_counts_drawer(
+                  n = nrow(xdat),
+                  B = plot.errors.boot.num,
+                  blocklen = plot.errors.boot.blocklen,
+                  sim = "fixed"
+                ),
+                gradients = FALSE
               )
-            )
+            } else {
+              tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+              rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
+              .np_inid_boot_from_regression(
+                xdat = tx.index,
+                exdat = tx.index,
+                bws = rbw,
+                ydat = ydat,
+                B = plot.errors.boot.num,
+                counts.drawer = .np_block_counts_drawer(
+                  n = nrow(tx.index),
+                  B = plot.errors.boot.num,
+                  blocklen = plot.errors.boot.blocklen,
+                  sim = plot.errors.boot.method
+                )
+              )
+            }
           }, error = function(e) {
             stop(sprintf("%s single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
                          plot.errors.boot.method,
