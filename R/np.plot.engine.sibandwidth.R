@@ -309,11 +309,12 @@
 
         if (plot.behavior != "plot"){
           plot.out[1] = NA
-          plot.out[[1]] = tobj
-
-          plot.out[[1]]$index = tobj$index[i.sort]
-          plot.out[[1]]$mean = tobj$mean[i.sort]
-          plot.out[[1]]$grad = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
+          plot.out[[1]] <- make_singleindex_payload(
+            index = tobj$index[i.sort],
+            mean = tobj$mean[i.sort],
+            grad = matrix(data = 0, nrow = nrow(xdat), ncol = ncol(xdat)),
+            gradients.flag = TRUE
+          )
           plot.out[[1]]$glerr = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
           plot.out[[1]]$gherr = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
           plot.out[[1]]$gbias = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
