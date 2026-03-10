@@ -1626,6 +1626,43 @@
   )$ksum) / nrow(xdat)
 }
 
+.np_operator_matrix_from_ksum <- function(ksum, nrow.out, ncol.out, where) {
+  km <- as.matrix(ksum)
+
+  if (nrow(km) == nrow.out && ncol(km) == ncol.out)
+    return(km)
+  if (nrow(km) == ncol.out && ncol(km) == nrow.out)
+    return(t(km))
+
+  stop(sprintf("%s returned unexpected operator shape", where))
+}
+
+.np_ksum_unconditional_operator_fixed <- function(xdat, exdat, bws, operator) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  n <- nrow(xdat)
+
+  K <- npksum(
+    txdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    tydat = diag(n),
+    operator = operator,
+    bandwidth.divide = TRUE
+  )$ksum
+
+  .np_operator_matrix_from_ksum(
+    ksum = K,
+    nrow.out = nrow(exdat),
+    ncol.out = n,
+    where = "npksum unconditional operator"
+  ) / n
+}
+
+.np_apply_operator_counts <- function(K, counts) {
+  t(K %*% counts)
+}
+
 .np_inid_boot_from_ksum_unconditional_exact <- function(xdat,
                                                         exdat,
                                                         bws,
@@ -1713,33 +1750,17 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid unconditional inid bootstrap dimensions")
 
-  ones <- matrix(1.0, nrow = n, ncol = 1L)
-  ksum0 <- npksum(
-    txdat = xdat,
-    tydat = ones,
+  K <- .np_ksum_unconditional_operator_fixed(
+    xdat = xdat,
     exdat = exdat,
     bws = bws,
-    weights = ones,
-    operator = operator,
-    bandwidth.divide = TRUE
-  )$ksum
-  t0 <- as.numeric(.np_boot_matrix_from_ksum(ksum0, B = 1L, nout = neval,
-                                             where = "npksum unconditional baseline")[1L, ]) / n
+    operator = operator
+  )
+  t0 <- rowSums(K)
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    ksum <- npksum(
-      txdat = xdat,
-      tydat = ones,
-      exdat = exdat,
-      bws = bws,
-      weights = counts.mat,
-      operator = operator,
-      bandwidth.divide = TRUE
-    )$ksum
-    tmat <- .np_boot_matrix_from_ksum(ksum, B = B, nout = neval,
-                                      where = "npksum unconditional counts")
-    return(list(t = tmat / n, t0 = t0))
+    return(list(t = .np_apply_operator_counts(K = K, counts = counts.mat), t0 = t0))
   }
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B)
@@ -1759,18 +1780,7 @@
     } else {
       stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
     }
-    ksum.chunk <- npksum(
-      txdat = xdat,
-      tydat = ones,
-      exdat = exdat,
-      bws = bws,
-      weights = counts.chunk,
-      operator = operator,
-      bandwidth.divide = TRUE
-    )$ksum
-    tmat[start:stopi, ] <- .np_boot_matrix_from_ksum(
-      ksum.chunk, B = bsz, nout = neval, where = "npksum unconditional chunk"
-    ) / n
+    tmat[start:stopi, ] <- .np_apply_operator_counts(K = K, counts = counts.chunk)
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
     start <- stopi + 1L
   }
@@ -1873,6 +1883,57 @@
   )$ksum) / nrow(xydat)
 
   num / pmax(den, .Machine$double.eps)
+}
+
+.np_ksum_conditional_operator_fixed <- function(xdat,
+                                                ydat,
+                                                exdat,
+                                                eydat,
+                                                bws,
+                                                cdf) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  n <- nrow(xdat)
+
+  kbx <- .np_con_make_kbandwidth_x(bws = bws, xdat = xdat)
+  kbxy <- .np_con_make_kbandwidth_xy(bws = bws, xdat = xdat, ydat = ydat)
+  xop <- rep.int("normal", ncol(xdat))
+  yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
+  xyop <- c(xop, yop)
+
+  Kden <- npksum(
+    txdat = xdat,
+    exdat = exdat,
+    bws = kbx,
+    tydat = diag(n),
+    operator = xop,
+    bandwidth.divide = TRUE
+  )$ksum
+  Knum <- npksum(
+    txdat = data.frame(xdat, ydat),
+    exdat = data.frame(exdat, eydat),
+    bws = kbxy,
+    tydat = diag(n),
+    operator = xyop,
+    bandwidth.divide = TRUE
+  )$ksum
+
+  list(
+    den = .np_operator_matrix_from_ksum(
+      ksum = Kden,
+      nrow.out = nrow(exdat),
+      ncol.out = n,
+      where = "npksum conditional denominator operator"
+    ) / n,
+    num = .np_operator_matrix_from_ksum(
+      ksum = Knum,
+      nrow.out = nrow(exdat),
+      ncol.out = n,
+      where = "npksum conditional numerator operator"
+    ) / n
+  )
 }
 
 .np_inid_boot_from_ksum_conditional_exact <- function(xdat,
@@ -1992,69 +2053,25 @@
   if (!.np_con_inid_ksum_eligible(bws))
     return(NULL)
 
-  kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = xdat),
-                  error = function(e) NULL)
-  kbxy <- tryCatch(.np_con_make_kbandwidth_xy(bws = bws, xdat = xdat, ydat = ydat),
-                   error = function(e) NULL)
-  if (is.null(kbx) || is.null(kbxy))
+  ops <- tryCatch(
+    .np_ksum_conditional_operator_fixed(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      cdf = cdf
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(ops))
     return(NULL)
-
-  xop <- rep.int("normal", ncol(xdat))
-  yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
-  xyop <- c(xop, yop)
-
-  xydat <- data.frame(xdat, ydat)
-  exydat <- data.frame(exdat, eydat)
-  ones <- matrix(1.0, nrow = n, ncol = 1L)
-
-  den0 <- npksum(
-    txdat = xdat,
-    tydat = ones,
-    exdat = exdat,
-    bws = kbx,
-    weights = ones,
-    operator = xop,
-    bandwidth.divide = TRUE
-  )$ksum
-  num0 <- npksum(
-    txdat = xydat,
-    tydat = ones,
-    exdat = exydat,
-    bws = kbxy,
-    weights = ones,
-    operator = xyop,
-    bandwidth.divide = TRUE
-  )$ksum
-  den0 <- as.numeric(.np_boot_matrix_from_ksum(den0, B = 1L, nout = neval,
-                                               where = "npksum conditional denominator baseline")[1L, ]) / n
-  num0 <- as.numeric(.np_boot_matrix_from_ksum(num0, B = 1L, nout = neval,
-                                               where = "npksum conditional numerator baseline")[1L, ]) / n
-  t0 <- num0 / pmax(den0, .Machine$double.eps)
+  t0 <- rowSums(ops$num) / pmax(rowSums(ops$den), .Machine$double.eps)
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    den <- npksum(
-      txdat = xdat,
-      tydat = ones,
-      exdat = exdat,
-      bws = kbx,
-      weights = counts.mat,
-      operator = xop,
-      bandwidth.divide = TRUE
-    )$ksum
-    num <- npksum(
-      txdat = xydat,
-      tydat = ones,
-      exdat = exydat,
-      bws = kbxy,
-      weights = counts.mat,
-      operator = xyop,
-      bandwidth.divide = TRUE
-    )$ksum
-    den <- .np_boot_matrix_from_ksum(den, B = B, nout = neval,
-                                     where = "npksum conditional denominator counts") / n
-    num <- .np_boot_matrix_from_ksum(num, B = B, nout = neval,
-                                     where = "npksum conditional numerator counts") / n
+    den <- t(ops$den %*% counts.mat)
+    num <- t(ops$num %*% counts.mat)
     return(list(t = num / pmax(den, .Machine$double.eps), t0 = t0))
   }
 
@@ -2075,30 +2092,8 @@
     } else {
       stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
     }
-
-    den <- npksum(
-      txdat = xdat,
-      tydat = ones,
-      exdat = exdat,
-      bws = kbx,
-      weights = counts.chunk,
-      operator = xop,
-      bandwidth.divide = TRUE
-    )$ksum
-    num <- npksum(
-      txdat = xydat,
-      tydat = ones,
-      exdat = exydat,
-      bws = kbxy,
-      weights = counts.chunk,
-      operator = xyop,
-      bandwidth.divide = TRUE
-    )$ksum
-
-    den <- .np_boot_matrix_from_ksum(den, B = bsz, nout = neval,
-                                     where = "npksum conditional denominator chunk") / n
-    num <- .np_boot_matrix_from_ksum(num, B = bsz, nout = neval,
-                                     where = "npksum conditional numerator chunk") / n
+    den <- t(ops$den %*% counts.chunk)
+    num <- t(ops$num %*% counts.chunk)
     tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
     start <- stopi + 1L
