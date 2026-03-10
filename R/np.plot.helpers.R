@@ -1108,6 +1108,249 @@
   list(t = t.mpi, t0 = t0)
 }
 
+.np_inid_boot_from_index <- function(xdat,
+                                     ydat,
+                                     bws,
+                                     B,
+                                     counts = NULL,
+                                     counts.drawer = NULL,
+                                     gradients = FALSE) {
+  if (!identical(bws$type, "fixed")) {
+    return(.np_inid_boot_from_index_exact(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bws,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      gradients = gradients
+    ))
+  }
+
+  xdat <- toFrame(xdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in single-index inid helper")
+  if (n < 1L || B < 1L)
+    stop("invalid single-index inid helper dimensions")
+  if (isTRUE(gradients))
+    stop("single-index inid helper does not support gradients", call. = FALSE)
+
+  idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+  y.num <- if (is.factor(ydat)) {
+    yadj <- adjustLevels(data.frame(ydat), bws$ydati)
+    bws$ydati$all.dlev[[1L]][as.integer(yadj[, 1L])]
+  } else {
+    as.double(ydat)
+  }
+
+  spec <- .npindex_resolve_spec(bws, where = "single-index inid helper")
+  regtype <- spec$regtype.engine
+  kbw <- .np_indexhat_kbw(bws = bws, idx.train = idx.train)
+  kw <- .np_kernel_weights_direct(
+    bws = kbw,
+    txdat = idx.train,
+    exdat = idx.train,
+    bandwidth.divide = TRUE,
+    kernel.pow = 1.0
+  )
+
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = n)
+  if (nrow(kw) != n || ncol(kw) != n)
+    stop("single-index inid helper kernel-weight matrix shape mismatch")
+
+  if (identical(regtype, "lc")) {
+    H <- sweep(
+      t(kw),
+      1L,
+      pmax(colSums(kw), .Machine$double.eps),
+      "/",
+      check.margin = FALSE
+    )
+    return(.np_inid_lc_boot_from_hat(
+      H = H,
+      ydat = y.num,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer
+    ))
+  }
+
+  degree <- if (identical(regtype, "ll")) {
+    1L
+  } else {
+    spec$degree.engine
+  }
+
+  W <- W.lp(
+    xdat = idx.train,
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+  W.eval <- W.lp(
+    xdat = idx.train,
+    exdat = idx.train,
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+  W <- as.matrix(W)
+  W.eval <- as.matrix(W.eval)
+
+  p <- ncol(W)
+  mcols <- p * (p + 1L) / 2L
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = 1.0e-12, cap = 1.0)
+  rhs <- W.eval
+  ones <- matrix(1.0, nrow = n, ncol = 1L)
+
+  Mfeat <- vector("list", n)
+  Zfeat <- vector("list", n)
+  t0 <- numeric(n)
+
+  for (i in seq_len(n)) {
+    k <- as.double(kw[, i])
+    WK <- W * k
+    Zfeat[[i]] <- WK * y.num
+
+    mf <- matrix(0.0, nrow = n, ncol = mcols)
+    idx <- 1L
+    for (a in seq_len(p)) {
+      for (b in a:p) {
+        mf[, idx] <- WK[, a] * W[, b]
+        idx <- idx + 1L
+      }
+    }
+    Mfeat[[i]] <- mf
+
+    M0 <- crossprod(ones, mf)
+    Z0 <- crossprod(ones, Zfeat[[i]])
+    t0[i] <- if (p > 3L) {
+      .np_inid_lp_predict_chunk_general(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    } else {
+      .np_inid_lp_predict_chunk(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    }
+  }
+
+  tmat <- matrix(NA_real_, nrow = B, ncol = n)
+
+  fill_chunk <- function(counts.chunk, start, stopi) {
+    for (i in seq_len(n)) {
+      Mvals <- crossprod(counts.chunk, Mfeat[[i]])
+      Zvals <- crossprod(counts.chunk, Zfeat[[i]])
+      tmat[start:stopi, i] <<- if (p > 3L) {
+        .np_inid_lp_predict_chunk_general(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      } else {
+        .np_inid_lp_predict_chunk(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      }
+    }
+  }
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+  } else {
+    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      counts.chunk <- if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+      } else {
+        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+      }
+      fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
+      start <- stopi + 1L
+    }
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_index_exact <- function(xdat,
+                                           ydat,
+                                           bws,
+                                           B,
+                                           counts = NULL,
+                                           counts.drawer = NULL,
+                                           gradients = FALSE) {
+  xdat <- toFrame(xdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in exact single-index bootstrap helper")
+  if (n < 1L || B < 1L)
+    stop("invalid exact single-index bootstrap dimensions")
+  if (isTRUE(gradients))
+    stop("exact single-index bootstrap helper does not support gradients", call. = FALSE)
+
+  fit_hat <- function(x.train, y.train) {
+    as.vector(npindexhat(
+      bws = bws,
+      txdat = x.train,
+      exdat = xdat,
+      y = y.train,
+      output = "apply",
+      s = 0L
+    ))
+  }
+
+  t0 <- fit_hat(x.train = xdat, y.train = ydat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+  counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
+
+  start <- 1L
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  while (start <= B) {
+    stopi <- min(B, start + chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    counts.chunk <- if (!is.null(counts.mat)) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+    }
+
+    for (jj in seq_len(bsz)) {
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      tmat[start + jj - 1L, ] <- fit_hat(
+        x.train = xdat[idx, , drop = FALSE],
+        y.train = ydat[idx]
+      )
+    }
+
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_inid_lp_unpack_sym_row <- function(mrow, p) {
   A <- matrix(0.0, nrow = p, ncol = p)
   idx <- 1L
@@ -5830,24 +6073,22 @@ compute.bootstrap.errors.sibandwidth =
     } else if (is.inid) {
       inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
         !isTRUE(gradients)
-      if (!isTRUE(inid.helper.ok)) {
-        stop("inid single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
-      } else {
-        boot.out <- .npRmpi_with_local_bootstrap({
-          tryCatch({
-            tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
-            rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
-            .np_inid_boot_from_regression(
-              xdat = tx.index,
-              exdat = tx.index,
-              bws = rbw,
-              ydat = ydat,
-              B = plot.errors.boot.num
-            )
-          }, error = function(e) {
-            stop(sprintf("inid single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
-                         conditionMessage(e)),
-                 call. = FALSE)
+    if (!isTRUE(inid.helper.ok)) {
+      stop("inid single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+    } else {
+      boot.out <- .npRmpi_with_local_bootstrap({
+        tryCatch({
+          .np_inid_boot_from_index(
+            xdat = xdat,
+            ydat = ydat,
+            bws = bws,
+            B = plot.errors.boot.num,
+            gradients = FALSE
+          )
+        }, error = function(e) {
+          stop(sprintf("inid single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
+                       conditionMessage(e)),
+               call. = FALSE)
           })
         })
       }

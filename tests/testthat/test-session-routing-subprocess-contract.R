@@ -967,6 +967,62 @@ test_that("session inid plot smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npindex inid consumer plot preserves bwtype variants in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE)",
+      "set.seed(20260310)",
+      "n <- 70",
+      "x1 <- runif(n)",
+      "x2 <- runif(n)",
+      "eta <- 1.2 * x1 - 0.8 * x2",
+      "p <- 1 / (1 + exp(-eta))",
+      "y <- rbinom(n, 1, p)",
+      "tx <- data.frame(x1=x1, x2=x2)",
+      "for (bwtype in c('fixed', 'generalized_nn', 'adaptive_nn')) {",
+      "  bw.arg <- if (identical(bwtype, 'fixed')) 0.85 else 9",
+      "  bw <- npindexbw(",
+      "    xdat=tx,",
+      "    ydat=y,",
+      "    method='kleinspady',",
+      "    regtype='lc',",
+      "    bwtype=bwtype,",
+      "    bws=c(1, 1, bw.arg),",
+      "    bandwidth.compute=FALSE",
+      "  )",
+      "  out <- suppressWarnings(plot(",
+      "    bw,",
+      "    xdat=tx,",
+      "    ydat=y,",
+      "    plot.behavior='data',",
+      "    plot.errors.method='bootstrap',",
+      "    plot.errors.boot.method='inid',",
+      "    plot.errors.boot.num=9",
+      "  ))",
+      "  stopifnot(is.list(out), length(out) > 0L)",
+      "  stopifnot(is.matrix(out[[1]]$merr), ncol(out[[1]]$merr) == 2L)",
+      "  cat(sprintf('SESSION_NPINDEX_BWTYPE_INID_PLOT_OK bwtype=%s\\n', bwtype))",
+      "}"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEX_BWTYPE_INID_PLOT_OK bwtype=fixed", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEX_BWTYPE_INID_PLOT_OK bwtype=generalized_nn", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEX_BWTYPE_INID_PLOT_OK bwtype=adaptive_nn", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session inid density plot smoke completes in subprocess", {
   skip_on_cran()
   skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_DENSITY_INID_TEST"), "1"),
