@@ -161,6 +161,26 @@
   )
 }
 
+.np_progress_maybe_emit_start_note <- function(state, now = .np_progress_now()) {
+  if (!isTRUE(state$enabled) || !isTRUE(state$start_note_pending)) {
+    return(state)
+  }
+
+  if ((now - state$started) < state$start_note_grace_sec) {
+    return(state)
+  }
+
+  .np_progress_emit(state$start_note)
+  state$start_note_pending <- FALSE
+  state$last_line <- state$start_note
+
+  if (isTRUE(state$start_note_consumes_throttle)) {
+    state$last_emit <- now
+  }
+
+  state
+}
+
 .np_progress_step <- function(state, done = NULL, detail = NULL) {
   if (!is.null(done)) {
     state$last_done <- done
@@ -171,15 +191,9 @@
   }
 
   now <- .np_progress_now()
-  if (isTRUE(state$start_note_pending) &&
-      (now - state$started) < state$start_note_grace_sec) {
-    return(state)
-  }
-
+  state <- .np_progress_maybe_emit_start_note(state = state, now = now)
   if (isTRUE(state$start_note_pending)) {
-    .np_progress_emit(state$start_note)
-    state$start_note_pending <- FALSE
-    state$last_line <- state$start_note
+    return(state)
   }
 
   if ((now - state$last_emit) < state$throttle_sec) {
