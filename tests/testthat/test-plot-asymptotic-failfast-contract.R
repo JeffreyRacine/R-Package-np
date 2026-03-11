@@ -14,6 +14,7 @@ test_that("plot contract: single-index asymptotic consumer payloads are supporte
     list(regtype = "ll"),
     list(regtype = "lp", basis = "tensor", degree = 2L)
   )
+  neval <- 50L
 
   for (method in c("ichimura", "kleinspady")) {
     y.use <- if (identical(method, "kleinspady")) y.bin else y.cont
@@ -39,6 +40,7 @@ test_that("plot contract: single-index asymptotic consumer payloads are supporte
           bw,
           xdat = xdat,
           ydat = y.use,
+          neval = neval,
           plot.behavior = "data",
           plot.errors.method = "asymptotic",
           plot.errors.type = "pointwise",
@@ -46,8 +48,8 @@ test_that("plot contract: single-index asymptotic consumer payloads are supporte
         ))[[1]]
 
         expect_s3_class(out, "singleindex")
-        expect_equal(length(out$mean), n, info = paste(method, bwtype, cfg$regtype, "mean length"))
-        expect_equal(dim(out$merr), c(n, 2L), info = paste(method, bwtype, cfg$regtype, "merr shape"))
+        expect_equal(length(out$mean), neval, info = paste(method, bwtype, cfg$regtype, "mean length"))
+        expect_equal(dim(out$merr), c(neval, 2L), info = paste(method, bwtype, cfg$regtype, "merr shape"))
         expect_true(all(is.finite(out$mean)), info = paste(method, bwtype, cfg$regtype, "mean finite"))
         expect_true(all(is.finite(out$merr)), info = paste(method, bwtype, cfg$regtype, "merr finite"))
       }
