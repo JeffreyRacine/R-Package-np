@@ -169,22 +169,24 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
 
-    if (plot.errors.method == "asymptotic") {
-      stop(
-        "asymptotic errors are unsupported for partially linear regression plots; use bootstrap errors",
-        call. = FALSE
-      )
-    }
-
     plot.errors = (plot.errors.method != "none")
 
     if (coef) {
-      fit.coef <- .np_plot_plreg_local_fit(
-        bws = bws,
-        xdat = xdat,
-        ydat = ydat,
-        zdat = zdat
-      )
+      fit.coef <- if (identical(plot.errors.method, "asymptotic")) {
+        npplreg(
+          bws = bws,
+          txdat = xdat,
+          tydat = ydat,
+          tzdat = zdat
+        )
+      } else {
+        .np_plot_plreg_local_fit(
+          bws = bws,
+          xdat = xdat,
+          ydat = ydat,
+          zdat = zdat
+        )
+      }
       cf <- as.double(fit.coef$xcoef)
       se <- as.double(fit.coef$xcoeferr)
       cf.names <- if (!is.null(names(fit.coef$xcoef))) names(fit.coef$xcoef) else bws$xnames
@@ -243,21 +245,46 @@
       if (bws$zdati$iord[1])
         z1.eval <- (bws$zdati$all.dlev[[1]])[as.integer(z1.eval)]
 
-      tobj <- .np_plot_plreg_local_fit(
-        bws = bws,
-        xdat = xdat,
-        ydat = ydat,
-        zdat = zdat,
-        exdat = x.eval[,1, drop = FALSE],
-        ezdat = x.eval[,2, drop = FALSE]
-      )
+      tobj <- if (identical(plot.errors.method, "asymptotic")) {
+        .np_plot_plreg_asymptotic_fit(
+          bws = bws,
+          xdat = xdat,
+          ydat = ydat,
+          zdat = zdat,
+          exdat = x.eval[,1, drop = FALSE],
+          ezdat = x.eval[,2, drop = FALSE]
+        )
+      } else {
+        .np_plot_plreg_local_fit(
+          bws = bws,
+          xdat = xdat,
+          ydat = ydat,
+          zdat = zdat,
+          exdat = x.eval[,1, drop = FALSE],
+          ezdat = x.eval[,2, drop = FALSE]
+        )
+      }
 
       terr = matrix(data = NA, nrow = nrow(x.eval), ncol = 3)
       
       treg = matrix(data = tobj$mean,
         nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
 
-      if (plot.errors.method == "bootstrap"){
+      if (plot.errors.method == "asymptotic") {
+        terr.obj <- .np_plot_asymptotic_error_from_se(
+          se = tobj$merr,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type,
+          m = nrow(x.eval)
+        )
+        terr[,1:2] <- terr.obj$err
+        terr.all <- terr.obj$all.err
+        lerr = matrix(data = tobj$mean - terr[,1],
+          nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
+        herr = matrix(data = tobj$mean + terr[,2],
+          nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
+
+      } else if (plot.errors.method == "bootstrap"){
         terr <- compute.bootstrap.errors(
           xdat = xdat, ydat = ydat, zdat = zdat,
           exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE],
@@ -286,7 +313,9 @@
       
       if(is.null(zlim)) {
           zlim =
-              if (plot.errors)
+              if (plot.errors && plot.errors.method == "asymptotic" && plot.errors.type == "all")
+                  compute.all.error.range(tobj$mean, terr.all)
+              else if (plot.errors)
                   c(min(lerr),max(herr))
               else
                   c(min(tobj$mean),max(tobj$mean))
@@ -471,19 +500,39 @@
         }
 
 
-        tobj <- .np_plot_plreg_local_fit(
-          bws = bws,
-          xdat = xdat,
-          ydat = ydat,
-          zdat = zdat,
-          exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-          ezdat = ezdat[seq_len(xi.neval),, drop = FALSE]
-        )
+        tobj <- if (identical(plot.errors.method, "asymptotic")) {
+          .np_plot_plreg_asymptotic_fit(
+            bws = bws,
+            xdat = xdat,
+            ydat = ydat,
+            zdat = zdat,
+            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+            ezdat = ezdat[seq_len(xi.neval),, drop = FALSE]
+          )
+        } else {
+          .np_plot_plreg_local_fit(
+            bws = bws,
+            xdat = xdat,
+            ydat = ydat,
+            zdat = zdat,
+            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+            ezdat = ezdat[seq_len(xi.neval),, drop = FALSE]
+          )
+        }
 
         temp.mean[seq_len(xi.neval)] = tobj$mean
 
         if (plot.errors){
-          if (plot.errors.method == "bootstrap"){
+          if (plot.errors.method == "asymptotic") {
+            asym.obj <- .np_plot_asymptotic_error_from_se(
+              se = tobj$merr,
+              alpha = plot.errors.alpha,
+              band.type = plot.errors.type,
+              m = xi.neval
+            )
+            temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+            temp.all.err <- asym.obj$all.err
+          } else if (plot.errors.method == "bootstrap"){
             temp.boot <- compute.bootstrap.errors(
                       xdat = xdat,
                       ydat = ydat,
@@ -636,19 +685,39 @@
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        tobj <- .np_plot_plreg_local_fit(
-          bws = bws,
-          xdat = xdat,
-          ydat = ydat,
-          zdat = zdat,
-          exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-          ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
-        )
+        tobj <- if (identical(plot.errors.method, "asymptotic")) {
+          .np_plot_plreg_asymptotic_fit(
+            bws = bws,
+            xdat = xdat,
+            ydat = ydat,
+            zdat = zdat,
+            exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+            ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
+          )
+        } else {
+          .np_plot_plreg_local_fit(
+            bws = bws,
+            xdat = xdat,
+            ydat = ydat,
+            zdat = zdat,
+            exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+            ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
+          )
+        }
 
         temp.mean[seq_len(xi.neval)] = tobj$mean
 
         if (plot.errors){
-          if (plot.errors.method == "bootstrap"){
+          if (plot.errors.method == "asymptotic") {
+            asym.obj <- .np_plot_asymptotic_error_from_se(
+              se = tobj$merr,
+              alpha = plot.errors.alpha,
+              band.type = plot.errors.type,
+              m = xi.neval
+            )
+            temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+            temp.all.err <- asym.obj$all.err
+          } else if (plot.errors.method == "bootstrap"){
             temp.boot <- compute.bootstrap.errors(
                       xdat = xdat,
                       ydat = ydat,

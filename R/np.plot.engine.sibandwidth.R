@@ -85,13 +85,6 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
 
-    if (plot.errors.method == "asymptotic") {
-      stop(
-        "asymptotic errors are unsupported for single-index regression plots; use bootstrap errors",
-        call. = FALSE
-      )
-    }
-
     plot.errors = (plot.errors.method != "none")
 
 
@@ -122,32 +115,42 @@
     neval = maxneval = length(ydat)
 
     xdat <- toFrame(xdat)
-    index.eval <- as.vector(toMatrix(xdat) %*% bws$beta)
-    tobj <- list(index = index.eval)
-    if (gradients) {
-      idx.train <- data.frame(index = index.eval)
-      rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-      fit.grad <- .np_regression_direct(
-        bws = rbw,
-        txdat = idx.train,
-        tydat = ydat,
-        exdat = idx.train,
-        gradients = TRUE,
-        gradient.order = 1L
-      )
-      tobj$mean <- as.vector(fit.grad$mean)
-      grad.index <- as.vector(fit.grad$grad[, 1L])
-      tobj$grad.index <- grad.index
-      tobj$grad <- grad.index %o% as.vector(bws$beta)
-    } else {
-      tobj$mean <- as.vector(npindexhat(
+    if (identical(plot.errors.method, "asymptotic")) {
+      tobj <- .np_plot_singleindex_asymptotic_eval(
         bws = bws,
         txdat = xdat,
+        tydat = ydat,
         exdat = xdat,
-        y = ydat,
-        output = "apply",
-        s = 0L
-      ))
+        gradients = gradients
+      )
+    } else {
+      index.eval <- as.vector(toMatrix(xdat) %*% bws$beta)
+      tobj <- list(index = index.eval)
+      if (gradients) {
+        idx.train <- data.frame(index = index.eval)
+        rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+        fit.grad <- .np_regression_direct(
+          bws = rbw,
+          txdat = idx.train,
+          tydat = ydat,
+          exdat = idx.train,
+          gradients = TRUE,
+          gradient.order = 1L
+        )
+        tobj$mean <- as.vector(fit.grad$mean)
+        grad.index <- as.vector(fit.grad$grad[, 1L])
+        tobj$grad.index <- grad.index
+        tobj$grad <- grad.index %o% as.vector(bws$beta)
+      } else {
+        tobj$mean <- as.vector(npindexhat(
+          bws = bws,
+          txdat = xdat,
+          exdat = xdat,
+          y = ydat,
+          output = "apply",
+          s = 0L
+        ))
+      }
     }
     
     temp.err = matrix(data = NA, nrow = maxneval, ncol = 3)
@@ -158,7 +161,16 @@
     temp.mean[] = if(gradients) tobj$grad.index else tobj$mean
 
     if (plot.errors){
-      if (plot.errors.method == "bootstrap") {
+      if (plot.errors.method == "asymptotic") {
+        asym.obj <- .np_plot_asymptotic_error_from_se(
+          se = if (gradients) tobj$gerr.index else tobj$merr,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type,
+          m = maxneval
+        )
+        temp.err[,1:2] <- asym.obj$err
+        temp.all.err <- asym.obj$all.err
+      } else if (plot.errors.method == "bootstrap") {
         temp.boot.raw <- compute.bootstrap.errors(
                   xdat = xdat, ydat = ydat,
                   gradients = gradients,
