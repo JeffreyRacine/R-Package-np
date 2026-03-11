@@ -72,7 +72,10 @@ test_that("npindexbw emits append-only bounded multistart progress", {
   x2 <- runif(30)
   y <- x1 + 0.5 * x2 + rnorm(30, sd = 0.1)
 
-  old_opts <- options(np.messages = TRUE)
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0
+  )
   on.exit(options(old_opts), add = TRUE)
 
   res <- with_nprmpi_bindings(

@@ -74,7 +74,10 @@ test_that("npsymtest emits append-only bounded bootstrap progress", {
   set.seed(42)
   x <- rgamma(30, shape = 2)
 
-  old_opts <- options(np.messages = TRUE)
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0
+  )
   on.exit(options(old_opts), add = TRUE)
 
   res <- with_nprmpi_bindings(
