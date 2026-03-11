@@ -1085,8 +1085,6 @@ npregiv <- function(y,
 
   ## Here is where the function `npregiv' really begins:
 
-  console <- newLineConsole()
-
   ## Basic error checking
 
   if(!is.logical(penalize.iteration)) stop("penalize.iteration must be logical (TRUE/FALSE)")
@@ -1153,41 +1151,31 @@ npregiv <- function(y,
 
     ## convergence <- NULL
 
-    console <- printClear(console)
-    console <- printPop(console)
-    if(is.null(bw)) {
-        console <- printPush("Computing bandwidths and E(y|w)...",console)
-    } else {
-        console <- printPush("Computing E(y|w) using supplied bandwidths...",console)
-    }
+    .np_progress_note("Preparing Tikhonov IV regression")
 
     if(is.null(bw)) {
-        hyw <- glpcv(ydat=y,
-                     xdat=w,
-                     degree=rep(p, num.w.numeric),
-                     nmulti=nmulti,
-                     random.seed=random.seed,
-                     optim.maxattempts=optim.maxattempts,
-                     optim.method=optim.method,
-                     optim.reltol=optim.reltol,
-                     optim.abstol=optim.abstol,
-                     optim.maxit=optim.maxit,
-                     ...)
+        hyw <- .np_progress_with_legacy_suppressed(glpcv(ydat=y,
+                                                        xdat=w,
+                                                        degree=rep(p, num.w.numeric),
+                                                        nmulti=nmulti,
+                                                        random.seed=random.seed,
+                                                        optim.maxattempts=optim.maxattempts,
+                                                        optim.method=optim.method,
+                                                        optim.reltol=optim.reltol,
+                                                        optim.abstol=optim.abstol,
+                                                        optim.maxit=optim.maxit,
+                                                        ...))
 
         bw.E.y.w <- hyw$bw
     } else {
         bw.E.y.w <- bw$bw.E.y.w
     }
 
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing weight matrix and E(y|w)...", console)
-
-    E.y.w <- glpreg(tydat=y,
-                    txdat=w,
-                    bws=bw.E.y.w,
-                    degree=rep(p, num.w.numeric),
-                    ...)$mean
+    E.y.w <- .np_progress_with_legacy_suppressed(glpreg(tydat=y,
+                                                        txdat=w,
+                                                        bws=bw.E.y.w,
+                                                        degree=rep(p, num.w.numeric),
+                                                        ...))$mean
 
     KYW <- Kmat.lp(mydata.train=data.frame(w),
                    bws=bw.E.y.w,
@@ -1196,41 +1184,29 @@ npregiv <- function(y,
 
     ## We conduct local polynomial kernel regression of E(y|w) on z
 
-    console <- printClear(console)
-    console <- printPop(console)
     if(is.null(bw)) {
-        console <- printPush("Computing bandwidths for E(E(y|w)|z)...", console)
-    } else {
-        console <- printPush("Computing E(E(y|w)|z) using supplied bandwidths...", console)
-    }
-
-    if(is.null(bw)) {
-        hywz <- glpcv(ydat=E.y.w,
-                      xdat=z,
-                      degree=rep(p, num.z.numeric),
-                      nmulti=nmulti,
-                      random.seed=random.seed,
-                      optim.maxattempts=optim.maxattempts,
-                      optim.method=optim.method,
-                      optim.reltol=optim.reltol,
-                      optim.abstol=optim.abstol,
-                      optim.maxit=optim.maxit,
-                      ...)
+        hywz <- .np_progress_with_legacy_suppressed(glpcv(ydat=E.y.w,
+                                                         xdat=z,
+                                                         degree=rep(p, num.z.numeric),
+                                                         nmulti=nmulti,
+                                                         random.seed=random.seed,
+                                                         optim.maxattempts=optim.maxattempts,
+                                                         optim.method=optim.method,
+                                                         optim.reltol=optim.reltol,
+                                                         optim.abstol=optim.abstol,
+                                                         optim.maxit=optim.maxit,
+                                                         ...))
 
         bw.E.E.y.w.z <- hywz$bw
     } else {
         bw.E.E.y.w.z <- bw$bw.E.E.y.w.z
     }
 
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing weight matrix and E(E(y|w)|z)...", console)
-
-    E.E.y.w.z <- glpreg(tydat=E.y.w,
-                        txdat=z,
-                        bws=bw.E.E.y.w.z,
-                        degree=rep(p, num.z.numeric),
-                        ...)$mean
+    E.E.y.w.z <- .np_progress_with_legacy_suppressed(glpreg(tydat=E.y.w,
+                                                            txdat=z,
+                                                            bws=bw.E.E.y.w.z,
+                                                            degree=rep(p, num.z.numeric),
+                                                            ...))$mean
 
     KYWZ <- Kmat.lp(mydata.train=data.frame(z),
                     bws=bw.E.E.y.w.z,
@@ -1249,18 +1225,13 @@ npregiv <- function(y,
     if(!is.null(bw)) alpha <- bw$alpha
 
     if(is.null(alpha)&&is.null(bw)) {
-      console <- printClear(console)
-      console <- printPop(console)
-      console <- printPush("Numerically solving for alpha...", console)
+      .np_progress_note("Solving Tikhonov regularization parameter")
       alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     }
 
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha.
 
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing initial phi(z) estimate...", console)
     phi <- as.vector(tikh(alpha, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z))
     phi.mat <- phi
     
@@ -1279,101 +1250,73 @@ npregiv <- function(y,
         phi.eval.mat <- cbind(phi.eval.mat,phi.eval)
     }    
 
-    console <- printClear(console)
-    console <- printPop(console)
-    if(is.null(bw)) {
-        console <- printPush("Computing bandwidths for E(phi(z)|w)...", console)
-    } else {
-        console <- printPush("Computing E(phi(z)|w) using supplied bandwidths...", console)
-    }
-
     bw.E.phi.w <- NULL
     bw.E.E.phi.w.z <- NULL
+    tikh.progress <- if(iterate.Tikhonov.num > 1) {
+      .np_progress_begin("Iterating Tikhonov solve", total = iterate.Tikhonov.num)
+    } else {
+      NULL
+    }
 
     for(i in 1:iterate.Tikhonov.num) {
-
-      if(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num) {
-          console <- printClear(console)
-          console <- printPop(console)
-          console <- printPush(paste("Iteration ",i," of ",iterate.Tikhonov.num,sep=""), console)
+      if(!is.null(tikh.progress)) {
+          tikh.progress <- .np_progress_step(tikh.progress, done = i, detail = "updating smoothing and phi(z)")
       }
 
       if(is.null(bw)) {
-          hphiw <- glpcv(ydat=phi, ## 23/1/15 phi is sample
-                         xdat=w,
-                         degree=rep(p, num.w.numeric),
-                         nmulti=nmulti.loop,
-                         random.seed=random.seed,
-                         optim.maxattempts=optim.maxattempts,
-                         optim.method=optim.method,
-                         optim.reltol=optim.reltol,
-                         optim.abstol=optim.abstol,
-                         optim.maxit=optim.maxit,
-                         bw.init=bw.E.phi.w,
-                         ...)
+          hphiw <- .np_progress_with_legacy_suppressed(glpcv(ydat=phi, ## 23/1/15 phi is sample
+                                                            xdat=w,
+                                                            degree=rep(p, num.w.numeric),
+                                                            nmulti=nmulti.loop,
+                                                            random.seed=random.seed,
+                                                            optim.maxattempts=optim.maxattempts,
+                                                            optim.method=optim.method,
+                                                            optim.reltol=optim.reltol,
+                                                            optim.abstol=optim.abstol,
+                                                            optim.maxit=optim.maxit,
+                                                            bw.init=bw.E.phi.w,
+                                                            ...))
 
           bw.E.phi.w <- hphiw$bw
       } else {
           bw.E.phi.w <- bw$bw.E.phi.w
       }
 
-      if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
-          console <- printClear(console)
-          console <- printPop(console)
-          console <- printPush("Computing weight matrix for E(phi(z)|w)...", console)
-      }
-
-      E.phi.w <- glpreg(tydat=phi,
-                        txdat=w,
-                        bws=bw.E.phi.w,
-                        degree=rep(p, num.w.numeric),
-                        ...)$mean
+      E.phi.w <- .np_progress_with_legacy_suppressed(glpreg(tydat=phi,
+                                                            txdat=w,
+                                                            bws=bw.E.phi.w,
+                                                            degree=rep(p, num.w.numeric),
+                                                            ...))$mean
 
       KPHIW <- Kmat.lp(mydata.train=data.frame(w),
                        bws=bw.E.phi.w,
                        p=rep(p, num.w.numeric),
                        ...)
 
-      if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
-          console <- printClear(console)
-          console <- printPop(console)
-          if(is.null(bw)) {
-              console <- printPush("Computing bandwidths for E(E(phi(z)|w)|z)...", console)
-          } else {
-              console <- printPush("Computing E(E(phi(z)|w)|z) using supplied bandwidths...", console)
-          }
-      }
-
       if(is.null(bw)) {
-          hphiwz <- glpcv(ydat=E.phi.w,
-                          xdat=z,
-                          degree=rep(p, num.z.numeric),
-                          nmulti=nmulti.loop,
-                          random.seed=random.seed,
-                          optim.maxattempts=optim.maxattempts,
-                          optim.method=optim.method,
-                          optim.reltol=optim.reltol,
-                          optim.abstol=optim.abstol,
-                          optim.maxit=optim.maxit,
-                          bw.init=bw.E.E.phi.w.z,
-                          ...)
+          hphiwz <- .np_progress_with_legacy_suppressed(glpcv(ydat=E.phi.w,
+                                                             xdat=z,
+                                                             degree=rep(p, num.z.numeric),
+                                                             nmulti=nmulti.loop,
+                                                             random.seed=random.seed,
+                                                             optim.maxattempts=optim.maxattempts,
+                                                             optim.method=optim.method,
+                                                             optim.reltol=optim.reltol,
+                                                             optim.abstol=optim.abstol,
+                                                             optim.maxit=optim.maxit,
+                                                             bw.init=bw.E.E.phi.w.z,
+                                                             ...))
 
           bw.E.E.phi.w.z <- hphiwz$bw
       } else {
           bw.E.E.phi.w.z <- bw$bw.E.E.phi.w.z
       }
 
-      E.E.phi.w.z <- glpreg(tydat=E.y.w,
-                            txdat=z,
-                            bws=bw.E.E.phi.w.z,
-                            degree=rep(p, num.z.numeric),
-                            ...)$mean
-
-      if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
-          console <- printClear(console)
-          console <- printPop(console)
-          console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
-      }
+      E.E.phi.w.z <- .np_progress_with_legacy_suppressed(glpreg(tydat=E.y.w,
+                                                                txdat=z,
+                                                                bws=bw.E.E.phi.w.z,
+                                                                degree=rep(p, num.z.numeric),
+                                                                ...))$mean
       
       KPHIW <- Kmat.lp(mydata.train=data.frame(w),
                        bws=bw.E.phi.w,
@@ -1396,10 +1339,8 @@ npregiv <- function(y,
       } else {
 
           if(is.null(alpha.iter)&&is.null(bw)) {
-              if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
-                  console <- printClear(console)
-                  console <- printPop(console)
-                  console <- printPush(paste("Iterating and recomputing the numerical solution for alpha (iteration ",i," of ",iterate.Tikhonov.num,")",sep=""), console)
+              if(!is.null(tikh.progress)) {
+                  tikh.progress <- .np_progress_step(tikh.progress, done = i, detail = "recomputing alpha")
               }
               alpha.iter <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.phi.w.z, r = E.y.w)$minimum
           }
@@ -1407,15 +1348,9 @@ npregiv <- function(y,
 
       ## Finally, we conduct regularized Tikhonov regression using this
       ## optimal alpha and the updated bandwidths.
-      
-      if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
-          console <- printClear(console)
-          console <- printPop(console)
-          console <- printPush("Computing final phi(z) estimate...", console)
-      }
 
       phi <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ, r = E.y.w))
-      phi.mat <- cbind(phi.mat,phi)    
+      phi.mat <- cbind(phi.mat,phi)
 
       H <- NULL
       if(return.weights.phi) {
@@ -1517,9 +1452,10 @@ npregiv <- function(y,
       }
       
     }
-    
-    console <- printClear(console)
-    console <- printPop(console)
+
+    if(!is.null(tikh.progress)) {
+        tikh.progress <- .np_progress_end(tikh.progress, detail = "updating smoothing and phi(z)")
+    }
 
     if((alpha.iter-alpha.min)/NZD(alpha.min) < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
     if((alpha.max-alpha.iter)/NZD(alpha.max) < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
@@ -1562,40 +1498,33 @@ npregiv <- function(y,
 
     ## Landweber-Fridman
 
-    ## For the stopping rule
-
-    console <- printClear(console)
-    console <- printPop(console)
-    if(is.null(bw)) {
-        console <- printPush(paste("Computing bandwidths and E(y|w) for stopping rule...",sep=""),console)
-    } else {
-        console <- printPush(paste("Computing E(y|w) for stopping rule using supplied bandwidths...",sep=""),console)
-    }
+    .np_progress_note("Preparing Landweber-Fridman IV regression")
+    progress <- .np_progress_begin("Iterating Landweber-Fridman solve")
 
     norm.stop <- numeric()
 
     if(is.null(bw)) {
-        h <- glpcv(ydat=y,
-                   xdat=w,
-                   degree=rep(p, num.w.numeric),
-                   nmulti=nmulti,
-                   random.seed=random.seed,
-                   optim.maxattempts=optim.maxattempts,
-                   optim.method=optim.method,
-                   optim.reltol=optim.reltol,
-                   optim.abstol=optim.abstol,
-                   optim.maxit=optim.maxit,
-                   ...)
+        h <- .np_progress_with_legacy_suppressed(glpcv(ydat=y,
+                                                      xdat=w,
+                                                      degree=rep(p, num.w.numeric),
+                                                      nmulti=nmulti,
+                                                      random.seed=random.seed,
+                                                      optim.maxattempts=optim.maxattempts,
+                                                      optim.method=optim.method,
+                                                      optim.reltol=optim.reltol,
+                                                      optim.abstol=optim.abstol,
+                                                      optim.maxit=optim.maxit,
+                                                      ...))
         bw.E.y.w <- h$bw
     } else {
         bw.E.y.w <- bw$bw.E.y.w
     }
 
-    E.y.w <- glpreg(tydat=y,
-                    txdat=w,
-                    bws=bw.E.y.w,
-                    degree=rep(p, num.w.numeric),
-                    ...)$mean
+    E.y.w <- .np_progress_with_legacy_suppressed(glpreg(tydat=y,
+                                                        txdat=w,
+                                                        bws=bw.E.y.w,
+                                                        degree=rep(p, num.w.numeric),
+                                                        ...))$mean
 
     if(return.weights.phi) {
 
@@ -1612,68 +1541,60 @@ npregiv <- function(y,
     ## We begin the iteration computing phi.0 and phi.1 directly, then
     ## iterate.
 
-    console <- printClear(console)
-    console <- printPop(console)
-    if(is.null(bw)) {
-        console <- printPush(paste("Computing bandwidths and E(y|z) for iteration 0...",sep=""),console)
-    } else {
-        console <- printPush(paste("Computing E(y|z) for iteration 0 using supplied bandwidths...",sep=""),console)
-    }
-
     if(is.null(starting.values)) {
 
       if(is.null(bw)) {
-          h <- glpcv(ydat=if(start.from=="Eyz") y else E.y.w,
-                     xdat=z,
-                     degree=rep(p, num.z.numeric),
-                     nmulti=nmulti,
-                     random.seed=random.seed,
-                     optim.maxattempts=optim.maxattempts,
-                     optim.method=optim.method,
-                     optim.reltol=optim.reltol,
-                     optim.abstol=optim.abstol,
-                     optim.maxit=optim.maxit,
-                     ...)
+          h <- .np_progress_with_legacy_suppressed(glpcv(ydat=if(start.from=="Eyz") y else E.y.w,
+                                                        xdat=z,
+                                                        degree=rep(p, num.z.numeric),
+                                                        nmulti=nmulti,
+                                                        random.seed=random.seed,
+                                                        optim.maxattempts=optim.maxattempts,
+                                                        optim.method=optim.method,
+                                                        optim.reltol=optim.reltol,
+                                                        optim.abstol=optim.abstol,
+                                                        optim.maxit=optim.maxit,
+                                                        ...))
           bw.E.y.z <- h$bw
       } else {
           bw.E.y.z <- bw$bw.E.y.z
       }
 
-      g <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
-                  txdat=z,
-                  bws=bw.E.y.z,
-                  degree=rep(p, num.z.numeric),
-                  ...)
+      g <- .np_progress_with_legacy_suppressed(glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
+                                                      txdat=z,
+                                                      bws=bw.E.y.z,
+                                                      degree=rep(p, num.z.numeric),
+                                                      ...))
 
       phi.0 <- g$mean
       phi.0.deriv.1 <- g$grad
       if(p >= 2) {
-          phi.0.deriv.2 <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
-                                  txdat=z,
-                                  bws=bw.E.y.z,
-                                  degree=rep(p, num.z.numeric),
-                                  deriv=2,
-                                  ...)$grad
+          phi.0.deriv.2 <- .np_progress_with_legacy_suppressed(glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
+                                                                      txdat=z,
+                                                                      bws=bw.E.y.z,
+                                                                      degree=rep(p, num.z.numeric),
+                                                                      deriv=2,
+                                                                      ...))$grad
       }
 
       if(!is.null(zeval)) {
-          g <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
-                      txdat=z,
-                      exdat=zeval,
-                      bws=bw.E.y.z,
-                      degree=rep(p, num.z.numeric),
-                      ...)
+          g <- .np_progress_with_legacy_suppressed(glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
+                                                          txdat=z,
+                                                          exdat=zeval,
+                                                          bws=bw.E.y.z,
+                                                          degree=rep(p, num.z.numeric),
+                                                          ...))
 
           phi.eval.0 <- g$mean
           phi.eval.0.deriv.1 <- g$grad
           if(p >= 2) {
-              phi.eval.0.deriv.2 <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
-                                           txdat=z,
-                                           exdat=zeval,
-                                           bws=bw.E.y.z,
-                                           degree=rep(p, num.z.numeric),
-                                           deriv=2,
-                                           ...)$grad
+              phi.eval.0.deriv.2 <- .np_progress_with_legacy_suppressed(glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
+                                                                               txdat=z,
+                                                                               exdat=zeval,
+                                                                               bws=bw.E.y.z,
+                                                                               degree=rep(p, num.z.numeric),
+                                                                               deriv=2,
+                                                                               ...))$grad
           }
       } else {
           phi.eval.0 <- NULL
@@ -1772,73 +1693,59 @@ npregiv <- function(y,
 
     starting.values.phi <- phi.0
 
-    console <- printClear(console)
-    console <- printPop(console)
-    if(smooth.residuals) {
-        if(is.null(bw)) {
-            console <- printPush(paste("Computing bandwidths and E[y-phi(z)|w] for iteration 1...",sep=""),console)
-        } else {
-            console <- printPush(paste("Computing E[y-phi(z)|w] for iteration 1 using supplied bandwidths...",sep=""),console)
-        }
-    } else {
-        if(is.null(bw)) {
-            console <- printPush(paste("Computing bandwidths and E[phi(z)|w] for iteration 1...",sep=""),console)
-        } else {
-            console <- printPush(paste("Computing E[phi(z)|w] for iteration 1 using supplied bandwidths...",sep=""),console)
-        }
-    }
+    progress <- .np_progress_step(progress, done = 1, detail = "updating residual smoothing")
 
     if(smooth.residuals) {
 
       resid <- y - phi.0
 
       if(is.null(bw)) {
-          h <- glpcv(ydat=resid,
-                     xdat=w,
-                     degree=rep(p, num.w.numeric),
-                     nmulti=nmulti,
-                     random.seed=random.seed,
-                     optim.maxattempts=optim.maxattempts,
-                     optim.method=optim.method,
-                     optim.reltol=optim.reltol,
-                     optim.abstol=optim.abstol,
-                     optim.maxit=optim.maxit,
-                     ...)
+          h <- .np_progress_with_legacy_suppressed(glpcv(ydat=resid,
+                                                        xdat=w,
+                                                        degree=rep(p, num.w.numeric),
+                                                        nmulti=nmulti,
+                                                        random.seed=random.seed,
+                                                        optim.maxattempts=optim.maxattempts,
+                                                        optim.method=optim.method,
+                                                        optim.reltol=optim.reltol,
+                                                        optim.abstol=optim.abstol,
+                                                        optim.maxit=optim.maxit,
+                                                        ...))
           bw.resid.w <- h$bw
       } else {
           bw.resid.w <- bw$bw.resid.w[1,]
       }
 
-      resid.fitted <- glpreg(tydat=resid,
-                             txdat=w,
-                             bws=bw.resid.w,
-                             degree=rep(p, num.w.numeric),
-                             ...)$mean
+      resid.fitted <- .np_progress_with_legacy_suppressed(glpreg(tydat=resid,
+                                                                 txdat=w,
+                                                                 bws=bw.resid.w,
+                                                                 degree=rep(p, num.w.numeric),
+                                                                 ...))$mean
 
     } else {
 
       if(is.null(bw)) {
-          h <- glpcv(ydat=phi.0,
-                     xdat=w,
-                     degree=rep(p, num.w.numeric),
-                     nmulti=nmulti,
-                     random.seed=random.seed,
-                     optim.maxattempts=optim.maxattempts,
-                     optim.method=optim.method,
-                     optim.reltol=optim.reltol,
-                     optim.abstol=optim.abstol,
-                     optim.maxit=optim.maxit,
-                     ...)
+          h <- .np_progress_with_legacy_suppressed(glpcv(ydat=phi.0,
+                                                        xdat=w,
+                                                        degree=rep(p, num.w.numeric),
+                                                        nmulti=nmulti,
+                                                        random.seed=random.seed,
+                                                        optim.maxattempts=optim.maxattempts,
+                                                        optim.method=optim.method,
+                                                        optim.reltol=optim.reltol,
+                                                        optim.abstol=optim.abstol,
+                                                        optim.maxit=optim.maxit,
+                                                        ...))
           bw.resid.w <- h$bw
       } else {
           bw.resid.w <- bw$bw.resid.w[1,]
       }
 
-      resid.fitted <- E.y.w - glpreg(tydat=phi.0,
-                                     txdat=w,
-                                     bws=bw.resid.w,
-                                     degree=rep(p, num.w.numeric),
-                                     ...)$mean
+      resid.fitted <- E.y.w - .np_progress_with_legacy_suppressed(glpreg(tydat=phi.0,
+                                                                         txdat=w,
+                                                                         bws=bw.resid.w,
+                                                                         degree=rep(p, num.w.numeric),
+                                                                         ...))$mean
 
     }
 
@@ -1853,44 +1760,30 @@ npregiv <- function(y,
 
     norm.stop[1] <- sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2))
 
-    console <- printClear(console)
-    console <- printPop(console)
-    if(smooth.residuals) {
-        if(is.null(bw)) {
-            console <- printPush(paste("Computing bandwidths and E[E(y-phi(z)|w)|z] for iteration 1...",sep=""),console)
-        } else {
-            console <- printPush(paste("Computing E[E(y-phi(z)|w)|z] for iteration 1 using supplied bandwidths...",sep=""),console)
-        }
-    } else {
-        if(is.null(bw)) {
-            console <- printPush(paste("Computing bandwidths and E[E(y|w) - E(phi(z)|w)|z] for iteration 1...",sep=""),console)
-        } else {
-            console <- printPush(paste("Computing E[E(y|w) - E(phi(z)|w)|z] for iteration 1 using supplied bandwidths...",sep=""),console)
-        }
-    }
+    progress <- .np_progress_step(progress, done = 1, detail = "updating adjoint smoothing")
 
     if(is.null(bw)) {
-        h <- glpcv(ydat=resid.fitted,
-                   xdat=z,
-                   degree=rep(p, num.z.numeric),
-                   nmulti=nmulti,
-                   random.seed=random.seed,
-                   optim.maxattempts=optim.maxattempts,
-                   optim.method=optim.method,
-                   optim.reltol=optim.reltol,
-                   optim.abstol=optim.abstol,
-                   optim.maxit=optim.maxit,
-                   ...)
+        h <- .np_progress_with_legacy_suppressed(glpcv(ydat=resid.fitted,
+                                                      xdat=z,
+                                                      degree=rep(p, num.z.numeric),
+                                                      nmulti=nmulti,
+                                                      random.seed=random.seed,
+                                                      optim.maxattempts=optim.maxattempts,
+                                                      optim.method=optim.method,
+                                                      optim.reltol=optim.reltol,
+                                                      optim.abstol=optim.abstol,
+                                                      optim.maxit=optim.maxit,
+                                                      ...))
         bw.resid.fitted.w.z <- h$bw
     } else {
         bw.resid.fitted.w.z <- bw$bw.resid.fitted.w.z[1,]
     }
 
-    g <- glpreg(tydat=resid.fitted,
-                txdat=z,
-                bws=bw.resid.fitted.w.z,
-                degree=rep(p, num.z.numeric),
-                ...)
+    g <- .np_progress_with_legacy_suppressed(glpreg(tydat=resid.fitted,
+                                                    txdat=z,
+                                                    bws=bw.resid.fitted.w.z,
+                                                    degree=rep(p, num.z.numeric),
+                                                    ...))
 
     phi.deriv.1.list <- vector(mode="list", length=iterate.max)
     phi.deriv.eval.1.list <- vector(mode="list", length=iterate.max)
@@ -1908,22 +1801,22 @@ npregiv <- function(y,
     phi.deriv.eval.2 <- NULL
 
     if(p >= 2) {
-        phi.deriv.2 <- phi.0.deriv.2 + constant*glpreg(tydat=resid.fitted,
-                                                       txdat=z,
-                                                       bws=bw.resid.fitted.w.z,
-                                                       degree=rep(p, num.z.numeric),
-                                                       deriv=2,
-                                                       ...)$grad
+        phi.deriv.2 <- phi.0.deriv.2 + constant*.np_progress_with_legacy_suppressed(glpreg(tydat=resid.fitted,
+                                                                                            txdat=z,
+                                                                                            bws=bw.resid.fitted.w.z,
+                                                                                            degree=rep(p, num.z.numeric),
+                                                                                            deriv=2,
+                                                                                            ...))$grad
         phi.deriv.2.list[[1]] <- phi.deriv.2
     }
 
     if(!is.null(zeval)) {
-        g <- glpreg(tydat=resid.fitted,
-                    txdat=z,
-                    exdat=zeval,
-                    bws=bw.resid.fitted.w.z,
-                    degree=rep(p, num.z.numeric),
-                    ...)
+        g <- .np_progress_with_legacy_suppressed(glpreg(tydat=resid.fitted,
+                                                        txdat=z,
+                                                        exdat=zeval,
+                                                        bws=bw.resid.fitted.w.z,
+                                                        degree=rep(p, num.z.numeric),
+                                                        ...))
         phi.eval <- phi.eval.0 + constant*g$mean
         phi.eval.mat <- matrix(NA, length(phi.eval), iterate.max)
         phi.eval.mat[,1] <- phi.eval
@@ -1932,13 +1825,13 @@ npregiv <- function(y,
         phi.deriv.eval.1.list[[1]] <- phi.deriv.eval.1
 
         if(p >= 2) {
-            phi.deriv.eval.2 <- phi.eval.0.deriv.2 + constant*glpreg(tydat=resid.fitted,
-                                                                     txdat=z,
-                                                                     bws=bw.resid.fitted.w.z,
-                                                                     exdat=zeval,
-                                                                     degree=rep(p, num.z.numeric),
-                                                                     deriv=2,
-                                                                     ...)$grad
+            phi.deriv.eval.2 <- phi.eval.0.deriv.2 + constant*.np_progress_with_legacy_suppressed(glpreg(tydat=resid.fitted,
+                                                                                                          txdat=z,
+                                                                                                          bws=bw.resid.fitted.w.z,
+                                                                                                          exdat=zeval,
+                                                                                                          degree=rep(p, num.z.numeric),
+                                                                                                          deriv=2,
+                                                                                                          ...))$grad
             phi.deriv.eval.2.list[[1]] <- phi.deriv.eval.2
         }
 
@@ -2081,78 +1974,62 @@ npregiv <- function(y,
     ## (but above all are named).
 
     for(j in 2:iterate.max) {
-
-      console <- printClear(console)
-      console <- printPop(console)
-
-      if(smooth.residuals) {
-          if(is.null(bw)) {
-              console <- printPush(paste("Computing bandwidths and E[y-phi(z)|w] for iteration ", j,"...",sep=""),console)
-          } else {
-              console <- printPush(paste("Computing E[y-phi(z)|w] for iteration ", j," using supplied bandwidths...",sep=""),console)
-          }
-      } else {
-          if(is.null(bw)) {
-              console <- printPush(paste("Computing bandwidths and E[phi(z)|w] for iteration ", j,"...",sep=""),console)
-          } else {
-              console <- printPush(paste("Computing E[phi(z)|w] for iteration ", j," using supplied bandwidths...",sep=""),console)
-          }
-      }
+      progress <- .np_progress_step(progress, done = j, detail = "updating residual smoothing")
 
       if(smooth.residuals) {
 
         resid <- y - phi
 
         if(is.null(bw)) {
-            h <- glpcv(ydat=resid,
-                       xdat=w,
-                       degree=rep(p, num.w.numeric),
-                       nmulti=nmulti.loop,
-                       random.seed=random.seed,
-                       optim.maxattempts=optim.maxattempts,
-                       optim.method=optim.method,
-                       optim.reltol=optim.reltol,
-                       optim.abstol=optim.abstol,
-                       optim.maxit=optim.maxit,
-                       bw.init=bw.resid.w.mat[j-1,],
-                       ...)
+            h <- .np_progress_with_legacy_suppressed(glpcv(ydat=resid,
+                                                          xdat=w,
+                                                          degree=rep(p, num.w.numeric),
+                                                          nmulti=nmulti.loop,
+                                                          random.seed=random.seed,
+                                                          optim.maxattempts=optim.maxattempts,
+                                                          optim.method=optim.method,
+                                                          optim.reltol=optim.reltol,
+                                                          optim.abstol=optim.abstol,
+                                                          optim.maxit=optim.maxit,
+                                                          bw.init=bw.resid.w.mat[j-1,],
+                                                          ...))
         } else {
             h <- NULL
             h$bw <- bw$bw.resid.w[j,]
         }
 
-        resid.fitted <- glpreg(tydat=resid,
-                               txdat=w,
-                               bws=h$bw,
-                               degree=rep(p, num.w.numeric),
-                               ...)$mean
+        resid.fitted <- .np_progress_with_legacy_suppressed(glpreg(tydat=resid,
+                                                                   txdat=w,
+                                                                   bws=h$bw,
+                                                                   degree=rep(p, num.w.numeric),
+                                                                   ...))$mean
 
 
       } else {
 
         if(is.null(bw)) {
-            h <- glpcv(ydat=phi,
-                       xdat=w,
-                       degree=rep(p, num.w.numeric),
-                       nmulti=nmulti.loop,
-                       random.seed=random.seed,
-                       optim.maxattempts=optim.maxattempts,
-                       optim.method=optim.method,
-                       optim.reltol=optim.reltol,
-                       optim.abstol=optim.abstol,
-                       optim.maxit=optim.maxit,
-                       bw.init=bw.resid.w.mat[j-1,],
-                       ...)
+            h <- .np_progress_with_legacy_suppressed(glpcv(ydat=phi,
+                                                          xdat=w,
+                                                          degree=rep(p, num.w.numeric),
+                                                          nmulti=nmulti.loop,
+                                                          random.seed=random.seed,
+                                                          optim.maxattempts=optim.maxattempts,
+                                                          optim.method=optim.method,
+                                                          optim.reltol=optim.reltol,
+                                                          optim.abstol=optim.abstol,
+                                                          optim.maxit=optim.maxit,
+                                                          bw.init=bw.resid.w.mat[j-1,],
+                                                          ...))
         } else {
             h <- NULL
             h$bw <- bw$bw.resid.w[j,]
         }
 
-        resid.fitted <- E.y.w - glpreg(tydat=phi,
-                                       txdat=w,
-                                       bws=h$bw,
-                                       degree=rep(p, num.w.numeric),
-                                       ...)$mean
+        resid.fitted <- E.y.w - .np_progress_with_legacy_suppressed(glpreg(tydat=phi,
+                                                                           txdat=w,
+                                                                           bws=h$bw,
+                                                                           degree=rep(p, num.w.numeric),
+                                                                           ...))$mean
 
       }
 
@@ -2169,44 +2046,30 @@ npregiv <- function(y,
 
       norm.stop[j] <- if (penalize.iteration) j*sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2)) else sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2))
 
-      console <- printClear(console)
-      console <- printPop(console)
-      if(smooth.residuals) {
-          if(is.null(bw)) {
-              console <- printPush(paste("Computing bandwidths and E[E(y-phi(z)|w)|z] for iteration ", j,"...",sep=""),console)
-          } else {
-              console <- printPush(paste("Computing E[E(y-phi(z)|w)|z] for iteration ", j," using supplied bandwidths...",sep=""),console)
-          }
-      } else {
-          if(is.null(bw)) {
-              console <- printPush(paste("Computing bandwidths and E[E(y|z)-E(phi(z)|w)|z] for iteration ", j,"...",sep=""),console)
-          } else {
-              console <- printPush(paste("Computing E[E(y|z)-E(phi(z)|w)|z] for iteration ", j," using supplied bandwidths...",sep=""),console)
-          }
-      }
+      progress <- .np_progress_step(progress, done = j, detail = "updating adjoint smoothing")
 
       if(is.null(bw)) {
-          h <- glpcv(ydat=resid.fitted,
-                     xdat=z,
-                     degree=rep(p, num.z.numeric),
-                     nmulti=nmulti.loop,
-                     random.seed=random.seed,
-                     optim.maxattempts=optim.maxattempts,
-                     optim.method=optim.method,
-                     optim.reltol=optim.reltol,
-                     optim.abstol=optim.abstol,
-                     optim.maxit=optim.maxit,
-                     bw.init=bw.resid.fitted.w.z.mat[j-1,],
-                     ...)
+          h <- .np_progress_with_legacy_suppressed(glpcv(ydat=resid.fitted,
+                                                        xdat=z,
+                                                        degree=rep(p, num.z.numeric),
+                                                        nmulti=nmulti.loop,
+                                                        random.seed=random.seed,
+                                                        optim.maxattempts=optim.maxattempts,
+                                                        optim.method=optim.method,
+                                                        optim.reltol=optim.reltol,
+                                                        optim.abstol=optim.abstol,
+                                                        optim.maxit=optim.maxit,
+                                                        bw.init=bw.resid.fitted.w.z.mat[j-1,],
+                                                        ...))
       } else {
           h$bw <- bw$bw.resid.fitted.w.z[j,]
       }
 
-      g <- glpreg(tydat=resid.fitted,
-                  txdat=z,
-                  bws=h$bw,
-                  degree=rep(p, num.z.numeric),
-                  ...)
+      g <- .np_progress_with_legacy_suppressed(glpreg(tydat=resid.fitted,
+                                                      txdat=z,
+                                                      bws=h$bw,
+                                                      degree=rep(p, num.z.numeric),
+                                                      ...))
 
       phi <- phi + constant*g$mean
       phi.mat[,j] <- phi
@@ -2214,35 +2077,35 @@ npregiv <- function(y,
       phi.deriv.1.list[[j]] <- phi.deriv.1
 
       if(p >= 2) {
-          phi.deriv.2 <- phi.deriv.2 + constant*glpreg(tydat=resid.fitted,
-                                                       txdat=z,
-                                                       bws=h$bw,
-                                                       degree=rep(p, num.z.numeric),
-                                                       deriv=2,
-                                                       ...)$grad
+          phi.deriv.2 <- phi.deriv.2 + constant*.np_progress_with_legacy_suppressed(glpreg(tydat=resid.fitted,
+                                                                                            txdat=z,
+                                                                                            bws=h$bw,
+                                                                                            degree=rep(p, num.z.numeric),
+                                                                                            deriv=2,
+                                                                                            ...))$grad
           phi.deriv.2.list[[j]] <- phi.deriv.2
       }
 
       if(!is.null(zeval)) {
-          g <- glpreg(tydat=resid.fitted,
-                      txdat=z,
-                      exdat=zeval,
-                      bws=h$bw,
-                      degree=rep(p, num.z.numeric),
-                      ...)
+          g <- .np_progress_with_legacy_suppressed(glpreg(tydat=resid.fitted,
+                                                          txdat=z,
+                                                          exdat=zeval,
+                                                          bws=h$bw,
+                                                          degree=rep(p, num.z.numeric),
+                                                          ...))
           phi.eval <- phi.eval + constant*g$mean
           phi.eval.mat[,j] <- phi.eval
 
           phi.deriv.eval.1 <- phi.deriv.eval.1 + constant*g$grad
           phi.deriv.eval.1.list[[j]] <- phi.deriv.eval.1
           if(p >= 2) {
-              phi.deriv.eval.2 <- phi.deriv.eval.2 + constant*glpreg(tydat=resid.fitted,
-                                                                     txdat=z,
-                                                                     exdat=zeval,
-                                                                     bws=h$bw,
-                                                                     degree=rep(p, num.z.numeric),
-                                                                     deriv=2,
-                                                                     ...)$grad
+              phi.deriv.eval.2 <- phi.deriv.eval.2 + constant*.np_progress_with_legacy_suppressed(glpreg(tydat=resid.fitted,
+                                                                                                          txdat=z,
+                                                                                                          exdat=zeval,
+                                                                                                          bws=h$bw,
+                                                                                                          degree=rep(p, num.z.numeric),
+                                                                                                          deriv=2,
+                                                                                                          ...))$grad
               phi.deriv.eval.2.list[[j]] <- phi.deriv.eval.2
           }
 
@@ -2357,9 +2220,7 @@ npregiv <- function(y,
 
       }
 
-      console <- printClear(console)
-      console <- printPop(console)
-      if(is.null(bw)) console <- printPush(paste("Computing stopping rule for iteration ", j,"...",sep=""),console)
+      progress <- .np_progress_step(progress, done = j, detail = "evaluating stopping rule")
 
       ## The number of iterations in LF is asymptotically equivalent
       ## to 1/alpha (where alpha is the regularization parameter in
@@ -2501,8 +2362,7 @@ npregiv <- function(y,
         convergence <- NULL
     }
     
-    console <- printClear(console)
-    console <- printPop(console)
+    progress <- .np_progress_end(progress, detail = "evaluating stopping rule")
 
     ret <- list(phi=phi,
                 phi.mat=phi.mat,
