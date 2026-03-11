@@ -130,3 +130,13 @@ test_that("npcopula no longer uses legacy console helpers", {
   expect_true(grepl("\\.np_progress_note\\(\\s*sprintf\\(\\s*\"Computing the quasi-inverse for the marginal of %s\"", src))
   expect_true(grepl("\\.np_progress_note\\(\\s*sprintf\\(\\s*\"Computing the marginal of %s for the expanded grid\"", src))
 })
+
+test_that("npindexbw no longer uses legacy console helpers", {
+  src_path <- testthat::test_path("..", "..", "R", "np.singleindex.bw.R")
+  skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
+  expect_true(grepl("\\.np_progress_begin\\(\"Multistart optimization\"", src))
+  expect_true(grepl("detail = sprintf\\(\"multistart %d\", i\\)", src))
+})
