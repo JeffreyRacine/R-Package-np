@@ -535,6 +535,60 @@ npscoefbw.scbandwidth <-
           cv_state$console <- NULL
           cv_state$fast_total <- 0L
           cv_state$objective_fast <- FALSE
+          cv_state$optim_progress <- NULL
+          cv_state$optim_eval <- 0L
+          cv_state$multistart_index <- NA_integer_
+
+          cv_progress_detail <- function(ridging = FALSE) {
+            detail <- sprintf("multistart %d", cv_state$multistart_index)
+            if (isTRUE(ridging)) {
+              paste(detail, "near-singular system encountered, ridging", sep = ", ")
+            } else {
+              detail
+            }
+          }
+
+          cv_progress_begin <- function() {
+            cv_state$optim_eval <- 0L
+            cv_state$optim_progress <- .np_progress_begin("Optimizing smooth coefficient bandwidth")
+            invisible(NULL)
+          }
+
+          cv_progress_step <- function(ridging = FALSE) {
+            cv_state$optim_eval <- cv_state$optim_eval + 1L
+            cv_state$optim_progress <- .np_progress_step(
+              state = cv_state$optim_progress,
+              done = cv_state$optim_eval,
+              detail = cv_progress_detail(ridging = ridging)
+            )
+            invisible(NULL)
+          }
+
+          cv_progress_end <- function(state) {
+            if (is.null(state))
+              return(invisible(NULL))
+
+            if (isTRUE(state$known_total) && identical(state$last_done, state$total))
+              return(invisible(NULL))
+
+            state$last_emit <- -Inf
+            .np_progress_end(state)
+            invisible(NULL)
+          }
+
+          cv_progress_finish <- function(ridging = FALSE) {
+            if (is.null(cv_state$optim_progress))
+              return(invisible(NULL))
+
+            cv_state$optim_progress$last_emit <- -Inf
+            cv_state$optim_progress <- .np_progress_end(
+              cv_state$optim_progress,
+              detail = cv_progress_detail(ridging = ridging)
+            )
+            cv_state$optim_progress <- NULL
+            invisible(NULL)
+          }
+
           overall.cv.ls <- function(param) {
             cv_state$objective_fast <- FALSE
             sbw <- apply_bw_to_scbw(bws, param)
@@ -580,16 +634,13 @@ npscoefbw.scbandwidth <-
               mean.loo <- rowSums(W * t(coef.loo))
             }
 
-            cv_state$console <- printClear(cv_state$console)
-            ##cv_state$console <- printPush(msg = paste("param:", param), console = cv_state$console)
-
             stopifnot(all(is.finite(mean.loo)))
 
             if(!any(mean.loo == maxPenalty)){
               fv <- sum((ydat-mean.loo)^2)/n
-              cv_state$console <- printPush(msg = paste("fval:", signif(fv, digits = getOption("digits", 7L))), console = cv_state$console)
+              cv_progress_step()
             } else {
-              cv_state$console <- printPush(msg = "near-singular system encountered, ridging", console = cv_state$console)
+              cv_progress_step(ridging = TRUE)
               fv <- maxPenalty
             }
 
@@ -646,7 +697,7 @@ npscoefbw.scbandwidth <-
 
             if (isTRUE(cv_state$objective_fast))
               cv_state$fast_total <- cv_state$fast_total + 1L
-            
+
             cv_state$console <- printClear(cv_state$console)
             cv_state$console <- printPush(msg = paste("fval:",
                                        signif(fv, digits = getOption("digits", 7L))),
@@ -675,15 +726,15 @@ npscoefbw.scbandwidth <-
                      (if (bws$scaling) ncatfac else 1.0))       
           })
 
-          console <- newLineConsole()
+          multistart.progress <- .np_progress_begin("Multistart optimization", total = nmulti)
+          on.exit(cv_progress_end(multistart.progress), add = TRUE)
           optim.control <- list(abstol = optim.abstol,
                                 reltol = optim.reltol,
                                 maxit = optim.maxit)
 
           for (i in seq_len(nmulti)) {
-
-            console <- printPush(msg = paste(sep="", "Multistart ", i, " of ", nmulti, "... "), console)
-            cv_state$console <- newLineConsole(console)
+            cv_state$multistart_index <- i
+            cv_progress_begin()
             
             if (i == 1) {
               tbw <- .npscoef_default_start_bandwidth(param = x.scale, bwtype = bws$type, nobs = n)
@@ -711,7 +762,7 @@ npscoefbw.scbandwidth <-
 
             }
 
-            cv_state$console <- printClear(cv_state$console)
+            cv_progress_finish()
 
             value.overall[i] <- optim.return$value
 
@@ -728,10 +779,11 @@ npscoefbw.scbandwidth <-
               best.overall <- i
             }
 
-            if(i < nmulti)
-              console <- printPop(console)
-            else
-              console <- printClear(console)
+            multistart.progress <- .np_progress_step(
+              state = multistart.progress,
+              done = i,
+              detail = sprintf("multistart %d", i)
+            )
           }
 
           param.overall <- bws$bw <- .npscoef_finalize_bandwidth(
