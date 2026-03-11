@@ -51,25 +51,26 @@ npcopula <- function(bws,
     if(ncol(u) != num.var) stop(paste("matrix u must have ", num.var," columns",sep=""))
   }
 
-  console <- newLineConsole()
-
   if(is.null(u)) {
     ## Compute the copula distribution or copula density for the
     ## sample realizations (joint CDF)
-    console <- printClear(console)
     if(!density) {
-      console <- printPush(msg = "Computing the copula for the sample realizations...", console)
+      .np_progress_note("Computing the copula for the sample realizations")
       copula <- fitted(npudist(bws=bws,data=data))
     } else {
-      console <- printPush(msg = "Computing the copula density for the sample realizations...", console)
+      .np_progress_note("Computing the copula density for the sample realizations")
       copula <- fitted(npudens(bws=bws,data=data))
     }
     ## Compute the marginal quantiles from the marginal CDFs (u_i=\hat
     ## F(x_i))
     u <- matrix(NA,bws$nobs,num.var)
     for (j in seq_len(num.var)) {
-      console <- printClear(console)
-      console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the sample realizations...",sep=""), console)
+      .np_progress_note(
+        sprintf(
+          "Computing the marginal of %s for the sample realizations",
+          bws$xnames[j]
+        )
+      )
       bw.j <- bws$bw[j]
       bws.F.marginal <- do.call(npudistbw, list(
                          dat = data[, bws$xnames[j], drop = FALSE],
@@ -105,8 +106,12 @@ npcopula <- function(bws,
     x.u <- data.frame(matrix(NA,n.u,num.var))
     names(x.u) <- bws$xnames
     for (j in seq_len(num.var)) {
-      console <- printClear(console)
-      console <- printPush(msg = paste("Computing the quasi-inverse for the marginal of ",bws$xnames[j],"...",sep=""), console)
+      .np_progress_note(
+        sprintf(
+          "Computing the quasi-inverse for the marginal of %s",
+          bws$xnames[j]
+        )
+      )
       ## Compute the quasi-inverse (Definition 2.3.6, Nelson
       ## (2006)).  Here we take pains to span a sufficiently rich
       ## set of evaluation points to cover a range of
@@ -158,26 +163,28 @@ npcopula <- function(bws,
     }
     ## To compute the copula we expand the grid of marginal quantiles
     ## so that every combination of the columns of u is constructed.
-    console <- printClear(console)
-    console <- printPush(msg = "Expanding the u matrix...", console)
+    .np_progress_note("Expanding the u matrix")
     x.u <- expand.grid(data.frame(x.u))
     for (k in seq_len(ncol(x.u))) {
       if(is.ordered(data[,k])) x.u[,k] <- ordered(x.u[,k],levels=levels(data[,k]))
     }
-    console <- printClear(console)
     if(!density) {
-      console <- printPush(msg = "Computing the copula for the expanded grid...", console)
+      .np_progress_note("Computing the copula for the expanded grid")
       copula <- predict(npudist(bws=bws),data=data,newdata=x.u)
     } else {
-      console <- printPush(msg = "Computing the copula density for the expanded grid...", console)
+      .np_progress_note("Computing the copula density for the expanded grid")
       copula <- predict(npudens(bws=bws),data=data,newdata=x.u)
       ## For the copula density require marginal densities. Desirable to
       ## have the same bws in numerator and denominator, so use those
       ## from the joint (mirror regression, conditional density
       ## estimation etc.)
       for (j in seq_len(num.var)) {
-        console <- printClear(console)
-        console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the expanded grid...",sep=""), console)
+        .np_progress_note(
+          sprintf(
+            "Computing the marginal of %s for the expanded grid",
+            bws$xnames[j]
+          )
+        )
         bw.j <- bws$bw[j]
         bws.f.marginal <- do.call(npudensbw, list(
                            dat = data[, bws$xnames[j], drop = FALSE],
@@ -195,8 +202,6 @@ npcopula <- function(bws,
       }
     }
   }
-
-  console <- printClear(console)
 
   if(!u.provided) {
     u <- data.frame(u)
