@@ -1796,23 +1796,36 @@
 .np_ksum_unconditional_operator_fixed <- function(xdat, exdat, bws, operator) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
+  if (!isa(bws, "kbandwidth"))
+    bws <- kbandwidth(bws)
   n <- nrow(xdat)
-
-  K <- npksum(
+  kw <- .np_kernel_weights_direct(
+    bws = bws,
     txdat = xdat,
     exdat = exdat,
-    bws = bws,
-    tydat = diag(n),
-    operator = operator,
-    bandwidth.divide = TRUE
-  )$ksum
+    bandwidth.divide = TRUE,
+    operator = operator
+  )
 
-  .np_operator_matrix_from_ksum(
-    ksum = K,
-    nrow.out = nrow(exdat),
-    ncol.out = n,
-    where = "npksum unconditional operator"
-  ) / n
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = n)
+  if (nrow(kw) != n || ncol(kw) != nrow(exdat))
+    stop("direct unconditional kernel weights returned unexpected operator shape")
+
+  operator <- as.character(operator)
+  if (length(operator) == 1L)
+    operator <- rep.int(operator, ncol(xdat))
+  if (length(operator) != ncol(xdat))
+    stop("direct unconditional kernel weights require one operator per column")
+
+  bw.scale <- 1.0
+  if (bws$ncon > 0L) {
+    con.ops <- operator[bws$icon]
+    if (any(con.ops == "normal"))
+      bw.scale <- prod(bws$bw[bws$icon][con.ops == "normal"])
+  }
+
+  t(kw) / (n * bw.scale)
 }
 
 .np_apply_operator_counts <- function(K, counts) {
