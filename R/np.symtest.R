@@ -26,11 +26,7 @@ npsymtest <- function(data = NULL,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
-
-
-  console <- newLineConsole()
-  console <- printPush(paste(sep="", "Working..."), console = console)
-  console <- printPop(console)
+  .np_progress_note("Computing bandwidths")
 
   ## If of type ts convert to numeric to handle time series data
 
@@ -152,17 +148,17 @@ npsymtest <- function(data = NULL,
   ## between boot.fun.boot and boot.fun.tsboot is the order of
   ## arguments.
 
-  boot.state <- list(counter = 0L, console = console)
+  boot.state <- new.env(parent = emptyenv())
+  boot.state$counter <- 0L
+  boot.state$progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
 
   ## Function to be fed to tsboot - accepts a vector of integers
   ## corresponding to all observations in the sample (1,2,...) that
   ## get permuted/rearranged to define resampled data.
 
 	boot.fun <- function(ii,data.null,bw) {
-    boot.state$console <- printClear(boot.state$console)
-    boot.state$console <- printPush(paste(sep="", "Bootstrap replication ",
-                                          boot.state$counter, "/", boot.num, "..."),
-                                    console = boot.state$console)
+    boot.state$counter <- boot.state$counter + 1L
+    boot.state$progress <- .np_progress_step(boot.state$progress, done = boot.state$counter)
     null.sample1 <- data.null[ii]
     if(is.numeric(data.null)) {
       null.sample2 <- -(null.sample1-mean(null.sample1))+mean(null.sample1)
@@ -181,7 +177,6 @@ npsymtest <- function(data = NULL,
         null.sample2 <- factor(-(tmp-location)+location,levels=data.levels)
       }
     }
-    boot.state$counter <- boot.state$counter + 1L
     return(Srho.sym(null.sample1,null.sample2,bw,method=method))
 	}
 
@@ -227,8 +222,7 @@ npsymtest <- function(data = NULL,
 
   }
 
-  console <- printClear(boot.state$console)
-  console <- printPop(console)  
+  boot.state$progress <- .np_progress_end(boot.state$progress)
 
   p.value <- mean(resampled.stat > test.stat)
 
