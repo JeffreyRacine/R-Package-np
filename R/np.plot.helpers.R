@@ -4326,6 +4326,158 @@ plotFactor <- function(f, y, ...){
   fit
 }
 
+.np_plot_singleindex_asymptotic_eval <- function(bws,
+                                                 txdat,
+                                                 tydat,
+                                                 exdat = NULL,
+                                                 gradients = FALSE) {
+  no.ex <- is.null(exdat)
+  gradients <- npValidateScalarLogical(gradients, "gradients")
+
+  txdat <- toFrame(txdat)
+  if (!no.ex) {
+    exdat <- toFrame(exdat)
+    if (!(txdat %~% exdat))
+      stop("'txdat' and 'exdat' are not similar data frames!")
+  }
+
+  if (is.factor(tydat)) {
+    tydat <- adjustLevels(data.frame(tydat), bws$ydati)[, 1L]
+    tydat <- (bws$ydati$all.dlev[[1L]])[as.integer(tydat)]
+  } else {
+    tydat <- as.double(tydat)
+  }
+
+  txdat <- adjustLevels(txdat, bws$xdati)
+  if (!no.ex)
+    exdat <- adjustLevels(exdat, bws$xdati)
+
+  txmat <- toMatrix(txdat)
+  exmat <- if (no.ex) txmat else toMatrix(exdat)
+  index <- as.vector(txmat %*% bws$beta)
+  index.eval <- as.vector(exmat %*% bws$beta)
+
+  spec <- .npindex_resolve_spec(bws, where = "plot.singleindex")
+  regtype <- spec$regtype.engine
+  npreg.args <- list(
+    txdat = data.frame(index = index),
+    tydat = tydat,
+    exdat = data.frame(index = index.eval),
+    bws = bws$bw,
+    bwtype = bws$type,
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    regtype = regtype,
+    gradients = gradients,
+    warn.glp.gradient = FALSE
+  )
+  if (identical(regtype, "lp")) {
+    npreg.args$basis <- spec$basis.engine
+    npreg.args$degree <- spec$degree.engine
+    npreg.args$bernstein.basis <- spec$bernstein.basis.engine
+  }
+
+  fit <- do.call(npreg, npreg.args)
+  out <- list(
+    index = index.eval,
+    mean = as.vector(fit$mean),
+    merr = as.double(fit$merr)
+  )
+
+  if (gradients) {
+    grad.index <- as.vector(fit$grad[, 1L])
+    gerr.index <- as.vector(fit$gerr[, 1L])
+    beta <- as.vector(bws$beta)
+    out$grad.index <- grad.index
+    out$gerr.index <- gerr.index
+    out$grad <- grad.index %o% beta
+    out$gerr <- gerr.index %o% abs(beta)
+  }
+
+  out
+}
+
+.np_plot_plreg_asymptotic_fit <-
+  function(bws,
+           xdat,
+           ydat,
+           zdat,
+           exdat,
+           ezdat) {
+
+    xdat <- toFrame(xdat)
+    zdat <- toFrame(zdat)
+
+    keep.rows <- rep_len(TRUE, nrow(xdat))
+    rows.omit <- attr(na.omit(data.frame(xdat, ydat, zdat)), "na.action")
+    if (length(rows.omit) > 0L)
+      keep.rows[as.integer(rows.omit)] <- FALSE
+
+    if (!any(keep.rows))
+      stop("Training data has no rows without NAs")
+
+    xdat <- xdat[keep.rows, , drop = FALSE]
+    ydat <- ydat[keep.rows]
+    zdat <- zdat[keep.rows, , drop = FALSE]
+
+    exdat <- toFrame(exdat)
+    ezdat <- toFrame(ezdat)
+
+    keep.eval <- rep_len(TRUE, nrow(exdat))
+    rows.omit <- attr(na.omit(data.frame(exdat, ezdat)), "na.action")
+    if (length(rows.omit) > 0L)
+      keep.eval[as.integer(rows.omit)] <- FALSE
+
+    if (!any(keep.eval))
+      stop("Evaluation data has no rows without NAs")
+
+    exdat <- exdat[keep.eval, , drop = FALSE]
+    ezdat <- ezdat[keep.eval, , drop = FALSE]
+
+    fit <- npplreg(
+      bws = bws,
+      txdat = xdat,
+      tydat = ydat,
+      tzdat = zdat,
+      exdat = exdat,
+      ezdat = ezdat
+    )
+
+    yfit <- npreg(
+      txdat = zdat,
+      tydat = ydat,
+      exdat = ezdat,
+      bws = bws$bw$yzbw
+    )
+
+    neval <- nrow(exdat)
+    resx.eval <- matrix(0.0, nrow = neval, ncol = ncol(xdat))
+    x.err.sq <- numeric(neval)
+
+    for (j in seq_len(ncol(xdat))) {
+      xfit <- npreg(
+        txdat = zdat,
+        tydat = xdat[, j],
+        exdat = ezdat,
+        bws = bws$bw[[j + 1L]]
+      )
+
+      if (is.factor(xdat[1L, j])) {
+        tmp.eval <- adjustLevels(exdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati, allowNewCells = TRUE)
+        x.num.eval <- (bws$bw[[j + 1L]]$ydati$all.dlev[[1L]])[as.integer(tmp.eval[, 1L])]
+      } else {
+        x.num.eval <- as.double(exdat[, j])
+      }
+
+      resx.eval[, j] <- x.num.eval - xfit$mean
+      x.err.sq <- x.err.sq + (fit$xcoef[j]^2) * (as.double(xfit$merr)^2)
+    }
+
+    beta.vcov.term <- rowSums((resx.eval %*% fit$xcoefvcov) * resx.eval)
+    fit$merr <- sqrt(pmax(as.double(yfit$merr)^2 + x.err.sq + beta.vcov.term, 0.0))
+    fit
+  }
+
 .np_plot_unconditional_eval <- function(xdat,
                                         exdat,
                                         bws,
