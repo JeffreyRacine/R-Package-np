@@ -1117,7 +1117,8 @@
                                      B,
                                      counts = NULL,
                                      counts.drawer = NULL,
-                                     gradients = FALSE) {
+                                     gradients = FALSE,
+                                     idx.eval = NULL) {
   if (!identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_index_exact(
       xdat = xdat,
@@ -1126,7 +1127,8 @@
       B = B,
       counts = counts,
       counts.drawer = counts.drawer,
-      gradients = gradients
+      gradients = gradients,
+      idx.eval = idx.eval
     ))
   }
 
@@ -1137,7 +1139,8 @@
       bws = bws,
       B = B,
       counts = counts,
-      counts.drawer = counts.drawer
+      counts.drawer = counts.drawer,
+      idx.eval = idx.eval
     ))
   }
 
@@ -1153,6 +1156,9 @@
     stop("single-index inid helper does not support gradients", call. = FALSE)
 
   idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+  if (is.null(idx.eval))
+    idx.eval <- idx.train
+  idx.eval <- toFrame(idx.eval)
   y.num <- if (is.factor(ydat)) {
     yadj <- adjustLevels(data.frame(ydat), bws$ydati)
     bws$ydati$all.dlev[[1L]][as.integer(yadj[, 1L])]
@@ -1166,14 +1172,15 @@
   kw <- .np_kernel_weights_direct(
     bws = kbw,
     txdat = idx.train,
-    exdat = idx.train,
+    exdat = idx.eval,
     bandwidth.divide = TRUE,
     kernel.pow = 1.0
   )
 
   if (!is.matrix(kw))
     kw <- matrix(kw, nrow = n)
-  if (nrow(kw) != n || ncol(kw) != n)
+  neval <- nrow(idx.eval)
+  if (nrow(kw) != n || ncol(kw) != neval)
     stop("single-index inid helper kernel-weight matrix shape mismatch")
 
   if (identical(regtype, "lc")) {
@@ -1207,7 +1214,7 @@
   )
   W.eval <- W.lp(
     xdat = idx.train,
-    exdat = idx.train,
+    exdat = idx.eval,
     degree = degree,
     basis = spec$basis.engine,
     bernstein.basis = spec$bernstein.basis.engine
@@ -1221,11 +1228,11 @@
   rhs <- W.eval
   ones <- matrix(1.0, nrow = n, ncol = 1L)
 
-  Mfeat <- vector("list", n)
-  Zfeat <- vector("list", n)
-  t0 <- numeric(n)
+  Mfeat <- vector("list", neval)
+  Zfeat <- vector("list", neval)
+  t0 <- numeric(neval)
 
-  for (i in seq_len(n)) {
+  for (i in seq_len(neval)) {
     k <- as.double(kw[, i])
     WK <- W * k
     Zfeat[[i]] <- WK * y.num
@@ -1259,10 +1266,10 @@
     }
   }
 
-  tmat <- matrix(NA_real_, nrow = B, ncol = n)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
   fill_chunk <- function(counts.chunk, start, stopi) {
-    for (i in seq_len(n)) {
+    for (i in seq_len(neval)) {
       Mvals <- crossprod(counts.chunk, Mfeat[[i]])
       Zvals <- crossprod(counts.chunk, Zfeat[[i]])
       tmat[start:stopi, i] <<- if (p > 3L) {
@@ -1310,7 +1317,8 @@
                                                     bws,
                                                     B,
                                                     counts = NULL,
-                                                    counts.drawer = NULL) {
+                                                    counts.drawer = NULL,
+                                                    idx.eval = NULL) {
   xdat <- toFrame(xdat)
   B <- as.integer(B)
   n <- nrow(xdat)
@@ -1321,11 +1329,14 @@
     stop("invalid single-index fixed gradient helper dimensions")
 
   idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+  if (is.null(idx.eval))
+    idx.eval <- idx.train
+  idx.eval <- toFrame(idx.eval)
   rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
 
   .np_inid_boot_from_regression(
     xdat = idx.train,
-    exdat = idx.train,
+    exdat = idx.eval,
     bws = rbw,
     ydat = ydat,
     B = B,
@@ -1343,7 +1354,8 @@
                                            B,
                                            counts = NULL,
                                            counts.drawer = NULL,
-                                           gradients = FALSE) {
+                                           gradients = FALSE,
+                                           idx.eval = NULL) {
   xdat <- toFrame(xdat)
   B <- as.integer(B)
   n <- nrow(xdat)
@@ -1355,14 +1367,18 @@
   if (isTRUE(gradients))
     stop("exact single-index bootstrap helper does not support gradients", call. = FALSE)
 
+  idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+  if (is.null(idx.eval))
+    idx.eval <- idx.train
+  idx.eval <- toFrame(idx.eval)
+
   fit_hat <- function(x.train, y.train) {
-    as.vector(npindexhat(
+    idx.train.b <- data.frame(index = as.vector(toMatrix(x.train) %*% bws$beta))
+    as.vector(.np_plot_singleindex_hat_apply_index(
       bws = bws,
-      txdat = x.train,
-      exdat = xdat,
-      y = y.train,
-      output = "apply",
-      s = 0L
+      idx.train = idx.train.b,
+      idx.eval = idx.eval,
+      y = y.train
     ))
   }
 
@@ -4307,16 +4323,129 @@ plotFactor <- function(f, y, ...){
   fit
 }
 
+.np_plot_validate_neval <- function(neval, where = "plot.singleindex") {
+  neval <- as.integer(neval)[1L]
+  if (is.na(neval) || neval < 1L)
+    stop(sprintf("argument 'neval' must be a positive integer in %s", where),
+         call. = FALSE)
+  neval
+}
+
+.np_plot_singleindex_eval_grid <- function(bws,
+                                           xdat,
+                                           neval,
+                                           trim = 0.0,
+                                           where = "plot.singleindex") {
+  xdat <- adjustLevels(toFrame(xdat), bws$xdati)
+  neval <- .np_plot_validate_neval(neval, where = where)
+  index.train <- as.vector(toMatrix(xdat) %*% bws$beta)
+  bounds <- trim.quantiles(index.train, trim = trim)
+  index.eval <- seq(bounds[1L], bounds[2L], length.out = neval)
+
+  list(
+    idx.train = data.frame(index = index.train),
+    idx.eval = data.frame(index = index.eval),
+    index.train = index.train,
+    index.eval = index.eval,
+    trainiseval = isTRUE(length(index.train) == length(index.eval)) &&
+      isTRUE(all.equal(index.train, index.eval, tolerance = 0))
+  )
+}
+
+.np_plot_singleindex_hat_apply_index <- function(bws, idx.train, idx.eval, y) {
+  if (identical(bws$type, "fixed")) {
+    return(.np_indexhat_core(
+      bws = bws,
+      idx.train = idx.train,
+      idx.eval = idx.eval,
+      y = y,
+      output = "apply",
+      ridge = 0.0
+    ))
+  }
+
+  .np_indexhat_exact(
+    bws = bws,
+    idx.train = idx.train,
+    idx.eval = idx.eval,
+    y = y,
+    output = "apply",
+    s = 0L
+  )
+}
+
+.np_plot_singleindex_hat_matrix_index <- function(bws, idx.train, idx.eval, s = 0L) {
+  s <- as.integer(s)[1L]
+  if (is.na(s) || !(s %in% c(0L, 1L)))
+    stop("argument 's' must be 0 or 1 in single-index plot hat helper",
+         call. = FALSE)
+
+  if (identical(s, 0L) && identical(bws$type, "fixed")) {
+    return(.np_indexhat_core(
+      bws = bws,
+      idx.train = idx.train,
+      idx.eval = idx.eval,
+      output = "matrix",
+      ridge = 0.0
+    ))
+  }
+
+  .np_indexhat_exact(
+    bws = bws,
+    idx.train = idx.train,
+    idx.eval = idx.eval,
+    output = "matrix",
+    s = s
+  )
+}
+
+.np_plot_singleindex_local_eval <- function(bws,
+                                            idx.train,
+                                            idx.eval,
+                                            ydat,
+                                            gradients = FALSE) {
+  out <- list(index = as.vector(idx.eval$index))
+
+  if (isTRUE(gradients)) {
+    rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+    fit.grad <- .np_regression_direct(
+      bws = rbw,
+      txdat = idx.train,
+      tydat = ydat,
+      exdat = idx.eval,
+      gradients = TRUE,
+      gradient.order = 1L
+    )
+    grad.index <- as.vector(fit.grad$grad[, 1L])
+    out$mean <- as.vector(fit.grad$mean)
+    out$grad.index <- grad.index
+    out$grad <- grad.index %o% as.vector(bws$beta)
+    return(out)
+  }
+
+  out$mean <- as.vector(.np_plot_singleindex_hat_apply_index(
+    bws = bws,
+    idx.train = idx.train,
+    idx.eval = idx.eval,
+    y = ydat
+  ))
+  out
+}
+
 .np_plot_singleindex_asymptotic_eval <- function(bws,
                                                  txdat,
                                                  tydat,
                                                  exdat = NULL,
-                                                 gradients = FALSE) {
+                                                 gradients = FALSE,
+                                                 index.eval = NULL) {
+  has.index.eval <- !is.null(index.eval)
   no.ex <- is.null(exdat)
   gradients <- npValidateScalarLogical(gradients, "gradients")
 
   txdat <- toFrame(txdat)
-  if (!no.ex) {
+  if (has.index.eval && !no.ex)
+    stop("supply either 'exdat' or 'index.eval', not both")
+  if (!has.index.eval && !no.ex) {
     exdat <- toFrame(exdat)
     if (!(txdat %~% exdat))
       stop("'txdat' and 'exdat' are not similar data frames!")
@@ -4334,9 +4463,16 @@ plotFactor <- function(f, y, ...){
     exdat <- adjustLevels(exdat, bws$xdati)
 
   txmat <- toMatrix(txdat)
-  exmat <- if (no.ex) txmat else toMatrix(exdat)
   index <- as.vector(txmat %*% bws$beta)
-  index.eval <- as.vector(exmat %*% bws$beta)
+  if (!has.index.eval) {
+    exmat <- if (no.ex) txmat else toMatrix(exdat)
+    index.eval <- as.vector(exmat %*% bws$beta)
+  } else {
+    index.eval <- as.double(index.eval)
+    if (!length(index.eval) || anyNA(index.eval) || any(!is.finite(index.eval)))
+      stop("argument 'index.eval' must contain finite evaluation points",
+           call. = FALSE)
+  }
 
   spec <- .npindex_resolve_spec(bws, where = "plot.singleindex")
   regtype <- spec$regtype.engine
@@ -6537,15 +6673,22 @@ compute.bootstrap.errors.sibandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.sibandwidth")
+    xdat <- toFrame(xdat)
+    idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+    dots <- list(...)
+    idx.eval <- dots$idx.eval
+    if (is.null(idx.eval))
+      idx.eval <- idx.train
+    idx.eval <- toFrame(idx.eval)
     prof.ctx <- .npRmpi_profile_bootstrap_begin(
       where = "compute.bootstrap.errors.sibandwidth",
       method = plot.errors.boot.method,
       B = plot.errors.boot.num,
       ntrain = .np_nrows_safe(xdat),
-      neval = .np_nrows_safe(xdat)
+      neval = .np_nrows_safe(idx.eval)
     )
 
-    boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
+    boot.err = matrix(data = NA, nrow = nrow(idx.eval), ncol = 3)
     boot.all.err <- NULL
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
@@ -6557,22 +6700,21 @@ compute.bootstrap.errors.sibandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.train <- npindex.sibandwidth(
-        txdat = xdat,
-        tydat = ydat,
+      fit.train.mean <- .np_plot_singleindex_hat_apply_index(
         bws = bws,
-        gradients = FALSE
+        idx.train = idx.train,
+        idx.eval = idx.train,
+        y = ydat
       )
-      H <- npindexhat(
+      H <- .np_plot_singleindex_hat_matrix_index(
         bws = bws,
-        txdat = xdat,
-        exdat = xdat,
-        output = "matrix",
+        idx.train = idx.train,
+        idx.eval = idx.eval,
         s = if (gradients) 1L else 0L
       )
 
       t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - as.vector(fit.train$mean))
+      eps <- as.double(ydat - as.vector(fit.train.mean))
       n <- length(eps)
       B <- plot.errors.boot.num
 
@@ -6580,7 +6722,7 @@ compute.bootstrap.errors.sibandwidth =
         list(
           t = .np_wild_boot_t(
             H = H,
-            fit.mean = as.vector(fit.train$mean),
+            fit.mean = as.vector(fit.train.mean),
             residuals = eps,
             B = B,
             wild = plot.errors.boot.wild
@@ -6596,14 +6738,15 @@ compute.bootstrap.errors.sibandwidth =
     } else {
       boot.out <- .npRmpi_with_local_bootstrap({
         tryCatch({
-          .np_inid_boot_from_index(
-            xdat = xdat,
-            ydat = ydat,
-            bws = bws,
-            B = plot.errors.boot.num,
-            gradients = gradients
-          )
-        }, error = function(e) {
+            .np_inid_boot_from_index(
+              xdat = xdat,
+              ydat = ydat,
+              bws = bws,
+              B = plot.errors.boot.num,
+              gradients = gradients,
+              idx.eval = idx.eval
+            )
+          }, error = function(e) {
           stop(sprintf("inid single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
                        conditionMessage(e)),
                call. = FALSE)
@@ -6630,7 +6773,8 @@ compute.bootstrap.errors.sibandwidth =
                   blocklen = plot.errors.boot.blocklen,
                   sim = plot.errors.boot.method
                 ),
-                gradients = gradients
+                gradients = gradients,
+                idx.eval = idx.eval
               )
             } else {
               tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
