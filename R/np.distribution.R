@@ -226,7 +226,7 @@ npudist.default <- function(bws, tdat, ...){
   
   sc.bw[[1]] <- quote(npudistbw)
 
-  if (has.explicit.bws) {
+  if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
   }
 

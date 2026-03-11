@@ -465,7 +465,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
   
   sc.bw[[1]] <- quote(npplregbw)
 
-  if (has.explicit.bws) {
+  if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
   }
 

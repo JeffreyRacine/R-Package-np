@@ -148,7 +148,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
   
   sc.bw[[1]] <- quote(npscoefbw)
 
-  if (has.explicit.bws) {
+  if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
   }
 

@@ -241,7 +241,7 @@ npconmode.default <- function(bws, txdat, tydat, ...){
   
   sc.bw[[1]] <- quote(npcdensbw)
 
-  if (has.explicit.bws) {
+  if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
   }
 
