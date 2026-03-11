@@ -238,3 +238,39 @@ test_that("fixed density/distribution helpers preserve bounded kernel options", 
   expect_equal(c.dens.fast$t, c.dens.explicit, tolerance = 1e-10)
   expect_equal(c.dist.fast$t, c.dist.explicit, tolerance = 1e-10)
 })
+
+test_that("fixed-bwtype unsupervised plot bootstrap covers inid fixed and geom", {
+  skip_if_not_installed("np")
+
+  set.seed(603104)
+  n <- 48
+  xdat <- data.frame(x = rnorm(n))
+  ydat <- data.frame(y = rnorm(n))
+
+  u.dens.bw <- npudensbw(dat = xdat, bws = 0.30, bandwidth.compute = FALSE, bwtype = "fixed")
+  u.dist.bw <- npudistbw(dat = xdat, bws = 0.30, bandwidth.compute = FALSE, bwtype = "fixed")
+  c.dens.bw <- npcdensbw(xdat = xdat, ydat = ydat, bws = c(0.35, 0.35), bandwidth.compute = FALSE, bwtype = "fixed")
+  c.dist.bw <- npcdistbw(xdat = xdat, ydat = ydat, bws = c(0.35, 0.35), bandwidth.compute = FALSE, bwtype = "fixed")
+
+  run_unsup_plot <- function(bw, ..., boot.method) {
+    suppressWarnings(plot(
+      bw,
+      plot.behavior = "data",
+      perspective = FALSE,
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = boot.method,
+      plot.errors.boot.blocklen = 3L,
+      plot.errors.boot.num = 5L,
+      plot.errors.type = "pointwise",
+      neval = 11L,
+      ...
+    ))
+  }
+
+  for (boot.method in c("inid", "fixed", "geom")) {
+    expect_type(run_unsup_plot(u.dens.bw, xdat = xdat, boot.method = boot.method), "list")
+    expect_type(run_unsup_plot(u.dist.bw, xdat = xdat, boot.method = boot.method), "list")
+    expect_type(run_unsup_plot(c.dens.bw, xdat = xdat, ydat = ydat, view = "fixed", boot.method = boot.method), "list")
+    expect_type(run_unsup_plot(c.dist.bw, xdat = xdat, ydat = ydat, view = "fixed", boot.method = boot.method), "list")
+  }
+})

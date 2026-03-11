@@ -1793,30 +1793,15 @@
   stop(sprintf("%s returned unexpected operator shape", where))
 }
 
-.np_ksum_unconditional_operator_fixed <- function(xdat, exdat, bws, operator) {
-  xdat <- toFrame(xdat)
-  exdat <- toFrame(exdat)
+.np_operator_kernel_weight_scale <- function(bws, operator, nvars, where) {
   if (!isa(bws, "kbandwidth"))
     bws <- kbandwidth(bws)
-  n <- nrow(xdat)
-  kw <- .np_kernel_weights_direct(
-    bws = bws,
-    txdat = xdat,
-    exdat = exdat,
-    bandwidth.divide = TRUE,
-    operator = operator
-  )
-
-  if (!is.matrix(kw))
-    kw <- matrix(kw, nrow = n)
-  if (nrow(kw) != n || ncol(kw) != nrow(exdat))
-    stop("direct unconditional kernel weights returned unexpected operator shape")
 
   operator <- as.character(operator)
   if (length(operator) == 1L)
-    operator <- rep.int(operator, ncol(xdat))
-  if (length(operator) != ncol(xdat))
-    stop("direct unconditional kernel weights require one operator per column")
+    operator <- rep.int(operator, nvars)
+  if (length(operator) != nvars)
+    stop(sprintf("%s requires one operator per column", where))
 
   bw.scale <- 1.0
   if (bws$ncon > 0L) {
@@ -1825,7 +1810,34 @@
       bw.scale <- prod(bws$bw[bws$icon][con.ops == "normal"])
   }
 
-  t(kw) / (n * bw.scale)
+  list(bws = bws, scale = bw.scale, operator = operator)
+}
+
+.np_ksum_unconditional_operator_fixed <- function(xdat, exdat, bws, operator) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  op.info <- .np_operator_kernel_weight_scale(
+    bws = bws,
+    operator = operator,
+    nvars = ncol(xdat),
+    where = "direct unconditional kernel weights"
+  )
+  bws <- op.info$bws
+  n <- nrow(xdat)
+  kw <- .np_kernel_weights_direct(
+    bws = bws,
+    txdat = xdat,
+    exdat = exdat,
+    bandwidth.divide = TRUE,
+    operator = op.info$operator
+  )
+
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = n)
+  if (nrow(kw) != n || ncol(kw) != nrow(exdat))
+    stop("direct unconditional kernel weights returned unexpected operator shape")
+
+  t(kw) / (n * op.info$scale)
 }
 
 .np_apply_operator_counts <- function(K, counts) {
@@ -2076,37 +2088,45 @@
   xop <- rep.int("normal", ncol(xdat))
   yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
   xyop <- c(xop, yop)
-
-  Kden <- npksum(
+  den.info <- .np_operator_kernel_weight_scale(
+    bws = kbx,
+    operator = xop,
+    nvars = ncol(xdat),
+    where = "direct conditional denominator kernel weights"
+  )
+  num.info <- .np_operator_kernel_weight_scale(
+    bws = kbxy,
+    operator = xyop,
+    nvars = ncol(xdat) + ncol(ydat),
+    where = "direct conditional numerator kernel weights"
+  )
+  Kden <- .np_kernel_weights_direct(
+    bws = den.info$bws,
     txdat = xdat,
     exdat = exdat,
-    bws = kbx,
-    tydat = diag(n),
-    operator = xop,
-    bandwidth.divide = TRUE
-  )$ksum
-  Knum <- npksum(
+    bandwidth.divide = TRUE,
+    operator = den.info$operator
+  )
+  Knum <- .np_kernel_weights_direct(
+    bws = num.info$bws,
     txdat = data.frame(xdat, ydat),
     exdat = data.frame(exdat, eydat),
-    bws = kbxy,
-    tydat = diag(n),
-    operator = xyop,
-    bandwidth.divide = TRUE
-  )$ksum
+    bandwidth.divide = TRUE,
+    operator = num.info$operator
+  )
+
+  if (!is.matrix(Kden))
+    Kden <- matrix(Kden, nrow = n)
+  if (!is.matrix(Knum))
+    Knum <- matrix(Knum, nrow = n)
+  if (nrow(Kden) != n || ncol(Kden) != nrow(exdat))
+    stop("direct conditional denominator kernel weights returned unexpected operator shape")
+  if (nrow(Knum) != n || ncol(Knum) != nrow(exdat))
+    stop("direct conditional numerator kernel weights returned unexpected operator shape")
 
   list(
-    den = .np_operator_matrix_from_ksum(
-      ksum = Kden,
-      nrow.out = nrow(exdat),
-      ncol.out = n,
-      where = "npksum conditional denominator operator"
-    ) / n,
-    num = .np_operator_matrix_from_ksum(
-      ksum = Knum,
-      nrow.out = nrow(exdat),
-      ncol.out = n,
-      where = "npksum conditional numerator operator"
-    ) / n
+    den = t(Kden) / (n * den.info$scale),
+    num = t(Knum) / (n * num.info$scale)
   )
 }
 
