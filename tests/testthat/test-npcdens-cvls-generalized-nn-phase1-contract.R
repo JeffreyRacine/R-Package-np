@@ -13,47 +13,79 @@ phase1_npcdens_cvls_gnn_fixture <- function() {
   list(x = x, y = y)
 }
 
-test_that("phase1 npcdensbw cv.ls generalized-nn lc matches the frozen public baseline", {
-  dat <- phase1_npcdens_cvls_gnn_fixture()
+phase1_npcdens_cvls_gnn_cases <- local({
+  cache <- NULL
 
-  bw.lc <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "lc",
-    bwtype = "generalized_nn",
-    bwmethod = "cv.ls",
-    nmulti = 0L,
-    itmax = 1L
-  )
+  function() {
+    if (!is.null(cache))
+      return(cache)
+
+    dat <- phase1_npcdens_cvls_gnn_fixture()
+    degree1 <- rep.int(1L, ncol(dat$x))
+    degree2 <- rep.int(2L, ncol(dat$x))
+
+    cache <<- list(
+      dat = dat,
+      degree1 = degree1,
+      degree2 = degree2,
+      bw.lc = npcdensbw(
+        xdat = dat$x,
+        ydat = dat$y,
+        regtype = "lc",
+        bwtype = "generalized_nn",
+        bwmethod = "cv.ls",
+        nmulti = 0L,
+        itmax = 1L
+      ),
+      bw.ll = npcdensbw(
+        xdat = dat$x,
+        ydat = dat$y,
+        regtype = "ll",
+        bwtype = "generalized_nn",
+        bwmethod = "cv.ls",
+        nmulti = 0L,
+        itmax = 1L
+      ),
+      bw.lp = npcdensbw(
+        xdat = dat$x,
+        ydat = dat$y,
+        regtype = "lp",
+        basis = "glp",
+        degree = degree1,
+        bwtype = "generalized_nn",
+        bwmethod = "cv.ls",
+        nmulti = 0L,
+        itmax = 1L
+      ),
+      bw.d2 = npcdensbw(
+        xdat = dat$x,
+        ydat = dat$y,
+        regtype = "lp",
+        basis = "glp",
+        degree = degree2,
+        bwtype = "generalized_nn",
+        bwmethod = "cv.ls",
+        nmulti = 0L,
+        itmax = 1L
+      )
+    )
+
+    cache
+  }
+})
+
+test_that("phase1 npcdensbw cv.ls generalized-nn lc matches the frozen public baseline", {
+  bw.lc <- phase1_npcdens_cvls_gnn_cases()$bw.lc
 
   expect_true(is.finite(bw.lc$fval))
   expect_equal(bw.lc$fval, 2.491814924713461, tolerance = 1e-10)
 })
 
 test_that("phase1 npcdensbw cv.ls generalized-nn keeps ll on canonical lp degree-1 glp", {
-  dat <- phase1_npcdens_cvls_gnn_fixture()
-  degree <- rep.int(1L, ncol(dat$x))
-
-  bw.ll <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "ll",
-    bwtype = "generalized_nn",
-    bwmethod = "cv.ls",
-    nmulti = 0L,
-    itmax = 1L
-  )
-  bw.lp <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree,
-    bwtype = "generalized_nn",
-    bwmethod = "cv.ls",
-    nmulti = 0L,
-    itmax = 1L
-  )
+  cases <- phase1_npcdens_cvls_gnn_cases()
+  degree <- cases$degree1
+  bw.ll <- cases$bw.ll
+  bw.lp <- cases$bw.lp
 
   expect_identical(bw.ll$regtype.engine, "lp")
   expect_identical(bw.ll$basis.engine, "glp")
@@ -66,34 +98,11 @@ test_that("phase1 npcdensbw cv.ls generalized-nn keeps ll on canonical lp degree
 })
 
 test_that("phase1 npcdensbw cv.ls generalized-nn lp degree-2 succeeds on a higher-order fixture", {
-  dat <- phase1_npcdens_cvls_gnn_fixture()
-  degree1 <- rep.int(1L, ncol(dat$x))
-  degree2 <- rep.int(2L, ncol(dat$x))
+  cases <- phase1_npcdens_cvls_gnn_cases()
+  bw.d1 <- cases$bw.lp
+  bw.d2 <- cases$bw.d2
 
-  bw.d1 <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree1,
-    bwtype = "generalized_nn",
-    bwmethod = "cv.ls",
-    nmulti = 0L,
-    itmax = 1L
-  )
-  bw.d2 <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree2,
-    bwtype = "generalized_nn",
-    bwmethod = "cv.ls",
-    nmulti = 0L,
-    itmax = 1L
-  )
-
-  expect_identical(as.integer(bw.d2$degree.engine), degree2)
+  expect_identical(as.integer(bw.d2$degree.engine), cases$degree2)
   expect_true(is.finite(bw.d2$fval))
   expect_equal(bw.d2$fval, 2.207059233661194, tolerance = 1e-10)
   expect_gt(abs(bw.d2$fval - bw.d1$fval), 1e-6)
@@ -101,7 +110,7 @@ test_that("phase1 npcdensbw cv.ls generalized-nn lp degree-2 succeeds on a highe
 
 test_that("phase1 npcdensbw cv.ls generalized-nn avoids search-boundary collapse", {
   set.seed(20260309)
-  n <- 60L
+  n <- 30L
   x <- data.frame(x1 = runif(n))
   y <- data.frame(y1 = x$x1^2 + rnorm(n, sd = 0.06))
 

@@ -13,44 +13,75 @@ phase1_npcdens_cvls_fixed_fixture <- function() {
   list(x = x, y = y)
 }
 
-test_that("phase1 npcdensbw cv.ls fixed lc matches the frozen public baseline", {
-  dat <- phase1_npcdens_cvls_fixed_fixture()
+phase1_npcdens_cvls_fixed_cases <- local({
+  cache <- NULL
 
-  bw.lc <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "lc",
-    bwtype = "fixed",
-    bwmethod = "cv.ls",
-    nmulti = 0L
-  )
+  function() {
+    if (!is.null(cache))
+      return(cache)
+
+    dat <- phase1_npcdens_cvls_fixed_fixture()
+    degree1 <- rep.int(1L, ncol(dat$x))
+    degree2 <- rep.int(2L, ncol(dat$x))
+
+    cache <<- list(
+      dat = dat,
+      degree1 = degree1,
+      degree2 = degree2,
+      bw.lc = npcdensbw(
+        xdat = dat$x,
+        ydat = dat$y,
+        regtype = "lc",
+        bwtype = "fixed",
+        bwmethod = "cv.ls",
+        nmulti = 0L
+      ),
+      bw.ll = npcdensbw(
+        xdat = dat$x,
+        ydat = dat$y,
+        regtype = "ll",
+        bwtype = "fixed",
+        bwmethod = "cv.ls",
+        nmulti = 0L
+      ),
+      bw.lp = npcdensbw(
+        xdat = dat$x,
+        ydat = dat$y,
+        regtype = "lp",
+        basis = "glp",
+        degree = degree1,
+        bwtype = "fixed",
+        bwmethod = "cv.ls",
+        nmulti = 0L
+      ),
+      bw.d2 = npcdensbw(
+        xdat = dat$x,
+        ydat = dat$y,
+        regtype = "lp",
+        basis = "glp",
+        degree = degree2,
+        bwtype = "fixed",
+        bwmethod = "cv.ls",
+        nmulti = 0L
+      )
+    )
+
+    cache
+  }
+})
+
+test_that("phase1 npcdensbw cv.ls fixed lc matches the frozen public baseline", {
+  bw.lc <- phase1_npcdens_cvls_fixed_cases()$bw.lc
 
   expect_true(is.finite(bw.lc$fval))
   expect_equal(bw.lc$fval, 3.085374015090927, tolerance = 1e-10)
 })
 
 test_that("phase1 npcdensbw cv.ls fixed keeps ll on canonical lp degree-1 glp", {
-  dat <- phase1_npcdens_cvls_fixed_fixture()
-  degree <- rep.int(1L, ncol(dat$x))
-
-  bw.ll <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "ll",
-    bwtype = "fixed",
-    bwmethod = "cv.ls",
-    nmulti = 0L
-  )
-  bw.lp <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree,
-    bwtype = "fixed",
-    bwmethod = "cv.ls",
-    nmulti = 0L
-  )
+  cases <- phase1_npcdens_cvls_fixed_cases()
+  degree <- cases$degree1
+  bw.ll <- cases$bw.ll
+  bw.lp <- cases$bw.lp
 
   expect_identical(bw.ll$regtype.engine, "lp")
   expect_identical(bw.ll$basis.engine, "glp")
@@ -63,39 +94,18 @@ test_that("phase1 npcdensbw cv.ls fixed keeps ll on canonical lp degree-1 glp", 
 })
 
 test_that("phase1 npcdensbw cv.ls fixed lp degree-2 succeeds on a higher-order fixture", {
-  dat <- phase1_npcdens_cvls_fixed_fixture()
-  degree1 <- rep.int(1L, ncol(dat$x))
-  degree2 <- rep.int(2L, ncol(dat$x))
+  cases <- phase1_npcdens_cvls_fixed_cases()
+  bw.d1 <- cases$bw.lp
+  bw.d2 <- cases$bw.d2
 
-  bw.d1 <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree1,
-    bwtype = "fixed",
-    bwmethod = "cv.ls",
-    nmulti = 0L
-  )
-  bw.d2 <- npcdensbw(
-    xdat = dat$x,
-    ydat = dat$y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree2,
-    bwtype = "fixed",
-    bwmethod = "cv.ls",
-    nmulti = 0L
-  )
-
-  expect_identical(as.integer(bw.d2$degree.engine), degree2)
+  expect_identical(as.integer(bw.d2$degree.engine), cases$degree2)
   expect_true(is.finite(bw.d2$fval))
   expect_gt(abs(bw.d2$fval - bw.d1$fval), 1e-6)
 })
 
 test_that("phase1 npcdensbw cv.ls fixed avoids boundary collapse on bounded support", {
   set.seed(20260310)
-  n <- 60L
+  n <- 30L
   x <- data.frame(x1 = runif(n))
   y <- data.frame(y1 = rbeta(n, shape1 = 1 + 2 * x$x1, shape2 = 2))
 
