@@ -249,7 +249,7 @@
         scoef.args$exdat <- x.eval[,1, drop = FALSE]
         scoef.args$ezdat <- x.eval[,2, drop = FALSE]
       }
-      tobj <- do.call(npscoef, scoef.args)
+      tobj <- .np_plot_with_local_compiled_eval(do.call(.np_scoef_fit_internal, scoef.args))
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
@@ -479,7 +479,7 @@
             tx.args$tzdat <- zdat
             tx.args$ezdat <- ez.slice
           }
-          return(do.call(npscoef, tx.args))
+          return(.np_plot_with_local_compiled_eval(do.call(.np_scoef_fit_internal, tx.args)))
         }
 
         hat.args <- list(

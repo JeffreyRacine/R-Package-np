@@ -198,7 +198,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
 
 }
 
-npscoef.scbandwidth <-
+.np_scoef_fit_internal <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
            tydat = stop("training data 'tydat' missing"),
@@ -229,9 +229,6 @@ npscoef.scbandwidth <-
       stop("'tol' must be a finite numeric scalar >= 0")
     maxiter <- as.integer(maxiter)
     tol <- as.double(tol)
-    .npRmpi_require_active_slave_pool(where = "npscoef()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
     regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
 
     miss.z <- missing(tzdat)
@@ -721,4 +718,43 @@ npscoef.scbandwidth <-
     ev$fit.time <- fit.elapsed
     ev
 
+  }
+
+npscoef.scbandwidth <-
+  function(bws,
+           txdat = stop("training data 'txdat' missing"),
+           tydat = stop("training data 'tydat' missing"),
+           tzdat = NULL,
+           exdat,
+           eydat,
+           ezdat,
+           betas = FALSE,
+           errors = TRUE,
+           iterate = TRUE,
+           leave.one.out = FALSE,
+           maxiter = 100,
+           residuals = FALSE,
+           tol = .Machine$double.eps,
+           ...){
+    .npRmpi_require_active_slave_pool(where = "npscoef()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
+    .np_scoef_fit_internal(
+      bws = bws,
+      txdat = txdat,
+      tydat = tydat,
+      tzdat = tzdat,
+      exdat = exdat,
+      eydat = eydat,
+      ezdat = ezdat,
+      betas = betas,
+      errors = errors,
+      iterate = iterate,
+      leave.one.out = leave.one.out,
+      maxiter = maxiter,
+      residuals = residuals,
+      tol = tol,
+      ...
+    )
   }
