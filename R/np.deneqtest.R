@@ -19,9 +19,11 @@ npdeneqtest <- function(x = NULL,
   if(!identical(names(data.frame(x)),names(data.frame(y)))) stop(" data frames x and y must have identical variable names")
   if(boot.num < 9) stop(" number of bootstrap replications must be >= 9")
 
+  .np_progress_note("Computing bandwidths")
+
   if(is.null(bw.x) || is.null(bw.y)) {
-    bw.x <- npudensbw(dat=x,...)
-    bw.y <- npudensbw(dat=y,...)     
+    bw.x <- .np_progress_with_legacy_suppressed(npudensbw(dat=x,...))
+    bw.y <- .np_progress_with_legacy_suppressed(npudensbw(dat=y,...))
   }
 
   ## Save seed prior to setting
@@ -111,20 +113,17 @@ npdeneqtest <- function(x = NULL,
   
   Tn.vector <- numeric(boot.num)
   In.vector <- numeric(boot.num)
-  
-  console <- newLineConsole()
+
+  progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
 
   for (i in seq_len(boot.num)) {
-    console <- printClear(console)
-    console <- printPush(paste(sep="", "Bootstrap replication ",
-                               i, "/", boot.num, "..."), console)
     output.boot <- teststat.boot(x,y,bw.x,bw.y)
     Tn.vector[i] <- output.boot$Tn
     In.vector[i] <- output.boot$In
+    progress <- .np_progress_step(progress, done = i)
   }
-  
-  console <- printClear(console)
-  console <- printPop(console)  
+
+  progress <- .np_progress_end(progress)
 
   ## Compute the test statistic
   
