@@ -51,7 +51,7 @@ test_that("npindex public adaptive-nn lc route does not collapse to fixed semant
   bw.adaptive <- npindexbw(
     xdat = tx,
     ydat = y,
-    bws = c(1, 1, 0.85),
+    bws = c(1, 1, 9),
     bandwidth.compute = FALSE,
     regtype = "lc",
     bwtype = "adaptive_nn"
