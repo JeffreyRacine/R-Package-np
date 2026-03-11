@@ -87,6 +87,43 @@ test_that("npreghat supports lp/ll derivatives and matrix apply mode", {
   )))
 })
 
+test_that("npreghat lc derivative matrix matches analytic npreg for fixed and generalized-nn", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260311)
+  n <- 70L
+  x <- sort(runif(n))
+  y <- sin(2 * pi * x) + 0.3 * x + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+  ex <- data.frame(x = seq(0.1, 0.9, length.out = 20L))
+
+  for (bwtype in c("fixed", "generalized_nn")) {
+    bw <- npregbw(
+      xdat = tx,
+      ydat = y,
+      regtype = "lc",
+      bwtype = bwtype,
+      bandwidth.compute = FALSE,
+      bws = if (identical(bwtype, "fixed")) 0.2 else 9L
+    )
+
+    fit <- npreg(
+      bws = bw,
+      txdat = tx,
+      tydat = y,
+      exdat = ex,
+      gradients = TRUE,
+      warn.glp.gradient = FALSE
+    )
+    H <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix", s = 1L)
+    grad.apply <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = "apply", s = 1L)
+
+    expect_equal(as.vector(H %*% y), as.vector(fit$grad[, 1]), tolerance = 1e-6)
+    expect_equal(as.vector(H %*% y), as.vector(grad.apply), tolerance = 1e-8)
+  }
+})
+
 test_that("npreghat lp bernstein path matches predict semantics", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
