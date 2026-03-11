@@ -82,12 +82,9 @@ npcmstest <- function(formula,
 
   ##  bw <- npregbw(xdat=xdat,ydat=model.resid)
 
-  console <- newLineConsole()
-  console <- printPush("Bandwidth selection", console)
+  .np_progress_note("Computing bandwidths")
 
-  bw <- npregbw(xdat=xdat, ydat=model$y, ...)
-
-  console <- printPop(console)
+  bw <- .np_progress_with_legacy_suppressed(npregbw(xdat=xdat, ydat=model$y, ...))
   
   ## Now define the Jn test statistic that takes arguments xdat, the
   ## residual vector, the bandwidth object, and the number of bootstrap
@@ -227,10 +224,9 @@ npcmstest <- function(formula,
 
   if(distribution == "bootstrap"){
     Sn.bootstrap <- numeric(boot.num)
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
 
     for (ii in seq_len(boot.num)) {
-      console <- printPush(paste(sep="", "Bootstrap replication ",
-                                 ii, "/", boot.num, "..."), console)
        if(boot.method == "iid"){
         Sn.bootstrap[ii] <- boot.iid(model.resid)
       } else if(boot.method == "wild"){
@@ -238,8 +234,9 @@ npcmstest <- function(formula,
       } else if(boot.method == "wild-rademacher"){
         Sn.bootstrap[ii] <- boot.wild.rademacher(model.resid)
       }
-      console <- printPop(console)
+      progress <- .np_progress_step(progress, done = ii)
     }
+    progress <- .np_progress_end(progress)
     Sn.bootstrap <- sort(Sn.bootstrap)
     ##cat("\n")
   }
