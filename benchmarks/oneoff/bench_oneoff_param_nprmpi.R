@@ -332,6 +332,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
 
   seeds <- make_seeds(cfg)
+
   if (cfg$show_progress) {
     cat("Running one-off MPI benchmark\n")
     cat("fun=", cfg$fun,
@@ -359,6 +360,10 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
     write.table(summary, file = cfg$out_summary, sep = ",", row.names = FALSE,
                 col.names = !file.exists(cfg$out_summary), append = file.exists(cfg$out_summary),
                 qmethod = "double")
+  }
+
+  if (any(!raw$ok)) {
+    stop("One or more benchmark iterations failed. See raw CSV: ", cfg$out_raw)
   }
 
   if (cfg$show_progress) {
