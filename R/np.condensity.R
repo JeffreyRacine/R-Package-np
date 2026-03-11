@@ -421,6 +421,7 @@ npcdens.default <- function(bws, txdat, tydat, ...){
   no.txdat <- missing(txdat)
   no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "conbandwidth")
+  bws.formula <- (!no.bws) && inherits(bws, "formula")
 
   ## autodispatch normalizes calls via match.call(), which can turn an
   ## originally unnamed formula first argument into named bws=... .
