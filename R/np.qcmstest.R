@@ -92,21 +92,18 @@ npqcmstest <- function(formula,
 
   ## ydat is model's residuals, xdat all regressors with types
 
-  console <- newLineConsole()
-  console <- printPush("Bandwidth selection", console)
+  .np_progress_note("Computing bandwidths")
 
   ## What are the optimal bandwidths? We could proceed to use those
   ## for the conditional expectation with raw y, or along the lines of
   ## Zheng (1998) does GCV where the dep var is varepsilon...
 
   if(bwydat == "y") {
-    bw <- npregbw(xdat=xdat, ydat=model$y, ...)
+    bw <- .np_progress_with_legacy_suppressed(npregbw(xdat=xdat, ydat=model$y, ...))
   } else if(bwydat == "varepsilon"){
     varepsilon <- qresidual(model.resid, tau)
-    bw <- npregbw(xdat=xdat, ydat=varepsilon, ...)
+    bw <- .np_progress_with_legacy_suppressed(npregbw(xdat=xdat, ydat=varepsilon, ...))
   }
-
-  console <- printPop(console)
 
   ## Now define the Jn test statistic that takes arguments xdat, the
   ## residual vector, the bandwidth object, and the number of bootstrap
@@ -242,9 +239,8 @@ npqcmstest <- function(formula,
 
   if(distribution == "bootstrap"){
     Sn.bootstrap <- numeric(boot.num)
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
     for (ii in seq_len(boot.num)) {
-      console <- printPush(paste(sep="", "Bootstrap replication ",
-                                 ii, "/", boot.num, "..."), console)
       if(boot.method == "iid"){
         Sn.bootstrap[ii] <- boot.iid(model.resid)
       } else if(boot.method == "wild"){
@@ -252,10 +248,10 @@ npqcmstest <- function(formula,
       } else if(boot.method == "wild-rademacher"){
         Sn.bootstrap[ii] <- boot.wild.rademacher(model.resid)
       }
-      console <- printPop(console)
+      progress <- .np_progress_step(progress, done = ii)
     }
+    progress <- .np_progress_end(progress)
     Sn.bootstrap <- sort(Sn.bootstrap)
-    cat("\n")
   }
 
   ##  Return a list containing the test statistic etc.
