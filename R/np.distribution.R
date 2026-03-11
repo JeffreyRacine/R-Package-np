@@ -228,6 +228,7 @@ npudist.default <- function(bws, tdat, ...){
 
   no.bws <- missing(bws)
   no.tdat <- missing(tdat)
+  has.explicit.bws <- (!no.bws) && isa(bws, "dbandwidth")
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
@@ -238,7 +239,7 @@ npudist.default <- function(bws, tdat, ...){
   
   sc.bw[[1]] <- quote(npudistbw)
 
-  if(bws.named){
+  if (has.explicit.bws) {
     sc.bw$bandwidth.compute <- FALSE
   }
 
@@ -251,7 +252,14 @@ npudist.default <- function(bws, tdat, ...){
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
-  tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+  tbw <- if (!has.explicit.bws) {
+    .np_progress_select_bandwidth(
+      "Selecting distribution bandwidth",
+      .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+    )
+  } else {
+    .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+  }
 
   ## convention: first argument is always dropped, second, if present, propagated
   call.args <- list(bws = tbw)

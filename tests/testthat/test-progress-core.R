@@ -167,3 +167,31 @@ test_that("legacy suppression restores np.messages on success and error", {
   )
   expect_true(isTRUE(getOption("np.messages")))
 })
+
+test_that("bandwidth selection helper emits note and suppresses nested legacy output", {
+  select_bw <- getFromNamespace(".np_progress_select_bandwidth", "npRmpi")
+
+  old_opts <- options(np.messages = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  seen <- NULL
+  messages <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_master = function() TRUE
+    ),
+    capture_messages_only({
+      value <- select_bw("Selecting regression bandwidth", {
+        seen <<- getOption("np.messages")
+        7
+      })
+      expect_identical(value, 7)
+    })
+  )
+  messages <- sub("\n$", "", messages, useBytes = TRUE)
+  messages <- messages[nzchar(messages)]
+
+  expect_false(isTRUE(seen))
+  expect_identical(messages, "[npRmpi] Selecting regression bandwidth")
+  expect_true(isTRUE(getOption("np.messages")))
+})
