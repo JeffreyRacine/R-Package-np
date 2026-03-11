@@ -70,6 +70,31 @@
   formatC(x, digits = 1L, format = "f")
 }
 
+.np_progress_start_grace_sec <- function(known_total = FALSE, domain = "general") {
+  default <- if (identical(domain, "plot")) {
+    0.75
+  } else if (isTRUE(known_total)) {
+    0.75
+  } else {
+    1.0
+  }
+
+  option_name <- if (identical(domain, "plot")) {
+    "np.plot.progress.start.grace.sec"
+  } else if (isTRUE(known_total)) {
+    "np.progress.start.grace.known.sec"
+  } else {
+    "np.progress.start.grace.unknown.sec"
+  }
+
+  val <- suppressWarnings(as.numeric(getOption(option_name, default))[1L])
+  if (!is.finite(val) || is.na(val) || val < 0) {
+    val <- default
+  }
+
+  val
+}
+
 .np_progress_format_known_total <- function(state, done, detail = NULL, now = .np_progress_now()) {
   total <- state$total
   pct <- if (isTRUE(total > 0)) 100 * done / total else 0
@@ -126,7 +151,13 @@
     last_emit = started - throttle_sec,
     throttle_sec = throttle_sec,
     last_done = if (known_total) 0 else NULL,
-    domain = domain
+    domain = domain,
+    start_note = paste0(label, "..."),
+    start_note_pending = TRUE,
+    start_note_grace_sec = .np_progress_start_grace_sec(known_total = known_total, domain = domain),
+    last_line = NULL,
+    last_emitted_done = NULL,
+    last_emitted_detail = NULL
   )
 }
 
@@ -140,6 +171,17 @@
   }
 
   now <- .np_progress_now()
+  if (isTRUE(state$start_note_pending) &&
+      (now - state$started) < state$start_note_grace_sec) {
+    return(state)
+  }
+
+  if (isTRUE(state$start_note_pending)) {
+    .np_progress_emit(state$start_note)
+    state$start_note_pending <- FALSE
+    state$last_line <- state$start_note
+  }
+
   if ((now - state$last_emit) < state$throttle_sec) {
     return(state)
   }
@@ -160,8 +202,14 @@
     )
   }
 
-  .np_progress_emit(line)
-  state$last_emit <- now
+  if (!identical(line, state$last_line)) {
+    .np_progress_emit(line)
+    state$last_emit <- now
+    state$last_line <- line
+    state$last_emitted_done <- if (is.null(done)) state$last_done else done
+    state$last_emitted_detail <- detail
+  }
+
   state
 }
 
@@ -171,23 +219,33 @@
   }
 
   now <- .np_progress_now()
+  if (is.null(state$last_line) &&
+      (now - state$started) < state$start_note_grace_sec) {
+    return(invisible(state))
+  }
 
   if (isTRUE(state$known_total)) {
     done <- if (is.null(state$total)) state$last_done else state$total
     line <- .np_progress_format_known_total(state = state, done = done, detail = detail, now = now)
-    if (!identical(done, state$last_done) || (now - state$last_emit) > 0) {
+    if (!(identical(done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
       .np_progress_emit(line)
       state$last_emit <- now
       state$last_done <- done
+      state$last_line <- line
+      state$last_emitted_done <- done
+      state$last_emitted_detail <- detail
     }
     return(invisible(state))
   }
 
   if (!is.null(state$last_done)) {
     line <- .np_progress_format_unknown_total(state = state, done = state$last_done, detail = detail, now = now)
-    if ((now - state$last_emit) > 0) {
+    if (!(identical(state$last_done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
       .np_progress_emit(line)
       state$last_emit <- now
+      state$last_line <- line
+      state$last_emitted_done <- state$last_done
+      state$last_emitted_detail <- detail
     }
   }
 
