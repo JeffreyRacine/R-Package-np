@@ -1,4 +1,10 @@
 library(testthat)
 library(npRmpi)
 
-test_check("npRmpi")
+local({
+  on.exit({
+    try(npRmpi.quit(force = TRUE), silent = TRUE)
+    try(mpi.finalize(), silent = TRUE)
+  }, add = TRUE)
+  test_check("npRmpi")
+})
