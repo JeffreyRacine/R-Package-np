@@ -82,6 +82,7 @@ test_that("plot helper progress emits append-only bounded messages", {
 
   messages <- normalize_messages(messages)
 
+  expect_identical(messages[[1L]], "[np] Plot bootstrap wild...")
   expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 1/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
   expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
   expect_equal(sum(grepl("^\\[np\\] Plot bootstrap wild 9/9 ", messages)), 1L)
