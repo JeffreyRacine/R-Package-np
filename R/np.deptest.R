@@ -25,6 +25,7 @@ npdeptest <- function(data.x = NULL,
 
   seed.state <- .np_seed_enter(random.seed)
 
+  .np_progress_note("Computing bandwidths")
 
   ## If the variable is a time series convert to type numeric
 
@@ -112,18 +113,13 @@ npdeptest <- function(data.x = NULL,
 
   } ## end of Srho.bivar function
   
-  console <- newLineConsole()
-  console <- printClear(console)
-  console <- printPop(console)  
-  
   ## Compute and save bandwidths (save for bootstrapping if requested)
 
-  bw.data.x <- npudensbw(~data.x)$bw
-  bw.data.y <- npudensbw(~data.y)$bw
-  bw.joint <- npudensbw(~data.x+data.y)$bw
-  
-  console <- printClear(console)
-  console <- printPush(paste(sep="", "Constructing metric entropy..."), console = console)
+  bw.data.x <- .np_progress_with_legacy_suppressed(npudensbw(~data.x))$bw
+  bw.data.y <- .np_progress_with_legacy_suppressed(npudensbw(~data.y))$bw
+  bw.joint <- .np_progress_with_legacy_suppressed(npudensbw(~data.x+data.y))$bw
+
+  .np_progress_note("Constructing metric entropy")
   
   Srho.vec <- Srho.bivar(data.x,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
 
@@ -133,29 +129,25 @@ npdeptest <- function(data.x = NULL,
   if(bootstrap) {
 
     Srho.vec.boot <- numeric()
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
 
     for (b in seq_len(boot.num)) {
-
-      console <- printClear(console)
-      console <- printPush(paste(sep="", "Bootstrap replication ",
-                                 b, "/", boot.num, "..."), console)
-      
       ## Break systematic relationship between x and y (null)
       
       data.x.boot <- data.x[sample.int(length(data.x), replace = TRUE)]
       
       Srho.vec.boot[b] <- Srho.bivar(data.x.boot,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
+      progress <- .np_progress_step(progress, done = b)
 
     }
+
+    progress <- .np_progress_end(progress)
 
     ## Compute P-values
 
     P <- mean(Srho.vec.boot > Srho.vec)
 
   }
-
-  console <- printClear(console)
-  console <- printPop(console)
 
   ## Restore seed
 
