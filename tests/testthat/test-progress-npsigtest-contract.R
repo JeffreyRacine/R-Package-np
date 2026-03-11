@@ -78,7 +78,10 @@ make_sigtest_fixture <- function(seed = 42, n = 30) {
 test_that("npsigtest joint path emits append-only bounded bootstrap progress", {
   fixture <- make_sigtest_fixture()
 
-  old_opts <- options(np.messages = TRUE)
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0
+  )
   on.exit(options(old_opts), add = TRUE)
 
   res <- with_np_bindings(
@@ -103,7 +106,10 @@ test_that("npsigtest joint path emits append-only bounded bootstrap progress", {
 test_that("npsigtest individual path emits per-variable append-only progress", {
   fixture <- make_sigtest_fixture(seed = 99)
 
-  old_opts <- options(np.messages = TRUE)
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0
+  )
   on.exit(options(old_opts), add = TRUE)
 
   res <- with_np_bindings(
