@@ -65,7 +65,7 @@ conbandwidth <-
   if(missing(cxkerorder))
     cxkerorder = 2
   else if (cxkertype == "uniform")
-    warning("ignoring kernel order specified with uniform kernel type")
+    .np_warning("ignoring kernel order specified with uniform kernel type")
   else {
     kord = c(2,4,6,8) 
     if (!any(kord == cxkerorder))
@@ -73,10 +73,10 @@ conbandwidth <-
   }
 
   if (cxkertype == "truncated gaussian" && cxkerorder != 2)
-    warning("using truncated gaussian of order 2, higher orders not yet implemented")
+    .np_warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
   if (bwmethod == "normal-reference" && (cxkertype != "gaussian" || bwtype != "fixed")){    
-    warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
+    .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
     bwtype = "fixed"
     cxkertype = "gaussian"
   }
@@ -84,7 +84,7 @@ conbandwidth <-
   if(missing(cykerorder))
     cykerorder = 2
   else if (cykertype == "uniform")
-    warning("ignoring kernel order specified with uniform kernel type")
+    .np_warning("ignoring kernel order specified with uniform kernel type")
   else {
     kord = c(2,4,6,8) 
     if (!any(kord == cykerorder))
@@ -92,10 +92,10 @@ conbandwidth <-
   }
 
   if (cykertype == "truncated gaussian" && cykerorder != 2)
-    warning("using truncated gaussian of order 2, higher orders not yet implemented")
+    .np_warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
   if (bwmethod == "normal-reference" && (cykertype != "gaussian" || bwtype != "fixed")){    
-    warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
+    .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
     bwtype = "fixed"
     cykertype = "gaussian"
   }

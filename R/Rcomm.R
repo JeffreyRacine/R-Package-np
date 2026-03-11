@@ -76,7 +76,7 @@ mpi.comm.spawn <- function(slave,
     #if (nslaves > mpi.universe.size()){
     #            tmp <- paste("Number of R slaves is over",
     #                    mpi.universe.size(),": maximum CPUs.")
-    #            warning(tmp)
+    #            .np_warning(tmp)
     #    }
     if (!is.numeric(nslaves) || length(nslaves) != 1L || is.na(nslaves) ||
         !is.finite(nslaves) || nslaves != floor(nslaves) || nslaves <= 0)

@@ -38,7 +38,7 @@ dbandwidth <-
     if(missing(ckerorder))
       ckerorder = 2
     else if (ckertype == "uniform")
-      warning("ignoring kernel order specified with uniform kernel type")
+      .np_warning("ignoring kernel order specified with uniform kernel type")
     else {
       kord = c(2,4,6,8) 
       if (!any(kord == ckerorder))
@@ -46,13 +46,13 @@ dbandwidth <-
     }
 
     if (bwmethod == "normal-reference" && (ckertype != "gaussian" || bwtype != "fixed")){    
-      warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
+      .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
       bwtype = "fixed"
       ckertype = "gaussian"
     }
 
     if (ckertype == "truncated gaussian" && ckerorder != 2)
-      warning("using truncated gaussian of order 2, higher orders not yet implemented")
+      .np_warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
 
     ukertype = match.arg(ukertype)

@@ -71,7 +71,7 @@ npsdeptest <- function(data = NULL,
       ## Inf, and NaN.
 
       if(!all(is.finite(summand))) {
-        warning(" non-finite value in summation-based statistic: integration recommended")
+        .np_warning(" non-finite value in summation-based statistic: integration recommended")
         summand <- summand[is.finite(summand)]
       }
 

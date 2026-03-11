@@ -43,6 +43,18 @@ capture_messages_only <- function(expr) {
   messages
 }
 
+capture_warnings_only <- function(expr) {
+  warnings <- character()
+  withCallingHandlers(
+    expr,
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  warnings
+}
+
 test_that("progress begin returns disabled state when messages are off", {
   begin <- getFromNamespace(".np_progress_begin", "npRmpi")
 
@@ -166,6 +178,14 @@ test_that("legacy suppression restores np.messages on success and error", {
     "boom"
   )
   expect_true(isTRUE(getOption("np.messages")))
+})
+
+test_that("warning helper prefixes package warnings", {
+  warn <- getFromNamespace(".np_warning", "npRmpi")
+
+  warnings <- capture_warnings_only(warn("kernel order ignored"))
+
+  expect_identical(warnings, "[npRmpi] kernel order ignored")
 })
 
 test_that("bandwidth selection helper emits note and suppresses nested legacy output", {

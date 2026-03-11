@@ -181,7 +181,7 @@
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
     if (coef && plot.errors.method != "none") {
-      warning("coef=TRUE currently disables plot errors for smooth coefficient plots.")
+      .np_warning("coef=TRUE currently disables plot errors for smooth coefficient plots.")
       plot.errors.method <- "none"
       plot.errors <- FALSE
     }

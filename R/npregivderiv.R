@@ -407,7 +407,7 @@ npregivderiv <- function(y,
   ## to the length of norm.stop.
 
   if(is.monotone.increasing(norm.stop)) {
-    warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g., instead set `start.from' to EEywz or provide a vector of starting values")
+    .np_warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g., instead set `start.from' to EEywz or provide a vector of starting values")
     convergence <- "FAILURE_MONOTONE_INCREASING"
     j <- length(norm.stop)
     phi <- phi.mat[,1]
@@ -427,7 +427,7 @@ npregivderiv <- function(y,
 
   progress <- .np_progress_end(progress, detail = "updating E(mu|w)")
 
-  if(j == iterate.max) warning(" iterate.max reached: increase iterate.max or inspect norm.stop vector")
+  if(j == iterate.max) .np_warning(" iterate.max reached: increase iterate.max or inspect norm.stop vector")
 
   ret <- list(phi=phi,
               phi.prime=phi.prime,

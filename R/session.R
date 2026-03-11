@@ -572,7 +572,7 @@ npRmpi.quit <- function(force = FALSE,
       return(invisible(TRUE))
     }
     if (identical(attach.state, "closing")) {
-      warning("attach-mode close already in progress; ignoring duplicate npRmpi.quit(mode='attach') call.",
+      .np_warning("attach-mode close already in progress; ignoring duplicate npRmpi.quit(mode='attach') call.",
               call. = FALSE)
       return(invisible(FALSE))
     }
@@ -592,7 +592,7 @@ npRmpi.quit <- function(force = FALSE,
       base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
     if (inherits(shut, "try-error")) {
       msg <- as.character(shut)
-      warning(
+      .np_warning(
         paste(
           "attach-mode worker shutdown broadcast failed or timed out;",
           "continuing communicator teardown.",
@@ -615,7 +615,7 @@ npRmpi.quit <- function(force = FALSE,
       barrier = isTRUE(ack.info$ok)
     )
     if (!isTRUE(ack.info$ok)) {
-      warning(
+      .np_warning(
         sprintf(
           "attach-mode worker shutdown ACK incomplete for session %s; missing ranks: %s",
           if (is.na(sid)) "NA" else as.character(sid),
@@ -625,7 +625,7 @@ npRmpi.quit <- function(force = FALSE,
       )
     }
     if (!isTRUE(release.info$ok)) {
-      warning(
+      .np_warning(
         sprintf(
           "attach-mode worker shutdown release incomplete for session %s; failed ranks: %s",
           if (is.na(sid)) "NA" else as.character(sid),

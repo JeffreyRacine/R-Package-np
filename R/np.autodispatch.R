@@ -37,7 +37,7 @@
     return(invisible(FALSE))
   if (isTRUE(getOption("npRmpi.conflicts.warned", FALSE)))
     return(invisible(TRUE))
-  warning("both packages 'npRmpi' and 'np' are attached: use explicit npRmpi:: calls to avoid masked-function ambiguity")
+  .np_warning("both packages 'npRmpi' and 'np' are attached: use explicit npRmpi:: calls to avoid masked-function ambiguity")
   options(npRmpi.conflicts.warned = TRUE)
   invisible(TRUE)
 }
@@ -49,7 +49,7 @@
     return(invisible(FALSE))
   if (isTRUE(getOption("npRmpi.conflicts.warned.rmpi", FALSE)))
     return(invisible(TRUE))
-  warning("both packages 'npRmpi' and 'Rmpi' are attached: prefer explicit npRmpi:: calls in user code to avoid dispatch ambiguity")
+  .np_warning("both packages 'npRmpi' and 'Rmpi' are attached: prefer explicit npRmpi:: calls in user code to avoid dispatch ambiguity")
   options(npRmpi.conflicts.warned.rmpi = TRUE)
   invisible(TRUE)
 }
@@ -237,7 +237,7 @@
     return(invisible(FALSE))
   }
   if (!isTRUE(getOption("npRmpi.autodispatch.warned.nested", FALSE))) {
-    warning("detected active mpi.bcast.cmd context; skipping nested auto-dispatch for this call")
+    .np_warning("detected active mpi.bcast.cmd context; skipping nested auto-dispatch for this call")
     options(npRmpi.autodispatch.warned.nested = TRUE)
   }
   invisible(TRUE)
@@ -1295,7 +1295,7 @@
   if (!.npRmpi_has_active_slave_pool(comm = comm)) {
     msg <- "npRmpi auto-dispatch requires an active slave pool; call npRmpi.init(...) first"
     if (strict) stop(msg)
-    warning(msg)
+    .np_warning(msg)
     return(FALSE)
   }
 

@@ -319,7 +319,7 @@ npreg.rbandwidth <-
           out.of.support <- c(out.of.support, colnames(txdat)[ii])
       }
       if (length(out.of.support)) {
-        warning(
+        .np_warning(
           "bernstein.basis=TRUE: evaluation continuous predictor(s) outside training support (",
           paste(unique(out.of.support), collapse = ", "),
           "); proceeding, but interpret extrapolated results with care",
@@ -513,7 +513,7 @@ npreg.rbandwidth <-
             myout$g[, bad.idx] <- NA_real_
             myout$gerr[, bad.idx] <- NA_real_
             if (warn.glp.gradient)
-              warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
+              .np_warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
           }
         }
       }

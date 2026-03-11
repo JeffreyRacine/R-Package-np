@@ -346,7 +346,7 @@ npregiv <- function(y,
 
                       WzkWz.inv[[i]] <- as.matrix(chol2inv(chol(t(W.z)%*%(K.x[,i]*W.z)+diag(rep(ridge,nc)))))
 
-                      warning(paste("Ridging obs. ", i, ", ridge = ", signif(ridge,6),sep=""),
+                      .np_warning(paste("Ridging obs. ", i, ", ridge = ", signif(ridge,6),sep=""),
                               immediate.=warning.immediate,
                               call.=!warning.immediate)
 
@@ -1053,7 +1053,7 @@ npregiv <- function(y,
         }
       }
 
-      if(optim.return$convergence != 0) warning(" optim failed to converge")
+      if(optim.return$convergence != 0) .np_warning(" optim failed to converge")
 
       fv.vec[iMulti] <- optim.return$value
 
@@ -1457,8 +1457,8 @@ npregiv <- function(y,
         tikh.progress <- .np_progress_end(tikh.progress, detail = "updating smoothing and phi(z)")
     }
 
-    if((alpha.iter-alpha.min)/NZD(alpha.min) < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
-    if((alpha.max-alpha.iter)/NZD(alpha.max) < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
+    if((alpha.iter-alpha.min)/NZD(alpha.min) < 0.01) .np_warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
+    if((alpha.max-alpha.iter)/NZD(alpha.max) < 0.01) .np_warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
 
     ret <- list(phi=phi,
                 phi.eval=phi.eval,
@@ -2298,7 +2298,7 @@ npregiv <- function(y,
       norm.value <- norm.stop/seq_along(norm.stop)
 
       if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
-          warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
+          .np_warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
           convergence <- "FAILURE_MONOTONE_INCREASING"
           phi <- starting.values.phi
           j <- 1
@@ -2339,7 +2339,7 @@ npregiv <- function(y,
               if(p>=2 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights <- phi.deriv.eval.2.weights.list[[j]]    
           }
       }
-      if(j == iterate.max) warning("iterate.max reached: increase iterate.max or inspect norm.stop vector")      
+      if(j == iterate.max) .np_warning("iterate.max reached: increase iterate.max or inspect norm.stop vector")      
     } else {
         ## bw passed in, set j to norm.index, push out weights etc.
         j <- bw$norm.index

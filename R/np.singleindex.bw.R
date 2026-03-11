@@ -308,7 +308,7 @@ npindexbw.default <-
       if (coarseclass(xdat[,1]) != "numeric")
         stop("xdat must contain at least one continuous variable")
 
-      warning(paste("xdat has one dimension. Using a single index model to reduce",
+      .np_warning(paste("xdat has one dimension. Using a single index model to reduce",
                     "dimensionality is unnecessary."))
     }
 
@@ -405,7 +405,7 @@ npindexbw.sibandwidth <-
       if (coarseclass(xdat[,1]) != "numeric")
         stop("xdat must contain at least one continuous variable")
 
-      warning(paste("xdat has one dimension. Using a single index model to reduce",
+      .np_warning(paste("xdat has one dimension. Using a single index model to reduce",
                     "dimensionality is unnecessary."))
     }
 

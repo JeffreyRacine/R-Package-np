@@ -20,12 +20,49 @@
     isTRUE(.np_progress_is_master())
 }
 
-.np_progress_pkg_prefix <- function() {
+.np_io_pkg_prefix <- function() {
   "[npRmpi]"
 }
 
+.np_io_prefix_text <- function(text) {
+  prefix <- .np_io_pkg_prefix()
+  if (!is.character(text)) {
+    return(text)
+  }
+
+  vapply(
+    text,
+    function(line) {
+      if (is.na(line) || startsWith(line, prefix)) {
+        return(line)
+      }
+
+      paste(prefix, line)
+    },
+    character(1L)
+  )
+}
+
+.np_message <- function(...) {
+  message(.np_io_prefix_text(paste(..., sep = "", collapse = "")))
+  invisible(NULL)
+}
+
+.np_warning <- function(..., call. = TRUE, immediate. = FALSE, noBreaks. = FALSE) {
+  warning(
+    .np_io_prefix_text(paste(..., sep = "", collapse = "")),
+    call. = call.,
+    immediate. = immediate.,
+    noBreaks. = noBreaks.
+  )
+}
+
+.np_progress_pkg_prefix <- function() {
+  .np_io_pkg_prefix()
+}
+
 .np_progress_emit <- function(line) {
-  message(line)
+  .np_message(line)
   invisible(NULL)
 }
 

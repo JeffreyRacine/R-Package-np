@@ -91,7 +91,7 @@ mpi.spawn.Rslaves <-
              if (!missing(nslaves) && length(nslaves) == 1 && is.finite(nslaves)) {
                  requested <- as.integer(nslaves)
                  if (!is.na(requested) && requested != existing) {
-                     warning(paste0(
+                     .np_warning(paste0(
                          "npRmpi is reusing an existing slave pool (", existing,
                          " slave(s)) but nslaves=", requested, " was requested. ",
                          "To change the number of slaves, call mpi.close.Rslaves(force=TRUE) ",
@@ -463,7 +463,7 @@ mpi.close.Rslaves <- function(dellog=TRUE, comm=1, force=FALSE){
         }, error = function(e) FALSE)
         if (isTRUE(reset.ok))
             return(invisible(0L))
-        warning(
+        .np_warning(
             "soft-close SPMD reset failed; falling back to hard-close to avoid stale sequence state",
             call. = FALSE
         )
@@ -485,7 +485,7 @@ mpi.close.Rslaves <- function(dellog=TRUE, comm=1, force=FALSE){
       base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
     if (inherits(shut, "try-error")) {
       msg <- as.character(shut)
-      warning(
+      .np_warning(
         paste(
           "timed out or failed while broadcasting slave shutdown token.",
           "Proceeding with communicator teardown;",
