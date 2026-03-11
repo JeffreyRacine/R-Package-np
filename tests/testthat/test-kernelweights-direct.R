@@ -1,11 +1,8 @@
 library(npRmpi)
 
 with_session_slave_pool <- function(expr) {
-  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
-    try(npRmpi.quit(), silent = TRUE)
-  }
-  suppressWarnings(npRmpi.init(nslaves = 1, quiet = TRUE))
-  on.exit(try(npRmpi.quit(), silent = TRUE), add = TRUE)
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   force(expr)
 }
 

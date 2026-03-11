@@ -1,18 +1,6 @@
 with_mpi_pool <- function(code) {
-  if (identical(Sys.getenv("_R_CHECK_PACKAGE_NAME_", ""), "npRmpi")) {
-    skip("MPI pool contract tests are skipped under R CMD check")
-  }
-
-  init_err <- tryCatch({
-    suppressWarnings(npRmpi.init(nslaves = 1, quiet = TRUE))
-    NULL
-  }, error = identity)
-
-  if (inherits(init_err, "error")) {
-    skip(sprintf("MPI init unavailable for npsigtest contract test: %s", conditionMessage(init_err)))
-  }
-
-  on.exit(try(npRmpi.quit(), silent = TRUE), add = TRUE)
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   force(code)
 }
 

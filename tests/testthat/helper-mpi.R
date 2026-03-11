@@ -1,5 +1,11 @@
 # Helper for MPI tests
+.mpi_check_context <- function() {
+  identical(Sys.getenv("_R_CHECK_PACKAGE_NAME_", ""), "npRmpi")
+}
+
 .mpi_pool_active <- function() {
+  if (.mpi_check_context())
+    return(FALSE)
   if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
     return(FALSE)
   isTRUE(try(mpi.comm.size(1) > 1, silent = TRUE))
@@ -7,7 +13,7 @@
 
 spawn_mpi_slaves <- function(n = 1L) {
   # R CMD check environments are not a stable MPI runtime target.
-  if (identical(Sys.getenv("_R_CHECK_PACKAGE_NAME_", ""), "npRmpi")) {
+  if (.mpi_check_context()) {
     return(FALSE)
   }
 
@@ -32,6 +38,8 @@ spawn_mpi_slaves <- function(n = 1L) {
 }
 
 close_mpi_slaves <- function(force = FALSE) {
+  if (.mpi_check_context())
+    return(invisible())
   if (!.mpi_pool_active())
     return(invisible())
 

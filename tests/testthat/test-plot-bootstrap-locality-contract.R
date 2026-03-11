@@ -1,8 +1,8 @@
 library(npRmpi)
 
 test_that("session-route regression bootstrap plot stays off local bootstrap wrapper", {
-  npRmpi.init(nslaves = 1, quiet = TRUE)
-  on.exit(npRmpi.quit(), add = TRUE)
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   set.seed(9420)
   xdat <- data.frame(x = rnorm(20))
