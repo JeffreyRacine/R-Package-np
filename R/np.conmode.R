@@ -254,7 +254,7 @@ npconmode.default <- function(bws, txdat, tydat, ...){
     if (ib > 0L) names(sc.bw)[ib] <- "formula"
   }
 
-  if (has.explicit.bws) {
+  if(bws.named && !bws.formula){
     sc.bw$bandwidth.compute <- FALSE
   }
 

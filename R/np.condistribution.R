@@ -443,7 +443,7 @@ npcdist.default <- function(bws, txdat, tydat, ...){
   if(tydat.named)
     tydat <- toFrame(tydat)
 
-  if (has.explicit.bws) {
+  if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
   }
 

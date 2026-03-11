@@ -444,7 +444,7 @@ npcdens.default <- function(bws, txdat, tydat, ...){
   if(tydat.named)
     tydat <- toFrame(tydat)
 
-  if (has.explicit.bws) {
+  if(bws.named && !bws.formula){
     sc.bw$bandwidth.compute <- FALSE
   }
 

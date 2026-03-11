@@ -154,7 +154,7 @@ npindex.default <- function(bws, txdat, tydat, ...){
   
   sc.bw[[1]] <- quote(npindexbw)
 
-  if (has.explicit.bws) {
+  if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
   }
 

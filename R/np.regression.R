@@ -596,7 +596,7 @@ npreg.default <- function(bws, txdat, tydat, ...){
   if(txdat.named)
     txdat <- toFrame(txdat)
 
-  if (has.explicit.bws) {
+  if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
   }
 
