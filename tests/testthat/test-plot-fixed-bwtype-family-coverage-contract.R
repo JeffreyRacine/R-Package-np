@@ -13,13 +13,34 @@ test_that("fixed-bwtype plot bootstrap covers regression and unsupervised famili
   yreg <- sin(xdat$x) + rnorm(n, sd = 0.15)
   ydat <- data.frame(y = rnorm(n))
 
-  reg.bw <- npregbw(
-    xdat = xdat,
-    ydat = yreg,
-    bws = 0.30,
-    bandwidth.compute = FALSE,
-    bwtype = "fixed",
-    regtype = "ll"
+  reg.bws <- list(
+    lc = npregbw(
+      xdat = xdat,
+      ydat = yreg,
+      bws = 0.30,
+      bandwidth.compute = FALSE,
+      bwtype = "fixed",
+      regtype = "lc"
+    ),
+    ll = npregbw(
+      xdat = xdat,
+      ydat = yreg,
+      bws = 0.30,
+      bandwidth.compute = FALSE,
+      bwtype = "fixed",
+      regtype = "ll"
+    ),
+    lp = npregbw(
+      xdat = xdat,
+      ydat = yreg,
+      bws = 0.30,
+      bandwidth.compute = FALSE,
+      bwtype = "fixed",
+      regtype = "lp",
+      degree = 2L,
+      basis = "glp",
+      bernstein.basis = FALSE
+    )
   )
   u.dens.bw <- npudensbw(dat = xdat, bws = 0.30, bandwidth.compute = FALSE, bwtype = "fixed")
   u.dist.bw <- npudistbw(dat = xdat, bws = 0.30, bandwidth.compute = FALSE, bwtype = "fixed")
@@ -42,7 +63,9 @@ test_that("fixed-bwtype plot bootstrap covers regression and unsupervised famili
   }
 
   for (boot.method in c("inid", "fixed", "geom")) {
-    expect_type(run_plot(reg.bw, xdat = xdat, ydat = yreg, boot.method = boot.method), "list")
+    for (reg.bw in reg.bws) {
+      expect_type(run_plot(reg.bw, xdat = xdat, ydat = yreg, boot.method = boot.method), "list")
+    }
     expect_type(run_plot(u.dens.bw, xdat = xdat, boot.method = boot.method), "list")
     expect_type(run_plot(u.dist.bw, xdat = xdat, boot.method = boot.method), "list")
     expect_type(run_plot(c.dens.bw, xdat = xdat, ydat = ydat, view = "fixed", boot.method = boot.method), "list")
