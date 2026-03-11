@@ -24,9 +24,9 @@ test_that("session-route qreg plots preserve quantreg mode and fitted tau", {
       "stopifnot(all(vapply(fit.slice, inherits, logical(1), 'qregression')))",
       "stopifnot(all(vapply(fit.fixed, function(xi) identical(xi$tau, 0.4), logical(1))))",
       "stopifnot(all(vapply(fit.slice, function(xi) identical(xi$tau, 0.4), logical(1))))",
-      "stopifnot(isTRUE(all.equal(fit.fixed[[1L]]$quantile, bw.fixed[[1L]]$quantile, tolerance = 1e-5)))",
+      "stopifnot(max(abs(fit.fixed[[1L]]$quantile - bw.fixed[[1L]]$quantile)) <= 1e-5)",
       "stopifnot(isTRUE(all.equal(fit.fixed[[1L]]$xeval, bw.fixed[[1L]]$xeval)))",
-      "stopifnot(isTRUE(all.equal(fit.slice[[1L]]$quantile, bw.slice[[1L]]$quantile, tolerance = 1e-5)))",
+      "stopifnot(max(abs(fit.slice[[1L]]$quantile - bw.slice[[1L]]$quantile)) <= 1e-5)",
       "stopifnot(isTRUE(all.equal(fit.slice[[1L]]$xeval, bw.slice[[1L]]$xeval)))",
       "cat('QREG_PLOT_TAU_OK\\n')"
     ),
