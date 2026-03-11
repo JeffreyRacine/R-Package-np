@@ -664,22 +664,33 @@ npreghat.rbandwidth <-
       where = "npreghat"
     )
 
+    first.derivative.request <- (sum(s) == 1L) && all(s %in% c(0L, 1L))
+    simple.operator.request <- (sum(s) == 0L) || first.derivative.request
+
     direct.apply <- identical(output, "apply") &&
       !is.null(y) &&
       !isTRUE(leave.one.out) &&
       (ncol(y) == 1L) &&
-      (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L)))) &&
+      simple.operator.request &&
       !(identical(bws$type, "generalized_nn") &&
           identical(reg.spec$regtype.engine, "lp"))
 
-    exact.core.route <- !identical(bws$type, "fixed") &&
-      !isTRUE(leave.one.out) &&
-      (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L)))) &&
+    lc.derivative.exact.route <- identical(regtype, "lc") &&
+      first.derivative.request
+
+    exact.core.route <- !isTRUE(leave.one.out) &&
+      simple.operator.request &&
       (
-        identical(bws$type, "adaptive_nn") ||
-          (identical(bws$regtype, "lp") &&
-             identical(reg.spec$regtype.engine, "lp") &&
-             any(degree > 1L))
+        lc.derivative.exact.route ||
+          (
+            !identical(bws$type, "fixed") &&
+              (
+                identical(bws$type, "adaptive_nn") ||
+                  (identical(bws$regtype, "lp") &&
+                     identical(reg.spec$regtype.engine, "lp") &&
+                     any(degree > 1L))
+              )
+          )
       )
 
     if (direct.apply) {
