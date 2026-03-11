@@ -1,19 +1,17 @@
-align_singleindex_plot_mean <- function(plot_obj, fit) {
-  idx <- as.vector(fit$index)
-  plot_idx <- as.vector(plot_obj$index)
-  ord <- match(plot_idx, idx)
-  if (anyNA(ord))
-    stop("failed to align single-index plot payload to fit index", call. = FALSE)
-  fit$mean[ord]
-}
+expected_singleindex_plot <- function(bw, tx, y, neval = 50L, gradients = FALSE) {
+  eval_grid <- getFromNamespace(".np_plot_singleindex_eval_grid", "np")
+  local_eval <- getFromNamespace(".np_plot_singleindex_local_eval", "np")
 
-align_singleindex_plot_grad <- function(plot_obj, fit) {
-  idx <- as.vector(fit$index)
-  plot_idx <- as.vector(plot_obj$index)
-  ord <- match(plot_idx, idx)
-  if (anyNA(ord))
-    stop("failed to align single-index plot payload to fit index", call. = FALSE)
-  as.matrix(fit$grad)[ord, , drop = FALSE]
+  info <- eval_grid(bws = bw, xdat = tx, neval = neval, where = "test")
+  out <- local_eval(
+    bws = bw,
+    idx.train = info$idx.train,
+    idx.eval = info$idx.eval,
+    ydat = y,
+    gradients = gradients
+  )
+  out$trainiseval <- info$trainiseval
+  out
 }
 
 with_plot_device <- function(expr) {
@@ -28,11 +26,13 @@ run_singleindex_bootstrap_plot <- function(bw,
                                            boot_method,
                                            gradients = FALSE,
                                            plot.behavior = "data",
-                                           boot_num = 9L) {
+                                           boot_num = 9L,
+                                           neval = 50L) {
   suppressWarnings(plot(
     bw,
     xdat = xdat,
     ydat = ydat,
+    neval = neval,
     plot.behavior = plot.behavior,
     perspective = FALSE,
     gradients = gradients,
@@ -134,9 +134,9 @@ test_that("npindex helpers match fitted and gradient outputs across regtype and 
         gradients = TRUE
       )
       helper.ref <- list(index = as.vector(as.matrix(tx) %*% bw$beta))
-      fit.mean.aligned <- align_singleindex_plot_mean(helper.ref, fit.mean)
-      fit.grad.mean.aligned <- align_singleindex_plot_mean(helper.ref, fit.grad)
-      fit.grad.aligned <- align_singleindex_plot_grad(helper.ref, fit.grad)
+      fit.mean.aligned <- fit.mean$mean
+      fit.grad.mean.aligned <- fit.grad$mean
+      fit.grad.aligned <- fit.grad$grad
       idx.train <- data.frame(index = helper.ref$index)
       rbw <- indexhat_rbw(bws = bw, idx.train = idx.train)
       helper.grad <- regression_direct(
@@ -232,11 +232,20 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
       }
 
       bw <- do.call(npindexbw, bw.args)
+      neval <- 17L
+      expected.mean <- expected_singleindex_plot(
+        bw = bw,
+        tx = tx,
+        y = y,
+        neval = neval,
+        gradients = FALSE
+      )
 
       out.data.mean <- suppressWarnings(plot(
         bw,
         xdat = tx,
         ydat = y,
+        neval = neval,
         plot.behavior = "data",
         perspective = FALSE,
         gradients = FALSE
@@ -245,20 +254,21 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         bw,
         xdat = tx,
         ydat = y,
+        neval = neval,
         plot.behavior = "plot-data",
         perspective = FALSE,
         gradients = FALSE
       ))[[1]]
-      fit.mean <- npindex(
-        bws = bw,
-        txdat = tx,
-        tydat = y,
-        gradients = FALSE
-      )
 
       expect_equal(
+        out.data.mean$index,
+        expected.mean$index,
+        tolerance = 1e-12,
+        info = paste(bt, cfg$label, "index")
+      )
+      expect_equal(
         out.data.mean$mean,
-        align_singleindex_plot_mean(out.data.mean, fit.mean),
+        expected.mean$mean,
         tolerance = 1e-10,
         info = paste(bt, cfg$label, "mean")
       )
@@ -268,11 +278,22 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         tolerance = 1e-12,
         info = paste(bt, cfg$label, "mean plot-data")
       )
+      expect_false(out.data.mean$trainiseval)
+      expect_equal(length(out.data.mean$mean), neval)
+
+      expected.grad <- expected_singleindex_plot(
+        bw = bw,
+        tx = tx,
+        y = y,
+        neval = neval,
+        gradients = TRUE
+      )
 
       out.data.grad <- suppressWarnings(plot(
         bw,
         xdat = tx,
         ydat = y,
+        neval = neval,
         plot.behavior = "data",
         perspective = FALSE,
         gradients = TRUE
@@ -281,26 +302,27 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         bw,
         xdat = tx,
         ydat = y,
+        neval = neval,
         plot.behavior = "plot-data",
         perspective = FALSE,
         gradients = TRUE
       ))[[1]]
-      fit.grad <- npindex(
-        bws = bw,
-        txdat = tx,
-        tydat = y,
-        gradients = TRUE
-      )
 
       expect_equal(
+        out.data.grad$index,
+        expected.grad$index,
+        tolerance = 1e-12,
+        info = paste(bt, cfg$label, "grad index")
+      )
+      expect_equal(
         out.data.grad$mean,
-        align_singleindex_plot_mean(out.data.grad, fit.grad),
+        expected.grad$mean,
         tolerance = 1e-10,
         info = paste(bt, cfg$label, "grad mean")
       )
       expect_equal(
         out.data.grad$grad,
-        align_singleindex_plot_grad(out.data.grad, fit.grad),
+        expected.grad$grad,
         tolerance = 1e-10,
         info = paste(bt, cfg$label, "grad")
       )
@@ -310,6 +332,8 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         tolerance = 1e-12,
         info = paste(bt, cfg$label, "grad plot-data")
       )
+      expect_false(out.data.grad$trainiseval)
+      expect_equal(nrow(out.data.grad$grad), neval)
     }
   }
 })
@@ -347,6 +371,7 @@ test_that("sibandwidth bootstrap helper routes work across bwtype, regtype, and 
       }
 
       bw <- do.call(npindexbw, bw.args)
+      neval <- 19L
       for (boot_method in c("wild", "inid", "fixed", "geom")) {
         out.data <- run_singleindex_bootstrap_plot(
           bw = bw,
@@ -354,7 +379,8 @@ test_that("sibandwidth bootstrap helper routes work across bwtype, regtype, and 
           ydat = y,
           boot_method = boot_method,
           gradients = FALSE,
-          plot.behavior = "data"
+          plot.behavior = "data",
+          neval = neval
         )
         out.plot <- with_plot_device(run_singleindex_bootstrap_plot(
           bw = bw,
@@ -362,17 +388,18 @@ test_that("sibandwidth bootstrap helper routes work across bwtype, regtype, and 
           ydat = y,
           boot_method = boot_method,
           gradients = FALSE,
-          plot.behavior = "plot-data"
+          plot.behavior = "plot-data",
+          neval = neval
         ))
 
         expect_equal(
           length(out.data$mean),
-          n,
+          neval,
           info = paste(bt, cfg$label, boot_method, "mean length")
         )
         expect_equal(
           dim(out.data$merr),
-          c(n, 2L),
+          c(neval, 2L),
           info = paste(bt, cfg$label, boot_method, "merr shape")
         )
         expect_true(

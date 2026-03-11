@@ -20,6 +20,7 @@
            lty = NULL,
            lwd = NULL,
            plot.behavior = c("plot","plot-data","data"),
+           neval = 50,
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.num = 1999,
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
@@ -43,9 +44,6 @@
     xdat <- xy$xdat
     ydat <- xy$ydat
 
-
-    if (is.null(plot.errors.bar.num))
-      plot.errors.bar.num = min(length(ydat),25)
 
     if (missing(plot.errors.method) &
         any(!missing(plot.errors.boot.num), !missing(plot.errors.boot.method),
@@ -100,61 +98,53 @@
     make_singleindex_payload <- function(index,
                                          mean,
                                          grad = NA,
-                                         gradients.flag = FALSE) {
+                                         gradients.flag = FALSE,
+                                         trainiseval = FALSE) {
       do.call(singleindex, list(
         bws = bws,
         index = index,
         mean = mean,
         grad = grad,
         ntrain = nrow(xdat),
-        trainiseval = TRUE,
+        trainiseval = trainiseval,
         gradients = gradients.flag
       ))
     }
 
-    neval = maxneval = length(ydat)
-
     xdat <- toFrame(xdat)
+    neval <- .np_plot_validate_neval(neval, where = "plot.sibandwidth")
+    eval.info <- .np_plot_singleindex_eval_grid(
+      bws = bws,
+      xdat = xdat,
+      neval = neval,
+      trim = 0.0,
+      where = "plot.sibandwidth"
+    )
+    maxneval <- nrow(eval.info$idx.eval)
+
+    if (is.null(plot.errors.bar.num))
+      plot.errors.bar.num = min(maxneval, 25L)
+
     if (identical(plot.errors.method, "asymptotic")) {
       tobj <- .np_plot_singleindex_asymptotic_eval(
         bws = bws,
         txdat = xdat,
         tydat = ydat,
-        exdat = xdat,
-        gradients = gradients
+        gradients = gradients,
+        index.eval = eval.info$index.eval
       )
     } else {
-      index.eval <- as.vector(toMatrix(xdat) %*% bws$beta)
-      tobj <- list(index = index.eval)
-      if (gradients) {
-        idx.train <- data.frame(index = index.eval)
-        rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-        fit.grad <- .np_regression_direct(
-          bws = rbw,
-          txdat = idx.train,
-          tydat = ydat,
-          exdat = idx.train,
-          gradients = TRUE,
-          gradient.order = 1L
-        )
-        tobj$mean <- as.vector(fit.grad$mean)
-        grad.index <- as.vector(fit.grad$grad[, 1L])
-        tobj$grad.index <- grad.index
-        tobj$grad <- grad.index %o% as.vector(bws$beta)
-      } else {
-        tobj$mean <- as.vector(npindexhat(
-          bws = bws,
-          txdat = xdat,
-          exdat = xdat,
-          y = ydat,
-          output = "apply",
-          s = 0L
-        ))
-      }
+      tobj <- .np_plot_singleindex_local_eval(
+        bws = bws,
+        idx.train = eval.info$idx.train,
+        idx.eval = eval.info$idx.eval,
+        ydat = ydat,
+        gradients = gradients
+      )
     }
     
     temp.err = matrix(data = NA, nrow = maxneval, ncol = 3)
-    temp.mean = replicate(maxneval, NA)
+    temp.mean = rep(NA_real_, maxneval)
     temp.all.err <- NULL
     
 
@@ -181,6 +171,7 @@
                   plot.errors.center = plot.errors.center,
                   plot.errors.type = plot.errors.type,
                   plot.errors.alpha = plot.errors.alpha,
+                  idx.eval = eval.info$idx.eval,
                   bws = bws)
         temp.err[,] <- temp.boot.raw[["boot.err"]]
         temp.all.err <- temp.boot.raw[["boot.all.err"]]
@@ -285,7 +276,8 @@
         plot.out[[1]] <- make_singleindex_payload(
           index = tobj$index,
           mean = tobj$mean,
-          gradients.flag = FALSE
+          gradients.flag = FALSE,
+          trainiseval = eval.info$trainiseval
         )
         if (plot.errors) {
           plot.out[[1]]$merr <- cbind(-temp.err[,1], temp.err[,2])
@@ -324,12 +316,13 @@
           plot.out[[1]] <- make_singleindex_payload(
             index = tobj$index[i.sort],
             mean = tobj$mean[i.sort],
-            grad = matrix(data = 0, nrow = nrow(xdat), ncol = ncol(xdat)),
-            gradients.flag = TRUE
+            grad = matrix(data = 0, nrow = maxneval, ncol = ncol(xdat)),
+            gradients.flag = TRUE,
+            trainiseval = eval.info$trainiseval
           )
-          plot.out[[1]]$glerr = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
-          plot.out[[1]]$gherr = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
-          plot.out[[1]]$gbias = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
+          plot.out[[1]]$glerr = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
+          plot.out[[1]]$gherr = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
+          plot.out[[1]]$gbias = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
           
         }
 
