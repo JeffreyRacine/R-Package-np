@@ -929,6 +929,71 @@ test_that("npscoefhat apply mode matches green core fits across bwtypes", {
   }
 })
 
+test_that("npscoefhat selected adaptive-nn owner preserves integer support and helper parity", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+  round_half_to_even <- getFromNamespace(".np_round_half_to_even", "npRmpi")
+
+  set.seed(20260308)
+  n <- 50L
+  x <- runif(n)
+  z <- runif(n)
+  y <- (0.4 + x) * sin(2 * pi * z) + rnorm(n, sd = 0.04)
+
+  tx <- data.frame(x = x)
+  tz <- data.frame(z = z)
+  ex <- data.frame(x = seq(0.1, 0.9, length.out = 12L))
+  ez <- data.frame(z = seq(0.1, 0.9, length.out = 12L))
+
+  tol <- sqrt(.Machine$double.eps)
+  upper <- n - 1L
+
+  for (regtype in c("lc", "ll", "lp")) {
+    bw.args <- list(
+      xdat = tx,
+      zdat = tz,
+      ydat = y,
+      regtype = regtype,
+      bwtype = "adaptive_nn",
+      nmulti = 1L
+    )
+    if (identical(regtype, "lp")) {
+      bw.args$degree <- 1L
+      bw.args$basis <- "glp"
+      bw.args$bernstein.basis <- FALSE
+    }
+
+    bw <- do.call(npscoefbw, bw.args)
+    expect_true(all(abs(bw$bw - round_half_to_even(bw$bw)) <= tol), info = regtype)
+    expect_true(all(bw$bw >= 1 & bw$bw <= upper), info = regtype)
+
+    hat.apply <- npscoefhat(
+      bws = bw,
+      txdat = tx,
+      tzdat = tz,
+      exdat = ex,
+      ezdat = ez,
+      y = y,
+      output = "apply",
+      iterate = FALSE
+    )
+    hat.matrix <- npscoefhat(
+      bws = bw,
+      txdat = tx,
+      tzdat = tz,
+      exdat = ex,
+      ezdat = ez,
+      output = "matrix",
+      iterate = FALSE
+    )
+
+    expect_equal(as.vector(hat.apply), as.vector(hat.matrix %*% y), tolerance = 1e-10, info = regtype)
+  }
+})
+
 
 test_that("semihat validates class and scalar controls", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
