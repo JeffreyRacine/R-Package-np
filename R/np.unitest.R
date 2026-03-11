@@ -28,10 +28,7 @@ npunitest <- function(data.x = NULL,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
-
-
-  console <- newLineConsole()
-  console <- printPush("Computing bandwidths...", console = console)
+  .np_progress_note("Computing bandwidths")
 
   ## If of type ts convert to numeric to handle time series data
 
@@ -131,13 +128,9 @@ npunitest <- function(data.x = NULL,
   
   ## Compute the test statistic
 
-  console <- printClear(console)
-  console <- printPush("Computing test statistic...", console = console)
+  .np_progress_note("Computing test statistic")
 
   test.stat <- Srho.univar(data.x,data.y,bw.x,bw.y,method=method)
-
-  console <- printClear(console)
-  console <- printPop(console)  
 
   if(bootstrap) {
     
@@ -166,12 +159,10 @@ npunitest <- function(data.x = NULL,
     }
     
     resampled.stat <- numeric(boot.num)
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
 
     for (b in seq_len(boot.num)) {
-      
-      console <- printClear(console)
-      console <- printPush(paste(sep="", "Bootstrap replication ",
-                                  b, "/", boot.num, "..."), console = console)
+      progress <- .np_progress_step(progress, done = b)
 
       ## Need to think this through... is the null one density? If so
       ## resample from that density for both x and y?
@@ -182,15 +173,14 @@ npunitest <- function(data.x = NULL,
       data.null.y <- data.null[sample.int(length(data.null), size = length(data.y), replace = TRUE)]
 
       resampled.stat[b] <- Srho.univar(data.null.x,data.null.y,bw.x,bw.y,method=method)
-      
+
     }
+
+    progress <- .np_progress_end(progress)
     
     p.value <- mean(resampled.stat > test.stat)
     
   }
-  
-  console <- printClear(console)
-  console <- printPop(console)  
 
   ## Restore seed
 
