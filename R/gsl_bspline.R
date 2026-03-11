@@ -21,7 +21,7 @@ gsl.bs.default <- function(x,
 #  if(!is.null(knots)) nbreak <- length(knots)
   if(!is.null(knots)&&length(knots)!=nbreak) {
     nbreak <- length(knots)
-    warning(paste(" nbreak and knots vector do not agree: resetting nbreak to", nbreak))
+    .np_warning(paste(" nbreak and knots vector do not agree: resetting nbreak to", nbreak))
   }
 
   ## For evaluation (newx) must use min/max for x unless otherwise
@@ -56,7 +56,7 @@ gsl.bs.default <- function(x,
 	outside <- ol | or 
 
 	if(any(outside)){
-			warning("some 'x' values beyond boundary knots may cause ill-conditioned bases")
+			.np_warning("some 'x' values beyond boundary knots may cause ill-conditioned bases")
 			ord <- degree + 1
 			derivs<- deriv:degree
 			if(ord == deriv) 
@@ -184,7 +184,7 @@ predict.gsl.bs <- function(object,
 				newx <- as.numeric(newx)
 
 #				if(min(newx)<x.min || max(newx)>x.max) {
-#						warning(" evaluation data lies beyond spline support: resetting those values to min/max")
+#						.np_warning(" evaluation data lies beyond spline support: resetting those values to min/max")
 #						newx[newx < x.min] <- x.min
 #						newx[newx > x.max] <- x.max
 #						newx.ind <- sort(c(which(newx < x.min),which(newx > x.max)))

@@ -90,7 +90,7 @@ vcov.singleindex <- function(object, ...) {
   if(!is.null(tc)) {
     return(tc)
   } else {
-    warning("variance-covariance matrix does not exist: verify gradients=TRUE")
+    .np_warning("variance-covariance matrix does not exist: verify gradients=TRUE")
   }
 }
 fitted.singleindex <- function(object, ...){

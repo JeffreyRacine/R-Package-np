@@ -112,7 +112,7 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
       gout.masked[, keep.idx] <- gout[, keep.idx, drop = FALSE]
     }
     if (any(gorder > x$bws$degree))
-      warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
+      .np_warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
   }
   gout.masked
 }

@@ -322,7 +322,7 @@ npCheckRegressionDesignCondition <- function(reg.code,
   }
 
   if (kB > kappa.warn) {
-    warning(sprintf("%s: regression design matrix is ill-conditioned (kappa(B)=%.3e > %.1e). Estimation may rely heavily on ridging; consider lower degree or less collinear predictors.",
+    .np_warning(sprintf("%s: regression design matrix is ill-conditioned (kappa(B)=%.3e > %.1e). Estimation may rely heavily on ridging; consider lower degree or less collinear predictors.",
                     where, kB, kappa.warn),
             call. = FALSE, immediate. = TRUE)
   }
@@ -1061,7 +1061,7 @@ adjustLevels <- function(data, dati, allowNewCells = FALSE){
       if (length(newCats) >= 1){
         if (dati$iuno[i]){
           if (length(newCats) > 1)
-            warning(paste("more than one 'new' category is redundant when estimating on unordered data.\n",
+            .np_warning(paste("more than one 'new' category is redundant when estimating on unordered data.\n",
                           "training data categories: ", paste(dati$all.lev[[i]], collapse=" "),"\n",
                           "redundant estimation data categories: ", paste(newCats, collapse=" "), "\n", sep=""))
           data[,i] <- factor(data[,i], levels = c(dati$all.lev[[i]], newCats))
@@ -1649,7 +1649,7 @@ EssDee <- function(y){
   IQR.vec <- apply(as.matrix(y),2,IQR)/QFAC
   mad.vec <- apply(as.matrix(y),2,mad)
   a <- apply(cbind(sd.vec,IQR.vec,mad.vec),1, function(x) max(x))
-  if(any(a<=0)) warning(paste("variable ",which(a<=0)," appears to be constant",sep=""))
+  if(any(a<=0)) .np_warning(paste("variable ",which(a<=0)," appears to be constant",sep=""))
   a <- apply(cbind(sd.vec,IQR.vec,mad.vec),1, function(x) min(x[x>0]))  
   return(a)
 }

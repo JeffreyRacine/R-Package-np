@@ -7,6 +7,19 @@ test_that("progress core avoids legacy emitters", {
   expect_false(grepl("\\bcat\\(", src))
   expect_false(grepl("\\bprint\\(", src))
   expect_true(grepl("\\.np_progress_select_bandwidth <- function\\(", src))
+  expect_true(grepl("\\.np_warning <- function\\(", src))
+})
+
+test_that("R layer routes warnings through unified helper", {
+  r_dir <- testthat::test_path("..", "..", "R")
+  skip_if_not(dir.exists(r_dir), "source R files unavailable in installed test context")
+  files <- setdiff(list.files(r_dir, pattern = "\\.[Rr]$", full.names = TRUE), file.path(r_dir, "progress.R"))
+
+  for (src_path in files) {
+    src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+    expect_false(grepl("\\bwarning\\(", src), info = basename(src_path))
+    expect_false(grepl("\\bmessage\\(", src), info = basename(src_path))
+  }
 })
 
 test_that("core estimator wrappers emit top-level bandwidth-selection notes", {

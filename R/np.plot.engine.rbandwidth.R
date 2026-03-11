@@ -146,7 +146,7 @@
       if (length(go))
         plot.gradient.order.label[which(bws$icon)] <- go
       if (any(go > bws$degree))
-        warning("some requested glp derivatives exceed polynomial degree; plotting NA for those components")
+        .np_warning("some requested glp derivatives exceed polynomial degree; plotting NA for those components")
     }
 
     if ((bws$ncon + bws$nord == 2) && (bws$nuno == 0) && perspective && !gradients &&

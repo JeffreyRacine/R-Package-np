@@ -111,7 +111,7 @@ npsymtest <- function(data = NULL,
         ## Inf, and NaN.
         summand <- f.data.rotate/f.data
         if(!all(is.finite(summand))) {
-          warning(" non-finite value in summation-based statistic: integration recommended")
+          .np_warning(" non-finite value in summation-based statistic: integration recommended")
           summand <- summand[is.finite(summand)]
         }
         return(0.5*mean((1-sqrt(summand))**2))
@@ -123,7 +123,7 @@ npsymtest <- function(data = NULL,
           return(0.5*(sqrt(f.data)-sqrt(f.data.rotate))**2)
         }
         return.integrate <- integrate(h,-Inf,Inf,subdivisions=1e+05,stop.on.error=FALSE,data=data,data.rotate=data.rotate)
-        if(return.integrate$message != "OK") warning(return.integrate$message)
+        if(return.integrate$message != "OK") .np_warning(return.integrate$message)
         return(return.integrate$value)
       }
     } else {

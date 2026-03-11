@@ -18,7 +18,7 @@ npunitest <- function(data.x = NULL,
   if(!identical(class(data.x), class(data.y))) stop(" data vectors must be of same data type")
   if((ncol(data.frame(data.x)) != 1) ||( ncol(data.frame(data.y)) != 1)) stop(" data vectors must have one dimension only")
   if(boot.num < 9) stop(" number of bootstrap replications must be >= 9")
-  if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x))) warning("non-overlapping empirical distributions (see `Details' in ?npunidist)")
+  if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x))) .np_warning("non-overlapping empirical distributions (see `Details' in ?npunidist)")
 
   method <- match.arg(method)
 
@@ -95,11 +95,11 @@ npunitest <- function(data.x = NULL,
         ## case, remove offending points, and warn. This traps -Inf,
         ## Inf, and NaN.
         if(!all(is.finite(summand))) {
-          warning(" non-finite value in summation-based statistic: integration recommended")
+          .np_warning(" non-finite value in summation-based statistic: integration recommended")
           summand <- summand[is.finite(summand)]
         }
         Srho <- 0.5*mean((1-sqrt(summand))**2)
-        if(Srho < 0 || Srho > 1) warning(" numerical instability in summation-based statistic: integration recommended")
+        if(Srho < 0 || Srho > 1) .np_warning(" numerical instability in summation-based statistic: integration recommended")
         return(Srho)
       } else {
         ## Integration
@@ -109,7 +109,7 @@ npunitest <- function(data.x = NULL,
           return(0.5*(sqrt(f.data.x)-sqrt(f.data.y))**2)
         }
         return.integrate <- integrate(h,-Inf,Inf,subdivisions=1e+05,stop.on.error=FALSE,data.x=data.x,data.y=data.y)      
-        if(return.integrate$message != "OK") warning(return.integrate$message)
+        if(return.integrate$message != "OK") .np_warning(return.integrate$message)
         return(return.integrate$value)
       }
     } else {

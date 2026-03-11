@@ -268,7 +268,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
     }
 
     if(iterate && !is.null(bws$bw.fitted) && !miss.ex){
-      warning("iteration is not supported for out of sample evaluations; using overall bandwidths")
+      .np_warning("iteration is not supported for out of sample evaluations; using overall bandwidths")
       iterate = FALSE
     }
 
@@ -554,7 +554,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
     ridge <- solver$ridge
 
     if (iterate && !is.null(bws$bw.fitted) && miss.ex && !identical(reg.engine, "lc"))
-      warning("iterate=TRUE currently supports regtype='lc' for npscoef; using iterate=FALSE")
+      .np_warning("iterate=TRUE currently supports regtype='lc' for npscoef; using iterate=FALSE")
     do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex && identical(reg.engine, "lc"))
     if (do.iterate){
       resid <- tydat - sapply(seq_len(enrow), function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })
@@ -588,7 +588,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
         max.err <- max(abs(resid.old - resid)/aydat)
       }
       if (max.err > tol)
-        warning(paste("backfit iterations did not converge. max err= ", max.err,", tol= ", tol,", maxiter= ", maxiter, sep=''))
+        .np_warning(paste("backfit iterations did not converge. max err= ", max.err,", tol= ", tol,", maxiter= ", maxiter, sep=''))
       mean <- tydat - resid
     } else {
       mean <- sapply(seq_len(enrow), function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })

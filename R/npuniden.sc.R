@@ -166,7 +166,7 @@ npuniden.sc <- function(X=NULL,
     attempts <- 1
     while((is.null(output.QP) || any(is.na(output.QP$solution))) && attempts <= attempts.max) {
         if(attempts==attempts.max && !function.distance) {
-            warning("solve.QP was unable to find a solution with function.distance=FALSE, restarting with function.distance=TRUE", immediate. = TRUE)
+            .np_warning("solve.QP was unable to find a solution with function.distance=FALSE, restarting with function.distance=TRUE", immediate. = TRUE)
             attempts <- 1
             function.distance <- TRUE
         }
@@ -212,7 +212,7 @@ npuniden.sc <- function(X=NULL,
     ## but return the unconstrained vector
 
     if(is.null(output.QP) || any(is.na(output.QP$solution))) {
-        warning("solve.QP was unable to find a solution, unconstrained estimate returned", immediate. = TRUE)
+        .np_warning("solve.QP was unable to find a solution, unconstrained estimate returned", immediate. = TRUE)
         output.QP$solution <- rep(0,n.train)
         solve.QP.flag <- FALSE
     }

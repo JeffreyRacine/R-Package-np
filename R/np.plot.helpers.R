@@ -3344,7 +3344,7 @@ compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type, warn.cov
     } else {
       sprintf("m=n.eval=%d (Bonferroni-conservative tails)", neval)
     }
-    warning(sprintf(
+    .np_warning(sprintf(
       paste0("plot.errors.boot.num=%d is too small for plot.errors.type='%s' ",
              "(alpha=%g). Minimum recommended is %d using ",
              "B >= ceiling(2*m/alpha - 1), with %s. ",
@@ -3558,18 +3558,18 @@ compute.default.error.range <- function(center, err) {
   common.scale <- common.scale | (!is.null(ylim))
 
   if (plot.errors.method == "none" && plot.errors.type == "all") {
-    warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+    .np_warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
     plot.errors.method <- "bootstrap"
   }
 
   if (allow_asymptotic_quantile && plot.errors.method == "asymptotic") {
     if (plot.errors.type == "simultaneous")
-      warning("asymptotic simultaneous confidence bands are unavailable here; returning NA interval limits")
+      .np_warning("asymptotic simultaneous confidence bands are unavailable here; returning NA interval limits")
     if (plot.errors.type == "all")
-      warning("asymptotic simultaneous confidence bands are unavailable here; 'all' returns pointwise/bonferroni and NA simultaneous")
+      .np_warning("asymptotic simultaneous confidence bands are unavailable here; 'all' returns pointwise/bonferroni and NA simultaneous")
 
     if (plot.errors.center == "bias-corrected") {
-      warning("no bias corrections can be calculated with asymptotics, centering on estimate")
+      .np_warning("no bias corrections can be calculated with asymptotics, centering on estimate")
       plot.errors.center <- "estimate"
     }
   }

@@ -84,7 +84,7 @@ sibandwidth <-
   if(missing(ckerorder))
     ckerorder = 2
   else if (ckertype == "uniform")
-    warning("ignoring kernel order specified with uniform kernel type")
+    .np_warning("ignoring kernel order specified with uniform kernel type")
   else {
     kord = c(2,4,6,8) 
     if (!any(kord == ckerorder))
@@ -92,7 +92,7 @@ sibandwidth <-
   }
 
   if (ckertype == "truncated gaussian" && ckerorder != 2)
-    warning("using truncated gaussian of order 2, higher orders not yet implemented")
+    .np_warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
   cbounds <- npKernelBoundsResolve(
