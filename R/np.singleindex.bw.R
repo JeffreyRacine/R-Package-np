@@ -640,7 +640,7 @@ npindexbw.sibandwidth <-
           fval.value <- numeric(nmulti)
           num.feval.overall <- 0
 
-          console <- newLineConsole()
+          progress <- .np_progress_begin("Multistart optimization", total = nmulti)
 
           if(bws$method == "ichimura"){
             optim.fn <- if(only.optimize.beta) ichimura.nobw else ichimura
@@ -654,8 +654,11 @@ npindexbw.sibandwidth <-
 
           for (i in seq_len(nmulti)) {
 
-            console <- printPush(paste(sep="", "Multistart ", i, " of ", nmulti, "..."), console)
-            ##cv.console <- newLineConsole(console)
+            progress <- .np_progress_step(
+              progress,
+              done = i,
+              detail = sprintf("multistart %d", i)
+            )
 
             ## We use the nlm command to minimize the objective function using
             ## starting values. Note that since we normalize beta_1=1 here beta
@@ -748,10 +751,8 @@ npindexbw.sibandwidth <-
               best <- i
             }
 
-            if(i != nmulti)
-              console <- printPop(console)
           }
-          console <- printClear(console)
+          .np_progress_end(progress, detail = sprintf("multistart %d", nmulti))
 
           bws$beta <- c(1.0, param[beta.idx])
           bws$bw <- .npindex_finalize_bandwidth(h = param[p], bwtype = bws$type, nobs = nobs)
