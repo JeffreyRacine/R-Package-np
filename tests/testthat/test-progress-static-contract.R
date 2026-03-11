@@ -6,6 +6,33 @@ test_that("progress core avoids legacy emitters", {
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
   expect_false(grepl("\\bcat\\(", src))
   expect_false(grepl("\\bprint\\(", src))
+  expect_true(grepl("\\.np_progress_select_bandwidth <- function\\(", src))
+})
+
+test_that("core estimator wrappers emit top-level bandwidth-selection notes", {
+  cases <- list(
+    list(file = "np.regression.R", label = "Selecting regression bandwidth"),
+    list(file = "np.density.R", label = "Selecting density bandwidth"),
+    list(file = "np.distribution.R", label = "Selecting distribution bandwidth"),
+    list(file = "np.condensity.R", label = "Selecting conditional density bandwidth"),
+    list(file = "np.condistribution.R", label = "Selecting conditional distribution bandwidth"),
+    list(file = "np.plregression.R", label = "Selecting partially linear regression bandwidth"),
+    list(file = "np.singleindex.R", label = "Selecting single-index bandwidth"),
+    list(file = "np.smoothcoef.R", label = "Selecting smooth coefficient bandwidth"),
+    list(file = "np.conmode.R", label = "Selecting conditional density bandwidth"),
+    list(file = "np.qregression.R", label = "Selecting conditional distribution bandwidth")
+  )
+
+  for (case in cases) {
+    src_path <- testthat::test_path("..", "..", "R", case$file)
+    skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
+    src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+    expect_true(
+      grepl(sprintf("\\.np_progress_select_bandwidth\\(\\s*\"%s\"", case$label), src),
+      info = case$file
+    )
+  }
 })
 
 test_that("npregivderiv no longer uses legacy console helpers", {
@@ -163,4 +190,21 @@ test_that("plot helpers use append-only progress core", {
   expect_true(grepl("\\.np_progress_step\\(", src))
   expect_true(grepl("\\.np_progress_end\\(", src))
   expect_true(grepl("\\.np_progress_note\\(", src))
+})
+
+test_that("compiled multistart spinner no longer emits legacy redraw output", {
+  src_path <- testthat::test_path("..", "..", "src", "np.c")
+  skip_if_not(file.exists(src_path), "source C files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_false(grepl("Rprintf\\(\"\\\\rMultistart", src))
+  expect_false(grepl("Rprintf\\(\"\\\\r +\\\\r\"", src))
+})
+
+test_that("compiled working-status redraw is removed", {
+  src_path <- testthat::test_path("..", "..", "src", "kernele.c")
+  skip_if_not(file.exists(src_path), "source C files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_false(grepl("REprintf\\(\"\\\\rWorking\\.\\.\\.", src))
 })

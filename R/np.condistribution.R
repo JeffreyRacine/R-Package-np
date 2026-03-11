@@ -398,6 +398,7 @@ npcdist.default <- function(bws, txdat, tydat, ...){
   no.bws <- missing(bws)
   no.txdat <- missing(txdat)
   no.tydat <- missing(tydat)
+  has.explicit.bws <- (!no.bws) && isa(bws, "condbandwidth")
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
@@ -411,7 +412,7 @@ npcdist.default <- function(bws, txdat, tydat, ...){
   
   sc.bw[[1]] <- quote(npcdistbw)
 
-  if(bws.named){
+  if (has.explicit.bws) {
     sc.bw$bandwidth.compute <- FALSE
   }
 
@@ -424,7 +425,14 @@ npcdist.default <- function(bws, txdat, tydat, ...){
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
-  tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+  tbw <- if (!has.explicit.bws) {
+    .np_progress_select_bandwidth(
+      "Selecting conditional distribution bandwidth",
+      .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+    )
+  } else {
+    .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+  }
 
   call.args <- list(bws = tbw)
   if (no.bws) {

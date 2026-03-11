@@ -155,6 +155,11 @@
   invisible(NULL)
 }
 
+.np_progress_select_bandwidth <- function(label, expr) {
+  .np_progress_note(label)
+  .np_progress_with_legacy_suppressed(expr)
+}
+
 .np_progress_with_legacy_suppressed <- function(expr) {
   old_np_messages <- getOption("np.messages")
   on.exit(options(np.messages = old_np_messages), add = TRUE)
