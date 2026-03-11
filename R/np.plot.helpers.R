@@ -32,8 +32,9 @@
 }
 
 .np_plot_progress_enabled <- function() {
-  isTRUE(getOption("np.messages")) &&
-    isTRUE(getOption("np.plot.progress", TRUE))
+  isTRUE(getOption("np.messages", TRUE)) &&
+    isTRUE(getOption("np.plot.progress", TRUE)) &&
+    isTRUE(.np_progress_is_interactive())
 }
 
 .np_plot_progress_interval_sec <- function() {
@@ -48,14 +49,11 @@
   if (is.na(total) || total < 1L || !.np_plot_progress_enabled())
     return(NULL)
 
-  list(
-    total = total,
-    label = as.character(label)[1L],
-    started = unname(as.double(proc.time()[["elapsed"]])),
-    last = -Inf,
-    interval = .np_plot_progress_interval_sec(),
-    console = newLineConsole()
-  )
+  state <- .np_progress_begin(label = as.character(label)[1L], total = total, domain = "plot")
+  state$enabled <- isTRUE(.np_plot_progress_enabled())
+  state$throttle_sec <- .np_plot_progress_interval_sec()
+  state$last_emit <- state$started - state$throttle_sec
+  state
 }
 
 .np_plot_progress_tick <- function(state, done, force = FALSE) {
@@ -67,36 +65,21 @@
     done <- 0L
   done <- max(0L, min(state$total, done))
 
-  now <- unname(as.double(proc.time()[["elapsed"]]))
-  if (!isTRUE(force) &&
-      done < state$total &&
-      (now - state$last) < state$interval) {
-    return(state)
-  }
+  if (isTRUE(force))
+    state$last_emit <- -Inf
 
-  elapsed <- max(0, now - state$started)
-  rate <- if (elapsed > 0) done / elapsed else 0
-  remain <- max(0L, state$total - done)
-  eta <- if (rate > 0) remain / rate else Inf
-  eta.txt <- if (is.finite(eta)) sprintf("%.1fs", eta) else "NA"
-  pct <- 100 * done / state$total
-
-  msg <- sprintf(
-    "%s %d/%d (%.1f%%, elapsed %.1fs, eta %s)",
-    state$label, done, state$total, pct, elapsed, eta.txt
-  )
-
-  state$console <- printClear(state$console)
-  state$console <- printPush(msg = msg, console = state$console)
-  state$last <- now
-  state
+  .np_progress_step(state = state, done = done)
 }
 
 .np_plot_progress_end <- function(state) {
   if (is.null(state))
     return(invisible(NULL))
-  state <- .np_plot_progress_tick(state = state, done = state$total, force = TRUE)
-  state$console <- printClear(state$console)
+
+  if (isTRUE(state$known_total) && identical(state$last_done, state$total))
+    return(invisible(NULL))
+
+  state$last_emit <- -Inf
+  .np_progress_end(state)
   invisible(NULL)
 }
 
@@ -104,15 +87,11 @@
   if (!.np_plot_progress_enabled())
     return(NULL)
 
-  console <- newLineConsole()
-  console <- printPush(msg = as.character(label)[1L], console = console)
-  console
+  .np_progress_note(as.character(label)[1L])
+  TRUE
 }
 
 .np_plot_activity_end <- function(console) {
-  if (is.null(console))
-    return(invisible(NULL))
-  console <- printClear(console)
   invisible(NULL)
 }
 

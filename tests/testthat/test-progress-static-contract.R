@@ -140,3 +140,15 @@ test_that("npindexbw no longer uses legacy console helpers", {
   expect_true(grepl("\\.np_progress_begin\\(\"Multistart optimization\"", src))
   expect_true(grepl("detail = sprintf\\(\"multistart %d\", i\\)", src))
 })
+
+test_that("plot helpers use append-only progress core", {
+  src_path <- testthat::test_path("..", "..", "R", "np.plot.helpers.R")
+  skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
+  expect_true(grepl("\\.np_progress_begin\\(", src))
+  expect_true(grepl("\\.np_progress_step\\(", src))
+  expect_true(grepl("\\.np_progress_end\\(", src))
+  expect_true(grepl("\\.np_progress_note\\(", src))
+})
