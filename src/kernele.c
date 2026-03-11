@@ -17583,11 +17583,6 @@ double  initd_dir)
 			fret = fret_best;
 			quantile[1] = quantile_multistart[1];
 
-      if(int_MINIMIZE_IO != IO_MIN_TRUE){
-        REprintf("\r                                                                             ");
-        REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-      }
-
 		}
 
 		quan[i] = quantile[1];
@@ -17666,10 +17661,6 @@ double  initd_dir)
 
 					fret = fret_best;
 					quantile[1] = quantile_multistart[1];
-          if(int_MINIMIZE_IO != IO_MIN_TRUE){
-            REprintf("\r                                                                             ");
-            REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-          }
 				}
 
 				quantile_l = quantile[1];
@@ -17739,11 +17730,6 @@ double  initd_dir)
 
 					fret = fret_best;
 					quantile[1] = quantile_multistart[1];
-          if(int_MINIMIZE_IO != IO_MIN_TRUE){
-            REprintf("\r                                                                             ");
-            REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-          }
-
 				}
 
 				quantile_u = quantile[1];
@@ -17861,12 +17847,6 @@ double  initd_dir)
 			fret = fret_best;
 			quantile[1] = quantile_multistart[1];
 
-			if((my_rank == 0) && (int_MINIMIZE_IO != IO_MIN_TRUE))
-			{
-				REprintf("\r                                                                             ");
-				REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, stride, iNum_Ms, zero);
-			}
-
 		}
 
 		quan[i-my_rank*stride] = quantile[1];
@@ -17944,14 +17924,6 @@ double  initd_dir)
 					fret = fret_best;
 					quantile[1] = quantile_multistart[1];
 
-          if((my_rank == 0) && (int_MINIMIZE_IO != IO_MIN_TRUE))
-					{
-
-						REprintf("\r                                                                             ");
-						REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-
-					}
-
 				}
 
 				quantile_l = quantile[1];
@@ -18021,13 +17993,6 @@ double  initd_dir)
 
 					fret = fret_best;
 					quantile[1] = quantile_multistart[1];
-
-          if((my_rank == 0) && (int_MINIMIZE_IO != IO_MIN_TRUE))
-					{
-						REprintf("\r                                                                             ");
-						REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-
-					}
 
 				}
 

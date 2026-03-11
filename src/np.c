@@ -686,12 +686,7 @@ void np_set_tgauss2(double * coefficients){
 }
 
 void spinner(int num) {
-  if(int_MINIMIZE_IO == IO_MIN_FALSE){
-    const char spinney[] = { '|', '/', '-', '\\' };
-    const int display_total = (imstot > 0) ? imstot : 1;
-    Rprintf("\rMultistart %d of %d %c", imsnum+1, display_total, spinney[num%4]);
-    R_FlushConsole();
-  }
+  (void) num;
 }
 
 void np_set_seed(int * num){
@@ -3462,9 +3457,6 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     int_TREE_X = NP_TREE_FALSE;
   }
 
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
-
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
@@ -4100,9 +4092,6 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
-
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
@@ -5051,9 +5040,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_glp_basis_extern = 1;
   np_glp_cv_clear_extern();
 
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
-
   return ;
 }
 
@@ -5978,9 +5964,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
   np_glp_cv_clear_extern();
-
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
 
   return ;
 }
@@ -7619,9 +7602,6 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     int_TREE_X = NP_TREE_FALSE;
   }
 
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
-
   np_glp_cv_clear_extern();
   np_reg_cv_core_clear_extern();
 
@@ -8978,7 +8958,5 @@ void np_quantile_conditional(double * tc_con,
   safe_free(eq);
   safe_free(eqerr);
 
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
   return ;
 }

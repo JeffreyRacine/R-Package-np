@@ -16,7 +16,7 @@ test_that("bandwidth summaries map base-run multistart labels to one", {
   )
 })
 
-test_that("nmulti zero progress displays one actual launch", {
+test_that("nmulti zero progress avoids legacy redraw output", {
   set.seed(1)
   x <- runif(20)
   y <- x + rnorm(20, sd = 0.1)
@@ -25,6 +25,6 @@ test_that("nmulti zero progress displays one actual launch", {
     npcdensbw(y ~ x, regtype = "ll", bwtype = "adaptive_nn", nmulti = 0, itmax = 1)
   )
 
-  expect_true(any(grepl("Multistart 1 of 1", out, fixed = TRUE)))
+  expect_false(any(grepl("Multistart 1 of 1", out, fixed = TRUE)))
   expect_false(any(grepl("Multistart 1 of 0", out, fixed = TRUE)))
 })
