@@ -1,0 +1,201 @@
+with_nprmpi_bindings <- function(bindings, code) {
+  code <- substitute(code)
+  ns <- asNamespace("npRmpi")
+  old <- lapply(names(bindings), function(name) get(name, envir = ns, inherits = FALSE))
+  names(old) <- names(bindings)
+
+  for (name in names(bindings)) {
+    was_locked <- bindingIsLocked(name, ns)
+    if (was_locked) {
+      unlockBinding(name, ns)
+    }
+    assign(name, bindings[[name]], envir = ns)
+    if (was_locked) {
+      lockBinding(name, ns)
+    }
+  }
+
+  on.exit({
+    for (name in names(old)) {
+      was_locked <- bindingIsLocked(name, ns)
+      if (was_locked) {
+        unlockBinding(name, ns)
+      }
+      assign(name, old[[name]], envir = ns)
+      if (was_locked) {
+        lockBinding(name, ns)
+      }
+    }
+  }, add = TRUE)
+
+  eval(code, envir = parent.frame())
+}
+
+capture_messages_only <- function(expr) {
+  messages <- character()
+  withCallingHandlers(
+    expr,
+    message = function(m) {
+      messages <<- c(messages, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
+  )
+  messages
+}
+
+normalize_messages <- function(x) {
+  sub("\n$", "", x)
+}
+
+progress_time_counter <- function(start = 0, by = 0.6) {
+  current <- start
+  function() {
+    current <<- current + by
+    current
+  }
+}
+
+test_that("plot helper progress emits append-only bounded messages on master", {
+  begin <- getFromNamespace(".np_plot_progress_begin", "npRmpi")
+  tick <- getFromNamespace(".np_plot_progress_tick", "npRmpi")
+  finish <- getFromNamespace(".np_plot_progress_end", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  messages <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_master = function() TRUE,
+      .np_progress_now = progress_time_counter()
+    ),
+    capture_messages_only({
+      state <- begin(total = 9, label = "Plot bootstrap wild")
+      state <- tick(state, done = 1)
+      state <- tick(state, done = 9)
+      finish(state)
+    })
+  )
+
+  messages <- normalize_messages(messages)
+
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 1/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_equal(sum(grepl("^\\[npRmpi\\] Plot bootstrap wild 9/9 ", messages)), 1L)
+  expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
+})
+
+test_that("plot helper activity emits a single append-only note on master", {
+  begin <- getFromNamespace(".np_plot_activity_begin", "npRmpi")
+  finish <- getFromNamespace(".np_plot_activity_end", "npRmpi")
+
+  old_opts <- options(np.messages = TRUE, np.plot.progress = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  messages <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_master = function() TRUE
+    ),
+    capture_messages_only({
+      activity <- begin("Constructing bootstrap bands...")
+      finish(activity)
+    })
+  )
+
+  messages <- normalize_messages(messages)
+  expect_identical(messages, "[npRmpi] Constructing bootstrap bands...")
+})
+
+test_that("plot helper progress is silent off master", {
+  begin <- getFromNamespace(".np_plot_progress_begin", "npRmpi")
+  tick <- getFromNamespace(".np_plot_progress_tick", "npRmpi")
+  finish <- getFromNamespace(".np_plot_progress_end", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.noninteractive = TRUE
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  messages <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() FALSE,
+      .np_progress_is_master = function() FALSE,
+      .np_progress_now = progress_time_counter()
+    ),
+    capture_messages_only({
+      state <- begin(total = 5, label = "Plot bootstrap wild")
+      state <- tick(state, done = 5)
+      finish(state)
+    })
+  )
+
+  expect_length(messages, 0)
+})
+
+test_that("plot helper progress supports the explicit noninteractive override on master", {
+  begin <- getFromNamespace(".np_plot_progress_begin", "npRmpi")
+  tick <- getFromNamespace(".np_plot_progress_tick", "npRmpi")
+  finish <- getFromNamespace(".np_plot_progress_end", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.noninteractive = TRUE
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  messages <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() FALSE,
+      .np_progress_is_master = function() TRUE,
+      .np_progress_now = progress_time_counter()
+    ),
+    capture_messages_only({
+      state <- begin(total = 5, label = "Plot bootstrap wild")
+      state <- tick(state, done = 5)
+      finish(state)
+    })
+  )
+
+  messages <- normalize_messages(messages)
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 5/5 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+})
+
+test_that("plot helper progress respects suppressMessages", {
+  begin <- getFromNamespace(".np_plot_progress_begin", "npRmpi")
+  tick <- getFromNamespace(".np_plot_progress_tick", "npRmpi")
+  finish <- getFromNamespace(".np_plot_progress_end", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  messages <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_master = function() TRUE,
+      .np_progress_now = progress_time_counter()
+    ),
+    capture_messages_only(
+      suppressMessages({
+        state <- begin(total = 5, label = "Plot bootstrap wild")
+        state <- tick(state, done = 5)
+        finish(state)
+      })
+    )
+  )
+
+  expect_length(messages, 0)
+})
