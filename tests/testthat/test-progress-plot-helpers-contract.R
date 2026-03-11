@@ -63,7 +63,8 @@ test_that("plot helper progress emits append-only bounded messages", {
   old_opts <- options(
     np.messages = TRUE,
     np.plot.progress = TRUE,
-    np.plot.progress.interval.sec = 0
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -87,6 +88,32 @@ test_that("plot helper progress emits append-only bounded messages", {
   expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
   expect_equal(sum(grepl("^\\[np\\] Plot bootstrap wild 9/9 ", messages)), 1L)
   expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
+})
+
+test_that("plot helper stays silent for instant runs below start grace", {
+  begin <- getFromNamespace(".np_plot_progress_begin", "np")
+  finish <- getFromNamespace(".np_plot_progress_end", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 1
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  messages <- with_np_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_now = progress_time_counter(start = 0, by = 0.2)
+    ),
+    capture_messages_only({
+      state <- begin(total = 5, label = "Plot bootstrap wild")
+      finish(state)
+    })
+  )
+
+  expect_length(messages, 0)
 })
 
 test_that("plot helper activity emits a single append-only note", {
@@ -116,7 +143,8 @@ test_that("plot helper progress is silent by default in noninteractive mode", {
   old_opts <- options(
     np.messages = TRUE,
     np.plot.progress = TRUE,
-    np.plot.progress.interval.sec = 0
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -143,7 +171,8 @@ test_that("plot helper progress respects suppressMessages", {
   old_opts <- options(
     np.messages = TRUE,
     np.plot.progress = TRUE,
-    np.plot.progress.interval.sec = 0
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0
   )
   on.exit(options(old_opts), add = TRUE)
 

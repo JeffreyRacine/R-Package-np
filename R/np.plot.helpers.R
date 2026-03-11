@@ -44,18 +44,26 @@
   val
 }
 
+.np_plot_progress_start_grace_sec <- function() {
+  val <- suppressWarnings(as.numeric(getOption("np.plot.progress.start.grace.sec", 0.75))[1L])
+  if (!is.finite(val) || is.na(val) || val < 0)
+    val <- 0.75
+  val
+}
+
 .np_plot_progress_begin <- function(total, label) {
   total <- as.integer(total)
   if (is.na(total) || total < 1L || !.np_plot_progress_enabled())
     return(NULL)
 
   label <- as.character(label)[1L]
-  .np_progress_note(paste0(label, "..."))
-
   state <- .np_progress_begin(label = label, total = total, domain = "plot")
   state$enabled <- isTRUE(.np_plot_progress_enabled())
   state$throttle_sec <- .np_plot_progress_interval_sec()
   state$last_emit <- state$started - state$throttle_sec
+  state$start_note <- paste0(label, "...")
+  state$start_note_pending <- TRUE
+  state$start_note_grace_sec <- .np_plot_progress_start_grace_sec()
   state
 }
 
@@ -68,19 +76,39 @@
     done <- 0L
   done <- max(0L, min(state$total, done))
 
+  now <- .np_progress_now()
+
+  if (isTRUE(state$start_note_pending) &&
+      (now - state$started) >= state$start_note_grace_sec) {
+    .np_progress_note(state$start_note)
+    state$start_note_pending <- FALSE
+  }
+
   if (isTRUE(force))
     state$last_emit <- -Inf
 
-  .np_progress_step(state = state, done = done)
+  old_last_emit <- state$last_emit
+  state <- .np_progress_step(state = state, done = done)
+  if (!identical(state$last_emit, old_last_emit))
+    state$start_note_pending <- FALSE
+  state
 }
 
 .np_plot_progress_end <- function(state) {
   if (is.null(state))
     return(invisible(NULL))
 
+  now <- .np_progress_now()
+  if (isTRUE(state$start_note_pending) &&
+      (now - state$started) < state$start_note_grace_sec &&
+      isTRUE(state$last_done == 0)) {
+    return(invisible(NULL))
+  }
+
   if (isTRUE(state$known_total) && identical(state$last_done, state$total))
     return(invisible(NULL))
 
+  state$start_note_pending <- FALSE
   state$last_emit <- -Inf
   .np_progress_end(state)
   invisible(NULL)
