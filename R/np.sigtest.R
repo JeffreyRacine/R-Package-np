@@ -276,11 +276,13 @@ if (getRversion() >= "2.15.1")
 
   call.args <- c(list(xdat = xdat, ydat = ydat, bws = bws.seed), bw.args)
 
-  result <- if (localize) {
-    .npRmpi_with_local_regression(do.call(bw.fun, call.args))
-  } else {
-    do.call(bw.fun, call.args)
-  }
+  result <- .np_progress_with_legacy_suppressed(
+    if (localize) {
+      .npRmpi_with_local_regression(do.call(bw.fun, call.args))
+    } else {
+      do.call(bw.fun, call.args)
+    }
+  )
 
   .npRmpi_autodispatch_untag(result)
 }
@@ -431,8 +433,6 @@ npsigtest.rbandwidth <- function(bws,
 
   In.vec <- numeric(boot.num)
 
-  console <- if (!collective.mode) newLineConsole() else NULL
-
   if(joint==TRUE) {
 
     ## Joint test
@@ -509,20 +509,14 @@ npsigtest.rbandwidth <- function(bws,
       ei <- ei - mean(ei)
       
     }
+
+    .np_progress_note("Testing joint significance")
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
     
     if (boot.type == "II") {
       bws.boot.prev <- bws.original
 
       for (i.star in seq_len(boot.num)) {
-        msg <- paste("Bootstrap rep. ",
-                     i.star,
-                     "/",
-                     boot.num,
-                     sep = "")
-
-        if (!collective.mode)
-          console <- printPush(msg = msg, console)
-
         if (boot.method == "iid") {
           ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
         } else if (boot.method == "wild") {
@@ -581,9 +575,7 @@ npsigtest.rbandwidth <- function(bws,
           npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
           mean((npreg.boot$grad[, index] / NZD(npreg.boot$gerr[, index]))^2)
         }
-
-        if (!collective.mode)
-          console <- printPop(console)
+        progress <- .np_progress_step(progress, done = i.star)
       }
     } else {
       boot.seeds <- .npRmpi_npsig_bootstrap_seed_plan(
@@ -667,6 +659,8 @@ npsigtest.rbandwidth <- function(bws,
         profile.where = "npsigtest:joint"
       )
     }
+
+    progress <- .np_progress_end(progress)
 
     ## Compute the P-value
 
@@ -758,25 +752,14 @@ npsigtest.rbandwidth <- function(bws,
         ei <- ei - mean(ei)
         
       }
+
+      .np_progress_note(sprintf("Testing variable %s of (%s)", i, paste(index, collapse = ",")))
+      progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
       
       if (boot.type == "II") {
         bws.boot.prev <- bws.original
 
         for (i.star in seq_len(boot.num)) {
-          msg <- paste("Bootstrap rep. ",
-                       i.star,
-                       "/",
-                       boot.num,
-                       " for variable ",
-                       i,
-                       " of (",
-                       paste(index, collapse = ","),
-                       ")... ",
-                       sep = "")
-
-          if (!collective.mode)
-            console <- printPush(msg = msg, console)
-
           if (boot.method == "iid") {
             ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
           } else if (boot.method == "wild") {
@@ -834,9 +817,7 @@ npsigtest.rbandwidth <- function(bws,
             npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
             mean((npreg.boot$grad[, i] / NZD(npreg.boot$gerr[, i]))^2)
           }
-
-          if (!collective.mode)
-            console <- printPop(console)
+          progress <- .np_progress_step(progress, done = i.star)
         }
       } else {
         boot.seeds <- .npRmpi_npsig_bootstrap_seed_plan(
@@ -919,6 +900,8 @@ npsigtest.rbandwidth <- function(bws,
           profile.where = "npsigtest:indiv"
         )
       }
+
+      progress <- .np_progress_end(progress)
       
       ## Compute the P-value
       
@@ -930,12 +913,6 @@ npsigtest.rbandwidth <- function(bws,
     
   } ## End invididual test
 
-  if (!collective.mode) {
-    console <- printPush(msg ="                                                                                ", console)
-    console <- printPop(console)
-    console <- printClear(console)
-  }
-  
   ## Return a list containing the statistic and its P-value
   ## bootstrapped In.vec for each variable...
 

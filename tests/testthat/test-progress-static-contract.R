@@ -105,3 +105,15 @@ test_that("npsdeptest no longer uses legacy console helpers", {
   expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
   expect_true(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
 })
+
+test_that("npsigtest no longer uses legacy console helpers", {
+  src_path <- testthat::test_path("..", "..", "R", "np.sigtest.R")
+  skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
+  expect_true(grepl("\\.np_progress_note\\(\"Testing joint significance\"\\)", src))
+  expect_true(grepl("\\.np_progress_note\\(sprintf\\(\"Testing variable %s of \\(%s\\)\",", src))
+  expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
+  expect_true(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
+})
