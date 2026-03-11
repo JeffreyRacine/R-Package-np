@@ -157,7 +157,7 @@ test_that("session generalized-nn shared degree-1 route stays exact after public
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "set.seed(20260308)",
       "n <- 80L",
@@ -353,7 +353,7 @@ test_that("session npplreg plain fixed lc plot-data completes locally", {
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "set.seed(20260310)",
       "n <- 60L",
@@ -430,7 +430,7 @@ test_that("session npindex residual and evaluation-error branches complete in in
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "set.seed(20260309)",
       "n <- 56L",
@@ -746,7 +746,7 @@ test_that("session adaptive-nn npreghat matrix owner stays exact in subprocess",
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "ns <- asNamespace('npRmpi')",
       "reg_direct <- get('.np_regression_direct', envir=ns, inherits=FALSE)",
@@ -807,7 +807,7 @@ test_that("session adaptive-nn npscoefhat selected owner preserves integer suppo
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "set.seed(20260308)",
       "n <- 50L",
@@ -856,7 +856,7 @@ test_that("session npindexhat adaptive-nn exact owner route completes in subproc
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "set.seed(105)",
       "n <- 60L",
@@ -887,7 +887,7 @@ test_that("session npindexhat adaptive-nn manual owner control stays exact in su
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "set.seed(314161)",
       "n <- 70L",
@@ -920,7 +920,7 @@ test_that("session npindexhat adaptive-nn ll owner route stays exact in subproce
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "set.seed(20260309)",
       "n <- 60L",
@@ -959,7 +959,7 @@ test_that("session npindex adaptive-nn public route preserves bwtype semantics i
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "set.seed(314161)",
       "n <- 70L",
@@ -2517,7 +2517,7 @@ test_that("session npindex nearest-neighbor exact route selects integer support 
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
       "set.seed(314163)",
       "n <- 70L",

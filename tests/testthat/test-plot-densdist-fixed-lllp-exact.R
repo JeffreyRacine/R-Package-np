@@ -1,6 +1,6 @@
 test_that("fixed conditional ll/lp density-distribution helper matches duplicate-sample refits", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   helper <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "npRmpi")
 

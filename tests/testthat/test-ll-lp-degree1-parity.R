@@ -1,6 +1,6 @@
 test_that("npreg cv objective and bandwidths match for ll and lp(degree=1)", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260227)
   x <- runif(70)
@@ -34,7 +34,7 @@ test_that("npreg cv objective and bandwidths match for ll and lp(degree=1)", {
 
 test_that("npreg and npreghat match for ll and lp(degree=1) in 1D", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260227)
   n <- 140
@@ -93,7 +93,7 @@ test_that("npreg and npreghat match for ll and lp(degree=1) in 1D", {
 
 test_that("npscoef cv and estimation match for ll and lp(degree=1) in 1D", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260227)
   n <- 80
@@ -164,7 +164,7 @@ test_that("npscoef cv and estimation match for ll and lp(degree=1) in 1D", {
 
 test_that("npindex cv, fit, and npindexhat(s=1) match for ll and lp(degree=1) in 1D", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260227)
   n <- 100
@@ -227,7 +227,7 @@ test_that("npindex cv, fit, and npindexhat(s=1) match for ll and lp(degree=1) in
 
 test_that("npplreg cv and estimation match for ll and lp(degree=1) in 1D", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260227)
   n <- 120
@@ -302,7 +302,7 @@ test_that("npplreg cv and estimation match for ll and lp(degree=1) in 1D", {
 
 test_that("npscoef multivariate cv and estimation match for ll and lp(degree=1)", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260306)
   n <- 65
@@ -372,7 +372,7 @@ test_that("npscoef multivariate cv and estimation match for ll and lp(degree=1)"
 
 test_that("npindex multivariate cv and estimation match for ll and lp(degree=1)", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   n <- 75
 
@@ -448,7 +448,7 @@ test_that("npindex multivariate cv and estimation match for ll and lp(degree=1)"
 
 test_that("npplreg multivariate cv and estimation match for ll and lp(degree=1)", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260309)
   n <- 70

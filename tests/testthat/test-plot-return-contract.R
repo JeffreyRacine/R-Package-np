@@ -2,7 +2,7 @@ library(npRmpi)
 
 test_that("plot return contract: 3D plot-data matches data mode for regression and conditional estimators", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
@@ -92,7 +92,7 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
 
 test_that("plot return contract: remaining public plot families return plot-data payloads", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)

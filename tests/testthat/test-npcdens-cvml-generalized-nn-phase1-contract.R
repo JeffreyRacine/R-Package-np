@@ -15,7 +15,7 @@ phase1_npcdens_cvml_gnn_fixture <- function() {
 
 test_that("phase1 npcdensbw cv.ml generalized-nn lc matches the frozen public baseline", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   dat <- phase1_npcdens_cvml_gnn_fixture()
 
@@ -35,7 +35,7 @@ test_that("phase1 npcdensbw cv.ml generalized-nn lc matches the frozen public ba
 
 test_that("phase1 npcdensbw cv.ml generalized-nn keeps ll on canonical lp degree-1 glp", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   dat <- phase1_npcdens_cvml_gnn_fixture()
   degree <- rep.int(1L, ncol(dat$x))
@@ -73,7 +73,7 @@ test_that("phase1 npcdensbw cv.ml generalized-nn keeps ll on canonical lp degree
 
 test_that("phase1 npcdensbw cv.ml generalized-nn lp degree-2 succeeds on a higher-order fixture", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   dat <- phase1_npcdens_cvml_gnn_fixture()
   degree1 <- rep.int(1L, ncol(dat$x))
@@ -110,7 +110,7 @@ test_that("phase1 npcdensbw cv.ml generalized-nn lp degree-2 succeeds on a highe
 
 test_that("phase1 npcdensbw cv.ml generalized-nn avoids search-boundary collapse", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260309)
   n <- 60L

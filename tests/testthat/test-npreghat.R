@@ -1,6 +1,6 @@
 test_that("npreghat reproduces npreg fitted values for mixed-data local constant", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260223)
   n <- 120
@@ -37,7 +37,7 @@ test_that("npreghat reproduces npreg fitted values for mixed-data local constant
 
 test_that("npreghat supports lp/ll derivatives and matrix apply mode", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(777)
   n <- 150
@@ -89,7 +89,7 @@ test_that("npreghat supports lp/ll derivatives and matrix apply mode", {
 
 test_that("npreghat lp bernstein path matches predict semantics", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260305)
   n <- 220
@@ -130,7 +130,7 @@ test_that("npreghat lp bernstein path matches predict semantics", {
 
 test_that("npreghat apply mode matches npreg across bwtypes", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260308)
   n <- 90
@@ -220,7 +220,7 @@ test_that("npreghat apply mode matches npreg across bwtypes", {
 
 test_that("npreghat nonfixed higher-order lp operator matches npreg and matrix apply semantics", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   make_case <- function(seed, bwtype) {
     set.seed(seed)

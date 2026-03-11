@@ -12,7 +12,7 @@ with_mpi_pool <- function(code) {
     skip(sprintf("MPI init unavailable for npsigtest contract test: %s", conditionMessage(init_err)))
   }
 
-  on.exit(try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE), add = TRUE)
+  on.exit(try(npRmpi.quit(), silent = TRUE), add = TRUE)
   force(code)
 }
 

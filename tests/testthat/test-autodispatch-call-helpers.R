@@ -107,7 +107,7 @@ test_that("autodispatch tmp replacement handles calls with missing arguments", {
 
 test_that("npudist(bws=...) resolves large autodispatch temporary call arguments", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   withr::local_options(npRmpi.autodispatch.arg.broadcast.threshold = 1L)
 

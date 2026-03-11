@@ -2,7 +2,7 @@ test_that("plot contract: bootstrap args require explicit bootstrap mode across 
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   msg <- "plot.errors.method must be set to 'bootstrap' when bootstrap error arguments are supplied"

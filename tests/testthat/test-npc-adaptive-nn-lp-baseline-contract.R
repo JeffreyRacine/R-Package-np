@@ -2,7 +2,7 @@ library(npRmpi)
 
 test_that("adaptive-nn conditional density lp matches ll and stays off the search boundary", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(42)
   n <- 120L
@@ -47,7 +47,7 @@ test_that("adaptive-nn conditional density lp matches ll and stays off the searc
 
 test_that("adaptive-nn conditional distribution lp matches ll and stays off the search boundary", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(42)
   n <- 120L

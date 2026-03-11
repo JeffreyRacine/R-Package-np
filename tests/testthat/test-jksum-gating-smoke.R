@@ -21,7 +21,7 @@ with_session_slave_pool <- function(expr) {
 
 teardown({
   if (session_pool_active())
-    try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE)
+    try(npRmpi.quit(), silent = TRUE)
 })
 
 make_jksum_mixed_data <- function(n = 220L, seed = 42L) {

@@ -1,2 +1,1 @@
-try(close_mpi_slaves(force=TRUE), silent=TRUE)
-
+try(close_mpi_slaves(), silent = TRUE)

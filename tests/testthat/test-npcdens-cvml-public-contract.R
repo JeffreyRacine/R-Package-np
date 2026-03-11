@@ -2,7 +2,7 @@ library(npRmpi)
 
 test_that("public npcdensbw cv.ml keeps lc adjacency live during containment", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260306)
   n <- 30L
@@ -18,7 +18,7 @@ test_that("public npcdensbw cv.ml keeps lc adjacency live during containment", {
 
 test_that("public npcdensbw cv.ml fixed LP/LL route activates with ll == lp parity", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260307)
   n <- 36L
@@ -50,7 +50,7 @@ test_that("public npcdensbw cv.ml fixed LP/LL route activates with ll == lp pari
 
 test_that("public npcdensbw cv.ml generalized-nn LP route activates with ll == lp parity", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260308)
   n <- 24L
@@ -86,7 +86,7 @@ test_that("public npcdensbw cv.ml generalized-nn LP route activates with ll == l
 
 test_that("public npcdensbw cv.ml adaptive-nn LP route activates with ll == lp parity", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260309)
   n <- 24L

@@ -2,7 +2,7 @@ test_that("npindex inid fast path matches explicit resample refits", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(3231)
@@ -39,7 +39,7 @@ test_that("npindex ll/lp inid fast path matches explicit resample refits", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = FALSE)
 
   set.seed(32315)
@@ -113,7 +113,7 @@ test_that("npreg inid ll/lp fast path matches explicit resample refits", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = FALSE)
 
   set.seed(3211)
@@ -184,7 +184,7 @@ test_that("npplreg inid fast path matches explicit resample refits", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(32316)
@@ -242,7 +242,7 @@ test_that("npreg inid fast path supports continuous-slice gradients", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = FALSE)
 
   set.seed(3212)
@@ -308,7 +308,7 @@ test_that("rbandwidth plot bootstrap supports gradients across methods", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(322)
@@ -340,7 +340,7 @@ test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(3233)
@@ -394,7 +394,7 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(328)
@@ -438,7 +438,7 @@ test_that("nearest-neighbor plot helpers run for regression and density/distribu
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(329)
@@ -482,7 +482,7 @@ test_that("nearest-neighbor regression and ksum helpers match explicit resample 
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = FALSE)
 
   set.seed(32905)

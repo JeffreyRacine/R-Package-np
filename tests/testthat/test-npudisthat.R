@@ -1,6 +1,6 @@
 test_that("npudisthat matches npudist and preserves matrix/apply parity across bwtypes", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   npudisthat <- getFromNamespace("npudisthat", "npRmpi")
 
@@ -38,7 +38,7 @@ test_that("npudisthat matches npudist and preserves matrix/apply parity across b
 
 test_that("npudisthat fixed-bandwidth count vectors reproduce resampled npudist fits", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   npudisthat <- getFromNamespace("npudisthat", "npRmpi")
 
@@ -74,7 +74,7 @@ test_that("npudisthat fixed-bandwidth count vectors reproduce resampled npudist 
 
 test_that("npudisthat preserves bounded gaussian manual-bandwidth semantics", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   npudisthat <- getFromNamespace("npudisthat", "npRmpi")
 

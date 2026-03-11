@@ -1,6 +1,6 @@
 test_that("default estimators build bandwidth calls in caller frame", {
   skip_if_not(spawn_mpi_slaves(1))
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   old.opts <- options(npRmpi.autodispatch = TRUE)
   on.exit(options(old.opts), add = TRUE)

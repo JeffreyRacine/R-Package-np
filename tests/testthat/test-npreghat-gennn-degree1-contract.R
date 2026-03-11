@@ -1,6 +1,6 @@
 test_that("generalized-nn ll and canonical lp degree-1 share the same public/apply regression route", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260308)
   n <- 90

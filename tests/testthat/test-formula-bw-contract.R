@@ -1,6 +1,6 @@
 test_that("formula npudensbw matches default interface with subset/na.action", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260222)
   dat <- data.frame(
@@ -29,7 +29,7 @@ test_that("formula npudensbw matches default interface with subset/na.action", {
 
 test_that("formula npudistbw matches default interface with subset/na.action", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260222)
   dat <- data.frame(
@@ -58,7 +58,7 @@ test_that("formula npudistbw matches default interface with subset/na.action", {
 
 test_that("formula npudistbw gdata path matches default interface", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260222)
   dat <- data.frame(
@@ -92,7 +92,7 @@ test_that("formula npudistbw gdata path matches default interface", {
 
 test_that("formula npregbw matches default interface with subset/na.action", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260222)
   dat <- data.frame(
@@ -125,7 +125,7 @@ test_that("formula npregbw matches default interface with subset/na.action", {
 
 test_that("formula npcdistbw gdata path matches default interface", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260222)
   dat <- data.frame(
@@ -160,7 +160,7 @@ test_that("formula npcdistbw gdata path matches default interface", {
 
 test_that("formula npcdensbw matches default interface with subset/na.action", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260222)
   dat <- data.frame(
@@ -191,7 +191,7 @@ test_that("formula npcdensbw matches default interface with subset/na.action", {
 
 test_that("formula npindexbw matches default interface with subset/na.action", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260222)
   dat <- data.frame(
@@ -227,7 +227,7 @@ test_that("formula npindexbw matches default interface with subset/na.action", {
 
 test_that("formula npplregbw matches default interface with subset/na.action", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   old.opts <- options(npRmpi.autodispatch = FALSE)
   on.exit(options(old.opts), add = TRUE)
 
@@ -264,7 +264,7 @@ test_that("formula npplregbw matches default interface with subset/na.action", {
 
 test_that("formula npscoefbw matches default interface with subset/na.action", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   old.opts <- options(npRmpi.autodispatch = FALSE)
   on.exit(options(old.opts), add = TRUE)
 

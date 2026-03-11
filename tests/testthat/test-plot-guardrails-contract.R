@@ -17,7 +17,12 @@ test_that("plot runtime files avoid forbidden *bw( calls", {
   skip_if(length(files) == 0L, "source R files unavailable in installed test context")
 
   forbidden <- "\\b[A-Za-z0-9._]+bw\\s*\\("
-  allowed <- c("\\.np_indexhat_rbw\\s*\\(")
+  allowed <- c(
+    "\\.np_indexhat_rbw\\s*\\(",
+    "\\.np_indexhat_kbw\\s*\\(",
+    "\\.npcdhat_make_xbw\\s*\\(",
+    "\\.npcdhat_make_ybw\\s*\\("
+  )
   offenders <- character()
 
   for (f in files) {

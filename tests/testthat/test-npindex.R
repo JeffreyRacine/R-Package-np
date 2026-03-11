@@ -29,7 +29,7 @@ test_that("npindex public adaptive-nn lc route does not collapse to fixed semant
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(314161)
@@ -79,7 +79,7 @@ test_that("npindexbw nearest-neighbor selection stores integer support and exact
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(314163)
@@ -108,7 +108,7 @@ test_that("npindexbw nearest-neighbor selection stores integer support and exact
 
 test_that("manual single-index nearest-neighbor bandwidths fail fast when not integer support", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   tx <- data.frame(x1 = seq(0.1, 0.9, length.out = 8L), x2 = seq(0.9, 0.1, length.out = 8L))
   y <- tx$x1 - tx$x2
@@ -129,7 +129,7 @@ test_that("npindex supports residual and error branches with evaluation y data",
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(20260309)

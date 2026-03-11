@@ -1,6 +1,6 @@
 test_that("npreg rejects non-logical gradients and residuals under autodispatch", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
@@ -43,7 +43,7 @@ test_that("lp regtype remains lp internally for degree 0/1", {
 
 test_that("lp degree-0 gradients fail fast while value path remains available under autodispatch", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
@@ -80,7 +80,7 @@ test_that("npreg.rbandwidth no longer contains bernstein OOS direct fallback", {
 
 test_that("lp bernstein OOS warns but keeps canonical npreg path under autodispatch", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
   options(npRmpi.autodispatch = TRUE)

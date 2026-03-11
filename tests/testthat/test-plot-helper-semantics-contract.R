@@ -47,7 +47,7 @@ with_spawned_plot_context <- function(code) {
 
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   force(code)

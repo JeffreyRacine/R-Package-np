@@ -8,7 +8,7 @@ quiet_capture <- function(expr) {
 
 test_that("smooth-coefficient wild bootstrap fails fast with explicit diagnostics", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
   options(npRmpi.autodispatch = TRUE)

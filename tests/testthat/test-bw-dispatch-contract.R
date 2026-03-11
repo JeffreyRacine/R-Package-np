@@ -1,6 +1,6 @@
 test_that("bw generics route named data args without bws to NULL methods", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260222)
   x <- rnorm(30)
@@ -18,7 +18,7 @@ test_that("bw generics route named data args without bws to NULL methods", {
 
 test_that("bw object dispatch remains intact", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260222)
   x <- rnorm(25)

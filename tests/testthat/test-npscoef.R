@@ -21,7 +21,7 @@ test_that("npscoef basic functionality works", {
 
 test_that("npscoefbw records ll/lp controls", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(43)
   n <- 80

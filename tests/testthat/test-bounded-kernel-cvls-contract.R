@@ -2,7 +2,7 @@ library(npRmpi)
 
 test_that("bounded cv.ls remains finite for gaussian order 2 and 4", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260224)
   x <- runif(80)
@@ -35,7 +35,7 @@ test_that("bounded cv.ls remains finite for gaussian order 2 and 4", {
 
 test_that("bounded conditional cv.ls remains finite for gaussian order 2 and 4", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260224)
   n <- 70
@@ -82,7 +82,7 @@ test_that("bounded conditional cv.ls remains finite for gaussian order 2 and 4",
 
 test_that("bounded conditional distribution cv.ls remains finite for gaussian order 2 and 4", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260312)
   n <- 70

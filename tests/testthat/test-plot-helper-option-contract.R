@@ -2,7 +2,7 @@ test_that("npRmpi helper constructors forward kernel options and normalize bwsca
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(7101)
@@ -77,7 +77,7 @@ test_that("npRmpi semihat regbw args forward index LP/kernel options with bound 
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(7102)
@@ -128,7 +128,7 @@ test_that("npRmpi semihat regbw args forward smooth-coef LP/kernel/scaling optio
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(7103)

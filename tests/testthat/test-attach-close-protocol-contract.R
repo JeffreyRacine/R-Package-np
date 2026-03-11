@@ -49,91 +49,86 @@ test_that("attach quit path contains idempotent state guard and ACK collection",
 test_that("attach ACK collector marks complete ACK sets as OK", {
   collect <- getFromNamespace(".npRmpi_attach_collect_close_acks", "npRmpi")
 
-  testthat::local_mocked_bindings(
+  testthat::with_mocked_bindings({
+    out <- collect(comm = 1L, session_id = 11L, expected = c(1L, 2L), timeout_sec = 0.05, poll_sleep = 0.001)
+    expect_true(isTRUE(out$ok))
+    expect_identical(out$acked, c(1L, 2L))
+    expect_identical(out$missing, integer(0))
+  },
     mpi.iprobe = function(source, tag, comm = 1L, status = 0L) TRUE,
     mpi.recv.Robj = function(source, tag, comm = 1L, status = 0L) {
       list(kind = "attach_close_ack", rank = as.integer(source), session_id = 11L)
     },
-    .env = asNamespace("npRmpi"),
     .package = "npRmpi"
   )
-
-  out <- collect(comm = 1L, session_id = 11L, expected = c(1L, 2L), timeout_sec = 0.05, poll_sleep = 0.001)
-  expect_true(isTRUE(out$ok))
-  expect_identical(out$acked, c(1L, 2L))
-  expect_identical(out$missing, integer(0))
 })
 
 test_that("attach ACK collector reports missing ranks on partial ACK sets", {
   collect <- getFromNamespace(".npRmpi_attach_collect_close_acks", "npRmpi")
 
-  testthat::local_mocked_bindings(
+  testthat::with_mocked_bindings({
+    out <- collect(comm = 1L, session_id = 12L, expected = c(1L, 2L), timeout_sec = 0.05, poll_sleep = 0.001)
+    expect_false(isTRUE(out$ok))
+    expect_identical(out$acked, 1L)
+    expect_identical(out$missing, 2L)
+  },
     mpi.iprobe = function(source, tag, comm = 1L, status = 0L) identical(as.integer(source), 1L),
     mpi.recv.Robj = function(source, tag, comm = 1L, status = 0L) {
       list(kind = "attach_close_ack", rank = as.integer(source), session_id = 12L)
     },
-    .env = asNamespace("npRmpi"),
     .package = "npRmpi"
   )
-
-  out <- collect(comm = 1L, session_id = 12L, expected = c(1L, 2L), timeout_sec = 0.05, poll_sleep = 0.001)
-  expect_false(isTRUE(out$ok))
-  expect_identical(out$acked, 1L)
-  expect_identical(out$missing, 2L)
 })
 
 test_that("attach release sender reports per-rank send failures", {
   send_release <- getFromNamespace(".npRmpi_attach_send_close_release", "npRmpi")
 
-  testthat::local_mocked_bindings(
+  testthat::with_mocked_bindings({
+    out <- send_release(comm = 1L, ranks = c(1L, 2L), session_id = 7L, barrier = TRUE)
+    expect_false(isTRUE(out$ok))
+    expect_identical(out$sent, 1L)
+    expect_identical(out$failed, 2L)
+  },
     mpi.send.Robj = function(data, dest, tag, comm = 1L) {
       if (identical(as.integer(dest), 2L))
         stop("send failed")
       invisible(TRUE)
     },
-    .env = asNamespace("npRmpi"),
     .package = "npRmpi"
   )
-
-  out <- send_release(comm = 1L, ranks = c(1L, 2L), session_id = 7L, barrier = TRUE)
-  expect_false(isTRUE(out$ok))
-  expect_identical(out$sent, 1L)
-  expect_identical(out$failed, 2L)
 })
 
 test_that("attach release waiter accepts matching session payload", {
   wait_release <- getFromNamespace(".npRmpi_attach_wait_close_release", "npRmpi")
 
-  testthat::local_mocked_bindings(
+  testthat::with_mocked_bindings({
+    out <- wait_release(comm = 1L, session_id = 9L, timeout_sec = 0.05, poll_sleep = 0.001)
+    expect_true(isTRUE(out$ok))
+    expect_true(isTRUE(out$barrier))
+    expect_identical(out$payload$session_id, 9L)
+  },
     mpi.comm.rank = function(comm = 1L) 1L,
     mpi.iprobe = function(source, tag, comm = 1L, status = 0L) TRUE,
     mpi.recv.Robj = function(source, tag, comm = 1L, status = 0L) {
       list(kind = "attach_close_release", session_id = 9L, barrier = TRUE)
     },
-    .env = asNamespace("npRmpi"),
     .package = "npRmpi"
   )
-
-  out <- wait_release(comm = 1L, session_id = 9L, timeout_sec = 0.05, poll_sleep = 0.001)
-  expect_true(isTRUE(out$ok))
-  expect_true(isTRUE(out$barrier))
-  expect_identical(out$payload$session_id, 9L)
 })
 
 test_that("attach release waiter rejects mismatched session payload", {
   wait_release <- getFromNamespace(".npRmpi_attach_wait_close_release", "npRmpi")
 
-  testthat::local_mocked_bindings(
+  testthat::with_mocked_bindings({
+    out <- wait_release(comm = 1L, session_id = 9L, timeout_sec = 0.05, poll_sleep = 0.001)
+    expect_false(isTRUE(out$ok))
+    expect_false(isTRUE(out$barrier))
+  },
     mpi.comm.rank = function(comm = 1L) 1L,
     mpi.iprobe = function(source, tag, comm = 1L, status = 0L) TRUE,
     mpi.recv.Robj = function(source, tag, comm = 1L, status = 0L) {
       list(kind = "attach_close_release", session_id = 10L, barrier = TRUE)
     },
-    .env = asNamespace("npRmpi"),
     .package = "npRmpi"
   )
-
-  out <- wait_release(comm = 1L, session_id = 9L, timeout_sec = 0.05, poll_sleep = 0.001)
-  expect_false(isTRUE(out$ok))
-  expect_false(isTRUE(out$barrier))
 })

@@ -9,7 +9,7 @@ test_that("MPI examples from man pages work correctly", {
   }
 
   # Ensure cleanup on exit
-  on.exit(try(close_mpi_slaves(force=TRUE), silent=TRUE))
+  on.exit(try(close_mpi_slaves(), silent=TRUE))
   options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
 
   # 1. npregbw example (from npseed.Rd correction)

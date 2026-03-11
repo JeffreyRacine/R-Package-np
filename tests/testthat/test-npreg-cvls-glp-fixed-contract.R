@@ -105,7 +105,7 @@ fixed_cvls_objective <- function(xdat,
 
 test_that("fixed cv.ls is exact on in-class local polynomial fixtures", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   tol <- 1e-20
 
@@ -146,7 +146,7 @@ test_that("fixed cv.ls is exact on in-class local polynomial fixtures", {
 
 test_that("fixed cv.ls keeps ll and canonical lp degree-1 aligned off-model", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260311)
   x <- sort(runif(48))

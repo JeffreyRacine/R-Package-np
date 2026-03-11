@@ -4,7 +4,7 @@ test_that("fixed ll gradient helper matches explicit refits without exact fallba
   old.calls <- getOption("npRmpi.regression.exact.calls")
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
   on.exit(options(npRmpi.regression.exact.calls = old.calls), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = FALSE)
 
   set.seed(20260310)
@@ -84,7 +84,7 @@ test_that("fixed lp gradient helper preserves derivative order and counts drawer
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = FALSE)
 
   set.seed(20260311)

@@ -1,6 +1,6 @@
 test_that("npcdenshat matches npcdens and preserves matrix/apply parity across supported bwtype/regtype cells", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   npcdenshat <- getFromNamespace("npcdenshat", "npRmpi")
 
@@ -56,7 +56,7 @@ test_that("npcdenshat matches npcdens and preserves matrix/apply parity across s
 
 test_that("npcdenshat apply mode matches matrix RHS multiplication", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   npcdenshat <- getFromNamespace("npcdenshat", "npRmpi")
 
@@ -87,7 +87,7 @@ test_that("npcdenshat apply mode matches matrix RHS multiplication", {
 
 test_that("npcdenshat preserves bounded gaussian manual-bandwidth semantics", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   npcdenshat <- getFromNamespace("npcdenshat", "npRmpi")
 

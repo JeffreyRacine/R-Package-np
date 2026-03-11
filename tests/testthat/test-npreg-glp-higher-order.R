@@ -1,6 +1,6 @@
 test_that("npreg lp higher-order gradients match npreghat across lp bases", {
   skip_if_not(spawn_mpi_slaves(1))
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   old.opts <- options(npRmpi.autodispatch = FALSE)
   on.exit(options(old.opts), add = TRUE)
 
@@ -41,7 +41,7 @@ test_that("npreg lp higher-order gradients match npreghat across lp bases", {
 
 test_that("npreg lp supports per-variable derivative orders", {
   skip_if_not(spawn_mpi_slaves(1))
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
   old.opts <- options(npRmpi.autodispatch = FALSE)
   on.exit(options(old.opts), add = TRUE)
 

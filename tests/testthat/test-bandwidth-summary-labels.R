@@ -44,7 +44,7 @@ make_regression_summary_label_fixture <- function(type) {
 
 test_that("fixed mixed-data bandwidth summaries label continuous scale factors correctly", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(123)
   n <- 40L

@@ -15,7 +15,7 @@ phase1_npcdens_cvls_fixed_fixture <- function() {
 
 test_that("phase1 npcdensbw cv.ls fixed lc matches the frozen public baseline", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   dat <- phase1_npcdens_cvls_fixed_fixture()
 
@@ -34,7 +34,7 @@ test_that("phase1 npcdensbw cv.ls fixed lc matches the frozen public baseline", 
 
 test_that("phase1 npcdensbw cv.ls fixed keeps ll on canonical lp degree-1 glp", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   dat <- phase1_npcdens_cvls_fixed_fixture()
   degree <- rep.int(1L, ncol(dat$x))
@@ -70,7 +70,7 @@ test_that("phase1 npcdensbw cv.ls fixed keeps ll on canonical lp degree-1 glp", 
 
 test_that("phase1 npcdensbw cv.ls fixed lp degree-2 succeeds on a higher-order fixture", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   dat <- phase1_npcdens_cvls_fixed_fixture()
   degree1 <- rep.int(1L, ncol(dat$x))
@@ -104,7 +104,7 @@ test_that("phase1 npcdensbw cv.ls fixed lp degree-2 succeeds on a higher-order f
 
 test_that("phase1 npcdensbw cv.ls fixed avoids boundary collapse on bounded support", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260310)
   n <- 60L

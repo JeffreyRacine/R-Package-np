@@ -21,7 +21,7 @@ explicit_singleindex_grad_index <- function(bw, tx, y, counts_vec) {
 
 test_that("fixed single-index gradient helper matches duplicate-sample refits", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   helper <- getFromNamespace(".np_inid_boot_from_index", "npRmpi")
 
@@ -116,7 +116,7 @@ test_that("fixed single-index gradient helper matches duplicate-sample refits", 
 
 test_that("fixed single-index gradient helper counts.drawer matches counts matrix", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   helper <- getFromNamespace(".np_inid_boot_from_index", "npRmpi")
 
@@ -166,7 +166,7 @@ test_that("fixed single-index gradient helper counts.drawer matches counts matri
 
 test_that("sibandwidth fixed gradient bootstrap now works for helper methods", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260310)
   n <- 30
@@ -202,7 +202,7 @@ test_that("sibandwidth fixed gradient bootstrap now works for helper methods", {
 
 test_that("single-index nonfixed gradient helper methods still fail fast", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260310)
   n <- 30

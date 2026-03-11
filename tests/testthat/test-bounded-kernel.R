@@ -1,6 +1,6 @@
 test_that("bounded gaussian kernel matches direct normalization at fixed bandwidth", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   x <- sort(c(5, 11, 21, 31, 46, 75, 98, 122, 145, 165, 195, 224, 245, 293, 321, 330, 350, 420))
   h <- 100
@@ -23,7 +23,7 @@ test_that("bounded gaussian kernel matches direct normalization at fixed bandwid
 
 test_that("cv bandwidth with range bounds is larger than unbounded for stress example", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   x <- sort(c(5, 11, 21, 31, 46, 75, 98, 122, 145, 165, 195, 224, 245, 293, 321, 330, 350, 420))
 

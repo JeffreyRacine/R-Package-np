@@ -10,7 +10,7 @@ make_xy <- function(n = 24L) {
 
 test_that("npcdensbw stores canonical ll/lp metadata", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   d <- make_xy()
 
@@ -55,7 +55,7 @@ test_that("npcdensbw stores canonical ll/lp metadata", {
 
 test_that("npcdistbw stores canonical ll/lp metadata", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   d <- make_xy()
 
@@ -87,7 +87,7 @@ test_that("npcdistbw stores canonical ll/lp metadata", {
 
 test_that("npc* conditional regtype argument contracts fail fast", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   d <- make_xy()
 
@@ -118,7 +118,7 @@ test_that("npc* conditional regtype argument contracts fail fast", {
 
 test_that("npcdens ll matches lp(degree=1, basis='glp')", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   d <- make_xy()
 
@@ -148,7 +148,7 @@ test_that("npcdens ll matches lp(degree=1, basis='glp')", {
 
 test_that("npcdist ll matches lp(degree=1, basis='glp')", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   d <- make_xy()
 

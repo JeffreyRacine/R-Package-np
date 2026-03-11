@@ -1,6 +1,6 @@
 test_that("npplregbw ll stores canonical engine metadata and child regression bandwidths", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260306)
   n <- 40
@@ -39,7 +39,7 @@ test_that("npplregbw ll stores canonical engine metadata and child regression ba
 
 test_that("npplregbw ll rejects non-canonical LP controls", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260306)
   n <- 30
@@ -86,7 +86,7 @@ test_that("npplregbw ll rejects non-canonical LP controls", {
 
 test_that("npindexbw ll stores canonical engine metadata", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260306)
   n <- 50
@@ -113,7 +113,7 @@ test_that("npindexbw ll stores canonical engine metadata", {
 
 test_that("npindexbw ll rejects non-canonical LP controls", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260306)
   n <- 40

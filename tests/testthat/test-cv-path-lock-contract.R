@@ -95,9 +95,13 @@ test_that("conditional public LP CV routes stay thin kernelcv dispatches", {
 
   lines <- readLines(src_file, warn = FALSE)
 
-  expect_equal(sum(grepl("int_ll_extern == LL_LP", lines, fixed = TRUE)), 3L)
-  expect_equal(sum(grepl("np_shadow_cv_con_density_ml\\(", lines)), 1L)
-  expect_equal(sum(grepl("np_shadow_cv_con_density_ls\\(", lines)), 1L)
-  expect_equal(sum(grepl("np_shadow_cv_con_distribution_ls\\(", lines)), 1L)
+  expect_equal(sum(grepl("^double cv_func_con_density_categorical_ml\\(", lines)), 1L)
+  expect_equal(sum(grepl("^double cv_func_con_density_categorical_ls\\(", lines)), 1L)
+  expect_equal(sum(grepl("^double cv_func_con_distribution_categorical_ls\\(", lines)), 1L)
+  expect_equal(sum(grepl("^double np_cv_func_con_density_categorical_ml\\(", lines)), 1L)
+  expect_equal(sum(grepl("^double np_cv_func_con_density_categorical_ls\\(", lines)), 1L)
+  expect_false(any(grepl("np_shadow_proof_cv_con_density_ml\\(", lines)))
+  expect_false(any(grepl("np_shadow_proof_cv_con_density_ls\\(", lines)))
+  expect_false(any(grepl("np_shadow_proof_cv_con_distribution_ls\\(", lines)))
   expect_equal(sum(grepl("kernel_estimate_regression_categorical_tree_np", lines, fixed = TRUE)), 0L)
 })
