@@ -15,6 +15,21 @@
     \item \code{np.messages} (logical): controls console/progress output.
     Default is \code{TRUE}.
 
+    \item \code{np.plot.progress} (logical): controls bounded
+    plot/bootstrap progress heartbeats. Default is \code{TRUE}.
+
+    \item \code{np.plot.progress.start.grace.sec} (numeric): delay before
+    the first plot/bootstrap progress line is shown. Default is
+    \code{0.75}.
+
+    \item \code{np.plot.progress.interval.sec} (numeric): minimum elapsed
+    time between plot/bootstrap heartbeat lines once progress reporting has
+    started. Default is \code{0.5}.
+
+    \item \code{np.plot.progress.max.intermediate} (integer): maximum
+    number of mid-run plot/bootstrap heartbeat lines emitted between the
+    initial start notice and final completion line. Default is \code{3}.
+
     \item \code{np.tree} (logical): enables kd-tree acceleration when
     supported by the selected kernel/operator combination. Default is
     \code{FALSE}.

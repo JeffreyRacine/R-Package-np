@@ -64,7 +64,8 @@ test_that("plot helper progress emits append-only bounded messages", {
     np.messages = TRUE,
     np.plot.progress = TRUE,
     np.plot.progress.interval.sec = 0,
-    np.plot.progress.start.grace.sec = 0
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 3
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -74,9 +75,10 @@ test_that("plot helper progress emits append-only bounded messages", {
       .np_progress_now = progress_time_counter()
     ),
     capture_messages_only({
-      state <- begin(total = 9, label = "Plot bootstrap wild")
-      state <- tick(state, done = 1)
-      state <- tick(state, done = 9)
+      state <- begin(total = 12, label = "Plot bootstrap wild")
+      for (i in seq_len(12L)) {
+        state <- tick(state, done = i)
+      }
       finish(state)
     })
   )
@@ -84,9 +86,11 @@ test_that("plot helper progress emits append-only bounded messages", {
   messages <- normalize_messages(messages)
 
   expect_identical(messages[[1L]], "[np] Plot bootstrap wild...")
-  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 1/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_equal(sum(grepl("^\\[np\\] Plot bootstrap wild 9/9 ", messages)), 1L)
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 3/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 6/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 9/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 12/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_equal(length(messages), 5L)
   expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
 })
 
@@ -98,7 +102,8 @@ test_that("plot helper stays silent for instant runs below start grace", {
     np.messages = TRUE,
     np.plot.progress = TRUE,
     np.plot.progress.interval.sec = 0,
-    np.plot.progress.start.grace.sec = 1
+    np.plot.progress.start.grace.sec = 1,
+    np.plot.progress.max.intermediate = 3
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -144,7 +149,8 @@ test_that("plot helper progress is silent by default in noninteractive mode", {
     np.messages = TRUE,
     np.plot.progress = TRUE,
     np.plot.progress.interval.sec = 0,
-    np.plot.progress.start.grace.sec = 0
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 3
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -154,8 +160,8 @@ test_that("plot helper progress is silent by default in noninteractive mode", {
       .np_progress_now = progress_time_counter()
     ),
     capture_messages_only({
-      state <- begin(total = 5, label = "Plot bootstrap wild")
-      state <- tick(state, done = 5)
+      state <- begin(total = 12, label = "Plot bootstrap wild")
+      state <- tick(state, done = 12)
       finish(state)
     })
   )
@@ -172,7 +178,8 @@ test_that("plot helper progress respects suppressMessages", {
     np.messages = TRUE,
     np.plot.progress = TRUE,
     np.plot.progress.interval.sec = 0,
-    np.plot.progress.start.grace.sec = 0
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 3
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -183,12 +190,47 @@ test_that("plot helper progress respects suppressMessages", {
     ),
     capture_messages_only(
       suppressMessages({
-        state <- begin(total = 5, label = "Plot bootstrap wild")
-        state <- tick(state, done = 5)
+        state <- begin(total = 12, label = "Plot bootstrap wild")
+        state <- tick(state, done = 12)
         finish(state)
       })
     )
   )
 
   expect_length(messages, 0)
+})
+
+test_that("plot helper progress caps intermediate heartbeats", {
+  begin <- getFromNamespace(".np_plot_progress_begin", "np")
+  tick <- getFromNamespace(".np_plot_progress_tick", "np")
+  finish <- getFromNamespace(".np_plot_progress_end", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 2
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  messages <- with_np_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_now = progress_time_counter()
+    ),
+    capture_messages_only({
+      state <- begin(total = 12, label = "Plot bootstrap wild")
+      for (i in seq_len(12L)) {
+        state <- tick(state, done = i)
+      }
+      finish(state)
+    })
+  )
+
+  messages <- normalize_messages(messages)
+  expect_equal(length(messages), 4L)
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 4/12 ", messages)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 8/12 ", messages)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 12/12 ", messages)))
 })

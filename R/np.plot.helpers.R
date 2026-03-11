@@ -48,6 +48,23 @@
   .np_progress_start_grace_sec(known_total = TRUE, domain = "plot")
 }
 
+.np_plot_progress_max_intermediate <- function() {
+  val <- suppressWarnings(as.integer(getOption("np.plot.progress.max.intermediate", 3L))[1L])
+  if (is.na(val) || val < 0L)
+    val <- 3L
+  val
+}
+
+.np_plot_progress_checkpoints <- function(total) {
+  total <- as.integer(total)
+  max_intermediate <- .np_plot_progress_max_intermediate()
+  if (is.na(total) || total < 2L || max_intermediate < 1L)
+    return(integer())
+
+  checkpoints <- unique(as.integer(ceiling(total * seq_len(max_intermediate) / (max_intermediate + 1L))))
+  checkpoints[checkpoints >= 1L & checkpoints < total]
+}
+
 .np_plot_progress_begin <- function(total, label) {
   total <- as.integer(total)
   if (is.na(total) || total < 1L || !.np_plot_progress_enabled())
@@ -59,6 +76,9 @@
   state$throttle_sec <- .np_plot_progress_interval_sec()
   state$last_emit <- state$started - state$throttle_sec
   state$start_note_grace_sec <- .np_plot_progress_start_grace_sec()
+  state$start_note_consumes_throttle <- TRUE
+  state$checkpoints <- .np_plot_progress_checkpoints(total = total)
+  state$next_checkpoint_idx <- 1L
   state
 }
 
@@ -70,6 +90,26 @@
   if (is.na(done))
     done <- 0L
   done <- max(0L, min(state$total, done))
+
+  state$last_done <- done
+  now <- .np_progress_now()
+  state <- .np_progress_maybe_emit_start_note(state = state, now = now)
+
+  if (!isTRUE(force)) {
+    checkpoints <- state$checkpoints
+    next_idx <- state$next_checkpoint_idx
+    if (!length(checkpoints) || is.na(next_idx) || next_idx > length(checkpoints)) {
+      return(state)
+    }
+
+    next_checkpoint <- checkpoints[[next_idx]]
+    if (done < next_checkpoint) {
+      return(state)
+    }
+
+    reached <- max(which(checkpoints <= done))
+    state$next_checkpoint_idx <- as.integer(reached + 1L)
+  }
 
   if (isTRUE(force))
     state$last_emit <- -Inf
