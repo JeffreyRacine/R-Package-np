@@ -23,6 +23,7 @@ npsdeptest <- function(data = NULL,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
+  .np_progress_note("Computing bandwidths")
 
 
   ## If the variable is a time series convert to type numeric
@@ -113,8 +114,6 @@ npsdeptest <- function(data = NULL,
 
   ## Compute the metric entropy for lags 1 through lag.num
 
-  console <- newLineConsole()
-
   Srho.vec <- numeric()
   ## `Portmanteau' cumulant of all lags
   Srho.cumulant.vec <- numeric()
@@ -125,12 +124,9 @@ npsdeptest <- function(data = NULL,
   bw.joint.y.lag <- numeric()      
   
   ## Save the bandwidths for resampling exercise...
+  lag.progress <- .np_progress_begin("Constructing metric entropy by lag", total = lag.num)
   
   for (k in seq_len(lag.num)) {
-    
-    console <- printClear(console)
-    console <- printPop(console)  
-    
     ## Create y and y.lag
     
     tmp <- ts.intersect(as.ts(data),lag(as.ts(data),k))
@@ -141,18 +137,18 @@ npsdeptest <- function(data = NULL,
     ## Compute and save bandwidths (save for bootstrapping if
     ## requested)
 
-    bw.y[k] <- npudensbw(~y)$bw
-    bw.y.lag[k] <- npudensbw(~y.lag)$bw
-    bw.joint <- npudensbw(~y+y.lag)$bw
+    bw.y[k] <- .np_progress_with_legacy_suppressed(npudensbw(~y))$bw
+    bw.y.lag[k] <- .np_progress_with_legacy_suppressed(npudensbw(~y.lag))$bw
+    bw.joint <- .np_progress_with_legacy_suppressed(npudensbw(~y+y.lag))$bw
     bw.joint.y[k] <- bw.joint[1]
     bw.joint.y.lag[k] <- bw.joint[2]
-
-    console <- printClear(console)
-    console <- printPush(paste(sep="", "Constructing metric entropy at lag ", k, "/", lag.num, "..."), console = console)
     
     Srho.vec[k] <- Srho.bivar(y,y.lag,bw.y[k],bw.y.lag[k],bw.joint,method=method)
+    lag.progress <- .np_progress_step(lag.progress, done = k, detail = paste("lag", k))
 
   }
+
+  lag.progress <- .np_progress_end(lag.progress, detail = paste("lag", lag.num))
 
   for (k in seq_len(lag.num)) Srho.cumulant.vec[k] <- sum(Srho.vec[seq_len(k)])
 
@@ -169,12 +165,9 @@ npsdeptest <- function(data = NULL,
 
     Srho.bootstrap.mat <- matrix(NA,boot.num,(lag.num))
 		Srho.cumulant.bootstrap.mat <- matrix(NA,boot.num,(lag.num))
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
 
     for (b in seq_len(boot.num)) {
-
-      console <- printClear(console)
-      console <- printPush(paste(sep="", "Bootstrap replication ",
-                                 b, "/", boot.num, "..."), console)
 
       ## Resample under the null
 
@@ -191,7 +184,11 @@ npsdeptest <- function(data = NULL,
         Srho.cumulant.bootstrap.mat[b,k] <- Srho.cumulant.vec.boot[k]
       }
 
+      progress <- .np_progress_step(progress, done = b)
+
     }
+
+    progress <- .np_progress_end(progress)
 
     ## Compute P-values
 
@@ -205,9 +202,6 @@ npsdeptest <- function(data = NULL,
 
   }
 
-  console <- printClear(console)
-  console <- printPop(console)
-  
   ## Restore seed
   
   .np_seed_exit(seed.state)
