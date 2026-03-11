@@ -5044,14 +5044,24 @@ compute.bootstrap.errors.rbandwidth =
       )
 
       if (is.null(fit.mean.train)) {
-        fit.train <- .npRmpi_with_local_regression(suppressWarnings(npreg.rbandwidth(
-          txdat = xdat,
-          tydat = ydat,
-          bws = bws,
-          gradients = FALSE,
-          warn.glp.gradient = FALSE
-        )))
-        fit.mean.train <- as.double(fit.train$mean)
+        if (identical(bws$type, "adaptive_nn")) {
+          fit.mean.train <- as.double(suppressWarnings(npreghat.rbandwidth(
+            bws = bws,
+            txdat = xdat,
+            exdat = xdat,
+            y = ydat,
+            output = "apply"
+          )))
+        } else {
+          fit.train <- .npRmpi_with_local_regression(suppressWarnings(npreg.rbandwidth(
+            txdat = xdat,
+            tydat = ydat,
+            bws = bws,
+            gradients = FALSE,
+            warn.glp.gradient = FALSE
+          )))
+          fit.mean.train <- as.double(fit.train$mean)
+        }
       }
       .npRmpi_bootstrap_transport_trace(
         what = "rbandwidth.wild",
@@ -5085,13 +5095,23 @@ compute.bootstrap.errors.rbandwidth =
         )
       )
 
-      H <- .npRmpi_with_local_regression(suppressWarnings(npreghat.rbandwidth(
-        bws = bws,
-        txdat = xdat,
-        exdat = exdat,
-        s = s.vec,
-        output = "matrix"
-      )))
+      H <- if (identical(bws$type, "adaptive_nn")) {
+        suppressWarnings(npreghat.rbandwidth(
+          bws = bws,
+          txdat = xdat,
+          exdat = exdat,
+          s = s.vec,
+          output = "matrix"
+        ))
+      } else {
+        .npRmpi_with_local_regression(suppressWarnings(npreghat.rbandwidth(
+          bws = bws,
+          txdat = xdat,
+          exdat = exdat,
+          s = s.vec,
+          output = "matrix"
+        )))
+      }
       .npRmpi_bootstrap_transport_trace(
         what = "rbandwidth.wild",
         event = "wild.hat.done",
