@@ -1,8 +1,9 @@
 test_that("npplreg generalized-nn cv.aic bootstrap representative session contract holds", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260311)
 
-  npRmpi.init(nslaves = 1L, comm = 1L, quiet = TRUE)
-  on.exit(npRmpi.quit(comm = 1L), add = TRUE)
   options(np.messages = FALSE)
 
   n <- 24L

@@ -63,6 +63,9 @@ progress_time_counter <- function(start = 0, by = 2.1) {
 }
 
 test_that("npscoefbw emits append-only multistart and objective progress on master", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(3240)
   n <- 65
   x <- runif(n)
@@ -71,8 +74,6 @@ test_that("npscoefbw emits append-only multistart and objective progress on mast
 
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
-  npRmpi.init(nslaves = 1L, quiet = TRUE)
-  on.exit(try(npRmpi.quit(), silent = TRUE), add = TRUE)
 
   res <- with_nprmpi_bindings(
     list(
@@ -102,6 +103,9 @@ test_that("npscoefbw emits append-only multistart and objective progress on mast
 })
 
 test_that("npscoefbw progress respects np.messages FALSE", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(3240)
   n <- 50
   x <- runif(n)
@@ -110,8 +114,6 @@ test_that("npscoefbw progress respects np.messages FALSE", {
 
   old_opts <- options(np.messages = FALSE)
   on.exit(options(old_opts), add = TRUE)
-  npRmpi.init(nslaves = 1L, quiet = TRUE)
-  on.exit(try(npRmpi.quit(), silent = TRUE), add = TRUE)
 
   res <- with_nprmpi_bindings(
     list(
@@ -136,6 +138,9 @@ test_that("npscoefbw progress respects np.messages FALSE", {
 })
 
 test_that("npscoefbw cv.iterate path emits append-only backfitting progress on master", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(3240)
   n <- 65
   x <- runif(n)
@@ -144,8 +149,6 @@ test_that("npscoefbw cv.iterate path emits append-only backfitting progress on m
 
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
-  npRmpi.init(nslaves = 1L, quiet = TRUE)
-  on.exit(try(npRmpi.quit(), silent = TRUE), add = TRUE)
 
   res <- with_nprmpi_bindings(
     list(
