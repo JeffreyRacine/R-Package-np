@@ -63,7 +63,8 @@ test_that("plot helper progress emits append-only bounded messages on master", {
   old_opts <- options(
     np.messages = TRUE,
     np.plot.progress = TRUE,
-    np.plot.progress.interval.sec = 0
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -88,6 +89,33 @@ test_that("plot helper progress emits append-only bounded messages on master", {
   expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
   expect_equal(sum(grepl("^\\[npRmpi\\] Plot bootstrap wild 9/9 ", messages)), 1L)
   expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
+})
+
+test_that("plot helper stays silent for instant runs below start grace on master", {
+  begin <- getFromNamespace(".np_plot_progress_begin", "npRmpi")
+  finish <- getFromNamespace(".np_plot_progress_end", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 1
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  messages <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_master = function() TRUE,
+      .np_progress_now = progress_time_counter(start = 0, by = 0.2)
+    ),
+    capture_messages_only({
+      state <- begin(total = 5, label = "Plot bootstrap wild")
+      finish(state)
+    })
+  )
+
+  expect_length(messages, 0)
 })
 
 test_that("plot helper activity emits a single append-only note on master", {
@@ -121,6 +149,7 @@ test_that("plot helper progress is silent off master", {
     np.messages = TRUE,
     np.plot.progress = TRUE,
     np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0,
     np.plot.progress.noninteractive = TRUE
   )
   on.exit(options(old_opts), add = TRUE)
@@ -150,6 +179,7 @@ test_that("plot helper progress supports the explicit noninteractive override on
     np.messages = TRUE,
     np.plot.progress = TRUE,
     np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0,
     np.plot.progress.noninteractive = TRUE
   )
   on.exit(options(old_opts), add = TRUE)
@@ -179,7 +209,8 @@ test_that("plot helper progress respects suppressMessages", {
   old_opts <- options(
     np.messages = TRUE,
     np.plot.progress = TRUE,
-    np.plot.progress.interval.sec = 0
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0
   )
   on.exit(options(old_opts), add = TRUE)
 
