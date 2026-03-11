@@ -148,6 +148,9 @@ test_that("npscoefbw multistart path uses append-only progress core", {
 
   expect_true(grepl("Optimizing smooth coefficient bandwidth", src, fixed = TRUE))
   expect_true(grepl("Multistart optimization", src, fixed = TRUE))
+  expect_true(grepl("Backfitting smooth coefficient bandwidth", src, fixed = TRUE))
+  expect_true(grepl("Optimizing partial residual bandwidth", src, fixed = TRUE))
+  expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
 })
 
 test_that("plot helpers use append-only progress core", {

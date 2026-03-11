@@ -536,12 +536,15 @@ npscoefbw.scbandwidth <-
         if (bandwidth.compute){
           maxPenalty <- sqrt(.Machine$double.xmax)
           cv_state <- new.env(parent = emptyenv())
-          cv_state$console <- NULL
           cv_state$fast_total <- 0L
           cv_state$objective_fast <- FALSE
           cv_state$optim_progress <- NULL
           cv_state$optim_eval <- 0L
           cv_state$multistart_index <- NA_integer_
+          cv_state$partial_progress <- NULL
+          cv_state$partial_eval <- 0L
+          cv_state$backfit_iteration <- NA_integer_
+          cv_state$partial_index <- NA_integer_
 
           cv_progress_detail <- function(ridging = FALSE) {
             detail <- sprintf("multistart %d", cv_state$multistart_index)
@@ -590,6 +593,58 @@ npscoefbw.scbandwidth <-
               detail = cv_progress_detail(ridging = ridging)
             )
             cv_state$optim_progress <- NULL
+            invisible(NULL)
+          }
+
+          partial_progress_detail <- function(fv = NULL) {
+            detail <- sprintf(
+              "backfitting iteration %d of %d, partial residual %d of %d",
+              cv_state$backfit_iteration,
+              cv.num.iterations,
+              cv_state$partial_index,
+              ncol(W)
+            )
+            if (!is.null(fv)) {
+              detail <- paste(
+                detail,
+                sprintf(
+                  "fval %s",
+                  format(signif(fv, digits = getOption("digits", 7L)), trim = TRUE)
+                ),
+                sep = ", "
+              )
+            }
+            detail
+          }
+
+          partial_progress_begin <- function(iteration, partial.index) {
+            cv_state$backfit_iteration <- iteration
+            cv_state$partial_index <- partial.index
+            cv_state$partial_eval <- 0L
+            cv_state$partial_progress <- .np_progress_begin("Optimizing partial residual bandwidth")
+            invisible(NULL)
+          }
+
+          partial_progress_step <- function(fv) {
+            cv_state$partial_eval <- cv_state$partial_eval + 1L
+            cv_state$partial_progress <- .np_progress_step(
+              state = cv_state$partial_progress,
+              done = cv_state$partial_eval,
+              detail = partial_progress_detail(fv = fv)
+            )
+            invisible(NULL)
+          }
+
+          partial_progress_finish <- function(fv = NULL) {
+            if (is.null(cv_state$partial_progress))
+              return(invisible(NULL))
+
+            cv_state$partial_progress$last_emit <- -Inf
+            cv_state$partial_progress <- .np_progress_end(
+              cv_state$partial_progress,
+              detail = partial_progress_detail(fv = fv)
+            )
+            cv_state$partial_progress <- NULL
             invisible(NULL)
           }
 
@@ -702,10 +757,7 @@ npscoefbw.scbandwidth <-
             if (isTRUE(cv_state$objective_fast))
               cv_state$fast_total <- cv_state$fast_total + 1L
             
-            cv_state$console <- printClear(cv_state$console)
-            cv_state$console <- printPush(msg = paste("fval:",
-                                       signif(fv, digits = getOption("digits", 7L))),
-                                     console = cv_state$console)
+            partial_progress_step(fv = fv)
             return((if (is.finite(fv)) fv else maxPenalty))
           }
 
@@ -797,13 +849,15 @@ npscoefbw.scbandwidth <-
             nobs = n,
             where = "npscoefbw"
           )
+          bws <- apply_bw_to_scbw(bws, bws$bw)
 
           if(cv.iterate){
-            
-            console <- newLineConsole()
-            
             n.part <- (ncol(xdat)+1)
-            
+            backfit.progress <- .np_progress_begin(
+              "Backfitting smooth coefficient bandwidth",
+              total = cv.num.iterations
+            )
+            on.exit(cv_progress_end(backfit.progress), add = TRUE)
             bws$bw.fitted <- matrix(data = bws$bw, nrow = length(bws$bw), ncol = n.part)
             ## obtain matrix of alpha.hat | h0 and beta.hat | h0
 
@@ -816,14 +870,16 @@ npscoefbw.scbandwidth <-
 
             
             for (i in seq_len(cv.num.iterations)) {
-              console <- printPush(msg = paste(sep="", "backfitting iteration ", i, " of ", cv.num.iterations, "... "), console)
+              backfit.progress <- .np_progress_step(
+                state = backfit.progress,
+                done = i,
+                detail = sprintf("iteration %d of %d", i, cv.num.iterations)
+              )
 
               for (j in seq_len(n.part)) {
-                console <- printPush(msg = paste(sep="", "partial residual ", j, " of ", n.part, "... "), console)
-                cv_state$console <- newLineConsole(console)
-
                 ## estimate partial residuals
                 partial.orig <- W[,j] * scoef$beta[,j] + resid.full
+                partial_progress_begin(iteration = i, partial.index = j)
                 
                 ## minimise
                 suppressWarnings(optim.return <-
@@ -832,8 +888,7 @@ npscoefbw.scbandwidth <-
                                        partial.index = j))
                 if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
                   num.feval.overall <- num.feval.overall + optim.return$counts[1]
-                
-                cv_state$console <- printClear(cv_state$console)
+                partial_progress_finish(fv = optim.return$value)
                 
                 ## grab parameter
                 bws$bw.fitted[,j] <- optim.return$par
@@ -873,16 +928,11 @@ npscoefbw.scbandwidth <-
                   }
                   
                   bws$bw <- param.overall
+                  bws <- apply_bw_to_scbw(bws, bws$bw)
                   ## estimate new full residuals 
                   resid.full <- partial.orig - W[,j] * scoef$beta[,j]
                 }
-
-                console <- printPop(console)
               }
-              if(i < cv.num.iterations)
-                console <- printPop(console)
-              else
-                console <- printClear(console)
             }
             scoef.loo.args <- list(
               bws = bws, txdat = xdat, tydat = ydat,
