@@ -240,7 +240,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   npRmpi.init(nslaves = cfg$nslaves)
   on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)
 
-  options(npRmpi.autodispatch = TRUE, np.messages = FALSE, np.tree = cfg)
+  options(npRmpi.autodispatch = TRUE, np.messages = FALSE, np.tree = cfg$np_tree)
   eval(substitute(
     options(npRmpi.autodispatch = TRUE, np.messages = FALSE, np.tree = TF),
     list(TF = cfg$np_tree)

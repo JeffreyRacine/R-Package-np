@@ -54,16 +54,25 @@ make_seeds <- function(cfg) {
   cfg$base_seed
 }
 
+collect_numeric <- function(x) {
+  if (is.null(x) || length(x) == 0L) return(numeric())
+  if (is.atomic(x)) return(suppressWarnings(as.numeric(x)))
+  if (is.list(x)) return(unlist(lapply(x, collect_numeric), use.names = FALSE))
+  numeric()
+}
+
 sig_numeric <- function(x, k = 25L) {
-  nums <- suppressWarnings(as.numeric(unlist(x)))
+  nums <- collect_numeric(x)
   nums <- nums[is.finite(nums)]
   if (length(nums) == 0L) return(NA_real_)
   mean(nums[seq_len(min(k, length(nums)))])
 }
 
 first_num_or_na <- function(x) {
-  if (is.null(x) || length(x) == 0L) return(NA_real_)
-  suppressWarnings(as.numeric(x)[1])
+  nums <- collect_numeric(x)
+  nums <- nums[is.finite(nums)]
+  if (length(nums) == 0L) return(NA_real_)
+  nums[1]
 }
 
 run_one <- function(fun, n, seed) {

@@ -33,6 +33,7 @@ parse_args <- function(args) {
 main <- function(args = commandArgs(trailingOnly = TRUE)) {
   cfg <- parse_args(args)
   script <- "/Users/jracine/Development/np-npRmpi/benchmarks/perf/oneoff/bench_oneoff_param_nprmpi.R"
+  log_dir <- dirname(cfg$out_manifest)
 
   real_funs <- c("npcmstest", "npconmode", "npqreg")
   synth_funs <- c("npcopula", "npdeneqtest", "npdeptest", "npregiv", "npsdeptest", "npsigtest", "npsymtest", "npunitest")
@@ -43,6 +44,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   run_case <- function(fun, n_value, is_real) {
     out_raw <- if (is_real) sprintf("/tmp/nprmpi_oneoff_%s_raw.csv", fun) else sprintf("/tmp/nprmpi_oneoff_%s_n%d_raw.csv", fun, n_value)
     out_sum <- if (is_real) sprintf("/tmp/nprmpi_oneoff_%s_summary.csv", fun) else sprintf("/tmp/nprmpi_oneoff_%s_n%d_summary.csv", fun, n_value)
+    log_file <- file.path(log_dir, if (is_real) sprintf("oneoff_%s.log", fun) else sprintf("oneoff_%s_n%d.log", fun, n_value))
 
     args <- c(script,
               paste0("--fun=", fun),
@@ -56,8 +58,8 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
               "--show_progress=FALSE")
 
     env <- c(sprintf("FI_TCP_IFACE=%s", cfg$iface))
-    rc <- system2("Rscript", args, env = env)
-    data.frame(fun = fun, n = if (is_real) NA_integer_ else n_value, out_raw = out_raw, out_summary = out_sum, rc = rc, stringsAsFactors = FALSE)
+    rc <- system2("env", c(env, "script", "-q", "/dev/null", "Rscript", args), stdout = log_file, stderr = log_file)
+    data.frame(fun = fun, n = if (is_real) NA_integer_ else n_value, out_raw = out_raw, out_summary = out_sum, log = log_file, rc = rc, stringsAsFactors = FALSE)
   }
 
   for (fun in real_funs) {
