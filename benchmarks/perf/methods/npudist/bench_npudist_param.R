@@ -224,6 +224,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   options(np.tree = cfg$np_tree)
   seeds <- make_seeds(cfg)
 
+
   if (cfg$show_progress) {
     cat("Running npudist serial benchmark with", length(seeds), "seeds\n")
     cat("backend=np",
@@ -261,6 +262,10 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
                 col.names = !file.exists(cfg$out_summary),
                 append = file.exists(cfg$out_summary),
                 qmethod = "double")
+  }
+
+  if (any(!raw$ok)) {
+    stop("One or more benchmark iterations failed. See raw CSV: ", cfg$out_raw)
   }
 
   if (cfg$show_progress) {
