@@ -9,7 +9,14 @@ test_that("public npcdistbw cv.ls keeps lc adjacency live during containment", {
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- data.frame(y1 = sin(2 * pi * x$x1) + rnorm(n, sd = 0.15))
 
-  bw.lc <- npcdistbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ls", nmulti = 0)
+  bw.lc <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lc",
+    bwmethod = "cv.ls",
+    nmulti = 0,
+    itmax = 1L
+  )
   fit.lc <- npcdist(bws = bw.lc)
 
   expect_true(is.finite(bw.lc$fval))
@@ -31,7 +38,8 @@ test_that("public npcdistbw cv.ls fixed LP/LL route activates with ll == lp pari
     ydat = y,
     regtype = "ll",
     bwmethod = "cv.ls",
-    nmulti = 0
+    nmulti = 0,
+    itmax = 1L
   )
   bw.lp <- npcdistbw(
     xdat = x,
@@ -40,7 +48,8 @@ test_that("public npcdistbw cv.ls fixed LP/LL route activates with ll == lp pari
     basis = "glp",
     degree = degree,
     bwmethod = "cv.ls",
-    nmulti = 0
+    nmulti = 0,
+    itmax = 1L
   )
 
   expect_true(is.finite(bw.ll$fval))
@@ -65,7 +74,7 @@ test_that("public npcdistbw cv.ls generalized-nn LP route activates with ll == l
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
     nmulti = 0,
-    itmax = 1
+    itmax = 1L
   )
   bw.lp <- npcdistbw(
     xdat = x,
@@ -76,7 +85,7 @@ test_that("public npcdistbw cv.ls generalized-nn LP route activates with ll == l
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
     nmulti = 0,
-    itmax = 1
+    itmax = 1L
   )
 
   expect_true(is.finite(bw.ll$fval))
@@ -101,7 +110,7 @@ test_that("public npcdistbw cv.ls adaptive-nn LP route activates with ll == lp p
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
     nmulti = 0,
-    itmax = 1
+    itmax = 1L
   )
   bw.lp <- npcdistbw(
     xdat = x,
@@ -112,7 +121,7 @@ test_that("public npcdistbw cv.ls adaptive-nn LP route activates with ll == lp p
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
     nmulti = 0,
-    itmax = 1
+    itmax = 1L
   )
 
   expect_true(is.finite(bw.ll$fval))
