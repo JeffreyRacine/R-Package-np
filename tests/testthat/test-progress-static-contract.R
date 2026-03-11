@@ -141,6 +141,15 @@ test_that("npindexbw no longer uses legacy console helpers", {
   expect_true(grepl("detail = sprintf\\(\"multistart %d\", i\\)", src))
 })
 
+test_that("npscoefbw multistart path uses append-only progress core", {
+  src_path <- testthat::test_path("..", "..", "R", "np.smoothcoef.bw.R")
+  skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("Optimizing smooth coefficient bandwidth", src, fixed = TRUE))
+  expect_true(grepl("Multistart optimization", src, fixed = TRUE))
+})
+
 test_that("plot helpers use append-only progress core", {
   src_path <- testthat::test_path("..", "..", "R", "np.plot.helpers.R")
   skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
