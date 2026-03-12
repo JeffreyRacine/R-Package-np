@@ -2374,8 +2374,14 @@
 }
 
 .np_ksum_eval_exact_state <- function(state, txdat, weights) {
-  txdat <- adjustLevels(toFrame(txdat), state$bws$xdati, allowNewCells = TRUE)
-  txm <- toMatrix(txdat)
+  if (state$bws$nuno == 0L &&
+      state$bws$nord == 0L &&
+      is.data.frame(txdat)) {
+    txm <- data.matrix(txdat)
+  } else {
+    txdat <- adjustLevels(toFrame(txdat), state$bws$xdati, allowNewCells = TRUE)
+    txm <- toMatrix(txdat)
+  }
   tnrow <- nrow(txdat)
   weights <- matrix(as.double(weights), ncol = 1L)
 
