@@ -90,28 +90,6 @@
   list(bws = bws, scale = bw.scale, operator = operator)
 }
 
-.npcdhat_make_kernel_matrix <- function(kbw, txdat, exdat, operator) {
-  if (!identical(kbw$type, "fixed")) {
-    n.train <- nrow(txdat)
-    return(npksum(
-      bws = kbw,
-      txdat = txdat,
-      exdat = exdat,
-      tydat = diag(n.train),
-      operator = operator,
-      bandwidth.divide = TRUE
-    )$ksum)
-  }
-
-  .np_direct_operator_matrix(
-    kbw = kbw,
-    txdat = txdat,
-    exdat = exdat,
-    operator = operator,
-    where = "conditional hat direct kernel matrix"
-  )
-}
-
 .np_direct_operator_matrix <- function(kbw, txdat, exdat, operator, where) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
@@ -166,6 +144,76 @@
     stop(sprintf("%s returned unexpected operator shape", where))
 
   crossprod(kw, rhs) / op.info$scale
+}
+
+.np_exact_operator_apply <- function(kbw, txdat, exdat, operator, rhs, where) {
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+  rhs <- as.matrix(rhs)
+  storage.mode(rhs) <- "double"
+
+  if (nrow(rhs) != nrow(txdat))
+    stop(sprintf("%s received RHS with unexpected number of rows", where))
+
+  out <- matrix(0.0, nrow = nrow(exdat), ncol = ncol(rhs))
+  for (j in seq_len(ncol(rhs))) {
+    out[, j] <- as.double(npksum(
+      bws = kbw,
+      txdat = txdat,
+      exdat = exdat,
+      tydat = rhs[, j],
+      operator = operator,
+      bandwidth.divide = TRUE
+    )$ksum)
+  }
+
+  if (ncol(out) == 1L)
+    out[, 1L, drop = FALSE]
+  else
+    out
+}
+
+.np_exact_operator_matrix <- function(kbw, txdat, exdat, operator, where) {
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+  n.train <- nrow(txdat)
+  H <- matrix(0.0, nrow = nrow(exdat), ncol = n.train)
+  e.j <- numeric(n.train)
+
+  for (j in seq_len(n.train)) {
+    e.j[] <- 0.0
+    e.j[j] <- 1.0
+    H[, j] <- .np_exact_operator_apply(
+      kbw = kbw,
+      txdat = txdat,
+      exdat = exdat,
+      operator = operator,
+      rhs = e.j,
+      where = where
+    )[, 1L]
+  }
+
+  H
+}
+
+.npcdhat_make_kernel_matrix <- function(kbw, txdat, exdat, operator) {
+  if (!identical(kbw$type, "fixed")) {
+    return(.np_exact_operator_matrix(
+      kbw = kbw,
+      txdat = txdat,
+      exdat = exdat,
+      operator = operator,
+      where = "conditional hat exact kernel matrix"
+    ))
+  }
+
+  .np_direct_operator_matrix(
+    kbw = kbw,
+    txdat = txdat,
+    exdat = exdat,
+    operator = operator,
+    where = "conditional hat direct kernel matrix"
+  )
 }
 
 .npcdhat_ratio_matrix <- function(bws, txdat, tydat, exdat, eydat, operator) {

@@ -861,7 +861,9 @@ npplreghat <-
         txdat = tzdat,
         output = "matrix"
       )
-      A <- qr.coef(qrR, diag(n) - H.y.train)
+      H.y.train[] <- -H.y.train
+      diag(H.y.train) <- diag(H.y.train) + 1.0
+      A <- qr.coef(qrR, H.y.train)
       A[is.na(A)] <- 0.0
       H <- H.y.eval + resx.eval %*% A
       return(H)
