@@ -68,6 +68,27 @@ test_that("npudisthat fixed-bandwidth count vectors reproduce resampled npudist 
   }
 })
 
+test_that("npudisthat fixed apply mode matches matrix RHS multiplication", {
+  npudisthat <- getFromNamespace("npudisthat", "np")
+
+  set.seed(20260311)
+  n <- 48
+  x <- sort(runif(n))
+  tx <- data.frame(x = x)
+  ex <- data.frame(x = seq(0.1, 0.9, length.out = 19))
+  bw <- npudistbw(
+    dat = tx,
+    bws = 0.16,
+    bwtype = "fixed",
+    bandwidth.compute = FALSE
+  )
+  rhs <- cbind(seq_len(n) / n, cos(seq_len(n) / 9))
+  H <- npudisthat(bws = bw, tdat = tx, edat = ex, output = "matrix")
+  apply.out <- npudisthat(bws = bw, tdat = tx, edat = ex, y = rhs, output = "apply")
+
+  expect_equal(apply.out, H %*% rhs, tolerance = 1e-12)
+})
+
 test_that("npudisthat preserves bounded gaussian manual-bandwidth semantics", {
   npudisthat <- getFromNamespace("npudisthat", "np")
 

@@ -95,6 +95,37 @@
   t(kw) / op.info$scale
 }
 
+.np_direct_operator_apply <- function(kbw, txdat, exdat, operator, rhs, where) {
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+  rhs <- as.matrix(rhs)
+  storage.mode(rhs) <- "double"
+
+  if (nrow(rhs) != nrow(txdat))
+    stop(sprintf("%s received RHS with unexpected number of rows", where))
+
+  op.info <- .np_operator_kernel_weight_scale(
+    bws = kbw,
+    operator = operator,
+    nvars = ncol(txdat),
+    where = where
+  )
+  kw <- .np_kernel_weights_direct(
+    bws = op.info$bws,
+    txdat = txdat,
+    exdat = exdat,
+    bandwidth.divide = TRUE,
+    operator = op.info$operator
+  )
+
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = nrow(txdat))
+  if (nrow(kw) != nrow(txdat) || ncol(kw) != nrow(exdat))
+    stop(sprintf("%s returned unexpected operator shape", where))
+
+  crossprod(kw, rhs) / op.info$scale
+}
+
 .npcdhat_make_kernel_matrix <- function(kbw, txdat, exdat, operator) {
   if (!identical(kbw$type, "fixed")) {
     n.train <- nrow(txdat)
