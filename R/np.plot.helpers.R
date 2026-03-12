@@ -3792,6 +3792,128 @@
   )
 }
 
+.np_ksum_exact_state_build <- function(bws, exdat, operator) {
+  exdat <- toFrame(exdat)
+  if (!isa(bws, "kbandwidth"))
+    bws <- kbandwidth(bws)
+
+  operator <- as.character(operator)
+  if (length(operator) == 1L)
+    operator <- rep.int(operator, length(exdat))
+  if (length(operator) != length(exdat))
+    stop("exact ksum state requires one operator per evaluation column")
+  if (!all(operator %in% names(ALL_OPERATORS)))
+    stop("invalid operator specification for exact ksum state")
+
+  uo.operators <- c("normal", "convolution", "integral")
+  if (!all(operator[bws$iuno | bws$iord] %in% uo.operators))
+    stop("unordered and ordered variables may only use normal, convolution, or integral operators")
+
+  exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+  npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+
+  exm <- toMatrix(exdat)
+  bounds <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+
+  list(
+    bws = bws,
+    operator.num = ALL_OPERATORS[operator],
+    euno = exm[, bws$iuno, drop = FALSE],
+    eord = exm[, bws$iord, drop = FALSE],
+    econ = exm[, bws$icon, drop = FALSE],
+    enrow = nrow(exdat),
+    bw = as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+    xmcv = as.double(bws$xmcv),
+    pad.num = as.double(attr(bws$xmcv, "pad.num")),
+    cker.lb = as.double(bounds$lb),
+    cker.ub = as.double(bounds$ub)
+  )
+}
+
+.np_ksum_eval_exact_state <- function(state, txdat, weights) {
+  txdat <- adjustLevels(toFrame(txdat), state$bws$xdati, allowNewCells = TRUE)
+  txm <- toMatrix(txdat)
+  tnrow <- nrow(txdat)
+  weights <- matrix(as.double(weights), ncol = 1L)
+
+  if (nrow(weights) != tnrow)
+    stop("exact ksum state apply requires one weight per training row")
+
+  myopti <- list(
+    num_obs_train = tnrow,
+    num_obs_eval = state$enrow,
+    num_uno = state$bws$nuno,
+    num_ord = state$bws$nord,
+    num_con = state$bws$ncon,
+    int_LARGE_SF = SF_ARB,
+    BANDWIDTH_reg_extern = switch(state$bws$type,
+      fixed = BW_FIXED,
+      generalized_nn = BW_GEN_NN,
+      adaptive_nn = BW_ADAP_NN
+    ),
+    int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
+    kerneval = switch(state$bws$ckertype,
+      gaussian = CKER_GAUSS + state$bws$ckerorder / 2 - 1,
+      epanechnikov = CKER_EPAN + state$bws$ckerorder / 2 - 1,
+      uniform = CKER_UNI,
+      "truncated gaussian" = CKER_TGAUSS
+    ),
+    ukerneval = switch(state$bws$ukertype,
+      aitchisonaitken = UKER_AIT,
+      liracine = UKER_LR
+    ),
+    okerneval = switch(state$bws$okertype,
+      wangvanryzin = OKER_WANG,
+      liracine = OKER_LR,
+      nliracine = OKER_NLR,
+      racineliyan = OKER_RLY
+    ),
+    miss.ex = FALSE,
+    leave.one.out = FALSE,
+    bandwidth.divide = TRUE,
+    mcv.numRow = attr(state$bws$xmcv, "num.row"),
+    wncol = 1L,
+    yncol = 1L,
+    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    return.kernel.weights = FALSE,
+    permutation.operator = PERMUTATION_OPERATORS[["none"]],
+    compute.score = FALSE,
+    compute.ocg = FALSE
+  )
+
+  asDouble <- function(data) {
+    if (is.null(data)) as.double(0.0) else as.double(data)
+  }
+
+  .np_plot_with_local_compiled_eval(.Call(
+    "C_np_kernelsum",
+    asDouble(txm[, state$bws$iuno, drop = FALSE]),
+    asDouble(txm[, state$bws$iord, drop = FALSE]),
+    asDouble(txm[, state$bws$icon, drop = FALSE]),
+    as.double(matrix(1.0, nrow = tnrow, ncol = 1L)),
+    as.double(weights),
+    asDouble(state$euno),
+    asDouble(state$eord),
+    asDouble(state$econ),
+    state$bw,
+    state$xmcv,
+    state$pad.num,
+    as.integer(c(
+      state$operator.num[state$bws$icon],
+      state$operator.num[state$bws$iuno],
+      state$operator.num[state$bws$iord]
+    )),
+    as.integer(myopti),
+    as.double(1.0),
+    as.integer(state$enrow),
+    as.integer(0L),
+    as.integer(0L),
+    state$cker.lb,
+    state$cker.ub,
+    PACKAGE = "npRmpi"
+  ))[[1L]]
+}
+
 .np_ksum_conditional_eval_exact <- function(xdat,
                                             ydat,
                                             exdat,
@@ -4259,18 +4381,44 @@
   if (is.null(kbx) || is.null(kbxy))
     return(NULL)
 
-  fit_one <- function(x.train, y.train, weights = NULL, n.total = NULL) {
-    .np_ksum_conditional_eval_exact(
-      xdat = x.train,
-      ydat = y.train,
-      exdat = exdat,
-      eydat = eydat,
-      kbx = kbx,
-      kbxy = kbxy,
-      cdf = cdf,
-      weights = weights,
-      n.total = n.total
+  den.state <- .np_ksum_exact_state_build(
+    bws = kbx,
+    exdat = exdat,
+    operator = rep.int("normal", ncol(xdat))
+  )
+  num.state <- .np_ksum_exact_state_build(
+    bws = kbxy,
+    exdat = data.frame(exdat, eydat),
+    operator = c(
+      rep.int("normal", ncol(xdat)),
+      rep.int(if (cdf) "integral" else "normal", ncol(ydat))
     )
+  )
+
+  fit_one <- function(x.train, y.train, weights = NULL, n.total = NULL) {
+    if (is.null(weights)) {
+      weights <- matrix(1.0, nrow = nrow(x.train), ncol = 1L)
+      n.total <- nrow(x.train)
+    } else {
+      weights <- matrix(as.double(weights), ncol = 1L)
+      if (nrow(weights) != nrow(x.train))
+        stop("exact conditional ksum helper requires one weight per training row")
+      if (is.null(n.total))
+        n.total <- sum(weights)
+    }
+
+    den <- as.numeric(.np_ksum_eval_exact_state(
+      state = den.state,
+      txdat = x.train,
+      weights = weights
+    )) / n.total
+    num <- as.numeric(.np_ksum_eval_exact_state(
+      state = num.state,
+      txdat = data.frame(x.train, y.train),
+      weights = weights
+    )) / n.total
+
+    num / pmax(den, .Machine$double.eps)
   }
 
   t0 <- fit_one(x.train = xdat, y.train = ydat)

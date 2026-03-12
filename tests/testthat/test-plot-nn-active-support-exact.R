@@ -111,51 +111,54 @@ test_that("nonfixed conditional exact bootstrap matches duplicate-row oracle", {
   )
   storage.mode(counts) <- "double"
 
-  bw <- npcdensbw(
-    xdat = xdat,
-    ydat = ydat,
-    bwtype = "generalized_nn",
-    bws = c(1, 1),
-    bandwidth.compute = FALSE
-  )
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    bw.val <- if (identical(bt, "adaptive_nn")) c(2, 2) else c(1, 1)
+    bw <- npcdensbw(
+      xdat = xdat,
+      ydat = ydat,
+      bwtype = bt,
+      bws = bw.val,
+      bandwidth.compute = FALSE
+    )
 
-  helper <- npRmpi:::.np_inid_boot_from_ksum_conditional_exact(
-    xdat = xdat,
-    ydat = ydat,
-    exdat = exdat,
-    eydat = eydat,
-    bws = bw,
-    B = ncol(counts),
-    cdf = FALSE,
-    counts = counts
-  )
+    helper <- npRmpi:::.np_inid_boot_from_ksum_conditional_exact(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bw,
+      B = ncol(counts),
+      cdf = FALSE,
+      counts = counts
+    )
 
-  kbx <- npRmpi:::.np_con_make_kbandwidth_x(bws = bw, xdat = xdat)
-  kbxy <- npRmpi:::.np_con_make_kbandwidth_xy(bws = bw, xdat = xdat, ydat = ydat)
+    kbx <- npRmpi:::.np_con_make_kbandwidth_x(bws = bw, xdat = xdat)
+    kbxy <- npRmpi:::.np_con_make_kbandwidth_xy(bws = bw, xdat = xdat, ydat = ydat)
 
-  manual <- vapply(seq_len(ncol(counts)), function(j) {
-    idx <- npRmpi:::.np_counts_to_indices(counts[, j])
-    npRmpi:::.np_ksum_conditional_eval_exact(
-      xdat = xdat[idx, , drop = FALSE],
-      ydat = ydat[idx, , drop = FALSE],
+    manual <- vapply(seq_len(ncol(counts)), function(j) {
+      idx <- npRmpi:::.np_counts_to_indices(counts[, j])
+      npRmpi:::.np_ksum_conditional_eval_exact(
+        xdat = xdat[idx, , drop = FALSE],
+        ydat = ydat[idx, , drop = FALSE],
+        exdat = exdat,
+        eydat = eydat,
+        kbx = kbx,
+        kbxy = kbxy,
+        cdf = FALSE
+      )
+    }, numeric(nrow(exdat)))
+
+    expect_equal(helper$t0, npRmpi:::.np_ksum_conditional_eval_exact(
+      xdat = xdat,
+      ydat = ydat,
       exdat = exdat,
       eydat = eydat,
       kbx = kbx,
       kbxy = kbxy,
       cdf = FALSE
-    )
-  }, numeric(nrow(exdat)))
-
-  expect_equal(helper$t0, npRmpi:::.np_ksum_conditional_eval_exact(
-    xdat = xdat,
-    ydat = ydat,
-    exdat = exdat,
-    eydat = eydat,
-    kbx = kbx,
-    kbxy = kbxy,
-    cdf = FALSE
-  ))
-  expect_equal(helper$t, t(manual), tolerance = 1e-14)
+    ), info = bt)
+    expect_equal(helper$t, t(manual), tolerance = 1e-14, info = bt)
+  }
 })
 
 test_that("npRmpi nonfixed unconditional exact helper fanout paths complete in subprocess", {
