@@ -341,6 +341,19 @@
   rep.int(seq_along(counts.col), counts.col)
 }
 
+.np_bind_data_frames_fast <- function(xdat, ydat) {
+  if (!is.data.frame(xdat) || !is.data.frame(ydat))
+    return(data.frame(xdat, ydat))
+  if (nrow(xdat) != nrow(ydat))
+    stop("bound data frames must have the same number of rows")
+
+  out <- c(unclass(xdat), unclass(ydat))
+  names(out) <- make.names(c(names(xdat), names(ydat)), unique = TRUE)
+  class(out) <- "data.frame"
+  attr(out, "row.names") <- attr(xdat, "row.names")
+  out
+}
+
 .np_active_boot_sample <- function(xdat, counts.col, ydat = NULL) {
   counts.col <- as.double(counts.col)
   if (length(counts.col) != nrow(xdat))
@@ -2311,7 +2324,7 @@
 .np_con_make_kbandwidth_xy <- function(bws, xdat, ydat) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
-  xydat <- data.frame(xdat, ydat)
+  xydat <- .np_bind_data_frames_fast(xdat, ydat)
   ckerlb <- c(if (is.null(bws$cxkerlb)) numeric(0) else bws$cxkerlb,
               if (is.null(bws$cykerlb)) numeric(0) else bws$cykerlb)
   ckerub <- c(if (is.null(bws$cxkerub)) numeric(0) else bws$cxkerub,
@@ -2491,8 +2504,8 @@
       n.total <- sum(weights)
   }
   ones <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
-  xydat <- data.frame(xdat, ydat)
-  exydat <- data.frame(exdat, eydat)
+  xydat <- .np_bind_data_frames_fast(xdat, ydat)
+  exydat <- .np_bind_data_frames_fast(exdat, eydat)
 
   den <- as.numeric(npksum(
     txdat = xdat,
@@ -3034,7 +3047,7 @@
   )
   num.state <- .np_ksum_exact_state_build(
     bws = kbxy,
-    exdat = data.frame(exdat, eydat),
+    exdat = .np_bind_data_frames_fast(exdat, eydat),
     operator = c(
       rep.int("normal", ncol(xdat)),
       rep.int(if (cdf) "integral" else "normal", ncol(ydat))
@@ -3081,7 +3094,7 @@
     )) / n.total
     num <- as.numeric(.np_ksum_eval_exact_state(
       state = num.state,
-      txdat = data.frame(x.train, y.train),
+      txdat = .np_bind_data_frames_fast(x.train, y.train),
       weights = weights
     )) / n.total
 
