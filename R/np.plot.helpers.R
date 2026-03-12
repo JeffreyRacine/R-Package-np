@@ -2460,7 +2460,7 @@
     asDouble(txm[, state$bws$iord, drop = FALSE]),
     asDouble(txm[, state$bws$icon, drop = FALSE]),
     as.double(matrix(1.0, nrow = tnrow, ncol = 1L)),
-    as.double(weights),
+    weights,
     asDouble(state$euno),
     asDouble(state$eord),
     asDouble(state$econ),
