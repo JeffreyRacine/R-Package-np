@@ -1,4 +1,4 @@
-test_that("fixed-bwtype plot bootstrap covers regression, unsupervised, and semiparametric families for inid fixed and geom", {
+test_that("fixed-bwtype plot bootstrap covers supervised wild and unsupervised inid fixed geom families", {
   skip_if_not_installed("np")
 
   set.seed(603106)
@@ -172,4 +172,34 @@ test_that("fixed-bwtype plot bootstrap covers regression, unsupervised, and semi
       expect_type(run_plot(si.bw, xdat = xidat, ydat = yindex, boot.method = boot.method), "list")
     }
   }
+
+  for (reg.bw in reg.bws) {
+    expect_type(run_plot(reg.bw, xdat = xdat, ydat = yreg, boot.method = "wild"), "list")
+  }
+  for (sc.bw in sc.bws) {
+    expect_type(run_plot(sc.bw, xdat = xdat, ydat = yscoef, zdat = zdat, boot.method = "wild"), "list")
+  }
+  for (pl.bw in pl.bws) {
+    expect_type(run_plot(pl.bw, xdat = xdat, ydat = yplreg, zdat = zdat, boot.method = "wild"), "list")
+  }
+  for (si.bw in si.bws) {
+    expect_type(run_plot(si.bw, xdat = xidat, ydat = yindex, boot.method = "wild"), "list")
+  }
+
+  expect_error(
+    run_plot(u.dens.bw, xdat = xdat, boot.method = "wild"),
+    "not supported"
+  )
+  expect_error(
+    run_plot(u.dist.bw, xdat = xdat, boot.method = "wild"),
+    "not supported"
+  )
+  expect_error(
+    run_plot(c.dens.bw, xdat = xdat, ydat = ydat, view = "fixed", boot.method = "wild"),
+    "not supported"
+  )
+  expect_error(
+    run_plot(c.dist.bw, xdat = xdat, ydat = ydat, view = "fixed", boot.method = "wild"),
+    "not supported"
+  )
 })
