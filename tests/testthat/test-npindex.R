@@ -178,3 +178,27 @@ test_that("npindex supports residual and error branches with evaluation y data",
     expect_true(all(is.finite(fit.grad$gerr)), info = cfg$regtype)
   }
 })
+
+test_that("npindex bootstrap error SD recovery matches covariance diagonal reduction", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  boot.sds <- getFromNamespace(".np_plot_bootstrap_col_sds", "npRmpi")
+
+  set.seed(20260311)
+  boot.t <- matrix(rnorm(250 * 24), nrow = 250, ncol = 24)
+
+  ref.mean <- sqrt(diag(cov(boot.t[, 1:12, drop = FALSE])))
+  ref.grad <- sqrt(diag(cov(boot.t[, 13:24, drop = FALSE])))
+
+  expect_equal(
+    boot.sds(boot.t[, 1:12, drop = FALSE]),
+    ref.mean,
+    tolerance = 1e-15
+  )
+  expect_equal(
+    boot.sds(boot.t[, 13:24, drop = FALSE]),
+    ref.grad,
+    tolerance = 1e-15
+  )
+})
