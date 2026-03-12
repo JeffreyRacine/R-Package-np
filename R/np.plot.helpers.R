@@ -1605,6 +1605,25 @@
   rep.int(seq_along(counts.col), as.integer(counts.col))
 }
 
+.np_active_boot_sample <- function(xdat, counts.col, ydat = NULL) {
+  counts.col <- as.double(counts.col)
+  if (length(counts.col) != nrow(xdat))
+    stop("bootstrap counts must align with training rows")
+  if (!is.null(ydat) && nrow(ydat) != nrow(xdat))
+    stop("bootstrap x/y training rows must align")
+
+  active <- counts.col > 0
+  if (!any(active))
+    stop("bootstrap counts must activate at least one training row")
+
+  list(
+    xdat = xdat[active, , drop = FALSE],
+    ydat = if (is.null(ydat)) NULL else ydat[active, , drop = FALSE],
+    weights = matrix(counts.col[active], ncol = 1L),
+    n.total = sum(counts.col)
+  )
+}
+
 .np_inid_boot_from_regression_exact <- function(xdat,
                                                 exdat,
                                                 bws,
@@ -2778,9 +2797,24 @@
   stop(sprintf("%s returned unexpected matrix shape", where))
 }
 
-.np_ksum_unconditional_eval_exact <- function(xdat, exdat, bws, operator) {
+.np_ksum_unconditional_eval_exact <- function(xdat,
+                                              exdat,
+                                              bws,
+                                              operator,
+                                              weights = NULL,
+                                              n.total = NULL) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
+  if (is.null(weights)) {
+    weights <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+    n.total <- nrow(xdat)
+  } else {
+    weights <- matrix(as.double(weights), ncol = 1L)
+    if (nrow(weights) != nrow(xdat))
+      stop("exact unconditional kernel helper requires one weight per training row")
+    if (is.null(n.total))
+      n.total <- sum(weights)
+  }
   kw <- .np_plot_kernel_weights_direct(
     bws = bws,
     txdat = xdat,
@@ -2788,7 +2822,7 @@
     operator = operator,
     where = "direct unconditional exact kernel weights"
   )
-  colSums(kw) / nrow(xdat)
+  as.numeric(crossprod(weights, kw)) / n.total
 }
 
 .np_ksum_kernel_weights_matrix <- function(kernel.weights, ntrain, neval, where = "ksum helper path") {
@@ -2951,12 +2985,14 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid unconditional exact bootstrap dimensions")
 
-  fit_one <- function(x.train) {
+  fit_one <- function(x.train, weights = NULL, n.total = NULL) {
     .np_ksum_unconditional_eval_exact(
       xdat = x.train,
       exdat = exdat,
       bws = bws,
-      operator = operator
+      operator = operator,
+      weights = weights,
+      n.total = n.total
     )
   }
 
@@ -2987,12 +3023,17 @@
         bsz <- ncol(counts.chunk)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          active.sample <- .np_active_boot_sample(
+            xdat = xdat,
+            counts.col = counts.chunk[, jj]
+          )
           out[jj, ] <- .np_ksum_unconditional_eval_exact(
-            xdat = xdat[idx, , drop = FALSE],
+            xdat = active.sample$xdat,
             exdat = exdat,
             bws = bws,
-            operator = operator
+            operator = operator,
+            weights = active.sample$weights,
+            n.total = active.sample$n.total
           )
         }
         out
@@ -3012,6 +3053,7 @@
           operator = operator,
           n = n,
           nout = nout,
+          .np_active_boot_sample = .np_active_boot_sample,
           .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
         )
       )
@@ -3042,12 +3084,17 @@
         bsz <- ncol(counts.chunk)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          active.sample <- .np_active_boot_sample(
+            xdat = xdat,
+            counts.col = counts.chunk[, jj]
+          )
           out[jj, ] <- .np_ksum_unconditional_eval_exact(
-            xdat = xdat[idx, , drop = FALSE],
+            xdat = active.sample$xdat,
             exdat = exdat,
             bws = bws,
-            operator = operator
+            operator = operator,
+            weights = active.sample$weights,
+            n.total = active.sample$n.total
           )
         }
         out
@@ -3067,6 +3114,7 @@
           bws = bws,
           operator = operator,
           nout = nout,
+          .np_active_boot_sample = .np_active_boot_sample,
           .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
         )
       )
@@ -3094,12 +3142,17 @@
         counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          active.sample <- .np_active_boot_sample(
+            xdat = xdat,
+            counts.col = counts.chunk[, jj]
+          )
           out[jj, ] <- .np_ksum_unconditional_eval_exact(
-            xdat = xdat[idx, , drop = FALSE],
+            xdat = active.sample$xdat,
             exdat = exdat,
             bws = bws,
-            operator = operator
+            operator = operator,
+            weights = active.sample$weights,
+            n.total = active.sample$n.total
           )
         }
         out
@@ -3119,6 +3172,7 @@
           bws = bws,
           operator = operator,
           nout = nout,
+          .np_active_boot_sample = .np_active_boot_sample,
           .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
         )
       )
@@ -3532,7 +3586,9 @@
                                             eydat,
                                             kbx,
                                             kbxy,
-                                            cdf) {
+                                            cdf,
+                                            weights = NULL,
+                                            n.total = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -3540,23 +3596,33 @@
   xop <- rep.int("normal", ncol(xdat))
   yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
   xyop <- c(xop, yop)
+  if (is.null(weights)) {
+    weights <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+    n.total <- nrow(xdat)
+  } else {
+    weights <- matrix(as.double(weights), ncol = 1L)
+    if (nrow(weights) != nrow(xdat))
+      stop("exact conditional kernel helper requires one weight per training row")
+    if (is.null(n.total))
+      n.total <- sum(weights)
+  }
   xydat <- data.frame(xdat, ydat)
   exydat <- data.frame(exdat, eydat)
 
-  den <- colSums(.np_plot_kernel_weights_direct(
+  den <- as.numeric(crossprod(weights, .np_plot_kernel_weights_direct(
     bws = kbx,
     txdat = xdat,
     exdat = exdat,
     operator = xop,
     where = "direct conditional exact denominator kernel weights"
-  )) / nrow(xdat)
-  num <- colSums(.np_plot_kernel_weights_direct(
+  ))) / n.total
+  num <- as.numeric(crossprod(weights, .np_plot_kernel_weights_direct(
     bws = kbxy,
     txdat = xydat,
     exdat = exydat,
     operator = xyop,
     where = "direct conditional exact numerator kernel weights"
-  )) / nrow(xydat)
+  ))) / n.total
 
   num / pmax(den, .Machine$double.eps)
 }
@@ -3673,7 +3739,7 @@
   if (is.null(kbx) || is.null(kbxy))
     return(NULL)
 
-  fit_one <- function(x.train, y.train) {
+  fit_one <- function(x.train, y.train, weights = NULL, n.total = NULL) {
     .np_ksum_conditional_eval_exact(
       xdat = x.train,
       ydat = y.train,
@@ -3681,7 +3747,9 @@
       eydat = eydat,
       kbx = kbx,
       kbxy = kbxy,
-      cdf = cdf
+      cdf = cdf,
+      weights = weights,
+      n.total = n.total
     )
   }
 
@@ -3712,15 +3780,21 @@
         bsz <- ncol(counts.chunk)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          active.sample <- .np_active_boot_sample(
+            xdat = xdat,
+            ydat = ydat,
+            counts.col = counts.chunk[, jj]
+          )
           out[jj, ] <- .np_ksum_conditional_eval_exact(
-            xdat = xdat[idx, , drop = FALSE],
-            ydat = ydat[idx, , drop = FALSE],
+            xdat = active.sample$xdat,
+            ydat = active.sample$ydat,
             exdat = exdat,
             eydat = eydat,
             kbx = kbx,
             kbxy = kbxy,
-            cdf = cdf
+            cdf = cdf,
+            weights = active.sample$weights,
+            n.total = active.sample$n.total
           )
         }
         out
@@ -3743,6 +3817,7 @@
           cdf = cdf,
           n = n,
           nout = nout,
+          .np_active_boot_sample = .np_active_boot_sample,
           .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
         )
       )
@@ -3773,15 +3848,21 @@
         bsz <- ncol(counts.chunk)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          active.sample <- .np_active_boot_sample(
+            xdat = xdat,
+            ydat = ydat,
+            counts.col = counts.chunk[, jj]
+          )
           out[jj, ] <- .np_ksum_conditional_eval_exact(
-            xdat = xdat[idx, , drop = FALSE],
-            ydat = ydat[idx, , drop = FALSE],
+            xdat = active.sample$xdat,
+            ydat = active.sample$ydat,
             exdat = exdat,
             eydat = eydat,
             kbx = kbx,
             kbxy = kbxy,
-            cdf = cdf
+            cdf = cdf,
+            weights = active.sample$weights,
+            n.total = active.sample$n.total
           )
         }
         out
@@ -3804,6 +3885,7 @@
           kbxy = kbxy,
           cdf = cdf,
           nout = nout,
+          .np_active_boot_sample = .np_active_boot_sample,
           .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
         )
       )
@@ -3831,15 +3913,21 @@
         counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          active.sample <- .np_active_boot_sample(
+            xdat = xdat,
+            ydat = ydat,
+            counts.col = counts.chunk[, jj]
+          )
           out[jj, ] <- .np_ksum_conditional_eval_exact(
-            xdat = xdat[idx, , drop = FALSE],
-            ydat = ydat[idx, , drop = FALSE],
+            xdat = active.sample$xdat,
+            ydat = active.sample$ydat,
             exdat = exdat,
             eydat = eydat,
             kbx = kbx,
             kbxy = kbxy,
-            cdf = cdf
+            cdf = cdf,
+            weights = active.sample$weights,
+            n.total = active.sample$n.total
           )
         }
         out
@@ -3862,6 +3950,7 @@
           kbxy = kbxy,
           cdf = cdf,
           nout = nout,
+          .np_active_boot_sample = .np_active_boot_sample,
           .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
         )
       )
