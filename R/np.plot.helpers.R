@@ -2619,14 +2619,14 @@
     bernstein.basis = isTRUE(xbw$bernstein.basis)
   )
 
-  kw <- npksum(
+  kw <- .np_kernel_weights_direct(
+    bws = xbw,
     txdat = xdat,
     exdat = exdat.unique,
-    bws = xbw,
-    return.kernel.weights = TRUE,
     bandwidth.divide = TRUE,
-    leave.one.out = FALSE
-  )$kw
+    leave.one.out = FALSE,
+    operator = rep.int("normal", ncol(xdat))
+  )
   if (!is.matrix(kw))
     kw <- matrix(kw, nrow = n)
   if (nrow(kw) != n || ncol(kw) != ngroups)
