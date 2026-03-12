@@ -66,6 +66,16 @@ test_that("active bootstrap sample preserves exact row-sliced training payload",
   expect_identical(out$n.total, sum(counts))
 })
 
+test_that("fast exact frame bind matches data.frame semantics", {
+  xdat <- data.frame("a b" = c(1, 2), xf = factor(c("a", "b")), check.names = FALSE)
+  ydat <- data.frame("a b" = c(3, 4), y = c(5, 6), check.names = FALSE)
+
+  expect_identical(
+    npRmpi:::.np_bind_data_frames_fast(xdat, ydat),
+    data.frame(xdat, ydat)
+  )
+})
+
 test_that("nonfixed unconditional exact helper matches direct kbandwidth precompute", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
