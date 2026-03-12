@@ -7393,12 +7393,10 @@ compute.bootstrap.errors.dbandwidth =
       !identical(bws$type, "fixed")
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
-      isTRUE(is.inid) &&
-      isTRUE(identical(bws$type, "fixed") || use.frozen.nonfixed)
+      isTRUE(is.inid)
     fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
-      isTRUE(is.block) &&
-      isTRUE(identical(bws$type, "fixed") || use.frozen.nonfixed)
+      isTRUE(is.block)
 
     boot.out <- NULL
     if (fast.inid || fast.block) {
