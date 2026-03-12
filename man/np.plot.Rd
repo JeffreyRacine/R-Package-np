@@ -134,6 +134,14 @@
   wild            : fast np*hat linear-operator bootstrap path
   inid/fixed/geom : fast direct helper path (no internal bandwidth search)
   }
+  For non-fixed density/distribution bootstrap, an explicit experimental
+  approximation is available via
+  \code{plot.errors.boot.nonfixed=c("exact","frozen")}. The default
+  \code{"exact"} route recomputes the non-fixed geometry for each resample.
+  The experimental \code{"frozen"} route reuses the original-sample
+  non-fixed geometry throughout the bootstrap run. This option is currently
+  implemented only for unconditional and conditional density/distribution
+  bootstrap routes and remains off by default.
   \code{inid} admits general heteroskedasticity of unknown form, though
   it does not allow for dependence. \code{fixed} conducts Kunsch's (1988)
   block bootstrap for dependent data, while \code{geom} conducts Politis

@@ -3134,6 +3134,153 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_plot_boot_from_frozen_operator <- function(H,
+                                               B,
+                                               counts = NULL,
+                                               counts.drawer = NULL,
+                                               what.base = "inid-hat-frozen") {
+  H <- as.matrix(H)
+  storage.mode(H) <- "double"
+  B <- as.integer(B)
+  neval <- nrow(H)
+  n <- ncol(H)
+
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid frozen bootstrap operator dimensions")
+
+  t0 <- rowSums(H)
+  HT <- t(H)
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    return(list(t = crossprod(counts.mat, HT), t0 = t0))
+  }
+
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
+  prob <- rep.int(1 / n, n)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  HT.local <- HT
+  counts.drawer.local <- counts.drawer
+  n.local <- n
+  prob.local <- prob
+
+  if (!is.null(counts.drawer) &&
+      .npRmpi_bootstrap_fanout_enabled(
+        comm = 1L,
+        n = n,
+        B = B,
+        chunk.size = chunk.size,
+        what = paste0(what.base, "-block")
+      )) {
+    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    worker <- function(task) {
+      start <- as.integer(task$start)
+      stopi <- start + as.integer(task$bsz) - 1L
+      counts.chunk <- .np_inid_counts_matrix(
+        n = n.local,
+        B = as.integer(task$bsz),
+        counts = counts.drawer.local(start, stopi)
+      )
+      crossprod(counts.chunk, HT.local)
+    }
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = paste0(what.base, "-block"),
+      profile.where = paste0("mpi.applyLB:", what.base, "-block"),
+      comm = 1L,
+      required.bindings = list(
+        HT.local = HT.local,
+        counts.drawer.local = counts.drawer.local,
+        n.local = n.local
+      )
+    )
+  }
+
+  if (!is.null(counts.drawer) && anyNA(tmat))
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = sprintf("%s-block fan-out returned incomplete results", what.base),
+      what = paste0(what.base, "-block")
+    )
+
+  if (anyNA(tmat) &&
+      .npRmpi_bootstrap_fanout_enabled(
+        comm = 1L,
+        n = n,
+        B = B,
+        chunk.size = chunk.size,
+        what = what.base
+      )) {
+    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    worker <- function(task) {
+      set.seed(as.integer(task$seed))
+      bsz <- as.integer(task$bsz)
+      counts.chunk <- stats::rmultinom(n = bsz, size = n.local, prob = prob.local)
+      crossprod(counts.chunk, HT.local)
+    }
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = what.base,
+      profile.where = paste0("mpi.applyLB:", what.base),
+      comm = 1L,
+      required.bindings = list(
+        HT.local = HT.local,
+        prob.local = prob.local,
+        n.local = n.local
+      )
+    )
+  }
+
+  if (anyNA(tmat))
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = sprintf("%s fan-out returned incomplete results", what.base),
+      what = what.base
+    )
+
+  list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_hat_unconditional_frozen <- function(xdat,
+                                                        exdat,
+                                                        bws,
+                                                        B,
+                                                        operator,
+                                                        counts = NULL,
+                                                        counts.drawer = NULL) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+
+  hat.fun <- switch(operator,
+                    normal = npudenshat,
+                    integral = npudisthat,
+                    stop("unsupported unconditional frozen bootstrap operator"))
+
+  H <- .np_plot_with_local_compiled_eval(
+    hat.fun(
+      bws = bws,
+      tdat = xdat,
+      edat = exdat,
+      output = "matrix"
+    )
+  )
+
+  .np_plot_boot_from_frozen_operator(
+    H = H,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    what.base = "inid-hat-frozen-unconditional"
+  )
+}
+
 .np_inid_boot_from_ksum_unconditional <- function(xdat,
                                                   exdat,
                                                   bws,
@@ -3269,6 +3416,41 @@
     )
 
   list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_hat_conditional_frozen <- function(xdat,
+                                                      ydat,
+                                                      exdat,
+                                                      eydat,
+                                                      bws,
+                                                      B,
+                                                      cdf,
+                                                      counts = NULL,
+                                                      counts.drawer = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+
+  hat.fun <- if (isTRUE(cdf)) npcdisthat else npcdenshat
+  H <- .np_plot_with_local_compiled_eval(
+    hat.fun(
+      bws = bws,
+      txdat = xdat,
+      tydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      output = "matrix"
+    )
+  )
+
+  .np_plot_boot_from_frozen_operator(
+    H = H,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    what.base = "inid-hat-frozen-conditional"
+  )
 }
 
 .np_con_inid_ksum_eligible <- function(bws) {
@@ -5504,6 +5686,7 @@ compute.default.error.range <- function(center, err) {
 .np_plot_normalize_common_options <- function(plot.behavior,
                                              plot.errors.method,
                                              plot.errors.boot.method,
+                                             plot.errors.boot.nonfixed = c("exact", "frozen"),
                                              plot.errors.boot.wild = c("rademacher", "mammen"),
                                              plot.errors.boot.blocklen,
                                              plot.errors.center,
@@ -5530,6 +5713,10 @@ compute.default.error.range <- function(center, err) {
   plot.errors.boot.method <- match.arg(
     scalar_choice(plot.errors.boot.method, "wild"),
     c("wild", "inid", "fixed", "geom")
+  )
+  plot.errors.boot.nonfixed <- match.arg(
+    scalar_choice(plot.errors.boot.nonfixed, "exact"),
+    c("exact", "frozen")
   )
   plot.errors.boot.wild <- match.arg(
     scalar_choice(plot.errors.boot.wild, "rademacher"),
@@ -5591,6 +5778,7 @@ compute.default.error.range <- function(center, err) {
     plot.behavior = plot.behavior,
     plot.errors.method = plot.errors.method,
     plot.errors.boot.method = plot.errors.boot.method,
+    plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
     plot.errors.boot.wild = plot.errors.boot.wild,
     plot.errors.boot.blocklen = plot.errors.boot.blocklen,
     plot.errors.center = plot.errors.center,
@@ -6278,6 +6466,7 @@ compute.bootstrap.errors.bandwidth =
            cdf,
            slice.index,
            plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -6299,6 +6488,8 @@ compute.bootstrap.errors.bandwidth =
 
     is.inid = plot.errors.boot.method=="inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
+      !identical(bws$type, "fixed")
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
       isTRUE(is.inid)
@@ -6326,16 +6517,27 @@ compute.bootstrap.errors.bandwidth =
       }
       boot.out <- .npRmpi_with_local_bootstrap({
         tryCatch(
-          .np_inid_boot_from_ksum_unconditional(
-            xdat = xdat,
-            exdat = exdat,
-            bws = bws,
-            B = plot.errors.boot.num,
-            operator = op,
-            counts.drawer = counts.drawer
-          ),
+          if (use.frozen.nonfixed) {
+            .np_inid_boot_from_hat_unconditional_frozen(
+              xdat = xdat,
+              exdat = exdat,
+              bws = bws,
+              B = plot.errors.boot.num,
+              operator = op,
+              counts.drawer = counts.drawer
+            )
+          } else {
+            .np_inid_boot_from_ksum_unconditional(
+              xdat = xdat,
+              exdat = exdat,
+              bws = bws,
+              B = plot.errors.boot.num,
+              operator = op,
+              counts.drawer = counts.drawer
+            )
+          },
           error = function(e) {
-            stop(sprintf("%s ksum helper path failed in compute.bootstrap.errors.bandwidth (%s)",
+            stop(sprintf("%s unconditional bootstrap helper failed in compute.bootstrap.errors.bandwidth (%s)",
                          if (fast.block) plot.errors.boot.method else "inid",
                          conditionMessage(e)),
                  call. = FALSE)
@@ -6408,6 +6610,7 @@ compute.bootstrap.errors.dbandwidth =
            exdat,
            slice.index,
            plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -6429,14 +6632,16 @@ compute.bootstrap.errors.dbandwidth =
 
     is.inid = plot.errors.boot.method=="inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
+      !identical(bws$type, "fixed")
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
       isTRUE(is.inid) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(identical(bws$type, "fixed") || use.frozen.nonfixed)
     fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
       isTRUE(is.block) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(identical(bws$type, "fixed") || use.frozen.nonfixed)
 
     boot.out <- NULL
     if (fast.inid || fast.block) {
@@ -6452,16 +6657,27 @@ compute.bootstrap.errors.dbandwidth =
       }
       boot.out <- .npRmpi_with_local_bootstrap({
         tryCatch(
-          .np_inid_boot_from_ksum_unconditional(
-            xdat = xdat,
-            exdat = exdat,
-            bws = bws,
-            B = plot.errors.boot.num,
-            operator = "integral",
-            counts.drawer = counts.drawer
-          ),
+          if (use.frozen.nonfixed) {
+            .np_inid_boot_from_hat_unconditional_frozen(
+              xdat = xdat,
+              exdat = exdat,
+              bws = bws,
+              B = plot.errors.boot.num,
+              operator = "integral",
+              counts.drawer = counts.drawer
+            )
+          } else {
+            .np_inid_boot_from_ksum_unconditional(
+              xdat = xdat,
+              exdat = exdat,
+              bws = bws,
+              B = plot.errors.boot.num,
+              operator = "integral",
+              counts.drawer = counts.drawer
+            )
+          },
           error = function(e) {
-            stop(sprintf("%s ksum helper path failed in compute.bootstrap.errors.dbandwidth (%s)",
+            stop(sprintf("%s unconditional distribution bootstrap helper failed in compute.bootstrap.errors.dbandwidth (%s)",
                          if (fast.block) plot.errors.boot.method else "inid",
                          conditionMessage(e)),
                  call. = FALSE)
@@ -6539,6 +6755,7 @@ compute.bootstrap.errors.conbandwidth =
            gradient.index,
            slice.index,
            plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -6569,18 +6786,23 @@ compute.bootstrap.errors.conbandwidth =
 
     is.inid = plot.errors.boot.method=="inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
+      !identical(bws$type, "fixed")
+    frozen.nonfixed.ok <- isTRUE(use.frozen.nonfixed) &&
+      isTRUE(!quantreg) &&
+      isTRUE(!gradients)
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
       isTRUE(is.inid) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(.np_con_inid_ksum_eligible(bws))
+      isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
     fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
       isTRUE(is.block) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(.np_con_inid_ksum_eligible(bws))
+      isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
 
     if (is.inid && !isTRUE(fast.inid))
       stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
@@ -6601,18 +6823,31 @@ compute.bootstrap.errors.conbandwidth =
       }
       boot.out <- .npRmpi_with_local_bootstrap({
         tryCatch(
-          .np_inid_boot_from_ksum_conditional(
-            xdat = xdat,
-            ydat = ydat,
-            exdat = exdat,
-            eydat = eydat,
-            bws = bws,
-            B = plot.errors.boot.num,
-            cdf = cdf,
-            counts.drawer = counts.drawer
-          ),
+          if (use.frozen.nonfixed) {
+            .np_inid_boot_from_hat_conditional_frozen(
+              xdat = xdat,
+              ydat = ydat,
+              exdat = exdat,
+              eydat = eydat,
+              bws = bws,
+              B = plot.errors.boot.num,
+              cdf = cdf,
+              counts.drawer = counts.drawer
+            )
+          } else {
+            .np_inid_boot_from_ksum_conditional(
+              xdat = xdat,
+              ydat = ydat,
+              exdat = exdat,
+              eydat = eydat,
+              bws = bws,
+              B = plot.errors.boot.num,
+              cdf = cdf,
+              counts.drawer = counts.drawer
+            )
+          },
           error = function(e) {
-            stop(sprintf("%s ksum helper failed in compute.bootstrap.errors.conbandwidth (%s)",
+            stop(sprintf("%s conditional bootstrap helper failed in compute.bootstrap.errors.conbandwidth (%s)",
                          if (fast.block) plot.errors.boot.method else "inid",
                          conditionMessage(e)),
                  call. = FALSE)
@@ -6698,6 +6933,7 @@ compute.bootstrap.errors.condbandwidth =
            gradient.index,
            slice.index,
            plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -6728,18 +6964,23 @@ compute.bootstrap.errors.condbandwidth =
 
     is.inid = plot.errors.boot.method=="inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
+      !identical(bws$type, "fixed")
+    frozen.nonfixed.ok <- isTRUE(use.frozen.nonfixed) &&
+      isTRUE(!quantreg) &&
+      isTRUE(!gradients)
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
       isTRUE(is.inid) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(.np_con_inid_ksum_eligible(bws))
+      isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
     fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
       isTRUE(is.block) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(.np_con_inid_ksum_eligible(bws))
+      isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
     if (is.inid && !isTRUE(fast.inid))
       stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     if (is.block && !isTRUE(fast.block))
@@ -6759,18 +7000,31 @@ compute.bootstrap.errors.condbandwidth =
       }
       boot.out <- .npRmpi_with_local_bootstrap({
         tryCatch(
-          .np_inid_boot_from_ksum_conditional(
-            xdat = xdat,
-            ydat = ydat,
-            exdat = exdat,
-            eydat = eydat,
-            bws = bws,
-            B = plot.errors.boot.num,
-            cdf = cdf,
-            counts.drawer = counts.drawer
-          ),
+          if (use.frozen.nonfixed) {
+            .np_inid_boot_from_hat_conditional_frozen(
+              xdat = xdat,
+              ydat = ydat,
+              exdat = exdat,
+              eydat = eydat,
+              bws = bws,
+              B = plot.errors.boot.num,
+              cdf = cdf,
+              counts.drawer = counts.drawer
+            )
+          } else {
+            .np_inid_boot_from_ksum_conditional(
+              xdat = xdat,
+              ydat = ydat,
+              exdat = exdat,
+              eydat = eydat,
+              bws = bws,
+              B = plot.errors.boot.num,
+              cdf = cdf,
+              counts.drawer = counts.drawer
+            )
+          },
           error = function(e) {
-            stop(sprintf("%s ksum helper failed in compute.bootstrap.errors.condbandwidth (%s)",
+            stop(sprintf("%s conditional bootstrap helper failed in compute.bootstrap.errors.condbandwidth (%s)",
                          if (fast.block) plot.errors.boot.method else "inid",
                          conditionMessage(e)),
                  call. = FALSE)
@@ -6821,7 +7075,7 @@ compute.bootstrap.errors.condbandwidth =
         label = "Computing bootstrap pmzsd errors"
       )
       on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
-      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
@@ -6998,7 +7252,7 @@ compute.bootstrap.errors.sibandwidth =
         label = "Computing bootstrap pmzsd errors"
       )
       on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
-      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)

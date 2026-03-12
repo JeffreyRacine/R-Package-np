@@ -36,6 +36,7 @@
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 1999,
@@ -133,6 +134,7 @@
 
     if (missing(plot.errors.method) &
         any(!missing(plot.errors.boot.num), !missing(plot.errors.boot.method),
+            !missing(plot.errors.boot.nonfixed),
             !missing(plot.errors.boot.blocklen))){
       stop(
         "plot.errors.method must be set to 'bootstrap' when bootstrap error arguments are supplied",
@@ -144,6 +146,7 @@
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
       plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
       plot.errors.boot.wild = plot.errors.boot.wild,
       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
       plot.errors.center = plot.errors.center,
@@ -160,6 +163,7 @@
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.nonfixed <- normalized.opts$plot.errors.boot.nonfixed
     plot.errors.boot.wild <- normalized.opts$plot.errors.boot.wild
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
@@ -170,6 +174,14 @@
     common.scale <- normalized.opts$common.scale
 
     plot.errors = (plot.errors.method != "none")
+    if (plot.errors.method == "bootstrap" &&
+        identical(plot.errors.boot.nonfixed, "frozen") &&
+        !identical(bws$type, "fixed")) {
+      stop(
+        "plot.errors.boot.nonfixed='frozen' is currently supported only for nonfixed unconditional/conditional density and distribution bootstrap routes",
+        call. = FALSE
+      )
+    }
 
     if (coef) {
       fit.coef <- if (identical(plot.errors.method, "asymptotic")) {
