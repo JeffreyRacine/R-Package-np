@@ -2995,6 +2995,20 @@
   is.finite(bw.max) && !is.na(bw.max) && n.train >= bw.max
 }
 
+.np_inid_ksum_unconditional_exact_eval_one <- function(active.sample,
+                                                       exdat,
+                                                       bw.eval,
+                                                       operator) {
+  .np_ksum_unconditional_eval_exact(
+    xdat = active.sample$xdat,
+    exdat = exdat,
+    bws = bw.eval,
+    operator = operator,
+    weights = active.sample$weights,
+    n.total = active.sample$n.total
+  )
+}
+
 .np_ksum_kernel_weights_matrix <- function(kernel.weights, ntrain, neval, where = "ksum helper path") {
   if (is.null(kernel.weights))
     stop(sprintf("%s did not return kernel weights", where))
@@ -3159,15 +3173,14 @@
                  error = function(e) NULL)
 
   fit_one <- function(x.train, weights = NULL, n.total = NULL) {
-    bw.eval <- if (!is.null(kb) &&
-                   .np_unconditional_exact_precomputed_kband_safe(
-                     bws = bws,
-                     n.train = nrow(x.train)
-                   )) kb else bws
     .np_ksum_unconditional_eval_exact(
       xdat = x.train,
       exdat = exdat,
-      bws = bw.eval,
+      bws = if (!is.null(kb) &&
+               .np_unconditional_exact_precomputed_kband_safe(
+                 bws = bws,
+                 n.train = nrow(x.train)
+               )) kb else bws,
       operator = operator,
       weights = weights,
       n.total = n.total
@@ -3205,10 +3218,16 @@
             xdat = xdat,
             counts.col = counts.chunk[, jj]
           )
-          out[jj, ] <- fit_one(
-            x.train = active.sample$xdat,
-            weights = active.sample$weights,
-            n.total = active.sample$n.total
+          bw.eval <- if (!is.null(kb) &&
+                         .np_unconditional_exact_precomputed_kband_safe(
+                           bws = bws,
+                           n.train = nrow(active.sample$xdat)
+                         )) kb else bws
+          out[jj, ] <- .np_inid_ksum_unconditional_exact_eval_one(
+            active.sample = active.sample,
+            exdat = exdat,
+            bw.eval = bw.eval,
+            operator = operator
           )
         }
         out
@@ -3223,10 +3242,14 @@
         required.bindings = list(
           counts.mat = counts.mat,
           xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          kb = kb,
+          operator = operator,
           n = n,
           nout = nout,
-          fit_one = fit_one,
           .np_active_boot_sample = .np_active_boot_sample,
+          .np_inid_ksum_unconditional_exact_eval_one = .np_inid_ksum_unconditional_exact_eval_one,
           .np_make_kbandwidth_unconditional = .np_make_kbandwidth_unconditional,
           .np_unconditional_exact_precomputed_kband_safe = .np_unconditional_exact_precomputed_kband_safe,
           .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
@@ -3263,10 +3286,16 @@
             xdat = xdat,
             counts.col = counts.chunk[, jj]
           )
-          out[jj, ] <- fit_one(
-            x.train = active.sample$xdat,
-            weights = active.sample$weights,
-            n.total = active.sample$n.total
+          bw.eval <- if (!is.null(kb) &&
+                         .np_unconditional_exact_precomputed_kband_safe(
+                           bws = bws,
+                           n.train = nrow(active.sample$xdat)
+                         )) kb else bws
+          out[jj, ] <- .np_inid_ksum_unconditional_exact_eval_one(
+            active.sample = active.sample,
+            exdat = exdat,
+            bw.eval = bw.eval,
+            operator = operator
           )
         }
         out
@@ -3282,9 +3311,13 @@
           n = n,
           counts.drawer = counts.drawer,
           xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          kb = kb,
+          operator = operator,
           nout = nout,
-          fit_one = fit_one,
           .np_active_boot_sample = .np_active_boot_sample,
+          .np_inid_ksum_unconditional_exact_eval_one = .np_inid_ksum_unconditional_exact_eval_one,
           .np_make_kbandwidth_unconditional = .np_make_kbandwidth_unconditional,
           .np_unconditional_exact_precomputed_kband_safe = .np_unconditional_exact_precomputed_kband_safe,
           .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
@@ -3318,10 +3351,16 @@
             xdat = xdat,
             counts.col = counts.chunk[, jj]
           )
-          out[jj, ] <- fit_one(
-            x.train = active.sample$xdat,
-            weights = active.sample$weights,
-            n.total = active.sample$n.total
+          bw.eval <- if (!is.null(kb) &&
+                         .np_unconditional_exact_precomputed_kband_safe(
+                           bws = bws,
+                           n.train = nrow(active.sample$xdat)
+                         )) kb else bws
+          out[jj, ] <- .np_inid_ksum_unconditional_exact_eval_one(
+            active.sample = active.sample,
+            exdat = exdat,
+            bw.eval = bw.eval,
+            operator = operator
           )
         }
         out
@@ -3337,9 +3376,13 @@
           n = n,
           prob = prob,
           xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          kb = kb,
+          operator = operator,
           nout = nout,
-          fit_one = fit_one,
           .np_active_boot_sample = .np_active_boot_sample,
+          .np_inid_ksum_unconditional_exact_eval_one = .np_inid_ksum_unconditional_exact_eval_one,
           .np_make_kbandwidth_unconditional = .np_make_kbandwidth_unconditional,
           .np_unconditional_exact_precomputed_kband_safe = .np_unconditional_exact_precomputed_kband_safe,
           .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact

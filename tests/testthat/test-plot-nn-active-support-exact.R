@@ -157,3 +157,46 @@ test_that("nonfixed conditional exact bootstrap matches duplicate-row oracle", {
   ))
   expect_equal(helper$t, t(manual), tolerance = 1e-14)
 })
+
+test_that("npRmpi nonfixed unconditional exact helper fanout paths complete in subprocess", {
+  skip_on_cran()
+
+  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    c(
+      "library(npRmpi)",
+      "options(np.messages = FALSE, np.tree = FALSE)",
+      "npRmpi.init(nslaves = 1)",
+      "on.exit(npRmpi.quit(force = TRUE), add = TRUE)",
+      "options(npRmpi.autodispatch = FALSE)",
+      "xdat <- data.frame(x = c(0, 0, 1, 3, 3, 10))",
+      "exdat <- data.frame(x = c(0, 2, 5, 9))",
+      "counts <- cbind(c(1,0,1,2,0,2), c(0,2,1,0,1,2))",
+      "storage.mode(counts) <- 'double'",
+      "bw <- npudensbw(dat = xdat, bws = 1, bwtype = 'generalized_nn', bandwidth.compute = FALSE)",
+      "fit_counts <- npRmpi:::.np_inid_boot_from_ksum_unconditional_exact(xdat = xdat, exdat = exdat, bws = bw, B = ncol(counts), operator = 'normal', counts = counts)",
+      "drawer <- function(start, stop) {",
+      "  counts.mat <- matrix(c(1,0,1,2,0,2,0,2,1,0,1,2), nrow = 6L)",
+      "  counts.mat[, start:stop, drop = FALSE]",
+      "}",
+      "fit_drawer <- npRmpi:::.np_inid_boot_from_ksum_unconditional_exact(xdat = xdat, exdat = exdat, bws = bw, B = ncol(counts), operator = 'normal', counts.drawer = drawer)",
+      "set.seed(20260312)",
+      "fit_random <- npRmpi:::.np_inid_boot_from_ksum_unconditional_exact(xdat = xdat, exdat = exdat, bws = bw, B = 3L, operator = 'normal')",
+      "stopifnot(isTRUE(all.equal(fit_counts$t, fit_drawer$t, tolerance = 1e-14)))",
+      "stopifnot(identical(dim(fit_counts$t), c(ncol(counts), nrow(exdat))))",
+      "stopifnot(identical(dim(fit_random$t), c(3L, nrow(exdat))))",
+      "cat('SESSION_COUNTS_OK', nrow(fit_counts$t), '\\n')",
+      "cat('SESSION_DRAWER_OK', nrow(fit_drawer$t), '\\n')",
+      "cat('SESSION_RANDOM_OK', nrow(fit_random$t), '\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_identical(res$status, 0L)
+  expect_true(any(grepl("SESSION_COUNTS_OK", res$output, fixed = TRUE)))
+  expect_true(any(grepl("SESSION_DRAWER_OK", res$output, fixed = TRUE)))
+  expect_true(any(grepl("SESSION_RANDOM_OK", res$output, fixed = TRUE)))
+})
