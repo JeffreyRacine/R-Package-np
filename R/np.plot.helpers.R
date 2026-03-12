@@ -5418,6 +5418,16 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
   )
 }
 
+.np_plot_bootstrap_col_sds <- function(boot.t) {
+  boot.t <- as.matrix(boot.t)
+  B <- nrow(boot.t)
+  if (B <= 1L)
+    return(rep.int(0.0, ncol(boot.t)))
+
+  mu <- colMeans(boot.t)
+  sqrt(colSums((sweep(boot.t, 2L, mu, "-"))^2) / (B - 1L))
+}
+
 .np_plot_asymptotic_error_from_se <- function(se, alpha, band.type, m = length(se)) {
   se <- as.numeric(se)
   n <- length(se)
@@ -5845,7 +5855,7 @@ compute.bootstrap.errors.rbandwidth =
         label = "Computing bootstrap pmzsd errors"
       )
       on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
-      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
@@ -6050,7 +6060,7 @@ compute.bootstrap.errors.scbandwidth =
         label = "Computing bootstrap pmzsd errors"
       )
       on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
-      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
@@ -6237,7 +6247,7 @@ compute.bootstrap.errors.plbandwidth =
         label = "Computing bootstrap pmzsd errors"
       )
       on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
-      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
@@ -6368,7 +6378,7 @@ compute.bootstrap.errors.bandwidth =
         label = "Computing bootstrap pmzsd errors"
       )
       on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
-      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
@@ -6494,7 +6504,7 @@ compute.bootstrap.errors.dbandwidth =
         label = "Computing bootstrap pmzsd errors"
       )
       on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
-      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
@@ -6653,7 +6663,7 @@ compute.bootstrap.errors.conbandwidth =
         label = "Computing bootstrap pmzsd errors"
       )
       on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
-      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
