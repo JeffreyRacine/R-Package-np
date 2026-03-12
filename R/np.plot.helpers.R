@@ -127,6 +127,16 @@
   invisible(NULL)
 }
 
+.np_plot_stage_progress_begin <- function(total, label) {
+  state <- .np_plot_progress_begin(total = total, label = label)
+  if (is.null(state))
+    return(NULL)
+
+  .np_progress_note(as.character(label)[1L])
+  state$start_note_pending <- FALSE
+  state
+}
+
 .np_plot_activity_begin <- function(label) {
   if (!.np_plot_progress_enabled())
     return(NULL)
@@ -5145,7 +5155,12 @@ plotFactor <- function(f, y, ...){
 
 ## Rank-based simultaneous confidence set helper, vendored from
 ## MCPAN::SCSrank (MCPAN 1.1-21, GPL-2; Schaarschmidt, Gerhard, Sill).
-np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...) {
+np.plot.SCSrank <- function(x,
+                            conf.level = 0.95,
+                            alternative = "two.sided",
+                            progress_tick = NULL,
+                            progress_offset = 0L,
+                            ...) {
   alternative <- match.arg(alternative, choices = c("two.sided", "less", "greater"))
 
   DataMatrix <- x
@@ -5159,6 +5174,8 @@ np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...
     ranks.j <- rank(DataMatrix[, j])
     row.max <- pmax(row.max, ranks.j)
     row.min <- pmin(row.min, ranks.j)
+    if (is.function(progress_tick))
+      progress_tick(progress_offset + j)
   }
 
   SCS <- matrix(NA_real_, nrow = K, ncol = 2L)
@@ -5171,6 +5188,8 @@ np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...
       for (j in seq_len(K)) {
         sortx <- sort.int(DataMatrix[, j])
         SCS[j, ] <- c(sortx[lower.idx], sortx[upper.idx])
+        if (is.function(progress_tick))
+          progress_tick(progress_offset + K + j)
       }
     },
     "less" = {
@@ -5178,6 +5197,8 @@ np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...
       for (j in seq_len(K)) {
         sortx <- sort.int(DataMatrix[, j])
         SCS[j, ] <- c(-Inf, sortx[tstar])
+        if (is.function(progress_tick))
+          progress_tick(progress_offset + K + j)
       }
     },
     "greater" = {
@@ -5186,6 +5207,8 @@ np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...
       for (j in seq_len(K)) {
         sortx <- sort.int(DataMatrix[, j])
         SCS[j, ] <- c(sortx[lower.idx], Inf)
+        if (is.function(progress_tick))
+          progress_tick(progress_offset + K + j)
       }
     }
   )
@@ -5213,7 +5236,7 @@ np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...
   q
 }
 
-.np_plot_quantile_bounds_multi <- function(boot.t, probs.list) {
+.np_plot_quantile_bounds_multi <- function(boot.t, probs.list, progress_tick = NULL, progress_offset = 0L) {
   probs.list <- unclass(probs.list)
   if (!length(probs.list))
     return(list())
@@ -5232,16 +5255,36 @@ np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...
     for (nm in names(probs.list)) {
       out[[nm]][j, ] <- .np_plot_quantile_type7_sorted(sorted.j, probs.list[[nm]])
     }
+    if (is.function(progress_tick))
+      progress_tick(progress_offset + j)
   }
 
   out
 }
 
-.np_plot_quantile_bounds_single <- function(boot.t, probs) {
-  t(apply(boot.t, 2L, quantile, probs = probs))
+.np_plot_quantile_bounds_single <- function(boot.t, probs, progress_tick = NULL, progress_offset = 0L) {
+  neval <- ncol(boot.t)
+  out <- matrix(NA_real_, nrow = neval, ncol = length(probs))
+  row.names <- colnames(boot.t)
+  if (!is.null(row.names))
+    rownames(out) <- row.names
+  colnames(out) <- names(stats::quantile(c(0, 1), probs = probs))
+
+  for (j in seq_len(neval)) {
+    out[j, ] <- stats::quantile(boot.t[, j], probs = probs)
+    if (is.function(progress_tick))
+      progress_tick(progress_offset + j)
+  }
+
+  out
 }
 
-compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type, warn.coverage = TRUE) {
+compute.bootstrap.quantile.bounds <- function(boot.t,
+                                              alpha,
+                                              band.type,
+                                              warn.coverage = TRUE,
+                                              progress_tick = NULL,
+                                              progress_offset = 0L) {
   B <- nrow(boot.t)
   neval <- ncol(boot.t)
 
@@ -5273,19 +5316,28 @@ compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type, warn.cov
   if (band.type == "pointwise") {
     return(.np_plot_quantile_bounds_single(
       boot.t = boot.t,
-      probs = c(alpha / 2.0, 1.0 - alpha / 2.0)
+      probs = c(alpha / 2.0, 1.0 - alpha / 2.0),
+      progress_tick = progress_tick,
+      progress_offset = progress_offset
     ))
   }
 
   if (band.type == "bonferroni") {
     return(.np_plot_quantile_bounds_single(
       boot.t = boot.t,
-      probs = c(alpha / (2.0 * neval), 1.0 - alpha / (2.0 * neval))
+      probs = c(alpha / (2.0 * neval), 1.0 - alpha / (2.0 * neval)),
+      progress_tick = progress_tick,
+      progress_offset = progress_offset
     ))
   }
 
   if (band.type == "simultaneous") {
-    return(np.plot.SCSrank(boot.t, conf.level = 1.0 - alpha)$conf.int)
+    return(np.plot.SCSrank(
+      boot.t,
+      conf.level = 1.0 - alpha,
+      progress_tick = progress_tick,
+      progress_offset = progress_offset
+    )$conf.int)
   }
 
   if (band.type == "all") {
@@ -5294,12 +5346,21 @@ compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type, warn.cov
       probs.list = list(
         pointwise = c(alpha / 2.0, 1.0 - alpha / 2.0),
         bonferroni = c(alpha / (2.0 * neval), 1.0 - alpha / (2.0 * neval))
-      )
+      ),
+      progress_tick = progress_tick,
+      progress_offset = progress_offset
     )
     return(list(
       pointwise = quantile.bounds$pointwise,
       bonferroni = quantile.bounds$bonferroni,
-      simultaneous = compute.bootstrap.quantile.bounds(boot.t, alpha, "simultaneous", warn.coverage = FALSE)
+      simultaneous = compute.bootstrap.quantile.bounds(
+        boot.t,
+        alpha,
+        "simultaneous",
+        warn.coverage = FALSE,
+        progress_tick = progress_tick,
+        progress_offset = progress_offset + neval
+      )
     ))
   }
 
@@ -5310,14 +5371,32 @@ compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type, warn.cov
   if (!(band.type %in% c("pointwise", "bonferroni", "simultaneous", "all")))
     stop("'band.type' must be one of pointwise, bonferroni, simultaneous, all")
 
-  activity <- .np_plot_activity_begin("Constructing bootstrap bands...")
-  on.exit(.np_plot_activity_end(activity), add = TRUE)
+  neval <- max(1L, ncol(boot.t))
+  progress.total <- switch(
+    band.type,
+    pointwise = neval,
+    bonferroni = neval,
+    simultaneous = 2L * neval,
+    all = 3L * neval
+  )
+  progress <- .np_plot_stage_progress_begin(
+    total = progress.total,
+    label = sprintf("Constructing bootstrap %s bands", band.type)
+  )
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+  progress_tick <- local({
+    function(done) {
+      progress <<- .np_plot_progress_tick(state = progress, done = done)
+      invisible(NULL)
+    }
+  })
 
   if (identical(band.type, "all")) {
     all.bounds <- compute.bootstrap.quantile.bounds(
       boot.t = boot.t,
       alpha = alpha,
-      band.type = "all"
+      band.type = "all",
+      progress_tick = progress_tick
     )
     bounds <- all.bounds$pointwise
     all.err <- lapply(all.bounds, function(bb) {
@@ -5327,7 +5406,8 @@ compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type, warn.cov
     bounds <- compute.bootstrap.quantile.bounds(
       boot.t = boot.t,
       alpha = alpha,
-      band.type = band.type
+      band.type = band.type,
+      progress_tick = progress_tick
     )
     all.err <- NULL
   }
@@ -5760,7 +5840,15 @@ compute.bootstrap.errors.rbandwidth =
     }
     
     if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_stage_progress_begin(
+        total = 2L,
+        label = "Computing bootstrap pmzsd errors"
+      )
+      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
+      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       boot.summary <- .np_plot_bootstrap_interval_summary(
@@ -5957,7 +6045,15 @@ compute.bootstrap.errors.scbandwidth =
     }
     
     if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_stage_progress_begin(
+        total = 2L,
+        label = "Computing bootstrap pmzsd errors"
+      )
+      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
+      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       boot.summary <- .np_plot_bootstrap_interval_summary(
@@ -6136,7 +6232,15 @@ compute.bootstrap.errors.plbandwidth =
     }
 
     if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_stage_progress_begin(
+        total = 2L,
+        label = "Computing bootstrap pmzsd errors"
+      )
+      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
+      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       boot.summary <- .np_plot_bootstrap_interval_summary(
@@ -6259,7 +6363,15 @@ compute.bootstrap.errors.bandwidth =
     }
 
     if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_stage_progress_begin(
+        total = 2L,
+        label = "Computing bootstrap pmzsd errors"
+      )
+      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
+      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       boot.summary <- .np_plot_bootstrap_interval_summary(
@@ -6377,7 +6489,15 @@ compute.bootstrap.errors.dbandwidth =
     }
 
     if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_stage_progress_begin(
+        total = 2L,
+        label = "Computing bootstrap pmzsd errors"
+      )
+      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
+      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       boot.summary <- .np_plot_bootstrap_interval_summary(
@@ -6528,7 +6648,15 @@ compute.bootstrap.errors.conbandwidth =
     }
 
     if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_stage_progress_begin(
+        total = 2L,
+        label = "Computing bootstrap pmzsd errors"
+      )
+      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
+      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       boot.summary <- .np_plot_bootstrap_interval_summary(
@@ -6678,7 +6806,15 @@ compute.bootstrap.errors.condbandwidth =
     }
 
     if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_stage_progress_begin(
+        total = 2L,
+        label = "Computing bootstrap pmzsd errors"
+      )
+      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
+      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       boot.summary <- .np_plot_bootstrap_interval_summary(
@@ -6847,7 +6983,15 @@ compute.bootstrap.errors.sibandwidth =
       stop("no MPI helper path available for this single-index bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     
     if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_stage_progress_begin(
+        total = 2L,
+        label = "Computing bootstrap pmzsd errors"
+      )
+      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
+      boot.sd <- sqrt(diag(cov(boot.out$t)))
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       interval.summary <- .np_plot_bootstrap_interval_summary(
