@@ -154,3 +154,55 @@ test_that("nonfixed conditional exact bootstrap matches duplicate-row oracle", {
     expect_equal(helper$t, t(manual), tolerance = 1e-14, info = bt)
   }
 })
+
+test_that("adaptive conditional exact reports invalid tiny-support resamples clearly", {
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  xdat <- data.frame(x = c(0, 0, 1, 3, 3, 10))
+  ydat <- data.frame(y = c(0, 0, 1, 2, 2, 4))
+  exdat <- data.frame(x = c(0, 2, 5, 9))
+  eydat <- data.frame(y = c(0, 1, 2, 4))
+  counts <- matrix(c(0, 2, 1, 0, 3, 0), ncol = 1L)
+  storage.mode(counts) <- "double"
+
+  bw <- npcdensbw(
+    xdat = xdat,
+    ydat = ydat,
+    bwtype = "adaptive_nn",
+    bws = c(2, 2),
+    bandwidth.compute = FALSE
+  )
+
+  idx <- np:::.np_counts_to_indices(counts[, 1L])
+  expect_error(
+    npcdens(
+      txdat = xdat[idx, , drop = FALSE],
+      tydat = ydat[idx, , drop = FALSE],
+      exdat = exdat,
+      eydat = eydat,
+      bws = npcdensbw(
+        xdat = xdat[idx, , drop = FALSE],
+        ydat = ydat[idx, , drop = FALSE],
+        bwtype = "adaptive_nn",
+        bws = c(2, 2),
+        bandwidth.compute = FALSE
+      )
+    ),
+    "invalid bandwidth"
+  )
+
+  expect_error(
+    np:::.np_inid_boot_from_ksum_conditional_exact(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bw,
+      B = 1L,
+      cdf = FALSE,
+      counts = counts
+    ),
+    "adaptive conditional exact bootstrap resample is invalid for this active support"
+  )
+})

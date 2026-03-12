@@ -2509,6 +2509,30 @@
   num / pmax(den, .Machine$double.eps)
 }
 
+.np_conditional_exact_fit_or_stop <- function(fit.expr,
+                                              bws,
+                                              x.train,
+                                              y.train) {
+  tryCatch(
+    fit.expr(),
+    error = function(e) {
+      if (identical(bws$type, "adaptive_nn")) {
+        stop(
+          sprintf(
+            "adaptive conditional exact bootstrap resample is invalid for this active support (n.active=%d, x.unique=%d, y.unique=%d): %s",
+            nrow(x.train),
+            nrow(unique(toFrame(x.train))),
+            nrow(unique(toFrame(y.train))),
+            conditionMessage(e)
+          ),
+          call. = FALSE
+        )
+      }
+      stop(e)
+    }
+  )
+}
+
 .np_ksum_conditional_operator_fixed <- function(xdat,
                                                 ydat,
                                                 exdat,
@@ -3011,29 +3035,50 @@
   )
 
   fit_one <- function(x.train, y.train, weights = NULL, n.total = NULL) {
-    if (is.null(weights)) {
-      weights <- matrix(1.0, nrow = nrow(x.train), ncol = 1L)
-      n.total <- nrow(x.train)
-    } else {
-      weights <- matrix(as.double(weights), ncol = 1L)
-      if (nrow(weights) != nrow(x.train))
-        stop("exact conditional ksum helper requires one weight per training row")
-      if (is.null(n.total))
-        n.total <- sum(weights)
-    }
+    .np_conditional_exact_fit_or_stop(
+      fit.expr = function() {
+        if (is.null(weights)) {
+          weights <- matrix(1.0, nrow = nrow(x.train), ncol = 1L)
+          n.total <- nrow(x.train)
+        } else {
+          weights <- matrix(as.double(weights), ncol = 1L)
+          if (nrow(weights) != nrow(x.train))
+            stop("exact conditional ksum helper requires one weight per training row")
+          if (is.null(n.total))
+            n.total <- sum(weights)
+        }
 
-    den <- as.numeric(.np_ksum_eval_exact_state(
-      state = den.state,
-      txdat = x.train,
-      weights = weights
-    )) / n.total
-    num <- as.numeric(.np_ksum_eval_exact_state(
-      state = num.state,
-      txdat = data.frame(x.train, y.train),
-      weights = weights
-    )) / n.total
+        if (identical(bws$type, "adaptive_nn")) {
+          return(.np_ksum_conditional_eval_exact(
+            xdat = x.train,
+            ydat = y.train,
+            exdat = exdat,
+            eydat = eydat,
+            kbx = kbx,
+            kbxy = kbxy,
+            cdf = cdf,
+            weights = weights,
+            n.total = n.total
+          ))
+        }
 
-    num / pmax(den, .Machine$double.eps)
+        den <- as.numeric(.np_ksum_eval_exact_state(
+          state = den.state,
+          txdat = x.train,
+          weights = weights
+        )) / n.total
+        num <- as.numeric(.np_ksum_eval_exact_state(
+          state = num.state,
+          txdat = data.frame(x.train, y.train),
+          weights = weights
+        )) / n.total
+
+        num / pmax(den, .Machine$double.eps)
+      },
+      bws = bws,
+      x.train = x.train,
+      y.train = y.train
+    )
   }
 
   t0 <- fit_one(x.train = xdat, y.train = ydat)
