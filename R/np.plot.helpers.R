@@ -2268,15 +2268,15 @@
   )
 }
 
-.np_inid_boot_from_conditional_localpoly_fixed <- function(xdat,
-                                                           ydat,
-                                                           exdat,
-                                                           eydat,
-                                                           bws,
-                                                           B,
-                                                           cdf,
-                                                           counts = NULL,
-                                                           counts.drawer = NULL) {
+.np_inid_boot_from_conditional_localpoly_fixed_rowwise <- function(xdat,
+                                                                   ydat,
+                                                                   exdat,
+                                                                   eydat,
+                                                                   bws,
+                                                                   B,
+                                                                   cdf,
+                                                                   counts = NULL,
+                                                                   counts.drawer = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -2344,6 +2344,283 @@
     t0[i] <- out$t0[1L]
     tmat[, i] <- out$t[, 1L]
     progress <- .np_plot_progress_tick(state = progress, done = i)
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_conditional_localpoly_fixed_counts <- function(xdat,
+                                                                  ydat,
+                                                                  exdat,
+                                                                  eydat,
+                                                                  bws,
+                                                                  B,
+                                                                  cdf,
+                                                                  counts) {
+  state <- .np_inid_boot_from_conditional_localpoly_fixed_precompute(
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    bws = bws,
+    cdf = cdf
+  )
+  counts.mat <- .np_inid_counts_matrix(n = state$n, B = B, counts = counts)
+  t0 <- numeric(state$neval)
+  tmat <- matrix(NA_real_, nrow = B, ncol = state$neval)
+
+  for (i in seq_len(state$neval)) {
+    feat <- .np_inid_boot_from_conditional_localpoly_fixed_features(state = state, i = i)
+    t0[i] <- .np_inid_boot_from_conditional_localpoly_fixed_t0(state = state, feat = feat)
+    tmat[, i] <- .np_inid_boot_from_conditional_localpoly_fixed_chunk(
+      state = state,
+      feat = feat,
+      counts.chunk = counts.mat
+    )
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_conditional_localpoly_fixed_precompute <- function(xdat,
+                                                                      ydat,
+                                                                      exdat,
+                                                                      eydat,
+                                                                      bws,
+                                                                      cdf) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  if (nrow(ydat) != n || nrow(eydat) != neval)
+    stop("conditional localpoly bootstrap helper requires aligned x/y training and evaluation rows")
+  if (n < 1L || neval < 1L)
+    stop("invalid conditional localpoly bootstrap dimensions")
+  if (!identical(bws$type, "fixed"))
+    stop("conditional localpoly bootstrap helper supports only fixed bandwidths")
+
+  xbw <- .npcdhat_make_xbw(bws = bws, txdat = xdat)
+  ybw <- .npcdhat_make_ybw(bws = bws, tydat = ydat)
+  Gy <- .npcdhat_make_kernel_matrix(
+    kbw = ybw,
+    txdat = ydat,
+    exdat = eydat,
+    operator = rep.int(if (cdf) "integral" else "normal", ncol(ydat))
+  )
+  Gy <- .np_operator_matrix_from_ksum(
+    ksum = Gy,
+    nrow.out = neval,
+    ncol.out = n,
+    where = "conditional localpoly y-operator"
+  )
+
+  regtype <- if (is.null(xbw$regtype)) "lc" else as.character(xbw$regtype)
+  if (identical(regtype, "lc"))
+    stop("conditional localpoly fixed counts helper requires regtype='ll' or 'lp'")
+
+  ncon <- xbw$ncon
+  degree <- if (identical(regtype, "ll")) {
+    rep.int(1L, ncon)
+  } else {
+    npValidateGlpDegree(
+      regtype = "lp",
+      degree = xbw$degree,
+      ncon = ncon
+    )
+  }
+
+  basis <- npValidateLpBasis(
+    regtype = "lp",
+    basis = if (is.null(xbw$basis)) "glp" else xbw$basis
+  )
+  bernstein.basis <- npValidateGlpBernstein(
+    regtype = "lp",
+    bernstein.basis = isTRUE(xbw$bernstein.basis)
+  )
+
+  kw <- npksum(
+    txdat = xdat,
+    exdat = exdat,
+    bws = xbw,
+    return.kernel.weights = TRUE,
+    bandwidth.divide = TRUE,
+    leave.one.out = FALSE
+  )$kw
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = n)
+  if (nrow(kw) != n || ncol(kw) != neval)
+    stop("conditional localpoly x-kernel-weight matrix shape mismatch")
+
+  W <- W.lp(
+    xdat = xdat,
+    degree = degree,
+    basis = basis,
+    bernstein.basis = bernstein.basis
+  )
+  W.eval <- W.lp(
+    xdat = xdat,
+    exdat = exdat,
+    degree = degree,
+    basis = basis,
+    bernstein.basis = bernstein.basis
+  )
+  W <- as.matrix(W)
+  W.eval <- as.matrix(W.eval)
+
+  if (nrow(W) != n || nrow(W.eval) != neval || ncol(W.eval) != ncol(W))
+    stop("conditional localpoly fixed moment design matrix shape mismatch")
+
+  p <- ncol(W)
+  mcols <- p * (p + 1L) / 2L
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = 1.0e-12, cap = 1.0)
+
+  list(
+    n = n,
+    neval = neval,
+    Gy = Gy,
+    kw = kw,
+    W = W,
+    W.eval = W.eval,
+    p = p,
+    mcols = mcols,
+    ridge.grid = ridge.grid
+  )
+}
+
+.np_inid_boot_from_conditional_localpoly_fixed_features <- function(state, i) {
+  k <- as.double(state$kw[, i])
+  WK <- state$W * k
+  Zfeat <- WK * as.double(state$Gy[i, ])
+
+  Mfeat <- matrix(0.0, nrow = state$n, ncol = state$mcols)
+  idx <- 1L
+  for (a in seq_len(state$p)) {
+    for (bb in a:state$p) {
+      Mfeat[, idx] <- WK[, a] * state$W[, bb]
+      idx <- idx + 1L
+    }
+  }
+
+  list(
+    Mfeat = Mfeat,
+    Zfeat = Zfeat,
+    rhs = state$W.eval[i, ]
+  )
+}
+
+.np_inid_boot_from_conditional_localpoly_fixed_t0 <- function(state, feat) {
+  M0 <- matrix(colSums(feat$Mfeat), nrow = 1L)
+  Z0 <- matrix(colSums(feat$Zfeat), nrow = 1L)
+
+  if (state$p > 3L) {
+    .np_inid_lp_predict_chunk_general(
+      Mvals = M0,
+      Zvals = Z0,
+      rhs = feat$rhs,
+      ridge.grid = state$ridge.grid
+    )[1L]
+  } else {
+    .np_inid_lp_predict_chunk(
+      Mvals = M0,
+      Zvals = Z0,
+      rhs = feat$rhs,
+      ridge.grid = state$ridge.grid
+    )[1L]
+  }
+}
+
+.np_inid_boot_from_conditional_localpoly_fixed_chunk <- function(state,
+                                                                 feat,
+                                                                 counts.chunk) {
+  Mvals <- crossprod(counts.chunk, feat$Mfeat)
+  Zvals <- crossprod(counts.chunk, feat$Zfeat)
+
+  if (state$p > 3L) {
+    .np_inid_lp_predict_chunk_general(
+      Mvals = Mvals,
+      Zvals = Zvals,
+      rhs = feat$rhs,
+      ridge.grid = state$ridge.grid
+    )
+  } else {
+    .np_inid_lp_predict_chunk(
+      Mvals = Mvals,
+      Zvals = Zvals,
+      rhs = feat$rhs,
+      ridge.grid = state$ridge.grid
+    )
+  }
+}
+
+.np_inid_boot_from_conditional_localpoly_fixed <- function(xdat,
+                                                           ydat,
+                                                           exdat,
+                                                           eydat,
+                                                           bws,
+                                                            B,
+                                                            cdf,
+                                                            counts = NULL,
+                                                            counts.drawer = NULL) {
+  if (!is.null(counts) || is.null(counts.drawer)) {
+    counts.mat <- if (!is.null(counts)) counts else .np_inid_counts_matrix(
+      n = nrow(toFrame(xdat)),
+      B = as.integer(B)
+    )
+    return(.np_inid_boot_from_conditional_localpoly_fixed_counts(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      B = B,
+      cdf = cdf,
+      counts = counts.mat
+    ))
+  }
+
+  state <- .np_inid_boot_from_conditional_localpoly_fixed_precompute(
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    bws = bws,
+    cdf = cdf
+  )
+  t0 <- numeric(state$neval)
+  for (i in seq_len(state$neval)) {
+    feat <- .np_inid_boot_from_conditional_localpoly_fixed_features(state = state, i = i)
+    t0[i] <- .np_inid_boot_from_conditional_localpoly_fixed_t0(state = state, feat = feat)
+  }
+
+  tmat <- matrix(NA_real_, nrow = B, ncol = state$neval)
+  progress.label <- "Plot bootstrap block"
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  chunk.size <- .np_inid_chunk_size(n = state$n, B = B)
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.size - 1L)
+    counts.chunk <- .np_inid_counts_matrix(
+      n = state$n,
+      B = stopi - start + 1L,
+      counts = counts.drawer(start, stopi)
+    )
+    for (i in seq_len(state$neval)) {
+      feat <- .np_inid_boot_from_conditional_localpoly_fixed_features(state = state, i = i)
+      tmat[start:stopi, i] <- .np_inid_boot_from_conditional_localpoly_fixed_chunk(
+        state = state,
+        feat = feat,
+        counts.chunk = counts.chunk
+      )
+    }
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    start <- stopi + 1L
   }
 
   list(t = tmat, t0 = t0)

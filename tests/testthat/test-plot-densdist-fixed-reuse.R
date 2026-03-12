@@ -55,55 +55,218 @@ test_that("fixed conditional density/distribution helper matches explicit refits
   B <- 7L
   counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
 
-  dens.bw <- npcdensbw(xdat = tx, ydat = ty, bws = c(0.45, 0.45), bandwidth.compute = FALSE)
-  dist.bw <- npcdistbw(xdat = tx, ydat = ty, bws = c(0.45, 0.45), bandwidth.compute = FALSE)
   fast.fun <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "np")
+  oracle.fun <- getFromNamespace(".np_inid_boot_from_conditional_localpoly_fixed_rowwise", "np")
 
-  dens.fast <- fast.fun(
-    xdat = tx,
-    ydat = ty,
-    exdat = ex,
-    eydat = ey,
-    bws = dens.bw,
-    B = B,
-    cdf = FALSE,
-    counts = counts
-  )
-  dist.fast <- fast.fun(
-    xdat = tx,
-    ydat = ty,
-    exdat = ex,
-    eydat = ey,
-    bws = dist.bw,
-    B = B,
-    cdf = TRUE,
-    counts = counts
+  cfgs <- list(
+    list(name = "lc", regtype = "lc", degree = NULL),
+    list(name = "ll", regtype = "ll", degree = NULL),
+    list(name = "lp", regtype = "lp", degree = 2L)
   )
 
-  dens.explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
-  dist.explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
-  for (b in seq_len(B)) {
-    idx <- rep.int(seq_len(n), counts[, b])
-    dens.explicit[b, ] <- npcdens(
-      txdat = tx[idx, , drop = FALSE],
-      tydat = ty[idx, , drop = FALSE],
+  for (cfg in cfgs) {
+    dens.args <- list(
+      xdat = tx,
+      ydat = ty,
+      bws = c(0.45, 0.45),
+      bandwidth.compute = FALSE,
+      bwtype = "fixed",
+      regtype = cfg$regtype
+    )
+    dist.args <- dens.args
+    if (!is.null(cfg$degree)) {
+      dens.args$degree <- cfg$degree
+      dens.args$basis <- "glp"
+      dens.args$bernstein.basis <- FALSE
+      dist.args$degree <- cfg$degree
+      dist.args$basis <- "glp"
+      dist.args$bernstein.basis <- FALSE
+    }
+
+    dens.bw <- do.call(npcdensbw, dens.args)
+    dist.bw <- do.call(npcdistbw, dist.args)
+
+    dens.fast <- fast.fun(
+      xdat = tx,
+      ydat = ty,
       exdat = ex,
       eydat = ey,
-      bws = dens.bw
-    )$condens
-    dist.explicit[b, ] <- npcdist(
-      txdat = tx[idx, , drop = FALSE],
-      tydat = ty[idx, , drop = FALSE],
+      bws = dens.bw,
+      B = B,
+      cdf = FALSE,
+      counts = counts
+    )
+    dist.fast <- fast.fun(
+      xdat = tx,
+      ydat = ty,
       exdat = ex,
       eydat = ey,
-      bws = dist.bw
-    )$condist
+      bws = dist.bw,
+      B = B,
+      cdf = TRUE,
+      counts = counts
+    )
+
+    dens.explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+    dist.explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+    for (b in seq_len(B)) {
+      idx <- rep.int(seq_len(n), counts[, b])
+      dens.explicit[b, ] <- npcdens(
+        txdat = tx[idx, , drop = FALSE],
+        tydat = ty[idx, , drop = FALSE],
+        exdat = ex,
+        eydat = ey,
+        bws = dens.bw
+      )$condens
+      dist.explicit[b, ] <- npcdist(
+        txdat = tx[idx, , drop = FALSE],
+        tydat = ty[idx, , drop = FALSE],
+        exdat = ex,
+        eydat = ey,
+        bws = dist.bw
+      )$condist
+    }
+
+    expect_equal(
+      dens.fast$t,
+      dens.explicit,
+      tolerance = 1e-10,
+      info = paste("density explicit", cfg$name)
+    )
+    expect_equal(
+      dist.fast$t,
+      dist.explicit,
+      tolerance = 1e-10,
+      info = paste("distribution explicit", cfg$name)
+    )
+    expect_equal(
+      dens.fast$t0,
+      npcdens(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = dens.bw)$condens,
+      tolerance = 1e-12,
+      info = paste("density t0", cfg$name)
+    )
+    expect_equal(
+      dist.fast$t0,
+      npcdist(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = dist.bw)$condist,
+      tolerance = 1e-12,
+      info = paste("distribution t0", cfg$name)
+    )
+
+    if (!identical(cfg$regtype, "lc")) {
+      dens.oracle <- oracle.fun(
+        xdat = tx,
+        ydat = ty,
+        exdat = ex,
+        eydat = ey,
+        bws = dens.bw,
+        B = B,
+        cdf = FALSE,
+        counts = counts
+      )
+      dist.oracle <- oracle.fun(
+        xdat = tx,
+        ydat = ty,
+        exdat = ex,
+        eydat = ey,
+        bws = dist.bw,
+        B = B,
+        cdf = TRUE,
+        counts = counts
+      )
+
+      expect_equal(
+        dens.fast$t,
+        dens.oracle$t,
+        tolerance = 1e-12,
+        info = paste("density oracle", cfg$name)
+      )
+      expect_equal(
+        dist.fast$t,
+        dist.oracle$t,
+        tolerance = 1e-12,
+        info = paste("distribution oracle", cfg$name)
+      )
+      expect_equal(
+        dens.fast$t0,
+        dens.oracle$t0,
+        tolerance = 1e-12,
+        info = paste("density oracle t0", cfg$name)
+      )
+      expect_equal(
+        dist.fast$t0,
+        dist.oracle$t0,
+        tolerance = 1e-12,
+        info = paste("distribution oracle t0", cfg$name)
+      )
+
+      drawer <- function(start, stopi) counts[, start:stopi, drop = FALSE]
+      dens.fast.drawer <- fast.fun(
+        xdat = tx,
+        ydat = ty,
+        exdat = ex,
+        eydat = ey,
+        bws = dens.bw,
+        B = B,
+        cdf = FALSE,
+        counts.drawer = drawer
+      )
+      dist.fast.drawer <- fast.fun(
+        xdat = tx,
+        ydat = ty,
+        exdat = ex,
+        eydat = ey,
+        bws = dist.bw,
+        B = B,
+        cdf = TRUE,
+        counts.drawer = drawer
+      )
+      dens.oracle.drawer <- oracle.fun(
+        xdat = tx,
+        ydat = ty,
+        exdat = ex,
+        eydat = ey,
+        bws = dens.bw,
+        B = B,
+        cdf = FALSE,
+        counts.drawer = drawer
+      )
+      dist.oracle.drawer <- oracle.fun(
+        xdat = tx,
+        ydat = ty,
+        exdat = ex,
+        eydat = ey,
+        bws = dist.bw,
+        B = B,
+        cdf = TRUE,
+        counts.drawer = drawer
+      )
+
+      expect_equal(
+        dens.fast.drawer$t,
+        dens.oracle.drawer$t,
+        tolerance = 1e-12,
+        info = paste("density drawer oracle", cfg$name)
+      )
+      expect_equal(
+        dist.fast.drawer$t,
+        dist.oracle.drawer$t,
+        tolerance = 1e-12,
+        info = paste("distribution drawer oracle", cfg$name)
+      )
+      expect_equal(
+        dens.fast.drawer$t0,
+        dens.oracle.drawer$t0,
+        tolerance = 1e-12,
+        info = paste("density drawer oracle t0", cfg$name)
+      )
+      expect_equal(
+        dist.fast.drawer$t0,
+        dist.oracle.drawer$t0,
+        tolerance = 1e-12,
+        info = paste("distribution drawer oracle t0", cfg$name)
+      )
+    }
   }
-
-  expect_equal(dens.fast$t, dens.explicit, tolerance = 1e-10)
-  expect_equal(dist.fast$t, dist.explicit, tolerance = 1e-10)
-  expect_equal(dens.fast$t0, npcdens(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = dens.bw)$condens, tolerance = 1e-12)
-  expect_equal(dist.fast$t0, npcdist(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = dist.bw)$condist, tolerance = 1e-12)
 })
 
 test_that("fixed density/distribution helpers preserve bounded kernel options", {
