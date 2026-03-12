@@ -1967,6 +1967,35 @@
   )$ksum) / n.total
 }
 
+.np_make_kbandwidth_unconditional <- function(bws, xdat) {
+  xdat <- toFrame(xdat)
+  kbandwidth.numeric(
+    bw = bws$bw,
+    bwscaling = FALSE,
+    # npksum helper constructors require raw bandwidths; bwscaling flags are
+    # non-fit-defining here and are intentionally normalized to FALSE.
+    bwtype = bws$type,
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    ckerbound = bws$ckerbound,
+    ckerlb = if (!is.null(bws$ckerlb)) bws$ckerlb else NULL,
+    ckerub = if (!is.null(bws$ckerub)) bws$ckerub else NULL,
+    ukertype = bws$ukertype,
+    okertype = bws$okertype,
+    nobs = nrow(xdat),
+    xdati = untangle(xdat),
+    xnames = names(xdat)
+  )
+}
+
+.np_unconditional_exact_precomputed_kband_safe <- function(bws, n.train) {
+  if (!identical(bws$type, "adaptive_nn"))
+    return(TRUE)
+
+  bw.max <- suppressWarnings(max(as.integer(bws$bw)))
+  is.finite(bw.max) && !is.na(bw.max) && n.train >= bw.max
+}
+
 .np_operator_matrix_from_ksum <- function(ksum, nrow.out, ncol.out, where) {
   km <- as.matrix(ksum)
 
@@ -2121,11 +2150,19 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid unconditional exact bootstrap dimensions")
 
+  kb <- tryCatch(.np_make_kbandwidth_unconditional(bws = bws, xdat = xdat),
+                 error = function(e) NULL)
+
   fit_one <- function(x.train, weights = NULL, n.total = NULL) {
+    bw.eval <- if (!is.null(kb) &&
+                   .np_unconditional_exact_precomputed_kband_safe(
+                     bws = bws,
+                     n.train = nrow(x.train)
+                   )) kb else bws
     .np_ksum_unconditional_eval_exact(
       xdat = x.train,
       exdat = exdat,
-      bws = bws,
+      bws = bw.eval,
       operator = operator,
       weights = weights,
       n.total = n.total

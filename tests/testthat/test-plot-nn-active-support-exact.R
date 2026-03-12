@@ -10,39 +10,85 @@ test_that("nonfixed unconditional exact bootstrap matches duplicate-row oracle",
   )
   storage.mode(counts) <- "double"
 
-  bw <- npudensbw(
-    dat = xdat,
-    bwtype = "generalized_nn",
-    bws = 1,
-    bandwidth.compute = FALSE
-  )
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    bw.val <- if (identical(bt, "adaptive_nn")) 2 else 1
+    bw <- npudensbw(
+      dat = xdat,
+      bwtype = bt,
+      bws = bw.val,
+      bandwidth.compute = FALSE
+    )
 
-  helper <- np:::.np_inid_boot_from_ksum_unconditional_exact(
-    xdat = xdat,
-    exdat = exdat,
-    bws = bw,
-    B = ncol(counts),
-    operator = "normal",
-    counts = counts
-  )
+    helper <- np:::.np_inid_boot_from_ksum_unconditional_exact(
+      xdat = xdat,
+      exdat = exdat,
+      bws = bw,
+      B = ncol(counts),
+      operator = "normal",
+      counts = counts
+    )
 
-  manual <- vapply(seq_len(ncol(counts)), function(j) {
-    idx <- np:::.np_counts_to_indices(counts[, j])
-    np:::.np_ksum_unconditional_eval_exact(
-      xdat = xdat[idx, , drop = FALSE],
+    manual <- vapply(seq_len(ncol(counts)), function(j) {
+      idx <- np:::.np_counts_to_indices(counts[, j])
+      np:::.np_ksum_unconditional_eval_exact(
+        xdat = xdat[idx, , drop = FALSE],
+        exdat = exdat,
+        bws = bw,
+        operator = "normal"
+      )
+    }, numeric(nrow(exdat)))
+
+    expect_equal(helper$t0, np:::.np_ksum_unconditional_eval_exact(
+      xdat = xdat,
       exdat = exdat,
       bws = bw,
       operator = "normal"
-    )
-  }, numeric(nrow(exdat)))
+    ), info = bt)
+    expect_equal(helper$t, t(manual), tolerance = 1e-14, info = bt)
+  }
+})
 
-  expect_equal(helper$t0, np:::.np_ksum_unconditional_eval_exact(
-    xdat = xdat,
-    exdat = exdat,
-    bws = bw,
-    operator = "normal"
-  ))
-  expect_equal(helper$t, t(manual), tolerance = 1e-14)
+test_that("nonfixed unconditional exact helper matches direct kbandwidth precompute", {
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  xdat <- data.frame(x = c(0, 0, 1, 3, 3, 10))
+  exdat <- data.frame(x = c(0, 2, 5, 9))
+  counts <- c(1, 1, 1, 2, 1, 2)
+  active <- counts > 0
+
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    bw.val <- if (identical(bt, "adaptive_nn")) 2 else 1
+    bw <- npudensbw(
+      dat = xdat,
+      bwtype = bt,
+      bws = bw.val,
+      bandwidth.compute = FALSE
+    )
+
+    kb <- np:::.np_make_kbandwidth_unconditional(bws = bw, xdat = xdat)
+    weighted.active <- matrix(as.double(counts[active]), ncol = 1L)
+
+    direct.bw <- np:::.np_ksum_unconditional_eval_exact(
+      xdat = xdat[active, , drop = FALSE],
+      exdat = exdat,
+      bws = bw,
+      operator = "normal",
+      weights = weighted.active,
+      n.total = sum(counts)
+    )
+
+    direct.kb <- np:::.np_ksum_unconditional_eval_exact(
+      xdat = xdat[active, , drop = FALSE],
+      exdat = exdat,
+      bws = kb,
+      operator = "normal",
+      weights = weighted.active,
+      n.total = sum(counts)
+    )
+
+    expect_equal(direct.kb, direct.bw, tolerance = 0, info = bt)
+  }
 })
 
 test_that("nonfixed conditional exact bootstrap matches duplicate-row oracle", {
