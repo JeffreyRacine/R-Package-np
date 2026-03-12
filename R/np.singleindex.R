@@ -595,11 +595,13 @@ npindex.sibandwidth <-
       boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = boot.num))
 
       index.merr = matrix(data = 0, ncol = 1, nrow = length(index.eval))
-      index.merr[,] = sqrt(diag(cov(boot.out$t[,seq_len(length(index.eval))])))
+      index.merr[,] = .np_plot_bootstrap_col_sds(boot.out$t[, seq_len(length(index.eval)), drop = FALSE])
 
       if (gradients) {
         index.gerr = matrix(data = 0, ncol = ncol(txdat), nrow = length(index.eval))
-        index.gerr[,] = sqrt(diag(cov(boot.out$t[,(length(index.eval)+1):(2*length(index.eval))])))
+        index.gerr[,] = .np_plot_bootstrap_col_sds(
+          boot.out$t[, (length(index.eval) + 1):(2 * length(index.eval)), drop = FALSE]
+        )
 
         for (i in seq_len(ncol(txdat)))
           index.gerr[,i] = abs(bws$beta[i])*index.gerr[,i]
