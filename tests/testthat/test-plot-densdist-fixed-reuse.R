@@ -362,6 +362,130 @@ test_that("fixed conditional ll/lp grouped inid helper matches the rowwise oracl
   }
 })
 
+test_that("fixed conditional ll/lp grouped helper is drawer-equal and chunk-invariant on repeated evaluation x rows", {
+  skip_if_not_installed("np")
+
+  old.chunk <- getOption("np.plot.inid.chunk.size")
+  options(np.plot.inid.chunk.size = 2L)
+  on.exit(options(np.plot.inid.chunk.size = old.chunk), add = TRUE)
+
+  set.seed(6031022)
+  n <- 68
+  tx <- data.frame(x = rnorm(n))
+  ty <- data.frame(y = rnorm(n))
+  x.grid <- seq(min(tx$x), max(tx$x), length.out = 7L)
+  y.grid <- seq(min(ty$y), max(ty$y), length.out = 6L)
+  grid <- expand.grid(y = y.grid, x = x.grid)
+  ex <- data.frame(x = grid$x)
+  ey <- data.frame(y = grid$y)
+  B <- 7L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  fast.fun <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "np")
+  oracle.fun <- getFromNamespace(".np_inid_boot_from_conditional_localpoly_fixed_rowwise", "np")
+
+  cfgs <- list(
+    list(name = "ll", regtype = "ll", degree = NULL),
+    list(name = "lp", regtype = "lp", degree = 2L)
+  )
+
+  for (cfg in cfgs) {
+    dens.args <- list(
+      xdat = tx,
+      ydat = ty,
+      bws = c(0.38, 0.38),
+      bandwidth.compute = FALSE,
+      bwtype = "fixed",
+      regtype = cfg$regtype
+    )
+    dist.args <- dens.args
+    if (!is.null(cfg$degree)) {
+      dens.args$degree <- cfg$degree
+      dens.args$basis <- "glp"
+      dens.args$bernstein.basis <- FALSE
+      dist.args$degree <- cfg$degree
+      dist.args$basis <- "glp"
+      dist.args$bernstein.basis <- FALSE
+    }
+
+    dens.bw <- do.call(npcdensbw, dens.args)
+    dist.bw <- do.call(npcdistbw, dist.args)
+    drawer <- function(start, stopi) counts[, start:stopi, drop = FALSE]
+
+    dens.fast <- fast.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dens.bw,
+      B = B,
+      cdf = FALSE,
+      counts = counts
+    )
+    dens.drawer <- fast.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dens.bw,
+      B = B,
+      cdf = FALSE,
+      counts.drawer = drawer
+    )
+    dens.oracle.drawer <- oracle.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dens.bw,
+      B = B,
+      cdf = FALSE,
+      counts.drawer = drawer
+    )
+
+    dist.fast <- fast.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dist.bw,
+      B = B,
+      cdf = TRUE,
+      counts = counts
+    )
+    dist.drawer <- fast.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dist.bw,
+      B = B,
+      cdf = TRUE,
+      counts.drawer = drawer
+    )
+    dist.oracle.drawer <- oracle.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dist.bw,
+      B = B,
+      cdf = TRUE,
+      counts.drawer = drawer
+    )
+
+    expect_equal(dens.drawer$t, dens.fast$t, tolerance = 1e-12, info = paste("density drawer chunk invariance", cfg$name))
+    expect_equal(dens.drawer$t0, dens.fast$t0, tolerance = 1e-10, info = paste("density drawer chunk invariance t0", cfg$name))
+    expect_equal(dens.drawer$t, dens.oracle.drawer$t, tolerance = 1e-8, info = paste("density drawer oracle repeated-x", cfg$name))
+    expect_equal(dens.drawer$t0, dens.oracle.drawer$t0, tolerance = 1e-10, info = paste("density drawer oracle repeated-x t0", cfg$name))
+
+    expect_equal(dist.drawer$t, dist.fast$t, tolerance = 1e-12, info = paste("distribution drawer chunk invariance", cfg$name))
+    expect_equal(dist.drawer$t0, dist.fast$t0, tolerance = 1e-10, info = paste("distribution drawer chunk invariance t0", cfg$name))
+    expect_equal(dist.drawer$t, dist.oracle.drawer$t, tolerance = 1e-8, info = paste("distribution drawer oracle repeated-x", cfg$name))
+    expect_equal(dist.drawer$t0, dist.oracle.drawer$t0, tolerance = 1e-10, info = paste("distribution drawer oracle repeated-x t0", cfg$name))
+  }
+})
+
 test_that("fixed density/distribution helpers preserve bounded kernel options", {
   skip_if_not_installed("np")
 
