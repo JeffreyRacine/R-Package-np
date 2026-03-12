@@ -374,6 +374,26 @@
   )
 }
 
+.np_active_boot_sample_matrix <- function(xmat, counts.col, ymat = NULL) {
+  counts.col <- as.double(counts.col)
+  if (length(counts.col) != nrow(xmat))
+    stop("bootstrap counts must align with training rows")
+  if (!is.null(ymat) && nrow(ymat) != nrow(xmat))
+    stop("bootstrap x/y training rows must align")
+
+  active <- counts.col > 0
+  if (!any(active))
+    stop("bootstrap counts must activate at least one training row")
+
+  idx <- which(active)
+  list(
+    xmat = xmat[idx, , drop = FALSE],
+    ymat = if (is.null(ymat)) NULL else ymat[idx, , drop = FALSE],
+    weights = matrix(counts.col[idx], ncol = 1L),
+    n.total = sum(counts.col)
+  )
+}
+
 .np_block_counts_drawer <- function(n,
                                     B,
                                     blocklen,
@@ -2390,13 +2410,20 @@
 .np_ksum_eval_exact_state <- function(state, txdat, weights) {
   if (state$bws$nuno == 0L &&
       state$bws$nord == 0L &&
-      is.data.frame(txdat)) {
+      is.matrix(txdat) &&
+      typeof(txdat) == "double") {
+    txm <- txdat
+    tnrow <- nrow(txdat)
+  } else if (state$bws$nuno == 0L &&
+             state$bws$nord == 0L &&
+             is.data.frame(txdat)) {
     txm <- data.matrix(txdat)
+    tnrow <- nrow(txdat)
   } else {
     txdat <- adjustLevels(toFrame(txdat), state$bws$xdati, allowNewCells = TRUE)
     txm <- toMatrix(txdat)
+    tnrow <- nrow(txdat)
   }
-  tnrow <- nrow(txdat)
   if (is.matrix(weights) &&
       typeof(weights) == "double" &&
       ncol(weights) == 1L) {
@@ -3111,6 +3138,87 @@
     )) / n.total
 
     num / pmax(den, .Machine$double.eps)
+  }
+
+  use.matrix.fast <- identical(bws$type, "generalized_nn") &&
+    den.state$bws$nuno == 0L &&
+    den.state$bws$nord == 0L &&
+    num.state$bws$nuno == 0L &&
+    num.state$bws$nord == 0L &&
+    all(vapply(xdat, is.numeric, logical(1))) &&
+    all(vapply(ydat, is.numeric, logical(1)))
+
+  if (use.matrix.fast) {
+    xmat <- data.matrix(xdat)
+    xymat <- cbind(xmat, data.matrix(ydat))
+
+    fit_one_matrix <- function(x.train, xy.train, weights = NULL, n.total = NULL) {
+      if (is.null(weights)) {
+        weights <- matrix(1.0, nrow = nrow(x.train), ncol = 1L)
+        n.total <- nrow(x.train)
+      } else {
+        weights <- matrix(as.double(weights), ncol = 1L)
+        if (nrow(weights) != nrow(x.train))
+          stop("exact conditional ksum helper requires one weight per training row")
+        if (is.null(n.total))
+          n.total <- sum(weights)
+      }
+
+      den <- as.numeric(.np_ksum_eval_exact_state(
+        state = den.state,
+        txdat = x.train,
+        weights = weights
+      )) / n.total
+      num <- as.numeric(.np_ksum_eval_exact_state(
+        state = num.state,
+        txdat = xy.train,
+        weights = weights
+      )) / n.total
+
+      num / pmax(den, .Machine$double.eps)
+    }
+
+    t0 <- fit_one_matrix(x.train = xmat, xy.train = xymat)
+    tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+    counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
+    progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+    progress <- .np_plot_progress_begin(total = B, label = progress.label)
+    on.exit({
+      .np_plot_progress_end(progress)
+    }, add = TRUE)
+
+    start <- 1L
+    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    while (start <= B) {
+      stopi <- min(B, start + chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      counts.chunk <- if (!is.null(counts.mat)) {
+        counts.mat[, start:stopi, drop = FALSE]
+      } else if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+      } else {
+        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+      }
+
+      for (jj in seq_len(bsz)) {
+        active.sample <- .np_active_boot_sample_matrix(
+          xmat = xmat,
+          ymat = xymat,
+          counts.col = counts.chunk[, jj]
+        )
+        tmat[start + jj - 1L, ] <- fit_one_matrix(
+          x.train = active.sample$xmat,
+          xy.train = active.sample$ymat,
+          weights = active.sample$weights,
+          n.total = active.sample$n.total
+        )
+      }
+
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      start <- stopi + 1L
+    }
+
+    return(list(t = tmat, t0 = t0))
   }
 
   t0 <- fit_one(x.train = xdat, y.train = ydat)
