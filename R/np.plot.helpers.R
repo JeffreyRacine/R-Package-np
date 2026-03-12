@@ -2397,7 +2397,13 @@
     txm <- toMatrix(txdat)
   }
   tnrow <- nrow(txdat)
-  weights <- matrix(as.double(weights), ncol = 1L)
+  if (is.matrix(weights) &&
+      typeof(weights) == "double" &&
+      ncol(weights) == 1L) {
+    weights <- weights
+  } else {
+    weights <- matrix(as.double(weights), ncol = 1L)
+  }
 
   if (nrow(weights) != tnrow)
     stop("exact ksum state apply requires one weight per training row")
