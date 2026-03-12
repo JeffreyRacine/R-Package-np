@@ -56,6 +56,25 @@ npudenshat <- function(bws,
   }
 
   n.train <- nrow(tdat)
+  if (identical(output, "apply")) {
+    if (is.null(y))
+      stop("argument 'y' is required when output='apply'")
+
+    if (identical(bws$type, "fixed")) {
+      out <- .np_direct_operator_apply(
+        kbw = bws,
+        txdat = tdat,
+        exdat = if (no.e) tdat else edat,
+        operator = "normal",
+        rhs = y,
+        where = "npudenshat direct operator apply"
+      ) / n.train
+      if (ncol(out) == 1L)
+        return(as.vector(out))
+      return(out)
+    }
+  }
+
   if (identical(bws$type, "fixed")) {
     H <- .np_direct_operator_matrix(
       kbw = bws,

@@ -72,6 +72,30 @@ test_that("npudisthat fixed-bandwidth count vectors reproduce resampled npudist 
   }
 })
 
+test_that("npudisthat fixed apply mode matches matrix RHS multiplication", {
+  skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  npudisthat <- getFromNamespace("npudisthat", "npRmpi")
+
+  set.seed(20260311)
+  n <- 48
+  x <- sort(runif(n))
+  tx <- data.frame(x = x)
+  ex <- data.frame(x = seq(0.1, 0.9, length.out = 19))
+  bw <- npudistbw(
+    dat = tx,
+    bws = 0.16,
+    bwtype = "fixed",
+    bandwidth.compute = FALSE
+  )
+  rhs <- cbind(seq_len(n) / n, cos(seq_len(n) / 9))
+  H <- npudisthat(bws = bw, tdat = tx, edat = ex, output = "matrix")
+  apply.out <- npudisthat(bws = bw, tdat = tx, edat = ex, y = rhs, output = "apply")
+
+  expect_equal(apply.out, H %*% rhs, tolerance = 1e-12)
+})
+
 test_that("npudisthat preserves bounded gaussian manual-bandwidth semantics", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
   on.exit(close_mpi_slaves(), add = TRUE)
