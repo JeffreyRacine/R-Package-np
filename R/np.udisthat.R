@@ -69,10 +69,19 @@ npudisthat <- function(bws,
         rhs = y,
         where = "npudisthat direct operator apply"
       ) / n.train
-      if (ncol(out) == 1L)
-        return(as.vector(out))
-      return(out)
+    } else {
+      out <- .np_exact_operator_apply(
+        kbw = bws,
+        txdat = tdat,
+        exdat = if (no.e) tdat else edat,
+        operator = "integral",
+        rhs = y,
+        where = "npudisthat exact operator apply"
+      ) / n.train
     }
+    if (ncol(out) == 1L)
+      return(as.vector(out))
+    return(out)
   }
 
   if (identical(bws$type, "fixed")) {
@@ -84,15 +93,13 @@ npudisthat <- function(bws,
       where = "npudisthat direct operator"
     ) / n.train
   } else {
-    H <- npksum(
-      bws = bws,
+    H <- .np_exact_operator_matrix(
+      kbw = bws,
       txdat = tdat,
       exdat = if (no.e) tdat else edat,
-      tydat = diag(n.train),
       operator = "integral",
-      bandwidth.divide = TRUE
-    )$ksum / n.train
-    H <- as.matrix(H)
+      where = "npudisthat exact operator"
+    ) / n.train
   }
 
   if (identical(output, "apply")) {

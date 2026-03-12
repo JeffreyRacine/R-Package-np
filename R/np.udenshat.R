@@ -69,10 +69,19 @@ npudenshat <- function(bws,
         rhs = y,
         where = "npudenshat direct operator apply"
       ) / n.train
-      if (ncol(out) == 1L)
-        return(as.vector(out))
-      return(out)
+    } else {
+      out <- .np_exact_operator_apply(
+        kbw = bws,
+        txdat = tdat,
+        exdat = if (no.e) tdat else edat,
+        operator = "normal",
+        rhs = y,
+        where = "npudenshat exact operator apply"
+      ) / n.train
     }
+    if (ncol(out) == 1L)
+      return(as.vector(out))
+    return(out)
   }
 
   if (identical(bws$type, "fixed")) {
@@ -84,15 +93,13 @@ npudenshat <- function(bws,
       where = "npudenshat direct operator"
     ) / n.train
   } else {
-    H <- npksum(
-      bws = bws,
+    H <- .np_exact_operator_matrix(
+      kbw = bws,
       txdat = tdat,
       exdat = if (no.e) tdat else edat,
-      tydat = diag(n.train),
       operator = "normal",
-      bandwidth.divide = TRUE
-    )$ksum / n.train
-    H <- as.matrix(H)
+      where = "npudenshat exact operator"
+    ) / n.train
   }
 
   if (identical(output, "apply")) {
