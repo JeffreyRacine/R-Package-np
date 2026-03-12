@@ -1779,6 +1779,26 @@
   )
 }
 
+.np_active_boot_sample_matrix <- function(xmat, counts.col, ymat = NULL) {
+  counts.col <- as.double(counts.col)
+  if (length(counts.col) != nrow(xmat))
+    stop("bootstrap counts must align with training rows")
+  if (!is.null(ymat) && nrow(ymat) != nrow(xmat))
+    stop("bootstrap x/y training rows must align")
+
+  active <- counts.col > 0
+  if (!any(active))
+    stop("bootstrap counts must activate at least one training row")
+
+  idx <- which(active)
+  list(
+    xmat = xmat[idx, , drop = FALSE],
+    ymat = if (is.null(ymat)) NULL else ymat[idx, , drop = FALSE],
+    weights = matrix(counts.col[idx], ncol = 1L),
+    n.total = sum(counts.col)
+  )
+}
+
 .np_inid_boot_from_regression_exact <- function(xdat,
                                                 exdat,
                                                 bws,
@@ -3847,13 +3867,20 @@
 .np_ksum_eval_exact_state <- function(state, txdat, weights) {
   if (state$bws$nuno == 0L &&
       state$bws$nord == 0L &&
-      is.data.frame(txdat)) {
+      is.matrix(txdat) &&
+      typeof(txdat) == "double") {
+    txm <- txdat
+    tnrow <- nrow(txdat)
+  } else if (state$bws$nuno == 0L &&
+             state$bws$nord == 0L &&
+             is.data.frame(txdat)) {
     txm <- data.matrix(txdat)
+    tnrow <- nrow(txdat)
   } else {
     txdat <- adjustLevels(toFrame(txdat), state$bws$xdati, allowNewCells = TRUE)
     txm <- toMatrix(txdat)
+    tnrow <- nrow(txdat)
   }
-  tnrow <- nrow(txdat)
   if (is.matrix(weights) &&
       typeof(weights) == "double" &&
       ncol(weights) == 1L) {
@@ -4060,12 +4087,15 @@
                                                         num.state) {
   weights <- matrix(as.double(active.sample$weights), ncol = 1L)
   n.total <- active.sample$n.total
+  x.train <- if (!is.null(active.sample$xmat)) active.sample$xmat else active.sample$xdat
+  y.train <- if (!is.null(active.sample$ydat)) active.sample$ydat else active.sample$ymat
+  xy.train <- if (!is.null(active.sample$ymat)) active.sample$ymat else data.frame(active.sample$xdat, active.sample$ydat)
 
   if (identical(bws$type, "adaptive_nn")) {
     return(tryCatch(
       .np_ksum_conditional_eval_exact_oracle(
-        xdat = active.sample$xdat,
-        ydat = active.sample$ydat,
+        xdat = x.train,
+        ydat = y.train,
         exdat = exdat,
         eydat = eydat,
         kbx = kbx,
@@ -4078,9 +4108,9 @@
         stop(
           sprintf(
             "adaptive conditional exact bootstrap resample is invalid for this active support (n.active=%d, x.unique=%d, y.unique=%d): %s",
-            nrow(active.sample$xdat),
-            nrow(unique(toFrame(active.sample$xdat))),
-            nrow(unique(toFrame(active.sample$ydat))),
+            nrow(x.train),
+            nrow(unique(toFrame(x.train))),
+            nrow(unique(toFrame(y.train))),
             conditionMessage(e)
           ),
           call. = FALSE
@@ -4091,12 +4121,12 @@
 
   den <- as.numeric(.np_ksum_eval_exact_state(
     state = den.state,
-    txdat = active.sample$xdat,
+    txdat = x.train,
     weights = weights
   )) / n.total
   num <- as.numeric(.np_ksum_eval_exact_state(
     state = num.state,
-    txdat = data.frame(active.sample$xdat, active.sample$ydat),
+    txdat = xy.train,
     weights = weights
   )) / n.total
 
@@ -4561,6 +4591,16 @@
     )
   )
 
+  use.matrix.fast <- identical(bws$type, "generalized_nn") &&
+    den.state$bws$nuno == 0L &&
+    den.state$bws$nord == 0L &&
+    num.state$bws$nuno == 0L &&
+    num.state$bws$nord == 0L &&
+    all(vapply(xdat, is.numeric, logical(1))) &&
+    all(vapply(ydat, is.numeric, logical(1)))
+  xmat <- if (use.matrix.fast) data.matrix(xdat) else NULL
+  xymat <- if (use.matrix.fast) cbind(xmat, data.matrix(ydat)) else NULL
+
   fit_one <- function(x.train, y.train, weights = NULL, n.total = NULL) {
     if (is.null(weights)) {
       weights <- matrix(1.0, nrow = nrow(x.train), ncol = 1L)
@@ -4591,7 +4631,26 @@
     )
   }
 
-  t0 <- fit_one(x.train = xdat, y.train = ydat)
+  t0 <- if (use.matrix.fast) {
+    .np_ksum_conditional_eval_exact_boot_active(
+      active.sample = list(
+        xmat = xmat,
+        ymat = xymat,
+        weights = matrix(1.0, nrow = nrow(xmat), ncol = 1L),
+        n.total = nrow(xmat)
+      ),
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      kbx = kbx,
+      kbxy = kbxy,
+      cdf = cdf,
+      den.state = den.state,
+      num.state = num.state
+    )
+  } else {
+    fit_one(x.train = xdat, y.train = ydat)
+  }
   nout <- length(t0)
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
@@ -4618,11 +4677,19 @@
         bsz <- ncol(counts.chunk)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          active.sample <- .np_active_boot_sample(
-            xdat = xdat,
-            ydat = ydat,
-            counts.col = counts.chunk[, jj]
-          )
+          active.sample <- if (use.matrix.fast) {
+            .np_active_boot_sample_matrix(
+              xmat = xmat,
+              ymat = xymat,
+              counts.col = counts.chunk[, jj]
+            )
+          } else {
+            .np_active_boot_sample(
+              xdat = xdat,
+              ydat = ydat,
+              counts.col = counts.chunk[, jj]
+            )
+          }
           out[jj, ] <- .np_ksum_conditional_eval_exact_boot_active(
             active.sample = active.sample,
             exdat = exdat,
@@ -4658,7 +4725,11 @@
           num.state = num.state,
           n = n,
           nout = nout,
+          use.matrix.fast = use.matrix.fast,
+          xmat = xmat,
+          xymat = xymat,
           .np_active_boot_sample = .np_active_boot_sample,
+          .np_active_boot_sample_matrix = .np_active_boot_sample_matrix,
           .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
           .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
           .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
@@ -4692,11 +4763,19 @@
         bsz <- ncol(counts.chunk)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          active.sample <- .np_active_boot_sample(
-            xdat = xdat,
-            ydat = ydat,
-            counts.col = counts.chunk[, jj]
-          )
+          active.sample <- if (use.matrix.fast) {
+            .np_active_boot_sample_matrix(
+              xmat = xmat,
+              ymat = xymat,
+              counts.col = counts.chunk[, jj]
+            )
+          } else {
+            .np_active_boot_sample(
+              xdat = xdat,
+              ydat = ydat,
+              counts.col = counts.chunk[, jj]
+            )
+          }
           out[jj, ] <- .np_ksum_conditional_eval_exact_boot_active(
             active.sample = active.sample,
             exdat = exdat,
@@ -4732,7 +4811,11 @@
           den.state = den.state,
           num.state = num.state,
           nout = nout,
+          use.matrix.fast = use.matrix.fast,
+          xmat = xmat,
+          xymat = xymat,
           .np_active_boot_sample = .np_active_boot_sample,
+          .np_active_boot_sample_matrix = .np_active_boot_sample_matrix,
           .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
           .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
           .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
@@ -4763,11 +4846,19 @@
         counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          active.sample <- .np_active_boot_sample(
-            xdat = xdat,
-            ydat = ydat,
-            counts.col = counts.chunk[, jj]
-          )
+          active.sample <- if (use.matrix.fast) {
+            .np_active_boot_sample_matrix(
+              xmat = xmat,
+              ymat = xymat,
+              counts.col = counts.chunk[, jj]
+            )
+          } else {
+            .np_active_boot_sample(
+              xdat = xdat,
+              ydat = ydat,
+              counts.col = counts.chunk[, jj]
+            )
+          }
           out[jj, ] <- .np_ksum_conditional_eval_exact_boot_active(
             active.sample = active.sample,
             exdat = exdat,
@@ -4803,7 +4894,11 @@
           den.state = den.state,
           num.state = num.state,
           nout = nout,
+          use.matrix.fast = use.matrix.fast,
+          xmat = xmat,
+          xymat = xymat,
           .np_active_boot_sample = .np_active_boot_sample,
+          .np_active_boot_sample_matrix = .np_active_boot_sample_matrix,
           .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
           .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
           .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
