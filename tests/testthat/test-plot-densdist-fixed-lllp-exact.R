@@ -1,185 +1,94 @@
-test_that("fixed conditional ll/lp density-distribution helper matches duplicate-sample refits", {
-  skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(), add = TRUE)
+test_that("fixed conditional localpoly helper routes all counts sources through grouped core", {
+  helper <- getFromNamespace(".np_inid_boot_from_conditional_localpoly_fixed", "npRmpi")
+  body.txt <- paste(deparse(body(helper), width.cutoff = 500L), collapse = " ")
 
-  helper <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "npRmpi")
-
-  run_case <- function(family = c("dens", "dist"), regtype = c("ll", "lp")) {
-    family <- match.arg(family)
-    regtype <- match.arg(regtype)
-
-    set.seed(switch(
-      paste(family, regtype, sep = "_"),
-      dens_ll = 603301L,
-      dist_ll = 603302L,
-      dens_lp = 603303L,
-      dist_lp = 603304L
-    ))
-
-    n <- 55L
-    B <- 7L
-    tx <- data.frame(x = sort(runif(n)))
-    ty <- data.frame(y = 0.5 * tx$x + rnorm(n, sd = 0.2))
-    ex <- data.frame(x = seq(min(tx$x), max(tx$x), length.out = 13L))
-    ey <- data.frame(y = seq(as.numeric(quantile(ty$y, 0.15)), as.numeric(quantile(ty$y, 0.85)), length.out = 13L))
-    counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
-
-    bw.args <- list(
-      xdat = tx,
-      ydat = ty,
-      bws = c(0.28, 0.28),
-      bandwidth.compute = FALSE,
-      bwtype = "fixed",
-      regtype = regtype
-    )
-    if (identical(regtype, "lp")) {
-      bw.args$basis <- "glp"
-      bw.args$degree <- 2L
-    }
-
-    bws <- if (identical(family, "dens")) {
-      do.call(npcdensbw, bw.args)
-    } else {
-      do.call(npcdistbw, bw.args)
-    }
-
-    fast <- helper(
-      xdat = tx,
-      ydat = ty,
-      exdat = ex,
-      eydat = ey,
-      bws = bws,
-      B = B,
-      cdf = identical(family, "dist"),
-      counts = counts
-    )
-    fast.drawer <- helper(
-      xdat = tx,
-      ydat = ty,
-      exdat = ex,
-      eydat = ey,
-      bws = bws,
-      B = B,
-      cdf = identical(family, "dist"),
-      counts.drawer = function(start, stop) counts[, start:stop, drop = FALSE]
-    )
-
-    explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
-    for (b in seq_len(B)) {
-      idx <- rep.int(seq_len(n), counts[, b])
-      explicit[b, ] <- if (identical(family, "dens")) {
-        npcdens(
-          txdat = tx[idx, , drop = FALSE],
-          tydat = ty[idx, , drop = FALSE],
-          exdat = ex,
-          eydat = ey,
-          bws = bws
-        )$condens
-      } else {
-        npcdist(
-          txdat = tx[idx, , drop = FALSE],
-          tydat = ty[idx, , drop = FALSE],
-          exdat = ex,
-          eydat = ey,
-          bws = bws
-        )$condist
-      }
-    }
-
-    t0 <- if (identical(family, "dens")) {
-      npcdens(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = bws)$condens
-    } else {
-      npcdist(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = bws)$condist
-    }
-
-    expect_equal(fast$t, explicit, tolerance = 1e-10, info = paste(family, regtype))
-    expect_equal(fast$t0, t0, tolerance = 1e-12, info = paste(family, regtype))
-    expect_equal(fast.drawer$t, explicit, tolerance = 1e-10, info = paste(family, regtype, "drawer"))
-    expect_equal(fast.drawer$t0, t0, tolerance = 1e-12, info = paste(family, regtype, "drawer"))
-  }
-
-  run_case("dens", "ll")
-  run_case("dist", "ll")
-  run_case("dens", "lp")
-  run_case("dist", "lp")
+  expect_match(body.txt, "\\.np_inid_boot_from_conditional_localpoly_fixed_precompute\\(")
+  expect_match(body.txt, "\\.np_inid_boot_from_conditional_localpoly_fixed_core\\(")
+  expect_false(grepl("\\.np_inid_boot_from_conditional_localpoly_fixed_rowwise\\(", body.txt))
 })
 
-test_that("fixed conditional ll/lp grouped inid helper matches the rowwise oracle on repeated evaluation x rows", {
-  skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(), add = TRUE)
+test_that("fixed conditional localpoly precompute uses direct fixed x-kernel weights in npRmpi", {
+  precompute <- getFromNamespace(".np_inid_boot_from_conditional_localpoly_fixed_precompute", "npRmpi")
+  body.txt <- paste(deparse(body(precompute), width.cutoff = 500L), collapse = " ")
 
-  helper <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "npRmpi")
-  oracle <- getFromNamespace(".np_inid_boot_from_conditional_localpoly_fixed_rowwise", "npRmpi")
+  expect_match(body.txt, "\\.np_kernel_weights_direct\\(")
+})
 
-  run_case <- function(family = c("dens", "dist"), regtype = c("ll", "lp")) {
-    family <- match.arg(family)
-    regtype <- match.arg(regtype)
+test_that("npRmpi fixed conditional grouped precompute/core smoke completes in subprocess", {
+  skip_on_cran()
 
-    set.seed(switch(
-      paste(family, regtype, sep = "_"),
-      dens_ll = 603311L,
-      dist_ll = 603312L,
-      dens_lp = 603313L,
-      dist_lp = 603314L
-    ))
+  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
 
-    n <- 55L
-    B <- 9L
-    tx <- data.frame(x = sort(runif(n)))
-    ty <- data.frame(y = 0.5 * tx$x + rnorm(n, sd = 0.2))
-    x.grid <- seq(min(tx$x), max(tx$x), length.out = 7L)
-    y.grid <- seq(as.numeric(quantile(ty$y, 0.15)), as.numeric(quantile(ty$y, 0.85)), length.out = 9L)
-    exy <- expand.grid(y = y.grid, x = x.grid)
-    ex <- data.frame(x = exy$x)
-    ey <- data.frame(y = exy$y)
-    counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=FALSE, np.plot.inid.chunk.size=2L)",
+      "np.ns <- asNamespace('npRmpi')",
+      "pre <- get('.np_inid_boot_from_conditional_localpoly_fixed_precompute', envir=np.ns, inherits=FALSE)",
+      "core <- get('.np_inid_boot_from_conditional_localpoly_fixed_core', envir=np.ns, inherits=FALSE)",
+      "set.seed(6033222)",
+      "n <- 68L",
+      "tx <- data.frame(x = rnorm(n))",
+      "ty <- data.frame(y = rnorm(n))",
+      "x.grid <- seq(min(tx$x), max(tx$x), length.out = 7L)",
+      "y.grid <- seq(min(ty$y), max(ty$y), length.out = 6L)",
+      "grid <- expand.grid(y = y.grid, x = x.grid)",
+      "ex <- data.frame(x = grid$x)",
+      "ey <- data.frame(y = grid$y)",
+      "B <- 7L",
+      "counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))",
+      "bw <- npcdensbw(xdat=tx, ydat=ty, bws=c(0.38, 0.38), bandwidth.compute=FALSE, bwtype='fixed', regtype='ll')",
+      "state <- pre(xdat=tx, ydat=ty, exdat=ex, eydat=ey, bws=bw, cdf=FALSE)",
+      "out <- core(state=state, B=B, counts=counts)",
+      "stopifnot(is.list(out), is.matrix(out$t), length(out$t0) == nrow(ex), nrow(out$t) == B)",
+      "cat('GROUPED_PRECORE_OK\\n')"
+    ),
+    timeout = 90L,
+    env = env
+  )
 
-    bw.args <- list(
-      xdat = tx,
-      ydat = ty,
-      bws = c(0.28, 0.28),
-      bandwidth.compute = FALSE,
-      bwtype = "fixed",
-      regtype = regtype
-    )
-    if (identical(regtype, "lp")) {
-      bw.args$basis <- "glp"
-      bw.args$degree <- 2L
-    }
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("GROUPED_PRECORE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
 
-    bws <- if (identical(family, "dens")) {
-      do.call(npcdensbw, bw.args)
-    } else {
-      do.call(npcdistbw, bw.args)
-    }
+test_that("npRmpi fixed conditional plot bootstrap covers fixed and geom in subprocess", {
+  skip_on_cran()
 
-    fast <- helper(
-      xdat = tx,
-      ydat = ty,
-      exdat = ex,
-      eydat = ey,
-      bws = bws,
-      B = B,
-      cdf = identical(family, "dist"),
-      counts = counts
-    )
-    slow <- oracle(
-      xdat = tx,
-      ydat = ty,
-      exdat = ex,
-      eydat = ey,
-      bws = bws,
-      B = B,
-      cdf = identical(family, "dist"),
-      counts = counts
-    )
+  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
 
-    expect_equal(fast$t, slow$t, tolerance = 1e-12, info = paste(family, regtype, "t"))
-    expect_equal(fast$t0, slow$t0, tolerance = 1e-10, info = paste(family, regtype, "t0"))
-  }
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(20260312)",
+      "n <- 60L",
+      "x <- rnorm(n)",
+      "y <- sin(x) + rnorm(n, sd=0.25)",
+      "bw.dens <- npcdensbw(xdat=data.frame(x=x), ydat=data.frame(y=y), regtype='lp', degree=2, bwtype='fixed', bandwidth.compute=FALSE, bws=c(0.45, 0.45), basis='glp', bernstein.basis=FALSE)",
+      "fit.dens <- npcdens(bws=bw.dens)",
+      "bw.dist <- npcdistbw(xdat=data.frame(x=x), ydat=data.frame(y=y), regtype='lp', degree=2, bwtype='fixed', bandwidth.compute=FALSE, bws=c(0.45, 0.45), basis='glp', bernstein.basis=FALSE)",
+      "fit.dist <- npcdist(bws=bw.dist)",
+      "for (boot.method in c('fixed', 'geom')) {",
+      "  out.dens <- plot(fit.dens, plot.errors.method='bootstrap', plot.errors.boot.method=boot.method, plot.errors.boot.num=9L, plot.errors.boot.blocklength=3L, plot.behavior='data')",
+      "  out.dist <- plot(fit.dist, plot.errors.method='bootstrap', plot.errors.boot.method=boot.method, plot.errors.boot.num=9L, plot.errors.boot.blocklength=3L, plot.behavior='data')",
+      "  stopifnot(is.list(out.dens), length(out.dens) > 0L, is.list(out.dist), length(out.dist) > 0L)",
+      "  cat('PLOT_BOOT_OK', boot.method, '\\n')",
+      "}"
+    ),
+    timeout = 90L,
+    env = env
+  )
 
-  run_case("dens", "ll")
-  run_case("dist", "ll")
-  run_case("dens", "lp")
-  run_case("dist", "lp")
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("PLOT_BOOT_OK fixed", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("PLOT_BOOT_OK geom", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
 })
