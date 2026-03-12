@@ -290,6 +290,272 @@ int is_valid_unordered_bw(double lambda,
   return ((lambda >= 0.0) && (lambda <= max_unordered_bw(num_categories, kernel)));
 }
 
+static int build_sorted_unique_support(int n,
+                                       const double *vector_data,
+                                       double **support_out,
+                                       int *support_n_out)
+{
+  int i, m;
+  double *support;
+
+  support = alloc_vecd(n);
+  for (i = 0; i < n; i++)
+    support[i] = vector_data[i];
+
+  sort_safe(n, support);
+
+  m = 1;
+  for (i = 1; i < n; i++) {
+    if (support[i] != support[m - 1])
+      support[m++] = support[i];
+  }
+
+  *support_out = support;
+  *support_n_out = m;
+
+  return 0;
+}
+
+static int find_support_index(int support_n,
+                              const double *support,
+                              double value)
+{
+  int lo, hi;
+
+  lo = 0;
+  hi = support_n - 1;
+
+  while (lo <= hi) {
+    const int mid = lo + (hi - lo) / 2;
+
+    if (support[mid] == value)
+      return mid;
+
+    if (support[mid] < value) {
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  return -1;
+}
+
+static int kth_unique_radius_from_support(int support_n,
+                                          const double *support,
+                                          int center_idx,
+                                          int int_k_nn,
+                                          double *radius_out)
+{
+  int left, right, count;
+  double last_distance;
+  int have_last;
+
+  left = center_idx - 1;
+  right = center_idx + 1;
+  count = 0;
+  have_last = 0;
+  last_distance = 0.0;
+
+  while ((count < int_k_nn) && ((left >= 0) || (right < support_n))) {
+    double dleft = DBL_MAX;
+    double dright = DBL_MAX;
+    double distance;
+
+    if (left >= 0)
+      dleft = support[center_idx] - support[left];
+    if (right < support_n)
+      dright = support[right] - support[center_idx];
+
+    distance = (dleft < dright) ? dleft : dright;
+
+    if ((distance > DBL_MIN) && ((!have_last) || (distance != last_distance))) {
+      last_distance = distance;
+      have_last = 1;
+      count++;
+    }
+
+    while ((left >= 0) && ((support[center_idx] - support[left]) == distance))
+      left--;
+    while ((right < support_n) && ((support[right] - support[center_idx]) == distance))
+      right++;
+  }
+
+  if ((count < int_k_nn) || (!have_last) || (last_distance <= DBL_MIN))
+    return 1;
+
+  *radius_out = last_distance;
+  return 0;
+}
+
+static int compute_nn_distance_unique_support_subset(int num_obs,
+                                                     double *vector_data,
+                                                     int int_k_nn,
+                                                     int query_start,
+                                                     int query_end,
+                                                     double *nn_distance)
+{
+  int i, j, support_n;
+  double *support;
+  double *support_radius;
+
+  support = NULL;
+  support_radius = NULL;
+
+  if ((query_start < 0) || (query_end >= num_obs) || (query_start > query_end))
+    return 1;
+
+  if (build_sorted_unique_support(num_obs, vector_data, &support, &support_n) != 0)
+    return 1;
+
+  support_radius = alloc_vecd(support_n);
+
+  for (i = 0; i < support_n; i++) {
+    if (kth_unique_radius_from_support(support_n, support, i, int_k_nn, &support_radius[i]) != 0) {
+      free(support);
+      free(support_radius);
+      return 1;
+    }
+  }
+
+  for (i = query_start, j = 0; i <= query_end; i++, j++) {
+    const int idx = find_support_index(support_n, support, vector_data[i]);
+
+    if (idx < 0) {
+      free(support);
+      free(support_radius);
+      return 1;
+    }
+
+    nn_distance[j] = support_radius[idx];
+    if (nn_distance[j] <= DBL_MIN) {
+      free(support);
+      free(support_radius);
+      return 1;
+    }
+  }
+
+  free(support);
+  free(support_radius);
+
+  return 0;
+}
+
+static int lower_bound_support(int support_n,
+                               const double *support,
+                               double value)
+{
+  int lo, hi;
+
+  lo = 0;
+  hi = support_n;
+
+  while (lo < hi) {
+    const int mid = lo + (hi - lo) / 2;
+
+    if (support[mid] < value) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+
+  return lo;
+}
+
+static int kth_unique_radius_for_eval_from_support(int support_n,
+                                                   const double *support,
+                                                   double eval_value,
+                                                   int int_k_nn,
+                                                   double *radius_out)
+{
+  int left, right, count, target_count;
+  int insert_idx;
+  int exact_match;
+  double last_distance;
+  int have_last;
+
+  insert_idx = lower_bound_support(support_n, support, eval_value);
+  exact_match = ((insert_idx < support_n) && (support[insert_idx] == eval_value));
+
+  if (exact_match) {
+    left = insert_idx - 1;
+    right = insert_idx + 1;
+  } else {
+    left = insert_idx - 1;
+    right = insert_idx;
+  }
+
+  target_count = int_k_nn + (exact_match ? 0 : 1);
+
+  count = 0;
+  have_last = 0;
+  last_distance = 0.0;
+
+  while ((count < target_count) && ((left >= 0) || (right < support_n))) {
+    double dleft = DBL_MAX;
+    double dright = DBL_MAX;
+    double distance;
+
+    if (left >= 0)
+      dleft = eval_value - support[left];
+    if (right < support_n)
+      dright = support[right] - eval_value;
+
+    distance = (dleft < dright) ? dleft : dright;
+
+    if ((distance > DBL_MIN) && ((!have_last) || (distance != last_distance))) {
+      last_distance = distance;
+      have_last = 1;
+      count++;
+    }
+
+    while ((left >= 0) && ((eval_value - support[left]) == distance))
+      left--;
+    while ((right < support_n) && ((support[right] - eval_value) == distance))
+      right++;
+  }
+
+  if ((count < target_count) || (!have_last) || (last_distance <= DBL_MIN))
+    return 1;
+
+  *radius_out = last_distance;
+  return 0;
+}
+
+static int compute_nn_distance_train_eval_unique_support_subset(int num_obs_train,
+                                                                int num_obs_eval,
+                                                                double *vector_data_train,
+                                                                double *vector_data_eval,
+                                                                int int_k_nn,
+                                                                int query_start,
+                                                                int query_end,
+                                                                double *nn_distance)
+{
+  int i, j, support_n;
+  double *support;
+
+  support = NULL;
+
+  if ((query_start < 0) || (query_end >= num_obs_eval) || (query_start > query_end))
+    return 1;
+
+  if (build_sorted_unique_support(num_obs_train, vector_data_train, &support, &support_n) != 0)
+    return 1;
+
+  for (i = query_start, j = 0; i <= query_end; i++, j++) {
+    if (kth_unique_radius_for_eval_from_support(
+          support_n, support, vector_data_eval[i], int_k_nn, &nn_distance[j]
+        ) != 0) {
+      free(support);
+      return 1;
+    }
+  }
+
+  free(support);
+  return 0;
+}
+
 /* Population variance, double precision */
 /* Returns 0 upon success, 1 upon failure (constant most likely) */
 
@@ -297,18 +563,6 @@ int is_valid_unordered_bw(double lambda,
 int compute_nn_distance(int num_obs, int suppress_parallel, double *vector_data,
 int int_k_nn, double *nn_distance)
 {
-
-    int i,j,k;
-
-    double *vector_dist;
-    double *vector_unique_dist;
-
-/* Vtune suggestions */
-
-    double *pointer_vj;
-    double *pointer_di;
-    double *pointer_dj;
-    double *pointer_nndi;
 
 #ifdef MPI2
     int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
@@ -318,9 +572,6 @@ int int_k_nn, double *nn_distance)
 
     int is, ie;
 #endif
-
-    vector_dist = alloc_vecd(num_obs);
-    vector_unique_dist = alloc_vecd(num_obs);
 
 #ifndef MPI2
 
@@ -333,66 +584,7 @@ int int_k_nn, double *nn_distance)
 			return(1);
     }
 
-/* Verified algorithm 3/25/98 */
-
-    pointer_di = &vector_data[0];
-    pointer_nndi = &nn_distance[0];
-
-    for (i=0; i<num_obs; i++)
-    {
-
-        pointer_vj = &vector_dist[0];
-        pointer_dj = &vector_data[0];
-
-        for (j=0; j<num_obs; j++)
-        {
-/* Compute distances for observation i */
-            *pointer_vj++ = fabs(*pointer_di-*pointer_dj++);
-        }
-
-        pointer_di++;
-
-/* Sort distances for observation i */
-/* NR code... */
-
-        sort_safe(num_obs, vector_dist);
-
-/* Compute kth nearest neighbor for observation i */
-/* vector_dist has 0, 1st nn, 2nd nn. int_k_nn is 1...n-1 */
-
-/* vector_dist[0] = 0.0... vector-dist[1] = first nn */
-/* ... vector_dist[n-1] is nth nn etc. */
-
-/* Initialize unique distance vector */
-
-        for(j=1; j < num_obs;j++)
-        {
-            vector_unique_dist[j]=0.0;
-        }
-
-        vector_unique_dist[0]=vector_dist[0];
-
-        for(j=1, k=1; j < num_obs;j++)
-        {
-            if(vector_dist[j]!=vector_dist[j-1]) vector_unique_dist[k++]=vector_dist[j];
-        }
-
-        *pointer_nndi = (double) vector_unique_dist[int_k_nn];
-
-/* Was == 0.0 */
-
-        if (*pointer_nndi++ <= DBL_MIN)
-        {
-            if(int_VERBOSE == 1)
-            {
-                    REprintf("\n** Error: A Kth nearest neighbor [%d] yields an invalid distance.", int_k_nn);
-
-            }
-            free(vector_dist);
-            free(vector_unique_dist);
-						return(1);
-        }
-    }
+    return(compute_nn_distance_unique_support_subset(num_obs, vector_data, int_k_nn, 0, num_obs - 1, nn_distance));
 
 #endif
 
@@ -412,71 +604,16 @@ int int_k_nn, double *nn_distance)
 
 
     if(!suppress_parallel){
-      pointer_di = &vector_data[my_rank*stride];
       is = my_rank*stride;
       ie = MIN(num_obs,(my_rank+1)*stride) - 1;
 
     } else {
-      pointer_di = &vector_data[0];
       is = 0;
       ie = num_obs - 1;
     }
 
-    pointer_nndi = &nn_distance[0];
-
-    for(i=is; i <= ie; i++)
-    {
-
-        pointer_vj = &vector_dist[0];
-        pointer_dj = &vector_data[0];
-
-        for (j=0; j<num_obs; j++)
-        {
-/* Compute distances for observation i */
-            *pointer_vj++ = fabs(*pointer_di-*pointer_dj++);
-        }
-
-        pointer_di++;
-
-/* Sort distances for observation i */
-/* NR code... */
-
-        sort_safe(num_obs, vector_dist);
-
-/* Compute kth nearest neighbor for observation i */
-/* vector_dist has 0, 1st nn, 2nd nn. int_k_nn is 1...n-1 */
-
-/* vector_dist[0] = 0.0... vector-dist[1] = first nn */
-/* ... vector_dist[n-1] is nth nn etc. */
-
-/* Initialize unique distance vector */
-
-        for(j=1; j < num_obs;j++)
-        {
-            vector_unique_dist[j]=0.0;
-        }
-
-        vector_unique_dist[0]=vector_dist[0];
-
-        for(j=1, k=1; j < num_obs;j++)
-        {
-            if(vector_dist[j]!=vector_dist[j-1]) vector_unique_dist[k++]=vector_dist[j];
-        }
-
-        *pointer_nndi = (double) vector_unique_dist[int_k_nn];
-
-/* Was == 0.0 */
-
-        if (*pointer_nndi++ <= DBL_MIN)
-        {
-            if(int_VERBOSE == 1)
-            {
-                    REprintf("\n** Error: A Kth nearest neighbor [%d] yields an invalid distance.", int_k_nn);
-            }
-						/*return(1);*/
-						return_flag_MPI = 1;
-        }
-    }
+    if (compute_nn_distance_unique_support_subset(num_obs, vector_data, int_k_nn, is, ie, nn_distance) != 0)
+        return_flag_MPI = 1;
 
     if(!suppress_parallel){
       MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
@@ -484,8 +621,6 @@ int int_k_nn, double *nn_distance)
     }
 
 		if(return_flag > 0) {
-			free(vector_dist);
-			free(vector_unique_dist);
 			return(1);
 		}
 
@@ -499,9 +634,6 @@ int int_k_nn, double *nn_distance)
     }
 #endif
 
-    free(vector_dist);
-    free(vector_unique_dist);
-
     return(0);
 
 }
@@ -514,18 +646,6 @@ int compute_nn_distance_train_eval(int num_obs_train,
                                    double *vector_data_eval,
                                    int int_k_nn,
                                    double *nn_distance){
-
-    int i,j,k;
-
-    double *vector_dist;
-    double *vector_unique_dist;
-
-/* Vtune suggestions */
-
-    double *pointer_vj;
-    double *pointer_di;
-    double *pointer_dj;
-    double *pointer_nndi;
 
 #ifdef MPI2
     int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
@@ -552,146 +672,47 @@ int compute_nn_distance_train_eval(int num_obs_train,
         return(1);
     }
 
-    vector_dist = alloc_vecd(num_obs_train);
-    vector_unique_dist = alloc_vecd(num_obs_train);
-
 #ifndef MPI2
-
-/* Verified algorithm 3/25/98 */
-
-    pointer_di = &vector_data_eval[0];
-    pointer_nndi = &nn_distance[0];
-
-    for (i=0; i<num_obs_eval; i++)
-    {
-
-        pointer_vj = &vector_dist[0];
-        pointer_dj = &vector_data_train[0];
-
-        for (j=0; j<num_obs_train; j++)
-        {
-/* Compute distances for observation i */
-            *pointer_vj++ = fabs(*pointer_di-*pointer_dj++);
-        }
-
-        pointer_di++;
-
-/* Sort distances for observation i */
-
-/* NR code... */
-        sort_safe(num_obs_train, vector_dist);
-
-/* Initialize unique distance vector */
-
-        for(j=1; j < num_obs_train;j++)
-        {
-            vector_unique_dist[j]=0.0;
-        }
-
-        vector_unique_dist[0]=vector_dist[0];
-
-        for(j=1, k=1; j < num_obs_train;j++)
-        {
-            if(vector_dist[j]!=vector_dist[j-1]) vector_unique_dist[k++]=vector_dist[j];
-        }
-
-/* vector_dist[0] = 0.0... vector-dist[1] = first nn */
-/* ... vector_dist[n-1] is nth nn etc. */
-
-        *pointer_nndi = (double) vector_unique_dist[int_k_nn];
-
-/* Test for inadmissible value */
-
-/* Was == 0.0 */
-        if (*pointer_nndi++ <= DBL_MIN)
-        {
-            if(int_VERBOSE == 1)
-            {
-                    REprintf("\n** Error: A Kth nearest neighbor [%d] yields a distance of zero.", int_k_nn);
-            }
-            free(vector_dist);                    /* Don't forget to free... */
-            free(vector_unique_dist);
-            return(1);
-        }
-
-    }
+    return(compute_nn_distance_train_eval_unique_support_subset(
+      num_obs_train,
+      num_obs_eval,
+      vector_data_train,
+      vector_data_eval,
+      int_k_nn,
+      0,
+      num_obs_eval - 1,
+      nn_distance
+    ));
 
 #endif
 
 #ifdef MPI2
 
-/* Verified algorithm 3/25/98 */
-
     if(!suppress_parallel){
-      pointer_di = &vector_data_eval[my_rank*stride];
       is = my_rank*stride;
       ie = MIN(num_obs_eval,(my_rank+1)*stride) - 1;
     } else {
-      pointer_di = &vector_data_eval[0];
       is = 0;
       ie = num_obs_eval - 1;
     }
-    pointer_nndi = &nn_distance[0];
 
-    for(i=is; i <= ie; i++)
-    {
-
-        pointer_vj = &vector_dist[0];
-        pointer_dj = &vector_data_train[0];
-
-        for (j=0; j<num_obs_train; j++)
-        {
-/* Compute distances for observation i */
-            *pointer_vj++ = fabs(*pointer_di-*pointer_dj++);
-        }
-
-        pointer_di++;
-
-/* Sort distances for observation i */
-
-/* NR code... */
-        sort_safe(num_obs_train, vector_dist);
-
-/* Initialize unique distance vector */
-
-        for(j=1; j < num_obs_train;j++)
-        {
-            vector_unique_dist[j]=0.0;
-        }
-
-        vector_unique_dist[0]=vector_dist[0];
-
-        for(j=1, k=1; j < num_obs_train;j++)
-        {
-            if(vector_dist[j]!=vector_dist[j-1]) vector_unique_dist[k++]=vector_dist[j];
-        }
-
-/* vector_dist[0] = 0.0... vector-dist[1] = first nn */
-/* ... vector_dist[n-1] is nth nn etc. */
-
-        *pointer_nndi = (double) vector_unique_dist[int_k_nn];
-
-/* Test for inadmissible value */
-
-/* Was == 0.0 */
-        if (*pointer_nndi++ <= DBL_MIN)
-        {
-            if(int_VERBOSE == 1)
-            {
-                    REprintf("\n** Error: A Kth nearest neighbor [%d] yields a distance of zero.", int_k_nn);
-            }
-						return_flag_MPI = 1;
-        }
-
-    }
+    if (compute_nn_distance_train_eval_unique_support_subset(
+          num_obs_train,
+          num_obs_eval,
+          vector_data_train,
+          vector_data_eval,
+          int_k_nn,
+          is,
+          ie,
+          nn_distance
+        ) != 0)
+      return_flag_MPI = 1;
 
     if(!suppress_parallel){
       MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
       MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
     }
 		if(return_flag > 0) {
-			free(vector_dist);                    /* Don't forget to free... */
-			free(vector_unique_dist);
 			return(1);
 		}
 
@@ -704,9 +725,6 @@ int compute_nn_distance_train_eval(int num_obs_train,
       MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
     }
 #endif
-
-    free(vector_dist);
-    free(vector_unique_dist);
 
     return(0);
 
