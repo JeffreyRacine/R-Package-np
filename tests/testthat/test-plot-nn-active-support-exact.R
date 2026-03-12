@@ -48,6 +48,22 @@ test_that("nonfixed unconditional exact bootstrap matches duplicate-row oracle",
   }
 })
 
+test_that("active bootstrap sample preserves exact row-sliced training payload", {
+  xdat <- data.frame(
+    x = c(0, 1, 3, 7),
+    xf = factor(c("a", "b", "b", "c"))
+  )
+  ydat <- data.frame(y = c(2, 4, 6, 8))
+  counts <- c(0, 2, 0, 1)
+
+  out <- np:::.np_active_boot_sample(xdat = xdat, ydat = ydat, counts.col = counts)
+
+  expect_identical(out$xdat, xdat[c(2, 4), , drop = FALSE])
+  expect_identical(out$ydat, ydat[c(2, 4), , drop = FALSE])
+  expect_identical(out$weights, matrix(c(2, 1), ncol = 1L))
+  expect_identical(out$n.total, sum(counts))
+})
+
 test_that("nonfixed unconditional exact helper matches direct kbandwidth precompute", {
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old_opts), add = TRUE)

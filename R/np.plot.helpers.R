@@ -352,10 +352,11 @@
   if (!any(active))
     stop("bootstrap counts must activate at least one training row")
 
+  idx <- which(active)
   list(
-    xdat = xdat[active, , drop = FALSE],
-    ydat = if (is.null(ydat)) NULL else ydat[active, , drop = FALSE],
-    weights = matrix(counts.col[active], ncol = 1L),
+    xdat = xdat[idx, , drop = FALSE],
+    ydat = if (is.null(ydat)) NULL else ydat[idx, , drop = FALSE],
+    weights = matrix(counts.col[idx], ncol = 1L),
     n.total = sum(counts.col)
   )
 }
