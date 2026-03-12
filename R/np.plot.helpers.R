@@ -3961,6 +3961,145 @@
   num / pmax(den, .Machine$double.eps)
 }
 
+.np_ksum_conditional_eval_exact_oracle <- function(xdat,
+                                                   ydat,
+                                                   exdat,
+                                                   eydat,
+                                                   kbx,
+                                                   kbxy,
+                                                   cdf,
+                                                   weights = NULL,
+                                                   n.total = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  xop <- rep.int("normal", ncol(xdat))
+  yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
+  xyop <- c(xop, yop)
+  if (is.null(weights)) {
+    weights <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+    n.total <- nrow(xdat)
+  } else {
+    weights <- matrix(as.double(weights), ncol = 1L)
+    if (nrow(weights) != nrow(xdat))
+      stop("exact conditional kernel helper requires one weight per training row")
+    if (is.null(n.total))
+      n.total <- sum(weights)
+  }
+  ones <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+  xydat <- data.frame(xdat, ydat)
+  exydat <- data.frame(exdat, eydat)
+
+  den <- as.numeric(.np_plot_with_local_compiled_eval(
+    npksum(
+      txdat = xdat,
+      tydat = ones,
+      exdat = exdat,
+      bws = kbx,
+      weights = weights,
+      operator = xop,
+      bandwidth.divide = TRUE
+    )$ksum
+  )) / n.total
+  num <- as.numeric(.np_plot_with_local_compiled_eval(
+    npksum(
+      txdat = xydat,
+      tydat = ones,
+      exdat = exydat,
+      bws = kbxy,
+      weights = weights,
+      operator = xyop,
+      bandwidth.divide = TRUE
+    )$ksum
+  )) / n.total
+
+  num / pmax(den, .Machine$double.eps)
+}
+
+.np_ksum_conditional_eval_exact_boot_active <- function(active.sample,
+                                                        exdat,
+                                                        eydat,
+                                                        bws,
+                                                        kbx,
+                                                        kbxy,
+                                                        cdf,
+                                                        den.state,
+                                                        num.state) {
+  tryCatch(
+    {
+      weights <- matrix(as.double(active.sample$weights), ncol = 1L)
+      n.total <- active.sample$n.total
+
+      if (identical(bws$type, "adaptive_nn")) {
+        return(.np_ksum_conditional_eval_exact_oracle(
+          xdat = active.sample$xdat,
+          ydat = active.sample$ydat,
+          exdat = exdat,
+          eydat = eydat,
+          kbx = kbx,
+          kbxy = kbxy,
+          cdf = cdf,
+          weights = weights,
+          n.total = n.total
+        ))
+      }
+
+      den <- as.numeric(.np_ksum_eval_exact_state(
+        state = den.state,
+        txdat = active.sample$xdat,
+        weights = weights
+      )) / n.total
+      num <- as.numeric(.np_ksum_eval_exact_state(
+        state = num.state,
+        txdat = data.frame(active.sample$xdat, active.sample$ydat),
+        weights = weights
+      )) / n.total
+
+      num / pmax(den, .Machine$double.eps)
+    },
+    error = function(e) {
+      if (identical(bws$type, "adaptive_nn")) {
+        stop(
+          sprintf(
+            "adaptive conditional exact bootstrap resample is invalid for this active support (n.active=%d, x.unique=%d, y.unique=%d): %s",
+            nrow(active.sample$xdat),
+            nrow(unique(toFrame(active.sample$xdat))),
+            nrow(unique(toFrame(active.sample$ydat))),
+            conditionMessage(e)
+          ),
+          call. = FALSE
+        )
+      }
+      stop(e)
+    }
+  )
+}
+
+.np_conditional_exact_fit_or_stop <- function(fit.expr,
+                                              bws,
+                                              x.train,
+                                              y.train) {
+  tryCatch(
+    fit.expr(),
+    error = function(e) {
+      if (identical(bws$type, "adaptive_nn")) {
+        stop(
+          sprintf(
+            "adaptive conditional exact bootstrap resample is invalid for this active support (n.active=%d, x.unique=%d, y.unique=%d): %s",
+            nrow(x.train),
+            nrow(unique(toFrame(x.train))),
+            nrow(unique(toFrame(y.train))),
+            conditionMessage(e)
+          ),
+          call. = FALSE
+        )
+      }
+      stop(e)
+    }
+  )
+}
+
 .np_plot_exact_row_groups <- function(dat) {
   dat <- toFrame(dat)
   n <- nrow(dat)
@@ -4407,18 +4546,22 @@
         n.total <- sum(weights)
     }
 
-    den <- as.numeric(.np_ksum_eval_exact_state(
-      state = den.state,
-      txdat = x.train,
-      weights = weights
-    )) / n.total
-    num <- as.numeric(.np_ksum_eval_exact_state(
-      state = num.state,
-      txdat = data.frame(x.train, y.train),
-      weights = weights
-    )) / n.total
-
-    num / pmax(den, .Machine$double.eps)
+    .np_ksum_conditional_eval_exact_boot_active(
+      active.sample = list(
+        xdat = x.train,
+        ydat = y.train,
+        weights = weights,
+        n.total = n.total
+      ),
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      kbx = kbx,
+      kbxy = kbxy,
+      cdf = cdf,
+      den.state = den.state,
+      num.state = num.state
+    )
   }
 
   t0 <- fit_one(x.train = xdat, y.train = ydat)
@@ -4453,16 +4596,16 @@
             ydat = ydat,
             counts.col = counts.chunk[, jj]
           )
-          out[jj, ] <- .np_ksum_conditional_eval_exact(
-            xdat = active.sample$xdat,
-            ydat = active.sample$ydat,
+          out[jj, ] <- .np_ksum_conditional_eval_exact_boot_active(
+            active.sample = active.sample,
             exdat = exdat,
             eydat = eydat,
+            bws = bws,
             kbx = kbx,
             kbxy = kbxy,
             cdf = cdf,
-            weights = active.sample$weights,
-            n.total = active.sample$n.total
+            den.state = den.state,
+            num.state = num.state
           )
         }
         out
@@ -4480,13 +4623,19 @@
           ydat = ydat,
           exdat = exdat,
           eydat = eydat,
+          bws = bws,
           kbx = kbx,
           kbxy = kbxy,
           cdf = cdf,
+          den.state = den.state,
+          num.state = num.state,
           n = n,
           nout = nout,
           .np_active_boot_sample = .np_active_boot_sample,
-          .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
+          .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
+          .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
+          .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
+          .np_ksum_conditional_eval_exact_boot_active = .np_ksum_conditional_eval_exact_boot_active
         )
       )
     }
@@ -4521,16 +4670,16 @@
             ydat = ydat,
             counts.col = counts.chunk[, jj]
           )
-          out[jj, ] <- .np_ksum_conditional_eval_exact(
-            xdat = active.sample$xdat,
-            ydat = active.sample$ydat,
+          out[jj, ] <- .np_ksum_conditional_eval_exact_boot_active(
+            active.sample = active.sample,
             exdat = exdat,
             eydat = eydat,
+            bws = bws,
             kbx = kbx,
             kbxy = kbxy,
             cdf = cdf,
-            weights = active.sample$weights,
-            n.total = active.sample$n.total
+            den.state = den.state,
+            num.state = num.state
           )
         }
         out
@@ -4549,12 +4698,18 @@
           ydat = ydat,
           exdat = exdat,
           eydat = eydat,
+          bws = bws,
           kbx = kbx,
           kbxy = kbxy,
           cdf = cdf,
+          den.state = den.state,
+          num.state = num.state,
           nout = nout,
           .np_active_boot_sample = .np_active_boot_sample,
-          .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
+          .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
+          .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
+          .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
+          .np_ksum_conditional_eval_exact_boot_active = .np_ksum_conditional_eval_exact_boot_active
         )
       )
     }
@@ -4586,16 +4741,16 @@
             ydat = ydat,
             counts.col = counts.chunk[, jj]
           )
-          out[jj, ] <- .np_ksum_conditional_eval_exact(
-            xdat = active.sample$xdat,
-            ydat = active.sample$ydat,
+          out[jj, ] <- .np_ksum_conditional_eval_exact_boot_active(
+            active.sample = active.sample,
             exdat = exdat,
             eydat = eydat,
+            bws = bws,
             kbx = kbx,
             kbxy = kbxy,
             cdf = cdf,
-            weights = active.sample$weights,
-            n.total = active.sample$n.total
+            den.state = den.state,
+            num.state = num.state
           )
         }
         out
@@ -4614,12 +4769,18 @@
           ydat = ydat,
           exdat = exdat,
           eydat = eydat,
+          bws = bws,
           kbx = kbx,
           kbxy = kbxy,
           cdf = cdf,
+          den.state = den.state,
+          num.state = num.state,
           nout = nout,
           .np_active_boot_sample = .np_active_boot_sample,
-          .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
+          .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
+          .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
+          .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
+          .np_ksum_conditional_eval_exact_boot_active = .np_ksum_conditional_eval_exact_boot_active
         )
       )
     }
