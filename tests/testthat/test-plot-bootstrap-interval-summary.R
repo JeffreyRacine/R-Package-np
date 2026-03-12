@@ -48,3 +48,18 @@ test_that("bootstrap interval summary avoids recursive pointwise recomputation f
   expect_equal(out$all.err$bonferroni, cbind(t0 - bonferroni[, 1L], bonferroni[, 2L] - t0))
   expect_equal(out$all.err$simultaneous, cbind(t0 - simultaneous[, 1L], simultaneous[, 2L] - t0))
 })
+
+test_that("pmzsd helper matches covariance-diagonal standard deviations", {
+  skip_if_not_installed("np")
+
+  boot_col_sds <- getFromNamespace(".np_plot_bootstrap_col_sds", "np")
+
+  set.seed(20260311L)
+  boot.t <- matrix(rnorm(257L * 11L), nrow = 257L, ncol = 11L)
+
+  expect_equal(
+    boot_col_sds(boot.t),
+    sqrt(diag(cov(boot.t))),
+    tolerance = 1e-12
+  )
+})
