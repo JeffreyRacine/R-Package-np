@@ -56,17 +56,25 @@ npudisthat <- function(bws,
   }
 
   n.train <- nrow(tdat)
-
-  H <- npksum(
-    bws = bws,
-    txdat = tdat,
-    exdat = if (no.e) tdat else edat,
-    tydat = diag(n.train),
-    operator = "integral",
-    bandwidth.divide = TRUE
-  )$ksum / n.train
-
-  H <- as.matrix(H)
+  if (identical(bws$type, "fixed")) {
+    H <- .np_direct_operator_matrix(
+      kbw = bws,
+      txdat = tdat,
+      exdat = if (no.e) tdat else edat,
+      operator = "integral",
+      where = "npudisthat direct operator"
+    ) / n.train
+  } else {
+    H <- npksum(
+      bws = bws,
+      txdat = tdat,
+      exdat = if (no.e) tdat else edat,
+      tydat = diag(n.train),
+      operator = "integral",
+      bandwidth.divide = TRUE
+    )$ksum / n.train
+    H <- as.matrix(H)
+  }
 
   if (identical(output, "apply")) {
     if (is.null(y))

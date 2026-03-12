@@ -56,19 +56,25 @@ npudenshat <- function(bws,
   }
 
   n.train <- nrow(tdat)
-
-  # Ask npksum for the full basis-response map; dividing by n.train yields the
-  # exact unconditional density operator that reproduces npudens().
-  H <- npksum(
-    bws = bws,
-    txdat = tdat,
-    exdat = if (no.e) tdat else edat,
-    tydat = diag(n.train),
-    operator = "normal",
-    bandwidth.divide = TRUE
-  )$ksum / n.train
-
-  H <- as.matrix(H)
+  if (identical(bws$type, "fixed")) {
+    H <- .np_direct_operator_matrix(
+      kbw = bws,
+      txdat = tdat,
+      exdat = if (no.e) tdat else edat,
+      operator = "normal",
+      where = "npudenshat direct operator"
+    ) / n.train
+  } else {
+    H <- npksum(
+      bws = bws,
+      txdat = tdat,
+      exdat = if (no.e) tdat else edat,
+      tydat = diag(n.train),
+      operator = "normal",
+      bandwidth.divide = TRUE
+    )$ksum / n.train
+    H <- as.matrix(H)
+  }
 
   if (identical(output, "apply")) {
     if (is.null(y))
