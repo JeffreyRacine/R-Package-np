@@ -76,6 +76,7 @@
 
   direct.args <- c("plot.behavior", "plot.errors.method", "plot.errors.type",
                    "plot.errors.boot.num", "plot.errors.boot.method",
+                   "plot.errors.boot.nonfixed",
                    "plot.errors.alpha", "perspective", "gradients",
                    "xdat", "data", "neval", "xtrim", "xq")
   use.direct <- isTRUE(object$ndim == 1) &&

@@ -30,6 +30,7 @@
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 1999,
            plot.errors.center = c("estimate","bias-corrected"),
@@ -81,6 +82,7 @@
 
     if (missing(plot.errors.method) &
         any(!missing(plot.errors.boot.num), !missing(plot.errors.boot.method),
+            !missing(plot.errors.boot.nonfixed),
             !missing(plot.errors.boot.blocklen))){
       stop(
         "plot.errors.method must be set to 'bootstrap' when bootstrap error arguments are supplied",
@@ -91,6 +93,7 @@
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
       plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
       plot.errors.center = plot.errors.center,
       plot.errors.type = plot.errors.type,
@@ -105,6 +108,7 @@
     plot.behavior <- normalized.opts$plot.behavior
     plot.errors.method <- normalized.opts$plot.errors.method
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.nonfixed <- normalized.opts$plot.errors.boot.nonfixed
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
     plot.errors.type <- normalized.opts$plot.errors.type
@@ -173,6 +177,7 @@
           cdf = FALSE,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
           plot.errors.boot.num = plot.errors.boot.num,
           plot.errors.center = plot.errors.center,
@@ -453,6 +458,7 @@
                       cdf = FALSE,
                       slice.index = i,
                       plot.errors.boot.method = plot.errors.boot.method,
+                      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                       plot.errors.boot.num = plot.errors.boot.num,
                       plot.errors.center = plot.errors.center,

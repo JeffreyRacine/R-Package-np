@@ -543,4 +543,10 @@ test_that("plot contract: bootstrap defaults are wild for regression-class and i
     defaults <- eval(formals(fn)$plot.errors.boot.method)
     expect_identical(defaults[1L], "inid")
   }
+
+  for (nm in c(reg.engines, unsup.engines)) {
+    fn <- getFromNamespace(nm, "np")
+    defaults <- eval(formals(fn)$plot.errors.boot.nonfixed)
+    expect_identical(defaults[1L], "exact")
+  }
 })

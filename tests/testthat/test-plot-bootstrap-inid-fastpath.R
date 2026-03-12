@@ -1125,6 +1125,56 @@ test_that("nearest-neighbor plot helpers run for regression and density/distribu
   }
 })
 
+test_that("nearest-neighbor frozen bootstrap plots run for unsupervised families and reject unsupported regression families", {
+  skip_if_not_installed("np")
+
+  set.seed(32908)
+  n <- 45
+  x <- data.frame(x = runif(n))
+  y <- sin(2 * pi * x$x) + rnorm(n, sd = 0.08)
+  yframe <- data.frame(y = y)
+
+  run_plot <- function(bw, ...) {
+    suppressWarnings(plot(
+      bw,
+      plot.behavior = "data",
+      perspective = FALSE,
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.nonfixed = "frozen",
+      plot.errors.boot.num = 5,
+      ...
+    ))
+  }
+
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    rbw <- npregbw(xdat = x, ydat = y, regtype = "ll", nmulti = 1, bwtype = bt)
+    expect_error(
+      run_plot(rbw, xdat = x, ydat = y, plot.errors.boot.method = "inid"),
+      "currently supported only"
+    )
+
+    for (boot.method in c("inid", "fixed", "geom")) {
+      ubw <- npudensbw(dat = x, nmulti = 1, bwtype = bt)
+      expect_type(run_plot(ubw, plot.errors.boot.method = boot.method), "list")
+
+      dbw <- npudistbw(dat = x, nmulti = 1, bwtype = bt)
+      expect_type(run_plot(dbw, plot.errors.boot.method = boot.method), "list")
+
+      cbw <- npcdensbw(xdat = x, ydat = yframe, nmulti = 1, bwtype = bt)
+      expect_type(
+        run_plot(cbw, xdat = x, ydat = yframe, view = "fixed", plot.errors.boot.method = boot.method),
+        "list"
+      )
+
+      cdbw <- npcdistbw(xdat = x, ydat = yframe, nmulti = 1, bwtype = bt)
+      expect_type(
+        run_plot(cdbw, xdat = x, ydat = yframe, view = "fixed", plot.errors.boot.method = boot.method),
+        "list"
+      )
+    }
+  }
+})
+
 test_that("nearest-neighbor regression helper matches explicit resample refits", {
   skip_if_not_installed("np")
 
@@ -1341,6 +1391,88 @@ test_that("nearest-neighbor ksum helpers match explicit resample refits", {
     expect_equal(u.dist.fast$t0, npudist(tdat = tx, edat = ex, bws = u.dist.bw)$dist, tolerance = 1e-12, info = paste(bt, "udist-t0"))
     expect_equal(c.dens.fast$t0, npcdens(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = c.dens.bw)$condens, tolerance = 1e-12, info = paste(bt, "npcdens-t0"))
     expect_equal(c.dist.fast$t0, npcdist(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = c.dist.bw)$condist, tolerance = 1e-12, info = paste(bt, "npcdist-t0"))
+  }
+})
+
+test_that("nearest-neighbor frozen hat helpers match frozen operator application", {
+  skip_if_not_installed("np")
+
+  set.seed(32907)
+  n <- 36
+  tx <- data.frame(x = runif(n))
+  ty <- data.frame(y = runif(n))
+  ex <- data.frame(x = seq(0.1, 0.9, length.out = 9))
+  ey <- data.frame(y = seq(0.15, 0.85, length.out = 9))
+  B <- 7L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  frozen.u <- getFromNamespace(".np_inid_boot_from_hat_unconditional_frozen", "np")
+  frozen.c <- getFromNamespace(".np_inid_boot_from_hat_conditional_frozen", "np")
+  udens.hat <- getFromNamespace("npudenshat", "np")
+  udist.hat <- getFromNamespace("npudisthat", "np")
+  cdens.hat <- getFromNamespace("npcdenshat", "np")
+  cdist.hat <- getFromNamespace("npcdisthat", "np")
+
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    bw.val <- if (identical(bt, "adaptive_nn")) 5 else 1
+    cbw.val <- rep.int(bw.val, 2L)
+
+    u.dens.bw <- npudensbw(dat = tx, bws = bw.val, bwtype = bt, bandwidth.compute = FALSE)
+    u.dist.bw <- npudistbw(dat = tx, bws = bw.val, bwtype = bt, bandwidth.compute = FALSE)
+    c.dens.bw <- npcdensbw(xdat = tx, ydat = ty, bws = cbw.val, bwtype = bt, bandwidth.compute = FALSE)
+    c.dist.bw <- npcdistbw(xdat = tx, ydat = ty, bws = cbw.val, bwtype = bt, bandwidth.compute = FALSE)
+
+    H.udens <- unclass(udens.hat(bws = u.dens.bw, tdat = tx, edat = ex, output = "matrix"))
+    H.udist <- unclass(udist.hat(bws = u.dist.bw, tdat = tx, edat = ex, output = "matrix"))
+    H.cdens <- unclass(cdens.hat(bws = c.dens.bw, txdat = tx, tydat = ty, exdat = ex, eydat = ey, output = "matrix"))
+    H.cdist <- unclass(cdist.hat(bws = c.dist.bw, txdat = tx, tydat = ty, exdat = ex, eydat = ey, output = "matrix"))
+
+    u.dens.frozen <- frozen.u(
+      xdat = tx,
+      exdat = ex,
+      bws = u.dens.bw,
+      B = B,
+      operator = "normal",
+      counts = counts
+    )
+    u.dist.frozen <- frozen.u(
+      xdat = tx,
+      exdat = ex,
+      bws = u.dist.bw,
+      B = B,
+      operator = "integral",
+      counts = counts
+    )
+    c.dens.frozen <- frozen.c(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = c.dens.bw,
+      B = B,
+      cdf = FALSE,
+      counts = counts
+    )
+    c.dist.frozen <- frozen.c(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = c.dist.bw,
+      B = B,
+      cdf = TRUE,
+      counts = counts
+    )
+
+    expect_equal(u.dens.frozen$t, t(H.udens %*% counts), tolerance = 1e-10, info = paste(bt, "udens"))
+    expect_equal(u.dist.frozen$t, t(H.udist %*% counts), tolerance = 1e-10, info = paste(bt, "udist"))
+    expect_equal(c.dens.frozen$t, t(H.cdens %*% counts), tolerance = 1e-10, info = paste(bt, "npcdens"))
+    expect_equal(c.dist.frozen$t, t(H.cdist %*% counts), tolerance = 1e-10, info = paste(bt, "npcdist"))
+
+    expect_equal(u.dens.frozen$t0, rowSums(H.udens), tolerance = 1e-12, info = paste(bt, "udens-t0"))
+    expect_equal(u.dist.frozen$t0, rowSums(H.udist), tolerance = 1e-12, info = paste(bt, "udist-t0"))
+    expect_equal(c.dens.frozen$t0, rowSums(H.cdens), tolerance = 1e-12, info = paste(bt, "npcdens-t0"))
+    expect_equal(c.dist.frozen$t0, rowSums(H.cdist), tolerance = 1e-12, info = paste(bt, "npcdist-t0"))
   }
 })
 
