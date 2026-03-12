@@ -70,16 +70,71 @@
   )
 }
 
+.np_operator_kernel_weight_scale <- function(bws, operator, nvars, where) {
+  if (!isa(bws, "kbandwidth"))
+    bws <- kbandwidth(bws)
+
+  operator <- as.character(operator)
+  if (length(operator) == 1L)
+    operator <- rep.int(operator, nvars)
+  if (length(operator) != nvars)
+    stop(sprintf("%s requires one operator per column", where))
+
+  bw.scale <- 1.0
+  if (bws$ncon > 0L) {
+    con.ops <- operator[bws$icon]
+    if (any(con.ops == "normal"))
+      bw.scale <- prod(bws$bw[bws$icon][con.ops == "normal"])
+  }
+
+  list(bws = bws, scale = bw.scale, operator = operator)
+}
+
 .npcdhat_make_kernel_matrix <- function(kbw, txdat, exdat, operator) {
-  n.train <- nrow(txdat)
-  npksum(
-    bws = kbw,
+  if (!identical(kbw$type, "fixed")) {
+    n.train <- nrow(txdat)
+    return(npksum(
+      bws = kbw,
+      txdat = txdat,
+      exdat = exdat,
+      tydat = diag(n.train),
+      operator = operator,
+      bandwidth.divide = TRUE
+    )$ksum)
+  }
+
+  .np_direct_operator_matrix(
+    kbw = kbw,
     txdat = txdat,
     exdat = exdat,
-    tydat = diag(n.train),
     operator = operator,
-    bandwidth.divide = TRUE
-  )$ksum
+    where = "conditional hat direct kernel matrix"
+  )
+}
+
+.np_direct_operator_matrix <- function(kbw, txdat, exdat, operator, where) {
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+  op.info <- .np_operator_kernel_weight_scale(
+    bws = kbw,
+    operator = operator,
+    nvars = ncol(txdat),
+    where = where
+  )
+  kw <- .np_kernel_weights_direct(
+    bws = op.info$bws,
+    txdat = txdat,
+    exdat = exdat,
+    bandwidth.divide = TRUE,
+    operator = op.info$operator
+  )
+
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = nrow(txdat))
+  if (nrow(kw) != nrow(txdat) || ncol(kw) != nrow(exdat))
+    stop(sprintf("%s returned unexpected operator shape", where))
+
+  t(kw) / op.info$scale
 }
 
 .npcdhat_ratio_matrix <- function(bws, txdat, tydat, exdat, eydat, operator) {
