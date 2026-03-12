@@ -3908,7 +3908,13 @@
   )
 
   asDouble <- function(data) {
-    if (is.null(data)) as.double(0.0) else as.double(data)
+    if (is.null(data)) {
+      as.double(0.0)
+    } else if (typeof(data) == "double") {
+      data
+    } else {
+      as.double(data)
+    }
   }
 
   .np_plot_with_local_compiled_eval(.Call(
