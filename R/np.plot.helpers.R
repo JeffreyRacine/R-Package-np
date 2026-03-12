@@ -341,6 +341,25 @@
   rep.int(seq_along(counts.col), counts.col)
 }
 
+.np_active_boot_sample <- function(xdat, counts.col, ydat = NULL) {
+  counts.col <- as.double(counts.col)
+  if (length(counts.col) != nrow(xdat))
+    stop("bootstrap counts must align with training rows")
+  if (!is.null(ydat) && nrow(ydat) != nrow(xdat))
+    stop("bootstrap x/y training rows must align")
+
+  active <- counts.col > 0
+  if (!any(active))
+    stop("bootstrap counts must activate at least one training row")
+
+  list(
+    xdat = xdat[active, , drop = FALSE],
+    ydat = if (is.null(ydat)) NULL else ydat[active, , drop = FALSE],
+    weights = matrix(counts.col[active], ncol = 1L),
+    n.total = sum(counts.col)
+  )
+}
+
 .np_block_counts_drawer <- function(n,
                                     B,
                                     blocklen,
@@ -1777,19 +1796,34 @@
   stop(sprintf("%s returned unexpected matrix shape", where))
 }
 
-.np_ksum_unconditional_eval_exact <- function(xdat, exdat, bws, operator) {
+.np_ksum_unconditional_eval_exact <- function(xdat,
+                                              exdat,
+                                              bws,
+                                              operator,
+                                              weights = NULL,
+                                              n.total = NULL) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
+  if (is.null(weights)) {
+    weights <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+    n.total <- nrow(xdat)
+  } else {
+    weights <- matrix(as.double(weights), ncol = 1L)
+    if (nrow(weights) != nrow(xdat))
+      stop("exact unconditional ksum helper requires one weight per training row")
+    if (is.null(n.total))
+      n.total <- sum(weights)
+  }
   ones <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
   as.numeric(npksum(
     txdat = xdat,
     tydat = ones,
     exdat = exdat,
     bws = bws,
-    weights = ones,
+    weights = weights,
     operator = operator,
     bandwidth.divide = TRUE
-  )$ksum) / nrow(xdat)
+  )$ksum) / n.total
 }
 
 .np_operator_matrix_from_ksum <- function(ksum, nrow.out, ncol.out, where) {
@@ -1946,12 +1980,14 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid unconditional exact bootstrap dimensions")
 
-  fit_one <- function(x.train) {
+  fit_one <- function(x.train, weights = NULL, n.total = NULL) {
     .np_ksum_unconditional_eval_exact(
       xdat = x.train,
       exdat = exdat,
       bws = bws,
-      operator = operator
+      operator = operator,
+      weights = weights,
+      n.total = n.total
     )
   }
 
@@ -1978,8 +2014,12 @@
     }
 
     for (jj in seq_len(bsz)) {
-      idx <- .np_counts_to_indices(counts.chunk[, jj])
-      tmat[start + jj - 1L, ] <- fit_one(x.train = xdat[idx, , drop = FALSE])
+      active.sample <- .np_active_boot_sample(xdat = xdat, counts.col = counts.chunk[, jj])
+      tmat[start + jj - 1L, ] <- fit_one(
+        x.train = active.sample$xdat,
+        weights = active.sample$weights,
+        n.total = active.sample$n.total
+      )
     }
 
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
@@ -2123,7 +2163,9 @@
                                             eydat,
                                             kbx,
                                             kbxy,
-                                            cdf) {
+                                            cdf,
+                                            weights = NULL,
+                                            n.total = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -2131,6 +2173,16 @@
   xop <- rep.int("normal", ncol(xdat))
   yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
   xyop <- c(xop, yop)
+  if (is.null(weights)) {
+    weights <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+    n.total <- nrow(xdat)
+  } else {
+    weights <- matrix(as.double(weights), ncol = 1L)
+    if (nrow(weights) != nrow(xdat))
+      stop("exact conditional ksum helper requires one weight per training row")
+    if (is.null(n.total))
+      n.total <- sum(weights)
+  }
   ones <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
   xydat <- data.frame(xdat, ydat)
   exydat <- data.frame(exdat, eydat)
@@ -2140,19 +2192,19 @@
     tydat = ones,
     exdat = exdat,
     bws = kbx,
-    weights = ones,
+    weights = weights,
     operator = xop,
     bandwidth.divide = TRUE
-  )$ksum) / nrow(xdat)
+  )$ksum) / n.total
   num <- as.numeric(npksum(
     txdat = xydat,
     tydat = ones,
     exdat = exydat,
     bws = kbxy,
-    weights = ones,
+    weights = weights,
     operator = xyop,
     bandwidth.divide = TRUE
-  )$ksum) / nrow(xydat)
+  )$ksum) / n.total
 
   num / pmax(den, .Machine$double.eps)
 }
@@ -2327,7 +2379,7 @@
   if (is.null(kbx) || is.null(kbxy))
     return(NULL)
 
-  fit_one <- function(x.train, y.train) {
+  fit_one <- function(x.train, y.train, weights = NULL, n.total = NULL) {
     .np_ksum_conditional_eval_exact(
       xdat = x.train,
       ydat = y.train,
@@ -2335,7 +2387,9 @@
       eydat = eydat,
       kbx = kbx,
       kbxy = kbxy,
-      cdf = cdf
+      cdf = cdf,
+      weights = weights,
+      n.total = n.total
     )
   }
 
@@ -2362,10 +2416,16 @@
     }
 
     for (jj in seq_len(bsz)) {
-      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      active.sample <- .np_active_boot_sample(
+        xdat = xdat,
+        ydat = ydat,
+        counts.col = counts.chunk[, jj]
+      )
       tmat[start + jj - 1L, ] <- fit_one(
-        x.train = xdat[idx, , drop = FALSE],
-        y.train = ydat[idx, , drop = FALSE]
+        x.train = active.sample$xdat,
+        y.train = active.sample$ydat,
+        weights = active.sample$weights,
+        n.total = active.sample$n.total
       )
     }
 
