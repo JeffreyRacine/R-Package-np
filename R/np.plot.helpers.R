@@ -4026,40 +4026,23 @@
                                                         cdf,
                                                         den.state,
                                                         num.state) {
-  tryCatch(
-    {
-      weights <- matrix(as.double(active.sample$weights), ncol = 1L)
-      n.total <- active.sample$n.total
+  weights <- matrix(as.double(active.sample$weights), ncol = 1L)
+  n.total <- active.sample$n.total
 
-      if (identical(bws$type, "adaptive_nn")) {
-        return(.np_ksum_conditional_eval_exact_oracle(
-          xdat = active.sample$xdat,
-          ydat = active.sample$ydat,
-          exdat = exdat,
-          eydat = eydat,
-          kbx = kbx,
-          kbxy = kbxy,
-          cdf = cdf,
-          weights = weights,
-          n.total = n.total
-        ))
-      }
-
-      den <- as.numeric(.np_ksum_eval_exact_state(
-        state = den.state,
-        txdat = active.sample$xdat,
-        weights = weights
-      )) / n.total
-      num <- as.numeric(.np_ksum_eval_exact_state(
-        state = num.state,
-        txdat = data.frame(active.sample$xdat, active.sample$ydat),
-        weights = weights
-      )) / n.total
-
-      num / pmax(den, .Machine$double.eps)
-    },
-    error = function(e) {
-      if (identical(bws$type, "adaptive_nn")) {
+  if (identical(bws$type, "adaptive_nn")) {
+    return(tryCatch(
+      .np_ksum_conditional_eval_exact_oracle(
+        xdat = active.sample$xdat,
+        ydat = active.sample$ydat,
+        exdat = exdat,
+        eydat = eydat,
+        kbx = kbx,
+        kbxy = kbxy,
+        cdf = cdf,
+        weights = weights,
+        n.total = n.total
+      ),
+      error = function(e) {
         stop(
           sprintf(
             "adaptive conditional exact bootstrap resample is invalid for this active support (n.active=%d, x.unique=%d, y.unique=%d): %s",
@@ -4071,9 +4054,21 @@
           call. = FALSE
         )
       }
-      stop(e)
-    }
-  )
+    ))
+  }
+
+  den <- as.numeric(.np_ksum_eval_exact_state(
+    state = den.state,
+    txdat = active.sample$xdat,
+    weights = weights
+  )) / n.total
+  num <- as.numeric(.np_ksum_eval_exact_state(
+    state = num.state,
+    txdat = data.frame(active.sample$xdat, active.sample$ydat),
+    weights = weights
+  )) / n.total
+
+  num / pmax(den, .Machine$double.eps)
 }
 
 .np_conditional_exact_fit_or_stop <- function(fit.expr,
