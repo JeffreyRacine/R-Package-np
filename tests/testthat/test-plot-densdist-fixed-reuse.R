@@ -269,6 +269,99 @@ test_that("fixed conditional density/distribution helper matches explicit refits
   }
 })
 
+test_that("fixed conditional ll/lp grouped inid helper matches the rowwise oracle on repeated evaluation x rows", {
+  skip_if_not_installed("np")
+
+  set.seed(6031021)
+  n <- 72
+  tx <- data.frame(x = rnorm(n))
+  ty <- data.frame(y = rnorm(n))
+  x.grid <- seq(min(tx$x), max(tx$x), length.out = 6L)
+  y.grid <- seq(min(ty$y), max(ty$y), length.out = 5L)
+  grid <- expand.grid(y = y.grid, x = x.grid)
+  ex <- data.frame(x = grid$x)
+  ey <- data.frame(y = grid$y)
+  B <- 6L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  fast.fun <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "np")
+  oracle.fun <- getFromNamespace(".np_inid_boot_from_conditional_localpoly_fixed_rowwise", "np")
+
+  cfgs <- list(
+    list(name = "ll", regtype = "ll", degree = NULL),
+    list(name = "lp", regtype = "lp", degree = 2L)
+  )
+
+  for (cfg in cfgs) {
+    dens.args <- list(
+      xdat = tx,
+      ydat = ty,
+      bws = c(0.40, 0.40),
+      bandwidth.compute = FALSE,
+      bwtype = "fixed",
+      regtype = cfg$regtype
+    )
+    dist.args <- dens.args
+    if (!is.null(cfg$degree)) {
+      dens.args$degree <- cfg$degree
+      dens.args$basis <- "glp"
+      dens.args$bernstein.basis <- FALSE
+      dist.args$degree <- cfg$degree
+      dist.args$basis <- "glp"
+      dist.args$bernstein.basis <- FALSE
+    }
+
+    dens.bw <- do.call(npcdensbw, dens.args)
+    dist.bw <- do.call(npcdistbw, dist.args)
+
+    dens.fast <- fast.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dens.bw,
+      B = B,
+      cdf = FALSE,
+      counts = counts
+    )
+    dens.oracle <- oracle.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dens.bw,
+      B = B,
+      cdf = FALSE,
+      counts = counts
+    )
+    dist.fast <- fast.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dist.bw,
+      B = B,
+      cdf = TRUE,
+      counts = counts
+    )
+    dist.oracle <- oracle.fun(
+      xdat = tx,
+      ydat = ty,
+      exdat = ex,
+      eydat = ey,
+      bws = dist.bw,
+      B = B,
+      cdf = TRUE,
+      counts = counts
+    )
+
+    expect_equal(dens.fast$t, dens.oracle$t, tolerance = 1e-12, info = paste("density repeated-x oracle", cfg$name))
+    expect_equal(dens.fast$t0, dens.oracle$t0, tolerance = 1e-10, info = paste("density repeated-x oracle t0", cfg$name))
+    expect_equal(dist.fast$t, dist.oracle$t, tolerance = 1e-12, info = paste("distribution repeated-x oracle", cfg$name))
+    expect_equal(dist.fast$t0, dist.oracle$t0, tolerance = 1e-10, info = paste("distribution repeated-x oracle t0", cfg$name))
+  }
+})
+
 test_that("fixed density/distribution helpers preserve bounded kernel options", {
   skip_if_not_installed("np")
 

@@ -611,6 +611,147 @@
   out
 }
 
+.np_inid_lp_predict_row_multi <- function(A, Z, rhs, ridge.grid) {
+  ridge.grid <- as.double(ridge.grid)
+  if (!length(ridge.grid) || anyNA(ridge.grid) || any(!is.finite(ridge.grid)) || any(ridge.grid < 0))
+    stop("argument 'ridge.grid' must be a non-empty non-negative finite numeric vector")
+  Z <- as.matrix(Z)
+  if (!length(Z))
+    return(numeric(0))
+  rhs <- as.double(rhs)
+  p <- nrow(Z)
+
+  if (p == 1L) {
+    den <- as.double(A[1L, 1L])
+    return(rhs[1L] * as.double(Z[1L, ]) / pmax(den, .Machine$double.eps))
+  }
+
+  if (p == 2L) {
+    a <- as.double(A[1L, 1L])
+    b <- as.double(A[1L, 2L])
+    c <- as.double(A[2L, 2L])
+    det <- a * c - b * b
+    if (is.finite(det) && abs(det) > .Machine$double.eps) {
+      coeff1 <- (rhs[1L] * c - rhs[2L] * b) / det
+      coeff2 <- (rhs[2L] * a - rhs[1L] * b) / det
+      return(coeff1 * as.double(Z[1L, ]) + coeff2 * as.double(Z[2L, ]))
+    }
+  } else if (p == 3L) {
+    a <- as.double(A[1L, 1L])
+    b <- as.double(A[1L, 2L])
+    c <- as.double(A[1L, 3L])
+    d <- as.double(A[2L, 2L])
+    e <- as.double(A[2L, 3L])
+    f <- as.double(A[3L, 3L])
+    det <- a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d)
+    if (is.finite(det) && abs(det) > .Machine$double.eps) {
+      c11 <- d * f - e * e
+      c12 <- c * e - b * f
+      c13 <- b * e - c * d
+      c22 <- a * f - c * c
+      c23 <- b * c - a * e
+      c33 <- a * d - b * b
+      coeff1 <- (rhs[1L] * c11 + rhs[2L] * c12 + rhs[3L] * c13) / det
+      coeff2 <- (rhs[1L] * c12 + rhs[2L] * c22 + rhs[3L] * c23) / det
+      coeff3 <- (rhs[1L] * c13 + rhs[2L] * c23 + rhs[3L] * c33) / det
+      return(
+        coeff1 * as.double(Z[1L, ]) +
+          coeff2 * as.double(Z[2L, ]) +
+          coeff3 * as.double(Z[3L, ])
+      )
+    }
+  }
+
+  z1 <- Z[1L, , drop = TRUE]
+
+  for (ridge in ridge.grid) {
+    Ar <- A
+    Zr <- Z
+    if (ridge > 0)
+      diag(Ar) <- diag(Ar) + ridge
+    if (ridge > 0)
+      Zr[1L, ] <- z1 + ridge * z1 / NZD(Ar[1L, 1L])
+    beta <- tryCatch(
+      solve(Ar, Zr),
+      error = function(e) NULL
+    )
+    if (!is.null(beta) && all(is.finite(beta)))
+      return(as.numeric(crossprod(rhs, beta)))
+  }
+
+  rep(NA_real_, ncol(Z))
+}
+
+.np_inid_lp_predict_chunk_multi <- function(Mvals, Zmats, rhs, ridge.grid) {
+  Mvals <- as.matrix(Mvals)
+  rhs <- as.double(rhs)
+  if (!length(Zmats))
+    return(matrix(numeric(0), nrow = nrow(Mvals), ncol = 0L))
+
+  bsz <- nrow(Mvals)
+  p <- length(Zmats)
+  g <- ncol(Zmats[[1L]])
+  out <- matrix(NA_real_, nrow = bsz, ncol = g)
+
+  if (p == 1L) {
+    den <- as.double(Mvals[, 1L])
+    out <- rhs[1L] * as.matrix(Zmats[[1L]]) / pmax(den, .Machine$double.eps)
+    return(out)
+  } else if (p == 2L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    det <- a * c - b * b
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      coeff1 <- (rhs[1L] * c[good] - rhs[2L] * b[good]) / det[good]
+      coeff2 <- (rhs[2L] * a[good] - rhs[1L] * b[good]) / det[good]
+      out[good, ] <-
+        sweep(as.matrix(Zmats[[1L]])[good, , drop = FALSE], 1L, coeff1, "*") +
+        sweep(as.matrix(Zmats[[2L]])[good, , drop = FALSE], 1L, coeff2, "*")
+    }
+  } else if (p == 3L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    d <- as.double(Mvals[, 4L])
+    e <- as.double(Mvals[, 5L])
+    f <- as.double(Mvals[, 6L])
+    det <- a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d)
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      c11 <- d[good] * f[good] - e[good] * e[good]
+      c12 <- c[good] * e[good] - b[good] * f[good]
+      c13 <- b[good] * e[good] - c[good] * d[good]
+      c22 <- a[good] * f[good] - c[good] * c[good]
+      c23 <- b[good] * c[good] - a[good] * e[good]
+      c33 <- a[good] * d[good] - b[good] * b[good]
+      coeff1 <- (rhs[1L] * c11 + rhs[2L] * c12 + rhs[3L] * c13) / det[good]
+      coeff2 <- (rhs[1L] * c12 + rhs[2L] * c22 + rhs[3L] * c23) / det[good]
+      coeff3 <- (rhs[1L] * c13 + rhs[2L] * c23 + rhs[3L] * c33) / det[good]
+      out[good, ] <-
+        sweep(as.matrix(Zmats[[1L]])[good, , drop = FALSE], 1L, coeff1, "*") +
+        sweep(as.matrix(Zmats[[2L]])[good, , drop = FALSE], 1L, coeff2, "*") +
+        sweep(as.matrix(Zmats[[3L]])[good, , drop = FALSE], 1L, coeff3, "*")
+    }
+  }
+
+  for (ii in seq_len(bsz)) {
+    if (all(is.finite(out[ii, ])))
+      next
+    A <- .np_inid_lp_unpack_sym_row(mrow = Mvals[ii, ], p = p)
+    Z <- do.call(rbind, lapply(Zmats, function(zmat) zmat[ii, , drop = FALSE]))
+    out[ii, ] <- .np_inid_lp_predict_row_multi(
+      A = A,
+      Z = Z,
+      rhs = rhs,
+      ridge.grid = ridge.grid
+    )
+  }
+
+  out
+}
+
 .np_inid_boot_from_regression_localpoly_fixed <- function(xdat,
                                                           exdat,
                                                           bws,
@@ -2268,6 +2409,40 @@
   )
 }
 
+.np_plot_exact_row_groups <- function(dat) {
+  dat <- toFrame(dat)
+  n <- nrow(dat)
+  if (n < 1L)
+    stop("row grouping requires at least one row")
+
+  key_cols <- lapply(dat, function(col) {
+    if (is.factor(col)) {
+      paste0("factor:", as.integer(col))
+    } else if (is.character(col)) {
+      paste0("character:", encodeString(col, quote = "\""))
+    } else if (is.logical(col)) {
+      paste0("logical:", ifelse(is.na(col), "NA", ifelse(col, "TRUE", "FALSE")))
+    } else if (inherits(col, "POSIXt")) {
+      paste0("POSIXt:", format(col, tz = "UTC", usetz = TRUE, digits = 17))
+    } else if (inherits(col, "Date")) {
+      paste0("Date:", as.character(col))
+    } else {
+      paste0(typeof(col), ":", format(col, digits = 17, scientific = FALSE, trim = TRUE))
+    }
+  })
+  keys <- do.call(paste, c(key_cols, sep = "\r"))
+  first <- which(!duplicated(keys))
+  index <- match(keys, keys[first])
+  groups <- split(seq_len(n), index)
+
+  list(
+    unique = dat[first, , drop = FALSE],
+    first = first,
+    index = index,
+    groups = groups
+  )
+}
+
 .np_inid_boot_from_conditional_localpoly_fixed_rowwise <- function(xdat,
                                                                    ydat,
                                                                    exdat,
@@ -2369,10 +2544,10 @@
   t0 <- numeric(state$neval)
   tmat <- matrix(NA_real_, nrow = B, ncol = state$neval)
 
-  for (i in seq_len(state$neval)) {
-    feat <- .np_inid_boot_from_conditional_localpoly_fixed_features(state = state, i = i)
-    t0[i] <- .np_inid_boot_from_conditional_localpoly_fixed_t0(state = state, feat = feat)
-    tmat[, i] <- .np_inid_boot_from_conditional_localpoly_fixed_chunk(
+  for (i in seq_len(state$ngroups)) {
+    feat <- .np_inid_boot_from_conditional_localpoly_fixed_group_features(state = state, i = i)
+    t0[feat$rows] <- .np_inid_boot_from_conditional_localpoly_fixed_t0(state = state, feat = feat)
+    tmat[, feat$rows] <- .np_inid_boot_from_conditional_localpoly_fixed_chunk(
       state = state,
       feat = feat,
       counts.chunk = counts.mat
@@ -2404,6 +2579,9 @@
 
   xbw <- .npcdhat_make_xbw(bws = bws, txdat = xdat)
   ybw <- .npcdhat_make_ybw(bws = bws, tydat = ydat)
+  ex.groups <- .np_plot_exact_row_groups(exdat)
+  exdat.unique <- ex.groups$unique
+  ngroups <- nrow(exdat.unique)
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
     txdat = ydat,
@@ -2443,7 +2621,7 @@
 
   kw <- npksum(
     txdat = xdat,
-    exdat = exdat,
+    exdat = exdat.unique,
     bws = xbw,
     return.kernel.weights = TRUE,
     bandwidth.divide = TRUE,
@@ -2451,7 +2629,7 @@
   )$kw
   if (!is.matrix(kw))
     kw <- matrix(kw, nrow = n)
-  if (nrow(kw) != n || ncol(kw) != neval)
+  if (nrow(kw) != n || ncol(kw) != ngroups)
     stop("conditional localpoly x-kernel-weight matrix shape mismatch")
 
   W <- W.lp(
@@ -2462,7 +2640,7 @@
   )
   W.eval <- W.lp(
     xdat = xdat,
-    exdat = exdat,
+    exdat = exdat.unique,
     degree = degree,
     basis = basis,
     bernstein.basis = bernstein.basis
@@ -2470,7 +2648,7 @@
   W <- as.matrix(W)
   W.eval <- as.matrix(W.eval)
 
-  if (nrow(W) != n || nrow(W.eval) != neval || ncol(W.eval) != ncol(W))
+  if (nrow(W) != n || nrow(W.eval) != ngroups || ncol(W.eval) != ncol(W))
     stop("conditional localpoly fixed moment design matrix shape mismatch")
 
   p <- ncol(W)
@@ -2480,6 +2658,9 @@
   list(
     n = n,
     neval = neval,
+    ngroups = ngroups,
+    groups = ex.groups$groups,
+    exdat.unique = exdat.unique,
     Gy = Gy,
     kw = kw,
     W = W,
@@ -2490,10 +2671,11 @@
   )
 }
 
-.np_inid_boot_from_conditional_localpoly_fixed_features <- function(state, i) {
+.np_inid_boot_from_conditional_localpoly_fixed_group_features <- function(state, i) {
+  rows <- state$groups[[i]]
   k <- as.double(state$kw[, i])
   WK <- state$W * k
-  Zfeat <- WK * as.double(state$Gy[i, ])
+  Gy.group <- state$Gy[rows, , drop = FALSE]
 
   Mfeat <- matrix(0.0, nrow = state$n, ncol = state$mcols)
   idx <- 1L
@@ -2504,55 +2686,43 @@
     }
   }
 
+  Zops <- vector("list", state$p)
+  for (a in seq_len(state$p))
+    Zops[[a]] <- t(sweep(Gy.group, 2L, WK[, a], "*"))
+
   list(
+    rows = rows,
+    Gy = Gy.group,
+    WK = WK,
     Mfeat = Mfeat,
-    Zfeat = Zfeat,
+    Zops = Zops,
     rhs = state$W.eval[i, ]
   )
 }
 
 .np_inid_boot_from_conditional_localpoly_fixed_t0 <- function(state, feat) {
-  M0 <- matrix(colSums(feat$Mfeat), nrow = 1L)
-  Z0 <- matrix(colSums(feat$Zfeat), nrow = 1L)
-
-  if (state$p > 3L) {
-    .np_inid_lp_predict_chunk_general(
-      Mvals = M0,
-      Zvals = Z0,
-      rhs = feat$rhs,
-      ridge.grid = state$ridge.grid
-    )[1L]
-  } else {
-    .np_inid_lp_predict_chunk(
-      Mvals = M0,
-      Zvals = Z0,
-      rhs = feat$rhs,
-      ridge.grid = state$ridge.grid
-    )[1L]
-  }
+  A0 <- .np_inid_lp_unpack_sym_row(mrow = colSums(feat$Mfeat), p = state$p)
+  Z0 <- t(feat$Gy %*% feat$WK)
+  .np_inid_lp_predict_row_multi(
+    A = A0,
+    Z = Z0,
+    rhs = feat$rhs,
+    ridge.grid = state$ridge.grid
+  )
 }
 
 .np_inid_boot_from_conditional_localpoly_fixed_chunk <- function(state,
                                                                  feat,
                                                                  counts.chunk) {
   Mvals <- crossprod(counts.chunk, feat$Mfeat)
-  Zvals <- crossprod(counts.chunk, feat$Zfeat)
+  Zmats <- lapply(feat$Zops, function(zop) crossprod(counts.chunk, zop))
 
-  if (state$p > 3L) {
-    .np_inid_lp_predict_chunk_general(
-      Mvals = Mvals,
-      Zvals = Zvals,
-      rhs = feat$rhs,
-      ridge.grid = state$ridge.grid
-    )
-  } else {
-    .np_inid_lp_predict_chunk(
-      Mvals = Mvals,
-      Zvals = Zvals,
-      rhs = feat$rhs,
-      ridge.grid = state$ridge.grid
-    )
-  }
+  .np_inid_lp_predict_chunk_multi(
+    Mvals = Mvals,
+    Zmats = Zmats,
+    rhs = feat$rhs,
+    ridge.grid = state$ridge.grid
+  )
 }
 
 .np_inid_boot_from_conditional_localpoly_fixed <- function(xdat,
@@ -2581,49 +2751,16 @@
     ))
   }
 
-  state <- .np_inid_boot_from_conditional_localpoly_fixed_precompute(
+  .np_inid_boot_from_conditional_localpoly_fixed_rowwise(
     xdat = xdat,
     ydat = ydat,
     exdat = exdat,
     eydat = eydat,
     bws = bws,
-    cdf = cdf
+    B = B,
+    cdf = cdf,
+    counts.drawer = counts.drawer
   )
-  t0 <- numeric(state$neval)
-  for (i in seq_len(state$neval)) {
-    feat <- .np_inid_boot_from_conditional_localpoly_fixed_features(state = state, i = i)
-    t0[i] <- .np_inid_boot_from_conditional_localpoly_fixed_t0(state = state, feat = feat)
-  }
-
-  tmat <- matrix(NA_real_, nrow = B, ncol = state$neval)
-  progress.label <- "Plot bootstrap block"
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
-  on.exit({
-    .np_plot_progress_end(progress)
-  }, add = TRUE)
-
-  chunk.size <- .np_inid_chunk_size(n = state$n, B = B)
-  start <- 1L
-  while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
-    counts.chunk <- .np_inid_counts_matrix(
-      n = state$n,
-      B = stopi - start + 1L,
-      counts = counts.drawer(start, stopi)
-    )
-    for (i in seq_len(state$neval)) {
-      feat <- .np_inid_boot_from_conditional_localpoly_fixed_features(state = state, i = i)
-      tmat[start:stopi, i] <- .np_inid_boot_from_conditional_localpoly_fixed_chunk(
-        state = state,
-        feat = feat,
-        counts.chunk = counts.chunk
-      )
-    }
-    progress <- .np_plot_progress_tick(state = progress, done = stopi)
-    start <- stopi + 1L
-  }
-
-  list(t = tmat, t0 = t0)
 }
 
 .np_inid_boot_from_ksum_conditional_exact <- function(xdat,
