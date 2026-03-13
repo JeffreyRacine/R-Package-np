@@ -81,7 +81,7 @@ test_that("wild categorical regression gradient helper matches explicit refits",
   expect_equal(as.vector(helper.out$t0), as.vector(fit0 - fit0[1L]), tolerance = 1e-6)
 })
 
-test_that("categorical regression gradient bootstrap works for default and wild routes", {
+test_that("categorical regression gradient bootstrap works for default, inid, and wild routes", {
   skip_if_not_installed("np")
 
   library(np)
@@ -108,7 +108,7 @@ test_that("categorical regression gradient bootstrap works for default and wild 
     errors = TRUE
   )
 
-  for (boot.method in c("default", "wild")) {
+  for (boot.method in c("default", "inid", "wild")) {
     args <- list(
       fit,
       plot.behavior = "data",

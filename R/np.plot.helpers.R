@@ -1094,6 +1094,24 @@
   }
 
   if (isTRUE(gradients)) {
+    xi.factor <- isTRUE(slice.index > 0L) &&
+      !is.null(bws$xdati) &&
+      (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
+    if (isTRUE(xi.factor)) {
+      return(.np_inid_boot_from_reghat_exact(
+        xdat = xdat,
+        exdat = exdat,
+        bws = bws,
+        ydat = ydat,
+        B = B,
+        counts = counts,
+        counts.drawer = counts.drawer,
+        gradients = TRUE,
+        gradient.order = gradient.order,
+        slice.index = slice.index
+      ))
+    }
+
     if (!identical(regtype, "lc")) {
       return(.np_inid_boot_from_regression_localpoly_fixed(
         xdat = xdat,
