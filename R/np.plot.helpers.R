@@ -278,6 +278,21 @@
   )
 }
 
+.np_plot_boot_from_hat_wild_factor_effects <- function(H, ydat, fit.mean, B, wild) {
+  out <- .np_plot_boot_from_hat_wild(
+    H = H,
+    ydat = ydat,
+    fit.mean = fit.mean,
+    B = B,
+    wild = wild
+  )
+  if (ncol(out$t) < 1L)
+    return(out)
+  out$t <- sweep(out$t, 1L, out$t[, 1L], "-", check.margin = FALSE)
+  out$t0 <- out$t0 - out$t0[1L]
+  out
+}
+
 .np_plot_require_bws <- function(bws, where) {
   if (is.null(bws))
     stop(sprintf("required argument 'bws' is missing or NULL in %s", where))
@@ -4994,11 +5009,11 @@ compute.bootstrap.errors.rbandwidth =
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
-    if (is.wild.hat && gradients) {
-      cont.idx <- which(bws$xdati$icon)
-      if (is.na(match(slice.index, cont.idx))) {
-        stop("plot.errors.boot.method='wild' supports gradients only for continuous slices in compute.bootstrap.errors.rbandwidth", call. = FALSE)
-      }
+    cont.idx <- which(bws$xdati$icon)
+    xi.factor <- isTRUE(slice.index > 0L) &&
+      (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
+    if (is.wild.hat && gradients && !xi.factor && is.na(match(slice.index, cont.idx))) {
+      stop("plot.errors.boot.method='wild' supports gradients only for continuous or categorical slices in compute.bootstrap.errors.rbandwidth", call. = FALSE)
     }
 
     inid.helper.ok <- TRUE
@@ -5062,8 +5077,7 @@ compute.bootstrap.errors.rbandwidth =
       )))
 
       s.vec <- NULL
-      if (gradients) {
-        cont.idx <- which(bws$xdati$icon)
+      if (gradients && !xi.factor) {
         cpos <- match(slice.index, cont.idx)
         gorder <- if (length(gradient.order) == 1L) {
           rep.int(as.integer(gradient.order), length(cont.idx))
@@ -5084,13 +5098,23 @@ compute.bootstrap.errors.rbandwidth =
         output = "matrix"
       ))
 
-      boot.out <- .np_plot_boot_from_hat_wild(
-        H = H,
-        ydat = ydat,
-        fit.mean = fit.mean,
-        B = plot.errors.boot.num,
-        wild = plot.errors.boot.wild
-      )
+      boot.out <- if (gradients && xi.factor) {
+        .np_plot_boot_from_hat_wild_factor_effects(
+          H = H,
+          ydat = ydat,
+          fit.mean = fit.mean,
+          B = plot.errors.boot.num,
+          wild = plot.errors.boot.wild
+        )
+      } else {
+        .np_plot_boot_from_hat_wild(
+          H = H,
+          ydat = ydat,
+          fit.mean = fit.mean,
+          B = plot.errors.boot.num,
+          wild = plot.errors.boot.wild
+        )
+      }
     }
 
     if (is.null(boot.out))
