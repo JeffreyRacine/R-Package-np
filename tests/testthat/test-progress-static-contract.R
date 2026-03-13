@@ -177,8 +177,8 @@ test_that("npindexbw no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_begin\\(\"Multistart optimization\"", src))
-  expect_true(grepl("detail = sprintf\\(\"multistart %d\", i\\)", src))
+  expect_true(grepl("\\.np_progress_select_bandwidth\\(\\s*\"Selecting single-index bandwidth\"", src))
+  expect_true(grepl("\\.np_progress_bandwidth_multistart_step\\(done = i, total = nmulti\\)", src))
 })
 
 test_that("npscoefbw multistart path uses append-only progress core", {
@@ -187,10 +187,21 @@ test_that("npscoefbw multistart path uses append-only progress core", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_true(grepl("Optimizing smooth coefficient bandwidth", src, fixed = TRUE))
-  expect_true(grepl("Multistart optimization", src, fixed = TRUE))
+  expect_true(grepl("\\.np_progress_select_bandwidth\\(\\s*\"Selecting smooth coefficient bandwidth\"", src))
+  expect_true(grepl("\\.np_progress_bandwidth_multistart_step\\(done = i, total = nmulti\\)", src))
   expect_true(grepl("Backfitting smooth coefficient bandwidth", src, fixed = TRUE))
   expect_true(grepl("Optimizing partial residual bandwidth", src, fixed = TRUE))
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
+})
+
+test_that("compiled multistart progress uses shared bandwidth helper", {
+  src_path <- testthat::test_path("..", "..", "src", "np.c")
+  skip_if_not(file.exists(src_path), "source C files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("np_progress_bandwidth_multistart_step\\(", src))
+  expect_false(grepl("Rprintf\\(\"\\\\rMultistart", src))
+  expect_false(grepl("Rprintf\\(\"\\\\r +\\\\r\"", src))
 })
 
 test_that("plot helpers use append-only progress core", {

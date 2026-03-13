@@ -211,6 +211,7 @@ npscoefbw.scbandwidth <-
     backfit.iterate <- npValidateScalarLogical(backfit.iterate, "backfit.iterate")
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    .np_progress_bandwidth_set_total(nmulti)
     backfit.maxiter <- npValidatePositiveInteger(backfit.maxiter, "backfit.maxiter")
     backfit.tol <- npValidatePositiveFiniteNumeric(backfit.tol, "backfit.tol")
     optim.maxattempts <- npValidatePositiveInteger(optim.maxattempts, "optim.maxattempts")
@@ -782,8 +783,6 @@ npscoefbw.scbandwidth <-
                      (if (bws$scaling) ncatfac else 1.0))       
           })
 
-          multistart.progress <- .np_progress_begin("Multistart optimization", total = nmulti)
-          on.exit(cv_progress_end(multistart.progress), add = TRUE)
           optim.control <- list(abstol = optim.abstol,
                                 reltol = optim.reltol,
                                 maxit = optim.maxit)
@@ -836,11 +835,7 @@ npscoefbw.scbandwidth <-
               best.overall <- i
             }
 
-            multistart.progress <- .np_progress_step(
-              state = multistart.progress,
-              done = i,
-              detail = sprintf("multistart %d", i)
-            )
+            .np_progress_bandwidth_multistart_step(done = i, total = nmulti)
           }
 
           param.overall <- bws$bw <- .npscoef_finalize_bandwidth(
@@ -1119,7 +1114,10 @@ npscoefbw.default <-
       nms <- mc.names[m]
       scbw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
-    tbw <- do.call(npscoefbw.scbandwidth, scbw.args)
+    tbw <- .np_progress_select_bandwidth(
+      "Selecting smooth coefficient bandwidth",
+      do.call(npscoefbw.scbandwidth, scbw.args)
+    )
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

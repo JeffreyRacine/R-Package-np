@@ -70,6 +70,33 @@ static int np_mpi_local_regression_saved_nproc = 1;
 static MPI_Comm np_mpi_local_regression_saved_comm1 = MPI_COMM_NULL;
 #endif
 
+static void np_progress_bandwidth_multistart_step(const int done, const int total)
+{
+  SEXP ns = R_NilValue;
+  SEXP fn = R_NilValue;
+  SEXP call = R_NilValue;
+  int err = 0;
+
+  if (done < 1 || total <= 1)
+    return;
+
+  PROTECT(ns = R_FindNamespace(Rf_ScalarString(Rf_mkChar("npRmpi"))));
+  if (ns == R_NilValue) {
+    UNPROTECT(1);
+    return;
+  }
+
+  PROTECT(fn = Rf_findVarInFrame(ns, Rf_install(".np_progress_bandwidth_multistart_step")));
+  if (fn == R_UnboundValue) {
+    UNPROTECT(2);
+    return;
+  }
+
+  PROTECT(call = Rf_lang3(fn, Rf_ScalarInteger(done), Rf_ScalarInteger(total)));
+  R_tryEval(call, ns, &err);
+  UNPROTECT(3);
+}
+
 /* Some externals for numerical routines */
 /* Some externals for numerical routines */
 
@@ -678,12 +705,7 @@ void np_set_tgauss2(double * coefficients){
 }
 
 void spinner(int num) {
-  if(int_MINIMIZE_IO == IO_MIN_FALSE){
-    const char spinney[] = { '|', '/', '-', '\\' };
-    const int display_total = (imstot > 0) ? imstot : 1;
-    Rprintf("\rMultistart %d of %d %c", imsnum+1, display_total, spinney[num%4]);
-    R_FlushConsole();
-  }
+  (void) num;
 }
 
 void np_set_seed(int * num){
@@ -2324,6 +2346,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     vector_scale_factor_multistart = alloc_vecd(num_var + 1);
     for(i = 1; i <= num_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
     		
     /* Conduct search from new random values of the search parameters */
        	
@@ -2445,6 +2468,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       objective_function_values[iMs_counter]=-fret;
       objective_function_evals[iMs_counter]=bwm_eval_count;
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
     /* Save best for estimation */
@@ -2496,9 +2520,6 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
-
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
@@ -2958,6 +2979,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     vector_scale_factor_multistart = alloc_vecd(num_var + 1);
     for(i = 1; i <= num_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
     		
     /* Conduct search from new random values of the search parameters */
        	
@@ -3075,6 +3097,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
       objective_function_values[iMs_counter]=fret;
       objective_function_evals[iMs_counter]=bwm_eval_count;
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
     /* Save best for estimation */
@@ -3135,9 +3158,6 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
-
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
@@ -3851,6 +3871,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     vector_scale_factor_multistart = alloc_vecd(num_all_var + 1);
     for(i = 1; i <= num_all_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
 			
 
     /* Conduct search from new random values of the search parameters */
@@ -3970,6 +3991,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
     /* Save best for estimation */
@@ -4084,9 +4106,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   vector_ckerub_extern = NULL;
   safe_free(cxylb);
   safe_free(cxyub);
-
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
 
   return ;
 }
@@ -4783,6 +4802,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     vector_scale_factor_multistart = alloc_vecd(num_all_var + 1);
     for(i = 1; i <= num_all_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
 			
 
     /* Conduct search from new random values of the search parameters */
@@ -4901,6 +4921,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
     /* Save best for estimation */
@@ -5013,9 +5034,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   vector_ckerub_extern = NULL;
   safe_free(cxylb);
   safe_free(cxyub);
-
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
 
   return ;
 }
@@ -6484,6 +6502,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
     for(i = 1; i <= num_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
 
     /* Conduct search from new random values of the search parameters */
 
@@ -6603,6 +6622,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
 
     }
 
@@ -6656,9 +6676,6 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
-
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
 
   np_glp_cv_clear_extern();
   np_reg_cv_core_clear_extern();
@@ -8018,7 +8035,5 @@ void np_quantile_conditional(double * tc_con,
   safe_free(eq);
   safe_free(eqerr);
 
-  if(int_MINIMIZE_IO != IO_MIN_TRUE)
-    Rprintf("\r                   \r");
   return ;
 }

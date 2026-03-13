@@ -143,6 +143,7 @@ npregbw.rbandwidth <-
     small <- npValidatePositiveFiniteNumeric(small, "small")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    .np_progress_bandwidth_set_total(nmulti)
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(
@@ -489,7 +490,10 @@ npregbw.default <-
     if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
     if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
 
-    tbw <- do.call(npregbw.rbandwidth, opt.args)
+    tbw <- .np_progress_select_bandwidth(
+      "Selecting regression bandwidth",
+      do.call(npregbw.rbandwidth, opt.args)
+    )
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

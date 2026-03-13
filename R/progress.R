@@ -15,7 +15,7 @@
 }
 
 .np_progress_enabled <- function(domain = "general") {
-  isTRUE(getOption("np.messages", TRUE)) &&
+  (isTRUE(.np_progress_runtime$force_enabled) || isTRUE(getOption("np.messages", TRUE))) &&
     isTRUE(.np_progress_is_interactive()) &&
     isTRUE(.np_progress_is_master())
 }
@@ -69,6 +69,16 @@
 .np_progress_fmt_num <- function(x) {
   formatC(x, digits = 1L, format = "f")
 }
+
+.np_progress_runtime <- local({
+  env <- new.env(parent = emptyenv())
+  env$bandwidth_depth <- 0L
+  env$bandwidth_label <- NULL
+  env$bandwidth_state <- NULL
+  env$bandwidth_old_messages <- NULL
+  env$force_enabled <- FALSE
+  env
+})
 
 .np_progress_start_grace_sec <- function(known_total = FALSE, domain = "general") {
   default <- if (identical(domain, "plot")) {
@@ -274,9 +284,131 @@
   invisible(NULL)
 }
 
+.np_progress_bandwidth_active <- function() {
+  isTRUE(.np_progress_runtime$bandwidth_depth > 0L)
+}
+
+.np_progress_bandwidth_detail <- function(done, total) {
+  sprintf("multistart %d of %d", as.integer(done)[1L], as.integer(total)[1L])
+}
+
+.np_progress_bandwidth_set_total <- function(total) {
+  state <- .np_progress_runtime$bandwidth_state
+  total <- suppressWarnings(as.integer(total)[1L])
+
+  if (is.null(state) || is.na(total) || total <= 1L) {
+    return(invisible(NULL))
+  }
+
+  if (isTRUE(state$known_total) && identical(as.integer(state$total), total)) {
+    return(invisible(NULL))
+  }
+
+  label <- .np_progress_runtime$bandwidth_label
+  if (is.null(label))
+    label <- state$label
+
+  upgraded <- .np_progress_begin(label = label, total = total, domain = "general")
+  upgraded$started <- state$started
+  upgraded$last_emit <- state$started - upgraded$throttle_sec
+  upgraded$start_note_pending <- state$start_note_pending
+  upgraded$last_line <- state$last_line
+  if (!isTRUE(state$start_note_pending) && identical(state$last_line, state$start_note)) {
+    upgraded$start_note_pending <- FALSE
+  }
+
+  .np_progress_runtime$bandwidth_state <- upgraded
+  invisible(NULL)
+}
+
+.np_progress_bandwidth_multistart_step <- function(done, total = NULL) {
+  state <- .np_progress_runtime$bandwidth_state
+
+  if (is.null(state)) {
+    return(invisible(NULL))
+  }
+
+  if (!is.null(total)) {
+    .np_progress_bandwidth_set_total(total = total)
+    state <- .np_progress_runtime$bandwidth_state
+  }
+
+  if (is.null(state) || !isTRUE(state$known_total)) {
+    return(invisible(NULL))
+  }
+
+  done <- suppressWarnings(as.integer(done)[1L])
+  if (is.na(done) || done < 1L) {
+    return(invisible(NULL))
+  }
+
+  total <- as.integer(state$total)
+  done <- min(done, total)
+  .np_progress_runtime$bandwidth_state <- .np_progress_step(
+    state = state,
+    done = done,
+    detail = .np_progress_bandwidth_detail(done = done, total = total)
+  )
+
+  invisible(NULL)
+}
+
+.np_progress_bandwidth_finish <- function() {
+  state <- .np_progress_runtime$bandwidth_state
+
+  if (is.null(state)) {
+    return(invisible(NULL))
+  }
+
+  if (isTRUE(state$known_total) && isTRUE(state$total > 1L)) {
+    total <- as.integer(state$total)
+    .np_progress_runtime$bandwidth_state <- .np_progress_end(
+      state,
+      detail = .np_progress_bandwidth_detail(done = total, total = total)
+    )
+  } else {
+    .np_progress_runtime$bandwidth_state <- .np_progress_end(state)
+  }
+
+  invisible(NULL)
+}
+
+.np_progress_bandwidth_clear <- function() {
+  .np_progress_runtime$bandwidth_depth <- 0L
+  .np_progress_runtime$bandwidth_label <- NULL
+  .np_progress_runtime$bandwidth_state <- NULL
+  .np_progress_runtime$bandwidth_old_messages <- NULL
+  .np_progress_runtime$force_enabled <- FALSE
+  invisible(NULL)
+}
+
 .np_progress_select_bandwidth <- function(label, expr) {
-  .np_progress_note(label)
-  .np_progress_with_legacy_suppressed(expr)
+  starting <- !.np_progress_bandwidth_active()
+  if (starting) {
+    .np_progress_runtime$bandwidth_old_messages <- getOption("np.messages", TRUE)
+    .np_progress_runtime$force_enabled <- isTRUE(.np_progress_runtime$bandwidth_old_messages)
+    options(np.messages = FALSE)
+    .np_progress_runtime$bandwidth_label <- as.character(label)[1L]
+    .np_progress_runtime$bandwidth_state <- .np_progress_begin(
+      label = .np_progress_runtime$bandwidth_label,
+      domain = "general"
+    )
+  }
+
+  .np_progress_runtime$bandwidth_depth <- as.integer(.np_progress_runtime$bandwidth_depth) + 1L
+  on.exit({
+    .np_progress_runtime$bandwidth_depth <- max(
+      0L,
+      as.integer(.np_progress_runtime$bandwidth_depth) - 1L
+    )
+    if (starting) {
+      .np_progress_bandwidth_finish()
+      options(np.messages = .np_progress_runtime$bandwidth_old_messages)
+      .np_progress_bandwidth_clear()
+    }
+  }, add = TRUE)
+
+  force(expr)
 }
 
 .np_progress_with_legacy_suppressed <- function(expr) {

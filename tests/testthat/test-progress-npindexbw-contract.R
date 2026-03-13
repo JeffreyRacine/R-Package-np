@@ -99,8 +99,8 @@ test_that("npindexbw emits append-only bounded multistart progress", {
   messages <- normalize_messages(res$messages)
 
   expect_s3_class(res$value, "sibandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Multistart optimization 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 1$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Multistart optimization 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 3$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting single-index bandwidth 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 1 of 3$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting single-index bandwidth 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 3 of 3$", messages)))
   expect_false(any(grepl("\b", messages, fixed = TRUE)))
 })
 
