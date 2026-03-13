@@ -491,7 +491,7 @@ test_that("single-line finish clears the rendered line without leaving a newline
 
   output <- capture_single_line_output(
     "npRmpi",
-    list(),
+    list(.np_progress_output_width = function() 80L),
     {
       render(list(render_line = line, last_width = 0L), event = "render")
       render(list(render_line = line, last_width = nchar(line, type = "width")), event = "finish")
@@ -500,7 +500,7 @@ test_that("single-line finish clears the rendered line without leaving a newline
 
   expect_identical(
     output,
-    paste0("\r", line, "\r", strrep(" ", nchar(line, type = "width")), "\r")
+    paste0("\r", line, "\r", strrep(" ", 80L), "\r")
   )
 })
 
