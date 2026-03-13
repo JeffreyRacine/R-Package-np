@@ -285,7 +285,7 @@ test_that("bandwidth selection helper suppresses legacy output and drives bounde
 
   expect_false(isTRUE(seen))
   expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth\\.\\.\\.$", messages)))
-  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 1 of 3$", messages)))
-  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 3 of 3$", messages)))
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
   expect_true(isTRUE(getOption("np.messages")))
 })

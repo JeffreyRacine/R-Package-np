@@ -102,12 +102,17 @@
   elapsed <- max(0, now - state$started)
   eta <- if (isTRUE(done > 0) && isTRUE(total >= done)) elapsed * (total - done) / done else 0
 
+  progress_token <- if (isTRUE(state$bandwidth_multistart)) {
+    sprintf("multistart %s/%s", format(done), format(total))
+  } else {
+    sprintf("%s/%s", format(done), format(total))
+  }
+
   line <- sprintf(
-    "%s %s %s/%s (%s%%, elapsed %ss, eta %ss)",
+    "%s %s %s (%s%%, elapsed %ss, eta %ss)",
     state$pkg_prefix,
     state$label,
-    format(done),
-    format(total),
+    progress_token,
     .np_progress_fmt_num(pct),
     .np_progress_fmt_num(elapsed),
     .np_progress_fmt_num(eta)
@@ -280,7 +285,7 @@
 }
 
 .np_progress_bandwidth_detail <- function(done, total) {
-  sprintf("multistart %d of %d", as.integer(done)[1L], as.integer(total)[1L])
+  NULL
 }
 
 .np_progress_bandwidth_set_total <- function(total) {
@@ -304,6 +309,7 @@
   upgraded$last_emit <- state$started - upgraded$throttle_sec
   upgraded$start_note_pending <- state$start_note_pending
   upgraded$last_line <- state$last_line
+  upgraded$bandwidth_multistart <- TRUE
   if (!isTRUE(state$start_note_pending) && identical(state$last_line, state$start_note)) {
     upgraded$start_note_pending <- FALSE
   }
