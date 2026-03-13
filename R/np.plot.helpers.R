@@ -67,6 +67,67 @@
   max(1L, as.integer(ceiling(total / (max_intermediate + 1L))))
 }
 
+.np_plot_progress_warmup_chunk <- function(n, B, chunk.size) {
+  n <- as.integer(n)[1L]
+  B <- as.integer(B)[1L]
+  chunk.size <- as.integer(chunk.size)[1L]
+  if (is.na(n) || n < 1L || is.na(B) || B < 1L || is.na(chunk.size) || chunk.size < 1L)
+    return(1L)
+  if (!isTRUE(.np_plot_progress_enabled()))
+    return(min(B, chunk.size))
+
+  warmup.bytes <- 4 * 1024 * 1024
+  warmup.chunk <- as.integer(floor(warmup.bytes / (8 * n)))
+  if (!is.finite(warmup.chunk) || is.na(warmup.chunk) || warmup.chunk < 1L)
+    warmup.chunk <- 1L
+
+  min(B, chunk.size, warmup.chunk)
+}
+
+.np_plot_progress_chunk_controller <- function(chunk.size, progress = NULL) {
+  chunk.size <- as.integer(chunk.size)[1L]
+  if (is.na(chunk.size) || chunk.size < 1L)
+    chunk.size <- 1L
+
+  target.sec <- if (!is.null(progress)) {
+    suppressWarnings(as.numeric(progress$throttle_sec)[1L])
+  } else {
+    NA_real_
+  }
+
+  list(
+    chunk.size = chunk.size,
+    adaptive = isTRUE(.np_plot_progress_enabled()) &&
+      !is.null(progress) &&
+      is.finite(target.sec) &&
+      !is.na(target.sec) &&
+      target.sec > 0,
+    target.sec = target.sec
+  )
+}
+
+.np_plot_progress_chunk_observe <- function(controller, bsz, elapsed.sec) {
+  if (is.null(controller) || !isTRUE(controller$adaptive))
+    return(controller)
+
+  bsz <- as.integer(bsz)[1L]
+  elapsed.sec <- suppressWarnings(as.numeric(elapsed.sec)[1L])
+  target.sec <- suppressWarnings(as.numeric(controller$target.sec)[1L])
+  if (is.na(bsz) || bsz < 1L || !is.finite(elapsed.sec) || is.na(elapsed.sec) || elapsed.sec <= 0)
+    return(controller)
+  if (!is.finite(target.sec) || is.na(target.sec) || target.sec <= 0)
+    return(controller)
+
+  suggested <- as.integer(round(bsz * target.sec / elapsed.sec))
+  lower <- max(1L, as.integer(floor(bsz / 4L)))
+  upper <- max(lower, as.integer(ceiling(bsz * 4L)))
+  if (is.na(suggested) || suggested < 1L)
+    suggested <- lower
+
+  controller$chunk.size <- min(upper, max(lower, suggested))
+  controller
+}
+
 .np_plot_progress_checkpoints <- function(total) {
   total <- as.integer(total)
   max_intermediate <- .np_plot_progress_max_intermediate()
@@ -307,7 +368,8 @@
   chunk <- as.integer(floor(target.bytes / (8 * n)))
   if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
     chunk <- 1L
-  min(B, chunk, .np_plot_progress_chunk_cap(B))
+  chunk <- min(B, chunk, .np_plot_progress_chunk_cap(B))
+  .np_plot_progress_warmup_chunk(n = n, B = B, chunk.size = chunk)
 }
 
 .np_wild_boot_t <- function(H, fit.mean, residuals, B, wild = c("mammen", "rademacher")) {
@@ -328,16 +390,23 @@
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
 
   start <- 1L
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     draws <- draw.fun(n = n, B = bsz)
     ystar <- residuals * draws
     ystar <- ystar + fit.mean
     out[start:stopi, ] <- t(H %*% ystar)
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -444,6 +513,8 @@
     chunk <- 1L
   if (isTRUE(progress_cap) && isTRUE(.np_plot_progress_enabled()))
     chunk <- min(chunk, .np_plot_progress_chunk_cap(B))
+  if (isTRUE(progress_cap))
+    chunk <- .np_plot_progress_warmup_chunk(n = n, B = B, chunk.size = chunk)
   min(B, chunk)
 }
 
@@ -630,11 +701,13 @@
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
 
   start <- 1L
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.drawer)) {
       .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
     } else {
@@ -644,6 +717,11 @@
     num <- crossprod(counts.chunk, Wy)
     tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -1134,10 +1212,12 @@
     progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
     chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
     start <- 1L
     while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
       bsz <- stopi - start + 1L
+      chunk.started <- .np_progress_now()
       counts.chunk <- if (!is.null(counts.drawer)) {
         .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
       } else {
@@ -1145,6 +1225,11 @@
       }
       fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
       progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = bsz,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
       start <- stopi + 1L
     }
   }
@@ -1336,9 +1421,11 @@
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   if (is.null(counts.drawer))
     chunk.size <- min(chunk.size, .np_plot_progress_chunk_cap(B))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.mat)) {
       counts.mat[, start:stopi, drop = FALSE]
     } else if (!is.null(counts.drawer)) {
@@ -1356,6 +1443,11 @@
     }
 
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -1547,10 +1639,12 @@
     progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
     chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
     start <- 1L
     while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
       bsz <- stopi - start + 1L
+      chunk.started <- .np_progress_now()
       counts.chunk <- if (!is.null(counts.drawer)) {
         .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
       } else {
@@ -1558,6 +1652,11 @@
       }
       fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
       progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = bsz,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
       start <- stopi + 1L
     }
   }
@@ -1646,9 +1745,11 @@
 
   start <- 1L
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.mat)) {
       counts.mat[, start:stopi, drop = FALSE]
     } else if (!is.null(counts.drawer)) {
@@ -1666,6 +1767,11 @@
     }
 
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -1914,10 +2020,12 @@
     progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
     chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
     start <- 1L
     while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
       bsz <- stopi - start + 1L
+      chunk.started <- .np_progress_now()
       counts.chunk <- if (!is.null(counts.drawer)) {
         .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
       } else {
@@ -1925,6 +2033,11 @@
       }
       fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
       progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = bsz,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
       start <- stopi + 1L
     }
   }
@@ -2300,11 +2413,13 @@
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
 
   start <- 1L
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.drawer)) {
       .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
     } else {
@@ -2313,6 +2428,11 @@
 
     tmat[start:stopi, ] <- .np_apply_operator_counts(K = H, counts = counts.chunk)
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -2395,9 +2515,11 @@
 
   start <- 1L
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.mat)) {
       counts.mat[, start:stopi, drop = FALSE]
     } else if (!is.null(counts.drawer)) {
@@ -2416,6 +2538,11 @@
     }
 
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -2470,11 +2597,13 @@
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
 
   start <- 1L
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.drawer)) {
       .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
     } else {
@@ -2482,6 +2611,11 @@
     }
     tmat[start:stopi, ] <- .np_apply_operator_counts(K = K, counts = counts.chunk)
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -3185,10 +3319,12 @@
   }
 
   chunk.size <- .np_inid_chunk_size(n = state$n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
   start <- 1L
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.mat)) {
       counts.mat[, start:stopi, drop = FALSE]
     } else if (!is.null(counts.drawer)) {
@@ -3198,6 +3334,11 @@
     }
     fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -3370,9 +3511,11 @@
 
     start <- 1L
     chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
     while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
       bsz <- stopi - start + 1L
+      chunk.started <- .np_progress_now()
       counts.chunk <- if (!is.null(counts.mat)) {
         counts.mat[, start:stopi, drop = FALSE]
       } else if (!is.null(counts.drawer)) {
@@ -3396,6 +3539,11 @@
       }
 
       progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = bsz,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
       start <- stopi + 1L
     }
 
@@ -3413,9 +3561,11 @@
 
   start <- 1L
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.mat)) {
       counts.mat[, start:stopi, drop = FALSE]
     } else if (!is.null(counts.drawer)) {
@@ -3439,6 +3589,11 @@
     }
 
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -3528,11 +3683,13 @@
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
 
   start <- 1L
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.drawer)) {
       .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
     } else {
@@ -3542,6 +3699,11 @@
     num <- t(ops$num %*% counts.chunk)
     tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -4175,9 +4337,11 @@ plotFactor <- function(f, y, ...){
 
   start <- 1L
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.mat)) {
       counts.mat[, start:stopi, drop = FALSE]
     } else if (!is.null(counts.drawer)) {
@@ -4195,6 +4359,11 @@ plotFactor <- function(f, y, ...){
     }
 
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -4243,9 +4412,11 @@ plotFactor <- function(f, y, ...){
 
   start <- 1L
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.mat)) {
       counts.mat[, start:stopi, drop = FALSE]
     } else if (!is.null(counts.drawer)) {
@@ -4263,6 +4434,11 @@ plotFactor <- function(f, y, ...){
     }
 
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 

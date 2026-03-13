@@ -260,7 +260,8 @@ test_that("block-style plot bootstrap chunking is capped only when plot progress
     list(.np_progress_is_interactive = function() TRUE),
     chunk_size(n = 1000L, B = 9999L, progress_cap = TRUE)
   )
-  expect_identical(capped, 2500L)
+  expect_true(capped < 2500L)
+  expect_true(capped > 0L)
 })
 
 test_that("block-style unconditional bootstrap emits intermediate progress updates", {
@@ -353,6 +354,24 @@ test_that("block bootstrap drawer defers ts.array setup until chunk demand", {
   expect_identical(get(".np_test_ts_array_calls", envir = .GlobalEnv), 2L)
   expect_identical(dim(out2), c(12L, 2L))
   expect_true(all(colSums(out2) == 12L))
+})
+
+test_that("plot progress chunk controller adapts chunk size toward throttle interval", {
+  make_controller <- getFromNamespace(".np_plot_progress_chunk_controller", "np")
+  observe_controller <- getFromNamespace(".np_plot_progress_chunk_observe", "np")
+
+  old_opts <- options(np.messages = TRUE, np.plot.progress = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  controller <- make_controller(chunk.size = 1000L, progress = list(throttle_sec = 0.5))
+  controller$adaptive <- TRUE
+  slower <- observe_controller(controller = controller, bsz = 1000L, elapsed.sec = 10)
+  expect_true(slower$chunk.size < 1000L)
+  expect_true(slower$chunk.size >= 250L)
+
+  slower$adaptive <- TRUE
+  faster <- observe_controller(controller = slower, bsz = slower$chunk.size, elapsed.sec = 0.05)
+  expect_true(faster$chunk.size > slower$chunk.size)
 })
 
 test_that("heavy plot helpers invoke delayed activity notifications", {
