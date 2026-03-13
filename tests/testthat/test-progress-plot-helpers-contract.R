@@ -242,6 +242,59 @@ test_that("plot helper activity yields the line to nested bounded progress", {
   expect_true(any(grepl("^\\[np\\] Plot bootstrap inid 4/4 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })
 
+test_that("block-style plot bootstrap chunking is capped only when plot progress is active", {
+  chunk_size <- getFromNamespace(".np_inid_chunk_size", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.max.intermediate = 3L,
+    np.plot.inid.chunk.size = NULL
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  expect_identical(chunk_size(n = 1000L, B = 9999L, progress_cap = FALSE), 8388L)
+  expect_identical(chunk_size(n = 1000L, B = 9999L, progress_cap = TRUE), 8388L)
+
+  capped <- with_np_progress_bindings(
+    list(.np_progress_is_interactive = function() TRUE),
+    chunk_size(n = 1000L, B = 9999L, progress_cap = TRUE)
+  )
+  expect_identical(capped, 2500L)
+})
+
+test_that("block-style unconditional bootstrap emits intermediate progress updates", {
+  helper <- getFromNamespace(".np_inid_lc_boot_from_hat", "np")
+  counts.drawer <- function(start, stopi) {
+    matrix(1L, nrow = 4L, ncol = stopi - start + 1L)
+  }
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 3L,
+    np.plot.inid.chunk.size = NULL
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    helper(
+      H = diag(4L),
+      ydat = c(1, 2, 3, 4),
+      B = 9L,
+      counts.drawer = counts.drawer
+    ),
+    now = progress_time_counter()
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap block 3/9 \\(", lines)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap block 6/9 \\(", lines)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap block 9/9 \\(", lines)))
+})
+
 test_that("heavy plot helpers invoke delayed activity notifications", {
   regression.eval <- getFromNamespace(".np_plot_regression_eval", "np")
   unconditional.eval <- getFromNamespace(".np_plot_unconditional_eval", "np")

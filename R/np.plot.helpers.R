@@ -426,7 +426,7 @@
   all.bp
 }
 
-.np_inid_chunk_size <- function(n, B) {
+.np_inid_chunk_size <- function(n, B, progress_cap = FALSE) {
   chunk.opt <- getOption("np.plot.inid.chunk.size")
   if (!is.null(chunk.opt)) {
     chunk.opt <- as.integer(chunk.opt)
@@ -442,6 +442,8 @@
   chunk <- as.integer(floor(target.bytes / (8 * n)))
   if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
     chunk <- 1L
+  if (isTRUE(progress_cap) && isTRUE(.np_plot_progress_enabled()))
+    chunk <- min(chunk, .np_plot_progress_chunk_cap(B))
   min(B, chunk)
 }
 
@@ -606,7 +608,7 @@
     ))
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = nrow(H))
   progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
@@ -1117,7 +1119,7 @@
     fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
     progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
     start <- 1L
     while (start <= B) {
       stopi <- min(B, start + chunk.size - 1L)
@@ -1317,7 +1319,7 @@
   }, add = TRUE)
 
   start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   if (is.null(counts.drawer))
     chunk.size <- min(chunk.size, .np_plot_progress_chunk_cap(B))
   while (start <= B) {
@@ -1530,7 +1532,7 @@
     fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
     progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
     start <- 1L
     while (start <= B) {
       stopi <- min(B, start + chunk.size - 1L)
@@ -1629,7 +1631,7 @@
   }, add = TRUE)
 
   start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
@@ -1897,7 +1899,7 @@
     fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
     progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
     start <- 1L
     while (start <= B) {
       stopi <- min(B, start + chunk.size - 1L)
@@ -2277,7 +2279,7 @@
     return(list(t = .np_apply_operator_counts(K = H, counts = counts.mat), t0 = t0))
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
@@ -2378,7 +2380,7 @@
   }, add = TRUE)
 
   start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
@@ -2447,7 +2449,7 @@
     return(list(t = .np_apply_operator_counts(K = K, counts = counts.mat), t0 = t0))
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
@@ -3168,7 +3170,7 @@
     NULL
   }
 
-  chunk.size <- .np_inid_chunk_size(n = state$n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = state$n, B = B, progress_cap = !is.null(counts.drawer))
   start <- 1L
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
@@ -3353,7 +3355,7 @@
     }, add = TRUE)
 
     start <- 1L
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
     while (start <= B) {
       stopi <- min(B, start + chunk.size - 1L)
       bsz <- stopi - start + 1L
@@ -3396,7 +3398,7 @@
   }, add = TRUE)
 
   start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
@@ -3505,7 +3507,7 @@
     return(list(t = num / pmax(den, .Machine$double.eps), t0 = t0))
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
@@ -4158,7 +4160,7 @@ plotFactor <- function(f, y, ...){
   }, add = TRUE)
 
   start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
@@ -4226,7 +4228,7 @@ plotFactor <- function(f, y, ...){
   }, add = TRUE)
 
   start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
