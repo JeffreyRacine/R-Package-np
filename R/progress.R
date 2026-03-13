@@ -116,7 +116,7 @@
 }
 
 .np_progress_single_line_surfaces <- function() {
-  c("bandwidth", "plot_activity")
+  c("bandwidth", "plot_activity", "plot_bounded")
 }
 
 .np_progress_renderer_for_surface <- function(surface, capability) {
@@ -618,6 +618,22 @@
   )
 
   invisible(NULL)
+}
+
+.np_progress_signal_from_c <- function(event, surface, current = NULL, total = NULL) {
+  event <- as.character(event)[1L]
+  surface <- as.character(surface)[1L]
+
+  if (is.na(event) || is.na(surface)) {
+    return(invisible(FALSE))
+  }
+
+  if (identical(event, "bandwidth_multistart_step") && identical(surface, "bandwidth")) {
+    .np_progress_bandwidth_multistart_step(done = current, total = total)
+    return(invisible(TRUE))
+  }
+
+  invisible(FALSE)
 }
 
 .np_progress_bandwidth_finish <- function() {

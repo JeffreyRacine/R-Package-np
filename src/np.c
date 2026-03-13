@@ -134,14 +134,14 @@ static double bwm_eval_count = 0.0;
 static double bwm_invalid_count = 0.0;
 static double bwm_fast_eval_count = 0.0;
 
-static void np_progress_bandwidth_multistart_step(const int done, const int total)
+static void np_progress_signal(const char *event, const char *surface, const int current, const int total)
 {
   SEXP ns = R_NilValue;
   SEXP fn = R_NilValue;
   SEXP call = R_NilValue;
   int err = 0;
 
-  if (done < 1 || total <= 1)
+  if (event == NULL || surface == NULL)
     return;
 
   PROTECT(ns = R_FindNamespace(Rf_ScalarString(Rf_mkChar("np"))));
@@ -150,15 +150,48 @@ static void np_progress_bandwidth_multistart_step(const int done, const int tota
     return;
   }
 
-  PROTECT(fn = Rf_findVarInFrame(ns, Rf_install(".np_progress_bandwidth_multistart_step")));
+  PROTECT(fn = Rf_findVarInFrame(ns, Rf_install(".np_progress_signal_from_c")));
   if (fn == R_UnboundValue) {
     UNPROTECT(2);
     return;
   }
 
-  PROTECT(call = Rf_lang3(fn, Rf_ScalarInteger(done), Rf_ScalarInteger(total)));
+  PROTECT(call = Rf_lang5(fn,
+                          Rf_mkString(event),
+                          Rf_mkString(surface),
+                          Rf_ScalarInteger(current),
+                          Rf_ScalarInteger(total)));
   R_tryEval(call, ns, &err);
   UNPROTECT(3);
+}
+
+SEXP C_np_progress_signal(SEXP event, SEXP surface, SEXP current, SEXP total)
+{
+  const char *event_c = NULL;
+  const char *surface_c = NULL;
+  int current_i = 0;
+  int total_i = 0;
+
+  if (TYPEOF(event) != STRSXP || XLENGTH(event) < 1 ||
+      TYPEOF(surface) != STRSXP || XLENGTH(surface) < 1)
+    error("C_np_progress_signal: event and surface must be character scalars");
+
+  event_c = CHAR(STRING_ELT(event, 0));
+  surface_c = CHAR(STRING_ELT(surface, 0));
+  current_i = Rf_asInteger(current);
+  total_i = Rf_asInteger(total);
+
+  np_progress_signal(event_c, surface_c, current_i, total_i);
+
+  return R_NilValue;
+}
+
+static void np_progress_bandwidth_multistart_step(const int done, const int total)
+{
+  if (done < 1 || total <= 1)
+    return;
+
+  np_progress_signal("bandwidth_multistart_step", "bandwidth", done, total);
 }
 
 static void resolve_bounds_or_default(SEXP lb_r, SEXP ub_r, int ncon, double ** lb_p, double ** ub_p)

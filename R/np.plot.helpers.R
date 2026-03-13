@@ -71,7 +71,7 @@
     return(NULL)
 
   label <- as.character(label)[1L]
-  state <- .np_progress_begin(label = label, total = total, domain = "plot")
+  state <- .np_progress_begin(label = label, total = total, domain = "plot", surface = "plot_bounded")
   state$enabled <- isTRUE(.np_plot_progress_enabled())
   state$throttle_sec <- .np_plot_progress_interval_sec()
   state$last_emit <- state$started - state$throttle_sec

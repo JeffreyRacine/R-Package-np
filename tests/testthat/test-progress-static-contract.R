@@ -214,7 +214,17 @@ test_that("compiled multistart spinner no longer emits legacy redraw output", {
 
   expect_false(grepl("Rprintf\\(\"\\\\rMultistart", src))
   expect_false(grepl("Rprintf\\(\"\\\\r +\\\\r\"", src))
+  expect_true(grepl("SEXP C_np_progress_signal\\(", src))
+  expect_true(grepl("\\.np_progress_signal_from_c", src))
   expect_true(grepl("np_progress_bandwidth_multistart_step\\(", src))
+})
+
+test_that("compiled progress bridge is registered narrowly", {
+  src_path <- testthat::test_path("..", "..", "src", "np_init.c")
+  skip_if_not(file.exists(src_path), "source C files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("\"C_np_progress_signal\"", src, fixed = TRUE))
 })
 
 test_that("compiled working-status redraw is removed", {

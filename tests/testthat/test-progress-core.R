@@ -303,3 +303,42 @@ test_that("bandwidth selection helper suppresses legacy output and drives bounde
   expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(isTRUE(getOption("np.messages")))
 })
+
+test_that("compiled progress bridge feeds the bounded bandwidth sink", {
+  select_bw <- getFromNamespace(".np_progress_select_bandwidth", "np")
+
+  old_opts <- options(np.messages = TRUE, np.progress.start.grace.known.sec = 0)
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      value <- select_bw("Selecting regression bandwidth", {
+        .Call(
+          "C_np_progress_signal",
+          "bandwidth_multistart_step",
+          "bandwidth",
+          1L,
+          3L,
+          PACKAGE = "np"
+        )
+        .Call(
+          "C_np_progress_signal",
+          "bandwidth_multistart_step",
+          "bandwidth",
+          3L,
+          3L,
+          PACKAGE = "np"
+        )
+        11
+      })
+      expect_identical(value, 11)
+    },
+    now = progress_time_values(c(0, 1.1, 2.2, 3.3))
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth\\.\\.\\.$", lines)))
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+})
