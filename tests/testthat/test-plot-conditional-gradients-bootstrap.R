@@ -1,116 +1,71 @@
-test_that("conditional density/distribution gradient bootstrap inid fails fast for bandwidth objects", {
+test_that("conditional density/distribution gradient bootstrap inid works for bandwidth objects", {
   skip_if_not_installed("np")
+
+  library(np)
 
   set.seed(20260225)
-  n <- 40L
-  x1 <- rnorm(n)
+  n <- 24L
+  x1 <- factor(sample(c("a", "b"), n, replace = TRUE))
   x2 <- rnorm(n)
   y <- rnorm(n)
 
   xdat <- data.frame(x1 = x1, x2 = x2)
   ydat <- data.frame(y = y)
 
-  bw.cd <- npcdensbw(
-    xdat = xdat,
-    ydat = ydat,
-    bws = c(0.45, 0.45, 0.45),
-    bandwidth.compute = FALSE
-  )
-  bw.cdist <- npcdistbw(
-    xdat = xdat,
-    ydat = ydat,
-    bws = c(0.45, 0.45, 0.45),
-    bandwidth.compute = FALSE
-  )
+  bw.cd <- suppressWarnings(npcdensbw(xdat = xdat, ydat = ydat, nmulti = 1L))
+  bw.cdist <- suppressWarnings(npcdistbw(xdat = xdat, ydat = ydat, nmulti = 1L))
 
-  expect_error(
-    suppressWarnings(
+  for (obj in list(bw.cd, bw.cdist)) {
+    out <- suppressWarnings(
       plot(
-        bw.cd,
+        obj,
+        xdat = xdat,
+        ydat = ydat,
         plot.behavior = "data",
         perspective = FALSE,
         gradients = TRUE,
         plot.errors.method = "bootstrap",
         plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 5
+        plot.errors.boot.num = 5L
       )
-    ),
-    "inid conditional helper unavailable",
-    fixed = TRUE
-  )
-  expect_error(
-    suppressWarnings(
-      plot(
-        bw.cdist,
-        plot.behavior = "data",
-        perspective = FALSE,
-        gradients = TRUE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 5
-      )
-    ),
-    "inid conditional helper unavailable",
-    fixed = TRUE
-  )
+    )
+    expect_type(out, "list")
+    expect_true(length(out[[1L]]$bxp) > 0L)
+  }
 })
 
-test_that("conditional density/distribution gradient bootstrap inid fails fast for fitted objects", {
+test_that("conditional density/distribution gradient bootstrap inid works for fitted objects", {
   skip_if_not_installed("np")
 
+  library(np)
+
   set.seed(20260226)
-  n <- 35L
-  x1 <- rnorm(n)
+  n <- 24L
+  x1 <- factor(sample(c("a", "b"), n, replace = TRUE))
   x2 <- rnorm(n)
   y <- rnorm(n)
 
   xdat <- data.frame(x1 = x1, x2 = x2)
   ydat <- data.frame(y = y)
 
-  bw.cd <- npcdensbw(
-    xdat = xdat,
-    ydat = ydat,
-    bws = c(0.5, 0.5, 0.5),
-    bandwidth.compute = FALSE
-  )
-  bw.cdist <- npcdistbw(
-    xdat = xdat,
-    ydat = ydat,
-    bws = c(0.5, 0.5, 0.5),
-    bandwidth.compute = FALSE
-  )
-
+  bw.cd <- suppressWarnings(npcdensbw(xdat = xdat, ydat = ydat, nmulti = 1L))
+  bw.cdist <- suppressWarnings(npcdistbw(xdat = xdat, ydat = ydat, nmulti = 1L))
   fit.cd <- npcdens(bws = bw.cd)
   fit.cdist <- npcdist(bws = bw.cdist)
 
-  expect_error(
-    suppressWarnings(
+  for (obj in list(fit.cd, fit.cdist)) {
+    out <- suppressWarnings(
       plot(
-        fit.cd,
+        obj,
         plot.behavior = "data",
         perspective = FALSE,
         gradients = TRUE,
         plot.errors.method = "bootstrap",
         plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 5
+        plot.errors.boot.num = 5L
       )
-    ),
-    "inid conditional helper unavailable",
-    fixed = TRUE
-  )
-  expect_error(
-    suppressWarnings(
-      plot(
-        fit.cdist,
-        plot.behavior = "data",
-        perspective = FALSE,
-        gradients = TRUE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 5
-      )
-    ),
-    "inid conditional helper unavailable",
-    fixed = TRUE
-  )
+    )
+    expect_type(out, "list")
+    expect_true(length(out[[1L]]$bxp) > 0L)
+  }
 })
