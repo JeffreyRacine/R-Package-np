@@ -70,6 +70,48 @@ test_that("plot engine startup helper respects plot.par.mfrow option override", 
   expect_true(is.list(state$oldpar))
 })
 
+test_that("unconditional interval payload helper preserves bootstrap and asymptotic semantics", {
+  skip_if_not_installed("np")
+
+  payload <- getFromNamespace(".np_plot_interval_payload", "np")
+
+  boot.raw <- list(
+    boot.err = cbind(c(0.2, 0.3), c(0.4, 0.5), c(1.2, 1.8)),
+    boot.all.err = list(pointwise = cbind(c(0.2, 0.3), c(0.4, 0.5))),
+    bxp = list(stats = matrix(1, nrow = 5, ncol = 1))
+  )
+
+  boot.out <- payload(
+    estimate = c(1, 2),
+    se = c(0.1, 0.2),
+    plot.errors.method = "bootstrap",
+    plot.errors.alpha = 0.05,
+    plot.errors.type = "all",
+    plot.errors.center = "bias-corrected",
+    bootstrap_raw = boot.raw
+  )
+
+  expect_equal(boot.out$err, boot.raw$boot.err)
+  expect_identical(boot.out$all.err, boot.raw$boot.all.err)
+  expect_identical(boot.out$center, boot.raw$boot.err[,3])
+  expect_identical(boot.out$bxp, boot.raw$bxp)
+
+  asym.out <- payload(
+    estimate = c(1, 2),
+    se = c(0.1, 0.2),
+    plot.errors.method = "asymptotic",
+    plot.errors.alpha = 0.05,
+    plot.errors.type = "pointwise",
+    plot.errors.center = "estimate",
+    bootstrap_raw = NULL
+  )
+
+  expect_identical(asym.out$center, c(1, 2))
+  expect_equal(dim(asym.out$err), c(2L, 3L))
+  expect_true(all(is.na(asym.out$err[,3])))
+  expect_identical(asym.out$bxp, list())
+})
+
 test_that("bandwidth and dbandwidth engines preserve data vs plot-data payloads", {
   skip_if_not_installed("np")
 

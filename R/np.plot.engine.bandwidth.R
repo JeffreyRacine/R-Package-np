@@ -159,54 +159,41 @@
       tdens = matrix(data = tobj$dens,
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-      terr = matrix(data = tobj$derr, nrow = nrow(x.eval), ncol = 3)
-      terr[,3] = NA
-      
+      terr.payload <- .np_plot_interval_payload(
+        estimate = tobj$dens,
+        se = tobj$derr,
+        plot.errors.method = plot.errors.method,
+        plot.errors.alpha = plot.errors.alpha,
+        plot.errors.type = plot.errors.type,
+        plot.errors.center = plot.errors.center,
+        bootstrap_raw = if (identical(plot.errors.method, "bootstrap")) {
+          compute.bootstrap.errors(
+            xdat = xdat,
+            exdat = x.eval,
+            cdf = FALSE,
+            slice.index = 0,
+            plot.errors.boot.method = plot.errors.boot.method,
+            plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+            plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+            plot.errors.boot.num = plot.errors.boot.num,
+            plot.errors.center = plot.errors.center,
+            plot.errors.type = plot.errors.type,
+            plot.errors.alpha = plot.errors.alpha,
+            bws = bws
+          )
+        } else {
+          NULL
+        }
+      )
+
+      terr <- terr.payload$err
+      terr.all <- terr.payload$all.err
+      center.val <- terr.payload$center
+
       lerr.all <- NULL
       herr.all <- NULL
 
-      if (plot.errors.method == "bootstrap"){
-        terr.obj <- compute.bootstrap.errors(xdat = xdat, 
-          exdat = x.eval,
-          cdf = FALSE,
-          slice.index = 0,
-          plot.errors.boot.method = plot.errors.boot.method,
-          plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
-          plot.errors.boot.blocklen = plot.errors.boot.blocklen,
-          plot.errors.boot.num = plot.errors.boot.num,
-          plot.errors.center = plot.errors.center,
-          plot.errors.type = plot.errors.type,
-          plot.errors.alpha = plot.errors.alpha,
-          bws = bws)
-        terr <- terr.obj[["boot.err"]]
-        terr.all <- terr.obj[["boot.all.err"]]
-
-        pc = (plot.errors.center == "bias-corrected")
-        center.val <- if (pc) terr[,3] else tobj$dens
-
-        lerr = matrix(data = center.val - terr[,1],
-          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
-
-        herr = matrix(data = center.val + terr[,2],
-          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
-
-        if (plot.errors.type == "all" && !is.null(terr.all)) {
-          lerr.all <- lapply(terr.all, function(te)
-            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
-          herr.all <- lapply(terr.all, function(te)
-            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
-        }
-
-      } else if (plot.errors.method == "asymptotic") {
-        terr.obj <- .np_plot_asymptotic_error_from_se(
-          se = tobj$derr,
-          alpha = plot.errors.alpha,
-          band.type = plot.errors.type,
-          m = nrow(x.eval)
-        )
-        terr[,1:2] <- terr.obj$err
-        terr.all <- terr.obj$all.err
-        center.val <- tobj$dens
+      if (plot.errors) {
         lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
@@ -439,36 +426,38 @@
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){
-          if (plot.errors.method == "asymptotic") {
-            asym.obj <- .np_plot_asymptotic_error_from_se(
-              se = tobj$derr,
-              alpha = plot.errors.alpha,
-              band.type = plot.errors.type,
-              m = xi.neval
-            )
-            temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
-            temp.all.err <- asym.obj$all.err
-          } else if (plot.errors.method == "bootstrap"){
-            temp.boot.raw <- compute.bootstrap.errors(
-                      xdat = xdat,
-                      exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-                      cdf = FALSE,
-                      slice.index = i,
-                      plot.errors.boot.method = plot.errors.boot.method,
-                      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
-                      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
-                      plot.errors.boot.num = plot.errors.boot.num,
-                      plot.errors.center = plot.errors.center,
-                      plot.errors.type = plot.errors.type,
-                      plot.errors.alpha = plot.errors.alpha,
-                      bws = bws)
-            temp.err[seq_len(xi.neval),] = temp.boot.raw[["boot.err"]]
-            temp.all.err <- temp.boot.raw[["boot.all.err"]]
-            temp.boot <- temp.boot.raw[["bxp"]]
-            if (!plot.bxp.out){
-              temp.boot$out <- numeric()
-              temp.boot$group <- integer()
+          temp.payload <- .np_plot_interval_payload(
+            estimate = temp.dens[seq_len(xi.neval)],
+            se = tobj$derr,
+            plot.errors.method = plot.errors.method,
+            plot.errors.alpha = plot.errors.alpha,
+            plot.errors.type = plot.errors.type,
+            plot.errors.center = plot.errors.center,
+            bootstrap_raw = if (identical(plot.errors.method, "bootstrap")) {
+              compute.bootstrap.errors(
+                xdat = xdat,
+                exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                cdf = FALSE,
+                slice.index = i,
+                plot.errors.boot.method = plot.errors.boot.method,
+                plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+                plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+                plot.errors.boot.num = plot.errors.boot.num,
+                plot.errors.center = plot.errors.center,
+                plot.errors.type = plot.errors.type,
+                plot.errors.alpha = plot.errors.alpha,
+                bws = bws
+              )
+            } else {
+              NULL
             }
+          )
+          temp.err[seq_len(xi.neval),] <- temp.payload$err
+          temp.all.err <- temp.payload$all.err
+          temp.boot <- temp.payload$bxp
+          if (identical(plot.errors.method, "bootstrap") && !plot.bxp.out){
+            temp.boot$out <- numeric()
+            temp.boot$group <- integer()
           }
         }
         

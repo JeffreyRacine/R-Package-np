@@ -217,6 +217,46 @@
   )
 }
 
+.np_plot_interval_payload <- function(estimate,
+                                      se,
+                                      plot.errors.method,
+                                      plot.errors.alpha,
+                                      plot.errors.type,
+                                      plot.errors.center,
+                                      bootstrap_raw = NULL) {
+  err <- matrix(data = se, nrow = length(estimate), ncol = 3)
+  err[,3] <- NA_real_
+  all.err <- NULL
+  center <- estimate
+  bxp <- list()
+
+  if (identical(plot.errors.method, "bootstrap")) {
+    if (is.null(bootstrap_raw))
+      stop("bootstrap interval payload requires bootstrap_raw")
+
+    err <- bootstrap_raw[["boot.err"]]
+    all.err <- bootstrap_raw[["boot.all.err"]]
+    center <- if (identical(plot.errors.center, "bias-corrected")) err[,3] else estimate
+    bxp <- bootstrap_raw[["bxp"]]
+  } else if (identical(plot.errors.method, "asymptotic")) {
+    asym.obj <- .np_plot_asymptotic_error_from_se(
+      se = se,
+      alpha = plot.errors.alpha,
+      band.type = plot.errors.type,
+      m = length(estimate)
+    )
+    err[,1:2] <- asym.obj$err
+    all.err <- asym.obj$all.err
+  }
+
+  list(
+    err = err,
+    all.err = all.err,
+    center = center,
+    bxp = bxp
+  )
+}
+
 .np_plot_layout_begin <- function(plot.behavior, plot.par.mfrow, mfrow) {
   list(
     pending = isTRUE(plot.behavior != "data" && plot.par.mfrow),
