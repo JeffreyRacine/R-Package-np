@@ -4,10 +4,11 @@ test_that("progress core avoids legacy emitters", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_false(grepl("\\bcat\\(", src))
   expect_false(grepl("\\bprint\\(", src))
   expect_true(grepl("\\.np_progress_select_bandwidth <- function\\(", src))
   expect_true(grepl("\\.np_warning <- function\\(", src))
+  expect_true(grepl("\\.np_progress_render_single_line <- function\\(", src))
+  expect_true(grepl("base::cat\\(", src))
 })
 
 test_that("R layer routes warnings through unified helper", {
@@ -181,7 +182,7 @@ test_that("npindexbw no longer uses legacy console helpers", {
   expect_true(grepl("\\.np_progress_bandwidth_multistart_step\\(done = i, total = nmulti\\)", src))
 })
 
-test_that("npscoefbw multistart path uses append-only progress core", {
+test_that("npscoefbw multistart path uses central progress core", {
   src_path <- testthat::test_path("..", "..", "R", "np.smoothcoef.bw.R")
   skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
@@ -194,7 +195,7 @@ test_that("npscoefbw multistart path uses append-only progress core", {
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
 })
 
-test_that("plot helpers use append-only progress core", {
+test_that("plot helpers use central progress core", {
   src_path <- testthat::test_path("..", "..", "R", "np.plot.helpers.R")
   skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")

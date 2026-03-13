@@ -141,19 +141,32 @@ test_that("plot helper activity delays its note until grace elapses", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  messages <- with_np_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_now = progress_time_values(c(0, 1.0))
-    ),
-    capture_messages_only({
+  legacy <- capture_progress_shadow_trace(
+    {
       activity <- begin("Constructing bootstrap bands")
       finish(activity)
-    })
+    },
+    force_renderer = "legacy",
+    now = progress_time_values(c(0, 1.0))
   )
 
-  messages <- normalize_messages(messages)
-  expect_identical(messages, "[np] Constructing bootstrap bands...")
+  actual <- capture_progress_shadow_trace(
+    {
+      activity <- begin("Constructing bootstrap bands")
+      finish(activity)
+    },
+    now = progress_time_values(c(0, 1.0))
+  )
+
+  expect_identical(
+    vapply(actual$trace, `[[`, character(1L), "line"),
+    vapply(legacy$trace, `[[`, character(1L), "line")
+  )
+  expect_identical(
+    vapply(actual$trace, `[[`, character(1L), "line"),
+    rep("[np] Constructing bootstrap bands...", 2L)
+  )
+  expect_identical(vapply(actual$trace, `[[`, character(1L), "event"), c("render", "finish"))
 })
 
 test_that("plot helper activity stays silent below grace", {
@@ -167,18 +180,15 @@ test_that("plot helper activity stays silent below grace", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  messages <- with_np_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_now = progress_time_values(c(0, 0.2))
-    ),
-    capture_messages_only({
+  actual <- capture_progress_shadow_trace(
+    {
       activity <- begin("Constructing bootstrap bands")
       finish(activity)
-    })
+    },
+    now = progress_time_values(c(0, 0.2))
   )
 
-  expect_length(messages, 0)
+  expect_length(actual$trace, 0)
 })
 
 test_that("heavy plot helpers invoke delayed activity notifications", {

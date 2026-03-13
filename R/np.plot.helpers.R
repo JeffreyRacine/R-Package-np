@@ -140,7 +140,7 @@
     return(NULL)
 
   label <- as.character(label)[1L]
-  state <- .np_progress_begin(label = label, domain = "plot")
+  state <- .np_progress_begin(label = label, domain = "plot", surface = "plot_activity")
   state$enabled <- isTRUE(.np_plot_progress_enabled())
   state$throttle_sec <- Inf
   state$last_emit <- state$started - state$throttle_sec
@@ -152,7 +152,8 @@
   if (is.null(state))
     return(invisible(NULL))
 
-  .np_progress_maybe_emit_start_note(state = state, now = .np_progress_now())
+  state <- .np_progress_maybe_emit_start_note(state = state, now = .np_progress_now())
+  .np_progress_end(state)
   invisible(NULL)
 }
 

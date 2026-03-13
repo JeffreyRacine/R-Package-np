@@ -1,59 +1,3 @@
-with_np_bindings <- function(bindings, code) {
-  code <- substitute(code)
-  ns <- asNamespace("np")
-  old <- lapply(names(bindings), function(name) get(name, envir = ns, inherits = FALSE))
-  names(old) <- names(bindings)
-
-  for (name in names(bindings)) {
-    was_locked <- bindingIsLocked(name, ns)
-    if (was_locked) {
-      unlockBinding(name, ns)
-    }
-    assign(name, bindings[[name]], envir = ns)
-    if (was_locked) {
-      lockBinding(name, ns)
-    }
-  }
-
-  on.exit({
-    for (name in names(old)) {
-      was_locked <- bindingIsLocked(name, ns)
-      if (was_locked) {
-        unlockBinding(name, ns)
-      }
-      assign(name, old[[name]], envir = ns)
-      if (was_locked) {
-        lockBinding(name, ns)
-      }
-    }
-  }, add = TRUE)
-
-  eval(code, envir = parent.frame())
-}
-
-capture_progress_conditions <- function(expr) {
-  messages <- character()
-  warnings <- character()
-
-  value <- withCallingHandlers(
-    expr,
-    message = function(m) {
-      messages <<- c(messages, conditionMessage(m))
-      invokeRestart("muffleMessage")
-    },
-    warning = function(w) {
-      warnings <<- c(warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
-
-  list(value = value, messages = messages, warnings = warnings)
-}
-
-normalize_messages <- function(x) {
-  sub("\n$", "", x)
-}
-
 progress_time_counter <- function(start = 0, by = 2.1) {
   current <- start
   function() {
@@ -62,7 +6,11 @@ progress_time_counter <- function(start = 0, by = 2.1) {
   }
 }
 
-test_that("npscoefbw emits append-only multistart and objective progress", {
+shadow_lines <- function(shadow) {
+  vapply(shadow$trace, `[[`, character(1L), "line")
+}
+
+test_that("npscoefbw uses single-line multistart with legacy objective progress", {
   set.seed(3240)
   n <- 65
   x <- runif(n)
@@ -72,31 +20,42 @@ test_that("npscoefbw emits append-only multistart and objective progress", {
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_np_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_now = progress_time_counter()
+  legacy <- capture_progress_shadow_trace(
+    npscoefbw(
+      xdat = data.frame(x = x),
+      zdat = data.frame(z = z),
+      ydat = y,
+      regtype = "lc",
+      nmulti = 2,
+      optim.maxit = 10,
+      cv.iterate = FALSE
     ),
-    capture_progress_conditions(
-      npscoefbw(
-        xdat = data.frame(x = x),
-        zdat = data.frame(z = z),
-        ydat = y,
-        regtype = "lc",
-        nmulti = 2,
-        optim.maxit = 10,
-        cv.iterate = FALSE
-      )
-    )
+    force_renderer = "legacy",
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(res$messages)
+  set.seed(3240)
+  actual <- capture_progress_shadow_trace(
+    npscoefbw(
+      xdat = data.frame(x = x),
+      zdat = data.frame(z = z),
+      ydat = y,
+      regtype = "lc",
+      nmulti = 2,
+      optim.maxit = 10,
+      cv.iterate = FALSE
+    ),
+    now = progress_time_counter()
+  )
 
-  expect_s3_class(res$value, "scbandwidth")
-  expect_true(any(grepl("^\\[np\\] Selecting smooth coefficient bandwidth multistart 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[np\\] Selecting smooth coefficient bandwidth multistart 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[np\\] Optimizing smooth coefficient bandwidth\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s: multistart 1$", messages)))
-  expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
+  bandwidth_lines <- shadow_lines(actual)[grepl("^\\[np\\] Selecting smooth coefficient bandwidth", shadow_lines(actual))]
+  legacy_bandwidth_lines <- shadow_lines(legacy)[grepl("^\\[np\\] Selecting smooth coefficient bandwidth", shadow_lines(legacy))]
+
+  expect_s3_class(actual$value, "scbandwidth")
+  expect_equal(bandwidth_lines, legacy_bandwidth_lines)
+  expect_true(any(grepl("^\\[np\\] Selecting smooth coefficient bandwidth multistart 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Selecting smooth coefficient bandwidth multistart 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Optimizing smooth coefficient bandwidth\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s: multistart 1$", shadow_lines(actual))))
 })
 
 test_that("npscoefbw progress respects np.messages FALSE", {
@@ -109,28 +68,23 @@ test_that("npscoefbw progress respects np.messages FALSE", {
   old_opts <- options(np.messages = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_np_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_now = progress_time_counter()
+  silent <- capture_progress_shadow_trace(
+    npscoefbw(
+      xdat = data.frame(x = x),
+      zdat = data.frame(z = z),
+      ydat = y,
+      regtype = "lc",
+      nmulti = 1,
+      optim.maxit = 5,
+      cv.iterate = FALSE
     ),
-    capture_progress_conditions(
-      npscoefbw(
-        xdat = data.frame(x = x),
-        zdat = data.frame(z = z),
-        ydat = y,
-        regtype = "lc",
-        nmulti = 1,
-        optim.maxit = 5,
-        cv.iterate = FALSE
-      )
-    )
+    now = progress_time_counter()
   )
 
-  expect_length(res$messages, 0)
+  expect_length(silent$trace, 0L)
 })
 
-test_that("npscoefbw cv.iterate path emits append-only backfitting progress", {
+test_that("npscoefbw cv.iterate path retains legacy backfitting progress semantics", {
   set.seed(3240)
   n <- 65
   x <- runif(n)
@@ -140,30 +94,24 @@ test_that("npscoefbw cv.iterate path emits append-only backfitting progress", {
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_np_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_now = progress_time_counter()
+  actual <- capture_progress_shadow_trace(
+    npscoefbw(
+      xdat = data.frame(x = x),
+      zdat = data.frame(z = z),
+      ydat = y,
+      regtype = "lc",
+      nmulti = 1,
+      optim.maxit = 5,
+      cv.iterate = TRUE,
+      cv.num.iterations = 2,
+      backfit.iterate = FALSE
     ),
-    capture_progress_conditions(
-      npscoefbw(
-        xdat = data.frame(x = x),
-        zdat = data.frame(z = z),
-        ydat = y,
-        regtype = "lc",
-        nmulti = 1,
-        optim.maxit = 5,
-        cv.iterate = TRUE,
-        cv.num.iterations = 2,
-        backfit.iterate = FALSE
-      )
-    )
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(res$messages)
+  lines <- shadow_lines(actual)
 
-  expect_s3_class(res$value, "scbandwidth")
-  expect_true(any(grepl("^\\[np\\] Backfitting smooth coefficient bandwidth 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): iteration 1 of 2$", messages)))
-  expect_true(any(grepl("^\\[np\\] Optimizing partial residual bandwidth\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s: backfitting iteration [0-9]+ of 2, partial residual [0-9]+ of 2, fval ", messages)))
-  expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
+  expect_s3_class(actual$value, "scbandwidth")
+  expect_true(any(grepl("^\\[np\\] Backfitting smooth coefficient bandwidth 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): iteration 1 of 2$", lines)))
+  expect_true(any(grepl("^\\[np\\] Optimizing partial residual bandwidth\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s: backfitting iteration [0-9]+ of 2, partial residual [0-9]+ of 2, fval ", lines)))
 })

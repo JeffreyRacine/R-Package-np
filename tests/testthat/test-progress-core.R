@@ -264,12 +264,8 @@ test_that("bandwidth selection helper suppresses legacy output and drives bounde
   on.exit(options(old_opts), add = TRUE)
 
   seen <- NULL
-  messages <- with_np_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
-    ),
-    capture_messages_only({
+  legacy <- capture_progress_shadow_trace(
+    {
       value <- select_bw("Selecting regression bandwidth", {
         seen <<- getOption("np.messages")
         set_total(3)
@@ -278,14 +274,32 @@ test_that("bandwidth selection helper suppresses legacy output and drives bounde
         7
       })
       expect_identical(value, 7)
-    })
+    },
+    force_renderer = "legacy",
+    now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
   )
-  messages <- sub("\n$", "", messages, useBytes = TRUE)
-  messages <- messages[nzchar(messages)]
+
+  seen <- NULL
+  actual <- capture_progress_shadow_trace(
+    {
+      value <- select_bw("Selecting regression bandwidth", {
+        seen <<- getOption("np.messages")
+        set_total(3)
+        step_bw(1, 3)
+        step_bw(3, 3)
+        7
+      })
+      expect_identical(value, 7)
+    },
+    now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
+  )
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+  legacy_lines <- vapply(legacy$trace, `[[`, character(1L), "line")
 
   expect_false(isTRUE(seen))
-  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth\\.\\.\\.$", messages)))
-  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_equal(lines, legacy_lines)
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth\\.\\.\\.$", lines)))
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(isTRUE(getOption("np.messages")))
 })

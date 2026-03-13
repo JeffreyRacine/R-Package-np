@@ -32,7 +32,7 @@ with_np_progress_bindings <- function(bindings, code) {
 }
 
 capture_progress_shadow_trace <- function(expr,
-                                          force_renderer = "legacy",
+                                          force_renderer = NULL,
                                           now = function() 0,
                                           interactive = TRUE) {
   expr_env <- parent.frame()
@@ -41,6 +41,9 @@ capture_progress_shadow_trace <- function(expr,
 
   recorder <- function(snapshot, event = c("render", "finish", "abort")) {
     event <- match.arg(event)
+    if (isTRUE(getFromNamespace(".np_progress_is_message_muffled", "np")(snapshot$line))) {
+      return(invisible(snapshot))
+    }
     trace[[length(trace) + 1L]] <<- list(
       event = event,
       renderer = force_renderer,
@@ -58,11 +61,18 @@ capture_progress_shadow_trace <- function(expr,
   }
 
   value <- with_np_progress_bindings(
-    list(
-      .np_progress_renderer_for_surface = function(surface, capability) force_renderer,
-      .np_progress_render_legacy = recorder,
-      .np_progress_is_interactive = function() interactive,
-      .np_progress_now = now
+    c(
+      if (!is.null(force_renderer)) {
+        list(.np_progress_renderer_for_surface = function(surface, capability) force_renderer)
+      } else {
+        list()
+      },
+      list(
+        .np_progress_render_legacy = recorder,
+        .np_progress_render_single_line = recorder,
+        .np_progress_is_interactive = function() interactive,
+        .np_progress_now = now
+      )
     ),
     {
       reset <- getFromNamespace(".np_progress_reset_registry", "np")
