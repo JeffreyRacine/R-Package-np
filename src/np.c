@@ -130,6 +130,14 @@ static void np_progress_bandwidth_multistart_step(const int done, const int tota
   np_progress_signal("bandwidth_multistart_step", "bandwidth", done, total);
 }
 
+static void np_progress_bandwidth_activity_step(const int done)
+{
+  if (done < 1)
+    return;
+
+  np_progress_signal("bandwidth_activity_step", "bandwidth", done, 0);
+}
+
 /* Some externals for numerical routines */
 /* Some externals for numerical routines */
 
@@ -205,6 +213,9 @@ static double (*bwmfunc_raw)(double *) = NULL;
 static double bwm_eval_count = 0.0;
 static double bwm_invalid_count = 0.0;
 static double bwm_fast_eval_count = 0.0;
+static clock_t bwm_progress_started_clock = 0;
+static clock_t bwm_progress_last_signal_clock = 0;
+static int bwm_progress_last_signal_eval = 0;
 
 static void resolve_bounds_or_default(SEXP lb_r, SEXP ub_r, int ncon, double ** lb_p, double ** ub_p)
 {
@@ -479,7 +490,33 @@ static void bwm_reset_counters(void)
   bwm_eval_count = 0.0;
   bwm_invalid_count = 0.0;
   bwm_fast_eval_count = 0.0;
+  bwm_progress_started_clock = clock();
+  bwm_progress_last_signal_clock = bwm_progress_started_clock;
+  bwm_progress_last_signal_eval = 0;
   np_fastcv_alllarge_hits_reset();
+}
+
+static void bwm_maybe_signal_activity(void)
+{
+  const int current_eval = (int) bwm_eval_count;
+  const clock_t now = clock();
+  const double signal_after_sec = 0.5;
+  const int signal_every_evals = 64;
+  double since_last = 0.0;
+
+  if (current_eval < 1)
+    return;
+
+  if ((bwm_progress_last_signal_clock > 0) && (now > bwm_progress_last_signal_clock))
+    since_last = ((double) (now - bwm_progress_last_signal_clock)) / (double) CLOCKS_PER_SEC;
+
+  if ((current_eval - bwm_progress_last_signal_eval) < signal_every_evals &&
+      since_last < signal_after_sec)
+    return;
+
+  np_progress_bandwidth_activity_step(current_eval);
+  bwm_progress_last_signal_eval = current_eval;
+  bwm_progress_last_signal_clock = now;
 }
 
 static inline void bwm_snapshot_fast_counters(void)
@@ -615,6 +652,7 @@ static double bwmfunc_wrapper(double *p)
   }
 
   val = bwmfunc_raw(use_p);
+  bwm_maybe_signal_activity();
 
   if (!R_FINITE(val) || val == DBL_MAX) {
     bwm_invalid_count += 1.0;

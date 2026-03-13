@@ -246,6 +246,42 @@ test_that("block bootstrap drawer uses iid fast path when block length is one", 
   expect_true(all(out >= 0))
 })
 
+test_that("block bootstrap drawer defers ts.array setup until chunk demand in npRmpi", {
+  drawer_factory <- getFromNamespace(".np_block_counts_drawer", "npRmpi")
+  boot.ns <- asNamespace("boot")
+  assign(".npRmpi_test_ts_array_calls", 0L, envir = .GlobalEnv)
+
+  trace(
+    what = "ts.array",
+    where = boot.ns,
+    tracer = quote(assign(
+      ".npRmpi_test_ts_array_calls",
+      get(".npRmpi_test_ts_array_calls", envir = .GlobalEnv) + 1L,
+      envir = .GlobalEnv
+    )),
+    print = FALSE
+  )
+  on.exit({
+    untrace("ts.array", where = boot.ns)
+    rm(".npRmpi_test_ts_array_calls", envir = .GlobalEnv)
+  }, add = TRUE)
+
+  set.seed(20260313)
+  drawer <- drawer_factory(n = 12L, B = 9L, blocklen = 3L, sim = "geom", n.sim = 12L)
+
+  expect_identical(get(".npRmpi_test_ts_array_calls", envir = .GlobalEnv), 0L)
+
+  out1 <- drawer(1L, 2L)
+  expect_identical(get(".npRmpi_test_ts_array_calls", envir = .GlobalEnv), 1L)
+  expect_identical(dim(out1), c(12L, 2L))
+  expect_true(all(colSums(out1) == 12L))
+
+  out2 <- drawer(3L, 4L)
+  expect_identical(get(".npRmpi_test_ts_array_calls", envir = .GlobalEnv), 2L)
+  expect_identical(dim(out2), c(12L, 2L))
+  expect_true(all(colSums(out2) == 12L))
+})
+
 test_that("block-style plot bootstrap uses progress-capped MPI task partitioning on master", {
   helper <- getFromNamespace(".np_inid_lc_boot_from_hat", "npRmpi")
   counts.drawer <- function(start, stopi) {

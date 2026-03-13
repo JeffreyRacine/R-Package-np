@@ -395,6 +395,45 @@ test_that("compiled progress bridge feeds the bounded bandwidth sink", {
   expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })
 
+test_that("compiled progress bridge feeds unknown-total bandwidth activity updates", {
+  select_bw <- getFromNamespace(".np_progress_select_bandwidth", "npRmpi")
+
+  old_opts <- options(np.messages = TRUE, np.progress.start.grace.unknown.sec = 0)
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      value <- select_bw("Selecting conditional density bandwidth", {
+        .Call(
+          "C_np_progress_signal",
+          "bandwidth_activity_step",
+          "bandwidth",
+          64L,
+          0L,
+          PACKAGE = "npRmpi"
+        )
+        .Call(
+          "C_np_progress_signal",
+          "bandwidth_activity_step",
+          "bandwidth",
+          128L,
+          0L,
+          PACKAGE = "npRmpi"
+        )
+        13
+      })
+      expect_identical(value, 13)
+    },
+    now = progress_time_values(c(0, 1.2, 3.4, 5.6))
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting conditional density bandwidth\\.\\.\\.$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting conditional density bandwidth\\.\\.\\. iteration 64, elapsed [0-9]+\\.[0-9]s$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting conditional density bandwidth\\.\\.\\. iteration 128, elapsed [0-9]+\\.[0-9]s$", lines)))
+})
+
 test_that("single-line fit drops detail before truncating", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
 

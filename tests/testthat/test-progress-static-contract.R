@@ -201,6 +201,9 @@ test_that("compiled multistart progress uses shared bandwidth helper", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_true(grepl("np_progress_bandwidth_multistart_step\\(", src))
+  expect_true(grepl("np_progress_bandwidth_activity_step\\(", src))
+  expect_true(grepl("bwm_maybe_signal_activity\\(", src))
+  expect_true(grepl("np_progress_signal(\"bandwidth_activity_step\", \"bandwidth\"", src, fixed = TRUE))
   expect_false(grepl("Rprintf\\(\"\\\\rMultistart", src))
   expect_false(grepl("Rprintf\\(\"\\\\r +\\\\r\"", src))
 })

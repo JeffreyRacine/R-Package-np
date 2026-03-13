@@ -1112,17 +1112,6 @@
 
   ts.array <- utils::getFromNamespace("ts.array", "boot")
   make.ends <- utils::getFromNamespace("make.ends", "boot")
-  ts.draws <- ts.array(
-    n = n,
-    n.sim = n.sim,
-    R = B,
-    l = blocklen,
-    sim = sim,
-    endcorr = isTRUE(endcorr)
-  )
-
-  starts <- as.matrix(ts.draws$starts)
-  lengths <- ts.draws$lengths
 
   function(start, stopi) {
     start <- as.integer(start)
@@ -1130,7 +1119,19 @@
     if (start < 1L || stopi < start || stopi > B)
       stop("invalid block bootstrap chunk bounds")
 
-    idx <- seq.int(start, stopi)
+    bsz <- stopi - start + 1L
+    ts.draws <- ts.array(
+      n = n,
+      n.sim = n.sim,
+      R = bsz,
+      l = blocklen,
+      sim = sim,
+      endcorr = isTRUE(endcorr)
+    )
+
+    starts <- as.matrix(ts.draws$starts)
+    lengths <- ts.draws$lengths
+    idx <- seq_len(bsz)
     out <- matrix(0.0, nrow = n, ncol = length(idx))
 
     for (jj in seq_along(idx)) {
