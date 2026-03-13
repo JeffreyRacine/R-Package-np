@@ -138,6 +138,7 @@ npregbw.rbandwidth <-
     small <- npValidatePositiveFiniteNumeric(small, "small")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    .np_progress_bandwidth_set_total(nmulti)
 
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
@@ -460,7 +461,10 @@ npregbw.default <-
       nms <- mc.names[m]
       bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
-    tbw <- do.call(npregbw.rbandwidth, bwsel.args)
+    tbw <- .np_progress_select_bandwidth(
+      "Selecting regression bandwidth",
+      do.call(npregbw.rbandwidth, bwsel.args)
+    )
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

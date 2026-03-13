@@ -338,7 +338,10 @@ npindexbw.default <-
         nms <- mc.names[m]
         bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
       }
-      tbw <- do.call(npindexbw.sibandwidth, bwsel.args)
+      tbw <- .np_progress_select_bandwidth(
+        "Selecting single-index bandwidth",
+        do.call(npindexbw.sibandwidth, bwsel.args)
+      )
     }
 
     mc <- match.call(expand.dots = FALSE)
@@ -376,6 +379,7 @@ npindexbw.sibandwidth <-
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     only.optimize.beta <- npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    .np_progress_bandwidth_set_total(nmulti)
     optim.maxattempts <- npValidatePositiveInteger(optim.maxattempts, "optim.maxattempts")
     optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
     optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
@@ -635,8 +639,6 @@ npindexbw.sibandwidth <-
           fval.value <- numeric(nmulti)
           num.feval.overall <- 0
 
-          progress <- .np_progress_begin("Multistart optimization", total = nmulti)
-
           if(bws$method == "ichimura"){
             optim.fn <- if(only.optimize.beta) ichimura.nobw else ichimura
             optim.control <- list(abstol=optim.abstol,
@@ -648,13 +650,6 @@ npindexbw.sibandwidth <-
           }
 
           for (i in seq_len(nmulti)) {
-
-            progress <- .np_progress_step(
-              progress,
-              done = i,
-              detail = sprintf("multistart %d", i)
-            )
-
             ## We use the nlm command to minimize the objective function using
             ## starting values. Note that since we normalize beta_1=1 here beta
             ## is the k-1 vector containing beta_2...beta_k
@@ -746,8 +741,9 @@ npindexbw.sibandwidth <-
               best <- i
             }
 
+            .np_progress_bandwidth_multistart_step(done = i, total = nmulti)
+
           }
-          .np_progress_end(progress, detail = sprintf("multistart %d", nmulti))
 
           bws$beta <- c(1.0, param[beta.idx])
           bws$bw <- .npindex_finalize_bandwidth(h = param[p], bwtype = bws$type, nobs = nobs)

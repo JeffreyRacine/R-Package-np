@@ -255,18 +255,26 @@ test_that("warning helper prefixes package warnings", {
   expect_identical(warnings, "[np] kernel order ignored")
 })
 
-test_that("bandwidth selection helper emits note and suppresses nested legacy output", {
+test_that("bandwidth selection helper suppresses legacy output and drives bounded updates", {
   select_bw <- getFromNamespace(".np_progress_select_bandwidth", "np")
+  set_total <- getFromNamespace(".np_progress_bandwidth_set_total", "np")
+  step_bw <- getFromNamespace(".np_progress_bandwidth_multistart_step", "np")
 
-  old_opts <- options(np.messages = TRUE)
+  old_opts <- options(np.messages = TRUE, np.progress.start.grace.known.sec = 0)
   on.exit(options(old_opts), add = TRUE)
 
   seen <- NULL
   messages <- with_np_bindings(
-    list(.np_progress_is_interactive = function() TRUE),
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
+    ),
     capture_messages_only({
       value <- select_bw("Selecting regression bandwidth", {
         seen <<- getOption("np.messages")
+        set_total(3)
+        step_bw(1, 3)
+        step_bw(3, 3)
         7
       })
       expect_identical(value, 7)
@@ -276,6 +284,8 @@ test_that("bandwidth selection helper emits note and suppresses nested legacy ou
   messages <- messages[nzchar(messages)]
 
   expect_false(isTRUE(seen))
-  expect_identical(messages, "[np] Selecting regression bandwidth")
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth\\.\\.\\.$", messages)))
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 1 of 3$", messages)))
+  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 3 of 3$", messages)))
   expect_true(isTRUE(getOption("np.messages")))
 })

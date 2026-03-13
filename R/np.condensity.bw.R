@@ -124,6 +124,7 @@ npcdensbw.conbandwidth <-
     memfac <- npValidatePositiveFiniteNumeric(memfac, "memfac")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    .np_progress_bandwidth_set_total(nmulti)
 
     if (length(bws$ybw) != dim(ydat)[2])
       stop(paste("length of bandwidth vector does not match number of columns of", "'ydat'"))
@@ -622,7 +623,10 @@ npcdensbw.default <-
       nms <- mc.names[m]
       bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
-    tbw <- do.call(npcdensbw.conbandwidth, bwsel.args)
+    tbw <- .np_progress_select_bandwidth(
+      "Selecting conditional density bandwidth",
+      do.call(npcdensbw.conbandwidth, bwsel.args)
+    )
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

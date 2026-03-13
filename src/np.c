@@ -134,6 +134,33 @@ static double bwm_eval_count = 0.0;
 static double bwm_invalid_count = 0.0;
 static double bwm_fast_eval_count = 0.0;
 
+static void np_progress_bandwidth_multistart_step(const int done, const int total)
+{
+  SEXP ns = R_NilValue;
+  SEXP fn = R_NilValue;
+  SEXP call = R_NilValue;
+  int err = 0;
+
+  if (done < 1 || total <= 1)
+    return;
+
+  PROTECT(ns = R_FindNamespace(Rf_ScalarString(Rf_mkChar("np"))));
+  if (ns == R_NilValue) {
+    UNPROTECT(1);
+    return;
+  }
+
+  PROTECT(fn = Rf_findVarInFrame(ns, Rf_install(".np_progress_bandwidth_multistart_step")));
+  if (fn == R_UnboundValue) {
+    UNPROTECT(2);
+    return;
+  }
+
+  PROTECT(call = Rf_lang3(fn, Rf_ScalarInteger(done), Rf_ScalarInteger(total)));
+  R_tryEval(call, ns, &err);
+  UNPROTECT(3);
+}
+
 static void resolve_bounds_or_default(SEXP lb_r, SEXP ub_r, int ncon, double ** lb_p, double ** ub_p)
 {
   int i;
@@ -3284,6 +3311,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     vector_scale_factor_multistart = alloc_vecd(num_var + 1);
     for(i = 1; i <= num_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
     		
     /* Conduct search from new random values of the search parameters */
        	
@@ -3405,6 +3433,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       objective_function_values[iMs_counter]=-fret;
       objective_function_evals[iMs_counter]=bwm_eval_count;
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
     /* Save best for estimation */
@@ -3915,6 +3944,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     vector_scale_factor_multistart = alloc_vecd(num_var + 1);
     for(i = 1; i <= num_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
     		
     /* Conduct search from new random values of the search parameters */
        	
@@ -4032,6 +4062,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
       objective_function_values[iMs_counter]=fret;
       objective_function_evals[iMs_counter]=bwm_eval_count;
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
     /* Save best for estimation */
@@ -4805,6 +4836,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     vector_scale_factor_multistart = alloc_vecd(num_all_var + 1);
     for(i = 1; i <= num_all_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
 			
 
     /* Conduct search from new random values of the search parameters */
@@ -4924,6 +4956,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
     /* Save best for estimation */
@@ -5733,6 +5766,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     vector_scale_factor_multistart = alloc_vecd(num_all_var + 1);
     for(i = 1; i <= num_all_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
 			
 
     /* Conduct search from new random values of the search parameters */
@@ -5851,6 +5885,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
     /* Save best for estimation */
@@ -7429,6 +7464,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
     for(i = 1; i <= num_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    np_progress_bandwidth_multistart_step(1, iNum_Multistart);
 
     /* Conduct search from new random values of the search parameters */
 
@@ -7548,6 +7584,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
+      np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
 
     }
 
