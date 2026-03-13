@@ -4600,6 +4600,20 @@
     all(vapply(ydat, is.numeric, logical(1)))
   xmat <- if (use.matrix.fast) data.matrix(xdat) else NULL
   xymat <- if (use.matrix.fast) cbind(xmat, data.matrix(ydat)) else NULL
+  active.sample.bindings <- c(
+    list(
+      .np_active_boot_sample = .np_active_boot_sample
+    ),
+    if (use.matrix.fast) {
+      list(
+        xmat = xmat,
+        xymat = xymat,
+        .np_active_boot_sample_matrix = .np_active_boot_sample_matrix
+      )
+    } else {
+      list()
+    }
+  )
 
   fit_one <- function(x.train, y.train, weights = NULL, n.total = NULL) {
     if (is.null(weights)) {
@@ -4711,29 +4725,28 @@
         what = "inid-ksum-conditional-exact-counts",
         profile.where = "mpi.applyLB:inid-ksum-conditional-exact-counts",
         comm = 1L,
-        required.bindings = list(
-          counts.mat = counts.mat,
-          xdat = xdat,
-          ydat = ydat,
-          exdat = exdat,
-          eydat = eydat,
-          bws = bws,
-          kbx = kbx,
-          kbxy = kbxy,
-          cdf = cdf,
-          den.state = den.state,
-          num.state = num.state,
-          n = n,
-          nout = nout,
-          use.matrix.fast = use.matrix.fast,
-          xmat = xmat,
-          xymat = xymat,
-          .np_active_boot_sample = .np_active_boot_sample,
-          .np_active_boot_sample_matrix = .np_active_boot_sample_matrix,
-          .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
-          .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
-          .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
-          .np_ksum_conditional_eval_exact_boot_active = .np_ksum_conditional_eval_exact_boot_active
+        required.bindings = c(
+          list(
+            counts.mat = counts.mat,
+            xdat = xdat,
+            ydat = ydat,
+            exdat = exdat,
+            eydat = eydat,
+            bws = bws,
+            kbx = kbx,
+            kbxy = kbxy,
+            cdf = cdf,
+            den.state = den.state,
+            num.state = num.state,
+            n = n,
+            nout = nout,
+            use.matrix.fast = use.matrix.fast,
+            .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
+            .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
+            .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
+            .np_ksum_conditional_eval_exact_boot_active = .np_ksum_conditional_eval_exact_boot_active
+          ),
+          active.sample.bindings
         )
       )
     }
@@ -4797,29 +4810,28 @@
         what = "inid-ksum-conditional-exact-block",
         profile.where = "mpi.applyLB:inid-ksum-conditional-exact-block",
         comm = 1L,
-        required.bindings = list(
-          n = n,
-          counts.drawer = counts.drawer,
-          xdat = xdat,
-          ydat = ydat,
-          exdat = exdat,
-          eydat = eydat,
-          bws = bws,
-          kbx = kbx,
-          kbxy = kbxy,
-          cdf = cdf,
-          den.state = den.state,
-          num.state = num.state,
-          nout = nout,
-          use.matrix.fast = use.matrix.fast,
-          xmat = xmat,
-          xymat = xymat,
-          .np_active_boot_sample = .np_active_boot_sample,
-          .np_active_boot_sample_matrix = .np_active_boot_sample_matrix,
-          .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
-          .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
-          .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
-          .np_ksum_conditional_eval_exact_boot_active = .np_ksum_conditional_eval_exact_boot_active
+        required.bindings = c(
+          list(
+            n = n,
+            counts.drawer = counts.drawer,
+            xdat = xdat,
+            ydat = ydat,
+            exdat = exdat,
+            eydat = eydat,
+            bws = bws,
+            kbx = kbx,
+            kbxy = kbxy,
+            cdf = cdf,
+            den.state = den.state,
+            num.state = num.state,
+            nout = nout,
+            use.matrix.fast = use.matrix.fast,
+            .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
+            .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
+            .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
+            .np_ksum_conditional_eval_exact_boot_active = .np_ksum_conditional_eval_exact_boot_active
+          ),
+          active.sample.bindings
         )
       )
     }
@@ -4880,29 +4892,28 @@
         what = "inid-ksum-conditional-exact",
         profile.where = "mpi.applyLB:inid-ksum-conditional-exact",
         comm = 1L,
-        required.bindings = list(
-          n = n,
-          prob = prob,
-          xdat = xdat,
-          ydat = ydat,
-          exdat = exdat,
-          eydat = eydat,
-          bws = bws,
-          kbx = kbx,
-          kbxy = kbxy,
-          cdf = cdf,
-          den.state = den.state,
-          num.state = num.state,
-          nout = nout,
-          use.matrix.fast = use.matrix.fast,
-          xmat = xmat,
-          xymat = xymat,
-          .np_active_boot_sample = .np_active_boot_sample,
-          .np_active_boot_sample_matrix = .np_active_boot_sample_matrix,
-          .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
-          .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
-          .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
-          .np_ksum_conditional_eval_exact_boot_active = .np_ksum_conditional_eval_exact_boot_active
+        required.bindings = c(
+          list(
+            n = n,
+            prob = prob,
+            xdat = xdat,
+            ydat = ydat,
+            exdat = exdat,
+            eydat = eydat,
+            bws = bws,
+            kbx = kbx,
+            kbxy = kbxy,
+            cdf = cdf,
+            den.state = den.state,
+            num.state = num.state,
+            nout = nout,
+            use.matrix.fast = use.matrix.fast,
+            .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
+            .np_ksum_conditional_eval_exact_oracle = .np_ksum_conditional_eval_exact_oracle,
+            .np_ksum_eval_exact_state = .np_ksum_eval_exact_state,
+            .np_ksum_conditional_eval_exact_boot_active = .np_ksum_conditional_eval_exact_boot_active
+          ),
+          active.sample.bindings
         )
       )
     }
