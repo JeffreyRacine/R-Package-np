@@ -1250,7 +1250,7 @@ npregiv <- function(y,
     bw.E.phi.w <- NULL
     bw.E.E.phi.w.z <- NULL
     tikh.progress <- if(iterate.Tikhonov.num > 1) {
-      .np_progress_begin("Iterating Tikhonov solve", total = iterate.Tikhonov.num)
+      .np_progress_begin("Iterating Tikhonov solve", total = iterate.Tikhonov.num, surface = "iv_solve")
     } else {
       NULL
     }
@@ -1496,7 +1496,7 @@ npregiv <- function(y,
     ## Landweber-Fridman
 
     .np_progress_note("Preparing Landweber-Fridman IV regression")
-    progress <- .np_progress_begin("Iterating Landweber-Fridman solve")
+    progress <- .np_progress_begin("Iterating Landweber-Fridman solve", surface = "iv_solve")
 
     norm.stop <- numeric()
 

@@ -114,7 +114,7 @@ npdeneqtest <- function(x = NULL,
   Tn.vector <- numeric(boot.num)
   In.vector <- numeric(boot.num)
 
-  progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
+  progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
   for (i in seq_len(boot.num)) {
     output.boot <- teststat.boot(x,y,bw.x,bw.y)

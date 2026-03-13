@@ -342,3 +342,80 @@ test_that("compiled progress bridge feeds the bounded bandwidth sink", {
   expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })
+
+test_that("single-line fit drops detail before truncating", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+
+  line <- "[np] Constructing metric entropy by lag 1/2 (50.0%, elapsed 7.2s, eta 7.2s): lag 1"
+  fitted <- fit(line, max_width = 78)
+
+  expect_identical(
+    fitted,
+    "[np] Constructing metric entropy by lag 1/2 (50.0%, elapsed 7.2s, eta 7.2s)"
+  )
+})
+
+test_that("single-line fit preserves both ends when truncation is still required", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+
+  line <- "[np] Bootstrap replications 123/999 (12.3%, elapsed 12.3s, eta 87.7s)"
+  fitted <- fit(line, max_width = 40)
+
+  expect_lte(nchar(fitted, type = "width"), 40L)
+  expect_true(startsWith(fitted, "[np]"))
+  expect_true(endsWith(fitted, "eta 87.7s)"))
+  expect_true(grepl("\\.\\.\\.", fitted))
+})
+
+test_that("RStudio capability keeps single-line viable at the boundary", {
+  capability <- getFromNamespace(".np_progress_capability", "np")
+
+  actual <- with_np_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_rstudio_console = function() TRUE
+    ),
+    capability()
+  )
+
+  expect_true(isTRUE(actual$interactive))
+  expect_true(isTRUE(actual$rstudio))
+  expect_true(isTRUE(actual$single_line_viable))
+})
+
+test_that("RStudio width budget reserves redraw margin centrally", {
+  output_width <- getFromNamespace(".np_progress_output_width", "np")
+
+  actual <- with_np_bindings(list(.np_progress_is_rstudio_console = function() TRUE), {
+    withr::local_options(list(width = 82))
+    output_width()
+  })
+
+  expect_identical(actual, 78L)
+})
+
+test_that("progress ownership suppresses nested visibility for legacy renderer too", {
+  begin <- getFromNamespace(".np_progress_begin", "np")
+  finish <- getFromNamespace(".np_progress_end", "np")
+  reset <- getFromNamespace(".np_progress_reset_registry", "np")
+
+  reset()
+  on.exit(reset(), add = TRUE)
+
+  states <- with_np_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_rstudio_console = function() TRUE,
+      .np_progress_now = function() 1
+    ),
+    {
+      outer <- begin("Outer task", total = 2)
+      inner <- begin("Inner task", total = 2)
+      finish(outer)
+      list(outer = outer, inner = inner)
+    }
+  )
+
+  expect_true(isTRUE(states$outer$visible))
+  expect_false(isTRUE(states$inner$visible))
+})

@@ -1,59 +1,3 @@
-with_np_bindings <- function(bindings, code) {
-  code <- substitute(code)
-  ns <- asNamespace("np")
-  old <- lapply(names(bindings), function(name) get(name, envir = ns, inherits = FALSE))
-  names(old) <- names(bindings)
-
-  for (name in names(bindings)) {
-    was_locked <- bindingIsLocked(name, ns)
-    if (was_locked) {
-      unlockBinding(name, ns)
-    }
-    assign(name, bindings[[name]], envir = ns)
-    if (was_locked) {
-      lockBinding(name, ns)
-    }
-  }
-
-  on.exit({
-    for (name in names(old)) {
-      was_locked <- bindingIsLocked(name, ns)
-      if (was_locked) {
-        unlockBinding(name, ns)
-      }
-      assign(name, old[[name]], envir = ns)
-      if (was_locked) {
-        lockBinding(name, ns)
-      }
-    }
-  }, add = TRUE)
-
-  eval(code, envir = parent.frame())
-}
-
-capture_progress_conditions <- function(expr) {
-  messages <- character()
-  warnings <- character()
-
-  value <- withCallingHandlers(
-    expr,
-    message = function(m) {
-      messages <<- c(messages, conditionMessage(m))
-      invokeRestart("muffleMessage")
-    },
-    warning = function(w) {
-      warnings <<- c(warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
-
-  list(value = value, messages = messages, warnings = warnings)
-}
-
-normalize_messages <- function(x) {
-  sub("\n$", "", x)
-}
-
 progress_time_counter <- function(start = 0, by = 0.6) {
   current <- start
   function() {
@@ -62,11 +6,27 @@ progress_time_counter <- function(start = 0, by = 0.6) {
   }
 }
 
+shadow_bootstrap_signature <- function(shadow) {
+  lines <- vapply(shadow$trace, `[[`, character(1L), "line")
+  events <- vapply(shadow$trace, `[[`, character(1L), "event")
+  keep <- grepl("^\\[np\\] Bootstrap replications", lines)
+
+  data.frame(
+    event = events[keep],
+    line = lines[keep],
+    stringsAsFactors = FALSE
+  )
+}
+
+shadow_lines <- function(shadow) {
+  shadow_bootstrap_signature(shadow)$line
+}
+
 npdeneqtest_fun <- function(...) {
   getFromNamespace("npdeneqtest", "np")(...)
 }
 
-test_that("npdeneqtest emits append-only bounded bootstrap progress", {
+test_that("npdeneqtest single-line bootstrap progress matches legacy semantics", {
   set.seed(42)
   n <- 50
   x <- data.frame(v1 = rnorm(n))
@@ -75,22 +35,25 @@ test_that("npdeneqtest emits append-only bounded bootstrap progress", {
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_np_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_now = progress_time_counter()
-    ),
-    capture_progress_conditions(
-      npdeneqtest_fun(x, y, boot.num = 9)
-    )
+  legacy <- capture_progress_shadow_trace(
+    npdeneqtest_fun(x, y, boot.num = 9),
+    force_renderer = "legacy",
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(res$messages)
+  set.seed(42)
+  single_line <- capture_progress_shadow_trace(
+    npdeneqtest_fun(x, y, boot.num = 9),
+    force_renderer = "single_line",
+    now = progress_time_counter()
+  )
 
-  expect_s3_class(res$value, "deneqtest")
-  expect_true(any(grepl("^\\[np\\] Computing bandwidths$", messages)))
-  expect_true(any(grepl("^\\[np\\] Bootstrap replications [0-9]+/[0-9]+ \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_false(any(grepl("\b", messages, fixed = TRUE)))
+  lines <- shadow_lines(single_line)
+
+  expect_s3_class(single_line$value, "deneqtest")
+  expect_equal(shadow_bootstrap_signature(single_line), shadow_bootstrap_signature(legacy))
+  expect_true(any(grepl("^\\[np\\] Bootstrap replications [0-9]+/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bootstrap replications 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })
 
 test_that("npdeneqtest progress respects np.messages FALSE", {
@@ -102,17 +65,12 @@ test_that("npdeneqtest progress respects np.messages FALSE", {
   old_opts <- options(np.messages = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_np_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_now = progress_time_counter()
-    ),
-    capture_progress_conditions(
-      npdeneqtest_fun(x, y, boot.num = 9)
-    )
+  res <- capture_progress_shadow_trace(
+    npdeneqtest_fun(x, y, boot.num = 9),
+    now = progress_time_counter()
   )
 
-  expect_length(res$messages, 0)
+  expect_length(res$trace, 0)
 })
 
 test_that("npdeneqtest progress respects suppressMessages", {
@@ -124,15 +82,10 @@ test_that("npdeneqtest progress respects suppressMessages", {
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_np_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_now = progress_time_counter()
-    ),
-    capture_progress_conditions(
-      suppressMessages(npdeneqtest_fun(x, y, boot.num = 9))
-    )
+  res <- capture_progress_shadow_trace(
+    suppressMessages(npdeneqtest_fun(x, y, boot.num = 9)),
+    now = progress_time_counter()
   )
 
-  expect_length(res$messages, 0)
+  expect_length(res$trace, 0)
 })

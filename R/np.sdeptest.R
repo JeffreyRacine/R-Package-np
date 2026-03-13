@@ -124,7 +124,7 @@ npsdeptest <- function(data = NULL,
   bw.joint.y.lag <- numeric()      
   
   ## Save the bandwidths for resampling exercise...
-  lag.progress <- .np_progress_begin("Constructing metric entropy by lag", total = lag.num)
+  lag.progress <- .np_progress_begin("Constructing metric entropy by lag", total = lag.num, surface = "lag")
   
   for (k in seq_len(lag.num)) {
     ## Create y and y.lag
@@ -165,7 +165,7 @@ npsdeptest <- function(data = NULL,
 
     Srho.bootstrap.mat <- matrix(NA,boot.num,(lag.num))
 		Srho.cumulant.bootstrap.mat <- matrix(NA,boot.num,(lag.num))
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
     for (b in seq_len(boot.num)) {
 

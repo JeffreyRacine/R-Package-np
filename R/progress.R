@@ -57,18 +57,56 @@
   invisible(NULL)
 }
 
-.np_progress_is_message_muffled <- function(line) {
-  suppressed <- FALSE
+.np_progress_call_name <- function(call) {
+  head <- call[[1L]]
 
-  withRestarts(
-    signalCondition(simpleMessage(line)),
-    muffleMessage = function() {
-      suppressed <<- TRUE
-      invisible(NULL)
-    }
-  )
+  if (is.symbol(head)) {
+    return(as.character(head))
+  }
 
-  suppressed
+  if (is.call(head) &&
+      identical(head[[1L]], as.name("::")) &&
+      length(head) >= 3L &&
+      is.symbol(head[[2L]]) &&
+      is.symbol(head[[3L]])) {
+    return(paste(as.character(head[[2L]]), as.character(head[[3L]]), sep = "::"))
+  }
+
+  ""
+}
+
+.np_progress_is_message_muffled <- function() {
+  calls <- sys.calls()
+  if (!length(calls)) {
+    return(FALSE)
+  }
+
+  any(vapply(
+    calls,
+    function(call) {
+      .np_progress_call_name(call) %in% c(
+        "suppressMessages",
+        "base::suppressMessages",
+        "suppressPackageStartupMessages",
+        "base::suppressPackageStartupMessages"
+      )
+    },
+    logical(1L)
+  ))
+}
+
+.np_progress_resolve_message_muffling <- function(state) {
+  if (!identical(state$renderer, "single_line")) {
+    return(state)
+  }
+
+  if (isTRUE(state$message_muffled_checked)) {
+    return(state)
+  }
+
+  state$message_muffled <- isTRUE(.np_progress_is_message_muffled())
+  state$message_muffled_checked <- TRUE
+  state
 }
 
 .np_progress_fmt_num <- function(x) {
@@ -94,6 +132,10 @@
 
 .np_progress_registry <- .np_progress_make_registry()
 
+.np_progress_is_rstudio_console <- function() {
+  identical(.Platform$GUI, "RStudio") || identical(Sys.getenv("RSTUDIO"), "1")
+}
+
 .np_progress_reset_registry <- function() {
   .np_progress_registry$next_id <- 0L
   .np_progress_registry$active_id <- NULL
@@ -107,16 +149,18 @@
 
 .np_progress_capability <- function(domain = "general") {
   interactive_console <- isTRUE(.np_progress_is_interactive())
+  rstudio_console <- isTRUE(.np_progress_is_rstudio_console())
 
   list(
     domain = domain,
     interactive = interactive_console,
+    rstudio = rstudio_console,
     single_line_viable = interactive_console
   )
 }
 
 .np_progress_single_line_surfaces <- function() {
-  c("bandwidth", "plot_activity", "plot_bounded")
+  c("bandwidth", "plot_activity", "plot_bounded", "bootstrap", "lag", "iv_solve")
 }
 
 .np_progress_renderer_for_surface <- function(surface, capability) {
@@ -146,7 +190,7 @@
   invisible(NULL)
 }
 
-.np_progress_make_snapshot <- function(state, line, event, now, done = NULL, detail = NULL) {
+.np_progress_make_snapshot <- function(state, line, event, now, done = NULL, detail = NULL, render_line = line) {
   list(
     id = state$id,
     surface = state$surface,
@@ -157,6 +201,7 @@
     total = state$total,
     detail = detail,
     line = line,
+    render_line = render_line,
     event = event,
     started_at = state$started,
     now = now,
@@ -174,18 +219,74 @@
   stderr()
 }
 
-.np_progress_render_single_line <- function(snapshot, event = c("render", "finish", "abort")) {
-  event <- match.arg(event)
-  if (isTRUE(.np_progress_is_message_muffled(snapshot$line))) {
-    return(invisible(snapshot))
+.np_progress_output_width <- function() {
+  width <- suppressWarnings(as.integer(getOption("width", 80))[1L])
+  if (!is.finite(width) || is.na(width) || width < 20L) {
+    width <- 80L
   }
 
+  reserve <- if (isTRUE(.np_progress_is_rstudio_console())) 4L else 0L
+  max(20L, width - reserve)
+}
+
+.np_progress_ellipsize_middle <- function(text, max_width) {
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return("")
+  }
+
+  if (nchar(text, type = "width") <= max_width) {
+    return(text)
+  }
+
+  if (max_width <= 3L) {
+    return(substr("...", 1L, max_width))
+  }
+
+  keep_right <- max(1L, floor((max_width - 3L) / 2L))
+  keep_left <- max_width - 3L - keep_right
+  paste0(
+    substr(text, 1L, keep_left),
+    "...",
+    substr(text, nchar(text, type = "chars") - keep_right + 1L, nchar(text, type = "chars"))
+  )
+}
+
+.np_progress_fit_single_line <- function(line, max_width = .np_progress_output_width()) {
+  if (!is.character(line) || length(line) != 1L || is.na(line)) {
+    return(line)
+  }
+
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return(line)
+  }
+
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  detail_pos <- regexpr(": ", line, fixed = TRUE)[1L]
+  if (detail_pos > 0L) {
+    without_detail <- substr(line, 1L, detail_pos - 1L)
+    if (nchar(without_detail, type = "width") <= max_width) {
+      return(without_detail)
+    }
+    line <- without_detail
+  }
+
+  .np_progress_ellipsize_middle(line, max_width = max_width)
+}
+
+.np_progress_render_single_line <- function(snapshot, event = c("render", "finish", "abort")) {
+  event <- match.arg(event)
+  render_line <- snapshot$render_line
   con <- .np_progress_single_line_connection()
-  width <- nchar(snapshot$line, type = "width")
+  width <- nchar(render_line, type = "width")
   pad <- max(0L, snapshot$last_width - width)
   suffix <- if (pad > 0L) paste(rep(" ", pad), collapse = "") else ""
 
-  base::cat("\r", snapshot$line, suffix, file = con, sep = "")
+  base::cat("\r", render_line, suffix, file = con, sep = "")
   if (event %in% c("finish", "abort")) {
     base::cat("\n", file = con, sep = "")
   }
@@ -199,9 +300,21 @@
     return(state)
   }
 
+  state <- .np_progress_resolve_message_muffling(state)
+  if (isTRUE(state$message_muffled)) {
+    return(state)
+  }
+
+  render_line <- if (identical(state$renderer, "single_line")) {
+    .np_progress_fit_single_line(line)
+  } else {
+    line
+  }
+
   snapshot <- .np_progress_make_snapshot(
     state = state,
     line = line,
+    render_line = render_line,
     event = event,
     now = now,
     done = done,
@@ -221,7 +334,7 @@
   }
 
   state$rendered <- TRUE
-  state$last_render_width <- nchar(line, type = "width")
+  state$last_render_width <- nchar(render_line, type = "width")
   state$last_line <- line
   state
 }
@@ -325,10 +438,8 @@
   renderer <- .np_progress_renderer_for_surface(surface = surface, capability = capability)
   visible <- if (!isTRUE(enabled)) {
     FALSE
-  } else if (identical(renderer, "single_line")) {
-    isTRUE(.np_progress_claim_owner(session_id))
   } else {
-    TRUE
+    isTRUE(.np_progress_claim_owner(session_id))
   }
 
   list(
@@ -354,7 +465,9 @@
     last_line = NULL,
     last_render_width = 0L,
     last_emitted_done = NULL,
-    last_emitted_detail = NULL
+    last_emitted_detail = NULL,
+    message_muffled = FALSE,
+    message_muffled_checked = FALSE
   )
 }
 
@@ -427,18 +540,14 @@
 
 .np_progress_end <- function(state, detail = NULL) {
   if (!isTRUE(state$enabled)) {
-    if (identical(state$renderer, "single_line")) {
-      .np_progress_release_owner(state$id)
-    }
+    .np_progress_release_owner(state$id)
     return(invisible(state))
   }
 
   now <- .np_progress_now()
   if (is.null(state$last_line) &&
       (now - state$started) < state$start_note_grace_sec) {
-    if (identical(state$renderer, "single_line")) {
-      .np_progress_release_owner(state$id)
-    }
+    .np_progress_release_owner(state$id)
     return(invisible(state))
   }
 
@@ -459,9 +568,7 @@
       state$last_emitted_done <- done
       state$last_emitted_detail <- detail
     }
-    if (identical(state$renderer, "single_line")) {
-      .np_progress_release_owner(state$id)
-    }
+    .np_progress_release_owner(state$id)
     return(invisible(state))
   }
 
@@ -492,25 +599,19 @@
     )
   }
 
-  if (identical(state$renderer, "single_line")) {
-    .np_progress_release_owner(state$id)
-  }
+  .np_progress_release_owner(state$id)
   invisible(state)
 }
 
 .np_progress_abort <- function(state, detail = NULL) {
   if (!isTRUE(state$enabled)) {
-    if (identical(state$renderer, "single_line")) {
-      .np_progress_release_owner(state$id)
-    }
+    .np_progress_release_owner(state$id)
     return(invisible(state))
   }
 
   now <- .np_progress_now()
   if (!isTRUE(state$rendered)) {
-    if (identical(state$renderer, "single_line")) {
-      .np_progress_release_owner(state$id)
-    }
+    .np_progress_release_owner(state$id)
     return(invisible(state))
   }
 
@@ -523,9 +624,7 @@
     done = state$last_done,
     detail = detail
   )
-  if (identical(state$renderer, "single_line")) {
-    .np_progress_release_owner(state$id)
-  }
+  .np_progress_release_owner(state$id)
   invisible(state)
 }
 
@@ -579,6 +678,8 @@
   upgraded$last_render_width <- state$last_render_width
   upgraded$last_emitted_done <- state$last_emitted_done
   upgraded$last_emitted_detail <- state$last_emitted_detail
+  upgraded$message_muffled <- state$message_muffled
+  upgraded$message_muffled_checked <- state$message_muffled_checked
   upgraded$bandwidth_multistart <- TRUE
   if (!isTRUE(state$start_note_pending) && identical(state$last_line, state$start_note)) {
     upgraded$start_note_pending <- FALSE

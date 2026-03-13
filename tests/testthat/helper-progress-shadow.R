@@ -41,7 +41,7 @@ capture_progress_shadow_trace <- function(expr,
 
   recorder <- function(snapshot, event = c("render", "finish", "abort")) {
     event <- match.arg(event)
-    if (isTRUE(getFromNamespace(".np_progress_is_message_muffled", "np")(snapshot$line))) {
+    if (isTRUE(getFromNamespace(".np_progress_is_message_muffled", "np")())) {
       return(invisible(snapshot))
     }
     trace[[length(trace) + 1L]] <<- list(
