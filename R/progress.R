@@ -283,11 +283,20 @@
   render_line <- snapshot$render_line
   con <- .np_progress_single_line_connection()
   width <- nchar(render_line, type = "width")
+  if (identical(event, "finish")) {
+    clear_width <- max(snapshot$last_width, width)
+    clear_line <- if (clear_width > 0L) strrep(" ", clear_width) else ""
+    base::cat("\r", clear_line, "\r", file = con, sep = "")
+    flush(con)
+    flush.console()
+    return(invisible(snapshot))
+  }
+
   pad <- max(0L, snapshot$last_width - width)
   suffix <- if (pad > 0L) paste(rep(" ", pad), collapse = "") else ""
 
   base::cat("\r", render_line, suffix, file = con, sep = "")
-  if (event %in% c("finish", "abort")) {
+  if (identical(event, "abort")) {
     base::cat("\n", file = con, sep = "")
   }
   flush(con)

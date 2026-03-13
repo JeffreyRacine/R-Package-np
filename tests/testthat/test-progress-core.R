@@ -68,6 +68,31 @@ progress_time_values <- function(values) {
   }
 }
 
+capture_single_line_output <- function(pkg, bindings, code) {
+  path <- tempfile(fileext = ".log")
+  con <- file(path, open = "wb")
+  closed <- FALSE
+
+  on.exit({
+    if (!closed) {
+      close(con)
+    }
+    unlink(path)
+  }, add = TRUE)
+
+  bindings$.np_progress_single_line_connection <- function() con
+
+  if (identical(pkg, "np")) {
+    with_np_bindings(bindings, code)
+  } else {
+    stop("unknown package: ", pkg)
+  }
+
+  close(con)
+  closed <- TRUE
+  readChar(path, nchars = file.info(path)$size, useBytes = TRUE)
+}
+
 test_that("progress begin returns disabled state when messages are off", {
   begin <- getFromNamespace(".np_progress_begin", "np")
 
@@ -392,6 +417,38 @@ test_that("RStudio width budget reserves redraw margin centrally", {
   })
 
   expect_identical(actual, 78L)
+})
+
+test_that("single-line finish clears the rendered line without leaving a newline", {
+  render <- getFromNamespace(".np_progress_render_single_line", "np")
+  line <- "[np] Bootstrap replications 2/2 (100.0%, elapsed 1.0s, eta 0.0s)"
+
+  output <- capture_single_line_output(
+    "np",
+    list(),
+    {
+      render(list(render_line = line, last_width = 0L), event = "render")
+      render(list(render_line = line, last_width = nchar(line, type = "width")), event = "finish")
+    }
+  )
+
+  expect_identical(
+    output,
+    paste0("\r", line, "\r", strrep(" ", nchar(line, type = "width")), "\r")
+  )
+})
+
+test_that("single-line abort preserves the final line and terminates it", {
+  render <- getFromNamespace(".np_progress_render_single_line", "np")
+  line <- "[np] Bootstrap replications aborted"
+
+  output <- capture_single_line_output(
+    "np",
+    list(),
+    render(list(render_line = line, last_width = 0L), event = "abort")
+  )
+
+  expect_identical(output, paste0("\r", line, "\n"))
 })
 
 test_that("progress ownership suppresses nested visibility for legacy renderer too", {
