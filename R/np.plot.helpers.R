@@ -955,8 +955,10 @@
   t0 <- numeric(neval)
   prep.label <- if (!is.null(counts.drawer)) "Preparing plot bootstrap block" else "Preparing plot bootstrap inid"
   prep.progress <- .np_plot_stage_progress_begin(total = neval, label = prep.label)
+  prep.progress.active <- TRUE
   on.exit({
-    .np_plot_progress_end(prep.progress)
+    if (isTRUE(prep.progress.active))
+      .np_plot_progress_end(prep.progress)
   }, add = TRUE)
 
   for (i in seq_len(neval)) {
@@ -993,6 +995,8 @@
     }
     prep.progress <- .np_plot_progress_tick(state = prep.progress, done = i)
   }
+  .np_plot_progress_end(prep.progress)
+  prep.progress.active <- FALSE
 
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"

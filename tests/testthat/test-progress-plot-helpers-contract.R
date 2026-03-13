@@ -165,13 +165,26 @@ test_that("plot helper activity renders immediately for long blocking work", {
     now = progress_time_values(c(0, 1.0))
   )
 
+  actual_render_lines <- vapply(
+    actual$trace[vapply(actual$trace, `[[`, character(1L), "event") == "render"],
+    `[[`,
+    character(1L),
+    "line"
+  )
+  legacy_render_lines <- vapply(
+    legacy$trace[vapply(legacy$trace, `[[`, character(1L), "event") == "render"],
+    `[[`,
+    character(1L),
+    "line"
+  )
+
   expect_identical(
-    vapply(actual$trace, `[[`, character(1L), "line"),
-    vapply(legacy$trace, `[[`, character(1L), "line")
+    actual_render_lines,
+    legacy_render_lines
   )
   expect_identical(
-    vapply(actual$trace, `[[`, character(1L), "line"),
-    rep("[np] Constructing bootstrap bands... elapsed 0.0s", 2L)
+    actual_render_lines,
+    "[np] Constructing bootstrap bands... elapsed 0.0s"
   )
   expect_identical(vapply(actual$trace, `[[`, character(1L), "event"), c("render", "finish"))
 })

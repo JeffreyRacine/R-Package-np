@@ -219,9 +219,78 @@
   stderr()
 }
 
+.np_progress_has_tty <- function() {
+  any(vapply(
+    list(stdin(), stdout(), stderr()),
+    function(con) {
+      tryCatch(isTRUE(isatty(con)), error = function(...) FALSE)
+    },
+    logical(1L)
+  ))
+}
+
+.np_progress_parse_width <- function(value) {
+  value <- suppressWarnings(as.integer(value)[1L])
+  if (!is.finite(value) || is.na(value) || value < 20L) {
+    return(NA_integer_)
+  }
+
+  value
+}
+
+.np_progress_terminal_width_probe <- function() {
+  if (!isTRUE(.np_progress_is_interactive()) || isTRUE(.np_progress_is_rstudio_console())) {
+    return(NA_integer_)
+  }
+  if (!isTRUE(.np_progress_has_tty())) {
+    return(NA_integer_)
+  }
+
+  if (identical(.Platform$OS.type, "windows")) {
+    return(.np_progress_parse_width(Sys.getenv("COLUMNS", "")))
+  }
+
+  probe <- tryCatch(
+    suppressWarnings(system2(
+      "sh",
+      c("-c", "stty size < /dev/tty 2>/dev/null"),
+      stdout = TRUE,
+      stderr = TRUE
+    )),
+    error = function(...) character()
+  )
+  if (length(probe)) {
+    fields <- strsplit(trimws(probe[[1L]]), "[[:space:]]+")[[1L]]
+    width <- .np_progress_parse_width(fields[[length(fields)]])
+    if (!is.na(width)) {
+      return(width)
+    }
+  }
+
+  probe <- tryCatch(
+    suppressWarnings(system2("tput", "cols", stdout = TRUE, stderr = TRUE)),
+    error = function(...) character()
+  )
+  if (length(probe)) {
+    width <- .np_progress_parse_width(probe[[1L]])
+    if (!is.na(width)) {
+      return(width)
+    }
+  }
+
+  .np_progress_parse_width(Sys.getenv("COLUMNS", ""))
+}
+
 .np_progress_output_width <- function() {
-  width <- suppressWarnings(as.integer(getOption("width", 80))[1L])
-  if (!is.finite(width) || is.na(width) || width < 20L) {
+  width <- if (isTRUE(.np_progress_is_rstudio_console())) {
+    .np_progress_parse_width(getOption("width", 80))
+  } else {
+    .np_progress_terminal_width_probe()
+  }
+  if (is.na(width)) {
+    width <- .np_progress_parse_width(getOption("width", 80))
+  }
+  if (is.na(width)) {
     width <- 80L
   }
 
@@ -591,10 +660,13 @@
     return(invisible(state))
   }
 
+  must_clear <- identical(state$renderer, "single_line") && isTRUE(state$rendered)
+
   if (isTRUE(state$known_total)) {
     done <- if (is.null(state$total)) state$last_done else state$total
     line <- .np_progress_format_line(state = state, done = done, detail = detail, now = now)
-    if (!(identical(done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
+    if (isTRUE(must_clear) ||
+        !(identical(done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
       state <- .np_progress_render(
         state = state,
         line = line,
@@ -614,7 +686,8 @@
 
   if (!is.null(state$last_done)) {
     line <- .np_progress_format_line(state = state, done = state$last_done, detail = detail, now = now)
-    if (!(identical(state$last_done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
+    if (isTRUE(must_clear) ||
+        !(identical(state$last_done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
       state <- .np_progress_render(
         state = state,
         line = line,
@@ -629,7 +702,7 @@
     }
   }
 
-  if (isTRUE(state$rendered) && is.null(state$last_done) && !is.null(state$last_line)) {
+  if (isTRUE(must_clear) && is.null(state$last_done) && !is.null(state$last_line)) {
     state <- .np_progress_render(
       state = state,
       line = state$last_line,

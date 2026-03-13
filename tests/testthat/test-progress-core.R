@@ -319,10 +319,21 @@ test_that("bandwidth selection helper suppresses legacy output and drives bounde
     now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
   )
   lines <- vapply(actual$trace, `[[`, character(1L), "line")
-  legacy_lines <- vapply(legacy$trace, `[[`, character(1L), "line")
+  legacy_lines <- vapply(
+    legacy$trace[vapply(legacy$trace, `[[`, character(1L), "event") == "render"],
+    `[[`,
+    character(1L),
+    "line"
+  )
+  render_lines <- vapply(
+    actual$trace[vapply(actual$trace, `[[`, character(1L), "event") == "render"],
+    `[[`,
+    character(1L),
+    "line"
+  )
 
   expect_false(isTRUE(seen))
-  expect_equal(lines, legacy_lines)
+  expect_equal(render_lines, legacy_lines)
   expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth\\.\\.\\.$", lines)))
   expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
@@ -420,6 +431,24 @@ test_that("RStudio width budget reserves redraw margin centrally", {
   expect_identical(actual, 78L)
 })
 
+test_that("terminal width probe takes precedence over stale option width", {
+  output_width <- getFromNamespace(".np_progress_output_width", "np")
+
+  actual <- with_np_bindings(
+    list(
+      .np_progress_is_rstudio_console = function() FALSE,
+      .np_progress_terminal_width_probe = function() 132L
+    ),
+    {
+      old_options <- options(width = 80)
+      on.exit(options(old_options), add = TRUE)
+      output_width()
+    }
+  )
+
+  expect_identical(actual, 132L)
+})
+
 test_that("single-line finish clears the rendered line without leaving a newline", {
   render <- getFromNamespace(".np_progress_render_single_line", "np")
   line <- "[np] Bootstrap replications 2/2 (100.0%, elapsed 1.0s, eta 0.0s)"
@@ -436,6 +465,40 @@ test_that("single-line finish clears the rendered line without leaving a newline
   expect_identical(
     output,
     paste0("\r", line, "\r", strrep(" ", nchar(line, type = "width")), "\r")
+  )
+})
+
+test_that("progress end clears single-line output even when the final state already rendered", {
+  begin <- getFromNamespace(".np_progress_begin", "np")
+  step <- getFromNamespace(".np_progress_step", "np")
+  finish <- getFromNamespace(".np_progress_end", "np")
+  reset <- getFromNamespace(".np_progress_reset_registry", "np")
+
+  output <- capture_single_line_output(
+    "np",
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_rstudio_console = function() FALSE,
+      .np_progress_now = progress_time_values(c(0, 0, 1, 1)),
+      .np_progress_output_width = function() 120L
+    ),
+    {
+      reset()
+      on.exit(reset(), add = TRUE)
+      state <- begin("Bootstrap replications", total = 2, surface = "bootstrap")
+      state <- step(state, done = 2)
+      finish(state)
+    }
+  )
+
+  line <- "[np] Bootstrap replications 2/2 (100.0%, elapsed 1.0s, eta 0.0s)"
+  expect_identical(
+    output,
+    paste0(
+      "\r",
+      strrep(" ", nchar(line, type = "width")),
+      "\r"
+    )
   )
 })
 
