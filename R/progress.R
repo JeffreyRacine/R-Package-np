@@ -293,7 +293,7 @@
   con <- .np_progress_single_line_connection()
   width <- nchar(render_line, type = "width")
   if (identical(event, "finish")) {
-    clear_width <- max(snapshot$last_width, width)
+    clear_width <- max(snapshot$last_width, width, .np_progress_output_width())
     clear_line <- if (clear_width > 0L) strrep(" ", clear_width) else ""
     base::cat("\r", clear_line, "\r", file = con, sep = "")
     flush(con)
