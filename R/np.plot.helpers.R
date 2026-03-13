@@ -4050,6 +4050,74 @@ plotFactor <- function(f, y, ...){
   list(t = tmat, t0 = t0)
 }
 
+.np_inid_boot_from_quantile_gradient_local <- function(xdat,
+                                                       ydat,
+                                                       exdat,
+                                                       bws,
+                                                       B,
+                                                       tau,
+                                                       gradient.index,
+                                                       counts = NULL,
+                                                       counts.drawer = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- as.double(ydat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("quantile gradient bootstrap helper requires aligned x/y training rows")
+  if (n < 1L || B < 1L)
+    stop("invalid quantile gradient bootstrap dimensions")
+
+  fit.fun <- function(x.train, y.train) {
+    as.vector(.np_plot_quantile_eval(
+      bws = bws,
+      txdat = x.train,
+      tydat = y.train,
+      exdat = exdat,
+      tau = tau,
+      gradients = TRUE
+    )$quantgrad[, gradient.index, drop = TRUE])
+  }
+
+  t0 <- fit.fun(x.train = xdat, y.train = ydat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+  counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  start <- 1L
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  while (start <= B) {
+    stopi <- min(B, start + chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    counts.chunk <- if (!is.null(counts.mat)) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+    }
+
+    for (jj in seq_len(bsz)) {
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      tmat[start + jj - 1L, ] <- fit.fun(
+        x.train = xdat[idx, , drop = FALSE],
+        y.train = ydat[idx]
+      )
+    }
+
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_plot_quantile_eval <- function(bws,
                                    txdat,
                                    tydat,
@@ -4108,9 +4176,6 @@ plotFactor <- function(f, y, ...){
         if (!xdat %~% exdat)
           stop("'txdat' and 'exdat' are not similar data frames!")
       }
-
-      if (gradients)
-        stop("gradients not currently supported for this object")
 
       if (length(bws$xbw) != length(xdat))
         stop("length of bandwidth vector does not match number of columns of 'txdat'")
@@ -5718,10 +5783,11 @@ compute.bootstrap.errors.conbandwidth =
       isTRUE(!gradients) &&
       isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
     gradient.local.ok <- isTRUE(!quantreg) && isTRUE(gradients)
+    quantile.gradient.local.ok <- isTRUE(quantreg) && isTRUE(gradients)
 
-    if (is.inid && !isTRUE(fast.inid) && !isTRUE(gradient.local.ok))
+    if (is.inid && !isTRUE(fast.inid) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.gradient.local.ok))
       stop("inid conditional helper unavailable for this configuration; no alternate fallback is permitted", call. = FALSE)
-    if (is.block && !isTRUE(fast.block) && !isTRUE(gradient.local.ok))
+    if (is.block && !isTRUE(fast.block) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.gradient.local.ok))
       stop(sprintf("%s conditional helper unavailable for this configuration; no alternate fallback is permitted", plot.errors.boot.method), call. = FALSE)
 
     boot.out <- NULL
@@ -5794,6 +5860,37 @@ compute.bootstrap.errors.conbandwidth =
         ),
         error = function(e) {
           stop(sprintf("%s conditional gradient bootstrap helper failed in compute.bootstrap.errors.conbandwidth (%s)",
+                       if (is.block) plot.errors.boot.method else "inid",
+                       conditionMessage(e)),
+               call. = FALSE)
+        }
+      )
+    }
+
+    if (is.null(boot.out) && isTRUE(quantile.gradient.local.ok) && (isTRUE(is.inid) || isTRUE(is.block))) {
+      counts.drawer <- if (is.block) {
+        .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+      } else {
+        NULL
+      }
+      boot.out <- tryCatch(
+        .np_inid_boot_from_quantile_gradient_local(
+          xdat = xdat,
+          ydat = ydat[[1L]],
+          exdat = exdat,
+          bws = bws,
+          B = plot.errors.boot.num,
+          tau = tau,
+          gradient.index = gradient.index,
+          counts.drawer = counts.drawer
+        ),
+        error = function(e) {
+          stop(sprintf("%s quantile gradient bootstrap helper failed in compute.bootstrap.errors.conbandwidth (%s)",
                        if (is.block) plot.errors.boot.method else "inid",
                        conditionMessage(e)),
                call. = FALSE)
