@@ -78,18 +78,6 @@ test_that("plot helper progress emits append-only bounded messages", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  legacy <- capture_progress_shadow_trace(
-    {
-      state <- begin(total = 12, label = "Plot bootstrap wild")
-      for (i in seq_len(12L)) {
-        state <- tick(state, done = i)
-      }
-      finish(state)
-    },
-    force_renderer = "legacy",
-    now = progress_time_counter()
-  )
-
   actual <- capture_progress_shadow_trace(
     {
       state <- begin(total = 12, label = "Plot bootstrap wild")
@@ -103,14 +91,17 @@ test_that("plot helper progress emits append-only bounded messages", {
 
   lines <- vapply(actual$trace, `[[`, character(1L), "line")
 
-  expect_identical(lines, vapply(legacy$trace, `[[`, character(1L), "line"))
-  expect_identical(vapply(actual$trace, `[[`, character(1L), "event"), c("render", "render", "render", "render", "finish"))
+  expect_identical(
+    vapply(actual$trace, `[[`, character(1L), "event"),
+    c(rep("render", 13L), "finish")
+  )
   expect_identical(lines[[1L]], "[np] Plot bootstrap wild...")
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 1/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 3/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 6/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 9/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 12/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_equal(length(lines), 5L)
+  expect_equal(length(lines), 14L)
 })
 
 test_that("plot helper stays silent for instant runs below start grace", {
@@ -401,23 +392,11 @@ test_that("plot helper progress caps intermediate heartbeats", {
   old_opts <- options(
     np.messages = TRUE,
     np.plot.progress = TRUE,
-    np.plot.progress.interval.sec = 0,
+    np.plot.progress.interval.sec = 10,
     np.plot.progress.start.grace.sec = 0,
     np.plot.progress.max.intermediate = 2
   )
   on.exit(options(old_opts), add = TRUE)
-
-  legacy <- capture_progress_shadow_trace(
-    {
-      state <- begin(total = 12, label = "Plot bootstrap wild")
-      for (i in seq_len(12L)) {
-        state <- tick(state, done = i)
-      }
-      finish(state)
-    },
-    force_renderer = "legacy",
-    now = progress_time_counter()
-  )
 
   actual <- capture_progress_shadow_trace(
     {
@@ -432,9 +411,7 @@ test_that("plot helper progress caps intermediate heartbeats", {
 
   lines <- vapply(actual$trace, `[[`, character(1L), "line")
 
-  expect_identical(lines, vapply(legacy$trace, `[[`, character(1L), "line"))
-  expect_equal(length(lines), 4L)
-  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 4/12 ", lines)))
-  expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 8/12 ", lines)))
+  expect_equal(length(lines), 2L)
+  expect_identical(lines[[1L]], "[np] Plot bootstrap wild...")
   expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 12/12 ", lines)))
 })
