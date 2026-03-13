@@ -289,6 +289,41 @@
   invisible(NULL)
 }
 
+.np_plot_normalize_wild <- function(wild = c("rademacher", "mammen")) {
+  if (length(wild) > 1L)
+    wild <- wild[1L]
+  match.arg(wild, c("mammen", "rademacher"))
+}
+
+.np_plot_boot_from_hat_wild <- function(H, ydat, fit.mean, B, wild) {
+  fit.mean <- as.vector(fit.mean)
+  list(
+    t = .np_wild_boot_t(
+      H = H,
+      fit.mean = fit.mean,
+      residuals = as.double(ydat - fit.mean),
+      B = as.integer(B),
+      wild = wild
+    ),
+    t0 = as.vector(H %*% as.double(ydat))
+  )
+}
+
+.np_plot_boot_from_hat_wild_factor_effects <- function(H, ydat, fit.mean, B, wild) {
+  out <- .np_plot_boot_from_hat_wild(
+    H = H,
+    ydat = ydat,
+    fit.mean = fit.mean,
+    B = B,
+    wild = wild
+  )
+  if (ncol(out$t) < 1L)
+    return(out)
+  out$t <- sweep(out$t, 1L, out$t[, 1L], "-", check.margin = FALSE)
+  out$t0 <- out$t0 - out$t0[1L]
+  out
+}
+
 .np_plot_inid_fastpath_enabled <- function() {
   TRUE
 }
@@ -301,6 +336,36 @@
   if (is.null(bws))
     stop(sprintf("required argument 'bws' is missing or NULL in %s", where))
   invisible(TRUE)
+}
+
+.np_plot_boot_factor_boxplots <- function(boot.t, tdati, ti, B) {
+  all.bp <- list()
+  ti <- as.integer(ti)[1L]
+  if (is.na(ti) || ti < 1L)
+    return(all.bp)
+  if (ti > length(tdati$iord) || ti > length(tdati$iuno))
+    return(all.bp)
+  if (!(isTRUE(tdati$iord[ti]) || isTRUE(tdati$iuno[ti])))
+    return(all.bp)
+
+  boot.frame <- as.data.frame(boot.t)
+  u.lev <- tdati$all.ulev[[ti]]
+  stopifnot(length(u.lev) == ncol(boot.frame))
+
+  all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+  all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+  for (i in seq_along(u.lev)) {
+    t.bp <- boxplot.stats(boot.frame[, i])
+    all.bp$stats[, i] <- t.bp$stats
+    all.bp$conf[, i] <- t.bp$conf
+    all.bp$out <- c(all.bp$out, t.bp$out)
+    all.bp$group <- c(all.bp$group, rep.int(i, length(t.bp$out)))
+  }
+
+  all.bp$n <- rep.int(as.integer(B), length(u.lev))
+  all.bp$names <- tdati$all.lev[[ti]]
+  all.bp
 }
 
 # Policy hook: fastpath remains default-on; keep as helper so policy can be
@@ -5964,6 +6029,145 @@ plotFactor <- function(f, y, ...){
   )
 }
 
+.np_inid_boot_from_conditional_gradient_local <- function(xdat,
+                                                          ydat,
+                                                          exdat,
+                                                          eydat,
+                                                          bws,
+                                                          B,
+                                                          cdf,
+                                                          gradient.index,
+                                                          counts = NULL,
+                                                          counts.drawer = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (nrow(ydat) != n || nrow(exdat) != nrow(eydat))
+    stop("conditional gradient bootstrap helper requires aligned x/y training and evaluation rows")
+  if (n < 1L || B < 1L)
+    stop("invalid conditional gradient bootstrap dimensions")
+
+  fit.fun <- function(x.train, y.train) {
+    as.vector(.np_plot_conditional_eval(
+      bws = bws,
+      xdat = x.train,
+      ydat = y.train,
+      exdat = exdat,
+      eydat = eydat,
+      cdf = cdf,
+      gradients = TRUE
+    )$congrad[, gradient.index, drop = TRUE])
+  }
+
+  t0 <- fit.fun(x.train = xdat, y.train = ydat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+  counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  start <- 1L
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  while (start <= B) {
+    stopi <- min(B, start + chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    counts.chunk <- if (!is.null(counts.mat)) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+    }
+
+    for (jj in seq_len(bsz)) {
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      tmat[start + jj - 1L, ] <- fit.fun(
+        x.train = xdat[idx, , drop = FALSE],
+        y.train = ydat[idx, , drop = FALSE]
+      )
+    }
+
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_quantile_gradient_local <- function(xdat,
+                                                       ydat,
+                                                       exdat,
+                                                       bws,
+                                                       B,
+                                                       tau,
+                                                       gradient.index,
+                                                       counts = NULL,
+                                                       counts.drawer = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- as.double(ydat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("quantile gradient bootstrap helper requires aligned x/y training rows")
+  if (n < 1L || B < 1L)
+    stop("invalid quantile gradient bootstrap dimensions")
+
+  fit.fun <- function(x.train, y.train) {
+    as.vector(.np_plot_quantile_eval(
+      bws = bws,
+      txdat = x.train,
+      tydat = y.train,
+      exdat = exdat,
+      tau = tau,
+      gradients = TRUE
+    )$quantgrad[, gradient.index, drop = TRUE])
+  }
+
+  t0 <- fit.fun(x.train = xdat, y.train = ydat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+  counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  start <- 1L
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  while (start <= B) {
+    stopi <- min(B, start + chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    counts.chunk <- if (!is.null(counts.mat)) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+    }
+
+    for (jj in seq_len(bsz)) {
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      tmat[start + jj - 1L, ] <- fit.fun(
+        x.train = xdat[idx, , drop = FALSE],
+        y.train = ydat[idx]
+      )
+    }
+
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_plot_quantile_eval <- function(bws,
                                    txdat,
                                    tydat,
@@ -6022,9 +6226,6 @@ plotFactor <- function(f, y, ...){
         if (!xdat %~% exdat)
           stop("'txdat' and 'exdat' are not similar data frames!")
       }
-
-      if (gradients)
-        stop("gradients not currently supported for this object")
 
       if (length(bws$xbw) != length(xdat))
         stop("length of bandwidth vector does not match number of columns of 'txdat'")
@@ -6947,11 +7148,11 @@ compute.bootstrap.errors.rbandwidth =
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
-    if (is.wild.hat && gradients) {
-      cont.idx <- which(bws$xdati$icon)
-      if (is.na(match(slice.index, cont.idx))) {
-        stop("plot.errors.boot.method='wild' supports gradients only for continuous slices in npRmpi; no serial fallback is permitted", call. = FALSE)
-      }
+    cont.idx <- which(bws$xdati$icon)
+    xi.factor <- isTRUE(slice.index > 0L) &&
+      (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
+    if (is.wild.hat && gradients && !xi.factor && is.na(match(slice.index, cont.idx))) {
+      stop("plot.errors.boot.method='wild' supports gradients only for continuous or categorical slices in npRmpi; no serial fallback is permitted", call. = FALSE)
     }
 
     inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled())
@@ -6995,9 +7196,7 @@ compute.bootstrap.errors.rbandwidth =
     }
 
     if (is.null(boot.out) && is.wild.hat) {
-      if (length(plot.errors.boot.wild) > 1L)
-        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
-      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
+      plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
       if (!is.null(fit.mean.train)) {
         fit.mean.train <- as.double(fit.mean.train)
         if (length(fit.mean.train) != length(ydat) || any(!is.finite(fit.mean.train))) {
@@ -7044,8 +7243,7 @@ compute.bootstrap.errors.rbandwidth =
       )
 
       s.vec <- NULL
-      if (gradients) {
-        cont.idx <- which(bws$xdati$icon)
+      if (gradients && !xi.factor) {
         cpos <- match(slice.index, cont.idx)
         gorder <- if (length(gradient.order) == 1L) {
           rep.int(as.integer(gradient.order), length(cont.idx))
@@ -7093,30 +7291,35 @@ compute.bootstrap.errors.rbandwidth =
         )
       )
 
-      t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - fit.mean.train)
-      n <- length(eps)
       B <- plot.errors.boot.num
       .npRmpi_bootstrap_transport_trace(
         what = "rbandwidth.wild",
         event = "wild.boot.start",
         fields = list(
           slice = slice.index,
-          n = n,
-          B = B
+          n = length(ydat),
+          B = B,
+          factor_slice = xi.factor
         )
       )
 
-      boot.out <- list(
-        t = .np_wild_boot_t(
+      boot.out <- if (gradients && xi.factor) {
+        .np_plot_boot_from_hat_wild_factor_effects(
           H = H,
+          ydat = ydat,
           fit.mean = fit.mean.train,
-          residuals = eps,
           B = B,
           wild = plot.errors.boot.wild
-        ),
-        t0 = t0
-      )
+        )
+      } else {
+        .np_plot_boot_from_hat_wild(
+          H = H,
+          ydat = ydat,
+          fit.mean = fit.mean.train,
+          B = B,
+          wild = plot.errors.boot.wild
+        )
+      }
       .npRmpi_bootstrap_transport_trace(
         what = "rbandwidth.wild",
         event = "wild.boot.done",
@@ -7940,10 +8143,12 @@ compute.bootstrap.errors.conbandwidth =
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
       isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
+    gradient.local.ok <- isTRUE(!quantreg) && isTRUE(gradients)
+    quantile.gradient.local.ok <- isTRUE(quantreg) && isTRUE(gradients)
 
-    if (is.inid && !isTRUE(fast.inid))
+    if (is.inid && !isTRUE(fast.inid) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.gradient.local.ok))
       stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
-    if (is.block && !isTRUE(fast.block))
+    if (is.block && !isTRUE(fast.block) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.gradient.local.ok))
       stop("fixed/geom conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     boot.out <- NULL
@@ -7993,10 +8198,75 @@ compute.bootstrap.errors.conbandwidth =
       })
     }
 
+    if (is.null(boot.out) && isTRUE(gradient.local.ok) && (isTRUE(is.inid) || isTRUE(is.block))) {
+      counts.drawer <- if (is.block) {
+        .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+      } else {
+        NULL
+      }
+      boot.out <- .npRmpi_with_local_bootstrap({
+        tryCatch(
+          .np_inid_boot_from_conditional_gradient_local(
+            xdat = xdat,
+            ydat = ydat,
+            exdat = exdat,
+            eydat = eydat,
+            bws = bws,
+            B = plot.errors.boot.num,
+            cdf = cdf,
+            gradient.index = gradient.index,
+            counts.drawer = counts.drawer
+          ),
+          error = function(e) {
+            stop(sprintf("%s conditional gradient bootstrap helper failed in compute.bootstrap.errors.conbandwidth (%s)",
+                         if (is.block) plot.errors.boot.method else "inid",
+                         conditionMessage(e)),
+                 call. = FALSE)
+          }
+        )
+      })
+    }
+
+    if (is.null(boot.out) && isTRUE(quantile.gradient.local.ok) && (isTRUE(is.inid) || isTRUE(is.block))) {
+      counts.drawer <- if (is.block) {
+        .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+      } else {
+        NULL
+      }
+      boot.out <- .npRmpi_with_local_bootstrap({
+        tryCatch(
+          .np_inid_boot_from_quantile_gradient_local(
+            xdat = xdat,
+            ydat = ydat[[1L]],
+            exdat = exdat,
+            bws = bws,
+            B = plot.errors.boot.num,
+            tau = tau,
+            gradient.index = gradient.index,
+            counts.drawer = counts.drawer
+          ),
+          error = function(e) {
+            stop(sprintf("%s quantile gradient bootstrap helper failed in compute.bootstrap.errors.conbandwidth (%s)",
+                         if (is.block) plot.errors.boot.method else "inid",
+                         conditionMessage(e)),
+                 call. = FALSE)
+          }
+        )
+      })
+    }
+
     if (is.null(boot.out))
       stop("no MPI helper path available for this conditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
-
-    all.bp <- list()
 
     if (slice.index <= bws$xndim){
       tdati <- bws$xdati
@@ -8005,29 +8275,12 @@ compute.bootstrap.errors.conbandwidth =
       tdati <- bws$ydati
       ti <- slice.index - bws$xndim
     }
-    
-    if (slice.index > 0 && (tdati$iord[ti] || tdati$iuno[ti])){
-      boot.frame <- as.data.frame(boot.out$t)
-      u.lev <- tdati$all.ulev[[ti]]
-
-      ## if we are bootstrapping a factor, there should be one
-      ## set of replications for each level
-      stopifnot(length(u.lev)==ncol(boot.frame))
-      
-      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
-      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
-
-      for (i in seq_along(u.lev)){
-        t.bp <- boxplot.stats(boot.frame[,i])
-        all.bp$stats[,i] <- t.bp$stats
-        all.bp$conf[,i] <- t.bp$conf
-        all.bp$out <- c(all.bp$out,t.bp$out)
-        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
-      }
-      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-      all.bp$names <- tdati$all.lev[[ti]]
-      rm(boot.frame)
-    }
+    all.bp <- .np_plot_boot_factor_boxplots(
+      boot.t = boot.out$t,
+      tdati = tdati,
+      ti = ti,
+      B = plot.errors.boot.num
+    )
 
     if (plot.errors.type == "pmzsd") {
       pmz.progress <- .np_plot_stage_progress_begin(
@@ -8078,166 +8331,26 @@ compute.bootstrap.errors.condbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    activity <- .np_plot_activity_begin(
-      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
-    )
-    on.exit(.np_plot_activity_end(activity), add = TRUE)
-    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.condbandwidth")
-    prof.ctx <- .npRmpi_profile_bootstrap_begin(
-      where = "compute.bootstrap.errors.condbandwidth",
-      method = plot.errors.boot.method,
-      B = plot.errors.boot.num,
-      ntrain = .np_nrows_safe(xdat),
-      neval = .np_nrows_safe(exdat)
-    )
-    exdat = toFrame(exdat)
-    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
-    boot.all.err <- NULL
-
-    tboo =
-      if(quantreg) "quant"
-      else if (cdf) "dist"
-      else "dens"
-
-    if (!identical(tboo, "quant")) {
-      .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "conditional density/distribution estimators")
-    }
-
-    is.inid = plot.errors.boot.method=="inid"
-    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
-      !identical(bws$type, "fixed")
-    frozen.nonfixed.ok <- isTRUE(use.frozen.nonfixed) &&
-      isTRUE(!quantreg) &&
-      isTRUE(!gradients)
-    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
-      isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
-      isTRUE(is.inid) &&
-      isTRUE(!quantreg) &&
-      isTRUE(!gradients) &&
-      isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
-    fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
-      isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
-      isTRUE(is.block) &&
-      isTRUE(!quantreg) &&
-      isTRUE(!gradients) &&
-      isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
-    if (is.inid && !isTRUE(fast.inid))
-      stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
-    if (is.block && !isTRUE(fast.block))
-      stop("fixed/geom conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
-
-    boot.out <- NULL
-    if (fast.inid || fast.block) {
-      counts.drawer <- if (fast.block) {
-        .np_block_counts_drawer(
-          n = nrow(xdat),
-          B = plot.errors.boot.num,
-          blocklen = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      } else {
-        NULL
-      }
-      boot.out <- .npRmpi_with_local_bootstrap({
-        tryCatch(
-          if (use.frozen.nonfixed) {
-            .np_inid_boot_from_hat_conditional_frozen(
-              xdat = xdat,
-              ydat = ydat,
-              exdat = exdat,
-              eydat = eydat,
-              bws = bws,
-              B = plot.errors.boot.num,
-              cdf = cdf,
-              counts.drawer = counts.drawer
-            )
-          } else {
-            .np_inid_boot_from_ksum_conditional(
-              xdat = xdat,
-              ydat = ydat,
-              exdat = exdat,
-              eydat = eydat,
-              bws = bws,
-              B = plot.errors.boot.num,
-              cdf = cdf,
-              counts.drawer = counts.drawer
-            )
-          },
-          error = function(e) {
-            stop(sprintf("%s conditional bootstrap helper failed in compute.bootstrap.errors.condbandwidth (%s)",
-                         if (fast.block) plot.errors.boot.method else "inid",
-                         conditionMessage(e)),
-                 call. = FALSE)
-          }
-        )
-      })
-    }
-
-    if (is.null(boot.out))
-      stop("no MPI helper path available for this conditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
-
-    all.bp <- list()
-
-    if (slice.index <= bws$xndim){
-      tdati <- bws$xdati
-      ti <- slice.index
-    } else {
-      tdati <- bws$ydati
-      ti <- slice.index - bws$xndim
-    }
-    
-    if (slice.index > 0 && (tdati$iord[ti] || tdati$iuno[ti])){
-      boot.frame <- as.data.frame(boot.out$t)
-      u.lev <- tdati$all.ulev[[ti]]
-
-      ## if we are bootstrapping a factor, there should be one
-      ## set of replications for each level
-      stopifnot(length(u.lev)==ncol(boot.frame))
-      
-      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
-      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
-
-      for (i in seq_along(u.lev)){
-        t.bp <- boxplot.stats(boot.frame[,i])
-        all.bp$stats[,i] <- t.bp$stats
-        all.bp$conf[,i] <- t.bp$conf
-        all.bp$out <- c(all.bp$out,t.bp$out)
-        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
-      }
-      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-      all.bp$names <- tdati$all.lev[[ti]]
-      rm(boot.frame)
-    }
-
-    if (plot.errors.type == "pmzsd") {
-      pmz.progress <- .np_plot_stage_progress_begin(
-        total = 2L,
-        label = "Computing bootstrap pmzsd errors"
-      )
-      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
-      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
-      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE) * boot.sd
-      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
-    }
-    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      boot.summary <- .np_plot_bootstrap_interval_summary(
-        boot.t = boot.out$t,
-        t0 = boot.out$t0,
-        alpha = plot.errors.alpha,
-        band.type = plot.errors.type
-      )
-      boot.err[,1:2] <- boot.summary$err
-      boot.all.err <- boot.summary$all.err
-    }
-    if (plot.errors.center == "bias-corrected")
-      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    .npRmpi_profile_finalize_bootstrap(
-      boot.err = boot.err,
-      bxp = all.bp,
-      boot.all.err = boot.all.err,
-      ctx = prof.ctx
+    compute.bootstrap.errors.conbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      cdf = cdf,
+      quantreg = quantreg,
+      tau = tau,
+      gradients = gradients,
+      gradient.index = gradient.index,
+      slice.index = slice.index,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.boot.num = plot.errors.boot.num,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      ...,
+      bws = bws
     )
   }
 
