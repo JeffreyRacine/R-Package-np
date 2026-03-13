@@ -321,6 +321,41 @@
   )
 }
 
+.np_progress_compact_single_line <- function(line, max_width) {
+  if (!is.character(line) || length(line) != 1L || is.na(line)) {
+    return(line)
+  }
+
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return(line)
+  }
+
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  compacted <- line
+  replacements <- list(
+    c(" smooth coefficient ", " smooth coef "),
+    c(" coefficient ", " coef "),
+    c(" single-index ", " SI "),
+    c(" regression ", " reg "),
+    c(" density ", " dens "),
+    c(" distribution ", " dist "),
+    c(" bandwidth", " bw")
+  )
+
+  for (rule in replacements) {
+    if (nchar(compacted, type = "width") <= max_width) {
+      break
+    }
+    compacted <- gsub(rule[[1L]], rule[[2L]], compacted, fixed = TRUE)
+  }
+
+  compacted
+}
+
 .np_progress_fit_single_line <- function(line, max_width = .np_progress_output_width()) {
   if (!is.character(line) || length(line) != 1L || is.na(line)) {
     return(line)
@@ -331,6 +366,11 @@
     return(line)
   }
 
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  line <- .np_progress_compact_single_line(line, max_width = max_width)
   if (nchar(line, type = "width") <= max_width) {
     return(line)
   }

@@ -391,6 +391,32 @@ test_that("single-line fit drops detail before truncating", {
   )
 })
 
+test_that("single-line fit compacts bandwidth labels before ellipsizing", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+
+  line <- "[np] Selecting regression bandwidth multistart 2/3 (66.7%, elapsed 6.3s, eta 3.2s)"
+  fitted <- fit(line, max_width = 80)
+
+  expect_lte(nchar(fitted, type = "width"), 80L)
+  expect_identical(
+    fitted,
+    "[np] Selecting reg bandwidth multistart 2/3 (66.7%, elapsed 6.3s, eta 3.2s)"
+  )
+})
+
+test_that("single-line fit keeps smooth coefficient bandwidth lines readable at 80 columns", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+
+  line <- "[np] Selecting smooth coefficient bandwidth multistart 2/2 (100.0%, elapsed 6.3s, eta 0.0s)"
+  fitted <- fit(line, max_width = 80)
+
+  expect_lte(nchar(fitted, type = "width"), 80L)
+  expect_identical(
+    fitted,
+    "[np] Selecting smooth coef bw multistart 2/2 (100.0%, elapsed 6.3s, eta 0.0s)"
+  )
+})
+
 test_that("single-line fit preserves both ends when truncation is still required", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 
