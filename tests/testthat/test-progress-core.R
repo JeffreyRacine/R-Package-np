@@ -577,10 +577,10 @@ test_that("plot progress can repaint on elapsed time before the first checkpoint
 })
 
 test_that("interactive bootstrap chunk sizes leave room for intermediate progress", {
-  inid_chunk <- getFromNamespace(".np_inid_chunk_size", "np")
+  progress_chunk_cap <- getFromNamespace(".np_plot_progress_chunk_cap", "np")
   wild_chunk <- getFromNamespace(".np_wild_chunk_size", "np")
 
-  expect_identical(inid_chunk(n = 500L, B = 9999L), 2500L)
+  expect_identical(progress_chunk_cap(9999L), 2500L)
   expect_identical(wild_chunk(n = 500L, B = 9999L), 2500L)
 })
 
