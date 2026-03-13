@@ -238,7 +238,26 @@
       persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
       
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+          persp(x1.eval,
+                x2.eval,
+                tdens,
+                zlim = zlim,
+                col = persp.col,
+                border = scalar_default(border, "black"),
+                ticktype = "detailed",
+                cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                cex.lab = scalar_default(cex.lab, par()$cex.lab),
+                cex.main = scalar_default(cex.main, par()$cex.main),
+                cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                xlab = scalar_default(xlab, gen.label(names(xdat)[1], "X1")),
+                ylab = scalar_default(ylab, gen.label(names(xdat)[2], "X2")),
+                zlab = scalar_default(zlab, "Joint Density"),
+                theta = i,
+                phi = phi,
+                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+
           if (plot.errors){
+            par(new = TRUE)
             if (plot.errors.type == "all" && !is.null(lerr.all)) {
               band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
               for (bn in c("pointwise", "simultaneous", "bonferroni")) {
@@ -281,27 +300,7 @@
                     lwd = scalar_default(lwd, par()$lwd))
               par(new = TRUE)
             }
-          }
-          
-          persp(x1.eval,
-                x2.eval,
-                tdens,
-                zlim = zlim,
-                col = persp.col,
-                border = scalar_default(border, "black"),
-                ticktype = "detailed",
-                cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                cex.main = scalar_default(cex.main, par()$cex.main),
-                cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                xlab = scalar_default(xlab, gen.label(names(xdat)[1], "X1")),
-                ylab = scalar_default(ylab, gen.label(names(xdat)[2], "X2")),
-                zlab = scalar_default(zlab, "Joint Density"),
-                theta = i,
-                phi = phi,
-                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
-          if (plot.errors){
             par(new = TRUE)
             if (plot.errors.type == "all" && !is.null(herr.all)) {
               band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
