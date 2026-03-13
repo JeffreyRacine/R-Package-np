@@ -129,6 +129,8 @@ npplreg.call <-
            zdat,
            exdat,
            ezdat) {
+    activity <- .np_plot_activity_begin("Computing partially linear plot fit")
+    on.exit(.np_plot_activity_end(activity), add = TRUE)
 
     xdat <- toFrame(xdat)
     zdat <- toFrame(zdat)
