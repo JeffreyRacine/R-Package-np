@@ -4435,6 +4435,12 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
   double temp = DBL_MAX;
   double *wbuf = NULL;
   const int use_wpow = (kpow != 1);
+  const int scalar_sum_fast =
+    (!have_sgn) &&
+    (!symmetric) &&
+    (max_A == 1) &&
+    (max_B == 1) &&
+    (kpow == 1);
 
   if(use_wpow){
     wbuf = (double *)malloc((size_t)num_weights*sizeof(double));
@@ -4447,6 +4453,59 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
   if (do_leave_one_out) {
     temp = weights[which_k];
     weights[which_k] = 0.0;
+  }
+
+  if(scalar_sum_fast){
+    if(xl == NULL){
+      if(!parallel_sum){
+        double acc = 0.0;
+
+        for(k = 0; k < num_weights; k++){
+          if(weights[k] == 0.0) continue;
+          acc += pmat_A[0][k*have_A]*pmat_B[0][k*have_B]*weights[k]/db;
+        }
+
+        result[0] += acc;
+      } else {
+        l = which_l;
+        for(k = 0; k < num_weights; k++){
+          if(weights[k] == 0.0) continue;
+          result[k] += pmat_A[0][l*have_A]*pmat_B[0][l*have_B]*weights[k]/db;
+        }
+      }
+    } else {
+      if(!parallel_sum){
+        double acc = 0.0;
+
+        for(int m = 0; m < xl->n; m++){
+          const int istart = xl->istart[m];
+          const int nlev = xl->nlev[m];
+
+          for(k = istart; k < istart+nlev; k++){
+            if(weights[k] == 0.0) continue;
+            acc += pmat_A[0][k*have_A]*pmat_B[0][k*have_B]*weights[k]/db;
+          }
+        }
+
+        result[0] += acc;
+      } else {
+        l = which_l;
+        for(int m = 0; m < xl->n; m++){
+          const int istart = xl->istart[m];
+          const int nlev = xl->nlev[m];
+
+          for(k = istart; k < istart+nlev; k++){
+            if(weights[k] == 0.0) continue;
+            result[k] += pmat_A[0][l*have_A]*pmat_B[0][l*have_B]*weights[k]/db;
+          }
+        }
+      }
+    }
+
+    if(do_leave_one_out)
+      weights[which_k] = temp;
+
+    return;
   }
   
   if(xl == NULL){

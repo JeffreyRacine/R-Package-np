@@ -181,6 +181,71 @@ test_that("nonfixed conditional exact bootstrap matches duplicate-row oracle", {
   }
 })
 
+test_that("generalized conditional exact state apply matches weighted active-support oracle", {
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  xdat <- data.frame(x = c(0, 0, 1, 3, 3, 10))
+  ydat <- data.frame(y = c(0, 0, 1, 2, 2, 4))
+  exdat <- data.frame(x = c(0, 2, 5, 9))
+  eydat <- data.frame(y = c(0, 1, 2, 4))
+  counts <- c(1, 0, 1, 2, 0, 2)
+  active <- counts > 0
+
+  bw <- npcdensbw(
+    xdat = xdat,
+    ydat = ydat,
+    bwtype = "generalized_nn",
+    bws = c(1, 1),
+    bandwidth.compute = FALSE
+  )
+
+  den.state <- np:::.np_ksum_exact_state_build(
+    bws = np:::.np_con_make_kbandwidth_x(bws = bw, xdat = xdat),
+    exdat = exdat,
+    operator = "normal"
+  )
+  num.state <- np:::.np_ksum_exact_state_build(
+    bws = np:::.np_con_make_kbandwidth_xy(bws = bw, xdat = xdat, ydat = ydat),
+    exdat = np:::.np_bind_data_frames_fast(exdat, eydat),
+    operator = c("normal", "normal")
+  )
+
+  sample <- np:::.np_active_boot_sample_matrix(
+    xmat = data.matrix(xdat),
+    ymat = cbind(data.matrix(xdat), data.matrix(ydat)),
+    counts.col = counts
+  )
+
+  den <- as.numeric(np:::.np_ksum_eval_exact_state(
+    state = den.state,
+    txdat = sample$xmat,
+    weights = sample$weights
+  )) / sample$n.total
+
+  num <- as.numeric(np:::.np_ksum_eval_exact_state(
+    state = num.state,
+    txdat = sample$ymat,
+    weights = sample$weights
+  )) / sample$n.total
+
+  expect_equal(
+    num / pmax(den, .Machine$double.eps),
+    np:::.np_ksum_conditional_eval_exact(
+      xdat = xdat[active, , drop = FALSE],
+      ydat = ydat[active, , drop = FALSE],
+      exdat = exdat,
+      eydat = eydat,
+      kbx = np:::.np_con_make_kbandwidth_x(bws = bw, xdat = xdat),
+      kbxy = np:::.np_con_make_kbandwidth_xy(bws = bw, xdat = xdat, ydat = ydat),
+      cdf = FALSE,
+      weights = counts[active],
+      n.total = sum(counts)
+    ),
+    tolerance = 0
+  )
+})
+
 test_that("adaptive conditional exact reports invalid tiny-support resamples clearly", {
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old_opts), add = TRUE)
