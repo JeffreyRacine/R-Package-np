@@ -132,7 +132,7 @@ npdeptest <- function(data.x = NULL,
   if(bootstrap) {
 
     Srho.vec.boot <- numeric()
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
     for (b in seq_len(boot.num)) {
       ## Break systematic relationship between x and y (null)

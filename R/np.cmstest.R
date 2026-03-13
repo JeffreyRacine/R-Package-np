@@ -224,7 +224,7 @@ npcmstest <- function(formula,
 
   if(distribution == "bootstrap"){
     Sn.bootstrap <- numeric(boot.num)
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
     for (ii in seq_len(boot.num)) {
        if(boot.method == "iid"){

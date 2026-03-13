@@ -4,7 +4,8 @@ test_that("progress core avoids legacy emitters", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_false(grepl("\\bcat\\(", src))
+  expect_true(grepl("\\.np_progress_render_single_line <- function\\(", src))
+  expect_true(grepl("base::cat\\(", src))
   expect_false(grepl("\\bprint\\(", src))
   expect_true(grepl("\\.np_progress_select_bandwidth <- function\\(", src))
   expect_true(grepl("\\.np_warning <- function\\(", src))

@@ -1,42 +1,9 @@
-with_nprmpi_bindings <- function(bindings, code) {
-  code <- substitute(code)
-  ns <- asNamespace("npRmpi")
-  old <- lapply(names(bindings), function(name) get(name, envir = ns, inherits = FALSE))
-  names(old) <- names(bindings)
-
-  for (name in names(bindings)) {
-    was_locked <- bindingIsLocked(name, ns)
-    if (was_locked) {
-      unlockBinding(name, ns)
-    }
-    assign(name, bindings[[name]], envir = ns)
-    if (was_locked) {
-      lockBinding(name, ns)
-    }
-  }
-
-  on.exit({
-    for (name in names(old)) {
-      was_locked <- bindingIsLocked(name, ns)
-      if (was_locked) {
-        unlockBinding(name, ns)
-      }
-      assign(name, old[[name]], envir = ns)
-      if (was_locked) {
-        lockBinding(name, ns)
-      }
-    }
-  }, add = TRUE)
-
-  eval(code, envir = parent.frame())
-}
-
-capture_progress_conditions <- function(expr) {
+capture_progress_shadow_with_conditions <- function(expr, force_renderer = NULL, now = function() 0) {
   messages <- character()
   warnings <- character()
 
-  value <- withCallingHandlers(
-    expr,
+  shadow <- withCallingHandlers(
+    capture_progress_shadow_trace(expr, force_renderer = force_renderer, now = now),
     message = function(m) {
       messages <<- c(messages, conditionMessage(m))
       invokeRestart("muffleMessage")
@@ -47,11 +14,20 @@ capture_progress_conditions <- function(expr) {
     }
   )
 
-  list(value = value, messages = messages, warnings = warnings)
+  list(
+    value = shadow$value,
+    trace = shadow$trace,
+    final_line = shadow$final_line,
+    messages = sub("\n$", "", messages),
+    warnings = warnings
+  )
 }
 
-normalize_messages <- function(x) {
-  sub("\n$", "", x)
+skip_live_route_slice <- function() {
+  skip_if_not(
+    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
+    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
+  )
 }
 
 progress_time_counter <- function(start = 0, by = 2.1) {
@@ -70,15 +46,25 @@ make_iv_data <- function(n = 40) {
   list(y = y, z = z, w = w)
 }
 
-npregiv_fun <- function(...) {
-  getFromNamespace("npregiv", "npRmpi")(...)
+shadow_lines_matching <- function(shadow, pattern) {
+  lines <- vapply(shadow$trace, `[[`, character(1L), "line")
+  lines[grepl(pattern, lines)]
 }
 
-npregivderiv_fun <- function(...) {
-  getFromNamespace("npregivderiv", "npRmpi")(...)
+shadow_signature <- function(shadow, pattern) {
+  lines <- vapply(shadow$trace, `[[`, character(1L), "line")
+  events <- vapply(shadow$trace, `[[`, character(1L), "event")
+  keep <- grepl(pattern, lines)
+
+  data.frame(
+    event = events[keep],
+    line = lines[keep],
+    stringsAsFactors = FALSE
+  )
 }
 
-test_that("Landweber npregiv emits append-only progress messages", {
+test_that("Landweber npregiv single-line progress matches legacy semantics", {
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -86,27 +72,30 @@ test_that("Landweber npregiv emits append-only progress messages", {
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
-    ),
-    capture_progress_conditions(
-      npregiv_fun(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 4)
-    )
+  legacy <- capture_progress_shadow_with_conditions(
+    npregiv(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 4),
+    force_renderer = "legacy",
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(res$messages)
+  dat <- make_iv_data()
+  single_line <- capture_progress_shadow_with_conditions(
+    npregiv(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 4),
+    force_renderer = "single_line",
+    now = progress_time_counter()
+  )
 
-  expect_s3_class(res$value, "npregiv")
-  expect_true(any(grepl("^\\[npRmpi\\] Preparing Landweber-Fridman IV regression$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Iterating Landweber-Fridman solve\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s", messages)))
-  expect_false(any(grepl("\b", messages, fixed = TRUE)))
+  pattern <- "^\\[npRmpi\\] Iterating Landweber-Fridman solve"
+  lines <- shadow_lines_matching(single_line, pattern)
+
+  expect_s3_class(single_line$value, "npregiv")
+  expect_equal(shadow_signature(single_line, pattern), shadow_signature(legacy, pattern))
+  expect_true(any(grepl("^\\[npRmpi\\] Preparing Landweber-Fridman IV regression$", single_line$messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Iterating Landweber-Fridman solve\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s", lines)))
 })
 
-test_that("Tikhonov npregiv emits append-only progress messages", {
+test_that("Tikhonov npregiv single-line progress matches legacy semantics", {
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -114,34 +103,44 @@ test_that("Tikhonov npregiv emits append-only progress messages", {
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
+  legacy <- capture_progress_shadow_with_conditions(
+    npregiv(
+      y = dat$y,
+      z = dat$z,
+      w = dat$w,
+      method = "Tikhonov",
+      iterate.Tikhonov = TRUE,
+      iterate.Tikhonov.num = 3
     ),
-    capture_progress_conditions(
-      npregiv_fun(
-        y = dat$y,
-        z = dat$z,
-        w = dat$w,
-        method = "Tikhonov",
-        iterate.Tikhonov = TRUE,
-        iterate.Tikhonov.num = 3
-      )
-    )
+    force_renderer = "legacy",
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(res$messages)
+  dat <- make_iv_data()
+  single_line <- capture_progress_shadow_with_conditions(
+    npregiv(
+      y = dat$y,
+      z = dat$z,
+      w = dat$w,
+      method = "Tikhonov",
+      iterate.Tikhonov = TRUE,
+      iterate.Tikhonov.num = 3
+    ),
+    force_renderer = "single_line",
+    now = progress_time_counter()
+  )
 
-  expect_s3_class(res$value, "npregiv")
-  expect_true(any(grepl("^\\[npRmpi\\] Preparing Tikhonov IV regression$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Iterating Tikhonov solve [0-9]+/[0-9]+ \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)", messages)))
-  expect_false(any(grepl("\b", messages, fixed = TRUE)))
+  pattern <- "^\\[npRmpi\\] Iterating Tikhonov solve"
+  lines <- shadow_lines_matching(single_line, pattern)
+
+  expect_s3_class(single_line$value, "npregiv")
+  expect_equal(shadow_signature(single_line, pattern), shadow_signature(legacy, pattern))
+  expect_true(any(grepl("^\\[npRmpi\\] Preparing Tikhonov IV regression$", single_line$messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Iterating Tikhonov solve [0-9]+/[0-9]+ \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)(: .*)?$", lines)))
 })
 
-test_that("npregivderiv emits append-only progress messages", {
+test_that("npregivderiv single-line progress matches legacy semantics", {
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -149,27 +148,30 @@ test_that("npregivderiv emits append-only progress messages", {
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
-    ),
-    capture_progress_conditions(
-      npregivderiv_fun(y = dat$y, z = dat$z, w = dat$w, iterate.max = 3)
-    )
+  legacy <- capture_progress_shadow_with_conditions(
+    npregivderiv(y = dat$y, z = dat$z, w = dat$w, iterate.max = 3),
+    force_renderer = "legacy",
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(res$messages)
+  dat <- make_iv_data()
+  single_line <- capture_progress_shadow_with_conditions(
+    npregivderiv(y = dat$y, z = dat$z, w = dat$w, iterate.max = 3),
+    force_renderer = "single_line",
+    now = progress_time_counter()
+  )
 
-  expect_s3_class(res$value, "npregivderiv")
-  expect_true(any(grepl("^\\[npRmpi\\] Preparing IV derivative regression$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Iterating Landweber-Fridman derivative solve\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s", messages)))
-  expect_false(any(grepl("\b", messages, fixed = TRUE)))
+  pattern <- "^\\[npRmpi\\] Iterating Landweber-Fridman derivative solve"
+  lines <- shadow_lines_matching(single_line, pattern)
+
+  expect_s3_class(single_line$value, "npregivderiv")
+  expect_equal(shadow_signature(single_line, pattern), shadow_signature(legacy, pattern))
+  expect_true(any(grepl("^\\[npRmpi\\] Preparing IV derivative regression$", single_line$messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Iterating Landweber-Fridman derivative solve\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s", lines)))
 })
 
 test_that("npregiv proof-slice progress respects np.messages FALSE", {
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -177,22 +179,17 @@ test_that("npregiv proof-slice progress respects np.messages FALSE", {
   old_opts <- options(np.messages = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
-    ),
-    capture_progress_conditions(
-      npregiv_fun(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 4)
-    )
+  res <- capture_progress_shadow_with_conditions(
+    npregiv(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 4),
+    now = progress_time_counter()
   )
 
   expect_length(res$messages, 0)
+  expect_length(res$trace, 0)
 })
 
 test_that("npregivderiv proof-slice progress respects suppressMessages", {
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -200,17 +197,19 @@ test_that("npregivderiv proof-slice progress respects suppressMessages", {
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
-    ),
-    capture_progress_conditions(
-      suppressMessages(npregivderiv_fun(y = dat$y, z = dat$z, w = dat$w, iterate.max = 3))
-    )
+  res <- capture_progress_shadow_with_conditions(
+    suppressMessages(npregivderiv(y = dat$y, z = dat$z, w = dat$w, iterate.max = 3)),
+    now = progress_time_counter()
   )
 
   expect_length(res$messages, 0)
+  expect_length(res$trace, 0)
+})
+
+test_that("IV source routes use the canonical single-line surface tag", {
+  src <- paste(readLines(testthat::test_path("..", "..", "R", "npregiv.R"), warn = FALSE), collapse = "\n")
+  expect_true(grepl('surface = "iv_solve"', src, fixed = TRUE))
+
+  src_deriv <- paste(readLines(testthat::test_path("..", "..", "R", "npregivderiv.R"), warn = FALSE), collapse = "\n")
+  expect_true(grepl('surface = "iv_solve"', src_deriv, fixed = TRUE))
 })

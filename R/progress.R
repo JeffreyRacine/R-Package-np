@@ -66,6 +66,58 @@
   invisible(NULL)
 }
 
+.np_progress_call_name <- function(call) {
+  head <- call[[1L]]
+
+  if (is.symbol(head)) {
+    return(as.character(head))
+  }
+
+  if (is.call(head) &&
+      identical(head[[1L]], as.name("::")) &&
+      length(head) >= 3L &&
+      is.symbol(head[[2L]]) &&
+      is.symbol(head[[3L]])) {
+    return(paste(as.character(head[[2L]]), as.character(head[[3L]]), sep = "::"))
+  }
+
+  ""
+}
+
+.np_progress_is_message_muffled <- function() {
+  calls <- sys.calls()
+  if (!length(calls)) {
+    return(FALSE)
+  }
+
+  any(vapply(
+    calls,
+    function(call) {
+      .np_progress_call_name(call) %in% c(
+        "suppressMessages",
+        "base::suppressMessages",
+        "suppressPackageStartupMessages",
+        "base::suppressPackageStartupMessages"
+      )
+    },
+    logical(1L)
+  ))
+}
+
+.np_progress_resolve_message_muffling <- function(state) {
+  if (!identical(state$renderer, "single_line")) {
+    return(state)
+  }
+
+  if (isTRUE(state$message_muffled_checked)) {
+    return(state)
+  }
+
+  state$message_muffled <- isTRUE(.np_progress_is_message_muffled())
+  state$message_muffled_checked <- TRUE
+  state
+}
+
 .np_progress_fmt_num <- function(x) {
   formatC(x, digits = 1L, format = "f")
 }
@@ -79,6 +131,231 @@
   env$force_enabled <- FALSE
   env
 })
+
+.np_progress_make_registry <- function() {
+  env <- new.env(parent = emptyenv())
+  env$next_id <- 0L
+  env$active_id <- NULL
+  env
+}
+
+.np_progress_registry <- .np_progress_make_registry()
+
+.np_progress_is_rstudio_console <- function() {
+  identical(.Platform$GUI, "RStudio") || identical(Sys.getenv("RSTUDIO"), "1")
+}
+
+.np_progress_reset_registry <- function() {
+  .np_progress_registry$next_id <- 0L
+  .np_progress_registry$active_id <- NULL
+  invisible(NULL)
+}
+
+.np_progress_next_id <- function() {
+  .np_progress_registry$next_id <- as.integer(.np_progress_registry$next_id) + 1L
+  sprintf("progress-%d", .np_progress_registry$next_id)
+}
+
+.np_progress_capability <- function(domain = "general") {
+  interactive_console <- isTRUE(.np_progress_is_interactive())
+  rstudio_console <- isTRUE(.np_progress_is_rstudio_console())
+
+  list(
+    domain = domain,
+    interactive = interactive_console,
+    rstudio = rstudio_console,
+    single_line_viable = interactive_console
+  )
+}
+
+.np_progress_single_line_surfaces <- function() {
+  c("bandwidth", "plot_activity", "plot_bounded", "bootstrap", "lag", "iv_solve")
+}
+
+.np_progress_renderer_for_surface <- function(surface, capability) {
+  if (surface %in% .np_progress_single_line_surfaces() &&
+      isTRUE(capability$single_line_viable)) {
+    return("single_line")
+  }
+
+  "legacy"
+}
+
+.np_progress_claim_owner <- function(session_id) {
+  active_id <- .np_progress_registry$active_id
+  if (is.null(active_id) || identical(active_id, session_id)) {
+    .np_progress_registry$active_id <- session_id
+    return(TRUE)
+  }
+
+  FALSE
+}
+
+.np_progress_release_owner <- function(session_id) {
+  if (identical(.np_progress_registry$active_id, session_id)) {
+    .np_progress_registry$active_id <- NULL
+  }
+
+  invisible(NULL)
+}
+
+.np_progress_make_snapshot <- function(state, line, event, now, done = NULL, detail = NULL, render_line = line) {
+  list(
+    id = state$id,
+    surface = state$surface,
+    renderer = state$renderer,
+    label = state$label,
+    kind = if (isTRUE(state$known_total)) "known" else "unknown",
+    current = done,
+    total = state$total,
+    detail = detail,
+    line = line,
+    render_line = render_line,
+    event = event,
+    started_at = state$started,
+    now = now,
+    last_width = state$last_render_width
+  )
+}
+
+.np_progress_render_legacy <- function(snapshot, event = c("render", "finish", "abort")) {
+  event <- match.arg(event)
+  .np_progress_emit(snapshot$line)
+  invisible(snapshot)
+}
+
+.np_progress_single_line_connection <- function() {
+  stderr()
+}
+
+.np_progress_output_width <- function() {
+  width <- suppressWarnings(as.integer(getOption("width", 80))[1L])
+  if (!is.finite(width) || is.na(width) || width < 20L) {
+    width <- 80L
+  }
+
+  reserve <- if (isTRUE(.np_progress_is_rstudio_console())) 4L else 0L
+  max(20L, width - reserve)
+}
+
+.np_progress_ellipsize_middle <- function(text, max_width) {
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return("")
+  }
+
+  if (nchar(text, type = "width") <= max_width) {
+    return(text)
+  }
+
+  if (max_width <= 3L) {
+    return(substr("...", 1L, max_width))
+  }
+
+  keep_right <- max(1L, floor((max_width - 3L) / 2L))
+  keep_left <- max_width - 3L - keep_right
+  paste0(
+    substr(text, 1L, keep_left),
+    "...",
+    substr(text, nchar(text, type = "chars") - keep_right + 1L, nchar(text, type = "chars"))
+  )
+}
+
+.np_progress_fit_single_line <- function(line, max_width = .np_progress_output_width()) {
+  if (!is.character(line) || length(line) != 1L || is.na(line)) {
+    return(line)
+  }
+
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return(line)
+  }
+
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  detail_pos <- regexpr(": ", line, fixed = TRUE)[1L]
+  if (detail_pos > 0L) {
+    without_detail <- substr(line, 1L, detail_pos - 1L)
+    if (nchar(without_detail, type = "width") <= max_width) {
+      return(without_detail)
+    }
+    line <- without_detail
+  }
+
+  .np_progress_ellipsize_middle(line, max_width = max_width)
+}
+
+.np_progress_render_single_line <- function(snapshot, event = c("render", "finish", "abort")) {
+  event <- match.arg(event)
+  render_line <- snapshot$render_line
+  con <- .np_progress_single_line_connection()
+  width <- nchar(render_line, type = "width")
+  if (identical(event, "finish")) {
+    clear_width <- max(snapshot$last_width, width)
+    clear_line <- if (clear_width > 0L) strrep(" ", clear_width) else ""
+    base::cat("\r", clear_line, "\r", file = con, sep = "")
+    flush(con)
+    flush.console()
+    return(invisible(snapshot))
+  }
+
+  pad <- max(0L, snapshot$last_width - width)
+  suffix <- if (pad > 0L) paste(rep(" ", pad), collapse = "") else ""
+
+  base::cat("\r", render_line, suffix, file = con, sep = "")
+  if (identical(event, "abort")) {
+    base::cat("\n", file = con, sep = "")
+  }
+  flush(con)
+  flush.console()
+  invisible(snapshot)
+}
+
+.np_progress_render <- function(state, line, event, now, done = NULL, detail = NULL) {
+  if (!isTRUE(state$enabled) || !isTRUE(state$visible)) {
+    return(state)
+  }
+
+  state <- .np_progress_resolve_message_muffling(state)
+  if (isTRUE(state$message_muffled)) {
+    return(state)
+  }
+
+  render_line <- if (identical(state$renderer, "single_line")) {
+    .np_progress_fit_single_line(line)
+  } else {
+    line
+  }
+
+  snapshot <- .np_progress_make_snapshot(
+    state = state,
+    line = line,
+    render_line = render_line,
+    event = event,
+    now = now,
+    done = done,
+    detail = detail
+  )
+
+  if (identical(state$renderer, "single_line")) {
+    .np_progress_render_single_line(
+      snapshot = snapshot,
+      event = if (identical(event, "finish")) "finish" else if (identical(event, "abort")) "abort" else "render"
+    )
+  } else {
+    .np_progress_render_legacy(
+      snapshot = snapshot,
+      event = if (identical(event, "finish")) "finish" else if (identical(event, "abort")) "abort" else "render"
+    )
+  }
+
+  state$rendered <- TRUE
+  state$last_render_width <- nchar(render_line, type = "width")
+  state$last_line <- line
+  state
+}
 
 .np_progress_start_grace_sec <- function(known_total = FALSE, domain = "general") {
   default <- if (identical(domain, "plot")) {
@@ -151,15 +428,45 @@
   line
 }
 
-.np_progress_begin <- function(label, total = NULL, domain = "general") {
+.np_progress_format_line <- function(state, done = NULL, detail = NULL, now = .np_progress_now()) {
+  if (isTRUE(state$known_total)) {
+    .np_progress_format_known_total(
+      state = state,
+      done = if (is.null(done)) state$last_done else done,
+      detail = detail,
+      now = now
+    )
+  } else {
+    .np_progress_format_unknown_total(
+      state = state,
+      done = if (is.null(done)) state$last_done else done,
+      detail = detail,
+      now = now
+    )
+  }
+}
+
+.np_progress_begin <- function(label, total = NULL, domain = "general", surface = domain) {
   known_total <- !is.null(total)
   throttle_sec <- if (known_total) 0.5 else 2.0
   started <- .np_progress_now()
+  capability <- .np_progress_capability(domain = domain)
+  session_id <- .np_progress_next_id()
+  enabled <- .np_progress_enabled(domain = domain)
+  renderer <- .np_progress_renderer_for_surface(surface = surface, capability = capability)
+  visible <- if (!isTRUE(enabled)) {
+    FALSE
+  } else {
+    isTRUE(.np_progress_claim_owner(session_id))
+  }
 
   list(
-    enabled = .np_progress_enabled(domain = domain),
+    id = session_id,
+    enabled = enabled,
+    visible = visible,
     pkg_prefix = .np_progress_pkg_prefix(),
     label = label,
+    surface = surface,
     total = total,
     known_total = known_total,
     started = started,
@@ -167,17 +474,23 @@
     throttle_sec = throttle_sec,
     last_done = if (known_total) 0 else NULL,
     domain = domain,
-    start_note = paste0(label, "..."),
+    renderer = renderer,
+    capability = capability,
+    rendered = FALSE,
+    start_note = sprintf("%s %s...", .np_progress_pkg_prefix(), label),
     start_note_pending = TRUE,
     start_note_grace_sec = .np_progress_start_grace_sec(known_total = known_total, domain = domain),
     last_line = NULL,
+    last_render_width = 0L,
     last_emitted_done = NULL,
-    last_emitted_detail = NULL
+    last_emitted_detail = NULL,
+    message_muffled = FALSE,
+    message_muffled_checked = FALSE
   )
 }
 
 .np_progress_maybe_emit_start_note <- function(state, now = .np_progress_now()) {
-  if (!isTRUE(state$enabled) || !isTRUE(state$start_note_pending)) {
+  if (!isTRUE(state$enabled) || !isTRUE(state$visible) || !isTRUE(state$start_note_pending)) {
     return(state)
   }
 
@@ -185,9 +498,13 @@
     return(state)
   }
 
-  .np_progress_emit(state$start_note)
+  state <- .np_progress_render(
+    state = state,
+    line = state$start_note,
+    event = "start",
+    now = now
+  )
   state$start_note_pending <- FALSE
-  state$last_line <- state$start_note
 
   if (isTRUE(state$start_note_consumes_throttle)) {
     state$last_emit <- now
@@ -215,26 +532,23 @@
     return(state)
   }
 
-  line <- if (isTRUE(state$known_total)) {
-    .np_progress_format_known_total(
-      state = state,
-      done = if (is.null(done)) state$last_done else done,
-      detail = detail,
-      now = now
-    )
-  } else {
-    .np_progress_format_unknown_total(
-      state = state,
-      done = if (is.null(done)) state$last_done else done,
-      detail = detail,
-      now = now
-    )
-  }
+  line <- .np_progress_format_line(
+    state = state,
+    done = if (is.null(done)) state$last_done else done,
+    detail = detail,
+    now = now
+  )
 
   if (!identical(line, state$last_line)) {
-    .np_progress_emit(line)
+    state <- .np_progress_render(
+      state = state,
+      line = line,
+      event = "update",
+      now = now,
+      done = if (is.null(done)) state$last_done else done,
+      detail = detail
+    )
     state$last_emit <- now
-    state$last_line <- line
     state$last_emitted_done <- if (is.null(done)) state$last_done else done
     state$last_emitted_detail <- detail
   }
@@ -244,40 +558,91 @@
 
 .np_progress_end <- function(state, detail = NULL) {
   if (!isTRUE(state$enabled)) {
+    .np_progress_release_owner(state$id)
     return(invisible(state))
   }
 
   now <- .np_progress_now()
   if (is.null(state$last_line) &&
       (now - state$started) < state$start_note_grace_sec) {
+    .np_progress_release_owner(state$id)
     return(invisible(state))
   }
 
   if (isTRUE(state$known_total)) {
     done <- if (is.null(state$total)) state$last_done else state$total
-    line <- .np_progress_format_known_total(state = state, done = done, detail = detail, now = now)
+    line <- .np_progress_format_line(state = state, done = done, detail = detail, now = now)
     if (!(identical(done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
-      .np_progress_emit(line)
+      state <- .np_progress_render(
+        state = state,
+        line = line,
+        event = "finish",
+        now = now,
+        done = done,
+        detail = detail
+      )
       state$last_emit <- now
       state$last_done <- done
-      state$last_line <- line
       state$last_emitted_done <- done
       state$last_emitted_detail <- detail
     }
+    .np_progress_release_owner(state$id)
     return(invisible(state))
   }
 
   if (!is.null(state$last_done)) {
-    line <- .np_progress_format_unknown_total(state = state, done = state$last_done, detail = detail, now = now)
+    line <- .np_progress_format_line(state = state, done = state$last_done, detail = detail, now = now)
     if (!(identical(state$last_done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
-      .np_progress_emit(line)
+      state <- .np_progress_render(
+        state = state,
+        line = line,
+        event = "finish",
+        now = now,
+        done = state$last_done,
+        detail = detail
+      )
       state$last_emit <- now
-      state$last_line <- line
       state$last_emitted_done <- state$last_done
       state$last_emitted_detail <- detail
     }
   }
 
+  if (isTRUE(state$rendered) && is.null(state$last_done) && !is.null(state$last_line)) {
+    state <- .np_progress_render(
+      state = state,
+      line = state$last_line,
+      event = "finish",
+      now = now,
+      detail = detail
+    )
+  }
+
+  .np_progress_release_owner(state$id)
+  invisible(state)
+}
+
+.np_progress_abort <- function(state, detail = NULL) {
+  if (!isTRUE(state$enabled)) {
+    .np_progress_release_owner(state$id)
+    return(invisible(state))
+  }
+
+  now <- .np_progress_now()
+  if (!isTRUE(state$rendered)) {
+    .np_progress_release_owner(state$id)
+    return(invisible(state))
+  }
+
+  line <- if (!is.null(detail)) paste0(state$pkg_prefix, " ", detail) else state$last_line
+  state <- .np_progress_render(
+    state = state,
+    line = line,
+    event = "abort",
+    now = now,
+    done = state$last_done,
+    detail = detail
+  )
+  .np_progress_release_owner(state$id)
   invisible(state)
 }
 
@@ -313,11 +678,26 @@
   if (is.null(label))
     label <- state$label
 
-  upgraded <- .np_progress_begin(label = label, total = total, domain = "general")
+  upgraded <- .np_progress_begin(
+    label = label,
+    total = total,
+    domain = state$domain,
+    surface = state$surface
+  )
+  upgraded$id <- state$id
+  upgraded$visible <- state$visible
   upgraded$started <- state$started
   upgraded$last_emit <- state$started - upgraded$throttle_sec
+  upgraded$renderer <- state$renderer
+  upgraded$capability <- state$capability
+  upgraded$rendered <- state$rendered
   upgraded$start_note_pending <- state$start_note_pending
   upgraded$last_line <- state$last_line
+  upgraded$last_render_width <- state$last_render_width
+  upgraded$last_emitted_done <- state$last_emitted_done
+  upgraded$last_emitted_detail <- state$last_emitted_detail
+  upgraded$message_muffled <- state$message_muffled
+  upgraded$message_muffled_checked <- state$message_muffled_checked
   upgraded$bandwidth_multistart <- TRUE
   if (!isTRUE(state$start_note_pending) && identical(state$last_line, state$start_note)) {
     upgraded$start_note_pending <- FALSE
@@ -359,6 +739,22 @@
   invisible(NULL)
 }
 
+.np_progress_signal_from_c <- function(event, surface, current = NULL, total = NULL) {
+  event <- as.character(event)[1L]
+  surface <- as.character(surface)[1L]
+
+  if (is.na(event) || is.na(surface)) {
+    return(invisible(FALSE))
+  }
+
+  if (identical(event, "bandwidth_multistart_step") && identical(surface, "bandwidth")) {
+    .np_progress_bandwidth_multistart_step(done = current, total = total)
+    return(invisible(TRUE))
+  }
+
+  invisible(FALSE)
+}
+
 .np_progress_bandwidth_finish <- function() {
   state <- .np_progress_runtime$bandwidth_state
 
@@ -397,7 +793,8 @@
     .np_progress_runtime$bandwidth_label <- as.character(label)[1L]
     .np_progress_runtime$bandwidth_state <- .np_progress_begin(
       label = .np_progress_runtime$bandwidth_label,
-      domain = "general"
+      domain = "general",
+      surface = "bandwidth"
     )
   }
 

@@ -73,8 +73,11 @@
     return(NULL)
 
   label <- as.character(label)[1L]
-  state <- .np_progress_begin(label = label, total = total, domain = "plot")
+  state <- .np_progress_begin(label = label, total = total, domain = "plot", surface = "plot_bounded")
   state$enabled <- isTRUE(.np_plot_progress_enabled())
+  if (isTRUE(state$enabled) && !isTRUE(state$visible)) {
+    state$visible <- isTRUE(.np_progress_claim_owner(state$id))
+  }
   state$throttle_sec <- .np_plot_progress_interval_sec()
   state$last_emit <- state$started - state$throttle_sec
   state$start_note_grace_sec <- .np_plot_progress_start_grace_sec()
@@ -142,8 +145,11 @@
     return(NULL)
 
   label <- as.character(label)[1L]
-  state <- .np_progress_begin(label = label, domain = "plot")
+  state <- .np_progress_begin(label = label, domain = "plot", surface = "plot_activity")
   state$enabled <- isTRUE(.np_plot_progress_enabled())
+  if (isTRUE(state$enabled) && !isTRUE(state$visible)) {
+    state$visible <- isTRUE(.np_progress_claim_owner(state$id))
+  }
   state$throttle_sec <- Inf
   state$last_emit <- state$started - state$throttle_sec
   state$start_note_grace_sec <- .np_plot_progress_start_grace_sec()

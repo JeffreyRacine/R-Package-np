@@ -78,30 +78,39 @@ test_that("plot helper progress emits append-only bounded messages on master", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  messages <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter()
-    ),
-    capture_messages_only({
+  legacy <- capture_progress_shadow_trace(
+    {
       state <- begin(total = 12, label = "Plot bootstrap wild")
       for (i in seq_len(12L)) {
         state <- tick(state, done = i)
       }
       finish(state)
-    })
+    },
+    force_renderer = "legacy",
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(messages)
+  actual <- capture_progress_shadow_trace(
+    {
+      state <- begin(total = 12, label = "Plot bootstrap wild")
+      for (i in seq_len(12L)) {
+        state <- tick(state, done = i)
+      }
+      finish(state)
+    },
+    now = progress_time_counter()
+  )
 
-  expect_identical(messages[[1L]], "[npRmpi] Plot bootstrap wild...")
-  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 3/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 6/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 9/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 12/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_equal(length(messages), 5L)
-  expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+
+  expect_identical(lines, vapply(legacy$trace, `[[`, character(1L), "line"))
+  expect_identical(vapply(actual$trace, `[[`, character(1L), "event"), c("render", "render", "render", "render", "finish"))
+  expect_identical(lines[[1L]], "[npRmpi] Plot bootstrap wild...")
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 3/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 6/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 9/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 12/12 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_equal(length(lines), 5L)
 })
 
 test_that("plot helper stays silent for instant runs below start grace on master", {
@@ -117,19 +126,15 @@ test_that("plot helper stays silent for instant runs below start grace on master
   )
   on.exit(options(old_opts), add = TRUE)
 
-  messages <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(start = 0, by = 0.2)
-    ),
-    capture_messages_only({
+  actual <- capture_progress_shadow_trace(
+    {
       state <- begin(total = 5, label = "Plot bootstrap wild")
       finish(state)
-    })
+    },
+    now = progress_time_counter(start = 0, by = 0.2)
   )
 
-  expect_length(messages, 0)
+  expect_length(actual$trace, 0)
 })
 
 test_that("plot helper activity delays its note until grace elapses on master", {
@@ -143,20 +148,32 @@ test_that("plot helper activity delays its note until grace elapses on master", 
   )
   on.exit(options(old_opts), add = TRUE)
 
-  messages <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_values(c(0, 1.0))
-    ),
-    capture_messages_only({
+  legacy <- capture_progress_shadow_trace(
+    {
       activity <- begin("Constructing bootstrap bands")
       finish(activity)
-    })
+    },
+    force_renderer = "legacy",
+    now = progress_time_values(c(0, 1.0))
   )
 
-  messages <- normalize_messages(messages)
-  expect_identical(messages, "[npRmpi] Constructing bootstrap bands...")
+  actual <- capture_progress_shadow_trace(
+    {
+      activity <- begin("Constructing bootstrap bands")
+      finish(activity)
+    },
+    now = progress_time_values(c(0, 1.0))
+  )
+
+  expect_identical(
+    vapply(actual$trace, `[[`, character(1L), "line"),
+    vapply(legacy$trace, `[[`, character(1L), "line")
+  )
+  expect_identical(
+    vapply(actual$trace, `[[`, character(1L), "line"),
+    "[npRmpi] Constructing bootstrap bands..."
+  )
+  expect_identical(vapply(actual$trace, `[[`, character(1L), "event"), "render")
 })
 
 test_that("plot helper activity stays silent below grace on master", {
@@ -170,19 +187,15 @@ test_that("plot helper activity stays silent below grace on master", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  messages <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_values(c(0, 0.2))
-    ),
-    capture_messages_only({
+  actual <- capture_progress_shadow_trace(
+    {
       activity <- begin("Constructing bootstrap bands")
       finish(activity)
-    })
+    },
+    now = progress_time_values(c(0, 0.2))
   )
 
-  expect_length(messages, 0)
+  expect_length(actual$trace, 0)
 })
 
 test_that("heavy plot helpers invoke delayed activity notifications", {
@@ -353,22 +366,16 @@ test_that("plot helper progress respects suppressMessages", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  messages <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter()
-    ),
-    capture_messages_only(
-      suppressMessages({
+  actual <- capture_progress_shadow_trace(
+    suppressMessages({
         state <- begin(total = 12, label = "Plot bootstrap wild")
         state <- tick(state, done = 12)
         finish(state)
-      })
-    )
+      }),
+    now = progress_time_counter()
   )
 
-  expect_length(messages, 0)
+  expect_length(actual$trace, 0)
 })
 
 test_that("plot helper progress caps intermediate heartbeats on master", {
@@ -385,24 +392,34 @@ test_that("plot helper progress caps intermediate heartbeats on master", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  messages <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter()
-    ),
-    capture_messages_only({
+  legacy <- capture_progress_shadow_trace(
+    {
       state <- begin(total = 12, label = "Plot bootstrap wild")
       for (i in seq_len(12L)) {
         state <- tick(state, done = i)
       }
       finish(state)
-    })
+    },
+    force_renderer = "legacy",
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(messages)
-  expect_equal(length(messages), 4L)
-  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 4/12 ", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 8/12 ", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 12/12 ", messages)))
+  actual <- capture_progress_shadow_trace(
+    {
+      state <- begin(total = 12, label = "Plot bootstrap wild")
+      for (i in seq_len(12L)) {
+        state <- tick(state, done = i)
+      }
+      finish(state)
+    },
+    now = progress_time_counter()
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+
+  expect_identical(lines, vapply(legacy$trace, `[[`, character(1L), "line"))
+  expect_equal(length(lines), 4L)
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 4/12 ", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 8/12 ", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 12/12 ", lines)))
 })

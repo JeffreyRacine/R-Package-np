@@ -511,7 +511,7 @@ npsigtest.rbandwidth <- function(bws,
     }
 
     .np_progress_note("Testing joint significance")
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
     
     if (boot.type == "II") {
       bws.boot.prev <- bws.original
@@ -754,7 +754,7 @@ npsigtest.rbandwidth <- function(bws,
       }
 
       .np_progress_note(sprintf("Testing variable %s of (%s)", i, paste(index, collapse = ",")))
-      progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
+      progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
       
       if (boot.type == "II") {
         bws.boot.prev <- bws.original

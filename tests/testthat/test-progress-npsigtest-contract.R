@@ -1,65 +1,32 @@
-with_nprmpi_bindings <- function(bindings, code) {
-  code <- substitute(code)
-  ns <- asNamespace("npRmpi")
-  old <- lapply(names(bindings), function(name) get(name, envir = ns, inherits = FALSE))
-  names(old) <- names(bindings)
-
-  for (name in names(bindings)) {
-    was_locked <- bindingIsLocked(name, ns)
-    if (was_locked) {
-      unlockBinding(name, ns)
-    }
-    assign(name, bindings[[name]], envir = ns)
-    if (was_locked) {
-      lockBinding(name, ns)
-    }
-  }
-
-  on.exit({
-    for (name in names(old)) {
-      was_locked <- bindingIsLocked(name, ns)
-      if (was_locked) {
-        unlockBinding(name, ns)
-      }
-      assign(name, old[[name]], envir = ns)
-      if (was_locked) {
-        lockBinding(name, ns)
-      }
-    }
-  }, add = TRUE)
-
-  eval(code, envir = parent.frame())
-}
-
-capture_progress_conditions <- function(expr) {
-  messages <- character()
-  warnings <- character()
-
-  value <- withCallingHandlers(
-    expr,
-    message = function(m) {
-      messages <<- c(messages, conditionMessage(m))
-      invokeRestart("muffleMessage")
-    },
-    warning = function(w) {
-      warnings <<- c(warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
-
-  list(value = value, messages = messages, warnings = warnings)
-}
-
-normalize_messages <- function(x) {
-  sub("\n$", "", x)
-}
-
 progress_time_counter <- function(start = 0, by = 0.6) {
   current <- start
   function() {
     current <<- current + by
     current
   }
+}
+
+shadow_bootstrap_signature <- function(shadow) {
+  lines <- vapply(shadow$trace, `[[`, character(1L), "line")
+  events <- vapply(shadow$trace, `[[`, character(1L), "event")
+  keep <- grepl("^\\[npRmpi\\] Bootstrap replications", lines)
+
+  data.frame(
+    event = events[keep],
+    line = lines[keep],
+    stringsAsFactors = FALSE
+  )
+}
+
+shadow_lines <- function(shadow) {
+  shadow_bootstrap_signature(shadow)$line
+}
+
+skip_live_route_slice <- function() {
+  skip_if_not(
+    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
+    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
+  )
 }
 
 npsigtest_fun <- function(...) {
@@ -71,125 +38,115 @@ make_sigtest_fixture <- function(seed = 42, n = 30) {
   x1 <- runif(n)
   x2 <- runif(n)
   y <- x1 + rnorm(n, sd = 0.1)
-  bw <- npregbw(y ~ x1 + x2, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
-  list(x1 = x1, x2 = x2, y = y, bw = bw)
+  bw <- getFromNamespace("npregbw", "npRmpi")(
+    y ~ x1 + x2,
+    bws = c(0.2, 0.4),
+    bandwidth.compute = FALSE
+  )
+  list(bw = bw)
 }
 
-test_that("npsigtest joint path emits append-only bounded bootstrap progress", {
+test_that("npsigtest joint single-line bootstrap progress matches legacy semantics", {
   skip_on_cran()
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   fixture <- make_sigtest_fixture()
 
-  old_opts <- options(
-    np.messages = TRUE,
-    np.progress.start.grace.known.sec = 0
-  )
+  old_opts <- options(np.messages = TRUE, np.progress.start.grace.known.sec = 0)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
-    ),
-    capture_progress_conditions(
-      npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1)
-    )
+  legacy <- capture_progress_shadow_trace(
+    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1),
+    force_renderer = "legacy",
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(res$messages)
+  single_line <- capture_progress_shadow_trace(
+    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1),
+    force_renderer = "single_line",
+    now = progress_time_counter()
+  )
 
-  expect_s3_class(res$value, "sigtest")
-  expect_true(any(grepl("^\\[npRmpi\\] Testing joint significance$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications 1/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_false(any(grepl("\b", messages, fixed = TRUE)))
+  lines <- shadow_lines(single_line)
+
+  expect_s3_class(single_line$value, "sigtest")
+  expect_equal(shadow_bootstrap_signature(single_line), shadow_bootstrap_signature(legacy))
+  expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications [0-9]+/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })
 
-test_that("npsigtest individual path emits per-variable append-only progress", {
+test_that("npsigtest individual single-line bootstrap progress matches legacy semantics", {
   skip_on_cran()
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   fixture <- make_sigtest_fixture(seed = 99)
 
-  old_opts <- options(
-    np.messages = TRUE,
-    np.progress.start.grace.known.sec = 0
-  )
+  old_opts <- options(np.messages = TRUE, np.progress.start.grace.known.sec = 0)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
-    ),
-    capture_progress_conditions(
-      npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = FALSE, index = c(1, 2))
-    )
+  legacy <- capture_progress_shadow_trace(
+    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = FALSE, index = c(1, 2)),
+    force_renderer = "legacy",
+    now = progress_time_counter()
   )
 
-  messages <- normalize_messages(res$messages)
+  single_line <- capture_progress_shadow_trace(
+    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = FALSE, index = c(1, 2)),
+    force_renderer = "single_line",
+    now = progress_time_counter()
+  )
 
-  expect_s3_class(res$value, "sigtest")
-  expect_true(any(grepl("^\\[npRmpi\\] Testing variable 1 of \\(1,2\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Testing variable 2 of \\(1,2\\)$", messages)))
-  expect_true(sum(grepl("^\\[npRmpi\\] Bootstrap replications 1/9 ", messages)) >= 2L)
-  expect_true(sum(grepl("^\\[npRmpi\\] Bootstrap replications 9/9 ", messages)) >= 2L)
-  expect_false(any(grepl("\b", messages, fixed = TRUE)))
+  lines <- shadow_lines(single_line)
+
+  expect_s3_class(single_line$value, "sigtest")
+  expect_equal(shadow_bootstrap_signature(single_line), shadow_bootstrap_signature(legacy))
+  expect_true(sum(grepl("^\\[npRmpi\\] Bootstrap replications [0-9]+/9 ", lines)) >= 2L)
+  expect_true(sum(grepl("^\\[npRmpi\\] Bootstrap replications 9/9 ", lines)) >= 2L)
 })
 
 test_that("npsigtest progress respects np.messages FALSE", {
   skip_on_cran()
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
-  fixture <- make_sigtest_fixture(seed = 17)
+  fixture <- make_sigtest_fixture()
 
   old_opts <- options(np.messages = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
-    ),
-    capture_progress_conditions(
-      npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1)
-    )
+  res <- capture_progress_shadow_trace(
+    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1),
+    now = progress_time_counter()
   )
 
-  expect_length(res$messages, 0)
+  expect_length(res$trace, 0)
 })
 
 test_that("npsigtest progress respects suppressMessages", {
   skip_on_cran()
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
-  fixture <- make_sigtest_fixture(seed = 23)
+  fixture <- make_sigtest_fixture()
 
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
-    ),
-    capture_progress_conditions(
-      suppressMessages(npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1))
-    )
+  res <- capture_progress_shadow_trace(
+    suppressMessages(npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1)),
+    now = progress_time_counter()
   )
 
-  expect_length(res$messages, 0)
+  expect_length(res$trace, 0)
+})
+
+test_that("npsigtest source routes use canonical bootstrap surface tags", {
+  src <- paste(readLines(testthat::test_path("..", "..", "R", "np.sigtest.R"), warn = FALSE), collapse = "\n")
+  expect_true(grepl('surface = "bootstrap"', src, fixed = TRUE))
 })

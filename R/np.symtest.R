@@ -150,7 +150,7 @@ npsymtest <- function(data = NULL,
 
   boot.state <- new.env(parent = emptyenv())
   boot.state$counter <- 0L
-  boot.state$progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
+  boot.state$progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
   ## Function to be fed to tsboot - accepts a vector of integers
   ## corresponding to all observations in the sample (1,2,...) that

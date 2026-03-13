@@ -206,7 +206,7 @@ npregivderiv <- function(y,
 
   ## Now we repeat this entire process using mu = y = phi.0 rather than y
 
-  progress <- .np_progress_begin("Iterating Landweber-Fridman derivative solve")
+  progress <- .np_progress_begin("Iterating Landweber-Fridman derivative solve", surface = "iv_solve")
 
   if(smooth.residuals) {
     progress <- .np_progress_step(progress, done = 1, detail = "updating E(mu|w)")

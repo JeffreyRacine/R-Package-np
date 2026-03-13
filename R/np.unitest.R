@@ -159,7 +159,7 @@ npunitest <- function(data.x = NULL,
     }
     
     resampled.stat <- numeric(boot.num)
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num)
+    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
     for (b in seq_len(boot.num)) {
       progress <- .np_progress_step(progress, done = b)

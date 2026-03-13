@@ -68,6 +68,31 @@ progress_time_values <- function(values) {
   }
 }
 
+capture_single_line_output <- function(pkg, bindings, code) {
+  path <- tempfile(fileext = ".log")
+  con <- file(path, open = "wb")
+  closed <- FALSE
+
+  on.exit({
+    if (!closed) {
+      close(con)
+    }
+    unlink(path)
+  }, add = TRUE)
+
+  bindings$.np_progress_single_line_connection <- function() con
+
+  if (identical(pkg, "npRmpi")) {
+    with_nprmpi_bindings(bindings, code)
+  } else {
+    stop("unknown package: ", pkg)
+  }
+
+  close(con)
+  closed <- TRUE
+  readChar(path, nchars = file.info(path)$size, useBytes = TRUE)
+}
+
 test_that("progress begin returns disabled state when messages are off", {
   begin <- getFromNamespace(".np_progress_begin", "npRmpi")
 
@@ -291,13 +316,8 @@ test_that("bandwidth selection helper suppresses legacy output and drives bounde
   on.exit(options(old_opts), add = TRUE)
 
   seen <- NULL
-  messages <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
-    ),
-    capture_messages_only({
+  legacy <- capture_progress_shadow_trace(
+    {
       value <- select_bw("Selecting regression bandwidth", {
         seen <<- getOption("np.messages")
         set_total(3)
@@ -306,14 +326,181 @@ test_that("bandwidth selection helper suppresses legacy output and drives bounde
         7
       })
       expect_identical(value, 7)
-    })
+    },
+    force_renderer = "legacy",
+    now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
   )
-  messages <- sub("\n$", "", messages, useBytes = TRUE)
-  messages <- messages[nzchar(messages)]
+
+  seen <- NULL
+  actual <- capture_progress_shadow_trace(
+    {
+      value <- select_bw("Selecting regression bandwidth", {
+        seen <<- getOption("np.messages")
+        set_total(3)
+        step_bw(1, 3)
+        step_bw(3, 3)
+        7
+      })
+      expect_identical(value, 7)
+    },
+    now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
+  )
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+  legacy_lines <- vapply(legacy$trace, `[[`, character(1L), "line")
 
   expect_false(isTRUE(seen))
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth\\.\\.\\.$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_equal(lines, legacy_lines)
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth\\.\\.\\.$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(isTRUE(getOption("np.messages")))
+})
+
+test_that("compiled progress bridge feeds the bounded bandwidth sink", {
+  select_bw <- getFromNamespace(".np_progress_select_bandwidth", "npRmpi")
+
+  old_opts <- options(np.messages = TRUE, np.progress.start.grace.known.sec = 0)
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      value <- select_bw("Selecting regression bandwidth", {
+        .Call(
+          "C_np_progress_signal",
+          "bandwidth_multistart_step",
+          "bandwidth",
+          1L,
+          3L,
+          PACKAGE = "npRmpi"
+        )
+        .Call(
+          "C_np_progress_signal",
+          "bandwidth_multistart_step",
+          "bandwidth",
+          3L,
+          3L,
+          PACKAGE = "npRmpi"
+        )
+        11
+      })
+      expect_identical(value, 11)
+    },
+    now = progress_time_values(c(0, 1.1, 2.2, 3.3))
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth\\.\\.\\.$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+})
+
+test_that("single-line fit drops detail before truncating", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
+
+  line <- "[npRmpi] Constructing metric entropy by lag 1/2 (50.0%, elapsed 7.2s, eta 7.2s): lag 1"
+  fitted <- fit(line, max_width = 78)
+
+  expect_lte(nchar(fitted, type = "width"), 78L)
+  expect_false(grepl(": lag 1$", fitted, fixed = TRUE))
+  expect_true(startsWith(fitted, "[npRmpi]"))
+  expect_true(endsWith(fitted, "eta 7.2s)"))
+})
+
+test_that("single-line fit preserves both ends when truncation is still required", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
+
+  line <- "[npRmpi] Bootstrap replications 123/999 (12.3%, elapsed 12.3s, eta 87.7s)"
+  fitted <- fit(line, max_width = 40)
+
+  expect_lte(nchar(fitted, type = "width"), 40L)
+  expect_true(startsWith(fitted, "[npRmpi]"))
+  expect_true(endsWith(fitted, "eta 87.7s)"))
+  expect_true(grepl("\\.\\.\\.", fitted))
+})
+
+test_that("RStudio capability keeps single-line viable at the boundary", {
+  capability <- getFromNamespace(".np_progress_capability", "npRmpi")
+
+  actual <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_rstudio_console = function() TRUE
+    ),
+    capability()
+  )
+
+  expect_true(isTRUE(actual$interactive))
+  expect_true(isTRUE(actual$rstudio))
+  expect_true(isTRUE(actual$single_line_viable))
+})
+
+test_that("RStudio width budget reserves redraw margin centrally", {
+  output_width <- getFromNamespace(".np_progress_output_width", "npRmpi")
+
+  actual <- with_nprmpi_bindings(list(.np_progress_is_rstudio_console = function() TRUE), {
+    withr::local_options(list(width = 82))
+    output_width()
+  })
+
+  expect_identical(actual, 78L)
+})
+
+test_that("single-line finish clears the rendered line without leaving a newline", {
+  render <- getFromNamespace(".np_progress_render_single_line", "npRmpi")
+  line <- "[npRmpi] Bootstrap replications 2/2 (100.0%, elapsed 1.0s, eta 0.0s)"
+
+  output <- capture_single_line_output(
+    "npRmpi",
+    list(),
+    {
+      render(list(render_line = line, last_width = 0L), event = "render")
+      render(list(render_line = line, last_width = nchar(line, type = "width")), event = "finish")
+    }
+  )
+
+  expect_identical(
+    output,
+    paste0("\r", line, "\r", strrep(" ", nchar(line, type = "width")), "\r")
+  )
+})
+
+test_that("single-line abort preserves the final line and terminates it", {
+  render <- getFromNamespace(".np_progress_render_single_line", "npRmpi")
+  line <- "[npRmpi] Bootstrap replications aborted"
+
+  output <- capture_single_line_output(
+    "npRmpi",
+    list(),
+    render(list(render_line = line, last_width = 0L), event = "abort")
+  )
+
+  expect_identical(output, paste0("\r", line, "\n"))
+})
+
+test_that("progress ownership suppresses nested visibility for legacy renderer too", {
+  begin <- getFromNamespace(".np_progress_begin", "npRmpi")
+  finish <- getFromNamespace(".np_progress_end", "npRmpi")
+  reset <- getFromNamespace(".np_progress_reset_registry", "npRmpi")
+
+  reset()
+  on.exit(reset(), add = TRUE)
+
+  states <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_master = function() TRUE,
+      .np_progress_is_rstudio_console = function() TRUE,
+      .np_progress_now = function() 1
+    ),
+    {
+      outer <- begin("Outer task", total = 2)
+      inner <- begin("Inner task", total = 2)
+      finish(outer)
+      list(outer = outer, inner = inner)
+    }
+  )
+
+  expect_true(isTRUE(states$outer$visible))
+  expect_false(isTRUE(states$inner$visible))
 })
