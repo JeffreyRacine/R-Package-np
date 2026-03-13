@@ -9912,7 +9912,7 @@ double *cv){
   np_gate_ctx_clear(&gate_x_ctx);
   np_gate_ctx_clear(&gate_y_ctx);
 
-  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)) &&
+  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN) || (BANDWIDTH_den == BW_ADAP_NN)) &&
      (int_ll_extern == LL_LP))
     return np_conditional_distribution_cvls_lp_stream(vector_scale_factor, cv);
 
@@ -11097,7 +11097,7 @@ double *cv){
   np_gate_ctx_clear(&gate_y_ctx);
   np_gate_ctx_clear(&gate_xy_ctx);
 
-  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)) &&
+  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN) || (BANDWIDTH_den == BW_ADAP_NN)) &&
      (int_ll_extern == LL_LP))
     return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
 
@@ -14675,7 +14675,8 @@ static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
   int status = 1;
 
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
 
   if(num_train <= 0)
@@ -14974,7 +14975,8 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
   if((ctx == NULL) || (vector_scale_factor == NULL))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
   if(num_train <= 0)
     return 1;
@@ -15249,7 +15251,8 @@ static int np_conditional_yrow_ctx_prepare(double *vector_scale_factor,
   if((ctx == NULL) || (vector_scale_factor == NULL))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
   if(num_train <= 0)
     return 1;
@@ -15423,7 +15426,8 @@ static int np_conditional_x_weight_row_stream_core(double *vector_scale_factor,
   if((row_out == NULL) || (vector_scale_factor == NULL))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
   if((eval_idx < 0) || (eval_idx >= num_train))
     return 1;
@@ -15667,7 +15671,9 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
                                                     double *row_out){
   const int num_train = num_obs_train_extern;
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
-  const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_eval;
+  const int bw_rows =
+    (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
+    ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : num_train);
   int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL, *operator_y = NULL;
   double *vsfy = NULL, *lambday = NULL, *kw = NULL;
   double **matrix_bandwidth_y = NULL, **matrix_bandwidth_eval_one = NULL;
@@ -15679,7 +15685,8 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
   if((row_out == NULL) || (vector_scale_factor == NULL))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
   if((eval_idx < 0) || (eval_idx >= num_eval))
     return 1;
@@ -16286,7 +16293,8 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
 
   xrow = alloc_vecd(MAX(1, num_obs));
@@ -16344,7 +16352,8 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
 
   xrow = alloc_vecd(MAX(1, num_obs));
@@ -16401,10 +16410,13 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
 
-  if((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE))
+  if((BANDWIDTH_den_extern == BW_ADAP_NN) ||
+     (int_TREE_X == NP_TREE_TRUE) ||
+     (int_TREE_Y == NP_TREE_TRUE))
     return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
 
   xblock = alloc_matd(num_obs, block_size);
@@ -16473,7 +16485,8 @@ int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
 
   xrow = alloc_vecd(MAX(1, num_train));
@@ -16541,7 +16554,7 @@ static int np_shadow_conditional_build_y_matrix(const int *operator_y,
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
   const int bw_rows =
     (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
-    ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : 0);
+    ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : num_obs_train_extern);
   int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL;
   double *vsfy = NULL, *lambday = NULL, *kw = NULL;
   double **matrix_bandwidth_y = NULL, **matrix_bandwidth_eval_one = NULL;
@@ -16549,7 +16562,8 @@ static int np_shadow_conditional_build_y_matrix(const int *operator_y,
   int i, l, status = 1;
 
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
 
   vsfy = alloc_vecd(MAX(1, num_var_tot));
@@ -17713,7 +17727,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                                                                 double *cv){
   np_gate_override_clear();
 
-  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)) &&
+  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN) || (BANDWIDTH_den == BW_ADAP_NN)) &&
      (int_ll_extern == LL_LP))
     return np_conditional_density_cvml_lp_stream(vector_scale_factor, cv);
 
