@@ -47,7 +47,7 @@ shadow_lines_matching <- function(shadow, pattern) {
 shadow_signature <- function(shadow, pattern) {
   lines <- vapply(shadow$trace, `[[`, character(1L), "line")
   events <- vapply(shadow$trace, `[[`, character(1L), "event")
-  keep <- grepl(pattern, lines)
+  keep <- grepl(pattern, lines) & events == "render"
 
   data.frame(
     event = events[keep],
