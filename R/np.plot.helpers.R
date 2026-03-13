@@ -139,12 +139,27 @@
   if (!.np_plot_progress_enabled())
     return(NULL)
 
-  .np_progress_note(as.character(label)[1L])
-  TRUE
+  label <- as.character(label)[1L]
+  state <- .np_progress_begin(label = label, domain = "plot")
+  state$enabled <- isTRUE(.np_plot_progress_enabled())
+  state$throttle_sec <- Inf
+  state$last_emit <- state$started - state$throttle_sec
+  state$start_note_grace_sec <- .np_plot_progress_start_grace_sec()
+  state
 }
 
-.np_plot_activity_end <- function(console) {
+.np_plot_activity_end <- function(state) {
+  if (is.null(state))
+    return(invisible(NULL))
+
+  .np_progress_maybe_emit_start_note(state = state, now = .np_progress_now())
   invisible(NULL)
+}
+
+.np_plot_activity_run <- function(label, expr) {
+  activity <- .np_plot_activity_begin(label)
+  on.exit(.np_plot_activity_end(activity), add = TRUE)
+  force(expr)
 }
 
 .np_plot_capture_par <- function(names = character()) {
@@ -3584,34 +3599,43 @@ plotFactor <- function(f, y, ...){
                                      gradients = FALSE,
                                      gradient.order = 1L,
                                      need.asymptotic = FALSE) {
-  if (isTRUE(need.asymptotic)) {
-    return(npreg(
-      txdat = xdat,
-      tydat = ydat,
-      exdat = exdat,
-      bws = bws,
-      gradients = gradients,
-      gradient.order = gradient.order,
-      warn.glp.gradient = FALSE
-    ))
-  }
+  .np_plot_activity_run(
+    label = if (isTRUE(need.asymptotic)) {
+      "Computing regression plot asymptotic fit"
+    } else {
+      "Computing regression plot fit"
+    },
+    expr = {
+      if (isTRUE(need.asymptotic)) {
+        return(npreg(
+          txdat = xdat,
+          tydat = ydat,
+          exdat = exdat,
+          bws = bws,
+          gradients = gradients,
+          gradient.order = gradient.order,
+          warn.glp.gradient = FALSE
+        ))
+      }
 
-  fit <- .np_regression_direct(
-    bws = bws,
-    txdat = xdat,
-    tydat = ydat,
-    exdat = exdat,
-    gradients = gradients,
-    gradient.order = gradient.order,
-    local.mode = identical(bws$type, "generalized_nn")
+      fit <- .np_regression_direct(
+        bws = bws,
+        txdat = xdat,
+        tydat = ydat,
+        exdat = exdat,
+        gradients = gradients,
+        gradient.order = gradient.order,
+        local.mode = identical(bws$type, "generalized_nn")
+      )
+
+      neval <- length(fit$mean)
+      fit$merr <- rep(NA_real_, neval)
+      if (isTRUE(gradients))
+        fit$gerr <- matrix(NA_real_, nrow = neval, ncol = NCOL(fit$grad))
+
+      fit
+    }
   )
-
-  neval <- length(fit$mean)
-  fit$merr <- rep(NA_real_, neval)
-  if (isTRUE(gradients))
-    fit$gerr <- matrix(NA_real_, nrow = neval, ncol = NCOL(fit$grad))
-
-  fit
 }
 
 .np_plot_validate_neval <- function(neval, where = "plot.singleindex") {
@@ -3695,32 +3719,37 @@ plotFactor <- function(f, y, ...){
                                             idx.eval,
                                             ydat,
                                             gradients = FALSE) {
-  out <- list(index = as.vector(idx.eval$index))
+  .np_plot_activity_run(
+    label = "Computing single-index plot fit",
+    expr = {
+      out <- list(index = as.vector(idx.eval$index))
 
-  if (isTRUE(gradients)) {
-    rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-    fit.grad <- .np_regression_direct(
-      bws = rbw,
-      txdat = idx.train,
-      tydat = ydat,
-      exdat = idx.eval,
-      gradients = TRUE,
-      gradient.order = 1L
-    )
-    grad.index <- as.vector(fit.grad$grad[, 1L])
-    out$mean <- as.vector(fit.grad$mean)
-    out$grad.index <- grad.index
-    out$grad <- grad.index %o% as.vector(bws$beta)
-    return(out)
-  }
+      if (isTRUE(gradients)) {
+        rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+        fit.grad <- .np_regression_direct(
+          bws = rbw,
+          txdat = idx.train,
+          tydat = ydat,
+          exdat = idx.eval,
+          gradients = TRUE,
+          gradient.order = 1L
+        )
+        grad.index <- as.vector(fit.grad$grad[, 1L])
+        out$mean <- as.vector(fit.grad$mean)
+        out$grad.index <- grad.index
+        out$grad <- grad.index %o% as.vector(bws$beta)
+        return(out)
+      }
 
-  out$mean <- as.vector(.np_plot_singleindex_hat_apply_index(
-    bws = bws,
-    idx.train = idx.train,
-    idx.eval = idx.eval,
-    y = ydat
-  ))
-  out
+      out$mean <- as.vector(.np_plot_singleindex_hat_apply_index(
+        bws = bws,
+        idx.train = idx.train,
+        idx.eval = idx.eval,
+        y = ydat
+      ))
+      out
+    }
+  )
 }
 
 .np_plot_singleindex_asymptotic_eval <- function(bws,
@@ -3729,80 +3758,85 @@ plotFactor <- function(f, y, ...){
                                                  exdat = NULL,
                                                  gradients = FALSE,
                                                  index.eval = NULL) {
-  has.index.eval <- !is.null(index.eval)
-  no.ex <- is.null(exdat)
-  gradients <- npValidateScalarLogical(gradients, "gradients")
+  .np_plot_activity_run(
+    label = "Computing single-index plot asymptotic fit",
+    expr = {
+      has.index.eval <- !is.null(index.eval)
+      no.ex <- is.null(exdat)
+      gradients <- npValidateScalarLogical(gradients, "gradients")
 
-  txdat <- toFrame(txdat)
-  if (has.index.eval && !no.ex)
-    stop("supply either 'exdat' or 'index.eval', not both")
-  if (!has.index.eval && !no.ex) {
-    exdat <- toFrame(exdat)
-    if (!(txdat %~% exdat))
-      stop("'txdat' and 'exdat' are not similar data frames!")
-  }
+      txdat <- toFrame(txdat)
+      if (has.index.eval && !no.ex)
+        stop("supply either 'exdat' or 'index.eval', not both")
+      if (!has.index.eval && !no.ex) {
+        exdat <- toFrame(exdat)
+        if (!(txdat %~% exdat))
+          stop("'txdat' and 'exdat' are not similar data frames!")
+      }
 
-  if (is.factor(tydat)) {
-    tydat <- adjustLevels(data.frame(tydat), bws$ydati)[, 1L]
-    tydat <- (bws$ydati$all.dlev[[1L]])[as.integer(tydat)]
-  } else {
-    tydat <- as.double(tydat)
-  }
+      if (is.factor(tydat)) {
+        tydat <- adjustLevels(data.frame(tydat), bws$ydati)[, 1L]
+        tydat <- (bws$ydati$all.dlev[[1L]])[as.integer(tydat)]
+      } else {
+        tydat <- as.double(tydat)
+      }
 
-  txdat <- adjustLevels(txdat, bws$xdati)
-  if (!no.ex)
-    exdat <- adjustLevels(exdat, bws$xdati)
+      txdat <- adjustLevels(txdat, bws$xdati)
+      if (!no.ex)
+        exdat <- adjustLevels(exdat, bws$xdati)
 
-  txmat <- toMatrix(txdat)
-  index <- as.vector(txmat %*% bws$beta)
-  if (!has.index.eval) {
-    exmat <- if (no.ex) txmat else toMatrix(exdat)
-    index.eval <- as.vector(exmat %*% bws$beta)
-  } else {
-    index.eval <- as.double(index.eval)
-    if (!length(index.eval) || anyNA(index.eval) || any(!is.finite(index.eval)))
-      stop("argument 'index.eval' must contain finite evaluation points",
-           call. = FALSE)
-  }
+      txmat <- toMatrix(txdat)
+      index <- as.vector(txmat %*% bws$beta)
+      if (!has.index.eval) {
+        exmat <- if (no.ex) txmat else toMatrix(exdat)
+        index.eval <- as.vector(exmat %*% bws$beta)
+      } else {
+        index.eval <- as.double(index.eval)
+        if (!length(index.eval) || anyNA(index.eval) || any(!is.finite(index.eval)))
+          stop("argument 'index.eval' must contain finite evaluation points",
+               call. = FALSE)
+      }
 
-  spec <- .npindex_resolve_spec(bws, where = "plot.singleindex")
-  regtype <- spec$regtype.engine
-  npreg.args <- list(
-    txdat = data.frame(index = index),
-    tydat = tydat,
-    exdat = data.frame(index = index.eval),
-    bws = bws$bw,
-    bwtype = bws$type,
-    ckertype = bws$ckertype,
-    ckerorder = bws$ckerorder,
-    regtype = regtype,
-    gradients = gradients,
-    warn.glp.gradient = FALSE
+      spec <- .npindex_resolve_spec(bws, where = "plot.singleindex")
+      regtype <- spec$regtype.engine
+      npreg.args <- list(
+        txdat = data.frame(index = index),
+        tydat = tydat,
+        exdat = data.frame(index = index.eval),
+        bws = bws$bw,
+        bwtype = bws$type,
+        ckertype = bws$ckertype,
+        ckerorder = bws$ckerorder,
+        regtype = regtype,
+        gradients = gradients,
+        warn.glp.gradient = FALSE
+      )
+      if (identical(regtype, "lp")) {
+        npreg.args$basis <- spec$basis.engine
+        npreg.args$degree <- spec$degree.engine
+        npreg.args$bernstein.basis <- spec$bernstein.basis.engine
+      }
+
+      fit <- do.call(npreg, npreg.args)
+      out <- list(
+        index = index.eval,
+        mean = as.vector(fit$mean),
+        merr = as.double(fit$merr)
+      )
+
+      if (gradients) {
+        grad.index <- as.vector(fit$grad[, 1L])
+        gerr.index <- as.vector(fit$gerr[, 1L])
+        beta <- as.vector(bws$beta)
+        out$grad.index <- grad.index
+        out$gerr.index <- gerr.index
+        out$grad <- grad.index %o% beta
+        out$gerr <- gerr.index %o% abs(beta)
+      }
+
+      out
+    }
   )
-  if (identical(regtype, "lp")) {
-    npreg.args$basis <- spec$basis.engine
-    npreg.args$degree <- spec$degree.engine
-    npreg.args$bernstein.basis <- spec$bernstein.basis.engine
-  }
-
-  fit <- do.call(npreg, npreg.args)
-  out <- list(
-    index = index.eval,
-    mean = as.vector(fit$mean),
-    merr = as.double(fit$merr)
-  )
-
-  if (gradients) {
-    grad.index <- as.vector(fit$grad[, 1L])
-    gerr.index <- as.vector(fit$gerr[, 1L])
-    beta <- as.vector(bws$beta)
-    out$grad.index <- grad.index
-    out$gerr.index <- gerr.index
-    out$grad <- grad.index %o% beta
-    out$gerr <- gerr.index %o% abs(beta)
-  }
-
-  out
 }
 
 .np_plot_plreg_asymptotic_fit <-
@@ -3812,6 +3846,8 @@ plotFactor <- function(f, y, ...){
            zdat,
            exdat,
            ezdat) {
+    activity <- .np_plot_activity_begin("Computing partially linear plot asymptotic fit")
+    on.exit(.np_plot_activity_end(activity), add = TRUE)
 
     xdat <- toFrame(xdat)
     zdat <- toFrame(zdat)
@@ -3891,26 +3927,41 @@ plotFactor <- function(f, y, ...){
                                         bws,
                                         cdf = FALSE,
                                         need.asymptotic = FALSE) {
-  if (isTRUE(need.asymptotic)) {
-    return(if (isTRUE(cdf)) {
-      npudist(tdat = xdat, edat = exdat, bws = bws)
+  .np_plot_activity_run(
+    label = if (isTRUE(need.asymptotic)) {
+      if (isTRUE(cdf)) {
+        "Computing unconditional distribution plot asymptotic fit"
+      } else {
+        "Computing unconditional density plot asymptotic fit"
+      }
+    } else if (isTRUE(cdf)) {
+      "Computing unconditional distribution plot fit"
     } else {
-      npudens(tdat = xdat, edat = exdat, bws = bws)
-    })
-  }
+      "Computing unconditional density plot fit"
+    },
+    expr = {
+      if (isTRUE(need.asymptotic)) {
+        return(if (isTRUE(cdf)) {
+          npudist(tdat = xdat, edat = exdat, bws = bws)
+        } else {
+          npudens(tdat = xdat, edat = exdat, bws = bws)
+        })
+      }
 
-  est <- .np_ksum_unconditional_eval_exact(
-    xdat = xdat,
-    exdat = exdat,
-    bws = bws,
-    operator = if (isTRUE(cdf)) "integral" else "normal"
+      est <- .np_ksum_unconditional_eval_exact(
+        xdat = xdat,
+        exdat = exdat,
+        bws = bws,
+        operator = if (isTRUE(cdf)) "integral" else "normal"
+      )
+
+      if (isTRUE(cdf)) {
+        list(dist = est, derr = rep(NA_real_, length(est)))
+      } else {
+        list(dens = est, derr = rep(NA_real_, length(est)))
+      }
+    }
   )
-
-  if (isTRUE(cdf)) {
-    list(dist = est, derr = rep(NA_real_, length(est)))
-  } else {
-    list(dens = est, derr = rep(NA_real_, length(est)))
-  }
 }
 
 .np_plot_quantile_eval <- function(bws,
@@ -3932,249 +3983,254 @@ plotFactor <- function(f, y, ...){
                                    dfac.dir = 0.25 * (3.0 - sqrt(5)),
                                    initd.dir = 1.0,
                                    ...) {
-  fit.start <- proc.time()[3]
-  gradients <- npValidateScalarLogical(gradients, "gradients")
+  .np_plot_activity_run(
+    label = "Computing quantile-regression plot fit",
+    expr = {
+      fit.start <- proc.time()[3]
+      gradients <- npValidateScalarLogical(gradients, "gradients")
 
-  if (!is.numeric(itmax) || length(itmax) != 1L || is.na(itmax) ||
-      !is.finite(itmax) || itmax < 1 || itmax != floor(itmax))
-    stop("'itmax' must be a positive integer")
-  if (!is.numeric(ftol) || length(ftol) != 1L || is.na(ftol) ||
-      !is.finite(ftol) || ftol <= 0)
-    stop("'ftol' must be a positive finite numeric scalar")
-  if (!is.numeric(tol) || length(tol) != 1L || is.na(tol) ||
-      !is.finite(tol) || tol <= 0)
-    stop("'tol' must be a positive finite numeric scalar")
-  if (!is.numeric(small) || length(small) != 1L || is.na(small) ||
-      !is.finite(small) || small <= 0)
-    stop("'small' must be a positive finite numeric scalar")
+      if (!is.numeric(itmax) || length(itmax) != 1L || is.na(itmax) ||
+          !is.finite(itmax) || itmax < 1 || itmax != floor(itmax))
+        stop("'itmax' must be a positive integer")
+      if (!is.numeric(ftol) || length(ftol) != 1L || is.na(ftol) ||
+          !is.finite(ftol) || ftol <= 0)
+        stop("'ftol' must be a positive finite numeric scalar")
+      if (!is.numeric(tol) || length(tol) != 1L || is.na(tol) ||
+          !is.finite(tol) || tol <= 0)
+        stop("'tol' must be a positive finite numeric scalar")
+      if (!is.numeric(small) || length(small) != 1L || is.na(small) ||
+          !is.finite(small) || small <= 0)
+        stop("'small' must be a positive finite numeric scalar")
 
-  itmax <- as.integer(itmax)
-  ftol <- as.double(ftol)
-  tol <- as.double(tol)
-  small <- as.double(small)
+      itmax <- as.integer(itmax)
+      ftol <- as.double(ftol)
+      tol <- as.double(tol)
+      small <- as.double(small)
 
-  no.ex <- missing(exdat)
+      no.ex <- missing(exdat)
 
-  xdat <- toFrame(txdat)
-  ydat <- toFrame(tydat)
+      xdat <- toFrame(txdat)
+      ydat <- toFrame(tydat)
 
-  if (!is.numeric(tau) || length(tau) != 1L || is.na(tau) || tau <= 0 || tau >= 1)
-    stop("'tau' must be a single numeric value in (0,1)")
-  if (ncol(ydat) != 1L)
-    stop("'tydat' has more than one column")
+      if (!is.numeric(tau) || length(tau) != 1L || is.na(tau) || tau <= 0 || tau >= 1)
+        stop("'tau' must be a single numeric value in (0,1)")
+      if (ncol(ydat) != 1L)
+        stop("'tydat' has more than one column")
 
-  if (!no.ex) {
-    exdat <- toFrame(exdat)
-    if (!xdat %~% exdat)
-      stop("'txdat' and 'exdat' are not similar data frames!")
-  }
+      if (!no.ex) {
+        exdat <- toFrame(exdat)
+        if (!xdat %~% exdat)
+          stop("'txdat' and 'exdat' are not similar data frames!")
+      }
 
-  if (gradients)
-    stop("gradients not currently supported for this object")
+      if (gradients)
+        stop("gradients not currently supported for this object")
 
-  if (length(bws$xbw) != length(xdat))
-    stop("length of bandwidth vector does not match number of columns of 'txdat'")
-  if (length(bws$ybw) != 1L)
-    stop("length of bandwidth vector does not match number of columns of 'tydat'")
+      if (length(bws$xbw) != length(xdat))
+        stop("length of bandwidth vector does not match number of columns of 'txdat'")
+      if (length(bws$ybw) != 1L)
+        stop("length of bandwidth vector does not match number of columns of 'tydat'")
 
-  if (any(bws$iyord) || any(bws$iyuno) || coarseclass(ydat[, 1L]) != "numeric")
-    stop("'tydat' is not continuous")
+      if (any(bws$iyord) || any(bws$iyuno) || coarseclass(ydat[, 1L]) != "numeric")
+        stop("'tydat' is not continuous")
 
-  if ((any(bws$ixcon) &&
-       !all(vapply(xdat[, bws$ixcon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
-      (any(bws$ixord) &&
-       !all(vapply(xdat[, bws$ixord, drop = FALSE], inherits, logical(1), "ordered"))) ||
-      (any(bws$ixuno) &&
-       !all(vapply(xdat[, bws$ixuno, drop = FALSE], inherits, logical(1), "factor"))))
-    stop("supplied bandwidths do not match 'txdat' in type")
+      if ((any(bws$ixcon) &&
+           !all(vapply(xdat[, bws$ixcon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
+          (any(bws$ixord) &&
+           !all(vapply(xdat[, bws$ixord, drop = FALSE], inherits, logical(1), "ordered"))) ||
+          (any(bws$ixuno) &&
+           !all(vapply(xdat[, bws$ixuno, drop = FALSE], inherits, logical(1), "factor"))))
+        stop("supplied bandwidths do not match 'txdat' in type")
 
-  keep.rows <- rep_len(TRUE, nrow(xdat))
-  rows.omit <- attr(na.omit(data.frame(xdat, ydat)), "na.action")
-  if (length(rows.omit) > 0L)
-    keep.rows[as.integer(rows.omit)] <- FALSE
-  if (!any(keep.rows))
-    stop("Training data has no rows without NAs")
+      keep.rows <- rep_len(TRUE, nrow(xdat))
+      rows.omit <- attr(na.omit(data.frame(xdat, ydat)), "na.action")
+      if (length(rows.omit) > 0L)
+        keep.rows[as.integer(rows.omit)] <- FALSE
+      if (!any(keep.rows))
+        stop("Training data has no rows without NAs")
 
-  xdat <- xdat[keep.rows, , drop = FALSE]
-  ydat <- ydat[keep.rows, , drop = FALSE]
+      xdat <- xdat[keep.rows, , drop = FALSE]
+      ydat <- ydat[keep.rows, , drop = FALSE]
 
-  if (!no.ex) {
-    keep.eval <- rep_len(TRUE, nrow(exdat))
-    rows.omit <- attr(na.omit(exdat), "na.action")
-    if (length(rows.omit) > 0L)
-      keep.eval[as.integer(rows.omit)] <- FALSE
-    exdat <- exdat[keep.eval, , drop = FALSE]
-  }
+      if (!no.ex) {
+        keep.eval <- rep_len(TRUE, nrow(exdat))
+        rows.omit <- attr(na.omit(exdat), "na.action")
+        if (length(rows.omit) > 0L)
+          keep.eval[as.integer(rows.omit)] <- FALSE
+        exdat <- exdat[keep.eval, , drop = FALSE]
+      }
 
-  tnrow <- nrow(xdat)
-  enrow <- if (no.ex) tnrow else nrow(exdat)
+      tnrow <- nrow(xdat)
+      enrow <- if (no.ex) tnrow else nrow(exdat)
 
-  xdat <- adjustLevels(xdat, bws$xdati)
-  ydat <- adjustLevels(ydat, bws$ydati)
-  if (!no.ex)
-    exdat <- adjustLevels(exdat, bws$xdati)
+      xdat <- adjustLevels(xdat, bws$xdati)
+      ydat <- adjustLevels(ydat, bws$ydati)
+      if (!no.ex)
+        exdat <- adjustLevels(exdat, bws$xdati)
 
-  txeval <- if (no.ex) xdat else exdat
-  xdat.df <- xdat
-  ydat.df <- ydat
-  if (!no.ex)
-    exdat.df <- exdat
+      txeval <- if (no.ex) xdat else exdat
+      xdat.df <- xdat
+      ydat.df <- ydat
+      if (!no.ex)
+        exdat.df <- exdat
 
-  ydat <- toMatrix(ydat)
-  xdat <- toMatrix(xdat)
+      ydat <- toMatrix(ydat)
+      xdat <- toMatrix(xdat)
 
-  xuno <- xdat[, bws$ixuno, drop = FALSE]
-  xcon <- xdat[, bws$ixcon, drop = FALSE]
-  xord <- xdat[, bws$ixord, drop = FALSE]
+      xuno <- xdat[, bws$ixuno, drop = FALSE]
+      xcon <- xdat[, bws$ixcon, drop = FALSE]
+      xord <- xdat[, bws$ixord, drop = FALSE]
 
-  if (!no.ex) {
-    exdat <- toMatrix(exdat)
-    exuno <- exdat[, bws$ixuno, drop = FALSE]
-    excon <- exdat[, bws$ixcon, drop = FALSE]
-    exord <- exdat[, bws$ixord, drop = FALSE]
-  } else {
-    exuno <- data.frame()
-    excon <- data.frame()
-    exord <- data.frame()
-  }
+      if (!no.ex) {
+        exdat <- toMatrix(exdat)
+        exuno <- exdat[, bws$ixuno, drop = FALSE]
+        excon <- exdat[, bws$ixcon, drop = FALSE]
+        exord <- exdat[, bws$ixord, drop = FALSE]
+      } else {
+        exuno <- data.frame()
+        excon <- data.frame()
+        exord <- data.frame()
+      }
 
-  myopti <- list(
-    num_obs_train = tnrow,
-    num_obs_eval = enrow,
-    int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
-    BANDWIDTH_den_extern = switch(bws$type,
-      fixed = BW_FIXED,
-      generalized_nn = BW_GEN_NN,
-      adaptive_nn = BW_ADAP_NN
-    ),
-    int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
-    xkerneval = switch(bws$cxkertype,
-      gaussian = CKER_GAUSS + bws$cxkerorder / 2 - 1,
-      epanechnikov = CKER_EPAN + bws$cxkerorder / 2 - 1,
-      uniform = CKER_UNI,
-      "truncated gaussian" = CKER_TGAUSS
-    ),
-    ykerneval = switch(bws$cykertype,
-      gaussian = CKER_GAUSS + bws$cykerorder / 2 - 1,
-      epanechnikov = CKER_EPAN + bws$cykerorder / 2 - 1,
-      uniform = CKER_UNI,
-      "truncated gaussian" = CKER_TGAUSS
-    ),
-    uxkerneval = switch(bws$uxkertype,
-      aitchisonaitken = UKER_AIT,
-      liracine = UKER_LR
-    ),
-    uykerneval = switch(bws$uykertype,
-      aitchisonaitken = UKER_AIT,
-      liracine = UKER_LR
-    ),
-    oxkerneval = switch(bws$oxkertype,
-      wangvanryzin = OKER_WANG,
-      liracine = OKER_LR,
-      racineliyan = OKER_RLY
-    ),
-    oykerneval = switch(bws$oykertype,
-      wangvanryzin = OKER_WANG,
-      liracine = OKER_NLR,
-      racineliyan = OKER_RLY
-    ),
-    num_yuno = bws$ynuno,
-    num_yord = bws$ynord,
-    num_ycon = bws$yncon,
-    num_xuno = bws$xnuno,
-    num_xord = bws$xnord,
-    num_xcon = bws$xncon,
-    no.ex = no.ex,
-    gradients = gradients,
-    itmax = itmax,
-    xmcv.numRow = attr(bws$xmcv, "num.row"),
-    nmulti = itmax,
-    dfc.dir = dfc.dir
-  )
+      myopti <- list(
+        num_obs_train = tnrow,
+        num_obs_eval = enrow,
+        int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
+        BANDWIDTH_den_extern = switch(bws$type,
+          fixed = BW_FIXED,
+          generalized_nn = BW_GEN_NN,
+          adaptive_nn = BW_ADAP_NN
+        ),
+        int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
+        xkerneval = switch(bws$cxkertype,
+          gaussian = CKER_GAUSS + bws$cxkerorder / 2 - 1,
+          epanechnikov = CKER_EPAN + bws$cxkerorder / 2 - 1,
+          uniform = CKER_UNI,
+          "truncated gaussian" = CKER_TGAUSS
+        ),
+        ykerneval = switch(bws$cykertype,
+          gaussian = CKER_GAUSS + bws$cykerorder / 2 - 1,
+          epanechnikov = CKER_EPAN + bws$cykerorder / 2 - 1,
+          uniform = CKER_UNI,
+          "truncated gaussian" = CKER_TGAUSS
+        ),
+        uxkerneval = switch(bws$uxkertype,
+          aitchisonaitken = UKER_AIT,
+          liracine = UKER_LR
+        ),
+        uykerneval = switch(bws$uykertype,
+          aitchisonaitken = UKER_AIT,
+          liracine = UKER_LR
+        ),
+        oxkerneval = switch(bws$oxkertype,
+          wangvanryzin = OKER_WANG,
+          liracine = OKER_LR,
+          racineliyan = OKER_RLY
+        ),
+        oykerneval = switch(bws$oykertype,
+          wangvanryzin = OKER_WANG,
+          liracine = OKER_NLR,
+          racineliyan = OKER_RLY
+        ),
+        num_yuno = bws$ynuno,
+        num_yord = bws$ynord,
+        num_ycon = bws$yncon,
+        num_xuno = bws$xnuno,
+        num_xord = bws$xnord,
+        num_xcon = bws$xncon,
+        no.ex = no.ex,
+        gradients = gradients,
+        itmax = itmax,
+        xmcv.numRow = attr(bws$xmcv, "num.row"),
+        nmulti = itmax,
+        dfc.dir = dfc.dir
+      )
 
-  myoptd <- list(
-    ftol = ftol,
-    tol = tol,
-    small = small,
-    lbc.dir = lbc.dir,
-    cfac.dir = cfac.dir,
-    initc.dir = initc.dir,
-    lbd.dir = lbd.dir,
-    hbd.dir = hbd.dir,
-    dfac.dir = dfac.dir,
-    initd.dir = initd.dir
-  )
+      myoptd <- list(
+        ftol = ftol,
+        tol = tol,
+        small = small,
+        lbc.dir = lbc.dir,
+        cfac.dir = cfac.dir,
+        initc.dir = initc.dir,
+        lbd.dir = lbd.dir,
+        hbd.dir = hbd.dir,
+        dfac.dir = dfac.dir,
+        initd.dir = initd.dir
+      )
 
-  myout <- .Call(
-    "C_np_quantile_conditional",
-    as.double(ydat),
-    as.double(xuno), as.double(xord), as.double(xcon),
-    as.double(exuno), as.double(exord), as.double(excon),
-    as.double(tau),
-    as.double(c(
-      bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-      bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-      bws$xbw[bws$ixuno], bws$xbw[bws$ixord]
-    )),
-    as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-    as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
-    as.integer(myopti),
-    as.double(myoptd),
-    as.integer(enrow),
-    as.integer(bws$xndim),
-    as.logical(gradients),
-    PACKAGE = "np"
-  )[c("yq", "yqerr", "yqgrad")]
+      myout <- .Call(
+        "C_np_quantile_conditional",
+        as.double(ydat),
+        as.double(xuno), as.double(xord), as.double(xcon),
+        as.double(exuno), as.double(exord), as.double(excon),
+        as.double(tau),
+        as.double(c(
+          bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+          bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+          bws$xbw[bws$ixuno], bws$xbw[bws$ixord]
+        )),
+        as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+        as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
+        as.integer(myopti),
+        as.double(myoptd),
+        as.integer(enrow),
+        as.integer(bws$xndim),
+        as.logical(gradients),
+        PACKAGE = "np"
+      )[c("yq", "yqerr", "yqgrad")]
 
-  if (all(!is.finite(myout$yqerr) | myout$yqerr <= 0.0)) {
-    dens.obj <- tryCatch(
-      .np_plot_conditional_eval(
+      if (all(!is.finite(myout$yqerr) | myout$yqerr <= 0.0)) {
+        dens.obj <- tryCatch(
+          .np_plot_conditional_eval(
+            bws = bws,
+            xdat = xdat.df,
+            ydat = ydat.df,
+            exdat = if (no.ex) xdat.df else exdat.df,
+            eydat = setNames(data.frame(as.double(myout$yq)), names(ydat.df)),
+            cdf = FALSE,
+            gradients = FALSE
+          ),
+          error = function(e) NULL
+        )
+        if (!is.null(dens.obj)) {
+          dens.q <- as.double(dens.obj$condens)
+          qvar <- tau * (1.0 - tau) / (tnrow * NZD(dens.q)^2)
+          myout$yqerr <- sqrt(pmax(qvar, 0.0))
+          myout$yqerr[!is.finite(myout$yqerr)] <- NA_real_
+        }
+      }
+
+      if (gradients) {
+        myout$yqgrad <- matrix(data = myout$yqgrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
+        rorder <- numeric(bws$xndim)
+        xidx <- seq_len(bws$xndim)
+        rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
+        myout$yqgrad <- myout$yqgrad[, rorder, drop = FALSE]
+      } else {
+        myout$yqgrad <- NA
+      }
+
+      fit.elapsed <- proc.time()[3] - fit.start
+      optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+      total.time <- fit.elapsed + if (is.na(optim.time)) 0.0 else optim.time
+
+      qregression(
         bws = bws,
-        xdat = xdat.df,
-        ydat = ydat.df,
-        exdat = if (no.ex) xdat.df else exdat.df,
-        eydat = setNames(data.frame(as.double(myout$yq)), names(ydat.df)),
-        cdf = FALSE,
-        gradients = FALSE
-      ),
-      error = function(e) NULL
-    )
-    if (!is.null(dens.obj)) {
-      dens.q <- as.double(dens.obj$condens)
-      qvar <- tau * (1.0 - tau) / (tnrow * NZD(dens.q)^2)
-      myout$yqerr <- sqrt(pmax(qvar, 0.0))
-      myout$yqerr[!is.finite(myout$yqerr)] <- NA_real_
+        xeval = txeval,
+        tau = tau,
+        quantile = myout$yq,
+        quanterr = myout$yqerr,
+        quantgrad = myout$yqgrad,
+        ntrain = tnrow,
+        trainiseval = no.ex,
+        gradients = gradients,
+        timing = bws$timing,
+        total.time = total.time,
+        optim.time = optim.time,
+        fit.time = fit.elapsed
+      )
     }
-  }
-
-  if (gradients) {
-    myout$yqgrad <- matrix(data = myout$yqgrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
-    rorder <- numeric(bws$xndim)
-    xidx <- seq_len(bws$xndim)
-    rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
-    myout$yqgrad <- myout$yqgrad[, rorder, drop = FALSE]
-  } else {
-    myout$yqgrad <- NA
-  }
-
-  fit.elapsed <- proc.time()[3] - fit.start
-  optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
-  total.time <- fit.elapsed + if (is.na(optim.time)) 0.0 else optim.time
-
-  qregression(
-    bws = bws,
-    xeval = txeval,
-    tau = tau,
-    quantile = myout$yq,
-    quanterr = myout$yqerr,
-    quantgrad = myout$yqgrad,
-    ntrain = tnrow,
-    trainiseval = no.ex,
-    gradients = gradients,
-    timing = bws$timing,
-    total.time = total.time,
-    optim.time = optim.time,
-    fit.time = fit.elapsed
   )
 }
 
@@ -4188,6 +4244,14 @@ plotFactor <- function(f, y, ...){
                                       proper = FALSE,
                                       proper.method = NULL,
                                       proper.control = list()) {
+  activity <- .np_plot_activity_begin(
+    if (isTRUE(cdf)) {
+      "Computing conditional distribution plot fit"
+    } else {
+      "Computing conditional density plot fit"
+    }
+  )
+  on.exit(.np_plot_activity_end(activity), add = TRUE)
   fit.start <- proc.time()[3]
   proper <- npValidateScalarLogical(proper, "proper")
 
@@ -4917,6 +4981,10 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    activity <- .np_plot_activity_begin(
+      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+    )
+    on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.rbandwidth")
     boot.out <- NULL
 
@@ -5075,6 +5143,10 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    activity <- .np_plot_activity_begin(
+      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+    )
+    on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.scbandwidth")
     miss.z <- missing(zdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -5226,6 +5298,10 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    activity <- .np_plot_activity_begin(
+      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+    )
+    on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.plbandwidth")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -5366,6 +5442,10 @@ compute.bootstrap.errors.bandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    activity <- .np_plot_activity_begin(
+      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+    )
+    on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.bandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -5509,6 +5589,10 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    activity <- .np_plot_activity_begin(
+      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+    )
+    on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.conbandwidth")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -5685,6 +5769,10 @@ compute.bootstrap.errors.sibandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    activity <- .np_plot_activity_begin(
+      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+    )
+    on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.sibandwidth")
     xdat <- toFrame(xdat)
     idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
