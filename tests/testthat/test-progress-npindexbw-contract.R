@@ -11,9 +11,10 @@ shadow_lines <- function(shadow) {
 }
 
 shadow_signature <- function(shadow) {
+  trace <- shadow$trace[vapply(shadow$trace, `[[`, character(1L), "event") == "render"]
   data.frame(
-    event = vapply(shadow$trace, `[[`, character(1L), "event"),
-    line = shadow_lines(shadow),
+    event = vapply(trace, `[[`, character(1L), "event"),
+    line = vapply(trace, `[[`, character(1L), "line"),
     stringsAsFactors = FALSE
   )
 }
