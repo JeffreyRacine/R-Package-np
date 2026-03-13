@@ -540,6 +540,19 @@
   if (length(blocklen) != 1L || is.na(blocklen) || blocklen < 1L || blocklen > n)
     stop("invalid block length for block bootstrap")
 
+  if (identical(blocklen, 1L)) {
+    prob <- rep.int(1 / n, n)
+
+    return(function(start, stopi) {
+      start <- as.integer(start)
+      stopi <- as.integer(stopi)
+      if (start < 1L || stopi < start || stopi > B)
+        stop("invalid block bootstrap chunk bounds")
+
+      stats::rmultinom(n = stopi - start + 1L, size = n.sim, prob = prob)
+    })
+  }
+
   ts.array <- utils::getFromNamespace("ts.array", "boot")
   make.ends <- utils::getFromNamespace("make.ends", "boot")
   ts.draws <- ts.array(

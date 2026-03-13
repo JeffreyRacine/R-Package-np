@@ -295,6 +295,30 @@ test_that("block-style unconditional bootstrap emits intermediate progress updat
   expect_true(any(grepl("^\\[np\\] Plot bootstrap block 9/9 \\(", lines)))
 })
 
+test_that("block bootstrap drawer uses iid fast path when block length is one", {
+  drawer_factory <- getFromNamespace(".np_block_counts_drawer", "np")
+  boot.ns <- asNamespace("boot")
+  calls <- 0L
+
+  trace(
+    what = "ts.array",
+    where = boot.ns,
+    tracer = quote(calls <<- calls + 1L),
+    print = FALSE
+  )
+  on.exit(untrace("ts.array", where = boot.ns), add = TRUE)
+
+  set.seed(20260313)
+  drawer <- drawer_factory(n = 8L, B = 11L, blocklen = 1L, sim = "geom", n.sim = 8L)
+  out <- drawer(1L, 3L)
+
+  expect_identical(calls, 0L)
+  expect_true(is.matrix(out))
+  expect_identical(dim(out), c(8L, 3L))
+  expect_true(all(colSums(out) == 8L))
+  expect_true(all(out >= 0))
+})
+
 test_that("heavy plot helpers invoke delayed activity notifications", {
   regression.eval <- getFromNamespace(".np_plot_regression_eval", "np")
   unconditional.eval <- getFromNamespace(".np_plot_unconditional_eval", "np")
