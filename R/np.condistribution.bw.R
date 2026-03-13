@@ -96,6 +96,21 @@ npcdistbw.formula <-
     tbw
   }
 
+.npRmpi_with_local_cdist_eval <- function(expr) {
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+  old.local <- getOption("npRmpi.local.regression.mode", FALSE)
+  options(npRmpi.autodispatch.disable = TRUE)
+  options(npRmpi.autodispatch.context = TRUE)
+  options(npRmpi.local.regression.mode = TRUE)
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+  on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+  on.exit(options(npRmpi.local.regression.mode = old.local), add = TRUE)
+  old.mode <- .Call("C_np_set_local_regression_mode", TRUE, PACKAGE = "npRmpi")
+  on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"), add = TRUE)
+  force(expr)
+}
+
 npcdistbw.condbandwidth <- 
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
@@ -197,10 +212,14 @@ npcdistbw.condbandwidth <-
       where = "npcdistbw"
     )
     .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    keep_local_cvls_nn <- bandwidth.compute &&
-      identical(spec$regtype.engine, "lp") &&
+    use.local.compiled.adaptive.cvls <- bandwidth.compute &&
       identical(bws$method, "cv.ls") &&
-      identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
+      identical(bws$type, "adaptive_nn")
+    keep_local_cvls_nn <- bandwidth.compute &&
+      identical(bws$method, "cv.ls") &&
+      (use.local.compiled.adaptive.cvls ||
+       (identical(spec$regtype.engine, "lp") &&
+        identical(bws$type, "generalized_nn")))
     if (.npRmpi_autodispatch_active() && !keep_local_cvls_nn)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -366,7 +385,31 @@ npcdistbw.condbandwidth <-
       cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
 
       if (bws$method != "normal-reference"){
-        myout <-
+        myout <- if (use.local.compiled.adaptive.cvls) {
+          .npRmpi_with_local_cdist_eval(
+            .Call("C_np_distribution_conditional_bw",
+                  as.double(yuno), as.double(yord), as.double(ycon),
+                  as.double(xuno), as.double(xord), as.double(xcon),
+                  as.double(gyuno), as.double(gyord), as.double(gycon),
+                  as.double(mysd),
+                  as.integer(myopti), as.double(myoptd),
+                  as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                              bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                              bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+                  as.integer(max(1, nmulti)),
+                  as.integer(penalty_mode),
+                  as.double(penalty.multiplier),
+                  as.integer(degree.code),
+                  as.integer(bernstein.engine),
+                  as.integer(basis.code),
+                  as.integer(reg.code),
+                  as.double(cxker.bounds.c$lb),
+                  as.double(cxker.bounds.c$ub),
+                  as.double(cyker.bounds.c$lb),
+                  as.double(cyker.bounds.c$ub),
+                  PACKAGE="npRmpi")
+          )
+        } else {
           .Call("C_np_distribution_conditional_bw",
                 as.double(yuno), as.double(yord), as.double(ycon),
                 as.double(xuno), as.double(xord), as.double(xcon),
@@ -388,6 +431,7 @@ npcdistbw.condbandwidth <-
                 as.double(cyker.bounds.c$lb),
                 as.double(cyker.bounds.c$ub),
                 PACKAGE="npRmpi")
+        }
         total.time <- proc.time()[3] - elapsed.start
       } else {
         nbw = double(yncol+xncol)
@@ -698,10 +742,14 @@ npcdistbw.default <-
     }
     tbw <- do.call(condbandwidth, bw.args)
     .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    keep_local_cvls_nn <- bandwidth.compute &&
-      identical(tbw$regtype.engine, "lp") &&
+    use.local.compiled.adaptive.cvls <- bandwidth.compute &&
       identical(tbw$method, "cv.ls") &&
-      identical(tbw$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
+      identical(tbw$type, "adaptive_nn")
+    keep_local_cvls_nn <- bandwidth.compute &&
+      identical(tbw$method, "cv.ls") &&
+      (use.local.compiled.adaptive.cvls ||
+       (identical(tbw$regtype.engine, "lp") &&
+        identical(tbw$type, "generalized_nn")))
     if (.npRmpi_autodispatch_active() && !keep_local_cvls_nn)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
                         
