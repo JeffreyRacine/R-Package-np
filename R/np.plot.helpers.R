@@ -200,6 +200,23 @@
   invisible(NULL)
 }
 
+.np_plot_scalar_default <- function(value, default) {
+  if (is.null(value)) default else value
+}
+
+.np_plot_engine_begin <- function(plot.par.mfrow = TRUE) {
+  oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
+
+  plot.par.mfrow.opt <- getOption("plot.par.mfrow")
+  if (!is.null(plot.par.mfrow.opt))
+    plot.par.mfrow <- plot.par.mfrow.opt
+
+  list(
+    oldpar = oldpar,
+    plot.par.mfrow = plot.par.mfrow
+  )
+}
+
 .np_plot_layout_begin <- function(plot.behavior, plot.par.mfrow, mfrow) {
   list(
     pending = isTRUE(plot.behavior != "data" && plot.par.mfrow),

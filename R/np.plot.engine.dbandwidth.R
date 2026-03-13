@@ -45,16 +45,10 @@
            ...,
            random.seed){
 
-    oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
-    on.exit(.np_plot_restore_par(oldpar), add = TRUE)
-
-    scalar_default <- function(value, default) {
-      if (is.null(value)) default else value
-    }
-
-    plot.par.mfrow.opt <- getOption("plot.par.mfrow")
-    if(!is.null(plot.par.mfrow.opt))
-        plot.par.mfrow <- plot.par.mfrow.opt
+    engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
+    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
+    plot.par.mfrow <- engine.ctx$plot.par.mfrow
+    scalar_default <- .np_plot_scalar_default
 
     miss.x <- missing(xdat)
 
