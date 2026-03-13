@@ -71,6 +71,120 @@
   env
 })
 
+.np_progress_make_registry <- function() {
+  env <- new.env(parent = emptyenv())
+  env$next_id <- 0L
+  env$active_id <- NULL
+  env
+}
+
+.np_progress_registry <- .np_progress_make_registry()
+
+.np_progress_reset_registry <- function() {
+  .np_progress_registry$next_id <- 0L
+  .np_progress_registry$active_id <- NULL
+  invisible(NULL)
+}
+
+.np_progress_next_id <- function() {
+  .np_progress_registry$next_id <- as.integer(.np_progress_registry$next_id) + 1L
+  sprintf("progress-%d", .np_progress_registry$next_id)
+}
+
+.np_progress_capability <- function(domain = "general") {
+  interactive_console <- isTRUE(.np_progress_is_interactive())
+
+  list(
+    domain = domain,
+    interactive = interactive_console,
+    single_line_viable = interactive_console
+  )
+}
+
+.np_progress_single_line_surfaces <- function() {
+  character()
+}
+
+.np_progress_renderer_for_surface <- function(surface, capability) {
+  if (surface %in% .np_progress_single_line_surfaces() &&
+      isTRUE(capability$single_line_viable)) {
+    return("single_line")
+  }
+
+  "legacy"
+}
+
+.np_progress_claim_owner <- function(session_id) {
+  active_id <- .np_progress_registry$active_id
+  if (is.null(active_id) || identical(active_id, session_id)) {
+    .np_progress_registry$active_id <- session_id
+    return(TRUE)
+  }
+
+  FALSE
+}
+
+.np_progress_release_owner <- function(session_id) {
+  if (identical(.np_progress_registry$active_id, session_id)) {
+    .np_progress_registry$active_id <- NULL
+  }
+
+  invisible(NULL)
+}
+
+.np_progress_make_snapshot <- function(state, line, event, now, done = NULL, detail = NULL) {
+  list(
+    id = state$id,
+    surface = state$surface,
+    renderer = state$renderer,
+    label = state$label,
+    kind = if (isTRUE(state$known_total)) "known" else "unknown",
+    current = done,
+    total = state$total,
+    detail = detail,
+    line = line,
+    event = event,
+    started_at = state$started,
+    now = now,
+    last_width = state$last_render_width
+  )
+}
+
+.np_progress_render_legacy <- function(snapshot, event = c("render", "finish", "abort")) {
+  event <- match.arg(event)
+  .np_progress_emit(snapshot$line)
+  invisible(snapshot)
+}
+
+.np_progress_render <- function(state, line, event, now, done = NULL, detail = NULL) {
+  if (!isTRUE(state$enabled) || !isTRUE(state$visible)) {
+    return(state)
+  }
+
+  snapshot <- .np_progress_make_snapshot(
+    state = state,
+    line = line,
+    event = event,
+    now = now,
+    done = done,
+    detail = detail
+  )
+
+  if (identical(state$renderer, "single_line")) {
+    stop("single-line renderer is not active before the bounded pilot tranche")
+  }
+
+  .np_progress_render_legacy(
+    snapshot = snapshot,
+    event = if (identical(event, "finish")) "finish" else if (identical(event, "abort")) "abort" else "render"
+  )
+
+  state$rendered <- TRUE
+  state$last_render_width <- nchar(line, type = "width")
+  state$last_line <- line
+  state
+}
+
 .np_progress_start_grace_sec <- function(known_total = FALSE, domain = "general") {
   default <- if (identical(domain, "plot")) {
     0.75
@@ -142,15 +256,47 @@
   line
 }
 
-.np_progress_begin <- function(label, total = NULL, domain = "general") {
+.np_progress_format_line <- function(state, done = NULL, detail = NULL, now = .np_progress_now()) {
+  if (isTRUE(state$known_total)) {
+    .np_progress_format_known_total(
+      state = state,
+      done = if (is.null(done)) state$last_done else done,
+      detail = detail,
+      now = now
+    )
+  } else {
+    .np_progress_format_unknown_total(
+      state = state,
+      done = if (is.null(done)) state$last_done else done,
+      detail = detail,
+      now = now
+    )
+  }
+}
+
+.np_progress_begin <- function(label, total = NULL, domain = "general", surface = domain) {
   known_total <- !is.null(total)
   throttle_sec <- if (known_total) 0.5 else 2.0
   started <- .np_progress_now()
+  capability <- .np_progress_capability(domain = domain)
+  session_id <- .np_progress_next_id()
+  enabled <- .np_progress_enabled(domain = domain)
+  renderer <- .np_progress_renderer_for_surface(surface = surface, capability = capability)
+  visible <- if (!isTRUE(enabled)) {
+    FALSE
+  } else if (identical(renderer, "single_line")) {
+    isTRUE(.np_progress_claim_owner(session_id))
+  } else {
+    TRUE
+  }
 
   list(
-    enabled = .np_progress_enabled(domain = domain),
+    id = session_id,
+    enabled = enabled,
+    visible = visible,
     pkg_prefix = .np_progress_pkg_prefix(),
     label = label,
+    surface = surface,
     total = total,
     known_total = known_total,
     started = started,
@@ -158,17 +304,21 @@
     throttle_sec = throttle_sec,
     last_done = if (known_total) 0 else NULL,
     domain = domain,
-    start_note = paste0(label, "..."),
+    renderer = renderer,
+    capability = capability,
+    rendered = FALSE,
+    start_note = sprintf("%s %s...", .np_progress_pkg_prefix(), label),
     start_note_pending = TRUE,
     start_note_grace_sec = .np_progress_start_grace_sec(known_total = known_total, domain = domain),
     last_line = NULL,
+    last_render_width = 0L,
     last_emitted_done = NULL,
     last_emitted_detail = NULL
   )
 }
 
 .np_progress_maybe_emit_start_note <- function(state, now = .np_progress_now()) {
-  if (!isTRUE(state$enabled) || !isTRUE(state$start_note_pending)) {
+  if (!isTRUE(state$enabled) || !isTRUE(state$visible) || !isTRUE(state$start_note_pending)) {
     return(state)
   }
 
@@ -176,9 +326,13 @@
     return(state)
   }
 
-  .np_progress_emit(state$start_note)
+  state <- .np_progress_render(
+    state = state,
+    line = state$start_note,
+    event = "start",
+    now = now
+  )
   state$start_note_pending <- FALSE
-  state$last_line <- state$start_note
 
   if (isTRUE(state$start_note_consumes_throttle)) {
     state$last_emit <- now
@@ -206,26 +360,23 @@
     return(state)
   }
 
-  line <- if (isTRUE(state$known_total)) {
-    .np_progress_format_known_total(
-      state = state,
-      done = if (is.null(done)) state$last_done else done,
-      detail = detail,
-      now = now
-    )
-  } else {
-    .np_progress_format_unknown_total(
-      state = state,
-      done = if (is.null(done)) state$last_done else done,
-      detail = detail,
-      now = now
-    )
-  }
+  line <- .np_progress_format_line(
+    state = state,
+    done = if (is.null(done)) state$last_done else done,
+    detail = detail,
+    now = now
+  )
 
   if (!identical(line, state$last_line)) {
-    .np_progress_emit(line)
+    state <- .np_progress_render(
+      state = state,
+      line = line,
+      event = "update",
+      now = now,
+      done = if (is.null(done)) state$last_done else done,
+      detail = detail
+    )
     state$last_emit <- now
-    state$last_line <- line
     state$last_emitted_done <- if (is.null(done)) state$last_done else done
     state$last_emitted_detail <- detail
   }
@@ -235,40 +386,95 @@
 
 .np_progress_end <- function(state, detail = NULL) {
   if (!isTRUE(state$enabled)) {
+    if (identical(state$renderer, "single_line")) {
+      .np_progress_release_owner(state$id)
+    }
     return(invisible(state))
   }
 
   now <- .np_progress_now()
   if (is.null(state$last_line) &&
       (now - state$started) < state$start_note_grace_sec) {
+    if (identical(state$renderer, "single_line")) {
+      .np_progress_release_owner(state$id)
+    }
     return(invisible(state))
   }
 
   if (isTRUE(state$known_total)) {
     done <- if (is.null(state$total)) state$last_done else state$total
-    line <- .np_progress_format_known_total(state = state, done = done, detail = detail, now = now)
+    line <- .np_progress_format_line(state = state, done = done, detail = detail, now = now)
     if (!(identical(done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
-      .np_progress_emit(line)
+      state <- .np_progress_render(
+        state = state,
+        line = line,
+        event = "finish",
+        now = now,
+        done = done,
+        detail = detail
+      )
       state$last_emit <- now
       state$last_done <- done
-      state$last_line <- line
       state$last_emitted_done <- done
       state$last_emitted_detail <- detail
+    }
+    if (identical(state$renderer, "single_line")) {
+      .np_progress_release_owner(state$id)
     }
     return(invisible(state))
   }
 
   if (!is.null(state$last_done)) {
-    line <- .np_progress_format_unknown_total(state = state, done = state$last_done, detail = detail, now = now)
+    line <- .np_progress_format_line(state = state, done = state$last_done, detail = detail, now = now)
     if (!(identical(state$last_done, state$last_emitted_done) && identical(detail, state$last_emitted_detail))) {
-      .np_progress_emit(line)
+      state <- .np_progress_render(
+        state = state,
+        line = line,
+        event = "finish",
+        now = now,
+        done = state$last_done,
+        detail = detail
+      )
       state$last_emit <- now
-      state$last_line <- line
       state$last_emitted_done <- state$last_done
       state$last_emitted_detail <- detail
     }
   }
 
+  if (identical(state$renderer, "single_line")) {
+    .np_progress_release_owner(state$id)
+  }
+  invisible(state)
+}
+
+.np_progress_abort <- function(state, detail = NULL) {
+  if (!isTRUE(state$enabled)) {
+    if (identical(state$renderer, "single_line")) {
+      .np_progress_release_owner(state$id)
+    }
+    return(invisible(state))
+  }
+
+  now <- .np_progress_now()
+  if (!isTRUE(state$rendered)) {
+    if (identical(state$renderer, "single_line")) {
+      .np_progress_release_owner(state$id)
+    }
+    return(invisible(state))
+  }
+
+  line <- if (!is.null(detail)) paste0(state$pkg_prefix, " ", detail) else state$last_line
+  state <- .np_progress_render(
+    state = state,
+    line = line,
+    event = "abort",
+    now = now,
+    done = state$last_done,
+    detail = detail
+  )
+  if (identical(state$renderer, "single_line")) {
+    .np_progress_release_owner(state$id)
+  }
   invisible(state)
 }
 
