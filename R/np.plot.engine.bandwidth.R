@@ -377,8 +377,7 @@
 
     } else {
 
-      if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(bws$ndim),cex=par()$cex)
+      plot.layout.pending <- (plot.behavior != "data" && plot.par.mfrow)
 
       ev = xdat[1,,drop = FALSE]
 
@@ -486,6 +485,10 @@
             data.err.all[[i]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
+          if (plot.layout.pending) {
+            par(mfrow = n2mfrow(bws$ndim), cex = par()$cex)
+            plot.layout.pending <- FALSE
+          }
           ## plot evaluation
           plot.fun <- if (xi.factor) {
             .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -612,6 +615,11 @@
         
         for (i in seq_len(bws$ndim)){
           xi.factor = is.factor(xdat[,i])
+
+          if (plot.layout.pending) {
+            par(mfrow = n2mfrow(bws$ndim), cex = par()$cex)
+            plot.layout.pending <- FALSE
+          }
 
           ## plot evaluation
           plot.fun <- if (xi.factor) {

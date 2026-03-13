@@ -137,7 +137,7 @@ test_that("plot helper stays silent for instant runs below start grace", {
   expect_length(actual$trace, 0)
 })
 
-test_that("plot helper activity delays its note until grace elapses", {
+test_that("plot helper activity renders immediately for long blocking work", {
   begin <- getFromNamespace(".np_plot_activity_begin", "np")
   finish <- getFromNamespace(".np_plot_activity_end", "np")
 
@@ -171,12 +171,12 @@ test_that("plot helper activity delays its note until grace elapses", {
   )
   expect_identical(
     vapply(actual$trace, `[[`, character(1L), "line"),
-    rep("[np] Constructing bootstrap bands...", 2L)
+    rep("[np] Constructing bootstrap bands... elapsed 0.0s", 2L)
   )
   expect_identical(vapply(actual$trace, `[[`, character(1L), "event"), c("render", "finish"))
 })
 
-test_that("plot helper activity stays silent below grace", {
+test_that("plot helper activity no longer waits for grace before first render", {
   begin <- getFromNamespace(".np_plot_activity_begin", "np")
   finish <- getFromNamespace(".np_plot_activity_end", "np")
 
@@ -195,7 +195,47 @@ test_that("plot helper activity stays silent below grace", {
     now = progress_time_values(c(0, 0.2))
   )
 
-  expect_length(actual$trace, 0)
+  expect_identical(vapply(actual$trace, `[[`, character(1L), "event"), c("render", "finish"))
+  expect_identical(
+    vapply(actual$trace, `[[`, character(1L), "line"),
+    rep("[np] Constructing bootstrap bands... elapsed 0.0s", 2L)
+  )
+})
+
+test_that("plot helper activity yields the line to nested bounded progress", {
+  activity.begin <- getFromNamespace(".np_plot_activity_begin", "np")
+  activity.end <- getFromNamespace(".np_plot_activity_end", "np")
+  progress.begin <- getFromNamespace(".np_plot_progress_begin", "np")
+  progress.tick <- getFromNamespace(".np_plot_progress_tick", "np")
+  progress.end <- getFromNamespace(".np_plot_progress_end", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 3
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      activity <- activity.begin("Preparing plot bootstrap inid")
+      state <- progress.begin(total = 4L, label = "Plot bootstrap inid")
+      for (i in seq_len(4L)) {
+        state <- progress.tick(state, done = i)
+      }
+      progress.end(state)
+      activity.end(activity)
+    },
+    now = progress_time_counter(start = 0, by = 0.6)
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+
+  expect_true(any(grepl("^\\[np\\] Preparing plot bootstrap inid\\.\\.\\. elapsed 0\\.0s$", lines)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap inid 1/4 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap inid 4/4 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })
 
 test_that("heavy plot helpers invoke delayed activity notifications", {

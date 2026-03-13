@@ -130,9 +130,7 @@
   if (is.null(state))
     return(NULL)
 
-  .np_progress_note(as.character(label)[1L])
-  state$start_note_pending <- FALSE
-  state
+  .np_progress_show_now(state = state, done = 0L)
 }
 
 .np_plot_activity_begin <- function(label) {
@@ -145,6 +143,8 @@
   state$throttle_sec <- Inf
   state$last_emit <- state$started - state$throttle_sec
   state$start_note_grace_sec <- .np_plot_progress_start_grace_sec()
+  state <- .np_progress_show_now(state = state)
+  .np_progress_release_owner(state$id)
   state
 }
 
@@ -166,6 +166,8 @@
 .np_plot_capture_par <- function(names = character()) {
   names <- unique(as.character(names))
   if (!length(names))
+    return(list())
+  if (identical(dev.cur(), 1L))
     return(list())
   par(names)
 }
@@ -934,6 +936,11 @@
   Mfeat <- vector("list", neval)
   Zfeat <- vector("list", neval)
   t0 <- numeric(neval)
+  prep.label <- if (!is.null(counts.drawer)) "Preparing plot bootstrap block" else "Preparing plot bootstrap inid"
+  prep.progress <- .np_plot_stage_progress_begin(total = neval, label = prep.label)
+  on.exit({
+    .np_plot_progress_end(prep.progress)
+  }, add = TRUE)
 
   for (i in seq_len(neval)) {
     k <- as.double(kw[, i])
@@ -967,6 +974,7 @@
         ridge.grid = ridge.grid
       )[1L]
     }
+    prep.progress <- .np_plot_progress_tick(state = prep.progress, done = i)
   }
 
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
