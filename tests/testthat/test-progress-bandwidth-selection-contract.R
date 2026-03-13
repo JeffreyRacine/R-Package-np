@@ -74,8 +74,8 @@ test_that("npudensbw emits bounded multistart bandwidth progress on master", {
   messages <- normalize_messages(messages)
 
   expect_s3_class(res, "bandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting density bandwidth 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 1 of 3$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting density bandwidth 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 3 of 3$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting density bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting density bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
 })
 
 test_that("npregbw emits bounded multistart bandwidth progress on master", {
@@ -112,6 +112,6 @@ test_that("npregbw emits bounded multistart bandwidth progress on master", {
   messages <- normalize_messages(messages)
 
   expect_s3_class(res, "rbandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 1 of 3$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 3 of 3$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
 })

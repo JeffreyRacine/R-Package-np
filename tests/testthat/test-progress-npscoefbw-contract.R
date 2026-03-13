@@ -97,8 +97,8 @@ test_that("npscoefbw emits append-only multistart and objective progress on mast
   messages <- normalize_messages(res$messages)
 
   expect_s3_class(res$value, "scbandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting smooth coefficient bandwidth 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 1 of 2$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting smooth coefficient bandwidth 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): multistart 2 of 2$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting smooth coefficient bandwidth multistart 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Selecting smooth coefficient bandwidth multistart 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Optimizing smooth coefficient bandwidth\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s: multistart 1$", messages)))
   expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
 })
