@@ -173,9 +173,10 @@ test_that("plot helper activity delays its note until grace elapses on master", 
   )
   expect_identical(
     vapply(actual$trace, `[[`, character(1L), "line"),
-    "[npRmpi] Constructing bootstrap bands..."
+    rep("[npRmpi] Constructing bootstrap bands... elapsed 0.0s", 2L)
   )
-  expect_identical(vapply(actual$trace, `[[`, character(1L), "event"), "render")
+  expect_identical(vapply(actual$trace, `[[`, character(1L), "event"),
+                   c("render", "finish"))
 })
 
 test_that("plot helper activity stays silent below grace on master", {
@@ -197,7 +198,43 @@ test_that("plot helper activity stays silent below grace on master", {
     now = progress_time_values(c(0, 0.2))
   )
 
-  expect_length(actual$trace, 0)
+  expect_identical(
+    vapply(actual$trace, `[[`, character(1L), "line"),
+    rep("[npRmpi] Constructing bootstrap bands... elapsed 0.0s", 2L)
+  )
+  expect_identical(vapply(actual$trace, `[[`, character(1L), "event"),
+                   c("render", "finish"))
+})
+
+test_that("plot activity relinquishes single-line ownership before bounded stage begins", {
+  begin.activity <- getFromNamespace(".np_plot_activity_begin", "npRmpi")
+  end.activity <- getFromNamespace(".np_plot_activity_end", "npRmpi")
+  begin.bounded <- getFromNamespace(".np_plot_progress_begin", "npRmpi")
+  end.bounded <- getFromNamespace(".np_plot_progress_end", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      activity <- begin.activity("Computing regression plot fit")
+      end.activity(activity)
+      bounded <- begin.bounded(total = 12, label = "Plot bootstrap wild")
+      bounded <- getFromNamespace(".np_plot_progress_tick", "npRmpi")(bounded, done = 12L)
+      end.bounded(bounded)
+    },
+    now = progress_time_counter()
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+  expect_true(any(grepl("^\\[npRmpi\\] Computing regression plot fit\\.\\.\\. elapsed 0\\.0s$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild\\.\\.\\.$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 12/12 ", lines)))
 })
 
 test_that("block-style plot bootstrap chunking is capped only when master plot progress is active", {

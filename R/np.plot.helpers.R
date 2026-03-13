@@ -216,9 +216,7 @@
   if (is.null(state))
     return(NULL)
 
-  .np_progress_note(as.character(label)[1L])
-  state$start_note_pending <- FALSE
-  state
+  .np_progress_show_now(state = state, done = 0L)
 }
 
 .np_plot_activity_begin <- function(label) {
@@ -234,6 +232,8 @@
   state$throttle_sec <- Inf
   state$last_emit <- state$started - state$throttle_sec
   state$start_note_grace_sec <- .np_plot_progress_start_grace_sec()
+  state <- .np_progress_show_now(state = state)
+  .np_progress_release_owner(state$id)
   state
 }
 
@@ -241,7 +241,8 @@
   if (is.null(state))
     return(invisible(NULL))
 
-  .np_progress_maybe_emit_start_note(state = state, now = .np_progress_now())
+  state <- .np_progress_maybe_emit_start_note(state = state, now = .np_progress_now())
+  .np_progress_end(state)
   invisible(NULL)
 }
 

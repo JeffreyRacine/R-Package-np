@@ -513,6 +513,37 @@
   state
 }
 
+.np_progress_show_now <- function(state, done = NULL, detail = NULL) {
+  if (is.null(state) || !isTRUE(state$enabled) || !isTRUE(state$visible)) {
+    return(state)
+  }
+
+  if (!is.null(done)) {
+    state$last_done <- done
+  }
+
+  now <- state$started
+  line <- .np_progress_format_line(
+    state = state,
+    done = state$last_done,
+    detail = detail,
+    now = now
+  )
+  state <- .np_progress_render(
+    state = state,
+    line = line,
+    event = "start",
+    now = now,
+    done = state$last_done,
+    detail = detail
+  )
+  state$start_note_pending <- FALSE
+  state$last_emit <- now
+  state$last_emitted_done <- state$last_done
+  state$last_emitted_detail <- detail
+  state
+}
+
 .np_progress_step <- function(state, done = NULL, detail = NULL) {
   if (!is.null(done)) {
     state$last_done <- done
