@@ -878,6 +878,28 @@
   invisible(NULL)
 }
 
+.np_progress_bandwidth_activity_step <- function(done = NULL) {
+  state <- .np_progress_runtime$bandwidth_state
+
+  if (is.null(state) || isTRUE(state$known_total)) {
+    return(invisible(NULL))
+  }
+
+  if (!is.null(done)) {
+    done <- suppressWarnings(as.integer(done)[1L])
+    if (is.na(done) || done < 1L) {
+      done <- NULL
+    }
+  }
+
+  .np_progress_runtime$bandwidth_state <- .np_progress_step(
+    state = state,
+    done = done
+  )
+
+  invisible(NULL)
+}
+
 .np_progress_signal_from_c <- function(event, surface, current = NULL, total = NULL) {
   event <- as.character(event)[1L]
   surface <- as.character(surface)[1L]
@@ -888,6 +910,11 @@
 
   if (identical(event, "bandwidth_multistart_step") && identical(surface, "bandwidth")) {
     .np_progress_bandwidth_multistart_step(done = current, total = total)
+    return(invisible(TRUE))
+  }
+
+  if (identical(event, "bandwidth_activity_step") && identical(surface, "bandwidth")) {
+    .np_progress_bandwidth_activity_step(done = current)
     return(invisible(TRUE))
   }
 

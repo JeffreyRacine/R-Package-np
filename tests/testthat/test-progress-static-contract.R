@@ -217,6 +217,9 @@ test_that("compiled multistart spinner no longer emits legacy redraw output", {
   expect_true(grepl("SEXP C_np_progress_signal\\(", src))
   expect_true(grepl("\\.np_progress_signal_from_c", src))
   expect_true(grepl("np_progress_bandwidth_multistart_step\\(", src))
+  expect_true(grepl("np_progress_bandwidth_activity_step\\(", src))
+  expect_true(grepl("bwm_maybe_signal_activity\\(", src))
+  expect_true(grepl("np_progress_signal\\(\"bandwidth_activity_step\", \"bandwidth\"", src, fixed = TRUE))
 })
 
 test_that("compiled progress bridge is registered narrowly", {
