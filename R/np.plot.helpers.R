@@ -180,6 +180,23 @@
   invisible(NULL)
 }
 
+.np_plot_layout_begin <- function(plot.behavior, plot.par.mfrow, mfrow) {
+  list(
+    pending = isTRUE(plot.behavior != "data" && plot.par.mfrow),
+    mfrow = mfrow
+  )
+}
+
+.np_plot_layout_activate <- function(state) {
+  if (is.null(state) || !isTRUE(state$pending)) {
+    return(state)
+  }
+
+  par(mfrow = state$mfrow, cex = par()$cex)
+  state$pending <- FALSE
+  state
+}
+
 .np_mammen_draws <- function(n, B) {
   a <- (1 - sqrt(5)) / 2
   p.a <- (sqrt(5) + 1) / (2 * sqrt(5))

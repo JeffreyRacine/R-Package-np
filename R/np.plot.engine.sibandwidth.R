@@ -98,8 +98,11 @@
     }
 
 
-    if (plot.behavior != "data" && plot.par.mfrow)
-      par(mfrow=if(gradients) n2mfrow(bws$ndim) else c(1,1),cex=par()$cex)
+    plot.layout <- .np_plot_layout_begin(
+      plot.behavior = plot.behavior,
+      plot.par.mfrow = plot.par.mfrow,
+      mfrow = if (gradients) n2mfrow(bws$ndim) else c(1, 1)
+    )
 
     plot.out = list()
 
@@ -217,6 +220,7 @@
 
 
       if (plot.behavior != "data"){      
+        plot.layout <- .np_plot_layout_activate(plot.layout)
         if (plot.errors){
           plot(tobj$index[i.sort], temp.mean[i.sort],
                ylim = if (!is.null(ylim)) ylim else c(ymin,ymax),
@@ -341,6 +345,7 @@
 
         for (i in seq_len(ncol(xdat))) {
           if (plot.behavior != "data"){
+            plot.layout <- .np_plot_layout_activate(plot.layout)
 
             if (is.null(ylim)) {
               if (!common.scale) {

@@ -433,8 +433,11 @@
         return ( list(r1 = r1) )
 
     } else {
-      if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(bws$xndim + bws$zndim),cex=par()$cex)
+      plot.layout <- .np_plot_layout_begin(
+        plot.behavior = plot.behavior,
+        plot.par.mfrow = plot.par.mfrow,
+        mfrow = n2mfrow(bws$xndim + bws$zndim)
+      )
 
       x.ev = xdat[1,,drop = FALSE]
       z.ev = zdat[1,,drop = FALSE]
@@ -582,6 +585,7 @@
             data.err.all[[plot.index]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
+          plot.layout <- .np_plot_layout_activate(plot.layout)
           ## plot evaluation
           plot.fun <- if (xi.factor) {
             .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -767,6 +771,7 @@
             data.err.all[[plot.index]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
+          plot.layout <- .np_plot_layout_activate(plot.layout)
           ## plot evaluation
           plot.fun <- if (xi.factor) {
             .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -909,6 +914,7 @@
             xOrZ <- "z"
             
           xi.factor = all.isFactor[plot.index]
+          plot.layout <- .np_plot_layout_activate(plot.layout)
 
           ## plot evaluation
           plot.fun <- if (xi.factor) {
