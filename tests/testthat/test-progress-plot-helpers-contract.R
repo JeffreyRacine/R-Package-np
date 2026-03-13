@@ -198,6 +198,112 @@ test_that("plot helper activity stays silent below grace on master", {
   expect_length(actual$trace, 0)
 })
 
+test_that("block-style plot bootstrap chunking is capped only when master plot progress is active", {
+  chunk_size <- getFromNamespace(".np_inid_chunk_size", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.max.intermediate = 3L,
+    np.plot.inid.chunk.size = NULL
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  expect_identical(chunk_size(n = 1000L, B = 9999L, progress_cap = FALSE), 8388L)
+  expect_identical(chunk_size(n = 1000L, B = 9999L, progress_cap = TRUE), 8388L)
+
+  capped <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_master = function() TRUE
+    ),
+    chunk_size(n = 1000L, B = 9999L, progress_cap = TRUE)
+  )
+  expect_identical(capped, 2500L)
+})
+
+test_that("block bootstrap drawer uses iid fast path when block length is one", {
+  drawer_factory <- getFromNamespace(".np_block_counts_drawer", "npRmpi")
+  boot.ns <- asNamespace("boot")
+  calls <- 0L
+
+  trace(
+    what = "ts.array",
+    where = boot.ns,
+    tracer = quote(calls <<- calls + 1L),
+    print = FALSE
+  )
+  on.exit(untrace("ts.array", where = boot.ns), add = TRUE)
+
+  set.seed(20260313)
+  drawer <- drawer_factory(n = 8L, B = 11L, blocklen = 1L, sim = "geom", n.sim = 8L)
+  out <- drawer(1L, 3L)
+
+  expect_identical(calls, 0L)
+  expect_true(is.matrix(out))
+  expect_identical(dim(out), c(8L, 3L))
+  expect_true(all(colSums(out) == 8L))
+  expect_true(all(out >= 0))
+})
+
+test_that("block-style plot bootstrap uses progress-capped MPI task partitioning on master", {
+  helper <- getFromNamespace(".np_inid_lc_boot_from_hat", "npRmpi")
+  counts.drawer <- function(start, stopi) {
+    matrix(1L, nrow = 4L, ncol = stopi - start + 1L)
+  }
+  seen.tasks <- list()
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 3L,
+    np.plot.inid.chunk.size = NULL
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  out <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_master = function() TRUE,
+      .npRmpi_bootstrap_fanout_enabled = function(...) TRUE,
+      .npRmpi_bootstrap_tune_chunk_size = function(B, chunk.size, ...) chunk.size,
+      .npRmpi_bootstrap_run_fanout = function(tasks, worker, ncol.out, ...) {
+        seen.tasks <<- lapply(tasks, function(task) {
+          c(start = as.integer(task$start), bsz = as.integer(task$bsz))
+        })
+        out <- matrix(NA_real_, nrow = sum(vapply(tasks, function(task) as.integer(task$bsz), integer(1L))), ncol = ncol.out)
+        row <- 1L
+        for (task in tasks) {
+          chunk <- worker(task)
+          bsz <- nrow(chunk)
+          out[row:(row + bsz - 1L), ] <- chunk
+          row <- row + bsz
+        }
+        out
+      }
+    ),
+    {
+      helper(
+        H = diag(4L),
+        ydat = c(1, 2, 3, 4),
+        B = 9L,
+        counts.drawer = counts.drawer
+      )
+    }
+  )
+
+  expect_identical(seen.tasks, list(
+    c(start = 1L, bsz = 3L),
+    c(start = 4L, bsz = 3L),
+    c(start = 7L, bsz = 3L)
+  ))
+  expect_true(is.list(out))
+  expect_true(is.matrix(out$t))
+  expect_identical(dim(out$t), c(9L, 4L))
+})
+
 test_that("heavy plot helpers invoke delayed activity notifications", {
   regression.eval <- getFromNamespace(".np_plot_regression_eval", "npRmpi")
   unconditional.eval <- getFromNamespace(".np_plot_unconditional_eval", "npRmpi")

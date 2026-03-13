@@ -57,6 +57,18 @@
   val
 }
 
+.np_plot_progress_chunk_cap <- function(total) {
+  total <- as.integer(total)
+  if (is.na(total) || total < 1L)
+    return(1L)
+
+  max_intermediate <- .np_plot_progress_max_intermediate()
+  if (is.na(max_intermediate) || max_intermediate < 1L)
+    return(total)
+
+  max(1L, as.integer(ceiling(total / (max_intermediate + 1L))))
+}
+
 .np_plot_progress_checkpoints <- function(total) {
   total <- as.integer(total)
   max_intermediate <- .np_plot_progress_max_intermediate()
@@ -1029,7 +1041,7 @@
   )
 }
 
-.np_inid_chunk_size <- function(n, B) {
+.np_inid_chunk_size <- function(n, B, progress_cap = FALSE) {
   chunk.opt <- getOption("np.plot.inid.chunk.size")
   if (!is.null(chunk.opt)) {
     chunk.opt <- as.integer(chunk.opt)
@@ -1045,6 +1057,8 @@
   chunk <- as.integer(floor(target.bytes / (8 * n)))
   if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
     chunk <- 1L
+  if (isTRUE(progress_cap) && isTRUE(.np_plot_progress_enabled()))
+    chunk <- min(chunk, .np_plot_progress_chunk_cap(B))
   min(B, chunk)
 }
 
@@ -1082,6 +1096,19 @@
     stop("invalid block bootstrap dimensions")
   if (length(blocklen) != 1L || is.na(blocklen) || blocklen < 1L || blocklen > n)
     stop("invalid block length for block bootstrap")
+
+  if (identical(blocklen, 1L)) {
+    prob <- rep.int(1 / n, n)
+
+    return(function(start, stopi) {
+      start <- as.integer(start)
+      stopi <- as.integer(stopi)
+      if (start < 1L || stopi < start || stopi > B)
+        stop("invalid block bootstrap chunk bounds")
+
+      stats::rmultinom(n = stopi - start + 1L, size = n.sim, prob = prob)
+    })
+  }
 
   ts.array <- utils::getFromNamespace("ts.array", "boot")
   make.ends <- utils::getFromNamespace("make.ends", "boot")
@@ -1152,7 +1179,7 @@
 
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
@@ -1430,7 +1457,7 @@
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
     fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
   } else {
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
     start <- 1L
     while (start <= B) {
       stopi <- min(B, start + chunk.size - 1L)
@@ -1523,7 +1550,7 @@
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
 
   start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
@@ -1929,7 +1956,7 @@
   nout <- length(t0)
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
@@ -2248,7 +2275,7 @@
   what.base <- if (isTRUE(gradients)) "inid-regression-localpoly-grad" else "inid-regression"
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
@@ -2717,7 +2744,7 @@
 
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
@@ -3311,7 +3338,7 @@
   nout <- length(t0)
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
@@ -3544,7 +3571,7 @@
 
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
@@ -3712,7 +3739,7 @@
 
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
@@ -4562,7 +4589,7 @@
     NULL
   }
 
-  chunk.size <- .np_inid_chunk_size(n = state$n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = state$n, B = B, progress_cap = !is.null(counts.drawer))
   start <- 1L
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
@@ -4754,7 +4781,7 @@
   nout <- length(t0)
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
@@ -5108,7 +5135,7 @@
 
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
@@ -6079,7 +6106,7 @@ plotFactor <- function(f, y, ...){
   }, add = TRUE)
 
   start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
@@ -6147,7 +6174,7 @@ plotFactor <- function(f, y, ...){
   }, add = TRUE)
 
   start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
