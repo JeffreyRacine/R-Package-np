@@ -109,7 +109,7 @@ test_that("npsdeptest progress respects suppressMessages", {
 })
 
 test_that("npsdeptest source routes use canonical lag and bootstrap surface tags", {
-  src <- paste(readLines(testthat::test_path("..", "..", "R", "np.sdeptest.R"), warn = FALSE), collapse = "\n")
+  src <- installed_function_text("npsdeptest")
   expect_true(grepl('surface = "lag"', src, fixed = TRUE))
   expect_true(grepl('surface = "bootstrap"', src, fixed = TRUE))
 })

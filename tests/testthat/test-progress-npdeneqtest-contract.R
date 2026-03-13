@@ -110,6 +110,6 @@ test_that("npdeneqtest progress respects suppressMessages", {
 })
 
 test_that("npdeneqtest source routes use canonical bootstrap surface tags", {
-  src <- paste(readLines(testthat::test_path("..", "..", "R", "np.deneqtest.R"), warn = FALSE), collapse = "\n")
+  src <- installed_function_text("npdeneqtest")
   expect_true(grepl('surface = "bootstrap"', src, fixed = TRUE))
 })

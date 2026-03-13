@@ -96,3 +96,7 @@ capture_progress_shadow_trace <- function(expr,
     final_line = if (length(trace)) trace[[length(trace)]]$line else NULL
   )
 }
+
+installed_function_text <- function(name, package = "npRmpi") {
+  paste(deparse(getFromNamespace(name, package)), collapse = "\n")
+}

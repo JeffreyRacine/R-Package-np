@@ -147,6 +147,10 @@ test_that("npsigtest progress respects suppressMessages", {
 })
 
 test_that("npsigtest source routes use canonical bootstrap surface tags", {
-  src <- paste(readLines(testthat::test_path("..", "..", "R", "np.sigtest.R"), warn = FALSE), collapse = "\n")
+  src <- paste(
+    installed_function_text("npsigtest.rbandwidth"),
+    installed_function_text("npsigtest.default"),
+    sep = "\n"
+  )
   expect_true(grepl('surface = "bootstrap"', src, fixed = TRUE))
 })

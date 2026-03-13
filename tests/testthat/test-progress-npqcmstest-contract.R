@@ -116,6 +116,6 @@ test_that("npqcmstest progress respects suppressMessages", {
 })
 
 test_that("npqcmstest source routes use canonical bootstrap surface tags", {
-  src <- paste(readLines(testthat::test_path("..", "..", "R", "np.qcmstest.R"), warn = FALSE), collapse = "\n")
+  src <- installed_function_text("npqcmstest")
   expect_true(grepl('surface = "bootstrap"', src, fixed = TRUE))
 })
