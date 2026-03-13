@@ -372,9 +372,39 @@
       dtheta = 5.0
       dphi = 10.0
       persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
+      first.render.activity <- NULL
+      first.render.pending <- TRUE
+      on.exit(.np_plot_activity_end(first.render.activity), add = TRUE)
       
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+          if (isTRUE(first.render.pending))
+            first.render.activity <- .np_plot_activity_begin("Rendering plot surface")
+          persp(x1.eval,
+                x2.eval,
+                tdens,
+                zlim = zlim,
+                col = persp.col,
+                border = scalar_default(border, "black"),
+                ticktype = "detailed",
+                cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                cex.lab = scalar_default(cex.lab, par()$cex.lab),
+                cex.main = scalar_default(cex.main, par()$cex.main),
+                cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                xlab = scalar_default(xlab, gen.label(names(xdat)[1], "X")),
+                ylab = scalar_default(ylab, gen.label(names(ydat)[1], "Y")),
+                zlab = scalar_default(zlab, paste("Conditional", if (cdf) "Distribution" else "Density")),
+                theta = i,
+                phi = phi,
+                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+
+          if (isTRUE(first.render.pending)) {
+            .np_plot_activity_end(first.render.activity)
+            first.render.activity <- NULL
+            first.render.pending <- FALSE
+          }
+
           if (plot.errors){
+            par(new = TRUE)
             if (plot.errors.type == "all" && !is.null(lerr.all)) {
               band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
               for (bn in c("pointwise", "simultaneous", "bonferroni")) {
@@ -417,27 +447,7 @@
                     lwd = scalar_default(lwd, par()$lwd))
               par(new = TRUE)
             }
-          }
 
-          persp(x1.eval,
-                x2.eval,
-                tdens,
-                zlim = zlim,
-                col = persp.col,
-                border = scalar_default(border, "black"),
-                ticktype = "detailed",
-                cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                cex.main = scalar_default(cex.main, par()$cex.main),
-                cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                xlab = scalar_default(xlab, gen.label(names(xdat)[1], "X")),
-                ylab = scalar_default(ylab, gen.label(names(ydat)[1], "Y")),
-                zlab = scalar_default(zlab, paste("Conditional", if (cdf) "Distribution" else "Density")),
-                theta = i,
-                phi = phi,
-                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
-
-          if (plot.errors){
             par(new = TRUE)
             if (plot.errors.type == "all" && !is.null(herr.all)) {
               band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")

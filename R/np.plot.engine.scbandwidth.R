@@ -352,27 +352,6 @@
       
       ##for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
         for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
-          if (plot.errors){
-            persp(x1.eval,
-                  x2.eval,
-                  lerr,
-                  zlim = zlim,
-                  cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                  cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                  cex.main = scalar_default(cex.main, par()$cex.main),
-                  cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                  col = persp.col,
-                  border = scalar_default(border, "grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = scalar_default(lwd, par()$lwd))
-            par(new = TRUE)
-          }
-
           persp(x1.eval,
                 x2.eval,
                 treg,
@@ -392,6 +371,24 @@
                 main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
+            par(new = TRUE)
+            persp(x1.eval,
+                  x2.eval,
+                  lerr,
+                  zlim = zlim,
+                  cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                  cex.lab = scalar_default(cex.lab, par()$cex.lab),
+                  cex.main = scalar_default(cex.main, par()$cex.main),
+                  cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                  col = persp.col,
+                  border = scalar_default(border, "grey"),
+                  ticktype = "detailed",
+                  xlab = "",
+                  ylab = "",
+                  zlab = "",
+                  theta = i,
+                  phi = phi,
+                  lwd = scalar_default(lwd, par()$lwd))
             par(new = TRUE)
             persp(x1.eval,
                   x2.eval,
