@@ -412,7 +412,8 @@ test_that("RStudio width budget reserves redraw margin centrally", {
   output_width <- getFromNamespace(".np_progress_output_width", "np")
 
   actual <- with_np_bindings(list(.np_progress_is_rstudio_console = function() TRUE), {
-    withr::local_options(list(width = 82))
+    old_options <- options(width = 82)
+    on.exit(options(old_options), add = TRUE)
     output_width()
   })
 
