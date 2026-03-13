@@ -10,6 +10,11 @@ shadow_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
+shadow_render_lines <- function(shadow) {
+  trace <- shadow$trace[vapply(shadow$trace, `[[`, character(1L), "event") == "render"]
+  vapply(trace, `[[`, character(1L), "line")
+}
+
 installed_function_text <- function(name, package = "np") {
   paste(deparse(getFromNamespace(name, package)), collapse = "\n")
 }
@@ -53,10 +58,11 @@ test_that("npscoefbw uses single-line multistart on the accepted bandwidth surfa
   )
 
   bandwidth_lines <- shadow_lines(actual)[grepl("^\\[np\\] Selecting smooth coefficient bandwidth", shadow_lines(actual))]
-  legacy_bandwidth_lines <- shadow_lines(legacy)[grepl("^\\[np\\] Selecting smooth coefficient bandwidth", shadow_lines(legacy))]
+  render_bandwidth_lines <- shadow_render_lines(actual)[grepl("^\\[np\\] Selecting smooth coefficient bandwidth", shadow_render_lines(actual))]
+  legacy_bandwidth_lines <- shadow_render_lines(legacy)[grepl("^\\[np\\] Selecting smooth coefficient bandwidth", shadow_render_lines(legacy))]
 
   expect_s3_class(actual$value, "scbandwidth")
-  expect_equal(bandwidth_lines, legacy_bandwidth_lines)
+  expect_equal(render_bandwidth_lines, legacy_bandwidth_lines)
   expect_true(any(grepl("^\\[np\\] Selecting smooth coefficient bandwidth multistart 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
   expect_true(any(grepl("^\\[np\\] Selecting smooth coefficient bandwidth multistart 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
 })
