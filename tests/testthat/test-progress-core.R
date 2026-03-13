@@ -417,6 +417,19 @@ test_that("single-line fit keeps smooth coefficient bandwidth lines readable at 
   )
 })
 
+test_that("single-line fit compacts plot bootstrap labels so prep detail survives", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+
+  line <- "[np] Preparing plot bootstrap inid 0/50 (0.0%, elapsed 0.0s, eta 0.0s): eval 1/50"
+  fitted <- fit(line, max_width = 80)
+
+  expect_lte(nchar(fitted, type = "width"), 80L)
+  expect_identical(
+    fitted,
+    "[np] Prep plot inid 0/50 (0.0%, elapsed 0.0s, eta 0.0s): eval 1/50"
+  )
+})
+
 test_that("single-line fit preserves both ends when truncation is still required", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 
@@ -481,7 +494,7 @@ test_that("single-line finish clears the rendered line without leaving a newline
 
   output <- capture_single_line_output(
     "np",
-    list(),
+    list(.np_progress_output_width = function() 80L),
     {
       render(list(render_line = line, last_width = 0L), event = "render")
       render(list(render_line = line, last_width = nchar(line, type = "width")), event = "finish")
@@ -490,7 +503,7 @@ test_that("single-line finish clears the rendered line without leaving a newline
 
   expect_identical(
     output,
-    paste0("\r", line, "\r", strrep(" ", nchar(line, type = "width")), "\r")
+    paste0("\r", line, "\r", strrep(" ", 80L), "\r")
   )
 })
 
@@ -522,10 +535,53 @@ test_that("progress end clears single-line output even when the final state alre
     output,
     paste0(
       "\r",
-      strrep(" ", nchar(line, type = "width")),
+      strrep(" ", 120L),
       "\r"
     )
   )
+})
+
+test_that("plot progress can repaint on elapsed time before the first checkpoint", {
+  begin <- getFromNamespace(".np_plot_progress_begin", "np")
+  tick <- getFromNamespace(".np_plot_progress_tick", "np")
+  finish <- getFromNamespace(".np_plot_progress_end", "np")
+  reset <- getFromNamespace(".np_progress_reset_registry", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.interval.sec = 0.5
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  output <- capture_single_line_output(
+    "np",
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_rstudio_console = function() FALSE,
+      .np_progress_now = progress_time_values(c(0, 0, 0.6, 1.2)),
+      .np_progress_output_width = function() 120L
+    ),
+    {
+      reset()
+      on.exit(reset(), add = TRUE)
+      state <- begin(total = 50L, label = "Preparing plot bootstrap inid")
+      state <- tick(state, done = 1L)
+      state <- tick(state, done = 2L)
+      finish(state)
+    }
+  )
+
+  expect_true(grepl("\\[np\\] Preparing plot bootstrap inid\\.\\.\\.", output))
+  expect_true(grepl("\\[np\\] Preparing plot bootstrap inid 2/50", output))
+})
+
+test_that("interactive bootstrap chunk sizes leave room for intermediate progress", {
+  inid_chunk <- getFromNamespace(".np_inid_chunk_size", "np")
+  wild_chunk <- getFromNamespace(".np_wild_chunk_size", "np")
+
+  expect_identical(inid_chunk(n = 500L, B = 9999L), 2500L)
+  expect_identical(wild_chunk(n = 500L, B = 9999L), 2500L)
 })
 
 test_that("single-line abort preserves the final line and terminates it", {

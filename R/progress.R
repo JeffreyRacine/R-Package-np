@@ -337,6 +337,10 @@
 
   compacted <- line
   replacements <- list(
+    c(" Preparing plot bootstrap ", " Prep plot "),
+    c(" Computing regression plot fit", " Regression plot fit"),
+    c(" Computing bootstrap pmzsd errors", " Bootstrap pmzsd"),
+    c(" Constructing bootstrap all bands", " Bootstrap all bands"),
     c(" smooth coefficient ", " smooth coef "),
     c(" coefficient ", " coef "),
     c(" single-index ", " SI "),
@@ -393,7 +397,7 @@
   con <- .np_progress_single_line_connection()
   width <- nchar(render_line, type = "width")
   if (identical(event, "finish")) {
-    clear_width <- max(snapshot$last_width, width)
+    clear_width <- max(snapshot$last_width, width, .np_progress_output_width())
     clear_line <- if (clear_width > 0L) strrep(" ", clear_width) else ""
     base::cat("\r", clear_line, "\r", file = con, sep = "")
     flush(con)

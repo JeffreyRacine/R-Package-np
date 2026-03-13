@@ -55,6 +55,18 @@
   val
 }
 
+.np_plot_progress_chunk_cap <- function(total) {
+  total <- as.integer(total)
+  if (is.na(total) || total < 1L)
+    return(1L)
+
+  max_intermediate <- .np_plot_progress_max_intermediate()
+  if (is.na(max_intermediate) || max_intermediate < 1L)
+    return(total)
+
+  max(1L, as.integer(ceiling(total / (max_intermediate + 1L))))
+}
+
 .np_plot_progress_checkpoints <- function(total) {
   total <- as.integer(total)
   max_intermediate <- .np_plot_progress_max_intermediate()
@@ -98,17 +110,25 @@
   if (!isTRUE(force)) {
     checkpoints <- state$checkpoints
     next_idx <- state$next_checkpoint_idx
-    if (!length(checkpoints) || is.na(next_idx) || next_idx > length(checkpoints)) {
-      return(state)
+    reached_checkpoint <- FALSE
+    if (length(checkpoints) && !is.na(next_idx) && next_idx <= length(checkpoints)) {
+      next_checkpoint <- checkpoints[[next_idx]]
+      if (done >= next_checkpoint) {
+        reached <- max(which(checkpoints <= done))
+        state$next_checkpoint_idx <- as.integer(reached + 1L)
+        reached_checkpoint <- TRUE
+      }
     }
 
-    next_checkpoint <- checkpoints[[next_idx]]
-    if (done < next_checkpoint) {
+    emitted_done <- if (is.null(state$last_emitted_done)) 0L else as.integer(state$last_emitted_done)
+    advanced <- isTRUE(done > emitted_done)
+    time_ready <- isTRUE(advanced) &&
+      !isTRUE(state$start_note_pending) &&
+      ((now - state$last_emit) >= state$throttle_sec)
+
+    if (!isTRUE(reached_checkpoint) && !isTRUE(time_ready)) {
       return(state)
     }
-
-    reached <- max(which(checkpoints <= done))
-    state$next_checkpoint_idx <- as.integer(reached + 1L)
   }
 
   if (isTRUE(force))
@@ -230,7 +250,7 @@
   chunk <- as.integer(floor(target.bytes / (8 * n)))
   if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
     chunk <- 1L
-  min(B, chunk)
+  min(B, chunk, .np_plot_progress_chunk_cap(B))
 }
 
 .np_wild_boot_t <- function(H, fit.mean, residuals, B, wild = c("mammen", "rademacher")) {
@@ -365,7 +385,7 @@
   chunk <- as.integer(floor(target.bytes / (8 * n)))
   if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
     chunk <- 1L
-  min(B, chunk)
+  min(B, chunk, .np_plot_progress_chunk_cap(B))
 }
 
 .np_inid_counts_matrix <- function(n, B, counts = NULL) {
@@ -962,6 +982,14 @@
   }, add = TRUE)
 
   for (i in seq_len(neval)) {
+    if (i == 1L)
+      prep.progress$last_emit <- -Inf
+    prep.progress <- .np_progress_step(
+      state = prep.progress,
+      done = i - 1L,
+      detail = sprintf("eval %d/%d", i, neval)
+    )
+
     k <- as.double(kw[, i])
     WK <- W * k
     Zfeat[[i]] <- WK * ydat
