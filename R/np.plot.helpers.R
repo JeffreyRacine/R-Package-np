@@ -524,6 +524,34 @@
   }
 }
 
+.np_plot_scoef_bootstrap_target_label <- function(bws, slice.index) {
+  slice.index <- suppressWarnings(as.integer(slice.index)[1L])
+  x_total <- suppressWarnings(as.integer(bws$xndim)[1L])
+  z_total <- suppressWarnings(as.integer(bws$zndim)[1L])
+  if (is.na(x_total) || x_total < 0L) x_total <- 0L
+  if (is.na(z_total) || z_total < 0L) z_total <- 0L
+  total <- max(1L, x_total + z_total)
+
+  if (is.na(slice.index) || slice.index <= 0L) {
+    return("surf 1/1")
+  }
+
+  if (slice.index <= x_total) {
+    target_name <- .np_plot_progress_target_name(
+      if (!is.null(bws$xnames) && length(bws$xnames) >= slice.index) bws$xnames[[slice.index]] else NULL,
+      sprintf("x%d", slice.index)
+    )
+  } else {
+    z_index <- slice.index - x_total
+    target_name <- .np_plot_progress_target_name(
+      if (!is.null(bws$znames) && length(bws$znames) >= z_index) bws$znames[[z_index]] else NULL,
+      sprintf("z%d", z_index)
+    )
+  }
+
+  sprintf("%s %d/%d", target_name, slice.index, total)
+}
+
 .np_mammen_draws <- function(n, B) {
   a <- (1 - sqrt(5)) / 2
   p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
@@ -2144,7 +2172,8 @@
                                      B,
                                      counts = NULL,
                                      counts.drawer = NULL,
-                                     leave.one.out = FALSE) {
+                                     leave.one.out = FALSE,
+                                     progress.label = NULL) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
   B <- as.integer(B)
@@ -2238,7 +2267,11 @@
   }
 
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -5940,6 +5973,7 @@ compute.bootstrap.errors.scbandwidth =
            exdat, ezdat,
            gradients,
            slice.index,
+           progress.target = NULL,
            plot.errors.boot.method,
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
@@ -5949,8 +5983,26 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    if (is.null(progress.target)) {
+      progress.target <- .np_plot_scoef_bootstrap_target_label(
+        bws = bws,
+        slice.index = slice.index
+      )
+    }
+    prep.label <- .np_plot_bootstrap_stage_label(
+      stage = sprintf("Preparing plot bootstrap %s", plot.errors.boot.method),
+      target_label = progress.target
+    )
+    progress.label <- .np_plot_bootstrap_stage_label(
+      stage = "Plot bootstrap",
+      target_label = progress.target
+    )
+    interval.label <- .np_plot_bootstrap_stage_label(
+      stage = sprintf("Constructing bootstrap %s bands", plot.errors.type),
+      target_label = progress.target
+    )
     activity <- .np_plot_activity_begin(
-      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+      prep.label
     )
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.scbandwidth")
@@ -5976,7 +6028,8 @@ compute.bootstrap.errors.scbandwidth =
           ezdat = if (miss.z) NULL else ezdat,
           bws = bws,
           B = plot.errors.boot.num,
-          leave.one.out = FALSE
+          leave.one.out = FALSE,
+          progress.label = progress.label
         ),
         error = function(e) {
           stop(sprintf("inid smooth coefficient helper failed in compute.bootstrap.errors.scbandwidth (%s)",
@@ -6004,7 +6057,8 @@ compute.bootstrap.errors.scbandwidth =
           bws = bws,
           B = plot.errors.boot.num,
           counts.drawer = counts.drawer,
-          leave.one.out = FALSE
+          leave.one.out = FALSE,
+          progress.label = progress.label
         ),
         error = function(e) {
           stop(sprintf("%s smooth coefficient helper failed in compute.bootstrap.errors.scbandwidth (%s)",
@@ -6048,7 +6102,8 @@ compute.bootstrap.errors.scbandwidth =
         ydat = ydat,
         fit.mean = fit.mean,
         B = plot.errors.boot.num,
-        wild = plot.errors.boot.wild
+        wild = plot.errors.boot.wild,
+        progress.label = progress.label
       )
     }
 
@@ -6080,7 +6135,8 @@ compute.bootstrap.errors.scbandwidth =
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
-        band.type = plot.errors.type
+        band.type = plot.errors.type,
+        progress.label = interval.label
       )
       boot.err[,1:2] <- interval.summary$err
       boot.all.err <- interval.summary$all.err
