@@ -224,6 +224,7 @@
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
+          progress.target = "surf 1/1",
           bws = bws)
         terr <- terr.obj[["boot.err"]]
         terr.all <- terr.obj[["boot.all.err"]]
@@ -517,6 +518,11 @@
                       plot.errors.center = plot.errors.center,
                       plot.errors.type = plot.errors.type,
                       plot.errors.alpha = plot.errors.alpha,
+                      progress.target = .np_plot_regression_bootstrap_target_label(
+                        bws = bws,
+                        slice.index = i,
+                        gradients = gradients
+                      ),
                       bws = bws)
             temp.err[seq_len(xi.neval),] = temp.boot.raw[["boot.err"]]
             temp.all.err <- temp.boot.raw[["boot.all.err"]]
