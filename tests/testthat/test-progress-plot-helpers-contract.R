@@ -128,6 +128,34 @@ test_that("plot helper stays silent for instant runs below start grace", {
   expect_length(actual$trace, 0)
 })
 
+test_that("bootstrap execution stage surfaces immediately on begin", {
+  begin <- getFromNamespace(".np_plot_bootstrap_progress_begin", "np")
+  finish <- getFromNamespace(".np_plot_progress_end", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 2,
+    np.plot.progress.start.grace.sec = 0.75
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      state <- begin(total = 12L, label = "Plot bootstrap (surf 1/1)")
+      finish(state)
+    },
+    now = progress_time_values(c(0, 0.2))
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+  expect_identical(
+    lines[[1L]],
+    "[np] Plot bootstrap (surf 1/1) 0/12 (0.0%, elapsed 0.0s, eta 0.0s)"
+  )
+  expect_identical(vapply(actual$trace, `[[`, character(1L), "event")[[1L]], "render")
+})
+
 test_that("plot helper activity renders immediately for long blocking work", {
   begin <- getFromNamespace(".np_plot_activity_begin", "np")
   finish <- getFromNamespace(".np_plot_activity_end", "np")

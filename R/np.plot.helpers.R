@@ -152,6 +152,14 @@
   state
 }
 
+.np_plot_bootstrap_progress_begin <- function(total, label) {
+  state <- .np_plot_progress_begin(total = total, label = label)
+  if (is.null(state))
+    return(NULL)
+
+  .np_progress_show_now(state = state, done = 0L)
+}
+
 .np_plot_progress_tick <- function(state, done, force = FALSE) {
   if (is.null(state))
     return(state)
@@ -608,7 +616,7 @@
   residuals <- as.double(residuals)
   wild <- .np_plot_normalize_wild(wild)
   draw.fun <- if (identical(wild, "mammen")) .np_mammen_draws else .np_rademacher_draws
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -940,7 +948,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -1432,7 +1440,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -1680,7 +1688,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -1882,7 +1890,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -2021,7 +2029,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -2272,7 +2280,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -2519,7 +2527,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -2713,7 +2721,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -2812,7 +2820,7 @@
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
   progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -2897,7 +2905,7 @@
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -3606,7 +3614,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -3820,7 +3828,7 @@
     } else {
       progress.label
     }
-    progress <- .np_plot_progress_begin(total = B, label = progress.label)
+    progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
     on.exit({
       .np_plot_progress_end(progress)
     }, add = TRUE)
@@ -3874,7 +3882,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -4006,7 +4014,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -4664,7 +4672,7 @@ plotFactor <- function(f, y, ...){
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -4744,7 +4752,7 @@ plotFactor <- function(f, y, ...){
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
