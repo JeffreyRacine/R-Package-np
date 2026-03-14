@@ -39,11 +39,19 @@ progress_time_counter <- function(start = 0, by = 1.7) {
   }
 }
 
+skip_live_route_slice <- function() {
+  skip_if_not(
+    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
+    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
+  )
+}
+
 shadow_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
 test_that("npplregbw uses coordinated generic bandwidth selection progress", {
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -89,6 +97,7 @@ test_that("npplregbw uses coordinated generic bandwidth selection progress", {
 })
 
 test_that("npplreg formula entry inherits coordinated generic bandwidth progress", {
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 

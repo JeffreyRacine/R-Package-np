@@ -221,7 +221,7 @@ test_that("npregivderiv proof-slice progress respects suppressMessages", {
 
 test_that("IV source routes use the canonical single-line surface tag", {
   src <- installed_function_text("npregiv")
-  expect_true(grepl('surface = "iv_solve"', src, fixed = TRUE))
+  expect_true(grepl(".np_progress_select_iv(", src, fixed = TRUE))
 
   src_deriv <- installed_function_text("npregivderiv")
   expect_true(grepl('surface = "iv_solve"', src_deriv, fixed = TRUE))

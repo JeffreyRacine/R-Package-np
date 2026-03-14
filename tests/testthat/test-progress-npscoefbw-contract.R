@@ -39,11 +39,19 @@ progress_time_counter <- function(start = 0, by = 2.1) {
   }
 }
 
+skip_live_route_slice <- function() {
+  skip_if_not(
+    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
+    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
+  )
+}
+
 shadow_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
 test_that("npscoefbw adopts the generic bandwidth selection line", {
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -92,6 +100,7 @@ test_that("npscoefbw adopts the generic bandwidth selection line", {
 })
 
 test_that("npscoefbw progress respects np.messages FALSE", {
+  skip_live_route_slice()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
