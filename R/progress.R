@@ -373,6 +373,162 @@
   compacted
 }
 
+.np_progress_compact_bandwidth_line <- function(line, max_width) {
+  if (!is.character(line) || length(line) != 1L || is.na(line)) {
+    return(line)
+  }
+
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return(line)
+  }
+
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  matches <- regexec("^(.+Bandwidth selection) \\((.+)\\)$", line)
+  capture <- regmatches(line, matches)[[1L]]
+  if (length(capture) != 3L) {
+    return(line)
+  }
+
+  prefix <- capture[[2L]]
+  fields <- strsplit(capture[[3L]], ", ", fixed = TRUE)[[1L]]
+  if (!length(fields)) {
+    return(line)
+  }
+
+  render <- function(parts) {
+    sprintf("%s (%s)", prefix, paste(parts, collapse = ", "))
+  }
+
+  abbreviate_fields <- function(parts) {
+    compacted <- parts
+    compacted <- sub("^multistart ([0-9]+/[0-9]+)$", "\\1", compacted)
+    compacted <- sub("^iteration ", "iter ", compacted)
+    compacted
+  }
+
+  drop_last_field <- function(parts) {
+    if (length(parts) <= 1L) {
+      parts
+    } else {
+      parts[seq_len(length(parts) - 1L)]
+    }
+  }
+
+  short_prefix <- sub("Bandwidth selection", "Bandwidth sel", prefix, fixed = TRUE)
+  fields_abbrev <- abbreviate_fields(fields)
+  fields_drop_eta <- drop_last_field(fields_abbrev)
+  fields_drop_eta_pct <- drop_last_field(fields_drop_eta)
+
+  render_prefix <- function(prefix_text, parts) {
+    sprintf("%s (%s)", prefix_text, paste(parts, collapse = ", "))
+  }
+
+  candidates <- list(
+    render(fields),
+    render(fields_abbrev),
+    render_prefix(short_prefix, fields_abbrev),
+    render_prefix(short_prefix, fields_drop_eta),
+    render_prefix(short_prefix, fields_drop_eta_pct)
+  )
+
+  for (candidate in candidates) {
+    if (nchar(candidate, type = "width") <= max_width) {
+      return(candidate)
+    }
+  }
+
+  line
+}
+
+.np_progress_compact_plot_bootstrap_line <- function(line, max_width) {
+  if (!is.character(line) || length(line) != 1L || is.na(line)) {
+    return(line)
+  }
+
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return(line)
+  }
+
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  matches <- regexec(
+    "^(.+(?:Plot bootstrap(?: \\([^)]+\\))?|Bootstrap (?:all bands|pmzsd)(?: \\([^)]+\\))?)) ([0-9]+/[0-9]+) \\((.+)\\)$",
+    line
+  )
+  capture <- regmatches(line, matches)[[1L]]
+  if (length(capture) != 4L) {
+    return(line)
+  }
+
+  prefix <- capture[[2L]]
+  counter <- capture[[3L]]
+  fields <- strsplit(capture[[4L]], ", ", fixed = TRUE)[[1L]]
+  if (!length(fields)) {
+    return(line)
+  }
+
+  render <- function(prefix_text, parts) {
+    sprintf("%s %s (%s)", prefix_text, counter, paste(parts, collapse = ", "))
+  }
+
+  compact_prefix <- prefix
+  compact_prefix <- sub("\\(grad index ", "(grad idx ", compact_prefix)
+  compact_prefix <- sub("\\(index ", "(idx ", compact_prefix)
+  short_prefix <- compact_prefix
+  short_prefix <- sub("Plot bootstrap", "Plot boot", short_prefix, fixed = TRUE)
+  short_prefix <- sub("Bootstrap all bands", "Boot all bands", short_prefix, fixed = TRUE)
+  short_prefix <- sub("Bootstrap pmzsd", "Boot pmzsd", short_prefix, fixed = TRUE)
+  short_prefix <- sub("\\(surf ", "(s ", short_prefix)
+  very_short_prefix <- short_prefix
+  very_short_prefix <- sub("Boot all bands", "Bands", very_short_prefix, fixed = TRUE)
+  very_short_prefix <- sub("Boot pmzsd", "Pmzsd", very_short_prefix, fixed = TRUE)
+
+  compact_fields <- function(parts) {
+    compacted <- parts
+    compacted <- sub("^elapsed ", "elap ", compacted)
+    compacted
+  }
+
+  drop_last_field <- function(parts) {
+    if (length(parts) <= 1L) {
+      parts
+    } else {
+      parts[seq_len(length(parts) - 1L)]
+    }
+  }
+
+  fields_compact <- compact_fields(fields)
+  fields_drop_eta <- drop_last_field(fields_compact)
+  fields_drop_eta_pct <- drop_last_field(fields_drop_eta)
+
+  candidates <- list(
+    render(prefix, fields),
+    render(compact_prefix, fields),
+    render(compact_prefix, fields_compact),
+    render(short_prefix, fields_compact),
+    render(short_prefix, fields_drop_eta),
+    render(short_prefix, fields_drop_eta_pct),
+    render(very_short_prefix, fields_drop_eta),
+    render(very_short_prefix, fields_drop_eta_pct),
+    sprintf("%s %s", very_short_prefix, counter)
+  )
+
+  for (candidate in candidates) {
+    if (nchar(candidate, type = "width") <= max_width) {
+      return(candidate)
+    }
+  }
+
+  line
+}
+
 .np_progress_fit_single_line <- function(line, max_width = .np_progress_output_width()) {
   if (!is.character(line) || length(line) != 1L || is.na(line)) {
     return(line)
@@ -388,6 +544,16 @@
   }
 
   line <- .np_progress_compact_single_line(line, max_width = max_width)
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  line <- .np_progress_compact_bandwidth_line(line, max_width = max_width)
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  line <- .np_progress_compact_plot_bootstrap_line(line, max_width = max_width)
   if (nchar(line, type = "width") <= max_width) {
     return(line)
   }

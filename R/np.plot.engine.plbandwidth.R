@@ -52,16 +52,10 @@
            ...,
            random.seed){
 
-    oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
-    on.exit(.np_plot_restore_par(oldpar), add = TRUE)
-
-    scalar_default <- function(value, default) {
-      if (is.null(value)) default else value
-    }
-
-    plot.par.mfrow.opt <- getOption("plot.par.mfrow")
-    if(!is.null(plot.par.mfrow.opt))
-        plot.par.mfrow <- plot.par.mfrow.opt
+    engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
+    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
+    plot.par.mfrow <- engine.ctx$plot.par.mfrow
+    scalar_default <- .np_plot_scalar_default
 
     if(!missing(gradients))
       stop("gradients not supported with partially linear models. Coefficients may be extracted with coef()")
@@ -302,6 +296,7 @@
           exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE],
           gradients = FALSE,
           slice.index = 0,
+          progress.target = "surf 1/1",
           plot.errors.boot.method = plot.errors.boot.method,
           plot.errors.boot.wild = plot.errors.boot.wild,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -430,8 +425,11 @@
         return ( list(r1 = r1) )
 
     } else {
-      if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(bws$xndim + bws$zndim),cex=par()$cex)
+      plot.layout <- .np_plot_layout_begin(
+        plot.behavior = plot.behavior,
+        plot.par.mfrow = plot.par.mfrow,
+        mfrow = n2mfrow(bws$xndim + bws$zndim)
+      )
 
       x.ev = xdat[1,,drop = FALSE]
       z.ev = zdat[1,,drop = FALSE]
@@ -550,6 +548,10 @@
                       ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
                       gradients = gradients,
                       slice.index = plot.index,
+                      progress.target = .np_plot_scoef_bootstrap_target_label(
+                        bws = bws,
+                        slice.index = plot.index
+                      ),
                       plot.errors.boot.method = plot.errors.boot.method,
                       plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -579,6 +581,7 @@
             data.err.all[[plot.index]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
+          plot.layout <- .np_plot_layout_activate(plot.layout)
           ## plot evaluation
           plot.fun <- if (xi.factor) {
             .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -735,6 +738,10 @@
                       ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                       gradients = gradients,
                       slice.index = plot.index,
+                      progress.target = .np_plot_scoef_bootstrap_target_label(
+                        bws = bws,
+                        slice.index = plot.index
+                      ),
                       plot.errors.boot.method = plot.errors.boot.method,
                       plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -764,6 +771,7 @@
             data.err.all[[plot.index]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
+          plot.layout <- .np_plot_layout_activate(plot.layout)
           ## plot evaluation
           plot.fun <- if (xi.factor) {
             .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -900,6 +908,7 @@
         xOrZ = "x"
         
         for (plot.index in seq_len(bws$xndim + bws$zndim)){
+          plot.layout <- .np_plot_layout_activate(plot.layout)
           i = if (plot.index <= bws$xndim) plot.index else plot.index - bws$xndim
 
           if (plot.index > bws$xndim)

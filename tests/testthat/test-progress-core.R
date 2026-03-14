@@ -554,3 +554,44 @@ test_that("progress ownership suppresses nested visibility for legacy renderer t
   expect_true(isTRUE(states$outer$visible))
   expect_false(isTRUE(states$inner$visible))
 })
+
+test_that("plot bootstrap lines compact semantically before ellipsizing", {
+  fit_line <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
+  line <- paste0(
+    "[npRmpi] Plot bootstrap (grad index 1/2) 5887/7500 ",
+    "(elapsed 31.0s, 78.5%, eta 8.5s)"
+  )
+
+  fitted <- fit_line(line, max_width = 72L)
+
+  expect_true(
+    startsWith(fitted, "[npRmpi] Plot bootstrap (grad idx 1/2)") ||
+      startsWith(fitted, "[npRmpi] Plot boot (grad idx 1/2)")
+  )
+  expect_match(fitted, "5887/7500", fixed = TRUE)
+  expect_false(grepl("\\.\\.\\.7/7500", fitted, fixed = TRUE))
+})
+
+test_that("bootstrap band counters keep the live fraction intact under width pressure", {
+  fit_line <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
+  line <- paste0(
+    "[npRmpi] Bootstrap all bands (surf 1/1) 6004/7500 ",
+    "(80.1%, elapsed 0.5s, eta 0.1s)"
+  )
+
+  fitted <- fit_line(line, max_width = 72L)
+
+  expect_match(fitted, "6004/7500", fixed = TRUE)
+  expect_false(grepl("\\.\\.\\.4/7500", fitted, fixed = TRUE))
+})
+
+test_that("bandwidth lines compact semantically before ellipsizing", {
+  fit_line <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
+  line <- "[npRmpi] Bandwidth selection (multistart 2/2, iteration 32, elapsed 11.2s, 62.3%, eta 6.8s)"
+
+  fitted <- fit_line(line, max_width = 62L)
+
+  expect_match(fitted, "2/2", fixed = TRUE)
+  expect_match(fitted, "iter 32", fixed = TRUE)
+  expect_false(grepl("2/\\.\\.\\.", fitted, fixed = TRUE))
+})

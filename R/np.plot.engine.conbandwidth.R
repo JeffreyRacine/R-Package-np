@@ -53,16 +53,10 @@
            ...,
            random.seed){
 
-    oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
-    on.exit(.np_plot_restore_par(oldpar), add = TRUE)
-
-    scalar_default <- function(value, default) {
-      if (is.null(value)) default else value
-    }
-
-    plot.par.mfrow.opt <- getOption("plot.par.mfrow")
-    if(!is.null(plot.par.mfrow.opt))
-        plot.par.mfrow <- plot.par.mfrow.opt
+    engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
+    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
+    plot.par.mfrow <- engine.ctx$plot.par.mfrow
+    scalar_default <- .np_plot_scalar_default
 
     cdf <- FALSE
     quantreg <- FALSE
@@ -278,6 +272,7 @@
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
+          progress.target = "surf 1/1",
           bws = bws)
         terr <- terr.obj[["boot.err"]]
         terr.all <- terr.obj[["boot.all.err"]]
@@ -503,8 +498,11 @@
       dsf = if (gradients) bws$xndim else 1
       tot.dim = bws$xndim + bws$yndim - quantreg
 
-      if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(dsf*tot.dim),cex=par()$cex)
+      plot.layout <- .np_plot_layout_begin(
+        plot.behavior = plot.behavior,
+        plot.par.mfrow = plot.par.mfrow,
+        mfrow = n2mfrow(dsf * tot.dim)
+      )
 
       x.ev = xdat[1,,drop = FALSE]
       y.ev = ydat[1,,drop = FALSE]
@@ -672,6 +670,12 @@
                         plot.errors.center = plot.errors.center,
                         plot.errors.type = plot.errors.type,
                         plot.errors.alpha = plot.errors.alpha,
+                        progress.target = .np_plot_conditional_bootstrap_target_label(
+                          bws = bws,
+                          slice.index = plot.index,
+                          gradients = gradients,
+                          gradient.index = if (gradients) i else 0L
+                        ),
                         bws = bws)
               temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
               temp.all.err <- temp.boot[["boot.all.err"]]
@@ -694,6 +698,7 @@
               data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
             }
           } else if (plot.behavior != "data") {
+            plot.layout <- .np_plot_layout_activate(plot.layout)
             ## plot evaluation
             plot.fun <- if (xi.factor) {
               .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -881,6 +886,12 @@
                           plot.errors.center = plot.errors.center,
                           plot.errors.type = plot.errors.type,
                           plot.errors.alpha = plot.errors.alpha,
+                          progress.target = .np_plot_conditional_bootstrap_target_label(
+                            bws = bws,
+                            slice.index = plot.index,
+                            gradients = gradients,
+                            gradient.index = if (gradients) i else 0L
+                          ),
                           bws = bws)
                 temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
                 temp.all.err <- temp.boot[["boot.all.err"]]
@@ -903,6 +914,7 @@
                 data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
               }
             } else if (plot.behavior != "data") {
+              plot.layout <- .np_plot_layout_activate(plot.layout)
               ## plot evaluation
               plot.fun <- if (xi.factor) {
                 .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -1026,6 +1038,7 @@
           xi.factor = all.isFactor[plot.index]
 
           for (j in seq_len(dsf)){
+            plot.layout <- .np_plot_layout_activate(plot.layout)
             ## plot evaluation
             idx <- (plot.index-1)*dsf+j
             plot.fun <- if (xi.factor) {

@@ -37,8 +37,9 @@
            ...,
            random.seed){
 
-    oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
-    on.exit(.np_plot_restore_par(oldpar), add = TRUE)
+    engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
+    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
+    plot.par.mfrow <- engine.ctx$plot.par.mfrow
 
     miss.xy = c(missing(xdat),missing(ydat))
     xy <- .np_plot_resolve_xydat(bws = bws, xdat = xdat, ydat = ydat, miss.xy = miss.xy)
@@ -98,14 +99,15 @@
     }
 
 
-    if (plot.behavior != "data" && plot.par.mfrow)
-      par(mfrow=if(gradients) n2mfrow(bws$ndim) else c(1,1),cex=par()$cex)
+    plot.layout <- .np_plot_layout_begin(
+      plot.behavior = plot.behavior,
+      plot.par.mfrow = plot.par.mfrow,
+      mfrow = if (gradients) n2mfrow(bws$ndim) else c(1, 1)
+    )
 
     plot.out = list()
 
-    scalar_default <- function(value, default) {
-      if (is.null(value)) default else value
-    }
+    scalar_default <- .np_plot_scalar_default
 
     make_singleindex_payload <- function(index,
                                          mean,
@@ -217,6 +219,7 @@
 
 
       if (plot.behavior != "data"){      
+        plot.layout <- .np_plot_layout_activate(plot.layout)
         if (plot.errors){
           plot(tobj$index[i.sort], temp.mean[i.sort],
                ylim = if (!is.null(ylim)) ylim else c(ymin,ymax),
@@ -341,6 +344,7 @@
 
         for (i in seq_len(ncol(xdat))) {
           if (plot.behavior != "data"){
+            plot.layout <- .np_plot_layout_activate(plot.layout)
 
             if (is.null(ylim)) {
               if (!common.scale) {

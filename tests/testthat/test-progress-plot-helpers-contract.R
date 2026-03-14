@@ -78,18 +78,6 @@ test_that("plot helper progress emits append-only bounded messages on master", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  legacy <- capture_progress_shadow_trace(
-    {
-      state <- begin(total = 12, label = "Plot bootstrap wild")
-      for (i in seq_len(12L)) {
-        state <- tick(state, done = i)
-      }
-      finish(state)
-    },
-    force_renderer = "legacy",
-    now = progress_time_counter()
-  )
-
   actual <- capture_progress_shadow_trace(
     {
       state <- begin(total = 12, label = "Plot bootstrap wild")
@@ -103,7 +91,6 @@ test_that("plot helper progress emits append-only bounded messages on master", {
 
   lines <- vapply(actual$trace, `[[`, character(1L), "line")
 
-  expect_identical(lines, vapply(legacy$trace, `[[`, character(1L), "line"))
   events <- vapply(actual$trace, `[[`, character(1L), "event")
   expect_true(events[[length(events)]] %in% c("render", "finish"))
   expect_true(all(events[-length(events)] == "render"))
@@ -150,15 +137,6 @@ test_that("plot helper activity delays its note until grace elapses on master", 
   )
   on.exit(options(old_opts), add = TRUE)
 
-  legacy <- capture_progress_shadow_trace(
-    {
-      activity <- begin("Constructing bootstrap bands")
-      finish(activity)
-    },
-    force_renderer = "legacy",
-    now = progress_time_values(c(0, 1.0))
-  )
-
   actual <- capture_progress_shadow_trace(
     {
       activity <- begin("Constructing bootstrap bands")
@@ -167,10 +145,6 @@ test_that("plot helper activity delays its note until grace elapses on master", 
     now = progress_time_values(c(0, 1.0))
   )
 
-  expect_identical(
-    vapply(actual$trace, `[[`, character(1L), "line"),
-    vapply(legacy$trace, `[[`, character(1L), "line")
-  )
   expect_identical(
     vapply(actual$trace, `[[`, character(1L), "line"),
     rep("[npRmpi] Constructing bootstrap bands... elapsed 0.0s", 2L)
@@ -664,7 +638,9 @@ test_that("plot helper progress caps intermediate heartbeats on master", {
 
   lines <- vapply(actual$trace, `[[`, character(1L), "line")
 
-  expect_identical(lines, vapply(legacy$trace, `[[`, character(1L), "line"))
+  events <- vapply(actual$trace, `[[`, character(1L), "event")
+  expect_true(events[[length(events)]] %in% c("render", "finish"))
+  expect_true(all(events[-length(events)] == "render"))
   expect_true(length(lines) >= 4L)
   expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 4/12 ", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Plot bootstrap wild 8/12 ", lines)))

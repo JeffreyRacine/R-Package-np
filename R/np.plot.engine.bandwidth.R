@@ -45,16 +45,10 @@
            ...,
            random.seed){
 
-    oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
-    on.exit(.np_plot_restore_par(oldpar), add = TRUE)
-
-    scalar_default <- function(value, default) {
-      if (is.null(value)) default else value
-    }
-
-    plot.par.mfrow.opt <- getOption("plot.par.mfrow")
-    if(!is.null(plot.par.mfrow.opt))
-        plot.par.mfrow <- plot.par.mfrow.opt
+    engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
+    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
+    plot.par.mfrow <- engine.ctx$plot.par.mfrow
+    scalar_default <- .np_plot_scalar_default
 
     miss.x <- missing(xdat)
 
@@ -377,8 +371,11 @@
 
     } else {
 
-      if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(bws$ndim),cex=par()$cex)
+      plot.layout <- .np_plot_layout_begin(
+        plot.behavior = plot.behavior,
+        plot.par.mfrow = plot.par.mfrow,
+        mfrow = n2mfrow(bws$ndim)
+      )
 
       ev = xdat[1,,drop = FALSE]
 
@@ -486,6 +483,7 @@
             data.err.all[[i]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
+          plot.layout <- .np_plot_layout_activate(plot.layout)
           ## plot evaluation
           plot.fun <- if (xi.factor) {
             .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -612,6 +610,7 @@
         
         for (i in seq_len(bws$ndim)){
           xi.factor = is.factor(xdat[,i])
+          plot.layout <- .np_plot_layout_activate(plot.layout)
 
           ## plot evaluation
           plot.fun <- if (xi.factor) {
