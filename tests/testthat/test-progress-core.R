@@ -495,6 +495,19 @@ test_that("single-line fit compacts plot bootstrap labels so prep detail survive
   )
 })
 
+test_that("single-line fit preserves readable plot bootstrap counters at 80 columns", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+
+  line <- "[np] Plot bootstrap (grad index 1/1) 12345/80000 (15.4%, elapsed 8.7s, eta 44.9s)"
+  fitted <- fit(line, max_width = 80)
+
+  expect_lte(nchar(fitted, type = "width"), 80L)
+  expect_identical(
+    fitted,
+    "[np] Plot bootstrap (grad idx 1/1) 12345/80000 (15.4%, elapsed 8.7s, eta 44.9s)"
+  )
+})
+
 test_that("single-line fit preserves both ends when truncation is still required", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 

@@ -516,6 +516,14 @@
   sprintf("%s %d/%d", target_name, slice.index, total)
 }
 
+.np_plot_singleindex_bootstrap_target_label <- function(gradients = FALSE) {
+  if (isTRUE(gradients)) {
+    "grad index 1/1"
+  } else {
+    "index 1/1"
+  }
+}
+
 .np_mammen_draws <- function(n, B) {
   a <- (1 - sqrt(5)) / 2
   p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
@@ -1693,7 +1701,8 @@
                                      counts = NULL,
                                      counts.drawer = NULL,
                                      gradients = FALSE,
-                                     idx.eval = NULL) {
+                                     idx.eval = NULL,
+                                     progress.label = NULL) {
   if (!identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_index_exact(
       xdat = xdat,
@@ -1703,7 +1712,8 @@
       counts = counts,
       counts.drawer = counts.drawer,
       gradients = gradients,
-      idx.eval = idx.eval
+      idx.eval = idx.eval,
+      progress.label = progress.label
     ))
   }
 
@@ -1715,7 +1725,8 @@
       B = B,
       counts = counts,
       counts.drawer = counts.drawer,
-      idx.eval = idx.eval
+      idx.eval = idx.eval,
+      progress.label = progress.label
     ))
   }
 
@@ -1766,7 +1777,8 @@
       ydat = y.num,
       B = B,
       counts = counts,
-      counts.drawer = counts.drawer
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
     ))
   }
 
@@ -1837,7 +1849,11 @@
   }
 
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -1902,7 +1918,8 @@
                                                     B,
                                                     counts = NULL,
                                                     counts.drawer = NULL,
-                                                    idx.eval = NULL) {
+                                                    idx.eval = NULL,
+                                                    progress.label = NULL) {
   xdat <- toFrame(xdat)
   B <- as.integer(B)
   n <- nrow(xdat)
@@ -1928,7 +1945,8 @@
     counts.drawer = counts.drawer,
     gradients = TRUE,
     gradient.order = 1L,
-    slice.index = 1L
+    slice.index = 1L,
+    progress.label = progress.label
   )
 }
 
@@ -1939,7 +1957,8 @@
                                            counts = NULL,
                                            counts.drawer = NULL,
                                            gradients = FALSE,
-                                           idx.eval = NULL) {
+                                           idx.eval = NULL,
+                                           progress.label = NULL) {
   xdat <- toFrame(xdat)
   B <- as.integer(B)
   n <- nrow(xdat)
@@ -1969,7 +1988,11 @@
   t0 <- fit_hat(x.train = xdat, y.train = ydat)
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -6635,8 +6658,21 @@ compute.bootstrap.errors.sibandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    progress.target <- .np_plot_singleindex_bootstrap_target_label(gradients = gradients)
+    prep.label <- .np_plot_bootstrap_stage_label(
+      stage = sprintf("Preparing plot bootstrap %s", plot.errors.boot.method),
+      target_label = progress.target
+    )
+    progress.label <- .np_plot_bootstrap_stage_label(
+      stage = "Plot bootstrap",
+      target_label = progress.target
+    )
+    interval.label <- .np_plot_bootstrap_stage_label(
+      stage = sprintf("Constructing bootstrap %s bands", plot.errors.type),
+      target_label = progress.target
+    )
     activity <- .np_plot_activity_begin(
-      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+      prep.label
     )
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.sibandwidth")
@@ -6676,7 +6712,8 @@ compute.bootstrap.errors.sibandwidth =
         ydat = ydat,
         fit.mean = fit.mean,
         B = plot.errors.boot.num,
-        wild = plot.errors.boot.wild
+        wild = plot.errors.boot.wild,
+        progress.label = progress.label
       )
     } else if (is.inid) {
       inid.helper.ok <- (!isTRUE(gradients)) || identical(bws$type, "fixed")
@@ -6690,7 +6727,8 @@ compute.bootstrap.errors.sibandwidth =
             bws = bws,
             B = plot.errors.boot.num,
             gradients = gradients,
-            idx.eval = idx.eval
+            idx.eval = idx.eval,
+            progress.label = progress.label
           )
         }, error = function(e) {
           stop(sprintf("inid single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
@@ -6717,7 +6755,8 @@ compute.bootstrap.errors.sibandwidth =
             B = plot.errors.boot.num,
             counts.drawer = counts.drawer,
             gradients = gradients,
-            idx.eval = idx.eval
+            idx.eval = idx.eval,
+            progress.label = progress.label
           )
         }, error = function(e) {
           stop(sprintf("%s single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
@@ -6747,7 +6786,8 @@ compute.bootstrap.errors.sibandwidth =
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
-        band.type = plot.errors.type
+        band.type = plot.errors.type,
+        progress.label = interval.label
       )
       boot.err[,1:2] <- interval.summary$err
       boot.all.err <- interval.summary$all.err

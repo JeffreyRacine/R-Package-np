@@ -415,6 +415,62 @@
   line
 }
 
+.np_progress_compact_plot_bootstrap_line <- function(line, max_width) {
+  if (!is.character(line) || length(line) != 1L || is.na(line)) {
+    return(line)
+  }
+
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return(line)
+  }
+
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  matches <- regexec("^(.+Plot bootstrap(?: \\([^)]+\\))?) ([0-9]+/[0-9]+) \\((.+)\\)$", line)
+  capture <- regmatches(line, matches)[[1L]]
+  if (length(capture) != 4L) {
+    return(line)
+  }
+
+  prefix <- capture[[2L]]
+  counter <- capture[[3L]]
+  fields <- strsplit(capture[[4L]], ", ", fixed = TRUE)[[1L]]
+  if (!length(fields)) {
+    return(line)
+  }
+
+  render <- function(prefix_text, parts) {
+    sprintf("%s %s (%s)", prefix_text, counter, paste(parts, collapse = ", "))
+  }
+
+  compact_prefix <- prefix
+  compact_prefix <- sub("\\(grad index ", "(grad idx ", compact_prefix)
+  compact_prefix <- sub("\\(index ", "(idx ", compact_prefix)
+
+  compact_fields <- function(parts) {
+    compacted <- parts
+    compacted <- sub("^elapsed ", "elap ", compacted)
+    compacted
+  }
+
+  candidates <- list(
+    render(prefix, fields),
+    render(compact_prefix, fields),
+    render(compact_prefix, compact_fields(fields))
+  )
+
+  for (candidate in candidates) {
+    if (nchar(candidate, type = "width") <= max_width) {
+      return(candidate)
+    }
+  }
+
+  line
+}
+
 .np_progress_fit_single_line <- function(line, max_width = .np_progress_output_width()) {
   if (!is.character(line) || length(line) != 1L || is.na(line)) {
     return(line)
@@ -435,6 +491,11 @@
   }
 
   line <- .np_progress_compact_bandwidth_line(line, max_width = max_width)
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  line <- .np_progress_compact_plot_bootstrap_line(line, max_width = max_width)
   if (nchar(line, type = "width") <= max_width) {
     return(line)
   }
