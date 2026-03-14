@@ -346,10 +346,21 @@ test_that("bandwidth selection helper suppresses legacy output and drives bounde
     now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
   )
   lines <- vapply(actual$trace, `[[`, character(1L), "line")
-  legacy_lines <- vapply(legacy$trace, `[[`, character(1L), "line")
+  legacy_lines <- vapply(
+    legacy$trace[vapply(legacy$trace, `[[`, character(1L), "event") == "render"],
+    `[[`,
+    character(1L),
+    "line"
+  )
+  render_lines <- vapply(
+    actual$trace[vapply(actual$trace, `[[`, character(1L), "event") == "render"],
+    `[[`,
+    character(1L),
+    "line"
+  )
 
   expect_false(isTRUE(seen))
-  expect_equal(lines, legacy_lines)
+  expect_equal(render_lines, legacy_lines)
   expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth\\.\\.\\.$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))

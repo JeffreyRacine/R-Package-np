@@ -429,7 +429,7 @@ npudensbw.default <-
       opt.args$scale.init.categorical.sample <- scale.init.categorical.sample
     if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
     if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
-    tbw <- .np_progress_select_bandwidth(
+    tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting density bandwidth",
       do.call(npudensbw.bandwidth, opt.args)
     )

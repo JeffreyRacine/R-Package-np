@@ -51,7 +51,9 @@ capture_progress_conditions <- function(expr) {
 }
 
 normalize_messages <- function(x) {
-  sub("\n$", "", x)
+  pieces <- unlist(strsplit(paste(x, collapse = "\n"), "[\r\n]+"))
+  pieces <- trimws(pieces, which = "right")
+  pieces[nzchar(pieces)]
 }
 
 progress_time_counter <- function(start = 0, by = 0.6) {
@@ -62,7 +64,7 @@ progress_time_counter <- function(start = 0, by = 0.6) {
   }
 }
 
-test_that("npindexbw emits append-only bounded multistart progress", {
+test_that("npindexbw adopts the generic bandwidth selection line", {
   skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -74,7 +76,8 @@ test_that("npindexbw emits append-only bounded multistart progress", {
 
   old_opts <- options(
     np.messages = TRUE,
-    np.progress.start.grace.known.sec = 0
+    np.progress.start.grace.known.sec = 0,
+    np.progress.start.grace.unknown.sec = 0
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -99,9 +102,11 @@ test_that("npindexbw emits append-only bounded multistart progress", {
   messages <- normalize_messages(res$messages)
 
   expect_s3_class(res$value, "sibandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting single-index bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting single-index bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_false(any(grepl("\b", messages, fixed = TRUE)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", messages)))
 })
 
 test_that("npindexbw progress respects np.messages FALSE", {

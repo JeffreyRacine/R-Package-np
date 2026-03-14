@@ -353,7 +353,7 @@ npindexbw.default <-
       if (!missing(optim.abstol)) opt.args$optim.abstol <- optim.abstol
       if (!missing(optim.maxit)) opt.args$optim.maxit <- optim.maxit
       if (!missing(only.optimize.beta)) opt.args$only.optimize.beta <- only.optimize.beta
-      tbw <- .np_progress_select_bandwidth(
+      tbw <- .np_progress_select_bandwidth_enhanced(
         "Selecting single-index bandwidth",
         do.call(npindexbw.sibandwidth, opt.args)
       )
@@ -447,6 +447,13 @@ npindexbw.sibandwidth <-
           ## Invariant objects used by objective evaluations.
           xmat <- xdat
           wmat <- cbind(ydat, 1.0)
+          bandwidth_eval_count <- 0L
+
+          bandwidth_progress_step <- function() {
+            bandwidth_eval_count <<- bandwidth_eval_count + 1L
+            .np_progress_bandwidth_activity_step(done = bandwidth_eval_count)
+            invisible(NULL)
+          }
 
           ## Note - there are two methods currently implemented, Ichimura's
           ## least squares approach and Klein and Spady's likelihood approach.
@@ -460,6 +467,7 @@ npindexbw.sibandwidth <-
           ichimuraMaxPenalty <- 10*mean(ydat^2)
 
           ichimura <- function(param) {
+            bandwidth_progress_step()
 
             ##Define the leave-one-out objective function, sum (y - \hat
             ## G(X\hat\beta))^2. We let beta denote beta_2...beta_k (first k-1
@@ -548,6 +556,7 @@ npindexbw.sibandwidth <-
           kleinspadyFloor <- sqrt(.Machine$double.eps)
 
           kleinspady <- function(param) {
+            bandwidth_progress_step()
 
             ## Define the leave-one-out objective function, sum (y - \hat
             ## G(X\hat\beta))^2. We let beta denote beta_2...beta_k (first k-1

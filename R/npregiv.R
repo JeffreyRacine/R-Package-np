@@ -930,6 +930,7 @@ npregiv <- function(y,
                      degree=degree)
 
     sum.lscv <- function(bw.gamma,...) {
+      .np_progress_iv_activity_step()
 
       ## Note - we set the kernel for unordered and ordered regressors
       ## to the liracine kernel (0<=lambda<=1) and test for proper
@@ -946,6 +947,7 @@ npregiv <- function(y,
     }
 
     sum.aicc <- function(bw.gamma,...) {
+      .np_progress_iv_activity_step()
 
       ## Note - we set the kernel for unordered and ordered regressors
       ## to the liracine kernel (0<=lambda<=1) and test for proper
@@ -1113,6 +1115,26 @@ npregiv <- function(y,
   start.from <- match.arg(start.from)
   method <- match.arg(method)
 
+  iv_set_stage <- function(label, iteration = NULL) {
+    .np_progress_iv_set_object(label = label, iteration = iteration)
+  }
+
+  iv_start_label <- function() {
+    if (identical(start.from, "Eyz")) "E[y|z]" else "E[E[y|w]|z]"
+  }
+
+  iv_residual_stage_label <- function(smooth.residuals) {
+    if (smooth.residuals) "E[y-phi(z)|w]" else "E[phi(z)|w]"
+  }
+
+  iv_adjoint_stage_label <- function(smooth.residuals) {
+    if (smooth.residuals) {
+      "E[E[y-phi(z)|w]|z]"
+    } else {
+      "E[E[y|w]-E[phi(z)|w]|z]"
+    }
+  }
+
   nmulti.loop <- if(!is.null(nmulti)) nmulti else 1
   nmulti <- if(!is.null(nmulti)) nmulti else 5
 
@@ -1139,6 +1161,7 @@ npregiv <- function(y,
   w.numeric <- vapply(seq_len(NCOL(w)), function(i) is.numeric(w[,i]), logical(1))
   num.w.numeric <- NCOL(as.data.frame(w[,w.numeric]))
 
+  result <- .np_progress_select_iv(.np_progress_iv_title(), {
   if(method=="Tikhonov") {
 
     ## Now y=phi(z) + u, hence E(y|w)=E(phi(z)|w) so we need two
@@ -1151,8 +1174,7 @@ npregiv <- function(y,
 
     ## convergence <- NULL
 
-    .np_progress_note("Preparing Tikhonov IV regression")
-
+    iv_set_stage("E[y|w]")
     if(is.null(bw)) {
         hyw <- .np_progress_with_legacy_suppressed(glpcv(ydat=y,
                                                         xdat=w,
@@ -1184,6 +1206,7 @@ npregiv <- function(y,
 
     ## We conduct local polynomial kernel regression of E(y|w) on z
 
+    iv_set_stage("E[E[y|w]|z]")
     if(is.null(bw)) {
         hywz <- .np_progress_with_legacy_suppressed(glpcv(ydat=E.y.w,
                                                          xdat=z,
@@ -1225,13 +1248,14 @@ npregiv <- function(y,
     if(!is.null(bw)) alpha <- bw$alpha
 
     if(is.null(alpha)&&is.null(bw)) {
-      .np_progress_note("Solving Tikhonov regularization parameter")
+      iv_set_stage("alpha")
       alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     }
 
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha.
 
+    iv_set_stage("phi(z)")
     phi <- as.vector(tikh(alpha, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z))
     phi.mat <- phi
     
@@ -1252,17 +1276,12 @@ npregiv <- function(y,
 
     bw.E.phi.w <- NULL
     bw.E.E.phi.w.z <- NULL
-    tikh.progress <- if(iterate.Tikhonov.num > 1) {
-      .np_progress_begin("Iterating Tikhonov solve", total = iterate.Tikhonov.num, surface = "iv_solve")
-    } else {
-      NULL
-    }
 
     for(i in 1:iterate.Tikhonov.num) {
-      if(!is.null(tikh.progress)) {
-          tikh.progress <- .np_progress_step(tikh.progress, done = i, detail = "updating smoothing and phi(z)")
-      }
+      iter.label <- if (iterate.Tikhonov.num > 1) i else NULL
+      iv_set_stage("E[phi(z)|w]", iteration = iter.label)
 
+      iv_set_stage("E[E[phi(z)|w]|z]", iteration = iter.label)
       if(is.null(bw)) {
           hphiw <- .np_progress_with_legacy_suppressed(glpcv(ydat=phi, ## 23/1/15 phi is sample
                                                             xdat=w,
@@ -1339,9 +1358,7 @@ npregiv <- function(y,
       } else {
 
           if(is.null(alpha.iter)&&is.null(bw)) {
-              if(!is.null(tikh.progress)) {
-                  tikh.progress <- .np_progress_step(tikh.progress, done = i, detail = "recomputing alpha")
-              }
+              iv_set_stage("alpha", iteration = iter.label)
               alpha.iter <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.phi.w.z, r = E.y.w)$minimum
           }
       }
@@ -1349,6 +1366,7 @@ npregiv <- function(y,
       ## Finally, we conduct regularized Tikhonov regression using this
       ## optimal alpha and the updated bandwidths.
 
+      iv_set_stage("phi(z)", iteration = iter.label)
       phi <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ, r = E.y.w))
       phi.mat <- cbind(phi.mat,phi)
 
@@ -1453,10 +1471,6 @@ npregiv <- function(y,
       
     }
 
-    if(!is.null(tikh.progress)) {
-        tikh.progress <- .np_progress_end(tikh.progress, detail = "updating smoothing and phi(z)")
-    }
-
     if((alpha.iter-alpha.min)/NZD(alpha.min) < 0.01) .np_warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
     if((alpha.max-alpha.iter)/NZD(alpha.max) < 0.01) .np_warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
 
@@ -1492,17 +1506,15 @@ npregiv <- function(y,
                 method=method,
                 ptm=proc.time() - ptm.start)
     class(ret) <- "npregiv"
-    return(ret)
+    ret
 
   } else {
 
     ## Landweber-Fridman
 
-    .np_progress_note("Preparing Landweber-Fridman IV regression")
-    progress <- .np_progress_begin("Iterating Landweber-Fridman solve", surface = "iv_solve")
-
     norm.stop <- numeric()
 
+    iv_set_stage("E[y|w]")
     if(is.null(bw)) {
         h <- .np_progress_with_legacy_suppressed(glpcv(ydat=y,
                                                       xdat=w,
@@ -1542,6 +1554,7 @@ npregiv <- function(y,
     ## iterate.
 
     if(is.null(starting.values)) {
+      iv_set_stage(iv_start_label())
 
       if(is.null(bw)) {
           h <- .np_progress_with_legacy_suppressed(glpcv(ydat=if(start.from=="Eyz") y else E.y.w,
@@ -1693,7 +1706,7 @@ npregiv <- function(y,
 
     starting.values.phi <- phi.0
 
-    progress <- .np_progress_step(progress, done = 1, detail = "updating residual smoothing")
+    iv_set_stage(iv_residual_stage_label(smooth.residuals), iteration = 1L)
 
     if(smooth.residuals) {
 
@@ -1760,7 +1773,7 @@ npregiv <- function(y,
 
     norm.stop[1] <- sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2))
 
-    progress <- .np_progress_step(progress, done = 1, detail = "updating adjoint smoothing")
+    iv_set_stage(iv_adjoint_stage_label(smooth.residuals), iteration = 1L)
 
     if(is.null(bw)) {
         h <- .np_progress_with_legacy_suppressed(glpcv(ydat=resid.fitted,
@@ -1974,7 +1987,7 @@ npregiv <- function(y,
     ## (but above all are named).
 
     for(j in 2:iterate.max) {
-      progress <- .np_progress_step(progress, done = j, detail = "updating residual smoothing")
+      iv_set_stage(iv_residual_stage_label(smooth.residuals), iteration = j)
 
       if(smooth.residuals) {
 
@@ -2046,7 +2059,7 @@ npregiv <- function(y,
 
       norm.stop[j] <- if (penalize.iteration) j*sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2)) else sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2))
 
-      progress <- .np_progress_step(progress, done = j, detail = "updating adjoint smoothing")
+      iv_set_stage(iv_adjoint_stage_label(smooth.residuals), iteration = j)
 
       if(is.null(bw)) {
           h <- .np_progress_with_legacy_suppressed(glpcv(ydat=resid.fitted,
@@ -2220,8 +2233,6 @@ npregiv <- function(y,
 
       }
 
-      progress <- .np_progress_step(progress, done = j, detail = "evaluating stopping rule")
-
       ## The number of iterations in LF is asymptotically equivalent
       ## to 1/alpha (where alpha is the regularization parameter in
       ## Tikhonov).  Plus the criterion function we use is increasing
@@ -2362,8 +2373,6 @@ npregiv <- function(y,
         convergence <- NULL
     }
     
-    progress <- .np_progress_end(progress, detail = "evaluating stopping rule")
-
     ret <- list(phi=phi,
                 phi.mat=phi.mat,
                 phi.deriv.1=as.matrix(phi.deriv.1),
@@ -2400,9 +2409,11 @@ npregiv <- function(y,
                 method=method,
                 ptm=proc.time() - ptm.start)
     class(ret) <- "npregiv"
-    return(ret)
+    ret
 
   }
+  })
+  return(result)
 
 }
 

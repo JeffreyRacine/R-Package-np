@@ -504,7 +504,7 @@ npudistbw.default <-
     if (!missing(transform.bounds)) opt.args$transform.bounds <- transform.bounds
     if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
     if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
-    tbw <- .np_progress_select_bandwidth(
+    tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting distribution bandwidth",
       do.call(npudistbw.dbandwidth, opt.args)
     )

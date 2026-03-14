@@ -774,7 +774,7 @@ npcdistbw.default <-
       nms <- mc.names[m]
       bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
-    tbw <- .np_progress_select_bandwidth(
+    tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting conditional distribution bandwidth",
       do.call(npcdistbw.condbandwidth, bwsel.args)
     )

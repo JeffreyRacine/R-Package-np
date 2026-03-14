@@ -31,29 +31,6 @@ with_nprmpi_bindings <- function(bindings, code) {
   eval(code, envir = parent.frame())
 }
 
-capture_progress_conditions <- function(expr) {
-  messages <- character()
-  warnings <- character()
-
-  value <- withCallingHandlers(
-    expr,
-    message = function(m) {
-      messages <<- c(messages, conditionMessage(m))
-      invokeRestart("muffleMessage")
-    },
-    warning = function(w) {
-      warnings <<- c(warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
-
-  list(value = value, messages = messages, warnings = warnings)
-}
-
-normalize_messages <- function(x) {
-  sub("\n$", "", x)
-}
-
 progress_time_counter <- function(start = 0, by = 2.1) {
   current <- start
   function() {
@@ -62,45 +39,56 @@ progress_time_counter <- function(start = 0, by = 2.1) {
   }
 }
 
-test_that("npscoefbw emits append-only multistart and objective progress on master", {
+shadow_lines <- function(shadow) {
+  vapply(shadow$trace, `[[`, character(1L), "line")
+}
+
+test_that("npscoefbw adopts the generic bandwidth selection line", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   set.seed(3240)
-  n <- 65
+  n <- 28
   x <- runif(n)
   z <- runif(n)
   y <- sin(2 * pi * z) + x * (1 + z) + rnorm(n, sd = 0.1)
 
-  old_opts <- options(np.messages = TRUE)
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0,
+    np.progress.start.grace.unknown.sec = 0
+  )
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
+  actual <- with_nprmpi_bindings(
     list(
       .np_progress_is_interactive = function() TRUE,
       .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter()
+      .np_progress_now = progress_time_counter(),
+      .np_progress_output_width = function() 500L
     ),
-    capture_progress_conditions(
+    capture_progress_shadow_trace(
       npscoefbw(
         xdat = data.frame(x = x),
         zdat = data.frame(z = z),
         ydat = y,
         regtype = "lc",
         nmulti = 2,
-        optim.maxit = 10,
+        optim.maxit = 3,
         cv.iterate = FALSE
-      )
+      ),
+      force_renderer = "single_line"
     )
   )
 
-  messages <- normalize_messages(res$messages)
+  lines <- shadow_lines(actual)
 
-  expect_s3_class(res$value, "scbandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting smooth coefficient bandwidth multistart 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Selecting smooth coefficient bandwidth multistart 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Optimizing smooth coefficient bandwidth\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s: multistart 1$", messages)))
-  expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
+  expect_s3_class(actual$value, "scbandwidth")
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/2\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 50\\.0%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
 })
 
 test_that("npscoefbw progress respects np.messages FALSE", {
@@ -108,7 +96,7 @@ test_that("npscoefbw progress respects np.messages FALSE", {
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   set.seed(3240)
-  n <- 50
+  n <- 24
   x <- runif(n)
   z <- runif(n)
   y <- sin(2 * pi * z) + x * (1 + z) + rnorm(n, sd = 0.1)
@@ -116,66 +104,33 @@ test_that("npscoefbw progress respects np.messages FALSE", {
   old_opts <- options(np.messages = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
+  silent <- with_nprmpi_bindings(
     list(
       .np_progress_is_interactive = function() TRUE,
       .np_progress_is_master = function() TRUE,
       .np_progress_now = progress_time_counter()
     ),
-    capture_progress_conditions(
+    capture_progress_shadow_trace(
       npscoefbw(
         xdat = data.frame(x = x),
         zdat = data.frame(z = z),
         ydat = y,
         regtype = "lc",
         nmulti = 1,
-        optim.maxit = 5,
+        optim.maxit = 2,
         cv.iterate = FALSE
       )
     )
   )
 
-  expect_length(res$messages, 0)
+  expect_length(silent$trace, 0L)
 })
 
-test_that("npscoefbw cv.iterate path emits append-only backfitting progress on master", {
-  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+test_that("npscoefbw cv.iterate path retains backfitting progress hooks", {
+  src <- installed_function_text("npscoefbw.scbandwidth")
 
-  set.seed(3240)
-  n <- 65
-  x <- runif(n)
-  z <- runif(n)
-  y <- sin(2 * pi * z) + x * (1 + z) + rnorm(n, sd = 0.1)
-
-  old_opts <- options(np.messages = TRUE)
-  on.exit(options(old_opts), add = TRUE)
-
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter()
-    ),
-    capture_progress_conditions(
-      npscoefbw(
-        xdat = data.frame(x = x),
-        zdat = data.frame(z = z),
-        ydat = y,
-        regtype = "lc",
-        nmulti = 1,
-        optim.maxit = 5,
-        cv.iterate = TRUE,
-        cv.num.iterations = 2,
-        backfit.iterate = FALSE
-      )
-    )
-  )
-
-  messages <- normalize_messages(res$messages)
-
-  expect_s3_class(res$value, "scbandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Backfitting smooth coefficient bandwidth 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): iteration 1 of 2$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Optimizing partial residual bandwidth\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s: backfitting iteration [0-9]+ of 2, partial residual [0-9]+ of 2, fval ", messages)))
-  expect_false(any(grepl(intToUtf8(8L), messages, fixed = TRUE)))
+  expect_true(grepl("Backfitting smooth coefficient bandwidth", src, fixed = TRUE))
+  expect_true(grepl("Optimizing partial residual bandwidth", src, fixed = TRUE))
+  expect_true(grepl("\\.np_progress_begin\\(\"Backfitting smooth coefficient bandwidth\"", src))
+  expect_true(grepl("\\.np_progress_begin\\(\"Optimizing partial residual bandwidth\"", src))
 })

@@ -564,6 +564,7 @@ npscoefbw.scbandwidth <-
 
           cv_progress_step <- function(ridging = FALSE) {
             cv_state$optim_eval <- cv_state$optim_eval + 1L
+            .np_progress_bandwidth_activity_step(done = cv_state$optim_eval)
             cv_state$optim_progress <- .np_progress_step(
               state = cv_state$optim_progress,
               done = cv_state$optim_eval,
@@ -1114,7 +1115,7 @@ npscoefbw.default <-
       nms <- mc.names[m]
       scbw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
-    tbw <- .np_progress_select_bandwidth(
+    tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting smooth coefficient bandwidth",
       do.call(npscoefbw.scbandwidth, scbw.args)
     )

@@ -490,7 +490,7 @@ npregbw.default <-
     if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
     if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
 
-    tbw <- .np_progress_select_bandwidth(
+    tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting regression bandwidth",
       do.call(npregbw.rbandwidth, opt.args)
     )

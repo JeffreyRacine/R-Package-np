@@ -490,7 +490,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
   }
     
   tbw <- if (!has.explicit.bws) {
-    .np_progress_select_bandwidth(
+    .np_progress_select_bandwidth_enhanced(
       "Selecting partially linear regression bandwidth",
       .np_eval_bw_call(sc.bw, caller_env = parent.frame())
     )
