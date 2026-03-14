@@ -204,6 +204,101 @@ test_that("conditional helper labels carry target context for block bootstrap ph
   expect_true(any(grepl("Constructing bootstrap all bands \\(grad x1 on x2 2/3\\)", captured$interval)))
 })
 
+test_that("conditional exact ksum wrapper preserves user-facing progress label", {
+  fn <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "npRmpi")
+  captured <- new.env(parent = emptyenv())
+  captured$progress <- character()
+
+  res <- with_nprmpi_bindings(
+    list(
+      .np_inid_boot_from_ksum_conditional_exact = function(..., progress.label = NULL) {
+        captured$progress <- c(captured$progress, progress.label)
+        list(t = matrix(0, nrow = 2L, ncol = 2L), t0 = c(0, 0))
+      }
+    ),
+    fn(
+      xdat = data.frame(x = c(0, 1, 2)),
+      ydat = data.frame(y = c(0.1, 0.2, 0.3)),
+      exdat = data.frame(x = c(0, 1)),
+      eydat = data.frame(y = c(0.1, 0.2)),
+      bws = list(type = "adaptive_nn"),
+      B = 2L,
+      cdf = FALSE,
+      counts.drawer = function(start, stopi) matrix(1L, nrow = 3L, ncol = stopi - start + 1L),
+      progress.label = "Plot bootstrap (surf 1/1)"
+    )
+  )
+
+  expect_true(is.list(res))
+  expect_identical(captured$progress, "Plot bootstrap (surf 1/1)")
+})
+
+test_that("conditional bootstrap exact path forwards target label from compute helper", {
+  fn <- getFromNamespace("compute.bootstrap.errors.conbandwidth", "npRmpi")
+  captured <- new.env(parent = emptyenv())
+  captured$prep <- character()
+  captured$progress <- character()
+  captured$interval <- character()
+
+  res <- with_nprmpi_bindings(
+    list(
+      .np_plot_activity_begin = function(label) {
+        captured$prep <- c(captured$prep, label)
+        list(label = label)
+      },
+      .np_plot_activity_end = function(state) invisible(NULL),
+      .np_inid_boot_from_ksum_conditional = function(..., progress.label = NULL) {
+        captured$progress <- c(captured$progress, progress.label)
+        list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
+      },
+      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL) {
+        captured$interval <- c(captured$interval, progress.label)
+        list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
+      },
+      .npRmpi_profile_bootstrap_begin = function(...) list(),
+      .npRmpi_profile_finalize_bootstrap = function(boot.err, bxp, boot.all.err, ctx) {
+        list(boot.err = boot.err, bxp = bxp, boot.all.err = boot.all.err)
+      },
+      .npRmpi_with_local_bootstrap = function(expr) expr,
+      .np_con_inid_ksum_eligible = function(bws) TRUE
+    ),
+    fn(
+      xdat = data.frame(x = c(0, 1, 2)),
+      ydat = data.frame(y = c(0.1, 0.2, 0.3)),
+      exdat = data.frame(x = c(0, 1, 2)),
+      eydat = data.frame(y = c(0.1, 0.2, 0.3)),
+      cdf = FALSE,
+      quantreg = FALSE,
+      tau = NULL,
+      gradients = FALSE,
+      gradient.index = NULL,
+      slice.index = 0L,
+      plot.errors.boot.method = "geom",
+      plot.errors.boot.nonfixed = "exact",
+      plot.errors.boot.blocklen = 2L,
+      plot.errors.boot.num = 2L,
+      plot.errors.center = "estimate",
+      plot.errors.type = "all",
+      plot.errors.alpha = 0.05,
+      progress.target = "surf 1/1",
+      bws = list(
+        type = "adaptive_nn",
+        xndim = 1L,
+        yndim = 1L,
+        xnames = "x",
+        ynames = "y",
+        xdati = list(),
+        ydati = list()
+      )
+    )
+  )
+
+  expect_true(is.list(res))
+  expect_true(any(grepl("Preparing plot bootstrap geom \\(surf 1/1\\)", captured$prep)))
+  expect_identical(captured$progress, "Plot bootstrap (surf 1/1)")
+  expect_true(any(grepl("Constructing bootstrap all bands \\(surf 1/1\\)", captured$interval)))
+})
+
 test_that("single-index helper labels carry target context for bootstrap phases", {
   fn <- getFromNamespace("compute.bootstrap.errors.sibandwidth", "npRmpi")
   captured <- new.env(parent = emptyenv())

@@ -126,6 +126,34 @@ test_that("plot helper stays silent for instant runs below start grace on master
   expect_length(actual$trace, 0)
 })
 
+test_that("bootstrap execution stage surfaces immediately on begin in npRmpi", {
+  begin <- getFromNamespace(".np_plot_bootstrap_progress_begin", "npRmpi")
+  finish <- getFromNamespace(".np_plot_progress_end", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 2,
+    np.plot.progress.start.grace.sec = 0.75
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      state <- begin(total = 12L, label = "Plot bootstrap (index 1/1)")
+      finish(state)
+    },
+    now = progress_time_values(c(0, 0.2))
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+  expect_identical(
+    lines[[1L]],
+    "[npRmpi] Plot bootstrap (index 1/1) 0/12 (0.0%, elapsed 0.0s, eta 0.0s)"
+  )
+  expect_true(vapply(actual$trace, `[[`, character(1L), "event")[[1L]] == "render")
+})
+
 test_that("plot helper activity delays its note until grace elapses on master", {
   begin <- getFromNamespace(".np_plot_activity_begin", "npRmpi")
   finish <- getFromNamespace(".np_plot_activity_end", "npRmpi")

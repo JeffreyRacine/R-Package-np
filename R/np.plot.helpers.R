@@ -160,6 +160,14 @@
   state
 }
 
+.np_plot_bootstrap_progress_begin <- function(total, label) {
+  state <- .np_plot_progress_begin(total = total, label = label)
+  if (is.null(state))
+    return(NULL)
+
+  .np_progress_show_now(state = state, done = 0L)
+}
+
 .np_plot_progress_tick <- function(state, done, force = FALSE) {
   if (is.null(state))
     return(state)
@@ -1009,7 +1017,7 @@
   } else {
     as.character(progress.label)[1L]
   }
-  progress <- .np_plot_progress_begin(
+  progress <- .np_plot_bootstrap_progress_begin(
     total = total.boot,
     label = progress.label
   )
@@ -1730,6 +1738,15 @@
   }
 
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
 
   fill_chunk <- function(counts.chunk, start, stopi) {
     for (i in seq_len(neval)) {
@@ -1756,18 +1773,27 @@
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
     fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+    progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
     chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
     start <- 1L
     while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
       bsz <- stopi - start + 1L
+      chunk.started <- .np_progress_now()
       counts.chunk <- if (!is.null(counts.drawer)) {
         .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
       } else {
         stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
       }
       fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = bsz,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
       start <- stopi + 1L
     }
   }
@@ -1851,12 +1877,23 @@
   t0 <- fit_hat(x.train = xdat, y.train = ydat)
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
 
   start <- 1L
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
   while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
     counts.chunk <- if (!is.null(counts.mat)) {
       counts.mat[, start:stopi, drop = FALSE]
     } else if (!is.null(counts.drawer)) {
@@ -1873,6 +1910,12 @@
       )
     }
 
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
     start <- stopi + 1L
   }
 
@@ -3380,7 +3423,7 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -4940,7 +4983,7 @@
 
   tmat <- matrix(NA_real_, nrow = B, ncol = state$neval)
   progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -5020,7 +5063,8 @@
                                                            B,
                                                            cdf,
                                                            counts = NULL,
-                                                           counts.drawer = NULL) {
+                                                           counts.drawer = NULL,
+                                                           progress.label = NULL) {
   state <- .np_inid_boot_from_conditional_localpoly_fixed_precompute(
     xdat = xdat,
     ydat = ydat,
@@ -5034,7 +5078,8 @@
     state = state,
     B = B,
     counts = counts,
-    counts.drawer = counts.drawer
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
   )
 }
 
@@ -5046,7 +5091,8 @@
                                                       B,
                                                       cdf,
                                                       counts = NULL,
-                                                      counts.drawer = NULL) {
+                                                      counts.drawer = NULL,
+                                                      progress.label = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -5215,6 +5261,7 @@
         worker = worker,
         ncol.out = nout,
         what = "inid-ksum-conditional-exact-counts",
+        progress.label = progress.label,
         profile.where = "mpi.applyLB:inid-ksum-conditional-exact-counts",
         comm = 1L,
         required.bindings = c(
@@ -5300,6 +5347,7 @@
         worker = worker,
         ncol.out = nout,
         what = "inid-ksum-conditional-exact-block",
+        progress.label = progress.label,
         profile.where = "mpi.applyLB:inid-ksum-conditional-exact-block",
         comm = 1L,
         required.bindings = c(
@@ -5382,6 +5430,7 @@
         worker = worker,
         ncol.out = nout,
         what = "inid-ksum-conditional-exact",
+        progress.label = progress.label,
         profile.where = "mpi.applyLB:inid-ksum-conditional-exact",
         comm = 1L,
         required.bindings = c(
@@ -5428,7 +5477,8 @@
                                                 B,
                                                 cdf,
                                                 counts = NULL,
-                                                counts.drawer = NULL) {
+                                                counts.drawer = NULL,
+                                                progress.label = NULL) {
   regtype <- .np_con_xregtype(bws)
 
   if (!identical(bws$type, "fixed")) {
@@ -5441,7 +5491,8 @@
       B = B,
       cdf = cdf,
       counts = counts,
-      counts.drawer = counts.drawer
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
     ))
   }
 
@@ -5455,7 +5506,8 @@
       B = B,
       cdf = cdf,
       counts = counts,
-      counts.drawer = counts.drawer
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
     ))
   }
 
@@ -5553,6 +5605,7 @@
       worker = worker,
       ncol.out = neval,
       what = "inid-ksum-conditional-block",
+      progress.label = progress.label,
       profile.where = "mpi.applyLB:inid-ksum-conditional-block",
       comm = 1L,
       required.bindings = list(
@@ -5593,6 +5646,7 @@
       worker = worker,
       ncol.out = neval,
       what = "inid-ksum-conditional",
+      progress.label = progress.label,
       profile.where = "mpi.applyLB:inid-ksum-conditional",
       comm = 1L,
       required.bindings = list(
@@ -6484,7 +6538,7 @@ plotFactor <- function(f, y, ...){
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -6564,7 +6618,7 @@ plotFactor <- function(f, y, ...){
   } else {
     progress.label
   }
-  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -8697,7 +8751,8 @@ compute.bootstrap.errors.conbandwidth =
               bws = bws,
               B = plot.errors.boot.num,
               cdf = cdf,
-              counts.drawer = counts.drawer
+              counts.drawer = counts.drawer,
+              progress.label = progress.label
             )
           },
           error = function(e) {
