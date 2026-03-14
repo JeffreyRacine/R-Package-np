@@ -135,17 +135,17 @@
   if (nrow(rhs) != nrow(txdat))
     stop(sprintf("%s received RHS with unexpected number of rows", where))
 
-  out <- matrix(0.0, nrow = nrow(exdat), ncol = ncol(rhs))
-  for (j in seq_len(ncol(rhs))) {
-    out[, j] <- as.double(npksum(
-      bws = kbw,
-      txdat = txdat,
-      exdat = exdat,
-      tydat = rhs[, j],
-      operator = operator,
-      bandwidth.divide = TRUE
-    )$ksum)
-  }
+  out <- npksum(
+    bws = kbw,
+    txdat = txdat,
+    exdat = exdat,
+    tydat = rhs,
+    operator = operator,
+    bandwidth.divide = TRUE
+  )$ksum
+
+  if (!is.matrix(out))
+    out <- matrix(out, nrow = nrow(exdat), ncol = ncol(rhs))
 
   if (ncol(out) == 1L)
     out[, 1L, drop = FALSE]
@@ -156,24 +156,14 @@
 .np_exact_operator_matrix <- function(kbw, txdat, exdat, operator, where) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
-  n.train <- nrow(txdat)
-  H <- matrix(0.0, nrow = nrow(exdat), ncol = n.train)
-  e.j <- numeric(n.train)
-
-  for (j in seq_len(n.train)) {
-    e.j[] <- 0.0
-    e.j[j] <- 1.0
-    H[, j] <- .np_exact_operator_apply(
-      kbw = kbw,
-      txdat = txdat,
-      exdat = exdat,
-      operator = operator,
-      rhs = e.j,
-      where = where
-    )[, 1L]
-  }
-
-  H
+  .np_exact_operator_apply(
+    kbw = kbw,
+    txdat = txdat,
+    exdat = exdat,
+    operator = operator,
+    rhs = diag(nrow(txdat)),
+    where = where
+  )
 }
 
 .npcdhat_make_kernel_matrix <- function(kbw, txdat, exdat, operator) {
