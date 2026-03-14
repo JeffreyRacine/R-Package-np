@@ -206,6 +206,22 @@ test_that("plot helper activity stays silent below grace on master", {
                    c("render", "finish"))
 })
 
+test_that("plot engine setup does not open a graphics device on the null device", {
+  capture.par <- getFromNamespace(".np_plot_capture_par", "npRmpi")
+
+  skip_if_not(isTRUE(unname(as.integer(dev.cur())) == 1L))
+
+  before <- unname(as.integer(dev.cur()))
+  on.exit({
+    while (!isTRUE(unname(as.integer(dev.cur())) == 1L)) {
+      dev.off()
+    }
+  }, add = TRUE)
+
+  expect_identical(capture.par(c("mfrow", "cex")), list())
+  expect_identical(unname(as.integer(dev.cur())), before)
+})
+
 test_that("plot activity relinquishes single-line ownership before bounded stage begins", {
   begin.activity <- getFromNamespace(".np_plot_activity_begin", "npRmpi")
   end.activity <- getFromNamespace(".np_plot_activity_end", "npRmpi")

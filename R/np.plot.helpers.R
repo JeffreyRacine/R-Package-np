@@ -256,6 +256,8 @@
   names <- unique(as.character(names))
   if (!length(names))
     return(list())
+  if (isTRUE(unname(as.integer(dev.cur())) == 1L))
+    return(list())
   par(names)
 }
 
