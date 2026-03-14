@@ -517,6 +517,288 @@
   val
 }
 
+.np_progress_bandwidth_enhanced_enabled <- function() {
+  isTRUE(getOption("np.progress.bandwidth.enhanced", FALSE))
+}
+
+.np_progress_bandwidth_enhanced_state <- function(state) {
+  isTRUE(state$bandwidth_progress_common)
+}
+
+.np_progress_bandwidth_coordinator_active <- function(state) {
+  isTRUE(state$bandwidth_coordinator_active)
+}
+
+.np_progress_bandwidth_title <- function() {
+  "Bandwidth selection"
+}
+
+.np_progress_bandwidth_initialize_state <- function(state) {
+  state$bandwidth_progress_common <- TRUE
+  state$bandwidth_nmulti_total <- 1L
+  state$bandwidth_multistart_current <- 1L
+  state$bandwidth_multistart_completed <- 0L
+  state$bandwidth_current_started <- state$started
+  state$bandwidth_multistart_durations <- numeric()
+  state$bandwidth_mode <- "iteration"
+  state$bandwidth_last_iteration <- NULL
+  state$bandwidth_estimate_last_emit <- NULL
+  state$bandwidth_coordinator_active <- FALSE
+  state$bandwidth_coordinator_groups <- NULL
+  state$bandwidth_coordinator_local_total <- NULL
+  state$bandwidth_coordinator_group_index <- NULL
+  state$bandwidth_coordinator_group_label <- NULL
+  state$bandwidth_coordinator_offset <- 0L
+  state$bandwidth_coordinator_local_current <- 1L
+  state$start_note <- sprintf(
+    "%s %s...",
+    state$pkg_prefix,
+    .np_progress_bandwidth_title()
+  )
+  state
+}
+
+.np_progress_bandwidth_set_coordinator <- function(total_groups, local_total) {
+  state <- .np_progress_runtime$bandwidth_state
+  total_groups <- suppressWarnings(as.integer(total_groups)[1L])
+  local_total <- suppressWarnings(as.integer(local_total)[1L])
+
+  if (is.null(state) ||
+      !.np_progress_bandwidth_enhanced_state(state) ||
+      is.na(total_groups) || total_groups < 1L ||
+      is.na(local_total) || local_total < 1L) {
+    return(invisible(NULL))
+  }
+
+  state$bandwidth_coordinator_active <- TRUE
+  state$bandwidth_coordinator_groups <- total_groups
+  state$bandwidth_coordinator_local_total <- local_total
+  state$bandwidth_coordinator_group_index <- 1L
+  state$bandwidth_coordinator_offset <- 0L
+  state$bandwidth_nmulti_total <- total_groups * local_total
+  state$bandwidth_multistart_current <- 1L
+  state$bandwidth_multistart_completed <- 0L
+  .np_progress_runtime$bandwidth_state <- state
+  invisible(NULL)
+}
+
+.np_progress_bandwidth_set_coordinator_group <- function(group_index, group_label = NULL) {
+  state <- .np_progress_runtime$bandwidth_state
+  group_index <- suppressWarnings(as.integer(group_index)[1L])
+
+  if (is.null(state) ||
+      !.np_progress_bandwidth_coordinator_active(state) ||
+      is.na(group_index) || group_index < 1L) {
+    return(invisible(NULL))
+  }
+
+  local_total <- suppressWarnings(as.integer(state$bandwidth_coordinator_local_total)[1L])
+  total <- suppressWarnings(as.integer(state$bandwidth_nmulti_total)[1L])
+  if (is.na(local_total) || local_total < 1L || is.na(total) || total < 1L) {
+    return(invisible(NULL))
+  }
+
+  offset <- (group_index - 1L) * local_total
+  state$bandwidth_coordinator_group_index <- group_index
+  state$bandwidth_coordinator_group_label <- if (is.null(group_label)) NULL else as.character(group_label)[1L]
+  state$bandwidth_coordinator_offset <- offset
+  state$bandwidth_coordinator_local_current <- 1L
+  state$bandwidth_multistart_completed <- min(offset, total)
+  state$bandwidth_multistart_current <- min(total, offset + 1L)
+  state$bandwidth_current_started <- .np_progress_now()
+  state$last_done <- NULL
+  if (offset > 0L) {
+    state$bandwidth_mode <- "complete_estimate"
+  }
+  if (!is.na(local_total) && local_total > 1L) {
+    state$start_note <- if (!is.null(state$bandwidth_coordinator_group_label)) {
+      sprintf(
+        "%s %s (%s, multistart 1/%s)",
+        state$pkg_prefix,
+        .np_progress_bandwidth_title(),
+        state$bandwidth_coordinator_group_label,
+        format(local_total)
+      )
+    } else {
+      sprintf(
+        "%s %s (multistart 1/%s)",
+        state$pkg_prefix,
+        .np_progress_bandwidth_title(),
+        format(local_total)
+      )
+    }
+  } else {
+    state$start_note <- if (!is.null(state$bandwidth_coordinator_group_label)) {
+      sprintf(
+        "%s %s (%s)",
+        state$pkg_prefix,
+        .np_progress_bandwidth_title(),
+        state$bandwidth_coordinator_group_label
+      )
+    } else {
+      sprintf(
+        "%s %s...",
+        state$pkg_prefix,
+        .np_progress_bandwidth_title()
+      )
+    }
+  }
+  .np_progress_runtime$bandwidth_state <- state
+  invisible(NULL)
+}
+
+.np_progress_bandwidth_register_nmulti <- function(state, total) {
+  total <- suppressWarnings(as.integer(total)[1L])
+  if (is.null(state) || is.na(total) || total < 1L) {
+    return(state)
+  }
+
+  if (.np_progress_bandwidth_coordinator_active(state)) {
+    state$bandwidth_coordinator_local_total <- total
+    groups <- suppressWarnings(as.integer(state$bandwidth_coordinator_groups)[1L])
+    if (!is.na(groups) && groups >= 1L) {
+      state$bandwidth_nmulti_total <- groups * total
+    }
+    return(state)
+  }
+
+  state$bandwidth_nmulti_total <- total
+  state$bandwidth_multistart_current <- min(
+    max(1L, suppressWarnings(as.integer(state$bandwidth_multistart_current)[1L])),
+    total
+  )
+  if (total > 1L) {
+    state$start_note <- sprintf(
+      "%s %s (multistart 1/%s)",
+      state$pkg_prefix,
+      .np_progress_bandwidth_title(),
+      format(total)
+    )
+  } else {
+    state$start_note <- sprintf(
+      "%s %s...",
+      state$pkg_prefix,
+      .np_progress_bandwidth_title()
+    )
+  }
+  state
+}
+
+.np_progress_bandwidth_estimated_total_time <- function(state) {
+  durations <- state$bandwidth_multistart_durations
+  total <- suppressWarnings(as.integer(state$bandwidth_nmulti_total)[1L])
+  if (!length(durations) || is.na(total) || total < 1L) {
+    return(NA_real_)
+  }
+
+  mean(durations) * total
+}
+
+.np_progress_bandwidth_format_iteration <- function(state, done = NULL, now = .np_progress_now()) {
+  elapsed <- max(0, now - state$started)
+  total <- suppressWarnings(as.integer(state$bandwidth_nmulti_total)[1L])
+  current <- suppressWarnings(as.integer(state$bandwidth_multistart_current)[1L])
+  fields <- character()
+
+  if (.np_progress_bandwidth_coordinator_active(state)) {
+    label <- state$bandwidth_coordinator_group_label
+    local_total <- suppressWarnings(as.integer(state$bandwidth_coordinator_local_total)[1L])
+    local_current <- suppressWarnings(as.integer(state$bandwidth_coordinator_local_current)[1L])
+    if (!is.null(label) && nzchar(label)) {
+      fields <- c(fields, label)
+    }
+    if (!is.na(local_total) && local_total > 1L && !is.na(local_current) && local_current >= 1L) {
+      fields <- c(fields, sprintf("multistart %s/%s", format(local_current), format(local_total)))
+    }
+  } else if (!is.na(total) && total > 1L && !is.na(current) && current >= 1L) {
+    fields <- c(fields, sprintf("multistart %s/%s", format(current), format(total)))
+  }
+
+  if (!is.null(done)) {
+    fields <- c(fields, sprintf("iteration %s", format(done)))
+  }
+
+  fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
+
+  sprintf(
+    "%s %s (%s)",
+    state$pkg_prefix,
+    .np_progress_bandwidth_title(),
+    paste(fields, collapse = ", ")
+  )
+}
+
+.np_progress_bandwidth_format_estimate <- function(state, now = .np_progress_now()) {
+  elapsed <- max(0, now - state$started)
+  total <- suppressWarnings(as.integer(state$bandwidth_nmulti_total)[1L])
+  completed <- suppressWarnings(as.integer(state$bandwidth_multistart_completed)[1L])
+  current <- suppressWarnings(as.integer(state$bandwidth_multistart_current)[1L])
+  if (is.na(total) || total < 1L || completed < 1L) {
+    return(.np_progress_bandwidth_format_iteration(state = state, done = state$last_done, now = now))
+  }
+
+  est.total <- .np_progress_bandwidth_estimated_total_time(state)
+  base.share <- 100 * completed / total
+  pct <- base.share
+  eta <- 0
+
+  if (is.finite(est.total) && !is.na(est.total) && est.total > 0) {
+    pct.calc <- 100 * elapsed / est.total
+    pct.upper <- if (completed < total) 99.9 else 100.0
+    pct <- max(base.share, min(pct.upper, pct.calc))
+    if (completed < total) {
+      eta <- max(0, est.total - elapsed)
+    }
+  }
+
+  fields <- character()
+
+  if (.np_progress_bandwidth_coordinator_active(state)) {
+    label <- state$bandwidth_coordinator_group_label
+    local_total <- suppressWarnings(as.integer(state$bandwidth_coordinator_local_total)[1L])
+    local_current <- suppressWarnings(as.integer(state$bandwidth_coordinator_local_current)[1L])
+    if (!is.null(label) && nzchar(label)) {
+      fields <- c(fields, label)
+    }
+    if (!is.na(local_current) && local_current >= 1L && !is.na(local_total) && local_total >= 1L) {
+      fields <- c(fields, sprintf("multistart %s/%s", format(local_current), format(local_total)))
+    }
+  } else if (!is.na(current) && current >= 1L) {
+    fields <- c(fields, sprintf("multistart %s/%s", format(current), format(total)))
+  }
+
+  if (completed < total && !is.null(state$last_done)) {
+    fields <- c(fields, sprintf("iteration %s", format(state$last_done)))
+  }
+
+  fields <- c(
+    fields,
+    sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)),
+    sprintf("%s%%", .np_progress_fmt_num(pct)),
+    sprintf("eta %ss", .np_progress_fmt_num(eta))
+  )
+
+  sprintf(
+    "%s %s (%s)",
+    state$pkg_prefix,
+    .np_progress_bandwidth_title(),
+    paste(fields, collapse = ", ")
+  )
+}
+
+.np_progress_bandwidth_format_line <- function(state, done = NULL, now = .np_progress_now()) {
+  mode <- state$bandwidth_mode
+  if (identical(mode, "complete_estimate")) {
+    .np_progress_bandwidth_format_estimate(state = state, now = now)
+  } else {
+    .np_progress_bandwidth_format_iteration(
+      state = state,
+      done = if (is.null(done)) state$last_done else done,
+      now = now
+    )
+  }
+}
+
 .np_progress_format_known_total <- function(state, done, detail = NULL, now = .np_progress_now()) {
   total <- state$total
   pct <- if (isTRUE(total > 0)) 100 * done / total else 0
@@ -564,6 +846,14 @@
 }
 
 .np_progress_format_line <- function(state, done = NULL, detail = NULL, now = .np_progress_now()) {
+  if (.np_progress_bandwidth_enhanced_state(state)) {
+    return(.np_progress_bandwidth_format_line(
+      state = state,
+      done = done,
+      now = now
+    ))
+  }
+
   if (isTRUE(state$known_total)) {
     .np_progress_format_known_total(
       state = state,
@@ -648,7 +938,7 @@
   state
 }
 
-.np_progress_step <- function(state, done = NULL, detail = NULL) {
+.np_progress_step_at <- function(state, now, done = NULL, detail = NULL, force = FALSE) {
   if (!is.null(done)) {
     state$last_done <- done
   }
@@ -657,13 +947,12 @@
     return(state)
   }
 
-  now <- .np_progress_now()
   state <- .np_progress_maybe_emit_start_note(state = state, now = now)
   if (isTRUE(state$start_note_pending)) {
     return(state)
   }
 
-  if ((now - state$last_emit) < state$throttle_sec) {
+  if (!isTRUE(force) && (now - state$last_emit) < state$throttle_sec) {
     return(state)
   }
 
@@ -691,6 +980,15 @@
   state
 }
 
+.np_progress_step <- function(state, done = NULL, detail = NULL) {
+  .np_progress_step_at(
+    state = state,
+    now = .np_progress_now(),
+    done = done,
+    detail = detail
+  )
+}
+
 .np_progress_end <- function(state, detail = NULL) {
   if (!isTRUE(state$enabled)) {
     .np_progress_release_owner(state$id)
@@ -705,6 +1003,39 @@
   }
 
   must_clear <- identical(state$renderer, "single_line") && isTRUE(state$rendered)
+
+  if (.np_progress_bandwidth_enhanced_state(state)) {
+    total <- suppressWarnings(as.integer(state$bandwidth_nmulti_total)[1L])
+    if (!is.na(total) && total > 1L) {
+      completed <- suppressWarnings(as.integer(state$bandwidth_multistart_completed)[1L])
+      if (completed < total) {
+        gap <- total - completed
+        dur <- max(0, now - state$bandwidth_current_started)
+        if (gap > 0L) {
+          state$bandwidth_multistart_durations <- c(
+            state$bandwidth_multistart_durations,
+            rep.int(dur, gap)
+          )
+        }
+        state$bandwidth_multistart_completed <- total
+        state$bandwidth_multistart_current <- total
+      }
+      state$bandwidth_mode <- "complete_estimate"
+      line <- .np_progress_bandwidth_format_estimate(state = state, now = now)
+      if (isTRUE(must_clear) || !identical(line, state$last_line)) {
+        state <- .np_progress_render(
+          state = state,
+          line = line,
+          event = "finish",
+          now = now,
+          done = state$last_done,
+          detail = detail
+        )
+      }
+      .np_progress_release_owner(state$id)
+      return(invisible(state))
+    }
+  }
 
   if (isTRUE(state$known_total)) {
     done <- if (is.null(state$total)) state$last_done else state$total
@@ -809,6 +1140,14 @@
     return(invisible(NULL))
   }
 
+  if (.np_progress_bandwidth_enhanced_state(state)) {
+    .np_progress_runtime$bandwidth_state <- .np_progress_bandwidth_register_nmulti(
+      state = state,
+      total = total
+    )
+    return(invisible(NULL))
+  }
+
   if (isTRUE(state$known_total) && identical(as.integer(state$total), total)) {
     return(invisible(NULL))
   }
@@ -858,6 +1197,60 @@
     state <- .np_progress_runtime$bandwidth_state
   }
 
+  if (.np_progress_bandwidth_enhanced_state(state)) {
+    done <- suppressWarnings(as.integer(done)[1L])
+    if (is.null(state) || is.na(done) || done < 1L) {
+      return(invisible(NULL))
+    }
+
+    total <- suppressWarnings(as.integer(state$bandwidth_nmulti_total)[1L])
+    local_total <- if (.np_progress_bandwidth_coordinator_active(state)) {
+      suppressWarnings(as.integer(state$bandwidth_coordinator_local_total)[1L])
+    } else {
+      total
+    }
+    if (is.na(local_total) || local_total < 2L || is.na(total) || total < 2L) {
+      return(invisible(NULL))
+    }
+
+    done <- min(done, local_total)
+    now <- .np_progress_now()
+    completed <- suppressWarnings(as.integer(state$bandwidth_multistart_completed)[1L])
+    completed <- max(0L, completed)
+    global_done <- if (.np_progress_bandwidth_coordinator_active(state)) {
+      offset <- suppressWarnings(as.integer(state$bandwidth_coordinator_offset)[1L])
+      offset + done
+    } else {
+      done
+    }
+    gap <- global_done - completed
+    if (gap > 0L) {
+      dur <- max(0, now - state$bandwidth_current_started)
+      state$bandwidth_multistart_durations <- c(
+        state$bandwidth_multistart_durations,
+        rep.int(dur, gap)
+      )
+    }
+    state$bandwidth_multistart_completed <- global_done
+    state$bandwidth_multistart_current <- if (done < local_total) global_done + 1L else min(total, global_done)
+    if (.np_progress_bandwidth_coordinator_active(state)) {
+      state$bandwidth_coordinator_local_current <- if (done < local_total) done + 1L else local_total
+    }
+    if (done < local_total) {
+      state$bandwidth_current_started <- now
+      state$last_done <- NULL
+    }
+    state$bandwidth_mode <- "complete_estimate"
+    state$last_emit <- -Inf
+    .np_progress_runtime$bandwidth_state <- .np_progress_step_at(
+      state = state,
+      now = now,
+      done = state$last_done,
+      force = TRUE
+    )
+    return(invisible(NULL))
+  }
+
   if (is.null(state) || !isTRUE(state$known_total)) {
     return(invisible(NULL))
   }
@@ -880,6 +1273,20 @@
 
 .np_progress_bandwidth_activity_step <- function(done = NULL) {
   state <- .np_progress_runtime$bandwidth_state
+
+  if (.np_progress_bandwidth_enhanced_state(state)) {
+    if (!is.null(done)) {
+      done <- suppressWarnings(as.integer(done)[1L])
+      if (is.na(done) || done < 1L) {
+        done <- NULL
+      }
+    }
+    .np_progress_runtime$bandwidth_state <- .np_progress_step(
+      state = state,
+      done = done
+    )
+    return(invisible(NULL))
+  }
 
   if (is.null(state) || isTRUE(state$known_total)) {
     return(invisible(NULL))
@@ -950,6 +1357,13 @@
   invisible(NULL)
 }
 
+.np_progress_with_bandwidth_enhanced <- function(expr) {
+  old <- getOption("np.progress.bandwidth.enhanced", FALSE)
+  on.exit(options(np.progress.bandwidth.enhanced = old), add = TRUE)
+  options(np.progress.bandwidth.enhanced = TRUE)
+  force(expr)
+}
+
 .np_progress_select_bandwidth <- function(label, expr) {
   starting <- !.np_progress_bandwidth_active()
   if (starting) {
@@ -962,6 +1376,11 @@
       domain = "general",
       surface = "bandwidth"
     )
+    if (.np_progress_bandwidth_enhanced_enabled()) {
+      .np_progress_runtime$bandwidth_state <- .np_progress_bandwidth_initialize_state(
+        .np_progress_runtime$bandwidth_state
+      )
+    }
   }
 
   .np_progress_runtime$bandwidth_depth <- as.integer(.np_progress_runtime$bandwidth_depth) + 1L
@@ -978,6 +1397,12 @@
   }, add = TRUE)
 
   force(expr)
+}
+
+.np_progress_select_bandwidth_enhanced <- function(label, expr) {
+  .np_progress_with_bandwidth_enhanced(
+    .np_progress_select_bandwidth(label = label, expr = expr)
+  )
 }
 
 .np_progress_with_legacy_suppressed <- function(expr) {

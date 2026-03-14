@@ -520,7 +520,7 @@ npreg.default <- function(bws, txdat, tydat, ...){
   }
     
   tbw <- if (!has.explicit.bws) {
-    .np_progress_select_bandwidth(
+    .np_progress_select_bandwidth_enhanced(
       "Selecting regression bandwidth",
       .np_eval_bw_call(sc.bw, caller_env = parent.frame())
     )

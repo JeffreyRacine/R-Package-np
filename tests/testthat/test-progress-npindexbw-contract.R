@@ -19,13 +19,17 @@ shadow_signature <- function(shadow) {
   )
 }
 
-test_that("npindexbw single-line multistart progress matches legacy semantics", {
+test_that("npindexbw adopts the generic bandwidth selection line", {
   set.seed(42)
   x1 <- runif(30)
   x2 <- runif(30)
   y <- x1 + 0.5 * x2 + rnorm(30, sd = 0.1)
 
-  old_opts <- options(np.messages = TRUE, np.progress.start.grace.known.sec = 0)
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0,
+    np.progress.start.grace.unknown.sec = 0
+  )
   on.exit(options(old_opts), add = TRUE)
 
   legacy <- capture_progress_shadow_trace(
@@ -57,8 +61,11 @@ test_that("npindexbw single-line multistart progress matches legacy semantics", 
 
   expect_s3_class(single_line$value, "sibandwidth")
   expect_equal(shadow_signature(single_line), shadow_signature(legacy))
-  expect_true(any(grepl("^\\[np\\] Selecting single-index bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Selecting single-index bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/3\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
 })
 
 test_that("npindexbw single-line progress respects np.messages FALSE and suppressMessages", {

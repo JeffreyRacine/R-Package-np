@@ -19,11 +19,15 @@ shadow_signature <- function(shadow) {
   )
 }
 
-test_that("npudensbw single-line bandwidth progress matches legacy semantics", {
+test_that("npudensbw bandwidth progress uses the enhanced multistart handoff", {
   set.seed(42)
   x <- rnorm(35)
 
-  old_opts <- options(np.messages = TRUE, np.progress.start.grace.known.sec = 0)
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0,
+    np.progress.start.grace.unknown.sec = 0
+  )
   on.exit(options(old_opts), add = TRUE)
 
   legacy <- capture_progress_shadow_trace(
@@ -51,16 +55,51 @@ test_that("npudensbw single-line bandwidth progress matches legacy semantics", {
 
   expect_s3_class(single_line$value, "bandwidth")
   expect_equal(shadow_signature(single_line), shadow_signature(legacy))
-  expect_true(any(grepl("^\\[np\\] Selecting density bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Selecting density bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/3\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
 })
 
-test_that("npregbw single-line bandwidth progress matches legacy semantics", {
+test_that("npudens indirect entry inherits the enhanced density bandwidth progress", {
+  set.seed(101)
+  x <- rnorm(35)
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0,
+    np.progress.start.grace.unknown.sec = 0
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    npudens(
+      tdat = data.frame(x = x),
+      bwmethod = "cv.ml",
+      nmulti = 3
+    ),
+    force_renderer = "single_line",
+    now = progress_time_counter()
+  )
+
+  lines <- shadow_lines(actual)
+
+  expect_s3_class(actual$value, "npdensity")
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/3\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
+})
+
+test_that("npregbw adopts the generic bandwidth selection line", {
   set.seed(7)
   x <- runif(30)
   y <- sin(2 * pi * x) + rnorm(30, sd = 0.1)
 
-  old_opts <- options(np.messages = TRUE, np.progress.start.grace.known.sec = 0)
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0,
+    np.progress.start.grace.unknown.sec = 0
+  )
   on.exit(options(old_opts), add = TRUE)
 
   legacy <- capture_progress_shadow_trace(
@@ -91,7 +130,7 @@ test_that("npregbw single-line bandwidth progress matches legacy semantics", {
   lines <- shadow_lines(single_line)
 
   expect_s3_class(single_line$value, "rbandwidth")
-  expect_equal(shadow_signature(single_line), shadow_signature(legacy))
-  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 1/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Selecting regression bandwidth multistart 3/3 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/3\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
 })

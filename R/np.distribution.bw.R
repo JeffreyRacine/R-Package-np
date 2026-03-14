@@ -486,7 +486,7 @@ npudistbw.default <-
       nms <- mc.names[m]
       bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
-    tbw <- .np_progress_select_bandwidth(
+    tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting distribution bandwidth",
       do.call(npudistbw.dbandwidth, bwsel.args)
     )

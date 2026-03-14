@@ -173,14 +173,21 @@ npplregbw.plbandwidth =
     zdat <- zdat[keep.rows,,drop = FALSE]
 
     ## y on z
+    total.groups <- 1L + ncol(xdat)
+    .np_progress_bandwidth_set_coordinator(
+      total_groups = total.groups,
+      local_total = max(1L, nmulti)
+    )
     total.time <-
       system.time({
+        .np_progress_bandwidth_set_coordinator_group(1L, "y~z")
         bws$bw$yzbw  <- npregbw(xdat = zdat, ydat = ydat,
                                 bws = bws$bw$yzbw, nmulti = nmulti, ...)
         
         ## x on z
 
         for (i in seq_len(ncol(xdat))) {
+          .np_progress_bandwidth_set_coordinator_group(i + 1L, sprintf("x%s~z", i))
           bws$bw[[i+1]] <- npregbw(xdat=zdat, ydat=xdat[,i],
                   bws = bws$bw[[i+1]], nmulti = nmulti, ...)
         }
@@ -320,7 +327,10 @@ npplregbw.default =
         nms <- mc.names[m]
         bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
       }
-      tbw <- do.call(npplregbw.plbandwidth, bwsel.args)
+      tbw <- .np_progress_select_bandwidth_enhanced(
+        "Selecting partially linear regression bandwidth",
+        do.call(npplregbw.plbandwidth, bwsel.args)
+      )
     }
 
     mc <- match.call(expand.dots = FALSE)

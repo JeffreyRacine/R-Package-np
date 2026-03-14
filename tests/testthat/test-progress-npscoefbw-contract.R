@@ -19,7 +19,7 @@ installed_function_text <- function(name, package = "np") {
   paste(deparse(getFromNamespace(name, package)), collapse = "\n")
 }
 
-test_that("npscoefbw uses single-line multistart on the accepted bandwidth surface", {
+test_that("npscoefbw adopts the generic bandwidth selection line", {
   set.seed(3240)
   n <- 28
   x <- runif(n)
@@ -57,14 +57,17 @@ test_that("npscoefbw uses single-line multistart on the accepted bandwidth surfa
     now = progress_time_counter()
   )
 
-  bandwidth_lines <- shadow_lines(actual)[grepl("^\\[np\\] Selecting smooth coefficient bandwidth", shadow_lines(actual))]
-  render_bandwidth_lines <- shadow_render_lines(actual)[grepl("^\\[np\\] Selecting smooth coefficient bandwidth", shadow_render_lines(actual))]
-  legacy_bandwidth_lines <- shadow_render_lines(legacy)[grepl("^\\[np\\] Selecting smooth coefficient bandwidth", shadow_render_lines(legacy))]
+  bandwidth_lines <- shadow_lines(actual)[grepl("^\\[np\\] Bandwidth selection", shadow_lines(actual))]
+  render_bandwidth_lines <- shadow_render_lines(actual)[grepl("^\\[np\\] Bandwidth selection", shadow_render_lines(actual))]
+  legacy_bandwidth_lines <- shadow_render_lines(legacy)[grepl("^\\[np\\] Bandwidth selection", shadow_render_lines(legacy))]
 
   expect_s3_class(actual$value, "scbandwidth")
   expect_equal(render_bandwidth_lines, legacy_bandwidth_lines)
-  expect_true(any(grepl("^\\[np\\] Selecting smooth coefficient bandwidth multistart 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
-  expect_true(any(grepl("^\\[np\\] Selecting smooth coefficient bandwidth multistart 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/2\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 50\\.0%, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", bandwidth_lines)))
 })
 
 test_that("npscoefbw progress respects np.messages FALSE", {

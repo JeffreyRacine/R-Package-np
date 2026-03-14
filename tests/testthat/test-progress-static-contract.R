@@ -25,16 +25,16 @@ test_that("R layer routes warnings through unified helper", {
 
 test_that("core estimator wrappers emit top-level bandwidth-selection notes", {
   cases <- list(
-    list(file = "np.regression.R", label = "Selecting regression bandwidth"),
-    list(file = "np.density.R", label = "Selecting density bandwidth"),
-    list(file = "np.distribution.R", label = "Selecting distribution bandwidth"),
-    list(file = "np.condensity.R", label = "Selecting conditional density bandwidth"),
-    list(file = "np.condistribution.R", label = "Selecting conditional distribution bandwidth"),
-    list(file = "np.plregression.R", label = "Selecting partially linear regression bandwidth"),
-    list(file = "np.singleindex.R", label = "Selecting single-index bandwidth"),
-    list(file = "np.smoothcoef.R", label = "Selecting smooth coefficient bandwidth"),
-    list(file = "np.conmode.R", label = "Selecting conditional density bandwidth"),
-    list(file = "np.qregression.R", label = "Selecting conditional distribution bandwidth")
+    list(file = "np.regression.R", label = "Selecting regression bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
+    list(file = "np.density.R", label = "Selecting density bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
+    list(file = "np.distribution.R", label = "Selecting distribution bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
+    list(file = "np.condensity.R", label = "Selecting conditional density bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
+    list(file = "np.condistribution.R", label = "Selecting conditional distribution bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
+    list(file = "np.plregression.R", label = "Selecting partially linear regression bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
+    list(file = "np.singleindex.R", label = "Selecting single-index bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
+    list(file = "np.smoothcoef.R", label = "Selecting smooth coefficient bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
+    list(file = "np.conmode.R", label = "Selecting conditional density bandwidth", helper = ".np_progress_select_bandwidth"),
+    list(file = "np.qregression.R", label = "Selecting conditional distribution bandwidth", helper = ".np_progress_select_bandwidth")
   )
 
   for (case in cases) {
@@ -43,7 +43,7 @@ test_that("core estimator wrappers emit top-level bandwidth-selection notes", {
     src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
     expect_true(
-      grepl(sprintf("\\.np_progress_select_bandwidth\\(\\s*\"%s\"", case$label), src),
+      grepl(sprintf("%s\\(\\s*\"%s\"", case$helper, case$label), src),
       info = case$file
     )
   }
@@ -178,7 +178,7 @@ test_that("npindexbw no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_select_bandwidth\\(\\s*\"Selecting single-index bandwidth\"", src))
+  expect_true(grepl("\\.np_progress_select_bandwidth_enhanced\\(\\s*\"Selecting single-index bandwidth\"", src))
   expect_true(grepl("\\.np_progress_bandwidth_multistart_step\\(done = i, total = nmulti\\)", src))
 })
 
@@ -188,11 +188,21 @@ test_that("npscoefbw multistart path uses central progress core", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_true(grepl("Optimizing smooth coefficient bandwidth", src, fixed = TRUE))
-  expect_true(grepl("\\.np_progress_select_bandwidth\\(\\s*\"Selecting smooth coefficient bandwidth\"", src))
+  expect_true(grepl("\\.np_progress_select_bandwidth_enhanced\\(\\s*\"Selecting smooth coefficient bandwidth\"", src))
   expect_true(grepl("\\.np_progress_bandwidth_multistart_step\\(done = i, total = nmulti\\)", src))
   expect_true(grepl("Backfitting smooth coefficient bandwidth", src, fixed = TRUE))
   expect_true(grepl("Optimizing partial residual bandwidth", src, fixed = TRUE))
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
+})
+
+test_that("npplregbw direct path uses coordinated bandwidth selector", {
+  src_path <- testthat::test_path("..", "..", "R", "np.plregression.bw.R")
+  skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("\\.np_progress_select_bandwidth_enhanced\\(\\s*\"Selecting partially linear regression bandwidth\"", src))
+  expect_true(grepl("\\.np_progress_bandwidth_set_coordinator\\(", src))
+  expect_true(grepl("\\.np_progress_bandwidth_set_coordinator_group\\(", src))
 })
 
 test_that("plot helpers use central progress core", {

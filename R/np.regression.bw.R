@@ -461,7 +461,7 @@ npregbw.default <-
       nms <- mc.names[m]
       bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
-    tbw <- .np_progress_select_bandwidth(
+    tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting regression bandwidth",
       do.call(npregbw.rbandwidth, bwsel.args)
     )
