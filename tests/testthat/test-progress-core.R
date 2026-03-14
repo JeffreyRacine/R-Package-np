@@ -615,6 +615,22 @@ test_that("plot progress can repaint on elapsed time before the first checkpoint
   expect_true(grepl("\\[np\\] Preparing plot bootstrap inid 2/50", output))
 })
 
+test_that("plot progress default cadence matches bandwidth heartbeat", {
+  plot_interval <- getFromNamespace(".np_plot_progress_interval_sec", "np")
+  begin <- getFromNamespace(".np_progress_begin", "np")
+
+  old_opts <- options(
+    np.plot.progress.interval.sec = NULL,
+    np.progress.interval.unknown.sec = NULL,
+    np.progress.interval.known.sec = NULL
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  expect_identical(plot_interval(), 2.0)
+  expect_identical(begin("Bandwidth selection")$throttle_sec, 2.0)
+  expect_identical(begin("Bootstrap replications", total = 10L)$throttle_sec, 0.5)
+})
+
 test_that("interactive bootstrap chunk sizes leave room for intermediate progress", {
   progress_chunk_cap <- getFromNamespace(".np_plot_progress_chunk_cap", "np")
   wild_chunk <- getFromNamespace(".np_wild_chunk_size", "np")

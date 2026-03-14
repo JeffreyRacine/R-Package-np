@@ -38,10 +38,7 @@
 }
 
 .np_plot_progress_interval_sec <- function() {
-  val <- suppressWarnings(as.numeric(getOption("np.plot.progress.interval.sec", 0.5))[1L])
-  if (!is.finite(val) || is.na(val) || val < 0)
-    val <- 0.5
-  val
+  .np_progress_interval_sec(known_total = FALSE, domain = "plot")
 }
 
 .np_plot_progress_start_grace_sec <- function() {
@@ -333,6 +330,97 @@
   par(mfrow = state$mfrow, cex = par()$cex)
   state$pending <- FALSE
   state
+}
+
+.np_plot_bootstrap_target_names <- function(xdat, names_hint = NULL, prefix = "x") {
+  if (!is.null(xdat)) {
+    xnames <- names(xdat)
+  } else {
+    xnames <- NULL
+  }
+
+  if (is.null(xnames) || !length(xnames)) {
+    xnames <- names_hint
+  }
+
+  if (is.null(xnames))
+    xnames <- character()
+
+  xnames <- as.character(xnames)
+  missing.idx <- !nzchar(xnames)
+  if (any(missing.idx))
+    xnames[missing.idx] <- paste0(prefix, which(missing.idx))
+  xnames
+}
+
+.np_plot_unconditional_surface_eligible <- function(bws, perspective) {
+  isTRUE(perspective) &&
+    isTRUE((bws$ncon + bws$nord) == 2L) &&
+    isTRUE(bws$nuno == 0L) &&
+    !any(xor(bws$xdati$iord, bws$xdati$inumord))
+}
+
+.np_plot_unconditional_eval_size <- function(x, neval) {
+  if (is.factor(x) || is.ordered(x))
+    return(length(levels(x)))
+
+  as.integer(neval)[1L]
+}
+
+.np_plot_bootstrap_phase_labels <- function(plot.errors.type) {
+  band.type <- as.character(plot.errors.type)[1L]
+  c(
+    preparing = "preparing",
+    bootstrap = "bootstrapping",
+    constructing = sprintf("constructing %s bands", band.type)
+  )
+}
+
+.np_plot_bootstrap_plan_unconditional_density <- function(bws,
+                                                          xdat,
+                                                          neval,
+                                                          perspective,
+                                                          plot.errors.boot.method,
+                                                          plot.errors.type) {
+  xdat <- toFrame(xdat)
+  neval <- as.integer(neval)[1L]
+  if (is.na(neval) || neval < 1L)
+    stop("'neval' must be a positive integer", call. = FALSE)
+
+  xnames <- .np_plot_bootstrap_target_names(
+    xdat = xdat,
+    names_hint = bws$xnames,
+    prefix = "x"
+  )
+
+  if (.np_plot_unconditional_surface_eligible(bws = bws, perspective = perspective)) {
+    x1.size <- .np_plot_unconditional_eval_size(xdat[[1L]], neval)
+    x2.size <- .np_plot_unconditional_eval_size(xdat[[2L]], neval)
+    targets <- list(list(
+      index = 1L,
+      kind = "surface",
+      label = sprintf("%s,%s surface", xnames[[1L]], xnames[[2L]]),
+      eval_size = as.integer(x1.size * x2.size)
+    ))
+  } else {
+    targets <- lapply(seq_len(bws$ndim), function(i) {
+      list(
+        index = as.integer(i),
+        kind = "slice",
+        label = xnames[[i]],
+        eval_size = .np_plot_unconditional_eval_size(xdat[[i]], neval)
+      )
+    })
+  }
+
+  list(
+    family = "unconditional_density",
+    method_label = as.character(plot.errors.boot.method)[1L],
+    band_type = as.character(plot.errors.type)[1L],
+    phase_labels = .np_plot_bootstrap_phase_labels(plot.errors.type),
+    target_total = length(targets),
+    targets = targets
+  )
 }
 
 .np_mammen_draws <- function(n, B) {
