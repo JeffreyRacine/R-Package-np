@@ -364,6 +364,57 @@
   compacted
 }
 
+.np_progress_compact_bandwidth_line <- function(line, max_width) {
+  if (!is.character(line) || length(line) != 1L || is.na(line)) {
+    return(line)
+  }
+
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return(line)
+  }
+
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  matches <- regexec("^(.+Bandwidth selection) \\((.+)\\)$", line)
+  capture <- regmatches(line, matches)[[1L]]
+  if (length(capture) != 3L) {
+    return(line)
+  }
+
+  prefix <- capture[[2L]]
+  fields <- strsplit(capture[[3L]], ", ", fixed = TRUE)[[1L]]
+  if (!length(fields)) {
+    return(line)
+  }
+
+  render <- function(parts) {
+    sprintf("%s (%s)", prefix, paste(parts, collapse = ", "))
+  }
+
+  abbreviate_fields <- function(parts) {
+    compacted <- parts
+    compacted <- sub("^multistart ([0-9]+/[0-9]+)$", "\\1", compacted)
+    compacted <- sub("^iteration ", "iter ", compacted)
+    compacted
+  }
+
+  candidates <- list(
+    render(fields),
+    render(abbreviate_fields(fields))
+  )
+
+  for (candidate in candidates) {
+    if (nchar(candidate, type = "width") <= max_width) {
+      return(candidate)
+    }
+  }
+
+  line
+}
+
 .np_progress_fit_single_line <- function(line, max_width = .np_progress_output_width()) {
   if (!is.character(line) || length(line) != 1L || is.na(line)) {
     return(line)
@@ -379,6 +430,11 @@
   }
 
   line <- .np_progress_compact_single_line(line, max_width = max_width)
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
+  line <- .np_progress_compact_bandwidth_line(line, max_width = max_width)
   if (nchar(line, type = "width") <= max_width) {
     return(line)
   }

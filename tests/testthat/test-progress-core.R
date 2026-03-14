@@ -456,6 +456,32 @@ test_that("single-line fit keeps smooth coefficient bandwidth lines readable at 
   )
 })
 
+test_that("single-line fit preserves readable bandwidth fields at 80 columns", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+
+  line <- "[np] Bandwidth selection (multistart 2/2, iteration 31, elapsed 10.6s, 62.4%, eta 6.4s)"
+  fitted <- fit(line, max_width = 80)
+
+  expect_lte(nchar(fitted, type = "width"), 80L)
+  expect_identical(
+    fitted,
+    "[np] Bandwidth selection (2/2, iter 31, elapsed 10.6s, 62.4%, eta 6.4s)"
+  )
+})
+
+test_that("single-line fit preserves readable coordinator bandwidth fields at 80 columns", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+
+  line <- "[np] Bandwidth selection (y~z, multistart 2/2, iteration 31, elapsed 10.6s, 62.4%, eta 6.4s)"
+  fitted <- fit(line, max_width = 80)
+
+  expect_lte(nchar(fitted, type = "width"), 80L)
+  expect_identical(
+    fitted,
+    "[np] Bandwidth selection (y~z, 2/2, iter 31, elapsed 10.6s, 62.4%, eta 6.4s)"
+  )
+})
+
 test_that("single-line fit compacts plot bootstrap labels so prep detail survives", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 
