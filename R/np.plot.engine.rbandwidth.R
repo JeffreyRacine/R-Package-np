@@ -209,17 +209,23 @@
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
       if (plot.errors.method == "asymptotic") {
-        engine.trace(
-          event = "npreg.start",
-          fields = list(slice = 0L, gradients = gradients, n_eval = nrow(x.eval))
-        )
-        tobj = npreg(txdat = xdat, tydat = ydat,
-          exdat = x.eval, bws = bws,
-          gradient.order = gradient.order,
-          warn.glp.gradient = FALSE)
-        engine.trace(
-          event = "npreg.done",
-          fields = list(slice = 0L, gradients = gradients, n_eval = length(tobj$mean))
+        tobj <- .np_plot_activity_run(
+          "Computing regression plot asymptotic fit",
+          {
+            engine.trace(
+              event = "npreg.start",
+              fields = list(slice = 0L, gradients = gradients, n_eval = nrow(x.eval))
+            )
+            tobj = npreg(txdat = xdat, tydat = ydat,
+              exdat = x.eval, bws = bws,
+              gradient.order = gradient.order,
+              warn.glp.gradient = FALSE)
+            engine.trace(
+              event = "npreg.done",
+              fields = list(slice = 0L, gradients = gradients, n_eval = length(tobj$mean))
+            )
+            tobj
+          }
         )
       } else if (!identical(bws$type, "fixed")) {
         engine.trace(
@@ -239,21 +245,26 @@
           fields = list(slice = 0L, gradients = gradients, n_eval = length(tobj$mean))
         )
       } else {
-        engine.trace(
-          event = "hat.apply.start",
-          fields = list(slice = 0L, gradients = gradients, n_eval = nrow(x.eval))
-        )
-        mean.hat <- rbw_hat_apply(
-          eval.df = x.eval,
-          s.vec = if (bws$ncon > 0L) integer(bws$ncon) else NULL
-        )
-        engine.trace(
-          event = "hat.apply.done",
-          fields = list(slice = 0L, gradients = gradients, n_eval = length(mean.hat))
-        )
-        tobj <- list(
-          mean = mean.hat,
-          merr = rep_len(NA_real_, length(mean.hat))
+        tobj <- .np_plot_activity_run(
+          "Computing regression plot fit",
+          {
+            engine.trace(
+              event = "hat.apply.start",
+              fields = list(slice = 0L, gradients = gradients, n_eval = nrow(x.eval))
+            )
+            mean.hat <- rbw_hat_apply(
+              eval.df = x.eval,
+              s.vec = if (bws$ncon > 0L) integer(bws$ncon) else NULL
+            )
+            engine.trace(
+              event = "hat.apply.done",
+              fields = list(slice = 0L, gradients = gradients, n_eval = length(mean.hat))
+            )
+            list(
+              mean = mean.hat,
+              merr = rep_len(NA_real_, length(mean.hat))
+            )
+          }
         )
       }
 
@@ -539,42 +550,54 @@
         if (!gradients &&
             plot.errors.method != "asymptotic" &&
             identical(bws$type, "fixed")) {
-          engine.trace(
-            event = "hat.apply.start",
-            fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
-          )
-          tr <- list(
-            mean = rbw_hat_apply(
-              eval.df = eval.slice,
-              s.vec = if (bws$ncon > 0L) integer(bws$ncon) else NULL
-            ),
-            merr = rep_len(NA_real_, xi.neval)
-          )
-          engine.trace(
-            event = "hat.apply.done",
-            fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
+          tr <- .np_plot_activity_run(
+            "Computing regression plot fit",
+            {
+              engine.trace(
+                event = "hat.apply.start",
+                fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
+              )
+              tr <- list(
+                mean = rbw_hat_apply(
+                  eval.df = eval.slice,
+                  s.vec = if (bws$ncon > 0L) integer(bws$ncon) else NULL
+                ),
+                merr = rep_len(NA_real_, xi.neval)
+              )
+              engine.trace(
+                event = "hat.apply.done",
+                fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
+              )
+              tr
+            }
           )
         } else if (plot.errors.method == "asymptotic") {
-          engine.trace(
-            event = "npreg.start",
-            fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
-          )
-          tr <- if (gradients && identical(bws$regtype, "lp")) {
-            suppressWarnings(npreg(txdat = xdat, tydat = ydat,
-              exdat = eval.slice, bws = bws,
-              gradients = gradients,
-              gradient.order = gradient.order,
-              warn.glp.gradient = FALSE))
-          } else {
-            npreg(txdat = xdat, tydat = ydat,
-              exdat = eval.slice, bws = bws,
-              gradients = gradients,
-              gradient.order = gradient.order,
-              warn.glp.gradient = FALSE)
-          }
-          engine.trace(
-            event = "npreg.done",
-            fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
+          tr <- .np_plot_activity_run(
+            "Computing regression plot asymptotic fit",
+            {
+              engine.trace(
+                event = "npreg.start",
+                fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
+              )
+              tr <- if (gradients && identical(bws$regtype, "lp")) {
+                suppressWarnings(npreg(txdat = xdat, tydat = ydat,
+                  exdat = eval.slice, bws = bws,
+                  gradients = gradients,
+                  gradient.order = gradient.order,
+                  warn.glp.gradient = FALSE))
+              } else {
+                npreg(txdat = xdat, tydat = ydat,
+                  exdat = eval.slice, bws = bws,
+                  gradients = gradients,
+                  gradient.order = gradient.order,
+                  warn.glp.gradient = FALSE)
+              }
+              engine.trace(
+                event = "npreg.done",
+                fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
+              )
+              tr
+            }
           )
         } else {
           engine.trace(
