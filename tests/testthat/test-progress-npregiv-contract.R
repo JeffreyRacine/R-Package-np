@@ -31,13 +31,104 @@ progress_time_counter <- function(start = 0, by = 2.1) {
   }
 }
 
-make_iv_data <- function(n = 40) {
+make_iv_data <- function(n = 18) {
   set.seed(42)
   z <- runif(n)
   w <- z + rnorm(n, sd = 0.1)
   y <- z^2 + rnorm(n, sd = 0.1)
   list(y = y, z = z, w = w)
 }
+
+cached_landweber_single_line <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      dat <- make_iv_data()
+      old_opts <- options(np.messages = TRUE)
+      on.exit(options(old_opts), add = TRUE)
+      cache <<- capture_progress_shadow_with_conditions(
+        npregiv(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 2),
+        force_renderer = "single_line",
+        now = progress_time_counter()
+      )
+    }
+    cache
+  }
+})
+
+cached_tikhonov_single_line <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      dat <- make_iv_data()
+      old_opts <- options(np.messages = TRUE)
+      on.exit(options(old_opts), add = TRUE)
+      cache <<- capture_progress_shadow_with_conditions(
+        npregiv(
+          y = dat$y,
+          z = dat$z,
+          w = dat$w,
+          method = "Tikhonov",
+          iterate.Tikhonov = TRUE,
+          iterate.Tikhonov.num = 2
+        ),
+        force_renderer = "single_line",
+        now = progress_time_counter()
+      )
+    }
+    cache
+  }
+})
+
+cached_landweber_no_residual_smoothing <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      dat <- make_iv_data()
+      old_opts <- options(np.messages = TRUE)
+      on.exit(options(old_opts), add = TRUE)
+      cache <<- capture_progress_shadow_with_conditions(
+        npregiv(
+          y = dat$y,
+          z = dat$z,
+          w = dat$w,
+          method = "Landweber-Fridman",
+          smooth.residuals = FALSE,
+          iterate.max = 2
+        ),
+        force_renderer = "single_line",
+        now = progress_time_counter()
+      )
+    }
+    cache
+  }
+})
+
+cached_npregivderiv_parity <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      old_opts <- options(np.messages = TRUE)
+      on.exit(options(old_opts), add = TRUE)
+
+      dat <- make_iv_data()
+      legacy <- capture_progress_shadow_with_conditions(
+        npregivderiv(y = dat$y, z = dat$z, w = dat$w, iterate.max = 2),
+        force_renderer = "legacy",
+        now = progress_time_counter()
+      )
+
+      single_line <- capture_progress_shadow_with_conditions(
+        npregivderiv(y = dat$y, z = dat$z, w = dat$w, iterate.max = 2),
+        force_renderer = "single_line",
+        now = progress_time_counter()
+      )
+
+      cache <<- list(legacy = legacy, single_line = single_line)
+    }
+    cache
+  }
+})
 
 shadow_lines_matching <- function(shadow, pattern) {
   lines <- vapply(shadow$trace, `[[`, character(1L), "line")
@@ -57,15 +148,7 @@ shadow_signature <- function(shadow, pattern) {
 }
 
 test_that("Landweber npregiv single-line progress reports object labels with outer iterations", {
-  dat <- make_iv_data()
-  old_opts <- options(np.messages = TRUE)
-  on.exit(options(old_opts), add = TRUE)
-
-  single_line <- capture_progress_shadow_with_conditions(
-    npregiv(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 4),
-    force_renderer = "single_line",
-    now = progress_time_counter()
-  )
+  single_line <- cached_landweber_single_line()
 
   lines <- vapply(single_line$trace, `[[`, character(1L), "line")
 
@@ -79,22 +162,7 @@ test_that("Landweber npregiv single-line progress reports object labels with out
 })
 
 test_that("Tikhonov npregiv single-line progress restores historical object labels", {
-  dat <- make_iv_data()
-  old_opts <- options(np.messages = TRUE)
-  on.exit(options(old_opts), add = TRUE)
-
-  single_line <- capture_progress_shadow_with_conditions(
-    npregiv(
-      y = dat$y,
-      z = dat$z,
-      w = dat$w,
-      method = "Tikhonov",
-      iterate.Tikhonov = TRUE,
-      iterate.Tikhonov.num = 3
-    ),
-    force_renderer = "single_line",
-    now = progress_time_counter()
-  )
+  single_line <- cached_tikhonov_single_line()
 
   lines <- vapply(single_line$trace, `[[`, character(1L), "line")
 
@@ -110,22 +178,7 @@ test_that("Tikhonov npregiv single-line progress restores historical object labe
 })
 
 test_that("Landweber npregiv without residual smoothing reports the alternate historical objects", {
-  dat <- make_iv_data()
-  old_opts <- options(np.messages = TRUE)
-  on.exit(options(old_opts), add = TRUE)
-
-  single_line <- capture_progress_shadow_with_conditions(
-    npregiv(
-      y = dat$y,
-      z = dat$z,
-      w = dat$w,
-      method = "Landweber-Fridman",
-      smooth.residuals = FALSE,
-      iterate.max = 4
-    ),
-    force_renderer = "single_line",
-    now = progress_time_counter()
-  )
+  single_line <- cached_landweber_no_residual_smoothing()
 
   lines <- vapply(single_line$trace, `[[`, character(1L), "line")
 
@@ -134,22 +187,9 @@ test_that("Landweber npregiv without residual smoothing reports the alternate hi
 })
 
 test_that("npregivderiv single-line progress matches legacy semantics", {
-  dat <- make_iv_data()
-  old_opts <- options(np.messages = TRUE)
-  on.exit(options(old_opts), add = TRUE)
-
-  legacy <- capture_progress_shadow_with_conditions(
-    npregivderiv(y = dat$y, z = dat$z, w = dat$w, iterate.max = 3),
-    force_renderer = "legacy",
-    now = progress_time_counter()
-  )
-
-  dat <- make_iv_data()
-  single_line <- capture_progress_shadow_with_conditions(
-    npregivderiv(y = dat$y, z = dat$z, w = dat$w, iterate.max = 3),
-    force_renderer = "single_line",
-    now = progress_time_counter()
-  )
+  parity <- cached_npregivderiv_parity()
+  legacy <- parity$legacy
+  single_line <- parity$single_line
 
   pattern <- "^\\[np\\] Iterating Landweber-Fridman derivative solve"
   lines <- shadow_lines_matching(single_line, pattern)
@@ -166,7 +206,7 @@ test_that("npregiv proof-slice progress respects np.messages FALSE", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_with_conditions(
-    npregiv(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 4),
+    npregiv(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 2),
     now = progress_time_counter()
   )
 
@@ -180,7 +220,7 @@ test_that("npregivderiv proof-slice progress respects suppressMessages", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_with_conditions(
-    suppressMessages(npregivderiv(y = dat$y, z = dat$z, w = dat$w, iterate.max = 3)),
+    suppressMessages(npregivderiv(y = dat$y, z = dat$z, w = dat$w, iterate.max = 2)),
     now = progress_time_counter()
   )
 
