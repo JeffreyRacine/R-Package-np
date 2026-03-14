@@ -278,6 +278,7 @@
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
+          progress.target = "surf 1/1",
           bws = bws)
         terr <- terr.obj[["boot.err"]]
         terr.all <- terr.obj[["boot.all.err"]]
@@ -677,6 +678,12 @@
                         plot.errors.center = plot.errors.center,
                         plot.errors.type = plot.errors.type,
                         plot.errors.alpha = plot.errors.alpha,
+                        progress.target = .np_plot_conditional_bootstrap_target_label(
+                          bws = bws,
+                          slice.index = plot.index,
+                          gradients = gradients,
+                          gradient.index = j
+                        ),
                         bws = bws)
               temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
               temp.all.err <- temp.boot[["boot.all.err"]]
@@ -888,6 +895,12 @@
                           plot.errors.center = plot.errors.center,
                           plot.errors.type = plot.errors.type,
                           plot.errors.alpha = plot.errors.alpha,
+                          progress.target = .np_plot_conditional_bootstrap_target_label(
+                            bws = bws,
+                            slice.index = plot.index,
+                            gradients = gradients,
+                            gradient.index = j
+                          ),
                           bws = bws)
                 temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
                 temp.all.err <- temp.boot[["boot.all.err"]]

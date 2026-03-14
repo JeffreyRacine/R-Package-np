@@ -476,6 +476,46 @@
   sprintf("%s %d/%d", target_name, slice.index, total)
 }
 
+.np_plot_conditional_bootstrap_target_label <- function(bws,
+                                                        slice.index,
+                                                        gradients = FALSE,
+                                                        gradient.index = 0L) {
+  slice.index <- suppressWarnings(as.integer(slice.index)[1L])
+  gradient.index <- suppressWarnings(as.integer(gradient.index)[1L])
+  x_total <- suppressWarnings(as.integer(bws$xndim)[1L])
+  y_total <- suppressWarnings(as.integer(bws$yndim)[1L])
+  if (is.na(x_total) || x_total < 0L) x_total <- 0L
+  if (is.na(y_total) || y_total < 0L) y_total <- 0L
+  total <- max(1L, x_total + y_total)
+
+  if (is.na(slice.index) || slice.index <= 0L) {
+    return("surf 1/1")
+  }
+
+  if (slice.index <= x_total) {
+    target_name <- .np_plot_progress_target_name(
+      if (!is.null(bws$xnames) && length(bws$xnames) >= slice.index) bws$xnames[[slice.index]] else NULL,
+      sprintf("x%d", slice.index)
+    )
+  } else {
+    y_index <- slice.index - x_total
+    target_name <- .np_plot_progress_target_name(
+      if (!is.null(bws$ynames) && length(bws$ynames) >= y_index) bws$ynames[[y_index]] else NULL,
+      sprintf("y%d", y_index)
+    )
+  }
+
+  if (isTRUE(gradients) && !is.na(gradient.index) && gradient.index > 0L) {
+    grad_name <- .np_plot_progress_target_name(
+      if (!is.null(bws$xnames) && length(bws$xnames) >= gradient.index) bws$xnames[[gradient.index]] else NULL,
+      sprintf("x%d", gradient.index)
+    )
+    target_name <- sprintf("grad %s on %s", grad_name, target_name)
+  }
+
+  sprintf("%s %d/%d", target_name, slice.index, total)
+}
+
 .np_mammen_draws <- function(n, B) {
   a <- (1 - sqrt(5)) / 2
   p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
@@ -2581,7 +2621,8 @@
 .np_plot_boot_from_frozen_operator <- function(H,
                                                B,
                                                counts = NULL,
-                                               counts.drawer = NULL) {
+                                               counts.drawer = NULL,
+                                               progress.label = NULL) {
   H <- as.matrix(H)
   storage.mode(H) <- "double"
   B <- as.integer(B)
@@ -2600,7 +2641,11 @@
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -3477,7 +3522,8 @@
 .np_inid_boot_from_conditional_localpoly_fixed_core <- function(state,
                                                                 B,
                                                                 counts = NULL,
-                                                                counts.drawer = NULL) {
+                                                                counts.drawer = NULL,
+                                                                progress.label = NULL) {
   B <- as.integer(B)
   feat.list <- lapply(seq_len(state$ngroups), function(i) {
     .np_inid_boot_from_conditional_localpoly_fixed_group_features(state = state, i = i)
@@ -3488,7 +3534,11 @@
     t0[feat$rows] <- .np_inid_boot_from_conditional_localpoly_fixed_t0(state = state, feat = feat)
 
   tmat <- matrix(NA_real_, nrow = B, ncol = state$neval)
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -3545,7 +3595,8 @@
                                                            B,
                                                            cdf,
                                                            counts = NULL,
-                                                           counts.drawer = NULL) {
+                                                           counts.drawer = NULL,
+                                                           progress.label = NULL) {
   state <- .np_inid_boot_from_conditional_localpoly_fixed_precompute(
     xdat = xdat,
     ydat = ydat,
@@ -3559,7 +3610,8 @@
     state = state,
     B = B,
     counts = counts,
-    counts.drawer = counts.drawer
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
   )
 }
 
@@ -3571,7 +3623,8 @@
                                                       B,
                                                       cdf,
                                                       counts = NULL,
-                                                      counts.drawer = NULL) {
+                                                      counts.drawer = NULL,
+                                                      progress.label = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -3695,7 +3748,11 @@
     t0 <- fit_one_matrix(x.train = xmat, xy.train = xymat)
     tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
     counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
-    progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+    progress.label <- if (is.null(progress.label)) {
+      if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+    } else {
+      progress.label
+    }
     progress <- .np_plot_progress_begin(total = B, label = progress.label)
     on.exit({
       .np_plot_progress_end(progress)
@@ -3745,7 +3802,11 @@
   t0 <- fit_one(x.train = xdat, y.train = ydat)
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -3800,7 +3861,8 @@
                                                 B,
                                                 cdf,
                                                 counts = NULL,
-                                                counts.drawer = NULL) {
+                                                counts.drawer = NULL,
+                                                progress.label = NULL) {
   regtype <- .np_con_xregtype(bws)
 
   if (!identical(bws$type, "fixed")) {
@@ -3813,7 +3875,8 @@
       B = B,
       cdf = cdf,
       counts = counts,
-      counts.drawer = counts.drawer
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
     ))
   }
 
@@ -3827,7 +3890,8 @@
       B = B,
       cdf = cdf,
       counts = counts,
-      counts.drawer = counts.drawer
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
     ))
   }
 
@@ -3870,7 +3934,11 @@
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -3910,7 +3978,8 @@
                                                       B,
                                                       cdf,
                                                       counts = NULL,
-                                                      counts.drawer = NULL) {
+                                                      counts.drawer = NULL,
+                                                      progress.label = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -3930,7 +3999,8 @@
     H = H,
     B = B,
     counts = counts,
-    counts.drawer = counts.drawer
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
   )
 }
 
@@ -4493,7 +4563,8 @@ plotFactor <- function(f, y, ...){
                                                           cdf,
                                                           gradient.index,
                                                           counts = NULL,
-                                                          counts.drawer = NULL) {
+                                                          counts.drawer = NULL,
+                                                          progress.label = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -4521,7 +4592,11 @@ plotFactor <- function(f, y, ...){
   t0 <- fit.fun(x.train = xdat, y.train = ydat)
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -4570,7 +4645,8 @@ plotFactor <- function(f, y, ...){
                                                        tau,
                                                        gradient.index,
                                                        counts = NULL,
-                                                       counts.drawer = NULL) {
+                                                       counts.drawer = NULL,
+                                                       progress.label = NULL) {
   xdat <- toFrame(xdat)
   ydat <- as.double(ydat)
   exdat <- toFrame(exdat)
@@ -4596,7 +4672,11 @@ plotFactor <- function(f, y, ...){
   t0 <- fit.fun(x.train = xdat, y.train = ydat)
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -6290,11 +6370,24 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.center,
            plot.errors.type,
            plot.errors.alpha,
+           progress.target = NULL,
            ...,
            bws){
-    activity <- .np_plot_activity_begin(
-      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+    prep.label <- .np_plot_bootstrap_stage_label(
+      stage = "Preparing plot bootstrap",
+      method_label = plot.errors.boot.method,
+      target_label = progress.target
     )
+    progress.label <- .np_plot_bootstrap_stage_label(
+      stage = "Plot bootstrap",
+      target_label = progress.target
+    )
+    interval.label <- .np_plot_bootstrap_stage_label(
+      stage = sprintf("Constructing bootstrap %s bands", plot.errors.type),
+      target_label = progress.target
+    )
+
+    activity <- .np_plot_activity_begin(prep.label)
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.conbandwidth")
     exdat = toFrame(exdat)
@@ -6355,7 +6448,8 @@ compute.bootstrap.errors.conbandwidth =
             bws = bws,
             B = plot.errors.boot.num,
             cdf = cdf,
-            counts.drawer = counts.drawer
+            counts.drawer = counts.drawer,
+            progress.label = progress.label
           )
         } else {
           .np_inid_boot_from_ksum_conditional(
@@ -6366,7 +6460,8 @@ compute.bootstrap.errors.conbandwidth =
             bws = bws,
             B = plot.errors.boot.num,
             cdf = cdf,
-            counts.drawer = counts.drawer
+            counts.drawer = counts.drawer,
+            progress.label = progress.label
           )
         },
         error = function(e) {
@@ -6399,7 +6494,8 @@ compute.bootstrap.errors.conbandwidth =
           B = plot.errors.boot.num,
           cdf = cdf,
           gradient.index = gradient.index,
-          counts.drawer = counts.drawer
+          counts.drawer = counts.drawer,
+          progress.label = progress.label
         ),
         error = function(e) {
           stop(sprintf("%s conditional gradient bootstrap helper failed in compute.bootstrap.errors.conbandwidth (%s)",
@@ -6430,7 +6526,8 @@ compute.bootstrap.errors.conbandwidth =
           B = plot.errors.boot.num,
           tau = tau,
           gradient.index = gradient.index,
-          counts.drawer = counts.drawer
+          counts.drawer = counts.drawer,
+          progress.label = progress.label
         ),
         error = function(e) {
           stop(sprintf("%s quantile gradient bootstrap helper failed in compute.bootstrap.errors.conbandwidth (%s)",
@@ -6474,7 +6571,8 @@ compute.bootstrap.errors.conbandwidth =
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
-        band.type = plot.errors.type
+        band.type = plot.errors.type,
+        progress.label = interval.label
       )
       boot.err[,1:2] <- interval.summary$err
       boot.all.err <- interval.summary$all.err
