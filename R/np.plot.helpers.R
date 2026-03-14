@@ -2411,7 +2411,8 @@
                                      B,
                                      counts = NULL,
                                      counts.drawer = NULL,
-                                     ridge = 1.0e-12) {
+                                     ridge = 1.0e-12,
+                                     progress.label = NULL) {
   txdat <- toFrame(txdat)
   tzdat <- toFrame(tzdat)
   exdat <- toFrame(exdat)
@@ -2513,6 +2514,15 @@
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   xres.train.b <- matrix(0.0, nrow = n, ncol = p)
   xres.eval.b <- matrix(0.0, nrow = neval, ncol = p)
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
 
   for (b in seq_len(B)) {
     for (j in seq_len(p)) {
@@ -2527,6 +2537,7 @@
       ridge = ridge
     )
     tmat[b, ] <- y.eval$t[b, ] + as.vector(xres.eval.b %*% beta.b)
+    progress <- .np_plot_progress_tick(state = progress, done = b)
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
@@ -6151,6 +6162,7 @@ compute.bootstrap.errors.plbandwidth =
            exdat, ezdat,
            gradients,
            slice.index,
+           progress.target = NULL,
            plot.errors.boot.method,
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
@@ -6160,8 +6172,26 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    if (is.null(progress.target)) {
+      progress.target <- .np_plot_scoef_bootstrap_target_label(
+        bws = bws,
+        slice.index = slice.index
+      )
+    }
+    prep.label <- .np_plot_bootstrap_stage_label(
+      stage = sprintf("Preparing plot bootstrap %s", plot.errors.boot.method),
+      target_label = progress.target
+    )
+    progress.label <- .np_plot_bootstrap_stage_label(
+      stage = "Plot bootstrap",
+      target_label = progress.target
+    )
+    interval.label <- .np_plot_bootstrap_stage_label(
+      stage = sprintf("Constructing bootstrap %s bands", plot.errors.type),
+      target_label = progress.target
+    )
     activity <- .np_plot_activity_begin(
-      sprintf("Preparing plot bootstrap %s", plot.errors.boot.method)
+      prep.label
     )
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.plbandwidth")
@@ -6198,7 +6228,8 @@ compute.bootstrap.errors.plbandwidth =
         ydat = ydat,
         fit.mean = fit.mean,
         B = plot.errors.boot.num,
-        wild = plot.errors.boot.wild
+        wild = plot.errors.boot.wild,
+        progress.label = progress.label
       )
     } else {
       boot.out <- NULL
@@ -6211,7 +6242,8 @@ compute.bootstrap.errors.plbandwidth =
             exdat = exdat,
             ezdat = ezdat,
             bws = bws,
-            B = plot.errors.boot.num
+            B = plot.errors.boot.num,
+            progress.label = progress.label
           ),
           error = function(e) {
             stop(sprintf("inid plreg helper failed in compute.bootstrap.errors.plbandwidth (%s)",
@@ -6235,7 +6267,8 @@ compute.bootstrap.errors.plbandwidth =
             ezdat = ezdat,
             bws = bws,
             B = plot.errors.boot.num,
-            counts.drawer = counts.drawer
+            counts.drawer = counts.drawer,
+            progress.label = progress.label
           ),
           error = function(e) {
             stop(sprintf("%s plreg helper failed in compute.bootstrap.errors.plbandwidth (%s)",
@@ -6280,7 +6313,8 @@ compute.bootstrap.errors.plbandwidth =
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
-        band.type = plot.errors.type
+        band.type = plot.errors.type,
+        progress.label = interval.label
       )
       boot.err[,1:2] <- interval.summary$err
       boot.all.err <- interval.summary$all.err

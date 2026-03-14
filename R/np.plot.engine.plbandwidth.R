@@ -302,6 +302,7 @@
           exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE],
           gradients = FALSE,
           slice.index = 0,
+          progress.target = "surf 1/1",
           plot.errors.boot.method = plot.errors.boot.method,
           plot.errors.boot.wild = plot.errors.boot.wild,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -553,6 +554,10 @@
                       ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
                       gradients = gradients,
                       slice.index = plot.index,
+                      progress.target = .np_plot_scoef_bootstrap_target_label(
+                        bws = bws,
+                        slice.index = plot.index
+                      ),
                       plot.errors.boot.method = plot.errors.boot.method,
                       plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -739,6 +744,10 @@
                       ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                       gradients = gradients,
                       slice.index = plot.index,
+                      progress.target = .np_plot_scoef_bootstrap_target_label(
+                        bws = bws,
+                        slice.index = plot.index
+                      ),
                       plot.errors.boot.method = plot.errors.boot.method,
                       plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
