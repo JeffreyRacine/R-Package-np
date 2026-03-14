@@ -119,6 +119,10 @@
   env$bandwidth_label <- NULL
   env$bandwidth_state <- NULL
   env$bandwidth_old_messages <- NULL
+  env$iv_depth <- 0L
+  env$iv_label <- NULL
+  env$iv_state <- NULL
+  env$iv_old_messages <- NULL
   env$force_enabled <- FALSE
   env
 })
@@ -521,6 +525,10 @@
   isTRUE(getOption("np.progress.bandwidth.enhanced", FALSE))
 }
 
+.np_progress_iv_enhanced_state <- function(state) {
+  isTRUE(state$iv_progress_common)
+}
+
 .np_progress_bandwidth_enhanced_state <- function(state) {
   isTRUE(state$bandwidth_progress_common)
 }
@@ -531,6 +539,44 @@
 
 .np_progress_bandwidth_title <- function() {
   "Bandwidth selection"
+}
+
+.np_progress_iv_title <- function() {
+  "IV regression"
+}
+
+.np_progress_iv_initialize_state <- function(state) {
+  state$iv_progress_common <- TRUE
+  state$iv_object_label <- NULL
+  state$iv_iteration <- NULL
+  state$start_note <- sprintf(
+    "%s %s...",
+    state$pkg_prefix,
+    .np_progress_iv_title()
+  )
+  state
+}
+
+.np_progress_iv_format_line <- function(state, now = .np_progress_now()) {
+  elapsed <- max(0, now - state$started)
+  fields <- character()
+
+  if (!is.null(state$iv_object_label) && nzchar(state$iv_object_label)) {
+    fields <- c(fields, state$iv_object_label)
+  }
+
+  if (!is.null(state$iv_iteration)) {
+    fields <- c(fields, sprintf("iteration %s", format(state$iv_iteration)))
+  }
+
+  fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
+
+  sprintf(
+    "%s %s (%s)",
+    state$pkg_prefix,
+    .np_progress_iv_title(),
+    paste(fields, collapse = ", ")
+  )
 }
 
 .np_progress_bandwidth_initialize_state <- function(state) {
@@ -846,6 +892,13 @@
 }
 
 .np_progress_format_line <- function(state, done = NULL, detail = NULL, now = .np_progress_now()) {
+  if (.np_progress_iv_enhanced_state(state)) {
+    return(.np_progress_iv_format_line(
+      state = state,
+      now = now
+    ))
+  }
+
   if (.np_progress_bandwidth_enhanced_state(state)) {
     return(.np_progress_bandwidth_format_line(
       state = state,
@@ -1128,6 +1181,86 @@
   isTRUE(.np_progress_runtime$bandwidth_depth > 0L)
 }
 
+.np_progress_iv_active <- function() {
+  isTRUE(.np_progress_runtime$iv_depth > 0L)
+}
+
+.np_progress_iv_set_object <- function(label = NULL, iteration = NULL) {
+  state <- .np_progress_runtime$iv_state
+
+  if (is.null(state) || !.np_progress_iv_enhanced_state(state)) {
+    return(invisible(NULL))
+  }
+
+  if (!is.null(label)) {
+    label <- as.character(label)[1L]
+    if (is.na(label) || !nzchar(label)) {
+      label <- NULL
+    }
+  }
+
+  if (!is.null(iteration)) {
+    iteration <- suppressWarnings(as.integer(iteration)[1L])
+    if (is.na(iteration) || iteration < 1L) {
+      iteration <- NULL
+    }
+  }
+
+  state$iv_object_label <- label
+  state$iv_iteration <- iteration
+  .np_progress_runtime$iv_state <- .np_progress_step_at(
+    state = state,
+    now = .np_progress_now(),
+    done = iteration,
+    force = TRUE
+  )
+
+  invisible(NULL)
+}
+
+.np_progress_iv_activity_step <- function(iteration = NULL) {
+  state <- .np_progress_runtime$iv_state
+
+  if (is.null(state) || !.np_progress_iv_enhanced_state(state)) {
+    return(invisible(NULL))
+  }
+
+  if (!is.null(iteration)) {
+    iteration <- suppressWarnings(as.integer(iteration)[1L])
+    if (is.na(iteration) || iteration < 1L) {
+      iteration <- NULL
+    }
+    state$iv_iteration <- iteration
+  }
+
+  .np_progress_runtime$iv_state <- .np_progress_step(
+    state = state,
+    done = state$iv_iteration
+  )
+
+  invisible(NULL)
+}
+
+.np_progress_iv_finish <- function() {
+  state <- .np_progress_runtime$iv_state
+
+  if (is.null(state)) {
+    return(invisible(NULL))
+  }
+
+  .np_progress_runtime$iv_state <- .np_progress_end(state)
+  invisible(NULL)
+}
+
+.np_progress_iv_clear <- function() {
+  .np_progress_runtime$iv_depth <- 0L
+  .np_progress_runtime$iv_label <- NULL
+  .np_progress_runtime$iv_state <- NULL
+  .np_progress_runtime$iv_old_messages <- NULL
+  .np_progress_runtime$force_enabled <- FALSE
+  invisible(NULL)
+}
+
 .np_progress_bandwidth_detail <- function(done, total) {
   NULL
 }
@@ -1403,6 +1536,38 @@
   .np_progress_with_bandwidth_enhanced(
     .np_progress_select_bandwidth(label = label, expr = expr)
   )
+}
+
+.np_progress_select_iv <- function(label = .np_progress_iv_title(), expr) {
+  starting <- !.np_progress_iv_active()
+  if (starting) {
+    .np_progress_runtime$iv_old_messages <- getOption("np.messages", TRUE)
+    .np_progress_runtime$force_enabled <- isTRUE(.np_progress_runtime$iv_old_messages)
+    options(np.messages = FALSE)
+    .np_progress_runtime$iv_label <- as.character(label)[1L]
+    .np_progress_runtime$iv_state <- .np_progress_iv_initialize_state(
+      .np_progress_begin(
+        label = .np_progress_runtime$iv_label,
+        domain = "general",
+        surface = "iv_solve"
+      )
+    )
+  }
+
+  .np_progress_runtime$iv_depth <- as.integer(.np_progress_runtime$iv_depth) + 1L
+  on.exit({
+    .np_progress_runtime$iv_depth <- max(
+      0L,
+      as.integer(.np_progress_runtime$iv_depth) - 1L
+    )
+    if (starting) {
+      .np_progress_iv_finish()
+      options(np.messages = .np_progress_runtime$iv_old_messages)
+      .np_progress_iv_clear()
+    }
+  }, add = TRUE)
+
+  force(expr)
 }
 
 .np_progress_with_legacy_suppressed <- function(expr) {

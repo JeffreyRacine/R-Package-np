@@ -56,52 +56,33 @@ shadow_signature <- function(shadow, pattern) {
   )
 }
 
-test_that("Landweber npregiv single-line progress matches legacy semantics", {
+test_that("Landweber npregiv single-line progress reports object labels with outer iterations", {
   dat <- make_iv_data()
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  legacy <- capture_progress_shadow_with_conditions(
-    npregiv(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 4),
-    force_renderer = "legacy",
-    now = progress_time_counter()
-  )
-
-  dat <- make_iv_data()
   single_line <- capture_progress_shadow_with_conditions(
     npregiv(y = dat$y, z = dat$z, w = dat$w, method = "Landweber-Fridman", iterate.max = 4),
     force_renderer = "single_line",
     now = progress_time_counter()
   )
 
-  pattern <- "^\\[np\\] Iterating Landweber-Fridman solve"
-  lines <- shadow_lines_matching(single_line, pattern)
+  lines <- vapply(single_line$trace, `[[`, character(1L), "line")
 
   expect_s3_class(single_line$value, "npregiv")
-  expect_equal(shadow_signature(single_line, pattern), shadow_signature(legacy, pattern))
-  expect_true(any(grepl("^\\[np\\] Preparing Landweber-Fridman IV regression$", single_line$messages)))
-  expect_true(any(grepl("^\\[np\\] Iterating Landweber-Fridman solve\\.\\.\\. iteration [0-9]+, elapsed [0-9]+\\.[0-9]s", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[y\\|w\\], elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[[^)]*\\|z\\], elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[y-phi\\(z\\)\\|w\\], iteration 1, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[E\\[y-phi\\(z\\)\\|w\\]\\|z\\], iteration 1, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_false(any(grepl("Iterating Landweber-Fridman solve", lines, fixed = TRUE)))
+  expect_false(any(grepl("%|eta ", lines)))
 })
 
-test_that("Tikhonov npregiv single-line progress matches legacy semantics", {
+test_that("Tikhonov npregiv single-line progress restores historical object labels", {
   dat <- make_iv_data()
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
-  legacy <- capture_progress_shadow_with_conditions(
-    npregiv(
-      y = dat$y,
-      z = dat$z,
-      w = dat$w,
-      method = "Tikhonov",
-      iterate.Tikhonov = TRUE,
-      iterate.Tikhonov.num = 3
-    ),
-    force_renderer = "legacy",
-    now = progress_time_counter()
-  )
-
-  dat <- make_iv_data()
   single_line <- capture_progress_shadow_with_conditions(
     npregiv(
       y = dat$y,
@@ -115,13 +96,41 @@ test_that("Tikhonov npregiv single-line progress matches legacy semantics", {
     now = progress_time_counter()
   )
 
-  pattern <- "^\\[np\\] Iterating Tikhonov solve"
-  lines <- shadow_lines_matching(single_line, pattern)
+  lines <- vapply(single_line$trace, `[[`, character(1L), "line")
 
   expect_s3_class(single_line$value, "npregiv")
-  expect_equal(shadow_signature(single_line, pattern), shadow_signature(legacy, pattern))
-  expect_true(any(grepl("^\\[np\\] Preparing Tikhonov IV regression$", single_line$messages)))
-  expect_true(any(grepl("^\\[np\\] Iterating Tikhonov solve [0-9]+/[0-9]+ \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)(: .*)?$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[y\\|w\\], elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[E\\[y\\|w\\]\\|z\\], elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(alpha, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[phi\\(z\\)\\|w\\], iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[E\\[phi\\(z\\)\\|w\\]\\|z\\], iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(phi\\(z\\), iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_false(any(grepl("Iterating Tikhonov solve", lines, fixed = TRUE)))
+  expect_false(any(grepl("%|eta ", lines)))
+})
+
+test_that("Landweber npregiv without residual smoothing reports the alternate historical objects", {
+  dat <- make_iv_data()
+  old_opts <- options(np.messages = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  single_line <- capture_progress_shadow_with_conditions(
+    npregiv(
+      y = dat$y,
+      z = dat$z,
+      w = dat$w,
+      method = "Landweber-Fridman",
+      smooth.residuals = FALSE,
+      iterate.max = 4
+    ),
+    force_renderer = "single_line",
+    now = progress_time_counter()
+  )
+
+  lines <- vapply(single_line$trace, `[[`, character(1L), "line")
+
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[phi\\(z\\)\\|w\\], iteration 1, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] IV regression \\(E\\[E\\[y\\|w\\]-E\\[phi\\(z\\)\\|w\\]\\|z\\], iteration 1, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
 })
 
 test_that("npregivderiv single-line progress matches legacy semantics", {

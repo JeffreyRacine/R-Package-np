@@ -64,8 +64,8 @@ test_that("npregiv no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_begin\\(\"Iterating Landweber-Fridman solve\"", src))
-  expect_true(grepl("\\.np_progress_begin\\(\"Iterating Tikhonov solve\"", src))
+  expect_true(grepl("\\.np_progress_select_iv\\(", src))
+  expect_true(grepl("\\.np_progress_iv_set_object\\(", src))
   expect_true(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
 })
 
