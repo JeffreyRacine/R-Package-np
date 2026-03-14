@@ -206,6 +206,27 @@ test_that("plot helper activity no longer waits for grace before first render", 
   )
 })
 
+test_that("plot engine setup does not open a graphics device on the null device", {
+  capture.par <- getFromNamespace(".np_plot_capture_par", "np")
+  engine.begin <- getFromNamespace(".np_plot_engine_begin", "np")
+
+  skip_if_not(isTRUE(unname(as.integer(dev.cur())) == 1L))
+
+  before <- unname(as.integer(dev.cur()))
+  on.exit({
+    while (!isTRUE(unname(as.integer(dev.cur())) == 1L)) {
+      dev.off()
+    }
+  }, add = TRUE)
+
+  expect_identical(capture.par(c("mfrow", "cex")), list())
+  expect_identical(unname(as.integer(dev.cur())), before)
+
+  state <- engine.begin(plot.par.mfrow = TRUE)
+  expect_true(is.list(state))
+  expect_identical(unname(as.integer(dev.cur())), before)
+})
+
 test_that("plot helper activity yields the line to nested bounded progress", {
   activity.begin <- getFromNamespace(".np_plot_activity_begin", "np")
   activity.end <- getFromNamespace(".np_plot_activity_end", "np")
