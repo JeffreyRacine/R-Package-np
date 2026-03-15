@@ -85,6 +85,114 @@ test_that("npcdenshat apply mode matches matrix RHS multiplication", {
   expect_equal(hy, H %*% rhs, tolerance = 1e-12)
 })
 
+test_that("npcdenshat matches npcdens on multivariate and mixed common-use evaluation cells", {
+  skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  npcdenshat <- getFromNamespace("npcdenshat", "npRmpi")
+
+  set.seed(20260315)
+  n <- 20
+  x.cont <- data.frame(
+    x1 = sort(runif(n)),
+    x2 = sort(runif(n))
+  )
+  y.cont <- data.frame(y = rnorm(n))
+  ex.cont <- data.frame(
+    x1 = seq(0.1, 0.9, length.out = 7),
+    x2 = seq(0.2, 0.8, length.out = 7)
+  )
+  ey.cont <- data.frame(y = seq(min(y.cont$y), max(y.cont$y), length.out = 7))
+
+  x.mixed <- data.frame(
+    x1 = runif(n),
+    x2 = runif(n),
+    uf = factor(sample(c("a", "b", "c"), n, replace = TRUE)),
+    of = ordered(sample(c("low", "mid", "high"), n, replace = TRUE),
+      levels = c("low", "mid", "high")
+    )
+  )
+  y.mixed <- data.frame(y = rnorm(n))
+  ex.mixed <- data.frame(
+    x1 = seq(0.1, 0.9, length.out = 7),
+    x2 = seq(0.15, 0.85, length.out = 7),
+    uf = factor(rep(c("a", "b"), length.out = 7), levels = levels(x.mixed$uf)),
+    of = ordered(rep(c("low", "high"), length.out = 7), levels = levels(x.mixed$of))
+  )
+  ey.mixed <- data.frame(y = seq(min(y.mixed$y), max(y.mixed$y), length.out = 7))
+
+  cases <- list(
+    list(
+      label = "cont2 generalized ll",
+      bw = npcdensbw(
+        xdat = x.cont,
+        ydat = y.cont,
+        regtype = "ll",
+        bwtype = "generalized_nn",
+        bws = c(6, 7, 7),
+        bandwidth.compute = FALSE
+      ),
+      txdat = x.cont,
+      tydat = y.cont,
+      exdat = ex.cont,
+      eydat = ey.cont
+    ),
+    list(
+      label = "mixed generalized lp2",
+      bw = npcdensbw(
+        xdat = x.mixed,
+        ydat = y.mixed,
+        regtype = "lp",
+        basis = "glp",
+        degree = c(2L, 2L),
+        bwtype = "generalized_nn",
+        bws = c(6, 7, 7, 0.45, 0.55),
+        bandwidth.compute = FALSE
+      ),
+      txdat = x.mixed,
+      tydat = y.mixed,
+      exdat = ex.mixed,
+      eydat = ey.mixed
+    )
+  )
+
+  for (case in cases) {
+    fit <- npcdens(
+      bws = case$bw,
+      txdat = case$txdat,
+      tydat = case$tydat,
+      exdat = case$exdat,
+      eydat = case$eydat
+    )
+    H <- npcdenshat(
+      bws = case$bw,
+      txdat = case$txdat,
+      tydat = case$tydat,
+      exdat = case$exdat,
+      eydat = case$eydat,
+      output = "matrix"
+    )
+    rhs <- cbind(rep.int(1, nrow(case$txdat)), seq_len(nrow(case$txdat)) / nrow(case$txdat))
+    hy <- npcdenshat(
+      bws = case$bw,
+      txdat = case$txdat,
+      tydat = case$tydat,
+      exdat = case$exdat,
+      eydat = case$eydat,
+      y = rhs,
+      output = "apply"
+    )
+
+    expect_equal(
+      as.vector(H %*% rhs[, 1L]),
+      as.vector(fit$condens),
+      tolerance = 1e-10,
+      info = case$label
+    )
+    expect_equal(hy, H %*% rhs, tolerance = 1e-12, info = case$label)
+  }
+})
+
 test_that("npcdenshat preserves bounded gaussian manual-bandwidth semantics", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
   on.exit(close_mpi_slaves(), add = TRUE)

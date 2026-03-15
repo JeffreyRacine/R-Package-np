@@ -70,6 +70,81 @@
   )
 }
 
+.npcdhat_make_xhat_matrix <- function(bws, txdat, exdat) {
+  xbw <- .npcdhat_make_xbw(bws = bws, txdat = txdat)
+  regtype <- if (is.null(xbw$regtype.engine)) {
+    if (is.null(xbw$regtype)) "lc" else as.character(xbw$regtype)
+  } else {
+    as.character(xbw$regtype.engine)
+  }
+  basis <- if (is.null(xbw$basis.engine)) {
+    if (is.null(xbw$basis)) "glp" else xbw$basis
+  } else {
+    xbw$basis.engine
+  }
+  degree <- if (is.null(xbw$degree.engine)) {
+    if (xbw$ncon > 0L) {
+      npValidateGlpDegree(regtype = "lp", degree = xbw$degree, ncon = xbw$ncon)
+    } else {
+      integer(0)
+    }
+  } else {
+    as.integer(xbw$degree.engine)
+  }
+  bernstein <- if (is.null(xbw$bernstein.basis.engine)) {
+    isTRUE(xbw$bernstein.basis)
+  } else {
+    isTRUE(xbw$bernstein.basis.engine)
+  }
+
+  if (identical(regtype, "lc")) {
+    return(.npreghat_exact_lc_matrix_from_kernel_weights(
+      bws = xbw,
+      txdat = txdat,
+      exdat = exdat
+    ))
+  }
+
+  if (identical(regtype, "ll")) {
+    return(.npreghat_exact_ll_matrix_from_kernel_weights(
+      bws = xbw,
+      txdat = txdat,
+      exdat = exdat,
+      s = integer(0)
+    ))
+  }
+
+  if (identical(regtype, "lp")) {
+    if (identical(xbw$type, "generalized_nn") && any(degree > 1L)) {
+      H <- matrix(NA_real_, nrow = nrow(exdat), ncol = nrow(txdat))
+      for (i in seq_len(nrow(exdat))) {
+        H[i, ] <- .npreghat_exact_matrix_from_core(
+          bws = xbw,
+          txdat = txdat,
+          exdat = exdat[i, , drop = FALSE]
+        )[1L, ]
+      }
+      return(H)
+    }
+
+    return(.npreghat_exact_lp_matrix_from_kernel_weights(
+      bws = xbw,
+      txdat = txdat,
+      exdat = exdat,
+      s = integer(0),
+      basis = basis,
+      degree = degree,
+      bernstein.basis = bernstein
+    ))
+  }
+
+  .npreghat_exact_matrix_from_core(
+    bws = xbw,
+    txdat = txdat,
+    exdat = exdat
+  )
+}
+
 .np_operator_kernel_weight_scale <- function(bws, operator, nvars, where) {
   if (!isa(bws, "kbandwidth"))
     bws <- kbandwidth(bws)
@@ -367,8 +442,12 @@
     ))
   }
 
-  xbw <- .npcdhat_make_xbw(bws = bws, txdat = txdat)
   ybw <- .npcdhat_make_ybw(bws = bws, tydat = tydat)
+  Hx <- .npcdhat_make_xhat_matrix(
+    bws = bws,
+    txdat = txdat,
+    exdat = exdat
+  )
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
@@ -376,17 +455,7 @@
     operator = rep.int(operator, ncol(tydat))
   )
 
-  H <- matrix(NA_real_, nrow = nrow(exdat), ncol = nrow(txdat))
-  for (i in seq_len(nrow(exdat))) {
-    x.row <- .npreghat_exact_matrix_from_core(
-      bws = xbw,
-      txdat = txdat,
-      exdat = exdat[i, , drop = FALSE]
-    )
-    H[i, ] <- as.vector(x.row[1L, ]) * as.vector(Gy[i, ])
-  }
-
-  H
+  Hx * Gy
 }
 
 .npcdhat_exact_apply <- function(bws, txdat, tydat, exdat, eydat, rhs, operator) {
@@ -402,8 +471,12 @@
     return(H %*% rhs)
   }
 
-  xbw <- .npcdhat_make_xbw(bws = bws, txdat = txdat)
   ybw <- .npcdhat_make_ybw(bws = bws, tydat = tydat)
+  Hx <- .npcdhat_make_xhat_matrix(
+    bws = bws,
+    txdat = txdat,
+    exdat = exdat
+  )
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
@@ -411,18 +484,7 @@
     operator = rep.int(operator, ncol(tydat))
   )
 
-  out <- matrix(0.0, nrow = nrow(exdat), ncol = ncol(rhs))
-  for (i in seq_len(nrow(exdat))) {
-    x.row <- .npreghat_exact_matrix_from_core(
-      bws = xbw,
-      txdat = txdat,
-      exdat = exdat[i, , drop = FALSE]
-    )
-    h.row <- as.vector(x.row[1L, ]) * as.vector(Gy[i, ])
-    out[i, ] <- drop(crossprod(h.row, rhs))
-  }
-
-  out
+  (Hx * Gy) %*% rhs
 }
 
 .npcdhat_core <- function(bws,
