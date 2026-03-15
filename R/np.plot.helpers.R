@@ -1849,6 +1849,17 @@
     s = if (isTRUE(gradients)) 1L else 0L
   )
 
+  if (!isTRUE(gradients)) {
+    return(.np_inid_lc_boot_from_hat(
+      H = H,
+      ydat = ydat,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
+
   .np_plot_boot_from_frozen_operator(
     H = H,
     B = B,
