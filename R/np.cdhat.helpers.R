@@ -126,7 +126,13 @@
   crossprod(kw, rhs) / op.info$scale
 }
 
-.np_exact_operator_apply <- function(kbw, txdat, exdat, operator, rhs, where) {
+.np_local_operator_ksum <- function(kbw,
+                                    txdat,
+                                    exdat,
+                                    operator,
+                                    rhs,
+                                    return.kernel.weights = FALSE,
+                                    where) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
   rhs <- as.matrix(rhs)
@@ -135,13 +141,120 @@
   if (nrow(rhs) != nrow(txdat))
     stop(sprintf("%s received RHS with unexpected number of rows", where))
 
-  out <- npksum(
+  op.info <- .np_operator_kernel_weight_scale(
     bws = kbw,
+    operator = operator,
+    nvars = ncol(txdat),
+    where = where
+  )
+  bws <- op.info$bws
+
+  txdat <- adjustLevels(txdat, bws$xdati, allowNewCells = TRUE)
+  exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+  npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+
+  txm <- toMatrix(txdat)
+  exm <- toMatrix(exdat)
+  tuno <- txm[, bws$iuno, drop = FALSE]
+  tcon <- txm[, bws$icon, drop = FALSE]
+  tord <- txm[, bws$iord, drop = FALSE]
+  euno <- exm[, bws$iuno, drop = FALSE]
+  econ <- exm[, bws$icon, drop = FALSE]
+  eord <- exm[, bws$iord, drop = FALSE]
+
+  tnrow <- nrow(txdat)
+  enrow <- nrow(exdat)
+  nkw <- if (isTRUE(return.kernel.weights)) tnrow * enrow else 0L
+
+  operator.num <- ALL_OPERATORS[op.info$operator]
+  myopti <- list(
+    num_obs_train = tnrow,
+    num_obs_eval = enrow,
+    num_uno = bws$nuno,
+    num_ord = bws$nord,
+    num_con = bws$ncon,
+    int_LARGE_SF = SF_ARB,
+    BANDWIDTH_reg_extern = switch(bws$type,
+      fixed = BW_FIXED,
+      generalized_nn = BW_GEN_NN,
+      adaptive_nn = BW_ADAP_NN
+    ),
+    int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
+    kerneval = switch(bws$ckertype,
+      gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
+      epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
+      uniform = CKER_UNI,
+      "truncated gaussian" = CKER_TGAUSS
+    ),
+    ukerneval = switch(bws$ukertype,
+      aitchisonaitken = UKER_AIT,
+      liracine = UKER_LR
+    ),
+    okerneval = switch(bws$okertype,
+      wangvanryzin = OKER_WANG,
+      liracine = OKER_LR,
+      nliracine = OKER_NLR,
+      racineliyan = OKER_RLY
+    ),
+    miss.ex = FALSE,
+    leave.one.out = FALSE,
+    bandwidth.divide = TRUE,
+    mcv.numRow = attr(bws$xmcv, "num.row"),
+    wncol = 0L,
+    yncol = ncol(rhs),
+    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    return.kernel.weights = isTRUE(return.kernel.weights),
+    permutation.operator = PERMUTATION_OPERATORS[["none"]],
+    compute.score = FALSE,
+    compute.ocg = FALSE
+  )
+
+  cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+
+  asDouble <- function(data) {
+    if (is.null(data)) as.double(0.0) else as.double(data)
+  }
+
+  myout <- .Call(
+    "C_np_kernelsum",
+    asDouble(tuno), asDouble(tord), asDouble(tcon),
+    asDouble(rhs), as.double(0.0),
+    asDouble(euno), asDouble(eord), asDouble(econ),
+    as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+    as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+    as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
+    as.integer(myopti), as.double(1.0),
+    as.integer(enrow),
+    as.integer(0L),
+    as.integer(nkw),
+    as.double(cker.bounds.c$lb),
+    as.double(cker.bounds.c$ub),
+    PACKAGE = "np"
+  )
+
+  out <- myout[["ksum"]]
+  if (!is.matrix(out))
+    out <- matrix(out, nrow = enrow, ncol = ncol(rhs))
+
+  kw <- NULL
+  if (isTRUE(return.kernel.weights))
+    kw <- matrix(as.double(myout[["kernel.weights"]]), nrow = tnrow, ncol = enrow)
+
+  list(ksum = out, kernel.weights = kw)
+}
+
+.np_exact_operator_apply <- function(kbw, txdat, exdat, operator, rhs, where) {
+  rhs <- as.matrix(rhs)
+  storage.mode(rhs) <- "double"
+
+  out <- .np_local_operator_ksum(
+    kbw = kbw,
     txdat = txdat,
     exdat = exdat,
-    tydat = rhs,
     operator = operator,
-    bandwidth.divide = TRUE
+    rhs = rhs,
+    return.kernel.weights = FALSE,
+    where = where
   )$ksum
 
   if (!is.matrix(out))
@@ -156,14 +269,29 @@
 .np_exact_operator_matrix <- function(kbw, txdat, exdat, operator, where) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
-  .np_exact_operator_apply(
+
+  probe <- .np_local_operator_ksum(
     kbw = kbw,
     txdat = txdat,
     exdat = exdat,
     operator = operator,
-    rhs = diag(nrow(txdat)),
+    rhs = matrix(1.0, nrow = nrow(txdat), ncol = 1L),
+    return.kernel.weights = TRUE,
     where = where
   )
+
+  kw <- probe$kernel.weights
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = nrow(txdat))
+  if (nrow(kw) != nrow(txdat) || ncol(kw) != nrow(exdat))
+    stop(sprintf("%s returned unexpected kernel-weight shape", where))
+
+  H.raw <- t(kw)
+  row.sum <- drop(H.raw %*% rep.int(1.0, nrow(txdat)))
+  row.sum[abs(row.sum) < .Machine$double.xmin] <- .Machine$double.xmin
+  row.scale <- as.vector(probe$ksum[, 1L]) / row.sum
+
+  sweep(H.raw, 1L, row.scale, "*")
 }
 
 .npcdhat_make_kernel_matrix <- function(kbw, txdat, exdat, operator) {
