@@ -371,6 +371,85 @@
     out
 }
 
+.np_indexhat_lc_kernel_weights <- function(bws, idx.train, idx.eval) {
+  kw <- .npRmpi_with_local_regression(npksum(
+    txdat = idx.train,
+    exdat = idx.eval,
+    bws = bws$bw,
+    bwtype = bws$type,
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    return.kernel.weights = TRUE
+  ))$kw
+
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = nrow(idx.train))
+
+  if (nrow(kw) != nrow(idx.train) || ncol(kw) != nrow(idx.eval))
+    stop("single-index lc kernel-weight matrix shape mismatch", call. = FALSE)
+
+  kw
+}
+
+.np_indexhat_lc_mean <- function(bws,
+                                 idx.train,
+                                 idx.eval,
+                                 y = NULL,
+                                 output = c("matrix", "apply")) {
+  output <- match.arg(output)
+  kw <- .np_indexhat_lc_kernel_weights(
+    bws = bws,
+    idx.train = idx.train,
+    idx.eval = idx.eval
+  )
+  H <- sweep(
+    t(kw),
+    1L,
+    pmax(colSums(kw), .Machine$double.eps),
+    "/",
+    check.margin = FALSE
+  )
+
+  if (identical(output, "matrix"))
+    return(H)
+
+  if (is.null(y))
+    stop("argument 'y' is required when output='apply'")
+
+  y <- .np_indexhat_numeric_y(y)
+  if (nrow(y) != nrow(idx.train))
+    stop("number of rows in 'y' must equal number of training rows")
+
+  out <- H %*% y
+  if (ncol(out) == 1L) as.vector(out) else out
+}
+
+.np_indexhat_lc_derivative <- function(bws,
+                                       idx.train,
+                                       idx.eval,
+                                       y = NULL,
+                                       output = c("matrix", "apply")) {
+  output <- match.arg(output)
+  out <- .npRmpi_with_local_hat_helper(npreghat(
+    bws = .np_indexhat_rbw(bws = bws, idx.train = idx.train),
+    txdat = idx.train,
+    exdat = idx.eval,
+    y = y,
+    output = output,
+    s = 1L
+  ))
+
+  if (!identical(output, "matrix"))
+    return(out)
+
+  matrix(
+    as.double(out),
+    nrow = nrow(out),
+    ncol = ncol(out),
+    dimnames = dimnames(out)
+  )
+}
+
 .np_indexhat_exact <- function(bws,
                                idx.train,
                                idx.eval,
@@ -403,31 +482,23 @@
   }
 
   if (identical(regtype.engine, "lc")) {
-    kbw <- .np_indexhat_kbw(bws = bws, idx.train = idx.train)
-    kw <- .np_kernel_weights_direct(
-      bws = kbw,
-      txdat = idx.train,
-      exdat = idx.eval,
-      bandwidth.divide = TRUE,
-      kernel.pow = 1.0
-    )
-    if (!is.matrix(kw))
-      kw <- matrix(kw, nrow = nrow(idx.train))
-    den <- pmax(colSums(kw), .Machine$double.eps)
-
-    if (identical(output, "matrix")) {
-      return(sweep(t(kw), 1L, den, "/", check.margin = FALSE))
+    if (s == 1L) {
+      return(.np_indexhat_lc_derivative(
+        bws = bws,
+        idx.train = idx.train,
+        idx.eval = idx.eval,
+        y = y,
+        output = output
+      ))
     }
 
-    if (is.null(y))
-      stop("argument 'y' is required when output='apply'")
-
-    y <- .np_indexhat_numeric_y(y)
-    if (nrow(y) != nrow(idx.train))
-      stop("number of rows in 'y' must equal number of training rows")
-
-    out <- sweep(t(kw), 1L, den, "/", check.margin = FALSE) %*% y
-    return(if (ncol(out) == 1L) as.vector(out) else out)
+    return(.np_indexhat_lc_mean(
+      bws = bws,
+      idx.train = idx.train,
+      idx.eval = idx.eval,
+      y = y,
+      output = output
+    ))
   }
 
   rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
@@ -711,6 +782,18 @@ npindexhat <-
 
     idx.train <- data.frame(index = index.train)
     idx.eval <- data.frame(index = index.eval)
+    spec <- .npindex_resolve_spec(bws, where = "npindexhat")
+
+    if (identical(spec$regtype.engine, "lc")) {
+      return(.np_indexhat_exact(
+        bws = bws,
+        idx.train = idx.train,
+        idx.eval = idx.eval,
+        y = y,
+        output = output,
+        s = s
+      ))
+    }
     if (s == 1L) {
       return(.np_indexhat_exact(
         bws = bws,
