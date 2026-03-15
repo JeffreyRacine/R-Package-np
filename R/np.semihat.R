@@ -1094,25 +1094,31 @@ npscoefhat <-
     H <- matrix(0.0, nrow = m, ncol = n)
 
     if (identical(spec$regtype.engine, "lc")) {
-      kw <- .npscoef_weight_matrix(
+      state <- .npscoef_effective_weight_state(
         bws = bws,
         tzdat = tzdat,
         ezdat = ezdat,
         leave.one.out = leave.one.out
       )
-      if (!is.matrix(kw))
-        kw <- matrix(kw, nrow = n)
+      chunk.size <- .npscoef_effective_weight_chunk_size(ntrain = n, neval = m)
 
-      for (i in seq_len(m)) {
-        solve.out <- .npreghat_solve_eval(
-          W = W.train,
-          w.eval = W.eval[i, ],
-          k = kw[, i],
-          ridge.base = ridge
-        )
-        if (is.null(solve.out))
-          stop(sprintf("failed to solve local hat system at evaluation row %d", i))
-        H[i, ] <- kw[, i] * drop(W.train %*% solve.out$v)
+      for (start in seq.int(1L, m, by = chunk.size)) {
+        stopi <- min(m, start + chunk.size - 1L)
+        idx <- seq.int(start, stopi)
+        kw.chunk <- .npscoef_effective_weight_chunk(state = state, eval.indices = idx)
+
+        for (jj in seq_along(idx)) {
+          ii <- idx[[jj]]
+          solve.out <- .npreghat_solve_eval(
+            W = W.train,
+            w.eval = W.eval[ii, ],
+            k = kw.chunk[, jj],
+            ridge.base = ridge
+          )
+          if (is.null(solve.out))
+            stop(sprintf("failed to solve local hat system at evaluation row %d", ii))
+          H[ii, ] <- kw.chunk[, jj] * drop(W.train %*% solve.out$v)
+        }
       }
     } else {
       lp_state <- .npscoef_lp_state(
@@ -1124,28 +1130,36 @@ npscoefhat <-
       )
       tensor.train <- .npscoef_row_tensor_design(W.train, lp_state$W.train)
       tensor.eval <- .npscoef_row_tensor_design(W.eval, lp_state$W.eval)
-      kw <- .np_kernel_weights_direct(
-        txdat = lp_state$z.train,
-        exdat = lp_state$z.eval,
-        bws = lp_state$rbw,
-        bandwidth.divide = TRUE,
-        kernel.pow = 1.0
-      )
-      if (leave.one.out) {
-        for (ii in seq_len(min(nrow(kw), ncol(kw))))
-          kw[ii, ii] <- 0.0
-      }
+      chunk.size <- .npscoef_effective_weight_chunk_size(ntrain = n, neval = m)
 
-      for (i in seq_len(m)) {
-        solve.out <- .npreghat_solve_eval(
-          W = tensor.train,
-          w.eval = tensor.eval[i, ],
-          k = kw[, i],
-          ridge.base = ridge
+      for (start in seq.int(1L, m, by = chunk.size)) {
+        stopi <- min(m, start + chunk.size - 1L)
+        idx <- seq.int(start, stopi)
+        kw.chunk <- .np_kernel_weights_direct(
+          txdat = lp_state$z.train,
+          exdat = lp_state$z.eval[idx, , drop = FALSE],
+          bws = lp_state$rbw,
+          bandwidth.divide = TRUE,
+          kernel.pow = 1.0
         )
-        if (is.null(solve.out))
-          stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", i))
-        H[i, ] <- kw[, i] * drop(tensor.train %*% solve.out$v)
+
+        if (leave.one.out) {
+          for (jj in seq_along(idx))
+            kw.chunk[idx[[jj]], jj] <- 0.0
+        }
+
+        for (jj in seq_along(idx)) {
+          ii <- idx[[jj]]
+          solve.out <- .npreghat_solve_eval(
+            W = tensor.train,
+            w.eval = tensor.eval[ii, ],
+            k = kw.chunk[, jj],
+            ridge.base = ridge
+          )
+          if (is.null(solve.out))
+            stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", ii))
+          H[ii, ] <- kw.chunk[, jj] * drop(tensor.train %*% solve.out$v)
+        }
       }
     }
 
