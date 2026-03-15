@@ -334,6 +334,23 @@ npreghat <-
   kw
 }
 
+.np_regression_lc_mean_from_kernel_weights <- function(bws,
+                                                       txdat,
+                                                       tydat,
+                                                       exdat = NULL) {
+  kw <- .np_kernel_weights_direct(
+    bws = bws,
+    txdat = txdat,
+    exdat = exdat,
+    leave.one.out = FALSE,
+    bandwidth.divide = identical(bws$type, "adaptive_nn"),
+    kernel.pow = 1.0
+  )
+  kw.sum <- colSums(kw)
+  kw.sum[kw.sum == 0.0] <- .Machine$double.xmin
+  drop(crossprod(kw, as.double(tydat)) / kw.sum)
+}
+
 .np_regression_direct <- function(bws,
                                   txdat,
                                   tydat,
@@ -420,6 +437,12 @@ npreghat <-
   } else {
     tydat <- as.double(tydat)
   }
+
+  mean.override <- !isTRUE(gradients) &&
+    identical(regtype, "lc") &&
+    identical(bws$type, "adaptive_nn")
+  txdat.frame <- txdat
+  exdat.frame <- if (no.ex) NULL else exdat
 
   txdat <- adjustLevels(txdat, bws$xdati)
   if (!no.ex) {
@@ -528,7 +551,17 @@ npreghat <-
     PACKAGE = "npRmpi"
   )
 
-  out <- list(mean = as.double(myout$mean))
+  mean.out <- as.double(myout$mean)
+  if (mean.override) {
+    mean.out <- .np_regression_lc_mean_from_kernel_weights(
+      bws = bws,
+      txdat = txdat.frame,
+      tydat = tydat,
+      exdat = exdat.frame
+    )
+  }
+
+  out <- list(mean = mean.out)
 
   if (gradients) {
     grad <- matrix(data = myout$g, nrow = enrow, ncol = ncol.x, byrow = FALSE)

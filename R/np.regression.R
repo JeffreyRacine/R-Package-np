@@ -361,6 +361,12 @@ npreg.rbandwidth <-
         eydat <- as.double(eydat)
     }
 
+    mean.override <- !isTRUE(gradients) &&
+      identical(bws$regtype, "lc") &&
+      identical(bws$type, "adaptive_nn")
+    txdat.frame <- txdat
+    exdat.frame <- if (no.ex) NULL else exdat
+
     ## re-assign levels in training and evaluation data to ensure correct
     ## conversion to numeric type.
     
@@ -492,6 +498,15 @@ npreg.rbandwidth <-
       .npRmpi_with_local_regression(call_regression())
     } else {
       call_regression()
+    }
+
+    if (mean.override) {
+      myout$mean <- .np_regression_lc_mean_from_kernel_weights(
+        bws = bws,
+        txdat = txdat.frame,
+        tydat = tydat,
+        exdat = exdat.frame
+      )
     }
 
     if (gradients){
