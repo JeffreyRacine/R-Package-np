@@ -5,9 +5,25 @@ npksum <-
     UseMethod("npksum", target)
   }
 
+.npRmpi_npksum_should_localize <- function(bws, dots = list()) {
+  if (inherits(bws, "kbandwidth"))
+    return(identical(bws$type, "adaptive_nn"))
+
+  if (is.list(bws) && !is.null(bws$type))
+    return(identical(bws$type, "adaptive_nn"))
+
+  if (is.list(dots) && !is.null(dots$bwtype))
+    return(identical(as.character(dots$bwtype)[1L], "adaptive_nn"))
+
+  FALSE
+}
+
 npksum.formula <-
   function(formula, data, newdata, subset, na.action, ...){
     .npRmpi_require_active_slave_pool(where = "npksum()")
+    if (.npRmpi_npksum_should_localize(NULL, list(...)) &&
+        !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+      return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -57,6 +73,9 @@ npksum.numeric <-
            leave.one.out, operator, permutation.operator, return.kernel.weights,
            ...){
     .npRmpi_require_active_slave_pool(where = "npksum()")
+    if (.npRmpi_npksum_should_localize(bws, list(...)) &&
+        !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+      return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -126,6 +145,9 @@ npksum.default <-
            return.kernel.weights = FALSE,
            ...){
     .npRmpi_require_active_slave_pool(where = "npksum()")
+    if (.npRmpi_npksum_should_localize(bws, list(...)) &&
+        !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+      return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -336,7 +358,7 @@ npksum.default <-
       permutation.operator = poperator.num,
       compute.score = compute.score,
       compute.ocg = compute.ocg,
-      suppress.parallel = FALSE)
+      suppress.parallel = isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
 
 	    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     

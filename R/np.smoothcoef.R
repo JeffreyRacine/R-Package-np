@@ -114,8 +114,15 @@ npscoef.call <-
     do.call(npscoef, c(call.args, list(...)))
   }
 
+.npRmpi_npscoef_should_localize <- function(bws) {
+  isa(bws, "scbandwidth") && identical(bws$type, "adaptive_nn")
+}
+
 npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
   .npRmpi_require_active_slave_pool(where = "npscoef()")
+  if (.npRmpi_npscoef_should_localize(bws) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+    return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -759,6 +766,9 @@ npscoef.scbandwidth <-
     tol <- as.double(tol)
 
     .npRmpi_require_active_slave_pool(where = "npscoef()")
+    if (.npRmpi_npscoef_should_localize(bws) &&
+        !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+      return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
