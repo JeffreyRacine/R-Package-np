@@ -107,8 +107,8 @@ double **matrix_Y_continuous_eval_extern;
 double **matrix_Y_unordered_eval_extern;
 double **matrix_Y_ordered_eval_extern;
 
-int *vector_X_support_count_extern = NULL;
-int *vector_Y_support_count_extern = NULL;
+int *vector_X_kmax_extern = NULL;
+int *vector_Y_kmax_extern = NULL;
 
 /* these are data which are sorted into an 'alternate' order */
 /* this allows us to support 2 trees simultaneously !*/
@@ -171,51 +171,51 @@ static void np_progress_signal(const char *event, const char *surface, const int
   UNPROTECT(3);
 }
 
-static int *np_compute_support_counts(int num_obs, int ncon, double **matrix_continuous)
+static int *np_compute_train_kmax(int num_obs, int ncon, double **matrix_continuous)
 {
   int j;
-  int *counts = NULL;
+  int *kmax = NULL;
 
   if ((ncon <= 0) || (matrix_continuous == NULL))
     return NULL;
 
-  counts = alloc_vecu(ncon);
+  kmax = alloc_vecu(ncon);
   for (j = 0; j < ncon; j++)
-    counts[j] = simple_unique(num_obs, matrix_continuous[j]);
+    kmax[j] = np_exact_train_kmax(num_obs, matrix_continuous[j]);
 
-  return counts;
+  return kmax;
 }
 
-static void np_clear_support_counts_extern(void)
+static void np_clear_kmax_extern(void)
 {
-  if (vector_X_support_count_extern != NULL) {
-    safe_free(vector_X_support_count_extern);
-    vector_X_support_count_extern = NULL;
+  if (vector_X_kmax_extern != NULL) {
+    safe_free(vector_X_kmax_extern);
+    vector_X_kmax_extern = NULL;
   }
-  if (vector_Y_support_count_extern != NULL) {
-    safe_free(vector_Y_support_count_extern);
-    vector_Y_support_count_extern = NULL;
+  if (vector_Y_kmax_extern != NULL) {
+    safe_free(vector_Y_kmax_extern);
+    vector_Y_kmax_extern = NULL;
   }
 }
 
-static void np_refresh_support_counts_extern(void)
+static void np_refresh_kmax_extern(void)
 {
-  np_clear_support_counts_extern();
+  np_clear_kmax_extern();
 
   if ((num_obs_train_extern > 0) && (num_reg_continuous_extern > 0))
-    vector_X_support_count_extern =
-      np_compute_support_counts(num_obs_train_extern,
-                                num_reg_continuous_extern,
-                                matrix_X_continuous_train_extern);
+    vector_X_kmax_extern =
+      np_compute_train_kmax(num_obs_train_extern,
+                            num_reg_continuous_extern,
+                            matrix_X_continuous_train_extern);
 
   if ((num_obs_train_extern > 0) && (num_var_continuous_extern > 0))
-    vector_Y_support_count_extern =
-      np_compute_support_counts(num_obs_train_extern,
-                                num_var_continuous_extern,
-                                matrix_Y_continuous_train_extern);
+    vector_Y_kmax_extern =
+      np_compute_train_kmax(num_obs_train_extern,
+                            num_var_continuous_extern,
+                            matrix_Y_continuous_train_extern);
 }
 
-static void np_validate_nonfixed_support_counts_extern(const char *where, const int bandwidth)
+static void np_validate_nonfixed_kmax_extern(const char *where, const int bandwidth)
 {
   int j;
 
@@ -223,15 +223,15 @@ static void np_validate_nonfixed_support_counts_extern(const char *where, const 
     return;
 
   for (j = 0; j < num_reg_continuous_extern; j++) {
-    if ((vector_X_support_count_extern == NULL) ||
-        (vector_X_support_count_extern[j] <= 1)) {
+    if ((vector_X_kmax_extern == NULL) ||
+        (vector_X_kmax_extern[j] < 1)) {
       error("%s: nonfixed nearest-neighbour bandwidths require at least two distinct continuous regressor values per dimension", where);
     }
   }
 
   for (j = 0; j < num_var_continuous_extern; j++) {
-    if ((vector_Y_support_count_extern == NULL) ||
-        (vector_Y_support_count_extern[j] <= 1)) {
+    if ((vector_Y_kmax_extern == NULL) ||
+        (vector_Y_kmax_extern[j] < 1)) {
       error("%s: nonfixed nearest-neighbour bandwidths require at least two distinct continuous variable values per dimension", where);
     }
   }
@@ -3242,8 +3242,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     vector_continuous_stddev[j] = mysd[j];
 
   vector_continuous_stddev_extern = vector_continuous_stddev;
-  np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern("C_np_density_bw", BANDWIDTH_den_extern);
+  np_refresh_kmax_extern();
+  np_validate_nonfixed_kmax_extern("C_np_density_bw", BANDWIDTH_den_extern);
 
   /* Initialize scale factors and Hessian for NR modules */
 
@@ -3615,7 +3615,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
   free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-  np_clear_support_counts_extern();
+  np_clear_kmax_extern();
   free_mat(matrix_y, num_var + 1);
   free(vector_scale_factor);
   free(vsfh);
@@ -3889,8 +3889,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     vector_continuous_stddev[j] = mysd[j];
 
   vector_continuous_stddev_extern = vector_continuous_stddev;
-  np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern("C_np_distribution_bw", BANDWIDTH_den_extern);
+  np_refresh_kmax_extern();
+  np_validate_nonfixed_kmax_extern("C_np_distribution_bw", BANDWIDTH_den_extern);
 
 
   /* Initialize scale factors and Directions for NR modules */
@@ -4247,7 +4247,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
   free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-  np_clear_support_counts_extern();
+  np_clear_kmax_extern();
 
   if(!cdfontrain){
     free_mat(matrix_X_unordered_eval_extern, num_reg_unordered_extern);
@@ -4761,8 +4761,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     vector_continuous_stddev[j] = mysd[j];
 
   vector_continuous_stddev_extern = vector_continuous_stddev;
-  np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern("C_np_density_conditional_bw", BANDWIDTH_den_extern);
+  np_refresh_kmax_extern();
+  np_validate_nonfixed_kmax_extern("C_np_density_conditional_bw", BANDWIDTH_den_extern);
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -5145,7 +5145,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
   free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-  np_clear_support_counts_extern();
+  np_clear_kmax_extern();
   free_mat(matrix_y, num_all_var + 1);
   safe_free(vector_scale_factor);
   safe_free(vsfh);
@@ -5707,8 +5707,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
 
   vector_continuous_stddev = vector_continuous_stddev_extern = mysd;
-  np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern("C_np_distribution_conditional_bw", BANDWIDTH_den_extern);
+  np_refresh_kmax_extern();
+  np_validate_nonfixed_kmax_extern("C_np_distribution_conditional_bw", BANDWIDTH_den_extern);
 
 
   /* Initialize scale factors and Directions for NR modules */
@@ -6077,7 +6077,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
   free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-  np_clear_support_counts_extern();
+  np_clear_kmax_extern();
 
   if(!cdfontrain){
     free_mat(matrix_Y_unordered_eval_extern, num_var_unordered_extern);
@@ -7447,8 +7447,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     error("failed to prepare LP CV basis cache");
   }
 
-  np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern("C_np_regression_bw", BANDWIDTH_reg_extern);
+  np_refresh_kmax_extern();
+  np_validate_nonfixed_kmax_extern("C_np_regression_bw", BANDWIDTH_reg_extern);
 
 
   /* Initialize scale factors and Directions for NR modules */
@@ -7779,7 +7779,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
   free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-  np_clear_support_counts_extern();
+  np_clear_kmax_extern();
 
   safe_free(vector_Y_extern);
 
