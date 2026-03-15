@@ -27,8 +27,8 @@ extern int int_LARGE_SF;
 extern int int_DEBUG;
 extern int int_VERBOSE;
 extern int int_ROBUST;
-extern int *vector_X_kmax_extern;
-extern int *vector_Y_kmax_extern;
+extern int *vector_X_support_count_extern;
+extern int *vector_Y_support_count_extern;
 
 
 #include <math.h>
@@ -107,28 +107,26 @@ int simple_unique(int n, double * vector){
   return(m);
 }
 
-static int np_kmax_x(const int idx, const int num_obs, double **matrix_x_continuous)
+static int np_support_count_x(const int idx, const int num_obs, double **matrix_x_continuous)
 {
-  if ((vector_X_kmax_extern != NULL) && (idx >= 0))
-    return vector_X_kmax_extern[idx];
+  if ((vector_X_support_count_extern != NULL) && (idx >= 0))
+    return vector_X_support_count_extern[idx];
 
-  return np_exact_train_kmax(num_obs, matrix_x_continuous[idx]);
+  return simple_unique(num_obs, matrix_x_continuous[idx]);
 }
 
-static int np_kmax_y(const int idx, const int num_obs, double **matrix_y_continuous)
+static int np_support_count_y(const int idx, const int num_obs, double **matrix_y_continuous)
 {
-  if ((vector_Y_kmax_extern != NULL) && (idx >= 0))
-    return vector_Y_kmax_extern[idx];
+  if ((vector_Y_support_count_extern != NULL) && (idx >= 0))
+    return vector_Y_support_count_extern[idx];
 
-  return np_exact_train_kmax(num_obs, matrix_y_continuous[idx]);
+  return simple_unique(num_obs, matrix_y_continuous[idx]);
 }
 
-static int np_cached_kmax(const int *kmax, const int idx, const int num_obs)
+static int np_support_kmax_cached(const int *counts, const int idx, const int num_obs)
 {
-  if ((kmax != NULL) && (idx >= 0))
-    return kmax[idx];
-
-  return MAX(0, num_obs - 1);
+  const int support_n = (counts != NULL) ? counts[idx] : num_obs;
+  return MAX(0, support_n - 1);
 }
 
 /* 7/24/95: Added pointer arithmetic for efficiency */
@@ -412,77 +410,6 @@ static int kth_unique_radius_from_support(int support_n,
 
   *radius_out = last_distance;
   return 0;
-}
-
-static int count_unique_radii_from_support(int support_n,
-                                           const double *support,
-                                           int center_idx)
-{
-  int left, right, count;
-  double last_distance;
-  int have_last;
-
-  left = center_idx - 1;
-  right = center_idx + 1;
-  count = 0;
-  have_last = 0;
-  last_distance = 0.0;
-
-  while ((left >= 0) || (right < support_n)) {
-    double dleft = DBL_MAX;
-    double dright = DBL_MAX;
-    double distance;
-
-    if (left >= 0)
-      dleft = support[center_idx] - support[left];
-    if (right < support_n)
-      dright = support[right] - support[center_idx];
-
-    distance = (dleft < dright) ? dleft : dright;
-
-    if ((distance > DBL_MIN) && ((!have_last) || (distance != last_distance))) {
-      last_distance = distance;
-      have_last = 1;
-      count++;
-    }
-
-    while ((left >= 0) && ((support[center_idx] - support[left]) == distance))
-      left--;
-    while ((right < support_n) && ((support[right] - support[center_idx]) == distance))
-      right++;
-  }
-
-  return count;
-}
-
-int np_exact_train_kmax(int num_obs, double *vector_data)
-{
-  int i, support_n, kmax;
-  double *support;
-
-  support = NULL;
-
-  if ((vector_data == NULL) || (num_obs <= 1))
-    return 0;
-
-  if (build_sorted_unique_support(num_obs, vector_data, &support, &support_n) != 0)
-    return 0;
-
-  if (support_n <= 1) {
-    free(support);
-    return 0;
-  }
-
-  kmax = INT_MAX;
-  for (i = 0; i < support_n; i++) {
-    const int local_cap = count_unique_radii_from_support(support_n, support, i);
-    if (local_cap < kmax)
-      kmax = local_cap;
-  }
-
-  free(support);
-
-  return (kmax == INT_MAX) ? 0 : kmax;
 }
 
 static int lower_bound_support(int support_n,
@@ -907,11 +834,11 @@ int initialize_nr_directions(int BANDWIDTH,
       matrix_y[i][i] = vector_scale_factor[i]*(random ? chidev(&seed, dfc_dir)  + lbc_dir: initc_dir)*c_dir;
   }else{
     for(i = 1; i <= num_reg_continuous; i++){
-      const double bw_max = np_kmax_x(i - 1, num_obs, matrix_x_continuous);
+      const double bw_max = np_support_count_x(i - 1, num_obs, matrix_x_continuous) - 1;
       matrix_y[i][i] = ceil(MIN(vector_scale_factor[i], bw_max - vector_scale_factor[i])*(random ? ran3(&seed): 1.0));
     }
     for(i = num_reg_continuous+1; i <= li; i++){
-      const double bw_max = np_kmax_y(i - num_reg_continuous - 1, num_obs, matrix_y_continuous);
+      const double bw_max = np_support_count_y(i - num_reg_continuous - 1, num_obs, matrix_y_continuous) - 1;
       matrix_y[i][i] = ceil(MIN(vector_scale_factor[i], bw_max - vector_scale_factor[i])*(random ? ran3(&seed): 1.0));
     }
   }
@@ -1002,7 +929,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   // x continuous
   for(i = 0; i < num_reg_continuous; i++,l++){
     if(!fixed_bw){
-      bw_nf = MAX(1.0,ceil(sqrt(np_kmax_x(i, num_obs, matrix_x_continuous))));
+      bw_nf = MAX(1.0,ceil(sqrt(np_support_count_x(i, num_obs, matrix_x_continuous))));
     }
     const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
@@ -1027,7 +954,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
           vector_scale_factor[l+1] = bwi*c_init;
         }
       } else {
-        if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > np_kmax_x(i, num_obs, matrix_x_continuous))){
+        if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > np_support_count_x(i, num_obs, matrix_x_continuous))){
           REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
           vector_scale_factor[l+1] = ceil(bwi*c_init);
         }
@@ -1038,7 +965,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   // y continuous
   for(i = 0; i < num_var_continuous; i++,l++){
     if(!fixed_bw){
-      bw_nf = MAX(1.0,ceil(sqrt(np_kmax_y(i, num_obs, matrix_y_continuous))));
+      bw_nf = MAX(1.0,ceil(sqrt(np_support_count_y(i, num_obs, matrix_y_continuous))));
     }
     const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
@@ -1063,7 +990,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
           vector_scale_factor[l+1] = bwi*c_init;
         }
       } else {
-        if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > np_kmax_y(i, num_obs, matrix_y_continuous))){
+        if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > np_support_count_y(i, num_obs, matrix_y_continuous))){
           REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
           vector_scale_factor[l+1] = ceil(bwi*c_init);
         }
@@ -1737,7 +1664,7 @@ double *vector_scale_factor)
         }
         else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
         {
-            const int kmax = np_cached_kmax(vector_X_kmax_extern, i - 1, num_obs);
+            const int kmax = np_support_kmax_cached(vector_X_support_count_extern, i - 1, num_obs);
             if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > kmax) )
             {
                 return(1);
@@ -1759,7 +1686,7 @@ double *vector_scale_factor)
         }
         else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
         {
-            const int kmax = np_cached_kmax(vector_Y_kmax_extern, i - num_reg_continuous - 1, num_obs);
+            const int kmax = np_support_kmax_cached(vector_Y_support_count_extern, i - num_reg_continuous - 1, num_obs);
             if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > kmax ) )
             {
                 return(1);

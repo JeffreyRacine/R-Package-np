@@ -218,7 +218,6 @@ double kernel_estimate_regression_categorical_aic_c(int int_ll,int KERNEL_reg,in
 double cv_func_regression_categorical_aic_c(double *vector_scale_factor);
 
 int simple_unique(int n, double * vector);
-int np_exact_train_kmax(int num_obs, double *vector_data);
 int unique(int num_obs, double *x);
 void spinner(int num);
 

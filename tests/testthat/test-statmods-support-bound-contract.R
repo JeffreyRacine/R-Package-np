@@ -21,7 +21,7 @@ test_that("nonfixed regression bandwidth search fails fast for constant regresso
     suppressWarnings(
       npregbw(ydat = rnorm(50), xdat = data.frame(x = rep(1, 50)), bwtype = "adaptive_nn")
     ),
-    "at least two distinct continuous regressor values per dimension|Invalid bandwidth supplied for continuous variable"
+    "at least two distinct continuous regressor values per dimension"
   )
 })
 
@@ -33,6 +33,6 @@ test_that("nonfixed conditional bandwidth search fails fast for constant respons
     suppressWarnings(
       npcdensbw(ydat = y, xdat = x, bwtype = "adaptive_nn")
     ),
-    "at least two distinct continuous variable values per dimension|invalid bandwidth"
+    "at least two distinct continuous variable values per dimension"
   )
 })
