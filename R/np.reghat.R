@@ -221,7 +221,7 @@ npreghat <-
   ntrain <- nrow(txdat)
   neval <- nrow(eval.data)
 
-  if (!identical(bws$type, "adaptive_nn") && any(degree > 1L)) {
+  if (identical(bws$type, "generalized_nn") && any(degree > 1L)) {
     return(.npreghat_exact_matrix_from_core(
       bws = bws,
       txdat = txdat,
@@ -996,7 +996,12 @@ npreghat.rbandwidth <-
     exact.lc.kernel.route <- !isTRUE(leave.one.out) &&
       !any(s > 0L) &&
       identical(regtype, "lc") &&
-      identical(bws$type, "adaptive_nn")
+      (bws$ncon > 0L)
+
+    exact.ll.kernel.route <- !isTRUE(leave.one.out) &&
+      simple.operator.request &&
+      identical(regtype, "ll") &&
+      (bws$ncon > 0L)
 
     exact.lp.kernel.route <- !isTRUE(leave.one.out) &&
       simple.operator.request &&
@@ -1008,16 +1013,11 @@ npreghat.rbandwidth <-
       simple.operator.request &&
       (
         exact.lc.kernel.route ||
+        exact.ll.kernel.route ||
         exact.lp.kernel.route ||
         lc.derivative.exact.route ||
         FALSE
       )
-
-    exact.ll.kernel.route <- !isTRUE(leave.one.out) &&
-      simple.operator.request &&
-      identical(bws$type, "adaptive_nn") &&
-      identical(regtype, "ll") &&
-      (bws$ncon > 0L)
 
     if (direct.apply) {
       direct.args <- list(
@@ -1045,6 +1045,13 @@ npreghat.rbandwidth <-
           txdat = txdat,
           exdat = if (no.ex) NULL else exdat
         ))
+      } else if (exact.ll.kernel.route) {
+        .npRmpi_with_local_regression(.npreghat_exact_ll_matrix_from_kernel_weights(
+          bws = bws,
+          txdat = txdat,
+          exdat = if (no.ex) NULL else exdat,
+          s = s
+        ))
       } else if (exact.lp.kernel.route) {
         .npRmpi_with_local_regression(.npreghat_exact_lp_matrix_from_kernel_weights(
           bws = bws,
@@ -1055,13 +1062,6 @@ npreghat.rbandwidth <-
           degree = reg.spec$degree.engine,
           bernstein.basis = reg.spec$bernstein.basis.engine
         ))
-      } else if (exact.ll.kernel.route) {
-        .npreghat_exact_ll_matrix_from_kernel_weights(
-          bws = bws,
-          txdat = txdat,
-          exdat = if (no.ex) NULL else exdat,
-          s = s
-        )
       } else {
         .npreghat_exact_matrix_from_core(
           bws = bws,
