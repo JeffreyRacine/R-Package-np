@@ -132,6 +132,21 @@ npreghat <-
   H
 }
 
+.npreghat_exact_lc_matrix_from_kernel_weights <- function(bws, txdat, exdat = NULL) {
+  kw <- .np_kernel_weights_direct(
+    bws = bws,
+    txdat = txdat,
+    exdat = exdat,
+    leave.one.out = FALSE,
+    bandwidth.divide = TRUE,
+    kernel.pow = 1.0
+  )
+
+  denom <- colSums(kw)
+  denom[denom == 0.0] <- .Machine$double.xmin
+  sweep(t(kw), 1L, denom, "/")
+}
+
 .npreghat_exact_ll_matrix_from_kernel_weights <- function(bws, txdat, exdat = NULL, s = NULL) {
   miss.ex <- is.null(exdat)
   eval.data <- if (miss.ex) txdat else exdat
@@ -189,6 +204,85 @@ npreghat <-
     } else {
       H[j, ] <- solved[1L + target.cont, ]
     }
+  }
+
+  H
+}
+
+.npreghat_exact_lp_matrix_from_kernel_weights <- function(bws,
+                                                          txdat,
+                                                          exdat = NULL,
+                                                          s = NULL,
+                                                          basis = "glp",
+                                                          degree = integer(0),
+                                                          bernstein.basis = FALSE) {
+  miss.ex <- is.null(exdat)
+  eval.data <- if (miss.ex) txdat else exdat
+  ntrain <- nrow(txdat)
+  neval <- nrow(eval.data)
+
+  if (!identical(bws$type, "adaptive_nn") && any(degree > 1L)) {
+    return(.npreghat_exact_matrix_from_core(
+      bws = bws,
+      txdat = txdat,
+      exdat = if (miss.ex) NULL else exdat,
+      s = s
+    ))
+  }
+
+  kw <- .np_kernel_weights_direct(
+    bws = bws,
+    txdat = txdat,
+    exdat = if (miss.ex) NULL else eval.data,
+    leave.one.out = FALSE,
+    bandwidth.divide = TRUE,
+    kernel.pow = 1.0
+  )
+
+  want.grad <- length(s) > 0L && any(s > 0L)
+  W.train <- W.lp(
+    xdat = txdat[, bws$icon, drop = FALSE],
+    degree = degree,
+    basis = basis,
+    bernstein.basis = bernstein.basis
+  )
+  W.eval <- W.lp(
+    xdat = txdat[, bws$icon, drop = FALSE],
+    exdat = if (miss.ex) NULL else eval.data[, bws$icon, drop = FALSE],
+    degree = degree,
+    gradient.vec = if (want.grad) s else NULL,
+    basis = basis,
+    bernstein.basis = bernstein.basis
+  )
+
+  H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+  eps <- 1.0 / max(1L, ntrain)
+
+  for (j in seq_len(neval)) {
+    w <- kw[, j]
+    A.base <- crossprod(W.train, W.train * w)
+    rhs <- W.eval[j, ]
+    solved <- tryCatch(solve(A.base, rhs), error = function(e) NULL)
+
+    if (is.null(solved) || !all(is.finite(solved))) {
+      A.try <- A.base
+      nepsilon <- 0.0
+
+      repeat {
+        diag(A.try) <- diag(A.try) + eps
+        nepsilon <- nepsilon + eps
+        solved <- tryCatch(solve(A.try, rhs), error = function(e) NULL)
+        if (!is.null(solved) && all(is.finite(solved)))
+          break
+      }
+
+      denom <- A.try[1L, 1L]
+      if (!is.finite(denom) || abs(denom) < .Machine$double.xmin)
+        denom <- .Machine$double.xmin
+      solved[1L] <- solved[1L] * (1.0 + nepsilon / denom)
+    }
+
+    H[j, ] <- w * drop(W.train %*% solved)
   }
 
   H
@@ -894,34 +988,35 @@ npreghat.rbandwidth <-
       !is.null(y) &&
       !isTRUE(leave.one.out) &&
       (ncol(y) == 1L) &&
-      simple.operator.request &&
-      !(identical(bws$type, "generalized_nn") &&
-          identical(reg.spec$regtype.engine, "lp"))
+      simple.operator.request
 
     lc.derivative.exact.route <- identical(regtype, "lc") &&
       first.derivative.request
 
+    exact.lc.kernel.route <- !isTRUE(leave.one.out) &&
+      !any(s > 0L) &&
+      identical(regtype, "lc") &&
+      identical(bws$type, "adaptive_nn")
+
+    exact.lp.kernel.route <- !isTRUE(leave.one.out) &&
+      simple.operator.request &&
+      identical(regtype, "lp") &&
+      identical(reg.spec$regtype.engine, "lp") &&
+      (bws$ncon > 0L)
+
     exact.core.route <- !isTRUE(leave.one.out) &&
       simple.operator.request &&
       (
+        exact.lc.kernel.route ||
+        exact.lp.kernel.route ||
         lc.derivative.exact.route ||
-          (
-            !identical(bws$type, "fixed") &&
-              (
-                identical(bws$type, "adaptive_nn") ||
-                  (identical(bws$regtype, "lp") &&
-                     identical(reg.spec$regtype.engine, "lp") &&
-                     any(degree > 1L))
-              )
-          )
+        FALSE
       )
 
     exact.ll.kernel.route <- !isTRUE(leave.one.out) &&
       simple.operator.request &&
       identical(bws$type, "adaptive_nn") &&
       identical(regtype, "ll") &&
-      identical(bws$nuno, 0L) &&
-      identical(bws$nord, 0L) &&
       (bws$ncon > 0L)
 
     if (direct.apply) {
@@ -944,7 +1039,23 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- if (exact.ll.kernel.route) {
+      H <- if (exact.lc.kernel.route) {
+        .npRmpi_with_local_regression(.npreghat_exact_lc_matrix_from_kernel_weights(
+          bws = bws,
+          txdat = txdat,
+          exdat = if (no.ex) NULL else exdat
+        ))
+      } else if (exact.lp.kernel.route) {
+        .npRmpi_with_local_regression(.npreghat_exact_lp_matrix_from_kernel_weights(
+          bws = bws,
+          txdat = txdat,
+          exdat = if (no.ex) NULL else exdat,
+          s = s,
+          basis = reg.spec$basis.engine,
+          degree = reg.spec$degree.engine,
+          bernstein.basis = reg.spec$bernstein.basis.engine
+        ))
+      } else if (exact.ll.kernel.route) {
         .npreghat_exact_ll_matrix_from_kernel_weights(
           bws = bws,
           txdat = txdat,
