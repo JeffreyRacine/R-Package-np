@@ -85,7 +85,7 @@
       bronze <- lapply(bws$chromoly, paste, collapse = " + ")
 
       tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                      env = environment(formula))
+                                      env = environment(tt))
       mf.xf.args <- as.list(tmf.xf)[-1L]
       tmf.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt))
       
@@ -174,15 +174,6 @@
     common.scale <- normalized.opts$common.scale
 
     plot.errors = (plot.errors.method != "none")
-    if (plot.errors.method == "bootstrap" &&
-        identical(plot.errors.boot.nonfixed, "frozen") &&
-        !identical(bws$type, "fixed")) {
-      stop(
-        "plot.errors.boot.nonfixed='frozen' is currently supported only for nonfixed unconditional/conditional density and distribution bootstrap routes",
-        call. = FALSE
-      )
-    }
-
     if (coef) {
       fit.coef <- if (identical(plot.errors.method, "asymptotic")) {
         npplreg(
@@ -304,6 +295,7 @@
           slice.index = 0,
           progress.target = "surf 1/1",
           plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
           plot.errors.boot.wild = plot.errors.boot.wild,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
           plot.errors.boot.num = plot.errors.boot.num,
@@ -559,6 +551,7 @@
                         slice.index = plot.index
                       ),
                       plot.errors.boot.method = plot.errors.boot.method,
+                      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
                       plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                       plot.errors.boot.num = plot.errors.boot.num,
@@ -749,6 +742,7 @@
                         slice.index = plot.index
                       ),
                       plot.errors.boot.method = plot.errors.boot.method,
+                      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
                       plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                       plot.errors.boot.num = plot.errors.boot.num,

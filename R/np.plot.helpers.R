@@ -6189,6 +6189,7 @@ compute.bootstrap.errors.scbandwidth =
            slice.index,
            progress.target = NULL,
            plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
@@ -6367,6 +6368,7 @@ compute.bootstrap.errors.plbandwidth =
            slice.index,
            progress.target = NULL,
            plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
@@ -6404,7 +6406,6 @@ compute.bootstrap.errors.plbandwidth =
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-
     if (is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
