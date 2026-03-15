@@ -5151,7 +5151,8 @@
 .np_inid_boot_from_conditional_localpoly_fixed_core <- function(state,
                                                                 B,
                                                                 counts = NULL,
-                                                                counts.drawer = NULL) {
+                                                                counts.drawer = NULL,
+                                                                progress.label = NULL) {
   B <- as.integer(B)
   feat.list <- lapply(seq_len(state$ngroups), function(i) {
     .np_inid_boot_from_conditional_localpoly_fixed_group_features(state = state, i = i)
@@ -5162,7 +5163,11 @@
     t0[feat$rows] <- .np_inid_boot_from_conditional_localpoly_fixed_t0(state = state, feat = feat)
 
   tmat <- matrix(NA_real_, nrow = B, ncol = state$neval)
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
