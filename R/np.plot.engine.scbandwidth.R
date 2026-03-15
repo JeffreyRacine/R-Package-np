@@ -178,14 +178,6 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
-    if (plot.errors.method == "bootstrap" &&
-        identical(plot.errors.boot.nonfixed, "frozen") &&
-        !identical(bws$type, "fixed")) {
-      stop(
-        "plot.errors.boot.nonfixed='frozen' is currently supported only for nonfixed unconditional/conditional density and distribution bootstrap routes",
-        call. = FALSE
-      )
-    }
     if (coef && plot.errors.method != "none") {
       .np_warning("coef=TRUE currently disables plot errors for smooth coefficient plots.")
       plot.errors.method <- "none"

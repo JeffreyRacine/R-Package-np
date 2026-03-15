@@ -79,7 +79,7 @@
       bronze <- lapply(bws$chromoly, paste, collapse = " + ")
 
       tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                      env = environment(formula))
+                                      env = environment(tt))
       mf.xf.args <- as.list(tmf.xf)[-1L]
       tmf.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt))
       
@@ -168,15 +168,6 @@
     common.scale <- normalized.opts$common.scale
 
     plot.errors = (plot.errors.method != "none")
-    if (plot.errors.method == "bootstrap" &&
-        identical(plot.errors.boot.nonfixed, "frozen") &&
-        !identical(bws$type, "fixed")) {
-      stop(
-        "plot.errors.boot.nonfixed='frozen' is currently supported only for nonfixed unconditional/conditional density and distribution bootstrap routes",
-        call. = FALSE
-      )
-    }
-
     if (coef) {
       fit.coef <- if (identical(plot.errors.method, "asymptotic")) {
         npplreg(
