@@ -142,14 +142,6 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
-    if (plot.errors.method == "bootstrap" &&
-        identical(plot.errors.boot.nonfixed, "frozen") &&
-        !identical(bws$type, "fixed")) {
-      stop(
-        "plot.errors.boot.nonfixed='frozen' is currently supported only for nonfixed unconditional/conditional density and distribution bootstrap routes",
-        call. = FALSE
-      )
-    }
     plot.gradient.order.label <- rep.int(1L, bws$ndim)
     if (gradients && identical(bws$regtype, "lp")) {
       go <- npValidateGlpGradientOrder(regtype = bws$regtype,
@@ -218,6 +210,7 @@
           gradient.order = gradient.order,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
           plot.errors.boot.wild = plot.errors.boot.wild,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
           plot.errors.boot.num = plot.errors.boot.num,
@@ -512,6 +505,7 @@
                       gradient.order = gradient.order,
                       slice.index = i,
                       plot.errors.boot.method = plot.errors.boot.method,
+                      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
                       plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                       plot.errors.boot.num = plot.errors.boot.num,

@@ -1258,19 +1258,19 @@
   out
 }
 
-.np_inid_boot_from_regression_localpoly_fixed <- function(xdat,
-                                                          exdat,
-                                                          bws,
-                                                          ydat,
-                                                          B,
-                                                          counts = NULL,
-                                                          counts.drawer = NULL,
-                                                          ridge = 1.0e-12,
-                                                          gradients = FALSE,
-                                                          gradient.order = 1L,
-                                                          slice.index = 1L,
-                                                          prep.label = NULL,
-                                                          progress.label = NULL) {
+.np_inid_boot_from_regression_localpoly_frozen <- function(xdat,
+                                                           exdat,
+                                                           bws,
+                                                           ydat,
+                                                           B,
+                                                           counts = NULL,
+                                                           counts.drawer = NULL,
+                                                           ridge = 1.0e-12,
+                                                           gradients = FALSE,
+                                                           gradient.order = 1L,
+                                                           slice.index = 1L,
+                                                           prep.label = NULL,
+                                                           progress.label = NULL) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   ydat <- as.double(ydat)
@@ -1282,12 +1282,9 @@
     stop("length of ydat must match training rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid inid regression bootstrap dimensions")
-  if (!identical(bws$type, "fixed"))
-    stop("local-polynomial fixed regression helper requires bwtype='fixed'")
-
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
   if (identical(regtype, "lc"))
-    stop("local-polynomial fixed regression helper requires regtype='ll' or 'lp'")
+    stop("local-polynomial frozen regression helper requires regtype='ll' or 'lp'")
 
   ncon <- bws$ncon
   degree <- if (identical(regtype, "ll")) {
@@ -1340,7 +1337,7 @@
     exdat = exdat,
     bws = bws,
     return.kernel.weights = TRUE,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = identical(bws$type, "adaptive_nn"),
     leave.one.out = FALSE
   )$kw
   if (!is.matrix(kw))
@@ -1499,6 +1496,39 @@
     stop("inid regression helper path produced non-finite values")
 
   list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_regression_localpoly_fixed <- function(xdat,
+                                                          exdat,
+                                                          bws,
+                                                          ydat,
+                                                          B,
+                                                          counts = NULL,
+                                                          counts.drawer = NULL,
+                                                          ridge = 1.0e-12,
+                                                          gradients = FALSE,
+                                                          gradient.order = 1L,
+                                                          slice.index = 1L,
+                                                          prep.label = NULL,
+                                                          progress.label = NULL) {
+  if (!identical(bws$type, "fixed"))
+    stop("local-polynomial fixed regression helper requires bwtype='fixed'")
+
+  .np_inid_boot_from_regression_localpoly_frozen(
+    xdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    ydat = ydat,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    ridge = ridge,
+    gradients = gradients,
+    gradient.order = gradient.order,
+    slice.index = slice.index,
+    prep.label = prep.label,
+    progress.label = progress.label
+  )
 }
 
 .np_inid_boot_from_regression <- function(xdat,
@@ -1728,6 +1758,97 @@
   }
 
   list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_reghat_frozen <- function(xdat,
+                                             exdat,
+                                             bws,
+                                             ydat,
+                                             B,
+                                             counts = NULL,
+                                             counts.drawer = NULL,
+                                             gradients = FALSE,
+                                             gradient.order = 1L,
+                                             slice.index = 1L,
+                                             prep.label = NULL,
+                                             progress.label = NULL) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in frozen regression bootstrap helper")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid frozen regression bootstrap dimensions")
+  if (identical(bws$type, "fixed"))
+    stop("frozen regression bootstrap helper is for nonfixed bandwidths only")
+
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  xi.factor <- isTRUE(slice.index > 0L) &&
+    !is.null(bws$xdati) &&
+    (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
+
+  if (isTRUE(xi.factor)) {
+    stop(
+      "plot.errors.boot.nonfixed='frozen' currently supports nonfixed regression means and continuous gradients only; use 'exact' for categorical slices",
+      call. = FALSE
+    )
+  }
+
+  if (identical(regtype, "lc")) {
+    if (isTRUE(gradients)) {
+      stop(
+        "plot.errors.boot.nonfixed='frozen' currently supports nonfixed local-constant regression means only; use 'exact' for local-constant gradients",
+        call. = FALSE
+      )
+    }
+
+    H <- suppressWarnings(
+      tryCatch(
+        npreghat.rbandwidth(
+          bws = bws,
+          txdat = xdat,
+          exdat = exdat,
+          s = 0L,
+          output = "matrix"
+        ),
+        error = function(e) NULL
+      )
+    )
+    if (is.null(H))
+      stop("failed to construct frozen nonfixed regression hat matrix", call. = FALSE)
+    if (!is.matrix(H))
+      H <- matrix(as.double(H), nrow = neval, ncol = n)
+    if (nrow(H) != neval || ncol(H) != n)
+      stop("frozen nonfixed regression hat matrix shape mismatch", call. = FALSE)
+
+    return(.np_inid_lc_boot_from_hat(
+      H = H,
+      ydat = ydat,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
+
+  .np_inid_boot_from_regression_localpoly_frozen(
+    xdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    ydat = ydat,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    gradients = gradients,
+    gradient.order = gradient.order,
+    slice.index = slice.index,
+    prep.label = prep.label,
+    progress.label = progress.label
+  )
 }
 
 .np_inid_boot_from_index <- function(xdat,
@@ -5802,6 +5923,7 @@ compute.bootstrap.errors.rbandwidth =
            gradient.order,
            slice.index,
            plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
@@ -5836,6 +5958,8 @@ compute.bootstrap.errors.rbandwidth =
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
+      !identical(bws$type, "fixed")
 
     cont.idx <- which(bws$xdati$icon)
     xi.factor <- isTRUE(slice.index > 0L) &&
@@ -5861,6 +5985,20 @@ compute.bootstrap.errors.rbandwidth =
       boot.out <- tryCatch(
         if (identical(bws$type, "fixed")) {
           .np_inid_boot_from_regression(
+            xdat = xdat,
+            exdat = exdat,
+            bws = bws,
+            ydat = ydat,
+            B = plot.errors.boot.num,
+            counts.drawer = counts.drawer,
+            gradients = gradients,
+            gradient.order = gradient.order,
+            slice.index = slice.index,
+            prep.label = prep.label,
+            progress.label = progress.label
+          )
+        } else if (use.frozen.nonfixed) {
+          .np_inid_boot_from_reghat_frozen(
             xdat = xdat,
             exdat = exdat,
             bws = bws,
