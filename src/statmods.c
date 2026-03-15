@@ -123,12 +123,6 @@ static int np_support_count_y(const int idx, const int num_obs, double **matrix_
   return simple_unique(num_obs, matrix_y_continuous[idx]);
 }
 
-static int np_support_kmax_cached(const int *counts, const int idx, const int num_obs)
-{
-  const int support_n = (counts != NULL) ? counts[idx] : num_obs;
-  return MAX(0, support_n - 1);
-}
-
 /* 7/24/95: Added pointer arithmetic for efficiency */
 
 /* This will generate the mean of a vector */
@@ -470,17 +464,16 @@ static int lower_bound_support(int support_n,
   return lo;
 }
 
-static int kth_unique_radius_for_eval_from_support(int support_n,
-                                                   const double *support,
-                                                   double eval_value,
-                                                   int int_k_nn,
-                                                   double *radius_out)
+static int kth_observation_radius_for_eval_from_support(int support_n,
+                                                        const double *support,
+                                                        const int *support_count,
+                                                        double eval_value,
+                                                        int int_k_nn,
+                                                        double *radius_out)
 {
-  int left, right, count, target_count;
+  int left, right, count;
   int insert_idx;
-  double last_distance;
   int exact_match;
-  int have_last;
 
   insert_idx = lower_bound_support(support_n, support, eval_value);
   exact_match = ((insert_idx < support_n) && (support[insert_idx] == eval_value));
@@ -488,18 +481,20 @@ static int kth_unique_radius_for_eval_from_support(int support_n,
   if (exact_match) {
     left = insert_idx - 1;
     right = insert_idx + 1;
+    count = support_count[insert_idx];
   } else {
     left = insert_idx - 1;
     right = insert_idx;
+    count = 0;
   }
 
-  target_count = int_k_nn + (exact_match ? 0 : 1);
+  if (count >= int_k_nn) {
+    if (exact_match)
+      return nearest_positive_radius_from_support(support_n, support, insert_idx, radius_out);
+    return 1;
+  }
 
-  count = 0;
-  have_last = 0;
-  last_distance = 0.0;
-
-  while ((count < target_count) && ((left >= 0) || (right < support_n))) {
+  while ((left >= 0) || (right < support_n)) {
     double dleft = DBL_MAX;
     double dright = DBL_MAX;
     double distance;
@@ -511,23 +506,25 @@ static int kth_unique_radius_for_eval_from_support(int support_n,
 
     distance = (dleft < dright) ? dleft : dright;
 
-    if ((distance > DBL_MIN) && ((!have_last) || (distance != last_distance))) {
-      last_distance = distance;
-      have_last = 1;
-      count++;
+    if (distance <= DBL_MIN)
+      return 1;
+
+    if ((left >= 0) && ((eval_value - support[left]) == distance)) {
+      count += support_count[left];
+      left--;
+    }
+    if ((right < support_n) && ((support[right] - eval_value) == distance)) {
+      count += support_count[right];
+      right++;
     }
 
-    while ((left >= 0) && ((eval_value - support[left]) == distance))
-      left--;
-    while ((right < support_n) && ((support[right] - eval_value) == distance))
-      right++;
+    if (count >= int_k_nn) {
+      *radius_out = distance;
+      return 0;
+    }
   }
 
-  if ((count < target_count) || (!have_last) || (last_distance <= DBL_MIN))
-    return 1;
-
-  *radius_out = last_distance;
-  return 0;
+  return 1;
 }
 
 static int compute_nn_distance_observation_support_subset(int num_obs,
@@ -603,41 +600,46 @@ static int compute_nn_distance_observation_support_subset(int num_obs,
   return 0;
 }
 
-static int compute_nn_distance_train_eval_unique_support_subset(int num_obs_train,
-                                                                int num_obs_eval,
-                                                                double *vector_data_train,
-                                                                double *vector_data_eval,
-                                                                int int_k_nn,
-                                                                int query_start,
-                                                                int query_end,
-                                                                double *nn_distance)
+static int compute_nn_distance_train_eval_observation_support_subset(int num_obs_train,
+                                                                     int num_obs_eval,
+                                                                     double *vector_data_train,
+                                                                     double *vector_data_eval,
+                                                                     int int_k_nn,
+                                                                     int query_start,
+                                                                     int query_end,
+                                                                     double *nn_distance)
 {
   int i, j, support_n;
   double *support;
+  int *support_count;
 
   support = NULL;
+  support_count = NULL;
 
   if ((query_start < 0) || (query_end >= num_obs_eval) || (query_start > query_end))
     return 1;
 
-  if (build_sorted_unique_support(num_obs_train, vector_data_train, &support, NULL, &support_n) != 0)
+  if (build_sorted_unique_support(num_obs_train, vector_data_train, &support, &support_count, &support_n) != 0)
     return 1;
 
-  if ((int_k_nn < 1) || (int_k_nn > support_n - 1)) {
+  if ((int_k_nn < 1) || (int_k_nn > num_obs_train - 1)) {
     free(support);
+    free(support_count);
     return 1;
   }
 
   for (i = query_start, j = 0; i <= query_end; i++, j++) {
-    if (kth_unique_radius_for_eval_from_support(
-          support_n, support, vector_data_eval[i], int_k_nn, &nn_distance[j]
+    if (kth_observation_radius_for_eval_from_support(
+          support_n, support, support_count, vector_data_eval[i], int_k_nn, &nn_distance[j]
         ) != 0) {
       free(support);
+      free(support_count);
       return 1;
     }
   }
 
   free(support);
+  free(support_count);
   return 0;
 }
 
@@ -766,7 +768,7 @@ int compute_nn_distance_train_eval(int num_obs_train,
 
 #ifndef MPI2
     {
-      const int rc = compute_nn_distance_train_eval_unique_support_subset(
+      const int rc = compute_nn_distance_train_eval_observation_support_subset(
         num_obs_train,
         num_obs_eval,
         vector_data_train,
@@ -777,7 +779,7 @@ int compute_nn_distance_train_eval(int num_obs_train,
         nn_distance
       );
       if ((rc != 0) && (int_VERBOSE == 1))
-        REprintf("\n** Error: Invalid Kth nearest neighbor (%d) relative to empirical support.", int_k_nn);
+        REprintf("\n** Error: Invalid Kth nearest neighbor (%d) relative to observation support.", int_k_nn);
       return rc;
     }
 
@@ -793,7 +795,7 @@ int compute_nn_distance_train_eval(int num_obs_train,
       ie = num_obs_eval - 1;
     }
 
-    if (compute_nn_distance_train_eval_unique_support_subset(
+    if (compute_nn_distance_train_eval_observation_support_subset(
           num_obs_train,
           num_obs_eval,
           vector_data_train,
@@ -811,7 +813,7 @@ int compute_nn_distance_train_eval(int num_obs_train,
     }
 		if(return_flag > 0) {
       if ((int_VERBOSE == 1) && (my_rank == 0))
-        REprintf("\n** Error: Invalid Kth nearest neighbor (%d) relative to empirical support.", int_k_nn);
+        REprintf("\n** Error: Invalid Kth nearest neighbor (%d) relative to observation support.", int_k_nn);
 			return(1);
 		}
 
@@ -886,14 +888,14 @@ int initialize_nr_directions(int BANDWIDTH,
   }else{
     for(i = 1; i <= num_reg_continuous; i++){
       const double bw_max =
-        (BANDWIDTH == BW_ADAP_NN) ?
+        ((BANDWIDTH == BW_ADAP_NN) || (BANDWIDTH == BW_GEN_NN)) ?
         (double)(num_obs - 1) :
         (double)(np_support_count_x(i - 1, num_obs, matrix_x_continuous) - 1);
       matrix_y[i][i] = ceil(MIN(vector_scale_factor[i], bw_max - vector_scale_factor[i])*(random ? ran3(&seed): 1.0));
     }
     for(i = num_reg_continuous+1; i <= li; i++){
       const double bw_max =
-        (BANDWIDTH == BW_ADAP_NN) ?
+        ((BANDWIDTH == BW_ADAP_NN) || (BANDWIDTH == BW_GEN_NN)) ?
         (double)(num_obs - 1) :
         (double)(np_support_count_y(i - num_reg_continuous - 1, num_obs, matrix_y_continuous) - 1);
       matrix_y[i][i] = ceil(MIN(vector_scale_factor[i], bw_max - vector_scale_factor[i])*(random ? ran3(&seed): 1.0));
@@ -976,7 +978,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
 
 
   const int fixed_bw = (BANDWIDTH == BW_FIXED);
-  const int adaptive_bw = (BANDWIDTH == BW_ADAP_NN);
+  const int count_bw = ((BANDWIDTH == BW_ADAP_NN) || (BANDWIDTH == BW_GEN_NN));
   double bw_nf = 0;
   const double bw_cmin = fixed_bw ? 0.0 : 1.0;
   const double bw_cmax = fixed_bw ? DBL_MAX : num_obs-1;
@@ -987,7 +989,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   // x continuous
   for(i = 0; i < num_reg_continuous; i++,l++){
     if(!fixed_bw){
-      bw_nf = MAX(1.0,ceil(sqrt(adaptive_bw ? num_obs : np_support_count_x(i, num_obs, matrix_x_continuous))));
+      bw_nf = MAX(1.0,ceil(sqrt(count_bw ? num_obs : np_support_count_x(i, num_obs, matrix_x_continuous))));
     }
     const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
@@ -1012,7 +1014,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
           vector_scale_factor[l+1] = bwi*c_init;
         }
       } else {
-        const double bw_kmax = adaptive_bw ? (double)(num_obs - 1) : (double)(np_support_count_x(i, num_obs, matrix_x_continuous) - 1);
+        const double bw_kmax = count_bw ? (double)(num_obs - 1) : (double)(np_support_count_x(i, num_obs, matrix_x_continuous) - 1);
         if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_kmax)){
           REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
           vector_scale_factor[l+1] = ceil(bwi*c_init);
@@ -1024,7 +1026,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   // y continuous
   for(i = 0; i < num_var_continuous; i++,l++){
     if(!fixed_bw){
-      bw_nf = MAX(1.0,ceil(sqrt(adaptive_bw ? num_obs : np_support_count_y(i, num_obs, matrix_y_continuous))));
+      bw_nf = MAX(1.0,ceil(sqrt(count_bw ? num_obs : np_support_count_y(i, num_obs, matrix_y_continuous))));
     }
     const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
@@ -1049,7 +1051,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
           vector_scale_factor[l+1] = bwi*c_init;
         }
       } else {
-        const double bw_kmax = adaptive_bw ? (double)(num_obs - 1) : (double)(np_support_count_y(i, num_obs, matrix_y_continuous) - 1);
+        const double bw_kmax = count_bw ? (double)(num_obs - 1) : (double)(np_support_count_y(i, num_obs, matrix_y_continuous) - 1);
         if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_kmax)){
           REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
           vector_scale_factor[l+1] = ceil(bwi*c_init);
@@ -1722,15 +1724,7 @@ double *vector_scale_factor)
                 return(1);
             }
         }
-        else if(BANDWIDTH == BW_GEN_NN)
-        {
-            const int kmax = np_support_kmax_cached(vector_X_support_count_extern, i - 1, num_obs);
-            if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > kmax) )
-            {
-                return(1);
-            }
-        }
-        else if(BANDWIDTH == BW_ADAP_NN)
+        else if((BANDWIDTH == BW_GEN_NN) || (BANDWIDTH == BW_ADAP_NN))
         {
             if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > num_obs - 1) )
             {
@@ -1751,15 +1745,7 @@ double *vector_scale_factor)
                 return(1);
             }
         }
-        else if(BANDWIDTH == BW_GEN_NN)
-        {
-            const int kmax = np_support_kmax_cached(vector_Y_support_count_extern, i - num_reg_continuous - 1, num_obs);
-            if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > kmax ) )
-            {
-                return(1);
-            }
-        }
-        else if(BANDWIDTH == BW_ADAP_NN)
+        else if((BANDWIDTH == BW_GEN_NN) || (BANDWIDTH == BW_ADAP_NN))
         {
             if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > num_obs - 1 ) )
             {
