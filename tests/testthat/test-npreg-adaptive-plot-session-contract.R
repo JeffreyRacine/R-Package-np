@@ -132,3 +132,57 @@ test_that("session adaptive-nn lc plot-data mean matches public npreg and npregh
   expect_true(any(grepl("SESSION_NPREG_ADAPTIVE_LC_PLOT_PARITY_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
+
+test_that("session adaptive-nn lc exact geom plot-data completes and reports bootstrap progress", {
+  skip_on_cran()
+
+  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=TRUE, np.plot.progress.noninteractive=TRUE)",
+      "set.seed(42)",
+      "n <- 100L",
+      "x <- runif(n, -1, 1)",
+      "y <- x^2 + rnorm(n, sd = 0.25 * stats::sd(x))",
+      "dat <- data.frame(x=x, y=y)",
+      "fit <- npreg(y ~ x, data=dat, nmulti=1L, regtype='lc', bwtype='adaptive_nn')",
+      "out <- suppressWarnings(plot(",
+      "  fit,",
+      "  plot.behavior='data',",
+      "  view='fixed',",
+      "  perspective=FALSE,",
+      "  neval=50L,",
+      "  plot.errors.method='bootstrap',",
+      "  plot.errors.boot.method='geom',",
+      "  plot.errors.boot.num=19L,",
+      "  plot.errors.type='pointwise',",
+      "  plot.errors.boot.nonfixed='exact'))",
+      "stopifnot(is.list(out), inherits(out[[1L]], 'npregression'))",
+      "eval.grid <- data.frame(x = out[[1L]]$eval[, 1L])",
+      "fit.oracle <- npreg(bws=fit$bws, txdat=data.frame(x=x), tydat=y, exdat=eval.grid, gradients=FALSE, warn.glp.gradient=FALSE)",
+      "hat.oracle <- npreghat(bws=fit$bws, txdat=data.frame(x=x), exdat=eval.grid, y=y, output='apply')",
+      "stopifnot(length(out[[1L]]$mean) == 50L)",
+      "stopifnot(max(abs(out[[1L]]$mean - fit.oracle$mean)) < 1e-8)",
+      "stopifnot(max(abs(out[[1L]]$mean - hat.oracle)) < 1e-8)",
+      "stopifnot(all(is.finite(out[[1L]]$merr)))",
+      "cat('SESSION_NPREG_ADAPTIVE_LC_EXACT_GEOM_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  if (res$status != 0L && .npreg_adaptive_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for session-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPREG_ADAPTIVE_LC_EXACT_GEOM_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("Preparing plot bootstrap geom", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("Plot bootstrap", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
