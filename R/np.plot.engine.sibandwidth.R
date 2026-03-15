@@ -88,15 +88,6 @@
     common.scale <- normalized.opts$common.scale
 
     plot.errors = (plot.errors.method != "none")
-    if (plot.errors.method == "bootstrap" &&
-        identical(plot.errors.boot.nonfixed, "frozen") &&
-        !identical(bws$type, "fixed")) {
-      stop(
-        "plot.errors.boot.nonfixed='frozen' is currently supported only for nonfixed unconditional/conditional density and distribution bootstrap routes",
-        call. = FALSE
-      )
-    }
-
 
     plot.layout <- .np_plot_layout_begin(
       plot.behavior = plot.behavior,
@@ -180,6 +171,7 @@
                   xdat = xdat, ydat = ydat,
                   gradients = gradients,
                   plot.errors.boot.method = plot.errors.boot.method,
+                  plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
                   plot.errors.boot.wild = plot.errors.boot.wild,
                   plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                   plot.errors.boot.num = plot.errors.boot.num,

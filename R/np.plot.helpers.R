@@ -1858,8 +1858,23 @@
                                      counts = NULL,
                                      counts.drawer = NULL,
                                      gradients = FALSE,
+                                     frozen = FALSE,
                                      idx.eval = NULL,
                                      progress.label = NULL) {
+  if (isTRUE(frozen)) {
+    return(.np_inid_boot_from_index_frozen(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bws,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      gradients = gradients,
+      idx.eval = idx.eval,
+      progress.label = progress.label
+    ))
+  }
+
   if (!identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_index_exact(
       xdat = xdat,
@@ -2067,6 +2082,48 @@
   }
 
   list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_index_frozen <- function(xdat,
+                                            ydat,
+                                            bws,
+                                            B,
+                                            counts = NULL,
+                                            counts.drawer = NULL,
+                                            gradients = FALSE,
+                                            idx.eval = NULL,
+                                            progress.label = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in frozen single-index bootstrap helper")
+  if (n < 1L || B < 1L)
+    stop("invalid frozen single-index bootstrap dimensions")
+  if (identical(bws$type, "fixed"))
+    stop("frozen single-index bootstrap helper is for nonfixed bandwidths only")
+
+  idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+  if (is.null(idx.eval))
+    idx.eval <- idx.train
+  idx.eval <- toFrame(idx.eval)
+
+  H <- .np_plot_singleindex_hat_matrix_index(
+    bws = bws,
+    idx.train = idx.train,
+    idx.eval = idx.eval,
+    s = if (isTRUE(gradients)) 1L else 0L
+  )
+
+  .np_plot_boot_from_frozen_operator(
+    H = H,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
+  )
 }
 
 .np_inid_boot_from_index_gradient_fixed <- function(xdat,
@@ -6886,6 +6943,7 @@ compute.bootstrap.errors.sibandwidth =
   function(xdat, ydat,
            gradients,
            plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
@@ -6926,6 +6984,8 @@ compute.bootstrap.errors.sibandwidth =
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method=="inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
+      !identical(bws$type, "fixed")
 
     if (is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
@@ -6952,7 +7012,7 @@ compute.bootstrap.errors.sibandwidth =
         progress.label = progress.label
       )
     } else if (is.inid) {
-      inid.helper.ok <- (!isTRUE(gradients)) || identical(bws$type, "fixed")
+      inid.helper.ok <- isTRUE(use.frozen.nonfixed) || (!isTRUE(gradients)) || identical(bws$type, "fixed")
       if (!isTRUE(inid.helper.ok)) {
         stop("inid bootstrap requires helper mode with gradients=FALSE in compute.bootstrap.errors.sibandwidth", call. = FALSE)
       } else {
@@ -6963,6 +7023,7 @@ compute.bootstrap.errors.sibandwidth =
             bws = bws,
             B = plot.errors.boot.num,
             gradients = gradients,
+            frozen = use.frozen.nonfixed,
             idx.eval = idx.eval,
             progress.label = progress.label
           )
@@ -6973,7 +7034,7 @@ compute.bootstrap.errors.sibandwidth =
         })
       }
     } else if (is.block) {
-      block.helper.ok <- (!isTRUE(gradients)) || identical(bws$type, "fixed")
+      block.helper.ok <- isTRUE(use.frozen.nonfixed) || (!isTRUE(gradients)) || identical(bws$type, "fixed")
       if (!isTRUE(block.helper.ok)) {
         stop(sprintf("%s bootstrap requires helper mode with gradients=FALSE in compute.bootstrap.errors.sibandwidth", plot.errors.boot.method), call. = FALSE)
       } else {
@@ -6991,6 +7052,7 @@ compute.bootstrap.errors.sibandwidth =
             B = plot.errors.boot.num,
             counts.drawer = counts.drawer,
             gradients = gradients,
+            frozen = use.frozen.nonfixed,
             idx.eval = idx.eval,
             progress.label = progress.label
           )
