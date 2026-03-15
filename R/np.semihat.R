@@ -210,6 +210,25 @@
   ))
 }
 
+.np_indexhat_ll_owner_rbw <- function(bws, idx.train) {
+  base <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+  npregbw(
+    xdat = idx.train,
+    ydat = rep.int(0.0, nrow(idx.train)),
+    bws = base$bw,
+    regtype = "ll",
+    bwtype = base$type,
+    bandwidth.compute = FALSE,
+    ckertype = base$ckertype,
+    ckerorder = base$ckerorder,
+    ckerbound = base$ckerbound,
+    ckerlb = base$ckerlb,
+    ckerub = base$ckerub,
+    ukertype = base$ukertype,
+    okertype = base$okertype
+  )
+}
+
 .np_indexhat_numeric_y <- function(y) {
   if (is.factor(y) || is.vector(y))
     return(matrix(as.double(y), ncol = 1L))
@@ -359,9 +378,61 @@
                                output = c("matrix", "apply"),
                                s = 0L) {
   output <- match.arg(output)
-  if (s == 1L) {
-    rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+  spec <- .npindex_resolve_spec(bws, where = "npindexhat")
+  regtype <- if (!is.null(bws$regtype)) as.character(bws$regtype)[1L] else spec$regtype.engine
+  regtype.engine <- spec$regtype.engine
+  if (identical(regtype, "ll")) {
+    out <- .npRmpi_with_local_hat_helper(npreghat(
+      bws = .np_indexhat_ll_owner_rbw(bws = bws, idx.train = idx.train),
+      txdat = idx.train,
+      exdat = idx.eval,
+      y = y,
+      output = output,
+      s = s
+    ))
 
+    if (!identical(output, "matrix"))
+      return(out)
+
+    return(matrix(
+      as.double(out),
+      nrow = nrow(out),
+      ncol = ncol(out),
+      dimnames = dimnames(out)
+    ))
+  }
+
+  if (identical(regtype.engine, "lc")) {
+    kbw <- .np_indexhat_kbw(bws = bws, idx.train = idx.train)
+    kw <- .np_kernel_weights_direct(
+      bws = kbw,
+      txdat = idx.train,
+      exdat = idx.eval,
+      bandwidth.divide = TRUE,
+      kernel.pow = 1.0
+    )
+    if (!is.matrix(kw))
+      kw <- matrix(kw, nrow = nrow(idx.train))
+    den <- pmax(colSums(kw), .Machine$double.eps)
+
+    if (identical(output, "matrix")) {
+      return(sweep(t(kw), 1L, den, "/", check.margin = FALSE))
+    }
+
+    if (is.null(y))
+      stop("argument 'y' is required when output='apply'")
+
+    y <- .np_indexhat_numeric_y(y)
+    if (nrow(y) != nrow(idx.train))
+      stop("number of rows in 'y' must equal number of training rows")
+
+    out <- sweep(t(kw), 1L, den, "/", check.margin = FALSE) %*% y
+    return(if (ncol(out) == 1L) as.vector(out) else out)
+  }
+
+  rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+
+  if (s == 1L) {
     fit_one <- function(ycol) {
       fit <- .npRmpi_with_local_regression(.np_regression_direct(
         bws = rbw,
@@ -406,62 +477,15 @@
     return(H)
   }
 
-  spec <- .npindex_resolve_spec(bws, where = "npindexhat")
-  regtype <- spec$regtype.engine
-  if (identical(regtype, "lc")) {
-    kbw <- .np_indexhat_kbw(bws = bws, idx.train = idx.train)
-    kw <- .np_kernel_weights_direct(
-      bws = kbw,
-      txdat = idx.train,
-      exdat = idx.eval,
-      bandwidth.divide = TRUE,
-      kernel.pow = 1.0
-    )
-    if (!is.matrix(kw))
-      kw <- matrix(kw, nrow = nrow(idx.train))
-    den <- pmax(colSums(kw), .Machine$double.eps)
-
-    if (identical(output, "matrix")) {
-      return(sweep(t(kw), 1L, den, "/", check.margin = FALSE))
-    }
-
-    if (is.null(y))
-      stop("argument 'y' is required when output='apply'")
-
-    y <- .np_indexhat_numeric_y(y)
-    if (nrow(y) != nrow(idx.train))
-      stop("number of rows in 'y' must equal number of training rows")
-
-    out <- sweep(t(kw), 1L, den, "/", check.margin = FALSE) %*% y
-    return(if (ncol(out) == 1L) as.vector(out) else out)
-  }
-
-  rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-
   fit_one <- function(ycol) {
-    fit <- if (s == 1L) {
-      .npRmpi_with_local_regression(.np_regression_direct(
-        bws = rbw,
-        txdat = idx.train,
-        tydat = ycol,
-        exdat = idx.eval,
-        gradients = TRUE,
-        gradient.order = 1L
-      ))
-    } else {
-      .npRmpi_with_local_regression(.np_regression_direct(
-        bws = rbw,
-        txdat = idx.train,
-        tydat = ycol,
-        exdat = idx.eval,
-        gradients = FALSE,
-        gradient.order = 1L
-      ))
-    }
-    if (s == 1L)
-      fit$grad[, 1L]
-    else
-      fit$mean
+    fit <- .npRmpi_with_local_regression(.np_regression_direct(
+      bws = rbw,
+      txdat = idx.train,
+      tydat = ycol,
+      exdat = idx.eval,
+      gradients = FALSE
+    ))
+    fit$mean
   }
 
   if (identical(output, "matrix")) {

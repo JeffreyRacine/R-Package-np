@@ -1585,8 +1585,23 @@
                                      counts = NULL,
                                      counts.drawer = NULL,
                                      gradients = FALSE,
+                                     frozen = FALSE,
                                      idx.eval = NULL,
                                      progress.label = NULL) {
+  if (isTRUE(frozen)) {
+    return(.np_inid_boot_from_index_frozen(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bws,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      gradients = gradients,
+      idx.eval = idx.eval,
+      progress.label = progress.label
+    ))
+  }
+
   if (!identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_index_exact(
       xdat = xdat,
@@ -1799,6 +1814,48 @@
   }
 
   list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_index_frozen <- function(xdat,
+                                            ydat,
+                                            bws,
+                                            B,
+                                            counts = NULL,
+                                            counts.drawer = NULL,
+                                            gradients = FALSE,
+                                            idx.eval = NULL,
+                                            progress.label = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in frozen single-index bootstrap helper")
+  if (n < 1L || B < 1L)
+    stop("invalid frozen single-index bootstrap dimensions")
+  if (identical(bws$type, "fixed"))
+    stop("frozen single-index bootstrap helper is for nonfixed bandwidths only")
+
+  idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+  if (is.null(idx.eval))
+    idx.eval <- idx.train
+  idx.eval <- toFrame(idx.eval)
+
+  H <- .np_plot_singleindex_hat_matrix_index(
+    bws = bws,
+    idx.train = idx.train,
+    idx.eval = idx.eval,
+    s = if (isTRUE(gradients)) 1L else 0L
+  )
+
+  .np_plot_boot_from_frozen_operator(
+    H = H,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
+  )
 }
 
 .np_inid_boot_from_index_gradient_fixed <- function(xdat,
@@ -6380,14 +6437,14 @@ plotFactor <- function(f, y, ...){
 
       if (isTRUE(gradients)) {
         rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-        fit.grad <- .np_regression_direct(
+        fit.grad <- .npRmpi_with_local_regression(.np_regression_direct(
           bws = rbw,
           txdat = idx.train,
           tydat = ydat,
           exdat = idx.eval,
           gradients = TRUE,
           gradient.order = 1L
-        )
+        ))
         grad.index <- as.vector(fit.grad$grad[, 1L])
         out$mean <- as.vector(fit.grad$mean)
         out$grad.index <- grad.index
@@ -9070,6 +9127,7 @@ compute.bootstrap.errors.sibandwidth =
   function(xdat, ydat,
            gradients,
            plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
@@ -9115,6 +9173,8 @@ compute.bootstrap.errors.sibandwidth =
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method=="inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
+      !identical(bws$type, "fixed")
 
     if (is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
@@ -9154,7 +9214,7 @@ compute.bootstrap.errors.sibandwidth =
       })
     } else if (is.inid) {
       inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
-        ((!isTRUE(gradients)) || identical(bws$type, "fixed"))
+        (isTRUE(use.frozen.nonfixed) || (!isTRUE(gradients)) || identical(bws$type, "fixed"))
     if (!isTRUE(inid.helper.ok)) {
       stop("inid single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     } else {
@@ -9166,6 +9226,7 @@ compute.bootstrap.errors.sibandwidth =
               bws = bws,
               B = plot.errors.boot.num,
               gradients = gradients,
+              frozen = use.frozen.nonfixed,
               idx.eval = idx.eval,
               progress.label = progress.label
             )
@@ -9178,7 +9239,7 @@ compute.bootstrap.errors.sibandwidth =
       }
     } else if (is.block) {
       block.helper.ok <- isTRUE(.np_plot_block_fastpath_enabled()) &&
-        ((!isTRUE(gradients)) || identical(bws$type, "fixed"))
+        (isTRUE(use.frozen.nonfixed) || (!isTRUE(gradients)) || identical(bws$type, "fixed"))
       if (!isTRUE(block.helper.ok)) {
         stop("fixed/geom single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
       } else {
@@ -9197,6 +9258,7 @@ compute.bootstrap.errors.sibandwidth =
                   sim = plot.errors.boot.method
                 ),
                 gradients = gradients,
+                frozen = use.frozen.nonfixed,
                 idx.eval = idx.eval,
                 progress.label = progress.label
               )

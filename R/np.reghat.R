@@ -132,6 +132,68 @@ npreghat <-
   H
 }
 
+.npreghat_exact_ll_matrix_from_kernel_weights <- function(bws, txdat, exdat = NULL, s = NULL) {
+  miss.ex <- is.null(exdat)
+  eval.data <- if (miss.ex) txdat else exdat
+  ntrain <- nrow(txdat)
+  neval <- nrow(eval.data)
+  kw <- .np_kernel_weights_direct(
+    bws = bws,
+    txdat = txdat,
+    exdat = if (miss.ex) NULL else eval.data,
+    leave.one.out = FALSE,
+    bandwidth.divide = identical(bws$type, "adaptive_nn"),
+    kernel.pow = 1.0
+  )
+
+  xcon.train <- as.matrix(txdat[, bws$icon, drop = FALSE])
+  xcon.eval <- as.matrix(eval.data[, bws$icon, drop = FALSE])
+  design <- cbind(1.0, xcon.train)
+  H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+
+  want.grad <- length(s) > 0L && any(s > 0L)
+  target.cont <- if (want.grad) which(s == 1L) else integer(0)
+
+  for (j in seq_len(neval)) {
+    w <- kw[, j]
+    A.base <- crossprod(design, design * w)
+    rhs.base <- t(design * w)
+    solved <- tryCatch(solve(A.base, rhs.base), error = function(e) NULL)
+
+    if (is.null(solved) || !all(is.finite(solved))) {
+      eps <- 1.0 / ntrain
+      nepsilon <- 0.0
+      A.try <- A.base
+      rhs.try <- rhs.base
+      diag(A.try) <- diag(A.try) + eps
+      solved <- tryCatch(solve(A.try, rhs.try), error = function(e) NULL)
+
+      while (is.null(solved) || !all(is.finite(solved))) {
+        diag(A.try) <- diag(A.try) + eps
+        nepsilon <- nepsilon + eps
+        solved <- tryCatch(solve(A.try, rhs.try), error = function(e) NULL)
+      }
+
+      if (nepsilon > 0.0) {
+        sumw <- sum(w)
+        if (sumw == 0.0)
+          sumw <- .Machine$double.xmin
+        rhs.try[1L, ] <- rhs.try[1L, ] + nepsilon * (w / sumw)
+        solved <- solve(A.try, rhs.try)
+      }
+    }
+
+    if (!want.grad) {
+      fit.weights <- c(1.0, xcon.eval[j, , drop = TRUE])
+      H[j, ] <- drop(fit.weights %*% solved)
+    } else {
+      H[j, ] <- solved[1L + target.cont, ]
+    }
+  }
+
+  H
+}
+
 .np_kernel_weights_direct <- function(bws,
                                       txdat,
                                       exdat = NULL,
@@ -821,6 +883,14 @@ npreghat.rbandwidth <-
           )
       )
 
+    exact.ll.kernel.route <- !isTRUE(leave.one.out) &&
+      simple.operator.request &&
+      identical(bws$type, "adaptive_nn") &&
+      identical(regtype, "ll") &&
+      identical(bws$nuno, 0L) &&
+      identical(bws$nord, 0L) &&
+      (bws$ncon > 0L)
+
     if (direct.apply) {
       direct.args <- list(
         bws = bws,
@@ -841,12 +911,21 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- .npreghat_exact_matrix_from_core(
-        bws = bws,
-        txdat = txdat,
-        exdat = if (no.ex) NULL else exdat,
-        s = s
-      )
+      H <- if (exact.ll.kernel.route) {
+        .npreghat_exact_ll_matrix_from_kernel_weights(
+          bws = bws,
+          txdat = txdat,
+          exdat = if (no.ex) NULL else exdat,
+          s = s
+        )
+      } else {
+        .npreghat_exact_matrix_from_core(
+          bws = bws,
+          txdat = txdat,
+          exdat = if (no.ex) NULL else exdat,
+          s = s
+        )
+      }
 
       if (identical(output, "apply")) {
         if (is.null(y))
