@@ -289,6 +289,8 @@
           slice.index = 0,
           progress.target = "surf 1/1",
           plot.errors.boot.method = plot.errors.boot.method,
+          t0.override = as.vector(tobj$mean),
+          plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
           plot.errors.boot.wild = plot.errors.boot.wild,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
           plot.errors.boot.num = plot.errors.boot.num,
@@ -544,6 +546,8 @@
                         slice.index = plot.index
                       ),
                       plot.errors.boot.method = plot.errors.boot.method,
+                      t0.override = as.vector(tobj$mean),
+                      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
                       plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                       plot.errors.boot.num = plot.errors.boot.num,
@@ -734,6 +738,8 @@
                         slice.index = plot.index
                       ),
                       plot.errors.boot.method = plot.errors.boot.method,
+                      t0.override = as.vector(tobj$mean),
+                      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
                       plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                       plot.errors.boot.num = plot.errors.boot.num,

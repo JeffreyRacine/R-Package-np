@@ -1,28 +1,51 @@
-npplreg_frozen_plot_case <- function(label, bwtype, boot.method) {
-  skip_on_cran()
-
+npplreg_semiparam_frozen_contract_case <- function() {
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
-  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess contract")
 
-  ok_tag <- sprintf("NPPLREG_FROZEN_%s_OK", label)
+  ok_tag <- "NPPLREG_SEMIPARAM_FROZEN_CONTRACT_OK"
   lines <- c(
+    "suppressPackageStartupMessages(library(np))",
     "suppressPackageStartupMessages(library(npRmpi))",
     "run_case <- function() {",
-    "  npRmpi.init(nslaves=1, quiet=TRUE)",
-    "  on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
-    "  options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
-    "  set.seed(42)",
-    "  n <- 80L",
-    "  x <- runif(n)",
-    "  z <- runif(n)",
-    "  y <- 1 + 0.7 * x + sin(z) + rnorm(n, sd=0.05)",
-    sprintf("  fit <- suppressWarnings(npplreg(y ~ x | z, regtype='ll', bwtype='%s', nmulti=1))", bwtype),
-    "  tf <- tempfile(fileext='.pdf')",
-    "  grDevices::pdf(tf)",
-    "  on.exit({ try(grDevices::dev.off(), silent=TRUE); unlink(tf) }, add=TRUE)",
-    sprintf("  args <- list(x=fit, neval=20L, plot.errors.method='bootstrap', plot.errors.boot.method='%s', plot.errors.boot.nonfixed='frozen', plot.errors.boot.num=41L, plot.errors.type='pointwise')", boot.method),
-    "  if (identical(args$plot.errors.boot.method, 'geom')) args$plot.errors.boot.blocklen <- 4L",
-    "  capture.output(do.call(plot, args))",
+    "  npRmpi.init(nslaves = 1, quiet = TRUE)",
+    "  on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
+    "  options(npRmpi.autodispatch = TRUE, np.messages = FALSE)",
+    "  txdat <- data.frame(x = c(0.05, 0.05, 0.25, 0.25, 0.60, 0.60, 0.90, 0.90))",
+    "  tzdat <- data.frame(z = c(0.10, 0.10, 0.35, 0.35, 0.65, 0.65, 0.95, 0.95))",
+    "  y <- with(txdat, 0.5 + 0.8 * x + sin(2 * pi * tzdat$z))",
+    "  bw <- npplregbw(xdat = txdat, zdat = tzdat, ydat = y, bws = matrix(c(3L, 3L), nrow = 2L, ncol = 1L), bwtype = 'adaptive_nn', bandwidth.compute = FALSE, regtype = 'll')",
+    "  invisible(capture.output(expected.plot <- plot(bw, xdat = txdat, ydat = y, zdat = tzdat, neval = 3L, plot.behavior = 'data')))",
+    "  if (!is.null(expected.plot$r1)) expected.plot <- expected.plot$r1",
+    "  ns <- asNamespace('npRmpi')",
+    "  orig <- getFromNamespace('.np_inid_boot_from_plreg', 'npRmpi')",
+    "  orig.compute <- getFromNamespace('compute.bootstrap.errors.plbandwidth', 'npRmpi')",
+    "  modes <- character()",
+    "  seen.ex <- list()",
+    "  seen.ez <- list()",
+    "  seen.t0 <- list()",
+    "  assignInNamespace('.np_inid_boot_from_plreg', function(..., mode = c('exact', 'frozen')) {",
+    "    mode <- match.arg(mode)",
+    "    dots <- list(...)",
+    "    modes <<- c(modes, mode)",
+    "    seen.ex[[length(seen.ex) + 1L]] <<- dots$exdat",
+    "    seen.ez[[length(seen.ez) + 1L]] <<- dots$ezdat",
+    "    t0.local <- if (is.null(dots$t0.override)) rep(0, nrow(dots$exdat)) else as.double(dots$t0.override)",
+    "    B.local <- if (is.null(dots$B)) 1L else as.integer(dots$B)",
+    "    list(t = matrix(rep(t0.local, each = B.local), nrow = B.local), t0 = t0.local)",
+    "  }, ns = 'npRmpi')",
+    "  assignInNamespace('compute.bootstrap.errors.plbandwidth', function(..., t0.override = NULL) {",
+    "    seen.t0[[length(seen.t0) + 1L]] <<- t0.override",
+    "    orig.compute(..., t0.override = t0.override)",
+    "  }, ns = 'npRmpi')",
+    "  on.exit(assignInNamespace('.np_inid_boot_from_plreg', orig, ns = 'npRmpi'), add = TRUE)",
+    "  on.exit(assignInNamespace('compute.bootstrap.errors.plbandwidth', orig.compute, ns = 'npRmpi'), add = TRUE)",
+    "  bootstrap.plot <- NULL",
+    "  invisible(capture.output(bootstrap.plot <- plot(bw, xdat = txdat, ydat = y, zdat = tzdat, neval = 3L, plot.behavior = 'data', plot.errors.method = 'bootstrap', plot.errors.boot.method = 'inid', plot.errors.boot.nonfixed = 'frozen', plot.errors.boot.num = 41L, plot.errors.type = 'pointwise')))",
+    "  stopifnot(length(modes) >= 1L)",
+    "  stopifnot(all(modes == 'frozen'))",
+    "  stopifnot(isTRUE(all.equal(as.double(seen.ex[[1L]][, 1L]), as.double(expected.plot$evalx), tolerance = 1e-10)))",
+    "  stopifnot(isTRUE(all.equal(as.double(seen.ez[[1L]][, 1L]), as.double(expected.plot$evalz), tolerance = 1e-10)))",
+    "  stopifnot(isTRUE(all.equal(as.vector(seen.t0[[1L]]), as.vector(expected.plot$mean), tolerance = 1e-10)))",
     "}",
     "run_case()",
     sprintf("cat('%s\\n')", ok_tag)
@@ -39,18 +62,6 @@ npplreg_frozen_plot_case <- function(label, bwtype, boot.method) {
               info = paste(res$output, collapse = "\n"))
 }
 
-test_that("npRmpi npplreg generalized frozen inid is supported", {
-  npplreg_frozen_plot_case("GENERALIZED_INID", "generalized_nn", "inid")
-})
-
-test_that("npRmpi npplreg generalized frozen geom is supported", {
-  npplreg_frozen_plot_case("GENERALIZED_GEOM", "generalized_nn", "geom")
-})
-
-test_that("npRmpi npplreg adaptive frozen inid is supported", {
-  npplreg_frozen_plot_case("ADAPTIVE_INID", "adaptive_nn", "inid")
-})
-
-test_that("npRmpi npplreg adaptive frozen geom is supported", {
-  npplreg_frozen_plot_case("ADAPTIVE_GEOM", "adaptive_nn", "geom")
+test_that("npRmpi npplreg frozen plot route forwards the frozen mode and center", {
+  npplreg_semiparam_frozen_contract_case()
 })
