@@ -2349,20 +2349,19 @@
   out
 }
 
-.np_inid_boot_from_scoef <- function(txdat,
-                                     ydat,
-                                     tzdat,
-                                     exdat,
-                                     ezdat,
-                                     bws,
-                                     B,
-                                     counts = NULL,
-                                     counts.drawer = NULL,
-                                     leave.one.out = FALSE,
-                                     progress.label = NULL) {
+.np_inid_boot_from_scoef_frozen <- function(txdat,
+                                            ydat,
+                                            tzdat,
+                                            exdat,
+                                            ezdat,
+                                            bws,
+                                            B,
+                                            counts = NULL,
+                                            counts.drawer = NULL,
+                                            leave.one.out = FALSE,
+                                            progress.label = NULL) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
-  B <- as.integer(B)
 
   miss.z <- missing(tzdat) || is.null(tzdat)
   if (miss.z) {
@@ -2385,74 +2384,86 @@
   if (length(ydat) != nrow(txdat))
     stop("length of ydat must match training rows in smooth coefficient inid helper")
 
-  txdat <- adjustLevels(txdat, bws$xdati)
-  exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
-  if (!miss.z) {
-    tzdat <- adjustLevels(tzdat, bws$zdati)
-    ezdat <- adjustLevels(ezdat, bws$zdati, allowNewCells = TRUE)
-  }
-
-  y.num <- .np_inid_scoef_numeric_y(ydat = ydat, bws = bws)
-  X.train <- toMatrix(txdat)
-  X.eval <- toMatrix(exdat)
-  W.train <- as.matrix(data.frame(1, X.train))
-  W.eval <- as.matrix(data.frame(1, X.eval))
-
-  kw <- .npscoef_weight_matrix(
+  hat.args <- list(
     bws = bws,
-    tzdat = tzdat,
-    ezdat = ezdat,
+    txdat = txdat,
+    exdat = exdat,
+    output = "matrix",
+    iterate = FALSE,
     leave.one.out = leave.one.out
   )
-  if (!is.matrix(kw))
-    kw <- matrix(kw, nrow = nrow(txdat))
-
-  n <- nrow(W.train)
-  neval <- nrow(W.eval)
-  if (nrow(kw) != n || ncol(kw) != neval)
-    stop("smooth coefficient inid helper kernel-weight matrix shape mismatch")
-
-  p <- ncol(W.train)
-  mcols <- p * (p + 1L) / 2L
-  ones <- matrix(1.0, nrow = n, ncol = 1L)
-  ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
-
-  Mfeat <- vector("list", neval)
-  Zfeat <- vector("list", neval)
-  t0 <- numeric(neval)
-
-  for (i in seq_len(neval)) {
-    k <- as.double(kw[, i])
-    WK <- W.train * k
-
-    zf <- WK * y.num
-    mf <- matrix(0.0, nrow = n, ncol = mcols)
-    idx <- 1L
-    for (a in seq_len(p)) {
-      for (b in a:p) {
-        mf[, idx] <- WK[, a] * W.train[, b]
-        idx <- idx + 1L
-      }
-    }
-
-    Mfeat[[i]] <- mf
-    Zfeat[[i]] <- zf
-
-    M0 <- crossprod(ones, mf)
-    Z0 <- crossprod(ones, zf)
-    t0i <- .np_inid_scoef_predict_chunk(Mvals = M0, Zvals = Z0, rhs = W.eval[i, ])[1L]
-    if (!is.finite(t0i)) {
-      t0i <- .np_inid_scoef_predict_row(
-        mrow = M0[1L, ],
-        zrow = Z0[1L, ],
-        rhs = W.eval[i, ],
-        ridge.grid = ridge.grid
-      )
-    }
-    t0[i] <- t0i
+  if (!miss.z) {
+    hat.args$tzdat <- tzdat
+    hat.args$ezdat <- ezdat
   }
 
-  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  H <- do.call(npscoefhat, hat.args)
+  .np_inid_lc_boot_from_hat(
+    H = H,
+    ydat = .np_inid_scoef_numeric_y(ydat = ydat, bws = bws),
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
+  )
+}
+
+.np_inid_boot_from_scoef_exact <- function(txdat,
+                                           ydat,
+                                           tzdat,
+                                           exdat,
+                                           ezdat,
+                                           bws,
+                                           B,
+                                           counts = NULL,
+                                           counts.drawer = NULL,
+                                           leave.one.out = FALSE,
+                                           progress.label = NULL) {
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(B)
+
+  miss.z <- missing(tzdat) || is.null(tzdat)
+  if (miss.z) {
+    tzdat <- txdat
+    ezdat <- exdat
+  } else {
+    tzdat <- toFrame(tzdat)
+    ezdat <- toFrame(ezdat)
+  }
+
+  if (nrow(txdat) != nrow(tzdat))
+    stop("smooth coefficient exact helper requires aligned txdat/tzdat rows")
+  if (nrow(exdat) != nrow(ezdat))
+    stop("smooth coefficient exact helper requires aligned exdat/ezdat rows")
+  if (ncol(txdat) != ncol(exdat))
+    stop("smooth coefficient exact helper requires matching txdat/exdat columns")
+  if (nrow(txdat) < 1L || nrow(exdat) < 1L || B < 1L)
+    stop("invalid smooth coefficient exact helper dimensions")
+  if (length(ydat) != nrow(txdat))
+    stop("length of ydat must match training rows in smooth coefficient exact helper")
+
+  fit.fun <- function(tx.train, y.train, tz.train) {
+    hat.args <- list(
+      bws = bws,
+      txdat = tx.train,
+      exdat = exdat,
+      y = y.train,
+      output = "apply",
+      iterate = FALSE,
+      leave.one.out = leave.one.out
+    )
+    if (!miss.z) {
+      hat.args$tzdat <- tz.train
+      hat.args$ezdat <- ezdat
+    }
+    as.vector(do.call(npscoefhat, hat.args))
+  }
+
+  t0 <- fit.fun(tx.train = txdat, y.train = ydat, tz.train = tzdat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+  n <- nrow(txdat)
+  counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
   progress.label <- if (is.null(progress.label)) {
     if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
   } else {
@@ -2463,63 +2474,85 @@
     .np_plot_progress_end(progress)
   }, add = TRUE)
 
-  fill_chunk <- function(counts.chunk, start, stopi) {
-    bsz <- ncol(counts.chunk)
-    for (i in seq_len(neval)) {
-      Mvals <- crossprod(counts.chunk, Mfeat[[i]])
-      Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      if (bsz == 1L) {
-        Mvals <- matrix(Mvals, nrow = 1L)
-        Zvals <- matrix(Zvals, nrow = 1L)
-      }
-      out <- .np_inid_scoef_predict_chunk(Mvals = Mvals, Zvals = Zvals, rhs = W.eval[i, ])
-      bad <- which(!is.finite(out))
-      if (length(bad)) {
-        for (bb in bad) {
-          out[bb] <- .np_inid_scoef_predict_row(
-            mrow = Mvals[bb, ],
-            zrow = Zvals[bb, ],
-            rhs = W.eval[i, ],
-            ridge.grid = ridge.grid
-          )
-        }
-      }
-      tmat[start:stopi, i] <<- out
+  start <- 1L
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    counts.chunk <- if (!is.null(counts.mat)) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
     }
-  }
 
-  if (!is.null(counts)) {
-    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
-    progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
-  } else {
-    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
-    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      chunk.started <- .np_progress_now()
-      counts.chunk <- if (!is.null(counts.drawer)) {
-        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
-      } else {
-        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
-      }
-      fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
-      progress <- .np_plot_progress_tick(state = progress, done = stopi)
-      chunk.controller <- .np_plot_progress_chunk_observe(
-        controller = chunk.controller,
-        bsz = bsz,
-        elapsed.sec = .np_progress_now() - chunk.started
+    for (jj in seq_len(bsz)) {
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      tmat[start + jj - 1L, ] <- fit.fun(
+        tx.train = txdat[idx, , drop = FALSE],
+        y.train = ydat[idx],
+        tz.train = tzdat[idx, , drop = FALSE]
       )
-      start <- stopi + 1L
     }
-  }
 
-  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
-    stop("inid smooth coefficient helper produced non-finite values")
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
 
   list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_scoef <- function(txdat,
+                                     ydat,
+                                     tzdat,
+                                     exdat,
+                                     ezdat,
+                                     bws,
+                                     B,
+                                     counts = NULL,
+                                     counts.drawer = NULL,
+                                     leave.one.out = FALSE,
+                                     progress.label = NULL,
+                                     mode = c("exact", "frozen")) {
+  mode <- match.arg(mode)
+
+  if (identical(mode, "frozen") && !identical(bws$type, "fixed")) {
+    return(.np_inid_boot_from_scoef_frozen(
+      txdat = txdat,
+      ydat = ydat,
+      tzdat = tzdat,
+      exdat = exdat,
+      ezdat = ezdat,
+      bws = bws,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      leave.one.out = leave.one.out,
+      progress.label = progress.label
+    ))
+  }
+
+  .np_inid_boot_from_scoef_exact(
+    txdat = txdat,
+    ydat = ydat,
+    tzdat = tzdat,
+    exdat = exdat,
+    ezdat = ezdat,
+    bws = bws,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    leave.one.out = leave.one.out,
+    progress.label = progress.label
+  )
 }
 
 .np_plreg_numeric_x_matrix <- function(txdat, exdat, bws) {
@@ -2588,17 +2621,17 @@
   stop("plreg weighted solve failed")
 }
 
-.np_inid_boot_from_plreg <- function(txdat,
-                                     ydat,
-                                     tzdat,
-                                     exdat,
-                                     ezdat,
-                                     bws,
-                                     B,
-                                     counts = NULL,
-                                     counts.drawer = NULL,
-                                     ridge = 1.0e-12,
-                                     progress.label = NULL) {
+.np_inid_boot_from_plreg_exact <- function(txdat,
+                                           ydat,
+                                           tzdat,
+                                           exdat,
+                                           ezdat,
+                                           bws,
+                                           B,
+                                           counts = NULL,
+                                           counts.drawer = NULL,
+                                           ridge = 1.0e-12,
+                                           progress.label = NULL) {
   txdat <- toFrame(txdat)
   tzdat <- toFrame(tzdat)
   exdat <- toFrame(exdat)
@@ -2730,6 +2763,102 @@
     stop("plreg inid helper path produced non-finite values")
 
   list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_plreg_frozen <- function(txdat,
+                                            ydat,
+                                            tzdat,
+                                            exdat,
+                                            ezdat,
+                                            bws,
+                                            B,
+                                            counts = NULL,
+                                            counts.drawer = NULL,
+                                            ridge = 1.0e-12,
+                                            progress.label = NULL) {
+  txdat <- toFrame(txdat)
+  tzdat <- toFrame(tzdat)
+  exdat <- toFrame(exdat)
+  ezdat <- toFrame(ezdat)
+
+  n <- nrow(txdat)
+  if (nrow(tzdat) != n)
+    stop("plreg frozen helper path requires aligned txdat/tzdat rows")
+  if (nrow(ezdat) != nrow(exdat))
+    stop("plreg frozen helper path requires aligned exdat/ezdat rows")
+  if (n < 1L || nrow(exdat) < 1L || ncol(txdat) < 1L || as.integer(B) < 1L)
+    stop("invalid plreg frozen helper path dimensions")
+
+  y.num <- if (is.factor(ydat)) {
+    ty <- adjustLevels(data.frame(ydat), bws$bw$yzbw$ydati)
+    bws$bw$yzbw$ydati$all.dlev[[1L]][as.integer(ty[, 1L])]
+  } else {
+    as.double(ydat)
+  }
+  if (length(y.num) != n)
+    stop("length of ydat must match training rows")
+
+  H <- npplreghat(
+    bws = bws,
+    txdat = txdat,
+    tzdat = tzdat,
+    exdat = exdat,
+    ezdat = ezdat,
+    output = "matrix"
+  )
+  .np_inid_lc_boot_from_hat(
+    H = H,
+    ydat = y.num,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
+  )
+}
+
+.np_inid_boot_from_plreg <- function(txdat,
+                                     ydat,
+                                     tzdat,
+                                     exdat,
+                                     ezdat,
+                                     bws,
+                                     B,
+                                     counts = NULL,
+                                     counts.drawer = NULL,
+                                     ridge = 1.0e-12,
+                                     progress.label = NULL,
+                                     mode = c("exact", "frozen")) {
+  mode <- match.arg(mode)
+
+  if (identical(mode, "frozen") && !identical(bws$type, "fixed")) {
+    return(.np_inid_boot_from_plreg_frozen(
+      txdat = txdat,
+      ydat = ydat,
+      tzdat = tzdat,
+      exdat = exdat,
+      ezdat = ezdat,
+      bws = bws,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      ridge = ridge,
+      progress.label = progress.label
+    ))
+  }
+
+  .np_inid_boot_from_plreg_exact(
+    txdat = txdat,
+    ydat = ydat,
+    tzdat = tzdat,
+    exdat = exdat,
+    ezdat = ezdat,
+    bws = bws,
+    B = B,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    ridge = ridge,
+    progress.label = progress.label
+  )
 }
 
 .np_boot_matrix_from_ksum <- function(ksum, B, nout, where = "ksum helper path") {
@@ -6228,7 +6357,9 @@ compute.bootstrap.errors.scbandwidth =
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
+      !identical(bws$type, "fixed")
+    helper.mode <- if (isTRUE(use.frozen.nonfixed)) "frozen" else "exact"
     boot.out <- NULL
 
     if (is.inid) {
@@ -6244,7 +6375,8 @@ compute.bootstrap.errors.scbandwidth =
           bws = bws,
           B = plot.errors.boot.num,
           leave.one.out = FALSE,
-          progress.label = progress.label
+          progress.label = progress.label,
+          mode = helper.mode
         ),
         error = function(e) {
           stop(sprintf("inid smooth coefficient helper failed in compute.bootstrap.errors.scbandwidth (%s)",
@@ -6273,7 +6405,8 @@ compute.bootstrap.errors.scbandwidth =
           B = plot.errors.boot.num,
           counts.drawer = counts.drawer,
           leave.one.out = FALSE,
-          progress.label = progress.label
+          progress.label = progress.label,
+          mode = helper.mode
         ),
         error = function(e) {
           stop(sprintf("%s smooth coefficient helper failed in compute.bootstrap.errors.scbandwidth (%s)",
@@ -6406,6 +6539,9 @@ compute.bootstrap.errors.plbandwidth =
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
+      !identical(bws$type, "fixed")
+    helper.mode <- if (isTRUE(use.frozen.nonfixed)) "frozen" else "exact"
     if (is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
@@ -6447,7 +6583,8 @@ compute.bootstrap.errors.plbandwidth =
             ezdat = ezdat,
             bws = bws,
             B = plot.errors.boot.num,
-            progress.label = progress.label
+            progress.label = progress.label,
+            mode = helper.mode
           ),
           error = function(e) {
             stop(sprintf("inid plreg helper failed in compute.bootstrap.errors.plbandwidth (%s)",
@@ -6472,7 +6609,8 @@ compute.bootstrap.errors.plbandwidth =
             bws = bws,
             B = plot.errors.boot.num,
             counts.drawer = counts.drawer,
-            progress.label = progress.label
+            progress.label = progress.label,
+            mode = helper.mode
           ),
           error = function(e) {
             stop(sprintf("%s plreg helper failed in compute.bootstrap.errors.plbandwidth (%s)",
