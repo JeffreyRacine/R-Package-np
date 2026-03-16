@@ -26,7 +26,7 @@ make_regression_summary_label_fixture <- function(type) {
     xnames = names(xdat),
     ynames = names(ydat),
     sfactor = 1,
-    bandwidth = 0.25,
+    bandwidth = if (identical(type, "fixed")) 0.25 else 2,
     nconfac = 1L,
     ncatfac = 0L,
     sdev = stats::sd(xdat$x),
