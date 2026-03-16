@@ -259,7 +259,13 @@
   nearest-neighbor runs, \code{"frozen"} is an approximation that can alter
   interval/band width by holding the original-sample nearest-neighbor
   geometry fixed across bootstrap resamples; \code{"exact"} remains the
-  recommended setting for production inference.
+  recommended setting for production inference. This approximation can be
+  more noticeable for conditional density/distribution plotting than for the
+  regression-style plot families because the conditional bootstrap paths
+  freeze both numerator and denominator nearest-neighbor geometry before
+  recombining them. In practice, conditional distribution bands are often
+  closer, while conditional density bands can differ more materially from
+  \code{"exact"} under generalized/adaptive nearest-neighbor bandwidths.
   \code{inid} admits general heteroskedasticity of unknown form, though
   it does not allow for dependence. \code{fixed} conducts Kunsch's (1988)
   block bootstrap for dependent data, while \code{geom} conducts Politis

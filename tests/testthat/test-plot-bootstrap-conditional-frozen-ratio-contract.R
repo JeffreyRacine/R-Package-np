@@ -9,6 +9,11 @@ test_that("npRmpi conditional frozen helper preserves numerator/denominator reco
   make_xkbw <- get(".npcdhat_make_xkbw", envir = ns)
   make_ybw <- get(".npcdhat_make_ybw", envir = ns)
   make_kmat <- get(".npcdhat_make_kernel_matrix", envir = ns)
+  make_kbx <- get(".np_con_make_kbandwidth_x", envir = ns)
+  make_kbxy <- get(".np_con_make_kbandwidth_xy", envir = ns)
+  exact_state_build <- get(".np_ksum_exact_state_build", envir = ns)
+  exact_state_eval <- get(".np_ksum_eval_exact_state", envir = ns)
+  bind_fast <- get(".np_bind_data_frames_fast", envir = ns)
 
   xdat <- data.frame(x = c(0.05, 0.15, 0.30, 0.45, 0.70, 0.90))
   ydat <- data.frame(y = c(0.10, 0.20, 0.35, 0.50, 0.72, 0.88))
@@ -45,6 +50,55 @@ test_that("npRmpi conditional frozen helper preserves numerator/denominator reco
     list(
       t = num / pmax(den, .Machine$double.eps),
       t0 = rowSums(num.op) / pmax(rowSums(den.op), .Machine$double.eps)
+    )
+  }
+
+  weighted_state_boot <- function(bw, cdf) {
+    kbx <- make_kbx(bws = bw, xdat = xdat)
+    kbxy <- make_kbxy(bws = bw, xdat = xdat, ydat = ydat)
+    den.state <- exact_state_build(
+      bws = kbx,
+      exdat = exdat,
+      operator = rep.int("normal", ncol(xdat))
+    )
+    num.state <- exact_state_build(
+      bws = kbxy,
+      exdat = bind_fast(exdat, eydat),
+      operator = c(
+        rep.int("normal", ncol(xdat)),
+        rep.int(if (isTRUE(cdf)) "integral" else "normal", ncol(ydat))
+      )
+    )
+
+    n.total <- colSums(counts)
+    tmat <- t(vapply(seq_len(ncol(counts)), function(j) {
+      den <- as.numeric(exact_state_eval(
+        state = den.state,
+        txdat = xdat,
+        weights = matrix(as.double(counts[, j]), ncol = 1L)
+      )) / n.total[j]
+      num <- as.numeric(exact_state_eval(
+        state = num.state,
+        txdat = bind_fast(xdat, ydat),
+        weights = matrix(as.double(counts[, j]), ncol = 1L)
+      )) / n.total[j]
+      num / pmax(den, .Machine$double.eps)
+    }, numeric(nrow(exdat))))
+
+    den0 <- as.numeric(exact_state_eval(
+      state = den.state,
+      txdat = xdat,
+      weights = matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+    )) / nrow(xdat)
+    num0 <- as.numeric(exact_state_eval(
+      state = num.state,
+      txdat = bind_fast(xdat, ydat),
+      weights = matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+    )) / nrow(xdat)
+
+    list(
+      t = tmat,
+      t0 = num0 / pmax(den0, .Machine$double.eps)
     )
   }
 
@@ -87,6 +141,7 @@ test_that("npRmpi conditional frozen helper preserves numerator/denominator reco
       counts = counts
     )
     manual.out <- manual_boot(bw = bw, cdf = cdf.ii)
+    weighted.out <- weighted_state_boot(bw = bw, cdf = cdf.ii)
 
     expect_equal(
       helper.out$t0,
@@ -99,6 +154,18 @@ test_that("npRmpi conditional frozen helper preserves numerator/denominator reco
       manual.out$t,
       tolerance = 1e-12,
       info = paste(bwtype.ii, if (cdf.ii) "dist" else "dens", "t")
+    )
+    expect_equal(
+      helper.out$t0,
+      weighted.out$t0,
+      tolerance = 1e-12,
+      info = paste(bwtype.ii, if (cdf.ii) "dist" else "dens", "weighted-state t0")
+    )
+    expect_equal(
+      helper.out$t,
+      weighted.out$t,
+      tolerance = 1e-12,
+      info = paste(bwtype.ii, if (cdf.ii) "dist" else "dens", "weighted-state t")
     )
   }
 })
