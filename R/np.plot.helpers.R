@@ -4697,26 +4697,79 @@
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
   eydat <- toFrame(eydat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
 
-  hat.fun <- if (isTRUE(cdf)) npcdisthat else npcdenshat
-  H <- .np_plot_with_local_compiled_eval(
-    hat.fun(
-      bws = bws,
-      txdat = xdat,
-      tydat = ydat,
-      exdat = exdat,
-      eydat = eydat,
-      output = "matrix"
+  if (nrow(ydat) != n || nrow(eydat) != neval)
+    stop("conditional frozen bootstrap helper requires aligned x/y training and evaluation rows")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid conditional frozen bootstrap dimensions")
+
+  operator <- if (isTRUE(cdf)) "integral" else "normal"
+  xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = xdat)
+  ykbw <- .npcdhat_make_ybw(bws = bws, tydat = ydat)
+  Kx <- .npcdhat_make_kernel_matrix(
+    kbw = xkbw,
+    txdat = xdat,
+    exdat = exdat,
+    operator = rep.int("normal", ncol(xdat))
+  )
+  Ky <- .npcdhat_make_kernel_matrix(
+    kbw = ykbw,
+    txdat = ydat,
+    exdat = eydat,
+    operator = rep.int(operator, ncol(ydat))
+  )
+
+  den.op <- Kx / n
+  num.op <- (Kx * Ky) / n
+  t0 <- rowSums(num.op) / pmax(rowSums(den.op), .Machine$double.eps)
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    den <- t(den.op %*% counts.mat)
+    num <- t(num.op %*% counts.mat)
+    return(list(t = num / pmax(den, .Machine$double.eps), t0 = t0))
+  }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    counts.chunk <- if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+    }
+
+    den <- t(den.op %*% counts.chunk)
+    num <- t(num.op %*% counts.chunk)
+    tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
     )
-  )
+    start <- stopi + 1L
+  }
 
-  .np_plot_boot_from_frozen_operator(
-    H = H,
-    B = B,
-    counts = counts,
-    counts.drawer = counts.drawer,
-    what.base = "inid-hat-frozen-conditional"
-  )
+  list(t = tmat, t0 = t0)
 }
 
 .np_con_inid_ksum_eligible <- function(bws) {
