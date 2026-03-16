@@ -39,7 +39,7 @@ test_that("regression bootstrap target labels format compactly", {
     xnames = c("x1", "x2")
   )
 
-  expect_identical(fmt(bws = bws, slice.index = 0L, gradients = FALSE), "surf 1/1")
+  expect_identical(fmt(bws = bws, slice.index = 0L, gradients = FALSE), "surf 1/2")
   expect_identical(fmt(bws = bws, slice.index = 1L, gradients = FALSE), "x1 1/2")
   expect_identical(fmt(bws = bws, slice.index = 2L, gradients = TRUE), "grad x2 2/2")
 })
@@ -54,7 +54,7 @@ test_that("conditional bootstrap target labels format compactly", {
     ynames = "y"
   )
 
-  expect_identical(fmt(bws = bws, slice.index = 0L, gradients = FALSE), "surf 1/1")
+  expect_identical(fmt(bws = bws, slice.index = 0L, gradients = FALSE), "surf 1/3")
   expect_identical(fmt(bws = bws, slice.index = 1L, gradients = FALSE), "x1 1/3")
   expect_identical(fmt(bws = bws, slice.index = 3L, gradients = FALSE), "y 3/3")
   expect_identical(fmt(bws = bws, slice.index = 2L, gradients = TRUE, gradient.index = 1L), "grad x1 on x2 2/3")
@@ -63,8 +63,8 @@ test_that("conditional bootstrap target labels format compactly", {
 test_that("single-index bootstrap target labels format compactly", {
   fmt <- getFromNamespace(".np_plot_singleindex_bootstrap_target_label", "npRmpi")
 
-  expect_identical(fmt(gradients = FALSE), "index 1/1")
-  expect_identical(fmt(gradients = TRUE), "grad index 1/1")
+  expect_null(fmt(gradients = FALSE))
+  expect_null(fmt(gradients = TRUE))
 })
 
 test_that("smooth coefficient bootstrap target labels format compactly", {
@@ -77,7 +77,7 @@ test_that("smooth coefficient bootstrap target labels format compactly", {
     znames = "z"
   )
 
-  expect_identical(fmt(bws = bws, slice.index = 0L), "surf 1/1")
+  expect_identical(fmt(bws = bws, slice.index = 0L), "surf 1/2")
   expect_identical(fmt(bws = bws, slice.index = 1L), "x 1/2")
   expect_identical(fmt(bws = bws, slice.index = 2L), "z 2/2")
 })
@@ -225,12 +225,12 @@ test_that("conditional exact ksum wrapper preserves user-facing progress label",
       B = 2L,
       cdf = FALSE,
       counts.drawer = function(start, stopi) matrix(1L, nrow = 3L, ncol = stopi - start + 1L),
-      progress.label = "Plot bootstrap (surf 1/1)"
+      progress.label = "Plot bootstrap"
     )
   )
 
   expect_true(is.list(res))
-  expect_identical(captured$progress, "Plot bootstrap (surf 1/1)")
+  expect_identical(captured$progress, "Plot bootstrap")
 })
 
 test_that("conditional bootstrap exact path forwards target label from compute helper", {
@@ -280,7 +280,7 @@ test_that("conditional bootstrap exact path forwards target label from compute h
       plot.errors.center = "estimate",
       plot.errors.type = "all",
       plot.errors.alpha = 0.05,
-      progress.target = "surf 1/1",
+      progress.target = NULL,
       bws = list(
         type = "adaptive_nn",
         xndim = 1L,
@@ -294,9 +294,9 @@ test_that("conditional bootstrap exact path forwards target label from compute h
   )
 
   expect_true(is.list(res))
-  expect_true(any(grepl("Preparing plot bootstrap geom \\(surf 1/1\\)", captured$prep)))
-  expect_identical(captured$progress, "Plot bootstrap (surf 1/1)")
-  expect_true(any(grepl("Constructing bootstrap all bands \\(surf 1/1\\)", captured$interval)))
+  expect_true(any(grepl("^Preparing plot bootstrap geom$", captured$prep)))
+  expect_identical(captured$progress, "Plot bootstrap")
+  expect_true(any(grepl("^Constructing bootstrap all bands$", captured$interval)))
 })
 
 test_that("single-index helper labels carry target context for bootstrap phases", {
@@ -342,9 +342,9 @@ test_that("single-index helper labels carry target context for bootstrap phases"
   )
 
   expect_true(is.list(res))
-  expect_true(any(grepl("Preparing plot bootstrap geom \\(index 1/1\\)", captured$prep)))
-  expect_true(any(grepl("Plot bootstrap \\(index 1/1\\)", captured$progress)))
-  expect_true(any(grepl("Constructing bootstrap all bands \\(index 1/1\\)", captured$interval)))
+  expect_true(any(grepl("^Preparing plot bootstrap geom$", captured$prep)))
+  expect_true(any(grepl("^Plot bootstrap$", captured$progress)))
+  expect_true(any(grepl("^Constructing bootstrap all bands$", captured$interval)))
 })
 
 test_that("unconditional helper keeps user-facing bootstrap labels in MPI fanout", {
