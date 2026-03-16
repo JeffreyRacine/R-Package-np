@@ -309,15 +309,15 @@ npreghat <-
 
   if (identical(bws$type, "generalized_nn") &&
       any(degree > 1L) &&
-      !isTRUE(getOption("np.tree")) &&
-      !want.grad) {
+      !isTRUE(getOption("np.tree"))) {
     return(.npreghat_exact_lp_matrix_from_regression_core_chunked(
       bws = bws,
       txdat = txdat,
       exdat = if (miss.ex) NULL else exdat,
       basis = basis,
       degree = degree,
-      bernstein.basis = bernstein.basis
+      bernstein.basis = bernstein.basis,
+      s = s
     ))
   }
 
@@ -384,6 +384,7 @@ npreghat <-
                                                                    basis = "glp",
                                                                    degree = integer(0),
                                                                    bernstein.basis = FALSE,
+                                                                   s = NULL,
                                                                    chunk.size = 128L) {
   no.ex <- is.null(exdat)
 
@@ -473,6 +474,7 @@ npreghat <-
   chunk.size <- max(1L, min(as.integer(chunk.size), ntrain))
   bw.vec <- as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord]))
   tree.flag <- isTRUE(getOption("np.tree"))
+  grad.vec <- if (length(s) && any(s > 0L)) as.integer(s) else integer(0L)
 
   for (start in seq.int(1L, ntrain, by = chunk.size)) {
     stop.col <- min(ntrain, start + chunk.size - 1L)
@@ -491,14 +493,15 @@ npreghat <-
       bw.vec,
       as.integer(bwtype.c),
       as.integer(kernel.x.c),
-      as.integer(kernel.xu.c),
-      as.integer(kernel.xo.c),
-      as.logical(tree.flag),
-      as.integer(degree),
-      as.integer(isTRUE(bernstein.basis)),
-      as.integer(npLpBasisCode(basis)),
-      PACKAGE = "np"
-    )
+        as.integer(kernel.xu.c),
+        as.integer(kernel.xo.c),
+        as.logical(tree.flag),
+        as.integer(degree),
+        grad.vec,
+        as.integer(isTRUE(bernstein.basis)),
+        as.integer(npLpBasisCode(basis)),
+        PACKAGE = "np"
+      )
   }
 
   H

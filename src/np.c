@@ -2168,12 +2168,13 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
                                           SEXP kernel_xo,
                                           SEXP use_tree,
                                           SEXP glp_degree,
+                                          SEXP glp_gradient_order,
                                           SEXP glp_bernstein,
                                           SEXP glp_basis)
 {
   SEXP txuno_r = R_NilValue, txord_r = R_NilValue, txcon_r = R_NilValue;
   SEXP exuno_r = R_NilValue, exord_r = R_NilValue, excon_r = R_NilValue;
-  SEXP rhs_r = R_NilValue, rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
+  SEXP rhs_r = R_NilValue, rbw_r = R_NilValue, degree_i = R_NilValue, grad_i = R_NilValue, out = R_NilValue;
   int nrow_txuno = 0, ncol_txuno = 0, nrow_txord = 0, ncol_txord = 0, nrow_txcon = 0, ncol_txcon = 0;
   int nrow_exuno = 0, ncol_exuno = 0, nrow_exord = 0, ncol_exord = 0, nrow_excon = 0, ncol_excon = 0;
   int nrow_rhs = 0, ncol_rhs = 0;
@@ -2196,6 +2197,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   rhs_r = PROTECT(coerceVector(rhs, REALSXP));
   rbw_r = PROTECT(coerceVector(rbw, REALSXP));
   degree_i = PROTECT(coerceVector(glp_degree, INTSXP));
+  grad_i = PROTECT(coerceVector(glp_gradient_order, INTSXP));
 
   np_shadow_matrix_dims(txuno, &nrow_txuno, &ncol_txuno);
   np_shadow_matrix_dims(txord, &nrow_txord, &ncol_txord);
@@ -2322,8 +2324,10 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   int_ll_extern = LL_LP;
   if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
     error("C_np_regression_lp_apply_conditional: glp_degree length mismatch");
+  if((XLENGTH(grad_i) != 0) && ((int)XLENGTH(grad_i) != num_reg_continuous_extern))
+    error("C_np_regression_lp_apply_conditional: glp_gradient_order length mismatch");
   vector_glp_degree_extern = INTEGER(degree_i);
-  vector_glp_gradient_order_extern = NULL;
+  vector_glp_gradient_order_extern = (XLENGTH(grad_i) > 0) ? INTEGER(grad_i) : NULL;
   int_glp_bernstein_extern = asInteger(glp_bernstein);
   int_glp_basis_extern = asInteger(glp_basis);
 
@@ -2367,7 +2371,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   np_glp_cv_clear_extern();
   safe_free(rhs_cols);
 
-  UNPROTECT(10);
+  UNPROTECT(11);
   return out;
 }
 

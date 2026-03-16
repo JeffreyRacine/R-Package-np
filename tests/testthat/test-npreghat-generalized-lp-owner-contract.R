@@ -99,3 +99,48 @@ test_that("tree-enabled generalized higher-degree lp owner stays exact via core 
   expect_equal(drop(H %*% y), a, tolerance = 1e-10)
   expect_equal(drop(H %*% y), g$mean, tolerance = 1e-10)
 })
+
+test_that("generalized higher-degree lp derivative owner matches npreg on evaluation data", {
+  run_case <- function(train_df, y, eval_df, degree, s, basis = "glp", bern = FALSE, tol = 1e-9) {
+    frame <- train_df
+    frame$y <- y
+    fml <- as.formula(paste("y~", paste(names(train_df), collapse = "+")))
+    bw <- npregbw(fml,
+                  data = frame,
+                  regtype = "lp",
+                  degree = degree,
+                  basis = basis,
+                  bernstein.basis = bern,
+                  bwtype = "generalized_nn")
+
+    H <- npreghat(bws = bw, txdat = train_df, exdat = eval_df, s = s)
+    a <- npreghat(bws = bw, txdat = train_df, exdat = eval_df, y = y, output = "apply", s = s)
+    g <- npreg(bws = bw, exdat = eval_df, gradients = TRUE)
+    target.col <- which(as.integer(s) == 1L)[1L]
+
+    expect_equal(drop(H %*% y), a, tolerance = tol)
+    expect_equal(drop(H %*% y), g$grad[, target.col], tolerance = tol)
+  }
+
+  set.seed(301)
+  n <- 80
+  x <- runif(n, -1, 1)
+  y <- x^2 + rnorm(n, sd = 0.15)
+  xe <- data.frame(x = seq(-1, 1, length.out = 41))
+  run_case(data.frame(x = x), y, xe, degree = 2L, s = 1L)
+  run_case(data.frame(x = x), y, xe, degree = 3L, s = 1L)
+
+  set.seed(302)
+  n <- 70
+  x1 <- runif(n, -1, 1)
+  x2 <- runif(n, -1, 1)
+  y <- x1^2 - x2 + x1 * x2 + rnorm(n, sd = 0.1)
+  xe <- expand.grid(x1 = seq(-1, 1, length.out = 6),
+                    x2 = seq(-1, 1, length.out = 6))
+  run_case(data.frame(x1 = x1, x2 = x2),
+           y,
+           xe,
+           degree = c(2L, 2L),
+           s = c(1L, 0L),
+           basis = "tensor")
+})
