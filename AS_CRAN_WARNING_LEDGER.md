@@ -2,12 +2,13 @@
 
 Tracker State: ACTIVE (canonical: `/Users/jracine/Development/ACTIVE_ISSUES_CANONICAL_2026-02-28.md`)
 
-Last refresh: 2026-03-05 (win-builder result ingestion + Windows link remediation)  
+Last refresh: 2026-03-16 (no-vignette tarball-first closeout refresh)  
 Tarball: `npRmpi_0.70-1.tar.gz`  
-Check log: `/Users/jracine/Development/npRmpi.Rcheck/00check.log`  
+Check log: `/tmp/nprmpi_fix_check.log`  
 Run bundles:
-- default local: `/tmp/release_hygiene_20260304_231716`
-- wrapper-assisted: `/tmp/release_hygiene_followup_20260304_232456`
+- default local: `/tmp/nprmpi_fix_check.log`
+- helper/static proof: `/tmp/nprmpi_fix5_static.log`
+- exact tiny-support proof: `/tmp/nprmpi_fix5_tiny_support.log`
 
 ## Current Status
 - Default local (`PATH` without `checkbashisms` wrapper): `Status: 1 WARNING, 1 NOTE`
@@ -24,13 +25,23 @@ Run bundles:
 - Disposition: both are local tooling conditions; no package-code action required.
 
 ## Effective Local Commands
-1. Build tarball:
-- `R CMD build /Users/jracine/Development/np-npRmpi`
+1. Build no-vignette tarball:
+- `R CMD build --no-build-vignettes --no-manual /Users/jracine/Development/np-npRmpi`
 2. Run `--as-cran` (default local baseline):
-- `R CMD check --as-cran /Users/jracine/Development/npRmpi_0.70-1.tar.gz`
+- `R CMD check --as-cran --ignore-vignettes /Users/jracine/Development/npRmpi_0.70-1.tar.gz`
 3. Optional wrapper-assisted run:
-- `PATH="/tmp:$PATH" R CMD check --as-cran /Users/jracine/Development/npRmpi_0.70-1.tar.gz`
+- `PATH="/tmp:$PATH" R CMD check --as-cran --ignore-vignettes /Users/jracine/Development/npRmpi_0.70-1.tar.gz`
 - wrapper path: `/tmp/checkbashisms` (shellcheck-backed compatibility shim with `-p/-d` acceptance).
+
+## Latest Local Closeout (2026-03-16)
+1. Observed check status:
+- default local no-vignette baseline: `Status: 1 WARNING, 1 NOTE`
+2. Validation bundle:
+- `/tmp/nprmpi_fix_check.log`
+- `/tmp/nprmpi_fix5_static.log`
+- `/tmp/nprmpi_fix5_tiny_support.log`
+3. Touched-suite outcome:
+- touched static contracts passed and the exact tiny-support helper proof returned `TINY_SUPPORT_OK 0e+00`.
 
 ## Win-Builder Submission Evidence (2026-03-04, late)
 1. Submitted via canonical devtools route:
