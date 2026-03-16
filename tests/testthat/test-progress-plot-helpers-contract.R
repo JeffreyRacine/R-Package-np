@@ -156,6 +156,33 @@ test_that("bootstrap execution stage surfaces immediately on begin", {
   expect_identical(vapply(actual$trace, `[[`, character(1L), "event")[[1L]], "render")
 })
 
+test_that("single-surface plot targets omit 1/1 suffixes", {
+  reg_label <- getFromNamespace(".np_plot_regression_bootstrap_target_label", "np")
+  idx_label <- getFromNamespace(".np_plot_singleindex_bootstrap_target_label", "np")
+  stage_label <- getFromNamespace(".np_plot_bootstrap_stage_label", "np")
+
+  expect_null(reg_label(list(ndim = 1L, xnames = list("x")), slice.index = 1L))
+  expect_null(idx_label(FALSE))
+  expect_identical(
+    stage_label("Plot bootstrap", method_label = "inid", target_label = idx_label(FALSE)),
+    "Plot bootstrap inid"
+  )
+})
+
+test_that("multi-surface plot targets retain i/n suffixes", {
+  reg_label <- getFromNamespace(".np_plot_regression_bootstrap_target_label", "np")
+  scoef_label <- getFromNamespace(".np_plot_scoef_bootstrap_target_label", "np")
+
+  expect_identical(
+    reg_label(list(ndim = 3L, xnames = list("x", "z", "w")), slice.index = 2L),
+    "z 2/3"
+  )
+  expect_identical(
+    scoef_label(list(xndim = 1L, zndim = 1L, xnames = list("x"), znames = list("z")), slice.index = 2L),
+    "z 2/2"
+  )
+})
+
 test_that("plot helper activity renders immediately for long blocking work", {
   begin <- getFromNamespace(".np_plot_activity_begin", "np")
   finish <- getFromNamespace(".np_plot_activity_end", "np")

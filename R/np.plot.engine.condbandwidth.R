@@ -278,7 +278,7 @@
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
-          progress.target = "surf 1/1",
+          progress.target = NULL,
           bws = bws)
         terr <- terr.obj[["boot.err"]]
         terr.all <- terr.obj[["boot.all.err"]]

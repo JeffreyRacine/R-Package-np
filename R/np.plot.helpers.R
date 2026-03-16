@@ -469,6 +469,28 @@
   }
 }
 
+.np_plot_progress_target_label <- function(target_name = NULL,
+                                           index = 1L,
+                                           total = 1L) {
+  index <- suppressWarnings(as.integer(index)[1L])
+  total <- suppressWarnings(as.integer(total)[1L])
+  target_name <- if (is.null(target_name)) NULL else as.character(target_name)[1L]
+
+  if (is.na(total) || total < 1L)
+    total <- 1L
+  if (is.na(index) || index < 1L)
+    index <- 1L
+
+  if (total <= 1L)
+    return(NULL)
+
+  if (!is.null(target_name) && nzchar(target_name) && !is.na(target_name)) {
+    sprintf("%s %d/%d", target_name, index, total)
+  } else {
+    sprintf("surf %d/%d", index, total)
+  }
+}
+
 .np_plot_regression_bootstrap_target_label <- function(bws,
                                                        slice.index,
                                                        gradients = FALSE) {
@@ -479,7 +501,7 @@
   }
 
   if (is.na(slice.index) || slice.index <= 0L) {
-    return("surf 1/1")
+    return(.np_plot_progress_target_label(index = 1L, total = total))
   }
 
   target_name <- .np_plot_progress_target_name(
@@ -490,7 +512,9 @@
     target_name <- sprintf("grad %s", target_name)
   }
 
-  sprintf("%s %d/%d", target_name, slice.index, total)
+  .np_plot_progress_target_label(target_name = target_name,
+                                 index = slice.index,
+                                 total = total)
 }
 
 .np_plot_conditional_bootstrap_target_label <- function(bws,
@@ -506,7 +530,7 @@
   total <- max(1L, x_total + y_total)
 
   if (is.na(slice.index) || slice.index <= 0L) {
-    return("surf 1/1")
+    return(.np_plot_progress_target_label(index = 1L, total = total))
   }
 
   if (slice.index <= x_total) {
@@ -530,15 +554,17 @@
     target_name <- sprintf("grad %s on %s", grad_name, target_name)
   }
 
-  sprintf("%s %d/%d", target_name, slice.index, total)
+  .np_plot_progress_target_label(target_name = target_name,
+                                 index = slice.index,
+                                 total = total)
 }
 
 .np_plot_singleindex_bootstrap_target_label <- function(gradients = FALSE) {
-  if (isTRUE(gradients)) {
-    "grad index 1/1"
-  } else {
-    "index 1/1"
-  }
+  .np_plot_progress_target_label(
+    target_name = if (isTRUE(gradients)) "grad index" else "index",
+    index = 1L,
+    total = 1L
+  )
 }
 
 .np_plot_scoef_bootstrap_target_label <- function(bws, slice.index) {
@@ -550,7 +576,7 @@
   total <- max(1L, x_total + z_total)
 
   if (is.na(slice.index) || slice.index <= 0L) {
-    return("surf 1/1")
+    return(.np_plot_progress_target_label(index = 1L, total = total))
   }
 
   if (slice.index <= x_total) {
@@ -566,7 +592,9 @@
     )
   }
 
-  sprintf("%s %d/%d", target_name, slice.index, total)
+  .np_plot_progress_target_label(target_name = target_name,
+                                 index = slice.index,
+                                 total = total)
 }
 
 .np_mammen_draws <- function(n, B) {
