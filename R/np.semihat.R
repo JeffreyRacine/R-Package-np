@@ -450,6 +450,23 @@
   )
 }
 
+.np_indexhat_lp_mean_matrix <- function(bws, idx.train, idx.eval) {
+  out <- .npRmpi_with_local_hat_helper(npreghat(
+    bws = .np_indexhat_rbw(bws = bws, idx.train = idx.train),
+    txdat = idx.train,
+    exdat = idx.eval,
+    output = "matrix",
+    s = 0L
+  ))
+
+  matrix(
+    as.double(out),
+    nrow = nrow(out),
+    ncol = ncol(out),
+    dimnames = dimnames(out)
+  )
+}
+
 .np_indexhat_exact <- function(bws,
                                idx.train,
                                idx.eval,
@@ -502,6 +519,27 @@
   }
 
   rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+
+  lp.mean.owner.safe <- identical(regtype.engine, "lp") &&
+    identical(output, "matrix") &&
+    s == 0L &&
+    !identical(bws$type, "fixed") &&
+    !(
+      identical(bws$type, "generalized_nn") &&
+        all(as.integer(spec$degree.engine) == 1L) &&
+        (
+          !identical(spec$basis.engine, "glp") ||
+            isTRUE(spec$bernstein.basis.engine)
+        )
+    )
+
+  if (lp.mean.owner.safe) {
+    return(.np_indexhat_lp_mean_matrix(
+      bws = bws,
+      idx.train = idx.train,
+      idx.eval = idx.eval
+    ))
+  }
 
   if (s == 1L) {
     fit_one <- function(ycol) {
