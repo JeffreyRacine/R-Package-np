@@ -1030,19 +1030,19 @@ npplreghat <-
       )
 
       for (j in seq_len(p)) {
-        H.x.eval <- npreghat(
-          bws = bws$bw[[j + 1L]],
-          txdat = tzdat,
-          exdat = ezdat,
-          output = "matrix"
-        )
         xhat.train <- as.vector(npreghat(
           bws = bws$bw[[j + 1L]],
           txdat = tzdat,
           y = x.train.num[, j],
           output = "apply"
         ))
-        xhat.eval <- as.vector(H.x.eval %*% x.train.num[, j])
+        xhat.eval <- as.vector(npreghat(
+          bws = bws$bw[[j + 1L]],
+          txdat = tzdat,
+          exdat = ezdat,
+          y = x.train.num[, j],
+          output = "apply"
+        ))
 
         resx.train[, j] <- x.train.num[, j] - xhat.train
         resx.eval[, j] <- x.eval.num[, j] - xhat.eval
