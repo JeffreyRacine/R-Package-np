@@ -254,7 +254,11 @@
   The experimental \code{"frozen"} route reuses the original-sample
   non-fixed geometry throughout the bootstrap run. This option is currently
   implemented only for unconditional and conditional density/distribution
-  bootstrap routes and remains off by default.
+  bootstrap routes and remains off by default. For generalized/adaptive
+  nearest-neighbor runs, \code{"frozen"} is an approximation that can alter
+  interval/band width by holding the original-sample nearest-neighbor
+  geometry fixed across bootstrap resamples; \code{"exact"} remains the
+  recommended setting for production inference.
   \code{inid} admits general heteroskedasticity of unknown form, though
   it does not allow for dependence. \code{fixed} conducts Kunsch's (1988)
   block bootstrap for dependent data, while \code{geom} conducts Politis
