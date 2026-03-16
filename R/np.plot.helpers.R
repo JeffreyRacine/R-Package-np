@@ -3522,20 +3522,20 @@
     stop("length of ydat must match training rows in smooth coefficient exact helper")
 
   fit.fun <- function(tx.train, y.train, tz.train) {
-    hat.args <- list(
+    fit.args <- list(
       bws = bws,
       txdat = tx.train,
+      tydat = y.train,
       exdat = exdat,
-      y = y.train,
-      output = "apply",
       iterate = FALSE,
+      errors = FALSE,
       leave.one.out = leave.one.out
     )
     if (!miss.z) {
-      hat.args$tzdat <- tz.train
-      hat.args$ezdat <- ezdat
+      fit.args$tzdat <- tz.train
+      fit.args$ezdat <- ezdat
     }
-    as.vector(do.call(npscoefhat, hat.args))
+    as.vector(do.call(.np_scoef_fit_internal, fit.args)$mean)
   }
 
   t0 <- fit.fun(tx.train = txdat, y.train = ydat, tz.train = tzdat)
@@ -3602,7 +3602,10 @@
                                      mode = c("exact", "frozen")) {
   mode <- match.arg(mode)
 
-  if (identical(mode, "frozen") && !identical(bws$type, "fixed")) {
+  # For fixed bandwidths, the smooth-coefficient bootstrap operator is fixed
+  # across resamples, so exact and frozen coincide and should both take the
+  # lean hat-reuse route.
+  if (identical(mode, "frozen") || identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_scoef_frozen(
       txdat = txdat,
       ydat = ydat,

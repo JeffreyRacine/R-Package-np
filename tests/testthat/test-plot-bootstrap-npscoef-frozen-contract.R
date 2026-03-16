@@ -78,3 +78,48 @@ npscoef_semiparam_frozen_contract_case <- function() {
 test_that("npRmpi npscoef exact/frozen split is correct and frozen is forwarded", {
   npscoef_semiparam_frozen_contract_case()
 })
+
+npscoef_fixed_semiparam_frozen_contract_case <- function() {
+  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess contract")
+
+  ok_tag <- "NPSCOEF_FIXED_SEMIPARAM_FROZEN_CONTRACT_OK"
+  lines <- c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "run_case <- function() {",
+    "  npRmpi.init(nslaves = 1, quiet = TRUE)",
+    "  on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
+    "  options(npRmpi.autodispatch = TRUE, np.messages = FALSE)",
+    "  set.seed(42)",
+    "  n <- 30L",
+    "  xdat <- data.frame(x = runif(n, -1, 1))",
+    "  zdat <- data.frame(z = rnorm(n))",
+    "  y <- with(xdat, x^2 + rnorm(n, sd = 0.1))",
+    "  exdat <- data.frame(x = seq(-0.9, 0.9, length.out = 9L))",
+    "  ezdat <- data.frame(z = seq(-1.0, 1.0, length.out = 9L))",
+    "  counts <- rmultinom(n = 5L, size = n, prob = rep.int(1 / n, n))",
+    "  bw <- npscoefbw(xdat = xdat, zdat = zdat, ydat = y, bws = c(0.6), bwtype = 'fixed', bandwidth.compute = FALSE, regtype = 'll')",
+    "  boot.fun <- getFromNamespace('.np_inid_boot_from_scoef', 'npRmpi')",
+    "  exact.out <- boot.fun(txdat = xdat, ydat = y, tzdat = zdat, exdat = exdat, ezdat = ezdat, bws = bw, B = ncol(counts), counts = counts, mode = 'exact')",
+    "  frozen.out <- boot.fun(txdat = xdat, ydat = y, tzdat = zdat, exdat = exdat, ezdat = ezdat, bws = bw, B = ncol(counts), counts = counts, mode = 'frozen')",
+    "  stopifnot(isTRUE(all.equal(exact.out$t0, frozen.out$t0, tolerance = 1e-12)))",
+    "  stopifnot(isTRUE(all.equal(exact.out$t, frozen.out$t, tolerance = 1e-12)))",
+    "}",
+    "run_case()",
+    sprintf("cat('%s\\n')", ok_tag)
+  )
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = lines,
+    timeout = 180L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl(ok_tag, res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+}
+
+test_that("npRmpi npscoef fixed exact matches frozen", {
+  npscoef_fixed_semiparam_frozen_contract_case()
+})
