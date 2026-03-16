@@ -166,7 +166,7 @@ npreghat <-
   eval.data <- if (no.ex) txdat else exdat
   ntrain <- nrow(txdat)
   neval <- nrow(eval.data)
-  block.size <- min(128L, ntrain)
+  block.size <- min(512L, ntrain)
   ones <- rep.int(1.0, ntrain)
   H <- matrix(0.0, nrow = neval, ncol = ntrain)
 
@@ -178,16 +178,8 @@ npreghat <-
     W[cbind(cols, seq_len(ib))] <- 1.0
     W[, ib + 1L] <- 1.0
 
-    ks <- npksum.default(
-      bws = bws,
-      txdat = txdat,
-      exdat = if (no.ex) txdat else eval.data,
-      tydat = ones,
-      weights = W,
-      bandwidth.divide = TRUE
-    )$ksum
-
-    ps <- npksum.default(
+    # The derivative call already returns both ksum and p.ksum.
+    out <- npksum.default(
       bws = bws,
       txdat = txdat,
       exdat = if (no.ex) txdat else eval.data,
@@ -195,7 +187,10 @@ npreghat <-
       weights = W,
       bandwidth.divide = TRUE,
       permutation.operator = "derivative"
-    )$p.ksum
+    )
+
+    ks <- out$ksum
+    ps <- out$p.ksum
 
     ks <- if (is.null(dim(ks))) {
       matrix(ks, nrow = ib + 1L, ncol = neval)
