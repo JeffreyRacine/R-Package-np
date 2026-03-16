@@ -146,6 +146,81 @@ npreghat <-
   sweep(t(kw), 1L, denom, "/")
 }
 
+.npreghat_exact_lc_derivative_matrix_from_npksum_chunked <- function(bws,
+                                                                     txdat,
+                                                                     exdat = NULL,
+                                                                     s) {
+  no.ex <- is.null(exdat)
+  txdat <- toFrame(txdat)
+  if (!no.ex) {
+    exdat <- toFrame(exdat)
+    if (!(txdat %~% exdat))
+      stop("'txdat' and 'exdat' are not similar data frames!")
+  }
+
+  target.cont <- which(s == 1L)
+  if (length(target.cont) != 1L)
+    stop("lc derivative hat matrix requires exactly one continuous first derivative")
+
+  eval.data <- if (no.ex) txdat else exdat
+  ntrain <- nrow(txdat)
+  neval <- nrow(eval.data)
+  block.size <- min(128L, ntrain)
+  ones <- rep.int(1.0, ntrain)
+  H <- matrix(0.0, nrow = neval, ncol = ntrain)
+
+  for (start in seq.int(1L, ntrain, by = block.size)) {
+    stop.col <- min(ntrain, start + block.size - 1L)
+    cols <- seq.int(start, stop.col)
+    ib <- length(cols)
+    W <- matrix(0.0, nrow = ntrain, ncol = ib + 1L)
+    W[cbind(cols, seq_len(ib))] <- 1.0
+    W[, ib + 1L] <- 1.0
+
+    ks <- npksum.default(
+      bws = bws,
+      txdat = txdat,
+      exdat = if (no.ex) txdat else eval.data,
+      tydat = ones,
+      weights = W,
+      bandwidth.divide = TRUE
+    )$ksum
+
+    ps <- npksum.default(
+      bws = bws,
+      txdat = txdat,
+      exdat = if (no.ex) txdat else eval.data,
+      tydat = ones,
+      weights = W,
+      bandwidth.divide = TRUE,
+      permutation.operator = "derivative"
+    )$p.ksum
+
+    ks <- if (is.null(dim(ks))) {
+      matrix(ks, nrow = ib + 1L, ncol = neval)
+    } else {
+      as.matrix(ks)
+    }
+    ps <- if (is.null(dim(ps))) {
+      matrix(ps, nrow = ib + 1L, ncol = neval)
+    } else if (length(dim(ps)) == 3L && dim(ps)[3L] == 1L) {
+      ps[, , 1L, drop = TRUE]
+    } else {
+      as.matrix(ps)
+    }
+
+    sk <- ks[nrow(ks), ]
+    dsk <- ps[nrow(ps), ]
+
+    H[, cols] <- t(
+      (ps[seq_len(ib), , drop = FALSE] / rep(sk, each = ib)) -
+      (ks[seq_len(ib), , drop = FALSE] * rep(dsk / (sk^2), each = ib))
+    )
+  }
+
+  H
+}
+
 .npreghat_exact_ll_matrix_from_kernel_weights <- function(bws, txdat, exdat = NULL, s = NULL) {
   miss.ex <- is.null(exdat)
   eval.data <- if (miss.ex) txdat else exdat
@@ -1021,7 +1096,14 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- if (exact.lc.kernel.route) {
+      H <- if (lc.derivative.exact.route) {
+        .npreghat_exact_lc_derivative_matrix_from_npksum_chunked(
+          bws = bws,
+          txdat = txdat,
+          exdat = if (no.ex) NULL else exdat,
+          s = s
+        )
+      } else if (exact.lc.kernel.route) {
         .npreghat_exact_lc_matrix_from_kernel_weights(
           bws = bws,
           txdat = txdat,
