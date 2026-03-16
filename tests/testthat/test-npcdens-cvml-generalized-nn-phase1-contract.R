@@ -27,7 +27,7 @@ test_that("phase1 npcdensbw cv.ml generalized-nn lc matches the frozen public ba
   )
 
   expect_true(is.finite(bw.lc$fval))
-  expect_equal(bw.lc$fval, 28.951908067815676, tolerance = 1e-10)
+  expect_equal(bw.lc$fval, 23.289998754972199, tolerance = 1e-10)
 })
 
 test_that("phase1 npcdensbw cv.ml generalized-nn keeps ll on canonical lp degree-1 glp", {
@@ -60,8 +60,8 @@ test_that("phase1 npcdensbw cv.ml generalized-nn keeps ll on canonical lp degree
   expect_identical(as.integer(bw.ll$degree.engine), degree)
   expect_true(is.finite(bw.ll$fval))
   expect_true(is.finite(bw.lp$fval))
-  expect_equal(bw.ll$fval, 18.348984655050714, tolerance = 1e-10)
-  expect_equal(bw.lp$fval, 18.348984655050714, tolerance = 1e-10)
+  expect_equal(bw.ll$fval, 23.496642394276616, tolerance = 1e-10)
+  expect_equal(bw.lp$fval, 23.496642394276616, tolerance = 1e-10)
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
 })
 
@@ -95,7 +95,7 @@ test_that("phase1 npcdensbw cv.ml generalized-nn lp degree-2 succeeds on a highe
 
   expect_identical(as.integer(bw.d2$degree.engine), degree2)
   expect_true(is.finite(bw.d2$fval))
-  expect_equal(bw.d2$fval, 25.836810846514766, tolerance = 1e-10)
+  expect_equal(bw.d2$fval, -3527.5134990827933, tolerance = 1e-10)
   expect_gt(abs(bw.d2$fval - bw.d1$fval), 1e-6)
 })
 

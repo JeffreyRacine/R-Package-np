@@ -214,7 +214,8 @@ test_that("plot helpers use central progress core", {
   expect_true(grepl("\\.np_progress_begin\\(", src))
   expect_true(grepl("\\.np_progress_step\\(", src))
   expect_true(grepl("\\.np_progress_end\\(", src))
-  expect_true(grepl("\\.np_progress_note\\(", src))
+  expect_true(grepl("\\.np_plot_bootstrap_progress_begin\\(", src))
+  expect_true(grepl("\\.np_plot_activity_begin\\(", src))
 })
 
 test_that("compiled multistart spinner no longer emits legacy redraw output", {
@@ -229,7 +230,7 @@ test_that("compiled multistart spinner no longer emits legacy redraw output", {
   expect_true(grepl("np_progress_bandwidth_multistart_step\\(", src))
   expect_true(grepl("np_progress_bandwidth_activity_step\\(", src))
   expect_true(grepl("bwm_maybe_signal_activity\\(", src))
-  expect_true(grepl("np_progress_signal\\(\"bandwidth_activity_step\", \"bandwidth\"", src, fixed = TRUE))
+  expect_true(grepl("np_progress_signal\\(\"bandwidth_activity_step\",\\s*\"bandwidth\"", src))
 })
 
 test_that("compiled progress bridge is registered narrowly", {

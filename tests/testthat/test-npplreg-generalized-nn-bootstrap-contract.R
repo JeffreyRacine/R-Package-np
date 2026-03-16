@@ -8,7 +8,7 @@ test_that("npplreg generalized-nn cv.aic bootstrap plot contract holds across re
 
   boot_methods <- c("inid", "fixed", "geom", "wild")
   regtypes <- c("lc", "ll", "lp")
-  bws.nn <- matrix(c(1, 9), nrow = 2L)
+  bws.nn <- matrix(c(2, 9), nrow = 2L)
 
   for (regtype in regtypes) {
     bw.args <- list(

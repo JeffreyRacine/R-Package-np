@@ -1125,7 +1125,7 @@ test_that("nearest-neighbor plot helpers run for regression and density/distribu
   }
 })
 
-test_that("nearest-neighbor frozen bootstrap plots run for unsupervised families and reject unsupported regression families", {
+test_that("nearest-neighbor frozen bootstrap plots run across regression and unsupervised families", {
   skip_if_not_installed("np")
 
   set.seed(32908)
@@ -1148,12 +1148,13 @@ test_that("nearest-neighbor frozen bootstrap plots run for unsupervised families
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
     rbw <- npregbw(xdat = x, ydat = y, regtype = "ll", nmulti = 1, bwtype = bt)
-    expect_error(
-      run_plot(rbw, xdat = x, ydat = y, plot.errors.boot.method = "inid"),
-      "currently supported only"
-    )
 
     for (boot.method in c("inid", "fixed", "geom")) {
+      expect_type(
+        run_plot(rbw, xdat = x, ydat = y, plot.errors.boot.method = boot.method),
+        "list"
+      )
+
       ubw <- npudensbw(dat = x, nmulti = 1, bwtype = bt)
       expect_type(run_plot(ubw, plot.errors.boot.method = boot.method), "list")
 
@@ -1196,7 +1197,7 @@ test_that("nearest-neighbor regression helper matches explicit resample refits",
   )
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) c(5, 5) else c(1, 1)
+    bw.val <- if (identical(bt, "adaptive_nn")) c(5, 5) else c(2, 2)
 
     for (cfg in cfgs) {
       bw.args <- list(
@@ -1314,7 +1315,7 @@ test_that("nearest-neighbor ksum helpers match explicit resample refits", {
   fast.c <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "np")
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) 5 else 1
+    bw.val <- if (identical(bt, "adaptive_nn")) 5 else 2
     cbw.val <- rep.int(bw.val, 2L)
 
     u.dens.bw <- npudensbw(dat = tx, bws = bw.val, bwtype = bt, bandwidth.compute = FALSE)
@@ -1412,9 +1413,12 @@ test_that("nearest-neighbor frozen hat helpers match frozen operator application
   udist.hat <- getFromNamespace("npudisthat", "np")
   cdens.hat <- getFromNamespace("npcdenshat", "np")
   cdist.hat <- getFromNamespace("npcdisthat", "np")
+  make_xkbw <- getFromNamespace(".npcdhat_make_xkbw", "np")
+  make_ybw <- getFromNamespace(".npcdhat_make_ybw", "np")
+  make_kmat <- getFromNamespace(".npcdhat_make_kernel_matrix", "np")
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) 5 else 1
+    bw.val <- if (identical(bt, "adaptive_nn")) 5 else 2
     cbw.val <- rep.int(bw.val, 2L)
 
     u.dens.bw <- npudensbw(dat = tx, bws = bw.val, bwtype = bt, bandwidth.compute = FALSE)
@@ -1426,6 +1430,38 @@ test_that("nearest-neighbor frozen hat helpers match frozen operator application
     H.udist <- unclass(udist.hat(bws = u.dist.bw, tdat = tx, edat = ex, output = "matrix"))
     H.cdens <- unclass(cdens.hat(bws = c.dens.bw, txdat = tx, tydat = ty, exdat = ex, eydat = ey, output = "matrix"))
     H.cdist <- unclass(cdist.hat(bws = c.dist.bw, txdat = tx, tydat = ty, exdat = ex, eydat = ey, output = "matrix"))
+    xkbw.dens <- make_xkbw(bws = c.dens.bw, txdat = tx)
+    xkbw.dist <- make_xkbw(bws = c.dist.bw, txdat = tx)
+    ybw.dens <- make_ybw(bws = c.dens.bw, tydat = ty)
+    ybw.dist <- make_ybw(bws = c.dist.bw, tydat = ty)
+    Kx.dens <- make_kmat(
+      kbw = xkbw.dens,
+      txdat = tx,
+      exdat = ex,
+      operator = rep.int("normal", ncol(tx))
+    )
+    Ky.dens <- make_kmat(
+      kbw = ybw.dens,
+      txdat = ty,
+      exdat = ey,
+      operator = rep.int("normal", ncol(ty))
+    )
+    Kx.dist <- make_kmat(
+      kbw = xkbw.dist,
+      txdat = tx,
+      exdat = ex,
+      operator = rep.int("normal", ncol(tx))
+    )
+    Ky.dist <- make_kmat(
+      kbw = ybw.dist,
+      txdat = ty,
+      exdat = ey,
+      operator = rep.int("integral", ncol(ty))
+    )
+    den.op.dens <- Kx.dens / n
+    num.op.dens <- (Kx.dens * Ky.dens) / n
+    den.op.dist <- Kx.dist / n
+    num.op.dist <- (Kx.dist * Ky.dist) / n
 
     u.dens.frozen <- frozen.u(
       xdat = tx,
@@ -1466,13 +1502,33 @@ test_that("nearest-neighbor frozen hat helpers match frozen operator application
 
     expect_equal(u.dens.frozen$t, t(H.udens %*% counts), tolerance = 1e-10, info = paste(bt, "udens"))
     expect_equal(u.dist.frozen$t, t(H.udist %*% counts), tolerance = 1e-10, info = paste(bt, "udist"))
-    expect_equal(c.dens.frozen$t, t(H.cdens %*% counts), tolerance = 1e-10, info = paste(bt, "npcdens"))
-    expect_equal(c.dist.frozen$t, t(H.cdist %*% counts), tolerance = 1e-10, info = paste(bt, "npcdist"))
+    expect_equal(
+      c.dens.frozen$t,
+      t(num.op.dens %*% counts) / pmax(t(den.op.dens %*% counts), .Machine$double.eps),
+      tolerance = 1e-10,
+      info = paste(bt, "npcdens")
+    )
+    expect_equal(
+      c.dist.frozen$t,
+      t(num.op.dist %*% counts) / pmax(t(den.op.dist %*% counts), .Machine$double.eps),
+      tolerance = 1e-10,
+      info = paste(bt, "npcdist")
+    )
 
     expect_equal(u.dens.frozen$t0, rowSums(H.udens), tolerance = 1e-12, info = paste(bt, "udens-t0"))
     expect_equal(u.dist.frozen$t0, rowSums(H.udist), tolerance = 1e-12, info = paste(bt, "udist-t0"))
-    expect_equal(c.dens.frozen$t0, rowSums(H.cdens), tolerance = 1e-12, info = paste(bt, "npcdens-t0"))
-    expect_equal(c.dist.frozen$t0, rowSums(H.cdist), tolerance = 1e-12, info = paste(bt, "npcdist-t0"))
+    expect_equal(
+      c.dens.frozen$t0,
+      rowSums(num.op.dens) / pmax(rowSums(den.op.dens), .Machine$double.eps),
+      tolerance = 1e-12,
+      info = paste(bt, "npcdens-t0")
+    )
+    expect_equal(
+      c.dist.frozen$t0,
+      rowSums(num.op.dist) / pmax(rowSums(den.op.dist), .Machine$double.eps),
+      tolerance = 1e-12,
+      info = paste(bt, "npcdist-t0")
+    )
   }
 })
 

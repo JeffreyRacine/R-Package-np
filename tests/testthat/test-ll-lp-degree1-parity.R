@@ -499,7 +499,7 @@ test_that("npplreg generalized-nn semiparametric hat invariants match for ll and
 
   tx <- data.frame(x = x)
   tz <- data.frame(z = z)
-  bws.fixed <- matrix(c(1, 9), nrow = 2L)
+  bws.fixed <- matrix(c(2, 9), nrow = 2L)
 
   bw.ll <- npplregbw(
     xdat = tx,

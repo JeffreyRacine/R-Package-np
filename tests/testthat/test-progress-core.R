@@ -673,9 +673,18 @@ test_that("plot progress default cadence matches bandwidth heartbeat", {
 test_that("interactive bootstrap chunk sizes leave room for intermediate progress", {
   progress_chunk_cap <- getFromNamespace(".np_plot_progress_chunk_cap", "np")
   wild_chunk <- getFromNamespace(".np_wild_chunk_size", "np")
+  enabled_chunk <- with_np_bindings(
+    list(.np_progress_is_interactive = function() TRUE),
+    wild_chunk(n = 500L, B = 9999L)
+  )
+  disabled_chunk <- with_np_bindings(
+    list(.np_progress_is_interactive = function() FALSE),
+    wild_chunk(n = 500L, B = 9999L)
+  )
 
   expect_identical(progress_chunk_cap(9999L), 2500L)
-  expect_identical(wild_chunk(n = 500L, B = 9999L), 2500L)
+  expect_identical(enabled_chunk, 16L)
+  expect_identical(disabled_chunk, 9999L)
 })
 
 test_that("single-line abort preserves the final line and terminates it", {

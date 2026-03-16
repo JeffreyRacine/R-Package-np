@@ -246,7 +246,7 @@ test_that("generalized conditional exact state apply matches weighted active-sup
   )
 })
 
-test_that("adaptive conditional exact reports invalid tiny-support resamples clearly", {
+test_that("adaptive conditional exact handles tiny-support resamples consistently", {
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
@@ -266,34 +266,30 @@ test_that("adaptive conditional exact reports invalid tiny-support resamples cle
   )
 
   idx <- np:::.np_counts_to_indices(counts[, 1L])
-  expect_error(
-    npcdens(
-      txdat = xdat[idx, , drop = FALSE],
-      tydat = ydat[idx, , drop = FALSE],
-      exdat = exdat,
-      eydat = eydat,
-      bws = npcdensbw(
-        xdat = xdat[idx, , drop = FALSE],
-        ydat = ydat[idx, , drop = FALSE],
-        bwtype = "adaptive_nn",
-        bws = c(2, 2),
-        bandwidth.compute = FALSE
-      )
-    ),
-    "invalid bandwidth"
+  explicit <- npcdens(
+    txdat = xdat[idx, , drop = FALSE],
+    tydat = ydat[idx, , drop = FALSE],
+    exdat = exdat,
+    eydat = eydat,
+    bws = npcdensbw(
+      xdat = xdat[idx, , drop = FALSE],
+      ydat = ydat[idx, , drop = FALSE],
+      bwtype = "adaptive_nn",
+      bws = c(2, 2),
+      bandwidth.compute = FALSE
+    )
   )
 
-  expect_error(
-    np:::.np_inid_boot_from_ksum_conditional_exact(
-      xdat = xdat,
-      ydat = ydat,
-      exdat = exdat,
-      eydat = eydat,
-      bws = bw,
-      B = 1L,
-      cdf = FALSE,
-      counts = counts
-    ),
-    "adaptive conditional exact bootstrap resample is invalid for this active support"
+  helper <- np:::.np_inid_boot_from_ksum_conditional_exact(
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    bws = bw,
+    B = 1L,
+    cdf = FALSE,
+    counts = counts
   )
+
+  expect_equal(as.numeric(helper$t[1L, ]), as.numeric(explicit$condens), tolerance = 1e-15)
 })

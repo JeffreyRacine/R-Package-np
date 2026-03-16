@@ -216,6 +216,23 @@ static void np_refresh_support_counts_extern(void)
                                 matrix_Y_continuous_train_extern);
 }
 
+static void np_reset_y_side_extern(void)
+{
+  num_var_unordered_extern = 0;
+  num_var_ordered_extern = 0;
+  num_var_continuous_extern = 0;
+
+  matrix_Y_unordered_train_extern = NULL;
+  matrix_Y_ordered_train_extern = NULL;
+  matrix_Y_continuous_train_extern = NULL;
+  matrix_Y_unordered_eval_extern = NULL;
+  matrix_Y_ordered_eval_extern = NULL;
+  matrix_Y_continuous_eval_extern = NULL;
+
+  num_categories_extern_Y = NULL;
+  matrix_categorical_vals_extern_Y = NULL;
+}
+
 static void np_validate_nonfixed_support_counts_extern(const char *where, const int bandwidth)
 {
   int j;
@@ -3333,6 +3350,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   num_reg_unordered_extern = myopti[BW_NUNOI];
   num_reg_ordered_extern = myopti[BW_NORDI];
   num_reg_continuous_extern = myopti[BW_NCONI];
+  np_reset_y_side_extern();
 
   vector_ckerlb_extern = ckerlb;
   vector_ckerub_extern = ckerub;
@@ -3871,6 +3889,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
+  np_reset_y_side_extern();
 
   return ;
   
@@ -3921,6 +3940,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   num_reg_unordered_extern = myopti[DBW_NUNOI];
   num_reg_ordered_extern = myopti[DBW_NORDI];
   num_reg_continuous_extern = myopti[DBW_NCONI];
+  np_reset_y_side_extern();
 
   vector_ckerlb_extern = ckerlb;
   vector_ckerub_extern = ckerub;
@@ -4513,6 +4533,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
+  np_reset_y_side_extern();
 
   return ;
   
@@ -7486,6 +7507,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   num_reg_continuous_extern = myopti[RBW_NCONI];
   num_reg_unordered_extern = myopti[RBW_NUNOI];
   num_reg_ordered_extern = myopti[RBW_NORDI];
+  np_reset_y_side_extern();
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
@@ -8047,6 +8069,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
+  np_reset_y_side_extern();
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
@@ -8107,6 +8130,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   num_reg_continuous_extern = myopti[REG_NCONI];
   num_reg_unordered_extern = myopti[REG_NUNOI];
   num_reg_ordered_extern = myopti[REG_NORDI];
+  np_reset_y_side_extern();
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
@@ -8531,6 +8555,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
+  np_reset_y_side_extern();
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;

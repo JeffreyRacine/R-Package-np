@@ -3168,22 +3168,12 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid unconditional exact bootstrap dimensions")
 
-  kb <- tryCatch(.np_make_kbandwidth_unconditional(bws = bws, xdat = xdat),
-                 error = function(e) NULL)
-
-  fit_one <- function(x.train, weights = NULL, n.total = NULL) {
-    bw.eval <- if (!is.null(kb) &&
-                   .np_unconditional_exact_precomputed_kband_safe(
-                     bws = bws,
-                     n.train = nrow(x.train)
-                   )) kb else bws
+  fit_one <- function(x.train) {
     .np_ksum_unconditional_eval_exact(
       xdat = x.train,
       exdat = exdat,
-      bws = bw.eval,
-      operator = operator,
-      weights = weights,
-      n.total = n.total
+      bws = bws,
+      operator = operator
     )
   }
 
@@ -3212,12 +3202,8 @@
     }
 
     for (jj in seq_len(bsz)) {
-      active.sample <- .np_active_boot_sample(xdat = xdat, counts.col = counts.chunk[, jj])
-      tmat[start + jj - 1L, ] <- fit_one(
-        x.train = active.sample$xdat,
-        weights = active.sample$weights,
-        n.total = active.sample$n.total
-      )
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      tmat[start + jj - 1L, ] <- fit_one(x.train = xdat[idx, , drop = FALSE])
     }
 
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
@@ -4085,164 +4071,36 @@
   if (!.np_con_inid_ksum_eligible(bws))
     return(NULL)
 
-  kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = xdat),
-                  error = function(e) NULL)
-  kbxy <- tryCatch(.np_con_make_kbandwidth_xy(bws = bws, xdat = xdat, ydat = ydat),
-                   error = function(e) NULL)
-  if (is.null(kbx) || is.null(kbxy))
-    return(NULL)
+  fit_one <- function(x.train, y.train) {
+    kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = x.train),
+                    error = function(e) NULL)
+    kbxy <- tryCatch(.np_con_make_kbandwidth_xy(bws = bws, xdat = x.train, ydat = y.train),
+                     error = function(e) NULL)
+    if (is.null(kbx) || is.null(kbxy))
+      return(NULL)
 
-  den.state <- .np_ksum_exact_state_build(
-    bws = kbx,
-    exdat = exdat,
-    operator = rep.int("normal", ncol(xdat))
-  )
-  num.state <- .np_ksum_exact_state_build(
-    bws = kbxy,
-    exdat = .np_bind_data_frames_fast(exdat, eydat),
-    operator = c(
-      rep.int("normal", ncol(xdat)),
-      rep.int(if (cdf) "integral" else "normal", ncol(ydat))
-    )
-  )
-
-  fit_one <- function(x.train, y.train, weights = NULL, n.total = NULL) {
-    if (is.null(weights)) {
-      weights <- matrix(1.0, nrow = nrow(x.train), ncol = 1L)
-      n.total <- nrow(x.train)
-    } else {
-      weights <- matrix(as.double(weights), ncol = 1L)
-      if (nrow(weights) != nrow(x.train))
-        stop("exact conditional ksum helper requires one weight per training row")
-      if (is.null(n.total))
-        n.total <- sum(weights)
+    fit.expr <- function() {
+      .np_ksum_conditional_eval_exact(
+        xdat = x.train,
+        ydat = y.train,
+        exdat = exdat,
+        eydat = eydat,
+        kbx = kbx,
+        kbxy = kbxy,
+        cdf = cdf
+      )
     }
 
     if (identical(bws$type, "adaptive_nn")) {
       return(.np_conditional_exact_fit_or_stop(
-        fit.expr = function() {
-          .np_ksum_conditional_eval_exact(
-            xdat = x.train,
-            ydat = y.train,
-            exdat = exdat,
-            eydat = eydat,
-            kbx = kbx,
-            kbxy = kbxy,
-            cdf = cdf,
-            weights = weights,
-            n.total = n.total
-          )
-        },
+        fit.expr = fit.expr,
         bws = bws,
         x.train = x.train,
         y.train = y.train
       ))
     }
 
-    den <- as.numeric(.np_ksum_eval_exact_state(
-      state = den.state,
-      txdat = x.train,
-      weights = weights
-    )) / n.total
-    num <- as.numeric(.np_ksum_eval_exact_state(
-      state = num.state,
-      txdat = .np_bind_data_frames_fast(x.train, y.train),
-      weights = weights
-    )) / n.total
-
-    num / pmax(den, .Machine$double.eps)
-  }
-
-  use.matrix.fast <- identical(bws$type, "generalized_nn") &&
-    den.state$bws$nuno == 0L &&
-    den.state$bws$nord == 0L &&
-    num.state$bws$nuno == 0L &&
-    num.state$bws$nord == 0L &&
-    all(vapply(xdat, is.numeric, logical(1))) &&
-    all(vapply(ydat, is.numeric, logical(1)))
-
-  if (use.matrix.fast) {
-    xmat <- data.matrix(xdat)
-    xymat <- cbind(xmat, data.matrix(ydat))
-
-    fit_one_matrix <- function(x.train, xy.train, weights = NULL, n.total = NULL) {
-      if (is.null(weights)) {
-        weights <- matrix(1.0, nrow = nrow(x.train), ncol = 1L)
-        n.total <- nrow(x.train)
-      } else {
-        weights <- matrix(as.double(weights), ncol = 1L)
-        if (nrow(weights) != nrow(x.train))
-          stop("exact conditional ksum helper requires one weight per training row")
-        if (is.null(n.total))
-          n.total <- sum(weights)
-      }
-
-      den <- as.numeric(.np_ksum_eval_exact_state(
-        state = den.state,
-        txdat = x.train,
-        weights = weights
-      )) / n.total
-      num <- as.numeric(.np_ksum_eval_exact_state(
-        state = num.state,
-        txdat = xy.train,
-        weights = weights
-      )) / n.total
-
-      num / pmax(den, .Machine$double.eps)
-    }
-
-    t0 <- fit_one_matrix(x.train = xmat, xy.train = xymat)
-    tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
-    counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
-    progress.label <- if (is.null(progress.label)) {
-      if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
-    } else {
-      progress.label
-    }
-    progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
-    on.exit({
-      .np_plot_progress_end(progress)
-    }, add = TRUE)
-
-    start <- 1L
-    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
-    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
-    while (start <= B) {
-      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      chunk.started <- .np_progress_now()
-      counts.chunk <- if (!is.null(counts.mat)) {
-        counts.mat[, start:stopi, drop = FALSE]
-      } else if (!is.null(counts.drawer)) {
-        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
-      } else {
-        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
-      }
-
-      for (jj in seq_len(bsz)) {
-        active.sample <- .np_active_boot_sample_matrix(
-          xmat = xmat,
-          ymat = xymat,
-          counts.col = counts.chunk[, jj]
-        )
-        tmat[start + jj - 1L, ] <- fit_one_matrix(
-          x.train = active.sample$xmat,
-          xy.train = active.sample$ymat,
-          weights = active.sample$weights,
-          n.total = active.sample$n.total
-        )
-      }
-
-      progress <- .np_plot_progress_tick(state = progress, done = stopi)
-      chunk.controller <- .np_plot_progress_chunk_observe(
-        controller = chunk.controller,
-        bsz = bsz,
-        elapsed.sec = .np_progress_now() - chunk.started
-      )
-      start <- stopi + 1L
-    }
-
-    return(list(t = tmat, t0 = t0))
+    fit.expr()
   }
 
   t0 <- fit_one(x.train = xdat, y.train = ydat)
@@ -4274,16 +4132,10 @@
     }
 
     for (jj in seq_len(bsz)) {
-      active.sample <- .np_active_boot_sample(
-        xdat = xdat,
-        ydat = ydat,
-        counts.col = counts.chunk[, jj]
-      )
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
       tmat[start + jj - 1L, ] <- fit_one(
-        x.train = active.sample$xdat,
-        y.train = active.sample$ydat,
-        weights = active.sample$weights,
-        n.total = active.sample$n.total
+        x.train = xdat[idx, , drop = FALSE],
+        y.train = ydat[idx, , drop = FALSE]
       )
     }
 
