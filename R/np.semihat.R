@@ -202,12 +202,12 @@
 }
 
 .np_indexhat_rbw <- function(bws, idx.train) {
-  do.call(npregbw, .np_semihat_make_regbw_args(
+  .np_semihat_make_regbw_state(
     source = bws,
     xdat = idx.train,
     ydat = rep.int(0.0, nrow(idx.train)),
     bw = bws$bw
-  ))
+  )
 }
 
 .np_indexhat_ll_owner_rbw <- function(bws, idx.train) {
@@ -467,6 +467,29 @@
   )
 }
 
+.np_indexhat_gradient_matrix <- function(bws, idx.train, idx.eval) {
+  regtype <- if (!is.null(bws$regtype)) as.character(bws$regtype)[1L] else "lc"
+  owner.bw <- if (identical(regtype, "ll")) {
+    .np_indexhat_ll_owner_rbw(bws = bws, idx.train = idx.train)
+  } else {
+    .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+  }
+  out <- .npRmpi_with_local_hat_helper(npreghat(
+    bws = owner.bw,
+    txdat = idx.train,
+    exdat = idx.eval,
+    output = "matrix",
+    s = 1L
+  ))
+
+  matrix(
+    as.double(out),
+    nrow = nrow(out),
+    ncol = ncol(out),
+    dimnames = dimnames(out)
+  )
+}
+
 .np_indexhat_exact <- function(bws,
                                idx.train,
                                idx.eval,
@@ -535,6 +558,31 @@
 
   if (lp.mean.owner.safe) {
     return(.np_indexhat_lp_mean_matrix(
+      bws = bws,
+      idx.train = idx.train,
+      idx.eval = idx.eval
+    ))
+  }
+
+  lp.grad.owner.safe <- identical(output, "matrix") &&
+    s == 1L &&
+    (
+      identical(regtype, "ll") ||
+        (
+          identical(regtype.engine, "lp") &&
+            !(
+              identical(bws$type, "generalized_nn") &&
+                all(as.integer(spec$degree.engine) == 1L) &&
+                (
+                  !identical(spec$basis.engine, "glp") ||
+                    isTRUE(spec$bernstein.basis.engine)
+                )
+            )
+        )
+    )
+
+  if (lp.grad.owner.safe) {
+    return(.np_indexhat_gradient_matrix(
       bws = bws,
       idx.train = idx.train,
       idx.eval = idx.eval
