@@ -72,6 +72,9 @@ npksum.numeric <-
            bandwidth.divide, compute.ocg, compute.score, kernel.pow,
            leave.one.out, operator, permutation.operator, return.kernel.weights,
            ...){
+    dots <- list(...)
+    return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
+    dots$return.derivative.kernel.weights <- NULL
     .npRmpi_require_active_slave_pool(where = "npksum()")
     if (.npRmpi_npksum_should_localize(bws, list(...)) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
@@ -99,7 +102,7 @@ npksum.numeric <-
     if (!missing(tydat))
       kbw_args$ydati <- untangle(as.data.frame(tydat))
 
-    kbw_args <- c(kbw_args, list(...))
+    kbw_args <- c(kbw_args, dots)
     tbw <- do.call(kbandwidth, kbw_args)
 
     call_args <- list(txdat = txdat, bws = tbw)
@@ -125,6 +128,8 @@ npksum.numeric <-
       call_args$compute.ocg <- compute.ocg
     if (!missing(return.kernel.weights))
       call_args$return.kernel.weights <- return.kernel.weights
+    if (return.derivative.kernel.weights)
+      call_args$return.derivative.kernel.weights <- return.derivative.kernel.weights
 
     do.call(npksum.default, call_args)
   }
@@ -144,6 +149,8 @@ npksum.default <-
            permutation.operator = names(PERMUTATION_OPERATORS),
            return.kernel.weights = FALSE,
            ...){
+    dots <- list(...)
+    return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
     .npRmpi_require_active_slave_pool(where = "npksum()")
     if (.npRmpi_npksum_should_localize(bws, list(...)) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
@@ -320,7 +327,14 @@ npksum.default <-
 
     nkw <- (if (return.kernel.weights) tnrow*enrow else 0)
 
-    return.names <- c("ksum","kernel.weights","p.ksum")
+    need.pkw <- isTRUE(return.derivative.kernel.weights) &&
+      return.kernel.weights &&
+      has.pksum &&
+      (p.length.out > 0L)
+
+    return.names <- c("ksum", "kernel.weights", "p.ksum")
+    if (need.pkw)
+      return.names <- c(return.names, "p.kernel.weights")
       
 	    myopti = list(
       num_obs_train = tnrow,
@@ -404,6 +418,21 @@ npksum.default <-
       kw <- NULL
     }
 
+    if(need.pkw){
+      raw.pkw <- myout[["p.kernel.weights"]]
+      if(length(raw.pkw) > 0L){
+        if(npvar == 1L){
+          p.kw <- matrix(data = raw.pkw, nrow = tnrow, ncol = enrow)
+        } else {
+          p.kw <- array(data = raw.pkw, dim = c(tnrow, enrow, npvar))
+        }
+      } else {
+        p.kw <- NULL
+      }
+    } else {
+      p.kw <- NULL
+    }
+
     if(has.pksum && (p.length.out > 0)) {
       dim.p <- p.dim.out[which(p.dim.out > 1)]
       if(length(dim.p) == 0) dim.p <- 1
@@ -434,6 +463,7 @@ npksum.default <-
                         ksum = myout[["ksum"]],
                         kw = kw,
                         p.ksum = p.myout,
+                        p.kw = p.kw,
                         ntrain = tnrow, trainiseval = miss.ex) )
 
   }

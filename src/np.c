@@ -1002,6 +1002,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                   int * myopti, double * kpow,
                   double * weighted_sum, double * weighted_p_sum,
                   double * kernel_weights,
+                  double * permutation_kernel_weights,
                   double * ckerlb, double * ckerub);
 void np_quantile_conditional(double * tc_con,
                              double * tu_uno, double * tu_ord, double * tu_con,
@@ -2109,11 +2110,12 @@ SEXP C_np_kernelsum(SEXP tuno,
   SEXP tuno_r=R_NilValue, tord_r=R_NilValue, tcon_r=R_NilValue, ty_r=R_NilValue, weights_r=R_NilValue;
   SEXP euno_r=R_NilValue, eord_r=R_NilValue, econ_r=R_NilValue, bw_r=R_NilValue, mcv_r=R_NilValue;
   SEXP padnum_r=R_NilValue, op_i=R_NilValue, myopti_i=R_NilValue, kpow_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
-  SEXP out=R_NilValue, out_names=R_NilValue, out_ksum=R_NilValue, out_pksum=R_NilValue, out_kw=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_ksum=R_NilValue, out_pksum=R_NilValue, out_kw=R_NilValue, out_pkw=R_NilValue;
   int n_ksum = asInteger(ksum_len);
   int n_pksum = asInteger(pksum_len);
   int n_kw = asInteger(kw_len);
-  int ncon = 0;
+  int ncon = 0, nuno = 0, nord = 0, p_operator = 0, do_score = 0, do_ocg = 0, return_kernel_weights = 0, p_nvar = 0;
+  R_xlen_t n_pkw = 0;
   int * myopti_p = NULL;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
@@ -2140,6 +2142,14 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
   ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
+  nuno = (int)INTEGER(myopti_i)[KWS_NUNOI];
+  nord = (int)INTEGER(myopti_i)[KWS_NORDI];
+  p_operator = (int)INTEGER(myopti_i)[KWS_POPI];
+  do_score = (int)INTEGER(myopti_i)[KWS_PSCOREI];
+  do_ocg = (int)INTEGER(myopti_i)[KWS_POCGI];
+  return_kernel_weights = (int)INTEGER(myopti_i)[KWS_RKWI];
+  p_nvar = ((p_operator != OP_NOOP) ? ncon : 0) + ((do_score || do_ocg) ? (nuno + nord) : 0);
+  n_pkw = (return_kernel_weights && (p_nvar > 0)) ? ((R_xlen_t)n_kw * (R_xlen_t)p_nvar) : 0;
   myopti_p = INTEGER(myopti_i);
   if(XLENGTH(myopti_i) <= KWS_SPARI){
     int i;
@@ -2155,6 +2165,7 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(out_ksum = allocVector(REALSXP, n_ksum));
   PROTECT(out_pksum = allocVector(REALSXP, n_pksum));
   PROTECT(out_kw = allocVector(REALSXP, n_kw));
+  PROTECT(out_pkw = allocVector(REALSXP, n_pkw));
 
   np_kernelsum(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
                REAL(ty_r), REAL(weights_r),
@@ -2162,21 +2173,23 @@ SEXP C_np_kernelsum(SEXP tuno,
                REAL(bw_r),
                REAL(mcv_r), REAL(padnum_r),
                INTEGER(op_i), myopti_p, REAL(kpow_r),
-               REAL(out_ksum), REAL(out_pksum), REAL(out_kw),
+               REAL(out_ksum), REAL(out_pksum), REAL(out_kw), REAL(out_pkw),
                ckerlb_p, ckerub_p);
 
-  PROTECT(out = allocVector(VECSXP, 3));
+  PROTECT(out = allocVector(VECSXP, 4));
   SET_VECTOR_ELT(out, 0, out_ksum);
   SET_VECTOR_ELT(out, 1, out_pksum);
   SET_VECTOR_ELT(out, 2, out_kw);
+  SET_VECTOR_ELT(out, 3, out_pkw);
 
-  PROTECT(out_names = allocVector(STRSXP, 3));
+  PROTECT(out_names = allocVector(STRSXP, 4));
   SET_STRING_ELT(out_names, 0, mkChar("ksum"));
   SET_STRING_ELT(out_names, 1, mkChar("p.ksum"));
   SET_STRING_ELT(out_names, 2, mkChar("kernel.weights"));
+  SET_STRING_ELT(out_names, 3, mkChar("p.kernel.weights"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(21);
+  UNPROTECT(22);
   return out;
 }
 
@@ -5922,7 +5935,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                       NULL,
                                       NULL,
                                       NULL,
-                                      ykw);
+                                      ykw,
+                                      NULL);
       if(status != 0)
         error("np_density_conditional: y-kernel response construction failed in LP path");
 
@@ -7521,13 +7535,14 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                   int * myopti, double * kpow, 
                   double * weighted_sum, double * weighted_p_sum,
                   double * kernel_weights,
+                  double * permutation_kernel_weights,
                   double * ckerlb, double * ckerub){
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
       
   /* the ys are the weights */
 
-  double * vector_scale_factor, * ksum, * p_ksum = NULL, pad_num, * kw = NULL;
+  double * vector_scale_factor, * ksum, * p_ksum = NULL, pad_num, * kw = NULL, * pkw = NULL;
   int i,j,k, num_var, num_obs_eval_alloc;
   int no_y, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
@@ -7537,7 +7552,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int use_tree = 0;
   int allocated_X_train = 1, allocated_X_eval = 1;
   int allocated_Y = 1, allocated_W = 1;
-  int ksum_is_output = 0, pksum_is_output = 0, kw_is_output = 0;
+  int ksum_is_output = 0, pksum_is_output = 0, kw_is_output = 0, pkw_is_output = 0;
 
   struct th_table * otabs = NULL;
   struct th_entry * ret = NULL;
@@ -7902,6 +7917,10 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
       kw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern);
     }
   }
+
+  if(return_kernel_weights && (p_nvar > 0)){
+    pkw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern*p_nvar);
+  }
   
   kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous_extern);
 
@@ -7982,7 +8001,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       matrix_ordered_indices,
                                       ksum,
                                       p_ksum,
-                                      kw);
+                                      kw,
+                                      pkw);
   if(npks_err != 0){
     error("kernel_weighted_sum_np failed with code %d", npks_err);
   }
@@ -8005,6 +8025,26 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
           for(j = 0; j < num_obs_train_extern; j++)
             for(i = 0; i < num_obs_eval_extern; i++)
               kernel_weights[ipe[i]*num_obs_train_extern + ipt[j]] = kw[j*num_obs_eval_extern + i];      
+        }
+      }
+    }
+
+    if(return_kernel_weights && (p_nvar > 0) && (pkw != NULL)){
+      if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+        for(k = 0; k < p_nvar; k++){
+          const int koff = k*num_obs_train_extern*num_obs_eval_extern;
+          for(j = 0; j < num_obs_eval_extern; j++)
+            for(i = 0; i < num_obs_train_extern; i++)
+              permutation_kernel_weights[koff + ipe[j]*num_obs_train_extern + ipt[i]] =
+                pkw[koff + j*num_obs_train_extern + i];
+        }
+      } else {
+        for(k = 0; k < p_nvar; k++){
+          const int koff = k*num_obs_train_extern*num_obs_eval_extern;
+          for(j = 0; j < num_obs_train_extern; j++)
+            for(i = 0; i < num_obs_eval_extern; i++)
+              permutation_kernel_weights[koff + ipe[i]*num_obs_train_extern + ipt[j]] =
+                pkw[koff + j*num_obs_eval_extern + i];
         }
       }
     }
@@ -8048,6 +8088,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   if(!kw_is_output)
     safe_free(kw);
+  if(!pkw_is_output)
+    safe_free(pkw);
 
   safe_free(ipt);
 

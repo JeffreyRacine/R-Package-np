@@ -1,5 +1,5 @@
 npkernelsum = 
-  function(bws, eval, ksum, kw, p.ksum,
+  function(bws, eval, ksum, kw, p.ksum, p.kw = NULL,
            ntrain, trainiseval = FALSE){
 
     if (missing(bws) || missing(eval) || missing(ksum) || missing(ntrain))
@@ -25,6 +25,9 @@ npkernelsum =
       ntrain = ntrain,
       trainiseval = trainiseval
       )
+
+    if (!is.null(p.kw))
+      d$p.kw <- p.kw
 
     class(d) = "npkernelsum"
 

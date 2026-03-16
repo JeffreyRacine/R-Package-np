@@ -166,6 +166,47 @@ npreghat <-
   eval.data <- if (no.ex) txdat else exdat
   ntrain <- nrow(txdat)
   neval <- nrow(eval.data)
+
+  if (identical(bws$type, "adaptive_nn")) {
+    out <- npksum.default(
+      bws = bws,
+      txdat = txdat,
+      exdat = if (no.ex) txdat else eval.data,
+      bandwidth.divide = TRUE,
+      return.kernel.weights = TRUE,
+      return.derivative.kernel.weights = TRUE,
+      permutation.operator = "derivative"
+    )
+
+    kw <- out$kw
+    pkw <- out$p.kw
+    if (is.null(kw) || is.null(pkw))
+      stop("adaptive lc derivative hat matrix requires kernel weights and derivative kernel weights")
+
+    if (!is.matrix(kw))
+      kw <- matrix(kw, nrow = ntrain, ncol = neval)
+
+    if (length(dim(pkw)) == 3L) {
+      pkw <- pkw[, , target.cont, drop = TRUE]
+    } else {
+      pkw <- as.matrix(pkw)
+    }
+
+    sk <- as.vector(out$ksum)
+    dsk <- out$p.ksum
+    if (length(dim(dsk)) == 3L) {
+      dsk <- dsk[, 1L, target.cont, drop = TRUE]
+    } else if (is.matrix(dsk)) {
+      dsk <- dsk[, target.cont, drop = TRUE]
+    }
+    dsk <- as.vector(dsk)
+
+    return(t(
+      sweep(pkw, 2L, sk, "/") -
+      sweep(kw, 2L, dsk / (sk^2), "*")
+    ))
+  }
+
   block.size <- min(512L, ntrain)
   ones <- rep.int(1.0, ntrain)
   H <- matrix(0.0, nrow = neval, ncol = ntrain)
