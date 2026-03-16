@@ -43,9 +43,209 @@
     \code{\link{npscoefbw}}.
   }
 
+  \item{xdat}{
+    training \eqn{x}-data used when plotting bandwidth objects. For
+    regression-like methods this is the regressor data; for conditional
+    density/distribution methods this is the conditioning data.
+  }
+
+  \item{ydat}{
+    training response/outcome data used when plotting bandwidth objects.
+    For regression-like methods this is typically a numeric vector; for
+    conditional density/distribution methods this is the conditional
+    response data frame.
+  }
+
+  \item{zdat}{
+    additional training covariate data for semiparametric families such as
+    partially linear, smooth coefficient, and single-index methods, when
+    relevant.
+  }
+
+  \item{data}{
+    an optional \code{\link{data.frame}} used to resolve stored formula
+    calls when explicit \code{xdat}, \code{ydat}, or \code{zdat} are not
+    supplied.
+  }
+
+  \item{xq, yq, zq}{
+    quantiles used to hold non-plotted variables fixed when constructing
+    slices. \code{xq} applies to \eqn{x}-variables, \code{yq} to
+    conditional response variables, and \code{zq} to auxiliary
+    semiparametric covariates, when relevant.
+  }
+
+  \item{xtrim, ytrim, ztrim}{
+    trimming/expansion controls for the evaluation support. These govern
+    the lower and upper limits of the plotted evaluation grid for
+    \eqn{x}-, \eqn{y}-, and \eqn{z}-variables, respectively, when
+    relevant.
+  }
+
+  \item{neval}{
+    the number of evaluation points used for each plotted continuous
+    margin.
+  }
+
+  \item{common.scale}{
+    a logical value specifying whether multiple panels should share a
+    common plotting scale when feasible.
+  }
+
+  \item{perspective}{
+    a logical value specifying whether bivariate continuous surfaces are
+    displayed with \code{\link{persp}}-style perspective plots when
+    relevant.
+  }
+
+  \item{gradients}{
+    a logical value specifying whether gradients/derivatives should be
+    plotted for families that support them.
+  }
+
+  \item{gradient.order}{
+    the derivative order requested for regression plots when relevant.
+  }
+
+  \item{coef}{
+    a logical value that, for semiparametric families where supported,
+    requests coefficient-function plotting instead of mean-function
+    plotting.
+  }
+
+  \item{coef.index}{
+    the coefficient index to plot for multi-coefficient smooth
+    coefficient models when \code{coef=TRUE}.
+  }
+
+  \item{tau}{
+    the quantile index used for quantile-regression-related plotting
+    routes when relevant.
+  }
+
+  \item{view}{
+    the viewing mode for bivariate surfaces. Supported values are
+    \code{"rotate"} and \code{"fixed"}.
+  }
+
+  \item{theta, phi}{
+    viewing angles passed to perspective-style surface plots when
+    relevant.
+  }
+
+  \item{plot.behavior}{
+    controls whether \code{plot} draws only, draws and returns payload
+    data, or returns payload data only. Supported values are
+    \code{"plot"}, \code{"plot-data"}, and \code{"data"}.
+  }
+
+  \item{plot.errors.method}{
+    controls interval/error construction. Supported values are
+    \code{"none"}, \code{"bootstrap"}, and \code{"asymptotic"}.
+  }
+
+  \item{plot.errors.boot.method}{
+    the bootstrap resampling scheme. Supported values are
+    \code{"wild"}, \code{"inid"}, \code{"fixed"}, and \code{"geom"} for
+    regression-family plots, and \code{"inid"}, \code{"fixed"}, and
+    \code{"geom"} for density/distribution-family plots.
+  }
+
+  \item{plot.errors.boot.nonfixed}{
+    for non-fixed density/distribution bootstrap routes, selects the
+    handling of non-fixed bandwidth geometry. Supported values are
+    \code{"exact"} and \code{"frozen"}.
+  }
+
+  \item{plot.errors.boot.wild}{
+    the wild-bootstrap multiplier distribution for regression-family
+    plots. Supported values are \code{"rademacher"} and
+    \code{"mammen"}.
+  }
+
+  \item{plot.errors.boot.blocklen}{
+    the block length (or mean block length) used by dependent-data
+    bootstrap methods \code{"fixed"} and \code{"geom"}.
+  }
+
+  \item{plot.errors.boot.num}{
+    the number of bootstrap replications.
+  }
+
+  \item{plot.errors.center}{
+    determines whether intervals are centered on the raw estimate or on a
+    bias-corrected estimate. Supported values are \code{"estimate"} and
+    \code{"bias-corrected"}.
+  }
+
+  \item{plot.errors.type}{
+    the interval/band type. Supported values are \code{"pmzsd"},
+    \code{"pointwise"}, \code{"bonferroni"}, \code{"simultaneous"}, and
+    \code{"all"}.
+  }
+
+  \item{plot.errors.alpha}{
+    the nominal significance level used for interval/band construction.
+  }
+
+  \item{plot.errors.style}{
+    the display style for plotted uncertainty, either \code{"band"} or
+    \code{"bar"}.
+  }
+
+  \item{plot.errors.bar}{
+    the glyph used for bar-style uncertainty displays. Supported values
+    are \code{"|"} and \code{"I"}.
+  }
+
+  \item{plot.errors.bar.num}{
+    the number of bar-style uncertainty markers to draw when
+    \code{plot.errors.style="bar"}.
+  }
+
+  \item{plot.bxp}{
+    a logical value requesting boxplot-style bootstrap summaries for
+    factor/categorical displays when available.
+  }
+
+  \item{plot.bxp.out}{
+    a logical value controlling whether outliers are included in returned
+    boxplot-style bootstrap summaries when \code{plot.bxp=TRUE}.
+  }
+
+  \item{plot.par.mfrow}{
+    a logical value specifying whether \code{par(mfrow=...)} should be
+    managed automatically for multi-panel plotting layouts.
+  }
+
+  \item{proper}{
+    a logical value requesting proper conditional density/distribution
+    handling where that option is implemented.
+  }
+
+  \item{proper.method}{
+    the properization method used when \code{proper=TRUE}. The current
+    supported value is \code{"project"}.
+  }
+
+  \item{proper.control}{
+    a list of additional controls for proper conditional
+    density/distribution handling.
+  }
+
+  \item{main, sub, xlab, ylab, zlab, col, border, type, lty, lwd,
+  xlim, ylim, zlim, cex.axis, cex.lab, cex.main, cex.sub}{
+    standard graphical controls forwarded to the underlying plotting
+    primitives when relevant.
+  }
+
+  \item{random.seed}{
+    an optional random seed used to make bootstrap plotting reproducible.
+  }
+
   \item{\dots}{
-    additional arguments supplied to control plotting behavior.
-    Supported arguments are described in \sQuote{Details}.
+    additional arguments supplied to control plotting behavior or passed
+    through to underlying plotting helpers where supported.
   }
 
 }
