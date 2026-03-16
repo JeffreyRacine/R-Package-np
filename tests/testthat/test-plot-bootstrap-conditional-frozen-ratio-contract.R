@@ -39,6 +39,62 @@ manual_conditional_frozen_boot <- function(bw, xdat, ydat, exdat, eydat, counts,
   )
 }
 
+manual_conditional_frozen_weighted_state <- function(bw, xdat, ydat, exdat, eydat, counts, cdf) {
+  ns <- asNamespace("np")
+  make_kbx <- get(".np_con_make_kbandwidth_x", envir = ns)
+  make_kbxy <- get(".np_con_make_kbandwidth_xy", envir = ns)
+  exact_state_build <- get(".np_ksum_exact_state_build", envir = ns)
+  exact_state_eval <- get(".np_ksum_eval_exact_state", envir = ns)
+  bind_fast <- get(".np_bind_data_frames_fast", envir = ns)
+
+  kbx <- make_kbx(bws = bw, xdat = xdat)
+  kbxy <- make_kbxy(bws = bw, xdat = xdat, ydat = ydat)
+  den.state <- exact_state_build(
+    bws = kbx,
+    exdat = exdat,
+    operator = rep.int("normal", ncol(xdat))
+  )
+  num.state <- exact_state_build(
+    bws = kbxy,
+    exdat = bind_fast(exdat, eydat),
+    operator = c(
+      rep.int("normal", ncol(xdat)),
+      rep.int(if (isTRUE(cdf)) "integral" else "normal", ncol(ydat))
+    )
+  )
+
+  n.total <- colSums(counts)
+  tmat <- t(vapply(seq_len(ncol(counts)), function(j) {
+    den <- as.numeric(exact_state_eval(
+      state = den.state,
+      txdat = xdat,
+      weights = matrix(as.double(counts[, j]), ncol = 1L)
+    )) / n.total[j]
+    num <- as.numeric(exact_state_eval(
+      state = num.state,
+      txdat = bind_fast(xdat, ydat),
+      weights = matrix(as.double(counts[, j]), ncol = 1L)
+    )) / n.total[j]
+    num / pmax(den, .Machine$double.eps)
+  }, numeric(nrow(exdat))))
+
+  den0 <- as.numeric(exact_state_eval(
+    state = den.state,
+    txdat = xdat,
+    weights = matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+  )) / nrow(xdat)
+  num0 <- as.numeric(exact_state_eval(
+    state = num.state,
+    txdat = bind_fast(xdat, ydat),
+    weights = matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+  )) / nrow(xdat)
+
+  list(
+    t = tmat,
+    t0 = num0 / pmax(den0, .Machine$double.eps)
+  )
+}
+
 test_that("conditional frozen helper preserves numerator/denominator recombination for nonfixed dens/dist", {
   ns <- asNamespace("np")
   frozen.fun <- get(".np_inid_boot_from_hat_conditional_frozen", envir = ns)
@@ -99,6 +155,15 @@ test_that("conditional frozen helper preserves numerator/denominator recombinati
       counts = counts,
       cdf = cases$cdf[ii]
     )
+    weighted.out <- manual_conditional_frozen_weighted_state(
+      bw = bw,
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      counts = counts,
+      cdf = cases$cdf[ii]
+    )
 
     expect_equal(
       helper.out$t0,
@@ -111,6 +176,18 @@ test_that("conditional frozen helper preserves numerator/denominator recombinati
       manual.out$t,
       tolerance = 1e-12,
       info = paste(cases$bwtype[ii], if (isTRUE(cases$cdf[ii])) "dist" else "dens", "t")
+    )
+    expect_equal(
+      helper.out$t0,
+      weighted.out$t0,
+      tolerance = 1e-12,
+      info = paste(cases$bwtype[ii], if (isTRUE(cases$cdf[ii])) "dist" else "dens", "weighted-state t0")
+    )
+    expect_equal(
+      helper.out$t,
+      weighted.out$t,
+      tolerance = 1e-12,
+      info = paste(cases$bwtype[ii], if (isTRUE(cases$cdf[ii])) "dist" else "dens", "weighted-state t")
     )
   }
 })
