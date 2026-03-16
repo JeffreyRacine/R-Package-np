@@ -64,19 +64,28 @@
   max(1L, as.integer(ceiling(total / (max_intermediate + 1L))))
 }
 
-.np_plot_progress_warmup_chunk <- function(n, B, chunk.size) {
+.np_plot_progress_warmup_max_reps <- function() {
+  val <- suppressWarnings(as.integer(getOption("np.plot.progress.warmup.max.reps", 16L))[1L])
+  if (is.na(val) || val < 1L)
+    val <- 16L
+  val
+}
+
+.np_plot_progress_warmup_chunk <- function(n, B, chunk.size,
+                                           progress_enabled = .np_plot_progress_enabled()) {
   n <- as.integer(n)[1L]
   B <- as.integer(B)[1L]
   chunk.size <- as.integer(chunk.size)[1L]
   if (is.na(n) || n < 1L || is.na(B) || B < 1L || is.na(chunk.size) || chunk.size < 1L)
     return(1L)
-  if (!isTRUE(.np_plot_progress_enabled()))
+  if (!isTRUE(progress_enabled))
     return(min(B, chunk.size))
 
   warmup.bytes <- 4 * 1024 * 1024
   warmup.chunk <- as.integer(floor(warmup.bytes / (8 * n)))
   if (!is.finite(warmup.chunk) || is.na(warmup.chunk) || warmup.chunk < 1L)
     warmup.chunk <- 1L
+  warmup.chunk <- min(warmup.chunk, .np_plot_progress_warmup_max_reps())
 
   min(B, chunk.size, warmup.chunk)
 }
@@ -576,7 +585,8 @@
   out
 }
 
-.np_wild_chunk_size <- function(n, B) {
+.np_wild_chunk_size <- function(n, B,
+                                progress_enabled = .np_plot_progress_enabled()) {
   chunk.opt <- getOption("np.plot.wild.chunk.size")
   if (!is.null(chunk.opt)) {
     chunk.opt <- as.integer(chunk.opt)
@@ -593,8 +603,14 @@
   chunk <- as.integer(floor(target.bytes / (8 * n)))
   if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
     chunk <- 1L
-  chunk <- min(B, chunk, .np_plot_progress_chunk_cap(B))
-  .np_plot_progress_warmup_chunk(n = n, B = B, chunk.size = chunk)
+  if (isTRUE(progress_enabled))
+    chunk <- min(B, chunk, .np_plot_progress_chunk_cap(B))
+  .np_plot_progress_warmup_chunk(
+    n = n,
+    B = B,
+    chunk.size = chunk,
+    progress_enabled = progress_enabled
+  )
 }
 
 .np_wild_boot_t <- function(H,
@@ -737,7 +753,8 @@
   all.bp
 }
 
-.np_inid_chunk_size <- function(n, B, progress_cap = FALSE) {
+.np_inid_chunk_size <- function(n, B, progress_cap = FALSE,
+                                progress_enabled = .np_plot_progress_enabled()) {
   chunk.opt <- getOption("np.plot.inid.chunk.size")
   if (!is.null(chunk.opt)) {
     chunk.opt <- as.integer(chunk.opt)
@@ -753,10 +770,15 @@
   chunk <- as.integer(floor(target.bytes / (8 * n)))
   if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
     chunk <- 1L
-  if (isTRUE(progress_cap) && isTRUE(.np_plot_progress_enabled()))
+  if (isTRUE(progress_enabled))
     chunk <- min(chunk, .np_plot_progress_chunk_cap(B))
-  if (isTRUE(progress_cap))
-    chunk <- .np_plot_progress_warmup_chunk(n = n, B = B, chunk.size = chunk)
+  if (isTRUE(progress_enabled) || isTRUE(progress_cap))
+    chunk <- .np_plot_progress_warmup_chunk(
+      n = n,
+      B = B,
+      chunk.size = chunk,
+      progress_enabled = progress_enabled
+    )
   min(B, chunk)
 }
 

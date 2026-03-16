@@ -313,6 +313,56 @@ test_that("block-style plot bootstrap chunking is capped only when plot progress
   expect_true(capped > 0L)
 })
 
+test_that("ordinary inid plot bootstrap chunking warms up early when plot progress is active", {
+  chunk_size <- getFromNamespace(".np_inid_chunk_size", "np")
+  warmup_max <- getFromNamespace(".np_plot_progress_warmup_max_reps", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.max.intermediate = 3L,
+    np.plot.progress.warmup.max.reps = 16L,
+    np.plot.inid.chunk.size = NULL
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  uncapped <- chunk_size(n = 500L, B = 999L, progress_cap = FALSE, progress_enabled = FALSE)
+  expect_identical(uncapped, 999L)
+
+  capped <- chunk_size(n = 500L, B = 999L, progress_cap = FALSE, progress_enabled = TRUE)
+  expect_true(capped > 0L)
+  expect_true(capped <= warmup_max())
+})
+
+test_that("ordinary inid plot bootstrap emits intermediate progress updates", {
+  helper <- getFromNamespace(".np_inid_lc_boot_from_hat", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 3L,
+    np.plot.progress.warmup.max.reps = 16L,
+    np.plot.inid.chunk.size = NULL
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    helper(
+      H = diag(4L),
+      ydat = c(1, 2, 3, 4),
+      B = 9L
+    ),
+    now = progress_time_counter()
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap inid 3/9 \\(", lines)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap inid 6/9 \\(", lines)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap inid 9/9 \\(", lines)))
+})
+
 test_that("block-style unconditional bootstrap emits intermediate progress updates", {
   helper <- getFromNamespace(".np_inid_lc_boot_from_hat", "np")
   counts.drawer <- function(start, stopi) {
