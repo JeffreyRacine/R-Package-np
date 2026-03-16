@@ -4763,6 +4763,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 
 // this will be fixed by using the mpi*v functions
 
+static double * kernel_weighted_sum_pkw_extern = NULL;
+static int kernel_weighted_sum_pkw_nvar_extern = 0;
+
 int kernel_weighted_sum_np_ctx(
 int * KERNEL_reg,
 int * KERNEL_unordered_reg,
@@ -6138,6 +6141,19 @@ const NP_GateOverrideCtx * const gate_override_ctx){
         for(i = 0; i < num_xt; i++)
           kw[j*num_xt + i] = tprod[i];
     }
+
+    if((kernel_weighted_sum_pkw_extern != NULL) && (kernel_weighted_sum_pkw_nvar_extern > 0)){
+      for(ii = 0; ii < kernel_weighted_sum_pkw_nvar_extern; ii++){
+        if(bandwidth_divide_weights)
+          for(i = 0; i < num_xt; i++)
+            kernel_weighted_sum_pkw_extern[ii*num_obs_eval*num_xt + j*num_xt + i] =
+              tprod_mp[ii*num_xt + i]/p_dband[ii];
+        else
+          for(i = 0; i < num_xt; i++)
+            kernel_weighted_sum_pkw_extern[ii*num_obs_eval*num_xt + j*num_xt + i] =
+              tprod_mp[ii*num_xt + i];
+      }
+    }
     
   }
 
@@ -6299,8 +6315,16 @@ double **matrix_categorical_vals,
 int ** matrix_ordered_indices,
 double * const weighted_sum,
 double * const weighted_permutation_sum,
-double * const kw){
-  return kernel_weighted_sum_np_ctx(KERNEL_reg,
+double * const kw,
+double * const pkw){
+  double * old_pkw = kernel_weighted_sum_pkw_extern;
+  int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
+  int status = 0;
+
+  kernel_weighted_sum_pkw_extern = pkw;
+  kernel_weighted_sum_pkw_nvar_extern = (pkw == NULL) ? 0 : (((permutation_operator != OP_NOOP) ? num_reg_continuous : 0) + ((do_score || do_ocg) ? num_reg_unordered + num_reg_ordered : 0));
+
+  status = kernel_weighted_sum_np_ctx(KERNEL_reg,
                                     KERNEL_unordered_reg,
                                     KERNEL_ordered_reg,
                                     BANDWIDTH_reg,
@@ -6353,6 +6377,9 @@ double * const kw){
                                     weighted_permutation_sum,
                                     kw,
                                     NULL);
+  kernel_weighted_sum_pkw_extern = old_pkw;
+  kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
+  return status;
 }
 
 int np_kernel_estimate_con_density_categorical_convolution_cv(
@@ -18384,7 +18411,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                          NULL, // no ocg
                          pdf,  // weighted sum
                          NULL, // no permutations
-                         NULL); // do not return kernel weights
+                         NULL, // do not return kernel weights
+                         NULL); // no permutation kernel weights
 
   if((BANDWIDTH_den == BW_FIXED) && (dop == OP_NORMAL)){
     for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){      
@@ -18862,6 +18890,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                                NULL,
                                rho_y,
                                NULL,
+                               NULL,
                                NULL);
 
         *cv = 0.0;
@@ -18940,7 +18969,8 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          rhon,  // weighted sum
                          NULL, // no permutations
-                         NULL); // do not return kernel weights
+                         NULL, // do not return kernel weights
+                         NULL); // no permutation kernel weights
 
   //x
   np_activate_bounds_x();
@@ -18990,7 +19020,8 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          rhod,  // weighted sum
                          NULL, // no permutations
-                         NULL); // do not return kernel weights
+                         NULL, // do not return kernel weights
+                         NULL); // no permutation kernel weights
   
   for(i = 0, *cv = 0.0; i < num_obs; i++){
     if((rhon[i] == 0.0) || (rhod[i] == 0.0)){
@@ -19342,7 +19373,8 @@ double * log_likelihood
                          matrix_ordered_indices, 
                          ksn,  // weighted sum
                          permn, // permutations
-                         NULL); // do not return kernel weights
+                         NULL, // do not return kernel weights
+                         NULL); // no permutation kernel weights
 
   //x - we assume x is in xy tree order
   //  - we also reuse kernels and operators because we can
@@ -19394,7 +19426,8 @@ double * log_likelihood
                          matrix_ordered_indices, // moo
                          ksd,  // weighted sum
                          permd, // no permutations
-                         NULL); // do not return kernel weights
+                         NULL, // do not return kernel weights
+                         NULL); // no permutation kernel weights
 
   
   if (is_cpdf) {
