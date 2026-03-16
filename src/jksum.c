@@ -15365,6 +15365,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   double *out = NULL, *eval_basis = NULL;
   int i, j, l;
   int status = 1;
+  int target_deriv = -1;
+  int target_order = 0;
 
   if((vector_scale_factor == NULL) || (rhs_cols == NULL) || (fitted_out == NULL))
     return 1;
@@ -15375,6 +15377,18 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     return 1;
   if((num_train <= 0) || (num_eval <= 0) || (num_reg_continuous_extern <= 0) || (n_rhs <= 0))
     return 1;
+
+  if(vector_glp_gradient_order_extern != NULL){
+    for(i = 0; i < num_reg_continuous_extern; i++){
+      const int ord = vector_glp_gradient_order_extern[i];
+      if(ord > 0){
+        if(target_deriv >= 0)
+          return 1;
+        target_deriv = i;
+        target_order = ord;
+      }
+    }
+  }
 
   memset(fitted_out, 0, (size_t)num_eval*(size_t)n_rhs*sizeof(double));
 
@@ -15557,7 +15571,27 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         goto cleanup_lp_apply;
     }
 
-    if(use_bernstein)
+    if(target_deriv >= 0){
+      if(use_bernstein)
+        np_glp_fill_basis_eval_deriv(target_deriv,
+                                     target_order,
+                                     num_reg_continuous_extern,
+                                     np_glp_cv_cache.terms,
+                                     np_glp_cv_cache.nterms,
+                                     matrix_X_continuous_eval_extern,
+                                     j,
+                                     np_glp_cv_cache.basis_ctx,
+                                     eval_basis);
+      else
+        np_glp_fill_basis_eval_deriv_raw(target_deriv,
+                                         target_order,
+                                         num_reg_continuous_extern,
+                                         np_glp_cv_cache.terms,
+                                         np_glp_cv_cache.nterms,
+                                         matrix_X_continuous_eval_extern,
+                                         j,
+                                         eval_basis);
+    } else if(use_bernstein) {
       np_glp_fill_basis_eval(num_reg_continuous_extern,
                              np_glp_cv_cache.terms,
                              np_glp_cv_cache.nterms,
@@ -15565,13 +15599,14 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                              j,
                              np_glp_cv_cache.basis_ctx,
                              eval_basis);
-    else
+    } else {
       np_glp_fill_basis_eval_raw(num_reg_continuous_extern,
                                  np_glp_cv_cache.terms,
                                  np_glp_cv_cache.nterms,
                                  matrix_X_continuous_eval_extern,
                                  j,
                                  eval_basis);
+    }
 
     for(int rhs_idx = 0; rhs_idx < n_rhs; rhs_idx++){
       double fit = 0.0;
