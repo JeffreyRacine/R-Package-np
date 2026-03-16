@@ -287,7 +287,7 @@
           exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE],
           gradients = FALSE,
           slice.index = 0,
-          progress.target = "surf 1/1",
+          progress.target = NULL,
           plot.errors.boot.method = plot.errors.boot.method,
           t0.override = as.vector(tobj$mean),
           plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,

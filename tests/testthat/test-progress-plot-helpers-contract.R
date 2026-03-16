@@ -154,6 +154,33 @@ test_that("bootstrap execution stage surfaces immediately on begin in npRmpi", {
   expect_true(vapply(actual$trace, `[[`, character(1L), "event")[[1L]] == "render")
 })
 
+test_that("single-surface plot targets omit 1/1 suffixes in npRmpi", {
+  reg_label <- getFromNamespace(".np_plot_regression_bootstrap_target_label", "npRmpi")
+  idx_label <- getFromNamespace(".np_plot_singleindex_bootstrap_target_label", "npRmpi")
+  stage_label <- getFromNamespace(".np_plot_bootstrap_stage_label", "npRmpi")
+
+  expect_null(reg_label(list(ndim = 1L, xnames = list("x")), slice.index = 1L))
+  expect_null(idx_label(FALSE))
+  expect_identical(
+    stage_label("Plot bootstrap", method_label = "inid", target_label = idx_label(FALSE)),
+    "Plot bootstrap inid"
+  )
+})
+
+test_that("multi-surface plot targets retain i/n suffixes in npRmpi", {
+  reg_label <- getFromNamespace(".np_plot_regression_bootstrap_target_label", "npRmpi")
+  scoef_label <- getFromNamespace(".np_plot_scoef_bootstrap_target_label", "npRmpi")
+
+  expect_identical(
+    reg_label(list(ndim = 3L, xnames = list("x", "z", "w")), slice.index = 2L),
+    "z 2/3"
+  )
+  expect_identical(
+    scoef_label(list(xndim = 1L, zndim = 1L, xnames = list("x"), znames = list("z")), slice.index = 2L),
+    "z 2/2"
+  )
+})
+
 test_that("plot helper activity delays its note until grace elapses on master", {
   begin <- getFromNamespace(".np_plot_activity_begin", "npRmpi")
   finish <- getFromNamespace(".np_plot_activity_end", "npRmpi")
