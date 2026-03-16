@@ -2,24 +2,37 @@
 
 Tracker State: ACTIVE (canonical: `/Users/jracine/Development/ACTIVE_ISSUES_CANONICAL_2026-02-28.md`)
 
-Last refresh: 2026-03-05 (win-builder result ingestion + Windows link remediation)  
+Last refresh: 2026-03-16 (no-vignette tarball-first closeout refresh)  
 Tarball: `np_0.70-1.tar.gz`  
-Check log: `/Users/jracine/Development/np.Rcheck/00check.log`  
-Run bundle: `/tmp/release_hygiene_followup_20260304_232456`
+Check log: `/tmp/np_fix_check.log`  
+Run bundle: `/tmp/np_fix18_harness.log`
 
 ## Current Status
-- `Status: 1 NOTE`
+- `Status: 1 WARNING, 1 NOTE` (local no-vignette `--as-cran` closeout)
 
-## Notes
+## WARNINGs / NOTEs
 1. `CRAN incoming feasibility` NOTE
 - Detail: version jump (`submitted: 0.70.1`, `existing: 0.60.20`).
 - Disposition: accepted for modernization release line.
+2. `top-level files` checkbashisms condition
+- Local default path emits WARNING:
+  - `A complete check needs the 'checkbashisms' script.`
+- Disposition: local tooling condition; no package-code action required.
 
 ## Effective Local Commands
-1. Build compacted tarball:
-- `R CMD build --compact-vignettes=both /Users/jracine/Development/np-master`
-2. Run `--as-cran`:
-- `R CMD check --as-cran /Users/jracine/Development/np_0.70-1.tar.gz`
+1. Build no-vignette tarball:
+- `R CMD build --no-build-vignettes --no-manual /Users/jracine/Development/np-master`
+2. Run no-vignette `--as-cran`:
+- `R CMD check --as-cran --ignore-vignettes /Users/jracine/Development/np_0.70-1.tar.gz`
+
+## Latest Local Closeout (2026-03-16)
+1. Observed check status:
+- `Status: 1 WARNING, 1 NOTE`
+2. Validation bundle:
+- `/tmp/np_fix18_harness.log`
+- `/tmp/np_fix_check.log`
+3. Touched-suite outcome:
+- installed `testthat` harness now finishes cleanly in the no-vignette check path.
 
 ## Win-Builder Submission Evidence (2026-03-04, late)
 1. Submitted via canonical devtools route:
