@@ -398,6 +398,36 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
       NULL
     }
 
+    fast_moment_solve <- function(tww.slice, tyw.slice, ridge.add, ridge.val) {
+      ncoef.local <- nrow(tww.slice)
+
+      if (ncoef.local == 1L) {
+        denom <- tww.slice[1L, 1L] + ridge.add
+        if (!is.finite(denom) || abs(denom) <= .Machine$double.eps)
+          return(NULL)
+        return((tyw.slice[1L] + ridge.val) / denom)
+      }
+
+      if (ncoef.local == 2L) {
+        a11 <- tww.slice[1L, 1L] + ridge.add
+        a12 <- tww.slice[1L, 2L]
+        a21 <- tww.slice[2L, 1L]
+        a22 <- tww.slice[2L, 2L] + ridge.add
+        b1 <- tyw.slice[1L] + ridge.val
+        b2 <- tyw.slice[2L]
+        detA <- a11 * a22 - a12 * a21
+        scale <- max(abs(c(a11, a12, a21, a22, b1, b2)), 1.0)
+        if (!is.finite(detA) || abs(detA) <= .Machine$double.eps * scale)
+          return(NULL)
+        return(c(
+          (b1 * a22 - a12 * b2) / detA,
+          (a11 * b2 - b1 * a21) / detA
+        ))
+      }
+
+      NULL
+    }
+
     solve_moment_system <- function(tyw, tww, W.eval.design, Wz.eval = NULL) {
       neval.local <- ncol(tyw)
       ncoef <- nrow(tyw)
@@ -414,11 +444,19 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
         for (ii in iloo) {
           doridge[ii] <- FALSE
           ridge.val <- ridge[ii]*tyw[,ii][1]/NZD(tww[,,ii][1,1])
-          theta.ii <- tryCatch(
-            solve(tww[,,ii] + diag(rep(ridge[ii], ncoef)),
-                  tyw[,ii] + c(ridge.val, rep(0, ncoef - 1))),
-            error = function(e) e
+          theta.ii <- fast_moment_solve(
+            tww.slice = tww[, , ii],
+            tyw.slice = tyw[, ii],
+            ridge.add = ridge[ii],
+            ridge.val = ridge.val
           )
+          if (is.null(theta.ii)) {
+            theta.ii <- tryCatch(
+              solve(tww[,,ii] + diag(rep(ridge[ii], ncoef)),
+                    tyw[,ii] + c(ridge.val, rep(0, ncoef - 1))),
+              error = function(e) e
+            )
+          }
           if (inherits(theta.ii, "error")) {
             ridge.idx[ii] <- ridge.idx[ii] + 1L
             if (ridge.idx[ii] <= length(ridge.grid)) {
