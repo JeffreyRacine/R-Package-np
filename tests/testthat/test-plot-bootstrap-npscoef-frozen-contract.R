@@ -132,3 +132,52 @@ test_that("npscoef frozen surface plot mode is forwarded", {
   expect_gte(length(modes), 1L)
   expect_true(all(modes == "frozen"))
 })
+
+test_that("npscoef fixed helper treats exact and frozen identically", {
+  boot.fun <- getFromNamespace(".np_inid_boot_from_scoef", "np")
+
+  set.seed(42)
+  n <- 30L
+  xdat <- data.frame(x = runif(n, -1, 1))
+  zdat <- data.frame(z = rnorm(n))
+  y <- with(xdat, x^2 + rnorm(n, sd = 0.1))
+  exdat <- data.frame(x = seq(-0.9, 0.9, length.out = 9L))
+  ezdat <- data.frame(z = seq(-1.0, 1.0, length.out = 9L))
+  counts <- rmultinom(n = 5L, size = n, prob = rep.int(1 / n, n))
+
+  bw <- npscoefbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = y,
+    bws = c(0.6),
+    bwtype = "fixed",
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+
+  exact.out <- boot.fun(
+    txdat = xdat,
+    ydat = y,
+    tzdat = zdat,
+    exdat = exdat,
+    ezdat = ezdat,
+    bws = bw,
+    B = ncol(counts),
+    counts = counts,
+    mode = "exact"
+  )
+  frozen.out <- boot.fun(
+    txdat = xdat,
+    ydat = y,
+    tzdat = zdat,
+    exdat = exdat,
+    ezdat = ezdat,
+    bws = bw,
+    B = ncol(counts),
+    counts = counts,
+    mode = "frozen"
+  )
+
+  expect_equal(exact.out$t0, frozen.out$t0, tolerance = 1e-12)
+  expect_equal(exact.out$t, frozen.out$t, tolerance = 1e-12)
+})
