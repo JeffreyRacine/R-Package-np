@@ -8,7 +8,7 @@ test_that("smooth coefficient bootstrap target labels format compactly", {
     znames = "z"
   )
 
-  expect_identical(fmt(bws = bws, slice.index = 0L), "surf 1/1")
+  expect_identical(fmt(bws = bws, slice.index = 0L), "surf 1/2")
   expect_identical(fmt(bws = bws, slice.index = 1L), "x 1/2")
   expect_identical(fmt(bws = bws, slice.index = 2L), "z 2/2")
 })
@@ -79,4 +79,3 @@ test_that("smooth coefficient helper labels carry target context for bootstrap p
   expect_true(any(grepl("Plot bootstrap \\(z 2/2\\)", captured$progress)))
   expect_true(any(grepl("Constructing bootstrap all bands \\(z 2/2\\)", captured$interval)))
 })
-

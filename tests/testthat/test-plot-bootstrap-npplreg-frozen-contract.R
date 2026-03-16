@@ -120,7 +120,7 @@ test_that("npplreg frozen bootstrap mode is forwarded into the helper", {
     ezdat = data.frame(z = seq(0.12, 0.92, length.out = 6L)),
     gradients = FALSE,
     slice.index = 0L,
-    progress.target = "surf 1/1",
+    progress.target = NULL,
     plot.errors.boot.method = "inid",
     plot.errors.boot.nonfixed = "frozen",
     plot.errors.boot.num = 41L,

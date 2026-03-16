@@ -1,8 +1,8 @@
 test_that("single-index bootstrap target labels format compactly", {
   fmt <- getFromNamespace(".np_plot_singleindex_bootstrap_target_label", "np")
 
-  expect_identical(fmt(gradients = FALSE), "index 1/1")
-  expect_identical(fmt(gradients = TRUE), "grad index 1/1")
+  expect_null(fmt(gradients = FALSE))
+  expect_null(fmt(gradients = TRUE))
 })
 
 test_that("single-index helper labels carry target context for bootstrap phases", {
@@ -59,8 +59,7 @@ test_that("single-index helper labels carry target context for bootstrap phases"
   )
 
   expect_true(is.list(out))
-  expect_true(any(grepl("Preparing plot bootstrap geom \\(index 1/1\\)", captured$prep)))
-  expect_true(any(grepl("Plot bootstrap \\(index 1/1\\)", captured$progress)))
-  expect_true(any(grepl("Constructing bootstrap all bands \\(index 1/1\\)", captured$interval)))
+  expect_true(any(grepl("^Preparing plot bootstrap geom$", captured$prep)))
+  expect_true(any(grepl("^Plot bootstrap$", captured$progress)))
+  expect_true(any(grepl("^Constructing bootstrap all bands$", captured$interval)))
 })
-

@@ -8,7 +8,7 @@ test_that("conditional bootstrap target labels format compactly", {
     ynames = "y"
   )
 
-  expect_identical(fmt(bws = bws, slice.index = 0L, gradients = FALSE), "surf 1/1")
+  expect_identical(fmt(bws = bws, slice.index = 0L, gradients = FALSE), "surf 1/3")
   expect_identical(fmt(bws = bws, slice.index = 1L, gradients = FALSE), "x1 1/3")
   expect_identical(fmt(bws = bws, slice.index = 3L, gradients = FALSE), "y 3/3")
   expect_identical(fmt(bws = bws, slice.index = 2L, gradients = TRUE, gradient.index = 1L), "grad x1 on x2 2/3")

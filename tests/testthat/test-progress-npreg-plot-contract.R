@@ -6,7 +6,7 @@ test_that("regression bootstrap target labels format compactly", {
     xnames = c("x1", "x2")
   )
 
-  expect_identical(fmt(bws = bws, slice.index = 0L, gradients = FALSE), "surf 1/1")
+  expect_identical(fmt(bws = bws, slice.index = 0L, gradients = FALSE), "surf 1/2")
   expect_identical(fmt(bws = bws, slice.index = 1L, gradients = FALSE), "x1 1/2")
   expect_identical(fmt(bws = bws, slice.index = 2L, gradients = TRUE), "grad x2 2/2")
 })
