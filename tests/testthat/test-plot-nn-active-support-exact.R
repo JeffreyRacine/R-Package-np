@@ -254,7 +254,7 @@ test_that("generalized conditional exact state apply matches weighted active-sup
   )
 })
 
-test_that("adaptive conditional exact reports invalid tiny-support resamples clearly", {
+test_that("adaptive conditional exact handles tiny-support resamples consistently", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
@@ -276,36 +276,28 @@ test_that("adaptive conditional exact reports invalid tiny-support resamples cle
   )
 
   idx <- npRmpi:::.np_counts_to_indices(counts[, 1L])
-  expect_error(
-    npcdens(
-      txdat = xdat[idx, , drop = FALSE],
-      tydat = ydat[idx, , drop = FALSE],
-      exdat = exdat,
-      eydat = eydat,
-      bws = npcdensbw(
-        xdat = xdat[idx, , drop = FALSE],
-        ydat = ydat[idx, , drop = FALSE],
-        bwtype = "adaptive_nn",
-        bws = c(2, 2),
-        bandwidth.compute = FALSE
-      )
-    ),
-    "invalid bandwidth"
+  explicit <- npRmpi:::.np_ksum_conditional_eval_exact(
+    xdat = xdat[idx, , drop = FALSE],
+    ydat = ydat[idx, , drop = FALSE],
+    exdat = exdat,
+    eydat = eydat,
+    kbx = npRmpi:::.np_con_make_kbandwidth_x(bws = bw, xdat = xdat),
+    kbxy = npRmpi:::.np_con_make_kbandwidth_xy(bws = bw, xdat = xdat, ydat = ydat),
+    cdf = FALSE
   )
 
-  expect_error(
-    npRmpi:::.np_inid_boot_from_ksum_conditional_exact(
-      xdat = xdat,
-      ydat = ydat,
-      exdat = exdat,
-      eydat = eydat,
-      bws = bw,
-      B = 1L,
-      cdf = FALSE,
-      counts = counts
-    ),
-    "adaptive conditional exact bootstrap resample is invalid for this active support"
+  helper <- npRmpi:::.np_inid_boot_from_ksum_conditional_exact(
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    bws = bw,
+    B = 1L,
+    cdf = FALSE,
+    counts = counts
   )
+
+  expect_equal(as.numeric(helper$t[1L, ]), as.numeric(explicit), tolerance = 1e-15)
 })
 
 test_that("npRmpi nonfixed unconditional exact helper fanout paths complete in subprocess", {

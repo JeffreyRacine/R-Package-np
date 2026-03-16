@@ -126,3 +126,45 @@ test_that("bounded conditional distribution cv.ls remains finite for gaussian or
   expect_true(all(is.finite(as.numeric(bw4$ybw))))
   expect_true(is.finite(as.numeric(bw4$fval)))
 })
+
+test_that("bounded unconditional cv.ls remains finite after conditional bounded selectors", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260316)
+  n <- 48
+  x <- runif(n)
+  y <- runif(n)
+
+  xdat <- data.frame(x = x)
+  ydat <- data.frame(y = y)
+
+  bw.cd <- npcdensbw(
+    xdat = xdat,
+    ydat = ydat,
+    bwmethod = "cv.ls",
+    bwtype = "fixed",
+    cxkertype = "gaussian",
+    cykertype = "gaussian",
+    cxkerorder = 2L,
+    cykerorder = 2L,
+    cxkerbound = "range",
+    cykerbound = "range",
+    nmulti = 1
+  )
+  expect_true(all(is.finite(as.numeric(bw.cd$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.cd$ybw))))
+
+  bw.ud <- npudensbw(
+    dat = xdat,
+    bwmethod = "cv.ls",
+    bwtype = "fixed",
+    ckertype = "gaussian",
+    ckerorder = 4L,
+    ckerbound = "range",
+    nmulti = 1
+  )
+
+  expect_true(is.finite(as.numeric(bw.ud$bw[1])))
+  expect_true(is.finite(as.numeric(bw.ud$fval)))
+})

@@ -4199,6 +4199,69 @@
     progress.label
   }
 
+  fit_one_local <- function(x.train) {
+    .np_ksum_unconditional_eval_exact(
+      xdat = x.train,
+      exdat = exdat,
+      bws = bws,
+      operator = operator
+    )
+  }
+
+  t0.local <- fit_one_local(x.train = xdat)
+  tmat.local <- matrix(NA_real_, nrow = B, ncol = length(t0.local))
+  counts.mat.local <- if (!is.null(counts)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  } else {
+    NULL
+  }
+  progress.local <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress.local)
+  }, add = TRUE)
+
+  start.local <- 1L
+  chunk.size.local <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller.local <- .np_plot_progress_chunk_controller(
+    chunk.size = chunk.size.local,
+    progress = progress.local
+  )
+  while (start.local <= B) {
+    stopi.local <- min(B, start.local + chunk.controller.local$chunk.size - 1L)
+    bsz.local <- stopi.local - start.local + 1L
+    chunk.started.local <- .np_progress_now()
+    counts.chunk.local <- if (!is.null(counts.mat.local)) {
+      counts.mat.local[, start.local:stopi.local, drop = FALSE]
+    } else if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz.local, counts = counts.drawer(start.local, stopi.local))
+    } else {
+      stats::rmultinom(n = bsz.local, size = n, prob = rep.int(1 / n, n))
+    }
+
+    for (jj.local in seq_len(bsz.local)) {
+      idx.local <- .np_counts_to_indices(counts.chunk.local[, jj.local])
+      tmat.local[start.local + jj.local - 1L, ] <- fit_one_local(
+        x.train = xdat[idx.local, , drop = FALSE]
+      )
+    }
+
+    progress.local <- .np_plot_progress_tick(state = progress.local, done = stopi.local)
+    chunk.controller.local <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller.local,
+      bsz = bsz.local,
+      elapsed.sec = .np_progress_now() - chunk.started.local
+    )
+    start.local <- stopi.local + 1L
+  }
+
+  return(list(t = tmat.local, t0 = t0.local))
+
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+
   kb <- tryCatch(.np_make_kbandwidth_unconditional(bws = bws, xdat = xdat),
                  error = function(e) NULL)
 
@@ -5658,6 +5721,92 @@
     stop("invalid conditional exact bootstrap dimensions")
   if (!.np_con_inid_ksum_eligible(bws))
     return(NULL)
+
+  fit_one_local <- function(x.train, y.train) {
+    kbx.local <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = x.train),
+                          error = function(e) NULL)
+    kbxy.local <- tryCatch(.np_con_make_kbandwidth_xy(bws = bws, xdat = x.train, ydat = y.train),
+                           error = function(e) NULL)
+    if (is.null(kbx.local) || is.null(kbxy.local))
+      return(NULL)
+
+    fit.expr.local <- function() {
+      .np_ksum_conditional_eval_exact(
+        xdat = x.train,
+        ydat = y.train,
+        exdat = exdat,
+        eydat = eydat,
+        kbx = kbx.local,
+        kbxy = kbxy.local,
+        cdf = cdf
+      )
+    }
+
+    if (identical(bws$type, "adaptive_nn")) {
+      return(.np_conditional_exact_fit_or_stop(
+        fit.expr = fit.expr.local,
+        bws = bws,
+        x.train = x.train,
+        y.train = y.train
+      ))
+    }
+
+    fit.expr.local()
+  }
+
+  t0.local <- fit_one_local(x.train = xdat, y.train = ydat)
+  tmat.local <- matrix(NA_real_, nrow = B, ncol = length(t0.local))
+  counts.mat.local <- if (!is.null(counts)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  } else {
+    NULL
+  }
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress.local <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress.local)
+  }, add = TRUE)
+
+  start.local <- 1L
+  chunk.size.local <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller.local <- .np_plot_progress_chunk_controller(
+    chunk.size = chunk.size.local,
+    progress = progress.local
+  )
+  while (start.local <= B) {
+    stopi.local <- min(B, start.local + chunk.controller.local$chunk.size - 1L)
+    bsz.local <- stopi.local - start.local + 1L
+    chunk.started.local <- .np_progress_now()
+    counts.chunk.local <- if (!is.null(counts.mat.local)) {
+      counts.mat.local[, start.local:stopi.local, drop = FALSE]
+    } else if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz.local, counts = counts.drawer(start.local, stopi.local))
+    } else {
+      stats::rmultinom(n = bsz.local, size = n, prob = rep.int(1 / n, n))
+    }
+
+    for (jj.local in seq_len(bsz.local)) {
+      idx.local <- .np_counts_to_indices(counts.chunk.local[, jj.local])
+      tmat.local[start.local + jj.local - 1L, ] <- fit_one_local(
+        x.train = xdat[idx.local, , drop = FALSE],
+        y.train = ydat[idx.local, , drop = FALSE]
+      )
+    }
+
+    progress.local <- .np_plot_progress_tick(state = progress.local, done = stopi.local)
+    chunk.controller.local <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller.local,
+      bsz = bsz.local,
+      elapsed.sec = .np_progress_now() - chunk.started.local
+    )
+    start.local <- stopi.local + 1L
+  }
+
+  return(list(t = tmat.local, t0 = t0.local))
 
   kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = xdat),
                   error = function(e) NULL)

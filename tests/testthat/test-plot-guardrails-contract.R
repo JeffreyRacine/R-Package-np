@@ -21,6 +21,7 @@ test_that("plot runtime files avoid forbidden *bw( calls", {
     "\\.np_indexhat_rbw\\s*\\(",
     "\\.np_indexhat_kbw\\s*\\(",
     "\\.npcdhat_make_xbw\\s*\\(",
+    "\\.npcdhat_make_xkbw\\s*\\(",
     "\\.npcdhat_make_ybw\\s*\\("
   )
   offenders <- character()

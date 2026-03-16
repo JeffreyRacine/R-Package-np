@@ -175,7 +175,7 @@ test_that("session generalized-nn shared degree-1 route stays exact after public
       "hat.reg.apply.lp <- npreghat(bws=bw.reg.lp, txdat=tz, exdat=ez, y=y, output='apply')",
       "hat.reg.matrix.ll <- npreghat(bws=bw.reg.ll, txdat=tz, exdat=ez)",
       "hat.reg.matrix.lp <- npreghat(bws=bw.reg.lp, txdat=tz, exdat=ez)",
-      "bws.pl <- matrix(c(1, 9), nrow=2L, ncol=1L)",
+      "bws.pl <- matrix(c(2, 9), nrow=2L, ncol=1L)",
       "bw.pl.ll <- npplregbw(xdat=tx, ydat=y, zdat=tz, regtype='ll', bwtype='generalized_nn', bws=bws.pl, bandwidth.compute=FALSE)",
       "bw.pl.lp <- npplregbw(xdat=tx, ydat=y, zdat=tz, regtype='lp', basis='glp', degree=1L, bernstein.basis=FALSE, bwtype='generalized_nn', bws=bws.pl, bandwidth.compute=FALSE)",
       "fit.pl.ll <- npplreg(bws=bw.pl.ll, txdat=tx, tzdat=tz, tydat=y)",

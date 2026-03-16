@@ -222,7 +222,7 @@ test_that("npplreghat generalized-nn apply matches npplreg means in session mode
     ydat = y,
     regtype = "ll",
     bwtype = "generalized_nn",
-    bws = matrix(c(1, 9), nrow = 2, ncol = 1),
+    bws = matrix(c(2, 9), nrow = 2, ncol = 1),
     bandwidth.compute = FALSE
   )
 
@@ -318,7 +318,7 @@ test_that("npplreg generalized-nn inid plot helper completes in session mode", {
     ydat = y,
     regtype = "ll",
     bwtype = "generalized_nn",
-    bws = matrix(c(1, 9), nrow = 2, ncol = 1),
+    bws = matrix(c(2, 9), nrow = 2, ncol = 1),
     bandwidth.compute = FALSE
   )
 
@@ -365,7 +365,7 @@ test_that("npplreg generalized-nn wild plot helper preserves means in session mo
     ydat = y,
     regtype = "ll",
     bwtype = "generalized_nn",
-    bws = matrix(c(1, 9), nrow = 2, ncol = 1),
+    bws = matrix(c(2, 9), nrow = 2, ncol = 1),
     bandwidth.compute = FALSE
   )
 
@@ -475,7 +475,7 @@ test_that("npplreg generalized-nn plot means match public estimator in session m
     ydat = y,
     regtype = "ll",
     bwtype = "generalized_nn",
-    bws = matrix(c(1, 9), nrow = 2, ncol = 1),
+    bws = matrix(c(2, 9), nrow = 2, ncol = 1),
     bandwidth.compute = FALSE
   )
 
