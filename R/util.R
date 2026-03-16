@@ -838,12 +838,25 @@ validateBandwidth <- function(bws){
       (a-b)/(a+b+.Machine$double.eps) > 5.0*.Machine$double.eps
     }
     
+    nn.lower.bound <- if (!identical(v, "x")) 1L else npRegressionNnLowerBound(bws)
+
     vb <- sapply(seq_along(bwv), function(i){
       falg <- (bwv[i] < 0)
 
       if (dati$icon[i] && (falg || (!is.finite(bwv[i])))){
         stop(paste("Invalid bandwidth supplied for continuous",
                    "variable", bws$varnames[[v]][i], ":",bwv[i]))
+      }
+
+      if (dati$icon[i] &&
+          !identical(bws$type, "fixed") &&
+          (bwv[i] > 0) &&
+          (bwv[i] < nn.lower.bound)) {
+        stop(sprintf(
+          "%s: nearest-neighbor bandwidth must be at least %d for continuous nonfixed regression",
+          bws$varnames[[v]][i],
+          nn.lower.bound
+        ))
       }
       
       if (dati$iord[i] &&
@@ -882,6 +895,8 @@ validateBandwidthTF <- function(bws){
       (a-b)/(a+b+.Machine$double.eps) > 5.0*.Machine$double.eps
     }
     
+    nn.lower.bound <- if (!identical(v, "x")) 1L else npRegressionNnLowerBound(bws)
+
     vb <- sapply(seq_along(bwv), function(i){
       falg <- (bwv[i] < 0)
 
@@ -890,7 +905,7 @@ validateBandwidthTF <- function(bws){
           if(falg || (!is.finite(bwv[i]))){
             return(FALSE)
           }
-        } else if((bwv[i] < 1) || (!is.finite(bwv[i]))) {
+        } else if((((bwv[i] > 0) && (bwv[i] < nn.lower.bound))) || (!is.finite(bwv[i]))) {
           return(FALSE)
         }
       }
@@ -913,6 +928,49 @@ validateBandwidthTF <- function(bws){
   }
   vbl <- all(unlist(lapply(seq_along(vari), bchecker)))
   return(vbl)
+}
+
+npRegressionNnLowerBound <- function(bws) {
+  if (!inherits(bws, "rbandwidth"))
+    return(1L)
+
+  if (is.null(bws$type) || identical(bws$type, "fixed"))
+    return(1L)
+
+  if (is.null(bws$icon) || !any(bws$icon))
+    return(1L)
+
+  2L
+}
+
+npValidateRegressionNnLowerBound <- function(bws,
+                                             where,
+                                             allow.zero.placeholder = FALSE) {
+  lower <- npRegressionNnLowerBound(bws)
+  if (lower <= 1L)
+    return(invisible(bws))
+
+  bw <- as.double(bws$bw)
+  icon <- which(as.logical(bws$icon))
+  if (!length(icon))
+    return(invisible(bws))
+
+  offenders <- bw[icon] < lower
+  if (allow.zero.placeholder)
+    offenders <- offenders & (bw[icon] > 0)
+  if (!any(offenders))
+    return(invisible(bws))
+
+  upper <- max(lower, as.integer(bws$nobs) - 1L)
+  stop(
+    sprintf(
+      "%s: nearest-neighbor bandwidth must be in [%d, %d] for continuous nonfixed regression",
+      where,
+      lower,
+      upper
+    ),
+    call. = FALSE
+  )
 }
 
 

@@ -62,6 +62,7 @@ int int_RESTART_FROM_MIN;
 int int_TREE_X;
 int int_TREE_Y;
 int int_TREE_XY;
+int int_nn_k_min_extern = 1;
 
 /* Some externals for numerical routines */
 /* Some externals for numerical routines */
@@ -3282,6 +3283,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * objective_function_invalid, double * timing,
                    int * penalty_mode, double * penalty_mult,
                    double * ckerlb, double * ckerub){
+  int_nn_k_min_extern = 1;
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -3868,6 +3870,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         double * objective_function_invalid, double * timing,
                         int * penalty_mode, double * penalty_mult,
                         double * ckerlb, double * ckerub){
+  int_nn_k_min_extern = 1;
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -4513,6 +4516,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                int * regtype,
                                double * cxkerlb, double * cxkerub,
                                double * cykerlb, double * cykerub){
+  int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y = NULL;
@@ -5459,6 +5463,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     int * regtype,
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub){
+  int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -7664,6 +7669,9 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     error("failed to prepare LP CV basis cache");
   }
 
+  int_nn_k_min_extern =
+    ((BANDWIDTH_reg_extern != BW_FIXED) && (num_reg_continuous_extern > 0)) ? 2 : 1;
+
   np_refresh_support_counts_extern();
   np_validate_nonfixed_support_counts_extern("C_np_regression_bw", BANDWIDTH_reg_extern);
 
@@ -8025,6 +8033,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
+  int_nn_k_min_extern = 1;
 
   //fprintf(stderr,"\nNP TOASTY\n");
   return ;
@@ -8041,6 +8050,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                       int * glp_bernstein,
                       int * glp_basis,
                       double * ckerlb, double * ckerub){
+  int_nn_k_min_extern = 1;
   np_regression_bw_mode(runo, rord, rcon, y,
                         mysd, myopti, myoptd, rbw, fval,
                         objective_function_values, objective_function_evals,

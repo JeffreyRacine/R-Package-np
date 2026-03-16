@@ -875,6 +875,8 @@ npreghat.rbandwidth <-
     if (length(bws$bw) != ncol(txdat))
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
+    npValidateRegressionNnLowerBound(bws, where = "npreghat")
+
     if ((any(bws$icon) &&
          !all(vapply(txdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
         (any(bws$iord) &&

@@ -125,9 +125,10 @@ npindexbw.NULL <-
     return(list(ok = FALSE, value = NA_real_))
   }
 
+  lower <- 2L
   upper <- max(1L, as.integer(nobs) - 1L)
   k <- .np_round_half_to_even(h)
-  list(ok = (k >= 1L) && (k <= upper), value = as.double(k))
+  list(ok = (k >= lower) && (k <= upper), value = as.double(k))
 }
 
 .npindex_default_start_bandwidth <- function(fit, bwtype, nobs) {
@@ -135,7 +136,8 @@ npindexbw.NULL <-
     return(1.059224 * EssDee(fit) * nobs^(-1 / 5))
   }
 
-  max(1, min(max(1L, as.integer(nobs) - 1L), .np_round_half_to_even(sqrt(nobs))))
+  lower <- 2L
+  max(lower, min(max(1L, as.integer(nobs) - 1L), .np_round_half_to_even(sqrt(nobs))))
 }
 
 .npindex_random_start_bandwidth <- function(fit, bwtype, nobs) {
@@ -143,7 +145,8 @@ npindexbw.NULL <-
     return(runif(1, min = 0.5, max = 1.5) * EssDee(fit) * nobs^(-1 / 5))
   }
 
-  runif(1, min = 1, max = max(1L, as.integer(nobs) - 1L))
+  upper <- max(1L, as.integer(nobs) - 1L)
+  runif(1, min = 2, max = max(2L, upper))
 }
 
 .npindex_finalize_bandwidth <- function(h, bwtype, nobs, where = "npindexbw") {
@@ -154,9 +157,9 @@ npindexbw.NULL <-
     }
     stop(
       sprintf(
-        "%s: nearest-neighbor bandwidth candidate must map to an integer in [1, %d]",
+        "%s: nearest-neighbor bandwidth candidate must map to an integer in [2, %d]",
         where,
-        max(1L, as.integer(nobs) - 1L)
+        max(2L, as.integer(nobs) - 1L)
       ),
       call. = FALSE
     )
