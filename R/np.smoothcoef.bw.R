@@ -125,11 +125,12 @@ npscoefbw.NULL <-
   if (identical(bwtype, "fixed"))
     return(as.double(param))
 
+  lower <- 2L
   upper <- max(1L, as.integer(nobs) - 1L)
   vapply(param, function(h) {
     if (!is.finite(h))
       return(NA_real_)
-    as.double(max(1L, min(upper, .np_round_half_to_even(h))))
+    as.double(max(lower, min(upper, .np_round_half_to_even(h))))
   }, numeric(1))
 }
 
@@ -137,8 +138,9 @@ npscoefbw.NULL <-
   if (identical(bwtype, "fixed"))
     return(as.double(param))
 
+  lower <- 2L
   upper <- max(1L, as.integer(nobs) - 1L)
-  start <- max(1L, min(upper, .np_round_half_to_even(sqrt(nobs))))
+  start <- max(lower, min(upper, .np_round_half_to_even(sqrt(nobs))))
   rep.int(as.double(start), length(param))
 }
 
@@ -148,7 +150,7 @@ npscoefbw.NULL <-
 
   upper <- max(1L, as.integer(nobs) - 1L)
   .npscoef_nn_candidate_bandwidth(
-    param = runif(length(param), min = 1, max = upper),
+    param = runif(length(param), min = 2, max = max(2L, upper)),
     bwtype = bwtype,
     nobs = nobs
   )
@@ -162,9 +164,9 @@ npscoefbw.NULL <-
     }
     stop(
       sprintf(
-        "%s: nearest-neighbor bandwidth must be an integer vector in [1, %d]",
+        "%s: nearest-neighbor bandwidth must be an integer vector in [2, %d]",
         where,
-        max(1L, as.integer(nobs) - 1L)
+        max(2L, as.integer(nobs) - 1L)
       ),
       call. = FALSE
     )

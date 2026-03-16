@@ -27,6 +27,7 @@ extern int int_LARGE_SF;
 extern int int_DEBUG;
 extern int int_VERBOSE;
 extern int int_ROBUST;
+extern int int_nn_k_min_extern;
 
 
 #include <math.h>
@@ -948,7 +949,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   const int fixed_bw = (BANDWIDTH == BW_FIXED);
   const int count_bw = ((BANDWIDTH == BW_ADAP_NN) || (BANDWIDTH == BW_GEN_NN));
   double bw_nf = 0;
-  const double bw_cmin = fixed_bw ? 0.0 : 1.0;
+  const double bw_cmin = fixed_bw ? 0.0 : (double)MAX(1, int_nn_k_min_extern);
   const double bw_cmax = fixed_bw ? DBL_MAX : num_obs-1;
   const int ncon = num_reg_continuous + num_var_continuous;
 
@@ -957,7 +958,8 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   // x continuous
   for(i = 0; i < num_reg_continuous; i++,l++){
     if(!fixed_bw){
-      bw_nf = MAX(1.0,ceil(sqrt(count_bw ? num_obs : simple_unique(num_obs,matrix_x_continuous[i]))));
+      bw_nf = MAX((double)MAX(1, int_nn_k_min_extern),
+                  ceil(sqrt(count_bw ? num_obs : simple_unique(num_obs,matrix_x_continuous[i]))));
     }
     const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
@@ -995,7 +997,8 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   // y continuous
   for(i = 0; i < num_var_continuous; i++,l++){
     if(!fixed_bw){
-      bw_nf = MAX(1.0,ceil(sqrt(count_bw ? num_obs : simple_unique(num_obs,matrix_y_continuous[i]))));
+      bw_nf = MAX((double)MAX(1, int_nn_k_min_extern),
+                  ceil(sqrt(count_bw ? num_obs : simple_unique(num_obs,matrix_y_continuous[i]))));
     }
     const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
@@ -1697,7 +1700,7 @@ double *vector_scale_factor)
         }
         else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
         {
-            if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > num_obs_m_1) )
+            if( (np_fround(vector_scale_factor[i]) < MAX(1, int_nn_k_min_extern)) || (np_fround(vector_scale_factor[i]) > num_obs_m_1) )
             {
                 return(1);
             }
@@ -1718,7 +1721,7 @@ double *vector_scale_factor)
         }
         else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
         {
-            if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > num_obs_m_1 ) )
+            if( (np_fround(vector_scale_factor[i]) < MAX(1, int_nn_k_min_extern)) || (np_fround(vector_scale_factor[i]) > num_obs_m_1 ) )
             {
                 return(1);
             }

@@ -219,6 +219,8 @@ npreg.rbandwidth <-
     if (length(bws$bw) != length(txdat))
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
+    npValidateRegressionNnLowerBound(bws, where = "npreg")
+
     bws$basis <- npValidateLpBasis(regtype = bws$regtype,
                                    basis = bws$basis)
     bws$degree <- npValidateGlpDegree(regtype = bws$regtype,

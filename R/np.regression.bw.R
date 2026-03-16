@@ -156,6 +156,12 @@ npregbw.rbandwidth <-
     if (length(bws$bw) != dim(xdat)[2])
       stop("length of bandwidth vector does not match number of columns of 'xdat'")
 
+    npValidateRegressionNnLowerBound(
+      bws,
+      where = "npregbw",
+      allow.zero.placeholder = TRUE
+    )
+
     if ((any(bws$icon) &&
          !all(vapply(xdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
         (any(bws$iord) &&
