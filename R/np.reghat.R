@@ -147,6 +147,81 @@ npreghat <-
   sweep(t(kw), 1L, denom, "/")
 }
 
+.npreghat_exact_lc_derivative_matrix_from_npksum_chunked <- function(bws,
+                                                                     txdat,
+                                                                     exdat = NULL,
+                                                                     s) {
+  no.ex <- is.null(exdat)
+  txdat <- toFrame(txdat)
+  if (!no.ex) {
+    exdat <- toFrame(exdat)
+    if (!(txdat %~% exdat))
+      stop("'txdat' and 'exdat' are not similar data frames!")
+  }
+
+  target.cont <- which(s == 1L)
+  if (length(target.cont) != 1L)
+    stop("lc derivative hat matrix requires exactly one continuous first derivative")
+
+  eval.data <- if (no.ex) txdat else exdat
+  ntrain <- nrow(txdat)
+  neval <- nrow(eval.data)
+  block.size <- min(128L, ntrain)
+  ones <- rep.int(1.0, ntrain)
+  H <- matrix(0.0, nrow = neval, ncol = ntrain)
+
+  for (start in seq.int(1L, ntrain, by = block.size)) {
+    stop.col <- min(ntrain, start + block.size - 1L)
+    cols <- seq.int(start, stop.col)
+    ib <- length(cols)
+    W <- matrix(0.0, nrow = ntrain, ncol = ib + 1L)
+    W[cbind(cols, seq_len(ib))] <- 1.0
+    W[, ib + 1L] <- 1.0
+
+    ks <- npksum.default(
+      bws = bws,
+      txdat = txdat,
+      exdat = if (no.ex) txdat else eval.data,
+      tydat = ones,
+      weights = W,
+      bandwidth.divide = TRUE
+    )$ksum
+
+    ps <- npksum.default(
+      bws = bws,
+      txdat = txdat,
+      exdat = if (no.ex) txdat else eval.data,
+      tydat = ones,
+      weights = W,
+      bandwidth.divide = TRUE,
+      permutation.operator = "derivative"
+    )$p.ksum
+
+    ks <- if (is.null(dim(ks))) {
+      matrix(ks, nrow = ib + 1L, ncol = neval)
+    } else {
+      as.matrix(ks)
+    }
+    ps <- if (is.null(dim(ps))) {
+      matrix(ps, nrow = ib + 1L, ncol = neval)
+    } else if (length(dim(ps)) == 3L && dim(ps)[3L] == 1L) {
+      ps[, , 1L, drop = TRUE]
+    } else {
+      as.matrix(ps)
+    }
+
+    sk <- ks[nrow(ks), ]
+    dsk <- ps[nrow(ps), ]
+
+    H[, cols] <- t(
+      (ps[seq_len(ib), , drop = FALSE] / rep(sk, each = ib)) -
+      (ks[seq_len(ib), , drop = FALSE] * rep(dsk / (sk^2), each = ib))
+    )
+  }
+
+  H
+}
+
 .npreghat_exact_ll_matrix_from_kernel_weights <- function(bws, txdat, exdat = NULL, s = NULL) {
   miss.ex <- is.null(exdat)
   eval.data <- if (miss.ex) txdat else exdat
@@ -587,6 +662,68 @@ npreghat <-
   drop(crossprod(kw, as.double(tydat)) / kw.sum)
 }
 
+.np_regression_lc_gradient_from_kernel_weights <- function(bws,
+                                                           txdat,
+                                                           tydat,
+                                                           exdat = NULL) {
+  no.ex <- is.null(exdat)
+  txdat <- toFrame(txdat)
+  if (!no.ex) {
+    exdat <- toFrame(exdat)
+    if (!(txdat %~% exdat))
+      stop("'txdat' and 'exdat' are not similar data frames!")
+  }
+
+  if (!(is.vector(tydat) || is.factor(tydat)))
+    stop("'tydat' must be a vector or a factor")
+  if (nrow(txdat) != length(tydat))
+    stop("number of explanatory data 'txdat' and dependent data 'tydat' do not match")
+
+  if (is.factor(tydat)) {
+    tydat <- adjustLevels(data.frame(tydat), bws$ydati)[, 1L]
+    tydat <- (bws$ydati$all.dlev[[1L]])[as.integer(tydat)]
+  } else {
+    tydat <- as.double(tydat)
+  }
+
+  eval.data <- if (no.ex) txdat else exdat
+  kw.obj <- npksum.default(
+    bws = bws,
+    txdat = txdat,
+    exdat = eval.data,
+    tydat = rep.int(1.0, nrow(txdat)),
+    weights = cbind(tydat, 1.0),
+    bandwidth.divide = TRUE,
+    permutation.operator = "derivative"
+  )
+
+  ks <- kw.obj$ksum
+  ps <- kw.obj$p.ksum
+
+  if (is.null(dim(ks)))
+    ks <- matrix(ks, nrow = 2L)
+  else
+    ks <- as.matrix(ks)
+
+  if (is.null(dim(ps))) {
+    ps <- array(ps, dim = c(2L, nrow(eval.data), 1L))
+  } else if (length(dim(ps)) == 2L) {
+    ps <- array(ps, dim = c(dim(ps), 1L))
+  }
+
+  denom <- ks[2L, ]
+  denom[denom == 0.0] <- .Machine$double.xmin
+  numer <- ks[1L, ]
+
+  grad <- matrix(0.0, nrow = nrow(eval.data), ncol = bws$ncon)
+  for (j in seq_len(bws$ncon)) {
+    ps.j <- ps[, , j, drop = TRUE]
+    grad[, j] <- (ps.j[1L, ] / denom) - (numer * ps.j[2L, ] / (denom^2))
+  }
+
+  grad
+}
+
 .np_regression_direct <- function(bws,
                                   txdat,
                                   tydat,
@@ -677,6 +814,10 @@ npreghat <-
   mean.override <- !isTRUE(gradients) &&
     identical(regtype, "lc") &&
     identical(bws$type, "adaptive_nn")
+  grad.override <- isTRUE(gradients) &&
+    identical(regtype, "lc") &&
+    identical(bws$type, "adaptive_nn") &&
+    (bws$ncon > 0L)
   txdat.frame <- txdat
   exdat.frame <- if (no.ex) NULL else exdat
 
@@ -813,6 +954,15 @@ npreghat <-
         if (any(invalid.order))
           grad[, cont.idx[invalid.order]] <- NA_real_
       }
+    }
+
+    if (grad.override) {
+      grad[, bws$icon] <- .np_regression_lc_gradient_from_kernel_weights(
+        bws = bws,
+        txdat = txdat.frame,
+        tydat = tydat,
+        exdat = exdat.frame
+      )
     }
 
     out$grad <- grad
@@ -1183,7 +1333,14 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- if (exact.lc.kernel.route) {
+      H <- if (lc.derivative.exact.route) {
+        .npRmpi_with_local_regression(.npreghat_exact_lc_derivative_matrix_from_npksum_chunked(
+          bws = bws,
+          txdat = txdat,
+          exdat = if (no.ex) NULL else exdat,
+          s = s
+        ))
+      } else if (exact.lc.kernel.route) {
         .npRmpi_with_local_regression(.npreghat_exact_lc_matrix_from_kernel_weights(
           bws = bws,
           txdat = txdat,

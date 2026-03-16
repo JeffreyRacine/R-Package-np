@@ -366,6 +366,10 @@ npreg.rbandwidth <-
     mean.override <- !isTRUE(gradients) &&
       identical(bws$regtype, "lc") &&
       identical(bws$type, "adaptive_nn")
+    grad.override <- isTRUE(gradients) &&
+      identical(bws$regtype, "lc") &&
+      identical(bws$type, "adaptive_nn") &&
+      (bws$ncon > 0L)
     txdat.frame <- txdat
     exdat.frame <- if (no.ex) NULL else exdat
 
@@ -520,6 +524,15 @@ npreg.rbandwidth <-
 
       myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE) 
       myout$gerr = as.matrix(myout$gerr[,rorder])
+
+      if (grad.override) {
+        myout$g[, bws$icon] <- .np_regression_lc_gradient_from_kernel_weights(
+          bws = bws,
+          txdat = txdat.frame,
+          tydat = tydat,
+          exdat = exdat.frame
+        )
+      }
 
       if (identical(bws$regtype, "lp")) {
         cont.idx <- which(bws$icon)
