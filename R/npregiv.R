@@ -2482,6 +2482,15 @@ plot.npregiv <- function(x,
                          ...) {
 
   object <- x
+  dots <- list(...)
+  take_arg <- function(name, default = NULL) {
+    if (!is.null(dots[[name]])) {
+      val <- dots[[name]]
+      dots[[name]] <- NULL
+      return(val)
+    }
+    default
+  }
 
   ## We only support univariate endogenous predictor z
   if(NCOL(object$z) > 1) stop(" only univariate z is supported")
@@ -2496,31 +2505,55 @@ plot.npregiv <- function(x,
   if(deriv) {
     phi.prime <- object$phi.deriv.1[,1]
 
-    plot(z[order(z)], phi.prime[order(z)],
-         type="l",
-         xlab=zname,
-         ylab=paste("d", yname, "/d", zname, sep=""),
-         ...)
+    plot.type <- take_arg("type", "l")
+    plot.xlab <- take_arg("xlab", zname)
+    plot.ylab <- take_arg("ylab", paste("d", yname, "/d", zname, sep=""))
+    do.call(plot, c(list(x = z[order(z)],
+                         y = phi.prime[order(z)],
+                         type = plot.type,
+                         xlab = plot.xlab,
+                         ylab = plot.ylab),
+                    dots))
 
   } else {
 
     if(plot.data) {
-      plot(z, y,
-           xlab=zname,
-           ylab=yname,
-           type="p",
-           col="lightgrey",
-           ...)
-      lines(z[order(z)], phi[order(z)],
-            lwd=2,
-            ...)
+      plot.type <- take_arg("type", "p")
+      plot.xlab <- take_arg("xlab", zname)
+      plot.ylab <- take_arg("ylab", yname)
+      user.col <- take_arg("col", NULL)
+      line.lwd <- take_arg("lwd", 2)
+      plot.args <- c(list(x = z,
+                          y = y,
+                          xlab = plot.xlab,
+                          ylab = plot.ylab,
+                          type = plot.type,
+                          col = if (is.null(user.col)) "lightgrey" else user.col),
+                     dots)
+      do.call(plot, plot.args)
+      line.args <- list(x = z[order(z)],
+                        y = phi[order(z)],
+                        lwd = line.lwd)
+      if (!is.null(user.col)) {
+        line.args$col <- user.col
+      }
+      do.call(lines, c(line.args, dots))
     } else {
-      plot(z[order(z)], phi[order(z)],
-           type="l",
-           xlab=zname,
-           ylab=yname,
-           lwd=2,
-           ...)
+      plot.type <- take_arg("type", "l")
+      plot.xlab <- take_arg("xlab", zname)
+      plot.ylab <- take_arg("ylab", yname)
+      user.col <- take_arg("col", NULL)
+      line.lwd <- take_arg("lwd", 2)
+      plot.args <- list(x = z[order(z)],
+                        y = phi[order(z)],
+                        type = plot.type,
+                        xlab = plot.xlab,
+                        ylab = plot.ylab,
+                        lwd = line.lwd)
+      if (!is.null(user.col)) {
+        plot.args$col <- user.col
+      }
+      do.call(plot, c(plot.args, dots))
     }
   }
 

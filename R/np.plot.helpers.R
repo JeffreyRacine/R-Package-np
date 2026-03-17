@@ -4489,8 +4489,18 @@ plotFactor <- function(f, y, ...){
 
   l.y = unlist(lapply(y, function (p) { c(0,p,NA) }))
 
-  lines(x = l.f, y = l.y, lty = 2)
-  points(x = f, y = y)
+  line.args <- list(x = l.f, y = l.y, lty = 2)
+  if (!is.null(dot.args$col)) line.args$col <- dot.args$col
+  if (!is.null(dot.args$lty)) line.args$lty <- dot.args$lty
+  if (!is.null(dot.args$lwd)) line.args$lwd <- dot.args$lwd
+  do.call(lines, line.args)
+
+  point.args <- list(x = f, y = y)
+  if (!is.null(dot.args$col)) point.args$col <- dot.args$col
+  if (!is.null(dot.args$pch)) point.args$pch <- dot.args$pch
+  if (!is.null(dot.args$cex)) point.args$cex <- dot.args$cex
+  if (!is.null(dot.args$bg)) point.args$bg <- dot.args$bg
+  do.call(points, point.args)
 }
 
 .np_plot_panel_fun <- function(plot.bootstrap, plot.bxp) {
@@ -4578,6 +4588,38 @@ plotFactor <- function(f, y, ...){
   xyz <- trans3d(x1[ok], x2[ok], y[ok], persp.mat)
   points(xyz, pch = pch, cex = cex, col = col, ...)
   invisible(TRUE)
+}
+
+.np_plot_user_args <- function(dots,
+                               type = c("plot", "points", "lines", "persp", "bxp")) {
+  if (is.null(dots) || !length(dots))
+    return(list())
+
+  type <- match.arg(type)
+  allowed <- switch(type,
+                    plot = c("pch", "cex", "xaxs", "yaxs", "xaxt", "yaxt",
+                             "las", "font", "adj", "bg", "fg", "bty", "asp"),
+                    points = c("pch", "cex", "col", "bg"),
+                    lines = c("lty", "lwd", "col"),
+                    persp = c("shade", "ltheta", "lphi", "expand", "nticks",
+                              "box", "axes"),
+                    bxp = c("boxfill", "outline", "notch", "varwidth",
+                            "frame.plot", "horizontal", "at", "show.names",
+                            "pars", "pch", "cex", "col", "bg"))
+
+  dots[names(dots) %in% allowed]
+}
+
+.np_plot_merge_user_args <- function(base.args, user.args) {
+  if (is.null(user.args) || !length(user.args))
+    return(base.args)
+  if (is.null(base.args) || !length(base.args))
+    return(user.args)
+
+  dup <- intersect(names(user.args), names(base.args))
+  if (length(dup))
+    user.args <- user.args[setdiff(names(user.args), dup)]
+  c(base.args, user.args)
 }
 
 .np_plot_resolve_xydat <- function(bws, xdat, ydat, miss.xy) {

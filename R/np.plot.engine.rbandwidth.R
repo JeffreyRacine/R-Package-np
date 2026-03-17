@@ -57,6 +57,23 @@
       if (is.null(value)) default else value
     }
 
+    dots <- list(...)
+    plot.user.args <- .np_plot_user_args(dots, "plot")
+    points.user.args <- .np_plot_user_args(dots, "points")
+    persp.user.args <- .np_plot_user_args(dots, "persp")
+    bxp.user.args <- .np_plot_user_args(dots, "bxp")
+    overlay.col <- if (!is.null(col)) col else points.user.args$col
+    overlay.points.args <- list(col = overlay.col,
+                                pch = points.user.args$pch,
+                                cex = points.user.args$cex,
+                                bg = points.user.args$bg)
+
+    bxp.args <- bxp.user.args
+    if (!is.null(col)) bxp.args$col <- col
+    if (!is.null(lty)) bxp.args$lty <- lty
+    if (!is.null(lwd)) bxp.args$lwd <- lwd
+    if (!is.null(border)) bxp.args$border <- border
+
     plot.par.mfrow.opt <- getOption("plot.par.mfrow")
     if(!is.null(plot.par.mfrow.opt))
         plot.par.mfrow <- plot.par.mfrow.opt
@@ -312,23 +329,25 @@
         overlay.x2 <- (bws$xdati$all.dlev[[2]])[as.integer(overlay.x2)]
 
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
-          persp.mat <- persp(x1.eval,
-                x2.eval,
-                treg,
-                zlim = zlim,
-                col = persp.col,
-                border = scalar_default(border, "black"),
-                ticktype = "detailed",
-                cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                cex.main = scalar_default(cex.main, par()$cex.main),
-                cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                xlab = scalar_default(xlab, gen.label(bws$xnames[1], "X1")),
-                ylab = scalar_default(ylab, gen.label(bws$xnames[2], "X2")),
-                zlab = scalar_default(zlab, gen.label(bws$ynames,"Conditional Mean")),
-                theta = i,
-                phi = phi,
-                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+          persp.args <- list(x = x1.eval,
+                             y = x2.eval,
+                             z = treg,
+                             zlim = zlim,
+                             col = persp.col,
+                             border = scalar_default(border, "black"),
+                             ticktype = "detailed",
+                             cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                             cex.lab = scalar_default(cex.lab, par()$cex.lab),
+                             cex.main = scalar_default(cex.main, par()$cex.main),
+                             cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                             xlab = scalar_default(xlab, gen.label(bws$xnames[1], "X1")),
+                             ylab = scalar_default(ylab, gen.label(bws$xnames[2], "X2")),
+                             zlab = scalar_default(zlab, gen.label(bws$ynames,"Conditional Mean")),
+                             theta = i,
+                             phi = phi,
+                             main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+          persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
+          persp.mat <- do.call(persp, persp.args)
 
           if (plot.errors){
             par(new = TRUE)
@@ -422,7 +441,12 @@
             }
           }
           if (overlay.ok)
-            .np_plot_overlay_points_persp(overlay.x1, overlay.x2, ydat, persp.mat = persp.mat)
+            .np_plot_overlay_points_persp(overlay.x1, overlay.x2, ydat,
+                                          persp.mat = persp.mat,
+                                          col = overlay.points.args$col,
+                                          pch = overlay.points.args$pch,
+                                          cex = overlay.points.args$cex,
+                                          bg = overlay.points.args$bg)
 
           Sys.sleep(0.5)
       }
@@ -596,14 +620,26 @@
             plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
             plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
             plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
+          } else {
+            if (!is.null(col)) plot.args$col <- col
+            if (!is.null(lty)) plot.args$lty <- lty
+            if (!is.null(lwd)) plot.args$lwd <- lwd
           }
           plot.args$main <- scalar_default(main, "")
           plot.args$sub <- scalar_default(sub, "")
+          plot.args <- .np_plot_merge_user_args(
+            plot.args,
+            if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
+          )
           if (overlay.ok && !xi.factor) {
             type.val <- plot.args$type
             plot.args$type <- "n"
             do.call(plot.fun, plot.args)
-            .np_plot_overlay_points_1d(xdat[,i], ydat)
+            .np_plot_overlay_points_1d(xdat[,i], ydat,
+                                       col = overlay.points.args$col,
+                                       pch = overlay.points.args$pch,
+                                       cex = overlay.points.args$cex,
+                                       bg = overlay.points.args$bg)
             if (!identical(type.val, "n")) {
               ok.line <- is.finite(ei) & is.finite(temp.mean)
               line.args <- list(x = ei[ok.line],
@@ -624,16 +660,26 @@
                               sub = plot.args$sub)
             if (!is.null(plot.args$ylim))
               base.args$ylim <- plot.args$ylim
+            base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             do.call(plot, base.args)
-            .np_plot_overlay_points_factor(xdat[,i], ydat)
+            .np_plot_overlay_points_factor(xdat[,i], ydat,
+                                           col = overlay.points.args$col,
+                                           pch = overlay.points.args$pch,
+                                           cex = overlay.points.args$cex,
+                                           bg = overlay.points.args$bg)
             if (plot.bootstrap && plot.bxp) {
-              do.call(bxp, list(z = temp.boot, add = TRUE))
+              do.call(bxp, c(list(z = temp.boot, add = TRUE), bxp.args))
             } else {
               l.f <- rep(ei, each = 3)
               l.f[3 * seq_along(ei)] <- NA
               l.y <- unlist(lapply(temp.mean, function(p) c(0, p, NA)))
               lines(x = l.f, y = l.y, lty = 2)
-              points(x = ei, y = temp.mean)
+              point.args <- list(x = ei, y = temp.mean)
+              if (!is.null(col)) point.args$col <- col
+              if (!is.null(points.user.args$pch)) point.args$pch <- points.user.args$pch
+              if (!is.null(points.user.args$cex)) point.args$cex <- points.user.args$cex
+              if (!is.null(points.user.args$bg)) point.args$bg <- points.user.args$bg
+              do.call(points, point.args)
             }
           } else {
             do.call(plot.fun, plot.args)
@@ -780,14 +826,26 @@
             plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
             plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
             plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
+          } else {
+            if (!is.null(col)) plot.args$col <- col
+            if (!is.null(lty)) plot.args$lty <- lty
+            if (!is.null(lwd)) plot.args$lwd <- lwd
           }
           plot.args$main <- scalar_default(main, "")
           plot.args$sub <- scalar_default(sub, "")
+          plot.args <- .np_plot_merge_user_args(
+            plot.args,
+            if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
+          )
           if (overlay.ok && !xi.factor) {
             type.val <- plot.args$type
             plot.args$type <- "n"
             do.call(plot.fun, plot.args)
-            .np_plot_overlay_points_1d(xdat[,i], ydat)
+            .np_plot_overlay_points_1d(xdat[,i], ydat,
+                                       col = overlay.points.args$col,
+                                       pch = overlay.points.args$pch,
+                                       cex = overlay.points.args$cex,
+                                       bg = overlay.points.args$bg)
             if (!identical(type.val, "n")) {
               ok.line <- is.finite(allei[,i]) & is.finite(data.eval[,i])
               line.args <- list(x = allei[ok.line, i],
@@ -807,16 +865,26 @@
                               main = plot.args$main,
                               sub = plot.args$sub,
                               ylim = plot.args$ylim)
+            base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             do.call(plot, base.args)
-            .np_plot_overlay_points_factor(xdat[,i], ydat)
+            .np_plot_overlay_points_factor(xdat[,i], ydat,
+                                           col = overlay.points.args$col,
+                                           pch = overlay.points.args$pch,
+                                           cex = overlay.points.args$cex,
+                                           bg = overlay.points.args$bg)
             if (plot.bootstrap && plot.bxp) {
-              do.call(bxp, list(z = all.bxp[[i]], add = TRUE))
+              do.call(bxp, c(list(z = all.bxp[[i]], add = TRUE), bxp.args))
             } else {
               l.f <- rep(allei[,i], each = 3)
               l.f[3 * seq_along(allei[,i])] <- NA
               l.y <- unlist(lapply(data.eval[,i], function(p) c(0, p, NA)))
               lines(x = l.f, y = l.y, lty = 2)
-              points(x = allei[,i], y = data.eval[,i])
+              point.args <- list(x = allei[,i], y = data.eval[,i])
+              if (!is.null(col)) point.args$col <- col
+              if (!is.null(points.user.args$pch)) point.args$pch <- points.user.args$pch
+              if (!is.null(points.user.args$cex)) point.args$cex <- points.user.args$cex
+              if (!is.null(points.user.args$bg)) point.args$bg <- points.user.args$bg
+              do.call(points, point.args)
             }
           } else {
             do.call(plot.fun, plot.args)
