@@ -6487,12 +6487,22 @@ plotFactor <- function(f, y, ...){
   dot.args <- list(...)
   dot.names <- names(dot.args)
   has.user.lty <- !is.null(dot.names) && any(dot.names == "lty")
+  is.fac <- is.factor(f) || is.ordered(f)
+  has.user.xaxt <- !is.null(dot.names) && any(dot.names == "xaxt")
+  has.user.xlim <- !is.null(dot.names) && any(dot.names == "xlim")
+  add.axis <- is.fac && !has.user.xaxt
+  x.pos <- if (is.fac) as.numeric(f) else f
 
-  if (has.user.lty) {
-    do.call(plot, c(list(x = f, y = y), dot.args))
-  } else {
-    plot(x = f, y = y, lty = "blank", ...)
-  }
+  base.args <- c(list(x = x.pos, y = y), dot.args)
+  if (add.axis)
+    base.args$xaxt <- "n"
+  if (is.fac && !has.user.xlim)
+    base.args$xlim <- c(0.5, length(levels(f)) + 0.5)
+  if (!has.user.lty)
+    base.args$lty <- "blank"
+  do.call(graphics::plot.default, base.args)
+  if (add.axis)
+    axis(1, at = seq_along(levels(f)), labels = levels(f))
 
   l.f = rep(f, each=3)
   l.f[3*seq_along(f)] = NA

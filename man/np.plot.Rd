@@ -102,7 +102,10 @@
         surface plots (currently \code{npreg}, \code{npscoef}, and
         \code{npplreg}) and expand plot limits to include the data. The
         option is ignored for derivative/gradient plots and coefficient
-        plots. Default is \code{TRUE}.
+        plots. Overlay points default to small, light markers and can be
+        customized with standard \code{points()} arguments passed via
+        \code{...} (for example \code{pch}, \code{cex}, \code{col}, and
+        \code{bg}). Default is \code{TRUE}.
       }
       \item{\code{plot.errors.method}}{
         one of \code{"none"}, \code{"bootstrap"}, or

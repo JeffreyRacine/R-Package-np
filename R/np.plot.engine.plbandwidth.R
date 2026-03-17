@@ -16,6 +16,7 @@
            main = NULL,
            type = NULL,
            border = NULL,
+           cex = NULL,
            cex.axis = NULL,
            cex.lab = NULL,
            cex.main = NULL,
@@ -63,6 +64,11 @@
     points.user.args <- .np_plot_user_args(dots, "points")
     persp.user.args <- .np_plot_user_args(dots, "persp")
     bxp.user.args <- .np_plot_user_args(dots, "bxp")
+    if (!is.null(cex)) {
+      if (is.null(plot.user.args$cex)) plot.user.args$cex <- cex
+      if (is.null(points.user.args$cex)) points.user.args$cex <- cex
+      if (is.null(bxp.user.args$cex)) bxp.user.args$cex <- cex
+    }
     overlay.col <- points.user.args$col
     overlay.points.args <- points.user.args
 
@@ -685,7 +691,10 @@
               do.call(lines, line.args)
             }
           } else if (overlay.ok && xi.factor) {
-            base.args <- list(x = ei,
+            axis.labels <- levels(ei)
+            axis.at <- seq_along(axis.labels)
+            add.axis <- is.null(plot.user.args$xaxt)
+            base.args <- list(x = as.numeric(ei),
                               y = temp.mean,
                               type = "n",
                               xlab = plot.args$xlab,
@@ -694,8 +703,18 @@
                               sub = plot.args$sub)
             if (!is.null(plot.args$ylim))
               base.args$ylim <- plot.args$ylim
+            axis.lim <- if (xOrZ == "x") xlim else zlim
+            if (!is.null(axis.lim)) {
+              base.args$xlim <- axis.lim
+            } else {
+              base.args$xlim <- c(0.5, length(axis.labels) + 0.5)
+            }
+            if (add.axis)
+              base.args$xaxt <- "n"
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
-            do.call(plot, base.args)
+            do.call(graphics::plot.default, base.args)
+            if (add.axis)
+              axis(1, at = axis.at, labels = axis.labels)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
             do.call(.np_plot_overlay_points_factor,
                     c(list(x = overlay.x, y = ydat),
@@ -1080,7 +1099,10 @@
               do.call(lines, line.args)
             }
           } else if (overlay.ok && xi.factor) {
-            base.args <- list(x = allei[,plot.index],
+            axis.labels <- levels(allei[,plot.index])
+            axis.at <- seq_along(axis.labels)
+            add.axis <- is.null(plot.user.args$xaxt)
+            base.args <- list(x = as.numeric(allei[,plot.index]),
                               y = data.eval[,plot.index],
                               type = "n",
                               xlab = plot.args$xlab,
@@ -1088,8 +1110,18 @@
                               main = plot.args$main,
                               sub = plot.args$sub,
                               ylim = plot.args$ylim)
+            axis.lim <- if (xOrZ == "x") xlim else zlim
+            if (!is.null(axis.lim)) {
+              base.args$xlim <- axis.lim
+            } else {
+              base.args$xlim <- c(0.5, length(axis.labels) + 0.5)
+            }
+            if (add.axis)
+              base.args$xaxt <- "n"
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
-            do.call(plot, base.args)
+            do.call(graphics::plot.default, base.args)
+            if (add.axis)
+              axis(1, at = axis.at, labels = axis.labels)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
             do.call(.np_plot_overlay_points_factor,
                     c(list(x = overlay.x, y = ydat),
