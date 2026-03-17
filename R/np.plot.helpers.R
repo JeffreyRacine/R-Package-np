@@ -6843,6 +6843,10 @@ plotFactor <- function(f, y, ...){
 
   if (is.null(col))
     col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+  if (is.null(pch))
+    pch <- 20
+  if (is.null(cex))
+    cex <- 0.5
   points(x[ok], y[ok], pch = pch, cex = cex, col = col, ...)
   invisible(TRUE)
 }
@@ -6859,6 +6863,10 @@ plotFactor <- function(f, y, ...){
 
   if (is.null(col))
     col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+  if (is.null(pch))
+    pch <- 20
+  if (is.null(cex))
+    cex <- 0.5
   points(x[ok], y[ok], pch = pch, cex = cex, col = col, ...)
   invisible(TRUE)
 }
@@ -6873,6 +6881,10 @@ plotFactor <- function(f, y, ...){
 
   if (is.null(col))
     col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+  if (is.null(pch))
+    pch <- 20
+  if (is.null(cex))
+    cex <- 0.5
   xyz <- trans3d(x1[ok], x2[ok], y[ok], persp.mat)
   points(xyz, pch = pch, cex = cex, col = col, ...)
   invisible(TRUE)
