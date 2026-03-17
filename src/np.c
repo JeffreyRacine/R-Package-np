@@ -758,6 +758,68 @@ static double bwmfunc_wrapper(double *p)
   return val;
 }
 
+static void np_copy_scale_factor(double *dest, const double *src, int n)
+{
+  int i;
+
+  for (i = 1; i <= n; i++)
+    dest[i] = src[i];
+}
+
+static int np_bw_candidate_is_admissible(
+  int n,
+  int use_transform,
+  int KERNEL,
+  int KERNEL_unordered_liracine,
+  int BANDWIDTH,
+  int BANDWIDTH_den_ml,
+  int REGRESSION_ML,
+  int num_obs,
+  int num_var_continuous,
+  int num_var_unordered,
+  int num_var_ordered,
+  int num_reg_continuous,
+  int num_reg_unordered,
+  int num_reg_ordered,
+  int *num_categories,
+  double *vector_scale_factor)
+{
+  double *candidate = vector_scale_factor;
+  double *tmp = NULL;
+  int invalid = 0;
+
+  if (BANDWIDTH != BW_FIXED)
+    return 1;
+
+  if (use_transform) {
+    tmp = alloc_vecd(n + 1);
+    np_copy_scale_factor(tmp, vector_scale_factor, n);
+    bwm_to_constrained(tmp, n);
+    candidate = tmp;
+  }
+
+  invalid = check_valid_scale_factor_cv(
+    KERNEL,
+    KERNEL_unordered_liracine,
+    BANDWIDTH,
+    BANDWIDTH_den_ml,
+    REGRESSION_ML,
+    num_obs,
+    num_var_continuous,
+    num_var_unordered,
+    num_var_ordered,
+    num_reg_continuous,
+    num_reg_unordered,
+    num_reg_ordered,
+    num_categories,
+    candidate);
+
+  if (tmp != NULL)
+    safe_free(tmp);
+
+  return (invalid == 0);
+}
+
 int * ipt_lookup_extern_X;
 int * ipt_lookup_extern_Y;
 int * ipt_lookup_extern_XY;
@@ -3324,8 +3386,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   double *vector_continuous_stddev;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
+  double *vector_scale_factor_startbest;
 
-  double fret, fret_best;
+  double fret, fret_best, fret_start_best, fret_initial;
   double ftol, tol;
   double (* bwmfunc)(double *) = NULL;
 
@@ -3339,6 +3402,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int i,j;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
+  int enforce_fixed_feasibility;
+  int have_start_best, have_multistart_best;
   int itmax, iter;
   int int_use_starting_values;
   int scale_cat;
@@ -3369,6 +3434,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int_use_starting_values= myopti[BW_USTARTI];
   int_LARGE_SF=myopti[BW_LSFI];
   BANDWIDTH_den_extern=myopti[BW_DENI];
+  enforce_fixed_feasibility = (BANDWIDTH_den_extern == BW_FIXED);
   int_RESTART_FROM_MIN = myopti[BW_REMINI];
   int_MINIMIZE_IO = myopti[BW_MINIOI];
 
@@ -3419,6 +3485,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_y = alloc_matd(num_var + 1, num_var +1);
   vector_scale_factor = alloc_vecd(num_var + 1);
+  vector_scale_factor_startbest = alloc_vecd(num_var + 1);
   vsfh = alloc_vecd(num_var + 1);
 
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
@@ -3642,8 +3709,33 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       bwm_penalty_mode = 1;
   }
 
-  fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
+  have_start_best = 0;
+  have_multistart_best = 0;
+  fret_start_best = DBL_MAX;
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_var,
+        bwm_use_transform,
+        KERNEL_den_extern,
+        KERNEL_den_unordered_extern,
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        0,
+        0,
+        0,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor)) {
+    have_start_best = 1;
+    fret_start_best = fret_initial;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
+  }
 
   powell(0,
          0,
@@ -3697,7 +3789,40 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
            bwmfunc_wrapper);
   }
 
-  iImproved = (fret < fret_best);
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_var,
+        bwm_use_transform,
+        KERNEL_den_extern,
+        KERNEL_den_unordered_extern,
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        0,
+        0,
+        0,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor) &&
+      ((!have_start_best) || (fret < fret_start_best))) {
+    have_start_best = 1;
+    fret_start_best = fret;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (have_start_best) {
+      fret = fret_start_best;
+      np_copy_scale_factor(vector_scale_factor, vector_scale_factor_startbest, num_var);
+    } else {
+      fret = DBL_MAX;
+    }
+  }
+
+  iImproved = (enforce_fixed_feasibility && have_start_best) ? (fret_start_best < fret_initial) : (fret < fret_best);
   *timing = timing_extern;
 
   /* When multistarting save initial minimum of objective function and scale factors */
@@ -3706,7 +3831,17 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   objective_function_invalid[0]=bwm_invalid_count;
 
   if(iMultistart == IMULTI_TRUE){
-    fret_best = fret;
+    if (enforce_fixed_feasibility) {
+      if (have_start_best) {
+        have_multistart_best = 1;
+        fret_best = fret;
+      } else {
+        have_multistart_best = 0;
+        fret_best = DBL_MAX;
+      }
+    } else {
+      fret_best = fret;
+    }
     vector_scale_factor_multistart = alloc_vecd(num_var + 1);
     for(i = 1; i <= num_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
@@ -3821,7 +3956,32 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
        			
       /* If this run resulted in an improved minimum save information */
        		
-      if(fret < fret_best){
+      if (enforce_fixed_feasibility) {
+        if (np_bw_candidate_is_admissible(
+              num_var,
+              bwm_use_transform,
+              KERNEL_reg_extern,
+              KERNEL_reg_unordered_extern,
+              BANDWIDTH_reg_extern,
+              BANDWIDTH_reg_extern,
+              0,
+              num_obs_train_extern,
+              0,
+              0,
+              0,
+              num_reg_continuous_extern,
+              num_reg_unordered_extern,
+              num_reg_ordered_extern,
+              num_categories_extern,
+              vector_scale_factor) &&
+            ((!have_multistart_best) || (fret < fret_best))) {
+          fret_best = fret;
+          have_multistart_best = 1;
+          iImproved = iMs_counter+1;
+          *timing = timing_extern;
+          np_copy_scale_factor(vector_scale_factor_multistart, vector_scale_factor, num_var);
+        }
+      } else if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
         *timing = timing_extern;
@@ -3837,13 +3997,49 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
     /* Save best for estimation */
 
-    fret = fret_best;
+    if (enforce_fixed_feasibility) {
+      if (have_multistart_best) {
+        fret = fret_best;
+        np_copy_scale_factor(vector_scale_factor, vector_scale_factor_multistart, num_var);
+        have_start_best = 1;
+        fret_start_best = fret_best;
+        np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor_multistart, num_var);
+      } else {
+        have_start_best = 0;
+        fret = DBL_MAX;
+      }
+    } else {
+      fret = fret_best;
 
-    for(i = 1; i <= num_var; i++)
-      vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+      for(i = 1; i <= num_var; i++)
+        vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+    }
 
     free(vector_scale_factor_multistart);
 
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (!have_start_best)
+      error("C_np_density_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!np_bw_candidate_is_admissible(
+          num_var,
+          bwm_use_transform,
+          KERNEL_den_extern,
+          KERNEL_den_unordered_extern,
+          BANDWIDTH_den_extern,
+          BANDWIDTH_den_extern,
+          0,
+          num_obs_train_extern,
+          0,
+          0,
+          0,
+          num_reg_continuous_extern,
+          num_reg_unordered_extern,
+          num_reg_ordered_extern,
+          num_categories_extern,
+          vector_scale_factor))
+      error("C_np_density_bw: optimizer returned an infeasible fixed-bandwidth candidate");
   }
 
   if (bwm_use_transform)
@@ -3872,6 +4068,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   np_clear_support_counts_extern();
   free_mat(matrix_y, num_var + 1);
   free(vector_scale_factor);
+  free(vector_scale_factor_startbest);
   free(vsfh);
   free(num_categories_extern);
 
@@ -3913,8 +4110,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   double *vector_continuous_stddev;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
+  double *vector_scale_factor_startbest;
 
-  double fret, fret_best;
+  double fret, fret_best, fret_start_best, fret_initial;
   double ftol, tol;
   double (* bwmfunc)(double *) = NULL;
 
@@ -3928,6 +4126,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int i,j;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
+  int enforce_fixed_feasibility;
+  int have_start_best, have_multistart_best;
   int itmax, iter;
   int int_use_starting_values, cdfontrain;
 
@@ -3962,6 +4162,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int_use_starting_values= myopti[DBW_USTARTI];
   int_LARGE_SF=myopti[DBW_LSFI];
   BANDWIDTH_den_extern=myopti[DBW_DENI];
+  enforce_fixed_feasibility = (BANDWIDTH_den_extern == BW_FIXED);
   int_RESTART_FROM_MIN = myopti[DBW_REMINI];
   int_MINIMIZE_IO = myopti[DBW_MINIOI];
 
@@ -4023,6 +4224,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_y = alloc_matd(num_var + 1, num_var +1);
   vector_scale_factor = alloc_vecd(num_var + 1);
+  vector_scale_factor_startbest = alloc_vecd(num_var + 1);
   vsfh = alloc_vecd(num_var + 1);
   // nb check vals
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
@@ -4282,8 +4484,33 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
       bwm_penalty_mode = 1;
   }
 
-  fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
+  have_start_best = 0;
+  have_multistart_best = 0;
+  fret_start_best = DBL_MAX;
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_var,
+        bwm_use_transform,
+        KERNEL_den_extern,
+        KERNEL_den_unordered_extern,
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        0,
+        0,
+        0,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor)) {
+    have_start_best = 1;
+    fret_start_best = fret_initial;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
+  }
 
   powell(0,
          0,
@@ -4336,7 +4563,40 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
            bwmfunc_wrapper);
   }
 
-  iImproved = (fret < fret_best);
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_var,
+        bwm_use_transform,
+        KERNEL_den_extern,
+        KERNEL_den_unordered_extern,
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        0,
+        0,
+        0,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor) &&
+      ((!have_start_best) || (fret < fret_start_best))) {
+    have_start_best = 1;
+    fret_start_best = fret;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (have_start_best) {
+      fret = fret_start_best;
+      np_copy_scale_factor(vector_scale_factor, vector_scale_factor_startbest, num_var);
+    } else {
+      fret = DBL_MAX;
+    }
+  }
+
+  iImproved = (enforce_fixed_feasibility && have_start_best) ? (fret_start_best < fret_initial) : (fret < fret_best);
   *timing = timing_extern;
 
   objective_function_values[0]=fret;
@@ -4345,7 +4605,17 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   /* When multistarting save initial minimum of objective function and scale factors */
 
   if(iMultistart == IMULTI_TRUE){
-    fret_best = fret;
+    if (enforce_fixed_feasibility) {
+      if (have_start_best) {
+        have_multistart_best = 1;
+        fret_best = fret;
+      } else {
+        have_multistart_best = 0;
+        fret_best = DBL_MAX;
+      }
+    } else {
+      fret_best = fret;
+    }
     vector_scale_factor_multistart = alloc_vecd(num_var + 1);
     for(i = 1; i <= num_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
@@ -4456,7 +4726,32 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
        			
       /* If this run resulted in an improved minimum save information */
        		
-      if(fret < fret_best){
+      if (enforce_fixed_feasibility) {
+        if (np_bw_candidate_is_admissible(
+              num_var,
+              bwm_use_transform,
+              KERNEL_den_extern,
+              KERNEL_den_unordered_extern,
+              BANDWIDTH_den_extern,
+              BANDWIDTH_den_extern,
+              0,
+              num_obs_train_extern,
+              0,
+              0,
+              0,
+              num_reg_continuous_extern,
+              num_reg_unordered_extern,
+              num_reg_ordered_extern,
+              num_categories_extern,
+              vector_scale_factor) &&
+            ((!have_multistart_best) || (fret < fret_best))) {
+          fret_best = fret;
+          have_multistart_best = 1;
+          iImproved = iMs_counter+1;
+          *timing = timing_extern;
+          np_copy_scale_factor(vector_scale_factor_multistart, vector_scale_factor, num_var);
+        }
+      } else if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
         *timing = timing_extern;
@@ -4472,13 +4767,49 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
     /* Save best for estimation */
 
-    fret = fret_best;
+    if (enforce_fixed_feasibility) {
+      if (have_multistart_best) {
+        fret = fret_best;
+        np_copy_scale_factor(vector_scale_factor, vector_scale_factor_multistart, num_var);
+        have_start_best = 1;
+        fret_start_best = fret_best;
+        np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor_multistart, num_var);
+      } else {
+        have_start_best = 0;
+        fret = DBL_MAX;
+      }
+    } else {
+      fret = fret_best;
 
-    for(i = 1; i <= num_var; i++)
-      vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+      for(i = 1; i <= num_var; i++)
+        vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+    }
 
     free(vector_scale_factor_multistart);
 
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (!have_start_best)
+      error("C_np_distribution_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!np_bw_candidate_is_admissible(
+          num_var,
+          bwm_use_transform,
+          KERNEL_den_extern,
+          KERNEL_den_unordered_extern,
+          BANDWIDTH_den_extern,
+          BANDWIDTH_den_extern,
+          0,
+          num_obs_train_extern,
+          0,
+          0,
+          0,
+          num_reg_continuous_extern,
+          num_reg_unordered_extern,
+          num_reg_ordered_extern,
+          num_categories_extern,
+          vector_scale_factor))
+      error("C_np_distribution_bw: optimizer returned an infeasible fixed-bandwidth candidate");
   }
 
   if (bwm_use_transform)
@@ -4514,6 +4845,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   free_mat(matrix_y, num_var + 1);
   free(vector_scale_factor);
+  free(vector_scale_factor_startbest);
   free(vsfh);
   free(num_categories_extern);
 
@@ -4561,9 +4893,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   double *vector_continuous_stddev;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
+  double *vector_scale_factor_startbest;
   double *cxylb = NULL, *cxyub = NULL;
 
-  double fret, fret_best;
+  double fret, fret_best, fret_start_best, fret_initial;
   double ftol, tol;
   double (* bwmfunc)(double *) = NULL;
 
@@ -4578,6 +4911,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   double fast_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
+  int enforce_fixed_feasibility;
+  int have_start_best, have_multistart_best;
   int itmax, iter;
   int int_use_starting_values, ibwmfunc, old_cdens, scale_cat;
   int need_y_side;
@@ -4647,6 +4982,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_use_starting_values= myopti[CBW_USTARTI];
   int_LARGE_SF=myopti[CBW_LSFI];
   BANDWIDTH_den_extern=myopti[CBW_DENI];
+  enforce_fixed_feasibility = (BANDWIDTH_den_extern == BW_FIXED);
   int_RESTART_FROM_MIN = myopti[CBW_REMINI];
   int_MINIMIZE_IO = myopti[CBW_MINIOI];
 
@@ -4727,6 +5063,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   matrix_y = alloc_matd(num_all_var + 1, num_all_var + 1);
   vector_scale_factor = alloc_vecd(num_all_var + 1);
+  vector_scale_factor_startbest = alloc_vecd(num_all_var + 1);
   vsfh = alloc_vecd(num_all_var + 1);
   
   matrix_categorical_vals_extern = 
@@ -5177,8 +5514,33 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       bwm_penalty_mode = 1;
   }
 
-  fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
+  have_start_best = 0;
+  have_multistart_best = 0;
+  fret_start_best = DBL_MAX;
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_all_var,
+        bwm_use_transform,
+        KERNEL_den_extern,
+        KERNEL_reg_unordered_extern,
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        num_var_continuous_extern,
+        num_var_unordered_extern,
+        num_var_ordered_extern,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor)) {
+    have_start_best = 1;
+    fret_start_best = fret_initial;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
+  }
 
   powell(0,
          0,
@@ -5230,7 +5592,40 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   }
 
-  iImproved = (fret < fret_best);
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_all_var,
+        bwm_use_transform,
+        KERNEL_den_extern,
+        KERNEL_reg_unordered_extern,
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        num_var_continuous_extern,
+        num_var_unordered_extern,
+        num_var_ordered_extern,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor) &&
+      ((!have_start_best) || (fret < fret_start_best))) {
+    have_start_best = 1;
+    fret_start_best = fret;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (have_start_best) {
+      fret = fret_start_best;
+      np_copy_scale_factor(vector_scale_factor, vector_scale_factor_startbest, num_all_var);
+    } else {
+      fret = DBL_MAX;
+    }
+  }
+
+  iImproved = (enforce_fixed_feasibility && have_start_best) ? (fret_start_best < fret_initial) : (fret < fret_best);
   *timing = timing_extern;
 
   objective_function_values[0]=-fret;
@@ -5242,7 +5637,17 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
 
   if(iMultistart == IMULTI_TRUE){
-    fret_best = fret;
+    if (enforce_fixed_feasibility) {
+      if (have_start_best) {
+        have_multistart_best = 1;
+        fret_best = fret;
+      } else {
+        have_multistart_best = 0;
+        fret_best = DBL_MAX;
+      }
+    } else {
+      fret_best = fret;
+    }
     vector_scale_factor_multistart = alloc_vecd(num_all_var + 1);
     for(i = 1; i <= num_all_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
@@ -5353,7 +5758,32 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 				
       /* If this run resulted in an improved minimum save information */
       
-      if(fret < fret_best){
+      if (enforce_fixed_feasibility) {
+        if (np_bw_candidate_is_admissible(
+              num_all_var,
+              bwm_use_transform,
+              KERNEL_den_extern,
+              KERNEL_reg_unordered_extern,
+              BANDWIDTH_den_extern,
+              BANDWIDTH_den_extern,
+              0,
+              num_obs_train_extern,
+              num_var_continuous_extern,
+              num_var_unordered_extern,
+              num_var_ordered_extern,
+              num_reg_continuous_extern,
+              num_reg_unordered_extern,
+              num_reg_ordered_extern,
+              num_categories_extern,
+              vector_scale_factor) &&
+            ((!have_multistart_best) || (fret < fret_best))) {
+          fret_best = fret;
+          have_multistart_best = 1;
+          iImproved = iMs_counter+1;
+          *timing = timing_extern;
+          np_copy_scale_factor(vector_scale_factor_multistart, vector_scale_factor, num_all_var);
+        }
+      } else if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
         *timing = timing_extern;
@@ -5371,10 +5801,46 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
     /* Save best for estimation */
 
-    fret = fret_best;
-    for(i = 1; i <= num_all_var; i++)
-      vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+    if (enforce_fixed_feasibility) {
+      if (have_multistart_best) {
+        fret = fret_best;
+        np_copy_scale_factor(vector_scale_factor, vector_scale_factor_multistart, num_all_var);
+        have_start_best = 1;
+        fret_start_best = fret_best;
+        np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor_multistart, num_all_var);
+      } else {
+        have_start_best = 0;
+        fret = DBL_MAX;
+      }
+    } else {
+      fret = fret_best;
+      for(i = 1; i <= num_all_var; i++)
+        vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+    }
     free(vector_scale_factor_multistart);
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (!have_start_best)
+      error("C_np_density_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!np_bw_candidate_is_admissible(
+          num_all_var,
+          bwm_use_transform,
+          KERNEL_den_extern,
+          KERNEL_reg_unordered_extern,
+          BANDWIDTH_den_extern,
+          BANDWIDTH_den_extern,
+          0,
+          num_obs_train_extern,
+          num_var_continuous_extern,
+          num_var_unordered_extern,
+          num_var_ordered_extern,
+          num_reg_continuous_extern,
+          num_reg_unordered_extern,
+          num_reg_ordered_extern,
+          num_categories_extern,
+          vector_scale_factor))
+      error("C_np_density_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate");
   }
 
   if (bwm_use_transform)
@@ -5407,6 +5873,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   np_clear_support_counts_extern();
   free_mat(matrix_y, num_all_var + 1);
   safe_free(vector_scale_factor);
+  safe_free(vector_scale_factor_startbest);
   safe_free(vsfh);
   safe_free(num_categories_extern);
   safe_free(num_categories_extern_XY);
@@ -5508,9 +5975,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   double *vector_continuous_stddev;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
+  double *vector_scale_factor_startbest;
   double *cxylb = NULL, *cxyub = NULL;
 
-  double fret, fret_best;
+  double fret, fret_best, fret_start_best, fret_initial;
   double ftol, tol;
   double (* bwmfunc)(double *) = NULL;
 
@@ -5525,6 +5993,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   double fast_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
+  int enforce_fixed_feasibility;
+  int have_start_best, have_multistart_best;
   int itmax, iter;
   int int_use_starting_values, ibwmfunc;
   int cdfontrain;
@@ -5596,6 +6066,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int_use_starting_values= myopti[CDBW_USTARTI];
   int_LARGE_SF=myopti[CDBW_LSFI];
   BANDWIDTH_den_extern=myopti[CDBW_DENI];
+  enforce_fixed_feasibility = (BANDWIDTH_den_extern == BW_FIXED);
   int_RESTART_FROM_MIN = myopti[CDBW_REMINI];
   int_MINIMIZE_IO = myopti[CDBW_MINIOI];
 
@@ -5681,6 +6152,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   
   matrix_y = alloc_matd(num_all_var + 1, num_all_var + 1);
   vector_scale_factor = alloc_vecd(num_all_var + 1);
+  vector_scale_factor_startbest = alloc_vecd(num_all_var + 1);
   vsfh = alloc_vecd(num_all_var + 1);
   
   matrix_categorical_vals_extern = 
@@ -6113,8 +6585,33 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       bwm_penalty_mode = 1;
   }
 
-  fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
+  have_start_best = 0;
+  have_multistart_best = 0;
+  fret_start_best = DBL_MAX;
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_all_var,
+        bwm_use_transform,
+        KERNEL_den_extern,
+        KERNEL_reg_unordered_extern,
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        num_var_continuous_extern,
+        num_var_unordered_extern,
+        num_var_ordered_extern,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor)) {
+    have_start_best = 1;
+    fret_start_best = fret_initial;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
+  }
 
   powell(0,
          0,
@@ -6164,7 +6661,40 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   }
 
-  iImproved = (fret < fret_best);
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_all_var,
+        bwm_use_transform,
+        KERNEL_den_extern,
+        KERNEL_reg_unordered_extern,
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        num_var_continuous_extern,
+        num_var_unordered_extern,
+        num_var_ordered_extern,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor) &&
+      ((!have_start_best) || (fret < fret_start_best))) {
+    have_start_best = 1;
+    fret_start_best = fret;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (have_start_best) {
+      fret = fret_start_best;
+      np_copy_scale_factor(vector_scale_factor, vector_scale_factor_startbest, num_all_var);
+    } else {
+      fret = DBL_MAX;
+    }
+  }
+
+  iImproved = (enforce_fixed_feasibility && have_start_best) ? (fret_start_best < fret_initial) : (fret < fret_best);
   *timing = timing_extern;
 
   objective_function_values[0]=fret;
@@ -6176,7 +6706,17 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
 
   if(iMultistart == IMULTI_TRUE){
-    fret_best = fret;
+    if (enforce_fixed_feasibility) {
+      if (have_start_best) {
+        have_multistart_best = 1;
+        fret_best = fret;
+      } else {
+        have_multistart_best = 0;
+        fret_best = DBL_MAX;
+      }
+    } else {
+      fret_best = fret;
+    }
     vector_scale_factor_multistart = alloc_vecd(num_all_var + 1);
     for(i = 1; i <= num_all_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
@@ -6286,7 +6826,32 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 				
       /* If this run resulted in an improved minimum save information */
       
-      if(fret < fret_best){
+      if (enforce_fixed_feasibility) {
+        if (np_bw_candidate_is_admissible(
+              num_all_var,
+              bwm_use_transform,
+              KERNEL_den_extern,
+              KERNEL_reg_unordered_extern,
+              BANDWIDTH_den_extern,
+              BANDWIDTH_den_extern,
+              0,
+              num_obs_train_extern,
+              num_var_continuous_extern,
+              num_var_unordered_extern,
+              num_var_ordered_extern,
+              num_reg_continuous_extern,
+              num_reg_unordered_extern,
+              num_reg_ordered_extern,
+              num_categories_extern,
+              vector_scale_factor) &&
+            ((!have_multistart_best) || (fret < fret_best))) {
+          fret_best = fret;
+          have_multistart_best = 1;
+          iImproved = iMs_counter+1;
+          *timing = timing_extern;
+          np_copy_scale_factor(vector_scale_factor_multistart, vector_scale_factor, num_all_var);
+        }
+      } else if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
         *timing = timing_extern;
@@ -6304,10 +6869,46 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
     /* Save best for estimation */
 
-    fret = fret_best;
-    for(i = 1; i <= num_all_var; i++)
-      vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+    if (enforce_fixed_feasibility) {
+      if (have_multistart_best) {
+        fret = fret_best;
+        np_copy_scale_factor(vector_scale_factor, vector_scale_factor_multistart, num_all_var);
+        have_start_best = 1;
+        fret_start_best = fret_best;
+        np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor_multistart, num_all_var);
+      } else {
+        have_start_best = 0;
+        fret = DBL_MAX;
+      }
+    } else {
+      fret = fret_best;
+      for(i = 1; i <= num_all_var; i++)
+        vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+    }
     free(vector_scale_factor_multistart);
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (!have_start_best)
+      error("C_np_distribution_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!np_bw_candidate_is_admissible(
+          num_all_var,
+          bwm_use_transform,
+          KERNEL_den_extern,
+          KERNEL_reg_unordered_extern,
+          BANDWIDTH_den_extern,
+          BANDWIDTH_den_extern,
+          0,
+          num_obs_train_extern,
+          num_var_continuous_extern,
+          num_var_unordered_extern,
+          num_var_ordered_extern,
+          num_reg_continuous_extern,
+          num_reg_unordered_extern,
+          num_reg_ordered_extern,
+          num_categories_extern,
+          vector_scale_factor))
+      error("C_np_distribution_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate");
   }
 
   if (bwm_use_transform)
@@ -6347,6 +6948,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   free_mat(matrix_y, num_all_var + 1);
   safe_free(vector_scale_factor);
+  safe_free(vector_scale_factor_startbest);
   safe_free(vsfh);
   safe_free(num_categories_extern);
   safe_free(bwm_kernel_unordered_vec);
@@ -7483,8 +8085,9 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   double *vector_continuous_stddev;
   double *vector_scale_factor, *vector_scale_factor_multistart, * vsfh;
+  double *vector_scale_factor_startbest;
 
-  double fret, fret_best;
+  double fret, fret_best, fret_start_best, fret_initial;
   double ftol, tol, small;
   double (* bwmfunc)(double *) = NULL;
 
@@ -7499,6 +8102,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   double fast_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
+  int enforce_fixed_feasibility;
+  int have_start_best, have_multistart_best;
   int itmax, iter;
   int int_use_starting_values;
 
@@ -7528,6 +8133,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   BANDWIDTH_reg_extern=myopti[RBW_REGI];
   BANDWIDTH_den_extern=0;
+  enforce_fixed_feasibility = (BANDWIDTH_reg_extern == BW_FIXED);
 
   itmax=myopti[RBW_ITMAXI];
   int_RESTART_FROM_MIN = myopti[RBW_REMINI];
@@ -7584,6 +8190,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_y = alloc_matd(num_var + 1, num_var +1);
   vector_scale_factor = alloc_vecd(num_var + 1);
+  vector_scale_factor_startbest = alloc_vecd(num_var + 1);
   vsfh = alloc_vecd(num_var + 1);
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
@@ -7812,8 +8419,33 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   }
   bwm_reset_counters();
 
-  fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
+  have_start_best = 0;
+  have_multistart_best = 0;
+  fret_start_best = DBL_MAX;
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_var,
+        bwm_use_transform,
+        KERNEL_reg_extern,
+        KERNEL_reg_unordered_extern,
+        BANDWIDTH_reg_extern,
+        BANDWIDTH_reg_extern,
+        0,
+        num_obs_train_extern,
+        0,
+        0,
+        0,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor)) {
+    have_start_best = 1;
+    fret_start_best = fret_initial;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
+  }
 
   if(!eval_only){
     powell(0,
@@ -7870,7 +8502,40 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     fret = fret_best;
   }
 
-  iImproved = (fret < fret_best);
+  if (enforce_fixed_feasibility &&
+      np_bw_candidate_is_admissible(
+        num_var,
+        bwm_use_transform,
+        KERNEL_reg_extern,
+        KERNEL_reg_unordered_extern,
+        BANDWIDTH_reg_extern,
+        BANDWIDTH_reg_extern,
+        0,
+        num_obs_train_extern,
+        0,
+        0,
+        0,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor) &&
+      ((!have_start_best) || (fret < fret_start_best))) {
+    have_start_best = 1;
+    fret_start_best = fret;
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (have_start_best) {
+      fret = fret_start_best;
+      np_copy_scale_factor(vector_scale_factor, vector_scale_factor_startbest, num_var);
+    } else {
+      fret = DBL_MAX;
+    }
+  }
+
+  iImproved = (enforce_fixed_feasibility && have_start_best) ? (fret_start_best < fret_initial) : (fret < fret_best);
   *timing = timing_extern;
 
   objective_function_values[0]=fret;
@@ -7882,7 +8547,17 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
 
   if((!eval_only) && (iMultistart == IMULTI_TRUE)){
-    fret_best = fret;
+    if (enforce_fixed_feasibility) {
+      if (have_start_best) {
+        have_multistart_best = 1;
+        fret_best = fret;
+      } else {
+        have_multistart_best = 0;
+        fret_best = DBL_MAX;
+      }
+    } else {
+      fret_best = fret;
+    }
     vector_scale_factor_multistart = alloc_vecd(num_var + 1);
 
     for(i = 1; i <= num_var; i++)
@@ -7994,7 +8669,32 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
       /* If this run resulted in an improved minimum save information */
 
-      if(fret < fret_best){
+      if (enforce_fixed_feasibility) {
+        if (np_bw_candidate_is_admissible(
+              num_var,
+              bwm_use_transform,
+              KERNEL_den_extern,
+              KERNEL_den_unordered_extern,
+              BANDWIDTH_den_extern,
+              BANDWIDTH_den_extern,
+              0,
+              num_obs_train_extern,
+              0,
+              0,
+              0,
+              num_reg_continuous_extern,
+              num_reg_unordered_extern,
+              num_reg_ordered_extern,
+              num_categories_extern,
+              vector_scale_factor) &&
+            ((!have_multistart_best) || (fret < fret_best))) {
+          fret_best = fret;
+          have_multistart_best = 1;
+          iImproved = iMs_counter+1;
+          *timing = timing_extern;
+          np_copy_scale_factor(vector_scale_factor_multistart, vector_scale_factor, num_var);
+        }
+      } else if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
         *timing = timing_extern;
@@ -8013,13 +8713,49 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
     /* Save best for estimation */
 
-    fret = fret_best;
+    if (enforce_fixed_feasibility) {
+      if (have_multistart_best) {
+        fret = fret_best;
+        np_copy_scale_factor(vector_scale_factor, vector_scale_factor_multistart, num_var);
+        have_start_best = 1;
+        fret_start_best = fret_best;
+        np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor_multistart, num_var);
+      } else {
+        have_start_best = 0;
+        fret = DBL_MAX;
+      }
+    } else {
+      fret = fret_best;
 
-    for(i = 1; i <= num_var; i++)
-      vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+      for(i = 1; i <= num_var; i++)
+        vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+    }
 
     free(vector_scale_factor_multistart);
 
+  }
+
+  if (enforce_fixed_feasibility) {
+    if (!have_start_best)
+      error("C_np_regression_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!np_bw_candidate_is_admissible(
+          num_var,
+          bwm_use_transform,
+          KERNEL_reg_extern,
+          KERNEL_reg_unordered_extern,
+          BANDWIDTH_reg_extern,
+          BANDWIDTH_reg_extern,
+          0,
+          num_obs_train_extern,
+          0,
+          0,
+          0,
+          num_reg_continuous_extern,
+          num_reg_unordered_extern,
+          num_reg_ordered_extern,
+          num_categories_extern,
+          vector_scale_factor))
+      error("C_np_regression_bw: optimizer returned an infeasible fixed-bandwidth candidate");
   }
 
   if (bwm_use_transform)
@@ -8050,6 +8786,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   free_mat(matrix_y, num_var + 1);
   safe_free(vector_scale_factor);
+  safe_free(vector_scale_factor_startbest);
   safe_free(vsfh);
   safe_free(num_categories_extern);
 

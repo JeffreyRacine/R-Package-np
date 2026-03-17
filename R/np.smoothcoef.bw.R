@@ -153,6 +153,19 @@ npscoefbw.NULL <-
   )
 }
 
+.npscoef_candidate_is_admissible <- function(param, bwtype, nobs) {
+  candidate <- .npscoef_nn_candidate_bandwidth(
+    param = param,
+    bwtype = bwtype,
+    nobs = nobs
+  )
+  if (any(!is.finite(candidate)))
+    return(FALSE)
+  if (identical(bwtype, "fixed"))
+    return(all(candidate > 0))
+  TRUE
+}
+
 .npscoef_finalize_bandwidth <- function(param, bwtype, nobs, where = "npscoefbw") {
   candidate <- .npscoef_nn_candidate_bandwidth(param = param, bwtype = bwtype, nobs = nobs)
   if (any(!is.finite(candidate))) {
@@ -167,6 +180,9 @@ npscoefbw.NULL <-
       ),
       call. = FALSE
     )
+  }
+  if (identical(bwtype, "fixed") && any(candidate <= 0)) {
+    stop(sprintf("%s: bandwidth must be strictly positive", where), call. = FALSE)
   }
   as.double(candidate)
 }
@@ -764,6 +780,7 @@ npscoefbw.scbandwidth <-
           ## Now we implement multistarting
 
           fval.min <- .Machine$double.xmax
+          have_best <- FALSE
           numimp <- 0
           value.overall <- numeric(nmulti)
           num.feval.overall <- 0
@@ -792,8 +809,15 @@ npscoefbw.scbandwidth <-
             
             if (i == 1) {
               tbw <- .npscoef_default_start_bandwidth(param = x.scale, bwtype = bws$type, nobs = n)
-              if (all(bws$bw != 0))
-                tbw <- .npscoef_finalize_bandwidth(param = bws$bw, bwtype = bws$type, nobs = n, where = "npscoefbw")
+              if (all(bws$bw != 0) &&
+                  .npscoef_candidate_is_admissible(param = bws$bw, bwtype = bws$type, nobs = n)) {
+                tbw <- .npscoef_finalize_bandwidth(
+                  param = bws$bw,
+                  bwtype = bws$type,
+                  nobs = n,
+                  where = "npscoefbw"
+                )
+              }
             } else {
               tbw <- .npscoef_random_start_bandwidth(param = x.scale, bwtype = bws$type, nobs = n)
             }
@@ -820,7 +844,11 @@ npscoefbw.scbandwidth <-
 
             value.overall[i] <- optim.return$value
 
-            if(optim.return$value < fval.min) {
+            if (.npscoef_candidate_is_admissible(
+              param = optim.return$par,
+              bwtype = bws$type,
+              nobs = n
+            ) && (!have_best || optim.return$value < fval.min)) {
               param <- .npscoef_finalize_bandwidth(
                 param = optim.return$par,
                 bwtype = bws$type,
@@ -831,9 +859,17 @@ npscoefbw.scbandwidth <-
               fval.min <- min.overall ## Added by jracine Jul 22 2010
               numimp.overall <- numimp + 1
               best.overall <- i
+              have_best <- TRUE
             }
 
             .np_progress_bandwidth_multistart_step(done = i, total = nmulti)
+          }
+
+          if (!have_best) {
+            if (identical(bws$type, "fixed")) {
+              stop("npscoefbw: no feasible fixed bandwidths found", call. = FALSE)
+            }
+            stop("npscoefbw: no feasible bandwidths found", call. = FALSE)
           }
 
           param.overall <- bws$bw <- .npscoef_finalize_bandwidth(
