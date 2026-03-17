@@ -774,7 +774,7 @@
                   ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
                   ehy = if (plotOnEstimate) na.omit(temp.dens + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
                   plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                  plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                  plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
                   lty = if (xi.factor) 1 else 2
                 )
@@ -998,7 +998,7 @@
                     ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
                     ehy = if (plotOnEstimate) na.omit(temp.dens + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
                     plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                    plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                    plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
                     plot.errors.bar.num = plot.errors.bar.num,
                     lty = if (xi.factor) 1 else 2
                   )
@@ -1129,7 +1129,7 @@
                   ely = if (plotOnEstimate) na.omit(data.eval[,idx] - data.err[,3*idx-2]) else na.omit(data.err[,3*idx] - data.err[,3*idx-2]),
                   ehy = if (plotOnEstimate) na.omit(data.eval[,idx] + data.err[,3*idx-1]) else na.omit(data.err[,3*idx] + data.err[,3*idx-1]),
                   plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                  plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                  plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
                   lty = if (xi.factor) 1 else 2
                 )

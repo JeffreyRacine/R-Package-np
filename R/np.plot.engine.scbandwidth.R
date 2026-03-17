@@ -68,8 +68,8 @@
     bxp.user.args <- .np_plot_user_args(dots, "bxp")
     overlay.col <- if (!is.null(col)) col else points.user.args$col
     overlay.points.args <- list(col = overlay.col,
-                                pch = points.user.args$pch,
-                                cex = points.user.args$cex,
+                                pch = if (is.null(points.user.args$pch)) 20 else points.user.args$pch,
+                                cex = if (is.null(points.user.args$cex)) 0.5 else points.user.args$cex,
                                 bg = points.user.args$bg)
 
     bxp.args <- bxp.user.args
@@ -757,7 +757,7 @@
                 center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
                 all.err = temp.all.err,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = 2,
                 add.legend = TRUE)
@@ -767,7 +767,7 @@
                 ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
                 ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = 2
               )
@@ -1007,7 +1007,7 @@
                   center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
                   all.err = temp.all.err,
                   plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                  plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                  plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
                   lty = 2,
                   add.legend = TRUE)
@@ -1017,7 +1017,7 @@
                   ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
                   ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
                   plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                  plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                  plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
                   lty = 2
                 )
@@ -1218,7 +1218,7 @@
                 center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,plot.index] else data.err[,3*plot.index])),
                 all.err = data.err.all[[plot.index]],
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = 2,
                 add.legend = TRUE)
@@ -1228,7 +1228,7 @@
                 ely = if (plotOnEstimate) na.omit(data.eval[,plot.index] - data.err[,3*plot.index-2]) else na.omit(data.err[,3*plot.index] - data.err[,3*plot.index-2]),
                 ehy = if (plotOnEstimate) na.omit(data.eval[,plot.index] + data.err[,3*plot.index-1]) else na.omit(data.err[,3*plot.index] + data.err[,3*plot.index-1]),
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = 2
               )
