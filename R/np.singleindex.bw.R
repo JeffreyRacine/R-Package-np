@@ -172,6 +172,10 @@ npindexbw.NULL <-
 }
 
 .npindex_selector_with_local_kernelsum <- function(expr) {
+  if (!isTRUE(.npRmpi_autodispatch_active()))
+    return(force(expr))
+  if (!isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+    return(force(expr))
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   old.local <- getOption("npRmpi.local.regression.mode", FALSE)
   options(npRmpi.autodispatch.disable = TRUE)
