@@ -62,11 +62,8 @@
     points.user.args <- .np_plot_user_args(dots, "points")
     persp.user.args <- .np_plot_user_args(dots, "persp")
     bxp.user.args <- .np_plot_user_args(dots, "bxp")
-    overlay.col <- if (!is.null(col)) col else points.user.args$col
-    overlay.points.args <- list(col = overlay.col,
-                                pch = if (is.null(points.user.args$pch)) 20 else points.user.args$pch,
-                                cex = if (is.null(points.user.args$cex)) 0.5 else points.user.args$cex,
-                                bg = points.user.args$bg)
+    overlay.col <- points.user.args$col
+    overlay.points.args <- points.user.args
 
     bxp.args <- bxp.user.args
     if (!is.null(col)) bxp.args$col <- col
@@ -441,12 +438,12 @@
             }
           }
           if (overlay.ok)
-            .np_plot_overlay_points_persp(overlay.x1, overlay.x2, ydat,
-                                          persp.mat = persp.mat,
-                                          col = overlay.points.args$col,
-                                          pch = overlay.points.args$pch,
-                                          cex = overlay.points.args$cex,
-                                          bg = overlay.points.args$bg)
+            do.call(.np_plot_overlay_points_persp,
+                    c(list(x1 = overlay.x1,
+                           x2 = overlay.x2,
+                           y = ydat,
+                           persp.mat = persp.mat),
+                      overlay.points.args))
 
           Sys.sleep(0.5)
       }
@@ -635,11 +632,9 @@
             type.val <- plot.args$type
             plot.args$type <- "n"
             do.call(plot.fun, plot.args)
-            .np_plot_overlay_points_1d(xdat[,i], ydat,
-                                       col = overlay.points.args$col,
-                                       pch = overlay.points.args$pch,
-                                       cex = overlay.points.args$cex,
-                                       bg = overlay.points.args$bg)
+            do.call(.np_plot_overlay_points_1d,
+                    c(list(x = xdat[,i], y = ydat),
+                      overlay.points.args))
             if (!identical(type.val, "n")) {
               ok.line <- is.finite(ei) & is.finite(temp.mean)
               line.args <- list(x = ei[ok.line],
@@ -662,11 +657,9 @@
               base.args$ylim <- plot.args$ylim
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             do.call(plot, base.args)
-            .np_plot_overlay_points_factor(xdat[,i], ydat,
-                                           col = overlay.points.args$col,
-                                           pch = overlay.points.args$pch,
-                                           cex = overlay.points.args$cex,
-                                           bg = overlay.points.args$bg)
+            do.call(.np_plot_overlay_points_factor,
+                    c(list(x = xdat[,i], y = ydat),
+                      overlay.points.args))
             if (plot.bootstrap && plot.bxp) {
               do.call(bxp, c(list(z = temp.boot, add = TRUE), bxp.args))
             } else {
@@ -696,7 +689,7 @@
                 center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
                 all.err = temp.all.err,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
+                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = 2,
                 add.legend = TRUE)
@@ -706,7 +699,7 @@
                 ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
                 ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
+                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = if (xi.factor) 1 else 2
               )
@@ -841,11 +834,9 @@
             type.val <- plot.args$type
             plot.args$type <- "n"
             do.call(plot.fun, plot.args)
-            .np_plot_overlay_points_1d(xdat[,i], ydat,
-                                       col = overlay.points.args$col,
-                                       pch = overlay.points.args$pch,
-                                       cex = overlay.points.args$cex,
-                                       bg = overlay.points.args$bg)
+            do.call(.np_plot_overlay_points_1d,
+                    c(list(x = xdat[,i], y = ydat),
+                      overlay.points.args))
             if (!identical(type.val, "n")) {
               ok.line <- is.finite(allei[,i]) & is.finite(data.eval[,i])
               line.args <- list(x = allei[ok.line, i],
@@ -867,11 +858,9 @@
                               ylim = plot.args$ylim)
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             do.call(plot, base.args)
-            .np_plot_overlay_points_factor(xdat[,i], ydat,
-                                           col = overlay.points.args$col,
-                                           pch = overlay.points.args$pch,
-                                           cex = overlay.points.args$cex,
-                                           bg = overlay.points.args$bg)
+            do.call(.np_plot_overlay_points_factor,
+                    c(list(x = xdat[,i], y = ydat),
+                      overlay.points.args))
             if (plot.bootstrap && plot.bxp) {
               do.call(bxp, c(list(z = all.bxp[[i]], add = TRUE), bxp.args))
             } else {
@@ -901,7 +890,7 @@
                 center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,i] else data.err[,3*i])),
                 all.err = data.err.all[[i]],
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
+                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = 2,
                 add.legend = TRUE)
@@ -911,7 +900,7 @@
                 ely = if (plotOnEstimate) na.omit(data.eval[,i] - data.err[,3*i-2]) else na.omit(data.err[,3*i] - data.err[,3*i-2]),
                 ehy = if (plotOnEstimate) na.omit(data.eval[,i] + data.err[,3*i-1]) else na.omit(data.err[,3*i] + data.err[,3*i-1]),
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
-                plot.errors.bar = if (xi.factor) "|" else plot.errors.bar,
+                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = if (xi.factor) 1 else 2
               )
