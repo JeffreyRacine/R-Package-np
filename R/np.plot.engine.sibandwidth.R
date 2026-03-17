@@ -100,6 +100,14 @@
 
     scalar_default <- .np_plot_scalar_default
 
+    dots <- list(...)
+    plot.user.args <- .np_plot_user_args(dots, "plot")
+    bxp.user.args <- .np_plot_user_args(dots, "bxp")
+    bxp.args <- bxp.user.args
+    if (!is.null(col)) bxp.args$col <- col
+    if (!is.null(lty)) bxp.args$lty <- lty
+    if (!is.null(lwd)) bxp.args$lwd <- lwd
+
     make_singleindex_payload <- function(index,
                                          mean,
                                          grad = NA,
@@ -213,21 +221,24 @@
       if (plot.behavior != "data"){      
         plot.layout <- .np_plot_layout_activate(plot.layout)
         if (plot.errors){
-          plot(tobj$index[i.sort], temp.mean[i.sort],
-               ylim = if (!is.null(ylim)) ylim else c(ymin,ymax),
-               xlim = xlim,
-               cex.axis = scalar_default(cex.axis, par()$cex.axis),
-               cex.lab =  scalar_default(cex.lab, par()$cex.lab),
-               cex.main = scalar_default(cex.main, par()$cex.main),
-               cex.sub = scalar_default(cex.sub, par()$cex.sub),
-               xlab = scalar_default(xlab, "index"),
-               ylab = scalar_default(ylab, gen.label(bws$ynames, 'Conditional Mean')),
-               type = scalar_default(type, 'l'),
-               lty = scalar_default(lty, par()$lty),
-               col = scalar_default(col, par()$col),
-               main = main,
-               sub = sub,
-               lwd = scalar_default(lwd, par()$lwd))
+          plot.args <- list(x = tobj$index[i.sort],
+                            y = temp.mean[i.sort],
+                            ylim = if (!is.null(ylim)) ylim else c(ymin, ymax),
+                            xlim = xlim,
+                            cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                            cex.lab =  scalar_default(cex.lab, par()$cex.lab),
+                            cex.main = scalar_default(cex.main, par()$cex.main),
+                            cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                            xlab = scalar_default(xlab, "index"),
+                            ylab = scalar_default(ylab, gen.label(bws$ynames, "Conditional Mean")),
+                            type = scalar_default(type, "l"),
+                            lty = scalar_default(lty, par()$lty),
+                            col = scalar_default(col, par()$col),
+                            main = main,
+                            sub = sub,
+                            lwd = scalar_default(lwd, par()$lwd))
+          plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
+          do.call(plot, plot.args)
           if (plot.errors.type == "all") {
             sorted.all.err <- lapply(temp.all.err, function(err) {
               if (is.null(err)) return(NULL)
@@ -260,21 +271,24 @@
                         lty = 2)
           }
         } else {
-          plot(tobj$index[i.sort], temp.mean[i.sort],
-               cex.axis = scalar_default(cex.axis, par()$cex.axis),
-               cex.lab =  scalar_default(cex.lab, par()$cex.lab),
-               cex.main = scalar_default(cex.main, par()$cex.main),
-               cex.sub = scalar_default(cex.sub, par()$cex.sub),
-               xlab = scalar_default(xlab, "Index"),
-               ylab = scalar_default(ylab, gen.label(bws$ynames, 'Conditional Mean')),
-               type = scalar_default(type, 'l'),
-               lty = scalar_default(lty, par()$lty),
-               col = scalar_default(col, par()$col),
-               main = main,
-               sub = sub,
-               xlim = xlim,
-               ylim = ylim,
-               lwd = scalar_default(lwd, par()$lwd))
+          plot.args <- list(x = tobj$index[i.sort],
+                            y = temp.mean[i.sort],
+                            cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                            cex.lab =  scalar_default(cex.lab, par()$cex.lab),
+                            cex.main = scalar_default(cex.main, par()$cex.main),
+                            cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                            xlab = scalar_default(xlab, "Index"),
+                            ylab = scalar_default(ylab, gen.label(bws$ynames, "Conditional Mean")),
+                            type = scalar_default(type, "l"),
+                            lty = scalar_default(lty, par()$lty),
+                            col = scalar_default(col, par()$col),
+                            main = main,
+                            sub = sub,
+                            xlim = xlim,
+                            ylim = ylim,
+                            lwd = scalar_default(lwd, par()$lwd))
+          plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
+          do.call(plot, plot.args)
         }
       }
 
@@ -365,20 +379,23 @@
               panel.ylim <- common.ylim
             }
             
-            plot(tobj$index[i.sort], temp.mean[i.sort]*bws$beta[i],
-                 ylim = panel.ylim,
-                 cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                 cex.lab =  scalar_default(cex.lab, par()$cex.lab),
-                 cex.main = scalar_default(cex.main, par()$cex.main),
-                 cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                 xlab = scalar_default(xlab, "index"),
-                 ylab = paste("Gradient Component",i, "of", gen.label(bws$ynames, 'Conditional Mean')),
-                 lty = scalar_default(lty, par()$lty),
-                 col = scalar_default(col, par()$col),
-                 type = scalar_default(type, 'l'),
-                 main = main,
-                 sub = sub,
-                 lwd = scalar_default(lwd, par()$lwd))
+            plot.args <- list(x = tobj$index[i.sort],
+                              y = temp.mean[i.sort] * bws$beta[i],
+                              ylim = panel.ylim,
+                              cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                              cex.lab =  scalar_default(cex.lab, par()$cex.lab),
+                              cex.main = scalar_default(cex.main, par()$cex.main),
+                              cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                              xlab = scalar_default(xlab, "index"),
+                              ylab = paste("Gradient Component", i, "of", gen.label(bws$ynames, "Conditional Mean")),
+                              lty = scalar_default(lty, par()$lty),
+                              col = scalar_default(col, par()$col),
+                              type = scalar_default(type, "l"),
+                              main = main,
+                              sub = sub,
+                              lwd = scalar_default(lwd, par()$lwd))
+            plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
+            do.call(plot, plot.args)
             
             if (plot.errors){
               if (plot.errors.type == "all") {

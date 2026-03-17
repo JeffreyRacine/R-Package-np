@@ -504,6 +504,15 @@ plot.npregivderiv <- function(x,
                               ...) {
 
   object <- x
+  dots <- list(...)
+  take_arg <- function(name, default = NULL) {
+    if (!is.null(dots[[name]])) {
+      val <- dots[[name]]
+      dots[[name]] <- NULL
+      return(val)
+    }
+    default
+  }
 
   ## We only support univariate endogenous predictor z
   if(NCOL(object$z) > 1) stop(" only univariate z is supported")
@@ -529,21 +538,41 @@ plot.npregivderiv <- function(x,
   }
 
   if(plot.data) {
-    plot(z, y,
-         xlab=zname,
-         ylab=yname,
-         type="p",
-         col="lightgrey",
-         ...)
-    lines(z[order(z)], fit[order(z)],
-          lwd=2,
-          ...)
+    plot.type <- take_arg("type", "p")
+    plot.xlab <- take_arg("xlab", zname)
+    plot.ylab <- take_arg("ylab", yname)
+    user.col <- take_arg("col", NULL)
+    line.lwd <- take_arg("lwd", 2)
+    plot.args <- c(list(x = z,
+                        y = y,
+                        xlab = plot.xlab,
+                        ylab = plot.ylab,
+                        type = plot.type,
+                        col = if (is.null(user.col)) "lightgrey" else user.col),
+                   dots)
+    do.call(plot, plot.args)
+    line.args <- list(x = z[order(z)],
+                      y = fit[order(z)],
+                      lwd = line.lwd)
+    if (!is.null(user.col)) {
+      line.args$col <- user.col
+    }
+    do.call(lines, c(line.args, dots))
   } else {
-    plot(z, fit[order(z)],
-         type="l",
-         xlab=zname,
-         ylab=ylab,
-         lwd=2,
-         ...)
+    plot.type <- take_arg("type", "l")
+    plot.xlab <- take_arg("xlab", zname)
+    plot.ylab <- take_arg("ylab", ylab)
+    user.col <- take_arg("col", NULL)
+    line.lwd <- take_arg("lwd", 2)
+    plot.args <- list(x = z[order(z)],
+                      y = fit[order(z)],
+                      type = plot.type,
+                      xlab = plot.xlab,
+                      ylab = plot.ylab,
+                      lwd = line.lwd)
+    if (!is.null(user.col)) {
+      plot.args$col <- user.col
+    }
+    do.call(plot, c(plot.args, dots))
   }
 }

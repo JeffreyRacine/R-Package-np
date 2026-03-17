@@ -59,6 +59,15 @@
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
     scalar_default <- .np_plot_scalar_default
 
+    dots <- list(...)
+    plot.user.args <- .np_plot_user_args(dots, "plot")
+    bxp.user.args <- .np_plot_user_args(dots, "bxp")
+    bxp.args <- bxp.user.args
+    if (!is.null(col)) bxp.args$col <- col
+    if (!is.null(lty)) bxp.args$lty <- lty
+    if (!is.null(lwd)) bxp.args$lwd <- lwd
+    if (!is.null(border)) bxp.args$border <- border
+
     cdf <- TRUE
     miss.xy = c(missing(xdat),missing(ydat))
     
@@ -732,9 +741,17 @@
               plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
               plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
               plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
+            } else {
+              if (!is.null(col)) plot.args$col <- col
+              if (!is.null(lty)) plot.args$lty <- lty
+              if (!is.null(lwd)) plot.args$lwd <- lwd
             }
             plot.args$main <- scalar_default(main, "")
             plot.args$sub <- scalar_default(sub, "")
+            plot.args <- .np_plot_merge_user_args(
+              plot.args,
+              if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
+            )
             do.call(plot.fun, plot.args)
 
             ## error plotting evaluation
@@ -949,9 +966,17 @@
                 plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
                 plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
                 plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
+              } else {
+                if (!is.null(col)) plot.args$col <- col
+                if (!is.null(lty)) plot.args$lty <- lty
+                if (!is.null(lwd)) plot.args$lwd <- lwd
               }
               plot.args$main <- scalar_default(main, "")
               plot.args$sub <- scalar_default(sub, "")
+              plot.args <- .np_plot_merge_user_args(
+                plot.args,
+                if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
+              )
               do.call(plot.fun, plot.args)
 
               ## error plotting evaluation
@@ -1070,9 +1095,17 @@
               plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
               plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
               plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
+            } else {
+              if (!is.null(col)) plot.args$col <- col
+              if (!is.null(lty)) plot.args$lty <- lty
+              if (!is.null(lwd)) plot.args$lwd <- lwd
             }
             plot.args$main <- scalar_default(main, "")
             plot.args$sub <- scalar_default(sub, "")
+            plot.args <- .np_plot_merge_user_args(
+              plot.args,
+              if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
+            )
             do.call(plot.fun, plot.args)
 
             ## error plotting evaluation
