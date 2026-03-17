@@ -97,6 +97,13 @@
       \item{\code{plot.behavior}}{
         one of \code{"plot"}, \code{"plot-data"}, or \code{"data"}.
       }
+      \item{\code{plot.data.overlay}}{
+        logical; when \code{TRUE}, overlay raw data points on regression
+        surface plots (currently \code{npreg}, \code{npscoef}, and
+        \code{npplreg}) and expand plot limits to include the data. The
+        option is ignored for derivative/gradient plots and coefficient
+        plots. Default is \code{TRUE}.
+      }
       \item{\code{plot.errors.method}}{
         one of \code{"none"}, \code{"bootstrap"}, or
         \code{"asymptotic"}.

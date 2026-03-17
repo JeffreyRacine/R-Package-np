@@ -46,6 +46,7 @@
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
            plot.par.mfrow = TRUE,
+           plot.data.overlay = TRUE,
            ...,
            random.seed){
 
@@ -142,6 +143,12 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
+    overlay.ok <- .np_plot_overlay_enabled(
+      plot.data.overlay = plot.data.overlay,
+      plot.behavior = plot.behavior,
+      gradients = gradients,
+      plot.data.overlay.missing = missing(plot.data.overlay)
+    )
     plot.gradient.order.label <- rep.int(1L, bws$ndim)
     if (gradients && identical(bws$regtype, "lp")) {
       go <- npValidateGlpGradientOrder(regtype = bws$regtype,
@@ -273,6 +280,8 @@
               else
                   c(min(tobj$mean),max(tobj$mean))
       }
+      if (overlay.ok)
+        zlim <- .np_plot_overlay_range(zlim, ydat)
         
       if (plot.behavior != "plot"){
         r1 = npregression(bws = bws,
@@ -295,8 +304,15 @@
 
       persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
       
+      overlay.x1 <- xdat[,1]
+      overlay.x2 <- xdat[,2]
+      if (is.factor(overlay.x1) || is.ordered(overlay.x1))
+        overlay.x1 <- (bws$xdati$all.dlev[[1]])[as.integer(overlay.x1)]
+      if (is.factor(overlay.x2) || is.ordered(overlay.x2))
+        overlay.x2 <- (bws$xdati$all.dlev[[2]])[as.integer(overlay.x2)]
+
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
-          persp(x1.eval,
+          persp.mat <- persp(x1.eval,
                 x2.eval,
                 treg,
                 zlim = zlim,
@@ -402,9 +418,11 @@
                     zlab = "",
                     theta = i,
                     phi = phi,
-                    lwd = scalar_default(lwd, par()$lwd))
+                      lwd = scalar_default(lwd, par()$lwd))
             }
           }
+          if (overlay.ok)
+            .np_plot_overlay_points_persp(overlay.x1, overlay.x2, ydat, persp.mat = persp.mat)
 
           Sys.sleep(0.5)
       }
@@ -554,12 +572,17 @@
           }
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- temp.mean
+          panel.ylim <- NULL
           if (plot.errors)
-            plot.args$ylim <- if (plot.errors.type == "all")
+            panel.ylim <- if (plot.errors.type == "all")
               compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
             else
               c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
                 max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
+          if (overlay.ok)
+            panel.ylim <- .np_plot_overlay_range(panel.ylim, ydat)
+          if (!is.null(panel.ylim))
+            plot.args$ylim <- panel.ylim
           plot.args$xlab <- scalar_default(xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
           plot.args$ylab <- scalar_default(ylab, paste(
             if (gradients) paste("Derivative order ", plot.gradient.order.label[i], " component ", i, " of", sep = "") else "",
@@ -576,7 +599,45 @@
           }
           plot.args$main <- scalar_default(main, "")
           plot.args$sub <- scalar_default(sub, "")
-          do.call(plot.fun, plot.args)
+          if (overlay.ok && !xi.factor) {
+            type.val <- plot.args$type
+            plot.args$type <- "n"
+            do.call(plot.fun, plot.args)
+            .np_plot_overlay_points_1d(xdat[,i], ydat)
+            if (!identical(type.val, "n")) {
+              ok.line <- is.finite(ei) & is.finite(temp.mean)
+              line.args <- list(x = ei[ok.line],
+                                y = temp.mean[ok.line],
+                                type = type.val,
+                                lty = plot.args$lty,
+                                lwd = plot.args$lwd,
+                                col = plot.args$col)
+              do.call(lines, line.args)
+            }
+          } else if (overlay.ok && xi.factor) {
+            base.args <- list(x = ei,
+                              y = temp.mean,
+                              type = "n",
+                              xlab = plot.args$xlab,
+                              ylab = plot.args$ylab,
+                              main = plot.args$main,
+                              sub = plot.args$sub)
+            if (!is.null(plot.args$ylim))
+              base.args$ylim <- plot.args$ylim
+            do.call(plot, base.args)
+            .np_plot_overlay_points_factor(xdat[,i], ydat)
+            if (plot.bootstrap && plot.bxp) {
+              do.call(bxp, list(z = temp.boot, add = TRUE))
+            } else {
+              l.f <- rep(ei, each = 3)
+              l.f[3 * seq_along(ei)] <- NA
+              l.y <- unlist(lapply(temp.mean, function(p) c(0, p, NA)))
+              lines(x = l.f, y = l.y, lty = 2)
+              points(x = ei, y = temp.mean)
+            }
+          } else {
+            do.call(plot.fun, plot.args)
+          }
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
@@ -676,6 +737,12 @@
           y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
         }
 
+        if (overlay.ok) {
+          y.range <- .np_plot_overlay_range(c(y.min, y.max), ydat)
+          y.min <- y.range[1L]
+          y.max <- y.range[2L]
+        }
+
         if(!is.null(ylim)){
           y.min = ylim[1]
           y.max = ylim[2]
@@ -716,7 +783,44 @@
           }
           plot.args$main <- scalar_default(main, "")
           plot.args$sub <- scalar_default(sub, "")
-          do.call(plot.fun, plot.args)
+          if (overlay.ok && !xi.factor) {
+            type.val <- plot.args$type
+            plot.args$type <- "n"
+            do.call(plot.fun, plot.args)
+            .np_plot_overlay_points_1d(xdat[,i], ydat)
+            if (!identical(type.val, "n")) {
+              ok.line <- is.finite(allei[,i]) & is.finite(data.eval[,i])
+              line.args <- list(x = allei[ok.line, i],
+                                y = data.eval[ok.line, i],
+                                type = type.val,
+                                lty = plot.args$lty,
+                                lwd = plot.args$lwd,
+                                col = plot.args$col)
+              do.call(lines, line.args)
+            }
+          } else if (overlay.ok && xi.factor) {
+            base.args <- list(x = allei[,i],
+                              y = data.eval[,i],
+                              type = "n",
+                              xlab = plot.args$xlab,
+                              ylab = plot.args$ylab,
+                              main = plot.args$main,
+                              sub = plot.args$sub,
+                              ylim = plot.args$ylim)
+            do.call(plot, base.args)
+            .np_plot_overlay_points_factor(xdat[,i], ydat)
+            if (plot.bootstrap && plot.bxp) {
+              do.call(bxp, list(z = all.bxp[[i]], add = TRUE))
+            } else {
+              l.f <- rep(allei[,i], each = 3)
+              l.f[3 * seq_along(allei[,i])] <- NA
+              l.y <- unlist(lapply(data.eval[,i], function(p) c(0, p, NA)))
+              lines(x = l.f, y = l.y, lty = 2)
+              points(x = allei[,i], y = data.eval[,i])
+            }
+          } else {
+            do.call(plot.fun, plot.args)
+          }
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){

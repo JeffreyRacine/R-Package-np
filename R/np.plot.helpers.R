@@ -4497,6 +4497,89 @@ plotFactor <- function(f, y, ...){
   if (plot.bootstrap && plot.bxp) bxp else plotFactor
 }
 
+.np_plot_overlay_enabled <- function(plot.data.overlay,
+                                    plot.behavior,
+                                    gradients = FALSE,
+                                    coef = FALSE,
+                                    plot.data.overlay.missing = FALSE) {
+  if (!isTRUE(plot.data.overlay))
+    return(FALSE)
+  if (identical(plot.behavior, "data"))
+    return(FALSE)
+  if (isTRUE(gradients)) {
+    if (!isTRUE(plot.data.overlay.missing))
+      .np_warning("plot.data.overlay is available only for regression surfaces, not derivatives")
+    return(FALSE)
+  }
+  if (isTRUE(coef)) {
+    if (!isTRUE(plot.data.overlay.missing))
+      .np_warning("plot.data.overlay is available only for regression surfaces, not coefficient plots")
+    return(FALSE)
+  }
+  TRUE
+}
+
+.np_plot_overlay_range <- function(existing.range, ydat) {
+  yr <- range(ydat, finite = TRUE)
+  if (!length(yr) || any(!is.finite(yr)))
+    return(existing.range)
+
+  if (is.null(existing.range) || length(existing.range) < 2L ||
+      all(!is.finite(existing.range))) {
+    return(yr)
+  }
+
+  c(min(existing.range[1L], yr[1L], na.rm = TRUE),
+    max(existing.range[2L], yr[2L], na.rm = TRUE))
+}
+
+.np_plot_overlay_points_1d <- function(x, y, col = NULL, pch = 20, cex = 0.5, ...) {
+  if (is.null(x) || is.null(y))
+    return(invisible(FALSE))
+  if (is.factor(x) || is.ordered(x))
+    return(invisible(FALSE))
+
+  ok <- is.finite(x) & is.finite(y)
+  if (!any(ok))
+    return(invisible(FALSE))
+
+  if (is.null(col))
+    col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+  points(x[ok], y[ok], pch = pch, cex = cex, col = col, ...)
+  invisible(TRUE)
+}
+
+.np_plot_overlay_points_factor <- function(x, y, col = NULL, pch = 20, cex = 0.5, ...) {
+  if (is.null(x) || is.null(y))
+    return(invisible(FALSE))
+  if (!(is.factor(x) || is.ordered(x)))
+    return(invisible(FALSE))
+
+  ok <- !is.na(x) & is.finite(y)
+  if (!any(ok))
+    return(invisible(FALSE))
+
+  if (is.null(col))
+    col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+  points(x[ok], y[ok], pch = pch, cex = cex, col = col, ...)
+  invisible(TRUE)
+}
+
+.np_plot_overlay_points_persp <- function(x1, x2, y, persp.mat, col = NULL, pch = 20, cex = 0.5, ...) {
+  if (is.null(x1) || is.null(x2) || is.null(y))
+    return(invisible(FALSE))
+
+  ok <- is.finite(x1) & is.finite(x2) & is.finite(y)
+  if (!any(ok))
+    return(invisible(FALSE))
+
+  if (is.null(col))
+    col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+  xyz <- trans3d(x1[ok], x2[ok], y[ok], persp.mat)
+  points(xyz, pch = pch, cex = cex, col = col, ...)
+  invisible(TRUE)
+}
+
 .np_plot_resolve_xydat <- function(bws, xdat, ydat, miss.xy) {
   if (any(miss.xy) && !all(miss.xy))
     stop("one of, but not both, xdat and ydat was specified")
