@@ -464,7 +464,7 @@ npRejectLegacyLpArgs <- function(dotnames, where = "npreg") {
   invisible(NULL)
 }
 
-dim_basis <- function(basis = c("additive", "glp", "tensor"),
+dim_basis <- function(basis = c("glp", "additive", "tensor"),
                       kernel = TRUE,
                       degree = NULL,
                       segments = NULL,
