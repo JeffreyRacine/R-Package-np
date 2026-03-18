@@ -7178,6 +7178,9 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.type,
            plot.errors.alpha,
            progress.target = NULL,
+           proper = FALSE,
+           proper.method = NULL,
+           proper.control = list(),
            ...,
            bws){
     prep.label <- .np_plot_bootstrap_stage_label(
@@ -7347,6 +7350,47 @@ compute.bootstrap.errors.conbandwidth =
 
     if (is.null(boot.out))
       stop("no canonical helper path available for this conditional bootstrap configuration", call. = FALSE)
+
+    if (!identical(tboo, "quant") && isTRUE(proper)) {
+      proper.template <- list(
+        xeval = exdat,
+        yeval = eydat,
+        gradients = gradients,
+        trainiseval = FALSE,
+        yndim = bws$yndim,
+        yncon = bws$yncon,
+        ynord = bws$ynord,
+        ynuno = bws$ynuno
+      )
+
+      if (isTRUE(cdf)) {
+        proper.plan <- .np_condist_prepare_proper_plan(
+          object = proper.template,
+          proper.control = proper.control
+        )
+        if (!isTRUE(proper.plan$supported)) {
+          stop(.np_condist_proper_reason_message(
+            reason = proper.plan$reason,
+            where = "plot()"
+          ), call. = FALSE)
+        }
+        boot.out$t0 <- .np_condist_project_values_with_plan(boot.out$t0, proper.plan)
+        boot.out$t <- .np_condist_project_values_with_plan(boot.out$t, proper.plan)
+      } else {
+        proper.plan <- .np_condens_prepare_proper_plan(
+          object = proper.template,
+          proper.control = proper.control
+        )
+        if (!isTRUE(proper.plan$supported)) {
+          stop(.np_condens_proper_reason_message(
+            reason = proper.plan$reason,
+            where = "plot()"
+          ), call. = FALSE)
+        }
+        boot.out$t0 <- .np_condens_project_values_with_plan(boot.out$t0, proper.plan)
+        boot.out$t <- .np_condens_project_values_with_plan(boot.out$t, proper.plan)
+      }
+    }
 
     if (slice.index <= bws$xndim){
       tdati <- bws$xdati

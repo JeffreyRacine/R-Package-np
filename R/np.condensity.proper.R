@@ -266,10 +266,7 @@
   )
 }
 
-.np_condens_apply_proper <- function(object,
-                                     proper.method = "project",
-                                     proper.control = list()) {
-  proper.method <- match.arg(as.character(proper.method)[1L], c("project"))
+.np_condens_prepare_proper_plan <- function(object, proper.control = list()) {
   proper.control <- .np_condens_normalize_proper_control(proper.control)
 
   grid <- .np_condens_detect_proper_grid(object = object, tol = proper.control$tol)
@@ -281,56 +278,105 @@
       grid.common = FALSE
     )
     return(list(
-      applied = FALSE,
+      supported = FALSE,
       reason = grid$reason,
       proper.info = info
     ))
   }
 
-  raw <- as.double(object$condens)
-  repaired <- raw
-  negative.count.raw <- integer(length(grid$slices))
-  integral.raw <- numeric(length(grid$slices))
-  projection.distance <- numeric(length(grid$slices))
-
-  for (i in seq_along(grid$slices)) {
-    idx <- grid$slices[[i]]
-    f.slice <- raw[idx]
-    w.slice <- tryCatch(
-      .np_condens_trapezoid_weights(grid$y.grid, tol = proper.control$tol),
-      error = function(e) e
+  weights <- tryCatch(
+    .np_condens_trapezoid_weights(grid$y.grid, tol = proper.control$tol),
+    error = function(e) e
+  )
+  if (inherits(weights, "error")) {
+    info <- .np_condens_make_reason_info(
+      reason = "invalid_quadrature",
+      supported = FALSE,
+      slice.count = length(grid$slices),
+      grid.common = TRUE
     )
-    if (inherits(w.slice, "error")) {
-      info <- .np_condens_make_reason_info(
-        reason = "invalid_quadrature",
-        supported = FALSE,
-        slice.count = length(grid$slices),
-        grid.common = TRUE
+    return(list(
+      supported = FALSE,
+      reason = "invalid_quadrature",
+      proper.info = info
+    ))
+  }
+
+  list(
+    supported = TRUE,
+    slices = grid$slices,
+    weights = weights,
+    y.grid = grid$y.grid,
+    proper.control = proper.control
+  )
+}
+
+.np_condens_project_values_with_plan <- function(values, plan) {
+  if (!isTRUE(plan$supported))
+    stop("proper projection plan is not supported")
+
+  is.vector.input <- is.null(dim(values))
+  values.mat <- if (is.vector.input) {
+    matrix(as.double(values), nrow = 1L)
+  } else {
+    data.matrix(values)
+  }
+
+  if (ncol(values.mat) != sum(lengths(plan$slices)))
+    stop("value length mismatch for proper density projection")
+
+  out <- values.mat
+  for (row in seq_len(nrow(values.mat))) {
+    for (idx in plan$slices) {
+      out[row, idx] <- .np_condens_project_weighted_simplex(
+        f = values.mat[row, idx],
+        w = plan$weights,
+        mass = 1,
+        tol = plan$proper.control$tol
       )
-      return(list(
-        applied = FALSE,
-        reason = "invalid_quadrature",
-        proper.info = info
-      ))
     }
+  }
 
-    g.slice <- .np_condens_project_weighted_simplex(
-      f = f.slice,
-      w = w.slice,
-      mass = 1,
-      tol = proper.control$tol
-    )
+  if (is.vector.input) as.vector(out[1L, ]) else out
+}
 
-    repaired[idx] <- g.slice
+.np_condens_apply_proper <- function(object,
+                                     proper.method = "project",
+                                     proper.control = list()) {
+  proper.method <- match.arg(as.character(proper.method)[1L], c("project"))
+  proper.control <- .np_condens_normalize_proper_control(proper.control)
+
+  plan <- .np_condens_prepare_proper_plan(
+    object = object,
+    proper.control = proper.control
+  )
+  if (!isTRUE(plan$supported)) {
+    return(list(
+      applied = FALSE,
+      reason = plan$reason,
+      proper.info = plan$proper.info
+    ))
+  }
+
+  raw <- as.double(object$condens)
+  repaired <- .np_condens_project_values_with_plan(raw, plan)
+  negative.count.raw <- integer(length(plan$slices))
+  integral.raw <- numeric(length(plan$slices))
+  projection.distance <- numeric(length(plan$slices))
+
+  for (i in seq_along(plan$slices)) {
+    idx <- plan$slices[[i]]
+    f.slice <- raw[idx]
+    g.slice <- repaired[idx]
     negative.count.raw[i] <- sum(f.slice < 0)
-    integral.raw[i] <- sum(w.slice * f.slice)
-    projection.distance[i] <- sqrt(sum(w.slice * (g.slice - f.slice)^2))
+    integral.raw[i] <- sum(plan$weights * f.slice)
+    projection.distance[i] <- sqrt(sum(plan$weights * (g.slice - f.slice)^2))
   }
 
   info <- .np_condens_make_reason_info(
     reason = "applied",
     supported = TRUE,
-    slice.count = length(grid$slices),
+    slice.count = length(plan$slices),
     grid.common = TRUE,
     negative.count.raw = negative.count.raw,
     integral.raw = integral.raw,

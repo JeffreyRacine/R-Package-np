@@ -73,7 +73,7 @@ test_that("plot condensity 1D data payload repairs only y-varying panels", {
   expect_true(all(out[[2]]$condens >= -1e-8))
 })
 
-test_that("plot condensity rejects asymptotic errors when repair is active", {
+test_that("plot condensity supports asymptotic and bootstrap errors on proper grids", {
   set.seed(2)
   x <- runif(60, -1, 1)
   y <- sin(2 * pi * x) + rnorm(60, sd = 0.2)
@@ -93,14 +93,37 @@ test_that("plot condensity rejects asymptotic errors when repair is active", {
     proper = TRUE
   )
 
-  expect_error(
-    suppressWarnings(plot(
-      fit,
-      plot.behavior = "data",
-      perspective = TRUE,
-      view = "fixed",
-      plot.errors.method = "asymptotic"
-    )),
-    "unsupported when proper=TRUE"
-  )
+  asym <- suppressWarnings(plot(
+    fit,
+    plot.behavior = "data",
+    perspective = TRUE,
+    view = "fixed",
+    plot.errors.method = "asymptotic"
+  ))
+  boot <- suppressWarnings(plot(
+    fit,
+    plot.behavior = "data",
+    perspective = TRUE,
+    view = "fixed",
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = 19,
+    plot.errors.type = "pointwise"
+  ))
+
+  expect_true(isTRUE(asym$cd1$proper.applied))
+  expect_true(all(asym$cd1$condens >= -1e-8))
+  expect_true(all(is.finite(asym$cd1$conderr)))
+
+  expect_true(isTRUE(boot$cd1$proper.applied))
+  expect_true(all(boot$cd1$condens >= -1e-8))
+  expect_true(all(is.finite(boot$cd1$conderr)))
+
+  yeval <- if (is.data.frame(boot$cd1$yeval)) boot$cd1$yeval[[1L]] else as.vector(boot$cd1$yeval)
+  xeval <- if (is.data.frame(boot$cd1$xeval)) boot$cd1$xeval[[1L]] else as.vector(boot$cd1$xeval)
+  w <- getFromNamespace(".np_condens_trapezoid_weights", "np")(sort(unique(yeval)))
+  mass <- vapply(split(seq_along(boot$cd1$condens), xeval), function(idx) {
+    sum(w * boot$cd1$condens[idx])
+  }, numeric(1))
+  expect_equal(unname(mass), rep(1, length(mass)), tolerance = 1e-8)
 })

@@ -80,7 +80,7 @@ test_that("plot condistribution 1D data payload repairs only y-varying panels", 
   expect_true(all(diff(out[[2]]$condist) >= -1e-8))
 })
 
-test_that("plot condistribution rejects asymptotic errors when repair is active", {
+test_that("plot condistribution supports asymptotic and bootstrap errors on proper grids", {
   set.seed(2)
   x <- runif(60, -1, 1)
   y <- sin(2 * pi * x) + rnorm(60, sd = 0.2)
@@ -100,14 +100,36 @@ test_that("plot condistribution rejects asymptotic errors when repair is active"
     proper = TRUE
   )
 
-  expect_error(
-    suppressWarnings(plot(
-      fit,
-      plot.behavior = "data",
-      perspective = TRUE,
-      view = "fixed",
-      plot.errors.method = "asymptotic"
-    )),
-    "unsupported when proper=TRUE"
-  )
+  asym <- suppressWarnings(plot(
+    fit,
+    plot.behavior = "data",
+    perspective = TRUE,
+    view = "fixed",
+    plot.errors.method = "asymptotic"
+  ))
+  boot <- suppressWarnings(plot(
+    fit,
+    plot.behavior = "data",
+    perspective = TRUE,
+    view = "fixed",
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = 19,
+    plot.errors.type = "pointwise"
+  ))
+
+  expect_true(isTRUE(asym$cd1$proper.applied))
+  expect_true(all(asym$cd1$condist >= -1e-8))
+  expect_true(all(asym$cd1$condist <= 1 + 1e-8))
+  expect_true(all(is.finite(asym$cd1$conderr)))
+
+  expect_true(isTRUE(boot$cd1$proper.applied))
+  expect_true(all(boot$cd1$condist >= -1e-8))
+  expect_true(all(boot$cd1$condist <= 1 + 1e-8))
+  expect_true(all(is.finite(boot$cd1$conderr)))
+
+  xeval <- if (is.data.frame(boot$cd1$xeval)) boot$cd1$xeval[[1L]] else as.vector(boot$cd1$xeval)
+  split.idx <- split(seq_along(boot$cd1$condist), xeval)
+  for (idx in split.idx)
+    expect_true(all(diff(boot$cd1$condist[idx]) >= -1e-8))
 })
