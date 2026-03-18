@@ -17,3 +17,41 @@ test_that("npplreg basic functionality works", {
   expect_output(summary(model))
   expect_length(coef(model), 1)
 })
+
+test_that("npplreg direct-fit objects expose canonical and compatibility bandwidth slots", {
+  set.seed(7)
+  n <- 80
+  x1 <- runif(n)
+  z1 <- runif(n)
+  y <- x1^2 + 2 * z1 + rnorm(n, sd = 0.1)
+
+  bw_mat <- matrix(c(0.1, 0.1), nrow = 2, ncol = 1)
+  bw <- npplregbw(xdat = z1, zdat = x1, ydat = y, bws = bw_mat, bandwidth.compute = FALSE)
+  model <- npplreg(bws = bw)
+
+  expect_true("bws" %in% names(model))
+  expect_true("bw" %in% names(model))
+  expect_s3_class(model$bws, "plbandwidth")
+  expect_s3_class(model$bw, "plbandwidth")
+  expect_equal(model$bw$bw, model$bws$bw)
+  expect_equal(model$bw$fval, model$bws$fval)
+})
+
+test_that("plregression methods remain compatible with legacy objects lacking bws", {
+  set.seed(11)
+  n <- 80
+  x1 <- runif(n)
+  z1 <- runif(n)
+  y <- x1^2 + 2 * z1 + rnorm(n, sd = 0.1)
+
+  bw_mat <- matrix(c(0.1, 0.1), nrow = 2, ncol = 1)
+  bw <- npplregbw(xdat = z1, zdat = x1, ydat = y, bws = bw_mat, bandwidth.compute = FALSE)
+  model <- npplreg(bws = bw)
+  legacy <- model
+  legacy$bws <- NULL
+
+  expect_silent(capture.output(print(legacy)))
+  expect_silent(capture.output(summary(legacy)))
+  expect_type(predict(legacy), "double")
+  expect_type(residuals(legacy), "double")
+})

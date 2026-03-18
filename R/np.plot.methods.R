@@ -130,7 +130,13 @@
 }
 .np_plot_singleindex <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
 .np_plot_smoothcoefficient <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
-.np_plot_plregression <- function(object, ...) .np_plot_from_slot(object, "bw", ...)
+.np_plot_plregression <- function(object, ...) {
+  .np_plot_call_method(
+    .np_plot_compat_dispatch,
+    bws = .np_plreg_bws(object, where = "plot.plregression"),
+    ...
+  )
+}
 
 plot.bandwidth <- function(x, ...) .np_plot_call_method(.np_plot_bandwidth_engine, bws = x, ...)
 plot.rbandwidth <- function(x, ...) .np_plot_call_method(.np_plot_rbandwidth_engine, bws = x, ...)

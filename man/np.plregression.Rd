@@ -188,7 +188,9 @@ FALSE, \dots)
     \eqn{\beta_i}{B[i]} in the model }
   \item{xcoeferr}{ standard errors of the coefficients }
   \item{xcoefvcov}{ covariance matrix of the coefficients }
-  \item{bw}{ the bandwidths, stored as a \code{plbandwidth} object }
+  \item{bws}{ the canonical bandwidth object, stored as a
+    \code{plbandwidth} object }
+  \item{bw}{ backward-compatible alias for \code{bws} }
   \item{resid}{ if \code{residuals = TRUE}, in-sample or out-of-sample
     residuals where appropriate (or possible) }
   \item{R2}{ coefficient of determination (Doksum and Samarov (1995))}
