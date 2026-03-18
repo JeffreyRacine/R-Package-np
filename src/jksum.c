@@ -4966,7 +4966,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
 
   double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, **m = NULL;
   double *tprod = NULL, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
-  double *perm_kbuf = NULL;
+  double *perm_kbuf = NULL, *kw_work = NULL;
   int use_disc_profile_cache = 0, disc_nprof = 0, disc_mark_token = 1;
   int disc_profile_from_override = 0;
   int disc_profile_from_global_cache = 0;
@@ -5006,6 +5006,20 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     matrix_X_unordered_train:matrix_X_unordered_eval;
   double * const * const xo = is_adaptive?
     matrix_X_ordered_train:matrix_X_ordered_eval;
+
+#ifdef MPI2
+  if((kw != NULL) && (!suppress_parallel)){
+    kw_work = (double *)calloc((size_t)num_obs_eval_alloc*(size_t)num_xt, sizeof(double));
+    if(kw_work == NULL){
+      status = KWSNP_ERR_BADINVOC;
+      goto cleanup;
+    }
+  } else {
+    kw_work = kw;
+  }
+#else
+  kw_work = kw;
+#endif
 
   if (num_obs_eval == 0) {
     status = KWSNP_ERR_NOEVAL;
@@ -6132,14 +6146,14 @@ const NP_GateOverrideCtx * const gate_override_ctx){
 
     }
 
-    if(kw != NULL){ 
+    if(kw_work != NULL){ 
       // if using adaptive bandwidths, kw is returned transposed
       if(bandwidth_divide_weights)
         for(i = 0; i < num_xt; i++)
-          kw[j*num_xt + i] = tprod[i]/dband;
+          kw_work[j*num_xt + i] = tprod[i]/dband;
       else
         for(i = 0; i < num_xt; i++)
-          kw[j*num_xt + i] = tprod[i];
+          kw_work[j*num_xt + i] = tprod[i];
     }
 
     if((kernel_weighted_sum_pkw_extern != NULL) && (kernel_weighted_sum_pkw_nvar_extern > 0)){
@@ -6169,8 +6183,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       }
     }
 
-    if(kw != NULL){
-      MPI_Allgather(MPI_IN_PLACE, stride * num_xt, MPI_DOUBLE, kw, stride * num_xt, MPI_DOUBLE, comm[1]);          
+    if(kw_work != NULL){
+      MPI_Allgather(MPI_IN_PLACE, stride * num_xt, MPI_DOUBLE, kw_work, stride * num_xt, MPI_DOUBLE, comm[1]);
     }
 
     if(p_nvar > 0){
@@ -6184,6 +6198,12 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     }
 #endif
   }
+
+#ifdef MPI2
+  if((kw != NULL) && (kw_work != kw)){
+    memcpy(kw, kw_work, (size_t)num_obs_eval*(size_t)num_xt*sizeof(double));
+  }
+#endif
 
 cleanup:
 #ifdef MPI2
@@ -6255,6 +6275,10 @@ cleanup:
   if(cont_largeh_active != NULL) free(cont_largeh_active);
   if(cont_largeh_active_fixed != NULL) free(cont_largeh_active_fixed);
   if(tree_active_dims != NULL) free(tree_active_dims);
+
+#ifdef MPI2
+  if((kw_work != NULL) && (kw_work != kw)) free(kw_work);
+#endif
 
   if(no_bpso)
     free(bpso);
@@ -7742,7 +7766,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
 
   moments = (double *)calloc((size_t)num_obs, (size_t)nterms*(size_t)nterms*sizeof(double));
   rhs = (double *)calloc((size_t)num_obs, (size_t)nterms*sizeof(double));
-  kw = alloc_vecd(MAX(1, num_obs - 1));
+  kw = alloc_vecd(MAX(1, num_obs));
   xj = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
   train_u = (double **)malloc((size_t)MAX(1, num_reg_unordered)*sizeof(double *));
   train_o = (double **)malloc((size_t)MAX(1, num_reg_ordered)*sizeof(double *));
@@ -7774,7 +7798,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   }
 #endif
 
-  for(j = 0; j < num_obs - 1; j++){
+  for(j = 0; j < (use_mpi_transport ? num_obs : (num_obs - 1)); j++){
     const double yj = vector_Y[j];
     const int nsub = num_obs - j - 1;
 #ifdef MPI2
@@ -7790,23 +7814,23 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
 
     for(l = 0; l < num_reg_unordered; l++){
       eval_u[l][0] = matrix_X_unordered[l][j];
-      train_u[l] = matrix_X_unordered[l] + j + 1;
+      train_u[l] = use_mpi_transport ? matrix_X_unordered[l] : (matrix_X_unordered[l] + j + 1);
     }
     for(l = 0; l < num_reg_ordered; l++){
       eval_o[l][0] = matrix_X_ordered[l][j];
-      train_o[l] = matrix_X_ordered[l] + j + 1;
+      train_o[l] = use_mpi_transport ? matrix_X_ordered[l] : (matrix_X_ordered[l] + j + 1);
     }
     for(l = 0; l < num_reg_continuous; l++){
       eval_c[l][0] = matrix_X_continuous[l][j];
       matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][0];
-      train_c[l] = matrix_X_continuous[l] + j + 1;
+      train_c[l] = use_mpi_transport ? matrix_X_continuous[l] : (matrix_X_continuous[l] + j + 1);
     }
 
     if(kernel_weighted_sum_np_ctx(kernel_c,
                                   kernel_u,
                                   kernel_o,
                                   BW_FIXED,
-                                  nsub,
+                                  use_mpi_transport ? num_obs : nsub,
                                   1,
                                   num_reg_unordered,
                                   num_reg_ordered,
@@ -7818,8 +7842,8 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   1,
                                   0,
                                   0,
-                                  0,
-                                  0,
+                                  use_mpi_transport ? 1 : 0,
+                                  j,
                                   operator,
                                   OP_NOOP,
                                   0,
@@ -7857,26 +7881,46 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   NULL) != 0)
       goto cleanup_glp_cv;
 
-    for(i = 0; i < nsub; i++){
-      const int ii = j + 1 + i;
-      const double w = kw[i];
-      const double yi = vector_Y[ii];
+    if(use_mpi_transport){
       double * const sj = moments_acc + (size_t)j*(size_t)nterms*(size_t)nterms;
-      double * const si = moments_acc + (size_t)ii*(size_t)nterms*(size_t)nterms;
       double * const tj = rhs_acc + (size_t)j*(size_t)nterms;
-      double * const ti = rhs_acc + (size_t)ii*(size_t)nterms;
 
-      if(w == 0.0)
-        continue;
+      for(i = 0; i < num_obs; i++){
+        const double w = kw[i];
+        const double yi = vector_Y[i];
 
-      for(a = 0; a < nterms; a++){
-        const double bia = basis[a][ii];
-        const double bja = basis[a][j];
-        tj[a] += w*bia*yi;
-        ti[a] += w*bja*yj;
-        for(b = 0; b < nterms; b++){
-          sj[a*nterms+b] += w*bia*basis[b][ii];
-          si[a*nterms+b] += w*bja*basis[b][j];
+        if((i == j) || (w == 0.0))
+          continue;
+
+        for(a = 0; a < nterms; a++){
+          const double bia = basis[a][i];
+          tj[a] += w*bia*yi;
+          for(b = 0; b < nterms; b++)
+            sj[a*nterms+b] += w*bia*basis[b][i];
+        }
+      }
+    } else {
+      for(i = 0; i < nsub; i++){
+        const int ii = j + 1 + i;
+        const double w = kw[i];
+        const double yi = vector_Y[ii];
+        double * const sj = moments_acc + (size_t)j*(size_t)nterms*(size_t)nterms;
+        double * const si = moments_acc + (size_t)ii*(size_t)nterms*(size_t)nterms;
+        double * const tj = rhs_acc + (size_t)j*(size_t)nterms;
+        double * const ti = rhs_acc + (size_t)ii*(size_t)nterms;
+
+        if(w == 0.0)
+          continue;
+
+        for(a = 0; a < nterms; a++){
+          const double bia = basis[a][ii];
+          const double bja = basis[a][j];
+          tj[a] += w*bia*yi;
+          ti[a] += w*bja*yj;
+          for(b = 0; b < nterms; b++){
+            sj[a*nterms+b] += w*bia*basis[b][ii];
+            si[a*nterms+b] += w*bja*basis[b][j];
+          }
         }
       }
     }
