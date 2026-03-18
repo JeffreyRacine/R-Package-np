@@ -78,10 +78,12 @@ test_that("autodispatch uses safe cleanup helper for temporary symbols", {
 
 test_that("autodispatch return rewriting covers prepublished temporary arguments", {
   impl.body <- paste(deparse(body(.npRmpi_distributed_call_impl), width.cutoff = 500L), collapse = " ")
+  sanitize.body <- paste(deparse(body(.npRmpi_autodispatch_sanitize_object), width.cutoff = 500L), collapse = " ")
 
   expect_match(impl.body, "tmpreplace <- c\\(prepared\\$tmpvals, prepared\\$prepublish\\)")
-  expect_match(impl.body, "\\.npRmpi_autodispatch_replace_tmp_calls\\(result, tmpvals = tmpreplace\\)")
+  expect_match(impl.body, "\\.npRmpi_autodispatch_sanitize_object\\(result, tmpvals = tmpreplace\\)")
   expect_match(impl.body, "\\.npRmpi_autodispatch_replace_tmps\\(result, tmpvals = tmpreplace\\)")
+  expect_match(sanitize.body, "\\.npRmpi_autodispatch_replace_tmp_calls\\(x, tmpvals = tmpvals\\)")
 })
 
 test_that("autodispatch target argument set covers gdat alias", {

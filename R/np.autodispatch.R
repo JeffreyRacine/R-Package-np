@@ -413,6 +413,8 @@
     on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(tmpnames, envir = .GlobalEnv), add = TRUE)
 
   res <- .npRmpi_eval_scmd(call.obj, envir = .GlobalEnv)
+  if (!is.null(tmpvals) && length(tmpvals))
+    res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpvals)
   if (is.character(remote.name) && length(remote.name) == 1L && nzchar(remote.name))
     .GlobalEnv[[remote.name]] <- res
   res
@@ -1601,6 +1603,18 @@
   x
 }
 
+.npRmpi_autodispatch_sanitize_object <- function(x, tmpvals) {
+  if (is.list(x))
+    return(.npRmpi_autodispatch_untag(
+      .npRmpi_autodispatch_replace_tmp_calls(x, tmpvals = tmpvals)
+    ))
+
+  if (is.call(x))
+    return(.npRmpi_autodispatch_replace_tmps(x, tmpvals = tmpvals))
+
+  .npRmpi_autodispatch_untag(x)
+}
+
 .npRmpi_rm_existing <- function(nms, envir = .GlobalEnv) {
   if (!length(nms))
     return(invisible(character(0)))
@@ -1826,7 +1840,7 @@
   if (is.list(result))
     return(.npRmpi_autodispatch_attach_timing(
       .npRmpi_autodispatch_tag_result(
-        .npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = tmpreplace),
+        .npRmpi_autodispatch_sanitize_object(result, tmpvals = tmpreplace),
         mode = "auto", remote = remote.name
       ),
       rec
