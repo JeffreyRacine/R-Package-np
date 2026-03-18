@@ -9,13 +9,6 @@
        call. = FALSE)
 }
 
-.np_plreg_reentry_bws <- function(object, where = "plregression") {
-  if (!is.null(object$bw) && inherits(object$bw, "plbandwidth"))
-    return(object$bw)
-
-  .np_plreg_bws(object, where = where)
-}
-
 plregression = 
   function(bws, xcoef, xcoeferr = 0, xcoefvcov, evalx, evalz, mean, resid = NA,
            ntrain, trainiseval = FALSE, residuals = FALSE,
@@ -125,12 +118,12 @@ residuals.plregression <- function(object, ...) {
  if(object$residuals) {
    return(object$resid)
  } else {
-   return(npplreg(bws = .np_plreg_reentry_bws(object, where = "residuals.plregression"),
+   return(npplreg(bws = .np_plreg_bws(object, where = "residuals.plregression"),
                   residuals = TRUE)$resid)
  }
 }
 predict.plregression <- function(object, se.fit = FALSE, ...) {
-  obj.bws <- .np_plreg_reentry_bws(object, where = "predict.plregression")
+  obj.bws <- .np_plreg_bws(object, where = "predict.plregression")
   dots <- list(...)
   has.formula.route <- !is.null(obj.bws$formula)
 
