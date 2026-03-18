@@ -32,7 +32,7 @@ make_proper_cdist_test_object <- function(condist,
                                           gradients = FALSE) {
   stopifnot(length(condist) == length(x.grid) * length(y.grid))
   eval.grid <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
-  condistribution(
+  getFromNamespace("condistribution", "npRmpi")(
     bws = make_proper_cdist_test_bws(),
     xeval = eval.grid["x"],
     yeval = eval.grid["y"],
@@ -78,6 +78,32 @@ test_that("proper finalizer repairs supported synthetic grids and preserves raw 
   split.idx <- split(seq_along(out$condist), out$xeval[[1L]])
   for (idx in split.idx)
     expect_true(all(diff(out$condist[idx]) >= -1e-10))
+})
+
+test_that("proper plan projects bootstrap-style distribution matrices slice-wise", {
+  raw <- c(-0.3, 0.7, 0.4, -0.1, 0.8, 1.2)
+  obj <- make_proper_cdist_test_object(condist = raw)
+
+  plan <- getFromNamespace(".np_condist_prepare_proper_plan", "npRmpi")(
+    object = obj,
+    proper.control = list()
+  )
+  expect_true(isTRUE(plan$supported))
+
+  projected <- getFromNamespace(".np_condist_project_values_with_plan", "npRmpi")(
+    values = rbind(raw, raw + 0.05),
+    plan = plan
+  )
+
+  expect_equal(dim(projected), c(2L, length(raw)))
+  expect_true(all(projected >= -1e-10))
+  expect_true(all(projected <= 1 + 1e-10))
+
+  split.idx <- split(seq_len(length(raw)), obj$xeval[[1L]])
+  for (row in seq_len(nrow(projected))) {
+    for (idx in split.idx)
+      expect_true(all(diff(projected[row, idx]) >= -1e-10))
+  }
 })
 
 test_that("proper finalizer stores request-only metadata on unsupported geometry", {

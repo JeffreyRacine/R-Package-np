@@ -32,7 +32,7 @@ make_proper_test_object <- function(condens,
                                     gradients = FALSE) {
   stopifnot(length(condens) == length(x.grid) * length(y.grid))
   eval.grid <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
-  condensity(
+  getFromNamespace("condensity", "npRmpi")(
     bws = make_proper_test_bws(),
     xeval = eval.grid["x"],
     yeval = eval.grid["y"],
@@ -79,6 +79,32 @@ test_that("proper finalizer repairs supported synthetic grids and preserves raw 
   split.idx <- split(seq_len(nrow(out$xeval)), out$xeval[[1L]])
   mass <- vapply(split.idx, function(idx) sum(w * out$condens[idx]), numeric(1))
   expect_equal(unname(mass), rep(1, length(mass)), tolerance = 1e-8)
+})
+
+test_that("proper plan projects bootstrap-style density matrices slice-wise", {
+  raw <- c(-0.3, 0.2, 0.9, -0.1, 0.4, 1.1)
+  obj <- make_proper_test_object(condens = raw)
+
+  plan <- getFromNamespace(".np_condens_prepare_proper_plan", "npRmpi")(
+    object = obj,
+    proper.control = list()
+  )
+  expect_true(isTRUE(plan$supported))
+
+  projected <- getFromNamespace(".np_condens_project_values_with_plan", "npRmpi")(
+    values = rbind(raw, raw + 0.05),
+    plan = plan
+  )
+
+  expect_equal(dim(projected), c(2L, length(raw)))
+  expect_true(all(projected >= -1e-10))
+
+  w <- getFromNamespace(".np_condens_trapezoid_weights", "npRmpi")(unique(obj$yeval[[1L]]))
+  split.idx <- split(seq_len(length(raw)), obj$xeval[[1L]])
+  for (row in seq_len(nrow(projected))) {
+    mass <- vapply(split.idx, function(idx) sum(w * projected[row, idx]), numeric(1))
+    expect_equal(unname(mass), rep(1, length(mass)), tolerance = 1e-8)
+  }
 })
 
 test_that("proper finalizer stores request-only metadata on unsupported geometry", {

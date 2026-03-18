@@ -232,10 +232,6 @@
           bws = bws
         )
       } else {
-        if (cdf && isTRUE(proper.args$proper.requested)) {
-          if (plot.errors)
-            stop("plot.errors.method != 'none' is unsupported when proper=TRUE is active on conditional distribution grids", call. = FALSE)
-        }
         tobj <- .np_plot_conditional_eval(
           bws = bws,
           xdat = xdat,
@@ -282,6 +278,9 @@
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
           progress.target = NULL,
+          proper = isTRUE(proper.args$proper.requested),
+          proper.method = proper.args$proper.method,
+          proper.control = proper.args$proper.control,
           bws = bws)
         terr <- terr.obj[["boot.err"]]
         terr.all <- terr.obj[["boot.all.err"]]
@@ -823,10 +822,6 @@
               bws = bws
             )
           } else {
-            if (cdf && isTRUE(proper.args$proper.requested)) {
-              if (plot.errors)
-                stop("plot.errors.method != 'none' is unsupported when proper=TRUE is active on y-varying conditional distribution panels", call. = FALSE)
-            }
             tobj <- .np_plot_conditional_eval(
               bws = bws,
               xdat = xdat,
@@ -912,6 +907,9 @@
                             gradients = gradients,
                             gradient.index = if (gradients) i else 0L
                           ),
+                          proper = isTRUE(proper.args$proper.requested),
+                          proper.method = proper.args$proper.method,
+                          proper.control = proper.args$proper.control,
                           bws = bws)
                 temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
                 temp.all.err <- temp.boot[["boot.all.err"]]
