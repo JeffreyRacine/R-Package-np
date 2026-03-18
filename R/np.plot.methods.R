@@ -47,6 +47,63 @@
   .np_plot_call_method(.np_plot_compat_dispatch, bws = bws, ...)
 }
 
+.np_plot_restore_bandwidth_from_call <- function(object, bws, caller_env = parent.frame()) {
+  if (!is.null(bws$formula) || is.null(object$call))
+    return(bws)
+
+  bws.orig <- tryCatch(
+    .np_eval_call_arg(object$call, "bws", caller_env = caller_env),
+    error = function(e) NULL
+  )
+
+  if (!is.null(bws.orig) && any(grepl("bandwidth$", class(bws.orig))))
+    return(bws.orig)
+
+  bws
+}
+
+.np_plot_plreg_training_data <- function(bws) {
+  out <- list(xdat = NULL, ydat = NULL, zdat = NULL)
+
+  if (is.null(bws))
+    return(out)
+
+  if (!is.null(bws$formula) && !is.null(bws$call)) {
+    tt <- terms(bws)
+    m <- match(c("formula", "data", "subset", "na.action"),
+               names(bws$call), nomatch = 0)
+
+    tmf.xf <- tmf <- bws$call[c(1, m)]
+    tmf[[1]] <- tmf.xf[[1]] <- as.name("model.frame")
+    tmf[["formula"]] <- tt
+
+    mf.args <- as.list(tmf)[-1L]
+    tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+
+    bronze <- lapply(bws$chromoly, paste, collapse = " + ")
+    tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
+                                      env = environment(tt))
+    mf.xf.args <- as.list(tmf.xf)[-1L]
+    tmf.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt))
+
+    out$ydat <- model.response(tmf)
+    out$xdat <- tmf.xf
+    out$zdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
+    return(out)
+  }
+
+  if (!is.null(bws$call)) {
+    out$xdat <- tryCatch(data.frame(.np_eval_bws_call_arg(bws, "xdat")),
+                         error = function(e) NULL)
+    out$ydat <- tryCatch(.np_eval_bws_call_arg(bws, "ydat"),
+                         error = function(e) NULL)
+    out$zdat <- tryCatch(data.frame(.np_eval_bws_call_arg(bws, "zdat")),
+                         error = function(e) NULL)
+  }
+
+  out
+}
+
 .np_plot_npregression <- function(object, ...) {
   dots <- list(...)
   if (is.null(dots$xdat) && is.null(dots$ydat) &&
@@ -129,13 +186,72 @@
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_singleindex <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
-.np_plot_smoothcoefficient <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
-.np_plot_plregression <- function(object, ...) {
-  .np_plot_call_method(
-    .np_plot_compat_dispatch,
-    bws = .np_plreg_bws(object, where = "plot.plregression"),
-    ...
+.np_plot_smoothcoefficient <- function(object, ...) {
+  dots <- list(...)
+  obj.bws <- .np_plot_restore_bandwidth_from_call(
+    object = object,
+    bws = object$bws,
+    caller_env = parent.frame(2L)
   )
+
+  if (is.null(dots$xdat) && is.null(dots$ydat) && is.null(dots$zdat) &&
+      isTRUE(object$trainiseval) &&
+      !is.null(object$eval) &&
+      !is.null(object$mean) &&
+      !is.null(object$resid) &&
+      length(object$mean) == length(object$resid) &&
+      all(is.finite(object$mean)) &&
+      all(is.finite(object$resid))) {
+    if (is.list(object$eval) && !is.null(object$eval$exdat)) {
+      dots$xdat <- object$eval$exdat
+      if (!is.null(object$eval$ezdat))
+        dots$zdat <- object$eval$ezdat
+    } else {
+      dots$xdat <- object$eval
+    }
+    dots$ydat <- object$mean + object$resid
+  }
+
+  do.call(.np_plot_call_method,
+          c(list(method = .np_plot_compat_dispatch, bws = obj.bws), dots))
+}
+.np_plot_plregression <- function(object, ...) {
+  dots <- list(...)
+  obj.bws <- .np_plot_restore_bandwidth_from_call(
+    object = object,
+    bws = .np_plreg_bws(object, where = "plot.plregression"),
+    caller_env = parent.frame(2L)
+  )
+
+  if (is.null(dots$xdat) && is.null(dots$ydat) && is.null(dots$zdat) &&
+      isTRUE(object$trainiseval) &&
+      !is.null(object$evalx) &&
+      !is.null(object$evalz) &&
+      !is.null(object$mean) &&
+      !is.null(object$resid) &&
+      NROW(object$evalx) == NROW(object$evalz) &&
+      NROW(object$evalx) == length(object$mean) &&
+      length(object$mean) == length(object$resid) &&
+      all(is.finite(object$mean)) &&
+      all(is.finite(object$resid))) {
+    dots$xdat <- object$evalx
+    dots$ydat <- object$mean + object$resid
+    dots$zdat <- object$evalz
+  }
+
+  if (is.null(dots$xdat) && is.null(dots$ydat) && is.null(dots$zdat)) {
+    training <- .np_plot_plreg_training_data(obj.bws)
+    if (!is.null(training$xdat) &&
+        !is.null(training$ydat) &&
+        !is.null(training$zdat)) {
+      dots$xdat <- training$xdat
+      dots$ydat <- training$ydat
+      dots$zdat <- training$zdat
+    }
+  }
+
+  do.call(.np_plot_call_method,
+          c(list(method = .np_plot_compat_dispatch, bws = obj.bws), dots))
 }
 
 plot.bandwidth <- function(x, ...) .np_plot_call_method(.np_plot_bandwidth_engine, bws = x, ...)

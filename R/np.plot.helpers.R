@@ -2469,6 +2469,220 @@
   )
 }
 
+.np_inid_boot_from_scoef_localpoly_fixed <- function(txdat,
+                                                     ydat,
+                                                     tzdat,
+                                                     exdat,
+                                                     ezdat,
+                                                     bws,
+                                                     B,
+                                                     counts = NULL,
+                                                     counts.drawer = NULL,
+                                                     leave.one.out = FALSE,
+                                                     ridge = 1.0e-12,
+                                                     prep.label = NULL,
+                                                     progress.label = NULL) {
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+  ydat <- .np_inid_scoef_numeric_y(ydat = ydat, bws = bws)
+  B <- as.integer(B)
+  leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
+
+  miss.z <- missing(tzdat) || is.null(tzdat)
+  if (miss.z) {
+    tzdat <- txdat
+    ezdat <- exdat
+  } else {
+    tzdat <- toFrame(tzdat)
+    ezdat <- toFrame(ezdat)
+  }
+
+  if (!identical(bws$type, "fixed"))
+    stop("smooth coefficient local-polynomial fixed helper requires bwtype='fixed'")
+  if (nrow(txdat) != nrow(tzdat))
+    stop("smooth coefficient local-polynomial fixed helper requires aligned txdat/tzdat rows")
+  if (nrow(exdat) != nrow(ezdat))
+    stop("smooth coefficient local-polynomial fixed helper requires aligned exdat/ezdat rows")
+  if (ncol(txdat) != ncol(exdat))
+    stop("smooth coefficient local-polynomial fixed helper requires matching txdat/exdat columns")
+  if (length(ydat) != nrow(txdat))
+    stop("length of ydat must match training rows in smooth coefficient local-polynomial fixed helper")
+  if (nrow(txdat) < 1L || nrow(exdat) < 1L || B < 1L)
+    stop("invalid smooth coefficient local-polynomial fixed helper dimensions")
+
+  spec <- .npscoef_canonical_spec(
+    source = bws,
+    zdat = tzdat,
+    where = "smooth coefficient local-polynomial fixed helper"
+  )
+  if (!identical(spec$regtype.engine, "lp"))
+    stop("smooth coefficient local-polynomial fixed helper requires regtype='ll' or 'lp'")
+
+  txdat <- adjustLevels(txdat, bws$xdati)
+  exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+  X.train <- toMatrix(txdat)
+  X.eval <- toMatrix(exdat)
+  W.train <- cbind(1.0, X.train)
+  W.eval <- cbind(1.0, X.eval)
+
+  lp_state <- .npscoef_lp_state(
+    bws = bws,
+    tzdat = tzdat,
+    ezdat = ezdat,
+    leave.one.out = leave.one.out,
+    where = "smooth coefficient local-polynomial fixed helper"
+  )
+  tensor.train <- .npscoef_row_tensor_design(W.train, lp_state$W.train)
+  tensor.eval <- .npscoef_row_tensor_design(W.eval, lp_state$W.eval)
+  kw <- .np_kernel_weights_direct(
+    txdat = lp_state$z.train,
+    exdat = lp_state$z.eval,
+    bws = lp_state$rbw,
+    bandwidth.divide = TRUE,
+    kernel.pow = 1.0
+  )
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = nrow(tensor.train))
+  if (leave.one.out) {
+    for (jj in seq_len(min(nrow(kw), ncol(kw))))
+      kw[jj, jj] <- 0.0
+  }
+
+  n <- nrow(tensor.train)
+  neval <- nrow(tensor.eval)
+  p <- ncol(tensor.train)
+  mcols <- p * (p + 1L) / 2L
+  rhs <- tensor.eval
+  ones <- matrix(1.0, nrow = n, ncol = 1L)
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = ridge, cap = 1.0)
+
+  Mfeat <- vector("list", neval)
+  Zfeat <- vector("list", neval)
+  t0 <- numeric(neval)
+  prep.label <- if (is.null(prep.label)) {
+    if (!is.null(counts.drawer)) "Preparing plot bootstrap block" else "Preparing plot bootstrap inid"
+  } else {
+    prep.label
+  }
+  prep.progress <- .np_plot_stage_progress_begin(total = neval, label = prep.label)
+  prep.progress.active <- TRUE
+  on.exit({
+    if (isTRUE(prep.progress.active))
+      .np_plot_progress_end(prep.progress)
+  }, add = TRUE)
+
+  for (i in seq_len(neval)) {
+    if (i == 1L)
+      prep.progress$last_emit <- -Inf
+    prep.progress <- .np_progress_step(
+      state = prep.progress,
+      done = i - 1L,
+      detail = sprintf("eval %d/%d", i, neval)
+    )
+
+    k <- as.double(kw[, i])
+    WK <- tensor.train * k
+    Zfeat[[i]] <- WK * ydat
+
+    mf <- matrix(0.0, nrow = n, ncol = mcols)
+    idx <- 1L
+    for (a in seq_len(p)) {
+      for (b in a:p) {
+        mf[, idx] <- WK[, a] * tensor.train[, b]
+        idx <- idx + 1L
+      }
+    }
+    Mfeat[[i]] <- mf
+
+    M0 <- crossprod(ones, mf)
+    Z0 <- crossprod(ones, Zfeat[[i]])
+    t0[i] <- if (p > 3L) {
+      .np_inid_lp_predict_chunk_general(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    } else {
+      .np_inid_lp_predict_chunk(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    }
+    prep.progress <- .np_plot_progress_tick(state = prep.progress, done = i)
+  }
+  .np_plot_progress_end(prep.progress)
+  prep.progress.active <- FALSE
+
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  fill_chunk <- function(counts.chunk, start, stopi) {
+    for (i in seq_len(neval)) {
+      Mvals <- crossprod(counts.chunk, Mfeat[[i]])
+      Zvals <- crossprod(counts.chunk, Zfeat[[i]])
+      tmat[start:stopi, i] <<- if (p > 3L) {
+        .np_inid_lp_predict_chunk_general(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      } else {
+        .np_inid_lp_predict_chunk(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      }
+    }
+  }
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+    progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
+  } else {
+    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      chunk.started <- .np_progress_now()
+      counts.chunk <- if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+      } else {
+        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+      }
+      fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = bsz,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
+      start <- stopi + 1L
+    }
+  }
+
+  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
+    stop("smooth coefficient local-polynomial fixed helper produced non-finite values")
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_inid_boot_from_scoef_exact <- function(txdat,
                                            ydat,
                                            tzdat,
@@ -2585,9 +2799,29 @@
                                      mode = c("exact", "frozen")) {
   mode <- match.arg(mode)
 
-  # For fixed bandwidths, the smooth-coefficient bootstrap operator is fixed
-  # across resamples, so exact and frozen coincide and should both take the
-  # lean hat-reuse route.
+  z.source <- if (missing(tzdat) || is.null(tzdat)) txdat else tzdat
+  spec <- .npscoef_canonical_spec(
+    source = bws,
+    zdat = z.source,
+    where = "smooth coefficient inid helper"
+  )
+
+  if (identical(bws$type, "fixed") && identical(spec$regtype.engine, "lp")) {
+    return(.np_inid_boot_from_scoef_localpoly_fixed(
+      txdat = txdat,
+      ydat = ydat,
+      tzdat = tzdat,
+      exdat = exdat,
+      ezdat = ezdat,
+      bws = bws,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      leave.one.out = leave.one.out,
+      progress.label = progress.label
+    ))
+  }
+
   if (identical(mode, "frozen") || identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_scoef_frozen(
       txdat = txdat,

@@ -181,3 +181,72 @@ test_that("npscoef fixed helper treats exact and frozen identically", {
   expect_equal(exact.out$t0, frozen.out$t0, tolerance = 1e-12)
   expect_equal(exact.out$t, frozen.out$t, tolerance = 1e-12)
 })
+
+test_that("npscoef fixed lp helper matches duplicate-row oracle", {
+  boot.fun <- getFromNamespace(".np_inid_boot_from_scoef", "np")
+
+  set.seed(20260318)
+  n <- 28L
+  xdat <- data.frame(x = runif(n, -1, 1))
+  zdat <- data.frame(z = rnorm(n))
+  y <- with(xdat, x^2 + zdat$z + rnorm(n, sd = 0.1))
+
+  ex.seq <- seq(
+    np:::trim.quantiles(xdat[, 1L], 0.05)[1L],
+    np:::trim.quantiles(xdat[, 1L], 0.05)[2L],
+    length.out = 4L
+  )
+  ez.seq <- seq(
+    np:::trim.quantiles(zdat[, 1L], 0.05)[1L],
+    np:::trim.quantiles(zdat[, 1L], 0.05)[2L],
+    length.out = 4L
+  )
+  eval.grid <- expand.grid(x = ex.seq, z = ez.seq)
+
+  bw <- npscoefbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = y,
+    bws = c(0.7),
+    bwtype = "fixed",
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 1,
+    bernstein.basis = FALSE
+  )
+
+  counts <- cbind(
+    c(rep(2L, 6L), rep(1L, n - 12L), rep(0L, 6L)),
+    c(rep(0L, 4L), rep(1L, n - 8L), rep(2L, 4L)),
+    c(3L, rep(1L, n - 3L), 2L, 0L)
+  )
+
+  helper.out <- boot.fun(
+    txdat = xdat,
+    ydat = y,
+    tzdat = zdat,
+    exdat = eval.grid["x"],
+    ezdat = eval.grid["z"],
+    bws = bw,
+    B = ncol(counts),
+    counts = counts,
+    mode = "exact"
+  )
+
+  oracle <- vapply(seq_len(ncol(counts)), function(j) {
+    idx <- np:::.np_counts_to_indices(counts[, j])
+    as.vector(npscoef(
+      bws = bw,
+      txdat = xdat[idx, , drop = FALSE],
+      tzdat = zdat[idx, , drop = FALSE],
+      tydat = y[idx],
+      exdat = eval.grid["x"],
+      ezdat = eval.grid["z"],
+      iterate = FALSE,
+      errors = FALSE
+    )$mean)
+  }, numeric(nrow(eval.grid)))
+  oracle <- t(oracle)
+
+  expect_equal(helper.out$t, oracle, tolerance = 1e-10)
+})

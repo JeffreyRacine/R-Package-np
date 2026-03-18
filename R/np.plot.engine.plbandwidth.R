@@ -1107,13 +1107,13 @@
         xOrZ = "x"
         
         for (plot.index in seq_len(bws$xndim + bws$zndim)){
+          plot.layout <- .np_plot_layout_activate(plot.layout)
           i = if (plot.index <= bws$xndim) plot.index else plot.index - bws$xndim
 
           if (plot.index > bws$xndim)
             xOrZ <- "z"
             
           xi.factor = all.isFactor[plot.index]
-          plot.layout <- .np_plot_layout_activate(plot.layout)
 
           ## plot evaluation
           plot.fun <- if (xi.factor) {
@@ -1143,10 +1143,80 @@
             plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
             plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
             plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
+          } else {
+            if (!is.null(col)) plot.args$col <- col
+            if (!is.null(lty)) plot.args$lty <- lty
+            if (!is.null(lwd)) plot.args$lwd <- lwd
           }
           plot.args$main <- scalar_default(main, "")
           plot.args$sub <- scalar_default(sub, "")
-          do.call(plot.fun, plot.args)
+          plot.args <- .np_plot_merge_user_args(
+            plot.args,
+            if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
+          )
+          if (overlay.ok && !xi.factor) {
+            type.val <- plot.args$type
+            plot.args$type <- "n"
+            do.call(plot.fun, plot.args)
+            overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
+            do.call(.np_plot_overlay_points_1d,
+                    c(list(x = overlay.x, y = ydat),
+                      overlay.points.args))
+            if (!identical(type.val, "n")) {
+              ok.line <- is.finite(allei[,plot.index]) & is.finite(data.eval[,plot.index])
+              line.args <- list(x = allei[ok.line, plot.index],
+                                y = data.eval[ok.line, plot.index],
+                                type = type.val,
+                                lty = plot.args$lty,
+                                lwd = plot.args$lwd,
+                                col = plot.args$col)
+              do.call(lines, line.args)
+            }
+          } else if (overlay.ok && xi.factor) {
+            axis.labels <- levels(allei[,plot.index])
+            axis.at <- seq_along(axis.labels)
+            add.axis <- is.null(plot.user.args$xaxt)
+            base.args <- list(x = as.numeric(allei[,plot.index]),
+                              y = data.eval[,plot.index],
+                              type = "n",
+                              xlab = plot.args$xlab,
+                              ylab = plot.args$ylab,
+                              main = plot.args$main,
+                              sub = plot.args$sub,
+                              ylim = plot.args$ylim)
+            axis.lim <- if (xOrZ == "x") xlim else zlim
+            if (!is.null(axis.lim)) {
+              base.args$xlim <- axis.lim
+            } else {
+              base.args$xlim <- c(0.5, length(axis.labels) + 0.5)
+            }
+            if (add.axis)
+              base.args$xaxt <- "n"
+            base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
+            do.call(graphics::plot.default, base.args)
+            if (add.axis)
+              axis(1, at = axis.at, labels = axis.labels)
+            overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
+            do.call(.np_plot_overlay_points_factor,
+                    c(list(x = overlay.x, y = ydat),
+                      overlay.points.args))
+            if (plot.bootstrap && plot.bxp) {
+              do.call(bxp, c(list(z = all.bxp[[plot.index]], add = TRUE), bxp.args))
+            } else {
+              l.f <- rep(allei[,plot.index], each = 3)
+              l.f[3 * seq_along(allei[,plot.index])] <- NA
+              l.y <- unlist(lapply(data.eval[,plot.index], function(p) c(0, p, NA)))
+              lines(x = l.f, y = l.y, lty = 2)
+              point.args <- list(x = allei[,plot.index], y = data.eval[,plot.index])
+              if (!is.null(col)) point.args$col <- col
+              if (!is.null(points.user.args$pch)) point.args$pch <- points.user.args$pch
+              if (!is.null(points.user.args$cex)) point.args$cex <- points.user.args$cex
+              if (!is.null(points.user.args$bg)) point.args$bg <- points.user.args$bg
+              do.call(points, point.args)
+            }
+          } else {
+            do.call(plot.fun, plot.args)
+          }
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
