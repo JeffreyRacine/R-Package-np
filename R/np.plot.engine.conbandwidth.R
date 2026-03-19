@@ -382,8 +382,12 @@
       first.render.activity <- NULL
       first.render.pending <- TRUE
       on.exit(.np_plot_activity_end(first.render.activity), add = TRUE)
+      frame.theta <- (0:((360 %/% dtheta - 1L) * rotate)) * dtheta + theta
+      rotation.progress <- .np_plot_rotation_progress_begin(length(frame.theta))
+      on.exit(.np_plot_rotation_progress_end(rotation.progress), add = TRUE)
       
-      for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+      for (frame.idx in seq_along(frame.theta)){
+          i <- frame.theta[[frame.idx]]
           if (isTRUE(first.render.pending))
             first.render.activity <- .np_plot_activity_begin("Rendering plot surface")
           persp(x1.eval,
@@ -502,6 +506,7 @@
             }
           }
 
+          rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)
           Sys.sleep(0.5)
       }
 

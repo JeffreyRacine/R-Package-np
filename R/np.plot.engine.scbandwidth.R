@@ -373,6 +373,9 @@
       dphi = 10.0
 
       persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
+      frame.theta <- (0:((360 %/% dtheta - 1L) * rotate)) * dtheta + theta
+      rotation.progress <- .np_plot_rotation_progress_begin(length(frame.theta))
+      on.exit(.np_plot_rotation_progress_end(rotation.progress), add = TRUE)
       overlay.x1 <- xdat[,1]
       if (is.factor(overlay.x1) || is.ordered(overlay.x1))
         overlay.x1 <- (bws$xdati$all.dlev[[1]])[as.integer(overlay.x1)]
@@ -387,7 +390,8 @@
       }
       
       ##for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
-        for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+        for (frame.idx in seq_along(frame.theta)){
+          i <- frame.theta[[frame.idx]]
           .np_plot_first_render_begin(first.render)
           persp.args <- list(x = x1.eval,
                              y = x2.eval,
@@ -456,6 +460,7 @@
                            persp.mat = persp.mat),
                       overlay.points.args))
 
+          rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)
           Sys.sleep(0.5)
         }
       ##}

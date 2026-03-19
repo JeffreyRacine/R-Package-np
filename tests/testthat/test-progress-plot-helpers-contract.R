@@ -704,3 +704,34 @@ test_that("plot helper progress caps intermediate heartbeats", {
   expect_identical(lines[[1L]], "[np] Plot bootstrap wild...")
   expect_true(any(grepl("^\\[np\\] Plot bootstrap wild 12/12 ", lines)))
 })
+
+test_that("rotation helper emits bounded progress with eta", {
+  begin <- getFromNamespace(".np_plot_rotation_progress_begin", "np")
+  tick <- getFromNamespace(".np_plot_rotation_progress_tick", "np")
+  finish <- getFromNamespace(".np_plot_rotation_progress_end", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 3
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      state <- begin(total_frames = 8L)
+      for (i in seq_len(8L)) {
+        state <- tick(state, done = i)
+      }
+      finish(state)
+    },
+    now = progress_time_counter()
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+  expect_identical(lines[[1L]], "[np] Rotating plot...")
+  expect_true(any(grepl("^\\[np\\] Rotating plot 1/8 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Rotating plot 8/8 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+})
