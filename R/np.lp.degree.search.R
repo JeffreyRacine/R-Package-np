@@ -132,7 +132,10 @@
                                             restart_total) {
   restart_total <- npValidatePositiveInteger(restart_total, "restart_total")
   max_cycles <- npValidatePositiveInteger(max_cycles, "degree.max.cycles")
-  restart_total * (1L + max_cycles * sum(vapply(candidates, length, integer(1L))))
+  per_cycle <- sum(vapply(candidates, function(cand) {
+    max(0L, length(cand) - 1L)
+  }, integer(1L)))
+  restart_total * (1L + max_cycles * per_cycle)
 }
 
 .np_degree_progress_label <- function() {
@@ -438,6 +441,7 @@
 
   run_coordinate <- function(initial_degree, restart_index) {
     current <- .np_degree_clip_to_grid(initial_degree, candidates)
+    current_record <- state$get_cached(current)
     if (!is.null(state$progress_state) &&
         identical(state$progress_state$renderer, "single_line")) {
       state$progress_state <- .np_degree_progress_step(
@@ -456,7 +460,8 @@
         force = TRUE
       )
     }
-    state$evaluate(current)
+    if (is.null(current_record))
+      current_record <- state$evaluate(current)
     state$progress_state <- .np_degree_progress_step(
       state = state$progress_state,
       done = NULL,
@@ -475,8 +480,19 @@
       prior <- current
       for (j in seq_along(candidates)) {
         best_local <- current[j]
-        best_local_value <- if (identical(direction, "min")) Inf else -Inf
+        best_local_value <- if (!is.null(current_record) &&
+                                identical(current_record$status, "ok") &&
+                                is.finite(current_record$objective)) {
+          current_record$objective
+        } else if (identical(direction, "min")) {
+          Inf
+        } else {
+          -Inf
+        }
+        best_local_record <- current_record
         for (d in candidates[[j]]) {
+          if (identical(as.integer(d), current[j]))
+            next
           trial <- current
           trial[j] <- as.integer(d)
           if (!is.null(state$progress_state) &&
@@ -527,9 +543,11 @@
           if (.np_degree_better(rec$objective, best_local_value, direction = direction)) {
             best_local <- as.integer(d)
             best_local_value <- rec$objective
+            best_local_record <- rec
           }
         }
         current[j] <- best_local
+        current_record <- best_local_record
       }
       if (identical(current, prior) || isTRUE(state$interrupted))
         break
@@ -608,6 +626,13 @@
         state$best_payload <- payload
     }
     invisible(NULL)
+  }
+
+  state$get_cached <- function(degree) {
+    key <- .np_degree_eval_key(as.integer(degree))
+    if (!exists(key, envir = state$cache, inherits = FALSE))
+      return(NULL)
+    get(key, envir = state$cache, inherits = FALSE)
   }
 
   state$evaluate <- function(degree) {
