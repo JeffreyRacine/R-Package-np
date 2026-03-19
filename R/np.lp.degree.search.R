@@ -629,7 +629,13 @@
     num.feval <- NA_real_
 
     result <- tryCatch(
-      eval_fun(degree),
+      {
+        .np_progress_bandwidth_set_context(
+          sprintf("deg %s", .np_degree_format_degree(degree))
+        )
+        on.exit(.np_progress_bandwidth_set_context(NULL), add = TRUE)
+        eval_fun(degree)
+      },
       interrupt = function(e) {
         state$interrupted <- TRUE
         NULL
