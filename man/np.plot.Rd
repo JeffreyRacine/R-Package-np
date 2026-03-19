@@ -280,6 +280,24 @@
   block bootstrap for dependent data, while \code{geom} conducts Politis
   and Romano's (1994) stationary bootstrap.
 
+  For local polynomial conditional density/distribution plotting
+  (\code{npcdens}/\code{npcdist} with \code{regtype="ll"} or
+  \code{regtype="lp"}) and \code{proper=TRUE}, the plotted estimate is
+  rendered proper slice-by-slice on the fixed evaluation grid: each
+  conditional density slice is projected to be nonnegative and to integrate
+  to one using trapezoidal quadrature weights from the evaluation
+  \eqn{y}-grid, while each conditional distribution slice is projected to
+  be monotone and bounded in \eqn{[0,1]}. When
+  \code{plot.errors.method="bootstrap"}, the bootstrap resample surfaces
+  are computed first on that same fixed grid and then properized
+  resample-by-resample using the same grid geometry before
+  \code{"pointwise"}, \code{"bonferroni"}, \code{"simultaneous"}, and
+  \code{"all"} bands are constructed. Thus the bootstrap distribution used
+  to form these bands is built from properized resample surfaces. The final
+  lower/upper band surfaces are interval envelopes and are not themselves
+  separately re-projected to satisfy the density/distribution shape
+  constraints.
+
   For consistency of the block and stationary bootstrap, the (mean)
   block length \eqn{b} should grow with the sample size \eqn{n} at an
   appropriate rate. If \eqn{b} is not given, then a default growth rate
