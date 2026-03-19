@@ -189,6 +189,8 @@
     common.scale <- normalized.opts$common.scale
 
     plot.errors = (plot.errors.method != "none")
+    first.render <- .np_plot_first_render_state()
+    on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     if (coef) {
       fit.coef <- if (identical(plot.errors.method, "asymptotic")) {
         npplreg(
@@ -390,6 +392,7 @@
       
       ##for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
         for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+          .np_plot_first_render_begin(first.render)
           persp.args <- list(x = x1.eval,
                              y = z1.eval,
                              z = treg,
@@ -409,6 +412,7 @@
                              main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
           persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
           persp.mat <- do.call(persp, persp.args)
+          .np_plot_first_render_end(first.render)
 
           if (plot.errors){
             par(new = TRUE)
@@ -675,7 +679,9 @@
           if (overlay.ok && !xi.factor) {
             type.val <- plot.args$type
             plot.args$type <- "n"
+            .np_plot_first_render_begin(first.render)
             do.call(plot.fun, plot.args)
+            .np_plot_first_render_end(first.render)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
             do.call(.np_plot_overlay_points_1d,
                     c(list(x = overlay.x, y = ydat),
@@ -712,7 +718,9 @@
             if (add.axis)
               base.args$xaxt <- "n"
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
+            .np_plot_first_render_begin(first.render)
             do.call(graphics::plot.default, base.args)
+            .np_plot_first_render_end(first.render)
             if (add.axis)
               axis(1, at = axis.at, labels = axis.labels)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
@@ -734,7 +742,9 @@
               do.call(points, point.args)
             }
           } else {
+            .np_plot_first_render_begin(first.render)
             do.call(plot.fun, plot.args)
+            .np_plot_first_render_end(first.render)
           }
 
           ## error plotting evaluation
@@ -927,7 +937,9 @@
           }
           plot.args$main <- scalar_default(main, "")
           plot.args$sub <- scalar_default(sub, "")
+          .np_plot_first_render_begin(first.render)
           do.call(plot.fun, plot.args)
+          .np_plot_first_render_end(first.render)
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
@@ -1083,7 +1095,9 @@
           if (overlay.ok && !xi.factor) {
             type.val <- plot.args$type
             plot.args$type <- "n"
+            .np_plot_first_render_begin(first.render)
             do.call(plot.fun, plot.args)
+            .np_plot_first_render_end(first.render)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
             do.call(.np_plot_overlay_points_1d,
                     c(list(x = overlay.x, y = ydat),
@@ -1119,7 +1133,9 @@
             if (add.axis)
               base.args$xaxt <- "n"
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
+            .np_plot_first_render_begin(first.render)
             do.call(graphics::plot.default, base.args)
+            .np_plot_first_render_end(first.render)
             if (add.axis)
               axis(1, at = axis.at, labels = axis.labels)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
@@ -1141,7 +1157,9 @@
               do.call(points, point.args)
             }
           } else {
+            .np_plot_first_render_begin(first.render)
             do.call(plot.fun, plot.args)
+            .np_plot_first_render_end(first.render)
           }
 
           ## error plotting evaluation

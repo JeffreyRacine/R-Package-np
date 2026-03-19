@@ -89,6 +89,8 @@
     common.scale <- normalized.opts$common.scale
 
     plot.errors = (plot.errors.method != "none")
+    first.render <- .np_plot_first_render_state()
+    on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
 
     plot.layout <- .np_plot_layout_begin(
       plot.behavior = plot.behavior,
@@ -238,7 +240,9 @@
                             sub = sub,
                             lwd = scalar_default(lwd, par()$lwd))
           plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
+          .np_plot_first_render_begin(first.render)
           do.call(plot, plot.args)
+          .np_plot_first_render_end(first.render)
           if (plot.errors.type == "all") {
             sorted.all.err <- lapply(temp.all.err, function(err) {
               if (is.null(err)) return(NULL)
@@ -288,7 +292,9 @@
                             ylim = ylim,
                             lwd = scalar_default(lwd, par()$lwd))
           plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
+          .np_plot_first_render_begin(first.render)
           do.call(plot, plot.args)
+          .np_plot_first_render_end(first.render)
         }
       }
 
@@ -395,7 +401,9 @@
                               sub = sub,
                               lwd = scalar_default(lwd, par()$lwd))
             plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
+            .np_plot_first_render_begin(first.render)
             do.call(plot, plot.args)
+            .np_plot_first_render_end(first.render)
             
             if (plot.errors){
               if (plot.errors.type == "all") {

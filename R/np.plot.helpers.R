@@ -269,6 +269,31 @@
   force(expr)
 }
 
+.np_plot_first_render_state <- function() {
+  state <- new.env(parent = emptyenv())
+  state$activity <- NULL
+  state$pending <- TRUE
+  state
+}
+
+.np_plot_first_render_begin <- function(state, label = "Rendering plot surface") {
+  if (is.null(state) || !isTRUE(state$pending))
+    return(invisible(NULL))
+
+  state$activity <- .np_plot_activity_begin(label)
+  invisible(NULL)
+}
+
+.np_plot_first_render_end <- function(state) {
+  if (is.null(state) || !isTRUE(state$pending))
+    return(invisible(NULL))
+
+  .np_plot_activity_end(state$activity)
+  state$activity <- NULL
+  state$pending <- FALSE
+  invisible(NULL)
+}
+
 .np_plot_capture_par <- function(names = character()) {
   names <- unique(as.character(names))
   if (!length(names))

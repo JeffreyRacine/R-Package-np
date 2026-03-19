@@ -235,6 +235,38 @@ test_that("plot helper activity stays silent below grace on master", {
                    c("render", "finish"))
 })
 
+test_that("first-render helper emits exactly one render activity line on master", {
+  init <- getFromNamespace(".np_plot_first_render_state", "npRmpi")
+  begin <- getFromNamespace(".np_plot_first_render_begin", "npRmpi")
+  finish <- getFromNamespace(".np_plot_first_render_end", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.start.grace.sec = 0.75
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  state <- init()
+  actual <- capture_progress_shadow_trace(
+    {
+      begin(state)
+      finish(state)
+      begin(state)
+      finish(state)
+    },
+    now = progress_time_values(c(0, 0.2))
+  )
+
+  expect_false(isTRUE(state$pending))
+  expect_identical(vapply(actual$trace, `[[`, character(1L), "event"),
+                   c("render", "finish"))
+  expect_identical(
+    vapply(actual$trace, `[[`, character(1L), "line"),
+    rep("[npRmpi] Rendering plot surface... elapsed 0.0s", 2L)
+  )
+})
+
 test_that("plot engine setup does not open a graphics device on the null device", {
   capture.par <- getFromNamespace(".np_plot_capture_par", "npRmpi")
 

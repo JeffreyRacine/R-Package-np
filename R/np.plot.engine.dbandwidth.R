@@ -121,6 +121,8 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
+    first.render <- .np_plot_first_render_state()
+    on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
 
     if ((bws$ncon + bws$nord == 2) && (bws$nuno == 0) && perspective &&
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
@@ -261,6 +263,7 @@
       persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
       
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+          .np_plot_first_render_begin(first.render)
           persp(x1.eval,
                 x2.eval,
                 tdens,
@@ -278,6 +281,7 @@
                 theta = i,
                 phi = phi,
                 main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+          .np_plot_first_render_end(first.render)
 
           if (plot.errors){
             par(new = TRUE)
@@ -538,7 +542,9 @@
             plot.args,
             if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
           )
+          .np_plot_first_render_begin(first.render)
           do.call(plot.fun, plot.args)
+          .np_plot_first_render_end(first.render)
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
@@ -670,7 +676,9 @@
             plot.args,
             if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
           )
+          .np_plot_first_render_begin(first.render)
           do.call(plot.fun, plot.args)
+          .np_plot_first_render_end(first.render)
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
