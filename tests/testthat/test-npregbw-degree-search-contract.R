@@ -386,4 +386,31 @@ test_that("automatic degree search emits staged progress output", {
   expect_true(any(grepl("Selecting polynomial degree and bandwidth", msgs)))
   expect_true(any(grepl("exhaustive", msgs)))
   expect_true(any(grepl("best (", msgs, fixed = TRUE)))
+
+  coord_msgs <- with_np_degree_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_renderer_for_surface = function(surface, capability) "legacy",
+      .np_progress_now = degree_progress_time_values(seq(0, 40, by = 0.5))
+    ),
+    capture_degree_messages_only(
+      get("npregbw", envir = asNamespace("np"), inherits = FALSE)(
+        y ~ x,
+        data = dat,
+        regtype = "lp",
+        degree.select = "coordinate",
+        degree.min = 0L,
+        degree.max = 1L,
+        degree.verify = TRUE,
+        degree.max.cycles = 2L,
+        bwtype = "fixed",
+        bwmethod = "cv.ls",
+        nmulti = 1L
+      )
+    )
+  )
+
+  expect_true(any(grepl("Coordinate automatic polynomial degree search over 0:1", coord_msgs)))
+  expect_true(any(grepl("step [0-9]+/[0-9]+", coord_msgs)))
+  expect_true(any(grepl("Exhaustively certifying automatic polynomial degree search over 2 degree combinations \\(re-optimizing bandwidths\\)", coord_msgs)))
 })

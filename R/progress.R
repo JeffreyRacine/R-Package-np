@@ -471,6 +471,45 @@
   line
 }
 
+.np_progress_compact_degree_line <- function(line, max_width) {
+  if (!is.character(line) || length(line) != 1L || is.na(line)) {
+    return(line)
+  }
+
+  max_width <- suppressWarnings(as.integer(max_width)[1L])
+  if (is.na(max_width) || max_width < 1L) {
+    return(line)
+  }
+
+  if (!grepl("Selecting polynomial degree and bandwidth", line, fixed = TRUE)) {
+    return(line)
+  }
+
+  compact <- function(text) {
+    out <- text
+    out <- sub("Selecting polynomial degree and bandwidth", "Degree/bw search", out, fixed = TRUE)
+    out <- gsub("elapsed ", "elap ", out, fixed = TRUE)
+    out <- gsub("restart ", "r ", out, fixed = TRUE)
+    out <- gsub("cycle ", "cy ", out, fixed = TRUE)
+    out <- gsub("coord ", "c ", out, fixed = TRUE)
+    out <- gsub("degree ", "deg ", out, fixed = TRUE)
+    out
+  }
+
+  candidates <- list(
+    line,
+    compact(line)
+  )
+
+  for (candidate in candidates) {
+    if (nchar(candidate, type = "width") <= max_width) {
+      return(candidate)
+    }
+  }
+
+  line
+}
+
 .np_progress_fit_single_line <- function(line, max_width = .np_progress_output_width()) {
   if (!is.character(line) || length(line) != 1L || is.na(line)) {
     return(line)
@@ -500,6 +539,11 @@
     return(line)
   }
 
+  line <- .np_progress_compact_degree_line(line, max_width = max_width)
+  if (nchar(line, type = "width") <= max_width) {
+    return(line)
+  }
+
   detail_pos <- regexpr(": ", line, fixed = TRUE)[1L]
   if (detail_pos > 0L) {
     without_detail <- substr(line, 1L, detail_pos - 1L)
@@ -520,7 +564,7 @@
   if (identical(event, "finish")) {
     clear_width <- max(snapshot$last_width, width, .np_progress_output_width())
     clear_line <- if (clear_width > 0L) strrep(" ", clear_width) else ""
-    base::cat("\r", clear_line, "\r", file = con, sep = "")
+    base::cat("\r", clear_line, "\r\n", file = con, sep = "")
     flush(con)
     flush.console()
     return(invisible(snapshot))
