@@ -1048,6 +1048,136 @@ npscoefbw.scbandwidth <-
     bws
   }
 
+.npscoefbw_build_scbandwidth <- function(xdat,
+                                         ydat,
+                                         zdat,
+                                         bws,
+                                         bandwidth.compute,
+                                         reg.args) {
+  miss.z <- is.null(zdat)
+  zdati <- if (miss.z) NULL else untangle(zdat)
+  znames <- if (miss.z) NULL else names(zdat)
+
+  sbw.args <- c(
+    list(
+      bw = bws,
+      nobs = dim(xdat)[1],
+      xdati = untangle(xdat),
+      ydati = untangle(data.frame(ydat)),
+      zdati = zdati,
+      xnames = names(xdat),
+      ynames = deparse(substitute(ydat)),
+      znames = znames,
+      bandwidth.compute = bandwidth.compute
+    ),
+    reg.args
+  )
+
+  do.call(scbandwidth, sbw.args)
+}
+
+.npscoefbw_run_fixed_degree <- function(xdat, ydat, zdat, bws, reg.args, opt.args) {
+  tbw <- .npscoefbw_build_scbandwidth(
+    xdat = xdat,
+    ydat = ydat,
+    zdat = zdat,
+    bws = bws,
+    bandwidth.compute = opt.args$bandwidth.compute,
+    reg.args = reg.args
+  )
+
+  scbw.args <- c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args)
+  if (!is.null(zdat))
+    scbw.args$zdat <- zdat
+  do.call(npscoefbw.scbandwidth, scbw.args)
+}
+
+.npscoefbw_degree_search_controls <- function(regtype,
+                                              regtype.named,
+                                              cv.iterate,
+                                              cv.iterate.named,
+                                              bandwidth.compute,
+                                              ncon,
+                                              degree.select,
+                                              degree.min,
+                                              degree.max,
+                                              degree.start,
+                                              degree.restarts,
+                                              degree.max.cycles,
+                                              degree.verify,
+                                              bernstein.basis,
+                                              bernstein.named) {
+  degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
+  if (identical(degree.select, "manual"))
+    return(NULL)
+
+  regtype.requested <- if (isTRUE(regtype.named)) match.arg(regtype, c("lc", "ll", "lp")) else "lc"
+  if (!identical(regtype.requested, "lp"))
+    stop("automatic degree search currently requires regtype='lp'")
+  if (!isTRUE(bandwidth.compute))
+    stop("automatic degree search requires bandwidth.compute=TRUE")
+  if (isTRUE(cv.iterate.named) && isTRUE(cv.iterate))
+    stop("automatic degree search currently requires cv.iterate=FALSE")
+  if (ncon < 1L)
+    stop("automatic degree search requires at least one continuous smoothing predictor")
+
+  bern.auto <- if (isTRUE(bernstein.named)) bernstein.basis else TRUE
+  bern.auto <- npValidateGlpBernstein(regtype = "lp", bernstein.basis = bern.auto)
+
+  bounds <- .np_degree_normalize_bounds(
+    ncon = ncon,
+    degree.min = degree.min,
+    degree.max = degree.max,
+    default.max = 3L
+  )
+
+  if (!isTRUE(bern.auto) && any(bounds$upper > 3L))
+    stop("automatic degree search with bernstein.basis=FALSE currently requires degree.max <= 3")
+
+  baseline.degree <- rep.int(0L, ncon)
+  start.degree <- if (is.null(degree.start)) {
+    pmax(bounds$lower, pmin(bounds$upper, baseline.degree))
+  } else {
+    start.raw <- npValidateGlpDegree(regtype = "lp", degree = degree.start, ncon = ncon, argname = "degree.start")
+    out.of.range <- vapply(seq_len(ncon), function(j) !(start.raw[j] %in% bounds$candidates[[j]]), logical(1))
+    if (any(out.of.range))
+      stop("degree.start must lie within the searched degree candidates for every continuous smoothing predictor")
+    start.raw
+  }
+
+  list(
+    method = degree.select,
+    candidates = bounds$candidates,
+    baseline.degree = baseline.degree,
+    start.degree = start.degree,
+    restarts = npValidateNonNegativeInteger(degree.restarts, "degree.restarts"),
+    max.cycles = npValidatePositiveInteger(degree.max.cycles, "degree.max.cycles"),
+    verify = npValidateScalarLogical(degree.verify, "degree.verify"),
+    bernstein.basis = bern.auto
+  )
+}
+
+.npscoefbw_attach_degree_search <- function(bws, search_result) {
+  metadata <- list(
+    mode = search_result$method,
+    verify = isTRUE(search_result$verify),
+    completed = isTRUE(search_result$completed),
+    certified = isTRUE(search_result$certified),
+    interrupted = isTRUE(search_result$interrupted),
+    baseline.degree = search_result$baseline$degree,
+    baseline.fval = search_result$baseline$objective,
+    best.degree = search_result$best$degree,
+    best.fval = search_result$best$objective,
+    n.unique = search_result$n.unique,
+    grid.size = search_result$grid.size,
+    restart.starts = lapply(search_result$restart.starts, as.integer),
+    trace = search_result$trace
+  )
+
+  bws$degree.search <- metadata
+  bws
+}
+
 npscoefbw.default <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
@@ -1070,6 +1200,13 @@ npscoefbw.default <-
            cv.iterate,
            cv.num.iterations,
            degree,
+           degree.select = c("manual", "coordinate", "exhaustive"),
+           degree.min = NULL,
+           degree.max = NULL,
+           degree.start = NULL,
+           degree.restarts = 0L,
+           degree.max.cycles = 20L,
+           degree.verify = FALSE,
            nmulti,
            okertype,
            optim.abstol,
@@ -1095,10 +1232,32 @@ npscoefbw.default <-
     if(!miss.z)
       zdat <- toFrame(zdat)
 
+    mc <- match.call(expand.dots = FALSE)
+    mc.names <- names(mc)
+    regtype.named <- any(mc.names == "regtype")
+    bernstein.named <- any(mc.names == "bernstein.basis")
+    cv.iterate.named <- any(mc.names == "cv.iterate")
+    degree.search <- .npscoefbw_degree_search_controls(
+      regtype = regtype,
+      regtype.named = regtype.named,
+      cv.iterate = cv.iterate,
+      cv.iterate.named = cv.iterate.named,
+      bandwidth.compute = bandwidth.compute,
+      ncon = sum(if (miss.z) untangle(xdat)$icon else untangle(zdat)$icon),
+      degree.select = if ("degree.select" %in% mc.names) degree.select else "manual",
+      degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
+      degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
+      degree.start = if ("degree.start" %in% mc.names) degree.start else NULL,
+      degree.restarts = if ("degree.restarts" %in% mc.names) degree.restarts else 0L,
+      degree.max.cycles = if ("degree.max.cycles" %in% mc.names) degree.max.cycles else 20L,
+      degree.verify = if ("degree.verify" %in% mc.names) degree.verify else FALSE,
+      bernstein.basis = bernstein.basis,
+      bernstein.named = bernstein.named
+    )
+
     ## first grab dummy args for scbandwidth() and perform 'bootstrap'
     ## bandwidth call
 
-    mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("regtype", "basis", "degree", "bernstein.basis",
                "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
@@ -1121,11 +1280,13 @@ npscoefbw.default <-
       nms <- mc.names[m]
       sbw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
+    reg.args <- sbw.args[setdiff(names(sbw.args), c("bw", "nobs", "xdati", "ydati", "zdati", "xnames", "ynames", "znames", "bandwidth.compute"))]
+    if (!is.null(degree.search))
+      reg.args$bernstein.basis <- degree.search$bernstein.basis
     tbw <- do.call(scbandwidth, sbw.args)
 
     ## next grab dummies for actual bandwidth selection and perform call
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("zdat", "bandwidth.compute",
+    margs <- c("zdat",
                "nmulti",
                "random.seed",
                "cv.iterate",
@@ -1138,18 +1299,62 @@ npscoefbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-
-    scbw.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
     if (any.m) {
       nms <- mc.names[m]
-      scbw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+      opt.args <- mget(nms, envir = environment(), inherits = FALSE)
+    } else {
+      opt.args <- list()
     }
-    tbw <- .np_progress_select_bandwidth_enhanced(
-      "Selecting smooth coefficient bandwidth",
-      do.call(npscoefbw.scbandwidth, scbw.args)
-    )
+    opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
 
-    mc <- match.call(expand.dots = FALSE)
+    if (!is.null(degree.search)) {
+      eval_fun <- function(degree.vec) {
+        cell.reg.args <- reg.args
+        cell.reg.args$regtype <- "lp"
+        cell.reg.args$degree <- as.integer(degree.vec)
+        cell.reg.args$bernstein.basis <- degree.search$bernstein.basis
+        cell.bws <- .npscoefbw_run_fixed_degree(
+          xdat = xdat,
+          ydat = ydat,
+          zdat = if (miss.z) NULL else zdat,
+          bws = bws,
+          reg.args = cell.reg.args,
+          opt.args = opt.args
+        )
+        list(
+          objective = as.numeric(cell.bws$fval[1L]),
+          payload = cell.bws,
+          num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_
+        )
+      }
+
+      search.result <- .np_degree_search(
+        method = degree.search$method,
+        candidates = degree.search$candidates,
+        baseline_degree = degree.search$baseline.degree,
+        start_degree = degree.search$start.degree,
+        restarts = degree.search$restarts,
+        max_cycles = degree.search$max.cycles,
+        verify = degree.search$verify,
+        eval_fun = eval_fun,
+        direction = "min",
+        trace_level = "full",
+        objective_name = "fval"
+      )
+      tbw <- .npscoefbw_attach_degree_search(
+        bws = search.result$best_payload,
+        search_result = search.result
+      )
+    } else {
+      scbw.args <- c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args)
+      if (!miss.z)
+        scbw.args$zdat <- zdat
+      tbw <- .np_progress_select_bandwidth_enhanced(
+        "Selecting smooth coefficient bandwidth",
+        do.call(npscoefbw.scbandwidth, scbw.args)
+      )
+    }
+
     environment(mc) <- parent.frame()
     tbw$call <- mc
 
