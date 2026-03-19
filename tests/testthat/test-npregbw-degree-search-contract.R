@@ -83,6 +83,7 @@ test_that("npregbw exhaustive degree search matches manual profile minimum", {
     data = dat,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -131,6 +132,7 @@ test_that("npregbw coordinate search can be exhaustively certified on a small gr
     data = dat,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -142,6 +144,7 @@ test_that("npregbw coordinate search can be exhaustively certified on a small gr
     data = dat,
     regtype = "lp",
     degree.select = "coordinate",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     degree.verify = TRUE,
@@ -191,6 +194,7 @@ test_that("npregbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bernstein.basis = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 4L,
       bwtype = "fixed",
@@ -206,6 +210,7 @@ test_that("npregbw automatic degree search enforces pilot guardrails", {
     regtype = "lp",
     bernstein.basis = FALSE,
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -231,6 +236,7 @@ test_that("npreg forwards automatic LP degree search through npregbw", {
       data = dat,
       regtype = "lp",
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -243,6 +249,89 @@ test_that("npreg forwards automatic LP degree search through npregbw", {
   expect_s3_class(fit$bws, "rbandwidth")
   expect_false(is.null(fit$bws$degree.search))
   expect_identical(fit$bws$degree.search$mode, "exhaustive")
+})
+
+test_that("npregbw NOMAD degree search backend improves over the baseline", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  dat <- data.frame(x = sort(runif(24)))
+  dat$y <- sin(2 * pi * dat$x) + rnorm(nrow(dat), sd = 0.05)
+
+  bw <- np::npregbw(
+    y ~ x,
+    data = dat,
+    regtype = "lp",
+    degree.select = "coordinate",
+    search.engine = "nomad",
+    degree.min = 0L,
+    degree.max = 2L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+
+  expect_s3_class(bw, "rbandwidth")
+  expect_identical(bw$degree.search$mode, "nomad")
+  expect_true(isTRUE(bw$degree.search$completed))
+  expect_gte(bw$degree.search$n.unique, 1L)
+  expect_lte(bw$degree.search$best.fval, bw$degree.search$baseline.fval + 1e-10)
+})
+
+test_that("npregbw automatic degree search defaults to NOMAD plus Powell", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  dat <- data.frame(x = sort(runif(24)))
+  dat$y <- sin(2 * pi * dat$x) + rnorm(nrow(dat), sd = 0.05)
+
+  bw <- np::npregbw(
+    y ~ x,
+    data = dat,
+    regtype = "lp",
+    degree.select = "coordinate",
+    degree.min = 0L,
+    degree.max = 2L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+
+  expect_identical(bw$degree.search$mode, "nomad+powell")
+  expect_true(isTRUE(bw$degree.search$completed))
+})
+
+test_that("npregbw NOMAD degree search fails fast when crs is unavailable", {
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  dat <- data.frame(x = runif(16), y = rnorm(16))
+
+  expect_error(
+    with_np_degree_bindings(
+      list(.np_nomad_require_crs = function() stop("crs missing", call. = FALSE)),
+      np::npregbw(
+        y ~ x,
+        data = dat,
+        regtype = "lp",
+        degree.select = "coordinate",
+        search.engine = "nomad",
+        degree.min = 0L,
+        degree.max = 1L,
+        bwtype = "fixed",
+        bwmethod = "cv.ls",
+        nmulti = 1L
+      )
+    ),
+    "crs missing"
+  )
 })
 
 test_that("internal degree search returns best-so-far on interrupt", {
@@ -343,6 +432,7 @@ test_that("automatic exhaustive search emits a safety warning on large grids", {
       data = dat,
       regtype = "lp",
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -375,6 +465,7 @@ test_that("automatic exhaustive search honors internal hard grid limits", {
       data = dat,
       regtype = "lp",
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -405,6 +496,7 @@ test_that("automatic degree search emits staged progress output", {
         data = dat,
         regtype = "lp",
         degree.select = "exhaustive",
+        search.engine = "cell",
         degree.min = 0L,
         degree.max = 1L,
         bwtype = "fixed",
@@ -431,6 +523,7 @@ test_that("automatic degree search emits staged progress output", {
         data = dat,
         regtype = "lp",
         degree.select = "coordinate",
+        search.engine = "cell",
         degree.min = 0L,
         degree.max = 1L,
         degree.verify = TRUE,
