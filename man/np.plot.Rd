@@ -275,6 +275,10 @@
   recombining them. In practice, conditional distribution bands are often
   closer, while conditional density bands can differ more materially from
   \code{"exact"} under generalized/adaptive nearest-neighbor bandwidths.
+  For smooth coefficient plots (\code{npscoef}) under non-fixed bandwidths,
+  \code{"exact"} can also be much more expensive than \code{"frozen"} on
+  large jobs, because the coefficient field must be recomputed for each
+  bootstrap resample rather than reusing the original-sample geometry.
   \code{inid} admits general heteroskedasticity of unknown form, though
   it does not allow for dependence. \code{fixed} conducts Kunsch's (1988)
   block bootstrap for dependent data, while \code{geom} conducts Politis
