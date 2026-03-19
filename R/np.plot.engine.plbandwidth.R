@@ -391,7 +391,11 @@
         overlay.x2 <- (bws$zdati$all.dlev[[1]])[as.integer(overlay.x2)]
       
       ##for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
-        for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+        frame.theta <- (0:((360 %/% dtheta - 1L) * rotate)) * dtheta + theta
+        rotation.progress <- .np_plot_rotation_progress_begin(length(frame.theta))
+        on.exit(.np_plot_rotation_progress_end(rotation.progress), add = TRUE)
+        for (frame.idx in seq_along(frame.theta)){
+          i <- frame.theta[[frame.idx]]
           .np_plot_first_render_begin(first.render)
           persp.args <- list(x = x1.eval,
                              y = z1.eval,
@@ -460,6 +464,7 @@
                            persp.mat = persp.mat),
                       overlay.points.args))
 
+          rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)
           Sys.sleep(0.5)
         }
       ##}

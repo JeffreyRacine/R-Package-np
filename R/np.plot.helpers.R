@@ -294,6 +294,22 @@
   invisible(NULL)
 }
 
+.np_plot_rotation_progress_begin <- function(total_frames, label = "Rotating plot") {
+  total_frames <- as.integer(total_frames)[1L]
+  if (is.na(total_frames) || total_frames < 2L)
+    return(NULL)
+
+  .np_plot_progress_begin(total = total_frames, label = label)
+}
+
+.np_plot_rotation_progress_tick <- function(state, done) {
+  .np_plot_progress_tick(state = state, done = done)
+}
+
+.np_plot_rotation_progress_end <- function(state) {
+  .np_plot_progress_end(state)
+}
+
 .np_plot_capture_par <- function(names = character()) {
   names <- unique(as.character(names))
   if (!length(names))
