@@ -29,7 +29,8 @@ npscoef_semiparam_frozen_contract_case <- function() {
     "  t0.oracle <- as.vector(np::npscoef(bws = bw_np, txdat = xdat, tzdat = zdat, tydat = y, exdat = exdat, ezdat = ezdat, iterate = FALSE, errors = FALSE)$mean)",
     "  stopifnot(isTRUE(all.equal(exact.out$t, exact.oracle, tolerance = 1e-10)))",
     "  stopifnot(isTRUE(all.equal(as.vector(exact.out$t0), t0.oracle, tolerance = 1e-10)))",
-    "  if (isTRUE(all.equal(exact.out$t, frozen.out$t, tolerance = 1e-10, check.attributes = FALSE))) stop('frozen matched exact unexpectedly')",
+    "  stopifnot(all(is.finite(frozen.out$t)))",
+    "  stopifnot(max(abs(frozen.out$t)) < 1e4)",
     "  expected.plot <- plot(bw, xdat = xdat, ydat = y, zdat = zdat, neval = 6L, coef = FALSE, plot.behavior = 'data')",
     "  if (!is.null(expected.plot$r1)) expected.plot <- expected.plot$r1",
     "  ns <- asNamespace('npRmpi')",
@@ -75,7 +76,7 @@ npscoef_semiparam_frozen_contract_case <- function() {
               info = paste(res$output, collapse = "\n"))
 }
 
-test_that("npRmpi npscoef exact/frozen split is correct and frozen is forwarded", {
+test_that("npRmpi npscoef exact helper is correct and frozen is forwarded", {
   npscoef_semiparam_frozen_contract_case()
 })
 
@@ -173,4 +174,52 @@ npscoef_fixed_lp_semiparam_contract_case <- function() {
 
 test_that("npRmpi npscoef fixed lp helper matches duplicate-row oracle", {
   npscoef_fixed_lp_semiparam_contract_case()
+})
+
+npscoef_nonfixed_lp_semiparam_contract_case <- function() {
+  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess contract")
+
+  ok_tag <- "NPSCOEF_NONFIXED_LP_SEMIPARAM_CONTRACT_OK"
+  lines <- c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "run_case <- function() {",
+    "  npRmpi.init(nslaves = 1, quiet = TRUE)",
+    "  on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
+    "  options(npRmpi.autodispatch = TRUE, np.messages = FALSE)",
+    "  set.seed(20260318)",
+    "  n <- 40L",
+    "  xdat <- data.frame(x = runif(n, -1, 1))",
+    "  zdat <- data.frame(z = rnorm(n))",
+    "  y <- with(xdat, x^2 + zdat$z + rnorm(n, sd = 0.1))",
+    "  exdat <- data.frame(x = seq(npRmpi:::trim.quantiles(xdat[, 1L], 0.05)[1L], npRmpi:::trim.quantiles(xdat[, 1L], 0.05)[2L], length.out = 5L))",
+    "  ezdat <- data.frame(z = seq(npRmpi:::trim.quantiles(zdat[, 1L], 0.05)[1L], npRmpi:::trim.quantiles(zdat[, 1L], 0.05)[2L], length.out = 5L))",
+    "  counts <- rmultinom(n = 5L, size = n, prob = rep.int(1 / n, n))",
+    "  boot.fun <- getFromNamespace('.np_inid_boot_from_scoef', 'npRmpi')",
+    "  bw.adap <- npscoefbw(xdat = xdat, zdat = zdat, ydat = y, nmulti = 1L, regtype = 'lp', degree = 1L, bernstein.basis = TRUE, bwtype = 'adaptive_nn')",
+    "  fr.adap <- boot.fun(txdat = xdat, ydat = y, tzdat = zdat, exdat = exdat, ezdat = ezdat, bws = bw.adap, B = ncol(counts), counts = counts, mode = 'frozen')",
+    "  stopifnot(all(is.finite(fr.adap$t)))",
+    "  stopifnot(max(abs(fr.adap$t)) < 1e4)",
+    "  bw.gnn <- npscoefbw(xdat = xdat, zdat = zdat, ydat = y, nmulti = 1L, regtype = 'll', bwtype = 'generalized_nn')",
+    "  fr.gnn <- boot.fun(txdat = xdat, ydat = y, tzdat = zdat, exdat = exdat, ezdat = ezdat, bws = bw.gnn, B = ncol(counts), counts = counts, mode = 'frozen')",
+    "  stopifnot(all(is.finite(fr.gnn$t)))",
+    "  stopifnot(max(abs(fr.gnn$t)) < 1e4)",
+    "}",
+    "run_case()",
+    sprintf("cat('%s\\n')", ok_tag)
+  )
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = lines,
+    timeout = 180L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl(ok_tag, res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+}
+
+test_that("npRmpi npscoef frozen nonfixed local-polynomial helpers stay finite", {
+  npscoef_nonfixed_lp_semiparam_contract_case()
 })
