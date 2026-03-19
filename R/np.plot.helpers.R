@@ -2494,29 +2494,27 @@
     ezdat <- exdat
   } else {
     tzdat <- toFrame(tzdat)
-    ezdat <- toFrame(ezdat)
+      ezdat <- toFrame(ezdat)
   }
 
-  if (!identical(bws$type, "fixed"))
-    stop("smooth coefficient local-polynomial fixed helper requires bwtype='fixed'")
   if (nrow(txdat) != nrow(tzdat))
-    stop("smooth coefficient local-polynomial fixed helper requires aligned txdat/tzdat rows")
+    stop("smooth coefficient local-polynomial helper requires aligned txdat/tzdat rows")
   if (nrow(exdat) != nrow(ezdat))
-    stop("smooth coefficient local-polynomial fixed helper requires aligned exdat/ezdat rows")
+    stop("smooth coefficient local-polynomial helper requires aligned exdat/ezdat rows")
   if (ncol(txdat) != ncol(exdat))
-    stop("smooth coefficient local-polynomial fixed helper requires matching txdat/exdat columns")
+    stop("smooth coefficient local-polynomial helper requires matching txdat/exdat columns")
   if (length(ydat) != nrow(txdat))
-    stop("length of ydat must match training rows in smooth coefficient local-polynomial fixed helper")
+    stop("length of ydat must match training rows in smooth coefficient local-polynomial helper")
   if (nrow(txdat) < 1L || nrow(exdat) < 1L || B < 1L)
-    stop("invalid smooth coefficient local-polynomial fixed helper dimensions")
+    stop("invalid smooth coefficient local-polynomial helper dimensions")
 
   spec <- .npscoef_canonical_spec(
     source = bws,
     zdat = tzdat,
-    where = "smooth coefficient local-polynomial fixed helper"
+    where = "smooth coefficient local-polynomial helper"
   )
   if (!identical(spec$regtype.engine, "lp"))
-    stop("smooth coefficient local-polynomial fixed helper requires regtype='ll' or 'lp'")
+    stop("smooth coefficient local-polynomial helper requires regtype='ll' or 'lp'")
 
   txdat <- adjustLevels(txdat, bws$xdati)
   exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
@@ -2530,7 +2528,7 @@
     tzdat = tzdat,
     ezdat = ezdat,
     leave.one.out = leave.one.out,
-    where = "smooth coefficient local-polynomial fixed helper"
+    where = "smooth coefficient local-polynomial helper"
   )
   tensor.train <- .npscoef_row_tensor_design(W.train, lp_state$W.train)
   tensor.eval <- .npscoef_row_tensor_design(W.eval, lp_state$W.eval)
@@ -2678,7 +2676,7 @@
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
-    stop("smooth coefficient local-polynomial fixed helper produced non-finite values")
+    stop("smooth coefficient local-polynomial helper produced non-finite values")
 
   list(t = tmat, t0 = t0)
 }
@@ -2806,7 +2804,8 @@
     where = "smooth coefficient inid helper"
   )
 
-  if (identical(bws$type, "fixed") && identical(spec$regtype.engine, "lp")) {
+  if (!identical(spec$regtype.engine, "lc") &&
+      (identical(mode, "frozen") || identical(bws$type, "fixed"))) {
     return(.np_inid_boot_from_scoef_localpoly_fixed(
       txdat = txdat,
       ydat = ydat,

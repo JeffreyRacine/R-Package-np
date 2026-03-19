@@ -6,7 +6,7 @@ quiet_eval <- function(expr) {
   value
 }
 
-test_that("npscoef exact helper matches duplicate-row oracle and frozen differs", {
+test_that("npscoef exact helper matches duplicate-row oracle and frozen stays finite", {
   boot.fun <- getFromNamespace(".np_inid_boot_from_scoef", "np")
 
   xdat <- data.frame(x = c(0.05, 0.05, 0.25, 0.25, 0.60, 0.60, 0.90, 0.90))
@@ -82,12 +82,8 @@ test_that("npscoef exact helper matches duplicate-row oracle and frozen differs"
   expect_equal(exact.out$t, exact.oracle, tolerance = 1e-10)
   expect_equal(as.vector(exact.out$t0), t0.oracle, tolerance = 1e-10)
   expect_equal(as.vector(frozen.out$t0), t0.oracle, tolerance = 1e-10)
-  expect_false(isTRUE(all.equal(
-    exact.out$t,
-    frozen.out$t,
-    tolerance = 1e-10,
-    check.attributes = FALSE
-  )))
+  expect_true(all(is.finite(frozen.out$t)))
+  expect_true(max(abs(frozen.out$t)) < 1e4)
 })
 
 test_that("npscoef frozen surface plot mode is forwarded", {
@@ -249,4 +245,81 @@ test_that("npscoef fixed lp helper matches duplicate-row oracle", {
   oracle <- t(oracle)
 
   expect_equal(helper.out$t, oracle, tolerance = 1e-10)
+})
+
+test_that("npscoef frozen nonfixed local-polynomial helpers stay finite", {
+  boot.fun <- getFromNamespace(".np_inid_boot_from_scoef", "np")
+
+  set.seed(20260318)
+  n <- 40L
+  xdat <- data.frame(x = runif(n, -1, 1))
+  zdat <- data.frame(z = rnorm(n))
+  y <- with(xdat, x^2 + zdat$z + rnorm(n, sd = 0.1))
+  exdat <- data.frame(x = seq(
+    np:::trim.quantiles(xdat[, 1L], 0.05)[1L],
+    np:::trim.quantiles(xdat[, 1L], 0.05)[2L],
+    length.out = 5L
+  ))
+  ezdat <- data.frame(z = seq(
+    np:::trim.quantiles(zdat[, 1L], 0.05)[1L],
+    np:::trim.quantiles(zdat[, 1L], 0.05)[2L],
+    length.out = 5L
+  ))
+  counts <- rmultinom(n = 5L, size = n, prob = rep.int(1 / n, n))
+
+  configs <- list(
+    list(
+      label = "adaptive_lp_bernstein",
+      bw = npscoefbw(
+        xdat = xdat,
+        zdat = zdat,
+        ydat = y,
+        nmulti = 1L,
+        regtype = "lp",
+        degree = 1L,
+        bernstein.basis = TRUE,
+        bwtype = "adaptive_nn"
+      )
+    ),
+    list(
+      label = "generalized_ll",
+      bw = npscoefbw(
+        xdat = xdat,
+        zdat = zdat,
+        ydat = y,
+        nmulti = 1L,
+        regtype = "ll",
+        bwtype = "generalized_nn"
+      )
+    )
+  )
+
+  for (cfg in configs) {
+    exact.out <- boot.fun(
+      txdat = xdat,
+      ydat = y,
+      tzdat = zdat,
+      exdat = exdat,
+      ezdat = ezdat,
+      bws = cfg$bw,
+      B = ncol(counts),
+      counts = counts,
+      mode = "exact"
+    )
+    frozen.out <- boot.fun(
+      txdat = xdat,
+      ydat = y,
+      tzdat = zdat,
+      exdat = exdat,
+      ezdat = ezdat,
+      bws = cfg$bw,
+      B = ncol(counts),
+      counts = counts,
+      mode = "frozen"
+    )
+
+    expect_equal(frozen.out$t0, exact.out$t0, tolerance = 1e-10, info = cfg$label)
+    expect_true(all(is.finite(frozen.out$t)), info = cfg$label)
+    expect_true(max(abs(frozen.out$t)) < 1e4, info = cfg$label)
+  }
 })
