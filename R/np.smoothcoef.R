@@ -120,10 +120,17 @@ npscoef.call <-
 
 npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
   .npRmpi_require_active_slave_pool(where = "npscoef()")
+  explicit.scbandwidth <- (!missing(bws)) && inherits(bws, "scbandwidth")
+  degree.select.value <- if ("degree.select" %in% names(list(...))) {
+    match.arg(list(...)$degree.select, c("manual", "coordinate", "exhaustive"))
+  } else {
+    "manual"
+  }
   if (.npRmpi_npscoef_should_localize(bws) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
     return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
-  if (.npRmpi_autodispatch_active())
+  if (.npRmpi_autodispatch_active() &&
+      (explicit.scbandwidth || identical(degree.select.value, "manual")))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   sc <- sys.call()
