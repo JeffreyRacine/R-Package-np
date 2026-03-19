@@ -109,6 +109,32 @@
   formatC(value, digits = 6L, format = "fg", flag = "#")
 }
 
+.np_degree_format_candidate_set <- function(cand) {
+  cand <- as.integer(cand)
+  if (!length(cand))
+    return("c()")
+
+  if (length(cand) >= 2L && all(diff(cand) == 1L))
+    return(sprintf("%s:%s", cand[1L], cand[length(cand)]))
+
+  sprintf("c(%s)", paste(cand, collapse = ","))
+}
+
+.np_degree_format_search_space <- function(candidates) {
+  paste(
+    vapply(candidates, .np_degree_format_candidate_set, character(1L)),
+    collapse = " x "
+  )
+}
+
+.np_degree_coordinate_visit_cap <- function(candidates,
+                                            max_cycles,
+                                            restart_total) {
+  restart_total <- npValidatePositiveInteger(restart_total, "restart_total")
+  max_cycles <- npValidatePositiveInteger(max_cycles, "degree.max.cycles")
+  restart_total * (1L + max_cycles * sum(vapply(candidates, length, integer(1L))))
+}
+
 .np_degree_progress_label <- function() {
   "Selecting polynomial degree and bandwidth"
 }
@@ -129,6 +155,8 @@
 .np_degree_progress_detail <- function(phase,
                                        best_record,
                                        objective_name = "objective",
+                                       step = NULL,
+                                       step_max = NULL,
                                        cycle = NULL,
                                        max_cycles = NULL,
                                        coordinate = NULL,
@@ -136,7 +164,22 @@
                                        restart_index = NULL,
                                        restart_total = NULL,
                                        evaluating = NULL) {
-  fields <- c(as.character(phase)[1L])
+  phase <- switch(
+    as.character(phase)[1L],
+    coordinate = "coord",
+    exhaustive = "exhaustive",
+    verify = "verify",
+    as.character(phase)[1L]
+  )
+  fields <- c(phase)
+
+  if (!is.null(step) && !is.na(step) && step >= 1L) {
+    if (!is.null(step_max) && !is.na(step_max) && step_max >= step) {
+      fields <- c(fields, sprintf("step %s/%s", format(step), format(step_max)))
+    } else {
+      fields <- c(fields, sprintf("step %s", format(step)))
+    }
+  }
 
   if (!is.null(restart_total) && !is.na(restart_total) && restart_total > 1L &&
       !is.null(restart_index) && !is.na(restart_index) && restart_index >= 1L) {
@@ -154,7 +197,7 @@
   }
 
   if (!is.null(evaluating)) {
-    fields <- c(fields, sprintf("degree %s", .np_degree_format_degree(evaluating)))
+    fields <- c(fields, sprintf("deg %s", .np_degree_format_degree(evaluating)))
   }
 
   fields <- c(fields, .np_degree_progress_best_detail(
@@ -369,7 +412,8 @@
       detail = .np_degree_progress_detail(
         phase = phase,
         best_record = state$best_record,
-        objective_name = objective_name
+        objective_name = objective_name,
+        evaluating = degree
       )
     )
     !isTRUE(state$interrupted)
@@ -386,6 +430,11 @@
                                          direction,
                                          objective_name = "objective") {
   restart_total <- length(restart_starts) + 1L
+  step_max <- .np_degree_coordinate_visit_cap(
+    candidates = candidates,
+    max_cycles = max_cycles,
+    restart_total = restart_total
+  )
 
   run_coordinate <- function(initial_degree, restart_index) {
     current <- .np_degree_clip_to_grid(initial_degree, candidates)
@@ -393,11 +442,13 @@
         identical(state$progress_state$renderer, "single_line")) {
       state$progress_state <- .np_degree_progress_step(
         state = state$progress_state,
-        done = state$visit_id,
+        done = NULL,
         detail = .np_degree_progress_detail(
           phase = "coordinate",
           best_record = state$best_record,
           objective_name = objective_name,
+          step = state$visit_id,
+          step_max = step_max,
           restart_index = restart_index,
           restart_total = restart_total,
           evaluating = current
@@ -408,13 +459,16 @@
     state$evaluate(current)
     state$progress_state <- .np_degree_progress_step(
       state = state$progress_state,
-      done = state$visit_id,
+      done = NULL,
       detail = .np_degree_progress_detail(
         phase = "coordinate",
         best_record = state$best_record,
         objective_name = objective_name,
+        step = max(1L, state$visit_id - 1L),
+        step_max = step_max,
         restart_index = restart_index,
-        restart_total = restart_total
+        restart_total = restart_total,
+        evaluating = current
       )
     )
     for (cycle in seq_len(max_cycles)) {
@@ -429,11 +483,13 @@
               identical(state$progress_state$renderer, "single_line")) {
             state$progress_state <- .np_degree_progress_step(
               state = state$progress_state,
-              done = state$visit_id,
+              done = NULL,
               detail = .np_degree_progress_detail(
                 phase = "coordinate",
                 best_record = state$best_record,
                 objective_name = objective_name,
+                step = state$visit_id,
+                step_max = step_max,
                 cycle = cycle,
                 max_cycles = max_cycles,
                 coordinate = j,
@@ -448,17 +504,20 @@
           rec <- state$evaluate(trial)
           state$progress_state <- .np_degree_progress_step(
             state = state$progress_state,
-            done = state$visit_id,
+            done = NULL,
             detail = .np_degree_progress_detail(
               phase = "coordinate",
               best_record = state$best_record,
               objective_name = objective_name,
+              step = max(1L, state$visit_id - 1L),
+              step_max = step_max,
               cycle = cycle,
               max_cycles = max_cycles,
               coordinate = j,
               ncon = length(candidates),
               restart_index = restart_index,
-              restart_total = restart_total
+              restart_total = restart_total,
+              evaluating = trial
             )
           )
           if (isTRUE(state$interrupted))
@@ -639,6 +698,11 @@
     state$baseline_record <- state$evaluate(baseline_degree)
 
     if (identical(method, "exhaustive")) {
+      .np_progress_note(sprintf(
+        "Exhaustive automatic polynomial degree search over %s degree combinations on %s",
+        format(grid.size, scientific = FALSE, trim = TRUE),
+        .np_degree_format_search_space(candidates)
+      ))
       state$progress_state <- .np_degree_progress_begin(
         total = grid.size,
         detail = .np_degree_progress_detail(
@@ -654,6 +718,20 @@
         objective_name = objective_name
       )
     } else {
+      restart_total <- length(restart_starts) + 1L
+      .np_progress_note(sprintf(
+        "Coordinate automatic polynomial degree search over %s (max %s search evaluations)",
+        .np_degree_format_search_space(candidates),
+        format(
+          .np_degree_coordinate_visit_cap(
+            candidates = candidates,
+            max_cycles = max_cycles,
+            restart_total = restart_total
+          ),
+          scientific = FALSE,
+          trim = TRUE
+        )
+      ))
       state$progress_state <- .np_degree_progress_begin(
         detail = .np_degree_progress_detail(
           phase = "coordinate",
@@ -680,7 +758,7 @@
           )
         )
         .np_progress_note(sprintf(
-          "Certifying automatic polynomial degree search over %s degree combinations",
+          "Exhaustively certifying automatic polynomial degree search over %s degree combinations (re-optimizing bandwidths)",
           format(grid.size, scientific = FALSE, trim = TRUE)
         ))
         state$progress_state <- .np_degree_progress_begin(
