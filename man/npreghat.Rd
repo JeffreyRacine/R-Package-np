@@ -89,7 +89,9 @@ data(cps71)
 bw <- npregbw(xdat = cps71$age, ydat = cps71$logwage,
               regtype = "ll", bandwidth.compute = FALSE, bws = 1.0)
 H <- npreghat(bws = bw, txdat = data.frame(age = cps71$age))
-fitted.fast <- H %*% cps71$logwage
+H.fitted <- H %*% cps71$logwage
+ghat <- npreg(bws = bw)
+head(cbind(fitted(ghat), H.fitted), n = 2L)
 }
 }
 \keyword{nonparametric}

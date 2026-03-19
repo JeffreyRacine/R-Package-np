@@ -91,11 +91,35 @@ Method-specific argument map:
 set.seed(42)
 n <- 100
 x <- runif(n)
-y <- sin(2*pi*x) + rnorm(n, sd = 0.1)
+z <- runif(n)
+y <- sin(2*pi*x) + 0.5 * z + rnorm(n, sd = 0.1)
 
-bw <- npindexbw(xdat = data.frame(x, x2 = x^2), ydat = y, nmulti = 1)
-H <- npindexhat(bws = bw, txdat = data.frame(x, x2 = x^2), output = "matrix")
-fit.fast <- H %*% y
+tx <- data.frame(x = x)
+tz <- data.frame(z = z)
+
+ibw <- npindexbw(xdat = data.frame(x, x2 = x^2), ydat = y,
+                 bws = c(0.5, 1.0, 1.0), bandwidth.compute = FALSE)
+iH <- npindexhat(bws = ibw, txdat = data.frame(x, x2 = x^2), output = "matrix")
+iH.fitted <- iH %*% y
+ifit <- npindex(bws = ibw, txdat = data.frame(x, x2 = x^2), tydat = y)
+head(cbind(fitted(ifit), iH.fitted), n = 2L)
+
+pbw <- npplregbw(xdat = tx, zdat = tz, ydat = y,
+                 bws = matrix(c(0.2, 0.2), nrow = 2L, ncol = 1L),
+                 bandwidth.compute = FALSE)
+pH <- npplreghat(bws = pbw, txdat = tx, tzdat = tz, output = "matrix")
+pH.fitted <- pH %*% y
+pfit <- npplreg(bws = pbw, txdat = tx, tydat = y, tzdat = tz)
+head(cbind(fitted(pfit), pH.fitted), n = 2L)
+
+sbw <- npscoefbw(xdat = tx, zdat = tz, ydat = y,
+                 bws = 0.2, bandwidth.compute = FALSE)
+sH <- npscoefhat(bws = sbw, txdat = tx, tzdat = tz,
+                 output = "matrix", iterate = FALSE)
+sH.fitted <- sH %*% y
+sfit <- npscoef(bws = sbw, txdat = tx, tydat = y, tzdat = tz,
+                iterate = FALSE)
+head(cbind(fitted(sfit), sH.fitted), n = 2L)
 }
 }
 \keyword{nonparametric}
