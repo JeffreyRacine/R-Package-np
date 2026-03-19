@@ -91,6 +91,7 @@ test_that("npindexbw exhaustive degree search matches manual Ichimura profile mi
     method = "ichimura",
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -140,6 +141,7 @@ test_that("npindexbw coordinate search can be exhaustively certified on a small 
     method = "ichimura",
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -152,6 +154,7 @@ test_that("npindexbw coordinate search can be exhaustively certified on a small 
     method = "ichimura",
     regtype = "lp",
     degree.select = "coordinate",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     degree.verify = TRUE,
@@ -212,6 +215,7 @@ test_that("npindexbw automatic degree search honors Klein-Spady objective direct
     method = "kleinspady",
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -242,6 +246,7 @@ test_that("npindexbw automatic degree search enforces pilot guardrails", {
       method = "ichimura",
       regtype = "lc",
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -259,6 +264,7 @@ test_that("npindexbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bandwidth.compute = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -276,6 +282,7 @@ test_that("npindexbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bernstein.basis = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 4L,
       bwtype = "fixed",
@@ -304,6 +311,7 @@ test_that("npindex forwards automatic LP degree search through npindexbw", {
     method = "ichimura",
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -342,6 +350,7 @@ test_that("npindexbw automatic degree search emits staged progress output", {
         method = "ichimura",
         regtype = "lp",
         degree.select = "exhaustive",
+        search.engine = "cell",
         degree.min = 0L,
         degree.max = 1L,
         bwtype = "fixed",
@@ -354,4 +363,40 @@ test_that("npindexbw automatic degree search emits staged progress output", {
   expect_true(any(grepl("Selecting polynomial degree and bandwidth", msgs)))
   expect_true(any(grepl("exhaustive", msgs)))
   expect_true(any(grepl("best (", msgs, fixed = TRUE)))
+})
+
+test_that("npindexbw automatic degree search defaults to NOMAD plus Powell", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  n <- 26
+  xdat <- data.frame(
+    x1 = runif(n, -1, 1),
+    x2 = runif(n, -1, 1)
+  )
+  index <- xdat$x1 + 0.5 * xdat$x2
+  y <- sin(index) + 0.15 * index^2 + rnorm(n, sd = 0.05)
+
+  auto <- npindexbw(
+    xdat = xdat,
+    ydat = y,
+    bws = c(1, 0.5, 0.3),
+    method = "ichimura",
+    regtype = "lp",
+    degree.select = "coordinate",
+    degree.min = 0L,
+    degree.max = 2L,
+    bwtype = "fixed",
+    nmulti = 1L
+  )
+
+  expect_s3_class(auto, "sibandwidth")
+  expect_false(is.null(auto$degree.search))
+  expect_identical(auto$degree.search$mode, "nomad+powell")
+  expect_true(is.finite(auto$fval))
+  expect_lte(auto$fval, auto$degree.search$baseline.fval + 1e-8)
+  expect_equal(auto$fval, auto$degree.search$best.fval, tolerance = 1e-8)
 })
