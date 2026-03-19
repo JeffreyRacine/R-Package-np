@@ -269,6 +269,7 @@ npplreg.plbandwidth <-
     residuals <- npValidateScalarLogical(residuals, "residuals")
     .npRmpi_require_active_slave_pool(where = "npplreg()")
     if (.npRmpi_autodispatch_active() &&
+        is.null(bws$degree.search) &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -439,7 +440,14 @@ npplreg.plbandwidth <-
 
 npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
   .npRmpi_require_active_slave_pool(where = "npplreg()")
+  explicit.plbandwidth <- (!missing(bws)) && inherits(bws, "plbandwidth")
+  degree.select.value <- if ("degree.select" %in% names(list(...))) {
+    match.arg(list(...)$degree.select, c("manual", "coordinate", "exhaustive"))
+  } else {
+    "manual"
+  }
   if (.npRmpi_autodispatch_active() &&
+      (explicit.plbandwidth || identical(degree.select.value, "manual")) &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
