@@ -294,6 +294,31 @@ test_that("restart starts are deterministic and RNG-independent", {
   expect_identical(starts1, starts2)
 })
 
+test_that("coordinate search skips incumbent cell revisits within a sweep", {
+  degree_search <- getFromNamespace(".np_degree_search", "np")
+
+  result <- degree_search(
+    method = "coordinate",
+    candidates = list(0:2, 0:2),
+    baseline_degree = c(0L, 0L),
+    start_degree = c(0L, 0L),
+    restarts = 0L,
+    max_cycles = 1L,
+    eval_fun = function(degree) {
+      list(
+        objective = as.numeric(sum(degree)),
+        payload = list(degree = as.integer(degree)),
+        num.feval = 1L
+      )
+    },
+    direction = "min",
+    trace_level = "full"
+  )
+
+  expect_identical(result$n.unique, 5L)
+  expect_false(any(result$trace$cached))
+})
+
 test_that("automatic exhaustive search emits a safety warning on large grids", {
   old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.degree.search.warn.grid = 3L)
   on.exit(options(old_opts), add = TRUE)
@@ -411,6 +436,6 @@ test_that("automatic degree search emits staged progress output", {
   )
 
   expect_true(any(grepl("Coordinate automatic polynomial degree search over 0:1", coord_msgs)))
-  expect_true(any(grepl("step [0-9]+/[0-9]+", coord_msgs)))
+  expect_true(any(grepl("max 3 search evaluations", coord_msgs)))
   expect_true(any(grepl("Exhaustively certifying automatic polynomial degree search over 2 degree combinations \\(re-optimizing bandwidths\\)", coord_msgs)))
 })
