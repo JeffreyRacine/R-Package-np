@@ -584,7 +584,8 @@
 }
 
 .np_wild_boot_t <- function(H, fit.mean, residuals, B, wild = c("mammen", "rademacher"),
-                            progress.label = NULL) {
+                            progress.label = NULL,
+                            prefer.local.single_worker = FALSE) {
   B <- as.integer(B)
   n <- length(residuals)
   if (length(fit.mean) != n)
@@ -609,7 +610,8 @@
     B = B,
     wild = wild,
     comm = 1L,
-    progress.label = progress.label
+    progress.label = progress.label,
+    prefer.local.single_worker = prefer.local.single_worker
   )
   if (is.matrix(t.mpi)) {
     .npRmpi_bootstrap_transport_trace(
@@ -646,7 +648,8 @@
 }
 
 .np_plot_boot_from_hat_wild <- function(H, ydat, fit.mean, B, wild,
-                                        progress.label = NULL) {
+                                        progress.label = NULL,
+                                        prefer.local.single_worker = FALSE) {
   fit.mean <- as.vector(fit.mean)
   list(
     t = .np_wild_boot_t(
@@ -655,21 +658,24 @@
       residuals = as.double(ydat - fit.mean),
       B = as.integer(B),
       wild = wild,
-      progress.label = progress.label
+      progress.label = progress.label,
+      prefer.local.single_worker = prefer.local.single_worker
     ),
     t0 = as.vector(H %*% as.double(ydat))
   )
 }
 
 .np_plot_boot_from_hat_wild_factor_effects <- function(H, ydat, fit.mean, B, wild,
-                                                       progress.label = NULL) {
+                                                       progress.label = NULL,
+                                                       prefer.local.single_worker = FALSE) {
   out <- .np_plot_boot_from_hat_wild(
     H = H,
     ydat = ydat,
     fit.mean = fit.mean,
     B = B,
     wild = wild,
-    progress.label = progress.label
+    progress.label = progress.label,
+    prefer.local.single_worker = prefer.local.single_worker
   )
   if (ncol(out$t) < 1L)
     return(out)
@@ -1055,6 +1061,7 @@
                                          progress.label = NULL,
                                          profile.where = NA_character_,
                                          comm = 1L,
+                                         prefer.local.single_worker = FALSE,
                                          required.bindings = NULL,
                                          ...) {
   total.boot <- sum(vapply(tasks, function(tt) as.integer(tt$bsz), integer(1)))
@@ -1093,6 +1100,11 @@
   workers <- .npRmpi_bootstrap_worker_count(comm = comm)
   use.master.local <- !isTRUE(.npRmpi_has_active_slave_pool(comm = comm)) &&
     isTRUE(.npRmpi_master_only_mode(comm = comm))
+  if (!isTRUE(use.master.local) &&
+      isTRUE(prefer.local.single_worker) &&
+      workers <= 1L) {
+    use.master.local <- TRUE
+  }
   .npRmpi_bootstrap_transport_trace(
     what = what,
     event = "fanout.start",
@@ -1100,6 +1112,7 @@
       workers = workers,
       tasks = length(tasks),
       master_local = isTRUE(use.master.local),
+      single_worker_local = isTRUE(prefer.local.single_worker) && workers <= 1L,
       comm = comm
     )
   )
@@ -1316,7 +1329,8 @@
 }
 
 .npRmpi_wild_boot_t_parallel <- function(H, fit.mean, residuals, B, wild, comm = 1L,
-                                         progress.label = NULL) {
+                                         progress.label = NULL,
+                                         prefer.local.single_worker = FALSE) {
   n <- length(residuals)
   p <- nrow(H)
   chunk.size <- .np_wild_chunk_size(n = n, B = B)
@@ -1381,7 +1395,8 @@
     fit.mean = fit.mean,
     residuals = residuals,
     wild.method = wild,
-    comm = comm
+    comm = comm,
+    prefer.local.single_worker = prefer.local.single_worker
   )
 }
 
@@ -2388,6 +2403,7 @@
                                                 gradients = FALSE,
                                                 gradient.order = 1L,
                                                 slice.index = 1L,
+                                                prefer.local.single_worker = FALSE,
                                                 progress.label = NULL) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
@@ -2470,6 +2486,7 @@
         progress.label = progress.label,
         profile.where = "mpi.applyLB:inid-regression-exact-counts",
         comm = 1L,
+        prefer.local.single_worker = prefer.local.single_worker,
         required.bindings = list(
           counts.mat = counts.mat,
           compute_chunk = compute_chunk,
@@ -2510,6 +2527,7 @@
         progress.label = progress.label,
         profile.where = "mpi.applyLB:inid-regression-exact-block",
         comm = 1L,
+        prefer.local.single_worker = prefer.local.single_worker,
         required.bindings = list(
           n = n,
           counts.drawer = counts.drawer,
@@ -2549,6 +2567,7 @@
         progress.label = progress.label,
         profile.where = "mpi.applyLB:inid-regression-exact",
         comm = 1L,
+        prefer.local.single_worker = prefer.local.single_worker,
         required.bindings = list(
           n = n,
           prob = prob,
@@ -2582,6 +2601,7 @@
                                                            gradients = FALSE,
                                                            gradient.order = 1L,
                                                            slice.index = 1L,
+                                                           prefer.local.single_worker = FALSE,
                                                            prep.label = NULL,
                                                            progress.label = NULL) {
   xdat <- toFrame(xdat)
@@ -2779,6 +2799,7 @@
         progress.label = progress.label,
         profile.where = paste0("mpi.applyLB:", what.base, "-counts"),
         comm = 1L,
+        prefer.local.single_worker = prefer.local.single_worker,
         required.bindings = list(
           counts.mat = counts.mat,
           compute_chunk = compute_chunk
@@ -2819,6 +2840,7 @@
         progress.label = progress.label,
         profile.where = paste0("mpi.applyLB:", what.base, "-block"),
         comm = 1L,
+        prefer.local.single_worker = prefer.local.single_worker,
         required.bindings = list(
           n = n,
           counts.drawer = counts.drawer,
@@ -2857,6 +2879,7 @@
         progress.label = progress.label,
         profile.where = paste0("mpi.applyLB:", what.base),
         comm = 1L,
+        prefer.local.single_worker = prefer.local.single_worker,
         required.bindings = list(
           n = n,
           prob = prob,
@@ -2889,6 +2912,7 @@
                                                           gradients = FALSE,
                                                           gradient.order = 1L,
                                                           slice.index = 1L,
+                                                          prefer.local.single_worker = FALSE,
                                                           prep.label = NULL,
                                                           progress.label = NULL) {
   if (!identical(bws$type, "fixed"))
@@ -2906,6 +2930,7 @@
     gradients = gradients,
     gradient.order = gradient.order,
     slice.index = slice.index,
+    prefer.local.single_worker = prefer.local.single_worker,
     prep.label = prep.label,
     progress.label = progress.label
   )
@@ -2922,6 +2947,7 @@
                                           gradients = FALSE,
                                           gradient.order = 1L,
                                           slice.index = 1L,
+                                          prefer.local.single_worker = FALSE,
                                           prep.label = NULL,
                                           progress.label = NULL) {
   xdat <- toFrame(xdat)
@@ -2949,6 +2975,7 @@
       gradients = gradients,
       gradient.order = gradient.order,
       slice.index = slice.index,
+      prefer.local.single_worker = prefer.local.single_worker,
       progress.label = progress.label
     ))
   }
@@ -2967,6 +2994,7 @@
         gradients = TRUE,
         gradient.order = gradient.order,
         slice.index = slice.index,
+        prefer.local.single_worker = prefer.local.single_worker,
         prep.label = prep.label,
         progress.label = progress.label
       ))
@@ -2983,6 +3011,7 @@
       gradients = TRUE,
       gradient.order = gradient.order,
       slice.index = slice.index,
+      prefer.local.single_worker = prefer.local.single_worker,
       progress.label = progress.label
     ))
   }
@@ -3025,6 +3054,7 @@
     counts = counts,
     counts.drawer = counts.drawer,
     ridge = ridge,
+    prefer.local.single_worker = prefer.local.single_worker,
     prep.label = prep.label,
     progress.label = progress.label
   )
@@ -3040,6 +3070,7 @@
                                                  gradients = FALSE,
                                                  gradient.order = 1L,
                                                  slice.index = 1L,
+                                                 prefer.local.single_worker = FALSE,
                                                  prep.label = NULL,
                                                  progress.label = NULL) {
   xdat <- toFrame(xdat)
@@ -3116,6 +3147,7 @@
     gradients = gradients,
     gradient.order = gradient.order,
     slice.index = slice.index,
+    prefer.local.single_worker = prefer.local.single_worker,
     prep.label = prep.label,
     progress.label = progress.label
   )
@@ -3945,6 +3977,7 @@
                                            counts = NULL,
                                            counts.drawer = NULL,
                                            ridge = 1.0e-12,
+                                           prefer.local.single_worker = FALSE,
                                            progress.label = NULL) {
   txdat <- toFrame(txdat)
   tzdat <- toFrame(tzdat)
@@ -3991,6 +4024,7 @@
     B = B,
     counts = counts.mat,
     ridge = ridge,
+    prefer.local.single_worker = prefer.local.single_worker,
     progress.label = progress.label
   )
   y.eval <- .np_inid_boot_from_regression(
@@ -4001,6 +4035,7 @@
     B = B,
     counts = counts.mat,
     ridge = ridge,
+    prefer.local.single_worker = prefer.local.single_worker,
     progress.label = progress.label
   )
 
@@ -4015,6 +4050,7 @@
       B = B,
       counts = counts.mat,
       ridge = ridge,
+      prefer.local.single_worker = prefer.local.single_worker,
       progress.label = progress.label
     )
     x.eval[[j]] <- .np_inid_boot_from_regression(
@@ -4025,6 +4061,7 @@
       B = B,
       counts = counts.mat,
       ridge = ridge,
+      prefer.local.single_worker = prefer.local.single_worker,
       progress.label = progress.label
     )
   }
@@ -4089,6 +4126,7 @@
                                             counts = NULL,
                                             counts.drawer = NULL,
                                             ridge = 1.0e-12,
+                                            prefer.local.single_worker = FALSE,
                                             progress.label = NULL) {
   txdat <- toFrame(txdat)
   tzdat <- toFrame(tzdat)
@@ -4130,7 +4168,8 @@
     bws = bws$bw$yzbw,
     ydat = y.num,
     B = B,
-    counts = counts.mat
+    counts = counts.mat,
+    prefer.local.single_worker = prefer.local.single_worker
   )
   y.eval <- .np_inid_boot_from_regression_frozen(
     xdat = tzdat,
@@ -4138,7 +4177,8 @@
     bws = bws$bw$yzbw,
     ydat = y.num,
     B = B,
-    counts = counts.mat
+    counts = counts.mat,
+    prefer.local.single_worker = prefer.local.single_worker
   )
 
   p <- ncol(txdat)
@@ -4151,7 +4191,8 @@
       bws = bws$bw[[j + 1L]],
       ydat = x.train.num[, j],
       B = B,
-      counts = counts.mat
+      counts = counts.mat,
+      prefer.local.single_worker = prefer.local.single_worker
     )
     x.eval[[j]] <- .np_inid_boot_from_regression_frozen(
       xdat = tzdat,
@@ -4159,7 +4200,8 @@
       bws = bws$bw[[j + 1L]],
       ydat = x.train.num[, j],
       B = B,
-      counts = counts.mat
+      counts = counts.mat,
+      prefer.local.single_worker = prefer.local.single_worker
     )
   }
 
@@ -4223,6 +4265,7 @@
                                      counts = NULL,
                                      counts.drawer = NULL,
                                      ridge = 1.0e-12,
+                                     prefer.local.single_worker = FALSE,
                                      progress.label = NULL,
                                      mode = c("exact", "frozen")) {
   mode <- match.arg(mode)
@@ -4239,6 +4282,7 @@
       counts = counts,
       counts.drawer = counts.drawer,
       ridge = ridge,
+      prefer.local.single_worker = prefer.local.single_worker,
       progress.label = progress.label
     ))
   }
@@ -4254,6 +4298,7 @@
     counts = counts,
     counts.drawer = counts.drawer,
     ridge = ridge,
+    prefer.local.single_worker = prefer.local.single_worker,
     progress.label = progress.label
   )
 }
@@ -8858,6 +8903,7 @@ compute.bootstrap.errors.rbandwidth =
             gradients = gradients,
             gradient.order = gradient.order,
             slice.index = slice.index,
+            prefer.local.single_worker = identical(bws$type, "fixed"),
             prep.label = prep.label,
             progress.label = progress.label
           )
@@ -8872,6 +8918,7 @@ compute.bootstrap.errors.rbandwidth =
             gradients = gradients,
             gradient.order = gradient.order,
             slice.index = slice.index,
+            prefer.local.single_worker = identical(bws$type, "fixed"),
             prep.label = prep.label,
             progress.label = progress.label
           )
@@ -9000,7 +9047,8 @@ compute.bootstrap.errors.rbandwidth =
           fit.mean = fit.mean.train,
           B = B,
           wild = plot.errors.boot.wild,
-          progress.label = progress.label
+          progress.label = progress.label,
+          prefer.local.single_worker = identical(bws$type, "fixed")
         )
       } else {
         .np_plot_boot_from_hat_wild(
@@ -9009,7 +9057,8 @@ compute.bootstrap.errors.rbandwidth =
           fit.mean = fit.mean.train,
           B = B,
           wild = plot.errors.boot.wild,
-          progress.label = progress.label
+          progress.label = progress.label,
+          prefer.local.single_worker = identical(bws$type, "fixed")
         )
       }
       .npRmpi_bootstrap_transport_trace(
@@ -9438,6 +9487,7 @@ compute.bootstrap.errors.plbandwidth =
             ezdat = ezdat,
             bws = bws,
             B = plot.errors.boot.num,
+            prefer.local.single_worker = identical(bws$type, "fixed"),
             progress.label = progress.label,
             mode = helper.mode
           ),
@@ -9466,6 +9516,7 @@ compute.bootstrap.errors.plbandwidth =
             bws = bws,
             B = plot.errors.boot.num,
             counts.drawer = counts.drawer,
+            prefer.local.single_worker = identical(bws$type, "fixed"),
             progress.label = progress.label,
             mode = helper.mode
           ),
