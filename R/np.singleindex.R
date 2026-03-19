@@ -120,7 +120,14 @@ npindex.call <-
 
 npindex.default <- function(bws, txdat, tydat, ...){
   .npRmpi_require_active_slave_pool(where = "npindex()")
-  if (.npRmpi_autodispatch_active())
+  explicit.sibandwidth <- (!missing(bws)) && inherits(bws, "sibandwidth")
+  degree.select.value <- if ("degree.select" %in% names(list(...))) {
+    match.arg(list(...)$degree.select, c("manual", "coordinate", "exhaustive"))
+  } else {
+    "manual"
+  }
+  if (.npRmpi_autodispatch_active() &&
+      (explicit.sibandwidth || identical(degree.select.value, "manual")))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   if (inherits(bws, "formula")) {
