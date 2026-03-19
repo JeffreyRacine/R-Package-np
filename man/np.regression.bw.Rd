@@ -38,6 +38,13 @@ npregbw(\dots)
         ckertype,
         ckerub,
         degree,
+        degree.select = c("manual", "coordinate", "exhaustive"),
+        degree.min = NULL,
+        degree.max = NULL,
+        degree.start = NULL,
+        degree.restarts = 0L,
+        degree.max.cycles = 20L,
+        degree.verify = FALSE,
         dfac.dir,
         dfac.init,
         dfc.dir,
@@ -150,6 +157,11 @@ npregbw(\dots)
     (B-spline) basis is used for continuous predictors. For
     \code{bernstein.basis=TRUE}, prediction/evaluation points must lie
     within the training support of each continuous predictor. For
+    automatic degree search, if \code{bernstein.basis} is not
+    explicitly supplied, the search route defaults to \code{TRUE} for
+    numerical stability. Explicit \code{bernstein.basis=FALSE} is
+    honored, but raw-polynomial search can be poorly conditioned at
+    higher degrees. For
     \code{regtype="ll"} and \code{regtype="lp"}, a pre-optimization
     design-conditioning check is performed on the training continuous
     design: rank deficiency triggers an error, and large condition
@@ -238,6 +250,51 @@ npregbw(\dots)
     treats this vector as fixed input and optimizes only bandwidths.
   }
 
+  \item{degree.select}{
+    character string controlling local-polynomial degree handling when
+    \code{regtype="lp"}. \code{"manual"} (default) treats
+    \code{degree} as fixed. \code{"coordinate"} performs cached
+    coordinate-wise search over admissible degree vectors.
+    \code{"exhaustive"} evaluates the full admissible degree grid.
+  }
+
+  \item{degree.min}{
+    optional scalar or integer vector giving lower bounds for automatic
+    degree search when \code{degree.select != "manual"}. If scalar, the
+    value is recycled over continuous predictors.
+  }
+
+  \item{degree.max}{
+    optional scalar or integer vector giving upper bounds for automatic
+    degree search when \code{degree.select != "manual"}. If scalar, the
+    value is recycled over continuous predictors.
+  }
+
+  \item{degree.start}{
+    optional starting degree vector for automatic degree search when
+    \code{degree.select="coordinate"}. If omitted, the search starts
+    from the degree-zero local-constant baseline on the continuous
+    predictors.
+  }
+
+  \item{degree.restarts}{
+    non-negative integer giving the number of additional deterministic
+    restarts used by coordinate search. Ignored for
+    \code{degree.select="manual"} and \code{"exhaustive"}.
+  }
+
+  \item{degree.max.cycles}{
+    positive integer giving the maximum number of coordinate-search
+    sweeps over the continuous-predictor degree vector. Ignored for
+    \code{degree.select="manual"} and \code{"exhaustive"}.
+  }
+
+  \item{degree.verify}{
+    logical value indicating whether a coordinate-search solution should
+    be exhaustively verified over the admissible degree grid after the
+    heuristic phase completes.
+  }
+
   \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
 
   \item{dfac.init}{non-random initial values for scale factors for categorical variables for Powell's algorithm. See Details}
@@ -303,7 +360,8 @@ npregbw(\dots)
     (Nadaraya-Watson) and \code{ll} specifies a local-linear
     estimator. \code{lp} specifies a local polynomial
     estimator with polynomial degree(s) given by \code{degree} for
-    continuous predictors. Defaults to \code{lc}.
+    continuous predictors, or selected automatically when
+    \code{degree.select != "manual"}. Defaults to \code{lc}.
   }
 
   \item{remin}{

@@ -29,6 +29,14 @@ npplregbw(\dots)
           zdat = stop("invoked without data `zdat'"),
           bandwidth.compute = TRUE,
           bws,
+          degree = NULL,
+          degree.select = c("manual", "coordinate", "exhaustive"),
+          degree.min = NULL,
+          degree.max = NULL,
+          degree.start = NULL,
+          degree.restarts = 0L,
+          degree.max.cycles = 20L,
+          degree.verify = FALSE,
           ftol,
           itmax,
           nmulti,
@@ -87,6 +95,57 @@ npplregbw(\dots)
     calculations. If specified, \code{npplregbw} will use the given
     bandwidths as the starting point for the numerical search for optimal
     bandwidths, unless you specify bandwidth.compute = FALSE. 
+  }
+
+  \item{degree}{
+    for local-polynomial partially linear fits, polynomial degree
+    specification for each continuous nonparametric regressor in
+    \code{zdat}. When supplied with \code{degree.select="manual"},
+    bandwidth optimization treats this vector as fixed input.
+  }
+
+  \item{degree.select}{
+    character string controlling local-polynomial degree handling for
+    the nonparametric \code{zdat} component. \code{"manual"} (default)
+    treats \code{degree} as fixed. \code{"coordinate"} performs cached
+    coordinate-wise search over admissible degree vectors.
+    \code{"exhaustive"} evaluates the full admissible degree grid.
+  }
+
+  \item{degree.min}{
+    optional scalar or integer vector giving lower bounds for automatic
+    degree search over continuous \code{zdat} predictors when
+    \code{degree.select != "manual"}.
+  }
+
+  \item{degree.max}{
+    optional scalar or integer vector giving upper bounds for automatic
+    degree search over continuous \code{zdat} predictors when
+    \code{degree.select != "manual"}.
+  }
+
+  \item{degree.start}{
+    optional starting degree vector for automatic coordinate search. If
+    omitted, the search starts from the degree-zero local-constant
+    baseline on the continuous \code{zdat} predictors.
+  }
+
+  \item{degree.restarts}{
+    non-negative integer giving the number of additional deterministic
+    coordinate-search restarts. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
+  }
+
+  \item{degree.max.cycles}{
+    positive integer giving the maximum number of coordinate-search
+    sweeps over the degree vector. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
+  }
+
+  \item{degree.verify}{
+    logical value indicating whether a coordinate-search solution should
+    be exhaustively verified over the admissible degree grid after the
+    heuristic phase completes.
   }
 
   
@@ -161,7 +220,8 @@ npplregbw(\dots)
     bandwidth type, kernel types, selection methods, and so on. To do
     this, you may specify any of \code{regtype}, 
     \code{bwmethod}, \code{bwscaling}, \code{bwtype}, \code{ckertype},
-    \code{ckerorder}, \code{ukertype}, \code{okertype}, as described in
+    \code{ckerorder}, \code{ukertype}, \code{okertype},
+    \code{bernstein.basis}, and \code{basis}, as described in
     \code{\link{npregbw}}.
   }
 }

@@ -32,6 +32,13 @@ npindexbw(\dots)
           basis = c("glp", "additive", "tensor"),
           bernstein.basis = FALSE,
           degree = NULL,
+          degree.select = c("manual", "coordinate", "exhaustive"),
+          degree.min = NULL,
+          degree.max = NULL,
+          degree.start = NULL,
+          degree.restarts = 0L,
+          degree.max.cycles = 20L,
+          degree.verify = FALSE,
           nmulti,
           only.optimize.beta,
           optim.abstol,
@@ -98,13 +105,61 @@ npindexbw(\dots)
 
   \item{bernstein.basis}{
     logical flag used when \code{regtype="lp"}; if \code{TRUE}, use a
-    Bernstein/B-spline basis for local polynomial terms.
+    Bernstein/B-spline basis for local polynomial terms. When automatic
+    degree search is requested and \code{bernstein.basis} is not
+    explicitly supplied, the search route defaults to \code{TRUE} for
+    numerical stability. Explicit \code{bernstein.basis=FALSE} is
+    honored, but raw-polynomial search can be poorly conditioned at
+    higher degrees.
   }
 
   \item{degree}{
     optional integer degree vector for continuous predictors when
     \code{regtype="lp"}. For single-index regression this is typically
     length one.
+  }
+
+  \item{degree.select}{
+    character string controlling local-polynomial degree handling when
+    \code{regtype="lp"}. \code{"manual"} (default) treats
+    \code{degree} as fixed. \code{"coordinate"} performs cached
+    coordinate-wise search over admissible degree values for the index
+    smoother. \code{"exhaustive"} evaluates the full admissible degree
+    grid.
+  }
+
+  \item{degree.min}{
+    optional scalar or integer vector giving lower bounds for automatic
+    degree search when \code{degree.select != "manual"}.
+  }
+
+  \item{degree.max}{
+    optional scalar or integer vector giving upper bounds for automatic
+    degree search when \code{degree.select != "manual"}.
+  }
+
+  \item{degree.start}{
+    optional starting degree vector for automatic coordinate search. If
+    omitted, the search starts from the degree-zero local-constant
+    baseline for the index smoother.
+  }
+
+  \item{degree.restarts}{
+    non-negative integer giving the number of additional deterministic
+    coordinate-search restarts. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
+  }
+
+  \item{degree.max.cycles}{
+    positive integer giving the maximum number of coordinate-search
+    sweeps over the degree vector. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
+  }
+
+  \item{degree.verify}{
+    logical value indicating whether a coordinate-search solution should
+    be exhaustively verified over the admissible degree grid after the
+    heuristic phase completes.
   }
 
   \item{nmulti}{
