@@ -6,7 +6,7 @@ quiet_eval <- function(expr) {
   value
 }
 
-test_that("npplreg exact helper matches duplicate-row oracle and frozen differs", {
+test_that("npplreg exact helper matches duplicate-row oracle and adaptive frozen stays finite", {
   boot.fun <- getFromNamespace(".np_inid_boot_from_plreg", "np")
 
   txdat <- data.frame(x = c(0.05, 0.05, 0.25, 0.25, 0.60, 0.60, 0.90, 0.90))
@@ -78,12 +78,43 @@ test_that("npplreg exact helper matches duplicate-row oracle and frozen differs"
   expect_equal(exact.out$t, exact.oracle, tolerance = 1e-10)
   expect_equal(as.vector(exact.out$t0), t0.oracle, tolerance = 1e-10)
   expect_equal(as.vector(frozen.out$t0), t0.oracle, tolerance = 1e-10)
+  expect_true(all(is.finite(frozen.out$t)))
+  expect_lt(max(abs(frozen.out$t)), 10 * max(abs(exact.out$t)) + 1e-8)
   expect_false(isTRUE(all.equal(
     exact.out$t,
     frozen.out$t,
     tolerance = 1e-10,
     check.attributes = FALSE
   )))
+})
+
+test_that("npplreg bootstrap plot payload stays finite across frozen nonfixed bw types", {
+  set.seed(42)
+  n <- 100
+  x <- runif(n, -1, 1)
+  z <- rnorm(n)
+  y <- x + rnorm(n, sd = 0.25 * sd(x))
+
+  for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+    fit <- npplreg(y ~ x | z, nmulti = 1, bwtype = bwtype)
+
+    for (mode in c("exact", "frozen")) {
+      out <- quiet_eval(plot(
+        fit,
+        plot.errors.method = "bootstrap",
+        view = "fixed",
+        plot.errors.boot.method = "geom",
+        neval = 12,
+        plot.errors.boot.num = 61,
+        plot.errors.type = "pointwise",
+        plot.errors.boot.nonfixed = mode,
+        plot.behavior = "data"
+      ))
+
+      expect_true(all(is.finite(out$r1$merr)), info = paste(bwtype, mode))
+      expect_true(max(abs(out$r1$merr)) < 1e4, info = paste(bwtype, mode))
+    }
+  }
 })
 
 test_that("npplreg frozen bootstrap mode is forwarded into the helper", {

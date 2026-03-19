@@ -3096,22 +3096,105 @@
   if (length(y.num) != n)
     stop("length of ydat must match training rows")
 
-  H <- npplreghat(
-    bws = bws,
-    txdat = txdat,
-    tzdat = tzdat,
-    exdat = exdat,
-    ezdat = ezdat,
-    output = "matrix"
-  )
-  .np_inid_lc_boot_from_hat(
-    H = H,
+  x.num <- .np_plreg_numeric_x_matrix(txdat = txdat, exdat = exdat, bws = bws)
+  x.train.num <- x.num$train
+  x.eval.num <- x.num$eval
+
+  counts.mat <- if (!is.null(counts)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  } else if (!is.null(counts.drawer)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts.drawer(1L, B))
+  } else {
+    .np_inid_counts_matrix(n = n, B = B)
+  }
+
+  y.train <- .np_inid_boot_from_reghat_frozen(
+    xdat = tzdat,
+    exdat = tzdat,
+    bws = bws$bw$yzbw,
     ydat = y.num,
     B = B,
-    counts = counts,
-    counts.drawer = counts.drawer,
-    progress.label = progress.label
+    counts = counts.mat
   )
+  y.eval <- .np_inid_boot_from_reghat_frozen(
+    xdat = tzdat,
+    exdat = ezdat,
+    bws = bws$bw$yzbw,
+    ydat = y.num,
+    B = B,
+    counts = counts.mat
+  )
+
+  p <- ncol(txdat)
+  x.train <- vector("list", p)
+  x.eval <- vector("list", p)
+  for (j in seq_len(p)) {
+    x.train[[j]] <- .np_inid_boot_from_reghat_frozen(
+      xdat = tzdat,
+      exdat = tzdat,
+      bws = bws$bw[[j + 1L]],
+      ydat = x.train.num[, j],
+      B = B,
+      counts = counts.mat
+    )
+    x.eval[[j]] <- .np_inid_boot_from_reghat_frozen(
+      xdat = tzdat,
+      exdat = ezdat,
+      bws = bws$bw[[j + 1L]],
+      ydat = x.train.num[, j],
+      B = B,
+      counts = counts.mat
+    )
+  }
+
+  xres.train0 <- matrix(0.0, nrow = n, ncol = p)
+  xres.eval0 <- matrix(0.0, nrow = nrow(exdat), ncol = p)
+  for (j in seq_len(p)) {
+    xres.train0[, j] <- x.train.num[, j] - as.double(x.train[[j]]$t0)
+    xres.eval0[, j] <- x.eval.num[, j] - as.double(x.eval[[j]]$t0)
+  }
+  yres0 <- y.num - as.double(y.train$t0)
+  beta0 <- .np_plreg_weighted_coef(
+    X = xres.train0,
+    y = yres0,
+    w = rep.int(1.0, n),
+    ridge = ridge
+  )
+  t0 <- as.double(y.eval$t0) + as.vector(xres.eval0 %*% beta0)
+
+  tmat <- matrix(NA_real_, nrow = B, ncol = nrow(exdat))
+  xres.train.b <- matrix(0.0, nrow = n, ncol = p)
+  xres.eval.b <- matrix(0.0, nrow = nrow(exdat), ncol = p)
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  for (b in seq_len(B)) {
+    for (j in seq_len(p)) {
+      xres.train.b[, j] <- x.train.num[, j] - x.train[[j]]$t[b, ]
+      xres.eval.b[, j] <- x.eval.num[, j] - x.eval[[j]]$t[b, ]
+    }
+    yres.b <- y.num - y.train$t[b, ]
+    beta.b <- .np_plreg_weighted_coef(
+      X = xres.train.b,
+      y = yres.b,
+      w = counts.mat[, b],
+      ridge = ridge
+    )
+    tmat[b, ] <- y.eval$t[b, ] + as.vector(xres.eval.b %*% beta.b)
+    progress <- .np_plot_progress_tick(state = progress, done = b)
+  }
+
+  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
+    stop("plreg frozen helper path produced non-finite values")
+
+  list(t = tmat, t0 = t0)
 }
 
 .np_inid_boot_from_plreg <- function(txdat,
