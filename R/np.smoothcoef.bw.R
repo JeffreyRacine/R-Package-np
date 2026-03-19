@@ -248,6 +248,8 @@ npscoefbw.NULL <-
     best.degree = search_result$best$degree,
     best.fval = search_result$best$objective,
     n.unique = search_result$n.unique,
+    n.visits = search_result$n.visits,
+    n.cached = search_result$n.cached,
     grid.size = search_result$grid.size,
     restart.starts = lapply(search_result$restart.starts, as.integer),
     trace = search_result$trace

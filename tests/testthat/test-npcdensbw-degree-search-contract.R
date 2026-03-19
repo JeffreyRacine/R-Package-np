@@ -49,6 +49,8 @@ test_that("npcdensbw exhaustive degree search matches manual profile minimum", {
   expect_lte(auto$fval, min(bw0$fval, bw1$fval) + 1e-10)
   expect_lte(auto$degree.search$best.fval, auto$degree.search$baseline.fval + 1e-10)
   expect_true(all(c("degree", "fval", "status", "cached") %in% names(auto$degree.search$trace)))
+  expect_identical(nrow(auto$degree.search$trace), auto$degree.search$n.unique)
+  expect_identical(auto$degree.search$n.cached, auto$degree.search$n.visits - auto$degree.search$n.unique)
 
   manual <- npcdensbw(
     y ~ x,

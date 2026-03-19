@@ -597,6 +597,7 @@
   state$trace_id <- 0L
   state$eval_id <- 0L
   state$visit_id <- 0L
+  state$cached_visits <- 0L
   state$best_record <- NULL
   state$best_payload <- NULL
   state$baseline_record <- NULL
@@ -642,8 +643,9 @@
 
     if (exists(key, envir = state$cache, inherits = FALSE)) {
       cached <- get(key, envir = state$cache, inherits = FALSE)
+      state$cached_visits <- state$cached_visits + 1L
       cached$cached <- TRUE
-      return(state$record_trace(cached))
+      return(cached)
     }
 
     started <- proc.time()[3]
@@ -835,6 +837,8 @@
     best = state$best_record,
     best_payload = state$best_payload,
     n.unique = state$eval_id,
+    n.visits = state$visit_id,
+    n.cached = state$cached_visits,
     grid.size = grid.size,
     restart.starts = restart_starts,
     trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name)

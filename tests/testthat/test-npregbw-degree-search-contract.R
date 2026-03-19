@@ -97,6 +97,8 @@ test_that("npregbw exhaustive degree search matches manual profile minimum", {
   expect_lte(auto$fval, min(bw0$fval, bw1$fval) + 1e-10)
   expect_lte(auto$degree.search$best.fval, auto$degree.search$baseline.fval + 1e-10)
   expect_true(all(c("degree", "fval", "status", "cached") %in% names(auto$degree.search$trace)))
+  expect_identical(nrow(auto$degree.search$trace), auto$degree.search$n.unique)
+  expect_identical(auto$degree.search$n.cached, auto$degree.search$n.visits - auto$degree.search$n.unique)
 
   manual <- npregbw(
     y ~ x,
@@ -156,6 +158,8 @@ test_that("npregbw coordinate search can be exhaustively certified on a small gr
   expect_equal(as.integer(coordinate$degree), as.integer(exhaustive$degree))
   expect_equal(coordinate$fval, exhaustive$fval, tolerance = 1e-10)
   expect_lte(coordinate$degree.search$best.fval, coordinate$degree.search$baseline.fval + 1e-10)
+  expect_identical(nrow(coordinate$degree.search$trace), coordinate$degree.search$n.unique)
+  expect_identical(coordinate$degree.search$n.cached, coordinate$degree.search$n.visits - coordinate$degree.search$n.unique)
 })
 
 test_that("npregbw automatic degree search enforces pilot guardrails", {
@@ -319,6 +323,9 @@ test_that("coordinate search skips incumbent cell revisits within a sweep", {
   )
 
   expect_identical(result$n.unique, 5L)
+  expect_identical(result$n.visits, 5L)
+  expect_identical(result$n.cached, 0L)
+  expect_identical(nrow(result$trace), result$n.unique)
   expect_false(any(result$trace$cached))
 })
 
