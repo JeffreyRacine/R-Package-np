@@ -119,6 +119,7 @@
   env$bandwidth_label <- NULL
   env$bandwidth_state <- NULL
   env$bandwidth_old_messages <- NULL
+  env$bandwidth_context_label <- NULL
   env$iv_depth <- 0L
   env$iv_label <- NULL
   env$iv_state <- NULL
@@ -126,6 +127,22 @@
   env$force_enabled <- FALSE
   env
 })
+
+.np_progress_bandwidth_set_context <- function(label = NULL) {
+  if (is.null(label)) {
+    .np_progress_runtime$bandwidth_context_label <- NULL
+    return(invisible(NULL))
+  }
+
+  label <- as.character(label)[1L]
+  if (is.na(label) || !nzchar(label)) {
+    .np_progress_runtime$bandwidth_context_label <- NULL
+    return(invisible(NULL))
+  }
+
+  .np_progress_runtime$bandwidth_context_label <- label
+  invisible(NULL)
+}
 
 .np_progress_make_registry <- function() {
   env <- new.env(parent = emptyenv())
@@ -1673,6 +1690,7 @@
   .np_progress_runtime$bandwidth_label <- NULL
   .np_progress_runtime$bandwidth_state <- NULL
   .np_progress_runtime$bandwidth_old_messages <- NULL
+  .np_progress_runtime$bandwidth_context_label <- NULL
   .np_progress_runtime$force_enabled <- FALSE
   invisible(NULL)
 }
@@ -1700,6 +1718,11 @@
       .np_progress_runtime$bandwidth_state <- .np_progress_bandwidth_initialize_state(
         .np_progress_runtime$bandwidth_state
       )
+      context_label <- .np_progress_runtime$bandwidth_context_label
+      if (!is.null(context_label) && nzchar(context_label)) {
+        .np_progress_bandwidth_set_coordinator(total_groups = 1L, local_total = 1L)
+        .np_progress_bandwidth_set_coordinator_group(1L, context_label)
+      }
     }
   }
 

@@ -116,3 +116,42 @@ test_that("dark-launched completion-estimate heartbeats keep the unknown-total t
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 22, elapsed 6\\.2s, 77\\.5%, eta 1\\.8s\\)$", complete_lines)))
   expect_true(all(diff(complete_times[seq_len(min(2L, length(complete_times)))]) >= 2.0))
 })
+
+test_that("bandwidth progress can carry a coordinator context label such as degree", {
+  select_bw <- getFromNamespace(".np_progress_select_bandwidth", "np")
+  set_total <- getFromNamespace(".np_progress_bandwidth_set_total", "np")
+  activity_bw <- getFromNamespace(".np_progress_bandwidth_activity_step", "np")
+  step_bw <- getFromNamespace(".np_progress_bandwidth_multistart_step", "np")
+  set_context <- getFromNamespace(".np_progress_bandwidth_set_context", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.bandwidth.enhanced = TRUE,
+    np.progress.start.grace.unknown.sec = 0
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      set_context("deg (1,0)")
+      on.exit(set_context(NULL), add = TRUE)
+      value <- select_bw("Selecting regression bandwidth", {
+        set_total(2L)
+        activity_bw(20L)
+        step_bw(1L, 2L)
+        activity_bw(21L)
+        13
+      })
+      expect_identical(value, 13)
+    },
+    now = progress_time_values(c(0, 1.0, 4.0, 6.2, 8.4))
+  )
+
+  lines <- shadow_lines(actual)
+
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\)\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 1/2, iteration 20, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 2/2, iteration 21, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
+})
