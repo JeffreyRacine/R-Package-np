@@ -526,7 +526,7 @@ npregbw.rbandwidth <-
 }
 
 .npregbw_nomad_controls <- function(search.engine) {
-  match.arg(search.engine, c("nomad+powell", "cell", "nomad"))
+  .np_degree_search_engine_controls(search.engine)
 }
 
 .npregbw_nomad_bw_setup <- function(xdat, template, bandwidth.scale.categorical = 1e4) {

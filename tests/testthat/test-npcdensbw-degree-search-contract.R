@@ -31,6 +31,7 @@ test_that("npcdensbw exhaustive degree search matches manual profile minimum", {
     data = dat,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -77,6 +78,7 @@ test_that("npcdensbw coordinate search can be exhaustively certified on a small 
     data = dat,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -88,6 +90,7 @@ test_that("npcdensbw coordinate search can be exhaustively certified on a small 
     data = dat,
     regtype = "lp",
     degree.select = "coordinate",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     degree.verify = TRUE,
@@ -134,6 +137,7 @@ test_that("npcdensbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bernstein.basis = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 4L,
       bwtype = "fixed",
@@ -159,6 +163,7 @@ test_that("npcdens forwards automatic LP degree search through npcdensbw", {
       data = dat,
       regtype = "lp",
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -171,4 +176,31 @@ test_that("npcdens forwards automatic LP degree search through npcdensbw", {
   expect_s3_class(fit$bws, "conbandwidth")
   expect_false(is.null(fit$bws$degree.search))
   expect_identical(fit$bws$degree.search$mode, "exhaustive")
+})
+
+test_that("npcdensbw automatic degree search defaults to NOMAD plus Powell", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  dat <- data.frame(x = sort(runif(18)))
+  dat$y <- dat$x + rnorm(nrow(dat), sd = 0.08)
+
+  bw <- np::npcdensbw(
+    y ~ x,
+    data = dat,
+    regtype = "lp",
+    degree.select = "coordinate",
+    degree.min = 0L,
+    degree.max = 1L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+
+  expect_identical(bw$degree.search$mode, "nomad+powell")
+  expect_true(isTRUE(bw$degree.search$completed))
+  expect_lte(bw$degree.search$best.fval, bw$degree.search$baseline.fval + 1e-8)
 })

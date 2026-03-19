@@ -43,6 +43,10 @@
   list(lower = lower, upper = upper, candidates = candidates)
 }
 
+.np_degree_search_engine_controls <- function(search.engine) {
+  match.arg(search.engine, c("nomad+powell", "cell", "nomad"))
+}
+
 .np_degree_trace_to_frame <- function(records, objective_name = "objective") {
   if (!length(records)) {
     out <- data.frame(

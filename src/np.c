@@ -1085,7 +1085,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                int * glp_basis,
                                int * regtype,
                                double * cxkerlb, double * cxkerub,
-                               double * cykerlb, double * cykerub);
+                               double * cykerlb, double * cykerub,
+                               const int eval_only);
 void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     double * u_uno, double * u_ord, double * u_con,
                                     double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
@@ -2972,27 +2973,28 @@ SEXP C_np_distribution_bw(SEXP myuno,
   return out;
 }
 
-SEXP C_np_density_conditional_bw(SEXP c_uno,
-                                 SEXP c_ord,
-                                 SEXP c_con,
-                                 SEXP u_uno,
-                                 SEXP u_ord,
-                                 SEXP u_con,
-                                 SEXP mysd,
-                                 SEXP myopti,
-                                 SEXP myoptd,
-                                 SEXP bw,
-                                 SEXP hist_len,
-                                 SEXP penalty_mode,
-                                 SEXP penalty_mult,
-                                 SEXP glp_degree,
-                                 SEXP glp_bernstein,
-                                 SEXP glp_basis,
-                                 SEXP regtype,
-                                 SEXP cxkerlb,
-                                 SEXP cxkerub,
-                                 SEXP cykerlb,
-                                 SEXP cykerub)
+static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
+                                               SEXP c_ord,
+                                               SEXP c_con,
+                                               SEXP u_uno,
+                                               SEXP u_ord,
+                                               SEXP u_con,
+                                               SEXP mysd,
+                                               SEXP myopti,
+                                               SEXP myoptd,
+                                               SEXP bw,
+                                               SEXP hist_len,
+                                               SEXP penalty_mode,
+                                               SEXP penalty_mult,
+                                               SEXP glp_degree,
+                                               SEXP glp_bernstein,
+                                               SEXP glp_basis,
+                                               SEXP regtype,
+                                               SEXP cxkerlb,
+                                               SEXP cxkerub,
+                                               SEXP cykerlb,
+                                               SEXP cykerub,
+                                               const int eval_only)
 {
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
   SEXP mysd_r=R_NilValue, myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue;
@@ -3052,7 +3054,8 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
                             REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                             REAL(out_fast), &pmode, &pmult,
                             INTEGER(degree_i), &bern, &basis, &ll_mode,
-                            cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
+                            cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
+                            eval_only);
 
   PROTECT(out = allocVector(VECSXP, 7));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -3281,6 +3284,64 @@ SEXP C_np_kernelsum(SEXP tuno,
 
   UNPROTECT(22);
   return out;
+}
+
+SEXP C_np_density_conditional_bw(SEXP c_uno,
+                                 SEXP c_ord,
+                                 SEXP c_con,
+                                 SEXP u_uno,
+                                 SEXP u_ord,
+                                 SEXP u_con,
+                                 SEXP mysd,
+                                 SEXP myopti,
+                                 SEXP myoptd,
+                                 SEXP bw,
+                                 SEXP hist_len,
+                                 SEXP penalty_mode,
+                                 SEXP penalty_mult,
+                                 SEXP glp_degree,
+                                 SEXP glp_bernstein,
+                                 SEXP glp_basis,
+                                 SEXP regtype,
+                                 SEXP cxkerlb,
+                                 SEXP cxkerub,
+                                 SEXP cykerlb,
+                                 SEXP cykerub)
+{
+  return C_np_density_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
+                                            mysd, myopti, myoptd, bw, hist_len,
+                                            penalty_mode, penalty_mult,
+                                            glp_degree, glp_bernstein, glp_basis, regtype,
+                                            cxkerlb, cxkerub, cykerlb, cykerub, 0);
+}
+
+SEXP C_np_density_conditional_bw_eval(SEXP c_uno,
+                                      SEXP c_ord,
+                                      SEXP c_con,
+                                      SEXP u_uno,
+                                      SEXP u_ord,
+                                      SEXP u_con,
+                                      SEXP mysd,
+                                      SEXP myopti,
+                                      SEXP myoptd,
+                                      SEXP bw,
+                                      SEXP hist_len,
+                                      SEXP penalty_mode,
+                                      SEXP penalty_mult,
+                                      SEXP glp_degree,
+                                      SEXP glp_bernstein,
+                                      SEXP glp_basis,
+                                      SEXP regtype,
+                                      SEXP cxkerlb,
+                                      SEXP cxkerub,
+                                      SEXP cykerlb,
+                                      SEXP cykerub)
+{
+  return C_np_density_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
+                                            mysd, myopti, myoptd, bw, hist_len,
+                                            penalty_mode, penalty_mult,
+                                            glp_degree, glp_bernstein, glp_basis, regtype,
+                                            cxkerlb, cxkerub, cykerlb, cykerub, 1);
 }
 
 SEXP C_np_quantile_conditional(SEXP tc_con,
@@ -4889,7 +4950,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                int * glp_basis,
                                int * regtype,
                                double * cxkerlb, double * cxkerub,
-                               double * cykerlb, double * cykerub){
+                               double * cykerlb, double * cykerub,
+                               const int eval_only){
   int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
@@ -5546,40 +5608,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
   }
 
-  powell(0,
-         0,
-         vector_scale_factor,
-         vector_scale_factor,
-         matrix_y,
-         num_all_var,
-         ftol,
-         tol,
-         small,
-         itmax,
-         &iter,
-         &fret,
-         bwmfunc_wrapper);
-
-  if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-
-    initialize_nr_directions(BANDWIDTH_den_extern,
-                             num_obs_train_extern,
-                             num_reg_continuous_extern,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             num_var_continuous_extern,
-                             num_var_unordered_extern,
-                             num_var_ordered_extern,
-                             vsfh,
-                             num_categories_extern,
-                             matrix_y,
-                             0, int_RANDOM_SEED,  
-                             lbc_dir, dfc_dir, c_dir, initc_dir,
-                             lbd_dir, hbd_dir, d_dir, initd_dir,
-                             matrix_X_continuous_train_extern,
-                             matrix_Y_continuous_train_extern);
-
-
+  if(!eval_only){
     powell(0,
            0,
            vector_scale_factor,
@@ -5594,6 +5623,43 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
            &fret,
            bwmfunc_wrapper);
 
+    if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
+
+      initialize_nr_directions(BANDWIDTH_den_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
+                               num_reg_unordered_extern,
+                               num_reg_ordered_extern,
+                               num_var_continuous_extern,
+                               num_var_unordered_extern,
+                               num_var_ordered_extern,
+                               vsfh,
+                               num_categories_extern,
+                               matrix_y,
+                               0, int_RANDOM_SEED,  
+                               lbc_dir, dfc_dir, c_dir, initc_dir,
+                               lbd_dir, hbd_dir, d_dir, initd_dir,
+                               matrix_X_continuous_train_extern,
+                               matrix_Y_continuous_train_extern);
+
+
+      powell(0,
+             0,
+             vector_scale_factor,
+             vector_scale_factor,
+             matrix_y,
+             num_all_var,
+             ftol,
+             tol,
+             small,
+             itmax,
+             &iter,
+             &fret,
+             bwmfunc_wrapper);
+
+    }
+  } else {
+    fret = fret_best;
   }
 
   if (enforce_fixed_feasibility &&
@@ -5640,7 +5706,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
-  if(iMultistart == IMULTI_TRUE){
+  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
