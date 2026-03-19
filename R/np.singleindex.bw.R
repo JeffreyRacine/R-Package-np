@@ -265,6 +265,135 @@ npindexbw.NULL <-
   fit.loo
 }
 
+.npindexbw_build_sibandwidth <- function(xdat,
+                                         ydat,
+                                         bws,
+                                         template,
+                                         bandwidth.compute,
+                                         reg.args) {
+  p <- ncol(xdat)
+  do.call(
+    sibandwidth,
+    c(
+      list(
+        beta = bws[seq_len(p)],
+        h = bws[p + 1L],
+        method = template$method,
+        ckertype = template$ckertype,
+        ckerorder = template$ckerorder,
+        ckerbound = template$ckerbound,
+        ckerlb = template$ckerlb,
+        ckerub = template$ckerub,
+        bwtype = template$type,
+        nobs = nrow(xdat),
+        xdati = untangle(xdat),
+        ydati = untangle(data.frame(ydat)),
+        xnames = names(xdat),
+        ynames = template$ynames,
+        bandwidth = bws[p + 1L],
+        bandwidth.compute = bandwidth.compute
+      ),
+      reg.args
+    )
+  )
+}
+
+.npindexbw_run_fixed_degree <- function(xdat, ydat, bws, template, reg.args, opt.args) {
+  tbw <- .npindexbw_build_sibandwidth(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws,
+    template = template,
+    bandwidth.compute = opt.args$bandwidth.compute,
+    reg.args = reg.args
+  )
+
+  do.call(npindexbw.sibandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
+}
+
+.npindexbw_degree_search_controls <- function(regtype,
+                                              regtype.named,
+                                              bandwidth.compute,
+                                              degree.select,
+                                              degree.min,
+                                              degree.max,
+                                              degree.start,
+                                              degree.restarts,
+                                              degree.max.cycles,
+                                              degree.verify,
+                                              bernstein.basis,
+                                              bernstein.named) {
+  degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
+  if (identical(degree.select, "manual"))
+    return(NULL)
+
+  regtype.requested <- if (isTRUE(regtype.named)) match.arg(regtype, c("lc", "ll", "lp")) else "lc"
+  if (!identical(regtype.requested, "lp"))
+    stop("automatic degree search currently requires regtype='lp'")
+  if (!isTRUE(bandwidth.compute))
+    stop("automatic degree search requires bandwidth.compute=TRUE")
+
+  bern.auto <- if (isTRUE(bernstein.named)) bernstein.basis else TRUE
+  bern.auto <- npValidateGlpBernstein(regtype = "lp", bernstein.basis = bern.auto)
+
+  bounds <- .np_degree_normalize_bounds(
+    ncon = 1L,
+    degree.min = degree.min,
+    degree.max = degree.max,
+    default.max = 3L
+  )
+
+  if (!isTRUE(bern.auto) && any(bounds$upper > 3L))
+    stop("automatic degree search with bernstein.basis=FALSE currently requires degree.max <= 3")
+
+  baseline.degree <- 0L
+  start.degree <- if (is.null(degree.start)) {
+    pmax(bounds$lower, pmin(bounds$upper, baseline.degree))
+  } else {
+    start.raw <- npValidateGlpDegree(
+      regtype = "lp",
+      degree = degree.start,
+      ncon = 1L,
+      argname = "degree.start"
+    )
+    if (!(start.raw[1L] %in% bounds$candidates[[1L]]))
+      stop("degree.start must lie within the searched degree candidates")
+    start.raw
+  }
+
+  list(
+    method = degree.select,
+    candidates = bounds$candidates,
+    baseline.degree = as.integer(baseline.degree),
+    start.degree = as.integer(start.degree),
+    restarts = npValidateNonNegativeInteger(degree.restarts, "degree.restarts"),
+    max.cycles = npValidatePositiveInteger(degree.max.cycles, "degree.max.cycles"),
+    verify = npValidateScalarLogical(degree.verify, "degree.verify"),
+    bernstein.basis = bern.auto
+  )
+}
+
+.npindexbw_attach_degree_search <- function(bws, search_result) {
+  metadata <- list(
+    mode = search_result$method,
+    verify = isTRUE(search_result$verify),
+    completed = isTRUE(search_result$completed),
+    certified = isTRUE(search_result$certified),
+    interrupted = isTRUE(search_result$interrupted),
+    baseline.degree = search_result$baseline$degree,
+    baseline.fval = search_result$baseline$objective,
+    best.degree = search_result$best$degree,
+    best.fval = search_result$best$objective,
+    n.unique = search_result$n.unique,
+    grid.size = search_result$grid.size,
+    restart.starts = lapply(search_result$restart.starts, as.integer),
+    trace = search_result$trace
+  )
+
+  bws$degree.search <- metadata
+  bws
+}
+
 npindexbw.default <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
@@ -273,6 +402,13 @@ npindexbw.default <-
            basis = c("glp", "additive", "tensor"),
            bernstein.basis = FALSE,
            degree = NULL,
+           degree.select = c("manual", "coordinate", "exhaustive"),
+           degree.min = NULL,
+           degree.max = NULL,
+           degree.start = NULL,
+           degree.restarts = 0L,
+           degree.max.cycles = 20L,
+           degree.verify = FALSE,
            nmulti,
            only.optimize.beta,
            optim.abstol,
@@ -302,8 +438,24 @@ npindexbw.default <-
                  "See documentation for details."))
 
     p <- ncol(xdat)
+    mc <- match.call(expand.dots = FALSE)
+    mc.names <- names(mc)
+    degree.search <- .npindexbw_degree_search_controls(
+      regtype = regtype,
+      regtype.named = "regtype" %in% mc.names,
+      bandwidth.compute = bandwidth.compute,
+      degree.select = if ("degree.select" %in% mc.names) degree.select else "manual",
+      degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
+      degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
+      degree.start = if ("degree.start" %in% mc.names) degree.start else NULL,
+      degree.restarts = if ("degree.restarts" %in% mc.names) degree.restarts else 0L,
+      degree.max.cycles = if ("degree.max.cycles" %in% mc.names) degree.max.cycles else 20L,
+      degree.verify = if ("degree.verify" %in% mc.names) degree.verify else FALSE,
+      bernstein.basis = bernstein.basis,
+      bernstein.named = "bernstein.basis" %in% mc.names
+    )
     spec <- npResolveCanonicalConditionalRegSpec(
-      mc.names = names(match.call(expand.dots = FALSE)),
+      mc.names = mc.names,
       regtype = regtype,
       basis = basis,
       degree = degree,
@@ -311,6 +463,10 @@ npindexbw.default <-
       ncon = 1L,
       where = "npindexbw"
     )
+    if (!is.null(degree.search)) {
+      spec$bernstein.basis <- degree.search$bernstein.basis
+      spec$bernstein.basis.engine <- degree.search$bernstein.basis
+    }
     tbw <- sibandwidth(beta = bws[seq_len(p)],
                        h = bws[p+1L], ...,
                        regtype = spec$regtype,
@@ -334,13 +490,69 @@ npindexbw.default <-
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
+    bwsel.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+    if (any.m) {
+      nms <- mc.names[m]
+      bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+    }
 
-    if (bandwidth.compute) {
-      bwsel.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
-      if (any.m) {
-        nms <- mc.names[m]
-        bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+    if (bandwidth.compute && !is.null(degree.search)) {
+      reg.args <- list(
+        regtype = spec$regtype,
+        basis = spec$basis,
+        degree = spec$degree,
+        bernstein.basis = spec$bernstein.basis,
+        regtype.engine = spec$regtype.engine,
+        basis.engine = spec$basis.engine,
+        degree.engine = spec$degree.engine,
+        bernstein.basis.engine = spec$bernstein.basis.engine
+      )
+      opt.args <- c(
+        list(bandwidth.compute = bandwidth.compute),
+        bwsel.args[setdiff(names(bwsel.args), c("xdat", "ydat", "bws"))]
+      )
+
+      eval_fun <- function(degree.vec) {
+        cell.reg.args <- reg.args
+        cell.reg.args$regtype <- "lp"
+        cell.reg.args$degree <- as.integer(degree.vec)
+        cell.reg.args$bernstein.basis <- degree.search$bernstein.basis
+        cell.reg.args$regtype.engine <- "lp"
+        cell.reg.args$degree.engine <- as.integer(degree.vec)
+        cell.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
+        cell.bws <- .npindexbw_run_fixed_degree(
+          xdat = xdat,
+          ydat = ydat,
+          bws = bws,
+          template = tbw,
+          reg.args = cell.reg.args,
+          opt.args = opt.args
+        )
+        list(
+          objective = as.numeric(cell.bws$fval[1L]),
+          payload = cell.bws,
+          num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_
+        )
       }
+
+      search.result <- .np_degree_search(
+        method = degree.search$method,
+        candidates = degree.search$candidates,
+        baseline_degree = degree.search$baseline.degree,
+        start_degree = degree.search$start.degree,
+        restarts = degree.search$restarts,
+        max_cycles = degree.search$max.cycles,
+        verify = degree.search$verify,
+        eval_fun = eval_fun,
+        direction = "min",
+        trace_level = "full",
+        objective_name = "fval"
+      )
+      tbw <- .npindexbw_attach_degree_search(
+        bws = search.result$best_payload,
+        search_result = search.result
+      )
+    } else if (bandwidth.compute) {
       tbw <- .np_progress_select_bandwidth_enhanced(
         "Selecting single-index bandwidth",
         do.call(npindexbw.sibandwidth, bwsel.args)
