@@ -7352,6 +7352,10 @@ compute.bootstrap.errors.conbandwidth =
       stop("no canonical helper path available for this conditional bootstrap configuration", call. = FALSE)
 
     if (!identical(tboo, "quant") && isTRUE(proper)) {
+      proper.progress.label <- .np_plot_bootstrap_stage_label(
+        stage = "Projecting proper bootstrap surfaces",
+        target_label = progress.target
+      )
       proper.template <- list(
         xeval = exdat,
         yeval = eydat,
@@ -7375,7 +7379,11 @@ compute.bootstrap.errors.conbandwidth =
           ), call. = FALSE)
         }
         boot.out$t0 <- .np_condist_project_values_with_plan(boot.out$t0, proper.plan)
-        boot.out$t <- .np_condist_project_values_with_plan(boot.out$t, proper.plan)
+        boot.out$t <- .np_condist_project_values_with_plan(
+          boot.out$t,
+          proper.plan,
+          progress.label = proper.progress.label
+        )
       } else {
         proper.plan <- .np_condens_prepare_proper_plan(
           object = proper.template,
@@ -7388,7 +7396,11 @@ compute.bootstrap.errors.conbandwidth =
           ), call. = FALSE)
         }
         boot.out$t0 <- .np_condens_project_values_with_plan(boot.out$t0, proper.plan)
-        boot.out$t <- .np_condens_project_values_with_plan(boot.out$t, proper.plan)
+        boot.out$t <- .np_condens_project_values_with_plan(
+          boot.out$t,
+          proper.plan,
+          progress.label = proper.progress.label
+        )
       }
     }
 

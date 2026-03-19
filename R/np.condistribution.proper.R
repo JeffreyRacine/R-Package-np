@@ -214,7 +214,9 @@
   )
 }
 
-.np_condist_project_values_with_plan <- function(values, plan) {
+.np_condist_project_values_with_plan <- function(values,
+                                                 plan,
+                                                 progress.label = NULL) {
   if (!isTRUE(plan$supported))
     stop("proper projection plan is not supported")
 
@@ -229,6 +231,14 @@
     stop("value length mismatch for proper distribution projection")
 
   out <- values.mat
+  progress <- NULL
+  if (!is.vector.input && !is.null(progress.label) && nrow(values.mat) > 1L) {
+    progress <- .np_plot_stage_progress_begin(
+      total = nrow(values.mat),
+      label = as.character(progress.label)[1L]
+    )
+    on.exit(.np_plot_progress_end(progress), add = TRUE)
+  }
   for (row in seq_len(nrow(values.mat))) {
     for (idx in plan$slices) {
       out[row, idx] <- .np_condist_project_bounded_isotonic(
@@ -239,6 +249,8 @@
         tol = plan$proper.control$tol
       )
     }
+    if (!is.null(progress))
+      progress <- .np_plot_progress_tick(state = progress, done = row)
   }
 
   if (is.vector.input) as.vector(out[1L, ]) else out
