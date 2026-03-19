@@ -36,6 +36,7 @@ test_that("npplregbw exhaustive degree search matches manual profile minimum", {
     ydat = y,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -84,6 +85,7 @@ test_that("npplregbw coordinate search can be exhaustively certified on a small 
     ydat = y,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -96,6 +98,7 @@ test_that("npplregbw coordinate search can be exhaustively certified on a small 
     ydat = y,
     regtype = "lp",
     degree.select = "coordinate",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     degree.verify = TRUE,
@@ -130,6 +133,7 @@ test_that("npplregbw automatic degree search enforces pilot guardrails", {
       ydat = y,
       regtype = "lc",
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -147,6 +151,7 @@ test_that("npplregbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bandwidth.compute = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bws = matrix(0.2, nrow = 2L, ncol = 1L)
@@ -162,6 +167,7 @@ test_that("npplregbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bernstein.basis = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 4L,
       bwtype = "fixed",
@@ -189,6 +195,7 @@ test_that("npplreg forwards automatic LP degree search through npplregbw", {
     data = dat,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -200,4 +207,39 @@ test_that("npplreg forwards automatic LP degree search through npplregbw", {
   expect_s3_class(fit$bws, "plbandwidth")
   expect_false(is.null(fit$bws$degree.search))
   expect_identical(fit$bws$degree.search$mode, "exhaustive")
+})
+
+test_that("npplregbw automatic degree search defaults to NOMAD plus Powell", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  n <- 24
+  xdat <- data.frame(x = rnorm(n))
+  zdat <- data.frame(z = runif(n))
+  y <- 1 + 0.75 * xdat$x + sin(2 * pi * zdat$z) + rnorm(n, sd = 0.08)
+
+  auto <- npplregbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = y,
+    regtype = "lp",
+    degree.select = "coordinate",
+    degree.min = 0L,
+    degree.max = 2L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+
+  expect_s3_class(auto, "plbandwidth")
+  expect_false(is.null(auto$degree.search))
+  expect_identical(auto$degree.search$mode, "nomad+powell")
+  expect_equal(length(auto$degree), 1L)
+  expect_true(is.finite(auto$fval))
+  expect_lte(auto$degree.search$best.fval, auto$degree.search$baseline.fval + 1e-8)
+  expect_lte(auto$fval, auto$degree.search$baseline.fval + 1e-8)
+  expect_equal(auto$fval, auto$degree.search$best.fval, tolerance = 1e-8)
 })

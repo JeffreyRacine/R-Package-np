@@ -945,6 +945,49 @@ npcdistbw.condbandwidth <-
     degree <- as.integer(best_record$degree)
     bw_vec <- .npcdistbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
 
+    build_direct_payload <- function() {
+      final.reg.args <- reg.args
+      final.reg.args$regtype <- "lp"
+      final.reg.args$pregtype <- "Local-Polynomial"
+      final.reg.args$degree <- degree
+      final.reg.args$bernstein.basis <- degree.search$bernstein.basis
+      final.reg.args$regtype.engine <- "lp"
+      final.reg.args$degree.engine <- degree
+      final.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
+
+      tbw <- .npcdistbw_build_condbandwidth(
+        xdat = xdat,
+        ydat = ydat,
+        bws = bw_vec,
+        bandwidth.compute = FALSE,
+        reg.args = final.reg.args
+      )
+      tbw$fval <- as.numeric(best_record$objective)
+      tbw$ifval <- as.numeric(best_record$objective)
+      tbw$num.feval <- if (!is.null(solution$bbe)) as.numeric(solution$bbe) else as.numeric(best_record$num.feval)
+      tbw$num.feval.fast <- 0
+      tbw$fval.history <- as.numeric(best_record$objective)
+      tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
+      tbw$invalid.history <- 0
+      tbw$timing <- NA_real_
+      tbw$total.time <- NA_real_
+
+      npcdistbw.condbandwidth(
+        xdat = xdat,
+        ydat = ydat,
+        bws = tbw,
+        bandwidth.compute = FALSE
+      )
+    }
+
+    use.baseline.payload <- identical(as.integer(degree), as.integer(degree.search$baseline.degree))
+    direct.payload <- if (isTRUE(use.baseline.payload)) baseline.bws else build_direct_payload()
+    direct.objective <- if (isTRUE(use.baseline.payload)) {
+      as.numeric(baseline.record$objective)
+    } else {
+      as.numeric(best_record$objective)
+    }
+
     if (identical(degree.search$engine, "nomad+powell")) {
       hot.reg.args <- reg.args
       hot.reg.args$regtype <- "lp"
@@ -956,47 +999,21 @@ npcdistbw.condbandwidth <-
       hot.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
       hot.opt.args <- opt.args
       hot.opt.args$nmulti <- 0L
-      return(.npcdistbw_run_fixed_degree(
+      hot.payload <- .npcdistbw_run_fixed_degree(
         xdat = xdat,
         ydat = ydat,
         bws = bw_vec,
         reg.args = hot.reg.args,
         opt.args = hot.opt.args
-      ))
+      )
+      hot.objective <- as.numeric(hot.payload$fval[1L])
+      if (is.finite(hot.objective) &&
+          .np_degree_better(hot.objective, direct.objective, direction = "min")) {
+        return(list(payload = hot.payload, objective = hot.objective))
+      }
     }
 
-    final.reg.args <- reg.args
-    final.reg.args$regtype <- "lp"
-    final.reg.args$pregtype <- "Local-Polynomial"
-    final.reg.args$degree <- degree
-    final.reg.args$bernstein.basis <- degree.search$bernstein.basis
-    final.reg.args$regtype.engine <- "lp"
-    final.reg.args$degree.engine <- degree
-    final.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
-
-    tbw <- .npcdistbw_build_condbandwidth(
-      xdat = xdat,
-      ydat = ydat,
-      bws = bw_vec,
-      bandwidth.compute = FALSE,
-      reg.args = final.reg.args
-    )
-    tbw$fval <- as.numeric(best_record$objective)
-    tbw$ifval <- as.numeric(best_record$objective)
-    tbw$num.feval <- if (!is.null(solution$bbe)) as.numeric(solution$bbe) else as.numeric(best_record$num.feval)
-    tbw$num.feval.fast <- 0
-    tbw$fval.history <- as.numeric(best_record$objective)
-    tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
-    tbw$invalid.history <- 0
-    tbw$timing <- NA_real_
-    tbw$total.time <- NA_real_
-
-    npcdistbw.condbandwidth(
-      xdat = xdat,
-      ydat = ydat,
-      bws = tbw,
-      bandwidth.compute = FALSE
-    )
+    list(payload = direct.payload, objective = direct.objective)
   }
 
   .np_nomad_search(

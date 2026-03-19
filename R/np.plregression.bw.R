@@ -292,11 +292,21 @@ npplregbw.plbandwidth =
   )
 }
 
+.npplregbw_child_responses <- function(xdat, ydat, yname = deparse(substitute(ydat))) {
+  c(
+    list(list(values = ydat, name = yname)),
+    lapply(seq_len(ncol(xdat)), function(i) {
+      list(values = xdat[, i], name = names(xdat)[i])
+    })
+  )
+}
+
 .npplregbw_degree_search_controls <- function(regtype,
                                               regtype.named,
                                               bandwidth.compute,
                                               ncon,
                                               degree.select,
+                                              search.engine,
                                               degree.min,
                                               degree.max,
                                               degree.start,
@@ -308,6 +318,7 @@ npplregbw.plbandwidth =
   degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
   if (identical(degree.select, "manual"))
     return(NULL)
+  search.engine <- .np_degree_search_engine_controls(search.engine)
 
   regtype.requested <- if (isTRUE(regtype.named)) match.arg(regtype, c("lc", "ll", "lp")) else "lc"
   if (!identical(regtype.requested, "lp"))
@@ -342,8 +353,11 @@ npplregbw.plbandwidth =
   }
 
   list(
-    method = degree.select,
+    method = if (identical(search.engine, "cell")) degree.select else search.engine,
+    engine = search.engine,
     candidates = bounds$candidates,
+    lower = bounds$lower,
+    upper = bounds$upper,
     baseline.degree = baseline.degree,
     start.degree = start.degree,
     restarts = npValidateNonNegativeInteger(degree.restarts, "degree.restarts"),
@@ -376,6 +390,247 @@ npplregbw.plbandwidth =
   bws
 }
 
+.npplregbw_nomad_search <- function(xdat,
+                                    ydat,
+                                    zdat,
+                                    bws,
+                                    reg.args,
+                                    outer.args,
+                                    opt.args,
+                                    degree.search) {
+  if (isTRUE(degree.search$verify))
+    stop("automatic degree search with search.engine='nomad' does not support degree.verify")
+
+  baseline.reg.args <- reg.args
+  baseline.reg.args$regtype <- "lp"
+  baseline.reg.args$degree <- as.integer(degree.search$baseline.degree)
+  baseline.reg.args$bernstein.basis <- degree.search$bernstein.basis
+  baseline.outer.args <- outer.args
+  baseline.outer.args$regtype <- "lp"
+  baseline.outer.args$degree <- as.integer(degree.search$baseline.degree)
+  baseline.outer.args$bernstein.basis <- degree.search$bernstein.basis
+
+  baseline.bws <- .npplregbw_run_fixed_degree(
+    xdat = xdat,
+    ydat = ydat,
+    zdat = zdat,
+    bws = bws,
+    reg.args = baseline.reg.args,
+    outer.args = baseline.outer.args,
+    opt.args = opt.args
+  )
+
+  child.templates <- baseline.bws$bw
+  if (!length(child.templates))
+    stop("automatic degree search with search.engine='nomad' could not initialize child bandwidth templates")
+  if (any(vapply(child.templates, function(tb) !identical(tb$type, "fixed"), logical(1))))
+    stop("automatic degree search with search.engine='nomad' currently requires bwtype='fixed'")
+
+  child.responses <- .npplregbw_child_responses(
+    xdat = xdat,
+    ydat = ydat,
+    yname = baseline.bws$ynames
+  )
+  child.setup <- lapply(child.templates, function(tb) .npregbw_nomad_bw_setup(xdat = zdat, template = tb))
+  child.point.length <- vapply(seq_along(child.templates), function(i) {
+    length(.npregbw_nomad_bw_to_point(child.templates[[i]]$bw, template = child.templates[[i]], setup = child.setup[[i]]))
+  }, integer(1L))
+
+  baseline.record <- list(
+    eval_id = 0L,
+    degree = as.integer(degree.search$baseline.degree),
+    objective = as.numeric(baseline.bws$fval[1L]),
+    status = "ok",
+    cached = FALSE,
+    message = NULL,
+    elapsed = 0,
+    num.feval = if (!is.null(baseline.bws$num.feval)) as.numeric(baseline.bws$num.feval[1L]) else NA_real_
+  )
+
+  child.lower <- unlist(lapply(child.setup, function(setup) {
+    c(rep.int(1e-2, length(setup$cont_idx)), rep.int(0, length(setup$cat_idx)))
+  }), use.names = FALSE)
+  child.upper <- unlist(lapply(child.setup, function(setup) {
+    c(rep.int(1e6, length(setup$cont_idx)), setup$cat_upper * setup$bandwidth.scale.categorical)
+  }), use.names = FALSE)
+  child.start <- unlist(lapply(seq_along(child.templates), function(i) {
+    .npregbw_nomad_bw_to_point(child.templates[[i]]$bw, template = child.templates[[i]], setup = child.setup[[i]])
+  }), use.names = FALSE)
+  bwdim <- length(child.start)
+  ndeg <- length(degree.search$baseline.degree)
+
+  x0 <- c(child.start, as.integer(degree.search$start.degree))
+  lb <- c(child.lower, degree.search$lower)
+  ub <- c(child.upper, degree.search$upper)
+  bbin <- c(rep.int(0L, bwdim), rep.int(1L, ndeg))
+
+  point_to_matrix <- function(point) {
+    cursor <- 1L
+    out <- matrix(0, nrow = length(child.templates), ncol = ncol(zdat))
+    for (i in seq_along(child.templates)) {
+      seg <- point[cursor:(cursor + child.point.length[i] - 1L)]
+      out[i, ] <- .npregbw_nomad_point_to_bw(seg, template = child.templates[[i]], setup = child.setup[[i]])
+      cursor <- cursor + child.point.length[i]
+    }
+    out
+  }
+
+  child_eval_payload <- function(bw.matrix, degree, penalty.multiplier) {
+    total.objective <- 0
+    total.feval <- 0
+    child.payloads <- vector("list", length(child.templates))
+
+    for (i in seq_along(child.templates)) {
+      child.reg.args <- reg.args
+      child.reg.args$regtype <- "lp"
+      child.reg.args$degree <- degree
+      child.reg.args$bernstein.basis <- degree.search$bernstein.basis
+      child.reg.args$bandwidth.compute <- NULL
+      resp <- child.responses[[i]]
+      tbw <- .npregbw_build_rbandwidth(
+        xdat = zdat,
+        ydat = resp$values,
+        bws = bw.matrix[i, ],
+        bandwidth.compute = FALSE,
+        reg.args = child.reg.args,
+        yname = resp$name
+      )
+      out <- .npregbw_eval_only(
+        xdat = zdat,
+        ydat = resp$values,
+        bws = tbw,
+        invalid.penalty = "baseline",
+        penalty.multiplier = penalty.multiplier
+      )
+      total.objective <- total.objective + out$objective
+      total.feval <- total.feval + out$num.feval
+      child.payloads[[i]] <- list(bws = tbw, objective = out$objective, response = resp)
+    }
+
+    list(objective = total.objective, num.feval = total.feval, child.payloads = child.payloads)
+  }
+
+  eval_fun <- function(point) {
+    point <- as.numeric(point)
+    degree <- as.integer(round(point[bwdim + seq_len(ndeg)]))
+    degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
+    bw.matrix <- point_to_matrix(point[seq_len(bwdim)])
+    out <- child_eval_payload(
+      bw.matrix = bw.matrix,
+      degree = degree,
+      penalty.multiplier = 10
+    )
+    list(
+      objective = out$objective,
+      degree = degree,
+      num.feval = out$num.feval
+    )
+  }
+
+  build_payload <- function(point, best_record, solution, interrupted) {
+    point <- as.numeric(point)
+    degree <- as.integer(best_record$degree)
+    bw.matrix <- point_to_matrix(point[seq_len(bwdim)])
+
+    build_direct_payload <- function() {
+      child.out <- child_eval_payload(
+        bw.matrix = bw.matrix,
+        degree = degree,
+        penalty.multiplier = 10
+      )
+      child.list <- vector("list", length(child.templates))
+
+      for (i in seq_along(child.templates)) {
+        resp <- child.responses[[i]]
+        tbw <- child.out$child.payloads[[i]]$bws
+        tbw$fval <- as.numeric(child.out$child.payloads[[i]]$objective)
+        tbw$ifval <- as.numeric(child.out$child.payloads[[i]]$objective)
+        tbw$num.feval <- 1
+        tbw$num.feval.fast <- 0
+        tbw$fval.history <- as.numeric(child.out$child.payloads[[i]]$objective)
+        tbw$eval.history <- 1
+        tbw$invalid.history <- 0
+        tbw$timing <- NA_real_
+        tbw$total.time <- NA_real_
+        child.list[[i]] <- npregbw.rbandwidth(
+          xdat = zdat,
+          ydat = resp$values,
+          bws = tbw,
+          bandwidth.compute = FALSE
+        )
+      }
+
+      plbw.args <- c(
+        list(
+          bws = child.list,
+          nobs = dim(xdat)[1],
+          fval = child.out$objective,
+          num.feval = if (!is.null(solution$bbe)) as.numeric(solution$bbe) else child.out$num.feval,
+          xdati = untangle(xdat),
+          ydati = untangle(data.frame(ydat)),
+          zdati = untangle(zdat),
+          xnames = names(xdat),
+          ynames = baseline.bws$ynames,
+          znames = names(zdat),
+          bandwidth.compute = TRUE
+        ),
+        modifyList(outer.args, list(regtype = "lp", degree = degree, bernstein.basis = degree.search$bernstein.basis))
+      )
+      do.call(plbandwidth, plbw.args)
+    }
+
+    use.baseline.payload <- identical(as.integer(degree), as.integer(degree.search$baseline.degree))
+    direct.payload <- if (isTRUE(use.baseline.payload)) baseline.bws else build_direct_payload()
+    direct.objective <- if (isTRUE(use.baseline.payload)) {
+      as.numeric(baseline.record$objective)
+    } else {
+      as.numeric(best_record$objective)
+    }
+
+    if (identical(degree.search$engine, "nomad+powell")) {
+      hot.reg.args <- reg.args
+      hot.reg.args$regtype <- "lp"
+      hot.reg.args$degree <- degree
+      hot.reg.args$bernstein.basis <- degree.search$bernstein.basis
+      hot.outer.args <- outer.args
+      hot.outer.args$regtype <- "lp"
+      hot.outer.args$degree <- degree
+      hot.outer.args$bernstein.basis <- degree.search$bernstein.basis
+      hot.opt.args <- opt.args
+      hot.opt.args$nmulti <- 0L
+      hot.payload <- .npplregbw_run_fixed_degree(
+        xdat = xdat,
+        ydat = ydat,
+        zdat = zdat,
+        bws = bw.matrix,
+        reg.args = hot.reg.args,
+        outer.args = hot.outer.args,
+        opt.args = hot.opt.args
+      )
+      hot.objective <- as.numeric(hot.payload$fval[1L])
+      if (is.finite(hot.objective) &&
+          .np_degree_better(hot.objective, direct.objective, direction = "min")) {
+        return(list(payload = hot.payload, objective = hot.objective))
+      }
+    }
+
+    list(payload = direct.payload, objective = direct.objective)
+  }
+
+  .np_nomad_search(
+    engine = degree.search$engine,
+    baseline_record = baseline.record,
+    x0 = x0,
+    bbin = bbin,
+    lb = lb,
+    ub = ub,
+    eval_fun = eval_fun,
+    build_payload = build_payload,
+    direction = "min",
+    objective_name = "fval"
+  )
+}
+
 npplregbw.default = 
   function(xdat = stop("invoked without data `xdat'"),
            ydat = stop("invoked without data `ydat'"),
@@ -384,6 +639,7 @@ npplregbw.default =
            bws,
            degree = NULL,
            degree.select = c("manual", "coordinate", "exhaustive"),
+           search.engine = c("nomad+powell", "cell", "nomad"),
            degree.min = NULL,
            degree.max = NULL,
            degree.start = NULL,
@@ -428,6 +684,7 @@ npplregbw.default =
       bandwidth.compute = bandwidth.compute,
       ncon = sum(untangle(zdat)$icon),
       degree.select = if ("degree.select" %in% mc.names) degree.select else "manual",
+      search.engine = if ("search.engine" %in% mc.names) search.engine else "nomad+powell",
       degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
       degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
       degree.start = if ("degree.start" %in% mc.names) degree.start else NULL,
@@ -481,44 +738,57 @@ npplregbw.default =
       }
 
       if (!is.null(degree.search)) {
-        eval_fun <- function(degree.vec) {
-          cell.reg.args <- reg.args
-          cell.reg.args$regtype <- "lp"
-          cell.reg.args$degree <- as.integer(degree.vec)
-          cell.reg.args$bernstein.basis <- degree.search$bernstein.basis
-          cell.outer.args <- outer.args
-          cell.outer.args$regtype <- "lp"
-          cell.outer.args$degree <- as.integer(degree.vec)
-          cell.outer.args$bernstein.basis <- degree.search$bernstein.basis
-          cell.bws <- .npplregbw_run_fixed_degree(
+        if (identical(degree.search$engine, "cell")) {
+          eval_fun <- function(degree.vec) {
+            cell.reg.args <- reg.args
+            cell.reg.args$regtype <- "lp"
+            cell.reg.args$degree <- as.integer(degree.vec)
+            cell.reg.args$bernstein.basis <- degree.search$bernstein.basis
+            cell.outer.args <- outer.args
+            cell.outer.args$regtype <- "lp"
+            cell.outer.args$degree <- as.integer(degree.vec)
+            cell.outer.args$bernstein.basis <- degree.search$bernstein.basis
+            cell.bws <- .npplregbw_run_fixed_degree(
+              xdat = xdat,
+              ydat = ydat,
+              zdat = zdat,
+              bws = bws,
+              reg.args = cell.reg.args,
+              outer.args = cell.outer.args,
+              opt.args = opt.args
+            )
+            list(
+              objective = as.numeric(cell.bws$fval[1L]),
+              payload = cell.bws,
+              num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_
+            )
+          }
+
+          search.result <- .np_degree_search(
+            method = degree.search$method,
+            candidates = degree.search$candidates,
+            baseline_degree = degree.search$baseline.degree,
+            start_degree = degree.search$start.degree,
+            restarts = degree.search$restarts,
+            max_cycles = degree.search$max.cycles,
+            verify = degree.search$verify,
+            eval_fun = eval_fun,
+            direction = "min",
+            trace_level = "full",
+            objective_name = "fval"
+          )
+        } else {
+          search.result <- .npplregbw_nomad_search(
             xdat = xdat,
             ydat = ydat,
             zdat = zdat,
             bws = bws,
-            reg.args = cell.reg.args,
-            outer.args = cell.outer.args,
-            opt.args = opt.args
-          )
-          list(
-            objective = as.numeric(cell.bws$fval[1L]),
-            payload = cell.bws,
-            num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_
+            reg.args = reg.args,
+            outer.args = outer.args,
+            opt.args = opt.args,
+            degree.search = degree.search
           )
         }
-
-        search.result <- .np_degree_search(
-          method = degree.search$method,
-          candidates = degree.search$candidates,
-          baseline_degree = degree.search$baseline.degree,
-          start_degree = degree.search$start.degree,
-          restarts = degree.search$restarts,
-          max_cycles = degree.search$max.cycles,
-          verify = degree.search$verify,
-          eval_fun = eval_fun,
-          direction = "min",
-          trace_level = "full",
-          objective_name = "fval"
-        )
         tbw <- .npplregbw_attach_degree_search(
           bws = search.result$best_payload,
           search_result = search.result

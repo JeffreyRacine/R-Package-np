@@ -1063,12 +1063,21 @@
     .np_progress_note("Refining NOMAD solution with one Powell hot start")
   }
 
-  state$best_payload <- build_payload(
+  payload_result <- build_payload(
     point = state$best_point,
     best_record = state$best_record,
     solution = solution,
     interrupted = state$interrupted
   )
+  if (is.list(payload_result) && !is.null(payload_result$payload)) {
+    state$best_payload <- payload_result$payload
+    if (!is.null(payload_result$objective) &&
+        .np_degree_better(payload_result$objective, state$best_record$objective, direction = direction)) {
+      state$best_record$objective <- as.numeric(payload_result$objective[1L])
+    }
+  } else {
+    state$best_payload <- payload_result
+  }
 
   state$progress_state <- .np_degree_progress_end(
     state = state$progress_state,
