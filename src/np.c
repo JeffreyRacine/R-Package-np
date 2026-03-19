@@ -145,6 +145,10 @@ static void np_progress_signal(const char *event, const char *surface, const int
 {
   SEXP ns = R_NilValue;
   SEXP fn = R_NilValue;
+  SEXP event_s = R_NilValue;
+  SEXP surface_s = R_NilValue;
+  SEXP current_s = R_NilValue;
+  SEXP total_s = R_NilValue;
   SEXP call = R_NilValue;
   int err = 0;
 
@@ -163,13 +167,13 @@ static void np_progress_signal(const char *event, const char *surface, const int
     return;
   }
 
-  PROTECT(call = Rf_lang5(fn,
-                          Rf_mkString(event),
-                          Rf_mkString(surface),
-                          Rf_ScalarInteger(current),
-                          Rf_ScalarInteger(total)));
+  PROTECT(event_s = Rf_mkString(event));
+  PROTECT(surface_s = Rf_mkString(surface));
+  PROTECT(current_s = Rf_ScalarInteger(current));
+  PROTECT(total_s = Rf_ScalarInteger(total));
+  PROTECT(call = Rf_lang5(fn, event_s, surface_s, current_s, total_s));
   R_tryEval(call, ns, &err);
-  UNPROTECT(3);
+  UNPROTECT(7);
 }
 
 static int *np_compute_support_counts(int num_obs, int ncon, double **matrix_continuous)
