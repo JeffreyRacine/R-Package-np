@@ -10,6 +10,10 @@ expect_bw_timing_contract <- function(obj, summary_label = "Estimation Time:") {
   expect_true(is.finite(obj$total.time))
   txt <- paste(capture.output(summary(obj)), collapse = "\n")
   expect_match(txt, summary_label, fixed = TRUE)
+  if (!is.null(obj$nomad.time) && is.finite(obj$nomad.time))
+    expect_match(txt, "NOMAD ", fixed = TRUE)
+  if (!is.null(obj$powell.time) && is.finite(obj$powell.time))
+    expect_match(txt, "Powell ", fixed = TRUE)
 }
 
 expect_fit_timing_contract <- function(obj, summary_label = "Estimation Time:") {
@@ -20,8 +24,15 @@ expect_fit_timing_contract <- function(obj, summary_label = "Estimation Time:") 
 
   txt <- paste(capture.output(summary(obj)), collapse = "\n")
   expect_match(txt, summary_label, fixed = TRUE)
-  expect_match(txt, "optim ", fixed = TRUE)
-  expect_match(txt, "fit ", fixed = TRUE)
+  if (!is.null(obj$nomad.time) && is.finite(obj$nomad.time)) {
+    expect_match(txt, "NOMAD ", fixed = TRUE)
+    if (!is.null(obj$powell.time) && is.finite(obj$powell.time))
+      expect_match(txt, "Powell ", fixed = TRUE)
+    expect_match(txt, "fit ", fixed = TRUE)
+  } else {
+    expect_match(txt, "optim ", fixed = TRUE)
+    expect_match(txt, "fit ", fixed = TRUE)
+  }
 }
 
 test_that("direct density and distribution families report elapsed optimization time", {
@@ -106,4 +117,45 @@ test_that("composite core families remain timing-contract compliant", {
 
   for (obj in list(fit_pl, fit_si, fit_sc))
     expect_fit_timing_contract(obj)
+})
+
+test_that("NOMAD plus Powell timing is carried through bandwidth and fit summaries", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  dat <- data.frame(x = sort(runif(24)))
+  dat$y <- sin(2 * pi * dat$x) + rnorm(nrow(dat), sd = 0.05)
+
+  bw <- quiet_eval(npregbw(
+    y ~ x,
+    data = dat,
+    regtype = "lp",
+    degree.select = "coordinate",
+    degree.min = 0L,
+    degree.max = 2L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  ))
+  fit <- quiet_eval(npreg(bws = bw, txdat = data.frame(x = dat$x), tydat = dat$y))
+
+  expect_identical(bw$degree.search$mode, "nomad+powell")
+  expect_true(is.finite(bw$nomad.time))
+  expect_true(is.finite(bw$powell.time))
+  expect_true(is.finite(bw$total.time))
+  expect_gte(bw$total.time + 1e-8, bw$nomad.time + bw$powell.time)
+  expect_equal(fit$optim.time, bw$total.time, tolerance = 1e-8)
+  expect_equal(fit$nomad.time, bw$nomad.time, tolerance = 1e-8)
+  expect_equal(fit$powell.time, bw$powell.time, tolerance = 1e-8)
+
+  bw_txt <- paste(capture.output(summary(bw)), collapse = "\n")
+  fit_txt <- paste(capture.output(summary(fit)), collapse = "\n")
+  expect_match(bw_txt, "NOMAD ", fixed = TRUE)
+  expect_match(bw_txt, "Powell ", fixed = TRUE)
+  expect_match(fit_txt, "NOMAD ", fixed = TRUE)
+  expect_match(fit_txt, "Powell ", fixed = TRUE)
+  expect_match(fit_txt, "fit ", fixed = TRUE)
 })

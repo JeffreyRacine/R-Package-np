@@ -690,5 +690,7 @@ npindex.sibandwidth <-
     ev$total.time <- total.time
     ev$optim.time <- optim.time
     ev$fit.time <- fit.elapsed
+    ev$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
+    ev$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
     ev
   }

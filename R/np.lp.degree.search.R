@@ -908,6 +908,8 @@
   state$interrupted <- FALSE
   state$error <- NULL
   state$progress_state <- NULL
+  state$nomad.time <- NA_real_
+  state$powell.time <- NA_real_
 
   state$record_trace <- function(rec) {
     state$trace_id <- state$trace_id + 1L
@@ -1020,6 +1022,7 @@
     )
   )
 
+  nomad.start <- proc.time()[3L]
   solution <- tryCatch(
     {
       crs::snomadr(
@@ -1047,6 +1050,7 @@
       NULL
     }
   )
+  state$nomad.time <- proc.time()[3L] - nomad.start
 
   if (!is.null(solution) && is.null(state$best_point) && length(solution$solution) == length(x0)) {
     state$best_point <- as.numeric(solution$solution)
@@ -1071,6 +1075,8 @@
   )
   if (is.list(payload_result) && !is.null(payload_result$payload)) {
     state$best_payload <- payload_result$payload
+    if (!is.null(payload_result$powell.time))
+      state$powell.time <- as.numeric(payload_result$powell.time[1L])
     if (!is.null(payload_result$objective) &&
         .np_degree_better(payload_result$objective, state$best_record$objective, direction = direction)) {
       state$best_record$objective <- as.numeric(payload_result$objective[1L])
@@ -1101,6 +1107,9 @@
     n.unique = state$eval_id,
     n.visits = state$visit_id,
     n.cached = 0L,
+    nomad.time = state$nomad.time,
+    powell.time = state$powell.time,
+    optim.time = sum(c(state$nomad.time, state$powell.time), na.rm = TRUE),
     grid.size = NA_integer_,
     restart.starts = list(),
     trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name)

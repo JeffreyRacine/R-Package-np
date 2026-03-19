@@ -372,6 +372,8 @@ npcdist.condbandwidth <-
                            rows.omit = rows.omit,
                            timing = bws$timing, total.time = total.time,
                            optim.time = optim.time, fit.time = fit.elapsed)
+    out$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
+    out$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
 
     .np_condist_finalize_proper_object(
       object = out,

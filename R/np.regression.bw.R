@@ -698,6 +698,7 @@ npregbw.rbandwidth <-
     point <- as.numeric(point)
     degree <- as.integer(best_record$degree)
     bw_vec <- .npregbw_nomad_point_to_bw(point[seq_len(ncon + ncat)], template = template, setup = setup)
+    powell.elapsed <- NA_real_
 
     build_direct_payload <- function() {
       final.reg.args <- reg.args
@@ -746,6 +747,7 @@ npregbw.rbandwidth <-
       hot.reg.args$bernstein.basis <- degree.search$bernstein.basis
       hot.opt.args <- opt.args
       hot.opt.args$nmulti <- 0L
+      powell.start <- proc.time()[3L]
       hot.payload <- .npregbw_run_fixed_degree(
         xdat = xdat,
         ydat = ydat,
@@ -754,14 +756,15 @@ npregbw.rbandwidth <-
         opt.args = hot.opt.args,
         yname = yname
       )
+      powell.elapsed <- proc.time()[3L] - powell.start
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
-        return(list(payload = hot.payload, objective = hot.objective))
+        return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
       }
     }
 
-    list(payload = direct.payload, objective = direct.objective)
+    list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
   .np_nomad_search(
@@ -865,6 +868,9 @@ npregbw.rbandwidth <-
     baseline.fval = search_result$baseline$objective,
     best.degree = search_result$best$degree,
     best.fval = search_result$best$objective,
+    nomad.time = search_result$nomad.time,
+    powell.time = search_result$powell.time,
+    optim.time = search_result$optim.time,
     n.unique = search_result$n.unique,
     n.visits = search_result$n.visits,
     n.cached = search_result$n.cached,
@@ -873,6 +879,12 @@ npregbw.rbandwidth <-
     trace = search_result$trace
   )
 
+  if (!is.null(search_result$nomad.time))
+    bws$nomad.time <- as.numeric(search_result$nomad.time[1L])
+  if (!is.null(search_result$powell.time))
+    bws$powell.time <- as.numeric(search_result$powell.time[1L])
+  if (!is.null(search_result$optim.time) && is.finite(search_result$optim.time))
+    bws$total.time <- as.numeric(search_result$optim.time[1L])
   bws$degree.search <- metadata
   bws
 }
