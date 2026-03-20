@@ -8,6 +8,7 @@ importFrom("parallel", "nextRNGStream", "detectCores")
 importFrom("quantreg", "rq")
 importFrom("quadprog", "solve.QP")
 export(b.star
+       ,dimBS
        ,.docall
        ,.force.type
        ,.mpi.undefined
