@@ -15161,7 +15161,7 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
   lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
   kw = alloc_vecd(MAX(1, num_train));
-  mean_row = alloc_vecd(1);
+  mean_row = alloc_vecd(MAX(1, num_train));
   matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
   matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
   if(num_reg_unordered_extern > 0) eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
@@ -15447,7 +15447,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   kernel_ox = (int *)calloc((size_t)MAX(1, num_reg_ordered_extern), sizeof(int));
   x_operator = (int *)calloc((size_t)MAX(1, num_reg_tot), sizeof(int));
 
-  mean_row = alloc_vecd(1);
+  mean_row = alloc_vecd(MAX(1, num_train));
   if((vsfx == NULL) || (lambdax == NULL) || (kw == NULL) || (mean_row == NULL) ||
      ((num_reg_continuous_extern > 0) && (matrix_bandwidth_x == NULL)) ||
      ((num_reg_continuous_extern > 0) && (matrix_bandwidth_eval_one == NULL)) ||
@@ -15804,7 +15804,7 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
   ctx->vsfx = alloc_vecd(MAX(1, num_reg_tot));
   ctx->lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
   ctx->kw = alloc_vecd(MAX(1, num_train));
-  ctx->mean_row = alloc_vecd(1);
+  ctx->mean_row = alloc_vecd(MAX(1, num_train));
   ctx->matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
   ctx->matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
   if(num_reg_unordered_extern > 0) ctx->eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
@@ -16543,7 +16543,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
   lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
   kw = alloc_vecd(MAX(1, num_train));
-  mean_row = alloc_vecd(1);
+  mean_row = alloc_vecd(MAX(1, num_train));
   matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
   matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
   if(num_reg_unordered_extern > 0) eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
@@ -17060,7 +17060,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
   lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
   kw = alloc_vecd(MAX(1, num_train));
-  mean_row = alloc_vecd(1);
+  mean_row = alloc_vecd(MAX(1, num_train));
   matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
   matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
   if(num_reg_unordered_extern > 0) eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
