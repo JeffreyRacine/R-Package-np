@@ -748,14 +748,20 @@ npregbw.rbandwidth <-
       hot.opt.args <- opt.args
       hot.opt.args$nmulti <- 0L
       powell.start <- proc.time()[3L]
-      hot.payload <- .npregbw_run_fixed_degree(
-        xdat = xdat,
-        ydat = ydat,
-        bws = bw_vec,
-        reg.args = hot.reg.args,
-        opt.args = hot.opt.args,
-        yname = yname
-      )
+      hot.payload <- local({
+        .np_progress_bandwidth_set_context(
+          sprintf("Powell hot start deg %s", .np_degree_format_degree(degree))
+        )
+        on.exit(.np_progress_bandwidth_set_context(NULL), add = TRUE)
+        .npregbw_run_fixed_degree(
+          xdat = xdat,
+          ydat = ydat,
+          bws = bw_vec,
+          reg.args = hot.reg.args,
+          opt.args = hot.opt.args,
+          yname = yname
+        )
+      })
       powell.elapsed <- proc.time()[3L] - powell.start
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&

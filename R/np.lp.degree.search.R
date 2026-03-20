@@ -850,7 +850,12 @@
 }
 
 .np_nomad_require_crs <- function() {
-  if (!requireNamespace("crs", quietly = TRUE)) {
+  ok <- tryCatch({
+    suppressPackageStartupMessages(loadNamespace("crs"))
+    TRUE
+  }, error = function(e) FALSE)
+
+  if (!isTRUE(ok)) {
     stop(
       "automatic degree search with search.engine='nomad' requires the 'crs' package; install.packages('crs')",
       call. = FALSE
@@ -879,6 +884,23 @@
   ))
 
   paste(fields, collapse = ", ")
+}
+
+.np_nomad_progress_start_detail <- function(engine,
+                                            baseline_degree,
+                                            best_record,
+                                            objective_name = "objective") {
+  paste(
+    sprintf("start %s", .np_degree_format_degree(baseline_degree)),
+    .np_nomad_progress_detail(
+      engine = engine,
+      eval_id = 0L,
+      current_degree = baseline_degree,
+      best_record = best_record,
+      objective_name = objective_name
+    ),
+    sep = ", "
+  )
 }
 
 .np_nomad_search <- function(engine = c("nomad", "nomad+powell"),
@@ -1008,15 +1030,10 @@
     if (identical(direction, "min")) Inf else .Machine$double.xmax
   }
 
-  .np_progress_note(sprintf(
-    "NOMAD automatic polynomial degree search starting from %s",
-    .np_degree_format_degree(baseline_record$degree)
-  ))
   state$progress_state <- .np_degree_progress_begin(
-    detail = .np_nomad_progress_detail(
+    detail = .np_nomad_progress_start_detail(
       engine = engine,
-      eval_id = 0L,
-      current_degree = baseline_record$degree,
+      baseline_degree = baseline_record$degree,
       best_record = state$best_record,
       objective_name = objective_name
     )
@@ -1063,8 +1080,15 @@
       state$error
     })
 
-  if (identical(engine, "nomad+powell")) {
-    .np_progress_note("Refining NOMAD solution with one Powell hot start")
+  if (identical(engine, "nomad+powell") && !is.null(state$progress_state)) {
+    state$progress_state <- .np_degree_progress_end(
+      state = state$progress_state,
+      detail = .np_degree_progress_best_detail(
+        best_record = state$best_record,
+        objective_name = objective_name
+      )
+    )
+    state$progress_state <- NULL
   }
 
   payload_result <- build_payload(

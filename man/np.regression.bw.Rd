@@ -39,6 +39,7 @@ npregbw(\dots)
         ckerub,
         degree,
         degree.select = c("manual", "coordinate", "exhaustive"),
+        search.engine = c("nomad+powell", "cell", "nomad"),
         degree.min = NULL,
         degree.max = NULL,
         degree.start = NULL,
@@ -255,7 +256,25 @@ npregbw(\dots)
     \code{regtype="lp"}. \code{"manual"} (default) treats
     \code{degree} as fixed. \code{"coordinate"} performs cached
     coordinate-wise search over admissible degree vectors.
-    \code{"exhaustive"} evaluates the full admissible degree grid.
+    \code{"exhaustive"} evaluates the full admissible degree grid when
+    \code{search.engine="cell"}. For NOMAD-based search engines, any
+    non-\code{"manual"} value requests direct joint search over degree
+    and bandwidth coordinates.
+  }
+
+  \item{search.engine}{
+    character string controlling the automatic local-polynomial search
+    backend when \code{regtype="lp"} and
+    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
+    performs direct joint mixed discrete/continuous search over fixed
+    bandwidths and the degree vector using \code{crs::snomadr()},
+    followed by one Powell hot start from the NOMAD solution.
+    \code{"nomad"} performs the direct joint NOMAD search without the
+    Powell refinement. \code{"cell"} uses the legacy profiled
+    degree-grid search built from repeated fixed-degree bandwidth
+    solves. NOMAD-based search currently requires \code{bwtype="fixed"},
+    \code{degree.verify=FALSE}, and the suggested package
+    \pkg{crs} to be installed.
   }
 
   \item{degree.min}{
@@ -292,7 +311,8 @@ npregbw(\dots)
   \item{degree.verify}{
     logical value indicating whether a coordinate-search solution should
     be exhaustively verified over the admissible degree grid after the
-    heuristic phase completes.
+    heuristic phase completes. Available only for
+    \code{search.engine="cell"}.
   }
 
   \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
@@ -456,7 +476,10 @@ npregbw(\dots)
   and discrete data types.
 
   The cross-validation methods employ multivariate numerical search
-  algorithms (direction set (Powell's) methods in multidimensions).
+  algorithms. For fixed-degree local-constant/local-linear regression,
+  and for local-polynomial regression with \code{degree.select="manual"},
+  the bandwidth search uses multidimensional Powell direction-set
+  optimization.
 
   Bandwidths can (and will) differ for each variable which is, of
   course, desirable.
@@ -502,6 +525,25 @@ npregbw(\dots)
   kernel. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
+
+  When \code{regtype="lp"} and \code{degree.select != "manual"},
+  \code{npregbw} can jointly determine the continuous-predictor degree
+  vector and bandwidth coordinates. With \code{search.engine="cell"},
+  the objective is profiled over the degree grid using cached
+  coordinate-wise or exhaustive search together with the existing
+  fixed-degree bandwidth optimizer. With
+  \code{search.engine="nomad"} or \code{"nomad+powell"}, the package
+  instead evaluates the cross-validation criterion directly over the
+  joint space of fixed bandwidths and polynomial degrees using
+  \code{crs::snomadr()}. \code{"nomad+powell"} then performs one Powell
+  hot start from the NOMAD solution and retains the better of the
+  direct NOMAD and polished solutions. This direct joint-search route
+  follows the polynomial-adaptive cross-validation rationale of Hall
+  and Racine (2015). When \code{bernstein.basis} is not explicitly
+  supplied, the automatic search route defaults to
+  \code{bernstein.basis=TRUE} for numerical stability; explicit
+  \code{bernstein.basis=FALSE} is honored but can be poorly conditioned
+  at higher degrees.
 
   The use of compactly supported kernels or the occurrence of small
   bandwidths during cross-validation can lead to numerical problems for
