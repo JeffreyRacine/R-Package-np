@@ -37,8 +37,9 @@
            ...,
            random.seed){
 
-    oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
-    on.exit(.np_plot_restore_par(oldpar), add = TRUE)
+    engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
+    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
+    plot.par.mfrow <- engine.ctx$plot.par.mfrow
 
     miss.xy = c(missing(xdat),missing(ydat))
     xy <- .np_plot_resolve_xydat(bws = bws, xdat = xdat, ydat = ydat, miss.xy = miss.xy)

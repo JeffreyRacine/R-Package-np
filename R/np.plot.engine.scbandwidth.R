@@ -55,8 +55,9 @@
            ...,
            random.seed){
 
-    oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
-    on.exit(.np_plot_restore_par(oldpar), add = TRUE)
+    engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
+    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
+    plot.par.mfrow <- engine.ctx$plot.par.mfrow
 
     scalar_default <- function(value, default) {
       if (is.null(value)) default else value
@@ -80,10 +81,6 @@
     if (!is.null(lty)) bxp.args$lty <- lty
     if (!is.null(lwd)) bxp.args$lwd <- lwd
     if (!is.null(border)) bxp.args$border <- border
-
-    opt.plot.par.mfrow <- getOption("plot.par.mfrow")
-    if (!is.null(opt.plot.par.mfrow))
-        plot.par.mfrow <- opt.plot.par.mfrow
 
     if(!missing(gradients))
       stop("gradients not supported with smooth coefficient models.")
