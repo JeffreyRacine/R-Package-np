@@ -643,6 +643,7 @@ npregbw.rbandwidth <-
   baseline.reg.args$degree <- as.integer(degree.search$baseline.degree)
   baseline.reg.args$bernstein.basis <- degree.search$bernstein.basis
 
+  .np_nomad_baseline_note(degree.search$baseline.degree)
   baseline.bws <- .npregbw_run_fixed_degree(
     xdat = xdat,
     ydat = ydat,
@@ -764,6 +765,7 @@ npregbw.rbandwidth <-
     }
 
     if (identical(degree.search$engine, "nomad+powell")) {
+      .np_nomad_powell_note(degree)
       hot.reg.args <- reg.args
       hot.reg.args$regtype <- "lp"
       hot.reg.args$degree <- degree

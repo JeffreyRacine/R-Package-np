@@ -903,6 +903,20 @@
   )
 }
 
+.np_nomad_baseline_note <- function(degree) {
+  .np_progress_note(sprintf(
+    "Fitting automatic polynomial degree search baseline %s",
+    .np_degree_format_degree(degree)
+  ))
+}
+
+.np_nomad_powell_note <- function(degree) {
+  .np_progress_note(sprintf(
+    "Refining NOMAD solution with one Powell hot start at degree %s",
+    .np_degree_format_degree(degree)
+  ))
+}
+
 .np_nomad_search <- function(engine = c("nomad", "nomad+powell"),
                              baseline_record,
                              x0,
