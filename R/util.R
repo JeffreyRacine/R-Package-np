@@ -530,6 +530,20 @@ dim_basis <- function(basis = c("glp", "additive", "tensor"),
         PACKAGE = "np")
 }
 
+dimBS <- function(basis = "additive",
+                  kernel = TRUE,
+                  degree = NULL,
+                  segments = NULL,
+                  include = NULL,
+                  categories = NULL) {
+  dim_basis(basis = basis,
+            kernel = kernel,
+            degree = degree,
+            segments = segments,
+            include = include,
+            categories = categories)
+}
+
 ## Function to test for monotone increasing vector
 
 is.monotone.increasing <- function(x) {
