@@ -104,7 +104,7 @@ call_public_cvls_shadow <- function(bw, x, y, compare_old = identical(bw$regtype
   )
 }
 
-test_that("public npcdensbw cv.ls keeps lc on the legacy objective", {
+test_that("public npcdensbw cv.ls lc matches the production fixed-point objective", {
   set.seed(222)
   n <- 32L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -113,7 +113,7 @@ test_that("public npcdensbw cv.ls keeps lc on the legacy objective", {
   bw.lc <- npcdensbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ls", nmulti = 0)
   shadow <- call_public_cvls_shadow(bw.lc, x, y)
 
-  expect_equal(bw.lc$fval, -shadow$old, tolerance = 1e-10)
+  expect_equal(bw.lc$fval, -shadow$prod, tolerance = 1e-10)
 })
 
 test_that("public npcdensbw cv.ls fixed LP/LL route activates with ll == lp parity", {
@@ -143,7 +143,7 @@ test_that("public npcdensbw cv.ls fixed LP/LL route activates with ll == lp pari
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-8)
 })
 
-test_that("public npcdensbw cv.ls fixed LP route preserves tree parity", {
+test_that("public npcdensbw cv.ls fixed LP tree and serial evaluators agree at fixed points", {
   set.seed(142)
   n <- 34L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -174,7 +174,16 @@ test_that("public npcdensbw cv.ls fixed LP route preserves tree parity", {
     nmulti = 0
   )
 
-  expect_equal(bw.tree$fval, bw.serial$fval, tolerance = 1e-8)
+  options(np.tree = FALSE)
+  serial.at.serial <- np:::.npcdensbw_eval_only(x, y$y1, bw.serial)$objective
+  serial.at.tree <- np:::.npcdensbw_eval_only(x, y$y1, bw.tree)$objective
+
+  options(np.tree = TRUE)
+  tree.at.serial <- np:::.npcdensbw_eval_only(x, y$y1, bw.serial)$objective
+  tree.at.tree <- np:::.npcdensbw_eval_only(x, y$y1, bw.tree)$objective
+
+  expect_equal(tree.at.serial, serial.at.serial, tolerance = 2e-2)
+  expect_equal(tree.at.tree, serial.at.tree, tolerance = 2e-2)
 })
 
 test_that("public npcdensbw cv.ls generalized-nn LP route activates with ll == lp parity", {

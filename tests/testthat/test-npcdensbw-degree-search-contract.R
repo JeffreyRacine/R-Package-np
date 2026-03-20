@@ -204,3 +204,45 @@ test_that("npcdensbw automatic degree search defaults to NOMAD plus Powell", {
   expect_true(isTRUE(bw$degree.search$completed))
   expect_lte(bw$degree.search$best.fval, bw$degree.search$baseline.fval + 1e-8)
 })
+
+test_that("npcdensbw direct nomad payload preserves CV metadata", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260320)
+  dat <- data.frame(x = runif(60))
+  dat$y <- rbeta(nrow(dat), 1, 1)
+
+  bw <- np::npcdensbw(
+    y ~ x,
+    data = dat,
+    regtype = "lp",
+    degree.select = "coordinate",
+    search.engine = "nomad",
+    degree.min = 0L,
+    degree.max = 3L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L,
+    cxkerbound = "range",
+    cykerbound = "range"
+  )
+
+  expect_identical(bw$method, "cv.ls")
+  expect_identical(bw$pmethod, "Least Squares Cross-Validation")
+  expect_true(length(bw$ifval) == 1L && is.na(bw$ifval))
+  expect_true(length(bw$fval.history) == 1L && is.na(bw$fval.history))
+  expect_true(length(bw$eval.history) == 1L && is.na(bw$eval.history))
+  expect_true(length(bw$invalid.history) == 1L && is.na(bw$invalid.history))
+  expect_equal(
+    bw$fval,
+    np:::.npcdensbw_eval_only(data.frame(x = dat$x), data.frame(y = dat$y), bw)$objective,
+    tolerance = 1e-12
+  )
+
+  printed <- paste(capture.output(print(bw)), collapse = "\n")
+  expect_false(grepl("Manual", printed, fixed = TRUE))
+  expect_false(grepl("achieved on multistart", printed, fixed = TRUE))
+})

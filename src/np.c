@@ -2384,6 +2384,423 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
   return out;
 }
 
+SEXP C_np_shadow_cv_yrow_conditional(SEXP tyuno,
+                                     SEXP tyord,
+                                     SEXP tycon,
+                                     SEXP txuno,
+                                     SEXP txord,
+                                     SEXP txcon,
+                                     SEXP rbw,
+                                     SEXP bwtype,
+                                     SEXP kernel_y,
+                                     SEXP kernel_yu,
+                                     SEXP kernel_yo,
+                                     SEXP use_tree,
+                                     SEXP row_index,
+                                     SEXP operator_code,
+                                     SEXP cykerlb,
+                                     SEXP cykerub)
+{
+  SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
+  SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
+  SEXP rbw_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
+  SEXP out=R_NilValue;
+  int nrow_yuno = 0, ncol_yuno = 0, nrow_yord = 0, ncol_yord = 0, nrow_ycon = 0, ncol_ycon = 0;
+  int nrow_xuno = 0, ncol_xuno = 0, nrow_xord = 0, ncol_xord = 0, nrow_xcon = 0, ncol_xcon = 0;
+  int num_obs = 0;
+  int tree_flag = asLogical(use_tree);
+  int row_idx = asInteger(row_index) - 1;
+  int op_code = asInteger(operator_code);
+  int int_large_sf_save = int_LARGE_SF;
+  int int_cyker_bound_save = int_cyker_bound_extern;
+  double nconfac_save = nconfac_extern;
+  double ncatfac_save = ncatfac_extern;
+  double *vector_continuous_stddev_save = vector_continuous_stddev_extern;
+  double *vector_cykerlb_save = vector_cykerlb_extern;
+  double *vector_cykerub_save = vector_cykerub_extern;
+  double *shadow_continuous_stddev = NULL;
+  double *row = NULL;
+  int i;
+
+  tyuno_r = PROTECT(coerceVector(tyuno, REALSXP));
+  tyord_r = PROTECT(coerceVector(tyord, REALSXP));
+  tycon_r = PROTECT(coerceVector(tycon, REALSXP));
+  txuno_r = PROTECT(coerceVector(txuno, REALSXP));
+  txord_r = PROTECT(coerceVector(txord, REALSXP));
+  txcon_r = PROTECT(coerceVector(txcon, REALSXP));
+  rbw_r = PROTECT(coerceVector(rbw, REALSXP));
+  cykerlb_r = PROTECT(coerceVector(cykerlb, REALSXP));
+  cykerub_r = PROTECT(coerceVector(cykerub, REALSXP));
+
+  np_shadow_matrix_dims(tyuno, &nrow_yuno, &ncol_yuno);
+  np_shadow_matrix_dims(tyord, &nrow_yord, &ncol_yord);
+  np_shadow_matrix_dims(tycon, &nrow_ycon, &ncol_ycon);
+  np_shadow_matrix_dims(txuno, &nrow_xuno, &ncol_xuno);
+  np_shadow_matrix_dims(txord, &nrow_xord, &ncol_xord);
+  np_shadow_matrix_dims(txcon, &nrow_xcon, &ncol_xcon);
+
+  num_obs = MAX(MAX(nrow_yuno, nrow_yord), MAX(MAX(nrow_ycon, nrow_xuno), MAX(nrow_xord, nrow_xcon)));
+  if(num_obs <= 0)
+    error("C_np_shadow_cv_yrow_conditional: zero-row inputs are not supported");
+  if((nrow_yuno > 0 && nrow_yuno != num_obs) || (nrow_yord > 0 && nrow_yord != num_obs) ||
+     (nrow_ycon > 0 && nrow_ycon != num_obs) || (nrow_xuno > 0 && nrow_xuno != num_obs) ||
+     (nrow_xord > 0 && nrow_xord != num_obs) || (nrow_xcon > 0 && nrow_xcon != num_obs))
+    error("C_np_shadow_cv_yrow_conditional: all inputs must share the same row count");
+  if((row_idx < 0) || (row_idx >= num_obs))
+    error("C_np_shadow_cv_yrow_conditional: row_index out of range");
+  if((asInteger(bwtype) != BW_FIXED) &&
+     (asInteger(bwtype) != BW_GEN_NN))
+    error("C_np_shadow_cv_yrow_conditional: fixed/generalized-nn bandwidths only");
+
+  np_shadow_state_active = 1;
+  num_obs_train_extern = num_obs_eval_extern = num_obs;
+  num_var_unordered_extern = ncol_yuno;
+  num_var_ordered_extern = ncol_yord;
+  num_var_continuous_extern = ncol_ycon;
+  num_reg_unordered_extern = ncol_xuno;
+  num_reg_ordered_extern = ncol_xord;
+  num_reg_continuous_extern = ncol_xcon;
+  int_LARGE_SF = 1;
+  nconfac_extern = 1.0;
+  ncatfac_extern = 1.0;
+
+  KERNEL_den_extern = asInteger(kernel_y);
+  KERNEL_den_unordered_extern = asInteger(kernel_yu);
+  KERNEL_den_ordered_extern = asInteger(kernel_yo);
+  KERNEL_reg_extern = CK_GAUSS2;
+  KERNEL_reg_unordered_extern = UKERNEL_UAA;
+  KERNEL_reg_ordered_extern = 0;
+  BANDWIDTH_den_extern = asInteger(bwtype);
+
+  vector_cykerlb_extern = REAL(cykerlb_r);
+  vector_cykerub_extern = REAL(cykerub_r);
+  int_cyker_bound_extern = np_has_finite_cker_bounds(vector_cykerlb_extern,
+                                                     vector_cykerub_extern,
+                                                     num_var_continuous_extern);
+
+  matrix_Y_unordered_train_extern = alloc_matd(num_obs, num_var_unordered_extern);
+  matrix_Y_ordered_train_extern = alloc_matd(num_obs, num_var_ordered_extern);
+  matrix_Y_continuous_train_extern = alloc_matd(num_obs, num_var_continuous_extern);
+  matrix_X_unordered_train_extern = alloc_matd(num_obs, num_reg_unordered_extern);
+  matrix_X_ordered_train_extern = alloc_matd(num_obs, num_reg_ordered_extern);
+  matrix_X_continuous_train_extern = alloc_matd(num_obs, num_reg_continuous_extern);
+
+  np_shadow_fill_matrix(matrix_Y_unordered_train_extern, REAL(tyuno_r), num_obs, num_var_unordered_extern);
+  np_shadow_fill_matrix(matrix_Y_ordered_train_extern, REAL(tyord_r), num_obs, num_var_ordered_extern);
+  np_shadow_fill_matrix(matrix_Y_continuous_train_extern, REAL(tycon_r), num_obs, num_var_continuous_extern);
+  np_shadow_fill_matrix(matrix_X_unordered_train_extern, REAL(txuno_r), num_obs, num_reg_unordered_extern);
+  np_shadow_fill_matrix(matrix_X_ordered_train_extern, REAL(txord_r), num_obs, num_reg_ordered_extern);
+  np_shadow_fill_matrix(matrix_X_continuous_train_extern, REAL(txcon_r), num_obs, num_reg_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    shadow_continuous_stddev =
+      (double *)malloc((size_t)(num_reg_continuous_extern + num_var_continuous_extern) * sizeof(double));
+    if(shadow_continuous_stddev == NULL)
+      error("C_np_shadow_cv_yrow_conditional: stddev allocation failed");
+    for(i = 0; i < num_reg_continuous_extern; i++)
+      shadow_continuous_stddev[i] =
+        standerrd(num_obs, matrix_X_continuous_train_extern[i]);
+    for(i = 0; i < num_var_continuous_extern; i++)
+      shadow_continuous_stddev[num_reg_continuous_extern + i] =
+        standerrd(num_obs, matrix_Y_continuous_train_extern[i]);
+    vector_continuous_stddev_extern = shadow_continuous_stddev;
+  } else {
+    vector_continuous_stddev_extern = NULL;
+  }
+
+  if(tree_flag){
+    int_TREE_Y = (num_var_continuous_extern > 0) ? NP_TREE_TRUE : NP_TREE_FALSE;
+    int_TREE_X = int_TREE_XY = NP_TREE_FALSE;
+    if(int_TREE_Y == NP_TREE_TRUE){
+      ipt_extern_Y = (int *)malloc((size_t)num_obs*sizeof(int));
+      ipt_lookup_extern_Y = (int *)malloc((size_t)num_obs*sizeof(int));
+      if((ipt_extern_Y == NULL) || (ipt_lookup_extern_Y == NULL))
+        error("C_np_shadow_cv_yrow_conditional: y-tree allocation failed");
+      for(i = 0; i < num_obs; i++) ipt_extern_Y[i] = i;
+      build_kdtree(matrix_Y_continuous_train_extern, num_obs, num_var_continuous_extern,
+                   4*num_var_continuous_extern, ipt_extern_Y, &kdt_extern_Y);
+      for(i = 0; i < num_obs; i++) ipt_lookup_extern_Y[ipt_extern_Y[i]] = i;
+      for(int j = 0; j < num_var_unordered_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_Y_unordered_train_extern[j][i] = REAL(tyuno_r)[j*num_obs + ipt_extern_Y[i]];
+      for(int j = 0; j < num_var_ordered_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_Y_ordered_train_extern[j][i] = REAL(tyord_r)[j*num_obs + ipt_extern_Y[i]];
+      for(int j = 0; j < num_var_continuous_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_Y_continuous_train_extern[j][i] = REAL(tycon_r)[j*num_obs + ipt_extern_Y[i]];
+    } else {
+      ipt_extern_Y = NULL;
+      ipt_lookup_extern_Y = NULL;
+      kdt_extern_Y = NULL;
+    }
+  } else {
+    int_TREE_X = int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
+    ipt_extern_X = ipt_extern_Y = ipt_extern_XY = NULL;
+    ipt_lookup_extern_X = ipt_lookup_extern_Y = ipt_lookup_extern_XY = NULL;
+    kdt_extern_X = kdt_extern_Y = kdt_extern_XY = NULL;
+  }
+
+  num_categories_extern_Y = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern);
+  matrix_categorical_vals_extern_Y = alloc_matd(num_obs, num_var_unordered_extern + num_var_ordered_extern);
+  determine_categorical_vals(num_obs,
+                             num_var_unordered_extern,
+                             num_var_ordered_extern,
+                             0,
+                             0,
+                             matrix_Y_unordered_train_extern,
+                             matrix_Y_ordered_train_extern,
+                             NULL,
+                             NULL,
+                             num_categories_extern_Y,
+                             matrix_categorical_vals_extern_Y);
+
+  row = (double *)malloc((size_t)num_obs*sizeof(double));
+  if(row == NULL)
+    error("C_np_shadow_cv_yrow_conditional: row allocation failed");
+  if(np_shadow_proof_conditional_y_row_stream(REAL(rbw_r), row_idx, op_code, row) != 0)
+    error("C_np_shadow_cv_yrow_conditional: y-row helper failed");
+
+  out = PROTECT(allocVector(REALSXP, num_obs));
+  for(i = 0; i < num_obs; i++)
+    REAL(out)[i] = row[i];
+
+  if(kdt_extern_Y != NULL) free_kdtree(&kdt_extern_Y);
+  safe_free(ipt_extern_Y); safe_free(ipt_lookup_extern_Y);
+  if(matrix_Y_unordered_train_extern != NULL) free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
+  if(matrix_Y_ordered_train_extern != NULL) free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
+  if(matrix_Y_continuous_train_extern != NULL) free_mat(matrix_Y_continuous_train_extern, num_var_continuous_extern);
+  if(matrix_X_unordered_train_extern != NULL) free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
+  if(matrix_X_ordered_train_extern != NULL) free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
+  if(matrix_X_continuous_train_extern != NULL) free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  if(num_categories_extern_Y != NULL) safe_free(num_categories_extern_Y);
+  if(matrix_categorical_vals_extern_Y != NULL) free_mat(matrix_categorical_vals_extern_Y, num_var_unordered_extern + num_var_ordered_extern);
+  safe_free(row);
+  safe_free(shadow_continuous_stddev);
+  matrix_Y_unordered_train_extern = matrix_Y_ordered_train_extern = matrix_Y_continuous_train_extern = NULL;
+  matrix_X_unordered_train_extern = matrix_X_ordered_train_extern = matrix_X_continuous_train_extern = NULL;
+  num_categories_extern_Y = NULL;
+  matrix_categorical_vals_extern_Y = NULL;
+  ipt_extern_Y = NULL;
+  ipt_lookup_extern_Y = NULL;
+  int_TREE_X = int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
+  vector_continuous_stddev_extern = vector_continuous_stddev_save;
+  vector_cykerlb_extern = vector_cykerlb_save;
+  vector_cykerub_extern = vector_cykerub_save;
+  int_cyker_bound_extern = int_cyker_bound_save;
+  int_LARGE_SF = int_large_sf_save;
+  nconfac_extern = nconfac_save;
+  ncatfac_extern = ncatfac_save;
+  np_shadow_state_active = 0;
+
+  UNPROTECT(10);
+  return out;
+}
+
+SEXP C_np_shadow_cv_xweights_full_conditional(SEXP tyuno,
+                                              SEXP tyord,
+                                              SEXP tycon,
+                                              SEXP txuno,
+                                              SEXP txord,
+                                              SEXP txcon,
+                                              SEXP rbw,
+                                              SEXP bwtype,
+                                              SEXP kernel_x,
+                                              SEXP kernel_xu,
+                                              SEXP kernel_xo,
+                                              SEXP use_tree,
+                                              SEXP regtype,
+                                              SEXP glp_degree,
+                                              SEXP glp_bernstein,
+                                              SEXP glp_basis,
+                                              SEXP row_index)
+{
+  SEXP tycon_r=R_NilValue;
+  SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
+  SEXP rbw_r=R_NilValue, degree_i=R_NilValue, out=R_NilValue;
+  int nrow_yuno = 0, ncol_yuno = 0, nrow_yord = 0, ncol_yord = 0, nrow_ycon = 0, ncol_ycon = 0;
+  int nrow_xuno = 0, ncol_xuno = 0, nrow_xord = 0, ncol_xord = 0, nrow_xcon = 0, ncol_xcon = 0;
+  int num_obs = 0;
+  int tree_flag = asLogical(use_tree);
+  int int_large_sf_save = int_LARGE_SF;
+  double nconfac_save = nconfac_extern;
+  double ncatfac_save = ncatfac_extern;
+  double *vector_continuous_stddev_save = vector_continuous_stddev_extern;
+  double *shadow_continuous_stddev = NULL;
+  double *row = NULL;
+  int row_idx = asInteger(row_index) - 1;
+  int i;
+
+  tycon_r = PROTECT(coerceVector(tycon, REALSXP));
+  txuno_r = PROTECT(coerceVector(txuno, REALSXP));
+  txord_r = PROTECT(coerceVector(txord, REALSXP));
+  txcon_r = PROTECT(coerceVector(txcon, REALSXP));
+  rbw_r = PROTECT(coerceVector(rbw, REALSXP));
+  degree_i = PROTECT(coerceVector(glp_degree, INTSXP));
+
+  np_shadow_matrix_dims(tyuno, &nrow_yuno, &ncol_yuno);
+  np_shadow_matrix_dims(tyord, &nrow_yord, &ncol_yord);
+  np_shadow_matrix_dims(tycon, &nrow_ycon, &ncol_ycon);
+  np_shadow_matrix_dims(txuno, &nrow_xuno, &ncol_xuno);
+  np_shadow_matrix_dims(txord, &nrow_xord, &ncol_xord);
+  np_shadow_matrix_dims(txcon, &nrow_xcon, &ncol_xcon);
+
+  num_obs = MAX(MAX(nrow_yuno, nrow_yord), MAX(MAX(nrow_ycon, nrow_xuno), MAX(nrow_xord, nrow_xcon)));
+  if(num_obs <= 0)
+    error("C_np_shadow_cv_xweights_full_conditional: zero-row inputs are not supported");
+  if((nrow_yuno > 0 && nrow_yuno != num_obs) || (nrow_yord > 0 && nrow_yord != num_obs) ||
+     (nrow_ycon > 0 && nrow_ycon != num_obs) || (nrow_xuno > 0 && nrow_xuno != num_obs) ||
+     (nrow_xord > 0 && nrow_xord != num_obs) || (nrow_xcon > 0 && nrow_xcon != num_obs))
+    error("C_np_shadow_cv_xweights_full_conditional: all inputs must share the same row count");
+  if((row_idx < 0) || (row_idx >= num_obs))
+    error("C_np_shadow_cv_xweights_full_conditional: row_index out of range");
+  if((asInteger(bwtype) != BW_FIXED) &&
+     (asInteger(bwtype) != BW_GEN_NN))
+    error("C_np_shadow_cv_xweights_full_conditional: fixed/generalized-nn bandwidths only");
+
+  np_shadow_state_active = 1;
+  num_obs_train_extern = num_obs_eval_extern = num_obs;
+  num_var_unordered_extern = ncol_yuno;
+  num_var_ordered_extern = ncol_yord;
+  num_var_continuous_extern = ncol_ycon;
+  num_reg_unordered_extern = ncol_xuno;
+  num_reg_ordered_extern = ncol_xord;
+  num_reg_continuous_extern = ncol_xcon;
+  int_LARGE_SF = 1;
+  nconfac_extern = 1.0;
+  ncatfac_extern = 1.0;
+
+  KERNEL_den_extern = CK_GAUSS2;
+  KERNEL_den_unordered_extern = UKERNEL_UAA;
+  KERNEL_den_ordered_extern = 0;
+  KERNEL_reg_extern = asInteger(kernel_x);
+  KERNEL_reg_unordered_extern = asInteger(kernel_xu);
+  KERNEL_reg_ordered_extern = asInteger(kernel_xo);
+  BANDWIDTH_den_extern = asInteger(bwtype);
+
+  matrix_X_unordered_train_extern = alloc_matd(num_obs, num_reg_unordered_extern);
+  matrix_X_ordered_train_extern = alloc_matd(num_obs, num_reg_ordered_extern);
+  matrix_X_continuous_train_extern = alloc_matd(num_obs, num_reg_continuous_extern);
+  np_shadow_fill_matrix(matrix_X_unordered_train_extern, REAL(txuno_r), num_obs, num_reg_unordered_extern);
+  np_shadow_fill_matrix(matrix_X_ordered_train_extern, REAL(txord_r), num_obs, num_reg_ordered_extern);
+  np_shadow_fill_matrix(matrix_X_continuous_train_extern, REAL(txcon_r), num_obs, num_reg_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    shadow_continuous_stddev =
+      (double *)malloc((size_t)(num_reg_continuous_extern + num_var_continuous_extern) * sizeof(double));
+    if(shadow_continuous_stddev == NULL)
+      error("C_np_shadow_cv_xweights_full_conditional: stddev allocation failed");
+    for(i = 0; i < num_reg_continuous_extern; i++)
+      shadow_continuous_stddev[i] =
+        standerrd(num_obs, matrix_X_continuous_train_extern[i]);
+    for(i = 0; i < num_var_continuous_extern; i++)
+      shadow_continuous_stddev[num_reg_continuous_extern + i] =
+        standerrd(num_obs, REAL(tycon_r) + i*num_obs);
+    vector_continuous_stddev_extern = shadow_continuous_stddev;
+  } else {
+    vector_continuous_stddev_extern = NULL;
+  }
+
+  if(tree_flag){
+    int_TREE_X = (num_reg_continuous_extern > 0) ? NP_TREE_TRUE : NP_TREE_FALSE;
+    int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
+    if(int_TREE_X == NP_TREE_TRUE){
+      ipt_extern_X = (int *)malloc((size_t)num_obs*sizeof(int));
+      ipt_lookup_extern_X = (int *)malloc((size_t)num_obs*sizeof(int));
+      if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
+        error("C_np_shadow_cv_xweights_full_conditional: x-tree allocation failed");
+      for(i = 0; i < num_obs; i++) ipt_extern_X[i] = i;
+      build_kdtree(matrix_X_continuous_train_extern, num_obs, num_reg_continuous_extern,
+                   4*num_reg_continuous_extern, ipt_extern_X, &kdt_extern_X);
+      for(i = 0; i < num_obs; i++) ipt_lookup_extern_X[ipt_extern_X[i]] = i;
+      for(int j = 0; j < num_reg_unordered_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[j*num_obs + ipt_extern_X[i]];
+      for(int j = 0; j < num_reg_ordered_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[j*num_obs + ipt_extern_X[i]];
+      for(int j = 0; j < num_reg_continuous_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[j*num_obs + ipt_extern_X[i]];
+    } else {
+      ipt_extern_X = NULL;
+      ipt_lookup_extern_X = NULL;
+      kdt_extern_X = NULL;
+    }
+  } else {
+    int_TREE_X = int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
+    ipt_extern_X = ipt_extern_Y = ipt_extern_XY = NULL;
+    ipt_lookup_extern_X = ipt_lookup_extern_Y = ipt_lookup_extern_XY = NULL;
+    kdt_extern_X = kdt_extern_Y = kdt_extern_XY = NULL;
+  }
+
+  num_categories_extern_X = alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
+  matrix_categorical_vals_extern_X = alloc_matd(num_obs, num_reg_unordered_extern + num_reg_ordered_extern);
+  determine_categorical_vals(num_obs,
+                             0,
+                             0,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             NULL,
+                             NULL,
+                             matrix_X_unordered_train_extern,
+                             matrix_X_ordered_train_extern,
+                             num_categories_extern_X,
+                             matrix_categorical_vals_extern_X);
+
+  int_ll_extern = asInteger(regtype);
+  if((int_ll_extern == LL_LP) && (num_reg_continuous_extern > 0)){
+    if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
+      error("C_np_shadow_cv_xweights_full_conditional: glp_degree length mismatch");
+    vector_glp_degree_extern = INTEGER(degree_i);
+    int_glp_bernstein_extern = asInteger(glp_bernstein);
+    int_glp_basis_extern = asInteger(glp_basis);
+  } else {
+    vector_glp_degree_extern = NULL;
+    int_glp_bernstein_extern = 0;
+    int_glp_basis_extern = 1;
+  }
+
+  row = (double *)malloc((size_t)num_obs*sizeof(double));
+  if(row == NULL)
+    error("C_np_shadow_cv_xweights_full_conditional: row allocation failed");
+  if(np_shadow_proof_conditional_x_weight_row_full(REAL(rbw_r), row_idx, row) != 0)
+    error("C_np_shadow_cv_xweights_full_conditional: full-row helper failed");
+
+  out = PROTECT(allocVector(REALSXP, num_obs));
+  for(i = 0; i < num_obs; i++)
+    REAL(out)[i] = row[i];
+
+  if(kdt_extern_X != NULL) free_kdtree(&kdt_extern_X);
+  safe_free(ipt_extern_X); safe_free(ipt_lookup_extern_X);
+  if(matrix_X_unordered_train_extern != NULL) free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
+  if(matrix_X_ordered_train_extern != NULL) free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
+  if(matrix_X_continuous_train_extern != NULL) free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  if(num_categories_extern_X != NULL) safe_free(num_categories_extern_X);
+  if(matrix_categorical_vals_extern_X != NULL) free_mat(matrix_categorical_vals_extern_X, num_reg_unordered_extern + num_reg_ordered_extern);
+  safe_free(row);
+  safe_free(shadow_continuous_stddev);
+  matrix_X_unordered_train_extern = matrix_X_ordered_train_extern = matrix_X_continuous_train_extern = NULL;
+  num_categories_extern_X = NULL;
+  matrix_categorical_vals_extern_X = NULL;
+  ipt_extern_X = NULL;
+  ipt_lookup_extern_X = NULL;
+  int_ll_extern = LL_LC;
+  vector_glp_degree_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  int_TREE_X = int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
+  vector_continuous_stddev_extern = vector_continuous_stddev_save;
+  int_LARGE_SF = int_large_sf_save;
+  nconfac_extern = nconfac_save;
+  ncatfac_extern = ncatfac_save;
+  np_glp_cv_clear_extern();
+  np_shadow_state_active = 0;
+
+  UNPROTECT(7);
+  return out;
+}
+
 SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
                                           SEXP txord,
                                           SEXP txcon,

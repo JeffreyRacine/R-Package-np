@@ -904,6 +904,8 @@ npindexhat <-
     txdat <- toFrame(txdat)
     exdat <- toFrame(exdat)
 
+    npKernelBoundsCheckEval(exdat, bws$xdati$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+
     txdat <- adjustLevels(txdat, bws$xdati)
     exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
 
@@ -1047,6 +1049,8 @@ npplreghat <-
       stop("evaluation data 'exdat' and 'ezdat' must have same number of rows")
     if (ncol(txdat) != ncol(exdat))
       stop("'txdat' and 'exdat' must have same number of columns")
+
+    npKernelBoundsCheckEval(ezdat, bws$zdati$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
 
     txdat <- adjustLevels(txdat, bws$xdati)
     exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
@@ -1214,6 +1218,8 @@ npscoefhat <-
       stop("'exdat' and 'ezdat' must have same number of evaluation rows")
     if (ncol(txdat) != ncol(exdat))
       stop("'txdat' and 'exdat' must have same number of columns")
+
+    npKernelBoundsCheckEval(ezdat, bws$zdati$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
 
     txdat <- adjustLevels(txdat, bws$xdati)
     exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)

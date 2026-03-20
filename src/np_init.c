@@ -14,6 +14,8 @@ extern SEXP C_np_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, S
 extern SEXP C_np_shadow_cv_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_shadow_cv_distribution_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_shadow_cv_xweights_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_shadow_cv_xweights_full_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_shadow_cv_yrow_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -41,6 +43,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_shadow_cv_density_conditional",(DL_FUNC) &C_np_shadow_cv_density_conditional,21},
     {"C_np_shadow_cv_distribution_conditional",(DL_FUNC) &C_np_shadow_cv_distribution_conditional,24},
     {"C_np_shadow_cv_xweights_conditional",(DL_FUNC) &C_np_shadow_cv_xweights_conditional,17},
+    {"C_np_shadow_cv_xweights_full_conditional",(DL_FUNC) &C_np_shadow_cv_xweights_full_conditional,17},
+    {"C_np_shadow_cv_yrow_conditional",(DL_FUNC) &C_np_shadow_cv_yrow_conditional,16},
     {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,17},
     {"C_np_density_conditional_bw",    (DL_FUNC) &C_np_density_conditional_bw,    21},
     {"C_np_density_conditional_bw_eval",(DL_FUNC) &C_np_density_conditional_bw_eval,21},

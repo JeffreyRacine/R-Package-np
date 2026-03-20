@@ -1977,6 +1977,34 @@ static inline void np_activate_bounds_xy(void){
   vector_ckerub_extern = vector_cxykerub_extern;
 }
 
+typedef struct {
+  int int_cker_bound;
+  double *ckerlb;
+  double *ckerub;
+} NPConditionalBoundState;
+
+static void np_conditional_push_bounds(int new_bound_flag,
+                                       double *new_lb,
+                                       double *new_ub,
+                                       NPConditionalBoundState *saved){
+  if(saved == NULL)
+    return;
+  saved->int_cker_bound = int_cker_bound_extern;
+  saved->ckerlb = vector_ckerlb_extern;
+  saved->ckerub = vector_ckerub_extern;
+  int_cker_bound_extern = new_bound_flag;
+  vector_ckerlb_extern = new_lb;
+  vector_ckerub_extern = new_ub;
+}
+
+static void np_conditional_pop_bounds(const NPConditionalBoundState *saved){
+  if(saved == NULL)
+    return;
+  int_cker_bound_extern = saved->int_cker_bound;
+  vector_ckerlb_extern = saved->ckerlb;
+  vector_ckerub_extern = saved->ckerub;
+}
+
 static inline double np_cker_invnorm(const int kernel,
                                      const double x,
                                      const double h,
@@ -3745,11 +3773,168 @@ void np_ckernelv(const int KERNEL,
 
 }
 
+static inline double np_bounded_convol_kernel_eval(const int KERNEL,
+                                                   const double t,
+                                                   const double x,
+                                                   const double hx,
+                                                   const double y,
+                                                   const double hy,
+                                                   const double lb,
+                                                   const double ub){
+  return kernel(KERNEL, (t - x)/hx)*
+    np_cker_invnorm(KERNEL, t, hx, lb, ub)*
+    kernel(KERNEL, (t - y)/hy)*
+    np_cker_invnorm(KERNEL, t, hy, lb, ub);
+}
+
+static double np_bounded_convol_finite_gl16(const int KERNEL,
+                                            const double x,
+                                            const double y,
+                                            const double hx,
+                                            const double hy,
+                                            const double lb,
+                                            const double ub){
+  static const double nodes[] = {
+    0.09501250983763744, 0.2816035507792589,
+    0.4580167776572274, 0.6178762444026437,
+    0.7554044083550030, 0.8656312023878318,
+    0.9445750230732326, 0.9894009349916499
+  };
+  static const double weights[] = {
+    0.1894506104550685, 0.1826034150449236,
+    0.1691565193950025, 0.1495959888165767,
+    0.1246289712555339, 0.09515851168249279,
+    0.06225352393864789, 0.02715245941175409
+  };
+  const double mid = 0.5*(lb + ub);
+  const double half = 0.5*(ub - lb);
+  double sum = 0.0;
+  int i;
+
+  if(!(ub > lb))
+    return 0.0;
+
+  for(i = 0; i < (int)(sizeof(nodes)/sizeof(nodes[0])); i++){
+    const double dx = half*nodes[i];
+    sum += weights[i]*
+      (np_bounded_convol_kernel_eval(KERNEL, mid - dx, x, hx, y, hy, lb, ub) +
+       np_bounded_convol_kernel_eval(KERNEL, mid + dx, x, hx, y, hy, lb, ub));
+  }
+
+  return half*sum;
+}
+
+static double np_bounded_convol_upper_inf_gl16(const int KERNEL,
+                                               const double x,
+                                               const double y,
+                                               const double hx,
+                                               const double hy,
+                                               const double lb){
+  static const double nodes[] = {
+    0.09501250983763744, 0.2816035507792589,
+    0.4580167776572274, 0.6178762444026437,
+    0.7554044083550030, 0.8656312023878318,
+    0.9445750230732326, 0.9894009349916499
+  };
+  static const double weights[] = {
+    0.1894506104550685, 0.1826034150449236,
+    0.1691565193950025, 0.1495959888165767,
+    0.1246289712555339, 0.09515851168249279,
+    0.06225352393864789, 0.02715245941175409
+  };
+  double sum = 0.0;
+  int i, s;
+
+  for(i = 0; i < (int)(sizeof(nodes)/sizeof(nodes[0])); i++){
+    for(s = -1; s <= 1; s += 2){
+      const double xi = s*nodes[i];
+      const double u = 0.5*(xi + 1.0);
+      const double omu = 1.0 - u;
+      const double t = lb + u/omu;
+      const double jac = 0.5/(omu*omu);
+      sum += weights[i]*
+        np_bounded_convol_kernel_eval(KERNEL, t, x, hx, y, hy, lb, R_PosInf)*
+        jac;
+    }
+  }
+
+  return sum;
+}
+
+static double np_bounded_convol_lower_inf_gl16(const int KERNEL,
+                                               const double x,
+                                               const double y,
+                                               const double hx,
+                                               const double hy,
+                                               const double ub){
+  static const double nodes[] = {
+    0.09501250983763744, 0.2816035507792589,
+    0.4580167776572274, 0.6178762444026437,
+    0.7554044083550030, 0.8656312023878318,
+    0.9445750230732326, 0.9894009349916499
+  };
+  static const double weights[] = {
+    0.1894506104550685, 0.1826034150449236,
+    0.1691565193950025, 0.1495959888165767,
+    0.1246289712555339, 0.09515851168249279,
+    0.06225352393864789, 0.02715245941175409
+  };
+  double sum = 0.0;
+  int i, s;
+
+  for(i = 0; i < (int)(sizeof(nodes)/sizeof(nodes[0])); i++){
+    for(s = -1; s <= 1; s += 2){
+      const double xi = s*nodes[i];
+      const double u = 0.5*(xi + 1.0);
+      const double omu = 1.0 - u;
+      const double t = ub - u/omu;
+      const double jac = 0.5/(omu*omu);
+      sum += weights[i]*
+        np_bounded_convol_kernel_eval(KERNEL, t, x, hx, y, hy, R_NegInf, ub)*
+        jac;
+    }
+  }
+
+  return sum;
+}
+
+static double np_bounded_convol_ckernel(const int KERNEL,
+                                        const double x,
+                                        const double y,
+                                        const double hx,
+                                        const double hy,
+                                        const double lb,
+                                        const double ub){
+  const int k0 = KERNEL % 10;
+
+  if(!(hx > 0.0) || !(hy > 0.0) || !isfinite(hx) || !isfinite(hy))
+    return 0.0;
+
+  if((k0 >= 4) && (k0 <= 8)){
+    const double sl = cksup[k0][0];
+    const double su = cksup[k0][1];
+    const double lo = MAX(isfinite(lb) ? lb : R_NegInf, MAX(x + hx*sl, y + hy*sl));
+    const double hi = MIN(isfinite(ub) ? ub : R_PosInf, MIN(x + hx*su, y + hy*su));
+    if(isfinite(lo) && isfinite(hi) && !(hi > lo))
+      return 0.0;
+  }
+
+  if(isfinite(lb) && isfinite(ub))
+    return np_bounded_convol_finite_gl16(k0, x, y, hx, hy, lb, ub);
+  if(isfinite(lb))
+    return np_bounded_convol_upper_inf_gl16(k0, x, y, hx, hy, lb);
+  if(isfinite(ub))
+    return np_bounded_convol_lower_inf_gl16(k0, x, y, hx, hy, ub);
+
+  return 0.0;
+}
+
 void np_convol_ckernelv(const int KERNEL, 
                         const double * const xt, const int num_xt, 
                         const int do_xw,
                         const double x, 
                         double * xt_h, 
+                        const int xt_h_is_scalar,
                         const double h, 
                         const double lb,
                         const double ub,
@@ -3769,38 +3954,15 @@ void np_convol_ckernelv(const int KERNEL,
     np_aconvol_rect, np_aconvol_tgauss2
   };
 
-  /* Bounded convolution adjustment:
-     For Gaussian-2 we can adjust the legacy full-support convolution exactly.
-     For other kernels we intentionally fall back to the legacy convolution path. */
   for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
     double kval;
-    const double hy = xt_h[i];
+    const double hy = xt_h_is_scalar ? xt_h[0] : xt_h[i];
 
     if(xw[j] == 0.0) continue;
 
-    kval = k[KERNEL](x, xt[i], h, hy);
-
-    if(use_bound_convol && (KERNEL == 0) && (h > 0.0) && (hy > 0.0)){
-      const double hx2 = h*h;
-      const double hy2 = hy*hy;
-      const double s2 = hx2 + hy2;
-      const double zx_u = isfinite(ub) ? ((ub - x)/h) : R_PosInf;
-      const double zx_l = isfinite(lb) ? ((lb - x)/h) : R_NegInf;
-      const double zy_u = isfinite(ub) ? ((ub - xt[i])/hy) : R_PosInf;
-      const double zy_l = isfinite(lb) ? ((lb - xt[i])/hy) : R_NegInf;
-      const double denx = np_cdf_gauss2(zx_u) - np_cdf_gauss2(zx_l);
-      const double deny = np_cdf_gauss2(zy_u) - np_cdf_gauss2(zy_l);
-
-      if(s2 > 0.0){
-        const double sig = h*hy/sqrt(s2);
-        const double mu = (x*hy2 + xt[i]*hx2)/s2;
-        const double zc_u = isfinite(ub) ? ((ub - mu)/sig) : R_PosInf;
-        const double zc_l = isfinite(lb) ? ((lb - mu)/sig) : R_NegInf;
-        const double cint = np_cdf_gauss2(zc_u) - np_cdf_gauss2(zc_l);
-        const double den = NZD_POS(denx)*NZD_POS(deny);
-        kval *= NZD_POS(cint)/den;
-      }
-    }
+    kval = use_bound_convol ?
+      np_bounded_convol_ckernel(KERNEL, x, xt[i], h, hy, lb, ub) :
+      k[KERNEL](x, xt[i], h, hy);
 
     result[i] = xw[j]*kval/ipow(hy, power);
   }
@@ -5021,8 +5183,11 @@ const NP_GateOverrideCtx * const gate_override_ctx){
 
 
   if(bandwidth_provided){
-    if(BANDWIDTH_reg == BW_GEN_NN)
+    if(BANDWIDTH_reg == BW_GEN_NN){
       matrix_bandwidth = matrix_bw_eval;
+      if(any_convolution)
+        matrix_alt_bandwidth = matrix_bw_train;
+    }
     else if (is_adaptive){
       if (any_convolution){
         matrix_alt_bandwidth = matrix_bw_eval;        
@@ -5030,6 +5195,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       matrix_bandwidth = matrix_bw_train;
     } else {
       matrix_bandwidth = matrix_bw_train;
+      if(any_convolution)
+        matrix_alt_bandwidth = matrix_bw_train;
     }
     lambda = lambda_pre;
   } else {
@@ -5840,7 +6007,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
                           xc[i][j], m[i][jbw],
                           vector_ckerlb_extern[i], vector_ckerub_extern[i]) : 1.0;
 
-        if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
+        if(operator[l] != OP_CONVOLUTION){
           if(p_nvar == 0){
             const int use_largeh = any_cont_largeh && (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
 
@@ -5860,17 +6027,18 @@ const NP_GateOverrideCtx * const gate_override_ctx){
         else if(p_nvar == 0){
           const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
           np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, tprod_has_vals, xc[i][j],
-                             matrix_alt_bandwidth[i], m[i][jbw],
+                             matrix_alt_bandwidth[i], (BANDWIDTH_reg == BW_FIXED),
+                             m[i][jbw],
                              use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
                              use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
                              use_bound_convol_i,
                              tprod, bpow[i]);
           tprod_has_vals = 1;
-        } else
-        {
+        } else {
           const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
           np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j],
-                             matrix_alt_bandwidth[i], m[i][jbw],
+                             matrix_alt_bandwidth[i], (BANDWIDTH_reg == BW_FIXED),
+                             m[i][jbw],
                              use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
                              use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
                              use_bound_convol_i,
@@ -11124,8 +11292,7 @@ double *cv){
   np_gate_ctx_clear(&gate_y_ctx);
   np_gate_ctx_clear(&gate_xy_ctx);
 
-  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN) || (BANDWIDTH_den == BW_ADAP_NN)) &&
-     (int_ll_extern == LL_LP))
+  if((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN) || (BANDWIDTH_den == BW_ADAP_NN))
     return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
 
   int64_t i,j,k,l;
@@ -14798,8 +14965,9 @@ static int np_shadow_conditional_kernel_row_raw(const int *kernel_c,
                                                mean_out);
 }
 
-static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
-                                                 double *weights_out){
+static int np_shadow_conditional_build_x_weights_core(double *vector_scale_factor,
+                                                      int drop_eval_self,
+                                                      double *weights_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
@@ -14809,6 +14977,7 @@ static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
+  NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
 
@@ -14823,10 +14992,11 @@ static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
   memset(weights_out, 0, (size_t)num_train*(size_t)num_train*sizeof(double));
 
   if(num_reg_tot <= 0){
-    const double w = (num_train > 1) ? 1.0/((double)(num_train - 1)) : 0.0;
+    const double denom = drop_eval_self ? ((double)(num_train - 1)) : ((double)num_train);
+    const double w = (denom > 0.0) ? 1.0/denom : 0.0;
     for(i = 0; i < num_train; i++)
       for(j = 0; j < num_train; j++)
-        if(i != j)
+        if((!drop_eval_self) || (i != j))
           weights_out[(size_t)i*(size_t)num_train + (size_t)j] = w;
     return 0;
   }
@@ -14920,6 +15090,10 @@ static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
         (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_x[l][i] : matrix_bandwidth_x[l][0];
     }
 
+    np_conditional_push_bounds(int_cxker_bound_extern,
+                               vector_cxkerlb_extern,
+                               vector_cxkerub_extern,
+                               &bounds_state);
     if(np_shadow_conditional_kernel_row_raw(kernel_cx,
                                             kernel_ux,
                                             kernel_ox,
@@ -14945,10 +15119,14 @@ static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
                                             int_TREE_X,
                                             kdt_extern_X,
                                             kw,
-                                            mean_row) != 0)
+                                            mean_row) != 0){
+      np_conditional_pop_bounds(&bounds_state);
       goto cleanup_xweights;
+    }
+    np_conditional_pop_bounds(&bounds_state);
 
-    kw[i] = 0.0;
+    if(drop_eval_self)
+      kw[i] = 0.0;
 
     if(ll_mode == LL_LC){
       for(j = 0; j < num_train; j++)
@@ -15045,6 +15223,16 @@ cleanup_xweights:
   return status;
 }
 
+static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
+                                                 double *weights_out){
+  return np_shadow_conditional_build_x_weights_core(vector_scale_factor, 1, weights_out);
+}
+
+static int np_shadow_conditional_build_x_weights_full(double *vector_scale_factor,
+                                                      double *weights_out){
+  return np_shadow_conditional_build_x_weights_core(vector_scale_factor, 0, weights_out);
+}
+
 int np_shadow_proof_conditional_x_weights_dense(double *vector_scale_factor,
                                                 double *weights_out){
   return np_shadow_conditional_build_x_weights(vector_scale_factor, weights_out);
@@ -15068,6 +15256,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
   double *eval_basis = NULL;
+  NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
 
@@ -15226,6 +15415,10 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
       }
     }
 
+    np_conditional_push_bounds(int_cxker_bound_extern,
+                               vector_cxkerlb_extern,
+                               vector_cxkerub_extern,
+                               &bounds_state);
     if(np_shadow_conditional_kernel_row_raw(kernel_cx,
                                             kernel_ux,
                                             kernel_ox,
@@ -15251,8 +15444,10 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                             (BANDWIDTH_den_extern == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
                                             (BANDWIDTH_den_extern == BW_ADAP_NN) ? NULL : kdt_extern_X,
                                             kw,
-                                            mean_row) != 0)
+                                            mean_row) != 0){
+      np_conditional_pop_bounds(&bounds_state);
       goto cleanup_lp_hat;
+    }
 
     if(kernel_weighted_sum_np_ctx(kernel_cx,
                                   kernel_ux,
@@ -15304,8 +15499,11 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                   out2,
                                   NULL,
                                   NULL,
-                                  NULL) != 0)
+                                  NULL) != 0){
+      np_conditional_pop_bounds(&bounds_state);
       goto cleanup_lp_hat;
+    }
+    np_conditional_pop_bounds(&bounds_state);
 
     for(l = 0; l < np_glp_cv_cache.nterms; l++){
       const int base = l*np_glp_cv_cache.nterms;
@@ -15541,6 +15739,7 @@ static int np_conditional_xrow_from_ctx(NPConditionalXRowCtx *ctx,
   const int num_train = num_obs_train_extern;
   int eval_pos = eval_idx;
   MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
+  NPConditionalBoundState bounds_state;
   int j, l;
   int status = 1;
 
@@ -15572,6 +15771,10 @@ static int np_conditional_xrow_from_ctx(NPConditionalXRowCtx *ctx,
       (BANDWIDTH_den_extern == BW_GEN_NN) ? ctx->matrix_bandwidth_x[l][eval_pos] : ctx->matrix_bandwidth_x[l][0];
   }
 
+  np_conditional_push_bounds(int_cxker_bound_extern,
+                             vector_cxkerlb_extern,
+                             vector_cxkerub_extern,
+                             &bounds_state);
   if(np_shadow_conditional_kernel_row_raw(ctx->kernel_cx,
                                           ctx->kernel_ux,
                                           ctx->kernel_ox,
@@ -15597,8 +15800,11 @@ static int np_conditional_xrow_from_ctx(NPConditionalXRowCtx *ctx,
                                           int_TREE_X,
                                           kdt_extern_X,
                                           ctx->kw,
-                                          ctx->mean_row) != 0)
+                                          ctx->mean_row) != 0){
+    np_conditional_pop_bounds(&bounds_state);
     goto cleanup_xrow_from_ctx;
+  }
+  np_conditional_pop_bounds(&bounds_state);
 
   ctx->kw[eval_pos] = 0.0;
 
@@ -16093,6 +16299,7 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
                                         double *row_out){
   const int num_train = num_obs_train_extern;
   int eval_pos = eval_idx;
+  NPConditionalBoundState bounds_state;
   int j, l;
 
   if((ctx == NULL) || (!ctx->ready) || (row_out == NULL))
@@ -16121,6 +16328,10 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
       (BANDWIDTH_den_extern == BW_GEN_NN) ? ctx->matrix_bandwidth_y[l][eval_pos] : ctx->matrix_bandwidth_y[l][0];
   }
 
+  np_conditional_push_bounds(int_cyker_bound_extern,
+                             vector_cykerlb_extern,
+                             vector_cykerub_extern,
+                             &bounds_state);
   if(np_shadow_conditional_kernel_row(ctx->kernel_cy,
                                       ctx->kernel_uy,
                                       ctx->kernel_oy,
@@ -16146,8 +16357,11 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
                                       int_TREE_Y,
                                       kdt_extern_Y,
                                       ctx->kw,
-                                      NULL) != 0)
+                                      NULL) != 0){
+    np_conditional_pop_bounds(&bounds_state);
     return 1;
+  }
+  np_conditional_pop_bounds(&bounds_state);
 
   for(j = 0; j < num_train; j++){
     const int orig_j = (int_TREE_Y == NP_TREE_TRUE) ? ipt_extern_Y[j] : j;
@@ -16157,9 +16371,10 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
   return 0;
 }
 
-static int np_conditional_x_weight_row_stream_core(double *vector_scale_factor,
-                                                   int eval_idx,
-                                                   double *row_out){
+static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_factor,
+                                                        int eval_idx,
+                                                        int drop_eval_self,
+                                                        double *row_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
@@ -16169,6 +16384,7 @@ static int np_conditional_x_weight_row_stream_core(double *vector_scale_factor,
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
+  NPConditionalBoundState bounds_state;
   int eval_pos = eval_idx;
   int i, j, l;
   int status = 1;
@@ -16188,9 +16404,10 @@ static int np_conditional_x_weight_row_stream_core(double *vector_scale_factor,
     eval_pos = ipt_lookup_extern_X[eval_idx];
 
   if(num_reg_tot <= 0){
-    const double w = (num_train > 1) ? 1.0/((double)(num_train - 1)) : 0.0;
+    const double denom = drop_eval_self ? ((double)(num_train - 1)) : ((double)num_train);
+    const double w = (denom > 0.0) ? 1.0/denom : 0.0;
     for(j = 0; j < num_train; j++)
-      if(j != eval_idx)
+      if((!drop_eval_self) || (j != eval_idx))
         row_out[j] = w;
     return 0;
   }
@@ -16280,6 +16497,10 @@ static int np_conditional_x_weight_row_stream_core(double *vector_scale_factor,
       (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_x[l][eval_pos] : matrix_bandwidth_x[l][0];
   }
 
+  np_conditional_push_bounds(int_cxker_bound_extern,
+                             vector_cxkerlb_extern,
+                             vector_cxkerub_extern,
+                             &bounds_state);
   if(np_shadow_conditional_kernel_row_raw(kernel_cx,
                                           kernel_ux,
                                           kernel_ox,
@@ -16305,10 +16526,14 @@ static int np_conditional_x_weight_row_stream_core(double *vector_scale_factor,
                                           int_TREE_X,
                                           kdt_extern_X,
                                           kw,
-                                          mean_row) != 0)
+                                          mean_row) != 0){
+    np_conditional_pop_bounds(&bounds_state);
     goto cleanup_xweight_row;
+  }
+  np_conditional_pop_bounds(&bounds_state);
 
-  kw[eval_pos] = 0.0;
+  if(drop_eval_self)
+    kw[eval_pos] = 0.0;
 
   if(ll_mode == LL_LC){
     double row_sum = 0.0;
@@ -16396,6 +16621,24 @@ cleanup_xweight_row:
   return status;
 }
 
+static int np_conditional_x_weight_row_stream_core(double *vector_scale_factor,
+                                                   int eval_idx,
+                                                   double *row_out){
+  return np_conditional_x_weight_row_stream_core_impl(vector_scale_factor,
+                                                      eval_idx,
+                                                      1,
+                                                      row_out);
+}
+
+static int np_conditional_x_weight_row_full_stream_core(double *vector_scale_factor,
+                                                        int eval_idx,
+                                                        double *row_out){
+  return np_conditional_x_weight_row_stream_core_impl(vector_scale_factor,
+                                                      eval_idx,
+                                                      0,
+                                                      row_out);
+}
+
 int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor,
                                                     int eval_idx,
                                                     double *row_out){
@@ -16408,6 +16651,29 @@ int np_shadow_proof_conditional_x_weight_row_fixed(double *vector_scale_factor,
   if(BANDWIDTH_den_extern != BW_FIXED)
     return 1;
   return np_conditional_x_weight_row_stream_core(vector_scale_factor, eval_idx, row_out);
+}
+
+int np_shadow_proof_conditional_x_weight_row_full(double *vector_scale_factor,
+                                                  int eval_idx,
+                                                  double *row_out){
+  return np_conditional_x_weight_row_full_stream_core(vector_scale_factor,
+                                                      eval_idx,
+                                                      row_out);
+}
+
+static int np_conditional_y_row_stream_op_core(double *vector_scale_factor,
+                                               int eval_idx,
+                                               int operator_code,
+                                               double *row_out);
+
+int np_shadow_proof_conditional_y_row_stream(double *vector_scale_factor,
+                                             int eval_idx,
+                                             int operator_code,
+                                             double *row_out){
+  return np_conditional_y_row_stream_op_core(vector_scale_factor,
+                                             eval_idx,
+                                             operator_code,
+                                             row_out);
 }
 
 static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
@@ -16428,6 +16694,7 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
   double *vsfy = NULL, *lambday = NULL, *kw = NULL;
   double **matrix_bandwidth_y = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_yuno_one = NULL, **eval_yord_one = NULL, **eval_ycon_one = NULL;
+  NPConditionalBoundState bounds_state;
   int eval_pos = eval_idx;
   int i, j, l;
   int status = 1;
@@ -16526,6 +16793,10 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
       (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_y[l][eval_pos] : matrix_bandwidth_y[l][0];
   }
 
+  np_conditional_push_bounds(int_cyker_bound_extern,
+                             vector_cykerlb_extern,
+                             vector_cykerub_extern,
+                             &bounds_state);
   if(np_shadow_conditional_kernel_row(kernel_cy,
                                       kernel_uy,
                                       kernel_oy,
@@ -16551,8 +16822,11 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
                                       int_TREE_Y,
                                       kdt_extern_Y,
                                       kw,
-                                      NULL) != 0)
+                                      NULL) != 0){
+    np_conditional_pop_bounds(&bounds_state);
     goto cleanup_yweight_row;
+  }
+  np_conditional_pop_bounds(&bounds_state);
 
   for(j = 0; j < num_train; j++){
     const int orig_j = (int_TREE_Y == NP_TREE_TRUE) ? ipt_extern_Y[j] : j;
@@ -16605,10 +16879,11 @@ static int np_conditional_lp_cvls_block_size(void){
   return 64;
 }
 
-static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor,
-                                                     int eval_start,
-                                                     int block_rows,
-                                                     double **rows_out){
+static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_factor,
+                                                          int eval_start,
+                                                          int block_rows,
+                                                          int drop_eval_self,
+                                                          double **rows_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
@@ -16619,6 +16894,7 @@ static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   double **matrix_X_continuous_eval_block = NULL;
   MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
+  NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
 
@@ -16633,12 +16909,13 @@ static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor
     return 1;
 
   if(num_reg_tot <= 0){
-    const double w = (num_train > 1) ? 1.0/((double)(num_train - 1)) : 0.0;
+    const double denom = drop_eval_self ? ((double)(num_train - 1)) : ((double)num_train);
+    const double w = (denom > 0.0) ? 1.0/denom : 0.0;
     for(i = 0; i < block_rows; i++){
       const int eval_pos = eval_start + i;
       memset(rows_out[i], 0, (size_t)num_train*sizeof(double));
       for(j = 0; j < num_train; j++)
-        if(j != eval_pos)
+        if((!drop_eval_self) || (j != eval_pos))
           rows_out[i][j] = w;
     }
     return 0;
@@ -16756,6 +17033,10 @@ static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor
         (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_x[l][i] : matrix_bandwidth_x[l][0];
     }
 
+    np_conditional_push_bounds(int_cxker_bound_extern,
+                               vector_cxkerlb_extern,
+                               vector_cxkerub_extern,
+                               &bounds_state);
     if(np_shadow_conditional_kernel_row_raw(kernel_cx,
                                             kernel_ux,
                                             kernel_ox,
@@ -16781,10 +17062,14 @@ static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor
                                             int_TREE_X,
                                             kdt_extern_X,
                                             kw,
-                                            mean_row) != 0)
+                                            mean_row) != 0){
+      np_conditional_pop_bounds(&bounds_state);
       goto cleanup_xweight_block;
+    }
+    np_conditional_pop_bounds(&bounds_state);
 
-    kw[eval_pos] = 0.0;
+    if(drop_eval_self)
+      kw[eval_pos] = 0.0;
 
     if(ll_mode == LL_LC){
       double row_sum = 0.0;
@@ -16861,6 +17146,28 @@ cleanup_xweight_block:
   return status;
 }
 
+static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor,
+                                                     int eval_start,
+                                                     int block_rows,
+                                                     double **rows_out){
+  return np_conditional_x_weight_block_stream_core_impl(vector_scale_factor,
+                                                        eval_start,
+                                                        block_rows,
+                                                        1,
+                                                        rows_out);
+}
+
+static int np_conditional_x_weight_block_full_stream_core(double *vector_scale_factor,
+                                                          int eval_start,
+                                                          int block_rows,
+                                                          double **rows_out){
+  return np_conditional_x_weight_block_stream_core_impl(vector_scale_factor,
+                                                        eval_start,
+                                                        block_rows,
+                                                        0,
+                                                        rows_out);
+}
+
 static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
                                                  int eval_start,
                                                  int block_rows,
@@ -16874,6 +17181,7 @@ static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
   double **matrix_bandwidth_y = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_yuno_one = NULL, **eval_yord_one = NULL, **eval_ycon_one = NULL;
   double **matrix_Y_continuous_eval_block = NULL;
+  NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
 
@@ -16978,6 +17286,10 @@ static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
         (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_y[l][i] : matrix_bandwidth_y[l][0];
     }
 
+    np_conditional_push_bounds(int_cyker_bound_extern,
+                               vector_cykerlb_extern,
+                               vector_cykerub_extern,
+                               &bounds_state);
     if(np_shadow_conditional_kernel_row(kernel_cy,
                                         kernel_uy,
                                         kernel_oy,
@@ -17003,8 +17315,11 @@ static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
                                         int_TREE_Y,
                                         kdt_extern_Y,
                                         kw,
-                                        NULL) != 0)
+                                        NULL) != 0){
+      np_conditional_pop_bounds(&bounds_state);
       goto cleanup_yweight_block;
+    }
+    np_conditional_pop_bounds(&bounds_state);
 
     for(j = 0; j < num_train; j++)
       rows_out[i][j] = kw[j];
@@ -17032,7 +17347,6 @@ cleanup_yweight_block:
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
-  const double log_DBL_MIN = log(DBL_MIN);
   const int use_cached_gnn = (BANDWIDTH_den_extern == BW_GEN_NN);
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
@@ -17078,7 +17392,14 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
     for(j = 0; j < num_obs; j++)
       fit += xrow[j]*yrow[j];
 
-    *cv -= (fit > DBL_MIN) ? log(fit) : log_DBL_MIN;
+    /* Match bkcde's default smooth penalty for negative LP delete-one densities. */
+    if(fit > DBL_MIN){
+      *cv -= log(fit);
+    } else if(fit < -DBL_MIN){
+      *cv += log(-fit) - 2.0*log(DBL_MIN);
+    } else {
+      *cv -= log(DBL_MIN);
+    }
   }
 
   status = 0;
@@ -17095,7 +17416,7 @@ cleanup_cvml_lp_stream:
 static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor,
                                                      double *cv){
   const int num_obs = num_obs_train_extern;
-  double *xrow = NULL, *yrow = NULL, *yconv = NULL;
+  double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *yconv = NULL;
   int i, j, k;
   int status = 1;
 
@@ -17107,9 +17428,10 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
     return 1;
 
   xrow = alloc_vecd(MAX(1, num_obs));
+  xrow_full = alloc_vecd(MAX(1, num_obs));
   yrow = alloc_vecd(MAX(1, num_obs));
   yconv = alloc_vecd(MAX(1, num_obs));
-  if((xrow == NULL) || (yrow == NULL) || (yconv == NULL))
+  if((xrow == NULL) || (xrow_full == NULL) || (yrow == NULL) || (yconv == NULL))
     goto cleanup_cvls_lp_stream;
 
   *cv = 0.0;
@@ -17119,6 +17441,8 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
 
     if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xrow) != 0)
       goto cleanup_cvls_lp_stream;
+    if(np_conditional_x_weight_row_full_stream_core(vector_scale_factor, i, xrow_full) != 0)
+      goto cleanup_cvls_lp_stream;
     if(np_conditional_y_row_stream_core(vector_scale_factor, i, yrow) != 0)
       goto cleanup_cvls_lp_stream;
 
@@ -17127,13 +17451,13 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
 
     for(j = 0; j < num_obs; j++){
       double inner = 0.0;
-      if(xrow[j] == 0.0)
+      if(xrow_full[j] == 0.0)
         continue;
       if(np_conditional_y_row_stream_op_core(vector_scale_factor, j, OP_CONVOLUTION, yconv) != 0)
         goto cleanup_cvls_lp_stream;
       for(k = 0; k < num_obs; k++)
-        inner += xrow[k]*yconv[k];
-      quad += xrow[j]*inner;
+        inner += xrow_full[k]*yconv[k];
+      quad += xrow_full[j]*inner;
     }
 
     *cv += quad - 2.0*lin;
@@ -17144,6 +17468,7 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
 
 cleanup_cvls_lp_stream:
   if(xrow != NULL) free(xrow);
+  if(xrow_full != NULL) free(xrow_full);
   if(yrow != NULL) free(yrow);
   if(yconv != NULL) free(yconv);
   return status;
@@ -17153,7 +17478,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(), MAX(1, num_obs));
-  double **xblock = NULL, **yblock = NULL, **yconvblock = NULL;
+  double **xblock = NULL, **xblock_full = NULL, **yblock = NULL, **yconvblock = NULL;
   int i0, j0, ii, jj, k;
   int status = 1;
 
@@ -17170,9 +17495,10 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
 
   xblock = alloc_matd(num_obs, block_size);
+  xblock_full = alloc_matd(num_obs, block_size);
   yblock = alloc_matd(num_obs, block_size);
   yconvblock = alloc_matd(num_obs, block_size);
-  if((xblock == NULL) || (yblock == NULL) || (yconvblock == NULL))
+  if((xblock == NULL) || (xblock_full == NULL) || (yblock == NULL) || (yconvblock == NULL))
     goto cleanup_cvls_lp_block;
 
   *cv = 0.0;
@@ -17182,6 +17508,8 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     double quad = 0.0;
 
     if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
+      goto cleanup_cvls_lp_block;
+    if(np_conditional_x_weight_block_full_stream_core(vector_scale_factor, i0, ib, xblock_full) != 0)
       goto cleanup_cvls_lp_block;
     if(np_conditional_y_block_stream_op_core(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0)
       goto cleanup_cvls_lp_block;
@@ -17197,7 +17525,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
         goto cleanup_cvls_lp_block;
 
       for(ii = 0; ii < ib; ii++){
-        double * const ai = xblock[ii];
+        double * const ai = xblock_full[ii];
         for(jj = 0; jj < jb; jj++){
           const double aij = ai[j0 + jj];
           double inner = 0.0;
@@ -17218,6 +17546,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
 
 cleanup_cvls_lp_block:
   if(xblock != NULL) free_mat(xblock, block_size);
+  if(xblock_full != NULL) free_mat(xblock_full, block_size);
   if(yblock != NULL) free_mat(yblock, block_size);
   if(yconvblock != NULL) free_mat(yconvblock, block_size);
   np_glp_cv_clear_extern();
@@ -17309,6 +17638,7 @@ static int np_shadow_conditional_build_y_matrix(const int *operator_y,
   double *vsfy = NULL, *lambday = NULL, *kw = NULL;
   double **matrix_bandwidth_y = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_yuno_one = NULL, **eval_yord_one = NULL, **eval_ycon_one = NULL;
+  NPConditionalBoundState bounds_state;
   int i, l, status = 1;
 
   if((BANDWIDTH_den_extern != BW_FIXED) &&
@@ -17389,6 +17719,10 @@ static int np_shadow_conditional_build_y_matrix(const int *operator_y,
         (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_y[l][i] : matrix_bandwidth_y[l][0];
     }
 
+    np_conditional_push_bounds(int_cyker_bound_extern,
+                               vector_cykerlb_extern,
+                               vector_cykerub_extern,
+                               &bounds_state);
     if(np_shadow_conditional_kernel_row(kernel_cy,
                                         kernel_uy,
                                         kernel_oy,
@@ -17414,8 +17748,11 @@ static int np_shadow_conditional_build_y_matrix(const int *operator_y,
                                         int_TREE_Y,
                                         kdt_extern_Y,
                                         kw,
-                                        NULL) != 0)
+                                        NULL) != 0){
+      np_conditional_pop_bounds(&bounds_state);
       goto cleanup_ymat;
+    }
+    np_conditional_pop_bounds(&bounds_state);
 
     for(l = 0; l < num_obs_train_extern; l++){
       const int orig_l = (int_TREE_Y == NP_TREE_TRUE) ? ipt_extern_Y[l] : l;
@@ -17487,7 +17824,7 @@ cleanup_cvml_shadow:
 }
 
 int np_shadow_proof_cv_con_density_ls(double *vector_scale_factor, double *cv){
-  double *weights = NULL, *yrow = NULL, *yconv = NULL;
+  double *weights = NULL, *weights_full = NULL, *yrow = NULL, *yconv = NULL;
   int *operator_y = NULL;
   int i, j, k, status = 1;
 
@@ -17495,13 +17832,16 @@ int np_shadow_proof_cv_con_density_ls(double *vector_scale_factor, double *cv){
     return 1;
 
   weights = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
+  weights_full = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
   yrow = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
   yconv = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
   operator_y = (int *)calloc((size_t)MAX(1, num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern), sizeof(int));
-  if((weights == NULL) || (yrow == NULL) || (yconv == NULL) || (operator_y == NULL))
+  if((weights == NULL) || (weights_full == NULL) || (yrow == NULL) || (yconv == NULL) || (operator_y == NULL))
     goto cleanup_cvls_shadow;
 
   if(np_shadow_conditional_build_x_weights(vector_scale_factor, weights) != 0)
+    goto cleanup_cvls_shadow;
+  if(np_shadow_conditional_build_x_weights_full(vector_scale_factor, weights_full) != 0)
     goto cleanup_cvls_shadow;
 
   for(i = 0; i < (num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern); i++)
@@ -17532,12 +17872,13 @@ int np_shadow_proof_cv_con_density_ls(double *vector_scale_factor, double *cv){
     double lin = 0.0;
     for(j = 0; j < num_obs_train_extern; j++){
       const double aij = weights[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
+      const double aij_full = weights_full[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
       lin += aij*yrow[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
-      if(aij == 0.0)
+      if(aij_full == 0.0)
         continue;
       for(k = 0; k < num_obs_train_extern; k++)
-        quad += aij*
-          weights[(size_t)i*(size_t)num_obs_train_extern + (size_t)k]*
+        quad += aij_full*
+          weights_full[(size_t)i*(size_t)num_obs_train_extern + (size_t)k]*
           yconv[(size_t)j*(size_t)num_obs_train_extern + (size_t)k];
     }
     *cv += quad - 2.0*lin;
@@ -17547,6 +17888,7 @@ int np_shadow_proof_cv_con_density_ls(double *vector_scale_factor, double *cv){
 
 cleanup_cvls_shadow:
   if(weights != NULL) free(weights);
+  if(weights_full != NULL) free(weights_full);
   if(yrow != NULL) free(yrow);
   if(yconv != NULL) free(yconv);
   if(operator_y != NULL) free(operator_y);
