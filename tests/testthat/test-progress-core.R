@@ -581,8 +581,24 @@ test_that("single-line finish clears the rendered line without leaving a newline
 
   expect_identical(
     output,
-    paste0("\r", line, "\r", strrep(" ", 80L), "\r")
+    paste0("\r", line, "\r", strrep(" ", nchar(line, type = "width")), "\r")
   )
+})
+
+test_that("single-line render uses ANSI erase when the console supports it", {
+  render <- getFromNamespace(".np_progress_render_single_line", "np")
+  line <- "[np] Rotating plot 18/72 (25.0%, elapsed 10.9s, eta 32.6s)"
+
+  output <- capture_single_line_output(
+    "np",
+    list(.np_progress_single_line_supports_ansi = function(con) TRUE),
+    {
+      render(list(render_line = line, last_width = 0L), event = "render")
+      render(list(render_line = line, last_width = nchar(line, type = "width")), event = "finish")
+    }
+  )
+
+  expect_identical(output, paste0("\r\033[2K", line, "\r\033[2K\r"))
 })
 
 test_that("progress end clears single-line output even when the final state already rendered", {
@@ -613,7 +629,7 @@ test_that("progress end clears single-line output even when the final state alre
     output,
     paste0(
       "\r",
-      strrep(" ", 120L),
+      strrep(" ", nchar(line, type = "width")),
       "\r"
     )
   )
