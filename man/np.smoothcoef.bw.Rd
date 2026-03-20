@@ -46,6 +46,7 @@ npscoefbw(\dots)
           cv.num.iterations,
           degree,
           degree.select = c("manual", "coordinate", "exhaustive"),
+          search.engine = c("nomad+powell", "cell", "nomad"),
           degree.min = NULL,
           degree.max = NULL,
           degree.start = NULL,
@@ -245,7 +246,25 @@ npscoefbw(\dots)
     \code{degree} as fixed. \code{"coordinate"} performs cached
     coordinate-wise search over admissible degree vectors for the
     continuous \code{z} variables. \code{"exhaustive"} evaluates the
-    full admissible degree grid.
+    full admissible degree grid when \code{search.engine="cell"}.
+    For NOMAD-based search engines, any non-\code{"manual"} value
+    requests direct joint search over degree and bandwidth
+    coordinates.
+  }
+
+  \item{search.engine}{
+    character string controlling the automatic local-polynomial search
+    backend when \code{regtype="lp"} and
+    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
+    performs direct joint search over the \code{zdat}-side continuous
+    bandwidth coordinates and degree vector using
+    \code{crs::snomadr()}, then applies one Powell hot start from the
+    NOMAD solution. \code{"nomad"} omits the Powell refinement.
+    \code{"cell"} profiles the criterion over the admissible degree
+    grid using repeated fixed-degree bandwidth solves. NOMAD-based
+    search currently requires \code{bwtype="fixed"},
+    \code{degree.verify=FALSE}, and the suggested package \pkg{crs} to
+    be installed.
   }
 
   \item{degree.min}{
@@ -279,7 +298,8 @@ npscoefbw(\dots)
   \item{degree.verify}{
     logical value indicating whether a coordinate-search solution should
     be exhaustively verified over the admissible degree grid after the
-    heuristic phase completes.
+    heuristic phase completes. Available only for
+    \code{search.engine="cell"}.
   }
 
   \item{nmulti}{
@@ -453,6 +473,22 @@ npscoefbw(\dots)
  Aitken's (1976) kernel, while ordered data types use a variation of the
  Wang and van Ryzin (1981) kernel.
 
+  When \code{regtype="lp"} and \code{degree.select != "manual"},
+  \code{npscoefbw} can jointly determine the \code{zdat}-side local
+  polynomial degree vector together with the associated bandwidth
+  coordinates. With \code{search.engine="cell"}, the criterion is
+  profiled over the admissible degree grid using cached
+  coordinate-wise or exhaustive search together with repeated
+  fixed-degree bandwidth solves. With \code{search.engine="nomad"} or
+  \code{"nomad+powell"}, the criterion is optimized directly over the
+  joint degree/bandwidth space using \code{crs::snomadr()};
+  \code{"nomad+powell"} then performs one Powell hot start from the
+  NOMAD solution and keeps the better of the direct NOMAD and polished
+  answers. This polynomial-adaptive joint-search route is motivated by
+  Hall and Racine (2015). When \code{bernstein.basis} is not explicitly
+  supplied, the automatic search route defaults to
+  \code{bernstein.basis=TRUE} for numerical stability.
+
 } 
 
 \value{
@@ -482,7 +518,10 @@ npscoefbw(\dots)
  136, 163-188.
 
  Hastie, T. and R. Tibshirani (1993), \dQuote{Varying-coefficient
-   models,} Journal of the Royal Statistical Society, B 55, 757-796.
+  models,} Journal of the Royal Statistical Society, B 55, 757-796.
+
+ Hall, P. and J.S. Racine (2015), \dQuote{Infinite Order Cross-Validated
+ Local Polynomial Regression,} Journal of Econometrics, 185, 510-525.
 
  Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
  and Practice,} Princeton University Press.
@@ -497,6 +536,10 @@ npscoefbw(\dots)
  Li, Q. and D. Ouyang and J.S. Racine (2013), \dQuote{Categorical
  semiparametric varying-coefficient models,} Journal of Applied
  Econometrics, 28, 551-589.
+
+ Li, A. and Q. Li and J.S. Racine (under revision), \dQuote{Boundary
+ Adjusted, Polynomial Adaptive, Nonparametric Kernel Conditional
+ Density Estimation,} Econometric Reviews.
 
  Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth estimators
  for discrete distributions,}  Biometrika, 68, 301-309.
