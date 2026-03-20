@@ -791,6 +791,7 @@ npcdensbw.conbandwidth <-
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   ndeg <- length(degree.search$start.degree)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) 1L else max(1L, as.integer(opt.args$nmulti[1L]))
+  objective.direction <- if (identical(reg.args$bwmethod, "cv.ml")) "max" else "min"
   bw_lower <- c(rep.int(1e-2, length(setup$cont_flat)), rep.int(0, length(setup$cat_flat)))
   bw_upper <- c(rep.int(1e6, length(setup$cont_flat)), setup$cat_upper * setup$bandwidth.scale.categorical)
 
@@ -918,7 +919,7 @@ npcdensbw.conbandwidth <-
       powell.elapsed <- proc.time()[3L] - powell.start
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
-          .np_degree_better(hot.objective, direct.objective, direction = "min")) {
+          .np_degree_better(hot.objective, direct.objective, direction = objective.direction)) {
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
       }
     }
@@ -936,7 +937,7 @@ npcdensbw.conbandwidth <-
     ub = ub,
     eval_fun = eval_fun,
     build_payload = build_payload,
-    direction = "min",
+    direction = objective.direction,
     objective_name = "fval",
     nmulti = nomad.nmulti,
     random.seed = random.seed,
@@ -1324,7 +1325,7 @@ npcdensbw.default <-
           max_cycles = degree.search$max.cycles,
           verify = degree.search$verify,
           eval_fun = eval_fun,
-          direction = "min",
+          direction = if (identical(reg.args$bwmethod, "cv.ml")) "max" else "min",
           trace_level = "full",
           objective_name = "fval"
         )
