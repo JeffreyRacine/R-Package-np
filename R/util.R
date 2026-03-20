@@ -944,6 +944,84 @@ validateBandwidthTF <- function(bws){
   return(vbl)
 }
 
+.np_refresh_xy_bandwidth_metadata <- function(bws) {
+  if (is.null(bws$xbw) || is.null(bws$ybw) ||
+      is.null(bws$xdati) || is.null(bws$ydati) ||
+      is.null(bws$nconfac) || is.null(bws$ncatfac) ||
+      is.null(bws$sdev) || is.null(bws$dati) || is.null(bws$klist)) {
+    return(bws)
+  }
+
+  bandwidth <- list(x = bws$xbw, y = bws$ybw)
+  sfactor <- bandwidth
+
+  if ((bws$xnuno + bws$ynuno) > 0L) {
+    if (isTRUE(bws$scaling)) {
+      if (bws$xnuno > 0L)
+        bandwidth$x[bws$xdati$iuno] <- bandwidth$x[bws$xdati$iuno] * bws$ncatfac
+      if (bws$ynuno > 0L)
+        bandwidth$y[bws$ydati$iuno] <- bandwidth$y[bws$ydati$iuno] * bws$ncatfac
+    } else {
+      if (bws$xnuno > 0L)
+        sfactor$x[bws$xdati$iuno] <- sfactor$x[bws$xdati$iuno] / bws$ncatfac
+      if (bws$ynuno > 0L)
+        sfactor$y[bws$ydati$iuno] <- sfactor$y[bws$ydati$iuno] / bws$ncatfac
+    }
+  }
+
+  if ((bws$xnord + bws$ynord) > 0L) {
+    if (isTRUE(bws$scaling)) {
+      if (bws$xnord > 0L)
+        bandwidth$x[bws$xdati$iord] <- bandwidth$x[bws$xdati$iord] * bws$ncatfac
+      if (bws$ynord > 0L)
+        bandwidth$y[bws$ydati$iord] <- bandwidth$y[bws$ydati$iord] * bws$ncatfac
+    } else {
+      if (bws$xnord > 0L)
+        sfactor$x[bws$xdati$iord] <- sfactor$x[bws$xdati$iord] / bws$ncatfac
+      if (bws$ynord > 0L)
+        sfactor$y[bws$ydati$iord] <- sfactor$y[bws$ydati$iord] / bws$ncatfac
+    }
+  }
+
+  if ((bws$xncon + bws$yncon) > 0L) {
+    sdev <- as.numeric(bws$sdev)
+    sx <- if (bws$xncon > 0L) sdev[seq_len(bws$xncon)] else numeric(0L)
+    sy <- if (bws$yncon > 0L) sdev[bws$xncon + seq_len(bws$yncon)] else numeric(0L)
+
+    if (isTRUE(bws$scaling)) {
+      if (bws$xncon > 0L)
+        bandwidth$x[bws$xdati$icon] <- bandwidth$x[bws$xdati$icon] * (sx * bws$nconfac)
+      if (bws$yncon > 0L)
+        bandwidth$y[bws$ydati$icon] <- bandwidth$y[bws$ydati$icon] * (sy * bws$nconfac)
+    } else {
+      if (bws$xncon > 0L)
+        sfactor$x[bws$xdati$icon] <- sfactor$x[bws$xdati$icon] / (sx * bws$nconfac)
+      if (bws$yncon > 0L)
+        sfactor$y[bws$ydati$icon] <- sfactor$y[bws$ydati$icon] / (sy * bws$nconfac)
+    }
+  }
+
+  sumNum <- lapply(c("x", "y"), function(v) {
+    dati <- bws$dati[[v]]
+    sfv <- sfactor[[v]]
+    sapply(seq_along(sfv), function(i) {
+      if (dati$icon[i])
+        return(sfv[i])
+      if (dati$iord[i])
+        return(oMaxL(dati$all.nlev[[i]], kertype = bws$klist[[v]]$okertype))
+      if (dati$iuno[i])
+        return(uMaxL(dati$all.nlev[[i]], kertype = bws$klist[[v]]$ukertype))
+      NA_real_
+    })
+  })
+  names(sumNum) <- c("x", "y")
+
+  bws$bandwidth <- bandwidth
+  bws$sfactor <- sfactor
+  bws$sumNum <- sumNum
+  bws
+}
+
 npRegressionNnLowerBound <- function(bws) {
   if (!inherits(bws, "rbandwidth"))
     return(1L)
