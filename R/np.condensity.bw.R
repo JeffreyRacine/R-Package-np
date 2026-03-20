@@ -453,6 +453,10 @@ npcdensbw.conbandwidth <-
                         basis.engine = tbw$basis.engine,
                         degree.engine = tbw$degree.engine,
                         bernstein.basis.engine = tbw$bernstein.basis.engine)
+
+    tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
+
+    tbw
            
     tbw
   }
