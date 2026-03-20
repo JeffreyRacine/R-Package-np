@@ -1,5 +1,46 @@
 library(npRmpi)
 
+test_that("provided fixed bounded cv.ls eval_only survives installed subprocess teardown", {
+  skip_on_cran()
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "set.seed(42)",
+      "n <- 80L",
+      "x <- runif(n)",
+      "y <- rbeta(n, 1, 1)",
+      "tx <- data.frame(x = x)",
+      "ty <- data.frame(y = y)",
+      "npRmpi.init(nslaves = 1L, quiet = TRUE)",
+      "bw.ls <- npcdensbw(",
+      "  xdat = tx,",
+      "  ydat = ty,",
+      "  bws = c(0.16, 0.14),",
+      "  regtype = 'lp',",
+      "  degree = 3L,",
+      "  bwtype = 'fixed',",
+      "  bwmethod = 'cv.ls',",
+      "  cxkerbound = 'range',",
+      "  cykerbound = 'range',",
+      "  bandwidth.compute = FALSE",
+      ")",
+      "npRmpi.quit(force = TRUE)",
+      "out <- npRmpi:::.npcdensbw_eval_only(tx, ty, bw.ls)",
+      "stopifnot(is.list(out), is.finite(out$objective))",
+      "cat('NPCDENS_CVLS_FIXED_BW_EVAL_ONLY_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("NPCDENS_CVLS_FIXED_BW_EVAL_ONLY_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("public npcdensbw cv.ls lc matches the production fixed-point objective", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
