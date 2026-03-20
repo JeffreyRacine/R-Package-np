@@ -848,12 +848,7 @@ npcdensbw.conbandwidth <-
         bandwidth.compute = FALSE,
         reg.args = final.reg.args
       )
-      payload <- npcdensbw.conbandwidth(
-        xdat = xdat,
-        ydat = ydat,
-        bws = tbw,
-        bandwidth.compute = FALSE
-      )
+      payload <- tbw
       payload$method <- as.character(reg.args$bwmethod[1L])
       payload$pmethod <- bwmToPrint(payload$method)
       payload$fval <- as.numeric(best_record$objective)
