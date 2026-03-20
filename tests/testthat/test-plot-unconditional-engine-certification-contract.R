@@ -67,7 +67,8 @@ test_that("plot engine startup helper respects plot.par.mfrow option override", 
   on.exit(restore(state$oldpar), add = TRUE)
 
   expect_identical(state$plot.par.mfrow, FALSE)
-  expect_true(is.list(state$oldpar))
+  expect_true(is.numeric(state$oldpar))
+  expect_length(state$oldpar, 1L)
 })
 
 test_that("unconditional interval payload helper preserves bootstrap and asymptotic semantics", {
