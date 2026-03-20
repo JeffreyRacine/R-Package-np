@@ -584,7 +584,7 @@ npplregbw.plbandwidth =
           znames = names(zdat),
           bandwidth.compute = TRUE
         ),
-        modifyList(outer.args, list(regtype = "lp", degree = degree, bernstein.basis = degree.search$bernstein.basis))
+        utils::modifyList(outer.args, list(regtype = "lp", degree = degree, bernstein.basis = degree.search$bernstein.basis))
       )
       do.call(plbandwidth, plbw.args)
     }
