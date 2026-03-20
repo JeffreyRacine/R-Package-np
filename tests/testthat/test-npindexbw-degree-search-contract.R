@@ -94,6 +94,7 @@ test_that("npindexbw exhaustive degree search matches manual Ichimura profile mi
     method = "ichimura",
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -158,6 +159,7 @@ test_that("npindexbw coordinate search can be exhaustively certified on a small 
     method = "ichimura",
     regtype = "lp",
     degree.select = "coordinate",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     degree.verify = TRUE,
@@ -221,6 +223,7 @@ test_that("npindexbw automatic degree search honors Klein-Spady objective direct
     method = "kleinspady",
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -254,6 +257,7 @@ test_that("npindexbw automatic degree search enforces pilot guardrails", {
       method = "ichimura",
       regtype = "lc",
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -271,6 +275,7 @@ test_that("npindexbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bandwidth.compute = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -288,12 +293,125 @@ test_that("npindexbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bernstein.basis = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 4L,
       bwtype = "fixed",
       nmulti = 1L
     ),
     "degree.max <= 3"
+  )
+})
+
+test_that("npindexbw NOMAD degree search backend improves over the baseline", {
+  skip_if_not_installed("crs")
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, npRmpi.autodispatch = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  n <- 26
+  xdat <- data.frame(
+    x1 = runif(n, -1, 1),
+    x2 = runif(n, -1, 1)
+  )
+  index <- xdat$x1 + 0.6 * xdat$x2
+  y <- sin(index) + 0.2 * index^2 + rnorm(n, sd = 0.05)
+  start.bws <- c(1, 0.6, 0.3)
+
+  bw <- npindexbw(
+    xdat = xdat,
+    ydat = y,
+    bws = start.bws,
+    method = "ichimura",
+    regtype = "lp",
+    degree.select = "coordinate",
+    search.engine = "nomad",
+    degree.min = 0L,
+    degree.max = 2L,
+    bwtype = "fixed",
+    nmulti = 1L
+  )
+
+  expect_s3_class(bw, "sibandwidth")
+  expect_identical(bw$degree.search$mode, "nomad")
+  expect_true(isTRUE(bw$degree.search$completed))
+  expect_gte(bw$degree.search$n.unique, 1L)
+  expect_lte(bw$degree.search$best.fval, bw$degree.search$baseline.fval + 1e-10)
+})
+
+test_that("npindexbw automatic degree search defaults to NOMAD plus Powell", {
+  skip_if_not_installed("crs")
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, npRmpi.autodispatch = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  n <- 26
+  xdat <- data.frame(
+    x1 = runif(n, -1, 1),
+    x2 = runif(n, -1, 1)
+  )
+  index <- xdat$x1 + 0.6 * xdat$x2
+  y <- sin(index) + 0.2 * index^2 + rnorm(n, sd = 0.05)
+  start.bws <- c(1, 0.6, 0.3)
+
+  bw <- npindexbw(
+    xdat = xdat,
+    ydat = y,
+    bws = start.bws,
+    method = "ichimura",
+    regtype = "lp",
+    degree.select = "coordinate",
+    degree.min = 0L,
+    degree.max = 1L,
+    bwtype = "fixed",
+    nmulti = 1L
+  )
+
+  expect_identical(bw$degree.search$mode, "nomad+powell")
+  expect_true(isTRUE(bw$degree.search$completed))
+  expect_true(is.finite(bw$nomad.time))
+  expect_true(is.finite(bw$powell.time))
+})
+
+test_that("npindexbw NOMAD degree search fails fast when crs is unavailable", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, npRmpi.autodispatch = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  n <- 20
+  xdat <- data.frame(
+    x1 = runif(n, -1, 1),
+    x2 = runif(n, -1, 1)
+  )
+  y <- xdat$x1 + xdat$x2 + rnorm(n, sd = 0.05)
+
+  expect_error(
+    with_nprmpi_npindex_degree_bindings(
+      list(.np_nomad_require_crs = function() stop("crs missing", call. = FALSE)),
+      npindexbw(
+        xdat = xdat,
+        ydat = y,
+        bws = c(1, 1, 0.3),
+        method = "ichimura",
+        regtype = "lp",
+        degree.select = "coordinate",
+        search.engine = "nomad",
+        degree.min = 0L,
+        degree.max = 1L,
+        bwtype = "fixed",
+        nmulti = 1L
+      )
+    ),
+    "crs missing"
   )
 })
 

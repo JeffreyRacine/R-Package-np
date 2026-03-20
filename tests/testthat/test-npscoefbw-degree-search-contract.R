@@ -1,3 +1,32 @@
+with_nprmpi_npscoef_degree_bindings <- function(bindings, code) {
+  code <- substitute(code)
+  ns <- asNamespace("npRmpi")
+  old <- lapply(names(bindings), function(name) get(name, envir = ns, inherits = FALSE))
+  names(old) <- names(bindings)
+
+  for (name in names(bindings)) {
+    was_locked <- bindingIsLocked(name, ns)
+    if (was_locked)
+      unlockBinding(name, ns)
+    assign(name, bindings[[name]], envir = ns)
+    if (was_locked)
+      lockBinding(name, ns)
+  }
+
+  on.exit({
+    for (name in names(old)) {
+      was_locked <- bindingIsLocked(name, ns)
+      if (was_locked)
+        unlockBinding(name, ns)
+      assign(name, old[[name]], envir = ns)
+      if (was_locked)
+        lockBinding(name, ns)
+    }
+  }, add = TRUE)
+
+  eval(code, envir = parent.frame())
+}
+
 test_that("npscoefbw exhaustive degree search matches manual profile minimum", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -39,6 +68,7 @@ test_that("npscoefbw exhaustive degree search matches manual profile minimum", {
     ydat = y,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -90,6 +120,7 @@ test_that("npscoefbw coordinate search can be exhaustively certified on a small 
     ydat = y,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -102,6 +133,7 @@ test_that("npscoefbw coordinate search can be exhaustively certified on a small 
     ydat = y,
     regtype = "lp",
     degree.select = "coordinate",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     degree.verify = TRUE,
@@ -139,6 +171,7 @@ test_that("npscoefbw automatic degree search enforces pilot guardrails", {
       ydat = y,
       regtype = "lc",
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bwtype = "fixed",
@@ -156,6 +189,7 @@ test_that("npscoefbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bandwidth.compute = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       bws = 0.2
@@ -171,6 +205,7 @@ test_that("npscoefbw automatic degree search enforces pilot guardrails", {
       regtype = "lp",
       bernstein.basis = FALSE,
       degree.select = "exhaustive",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 4L,
       bwtype = "fixed",
@@ -187,6 +222,7 @@ test_that("npscoefbw automatic degree search enforces pilot guardrails", {
       ydat = y,
       regtype = "lp",
       degree.select = "coordinate",
+      search.engine = "cell",
       degree.min = 0L,
       degree.max = 1L,
       cv.iterate = TRUE,
@@ -218,6 +254,7 @@ test_that("npscoef forwards automatic LP degree search through npscoefbw", {
     data = dat,
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -229,4 +266,106 @@ test_that("npscoef forwards automatic LP degree search through npscoefbw", {
   expect_s3_class(fit$bws, "scbandwidth")
   expect_false(is.null(fit$bws$degree.search))
   expect_identical(fit$bws$degree.search$mode, "exhaustive")
+})
+
+test_that("npscoefbw NOMAD degree search backend improves over the baseline", {
+  skip_if_not_installed("crs")
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, npRmpi.autodispatch = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  n <- 24
+  xdat <- data.frame(x = runif(n))
+  zdat <- data.frame(z = sort(runif(n)))
+  y <- (1 + zdat$z^2) * xdat$x + rnorm(n, sd = 0.08)
+
+  bw <- npscoefbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = y,
+    regtype = "lp",
+    degree.select = "coordinate",
+    search.engine = "nomad",
+    degree.min = 0L,
+    degree.max = 2L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+
+  expect_s3_class(bw, "scbandwidth")
+  expect_identical(bw$degree.search$mode, "nomad")
+  expect_true(isTRUE(bw$degree.search$completed))
+  expect_gte(bw$degree.search$n.unique, 1L)
+  expect_lte(bw$degree.search$best.fval, bw$degree.search$baseline.fval + 1e-10)
+})
+
+test_that("npscoefbw automatic degree search defaults to NOMAD plus Powell", {
+  skip_if_not_installed("crs")
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, npRmpi.autodispatch = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  n <- 24
+  xdat <- data.frame(x = runif(n))
+  zdat <- data.frame(z = sort(runif(n)))
+  y <- (1 + zdat$z^2) * xdat$x + rnorm(n, sd = 0.08)
+
+  bw <- npscoefbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = y,
+    regtype = "lp",
+    degree.select = "coordinate",
+    degree.min = 0L,
+    degree.max = 1L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+
+  expect_identical(bw$degree.search$mode, "nomad+powell")
+  expect_true(isTRUE(bw$degree.search$completed))
+  expect_true(is.finite(bw$nomad.time))
+  expect_true(is.finite(bw$powell.time))
+})
+
+test_that("npscoefbw NOMAD degree search fails fast when crs is unavailable", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, npRmpi.autodispatch = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260319)
+  n <- 20
+  xdat <- data.frame(x = runif(n))
+  zdat <- data.frame(z = runif(n))
+  y <- (1 + zdat$z) * xdat$x + rnorm(n, sd = 0.08)
+
+  expect_error(
+    with_nprmpi_npscoef_degree_bindings(
+      list(.np_nomad_require_crs = function() stop("crs missing", call. = FALSE)),
+      npscoefbw(
+        xdat = xdat,
+        zdat = zdat,
+        ydat = y,
+        regtype = "lp",
+        degree.select = "coordinate",
+        search.engine = "nomad",
+        degree.min = 0L,
+        degree.max = 1L,
+        bwtype = "fixed",
+        bwmethod = "cv.ls",
+        nmulti = 1L
+      )
+    ),
+    "crs missing"
+  )
 })
