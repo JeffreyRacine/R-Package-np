@@ -10,6 +10,8 @@
 #include <time.h>
 
 #include <R.h>
+#include <R_ext/Applic.h>
+#include <R_ext/Lapack.h>
 #include <R_ext/Utils.h>
 #include <Rmath.h>
 #include <Rinternals.h>
@@ -3778,13 +3780,31 @@ static inline double np_bounded_convol_kernel_eval(const int KERNEL,
                                                    const double x,
                                                    const double hx,
                                                    const double y,
-                                                   const double hy,
-                                                   const double lb,
-                                                   const double ub){
+                                                   const double hy){
   return kernel(KERNEL, (t - x)/hx)*
-    np_cker_invnorm(KERNEL, t, hx, lb, ub)*
-    kernel(KERNEL, (t - y)/hy)*
-    np_cker_invnorm(KERNEL, t, hy, lb, ub);
+    kernel(KERNEL, (t - y)/hy);
+}
+
+static inline double np_bounded_convol_gauss2(const double x,
+                                              const double y,
+                                              const double hx,
+                                              const double hy,
+                                              const double lb,
+                                              const double ub,
+                                              const double invnorm_x,
+                                              const double invnorm_y){
+  const double h2 = hx*hx + hy*hy;
+  const double hs = sqrt(h2);
+  const double s = hx*hy/hs;
+  const double mu = (x*hy*hy + y*hx*hx)/h2;
+  const double z2 = (x - y)*(x - y)/h2;
+  const double base =
+    ONE_OVER_SQRT_TWO_PI*hx*hy*exp(-0.5*z2)/hs;
+  const double zu = isfinite(ub) ? ((ub - mu)/s) : R_PosInf;
+  const double zl = isfinite(lb) ? ((lb - mu)/s) : R_NegInf;
+  const double mass = np_cdf_gauss2(zu) - np_cdf_gauss2(zl);
+
+  return base*invnorm_x*invnorm_y*mass;
 }
 
 static double np_bounded_convol_finite_gl16(const int KERNEL,
@@ -3793,7 +3813,9 @@ static double np_bounded_convol_finite_gl16(const int KERNEL,
                                             const double hx,
                                             const double hy,
                                             const double lb,
-                                            const double ub){
+                                            const double ub,
+                                            const double invnorm_x,
+                                            const double invnorm_y){
   static const double nodes[] = {
     0.09501250983763744, 0.2816035507792589,
     0.4580167776572274, 0.6178762444026437,
@@ -3817,11 +3839,11 @@ static double np_bounded_convol_finite_gl16(const int KERNEL,
   for(i = 0; i < (int)(sizeof(nodes)/sizeof(nodes[0])); i++){
     const double dx = half*nodes[i];
     sum += weights[i]*
-      (np_bounded_convol_kernel_eval(KERNEL, mid - dx, x, hx, y, hy, lb, ub) +
-       np_bounded_convol_kernel_eval(KERNEL, mid + dx, x, hx, y, hy, lb, ub));
+      (np_bounded_convol_kernel_eval(KERNEL, mid - dx, x, hx, y, hy) +
+       np_bounded_convol_kernel_eval(KERNEL, mid + dx, x, hx, y, hy));
   }
 
-  return half*sum;
+  return invnorm_x*invnorm_y*half*sum;
 }
 
 static double np_bounded_convol_upper_inf_gl16(const int KERNEL,
@@ -3829,7 +3851,9 @@ static double np_bounded_convol_upper_inf_gl16(const int KERNEL,
                                                const double y,
                                                const double hx,
                                                const double hy,
-                                               const double lb){
+                                               const double lb,
+                                               const double invnorm_x,
+                                               const double invnorm_y){
   static const double nodes[] = {
     0.09501250983763744, 0.2816035507792589,
     0.4580167776572274, 0.6178762444026437,
@@ -3853,12 +3877,12 @@ static double np_bounded_convol_upper_inf_gl16(const int KERNEL,
       const double t = lb + u/omu;
       const double jac = 0.5/(omu*omu);
       sum += weights[i]*
-        np_bounded_convol_kernel_eval(KERNEL, t, x, hx, y, hy, lb, R_PosInf)*
+        np_bounded_convol_kernel_eval(KERNEL, t, x, hx, y, hy)*
         jac;
     }
   }
 
-  return sum;
+  return invnorm_x*invnorm_y*sum;
 }
 
 static double np_bounded_convol_lower_inf_gl16(const int KERNEL,
@@ -3866,7 +3890,9 @@ static double np_bounded_convol_lower_inf_gl16(const int KERNEL,
                                                const double y,
                                                const double hx,
                                                const double hy,
-                                               const double ub){
+                                               const double ub,
+                                               const double invnorm_x,
+                                               const double invnorm_y){
   static const double nodes[] = {
     0.09501250983763744, 0.2816035507792589,
     0.4580167776572274, 0.6178762444026437,
@@ -3890,12 +3916,12 @@ static double np_bounded_convol_lower_inf_gl16(const int KERNEL,
       const double t = ub - u/omu;
       const double jac = 0.5/(omu*omu);
       sum += weights[i]*
-        np_bounded_convol_kernel_eval(KERNEL, t, x, hx, y, hy, R_NegInf, ub)*
+        np_bounded_convol_kernel_eval(KERNEL, t, x, hx, y, hy)*
         jac;
     }
   }
 
-  return sum;
+  return invnorm_x*invnorm_y*sum;
 }
 
 static double np_bounded_convol_ckernel(const int KERNEL,
@@ -3906,9 +3932,14 @@ static double np_bounded_convol_ckernel(const int KERNEL,
                                         const double lb,
                                         const double ub){
   const int k0 = KERNEL % 10;
+  const double invnorm_x = np_cker_invnorm(KERNEL, x, hx, lb, ub);
+  const double invnorm_y = np_cker_invnorm(KERNEL, y, hy, lb, ub);
 
   if(!(hx > 0.0) || !(hy > 0.0) || !isfinite(hx) || !isfinite(hy))
     return 0.0;
+
+  if(k0 == 0)
+    return np_bounded_convol_gauss2(x, y, hx, hy, lb, ub, invnorm_x, invnorm_y);
 
   if((k0 >= 4) && (k0 <= 8)){
     const double sl = cksup[k0][0];
@@ -3920,11 +3951,11 @@ static double np_bounded_convol_ckernel(const int KERNEL,
   }
 
   if(isfinite(lb) && isfinite(ub))
-    return np_bounded_convol_finite_gl16(k0, x, y, hx, hy, lb, ub);
+    return np_bounded_convol_finite_gl16(k0, x, y, hx, hy, lb, ub, invnorm_x, invnorm_y);
   if(isfinite(lb))
-    return np_bounded_convol_upper_inf_gl16(k0, x, y, hx, hy, lb);
+    return np_bounded_convol_upper_inf_gl16(k0, x, y, hx, hy, lb, invnorm_x, invnorm_y);
   if(isfinite(ub))
-    return np_bounded_convol_lower_inf_gl16(k0, x, y, hx, hy, ub);
+    return np_bounded_convol_lower_inf_gl16(k0, x, y, hx, hy, ub, invnorm_x, invnorm_y);
 
   return 0.0;
 }
@@ -14965,6 +14996,132 @@ static int np_shadow_conditional_kernel_row_raw(const int *kernel_c,
                                                mean_out);
 }
 
+static int np_glp_qr_drop_row_bkcde(double **basis,
+                                    int num_train,
+                                    int k,
+                                    const double *kw,
+                                    int eval_pos,
+                                    double *row_out){
+  const double tol = 1.0e-7;
+  double *xqr = NULL, *qraux = NULL, *work = NULL, *y = NULL, *qy = NULL;
+  int *pivot = NULL;
+  int ldx = num_train, n = num_train, p = k, rank = 0, ny = 1;
+  int i, j;
+  int status = 1;
+
+  if((basis == NULL) || (kw == NULL) || (row_out == NULL) || (num_train <= 0) || (k <= 0))
+    return 1;
+  if((eval_pos < 0) || (eval_pos >= num_train))
+    return 1;
+
+  xqr = (double *)malloc((size_t)num_train*(size_t)k*sizeof(double));
+  qraux = (double *)malloc((size_t)k*sizeof(double));
+  work = (double *)malloc((size_t)(2*k)*sizeof(double));
+  y = (double *)calloc((size_t)num_train, sizeof(double));
+  qy = (double *)malloc((size_t)num_train*sizeof(double));
+  pivot = (int *)malloc((size_t)k*sizeof(int));
+  if((xqr == NULL) || (qraux == NULL) || (work == NULL) ||
+     (y == NULL) || (qy == NULL) || (pivot == NULL))
+    goto cleanup_glp_qr_drop;
+
+  for(j = 0; j < k; j++){
+    pivot[j] = j + 1;
+    for(i = 0; i < num_train; i++){
+      const double w = kw[i];
+      xqr[i + j*num_train] = ((w > 0.0) ? sqrt(w) : 0.0) * basis[j][i];
+    }
+  }
+
+  F77_NAME(dqrdc2)(xqr, &ldx, &n, &p, (double *)&tol, &rank, qraux, pivot, work);
+  if((rank < 0) || (rank > k))
+    goto cleanup_glp_qr_drop;
+  if(rank < k)
+    goto cleanup_glp_qr_drop;
+
+  for(i = 0; i < rank; i++){
+    double s = basis[i][eval_pos];
+    for(j = 0; j < i; j++)
+      s -= xqr[j + i*num_train]*y[j];
+    if(fabs(xqr[i + i*num_train]) <= DBL_MIN)
+      goto cleanup_glp_qr_drop;
+    y[i] = s/xqr[i + i*num_train];
+  }
+
+  F77_NAME(dqrqy)(xqr, &n, &p, qraux, y, &ny, qy);
+
+  for(i = 0; i < num_train; i++){
+    const double w = kw[i];
+    row_out[i] = ((w > 0.0) ? sqrt(w) : 0.0) * qy[i];
+  }
+
+  status = 0;
+
+cleanup_glp_qr_drop:
+  if(xqr != NULL) free(xqr);
+  if(qraux != NULL) free(qraux);
+  if(work != NULL) free(work);
+  if(y != NULL) free(y);
+  if(qy != NULL) free(qy);
+  if(pivot != NULL) free(pivot);
+  return status;
+}
+
+static int np_mat_bad_rcond_sym(MATRIX A, double min_rcond){
+  const int n = MatRow(A);
+  char jobz = 'N';
+  char uplo = 'U';
+  int i, j;
+  int info = 0;
+  int lwork = -1;
+  double work_query = 0.0;
+  double max_eval = 0.0, min_eval = DBL_MAX;
+  double *Ac = NULL, *eval = NULL, *work = NULL;
+  int bad = 1;
+
+  if((A == NULL) || (MatCol(A) != n) || (n <= 0))
+    return 1;
+
+  Ac = (double *)malloc((size_t)n*(size_t)n*sizeof(double));
+  eval = (double *)malloc((size_t)n*sizeof(double));
+  if((Ac == NULL) || (eval == NULL))
+    goto cleanup_bad_rcond;
+
+  for(j = 0; j < n; j++)
+    for(i = 0; i < n; i++)
+      Ac[i + j*n] = A[i][j];
+
+  F77_CALL(dsyev)(&jobz, &uplo, &n, Ac, &n, eval, &work_query, &lwork, &info FCONE FCONE);
+  if(info != 0)
+    goto cleanup_bad_rcond;
+
+  lwork = MAX(1, (int)work_query);
+  work = (double *)malloc((size_t)lwork*sizeof(double));
+  if(work == NULL)
+    goto cleanup_bad_rcond;
+
+  F77_CALL(dsyev)(&jobz, &uplo, &n, Ac, &n, eval, work, &lwork, &info FCONE FCONE);
+  if(info != 0)
+    goto cleanup_bad_rcond;
+
+  for(i = 0; i < n; i++){
+    if(!R_FINITE(eval[i]))
+      goto cleanup_bad_rcond;
+    max_eval = MAX(max_eval, fabs(eval[i]));
+    min_eval = MIN(min_eval, fabs(eval[i]));
+  }
+
+  if(!(max_eval > 0.0))
+    goto cleanup_bad_rcond;
+
+  bad = ((min_eval / max_eval) < min_rcond);
+
+cleanup_bad_rcond:
+  if(Ac != NULL) free(Ac);
+  if(eval != NULL) free(eval);
+  if(work != NULL) free(work);
+  return bad;
+}
+
 static int np_shadow_conditional_build_x_weights_core(double *vector_scale_factor,
                                                       int drop_eval_self,
                                                       double *weights_out){
@@ -15149,49 +15306,52 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
       if((KWM == NULL) || (RHS == NULL) || (SOL == NULL))
         goto cleanup_xweights;
 
-      for(l = 0; l < k; l++){
-        RHS[l][0] = np_glp_cv_cache.basis[l][i];
-        for(j = 0; j < k; j++)
-          KWM[l][j] = 0.0;
-      }
+      if(drop_eval_self){
+        if(np_glp_qr_drop_row_bkcde(np_glp_cv_cache.basis,
+                                    num_train,
+                                    k,
+                                    kw,
+                                    i,
+                                    mean_row) != 0)
+          goto cleanup_xweights;
 
-      for(j = 0; j < num_train; j++){
-        const double wj = kw[j];
-        if(wj == 0.0)
-          continue;
-        for(int a = 0; a < k; a++){
-          const double za = np_glp_cv_cache.basis[a][j];
-          for(int b = a; b < k; b++){
-            const double zb = np_glp_cv_cache.basis[b][j];
-            KWM[a][b] += wj*za*zb;
-            if(b != a) KWM[b][a] += wj*za*zb;
+        for(j = 0; j < num_train; j++){
+          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          weights_out[(size_t)orig_i*(size_t)num_train + (size_t)orig_j] = mean_row[j];
+        }
+      } else {
+        for(l = 0; l < k; l++){
+          RHS[l][0] = np_glp_cv_cache.basis[l][i];
+          for(j = 0; j < k; j++)
+            KWM[l][j] = 0.0;
+        }
+
+        for(j = 0; j < num_train; j++){
+          const double wj = kw[j];
+          if(wj == 0.0)
+            continue;
+          for(int a = 0; a < k; a++){
+            const double za = np_glp_cv_cache.basis[a][j];
+            for(int b = a; b < k; b++){
+              const double zb = np_glp_cv_cache.basis[b][j];
+              KWM[a][b] += wj*za*zb;
+              if(b != a) KWM[b][a] += wj*za*zb;
+            }
           }
         }
-      }
 
-      {
-        const double epsilon = 1.0/(double)MAX(1, num_train);
-        double nepsilon = 0.0;
-        int ridge_it = 0;
-        while(mat_solve(KWM, RHS, SOL) == NULL){
+        if(np_mat_bad_rcond_sym(KWM, 1.0e-10))
+          goto cleanup_xweights;
+        if(mat_solve(KWM, RHS, SOL) == NULL)
+          goto cleanup_xweights;
+
+        for(j = 0; j < num_train; j++){
+          double zju = 0.0;
+          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
           for(l = 0; l < k; l++)
-            KWM[l][l] += epsilon;
-          nepsilon += epsilon;
-          ridge_it++;
-          if(ridge_it > 64)
-            goto cleanup_xweights;
+            zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
+          weights_out[(size_t)orig_i*(size_t)num_train + (size_t)orig_j] = kw[j]*zju;
         }
-
-        if(nepsilon > 0.0)
-          SOL[0][0] += (nepsilon/NZD_POS(KWM[0][0]))*SOL[0][0];
-      }
-
-      for(j = 0; j < num_train; j++){
-        double zju = 0.0;
-        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        for(l = 0; l < k; l++)
-          zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
-        weights_out[(size_t)orig_i*(size_t)num_train + (size_t)orig_j] = kw[j]*zju;
       }
 
       mat_free(KWM);
@@ -15830,49 +15990,17 @@ static int np_conditional_xrow_from_ctx(NPConditionalXRowCtx *ctx,
     if((KWM == NULL) || (RHS == NULL) || (SOL == NULL))
       goto cleanup_xrow_from_ctx;
 
-    for(l = 0; l < k; l++){
-      RHS[l][0] = np_glp_cv_cache.basis[l][eval_pos];
-      for(j = 0; j < k; j++)
-        KWM[l][j] = 0.0;
-    }
+    if(np_glp_qr_drop_row_bkcde(np_glp_cv_cache.basis,
+                                num_train,
+                                k,
+                                ctx->kw,
+                                eval_pos,
+                                ctx->mean_row) != 0)
+      goto cleanup_xrow_from_ctx;
 
     for(j = 0; j < num_train; j++){
-      const double wj = ctx->kw[j];
-      if(wj == 0.0)
-        continue;
-      for(int a = 0; a < k; a++){
-        const double za = np_glp_cv_cache.basis[a][j];
-        for(int b = a; b < k; b++){
-          const double zb = np_glp_cv_cache.basis[b][j];
-          KWM[a][b] += wj*za*zb;
-          if(b != a) KWM[b][a] += wj*za*zb;
-        }
-      }
-    }
-
-    {
-      const double epsilon = 1.0/(double)MAX(1, num_train);
-      double nepsilon = 0.0;
-      int ridge_it = 0;
-      while(mat_solve(KWM, RHS, SOL) == NULL){
-        for(l = 0; l < k; l++)
-          KWM[l][l] += epsilon;
-        nepsilon += epsilon;
-        ridge_it++;
-        if(ridge_it > 64)
-          goto cleanup_xrow_from_ctx;
-      }
-
-      if(nepsilon > 0.0)
-        SOL[0][0] += (nepsilon/NZD_POS(KWM[0][0]))*SOL[0][0];
-    }
-
-    for(j = 0; j < num_train; j++){
-      double zju = 0.0;
       const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-      for(l = 0; l < k; l++)
-        zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
-      row_out[orig_j] = ctx->kw[j]*zju;
+      row_out[orig_j] = ctx->mean_row[j];
     }
   }
 
@@ -16557,44 +16685,52 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
     if((KWM == NULL) || (RHS == NULL) || (SOL == NULL))
       goto cleanup_xweight_row;
 
-    for(l = 0; l < k; l++){
-      RHS[l][0] = np_glp_cv_cache.basis[l][eval_pos];
-      for(j = 0; j < k; j++)
-        KWM[l][j] = 0.0;
-    }
+    if(drop_eval_self){
+      if(np_glp_qr_drop_row_bkcde(np_glp_cv_cache.basis,
+                                  num_train,
+                                  k,
+                                  kw,
+                                  eval_pos,
+                                  mean_row) != 0)
+        goto cleanup_xweight_row;
 
-    for(j = 0; j < num_train; j++){
-      const double wj = kw[j];
-      if(wj == 0.0)
-        continue;
-      for(int a = 0; a < k; a++){
-        const double za = np_glp_cv_cache.basis[a][j];
-        for(int b = a; b < k; b++){
-          const double zb = np_glp_cv_cache.basis[b][j];
-          KWM[a][b] += wj*za*zb;
-          if(b != a) KWM[b][a] += wj*za*zb;
+      for(j = 0; j < num_train; j++){
+        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+        row_out[orig_j] = mean_row[j];
+      }
+    } else {
+      for(l = 0; l < k; l++){
+        RHS[l][0] = np_glp_cv_cache.basis[l][eval_pos];
+        for(j = 0; j < k; j++)
+          KWM[l][j] = 0.0;
+      }
+
+      for(j = 0; j < num_train; j++){
+        const double wj = kw[j];
+        if(wj == 0.0)
+          continue;
+        for(int a = 0; a < k; a++){
+          const double za = np_glp_cv_cache.basis[a][j];
+          for(int b = a; b < k; b++){
+            const double zb = np_glp_cv_cache.basis[b][j];
+            KWM[a][b] += wj*za*zb;
+            if(b != a) KWM[b][a] += wj*za*zb;
+          }
         }
       }
-    }
 
-    {
-      const double epsilon = 1.0/(double)MAX(1, num_train);
-      int ridge_it = 0;
-      while(mat_solve(KWM, RHS, SOL) == NULL){
+      if(np_mat_bad_rcond_sym(KWM, 1.0e-10))
+        goto cleanup_xweight_row;
+      if(mat_solve(KWM, RHS, SOL) == NULL)
+        goto cleanup_xweight_row;
+
+      for(j = 0; j < num_train; j++){
+        double zju = 0.0;
+        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
         for(l = 0; l < k; l++)
-          KWM[l][l] += epsilon;
-        ridge_it++;
-        if(ridge_it > 64)
-          goto cleanup_xweight_row;
+          zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
+        row_out[orig_j] = kw[j]*zju;
       }
-    }
-
-    for(j = 0; j < num_train; j++){
-      double zju = 0.0;
-      const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-      for(l = 0; l < k; l++)
-        zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
-      row_out[orig_j] = kw[j]*zju;
     }
   }
 
@@ -17082,43 +17218,46 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     } else {
       const int k = np_glp_cv_cache.nterms;
 
-      for(l = 0; l < k; l++){
-        RHS[l][0] = np_glp_cv_cache.basis[l][eval_pos];
-        for(j = 0; j < k; j++)
-          KWM[l][j] = 0.0;
-      }
+      if(drop_eval_self){
+        if(np_glp_qr_drop_row_bkcde(np_glp_cv_cache.basis,
+                                    num_train,
+                                    k,
+                                    kw,
+                                    eval_pos,
+                                    rows_out[i]) != 0)
+          goto cleanup_xweight_block;
+      } else {
+        for(l = 0; l < k; l++){
+          RHS[l][0] = np_glp_cv_cache.basis[l][eval_pos];
+          for(j = 0; j < k; j++)
+            KWM[l][j] = 0.0;
+        }
 
-      for(j = 0; j < num_train; j++){
-        const double wj = kw[j];
-        if(wj == 0.0)
-          continue;
-        for(int a = 0; a < k; a++){
-          const double za = np_glp_cv_cache.basis[a][j];
-          for(int b = a; b < k; b++){
-            const double zb = np_glp_cv_cache.basis[b][j];
-            KWM[a][b] += wj*za*zb;
-            if(b != a) KWM[b][a] += wj*za*zb;
+        for(j = 0; j < num_train; j++){
+          const double wj = kw[j];
+          if(wj == 0.0)
+            continue;
+          for(int a = 0; a < k; a++){
+            const double za = np_glp_cv_cache.basis[a][j];
+            for(int b = a; b < k; b++){
+              const double zb = np_glp_cv_cache.basis[b][j];
+              KWM[a][b] += wj*za*zb;
+              if(b != a) KWM[b][a] += wj*za*zb;
+            }
           }
         }
-      }
 
-      {
-        const double epsilon = 1.0/(double)MAX(1, num_train);
-        int ridge_it = 0;
-        while(mat_solve(KWM, RHS, SOL) == NULL){
+        if(np_mat_bad_rcond_sym(KWM, 1.0e-10))
+          goto cleanup_xweight_block;
+        if(mat_solve(KWM, RHS, SOL) == NULL)
+          goto cleanup_xweight_block;
+
+        for(j = 0; j < num_train; j++){
+          double zju = 0.0;
           for(l = 0; l < k; l++)
-            KWM[l][l] += epsilon;
-          ridge_it++;
-          if(ridge_it > 64)
-            goto cleanup_xweight_block;
+            zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
+          rows_out[i][j] = kw[j]*zju;
         }
-      }
-
-      for(j = 0; j < num_train; j++){
-        double zju = 0.0;
-        for(l = 0; l < k; l++)
-          zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
-        rows_out[i][j] = kw[j]*zju;
       }
     }
   }

@@ -23,16 +23,16 @@ shadow_safe_call <- function(name, ...) {
 }
 
 bounded_pair_convolution_exact <- function(y.eval, y.train, h, lb, ub) {
+  gy.eval <- pnorm((ub - y.eval) / h) - pnorm((lb - y.eval) / h)
+  gy.train <- pnorm((ub - y.train) / h) - pnorm((lb - y.train) / h)
+
   integrate(
-    function(t) {
-      denom <- h * (pnorm((ub - t) / h) - pnorm((lb - t) / h))
-      dnorm((t - y.eval) / h) / denom * dnorm((t - y.train) / h) / denom
-    },
-    lower = lb,
-    upper = ub,
+    function(u) dnorm(u) * dnorm(u + (y.eval - y.train) / h),
+    lower = (lb - y.eval) / h,
+    upper = (ub - y.eval) / h,
     subdivisions = 4000L,
     rel.tol = 1e-10
-  )$value
+  )$value / (h * gy.eval * gy.train)
 }
 
 test_that("bounded conditional y-convolution row matches direct integration at the upper boundary", {
@@ -115,22 +115,19 @@ test_that("bounded conditional cv.ls fixed-point objective matches direct integr
   w.loo <- w.loo / rowSums(w.loo)
 
   f.loo <- rowSums(Ky * w.loo)
-  intsq <- vapply(seq_len(n), function(i) {
-    fhat <- function(t) {
-      vapply(t, function(tt) {
-        denom <- h[1] * (pnorm((y.ub - tt) / h[1]) - pnorm((y.lb - tt) / h[1]))
-        ky.t <- dnorm((tt - y) / h[1]) / denom
-        sum(w.full[i, ] * ky.t)
-      }, numeric(1))
-    }
-    integrate(
-      function(t) fhat(t)^2,
-      lower = y.lb,
-      upper = y.ub,
-      subdivisions = 4000L,
-      rel.tol = 1e-10
-    )$value
-  }, numeric(1))
+  Ky.conv <- outer(
+    y,
+    y,
+    Vectorize(function(y.eval, y.train) {
+      bounded_pair_convolution_exact(y.eval, y.train, h[1], y.lb, y.ub)
+    })
+  )
+
+  intsq <- vapply(
+    seq_len(n),
+    function(i) as.numeric(w.full[i, ] %*% Ky.conv %*% w.full[i, ]),
+    numeric(1)
+  )
 
   exact.obj <- -(mean(intsq) - 2 * mean(f.loo))
   np.obj <- np:::.npcdensbw_eval_only(data.frame(x = x), y, bw)$objective
