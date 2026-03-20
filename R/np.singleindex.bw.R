@@ -330,6 +330,90 @@ npindexbw.NULL <-
   do.call(npindexbw.sibandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
 }
 
+.npindexbw_eval_objective <- function(param,
+                                      xmat,
+                                      ydat,
+                                      bws,
+                                      spec) {
+  p <- ncol(xmat)
+  beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
+  beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
+  h <- as.double(param[p])
+  nobs <- nrow(xmat)
+
+  if (identical(bws$method, "ichimura")) {
+    invalid.penalty <- 10 * mean(ydat^2)
+  } else {
+    invalid.penalty <- sqrt(.Machine$double.xmax)
+  }
+
+  h.candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bws$type, nobs = nobs)
+  if (!h.candidate$ok)
+    return(invalid.penalty)
+  h <- h.candidate$value
+
+  index <- xmat %*% c(1, beta)
+  wmat <- cbind(ydat, 1.0)
+
+  fit.loo <- if (identical(spec$regtype.engine, "lc")) {
+    tww <- tryCatch(
+      npksum(
+        txdat = index,
+        tydat = wmat,
+        weights = wmat,
+        leave.one.out = TRUE,
+        bandwidth.divide = TRUE,
+        bws = c(h),
+        bwtype = bws$type,
+        ckertype = bws$ckertype,
+        ckerorder = bws$ckerorder,
+        ckerbound = bws$ckerbound,
+        ckerlb = bws$ckerlb,
+        ckerub = bws$ckerub
+      )$ksum,
+      error = function(e) NULL
+    )
+    if (is.null(tww))
+      return(invalid.penalty)
+    tww[1, 2, ] / NZD(tww[2, 2, ])
+  } else {
+    ok.design <- tryCatch({
+      npCheckRegressionDesignCondition(
+        reg.code = REGTYPE_LP,
+        xcon = data.frame(index = index),
+        basis = spec$basis.engine,
+        degree = spec$degree.engine,
+        bernstein.basis = spec$bernstein.basis.engine,
+        where = "npindexbw"
+      )
+      TRUE
+    }, error = function(e) FALSE)
+
+    if (!ok.design)
+      return(invalid.penalty)
+
+    .npindex_lp_loo_fit(
+      index = index,
+      ydat = ydat,
+      h = h,
+      bws = bws,
+      spec = spec
+    )
+  }
+
+  if (any(!is.finite(fit.loo)))
+    return(invalid.penalty)
+
+  if (identical(bws$method, "ichimura")) {
+    return(mean((ydat - fit.loo)^2))
+  }
+
+  floor <- sqrt(.Machine$double.eps)
+  fit.loo[fit.loo < floor] <- floor
+  fit.loo[fit.loo > 1 - floor] <- 1 - floor
+  -mean(ydat * log(fit.loo) + (1.0 - ydat) * log1p(-fit.loo))
+}
+
 .npindexbw_nomad_search <- function(xdat,
                                     ydat,
                                     bws,
