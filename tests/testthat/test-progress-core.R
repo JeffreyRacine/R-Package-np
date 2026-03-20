@@ -581,7 +581,7 @@ test_that("single-line finish clears the rendered line without leaving a newline
 
   expect_identical(
     output,
-    paste0("\r", line, "\r", strrep(" ", 80L), "\r")
+    paste0("\r", line, "\r", strrep(" ", 80L), "\r\n")
   )
 })
 
@@ -614,7 +614,7 @@ test_that("progress end clears single-line output even when the final state alre
     paste0(
       "\r",
       strrep(" ", 120L),
-      "\r"
+      "\r\n"
     )
   )
 })
