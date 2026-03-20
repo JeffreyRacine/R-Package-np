@@ -511,6 +511,11 @@ npreghat <-
   bw.vec <- as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord]))
   tree.flag <- isTRUE(getOption("np.tree"))
   grad.vec <- if (length(s) && any(s > 0L)) as.integer(s) else integer(0L)
+  on.exit(
+    tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
+             error = function(e) NULL),
+    add = TRUE
+  )
 
   for (start in seq.int(1L, ntrain, by = chunk.size)) {
     stop.col <- min(ntrain, start + chunk.size - 1L)

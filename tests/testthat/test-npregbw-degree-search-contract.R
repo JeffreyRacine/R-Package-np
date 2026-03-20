@@ -387,6 +387,69 @@ test_that("restart starts are deterministic and RNG-independent", {
   expect_identical(starts1, starts2)
 })
 
+test_that("NOMAD LP degree starts are deterministic, safe, and prefix-stable", {
+  build_degree_starts <- getFromNamespace(".np_lp_nomad_build_degree_starts", "np")
+
+  starts3 <- build_degree_starts(
+    initial = c(1L, 1L, 1L, 1L),
+    lower = rep(0L, 4L),
+    upper = rep(10L, 4L),
+    basis = "tensor",
+    nobs = 100L,
+    nmulti = 3L,
+    random.seed = 42L
+  )
+  starts5 <- build_degree_starts(
+    initial = c(1L, 1L, 1L, 1L),
+    lower = rep(0L, 4L),
+    upper = rep(10L, 4L),
+    basis = "tensor",
+    nobs = 100L,
+    nmulti = 5L,
+    random.seed = 42L
+  )
+
+  expect_identical(starts5[seq_len(3L), , drop = FALSE], starts3)
+  expect_identical(as.integer(starts3[1L, ]), c(1L, 1L, 1L, 1L))
+  expect_true(all(apply(starts5, 1L, function(d) np:::dim_basis(basis = "tensor", degree = d) <= floor(0.25 * (100L - 1L)))))
+})
+
+test_that("NOMAD mixed starts preserve user start 1 and expose prefix-stable restart points", {
+  build_starts <- getFromNamespace(".np_nomad_build_starts", "np")
+
+  x0 <- c(1.5, 0.25, 1, 1, 1)
+  spec <- list(
+    initial = c(1L, 1L, 1L),
+    lower = c(0L, 0L, 0L),
+    upper = c(10L, 10L, 10L),
+    basis = "glp",
+    nobs = 80L,
+    user_supplied = TRUE
+  )
+
+  starts2 <- build_starts(
+    x0 = x0,
+    bbin = c(0L, 0L, 1L, 1L, 1L),
+    lb = c(1e-2, 0, 0, 0, 0),
+    ub = c(1e6, 1, 10, 10, 10),
+    nmulti = 2L,
+    random.seed = 99L,
+    degree_spec = spec
+  )
+  starts4 <- build_starts(
+    x0 = x0,
+    bbin = c(0L, 0L, 1L, 1L, 1L),
+    lb = c(1e-2, 0, 0, 0, 0),
+    ub = c(1e6, 1, 10, 10, 10),
+    nmulti = 4L,
+    random.seed = 99L,
+    degree_spec = spec
+  )
+
+  expect_equal(starts2[1L, ], x0)
+  expect_identical(starts4[seq_len(2L), , drop = FALSE], starts2)
+})
+
 test_that("coordinate search skips incumbent cell revisits within a sweep", {
   degree_search <- getFromNamespace(".np_degree_search", "np")
 
@@ -507,7 +570,7 @@ test_that("automatic degree search emits staged progress output", {
   )
 
   expect_true(any(grepl("Automatic polynomial degree search baseline \\(0\\)", msgs)))
-  expect_true(any(grepl("Selecting polynomial degree and bandwidth", msgs)))
+  expect_true(any(grepl("Selecting polynomial degree and bw", msgs, fixed = TRUE)))
   expect_true(any(grepl("exhaustive", msgs)))
   expect_true(any(grepl("best (", msgs, fixed = TRUE)))
 

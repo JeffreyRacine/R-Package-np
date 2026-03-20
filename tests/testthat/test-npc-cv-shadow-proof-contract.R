@@ -68,11 +68,20 @@ shadow_degree <- function(bw) {
   if (identical(bw$regtype.engine, "lp")) as.integer(bw$degree.engine) else integer(0)
 }
 
+shadow_safe_call <- function(name, ...) {
+  on.exit(
+    tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
+             error = function(e) NULL),
+    add = TRUE
+  )
+  .Call(name, ..., PACKAGE = "np")
+}
+
 call_shadow_density <- function(bw, x, y, criterion = c("cv.ml", "cv.ls"),
                                 use_tree = FALSE, compare_old = TRUE) {
   criterion <- match.arg(criterion)
   n <- nrow(x)
-  .Call(
+  shadow_safe_call(
     "C_np_shadow_cv_density_conditional",
     empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(y),
     empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(x),
@@ -90,8 +99,7 @@ call_shadow_density <- function(bw, x, y, criterion = c("cv.ml", "cv.ls"),
     shadow_degree(bw),
     isTRUE(bw$bernstein.basis.engine),
     shadow_basis_code(bw$basis.engine),
-    compare_old,
-    PACKAGE = "np"
+    compare_old
   )
 }
 
@@ -100,7 +108,7 @@ call_shadow_distribution <- function(bw, x, ytrain, yeval = ytrain,
                                      compare_old = TRUE) {
   n <- nrow(x)
   ne <- nrow(yeval)
-  .Call(
+  shadow_safe_call(
     "C_np_shadow_cv_distribution_conditional",
     empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(ytrain),
     empty_shadow_matrix(ne), empty_shadow_matrix(ne), as.matrix(yeval),
@@ -119,14 +127,13 @@ call_shadow_distribution <- function(bw, x, ytrain, yeval = ytrain,
     isTRUE(bw$bernstein.basis.engine),
     shadow_basis_code(bw$basis.engine),
     cdfontrain,
-    compare_old,
-    PACKAGE = "np"
+    compare_old
   )
 }
 
 call_shadow_xweights_row <- function(bw, x, y, row_index, use_tree = FALSE) {
   n <- nrow(x)
-  .Call(
+  shadow_safe_call(
     "C_np_shadow_cv_xweights_conditional",
     empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(y),
     empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(x),
@@ -140,10 +147,14 @@ call_shadow_xweights_row <- function(bw, x, y, row_index, use_tree = FALSE) {
     shadow_degree(bw),
     isTRUE(bw$bernstein.basis.engine),
     shadow_basis_code(bw$basis.engine),
-    as.integer(row_index),
-    PACKAGE = "np"
+    as.integer(row_index)
   )
 }
+
+test_that("shadow reset state is a harmless no-op when inactive", {
+  expect_null(.Call("C_np_shadow_reset_state", PACKAGE = "np"))
+  expect_null(.Call("C_np_shadow_reset_state", PACKAGE = "np"))
+})
 
 test_that("shadow density lc matches legacy cv objectives", {
   set.seed(42)

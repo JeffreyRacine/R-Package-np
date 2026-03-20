@@ -71,10 +71,19 @@ adaptive_shadow_basis <- function(basis_engine, regtype_engine) {
   )
 }
 
+adaptive_shadow_safe_call <- function(name, ...) {
+  on.exit(
+    tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
+             error = function(e) NULL),
+    add = TRUE
+  )
+  .Call(name, ..., PACKAGE = "np")
+}
+
 call_adaptive_density_shadow <- function(bw, x, y, criterion = c("cv.ml", "cv.ls")) {
   criterion <- match.arg(criterion)
   n <- nrow(x)
-  .Call(
+  adaptive_shadow_safe_call(
     "C_np_shadow_cv_density_conditional",
     adaptive_shadow_empty(n), adaptive_shadow_empty(n), as.matrix(y),
     adaptive_shadow_empty(n), adaptive_shadow_empty(n), as.matrix(x),
@@ -92,15 +101,14 @@ call_adaptive_density_shadow <- function(bw, x, y, criterion = c("cv.ml", "cv.ls
     adaptive_shadow_degree(bw),
     isTRUE(bw$bernstein.basis.engine),
     adaptive_shadow_basis(bw$basis.engine, bw$regtype.engine),
-    identical(bw$regtype.engine, "lc"),
-    PACKAGE = "np"
+    identical(bw$regtype.engine, "lc")
   )
 }
 
 call_adaptive_distribution_shadow <- function(bw, x, ytrain, yeval = ytrain, cdfontrain = FALSE) {
   n <- nrow(x)
   ne <- nrow(yeval)
-  .Call(
+  adaptive_shadow_safe_call(
     "C_np_shadow_cv_distribution_conditional",
     adaptive_shadow_empty(n), adaptive_shadow_empty(n), as.matrix(ytrain),
     adaptive_shadow_empty(ne), adaptive_shadow_empty(ne), as.matrix(yeval),
@@ -119,8 +127,7 @@ call_adaptive_distribution_shadow <- function(bw, x, ytrain, yeval = ytrain, cdf
     isTRUE(bw$bernstein.basis.engine),
     adaptive_shadow_basis(bw$basis.engine, bw$regtype.engine),
     cdfontrain,
-    identical(bw$regtype.engine, "lc"),
-    PACKAGE = "np"
+    identical(bw$regtype.engine, "lc")
   )
 }
 

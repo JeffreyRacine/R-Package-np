@@ -71,9 +71,18 @@ cvls_shadow_basis <- function(basis_engine, regtype_engine) {
   )
 }
 
+cvls_shadow_safe_call <- function(name, ...) {
+  on.exit(
+    tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
+             error = function(e) NULL),
+    add = TRUE
+  )
+  .Call(name, ..., PACKAGE = "np")
+}
+
 call_public_cvls_shadow <- function(bw, x, y, compare_old = identical(bw$regtype.engine, "lc")) {
   n <- nrow(x)
-  .Call(
+  cvls_shadow_safe_call(
     "C_np_shadow_cv_density_conditional",
     cvls_shadow_empty(n), cvls_shadow_empty(n), as.matrix(y),
     cvls_shadow_empty(n), cvls_shadow_empty(n), as.matrix(x),
@@ -91,8 +100,7 @@ call_public_cvls_shadow <- function(bw, x, y, compare_old = identical(bw$regtype
     cvls_shadow_degree(bw),
     isTRUE(bw$bernstein.basis.engine),
     cvls_shadow_basis(bw$basis.engine, bw$regtype.engine),
-    compare_old,
-    PACKAGE = "np"
+    compare_old
   )
 }
 

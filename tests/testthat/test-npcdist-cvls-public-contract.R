@@ -51,10 +51,19 @@ cdist_shadow_bwtype <- function(bw) {
   )
 }
 
+cdist_shadow_safe_call <- function(name, ...) {
+  on.exit(
+    tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
+             error = function(e) NULL),
+    add = TRUE
+  )
+  .Call(name, ..., PACKAGE = "np")
+}
+
 call_public_cdist_cvls_shadow <- function(bw, x, ytrain, yeval = ytrain, cdfontrain = FALSE) {
   n <- nrow(x)
   ne <- nrow(yeval)
-  .Call(
+  cdist_shadow_safe_call(
     "C_np_shadow_cv_distribution_conditional",
     cdist_shadow_empty(n), cdist_shadow_empty(n), as.matrix(ytrain),
     cdist_shadow_empty(ne), cdist_shadow_empty(ne), as.matrix(yeval),
@@ -73,8 +82,7 @@ call_public_cdist_cvls_shadow <- function(bw, x, ytrain, yeval = ytrain, cdfontr
     FALSE,
     0L,
     cdfontrain,
-    TRUE,
-    PACKAGE = "np"
+    TRUE
   )
 }
 

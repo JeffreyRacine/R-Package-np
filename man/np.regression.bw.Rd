@@ -291,9 +291,16 @@ npregbw(\dots)
 
   \item{degree.start}{
     optional starting degree vector for automatic degree search when
-    \code{degree.select="coordinate"}. If omitted, the search starts
+    \code{degree.select="coordinate"}. If omitted, cell-based search starts
     from the degree-zero local-constant baseline on the continuous
-    predictors.
+    predictors, while NOMAD-based search starts from a clipped
+    degree-one vector on the searchable continuous predictors. For
+    NOMAD multistarts, later restart starts are generated
+    reproducibly from a conservative proposal box and screened using
+    \code{dim_basis()} so that the initial basis dimension remains well
+    below the training-sample limit. This avoids wasting starts on flat
+    penalty or heavily ridged designs while leaving the full user
+    requested degree search region unchanged.
   }
 
   \item{degree.restarts}{
@@ -543,7 +550,14 @@ npregbw(\dots)
   supplied, the automatic search route defaults to
   \code{bernstein.basis=TRUE} for numerical stability; explicit
   \code{bernstein.basis=FALSE} is honored but can be poorly conditioned
-  at higher degrees.
+  at higher degrees. NOMAD multistarts are initialized more
+  conservatively than the full degree search box: start 1 is the
+  user-supplied degree/bandwidth vector when provided and otherwise a
+  clipped degree-one vector, while later starts are reproducible random
+  draws from a reduced degree proposal box whose candidates are screened
+  using \code{dim_basis()}. This heuristic is used only to obtain
+  feasible, numerically safer, and quicker initial evaluations; it does
+  not restrict the admissible degree region searched by NOMAD.
 
   The use of compactly supported kernels or the occurrence of small
   bandwidths during cross-validation can lead to numerical problems for
