@@ -31,6 +31,7 @@ npplregbw(\dots)
           bws,
           degree = NULL,
           degree.select = c("manual", "coordinate", "exhaustive"),
+          search.engine = c("nomad+powell", "cell", "nomad"),
           degree.min = NULL,
           degree.max = NULL,
           degree.start = NULL,
@@ -109,7 +110,24 @@ npplregbw(\dots)
     the nonparametric \code{zdat} component. \code{"manual"} (default)
     treats \code{degree} as fixed. \code{"coordinate"} performs cached
     coordinate-wise search over admissible degree vectors.
-    \code{"exhaustive"} evaluates the full admissible degree grid.
+    \code{"exhaustive"} evaluates the full admissible degree grid when
+    \code{search.engine="cell"}. For NOMAD-based search engines, any
+    non-\code{"manual"} value requests direct joint search over degree
+    and bandwidth coordinates for the nonparametric component.
+  }
+
+  \item{search.engine}{
+    character string controlling the automatic local-polynomial search
+    backend for the nonparametric \code{zdat} component when
+    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
+    performs direct joint search over fixed bandwidths and the degree
+    vector using \code{crs::snomadr()}, then applies one Powell hot
+    start from the NOMAD solution. \code{"nomad"} omits the Powell
+    refinement. \code{"cell"} profiles the criterion over the
+    admissible degree grid using repeated fixed-degree bandwidth solves.
+    NOMAD-based search currently requires fixed-bandwidth child
+    templates, \code{degree.verify=FALSE}, and the suggested package
+    \pkg{crs} to be installed.
   }
 
   \item{degree.min}{
@@ -145,7 +163,8 @@ npplregbw(\dots)
   \item{degree.verify}{
     logical value indicating whether a coordinate-search solution should
     be exhaustively verified over the admissible degree grid after the
-    heuristic phase completes.
+    heuristic phase completes. Available only for
+    \code{search.engine="cell"}.
   }
 
   
@@ -287,6 +306,20 @@ npplregbw(\dots)
  kernel. Unordered discrete data types use a variation on Aitchison and
  Aitken's (1976) kernel, while ordered data types use a variation of the
  Wang and van Ryzin (1981) kernel.
+
+ When the nonparametric component is estimated with
+ \code{regtype="lp"} and \code{degree.select != "manual"},
+ \code{npplregbw} can jointly determine the \code{zdat}-side degree
+ vector and the associated bandwidth coordinates. With
+ \code{search.engine="cell"}, the criterion is profiled over the degree
+ grid using cached coordinate-wise or exhaustive search together with
+ repeated fixed-degree bandwidth solves. With
+ \code{search.engine="nomad"} or \code{"nomad+powell"}, the criterion
+ is optimized directly over the joint degree/bandwidth space using
+ \code{crs::snomadr()}; \code{"nomad+powell"} then performs one Powell
+ hot start and keeps the better of the direct NOMAD and polished
+ solutions. For the nonparametric regression component, this
+ polynomial-adaptive joint-search route follows Hall and Racine (2015).
 }
 \value{
   if \code{bwtype} is set to \code{fixed}, an object containing bandwidths
@@ -309,7 +342,10 @@ npplregbw(\dots)
 
  Gao, Q. and L. Liu and J.S. Racine (2015), \dQuote{A partially linear
  kernel estimator for categorical data,} Econometric Reviews, 34 (6-10),
- 958-977.
+958-977.
+
+ Hall, P. and J.S. Racine (2015), \dQuote{Infinite Order Cross-Validated
+ Local Polynomial Regression,} Journal of Econometrics, 185, 510-525.
 
  Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
  and Practice,} Princeton University Press.

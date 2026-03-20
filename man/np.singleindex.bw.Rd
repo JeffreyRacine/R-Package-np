@@ -33,6 +33,7 @@ npindexbw(\dots)
           bernstein.basis = FALSE,
           degree = NULL,
           degree.select = c("manual", "coordinate", "exhaustive"),
+          search.engine = c("nomad+powell", "cell", "nomad"),
           degree.min = NULL,
           degree.max = NULL,
           degree.start = NULL,
@@ -125,7 +126,22 @@ npindexbw(\dots)
     \code{degree} as fixed. \code{"coordinate"} performs cached
     coordinate-wise search over admissible degree values for the index
     smoother. \code{"exhaustive"} evaluates the full admissible degree
-    grid.
+    grid when \code{search.engine="cell"}. For NOMAD-based search
+    engines, any non-\code{"manual"} value requests direct joint search
+    over the degree and bandwidth coordinates.
+  }
+
+  \item{search.engine}{
+    character string controlling the automatic local-polynomial search
+    backend when \code{regtype="lp"} and
+    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
+    performs direct joint search over the index-smoother bandwidth and
+    degree using \code{crs::snomadr()}, then applies one Powell hot
+    start from the NOMAD solution. \code{"nomad"} omits the Powell
+    refinement. \code{"cell"} profiles the criterion over the
+    admissible degree grid using repeated fixed-degree solves.
+    NOMAD-based search currently requires \code{degree.verify=FALSE}
+    and the suggested package \pkg{crs} to be installed.
   }
 
   \item{degree.min}{
@@ -159,7 +175,8 @@ npindexbw(\dots)
   \item{degree.verify}{
     logical value indicating whether a coordinate-search solution should
     be exhaustively verified over the admissible degree grid after the
-    heuristic phase completes.
+    heuristic phase completes. Available only for
+    \code{search.engine="cell"}.
   }
 
   \item{nmulti}{
@@ -330,6 +347,19 @@ npindexbw(\dots)
   the regression of response \code{y1} and semiparametric regressors
   \code{x1} and \code{x2} are to be estimated.  See below for further
   examples.
+
+  When \code{regtype="lp"} and \code{degree.select != "manual"},
+  \code{npindexbw} can jointly determine the local-polynomial degree for
+  the index smoother together with its bandwidth coordinate. With
+  \code{search.engine="cell"}, the criterion is profiled over the
+  admissible degree grid using cached coordinate-wise or exhaustive
+  search. With \code{search.engine="nomad"} or
+  \code{"nomad+powell"}, the criterion is optimized directly over the
+  joint degree/bandwidth space using \code{crs::snomadr()};
+  \code{"nomad+powell"} then performs one Powell hot start and retains
+  the better of the direct NOMAD and polished solutions. For the
+  index-smoother local-polynomial component, this polynomial-adaptive
+  joint-search route follows Hall and Racine (2015).
   
 }
 
@@ -370,6 +400,9 @@ npindexbw(\dots)
 
   Klein, R. W. and R. H. Spady (1993), \dQuote{An efficient semiparametric
   estimator for binary response models,} Econometrica, 61, 387-421.
+
+  Hall, P. and J.S. Racine (2015), \dQuote{Infinite Order Cross-Validated
+  Local Polynomial Regression,} Journal of Econometrics, 185, 510-525.
 
   Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics:
   Theory and Practice,} Princeton University Press.

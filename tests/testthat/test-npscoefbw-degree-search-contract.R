@@ -234,6 +234,33 @@ test_that("npscoefbw automatic degree search enforces pilot guardrails", {
   )
 })
 
+test_that("npscoefbw eval-only route localizes internal fits under autodispatch", {
+  n <- 8L
+  xdat <- data.frame(x = seq_len(n) / n)
+  zdat <- data.frame(z = seq_len(n) / n)
+  ydat <- seq_len(n) / n
+  bws <- list(fval = 1)
+  localized <- FALSE
+
+  out <- with_mocked_bindings(
+    .npscoefbw_eval_only(
+      xdat = xdat,
+      ydat = ydat,
+      zdat = zdat,
+      bws = bws
+    ),
+    .npRmpi_with_local_regression = function(expr) {
+      localized <<- TRUE
+      force(expr)
+    },
+    npscoef = function(...) list(mean = rep(0, n)),
+    .package = "npRmpi"
+  )
+
+  expect_true(localized)
+  expect_equal(out$objective, mean(ydat^2))
+})
+
 test_that("npscoef forwards automatic LP degree search through npscoefbw", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)

@@ -109,6 +109,7 @@ npcdistbw(\dots)
           basis = c("glp", "additive", "tensor"),
           degree = NULL,
           degree.select = c("manual", "coordinate", "exhaustive"),
+          search.engine = c("nomad+powell", "cell", "nomad"),
           degree.min = NULL,
           degree.max = NULL,
           degree.start = NULL,
@@ -429,7 +430,25 @@ npcdistbw(\dots)
     \code{degree} as fixed. \code{"coordinate"} performs cached
     coordinate-wise search over admissible degree vectors for the
     continuous \code{xdat} predictors. \code{"exhaustive"} evaluates
-    the full admissible degree grid.
+    the full admissible degree grid when \code{search.engine="cell"}.
+    For NOMAD-based search engines, any non-\code{"manual"} value
+    requests direct joint search over degree and bandwidth
+    coordinates.
+  }
+
+  \item{search.engine}{
+    character string controlling the automatic local-polynomial search
+    backend when \code{regtype="lp"} and
+    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
+    performs direct joint search over the \code{xdat}-side continuous
+    bandwidth coordinates and degree vector using
+    \code{crs::snomadr()}, then applies one Powell hot start from the
+    NOMAD solution. \code{"nomad"} omits the Powell refinement.
+    \code{"cell"} profiles the criterion over the admissible degree
+    grid using repeated fixed-degree bandwidth solves. NOMAD-based
+    search currently requires \code{bwtype="fixed"},
+    \code{degree.verify=FALSE}, and the suggested package \pkg{crs} to
+    be installed.
   }
 
   \item{degree.min}{
@@ -465,7 +484,8 @@ npcdistbw(\dots)
   \item{degree.verify}{
     logical value indicating whether a coordinate-search solution should
     be exhaustively verified over the admissible degree grid after the
-    heuristic phase completes.
+    heuristic phase completes. Available only for
+    \code{search.engine="cell"}.
   }
 
   \item{bernstein.basis}{
@@ -538,7 +558,9 @@ npcdistbw(\dots)
   types.
 
   The cross-validation methods employ multivariate numerical search
-  algorithms (direction set (Powell's) methods in multidimensions).
+  algorithms. For fixed local-constant/local-linear fits, and for
+  local-polynomial fits with \code{degree.select="manual"}, bandwidth
+  search uses multidimensional Powell direction-set optimization.
 
   Bandwidths can (and will) differ for each variable which is, of
   course, desirable.
@@ -584,6 +606,23 @@ npcdistbw(\dots)
   kernel. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
+
+  When \code{regtype="lp"} and \code{degree.select != "manual"},
+  \code{npcdistbw} can jointly determine the \code{xdat}-side local
+  polynomial degree vector and the fixed bandwidth coordinates entering
+  the conditional distribution criterion. With
+  \code{search.engine="cell"}, the criterion is profiled over the
+  admissible degree grid using cached coordinate-wise or exhaustive
+  search. With \code{search.engine="nomad"} or
+  \code{"nomad+powell"}, the criterion is optimized directly over the
+  joint degree/bandwidth space using \code{crs::snomadr()};
+  \code{"nomad+powell"} then performs one Powell hot start from the
+  NOMAD solution and keeps the better of the direct NOMAD and polished
+  answers. This polynomial-adaptive joint-search route is motivated by
+  Hall and Racine (2015) together with Li, Li, and Racine (under
+  revision). When \code{bernstein.basis} is not explicitly supplied,
+  the automatic search route defaults to \code{bernstein.basis=TRUE}
+  for numerical stability.
 
   The optimizer invoked for search is Powell's conjugate direction
   method which requires the setting of (non-random) initial values and
@@ -635,6 +674,9 @@ npcdistbw(\dots)
   the estimation of conditional probability densities,} Journal of the
   American Statistical Association, 99, 1015-1026.
 
+  Hall, P. and J.S. Racine (2015), \dQuote{Infinite Order Cross-Validated
+  Local Polynomial Regression,} Journal of Econometrics, 185, 510-525.
+
   Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
   and Practice,} Princeton University Press.
 
@@ -646,6 +688,10 @@ npcdistbw(\dots)
   Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal bandwidth
   selection for nonparametric conditional distribution and quantile
   functions}, Journal of Business and Economic Statistics, 31, 57-65.
+
+  Li, A. and Q. Li and J.S. Racine (under revision), \dQuote{Boundary
+  Adjusted, Polynomial Adaptive, Nonparametric Kernel Conditional
+  Density Estimation,} Econometric Reviews.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.

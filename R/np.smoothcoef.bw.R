@@ -191,15 +191,17 @@ npscoefbw.NULL <-
   penalty <- penalty.multiplier * base.penalty
 
   fit <- tryCatch(
-    npscoef(
-      bws = bws,
-      txdat = xdat,
-      tydat = ydat,
-      tzdat = zdat,
-      leave.one.out = TRUE,
-      iterate = FALSE,
-      betas = FALSE,
-      errors = FALSE
+    .npRmpi_with_local_regression(
+      npscoef(
+        bws = bws,
+        txdat = xdat,
+        tydat = ydat,
+        tzdat = zdat,
+        leave.one.out = TRUE,
+        iterate = FALSE,
+        betas = FALSE,
+        errors = FALSE
+      )
     ),
     error = function(e) e
   )
