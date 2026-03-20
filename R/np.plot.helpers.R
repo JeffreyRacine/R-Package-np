@@ -321,14 +321,16 @@
 }
 
 .np_plot_engine_begin <- function(plot.par.mfrow = TRUE) {
-  oldpar <- .np_plot_capture_par(c("mfrow", "cex"))
-
   plot.par.mfrow.opt <- getOption("plot.par.mfrow")
   if (!is.null(plot.par.mfrow.opt))
     plot.par.mfrow <- plot.par.mfrow.opt
 
+  oldpar.names <- "cex"
+  if (isTRUE(plot.par.mfrow))
+    oldpar.names <- c("mfrow", oldpar.names)
+
   list(
-    oldpar = oldpar,
+    oldpar = .np_plot_capture_par(oldpar.names),
     plot.par.mfrow = plot.par.mfrow
   )
 }
