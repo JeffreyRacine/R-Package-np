@@ -919,56 +919,55 @@ npcdistbw.condbandwidth <-
                                     bws,
                                     reg.args,
                                     opt.args,
-                                    degree.search) {
+                                    degree.search,
+                                    random.seed = 42L) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
 
-  baseline.reg.args <- reg.args
-  baseline.reg.args$regtype <- "lp"
-  baseline.reg.args$pregtype <- "Local-Polynomial"
-  baseline.reg.args$degree <- as.integer(degree.search$baseline.degree)
-  baseline.reg.args$bernstein.basis <- degree.search$bernstein.basis
-  baseline.reg.args$regtype.engine <- "lp"
-  baseline.reg.args$degree.engine <- as.integer(degree.search$baseline.degree)
-  baseline.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
+  template.reg.args <- reg.args
+  template.reg.args$regtype <- "lp"
+  template.reg.args$pregtype <- "Local-Polynomial"
+  template.reg.args$degree <- as.integer(degree.search$start.degree)
+  template.reg.args$bernstein.basis <- degree.search$bernstein.basis
+  template.reg.args$regtype.engine <- "lp"
+  template.reg.args$degree.engine <- as.integer(degree.search$start.degree)
+  template.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
 
-  .np_nomad_baseline_note(degree.search$baseline.degree)
-  baseline.bws <- .npcdistbw_run_fixed_degree(
+  template <- .npcdistbw_build_condbandwidth(
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    reg.args = baseline.reg.args,
-    opt.args = opt.args
+    bandwidth.compute = FALSE,
+    reg.args = template.reg.args
   )
 
-  if (!identical(baseline.bws$type, "fixed"))
+  if (!identical(template$type, "fixed"))
     stop("automatic degree search with search.engine='nomad' currently requires bwtype='fixed'")
-
-  baseline.record <- list(
-    eval_id = 0L,
-    degree = as.integer(degree.search$baseline.degree),
-    objective = as.numeric(baseline.bws$fval[1L]),
-    status = "ok",
-    cached = FALSE,
-    message = NULL,
-    elapsed = 0,
-    num.feval = if (!is.null(baseline.bws$num.feval)) as.numeric(baseline.bws$num.feval[1L]) else NA_real_
-  )
-
-  template <- baseline.bws
   setup <- .npcdistbw_nomad_bw_setup(xdat = xdat, ydat = ydat, template = template)
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
-  ndeg <- length(degree.search$baseline.degree)
+  ndeg <- length(degree.search$start.degree)
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) 1L else max(1L, as.integer(opt.args$nmulti[1L]))
   bw_lower <- c(rep.int(1e-2, length(setup$cont_flat)), rep.int(0, length(setup$cat_flat)))
   bw_upper <- c(rep.int(1e6, length(setup$cont_flat)), setup$cat_upper * setup$bandwidth.scale.categorical)
 
   x0 <- c(
-    .npcdistbw_nomad_bw_to_point(c(template$ybw, template$xbw), template = template, setup = setup),
+    .np_nomad_complete_start_point(
+      point = {
+        raw <- c(template$ybw, template$xbw)
+        if (all(raw == 0)) NULL else .npcdistbw_nomad_bw_to_point(raw, template = template, setup = setup)
+      },
+      lower = bw_lower,
+      upper = bw_upper,
+      ncont = length(setup$cont_flat)
+    ),
     as.integer(degree.search$start.degree)
   )
   lb <- c(bw_lower, degree.search$lower)
   ub <- c(bw_upper, degree.search$upper)
   bbin <- c(rep.int(0L, bwdim), rep.int(1L, ndeg))
+  baseline.record <- NULL
+
+  .np_nomad_baseline_note(degree.search$start.degree)
 
   eval_fun <- function(point) {
     point <- as.numeric(point)
@@ -1052,13 +1051,8 @@ npcdistbw.condbandwidth <-
       )
     }
 
-    use.baseline.payload <- identical(as.integer(degree), as.integer(degree.search$baseline.degree))
-    direct.payload <- if (isTRUE(use.baseline.payload)) baseline.bws else build_direct_payload()
-    direct.objective <- if (isTRUE(use.baseline.payload)) {
-      as.numeric(baseline.record$objective)
-    } else {
-      as.numeric(best_record$objective)
-    }
+    direct.payload <- build_direct_payload()
+    direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
       .np_nomad_powell_note(degree)
@@ -1094,6 +1088,7 @@ npcdistbw.condbandwidth <-
   .np_nomad_search(
     engine = degree.search$engine,
     baseline_record = baseline.record,
+    start_degree = degree.search$start.degree,
     x0 = x0,
     bbin = bbin,
     lb = lb,
@@ -1101,13 +1096,25 @@ npcdistbw.condbandwidth <-
     eval_fun = eval_fun,
     build_payload = build_payload,
     direction = "min",
-    objective_name = "fval"
+    objective_name = "fval",
+    nmulti = nomad.nmulti,
+    random.seed = random.seed,
+    degree_spec = list(
+      initial = degree.search$start.degree,
+      lower = degree.search$lower,
+      upper = degree.search$upper,
+      basis = degree.search$basis,
+      nobs = degree.search$nobs,
+      user_supplied = degree.search$start.user
+    )
   )
 }
 
 .npcdistbw_degree_search_controls <- function(regtype,
                                               regtype.named,
                                               ncon,
+                                              nobs,
+                                              basis,
                                               degree.select,
                                               search.engine,
                                               degree.min,
@@ -1143,8 +1150,13 @@ npcdistbw.condbandwidth <-
     stop("automatic degree search with bernstein.basis=FALSE currently requires degree.max <= 3")
 
   baseline.degree <- rep.int(0L, ncon)
+  default.start.degree <- if (identical(search.engine, "cell")) {
+    baseline.degree
+  } else {
+    rep.int(1L, ncon)
+  }
   start.degree <- if (is.null(degree.start)) {
-    pmax(bounds$lower, pmin(bounds$upper, baseline.degree))
+    pmax(bounds$lower, pmin(bounds$upper, default.start.degree))
   } else {
     start.raw <- npValidateGlpDegree(regtype = "lp", degree = degree.start, ncon = ncon, argname = "degree.start")
     out.of.range <- vapply(seq_len(ncon), function(j) !(start.raw[j] %in% bounds$candidates[[j]]), logical(1))
@@ -1161,6 +1173,9 @@ npcdistbw.condbandwidth <-
     upper = bounds$upper,
     baseline.degree = baseline.degree,
     start.degree = start.degree,
+    start.user = !is.null(degree.start),
+    basis = if (missing(basis) || is.null(basis)) "glp" else as.character(basis[1L]),
+    nobs = as.integer(nobs[1L]),
     restarts = npValidateNonNegativeInteger(degree.restarts, "degree.restarts"),
     max.cycles = npValidatePositiveInteger(degree.max.cycles, "degree.max.cycles"),
     verify = npValidateScalarLogical(degree.verify, "degree.verify"),
@@ -1186,7 +1201,10 @@ npcdistbw.condbandwidth <-
     n.visits = search_result$n.visits,
     n.cached = search_result$n.cached,
     grid.size = search_result$grid.size,
-    restart.starts = lapply(search_result$restart.starts, as.integer),
+    restart.starts = search_result$restart.starts,
+    restart.degree.starts = search_result$restart.degree.starts,
+    restart.bandwidth.starts = search_result$restart.bandwidth.starts,
+    restart.start.info = search_result$restart.start.info,
     trace = search_result$trace
   )
 
@@ -1329,6 +1347,8 @@ npcdistbw.default <-
                        lp = "Local-Polynomial")
 
     search.mc.names <- names(mc)
+    lp.dot.args <- list(...)
+    random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     degree.select.value <- if ("degree.select" %in% search.mc.names) degree.select else "manual"
     search.engine.value <- if ("search.engine" %in% search.mc.names) search.engine else "nomad+powell"
     degree.min.value <- if ("degree.min" %in% search.mc.names) degree.min else NULL
@@ -1341,6 +1361,8 @@ npcdistbw.default <-
       regtype = regtype,
       regtype.named = regtype.named,
       ncon = sum(x.info$icon),
+      nobs = NROW(xdat),
+      basis = if (basis.named) basis else "glp",
       degree.select = degree.select.value,
       search.engine = search.engine.value,
       degree.min = degree.min.value,
@@ -1479,7 +1501,8 @@ npcdistbw.default <-
           bws = bws,
           reg.args = reg.args,
           opt.args = opt.args,
-          degree.search = degree.search
+          degree.search = degree.search,
+          random.seed = random.seed.value
         )
       }
       tbw <- .npcdistbw_attach_degree_search(

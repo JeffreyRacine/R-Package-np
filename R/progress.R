@@ -564,13 +564,15 @@
     return(line)
   }
 
-  if (!grepl("Selecting polynomial degree and bandwidth", line, fixed = TRUE)) {
+  if (!grepl("Selecting polynomial degree and bandwidth", line, fixed = TRUE) &&
+      !grepl("Selecting polynomial degree and bw", line, fixed = TRUE)) {
     return(line)
   }
 
   compact <- function(text) {
     out <- text
     out <- sub("Selecting polynomial degree and bandwidth", "Degree/bw search", out, fixed = TRUE)
+    out <- sub("Selecting polynomial degree and bw", "Degree/bw search", out, fixed = TRUE)
     out <- gsub("elapsed ", "elap ", out, fixed = TRUE)
     out <- gsub("restart ", "r ", out, fixed = TRUE)
     out <- gsub("cycle ", "cy ", out, fixed = TRUE)

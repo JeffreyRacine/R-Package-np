@@ -143,7 +143,7 @@
 }
 
 .np_degree_progress_label <- function() {
-  "Selecting polynomial degree and bandwidth"
+  "Selecting polynomial degree and bw"
 }
 
 .np_degree_progress_best_detail <- function(best_record,
@@ -865,12 +865,295 @@
   invisible(TRUE)
 }
 
+.np_degree_extract_random_seed <- function(dots, default = 42L) {
+  if (is.null(dots) || length(dots) == 0L)
+    return(as.integer(default)[1L])
+
+  if (is.null(names(dots)) || !"random.seed" %in% names(dots))
+    return(as.integer(default)[1L])
+
+  npValidateNonNegativeInteger(dots[["random.seed"]], "random.seed")
+}
+
+.np_nomad_coerce_start_value <- function(x, type, lb, ub) {
+  if (identical(as.integer(type), 3L)) {
+    x <- if (is.finite(x) && x >= 0.5) 1 else 0
+  } else if (identical(as.integer(type), 1L) || identical(as.integer(type), 2L)) {
+    x <- round(x)
+  }
+
+  if (is.finite(lb) && x < lb)
+    x <- lb
+  if (is.finite(ub) && x > ub)
+    x <- ub
+
+  as.numeric(x)
+}
+
+.np_nomad_complete_start_point <- function(point,
+                                           lower,
+                                           upper,
+                                           ncont = 0L) {
+  n <- length(lower)
+  out <- rep(NA_real_, n)
+
+  if (!is.null(point)) {
+    point <- as.numeric(point)
+    if (length(point) == n)
+      out <- point
+  }
+
+  ncont <- max(0L, min(as.integer(ncont), n))
+  if (ncont > 0L) {
+    cont.default <- pmax(lower[seq_len(ncont)], pmin(upper[seq_len(ncont)], 1.5))
+    bad <- !is.finite(out[seq_len(ncont)]) | out[seq_len(ncont)] <= 0
+    out[seq_len(ncont)][bad] <- cont.default[bad]
+  }
+
+  if (n > ncont) {
+    cat.idx <- (ncont + 1L):n
+    cat.default <- pmax(lower[cat.idx], pmin(upper[cat.idx], 0.5 * upper[cat.idx]))
+    bad <- !is.finite(out[cat.idx]) | out[cat.idx] < lower[cat.idx] | out[cat.idx] > upper[cat.idx]
+    out[cat.idx][bad] <- cat.default[bad]
+  }
+
+  pmax(lower, pmin(upper, out))
+}
+
+.np_lp_nomad_dim_budget <- function(nobs) {
+  nobs <- as.integer(nobs[1L])
+  if (!is.finite(nobs) || is.na(nobs) || nobs <= 1L)
+    return(1L)
+  max(1L, as.integer(floor(0.25 * (nobs - 1L))))
+}
+
+.np_lp_nomad_proposal_upper <- function(lower, upper) {
+  q <- length(lower)
+  if (!q)
+    return(integer(0))
+
+  lower <- as.integer(lower)
+  upper <- as.integer(upper)
+  as.integer(pmin(
+    upper,
+    pmax(lower + 1L, ceiling(upper / max(1L, q)))
+  ))
+}
+
+.np_lp_nomad_reduce_degree_start <- function(degree,
+                                             lower,
+                                             basis = c("glp", "additive", "tensor"),
+                                             dim_budget = Inf) {
+  basis <- match.arg(basis)
+  out <- as.integer(degree)
+  lower <- as.integer(lower)
+
+  if (!is.finite(dim_budget))
+    return(out)
+
+  repeat {
+    current.dim <- tryCatch(
+      dim_basis(basis = basis, degree = out),
+      error = function(e) Inf
+    )
+    if (is.finite(current.dim) && current.dim <= dim_budget)
+      break
+
+    idx <- which(out > lower)
+    if (!length(idx))
+      break
+
+    drop.idx <- idx[which.max(out[idx])][1L]
+    out[drop.idx] <- out[drop.idx] - 1L
+  }
+
+  out
+}
+
+.np_lp_nomad_build_degree_starts <- function(initial,
+                                             lower,
+                                             upper,
+                                             basis = c("glp", "additive", "tensor"),
+                                             nobs,
+                                             nmulti = 1L,
+                                             random.seed = 42L,
+                                             max.tries = 256L,
+                                             user_supplied = FALSE) {
+  basis <- match.arg(basis)
+  lower <- as.integer(lower)
+  upper <- as.integer(upper)
+  q <- length(lower)
+  nstart <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
+
+  if (!q)
+    return(matrix(integer(0), nrow = nstart, ncol = 0L))
+
+  starts <- matrix(0L, nrow = nstart, ncol = q)
+  dim_budget <- .np_lp_nomad_dim_budget(nobs)
+  proposal.upper <- .np_lp_nomad_proposal_upper(lower, upper)
+
+  initial <- as.integer(pmax(lower, pmin(upper, initial)))
+  if (!isTRUE(user_supplied))
+    initial <- .np_lp_nomad_reduce_degree_start(
+      degree = initial,
+      lower = lower,
+      basis = basis,
+      dim_budget = dim_budget
+    )
+  starts[1L, ] <- initial
+
+  if (nstart <= 1L)
+    return(starts)
+
+  seed.state <- .np_seed_enter(random.seed)
+  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+
+  max.tries <- max(1L, as.integer(max.tries[1L]))
+  for (j in 2:nstart) {
+    accepted <- FALSE
+    fallback <- starts[1L, ]
+    for (k in seq_len(max.tries)) {
+      candidate <- vapply(
+        seq_len(q),
+        function(i) sample.int(proposal.upper[i] - lower[i] + 1L, 1L) + lower[i] - 1L,
+        integer(1L)
+      )
+      fallback <- candidate
+      candidate.dim <- tryCatch(
+        dim_basis(basis = basis, degree = candidate),
+        error = function(e) Inf
+      )
+      if (is.finite(candidate.dim) && candidate.dim <= dim_budget) {
+        starts[j, ] <- as.integer(candidate)
+        accepted <- TRUE
+        break
+      }
+    }
+
+    if (!accepted) {
+      starts[j, ] <- .np_lp_nomad_reduce_degree_start(
+        degree = fallback,
+        lower = lower,
+        basis = basis,
+        dim_budget = dim_budget
+      )
+    }
+  }
+
+  starts
+}
+
+.np_nomad_build_starts <- function(x0,
+                                   bbin,
+                                   lb,
+                                   ub,
+                                   nmulti = 1L,
+                                   random.seed = 42L,
+                                   degree_spec = NULL) {
+  n <- length(lb)
+  if (length(ub) != n || length(bbin) != n)
+    stop("NOMAD start construction requires matching lengths for x0/bbin/lb/ub")
+
+  nstart <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
+  starts <- matrix(0, nrow = nstart, ncol = n)
+
+  seed.state <- .np_seed_enter(random.seed)
+  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+
+  for (j in seq_len(nstart)) {
+    for (i in seq_len(n)) {
+      lo <- if (is.finite(lb[i])) lb[i] else -1
+      hi <- if (is.finite(ub[i])) ub[i] else 1
+      if (hi < lo) {
+        tmp <- lo
+        lo <- hi
+        hi <- tmp
+      }
+      starts[j, i] <- .np_nomad_coerce_start_value(
+        runif(1L, min = lo, max = hi),
+        type = bbin[i],
+        lb = lb[i],
+        ub = ub[i]
+      )
+    }
+  }
+
+  if (!is.null(degree_spec)) {
+    q <- length(degree_spec$lower)
+    if (q > 0L) {
+      degree.idx <- (n - q + 1L):n
+      degree.starts <- .np_lp_nomad_build_degree_starts(
+        initial = if (is.null(degree_spec$initial)) rep.int(1L, q) else degree_spec$initial,
+        lower = degree_spec$lower,
+        upper = degree_spec$upper,
+        basis = if (is.null(degree_spec$basis)) "glp" else degree_spec$basis,
+        nobs = degree_spec$nobs,
+        nmulti = nstart,
+        random.seed = random.seed,
+        user_supplied = isTRUE(degree_spec$user_supplied)
+      )
+      starts[, degree.idx] <- degree.starts
+    }
+  }
+
+  if (is.null(x0))
+    return(starts)
+
+  x0 <- as.numeric(x0)
+  if (length(x0) == n) {
+    starts[1L, ] <- vapply(
+      seq_len(n),
+      function(i) .np_nomad_coerce_start_value(x0[i], type = bbin[i], lb = lb[i], ub = ub[i]),
+      numeric(1L)
+    )
+    if (!is.null(degree_spec)) {
+      q <- length(degree_spec$lower)
+      if (q > 0L) {
+        degree.idx <- (n - q + 1L):n
+        starts[1L, degree.idx] <- .np_lp_nomad_build_degree_starts(
+          initial = if (is.null(degree_spec$initial)) rep.int(1L, q) else degree_spec$initial,
+          lower = degree_spec$lower,
+          upper = degree_spec$upper,
+          basis = if (is.null(degree_spec$basis)) "glp" else degree_spec$basis,
+          nobs = degree_spec$nobs,
+          nmulti = 1L,
+          random.seed = random.seed,
+          user_supplied = isTRUE(degree_spec$user_supplied)
+        )[1L, ]
+      }
+    }
+    return(starts)
+  }
+
+  if (length(x0) >= n * nstart) {
+    for (j in seq_len(nstart)) {
+      starts[j, ] <- vapply(
+        seq_len(n),
+        function(i) .np_nomad_coerce_start_value(
+          x0[j + (i - 1L) * nstart],
+          type = bbin[i],
+          lb = lb[i],
+          ub = ub[i]
+        ),
+        numeric(1L)
+      )
+    }
+  }
+
+  starts
+}
+
 .np_nomad_progress_detail <- function(engine,
                                       eval_id,
                                       current_degree,
                                       best_record,
-                                      objective_name = "objective") {
+                                      objective_name = "objective",
+                                      nmulti = 1L) {
   fields <- c(engine)
+
+  nmulti <- suppressWarnings(as.integer(nmulti)[1L])
+  if (!is.na(nmulti) && nmulti > 1L)
+    fields <- c(fields, sprintf("multistarts %s", format(nmulti)))
 
   if (!is.null(eval_id) && is.finite(eval_id) && eval_id >= 0L)
     fields <- c(fields, sprintf("eval %s", format(eval_id)))
@@ -888,16 +1171,19 @@
 
 .np_nomad_progress_start_detail <- function(engine,
                                             baseline_degree,
+                                            nmulti,
                                             best_record,
                                             objective_name = "objective") {
   paste(
     sprintf("start %s", .np_degree_format_degree(baseline_degree)),
+    sprintf("multistart 1/%s", format(max(1L, as.integer(nmulti)))),
     .np_nomad_progress_detail(
       engine = engine,
       eval_id = 0L,
       current_degree = baseline_degree,
       best_record = best_record,
-      objective_name = objective_name
+      objective_name = objective_name,
+      nmulti = nmulti
     ),
     sep = ", "
   )
@@ -905,7 +1191,7 @@
 
 .np_nomad_baseline_note <- function(degree) {
   .np_progress_note(sprintf(
-    "Fitting automatic polynomial degree search baseline %s",
+    "Starting NOMAD automatic polynomial degree search at degree %s",
     .np_degree_format_degree(degree)
   ))
 }
@@ -919,6 +1205,7 @@
 
 .np_nomad_search <- function(engine = c("nomad", "nomad+powell"),
                              baseline_record,
+                             start_degree = NULL,
                              x0,
                              bbin,
                              lb,
@@ -927,8 +1214,10 @@
                              build_payload,
                              direction = c("min", "max"),
                              objective_name = "objective",
+                             nmulti = 1L,
                              random.seed = 42L,
-                             display.nomad.progress = FALSE) {
+                             display.nomad.progress = FALSE,
+                             degree_spec = NULL) {
   engine <- match.arg(engine)
   direction <- match.arg(direction)
   .np_nomad_require_crs()
@@ -939,6 +1228,7 @@
   state$eval_id <- 0L
   state$visit_id <- 0L
   state$best_record <- baseline_record
+  state$baseline_record <- baseline_record
   state$best_point <- NULL
   state$best_payload <- NULL
   state$interrupted <- FALSE
@@ -946,6 +1236,51 @@
   state$progress_state <- NULL
   state$nomad.time <- NA_real_
   state$powell.time <- NA_real_
+  state$restart_starts <- NULL
+
+  nomad.nmulti <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
+  start_matrix <- .np_nomad_build_starts(
+    x0 = x0,
+    bbin = bbin,
+    lb = lb,
+    ub = ub,
+    nmulti = nomad.nmulti,
+    random.seed = random.seed,
+    degree_spec = degree_spec
+  )
+  state$restart_starts <- lapply(
+    seq_len(nrow(start_matrix)),
+    function(i) as.numeric(start_matrix[i, ])
+  )
+  if (!is.null(degree_spec) && length(degree_spec$lower) > 0L) {
+    q <- length(degree_spec$lower)
+    degree.idx <- (ncol(start_matrix) - q + 1L):ncol(start_matrix)
+    state$restart_degree_starts <- lapply(
+      seq_len(nrow(start_matrix)),
+      function(i) as.integer(start_matrix[i, degree.idx])
+    )
+    if (degree.idx[1L] > 1L) {
+      state$restart_bandwidth_starts <- lapply(
+        seq_len(nrow(start_matrix)),
+        function(i) as.numeric(start_matrix[i, seq_len(degree.idx[1L] - 1L)])
+      )
+    } else {
+      state$restart_bandwidth_starts <- replicate(nrow(start_matrix), numeric(0), simplify = FALSE)
+    }
+    state$restart_start_info <- list(
+      basis = if (is.null(degree_spec$basis)) "glp" else degree_spec$basis,
+      dim_budget = .np_lp_nomad_dim_budget(degree_spec$nobs),
+      proposal.upper = .np_lp_nomad_proposal_upper(
+        lower = degree_spec$lower,
+        upper = degree_spec$upper
+      ),
+      user_supplied_start = isTRUE(degree_spec$user_supplied)
+    )
+  } else {
+    state$restart_degree_starts <- NULL
+    state$restart_bandwidth_starts <- NULL
+    state$restart_start_info <- NULL
+  }
 
   state$record_trace <- function(rec) {
     state$trace_id <- state$trace_id + 1L
@@ -1019,6 +1354,8 @@
       elapsed = proc.time()[3L] - started,
       num.feval = num.feval
     )
+    if (is.null(state$baseline_record))
+      state$baseline_record <- rec
     state$record_trace(rec)
     state$update_best(rec, point = point)
     state$progress_state <- .np_degree_progress_step(
@@ -1029,7 +1366,8 @@
         eval_id = state$eval_id,
         current_degree = degree,
         best_record = state$best_record,
-        objective_name = objective_name
+        objective_name = objective_name,
+        nmulti = nomad.nmulti
       )
     )
 
@@ -1047,7 +1385,12 @@
   state$progress_state <- .np_degree_progress_begin(
     detail = .np_nomad_progress_start_detail(
       engine = engine,
-      baseline_degree = baseline_record$degree,
+      baseline_degree = if (is.null(start_degree)) {
+        if (is.null(baseline_record)) integer(0) else baseline_record$degree
+      } else {
+        as.integer(start_degree)
+      },
+      nmulti = nomad.nmulti,
       best_record = state$best_record,
       objective_name = objective_name
     )
@@ -1061,10 +1404,10 @@
         n = length(x0),
         bbin = as.integer(bbin),
         bbout = 0L,
-        x0 = as.numeric(x0),
+        x0 = start_matrix,
         lb = as.double(lb),
         ub = as.double(ub),
-        nmulti = 0L,
+        nmulti = as.integer(nomad.nmulti),
         random.seed = as.integer(random.seed),
         opts = list(),
         display.nomad.progress = display.nomad.progress,
@@ -1137,7 +1480,7 @@
     completed = !isTRUE(state$interrupted),
     certified = FALSE,
     interrupted = isTRUE(state$interrupted),
-    baseline = baseline_record,
+    baseline = state$baseline_record,
     best = state$best_record,
     best_payload = state$best_payload,
     best_point = state$best_point,
@@ -1148,7 +1491,10 @@
     powell.time = state$powell.time,
     optim.time = sum(c(state$nomad.time, state$powell.time), na.rm = TRUE),
     grid.size = NA_integer_,
-    restart.starts = list(),
+    restart.starts = state$restart_starts,
+    restart.degree.starts = state$restart_degree_starts,
+    restart.bandwidth.starts = state$restart_bandwidth_starts,
+    restart.start.info = state$restart_start_info,
     trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name)
   )
 }

@@ -1,4 +1,5 @@
 npscoef_semiparam_frozen_contract_case <- function() {
+  skip_if_not_installed("np")
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess contract")
 
@@ -126,6 +127,7 @@ test_that("npRmpi npscoef fixed exact matches frozen", {
 })
 
 npscoef_fixed_lp_semiparam_contract_case <- function() {
+  skip_if_not_installed("np")
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess contract")
 

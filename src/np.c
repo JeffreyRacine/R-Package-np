@@ -834,9 +834,10 @@ KDT * kdt_extern_Y = NULL;
 KDT * kdt_extern_XY = NULL;
 
 // to facilitate bandwidth->scale-factor conversions
- double * vector_continuous_stddev_extern = NULL;
+double * vector_continuous_stddev_extern = NULL;
 double nconfac_extern = 0.0;
 double ncatfac_extern = 0.0;
+static int np_shadow_state_active = 0;
 
 extern int iff;
 
@@ -988,6 +989,145 @@ SEXP C_np_release_static_buffers(void)
   return R_NilValue;
 }
 
+static void np_shadow_reset_state_internal(void)
+{
+  double **yuno_train = matrix_Y_unordered_train_extern;
+  double **yord_train = matrix_Y_ordered_train_extern;
+  double **ycon_train = matrix_Y_continuous_train_extern;
+  double **yuno_eval = matrix_Y_unordered_eval_extern;
+  double **yord_eval = matrix_Y_ordered_eval_extern;
+  double **ycon_eval = matrix_Y_continuous_eval_extern;
+  double **xuno_train = matrix_X_unordered_train_extern;
+  double **xord_train = matrix_X_ordered_train_extern;
+  double **xcon_train = matrix_X_continuous_train_extern;
+  double **xuno_eval = matrix_X_unordered_eval_extern;
+  double **xord_eval = matrix_X_ordered_eval_extern;
+  double **xcon_eval = matrix_X_continuous_eval_extern;
+  double **xyuno_train = matrix_XY_unordered_train_extern;
+  double **xyord_train = matrix_XY_ordered_train_extern;
+  double **xycon_train = matrix_XY_continuous_train_extern;
+  double **xyuno_eval = matrix_XY_unordered_eval_extern;
+  double **xyord_eval = matrix_XY_ordered_eval_extern;
+  double **xycon_eval = matrix_XY_continuous_eval_extern;
+  int nuno = num_var_unordered_extern;
+  int nord = num_var_ordered_extern;
+  int ncon = num_var_continuous_extern;
+  int runo = num_reg_unordered_extern;
+  int rord = num_reg_ordered_extern;
+  int rcon = num_reg_continuous_extern;
+
+  if (!np_shadow_state_active)
+    return;
+
+  if (kdt_extern_X != NULL) free_kdtree(&kdt_extern_X);
+  if (kdt_extern_Y != NULL) free_kdtree(&kdt_extern_Y);
+  if (kdt_extern_XY != NULL) free_kdtree(&kdt_extern_XY);
+
+  safe_free(ipt_extern_X);
+  safe_free(ipt_extern_Y);
+  safe_free(ipt_extern_XY);
+  safe_free(ipt_lookup_extern_X);
+  safe_free(ipt_lookup_extern_Y);
+  safe_free(ipt_lookup_extern_XY);
+
+  if (yuno_eval != NULL && yuno_eval != yuno_train) free_mat(yuno_eval, nuno);
+  if (yord_eval != NULL && yord_eval != yord_train) free_mat(yord_eval, nord);
+  if (ycon_eval != NULL && ycon_eval != ycon_train) free_mat(ycon_eval, ncon);
+  if (xuno_eval != NULL && xuno_eval != xuno_train) free_mat(xuno_eval, runo);
+  if (xord_eval != NULL && xord_eval != xord_train) free_mat(xord_eval, rord);
+  if (xcon_eval != NULL && xcon_eval != xcon_train) free_mat(xcon_eval, rcon);
+  if (xyuno_eval != NULL && xyuno_eval != xyuno_train) free_mat(xyuno_eval, nuno + runo);
+  if (xyord_eval != NULL && xyord_eval != xyord_train) free_mat(xyord_eval, nord + rord);
+  if (xycon_eval != NULL && xycon_eval != xycon_train) free_mat(xycon_eval, ncon + rcon);
+
+  if (yuno_train != NULL) free_mat(yuno_train, nuno);
+  if (yord_train != NULL) free_mat(yord_train, nord);
+  if (ycon_train != NULL) free_mat(ycon_train, ncon);
+  if (xuno_train != NULL) free_mat(xuno_train, runo);
+  if (xord_train != NULL) free_mat(xord_train, rord);
+  if (xcon_train != NULL) free_mat(xcon_train, rcon);
+  if (xyuno_train != NULL) free_mat(xyuno_train, nuno + runo);
+  if (xyord_train != NULL) free_mat(xyord_train, nord + rord);
+  if (xycon_train != NULL) free_mat(xycon_train, ncon + rcon);
+
+  if (matrix_categorical_vals_extern != NULL) free_mat(matrix_categorical_vals_extern, nuno + nord + runo + rord);
+  if (matrix_categorical_vals_extern_X != NULL) free_mat(matrix_categorical_vals_extern_X, runo + rord);
+  if (matrix_categorical_vals_extern_Y != NULL) free_mat(matrix_categorical_vals_extern_Y, nuno + nord);
+  if (matrix_categorical_vals_extern_XY != NULL) free_mat(matrix_categorical_vals_extern_XY, nuno + nord + runo + rord);
+
+  safe_free(num_categories_extern);
+  safe_free(num_categories_extern_X);
+  safe_free(num_categories_extern_Y);
+  safe_free(num_categories_extern_XY);
+  safe_free(vector_continuous_stddev_extern);
+
+  matrix_Y_unordered_train_extern = NULL;
+  matrix_Y_ordered_train_extern = NULL;
+  matrix_Y_continuous_train_extern = NULL;
+  matrix_Y_unordered_eval_extern = NULL;
+  matrix_Y_ordered_eval_extern = NULL;
+  matrix_Y_continuous_eval_extern = NULL;
+  matrix_X_unordered_train_extern = NULL;
+  matrix_X_ordered_train_extern = NULL;
+  matrix_X_continuous_train_extern = NULL;
+  matrix_X_unordered_eval_extern = NULL;
+  matrix_X_ordered_eval_extern = NULL;
+  matrix_X_continuous_eval_extern = NULL;
+  matrix_XY_unordered_train_extern = NULL;
+  matrix_XY_ordered_train_extern = NULL;
+  matrix_XY_continuous_train_extern = NULL;
+  matrix_XY_unordered_eval_extern = NULL;
+  matrix_XY_ordered_eval_extern = NULL;
+  matrix_XY_continuous_eval_extern = NULL;
+  matrix_categorical_vals_extern = NULL;
+  matrix_categorical_vals_extern_X = NULL;
+  matrix_categorical_vals_extern_Y = NULL;
+  matrix_categorical_vals_extern_XY = NULL;
+  num_categories_extern = NULL;
+  num_categories_extern_X = NULL;
+  num_categories_extern_Y = NULL;
+  num_categories_extern_XY = NULL;
+  vector_continuous_stddev_extern = NULL;
+
+  num_obs_train_extern = 0;
+  num_obs_eval_extern = 0;
+  num_var_unordered_extern = 0;
+  num_var_ordered_extern = 0;
+  num_var_continuous_extern = 0;
+  num_reg_unordered_extern = 0;
+  num_reg_ordered_extern = 0;
+  num_reg_continuous_extern = 0;
+  int_ll_extern = LL_LC;
+  vector_glp_degree_extern = NULL;
+  vector_glp_gradient_order_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  int_TREE_X = NP_TREE_FALSE;
+  int_TREE_Y = NP_TREE_FALSE;
+  int_TREE_XY = NP_TREE_FALSE;
+  int_LARGE_SF = 0;
+  nconfac_extern = 0.0;
+  ncatfac_extern = 0.0;
+  KERNEL_reg_extern = 0;
+  KERNEL_reg_unordered_extern = 0;
+  KERNEL_reg_ordered_extern = 0;
+  KERNEL_den_extern = 0;
+  KERNEL_den_unordered_extern = 0;
+  KERNEL_den_ordered_extern = 0;
+  BANDWIDTH_den_extern = 0;
+  cdfontrain_extern = 0;
+
+  np_glp_cv_clear_extern();
+  np_reg_cv_core_clear_extern();
+  np_shadow_state_active = 0;
+}
+
+SEXP C_np_shadow_reset_state(void)
+{
+  np_shadow_reset_state_internal();
+  return R_NilValue;
+}
+
 static void np_regression_bw_mode(double * runo, double * rord, double * rcon, double * y,
                                   double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
                                   double * objective_function_values, double * objective_function_evals,
@@ -1061,7 +1201,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                int * glp_basis,
                                int * regtype,
                                double * cxkerlb, double * cxkerub,
-                               double * cykerlb, double * cykerub);
+                               double * cykerlb, double * cykerub,
+                               const int eval_only);
 void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     double * u_uno, double * u_ord, double * u_con,
                                     double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
@@ -1075,7 +1216,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     int * glp_basis,
                                     int * regtype,
                                     double * cxkerlb, double * cxkerub,
-                                    double * cykerlb, double * cykerub);
+                                    double * cykerlb, double * cykerub,
+                                    const int eval_only);
 void np_kernelsum(double * tuno, double * tord, double * tcon,
                   double * ty, double * weights,
                   double * euno, double * eord, double * econ,
@@ -1716,27 +1858,28 @@ SEXP C_np_distribution_bw(SEXP myuno,
   return out;
 }
 
-SEXP C_np_density_conditional_bw(SEXP c_uno,
-                                 SEXP c_ord,
-                                 SEXP c_con,
-                                 SEXP u_uno,
-                                 SEXP u_ord,
-                                 SEXP u_con,
-                                 SEXP mysd,
-                                 SEXP myopti,
-                                 SEXP myoptd,
-                                 SEXP bw,
-                                 SEXP hist_len,
-                                 SEXP penalty_mode,
-                                 SEXP penalty_mult,
-                                 SEXP glp_degree,
-                                 SEXP glp_bernstein,
-                                 SEXP glp_basis,
-                                 SEXP regtype,
-                                 SEXP cxkerlb,
-                                 SEXP cxkerub,
-                                 SEXP cykerlb,
-                                 SEXP cykerub)
+static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
+                                               SEXP c_ord,
+                                               SEXP c_con,
+                                               SEXP u_uno,
+                                               SEXP u_ord,
+                                               SEXP u_con,
+                                               SEXP mysd,
+                                               SEXP myopti,
+                                               SEXP myoptd,
+                                               SEXP bw,
+                                               SEXP hist_len,
+                                               SEXP penalty_mode,
+                                               SEXP penalty_mult,
+                                               SEXP glp_degree,
+                                               SEXP glp_bernstein,
+                                               SEXP glp_basis,
+                                               SEXP regtype,
+                                               SEXP cxkerlb,
+                                               SEXP cxkerub,
+                                               SEXP cykerlb,
+                                               SEXP cykerub,
+                                               const int eval_only)
 {
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
   SEXP mysd_r=R_NilValue, myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue;
@@ -1796,7 +1939,8 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
                             REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                             REAL(out_fast), &pmode, &pmult,
                             INTEGER(degree_i), &bern, &basis, &ll_mode,
-                            cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
+                            cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
+                            eval_only);
 
   PROTECT(out = allocVector(VECSXP, 7));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -1821,30 +1965,31 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   return out;
 }
 
-SEXP C_np_distribution_conditional_bw(SEXP c_uno,
-                                      SEXP c_ord,
-                                      SEXP c_con,
-                                      SEXP u_uno,
-                                      SEXP u_ord,
-                                      SEXP u_con,
-                                      SEXP cg_uno,
-                                      SEXP cg_ord,
-                                      SEXP cg_con,
-                                      SEXP mysd,
-                                      SEXP myopti,
-                                      SEXP myoptd,
-                                      SEXP bw,
-                                      SEXP hist_len,
-                                      SEXP penalty_mode,
-                                      SEXP penalty_mult,
-                                      SEXP glp_degree,
-                                      SEXP glp_bernstein,
-                                      SEXP glp_basis,
-                                      SEXP regtype,
-                                      SEXP cxkerlb,
-                                      SEXP cxkerub,
-                                      SEXP cykerlb,
-                                      SEXP cykerub)
+static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
+                                                    SEXP c_ord,
+                                                    SEXP c_con,
+                                                    SEXP u_uno,
+                                                    SEXP u_ord,
+                                                    SEXP u_con,
+                                                    SEXP cg_uno,
+                                                    SEXP cg_ord,
+                                                    SEXP cg_con,
+                                                    SEXP mysd,
+                                                    SEXP myopti,
+                                                    SEXP myoptd,
+                                                    SEXP bw,
+                                                    SEXP hist_len,
+                                                    SEXP penalty_mode,
+                                                    SEXP penalty_mult,
+                                                    SEXP glp_degree,
+                                                    SEXP glp_bernstein,
+                                                    SEXP glp_basis,
+                                                    SEXP regtype,
+                                                    SEXP cxkerlb,
+                                                    SEXP cxkerub,
+                                                    SEXP cykerlb,
+                                                    SEXP cykerub,
+                                                    const int eval_only)
 {
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
   SEXP cg_uno_r=R_NilValue, cg_ord_r=R_NilValue, cg_con_r=R_NilValue, mysd_r=R_NilValue;
@@ -1907,7 +2052,8 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
                                  REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                                  REAL(out_fast), &pmode, &pmult,
                                  INTEGER(degree_i), &bern, &basis, &ll_mode,
-                                 cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
+                                 cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
+                                 eval_only);
 
   PROTECT(out = allocVector(VECSXP, 7));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -1930,6 +2076,128 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
 
   UNPROTECT(27);
   return out;
+}
+
+SEXP C_np_distribution_conditional_bw(SEXP c_uno,
+                                      SEXP c_ord,
+                                      SEXP c_con,
+                                      SEXP u_uno,
+                                      SEXP u_ord,
+                                      SEXP u_con,
+                                      SEXP cg_uno,
+                                      SEXP cg_ord,
+                                      SEXP cg_con,
+                                      SEXP mysd,
+                                      SEXP myopti,
+                                      SEXP myoptd,
+                                      SEXP bw,
+                                      SEXP hist_len,
+                                      SEXP penalty_mode,
+                                      SEXP penalty_mult,
+                                      SEXP glp_degree,
+                                      SEXP glp_bernstein,
+                                      SEXP glp_basis,
+                                      SEXP regtype,
+                                      SEXP cxkerlb,
+                                      SEXP cxkerub,
+                                      SEXP cykerlb,
+                                      SEXP cykerub)
+{
+  return C_np_distribution_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
+                                                 cg_uno, cg_ord, cg_con, mysd, myopti, myoptd,
+                                                 bw, hist_len, penalty_mode, penalty_mult,
+                                                 glp_degree, glp_bernstein, glp_basis, regtype,
+                                                 cxkerlb, cxkerub, cykerlb, cykerub, 0);
+}
+
+SEXP C_np_distribution_conditional_bw_eval(SEXP c_uno,
+                                           SEXP c_ord,
+                                           SEXP c_con,
+                                           SEXP u_uno,
+                                           SEXP u_ord,
+                                           SEXP u_con,
+                                           SEXP cg_uno,
+                                           SEXP cg_ord,
+                                           SEXP cg_con,
+                                           SEXP mysd,
+                                           SEXP myopti,
+                                           SEXP myoptd,
+                                           SEXP bw,
+                                           SEXP hist_len,
+                                           SEXP penalty_mode,
+                                           SEXP penalty_mult,
+                                           SEXP glp_degree,
+                                           SEXP glp_bernstein,
+                                           SEXP glp_basis,
+                                           SEXP regtype,
+                                           SEXP cxkerlb,
+                                           SEXP cxkerub,
+                                           SEXP cykerlb,
+                                           SEXP cykerub)
+{
+  return C_np_distribution_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
+                                                 cg_uno, cg_ord, cg_con, mysd, myopti, myoptd,
+                                                 bw, hist_len, penalty_mode, penalty_mult,
+                                                 glp_degree, glp_bernstein, glp_basis, regtype,
+                                                 cxkerlb, cxkerub, cykerlb, cykerub, 1);
+}
+
+SEXP C_np_density_conditional_bw(SEXP c_uno,
+                                 SEXP c_ord,
+                                 SEXP c_con,
+                                 SEXP u_uno,
+                                 SEXP u_ord,
+                                 SEXP u_con,
+                                 SEXP mysd,
+                                 SEXP myopti,
+                                 SEXP myoptd,
+                                 SEXP bw,
+                                 SEXP hist_len,
+                                 SEXP penalty_mode,
+                                 SEXP penalty_mult,
+                                 SEXP glp_degree,
+                                 SEXP glp_bernstein,
+                                 SEXP glp_basis,
+                                 SEXP regtype,
+                                 SEXP cxkerlb,
+                                 SEXP cxkerub,
+                                 SEXP cykerlb,
+                                 SEXP cykerub)
+{
+  return C_np_density_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
+                                            mysd, myopti, myoptd, bw, hist_len,
+                                            penalty_mode, penalty_mult,
+                                            glp_degree, glp_bernstein, glp_basis, regtype,
+                                            cxkerlb, cxkerub, cykerlb, cykerub, 0);
+}
+
+SEXP C_np_density_conditional_bw_eval(SEXP c_uno,
+                                      SEXP c_ord,
+                                      SEXP c_con,
+                                      SEXP u_uno,
+                                      SEXP u_ord,
+                                      SEXP u_con,
+                                      SEXP mysd,
+                                      SEXP myopti,
+                                      SEXP myoptd,
+                                      SEXP bw,
+                                      SEXP hist_len,
+                                      SEXP penalty_mode,
+                                      SEXP penalty_mult,
+                                      SEXP glp_degree,
+                                      SEXP glp_bernstein,
+                                      SEXP glp_basis,
+                                      SEXP regtype,
+                                      SEXP cxkerlb,
+                                      SEXP cxkerub,
+                                      SEXP cykerlb,
+                                      SEXP cykerub)
+{
+  return C_np_density_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
+                                            mysd, myopti, myoptd, bw, hist_len,
+                                            penalty_mode, penalty_mult,
+                                            glp_degree, glp_bernstein, glp_basis, regtype,
+                                            cxkerlb, cxkerub, cykerlb, cykerub, 1);
 }
 
 SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
@@ -2007,6 +2275,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
      (asInteger(bwtype) != BW_GEN_NN))
     error("C_np_regression_lp_apply_conditional: fixed/generalized-nn bandwidths only");
 
+  np_shadow_state_active = 1;
   num_obs_train_extern = num_obs_train;
   num_obs_eval_extern = num_obs_eval;
   num_var_unordered_extern = 0;
@@ -2162,6 +2431,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   nconfac_extern = nconfac_save;
   ncatfac_extern = ncatfac_save;
   np_glp_cv_clear_extern();
+  np_shadow_state_active = 0;
 
   if(helper_status != 0)
     error("C_np_regression_lp_apply_conditional: lp apply helper failed");
@@ -3884,7 +4154,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                int * glp_basis,
                                int * regtype,
                                double * cxkerlb, double * cxkerub,
-                               double * cykerlb, double * cykerub){
+                               double * cykerlb, double * cykerub,
+                               const int eval_only){
   int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
@@ -4539,40 +4810,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
   }
 
-  powell(0,
-         0,
-         vector_scale_factor,
-         vector_scale_factor,
-         matrix_y,
-         num_all_var,
-         ftol,
-         tol,
-         small,
-         itmax,
-         &iter,
-         &fret,
-         bwmfunc_wrapper);
-
-  if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-
-    initialize_nr_directions(BANDWIDTH_den_extern,
-                             num_obs_train_extern,
-                             num_reg_continuous_extern,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             num_var_continuous_extern,
-                             num_var_unordered_extern,
-                             num_var_ordered_extern,
-                             vsfh,
-                             num_categories_extern,
-                             matrix_y,
-                             0, int_RANDOM_SEED,  
-                             lbc_dir, dfc_dir, c_dir, initc_dir,
-                             lbd_dir, hbd_dir, d_dir, initd_dir,
-                             matrix_X_continuous_train_extern,
-                             matrix_Y_continuous_train_extern);
-
-
+  if(!eval_only){
     powell(0,
            0,
            vector_scale_factor,
@@ -4587,6 +4825,43 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
            &fret,
            bwmfunc_wrapper);
 
+    if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
+
+      initialize_nr_directions(BANDWIDTH_den_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
+                               num_reg_unordered_extern,
+                               num_reg_ordered_extern,
+                               num_var_continuous_extern,
+                               num_var_unordered_extern,
+                               num_var_ordered_extern,
+                               vsfh,
+                               num_categories_extern,
+                               matrix_y,
+                               0, int_RANDOM_SEED,  
+                               lbc_dir, dfc_dir, c_dir, initc_dir,
+                               lbd_dir, hbd_dir, d_dir, initd_dir,
+                               matrix_X_continuous_train_extern,
+                               matrix_Y_continuous_train_extern);
+
+
+      powell(0,
+             0,
+             vector_scale_factor,
+             vector_scale_factor,
+             matrix_y,
+             num_all_var,
+             ftol,
+             tol,
+             small,
+             itmax,
+             &iter,
+             &fret,
+             bwmfunc_wrapper);
+
+    }
+  } else {
+    fret = fret_best;
   }
 
   if (enforce_fixed_feasibility &&
@@ -4633,7 +4908,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
-  if(iMultistart == IMULTI_TRUE){
+  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
@@ -4962,7 +5237,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     int * glp_basis,
                                     int * regtype,
                                     double * cxkerlb, double * cxkerub,
-                                    double * cykerlb, double * cykerub){
+                                    double * cykerlb, double * cykerub,
+                                    const int eval_only){
   int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
@@ -5608,38 +5884,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
   }
 
-  powell(0,
-         0,
-         vector_scale_factor,
-         vector_scale_factor,
-         matrix_y,
-         num_all_var,
-         ftol,
-         tol,
-         small,
-         itmax,
-         &iter,
-         &fret,
-         bwmfunc_wrapper);
-
-  if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-    initialize_nr_directions(BANDWIDTH_den_extern,
-                             num_obs_train_extern,
-                             num_reg_continuous_extern,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             num_var_continuous_extern,
-                             num_var_unordered_extern,
-                             num_var_ordered_extern,
-                             vsfh,
-                             num_categories_extern,
-                             matrix_y,
-                             0, int_RANDOM_SEED,  
-                             lbc_dir, dfc_dir, c_dir, initc_dir,
-                             lbd_dir, hbd_dir, d_dir, initd_dir,
-                             matrix_X_continuous_train_extern,
-                             matrix_Y_continuous_train_extern);
-
+  if(!eval_only){
     powell(0,
            0,
            vector_scale_factor,
@@ -5654,6 +5899,41 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
            &fret,
            bwmfunc_wrapper);
 
+    if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
+      initialize_nr_directions(BANDWIDTH_den_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
+                               num_reg_unordered_extern,
+                               num_reg_ordered_extern,
+                               num_var_continuous_extern,
+                               num_var_unordered_extern,
+                               num_var_ordered_extern,
+                               vsfh,
+                               num_categories_extern,
+                               matrix_y,
+                               0, int_RANDOM_SEED,  
+                               lbc_dir, dfc_dir, c_dir, initc_dir,
+                               lbd_dir, hbd_dir, d_dir, initd_dir,
+                               matrix_X_continuous_train_extern,
+                               matrix_Y_continuous_train_extern);
+
+      powell(0,
+             0,
+             vector_scale_factor,
+             vector_scale_factor,
+             matrix_y,
+             num_all_var,
+             ftol,
+             tol,
+             small,
+             itmax,
+             &iter,
+             &fret,
+             bwmfunc_wrapper);
+
+    }
+  } else {
+    fret = fret_best;
   }
 
   if (enforce_fixed_feasibility &&
@@ -5700,7 +5980,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
-  if(iMultistart == IMULTI_TRUE){
+  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
