@@ -1277,6 +1277,26 @@ genTimingStr <- function(x){
   if (is.null(x$total.time) || is.na(x$total.time))
     return("")
 
+  nomad.time <- if (!is.null(x$nomad.time) && !is.na(x$nomad.time))
+    as.double(x$nomad.time) else NA_real_
+  powell.time <- if (!is.null(x$powell.time) && !is.na(x$powell.time))
+    as.double(x$powell.time) else NA_real_
+  fit.time <- if (!is.null(x$fit.time) && !is.na(x$fit.time))
+    as.double(x$fit.time) else NA_real_
+
+  if (is.finite(nomad.time) || is.finite(powell.time)) {
+    detail <- character(0)
+    if (is.finite(nomad.time))
+      detail <- c(detail, paste("NOMAD ", format(nomad.time), "s", sep = ""))
+    if (is.finite(powell.time))
+      detail <- c(detail, paste("Powell ", format(powell.time), "s", sep = ""))
+    if (is.finite(fit.time))
+      detail <- c(detail, paste("fit ", format(fit.time), "s", sep = ""))
+
+    return(paste("\nEstimation Time: ", format(x$total.time), " seconds (",
+                 paste(detail, collapse = ", "), ")", sep = ""))
+  }
+
   .npRmpiTimingProfileRecord <- function() {
     rec <- NULL
 

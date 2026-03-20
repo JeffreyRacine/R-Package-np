@@ -206,9 +206,13 @@ FALSE, \dots)
   order and cross-partial extraction are reserved for future extension.
   In mixed-data GLP settings, derivative entries for unordered/ordered
   predictors are returned as \code{NA}.
-  The degree vector is fixed user input (one entry per continuous
-  predictor, non-negative integers in \code{[0,12]}), while
-  optimization remains over bandwidths only. For
+  When \code{npregbw(..., regtype="lp")} is used with
+  \code{degree.select="manual"}, the degree vector remains fixed user
+  input. When \code{degree.select != "manual"}, \code{npregbw} can
+  jointly select polynomial degree and bandwidth using either the
+  cached cell-search backend or the direct
+  \code{search.engine="nomad"}/\code{"nomad+powell"} route described in
+  \code{\link{npregbw}}; the latter follows Hall and Racine (2015). For
   \code{bernstein.basis=TRUE}, evaluation points for continuous predictors
   must lie within training support; use \code{bernstein.basis=FALSE} for
   extrapolation. For \code{regtype="ll"} and \code{regtype="lp"}, the

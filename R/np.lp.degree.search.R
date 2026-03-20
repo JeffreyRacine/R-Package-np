@@ -43,6 +43,10 @@
   list(lower = lower, upper = upper, candidates = candidates)
 }
 
+.np_degree_search_engine_controls <- function(search.engine) {
+  match.arg(search.engine, c("nomad+powell", "cell", "nomad"))
+}
+
 .np_degree_trace_to_frame <- function(records, objective_name = "objective") {
   if (!length(records)) {
     out <- data.frame(
@@ -841,6 +845,296 @@
     n.cached = state$cached_visits,
     grid.size = grid.size,
     restart.starts = restart_starts,
+    trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name)
+  )
+}
+
+.np_nomad_require_crs <- function() {
+  ok <- tryCatch({
+    suppressPackageStartupMessages(loadNamespace("crs"))
+    TRUE
+  }, error = function(e) FALSE)
+
+  if (!isTRUE(ok)) {
+    stop(
+      "automatic degree search with search.engine='nomad' requires the 'crs' package; install.packages('crs')",
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
+.np_nomad_progress_detail <- function(engine,
+                                      eval_id,
+                                      current_degree,
+                                      best_record,
+                                      objective_name = "objective") {
+  fields <- c(engine)
+
+  if (!is.null(eval_id) && is.finite(eval_id) && eval_id >= 0L)
+    fields <- c(fields, sprintf("eval %s", format(eval_id)))
+
+  if (!is.null(current_degree))
+    fields <- c(fields, sprintf("deg %s", .np_degree_format_degree(current_degree)))
+
+  fields <- c(fields, .np_degree_progress_best_detail(
+    best_record = best_record,
+    objective_name = objective_name
+  ))
+
+  paste(fields, collapse = ", ")
+}
+
+.np_nomad_progress_start_detail <- function(engine,
+                                            baseline_degree,
+                                            best_record,
+                                            objective_name = "objective") {
+  paste(
+    sprintf("start %s", .np_degree_format_degree(baseline_degree)),
+    .np_nomad_progress_detail(
+      engine = engine,
+      eval_id = 0L,
+      current_degree = baseline_degree,
+      best_record = best_record,
+      objective_name = objective_name
+    ),
+    sep = ", "
+  )
+}
+
+.np_nomad_search <- function(engine = c("nomad", "nomad+powell"),
+                             baseline_record,
+                             x0,
+                             bbin,
+                             lb,
+                             ub,
+                             eval_fun,
+                             build_payload,
+                             direction = c("min", "max"),
+                             objective_name = "objective",
+                             random.seed = 42L,
+                             display.nomad.progress = FALSE) {
+  engine <- match.arg(engine)
+  direction <- match.arg(direction)
+  .np_nomad_require_crs()
+
+  state <- new.env(parent = emptyenv())
+  state$trace_records <- list()
+  state$trace_id <- 0L
+  state$eval_id <- 0L
+  state$visit_id <- 0L
+  state$best_record <- baseline_record
+  state$best_point <- NULL
+  state$best_payload <- NULL
+  state$interrupted <- FALSE
+  state$error <- NULL
+  state$progress_state <- NULL
+  state$nomad.time <- NA_real_
+  state$powell.time <- NA_real_
+
+  state$record_trace <- function(rec) {
+    state$trace_id <- state$trace_id + 1L
+    rec$trace_id <- state$trace_id
+    state$trace_records[[length(state$trace_records) + 1L]] <- rec
+    invisible(rec)
+  }
+
+  state$update_best <- function(rec, point) {
+    if (!identical(rec$status, "ok") || !is.finite(rec$objective))
+      return(invisible(NULL))
+
+    incumbent <- if (is.null(state$best_record)) {
+      if (identical(direction, "min")) Inf else -Inf
+    } else {
+      state$best_record$objective
+    }
+
+    if (.np_degree_better(rec$objective, incumbent, direction = direction)) {
+      state$best_record <- rec
+      state$best_point <- point
+    }
+
+    invisible(NULL)
+  }
+
+  wrapped_eval <- function(point) {
+    point <- as.numeric(point)
+    state$visit_id <- state$visit_id + 1L
+    started <- proc.time()[3L]
+    status <- "ok"
+    msg <- NULL
+    objective <- NA_real_
+    degree <- integer(0)
+    num.feval <- NA_real_
+
+    result <- tryCatch(
+      eval_fun(point),
+      interrupt = function(e) {
+        state$interrupted <- TRUE
+        NULL
+      },
+      error = function(e) {
+        status <<- "error"
+        msg <<- conditionMessage(e)
+        NULL
+      }
+    )
+
+    if (isTRUE(state$interrupted))
+      stop(structure(list(message = "interrupt"), class = c("interrupt", "condition")))
+
+    if (!is.null(result)) {
+      if (!is.list(result) || is.null(result$objective) || is.null(result$degree))
+        stop("NOMAD fixed-point evaluator must return a list containing 'objective' and 'degree'")
+
+      objective <- as.numeric(result$objective[1L])
+      degree <- as.integer(result$degree)
+      if (!is.null(result$num.feval))
+        num.feval <- as.numeric(result$num.feval[1L])
+    }
+
+    state$eval_id <- state$eval_id + 1L
+    rec <- list(
+      eval_id = state$eval_id,
+      degree = degree,
+      objective = objective,
+      status = status,
+      cached = FALSE,
+      message = msg,
+      elapsed = proc.time()[3L] - started,
+      num.feval = num.feval
+    )
+    state$record_trace(rec)
+    state$update_best(rec, point = point)
+    state$progress_state <- .np_degree_progress_step(
+      state = state$progress_state,
+      done = state$eval_id,
+      detail = .np_nomad_progress_detail(
+        engine = engine,
+        eval_id = state$eval_id,
+        current_degree = degree,
+        best_record = state$best_record,
+        objective_name = objective_name
+      )
+    )
+
+    if (identical(status, "ok")) {
+      if (identical(direction, "min")) {
+        return(objective)
+      } else {
+        return(-objective)
+      }
+    }
+
+    if (identical(direction, "min")) Inf else .Machine$double.xmax
+  }
+
+  state$progress_state <- .np_degree_progress_begin(
+    detail = .np_nomad_progress_start_detail(
+      engine = engine,
+      baseline_degree = baseline_record$degree,
+      best_record = state$best_record,
+      objective_name = objective_name
+    )
+  )
+
+  nomad.start <- proc.time()[3L]
+  solution <- tryCatch(
+    {
+      crs::snomadr(
+        eval.f = wrapped_eval,
+        n = length(x0),
+        bbin = as.integer(bbin),
+        bbout = 0L,
+        x0 = as.numeric(x0),
+        lb = as.double(lb),
+        ub = as.double(ub),
+        nmulti = 0L,
+        random.seed = as.integer(random.seed),
+        opts = list(),
+        display.nomad.progress = display.nomad.progress,
+        snomadr.environment = environment(wrapped_eval)
+      )
+    },
+    interrupt = function(e) {
+      state$interrupted <- TRUE
+      NULL
+    },
+    error = function(e) {
+      state$error <- conditionMessage(e)
+      NULL
+    }
+  )
+  state$nomad.time <- proc.time()[3L] - nomad.start
+
+  if (!is.null(solution) && is.null(state$best_point) && length(solution$solution) == length(x0)) {
+    state$best_point <- as.numeric(solution$solution)
+  }
+
+  if (is.null(state$best_point))
+    stop(if (is.null(state$error)) {
+      "automatic degree search failed to obtain any admissible fitted model"
+    } else {
+      state$error
+    })
+
+  if (identical(engine, "nomad+powell") && !is.null(state$progress_state)) {
+    state$progress_state <- .np_degree_progress_end(
+      state = state$progress_state,
+      detail = .np_degree_progress_best_detail(
+        best_record = state$best_record,
+        objective_name = objective_name
+      )
+    )
+    state$progress_state <- NULL
+  }
+
+  payload_result <- build_payload(
+    point = state$best_point,
+    best_record = state$best_record,
+    solution = solution,
+    interrupted = state$interrupted
+  )
+  if (is.list(payload_result) && !is.null(payload_result$payload)) {
+    state$best_payload <- payload_result$payload
+    if (!is.null(payload_result$powell.time))
+      state$powell.time <- as.numeric(payload_result$powell.time[1L])
+    if (!is.null(payload_result$objective) &&
+        .np_degree_better(payload_result$objective, state$best_record$objective, direction = direction)) {
+      state$best_record$objective <- as.numeric(payload_result$objective[1L])
+    }
+  } else {
+    state$best_payload <- payload_result
+  }
+
+  state$progress_state <- .np_degree_progress_end(
+    state = state$progress_state,
+    detail = .np_degree_progress_best_detail(
+      best_record = state$best_record,
+      objective_name = objective_name
+    ),
+    interrupted = state$interrupted
+  )
+
+  list(
+    method = engine,
+    verify = FALSE,
+    completed = !isTRUE(state$interrupted),
+    certified = FALSE,
+    interrupted = isTRUE(state$interrupted),
+    baseline = baseline_record,
+    best = state$best_record,
+    best_payload = state$best_payload,
+    best_point = state$best_point,
+    n.unique = state$eval_id,
+    n.visits = state$visit_id,
+    n.cached = 0L,
+    nomad.time = state$nomad.time,
+    powell.time = state$powell.time,
+    optim.time = sum(c(state$nomad.time, state$powell.time), na.rm = TRUE),
+    grid.size = NA_integer_,
+    restart.starts = list(),
     trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name)
   )
 }
