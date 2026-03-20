@@ -35,14 +35,17 @@ test_that("plot.par.mfrow=FALSE is honored for npcdens auto and manual plots", {
   on.exit(grDevices::dev.off(), add = TRUE)
 
   par(mfrow = c(2, 2))
+  plot(1:10)
+  plot(1:10)
   suppressWarnings(
     plot(f.auto, theta = 70, phi = 10, view = "fixed", zlim = c(0, 2))
   )
   expect_identical(par("mfrow"), c(2L, 2L))
+  expect_identical(par("mfg"), c(2L, 1L, 2L, 2L))
 
-  par(mfrow = c(2, 2))
   suppressWarnings(
     plot(f.manual, theta = 70, phi = 10, view = "fixed", zlim = c(0, 2))
   )
   expect_identical(par("mfrow"), c(2L, 2L))
+  expect_identical(par("mfg"), c(2L, 2L, 2L, 2L))
 })
