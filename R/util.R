@@ -1627,7 +1627,8 @@ npBandwidthSummaryLabel <- function(bwtype, bwscaling = FALSE){
 genBwSelStr <- function(x){
   fval.str <- ""
   if (!identical(x$fval, NA)) {
-    fval.str <- if (is.null(x$ifval) || identical(x$ifval, NA)) {
+    missing.ifval <- is.null(x$ifval) || (length(x$ifval) == 1L && is.na(x$ifval))
+    fval.str <- if (missing.ifval) {
       paste("\nObjective Function Value: ", format(x$fval), sep = "")
     } else {
       ms.label <- if (x$ifval <= 0) 1L else x$ifval

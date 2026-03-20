@@ -164,6 +164,7 @@ void np_reg_cv_core_clear_extern(void);
 int np_shadow_cv_con_density_ml(double *vector_scale_factor, double *cv);
 int np_shadow_cv_con_density_ls(double *vector_scale_factor, double *cv);
 int np_shadow_cv_con_distribution_ls(double *vector_scale_factor, double *cv);
+int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor, int eval_idx, double *row_out);
 int np_regression_lp_apply_matrix(double *vector_scale_factor, double **rhs_cols, int n_rhs, double *fitted_out);
 double cv_func_regression_categorical_ls_nn(double *vector_scale_factor);
 

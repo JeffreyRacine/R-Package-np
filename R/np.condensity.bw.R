@@ -875,22 +875,24 @@ npcdensbw.conbandwidth <-
         bandwidth.compute = FALSE,
         reg.args = final.reg.args
       )
-      tbw$fval <- as.numeric(best_record$objective)
-      tbw$ifval <- as.numeric(best_record$objective)
-      tbw$num.feval <- if (!is.null(solution$bbe)) as.numeric(solution$bbe) else as.numeric(best_record$num.feval)
-      tbw$num.feval.fast <- 0
-      tbw$fval.history <- as.numeric(best_record$objective)
-      tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
-      tbw$invalid.history <- 0
-      tbw$timing <- NA_real_
-      tbw$total.time <- NA_real_
-
-      npcdensbw.conbandwidth(
+      payload <- npcdensbw.conbandwidth(
         xdat = xdat,
         ydat = ydat,
         bws = tbw,
         bandwidth.compute = FALSE
       )
+      payload$method <- as.character(reg.args$bwmethod[1L])
+      payload$pmethod <- bwmToPrint(payload$method)
+      payload$fval <- as.numeric(best_record$objective)
+      payload$ifval <- NA_real_
+      payload$num.feval <- if (!is.null(solution$bbe)) as.numeric(solution$bbe) else as.numeric(best_record$num.feval)
+      payload$num.feval.fast <- 0
+      payload$fval.history <- NA_real_
+      payload$eval.history <- NA_real_
+      payload$invalid.history <- NA_real_
+      payload$timing <- NA_real_
+      payload$total.time <- NA_real_
+      payload
     }
 
     direct.payload <- build_direct_payload()
