@@ -639,7 +639,7 @@
   if (identical(event, "finish")) {
     clear_width <- max(snapshot$last_width, width, .np_progress_output_width())
     clear_line <- if (clear_width > 0L) strrep(" ", clear_width) else ""
-    base::cat("\r", clear_line, "\r\n", file = con, sep = "")
+    base::cat("\r", clear_line, "\r", file = con, sep = "")
     flush(con)
     flush.console()
     return(invisible(snapshot))
@@ -1754,6 +1754,11 @@
       if (!is.null(context_label) && nzchar(context_label)) {
         .np_progress_bandwidth_set_coordinator(total_groups = 1L, local_total = 1L)
         .np_progress_bandwidth_set_coordinator_group(1L, context_label)
+        .np_progress_runtime$bandwidth_state$start_note_grace_sec <- 0
+        .np_progress_runtime$bandwidth_state <- .np_progress_maybe_emit_start_note(
+          .np_progress_runtime$bandwidth_state,
+          now = .np_progress_runtime$bandwidth_state$started
+        )
       }
     }
   }
