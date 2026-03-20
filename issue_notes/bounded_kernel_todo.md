@@ -1,10 +1,16 @@
 # Bounded Continuous Kernel Rollout TODO (`np-npRmpi`)
 
-## Status (2026-02-24)
+## Status (2026-03-20)
 
-- Deferred to future modernization tranche by decision.
-- This file remains the canonical backlog for bounded convolution/native completion.
-- It is not a blocker for concluding the current modernization push.
+- Fixed-bandwidth bounded continuous-kernel support is the active supported
+  public slice in serial `np-master` and is now mirrored here.
+- The current `npRmpi` mirror builds cleanly after the bounded `npcdens cv.ls`
+  repair tranche; public bounded support remains `bwtype = "fixed"` only.
+- Public bounded continuous-kernel use with
+  `bwtype %in% c("generalized_nn", "adaptive_nn")` remains intentionally
+  unsupported and still fails fast in the R constructors.
+- This file remains the canonical backlog for widening bounded support beyond the
+  current fixed-bandwidth slice in MPI-aware routes.
 
 ## CRAN Example Policy
 
@@ -35,53 +41,76 @@
 
 ## Remaining (core implementation)
 
-1. C kernel normalization path
-- Implement bounded normalization for continuous kernels in `src/jksum.c`:
-  - `K((x-x_i)/h) / (G((b-x)/h)-G((a-x)/h))`
-- Ensure the path is active in all relevant operator modes where intended.
+1. Public nonfixed bounded activation
+- Evaluate whether bounded continuous kernels can be activated publicly for:
+  - `bwtype = "generalized_nn"`
+  - `bwtype = "adaptive_nn"`
+- Current public policy remains:
+  - finite continuous bounds require `bwtype = "fixed"`
+- Activation requirements before removing that hard-stop:
+  - serial proof already complete,
+  - mirrored `npRmpi` session/attach/profile validation,
+  - fixed-point objective certification on bounded anchors,
+  - end-to-end fit sanity for `cv.ml` and `cv.ls`,
+  - explicit MPI route performance evidence.
+
+2. C kernel normalization path
+- Verify the bounded normalization path remains correct/active for all supported
+  continuous kernels/orders in `src/jksum.c`:
+  - Gaussian `2/4/6/8`
+  - Epanechnikov `2/4/6/8`
+  - rectangular
+  - truncated Gaussian `2`
 - Keep defaults exact when bounds are effectively unbounded.
 
-2. C API plumbing
+3. C API plumbing
 - Pass resolved bounds from R into C entry points that evaluate kernels directly:
   - `np_kernelsum`, `np_regression`, `np_density`, `np_density_conditional`
   - BW-selection entry points as needed for CV consistency.
 - Update `src/np_init.c` registrations/signatures and all `.Call(...)` call sites.
 
-3. Convolution/CV behavior
-- Confirm convolution-dependent objectives (`cv.ls` paths) under finite bounds.
-- If bounded convolution is unavailable for a path, define/implement explicit fallback behavior and document it.
+4. Convolution/CV behavior
+- Fixed-bandwidth bounded convolution is now the target mirrored behavior for
+  public `npcdens cv.ls`.
+- Remaining widening work:
+  - confirm bounded convolution semantics for public `generalized_nn`,
+  - determine whether bounded `adaptive_nn` convolution is correct and supportable,
+  - decide whether additional analytic bounded-convolution kernels beyond
+    Gaussian-2 are worth implementing for speed.
 
-4. Denominator micro-optimization (`NZD_pos` in C)
+5. Denominator micro-optimization (`NZD_pos` in C)
 - Expand/verify positive-only guard coverage for any remaining known-nonnegative denominator sites in `jksum.c` beyond the current rollout.
 - Add focused pre/post perf artifacts for this micro-optimization slice (fixed and varying seed policy where applicable).
 
-5. Predict/eval policy
+6. Predict/eval policy
 - Verify hard-stop behavior is consistent across all user-facing predict/eval paths.
 - Add clear error messages for offending variable(s).
 
-6. Testing
+7. Testing
 - Add/extend tests for:
   - `none`/`range`/`fixed`
   - scalar vs vector bounds
   - invalid bounds (`a >= b`, training support violation)
   - eval support violation
-  - finite bounds + non-fixed `bwtype` hard-stop
+  - finite bounds + non-fixed `bwtype` hard-stop (until activation tranche lands)
   - parity check: `(-Inf, Inf)` equals baseline behavior.
 
-7. Documentation
+8. Documentation
 - Update relevant `.Rd` files for new args and semantics:
   - bw constructors and front-end bw wrappers
   - estimator docs where eval hard-stop applies.
 - Add note in package-level docs/changelog about bounded-kernel feature and caveats.
+- Be explicit that current public support is `bwtype = "fixed"` only until a
+  later nonfixed widening tranche is proven.
 - Confirm no `options()`-based interface is required for this feature.
 
-8. Porting to `np-npRmpi`
+9. Porting to `np-npRmpi`
 - After `np-master` stabilizes and tests pass:
   - port shared core changes
   - merge repo-specific R-layer docs/options carefully
   - run smoke benchmark/parity check in MPI path.
 
-9. Conditional density/distribution `regtype` extension (`lc` -> `ll`)
+10. Conditional density/distribution `regtype` extension (`lc` -> `ll`)
 - Add `regtype = c("lc","ll")` to:
   - `conbandwidth`/`npcdens*`
   - `condbandwidth`/`npcdist*`
