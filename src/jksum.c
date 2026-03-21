@@ -11,6 +11,7 @@
 
 #include <R.h>
 #include <R_ext/Applic.h>
+#include <R_ext/BLAS.h>
 #include <R_ext/Lapack.h>
 #include <R_ext/Utils.h>
 #include <Rmath.h>
@@ -157,6 +158,13 @@ extern KDT * kdt_extern_XY;
 extern int * ipt_extern_X;
 extern int * ipt_extern_Y;
 extern int * ipt_extern_XY;
+
+static double np_blas_ddot_int(const int n, const double *x, const double *y){
+  const int inc = 1;
+  if((n <= 0) || (x == NULL) || (y == NULL))
+    return 0.0;
+  return F77_CALL(ddot)(&n, x, &inc, y, &inc);
+}
 
 extern int * ipt_lookup_extern_X;
 extern int * ipt_lookup_extern_Y;
@@ -17440,7 +17448,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   const int num_obs = num_obs_train_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(), MAX(1, num_obs));
   double **xblock = NULL, **xblock_full = NULL, **yblock = NULL, **yconvblock = NULL;
-  int i0, j0, ii, jj, k;
+  int i0, j0, ii, jj;
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
@@ -17476,8 +17484,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
       goto cleanup_cvls_lp_block;
 
     for(ii = 0; ii < ib; ii++)
-      for(k = 0; k < num_obs; k++)
-        lin += xblock[ii][k]*yblock[ii][k];
+      lin += np_blas_ddot_int(num_obs, xblock[ii], yblock[ii]);
 
     for(j0 = 0; j0 < num_obs; j0 += block_size){
       const int jb = MIN(block_size, num_obs - j0);
@@ -17489,11 +17496,10 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
         double * const ai = xblock_full[ii];
         for(jj = 0; jj < jb; jj++){
           const double aij = ai[j0 + jj];
-          double inner = 0.0;
+          double inner;
           if(aij == 0.0)
             continue;
-          for(k = 0; k < num_obs; k++)
-            inner += ai[k]*yconvblock[jj][k];
+          inner = np_blas_ddot_int(num_obs, ai, yconvblock[jj]);
           quad += aij*inner;
         }
       }
