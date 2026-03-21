@@ -9,10 +9,11 @@
 	kernel methods that seamlessly handle a mix of continuous, unordered,
 	and ordered factor data types (unordered and ordered factors are often
 	referred to as \sQuote{nominal} and \sQuote{ordinal} categorical
-	variables respectively). A vignette containing many of the examples
-	found in the help files accompanying the \pkg{np} package that is
-	intended to serve as a gentle introduction to this package can be
-	accessed via \code{vignette("np", package="np")}.
+	variables respectively). A getting-started vignette containing a
+	short introduction to the \pkg{np} package can be accessed via
+	\code{vignette("np_getting_started", package = "np")}. An installed
+	vignette for the entropy-based test family can be accessed via
+	\code{vignette("np_entropy_tests", package = "np")}.
 
   For a listing of all routines in the \pkg{np} package type:
   \sQuote{library(help="np")}.  
