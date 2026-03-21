@@ -1025,6 +1025,7 @@ npcdensbw.conbandwidth <-
 .npcdensbw_attach_degree_search <- function(bws, search_result) {
   metadata <- list(
     mode = search_result$method,
+    direction = search_result$direction,
     verify = isTRUE(search_result$verify),
     completed = isTRUE(search_result$completed),
     certified = isTRUE(search_result$certified),

@@ -1494,7 +1494,8 @@
       },
       message = if (is.null(solution_i)) state$error else solution_i$message,
       objective = if (!is.null(solution_i) && !is.null(solution_i$objective)) {
-        as.numeric(solution_i$objective[1L])
+        raw.objective <- as.numeric(solution_i$objective[1L])
+        if (identical(direction, "min")) raw.objective else -raw.objective
       } else {
         NA_real_
       },
@@ -1582,6 +1583,7 @@
 
   list(
     method = engine,
+    direction = direction,
     verify = FALSE,
     completed = !isTRUE(state$interrupted),
     certified = FALSE,

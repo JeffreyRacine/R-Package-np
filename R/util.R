@@ -1504,6 +1504,11 @@ genTimingStr <- function(x){
 
 .np_attach_nomad_restart_summary <- function(bws, search_result, tol = 1e-10) {
   restart.results <- search_result$restart.results
+  direction <- if (!is.null(search_result$direction) && length(search_result$direction)) {
+    as.character(search_result$direction[1L])
+  } else {
+    "min"
+  }
   restart.fval <- if (!is.null(restart.results) && length(restart.results)) {
     vapply(
       restart.results,
@@ -1537,7 +1542,7 @@ genTimingStr <- function(x){
         best.restart <- as.integer(idx)
     }
   } else if (length(restart.fval) && any(is.finite(restart.fval))) {
-    best.restart <- as.integer(which.min(restart.fval))
+    best.restart <- as.integer(if (identical(direction, "max")) which.max(restart.fval) else which.min(restart.fval))
   }
 
   bws$nomad.restart.results <- restart.results
