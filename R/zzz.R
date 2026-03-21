@@ -1,5 +1,12 @@
 .onAttach <- function (lib, pkg) {
-	packageStartupMessage("Nonparametric Kernel Methods for Mixed Datatypes (version 0.70-1)\n[vignette(\"np_faq\",package=\"np\") provides answers to frequently asked questions]\n[vignette(\"np\",package=\"np\") an overview]\n[vignette(\"entropy_np\",package=\"np\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
+	packageStartupMessage(
+    sprintf(
+      'np %s: vignette("np_getting_started", package = "np"); vignette("np_entropy_tests", package = "np")',
+      utils::packageVersion(pkg)
+    ),
+    domain = NULL,
+    appendLF = TRUE
+  )
 }
 
 .onLoad <- function (lib, pkg) {
