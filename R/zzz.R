@@ -23,13 +23,9 @@
 
 .onAttach <- function (lib, pkg) {
 		packageStartupMessage(
-      paste0(
-        "Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.70-1)",
-        " + embedded Rmpi backend ",
-        .npRmpi_embedded_backend_version,
-        "\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]",
-        "\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]",
-        "\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]"
+      sprintf(
+        'npRmpi %s: vignette("nprmpi_getting_started", package = "npRmpi")',
+        utils::packageVersion(pkg)
       ),
       domain = NULL,
       appendLF = TRUE
