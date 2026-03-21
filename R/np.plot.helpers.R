@@ -1105,6 +1105,7 @@
                                          profile.where = NA_character_,
                                          comm = 1L,
                                          prefer.local.single_worker = FALSE,
+                                         master_local_chunk = FALSE,
                                          required.bindings = NULL,
                                          ...) {
   total.boot <- sum(vapply(tasks, function(tt) as.integer(tt$bsz), integer(1)))
@@ -1148,6 +1149,10 @@
       workers <= 1L) {
     use.master.local <- TRUE
   }
+  master_local_chunk <- isTRUE(master_local_chunk) &&
+    !isTRUE(use.master.local) &&
+    workers >= 1L &&
+    length(tasks) >= 2L
   .npRmpi_bootstrap_transport_trace(
     what = what,
     event = "fanout.start",
@@ -1155,6 +1160,7 @@
       workers = workers,
       tasks = length(tasks),
       master_local = isTRUE(use.master.local),
+      master_local_chunk = master_local_chunk,
       single_worker_local = isTRUE(prefer.local.single_worker) && workers <= 1L,
       comm = comm
     )
@@ -1185,7 +1191,10 @@
   } else if (workers >= 1L && length(tasks) >= 2L) {
     tryCatch({
       n.tasks <- length(tasks)
-      remote.idx <- seq_len(n.tasks)
+      local.idx <- integer(0)
+      if (master_local_chunk)
+        local.idx <- which.max(vapply(tasks, function(tt) as.integer(tt$bsz), integer(1L)))[1L]
+      remote.idx <- setdiff(seq_len(n.tasks), local.idx)
       parts.out <- vector("list", n.tasks)
 
       if (length(remote.idx) == 0L) {
@@ -1203,7 +1212,11 @@
         .npRmpi_bootstrap_transport_trace(
           what = what,
           event = "fanout.master_assist.start",
-          fields = list(n_remote = n.remote, slave_num = slave.num, local_n = 0L)
+          fields = list(
+            n_remote = n.remote,
+            slave_num = slave.num,
+            local_n = if (length(local.idx)) 1L else 0L
+          )
         )
 
         init <- min(slave.num, n.remote)
@@ -1231,9 +1244,26 @@
           }
         }
 
+        done.boot <- 0L
+        if (length(local.idx)) {
+          task.local.idx <- local.idx[[1L]]
+          .npRmpi_bootstrap_transport_trace(
+            what = what,
+            event = "fanout.master_local_chunk.start",
+            fields = list(task_idx = task.local.idx)
+          )
+          parts.out[[task.local.idx]] <- do.call(worker.exec, c(list(tasks[[task.local.idx]]), list(...)))
+          done.boot <- done.boot + as.integer(tasks[[task.local.idx]]$bsz)
+          progress <- .np_plot_progress_tick(state = progress, done = done.boot)
+          .npRmpi_bootstrap_transport_trace(
+            what = what,
+            event = "fanout.master_local_chunk.done",
+            fields = list(task_idx = task.local.idx, bsz = as.integer(tasks[[task.local.idx]]$bsz))
+          )
+        }
+
         sent <- init
         done <- 0L
-        done.boot <- 0L
 
         while (done < n.remote) {
           progressed <- FALSE
@@ -1295,7 +1325,11 @@
         .npRmpi_bootstrap_transport_trace(
           what = what,
           event = "fanout.master_assist.done",
-          fields = list(done = done, n_remote = n.remote, local_done = 0L)
+          fields = list(
+            done = done,
+            n_remote = n.remote,
+            local_done = if (length(local.idx)) 1L else 0L
+          )
         )
       }
 

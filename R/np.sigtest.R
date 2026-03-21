@@ -231,7 +231,7 @@ if (getRversion() >= "2.15.1")
     B = n.boot,
     chunk.size = chunk.size,
     comm = comm,
-    include.master = FALSE
+    include.master = TRUE
   )
   tasks <- .npRmpi_npsig_bootstrap_tasks(n.boot = n.boot, chunk.size = chunk.size)
 
@@ -250,6 +250,7 @@ if (getRversion() >= "2.15.1")
     what = what,
     profile.where = profile.where,
     comm = comm,
+    master_local_chunk = TRUE,
     required.bindings = bindings,
     boot.seeds = boot.seeds
   )
