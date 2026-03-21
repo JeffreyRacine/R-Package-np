@@ -1,0 +1,119 @@
+---
+title: "Getting Started with np"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with np}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+options(np.messages = FALSE)
+```
+
+This vignette is meant to be the smallest useful package-side introduction to
+`np`. The emphasis is on one clean workflow that users can run after
+installation: choose a bandwidth, fit a model, inspect the result, and plot it.
+
+Broader worked examples, package comparisons, and method-specific articles are
+better carried by the gallery site:
+
+- <https://jeffreyracine.github.io/gallery/np_npRmpi.html>
+- <https://jeffreyracine.github.io/gallery/quickstarts.html>
+
+## The basic workflow
+
+In `np`, the bandwidth object is often the key object in the analysis.
+
+1. compute or inspect a bandwidth object,
+2. fit the model,
+3. summarize or plot the result.
+
+## A simple regression example
+
+```{r}
+library(np)
+data(cps71, package = "np")
+
+bw <- npregbw(logwage ~ age, data = cps71)
+summary(bw)
+
+fit <- npreg(bws = bw)
+summary(fit)
+```
+
+## Plotting the fitted relationship
+
+```{r, fig.width = 6, fig.height = 4}
+plot(cps71$age, cps71$logwage, cex = 0.25, col = "grey")
+lines(cps71$age, fitted(fit), col = 2, lwd = 2)
+```
+
+## Mixed data
+
+One important feature of `np` is that it handles mixed data directly. Variable
+class matters: unordered categorical variables should be factors, and ordered
+categorical variables should be ordered factors when appropriate.
+
+```{r}
+set.seed(42)
+mydat <- data.frame(
+  y = rnorm(200),
+  x_cont = runif(200),
+  x_unordered = factor(sample(c("a", "b", "c"), 200, replace = TRUE)),
+  x_ordered = ordered(sample(1:4, 200, replace = TRUE))
+)
+
+bw_mixed <- npregbw(y ~ x_cont + x_unordered + x_ordered, data = mydat)
+fit_mixed <- npreg(bws = bw_mixed)
+summary(fit_mixed)
+```
+
+## A note on modern local-polynomial search
+
+For local-polynomial-capable methods, `np` now supports joint selection of
+polynomial order and bandwidth. The modern route is to use
+`search.engine = "nomad+powell"` when you want the search to choose both
+together.
+
+Keep the first run modest and runnable. Fuller worked examples belong on the
+gallery rather than in this package vignette.
+
+## Data preparation matters
+
+In `np`, the formula interface tells the function which variables are the
+response and regressors. It is not imposing an ordinary linear-additive model.
+
+It is also important not to pass blocks of 0/1 dummies as if this were a
+standard linear-model workflow. If the underlying variable is categorical, it
+is usually better to keep it as one `factor` or `ordered` variable.
+
+## Other common starting points
+
+This vignette keeps the package-side introduction intentionally narrow. Other
+common first routes are:
+
+- `?npudens` and `?npudist` for unconditional density and distribution work,
+- `?npcdens`, `?npcdist`, and `?npqreg` for conditional density, distribution,
+  and quantiles,
+- `?npconmode` for classification and conditional mode estimation,
+- `?npplreg`, `?npindex`, and `?npscoef` for semiparametric models.
+
+Those broader branches are better carried by help pages and website articles
+than by a single shipped vignette.
+
+## Where to go next
+
+- `vignette("np_entropy_tests", package = "np")` for a compact package-side
+  testing overview
+- `?npreg`, `?npregbw`, `?npudens`, and `?npcdens` for core help pages
+- <https://jeffreyracine.github.io/gallery/kernel_primer.html> for the
+  conceptual kernel overview
+- <https://jeffreyracine.github.io/gallery/density_distribution_quantiles.html>
+  for density, distribution, and quantile workflows
+- <https://jeffreyracine.github.io/gallery/semiparametric_models.html> for
+  partially linear, single-index, and varying-coefficient routes

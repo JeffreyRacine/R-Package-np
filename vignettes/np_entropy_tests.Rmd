@@ -1,0 +1,72 @@
+---
+title: "Entropy and Testing with np"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Entropy and Testing with np}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+options(np.messages = FALSE)
+```
+
+This vignette is meant to be a small package-side introduction to the
+entropy-based testing tools in `np`. It is intentionally much shorter than the
+legacy article-style document and focuses on what the functions are for and one
+small runnable example.
+
+The fuller narrative treatment now belongs on the gallery site rather than in a
+shipped package vignette:
+
+- <https://jeffreyracine.github.io/gallery/entropy_tests.html>
+
+## Main functions
+
+The main entropy-based testing functions are:
+
+- `npdeneqtest`: equality of multivariate densities
+- `npunitest`: equality of univariate densities
+- `npsymtest`: asymmetry in a univariate variable or series
+- `npdeptest`: nonlinear pairwise dependence
+- `npsdeptest`: nonlinear serial dependence
+
+These functions can be computationally demanding, especially when integration
+and bootstrap resampling are involved.
+
+## A small example
+
+For a first run, it is reasonable to begin with a simple univariate comparison
+and keep the example small enough that bootstrapping remains practical.
+
+```{r}
+library(np)
+set.seed(42)
+
+n <- 250
+x <- rnorm(n)
+y <- rnorm(n)
+
+npunitest(x, y, bootstrap = TRUE)
+```
+
+## Practical guidance
+
+- start with the smallest example that answers your question,
+- use the default integral-based versions for serious work unless you have a
+  reason not to,
+- expect runtime to grow quickly when bootstrap resampling is involved,
+- if the testing workflow is correct but the runtime becomes burdensome, move to
+  `npRmpi` rather than rewriting the statistical problem.
+
+## Where to go next
+
+- `?npunitest`, `?npdeneqtest`, `?npdeptest`, `?npsdeptest`, `?npsymtest`
+- <https://jeffreyracine.github.io/gallery/entropy_tests.html> for the longer
+  website article
+- <https://jeffreyracine.github.io/gallery/mpi_large_data.html> if the testing
+  workflow is correct but runtime now points to `npRmpi`
