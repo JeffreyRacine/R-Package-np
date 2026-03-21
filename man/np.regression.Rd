@@ -326,7 +326,7 @@ FALSE, \dots)
 ## directory (npRmpi/demos) and study them carefully. Also kindly see
 ## the more extensive examples in the np package itself. See the npRmpi
 ## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
+## vignette("nprmpi_getting_started", package = "npRmpi").
 ##
 ## R CMD check can set up a process environment where spawn-mode MPI
 ## teardown may terminate the check parent process. Keep this example
