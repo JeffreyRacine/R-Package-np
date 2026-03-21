@@ -1597,6 +1597,7 @@
     powell.time = state$powell.time,
     optim.time = sum(c(state$nomad.time, state$powell.time), na.rm = TRUE),
     grid.size = NA_integer_,
+    best.restart = state$best_restart_index,
     restart.starts = state$restart_starts,
     restart.degree.starts = state$restart_degree_starts,
     restart.bandwidth.starts = state$restart_bandwidth_starts,
