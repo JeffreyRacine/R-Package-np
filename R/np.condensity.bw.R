@@ -894,7 +894,6 @@ npcdensbw.conbandwidth <-
     direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
-      .np_nomad_powell_note(degree)
       hot.reg.args <- reg.args
       hot.reg.args$regtype <- "lp"
       hot.reg.args$pregtype <- "Local-Polynomial"
@@ -906,12 +905,15 @@ npcdensbw.conbandwidth <-
       hot.opt.args <- opt.args
       hot.opt.args$nmulti <- 0L
       powell.start <- proc.time()[3L]
-      hot.payload <- .npcdensbw_run_fixed_degree(
-        xdat = xdat,
-        ydat = ydat,
-        bws = bw_vec,
-        reg.args = hot.reg.args,
-        opt.args = hot.opt.args
+      hot.payload <- .np_nomad_with_powell_progress(
+        degree,
+        .npcdensbw_run_fixed_degree(
+          xdat = xdat,
+          ydat = ydat,
+          bws = bw_vec,
+          reg.args = hot.reg.args,
+          opt.args = hot.opt.args
+        )
       )
       powell.elapsed <- proc.time()[3L] - powell.start
       hot.objective <- as.numeric(hot.payload$fval[1L])
