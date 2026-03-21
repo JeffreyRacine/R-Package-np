@@ -1148,12 +1148,19 @@
                                       current_degree,
                                       best_record,
                                       objective_name = "objective",
+                                      restart_index = NULL,
                                       nmulti = 1L) {
   fields <- c(engine)
 
   nmulti <- suppressWarnings(as.integer(nmulti)[1L])
-  if (!is.na(nmulti) && nmulti > 1L)
-    fields <- c(fields, sprintf("multistarts %s", format(nmulti)))
+  restart_index <- suppressWarnings(as.integer(restart_index)[1L])
+  if (!is.na(nmulti) && nmulti > 1L) {
+    if (!is.na(restart_index) && restart_index >= 1L) {
+      fields <- c(fields, sprintf("multistart %s/%s", format(restart_index), format(nmulti)))
+    } else {
+      fields <- c(fields, sprintf("multistarts %s", format(nmulti)))
+    }
+  }
 
   if (!is.null(eval_id) && is.finite(eval_id) && eval_id >= 0L)
     fields <- c(fields, sprintf("eval %s", format(eval_id)))
@@ -1171,18 +1178,24 @@
 
 .np_nomad_progress_start_detail <- function(engine,
                                             baseline_degree,
+                                            restart_index = 1L,
                                             nmulti,
                                             best_record,
                                             objective_name = "objective") {
   paste(
     sprintf("start %s", .np_degree_format_degree(baseline_degree)),
-    sprintf("multistart 1/%s", format(max(1L, as.integer(nmulti)))),
+    sprintf(
+      "multistart %s/%s",
+      format(max(1L, as.integer(restart_index)[1L])),
+      format(max(1L, as.integer(nmulti)))
+    ),
     .np_nomad_progress_detail(
       engine = engine,
       eval_id = 0L,
       current_degree = baseline_degree,
       best_record = best_record,
       objective_name = objective_name,
+      restart_index = restart_index,
       nmulti = nmulti
     ),
     sep = ", "
@@ -1237,6 +1250,9 @@
   state$nomad.time <- NA_real_
   state$powell.time <- NA_real_
   state$restart_starts <- NULL
+  state$restart_results <- NULL
+  state$current_restart <- NA_integer_
+  state$best_restart_index <- NA_integer_
 
   nomad.nmulti <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
   start_matrix <- .np_nomad_build_starts(
@@ -1302,6 +1318,7 @@
     if (.np_degree_better(rec$objective, incumbent, direction = direction)) {
       state$best_record <- rec
       state$best_point <- point
+      state$best_restart_index <- state$current_restart
     }
 
     invisible(NULL)
@@ -1367,6 +1384,7 @@
         current_degree = degree,
         best_record = state$best_record,
         objective_name = objective_name,
+        restart_index = state$current_restart,
         nmulti = nomad.nmulti
       )
     )
@@ -1390,44 +1408,133 @@
       } else {
         as.integer(start_degree)
       },
+      restart_index = 1L,
       nmulti = nomad.nmulti,
       best_record = state$best_record,
       objective_name = objective_name
     )
   )
 
-  nomad.start <- proc.time()[3L]
-  solution <- tryCatch(
-    {
-      crs::snomadr(
-        eval.f = wrapped_eval,
-        n = length(x0),
-        bbin = as.integer(bbin),
-        bbout = 0L,
-        x0 = start_matrix,
-        lb = as.double(lb),
-        ub = as.double(ub),
-        nmulti = as.integer(nomad.nmulti),
-        random.seed = as.integer(random.seed),
-        opts = list(),
-        display.nomad.progress = display.nomad.progress
-        ,
-        snomadr.environment = environment(wrapped_eval)
-      )
-    },
-    interrupt = function(e) {
-      state$interrupted <- TRUE
-      NULL
-    },
-    error = function(e) {
-      state$error <- conditionMessage(e)
-      NULL
+  restart_results <- vector("list", nomad.nmulti)
+  best_solution <- NULL
+  nomad.elapsed <- 0
+  for (i in seq_len(nomad.nmulti)) {
+    state$current_restart <- as.integer(i)
+    restart_degree <- if (!is.null(state$restart_degree_starts) &&
+                          length(state$restart_degree_starts) >= i) {
+      state$restart_degree_starts[[i]]
+    } else if (is.null(start_degree)) {
+      if (is.null(baseline_record)) integer(0) else baseline_record$degree
+    } else {
+      as.integer(start_degree)
     }
-  )
-  state$nomad.time <- proc.time()[3L] - nomad.start
 
-  if (!is.null(solution) && is.null(state$best_point) && length(solution$solution) == length(x0)) {
-    state$best_point <- as.numeric(solution$solution)
+    if (i > 1L) {
+      state$progress_state <- .np_degree_progress_step(
+        state = state$progress_state,
+        done = state$eval_id,
+        detail = .np_nomad_progress_start_detail(
+          engine = engine,
+          baseline_degree = restart_degree,
+          restart_index = i,
+          nmulti = nomad.nmulti,
+          best_record = state$best_record,
+          objective_name = objective_name
+        )
+      )
+    }
+
+    pre_restart_best <- if (is.null(state$best_record) || is.null(state$best_record$objective)) {
+      if (identical(direction, "min")) Inf else -Inf
+    } else {
+      state$best_record$objective
+    }
+
+    nomad.start <- proc.time()[3L]
+    solution_i <- tryCatch(
+      {
+        crs::snomadr(
+          eval.f = wrapped_eval,
+          n = length(x0),
+          bbin = as.integer(bbin),
+          bbout = 0L,
+          x0 = as.numeric(start_matrix[i, ]),
+          lb = as.double(lb),
+          ub = as.double(ub),
+          nmulti = 0L,
+          random.seed = as.integer(random.seed),
+          opts = list(),
+          display.nomad.progress = display.nomad.progress,
+          snomadr.environment = environment(wrapped_eval)
+        )
+      },
+      interrupt = function(e) {
+        state$interrupted <- TRUE
+        NULL
+      },
+      error = function(e) {
+        state$error <- conditionMessage(e)
+        NULL
+      }
+    )
+    restart.elapsed <- proc.time()[3L] - nomad.start
+    nomad.elapsed <- nomad.elapsed + restart.elapsed
+
+    restart_results[[i]] <- list(
+      restart = i,
+      start = as.numeric(start_matrix[i, ]),
+      degree.start = restart_degree,
+      elapsed = restart.elapsed,
+      status = if (is.null(solution_i)) {
+        if (isTRUE(state$interrupted)) "interrupt" else "error"
+      } else if (!is.null(solution_i$status)) {
+        as.character(solution_i$status)
+      } else {
+        "ok"
+      },
+      message = if (is.null(solution_i)) state$error else solution_i$message,
+      objective = if (!is.null(solution_i) && !is.null(solution_i$objective)) {
+        as.numeric(solution_i$objective[1L])
+      } else {
+        NA_real_
+      },
+      bbe = if (!is.null(solution_i) && !is.null(solution_i$bbe)) {
+        as.numeric(solution_i$bbe[1L])
+      } else {
+        NA_real_
+      },
+      iterations = if (!is.null(solution_i) && !is.null(solution_i$iterations)) {
+        as.numeric(solution_i$iterations[1L])
+      } else {
+        NA_real_
+      },
+      solution = if (!is.null(solution_i) && !is.null(solution_i$solution)) {
+        as.numeric(solution_i$solution)
+      } else {
+        NULL
+      }
+    )
+
+    if (isTRUE(state$interrupted))
+      break
+
+    post_restart_best <- if (is.null(state$best_record) || is.null(state$best_record$objective)) {
+      if (identical(direction, "min")) Inf else -Inf
+    } else {
+      state$best_record$objective
+    }
+    if (!is.null(solution_i) &&
+        .np_degree_better(post_restart_best, pre_restart_best, direction = direction)) {
+      best_solution <- solution_i
+    }
+  }
+  state$nomad.time <- nomad.elapsed
+  state$restart_results <- restart_results
+
+  if (!is.null(best_solution) &&
+      is.null(state$best_point) &&
+      length(best_solution$solution) == length(x0)) {
+    state$best_point <- as.numeric(best_solution$solution)
   }
 
   if (is.null(state$best_point))
@@ -1451,7 +1558,7 @@
   payload_result <- build_payload(
     point = state$best_point,
     best_record = state$best_record,
-    solution = solution,
+    solution = best_solution,
     interrupted = state$interrupted
   )
   if (is.list(payload_result) && !is.null(payload_result$payload)) {
@@ -1496,6 +1603,7 @@
     restart.degree.starts = state$restart_degree_starts,
     restart.bandwidth.starts = state$restart_bandwidth_starts,
     restart.start.info = state$restart_start_info,
+    restart.results = state$restart_results,
     trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name)
   )
 }
