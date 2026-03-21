@@ -94,4 +94,14 @@ test_that("npcdens nomad cv.ml retains the best objective found", {
   expect_true(is.finite(auto$bws$degree.search$best.fval))
   expect_true(auto$bws$degree.search$best.fval >= auto$bws$degree.search$baseline.fval - 1e-8)
   expect_equal(as.numeric(auto$bws$fval[1L]), as.numeric(auto$bws$degree.search$best.fval), tolerance = 1e-8)
+  expect_identical(auto$bws$degree.search$direction, "max")
+  expect_identical(
+    as.numeric(auto$bws$nomad.restart.fval),
+    as.numeric(vapply(auto$bws$nomad.restart.results, `[[`, numeric(1L), "objective"))
+  )
+  expect_equal(as.integer(auto$bws$nomad.best.restart), as.integer(which.max(auto$bws$nomad.restart.fval)))
+  expect_lte(
+    auto$bws$nomad.restart.fval[auto$bws$nomad.best.restart],
+    as.numeric(auto$bws$degree.search$best.fval) + 1e-6
+  )
 })
