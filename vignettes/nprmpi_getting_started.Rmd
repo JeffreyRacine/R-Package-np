@@ -1,0 +1,142 @@
+---
+title: "Getting Started with npRmpi"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with npRmpi}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+This vignette is intentionally conservative. The goal is to provide a
+package-side overview of the modern `npRmpi` workflow without making routine
+vignette builds depend on live MPI startup.
+
+The full install matrix, platform-specific notes, and longer mode comparisons
+belong on the gallery site rather than in a shipped package vignette:
+
+- <https://jeffreyracine.github.io/gallery/mpi_large_data.html>
+- <https://jeffreyracine.github.io/gallery/quickstarts.html>
+
+The main practical point is simple: on platforms where spawning is supported,
+the recommended interactive route is now `session` mode (the `spawn` code
+path), where the estimator calls look like ordinary `np` code once MPI has been
+initialized.
+
+## Which mode should I use?
+
+- Use `session` / `spawn` for ordinary interactive work on platforms where
+  spawning is supported.
+- Use `attach` when the MPI world is already launched with `mpiexec`.
+- Use `profile` / manual-broadcast mode when startup and broadcast logic need to
+  be explicit, especially on larger or heterogeneous clusters.
+
+For teaching and troubleshooting, it is usually better to be explicit than to
+rely on `mode = "auto"`.
+
+## Recommended starting point: session mode
+
+```{r}
+library(npRmpi)
+
+npRmpi.init(nslaves = 1)
+on.exit(npRmpi.quit(), add = TRUE)
+
+options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
+
+set.seed(1)
+x <- runif(200)
+y <- sin(2 * pi * x) + rnorm(200, sd = 0.2)
+
+bw <- npregbw(y ~ x, regtype = "ll", bwmethod = "cv.ls")
+fit <- npreg(bws = bw)
+summary(fit)
+```
+
+The same joint polynomial-order and bandwidth selection route is also available
+here for local-polynomial-capable methods via
+`search.engine = "nomad+powell"`, but this package-side vignette stays
+operational rather than methodological.
+
+On current package sources, `spawn` is not the Windows entry path. There the
+practical starting point is `attach` mode under `mpiexec`.
+
+## Attach mode
+
+Use attach mode when the MPI world is already launched via `mpiexec`.
+
+```{r}
+library(npRmpi)
+npRmpi.init(mode = "attach", autodispatch = TRUE, np.messages = FALSE)
+
+if (mpi.comm.rank(0L) == 0L) {
+  set.seed(1)
+  x <- runif(200)
+  y <- sin(2 * pi * x) + rnorm(200, sd = 0.2)
+
+  bw <- npregbw(y ~ x, regtype = "ll", bwmethod = "cv.ls")
+  fit <- npreg(bws = bw)
+  summary(fit)
+
+  npRmpi.quit(mode = "attach")
+}
+```
+
+For attach mode, keep `R_PROFILE_USER` and `R_PROFILE` cleared at launch time.
+Profile startup belongs to a different mode.
+
+## Profile / manual-broadcast mode
+
+Use profile mode when explicit startup and broadcast control are needed,
+especially on larger or heterogeneous clusters.
+
+```{r}
+mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)
+mpi.bcast.cmd(options(np.messages = FALSE), caller.execute = TRUE)
+
+set.seed(1)
+x <- runif(200)
+y <- sin(2 * pi * x) + rnorm(200, sd = 0.2)
+dat <- data.frame(y, x)
+
+mpi.bcast.Robj2slave(dat)
+mpi.bcast.cmd(
+  bw <- npregbw(y ~ x, regtype = "ll", bwmethod = "cv.ls", data = dat),
+  caller.execute = TRUE
+)
+mpi.bcast.cmd(
+  fit <- npreg(bws = bw, data = dat),
+  caller.execute = TRUE
+)
+
+summary(fit)
+mpi.bcast.cmd(mpi.quit(), caller.execute = TRUE)
+```
+
+For profile mode, use exactly one startup profile source via `R_PROFILE_USER`,
+clear `R_PROFILE`, and avoid `--vanilla`.
+
+## Practical guidance
+
+- Start with `session` / `spawn` mode first on macOS and Linux.
+- Start with `attach` mode first on Windows.
+- Treat `attach` and `profile` as standard advanced workflows.
+- Keep the attach and profile launch contracts distinct rather than mixing them.
+- Keep the package-side vignette light; use longer website documentation for
+  platform-specific install notes and cluster recipes.
+
+## Where to go next
+
+- `?npRmpi.init` and package README for current install notes
+- demo scripts for `attach` and `profile` workflows
+- <https://jeffreyracine.github.io/gallery/mpi_large_data.html> for the longer
+  install/run guide
+- <https://jeffreyracine.github.io/gallery/np_npRmpi.html> for the serial-to-MPI
+  transition story
