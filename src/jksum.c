@@ -5241,6 +5241,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   } else {
     matrix_bandwidth = alloc_tmatd(mstep, num_reg_continuous);  
     lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
+    if(any_convolution && (BANDWIDTH_reg == BW_FIXED))
+      matrix_alt_bandwidth = matrix_bandwidth;
   } 
 
 

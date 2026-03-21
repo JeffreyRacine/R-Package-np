@@ -116,6 +116,28 @@ test_that("public npcdensbw cv.ls lc matches the production fixed-point objectiv
   expect_equal(bw.lc$fval, -shadow$prod, tolerance = 1e-10)
 })
 
+test_that("provided fixed lc cv.ls eval_only remains finite", {
+  set.seed(42)
+  x <- data.frame(x = runif(80L))
+  y <- data.frame(y = rbeta(80L, 1, 1))
+
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lc",
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    bws = c(0.4, 0.4),
+    bandwidth.compute = FALSE
+  )
+
+  out <- np:::.npcdensbw_eval_only(x, y, bw)
+
+  expect_true(is.list(out))
+  expect_true(is.finite(out$objective))
+  expect_equal(out$num.feval, 1)
+})
+
 test_that("public npcdensbw cv.ls fixed LP/LL route activates with ll == lp parity", {
   set.seed(141)
   n <- 36L
