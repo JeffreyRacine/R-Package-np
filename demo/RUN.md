@@ -2,10 +2,15 @@
 
 This directory is the canonical demo harness for `npRmpi` timing/behavior checks.
 
+It is intentionally focused on the `attach` and `profile` / manual-broadcast
+routes. Session mode (the `spawn` code path reached with
+`npRmpi.init(nslaves=...)`) is documented in `?npRmpi.init` and in the shipped
+getting-started vignette rather than in this demo matrix.
+
 ## What This Runs
 
 - `serial` mode: `np` scripts (`*_serial.R`) via `R CMD BATCH --no-save`
-- `attach` mode: `npRmpi` attach scripts (`*_npRmpi_attach.R`) via `mpiexec ... Rscript --no-save`
+- `attach` mode: `npRmpi` attach scripts (`*_npRmpi_attach.R`) via `mpiexec ... Rscript --no-save`; startup entry point is `npRmpi.init(mode="attach")`
 - `profile` mode: `npRmpi` manual-broadcast scripts (`*_npRmpi_profile.R`) via `mpiexec ... R CMD BATCH --no-save`
 
 `runall` executes in this order:
@@ -32,6 +37,7 @@ The `makefile` is the source of truth for launch semantics:
 - `profile`: timeout + explicit `R_PROFILE_USER` + cleared `R_PROFILE` + optional `FI_*` env overrides + `NP_RMPI_PROFILE_RECV_TIMEOUT_SEC`
 - all mode loops (`serial`, `attach`, `profile`) are fail-fast per demo; any failed demo exits non-zero immediately (no masked failures).
 - attach demo scripts execute estimator bodies on master rank only (`mpi.comm.rank(0L) == 0L`) and finalize with `npRmpi.quit(mode="attach", ...)`.
+- profile demo scripts do not call `npRmpi.init()`; startup comes from `inst/Rprofile`, then scripts use `np.mpi.initialize()` plus explicit `mpi.bcast.*` calls.
 
 Profile startup contract (required):
 - provide exactly one profile source per profile run:

@@ -28,13 +28,14 @@ belong on the gallery site rather than in a shipped package vignette:
 The main practical point is simple: on platforms where spawning is supported,
 the recommended interactive route is now `session` mode (the `spawn` code
 path), where the estimator calls look like ordinary `np` code once MPI has been
-initialized.
+initialized with `npRmpi.init(nslaves = ...)`.
 
 ## Which mode should I use?
 
 - Use `session` / `spawn` for ordinary interactive work on platforms where
   spawning is supported.
-- Use `attach` when the MPI world is already launched with `mpiexec`.
+- Use `attach` when the MPI world is already launched with `mpiexec` and you
+  still want `npRmpi.init(mode = "attach")` to manage the worker loop.
 - Use `profile` / manual-broadcast mode when startup and broadcast logic need to
   be explicit, especially on larger or heterogeneous clusters.
 
@@ -70,7 +71,8 @@ practical starting point is `attach` mode under `mpiexec`.
 
 ## Attach mode
 
-Use attach mode when the MPI world is already launched via `mpiexec`.
+Use attach mode when the MPI world is already launched via `mpiexec` and you
+want `npRmpi.init(mode = "attach")` to be the startup entry point.
 
 ```{r}
 library(npRmpi)
@@ -90,12 +92,16 @@ if (mpi.comm.rank(0L) == 0L) {
 ```
 
 For attach mode, keep `R_PROFILE_USER` and `R_PROFILE` cleared at launch time.
-Profile startup belongs to a different mode.
+Profile startup belongs to a different mode and should not be mixed into
+attach launches.
 
 ## Profile / manual-broadcast mode
 
 Use profile mode when explicit startup and broadcast control are needed,
-especially on larger or heterogeneous clusters.
+especially on larger or heterogeneous clusters. In this route,
+`npRmpi.init()` is not the startup entry point; instead, ranks are launched
+with `inst/Rprofile` (or `R_PROFILE_USER`) and then initialized explicitly
+inside the script.
 
 ```{r}
 mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)
@@ -120,14 +126,18 @@ summary(fit)
 mpi.bcast.cmd(mpi.quit(), caller.execute = TRUE)
 ```
 
-For profile mode, use exactly one startup profile source via `R_PROFILE_USER`,
-clear `R_PROFILE`, and avoid `--vanilla`.
+For profile mode, use exactly one startup profile source via `R_PROFILE_USER`
+or a local `.Rprofile`, clear `R_PROFILE`, and avoid `--vanilla`.
 
 ## Practical guidance
 
 - Start with `session` / `spawn` mode first on macOS and Linux.
 - Start with `attach` mode first on Windows.
 - Treat `attach` and `profile` as standard advanced workflows.
+- Use `attach` when you want `npRmpi.init(mode = "attach")` to manage the
+  worker loop for an already-launched MPI world.
+- Use `profile` when you want startup and broadcasts to be explicit and
+  script-controlled.
 - Keep the attach and profile launch contracts distinct rather than mixing them.
 - Keep the package-side vignette light; use longer website documentation for
   platform-specific install notes and cluster recipes.

@@ -3,11 +3,13 @@
 \alias{npRmpi.init}
 \alias{npRmpi.quit}
 \alias{npRmpi.session.info}
-\title{Init/Quit Helpers for Interactive npRmpi Sessions}
+\title{Init/Quit Helpers for Session and Attach npRmpi Workflows}
 \description{
-Convenience helpers for interactive use of \pkg{npRmpi}. These functions
-provide a recommended, robust workflow: initialize a slave pool once and
-reuse it across multiple examples within the same R session.
+Convenience helpers for the two ordinary \pkg{npRmpi} startup routes:
+session mode (the \code{"spawn"} code path) and attach mode
+(\code{mode="attach"}). These helpers are the recommended entry points
+for routine interactive use and for \code{mpiexec}-launched scripts that
+attach to an already-running MPI world.
 }
 \usage{
 npRmpi.init(..., nslaves = 1, comm = 1,
@@ -26,10 +28,12 @@ npRmpi.session.info(comm = 1)
 \arguments{
   \item{nslaves}{Number of slaves to spawn for interactive execution (\code{mode="spawn"}); must be at least \code{1}. For serial workflows, use package \pkg{np}.}
   \item{comm}{Communicator used for the master+slaves pool (defaults to \code{1}).}
-  \item{mode}{Startup/stop mode. \code{"spawn"} starts slaves from rank 0.
-    \code{"attach"} attaches to an already-launched MPI world (e.g. started
-    with \code{mpiexec -n ...}) without spawning. \code{"auto"} selects
-    \code{"attach"} when \code{mpi.comm.size(0) > 1}, otherwise \code{"spawn"}.}
+  \item{mode}{Startup/stop mode. \code{"spawn"} starts slaves from rank 0
+    and is the session-mode code path. \code{"attach"} attaches to an
+    already-launched MPI world (for example started with
+    \code{mpiexec -n ...}) without spawning. \code{"auto"} selects
+    \code{"attach"} when \code{mpi.comm.size(0) > 1}, otherwise
+    \code{"spawn"}.}
   \item{autodispatch}{Logical; if non-\code{NULL}, sets
     \code{options(npRmpi.autodispatch=...)} inside \code{npRmpi.init()}.}
   \item{autodispatch.verify.options}{Logical; when \code{TRUE}, verify selected
@@ -51,37 +55,49 @@ npRmpi.session.info(comm = 1)
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
-\code{npRmpi.init()} now supports two robust execution models:
+\code{npRmpi.init()} and \code{npRmpi.quit()} are the ordinary entry
+points for two workflows:
 \enumerate{
-  \item Interactive/spawn mode (\code{mode="spawn"}, \code{nslaves>=1}): spawns slaves and
-  initializes all ranks.
+  \item Session mode (\code{mode="spawn"}, \code{nslaves>=1}): a single R
+  process spawns workers and then uses ordinary \pkg{npRmpi} calls.
   \item Batch/attach mode (\code{mode="attach"}): attaches to a pre-launched
-  MPI world and runs worker-loop coordination internally (no external
-  bootstrap profile file required).
+  MPI world and runs worker-loop coordination internally.
 }
 
-Mode quick-start guidance:
+\strong{Profile/manual-broadcast mode is a separate advanced route.} It
+does not call \code{npRmpi.init()}. Instead, ranks are started under
+\code{mpiexec} with \code{inst/Rprofile} (or an explicit
+\code{R_PROFILE_USER} path), and the script then uses
+\code{mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)} plus
+explicit \code{mpi.bcast.*} calls. See \code{\link{np.mpi.initialize}},
+\code{inst/Rprofile}, and the demo run guide for that route.
+
+Workflow quick-start guidance:
 \enumerate{
-  \item \strong{Session mode (\code{mode="spawn"})}: single R process
-  spawns workers. Typical launch: \code{Rscript foo.R} or
-  \code{R CMD BATCH --no-save foo.R}. Call \code{npRmpi.init(nslaves=...)}
-  in the script.
+  \item \strong{Session mode (\code{mode="spawn"})}: recommended first on
+  platforms where spawning is supported. Typical launch:
+  \code{Rscript foo.R} or \code{R CMD BATCH --no-save foo.R}, then call
+  \code{npRmpi.init(nslaves=...)} inside the script.
   \item \strong{Attach mode (\code{mode="attach"})}: launch under
   \code{mpiexec} and call \code{npRmpi.init(mode="attach")} inside the
-  script. Typical launch: \code{mpiexec -n <ranks> Rscript --no-save foo.R}
-  (or \code{R CMD BATCH --no-save}).
+  script. Typical launch:
+  \code{mpiexec -env R_PROFILE_USER '' -env R_PROFILE '' -n <ranks> Rscript --no-save foo.R}
+  (or \code{R CMD BATCH --no-save}). Clearing startup-profile variables is
+  intentional here because profile/manual-broadcast startup belongs to a
+  different route.
   \item \strong{Profile/manual-broadcast mode}: launch under
   \code{mpiexec} with \code{inst/Rprofile} and explicit
-  \code{mpi.bcast.*} calls. Use
-  \code{R CMD BATCH --no-save} (not \code{--vanilla}).
+  \code{mpi.bcast.*} calls. Use \code{R CMD BATCH --no-save} (not
+  \code{--vanilla}) and provide exactly one startup profile source.
 }
 
 \strong{Performance note.} Wall-clock can differ across workflows even for
 identical statistical output. The main drivers are MPI message passing and
 startup/teardown behavior:
 \enumerate{
-  \item \code{mpiexec + attach + manual mpi.bcast.*} often has the lowest
-  messaging overhead for small/moderate jobs.
+  \item Profile/manual-broadcast mode often has the lowest messaging
+  overhead for small/moderate jobs because startup and broadcasts are
+  explicit.
   \item Using \code{R CMD BATCH --no-save} with
   \code{npRmpi.init(mode="spawn")} is simpler to use but
   may pay additional broadcast/setup overhead, especially when many slaves are
@@ -97,7 +113,7 @@ startup/teardown behavior:
   pattern.
 }
 
-Template startup profile for manual-broadcast attach workflows is provided at
+Template startup profile for profile/manual-broadcast workflows is provided at
 \code{inst/Rprofile}. Copy it to the job working directory (or set
 \code{R_PROFILE_USER} to that file) when using
 \code{mpiexec -n ... R CMD BATCH --no-save ...}
@@ -135,10 +151,10 @@ if (is.master) {
   mpi.quit()  # explicit master finalize for clean mpiexec exit
 }
 
-## CASE 3: performance-oriented attach mode with manual broadcast (.Rprofile)
-## run: mpiexec -env R_PROFILE_USER ../.Rprofile -env R_PROFILE '' \
+## CASE 3: performance-oriented profile/manual-broadcast mode
+## run: mpiexec -env R_PROFILE_USER ../inst/Rprofile -env R_PROFILE '' \
 ##              -n 6 R CMD BATCH --no-save script_attach_manual.R
-## requires: .Rprofile from inst/Rprofile in working dir (or R_PROFILE_USER set)
+## requires: inst/Rprofile (or R_PROFILE_USER set to that file)
 ## do not use: R CMD BATCH --vanilla (skips .Rprofile)
 mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)
 mpi.bcast.cmd(library(MASS), caller.execute=TRUE)
@@ -160,7 +176,9 @@ systems), \code{force=FALSE} performs a soft-close to keep daemons alive
 for reuse within the session; use \code{force=TRUE} to actually shut down
 the slaves. In \code{mode="attach"}, \code{npRmpi.quit()} signals worker
 ranks to exit their loop and returns on rank 0 without forcing an R quit
-on the master process.
+on the master process. In profile/manual-broadcast mode, termination is
+handled explicitly in the script via broadcasted \code{mpi.quit()} calls
+rather than via \code{npRmpi.quit()}.
 
 Advanced diagnostic option: setting environment variable
 \code{NP_RMPI_SKIP_INIT} to a non-empty value before loading \pkg{npRmpi}
@@ -197,6 +215,11 @@ npRmpi.quit()
 ## ... np* calls ...
 ## npRmpi.quit(mode="attach")
 ## mpi.quit()
+##
+## Profile/manual-broadcast mode is separate:
+## start ranks with inst/Rprofile, then use
+## mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)
+## and explicit mpi.bcast.* calls.
 }
 }
 \keyword{nonparametric}
