@@ -17454,9 +17454,16 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(), MAX(1, num_obs));
+  const int nblocks = (num_obs + block_size - 1)/block_size;
   double **xblock = NULL, **xblock_full = NULL, **yblock = NULL, **yconvblock = NULL;
+  double *block_terms = NULL;
   int i0, j0, ii, jj;
   int status = 1;
+#ifdef MPI2
+  const int use_parallel_blocks = (iNum_Processors > 1);
+#else
+  const int use_parallel_blocks = 0;
+#endif
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
@@ -17474,19 +17481,29 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   xblock_full = alloc_matd(num_obs, block_size);
   yblock = alloc_matd(num_obs, block_size);
   yconvblock = alloc_matd(num_obs, block_size);
-  if((xblock == NULL) || (xblock_full == NULL) || (yblock == NULL) || (yconvblock == NULL))
+  if(use_parallel_blocks){
+    block_terms = (double *)calloc((size_t)nblocks, sizeof(double));
+  }
+  if((xblock == NULL) || (xblock_full == NULL) || (yblock == NULL) || (yconvblock == NULL) ||
+     (use_parallel_blocks && (block_terms == NULL)))
     goto cleanup_cvls_lp_block;
 
   *cv = 0.0;
   for(i0 = 0; i0 < num_obs; i0 += block_size){
     const int ib = MIN(block_size, num_obs - i0);
+    const int block_id = i0 / block_size;
     double lin = 0.0;
     double quad = 0.0;
 
+    if(use_parallel_blocks && ((block_id % iNum_Processors) != my_rank))
+      continue;
+
     if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
       goto cleanup_cvls_lp_block;
+
     if(np_conditional_x_weight_block_full_stream_core(vector_scale_factor, i0, ib, xblock_full) != 0)
       goto cleanup_cvls_lp_block;
+
     if(np_conditional_y_block_stream_op_core(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0)
       goto cleanup_cvls_lp_block;
 
@@ -17512,8 +17529,21 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
       }
     }
 
-    *cv += quad - 2.0*lin;
+    if(use_parallel_blocks){
+      block_terms[block_id] = quad - 2.0*lin;
+    } else {
+      *cv += quad - 2.0*lin;
+    }
   }
+
+#ifdef MPI2
+  if(use_parallel_blocks){
+    MPI_Allreduce(MPI_IN_PLACE, block_terms, nblocks, MPI_DOUBLE, MPI_SUM, comm[1]);
+    *cv = 0.0;
+    for(ii = 0; ii < nblocks; ii++)
+      *cv += block_terms[ii];
+  }
+#endif
 
   *cv /= (double)num_obs;
   status = 0;
@@ -17523,6 +17553,7 @@ cleanup_cvls_lp_block:
   if(xblock_full != NULL) free_mat(xblock_full, block_size);
   if(yblock != NULL) free_mat(yblock, block_size);
   if(yconvblock != NULL) free_mat(yconvblock, block_size);
+  if(block_terms != NULL) free(block_terms);
   np_glp_cv_clear_extern();
   return status;
 }
