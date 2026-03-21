@@ -25,7 +25,7 @@
 		packageStartupMessage(
       sprintf(
         'npRmpi %s: vignette("nprmpi_getting_started", package = "npRmpi")',
-        utils::packageVersion(pkg)
+        utils::packageDescription(pkg, fields = "Version")
       ),
       domain = NULL,
       appendLF = TRUE
