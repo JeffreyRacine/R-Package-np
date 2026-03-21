@@ -1396,6 +1396,53 @@ genTimingStr <- function(x){
 
   paste("\nEstimation Time: ",format(x$total.time)," seconds",sep = "")
 }
+
+.np_attach_nomad_restart_summary <- function(bws, search_result, tol = 1e-10) {
+  restart.results <- search_result$restart.results
+  restart.fval <- if (!is.null(restart.results) && length(restart.results)) {
+    vapply(
+      restart.results,
+      function(x) {
+        if (is.null(x$objective) || !length(x$objective)) NA_real_ else as.numeric(x$objective[1L])
+      },
+      numeric(1L)
+    )
+  } else {
+    numeric(0L)
+  }
+
+  best.objective <- if (!is.null(search_result$best$objective) && length(search_result$best$objective)) {
+    as.numeric(search_result$best$objective[1L])
+  } else {
+    NA_real_
+  }
+
+  best.restart <- NA_integer_
+  if (!is.null(search_result$best.restart) &&
+      length(search_result$best.restart) &&
+      is.finite(search_result$best.restart[1L])) {
+    best.restart <- as.integer(search_result$best.restart[1L])
+  } else if (length(restart.fval) && is.finite(best.objective)) {
+    diffs <- abs(restart.fval - best.objective)
+    diffs[!is.finite(diffs)] <- Inf
+    if (any(is.finite(diffs))) {
+      idx <- which.min(diffs)
+      scale <- max(1, abs(best.objective))
+      if (is.finite(diffs[idx]) && diffs[idx] <= tol * scale)
+        best.restart <- as.integer(idx)
+    }
+  } else if (length(restart.fval) && any(is.finite(restart.fval))) {
+    best.restart <- as.integer(which.min(restart.fval))
+  }
+
+  bws$nomad.restart.results <- restart.results
+  bws$nomad.restart.fval <- restart.fval
+  bws$nomad.best.restart <- best.restart
+  bws$nomad.restart.starts <- search_result$restart.starts
+  bws$nomad.restart.degree.starts <- search_result$restart.degree.starts
+  bws$nomad.restart.bandwidth.starts <- search_result$restart.bandwidth.starts
+  bws
+}
   
 pCatGofStr <- function(x){
   if(!identical(x$confusion.matrix, NA)){
