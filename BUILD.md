@@ -11,6 +11,16 @@ export CC=mpicc
 export CXX=mpicxx
 ```
 
+## One-Command Preflight
+
+```bash
+cd /Users/jracine/Development
+./release_preflight.sh npRmpi
+```
+
+This builds `npRmpi`, runs the shared package/gallery sync audit, and then runs
+the final tarball-first `R CMD check --as-cran`.
+
 ## Build Tarball
 
 ```bash
@@ -52,11 +62,18 @@ signoff:
 
 ```bash
 cd /Users/jracine/Development
-./package_gallery_sync_audit.sh
+./release_preflight.sh npRmpi
 ```
 
 For `npRmpi`, this audit also checks that the source tarball keeps
 `build/vignette.rds`.
+
+If gallery routing pages also changed, use:
+
+```bash
+cd /Users/jracine/Development
+./release_preflight.sh --render-gallery npRmpi
+```
 
 ### MPI Example Modes During Check
 
