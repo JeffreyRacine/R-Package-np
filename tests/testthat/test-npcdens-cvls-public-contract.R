@@ -61,6 +61,33 @@ test_that("public npcdensbw cv.ls lc matches the production fixed-point objectiv
   )
 })
 
+test_that("provided fixed lc cv.ls eval_only remains finite", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old_opts <- options(npRmpi.autodispatch = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(42)
+  x <- data.frame(x = runif(80L))
+  y <- data.frame(y = rbeta(80L, 1, 1))
+
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lc",
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    bws = c(0.4, 0.4),
+    bandwidth.compute = FALSE
+  )
+
+  out <- npRmpi:::.npcdensbw_eval_only(x, y, bw)
+
+  expect_true(is.list(out))
+  expect_true(is.finite(out$objective))
+  expect_equal(out$num.feval, 1)
+})
+
 test_that("public npcdensbw cv.ls fixed LP/LL route activates with ll == lp parity", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)

@@ -5208,8 +5208,11 @@ const NP_GateOverrideCtx * const gate_override_ctx){
 
 
   if(bandwidth_provided){
-    if(BANDWIDTH_reg == BW_GEN_NN)
+    if(BANDWIDTH_reg == BW_GEN_NN){
       matrix_bandwidth = matrix_bw_eval;
+      if(any_convolution)
+        matrix_alt_bandwidth = matrix_bw_train;
+    }
     else if (is_adaptive){
       if (any_convolution){
         matrix_alt_bandwidth = matrix_bw_eval;
@@ -5224,6 +5227,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   } else {
     matrix_bandwidth = alloc_tmatd(mstep, num_reg_continuous);  
     lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
+    if(any_convolution && (BANDWIDTH_reg == BW_FIXED))
+      matrix_alt_bandwidth = matrix_bandwidth;
   } 
 
 
@@ -11713,7 +11718,6 @@ double *cv){
                         vsfxy,
                         NULL, NULL, NULL,
                         NULL, NULL, NULL);
-  
 
   x_operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
 
