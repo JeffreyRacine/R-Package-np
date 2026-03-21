@@ -737,7 +737,6 @@ npregbw.rbandwidth <-
     direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
-      .np_nomad_powell_note(degree)
       hot.reg.args <- reg.args
       hot.reg.args$regtype <- "lp"
       hot.reg.args$degree <- degree
@@ -745,11 +744,7 @@ npregbw.rbandwidth <-
       hot.opt.args <- opt.args
       hot.opt.args$nmulti <- 0L
       powell.start <- proc.time()[3L]
-      hot.payload <- local({
-        .np_progress_bandwidth_set_context(
-          sprintf("Powell hot start deg %s", .np_degree_format_degree(degree))
-        )
-        on.exit(.np_progress_bandwidth_set_context(NULL), add = TRUE)
+      hot.payload <- .np_nomad_with_powell_progress(degree, local({
         .npregbw_run_fixed_degree(
           xdat = xdat,
           ydat = ydat,
@@ -758,7 +753,7 @@ npregbw.rbandwidth <-
           opt.args = hot.opt.args,
           yname = yname
         )
-      })
+      }))
       powell.elapsed <- proc.time()[3L] - powell.start
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&

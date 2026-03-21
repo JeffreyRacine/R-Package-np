@@ -1183,7 +1183,7 @@
                                             best_record,
                                             objective_name = "objective") {
   paste(
-    sprintf("start %s", .np_degree_format_degree(baseline_degree)),
+    sprintf("starting at degree %s", .np_degree_format_degree(baseline_degree)),
     sprintf(
       "multistart %s/%s",
       format(max(1L, as.integer(restart_index)[1L])),
@@ -1203,17 +1203,24 @@
 }
 
 .np_nomad_baseline_note <- function(degree) {
-  .np_progress_note(sprintf(
-    "Starting NOMAD automatic polynomial degree search at degree %s",
-    .np_degree_format_degree(degree)
-  ))
+  invisible(NULL)
 }
 
 .np_nomad_powell_note <- function(degree) {
-  .np_progress_note(sprintf(
+  invisible(NULL)
+}
+
+.np_nomad_powell_context_label <- function(degree) {
+  sprintf(
     "Refining NOMAD solution with one Powell hot start at degree %s",
     .np_degree_format_degree(degree)
-  ))
+  )
+}
+
+.np_nomad_with_powell_progress <- function(degree, expr) {
+  .np_progress_bandwidth_set_context(.np_nomad_powell_context_label(degree))
+  on.exit(.np_progress_bandwidth_set_context(NULL), add = TRUE)
+  force(expr)
 }
 
 .np_nomad_search <- function(engine = c("nomad", "nomad+powell"),
