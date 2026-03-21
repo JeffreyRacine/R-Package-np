@@ -153,12 +153,25 @@ npcopula <- function(bws,
     for (k in seq_len(ncol(x.u))) {
       if(is.ordered(data[,k])) x.u[,k] <- ordered(x.u[,k],levels=levels(data[,k]))
     }
+    unit.weights <- rep_len(1, nrow(data))
     if(!density) {
       .np_progress_note("Computing the copula for the expanded grid")
-      copula <- predict(npudist(bws=bws),data=data,newdata=x.u)
+      copula <- npudisthat(
+        bws = bws,
+        tdat = data,
+        edat = x.u,
+        y = unit.weights,
+        output = "apply"
+      )
     } else {
       .np_progress_note("Computing the copula density for the expanded grid")
-      copula <- predict(npudens(bws=bws),data=data,newdata=x.u)
+      copula <- npudenshat(
+        bws = bws,
+        tdat = data,
+        edat = x.u,
+        y = unit.weights,
+        output = "apply"
+      )
       ## For the copula density require marginal densities. Desirable to
       ## have the same bws in numerator and denominator, so use those
       ## from the joint (mirror regression, conditional density
@@ -182,7 +195,13 @@ npcopula <- function(bws,
         xeval <- data.frame(x.u[,j])
         names(xeval) <- bws$xnames[j]
         ## Divide copula density by its marginals
-        copula <- copula/NZD(predict(npudens(bws=bws.f.marginal,data=data),newdata=xeval))
+        copula <- copula/NZD(npudenshat(
+          bws = bws.f.marginal,
+          tdat = data[, bws$xnames[j], drop = FALSE],
+          edat = xeval,
+          y = unit.weights,
+          output = "apply"
+        ))
       }
     }
   }
