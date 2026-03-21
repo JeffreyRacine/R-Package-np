@@ -5,15 +5,17 @@
 ```bash
 cd /Users/jracine/Development
 R CMD build np-master
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-master/DESCRIPTION)
 ```
 
-This produces `np_0.70-0.tar.gz` in `/Users/jracine/Development`.
+This produces `np_${VERSION}.tar.gz` in `/Users/jracine/Development`.
 
 ## Install
 
 ```bash
 cd /Users/jracine/Development
-R CMD INSTALL np_0.70-0.tar.gz
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-master/DESCRIPTION)
+R CMD INSTALL "np_${VERSION}.tar.gz"
 ```
 
 ## Quick Load Check
@@ -26,7 +28,27 @@ R -q -e 'library(np); sessionInfo()'
 
 ```bash
 cd /Users/jracine/Development
-R CMD check --as-cran np_0.70-0.tar.gz
+./package_gallery_sync_audit.sh
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-master/DESCRIPTION)
+R CMD check --as-cran "np_${VERSION}.tar.gz"
+```
+
+## Release-Surface Audit
+
+When vignette names, startup routing, package help routing, or gallery package
+links change, run the shared audit before signoff:
+
+```bash
+cd /Users/jracine/Development
+./package_gallery_sync_audit.sh
+```
+
+Then run the package check:
+
+```bash
+cd /Users/jracine/Development
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-master/DESCRIPTION)
+R CMD check --as-cran "np_${VERSION}.tar.gz"
 ```
 
 ## Canonical Implementation Directive (2026-03-05)
