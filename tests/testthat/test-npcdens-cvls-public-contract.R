@@ -61,6 +61,23 @@ test_that("public npcdensbw cv.ls lc matches the production fixed-point objectiv
   )
 })
 
+test_that("public npcdensbw cv.ls lc frozen benchmark stays on the serial-aligned route", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  set.seed(42)
+  n <- 250L
+  rho <- 0.25
+  mu <- c(0, 0)
+  Sigma <- matrix(c(1, rho, rho, 1), 2, 2)
+  data <- MASS::mvrnorm(n = n, mu = mu, Sigma = Sigma)
+  mydat <- data.frame(x = data[, 2], y = data[, 1])
+
+  bw.lc <- npcdensbw(y ~ x, data = mydat, bwmethod = "cv.ls")
+
+  expect_equal(bw.lc$fval, 0.294769693962935, tolerance = 1e-12)
+})
+
 test_that("provided fixed lc cv.ls eval_only remains finite", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
