@@ -16,15 +16,17 @@ export CXX=mpicxx
 ```bash
 cd /Users/jracine/Development
 R CMD build np-npRmpi
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-npRmpi/DESCRIPTION)
 ```
 
-This produces `npRmpi_0.70-1.tar.gz` in `/Users/jracine/Development`.
+This produces `npRmpi_${VERSION}.tar.gz` in `/Users/jracine/Development`.
 
 ## Install
 
 ```bash
 cd /Users/jracine/Development
-R CMD INSTALL npRmpi_0.70-1.tar.gz
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-npRmpi/DESCRIPTION)
+R CMD INSTALL "npRmpi_${VERSION}.tar.gz"
 ```
 
 ## Quick Load Check
@@ -37,8 +39,24 @@ R -q -e 'library(npRmpi); sessionInfo()'
 
 ```bash
 cd /Users/jracine/Development
-R CMD check --as-cran npRmpi_0.70-1.tar.gz
+./package_gallery_sync_audit.sh
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-npRmpi/DESCRIPTION)
+R CMD check --as-cran "npRmpi_${VERSION}.tar.gz"
 ```
+
+## Release-Surface Audit
+
+When vignette names, startup routing, package help routing, gallery package
+links, or source-tarball vignette packaging change, run the shared audit before
+signoff:
+
+```bash
+cd /Users/jracine/Development
+./package_gallery_sync_audit.sh
+```
+
+For `npRmpi`, this audit also checks that the source tarball keeps
+`build/vignette.rds`.
 
 ### MPI Example Modes During Check
 
@@ -57,7 +75,8 @@ cd /Users/jracine/Development
 R CMD build np-npRmpi
 
 cd /Users/jracine/Development
-NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1 R CMD check --as-cran npRmpi_0.70-1.tar.gz
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-npRmpi/DESCRIPTION)
+NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1 R CMD check --as-cran "npRmpi_${VERSION}.tar.gz"
 
 cd /Users/jracine/Development/np-npRmpi/man
 ./dontrun
@@ -66,10 +85,13 @@ cd /Users/jracine/Development/np-npRmpi/man
 ## Runtime Modes
 
 - Interactive R session:
-  - `npRmpi.init(mode="spawn", nslaves=...)`
+  - `npRmpi.init(nslaves=...)` for session mode (the `spawn` code path)
 - Cluster/batch under `mpiexec`:
   - start script with `npRmpi.init(mode="attach", autodispatch=TRUE, np.messages=FALSE)`
   - end script with `npRmpi.quit(mode="attach")`
+- Manual-broadcast/profile mode:
+  - start ranks with `inst/Rprofile` (or `R_PROFILE_USER`) and explicit `mpi.bcast.*` calls
+  - use `np.mpi.initialize()` rather than `npRmpi.init()` as the workflow initializer
 
 ## Canonical Implementation Directive (2026-03-05)
 
