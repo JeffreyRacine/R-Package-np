@@ -76,8 +76,8 @@ test_that("npcdensbw exhaustive degree search matches manual profile minimum", {
   expect_identical(auto$degree.search$mode, "exhaustive")
   expect_true(isTRUE(auto$degree.search$completed))
   expect_true(isTRUE(auto$degree.search$certified))
-  expect_lte(auto$fval, min(bw0$fval, bw1$fval) + 1e-10)
-  expect_lte(auto$degree.search$best.fval, auto$degree.search$baseline.fval + 1e-10)
+  expect_gte(auto$fval, max(bw0$fval, bw1$fval) - 1e-10)
+  expect_gte(auto$degree.search$best.fval, auto$degree.search$baseline.fval - 1e-10)
   expect_true(all(c("degree", "fval", "status", "cached") %in% names(auto$degree.search$trace)))
   expect_identical(nrow(auto$degree.search$trace), auto$degree.search$n.unique)
   expect_identical(auto$degree.search$n.cached, auto$degree.search$n.visits - auto$degree.search$n.unique)
@@ -246,7 +246,7 @@ test_that("npcdensbw NOMAD degree search backend improves over the baseline", {
   expect_identical(bw$degree.search$mode, "nomad")
   expect_true(isTRUE(bw$degree.search$completed))
   expect_gte(bw$degree.search$n.unique, 1L)
-  expect_lte(bw$degree.search$best.fval, bw$degree.search$baseline.fval + 1e-10)
+  expect_gte(bw$degree.search$best.fval, bw$degree.search$baseline.fval - 1e-10)
 })
 
 test_that("npcdensbw automatic degree search defaults to NOMAD plus Powell", {
@@ -354,7 +354,7 @@ test_that("npcdensbw nomad+powell payload does not inject phantom multistart tot
     print = FALSE
   )
   trace(
-    npRmpi:::.np_nomad_powell_note,
+    npRmpi:::.np_nomad_with_powell_progress,
     tracer = eval(substitute(
       quote({
         assign(
@@ -368,7 +368,7 @@ test_that("npcdensbw nomad+powell payload does not inject phantom multistart tot
     print = FALSE
   )
   on.exit(untrace(npRmpi:::.np_progress_bandwidth_set_total), add = TRUE)
-  on.exit(untrace(npRmpi:::.np_nomad_powell_note), add = TRUE)
+  on.exit(untrace(npRmpi:::.np_nomad_with_powell_progress), add = TRUE)
 
   bw <- npRmpi::npcdensbw(
     y ~ x,
