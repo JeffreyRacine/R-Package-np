@@ -1553,6 +1553,28 @@ genTimingStr <- function(x){
   bws$nomad.restart.bandwidth.starts <- search_result$restart.bandwidth.starts
   bws
 }
+
+.np_multistart_label <- function(x, tol = sqrt(.Machine$double.eps)) {
+  if (!is.null(x$nomad.best.restart) &&
+      length(x$nomad.best.restart) == 1L &&
+      is.finite(x$nomad.best.restart)) {
+    idx <- as.numeric(x$nomad.best.restart[1L])
+    if (abs(idx - round(idx)) <= tol && idx >= 1)
+      return(as.integer(round(idx)))
+  }
+
+  if (!is.null(x$ifval) &&
+      length(x$ifval) == 1L &&
+      is.finite(x$ifval)) {
+    idx <- as.numeric(x$ifval[1L])
+    if (abs(idx - round(idx)) <= tol) {
+      idx <- as.integer(round(idx))
+      return(if (idx <= 0L) 1L else idx)
+    }
+  }
+
+  NA_integer_
+}
   
 pCatGofStr <- function(x){
   if(!identical(x$confusion.matrix, NA)){
@@ -1679,11 +1701,10 @@ npBandwidthSummaryLabel <- function(bwtype, bwscaling = FALSE){
 genBwSelStr <- function(x){
   fval.str <- ""
   if (!identical(x$fval, NA)) {
-    missing.ifval <- is.null(x$ifval) || (length(x$ifval) == 1L && is.na(x$ifval))
-    fval.str <- if (missing.ifval) {
+    ms.label <- .np_multistart_label(x)
+    fval.str <- if (is.na(ms.label)) {
       paste("\nObjective Function Value: ", format(x$fval), sep = "")
     } else {
-      ms.label <- if (x$ifval <= 0) 1L else x$ifval
       paste("\nObjective Function Value: ", format(x$fval),
             " (achieved on multistart ", ms.label, ")", sep = "")
     }
