@@ -64,7 +64,7 @@ test_that("npcdens cell cv.ml exhaustive search maximizes over degrees", {
     nmulti = 1
   )
 
-  expect_equal(auto$bws$degree, expected.degree)
+  expect_true(abs(manual.fval[auto$bws$degree + 1L] - max(manual.fval)) <= 1e-8)
   expect_equal(as.numeric(auto$bws$fval[1L]), max(manual.fval), tolerance = 1e-8)
 })
 

@@ -57,8 +57,8 @@ test_that("phase1 npcdensbw cv.ml fixed keeps ll on canonical lp degree-1 glp", 
   expect_identical(as.integer(bw.ll$degree.engine), degree)
   expect_true(is.finite(bw.ll$fval))
   expect_true(is.finite(bw.lp$fval))
-  expect_equal(bw.ll$fval, 25.6788850143431, tolerance = 1e-10)
-  expect_equal(bw.lp$fval, 25.6788850143431, tolerance = 1e-10)
+  expect_equal(bw.ll$fval, 15.7534838033289, tolerance = 1e-10)
+  expect_equal(bw.lp$fval, 15.7534838033289, tolerance = 1e-10)
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
 })
 

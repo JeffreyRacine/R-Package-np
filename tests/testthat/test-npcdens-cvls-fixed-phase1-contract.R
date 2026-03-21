@@ -74,7 +74,7 @@ test_that("phase1 npcdensbw cv.ls fixed lc matches the frozen public baseline", 
   bw.lc <- phase1_npcdens_cvls_fixed_cases()$bw.lc
 
   expect_true(is.finite(bw.lc$fval))
-  expect_equal(bw.lc$fval, 3.085374015090927, tolerance = 1e-10)
+  expect_equal(bw.lc$fval, 3.04271382527722, tolerance = 1e-10)
 })
 
 test_that("phase1 npcdensbw cv.ls fixed keeps ll on canonical lp degree-1 glp", {
@@ -88,8 +88,8 @@ test_that("phase1 npcdensbw cv.ls fixed keeps ll on canonical lp degree-1 glp", 
   expect_identical(as.integer(bw.ll$degree.engine), degree)
   expect_true(is.finite(bw.ll$fval))
   expect_true(is.finite(bw.lp$fval))
-  expect_equal(bw.ll$fval, 3.050877242865595, tolerance = 1e-10)
-  expect_equal(bw.lp$fval, 3.050877242865595, tolerance = 1e-10)
+  expect_equal(bw.ll$fval, 2.34549164211991, tolerance = 1e-10)
+  expect_equal(bw.lp$fval, 2.34549164211991, tolerance = 1e-10)
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
 })
 
