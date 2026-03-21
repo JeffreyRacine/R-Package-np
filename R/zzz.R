@@ -2,7 +2,7 @@
 	packageStartupMessage(
     sprintf(
       'np %s: vignette("np_getting_started", package = "np"); vignette("np_entropy_tests", package = "np")',
-      utils::packageVersion(pkg)
+      utils::packageDescription(pkg, fields = "Version")
     ),
     domain = NULL,
     appendLF = TRUE
