@@ -1,5 +1,15 @@
 # Build (np)
 
+## One-Command Preflight
+
+```bash
+cd /Users/jracine/Development
+./release_preflight.sh np
+```
+
+This builds `np`, runs the shared package/gallery sync audit, and then runs the
+final tarball-first `R CMD check --as-cran`.
+
 ## Build Tarball
 
 ```bash
@@ -40,13 +50,21 @@ links change, run the shared audit before signoff:
 
 ```bash
 cd /Users/jracine/Development
-./package_gallery_sync_audit.sh
+./release_preflight.sh np
+```
+
+If gallery routing pages also changed, use:
+
+```bash
+cd /Users/jracine/Development
+./release_preflight.sh --render-gallery np
 ```
 
 Then run the package check:
 
 ```bash
 cd /Users/jracine/Development
+./package_gallery_sync_audit.sh
 VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-master/DESCRIPTION)
 R CMD check --as-cran "np_${VERSION}.tar.gz"
 ```
