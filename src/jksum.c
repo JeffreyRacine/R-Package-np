@@ -8406,7 +8406,10 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     TORD = mat_creat(num_reg_ordered, 1, UNDEFINED);
     matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
     XTKX = (double **)malloc((size_t)nrc2*sizeof(double *));
-    kwm = (double *)malloc((size_t)nrcc22*(size_t)num_obs_eval_alloc*sizeof(double));
+    {
+      const size_t kwm_len = (size_t)nrcc22*(size_t)num_obs_eval_alloc;
+      kwm = (double *)malloc(kwm_len*sizeof(double));
+    }
     sgn = (double *)malloc((size_t)nrc2*sizeof(double));
     evalv = (double *)malloc((size_t)nrc1*sizeof(double));
 
@@ -8420,8 +8423,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
       goto cleanup_lp_work;
     }
 
-    for(i = 0; i < nrcc22*num_obs_eval_alloc; i++)
-      kwm[i] = 0.0;
+      for(size_t ii = 0; ii < (size_t)nrcc22*(size_t)num_obs_eval_alloc; ii++)
+        kwm[ii] = 0.0;
 
     sgn[0] = 1.0;
     for(i = 1; i < nrc2; i++) sgn[i] = 1.0;
@@ -9273,9 +9276,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     for(l = 0; l < num_reg_ordered; l++)
       PXO[l] = matrix_X_ordered[l];
 
-    double * kwm = (double *)malloc(nrcc22*num_obs_eval_alloc*sizeof(double));
+    const size_t kwm_len = (size_t)nrcc22*(size_t)num_obs_eval_alloc;
+    double * kwm = (double *)malloc(kwm_len*sizeof(double));
 
-    for(int ii = 0; ii < nrcc22*num_obs; ii++)
+    for(size_t ii = 0; ii < kwm_len; ii++)
       kwm[ii] = 0.0;
 
     double * sgn = (double *)malloc((nrc2)*sizeof(double));
@@ -14344,9 +14348,10 @@ double *SIGN){
     for(l = 0; l < num_reg_ordered; l++)
       PXO[l] = matrix_X_ordered_train[l];
 
-    double * kwm = (double *)malloc(nrcc33*num_obs_eval_alloc*sizeof(double));
+    const size_t kwm_len = (size_t)nrcc33*(size_t)num_obs_eval_alloc;
+    double * kwm = (double *)malloc(kwm_len*sizeof(double));
 
-    for(int ii = 0; ii < nrcc33*num_obs_eval_alloc; ii++)
+    for(size_t ii = 0; ii < kwm_len; ii++)
       kwm[ii] = 0.0;
 
     // with local linear, we already have the gradients of the continuous components
@@ -14359,7 +14364,8 @@ double *SIGN){
     int do_ocg = do_grad && (p_nvar > 0);
 
     if(do_ocg){
-      permy = (double *)malloc(nrcc33*num_obs_eval_alloc*p_nvar*sizeof(double));
+      const size_t permy_len = kwm_len*(size_t)p_nvar;
+      permy = (double *)malloc(permy_len*sizeof(double));
       if(permy == NULL)
         error("\n** Error: memory allocation failed.");
     }
