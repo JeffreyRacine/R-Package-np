@@ -77,7 +77,8 @@ Workflow quick-start guidance:
   \item \strong{Session mode (\code{mode="spawn"})}: recommended first on
   platforms where spawning is supported. Typical launch:
   \code{Rscript foo.R} or \code{R CMD BATCH --no-save foo.R}, then call
-  \code{npRmpi.init(nslaves=...)} inside the script.
+  \code{npRmpi.init(nslaves=...)} near the top of the script and
+  \code{npRmpi.quit()} at the end.
   \item \strong{Attach mode (\code{mode="attach"})}: launch under
   \code{mpiexec} and call \code{npRmpi.init(mode="attach")} inside the
   script. Typical launch:
@@ -211,7 +212,7 @@ npRmpi.quit()
 ## Batch/cluster style (under mpiexec):
 ## mpiexec -n 128 Rscript foo.R
 ## inside foo.R:
-## npRmpi.init(mode="attach", autodispatch=TRUE, np.messages=FALSE)
+## npRmpi.init(mode="attach")
 ## ... np* calls ...
 ## npRmpi.quit(mode="attach")
 ## mpi.quit()

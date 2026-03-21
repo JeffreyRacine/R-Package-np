@@ -9,7 +9,7 @@ slaves for you.
 
 ```r
 library(npRmpi)
-npRmpi.init(nslaves = 1, mode = "spawn", autodispatch = TRUE, np.messages = FALSE)
+npRmpi.init(nslaves = 1)
 
 # ... run np* calls ...
 
@@ -28,7 +28,7 @@ Inside `foo.R`:
 
 ```r
 library(npRmpi)
-npRmpi.init(mode = "attach", autodispatch = TRUE, np.messages = FALSE)
+npRmpi.init(mode = "attach")
 
 # ... run np* calls ...
 

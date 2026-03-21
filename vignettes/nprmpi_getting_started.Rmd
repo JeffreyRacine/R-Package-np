@@ -48,9 +48,6 @@ rely on `mode = "auto"`.
 library(npRmpi)
 
 npRmpi.init(nslaves = 1)
-on.exit(npRmpi.quit(), add = TRUE)
-
-options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
 
 set.seed(1)
 x <- runif(200)
@@ -59,6 +56,8 @@ y <- sin(2 * pi * x) + rnorm(200, sd = 0.2)
 bw <- npregbw(y ~ x, regtype = "ll", bwmethod = "cv.ls")
 fit <- npreg(bws = bw)
 summary(fit)
+
+npRmpi.quit()
 ```
 
 The same joint polynomial-order and bandwidth selection route is also available
@@ -76,7 +75,7 @@ want `npRmpi.init(mode = "attach")` to be the startup entry point.
 
 ```{r}
 library(npRmpi)
-npRmpi.init(mode = "attach", autodispatch = TRUE, np.messages = FALSE)
+npRmpi.init(mode = "attach")
 
 if (mpi.comm.rank(0L) == 0L) {
   set.seed(1)
@@ -105,7 +104,6 @@ inside the script.
 
 ```{r}
 mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)
-mpi.bcast.cmd(options(np.messages = FALSE), caller.execute = TRUE)
 
 set.seed(1)
 x <- runif(200)

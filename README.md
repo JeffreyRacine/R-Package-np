@@ -38,7 +38,7 @@ Then build/install from the repo:
 
 ```bash
 R CMD build .
-R CMD INSTALL npRmpi_0.70-0.tar.gz
+R CMD INSTALL npRmpi_0.70-1.tar.gz
 ```
 
 See `BUILD.md` and `WORKTREES.md` in this repo for local build details.
@@ -49,8 +49,7 @@ Interactive session:
 
 ```r
 library(npRmpi)
-npRmpi.init(mode = "spawn", nslaves = 1)
-options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
+npRmpi.init(nslaves = 1)
 
 set.seed(1)
 x <- runif(200)
@@ -66,7 +65,7 @@ Batch/cluster (`mpiexec`) session:
 
 ```r
 library(npRmpi)
-npRmpi.init(mode = "attach", autodispatch = TRUE, np.messages = FALSE)
+npRmpi.init(mode = "attach")
 # ... np* calls ...
 npRmpi.quit(mode = "attach")
 ```
