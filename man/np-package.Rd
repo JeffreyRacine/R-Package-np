@@ -9,10 +9,9 @@
 	kernel methods that seamlessly handle a mix of continuous, unordered,
 	and ordered factor data types (unordered and ordered factors are often
 	referred to as \sQuote{nominal} and \sQuote{ordinal} categorical
-	variables respectively). A vignette containing many of the examples
-	found in the help files accompanying the \pkg{npRmpi} package that is
-	intended to serve as a gentle introduction to this package can be
-	accessed via \code{vignette("npRmpi", package="npRmpi")}.
+	variables respectively). A getting-started vignette containing a
+	short introduction to the \pkg{npRmpi} package can be accessed via
+	\code{vignette("nprmpi_getting_started", package = "npRmpi")}.
 
   For a listing of all routines in the \pkg{npRmpi} package type:
   \sQuote{library(help="npRmpi")}.  
