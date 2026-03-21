@@ -277,7 +277,7 @@ test_that("npregbw NOMAD degree search backend improves over the baseline", {
     degree.max = 2L,
     bwtype = "fixed",
     bwmethod = "cv.ls",
-    nmulti = 1L
+    nmulti = 3L
   )
 
   expect_s3_class(bw, "rbandwidth")
@@ -285,6 +285,16 @@ test_that("npregbw NOMAD degree search backend improves over the baseline", {
   expect_true(isTRUE(bw$degree.search$completed))
   expect_gte(bw$degree.search$n.unique, 1L)
   expect_lte(bw$degree.search$best.fval, bw$degree.search$baseline.fval + 1e-10)
+  expect_identical(length(bw$degree.search$restart.degree.starts), 3L)
+  expect_identical(length(bw$degree.search$restart.results), 3L)
+  expect_identical(bw$degree.search$restart.results[[1L]]$restart, 1L)
+  restart.objectives <- unlist(lapply(
+    bw$degree.search$restart.results,
+    function(x) if (is.null(x$objective)) NA_real_ else as.numeric(x$objective[1L])
+  ))
+  restart.objectives <- restart.objectives[is.finite(restart.objectives)]
+  expect_true(length(restart.objectives) >= 1L)
+  expect_lte(bw$degree.search$best.fval, min(restart.objectives) + 1e-10)
 })
 
 test_that("npregbw automatic degree search defaults to NOMAD plus Powell", {

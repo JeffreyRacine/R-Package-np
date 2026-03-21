@@ -914,6 +914,7 @@ npregbw.rbandwidth <-
     restart.degree.starts = search_result$restart.degree.starts,
     restart.bandwidth.starts = search_result$restart.bandwidth.starts,
     restart.start.info = search_result$restart.start.info,
+    restart.results = search_result$restart.results,
     trace = search_result$trace
   )
 
