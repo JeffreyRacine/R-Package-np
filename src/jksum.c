@@ -4939,7 +4939,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 static double * kernel_weighted_sum_pkw_extern = NULL;
 static int kernel_weighted_sum_pkw_nvar_extern = 0;
 
-int kernel_weighted_sum_np_ctx(
+static int kernel_weighted_sum_np_ctx_ex(
 int * KERNEL_reg,
 int * KERNEL_unordered_reg,
 int * KERNEL_ordered_reg,
@@ -4992,7 +4992,8 @@ int ** matrix_ordered_indices,
 double * const weighted_sum,
 double * const weighted_permutation_sum,
 double * const kw,
-const NP_GateOverrideCtx * const gate_override_ctx){
+const NP_GateOverrideCtx * const gate_override_ctx,
+const int keep_kw_owner_local){
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
   const NP_GateOverrideCtx gate_ctx_empty = {0};
@@ -6365,7 +6366,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       }
     }
 
-    if(kw_work != NULL){
+    if((kw_work != NULL) && (!keep_kw_owner_local)){
       MPI_Allgather(MPI_IN_PLACE, stride * num_xt, MPI_DOUBLE, kw_work, stride * num_xt, MPI_DOUBLE, comm[1]);
     }
 
@@ -6467,6 +6468,117 @@ cleanup:
 
 
   return(status);
+}
+
+int kernel_weighted_sum_np_ctx(
+int * KERNEL_reg,
+int * KERNEL_unordered_reg,
+int * KERNEL_ordered_reg,
+const int BANDWIDTH_reg,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+const int leave_one_out,
+const int leave_one_out_offset,
+const int kernel_pow,
+const int bandwidth_divide,
+const int bandwidth_divide_weights,
+const int symmetric,
+const int gather_scatter,
+const int drop_one_train,
+const int drop_which_train,
+const int * const operator,
+const int permutation_operator,
+int do_score,
+int do_ocg,
+int * bpso,
+const int suppress_parallel,
+const int ncol_Y,
+const int ncol_W,
+const int int_TREE,
+const int do_partial_tree,
+KDT * const kdt,
+NL * const inl,
+int * const nld,
+int * const idx,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_continuous_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double **matrix_X_continuous_eval,
+double **matrix_Y,
+double **matrix_W,
+double * sgn,
+double *vector_scale_factor,
+int bandwidth_provided,
+double ** matrix_bw_train,
+double ** matrix_bw_eval,
+double * lambda_pre,
+int *num_categories,
+double **matrix_categorical_vals,
+int ** matrix_ordered_indices,
+double * const weighted_sum,
+double * const weighted_permutation_sum,
+double * const kw,
+const NP_GateOverrideCtx * const gate_override_ctx){
+  return kernel_weighted_sum_np_ctx_ex(
+    KERNEL_reg,
+    KERNEL_unordered_reg,
+    KERNEL_ordered_reg,
+    BANDWIDTH_reg,
+    num_obs_train,
+    num_obs_eval,
+    num_reg_unordered,
+    num_reg_ordered,
+    num_reg_continuous,
+    leave_one_out,
+    leave_one_out_offset,
+    kernel_pow,
+    bandwidth_divide,
+    bandwidth_divide_weights,
+    symmetric,
+    gather_scatter,
+    drop_one_train,
+    drop_which_train,
+    operator,
+    permutation_operator,
+    do_score,
+    do_ocg,
+    bpso,
+    suppress_parallel,
+    ncol_Y,
+    ncol_W,
+    int_TREE,
+    do_partial_tree,
+    kdt,
+    inl,
+    nld,
+    idx,
+    matrix_X_unordered_train,
+    matrix_X_ordered_train,
+    matrix_X_continuous_train,
+    matrix_X_unordered_eval,
+    matrix_X_ordered_eval,
+    matrix_X_continuous_eval,
+    matrix_Y,
+    matrix_W,
+    sgn,
+    vector_scale_factor,
+    bandwidth_provided,
+    matrix_bw_train,
+    matrix_bw_eval,
+    lambda_pre,
+    num_categories,
+    matrix_categorical_vals,
+    matrix_ordered_indices,
+    weighted_sum,
+    weighted_permutation_sum,
+    kw,
+    gate_override_ctx,
+    0);
 }
 
 int kernel_weighted_sum_np(
@@ -9958,8 +10070,6 @@ double * cv){
   double **matrix_wX_ordered_eval=NULL;
   double **matrix_wX_continuous_eval=NULL;
 
-  int64_t is,ie;
-
   int64_t N, num_obs_eval_alloc, num_obs_train_alloc, num_obs_wx_alloc;
   int64_t wx, nwx;
 
@@ -9967,17 +10077,11 @@ double * cv){
 
 #ifdef MPI2
   int64_t stride_t = MAX((int64_t)ceil((double) num_obs_train / (double) iNum_Processors),1);
-
-  is = stride_t * my_rank;
-  ie = MIN(num_obs_train - 1, is + stride_t - 1);
   int64_t stride_e = MAX((int64_t)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   
   num_obs_train_alloc = stride_t*iNum_Processors;
   num_obs_eval_alloc = stride_e*iNum_Processors;
 #else
-  is = 0;
-  ie = num_obs_train - 1;
-
   num_obs_train_alloc = num_obs_train;
   num_obs_eval_alloc = num_obs_eval;
 #endif
@@ -10149,59 +10253,89 @@ double * cv){
       matrix_wX_ordered_eval[l] = matrix_X_ordered_eval[l] + wxo;
 
 
-    kernel_weighted_sum_np_ctx(kernel_c,
-                           kernel_u,
-                           kernel_o,
-                           BANDWIDTH_den,
-                           num_obs_train,
-                           dwx,
-                           num_reg_unordered,
-                           num_reg_ordered,
-                           num_reg_continuous,
-                           0,
-                           0,
-                           1,
-                           1,
-                           0, 
-                           0,
-                           0,
-                           0,
-                           0,
-                           operator,
-                           OP_NOOP, // no permutations
-                           0, // no score
-                           0, // no ocg
-                           NULL,
-                           0, // don't explicity suppress parallel
-                           0,
-                           0,
-                           int_TREE_X,
-                           0,
-                           kdt_extern_X, 
-                           NULL, NULL, NULL,
-                           matrix_X_unordered_train,
-                           matrix_X_ordered_train,
-                           matrix_X_continuous_train,
-                           matrix_wX_unordered_eval,
-                           matrix_wX_ordered_eval,
-                           matrix_wX_continuous_eval,
-                           NULL,
-                           NULL,
-                           NULL,
-                           vsf,
-                           1,matrix_bandwidth,matrix_bandwidth,lambda,
-                           num_categories,
-                           matrix_categorical_vals,
-                           NULL,
-                           mean,
-                           NULL, // no permutations
-                           kwx,
-                           &gate_ctx_local);
+    kernel_weighted_sum_np_ctx_ex(kernel_c,
+                              kernel_u,
+                              kernel_o,
+                              BANDWIDTH_den,
+                              num_obs_train,
+                              dwx,
+                              num_reg_unordered,
+                              num_reg_ordered,
+                              num_reg_continuous,
+                              0,
+                              0,
+                              1,
+                              1,
+                              0, 
+                              0,
+                              0,
+                              0,
+                              0,
+                              operator,
+                              OP_NOOP, // no permutations
+                              0, // no score
+                              0, // no ocg
+                              NULL,
+                              0, // don't explicity suppress parallel
+                              0,
+                              0,
+                              int_TREE_X,
+                              0,
+                              kdt_extern_X, 
+                              NULL, NULL, NULL,
+                              matrix_X_unordered_train,
+                              matrix_X_ordered_train,
+                              matrix_X_continuous_train,
+                              matrix_wX_unordered_eval,
+                              matrix_wX_ordered_eval,
+                              matrix_wX_continuous_eval,
+                              NULL,
+                              NULL,
+                              NULL,
+                              vsf,
+                              1,matrix_bandwidth,matrix_bandwidth,lambda,
+                              num_categories,
+                              matrix_categorical_vals,
+                              NULL,
+                              mean,
+                              NULL, // no permutations
+                              kwx,
+                              &gate_ctx_local,
+                              1);
     
-    for(i = is; i <= ie; i++){
+#ifdef MPI2
+    {
+      const int64_t stride_local_eval = MAX((int64_t)ceil((double) dwx / (double) iNum_Processors), 1);
+      const int64_t js_local_eval = stride_local_eval * my_rank;
+      const int64_t je_local_eval = MIN(dwx - 1, js_local_eval + stride_local_eval - 1);
+
+      for(j = js_local_eval; j <= je_local_eval; j++){
+        const int64_t j_global = wxo + j;
+
+        for(i = 0; i < num_obs_train; i++){
+          if(cdfontrain && (j_global == i)) continue;
+          indy = 1;
+          for(l = 0; (l < num_reg_ordered) && (indy != 0); l++){
+            indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j_global]);
+          }
+          for(l = 0; (l < num_reg_continuous) && (indy != 0); l++){
+            indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j_global]);
+          }
+          if(BANDWIDTH_den != BW_ADAP_NN){
+            const double tvd = (indy - mean[j]/ofac + kwx[j*num_obs_train + i]/ofac);
+            *cv += tvd*tvd;
+          } else {
+            const double tvd = (indy - mean[j]/ofac + kwx[i*dwx + j]/ofac);
+            *cv += tvd*tvd;
+          }
+        }
+      }
+    }
+#else
+    for(i = 0; i < num_obs_train; i++){
       for(j = wxo; j < (wxo + dwx); j++){
-        if(cdfontrain && (j == i)) continue;
         const int64_t jo = j - wxo;
+        if(cdfontrain && (j == i)) continue;
         indy = 1;
         for(l = 0; (l < num_reg_ordered) && (indy != 0); l++){
           indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
@@ -10216,9 +10350,9 @@ double * cv){
           const double tvd = (indy - mean[jo]/ofac + kwx[i*dwx + jo]/ofac);
           *cv += tvd*tvd;
         }
-
       }
     }
+#endif
   }
 #ifdef MPI2
   MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
