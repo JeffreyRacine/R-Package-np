@@ -58,6 +58,4 @@ npver
 ^benchmarks/validation
 ^benchmarks/common
 ^benchmarks$
-^build$
-^build/
 ^cran-comments\.md$
