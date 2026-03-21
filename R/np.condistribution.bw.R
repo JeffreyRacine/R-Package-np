@@ -1203,10 +1203,12 @@ npcdistbw.condbandwidth <-
     n.visits = search_result$n.visits,
     n.cached = search_result$n.cached,
     grid.size = search_result$grid.size,
+    best.restart = search_result$best.restart,
     restart.starts = search_result$restart.starts,
     restart.degree.starts = search_result$restart.degree.starts,
     restart.bandwidth.starts = search_result$restart.bandwidth.starts,
     restart.start.info = search_result$restart.start.info,
+    restart.results = search_result$restart.results,
     trace = search_result$trace
   )
 
@@ -1216,6 +1218,7 @@ npcdistbw.condbandwidth <-
     bws$powell.time <- as.numeric(search_result$powell.time[1L])
   if (!is.null(search_result$optim.time) && is.finite(search_result$optim.time))
     bws$total.time <- as.numeric(search_result$optim.time[1L])
+  bws <- .np_attach_nomad_restart_summary(bws, search_result)
   bws$degree.search <- metadata
   bws
 }

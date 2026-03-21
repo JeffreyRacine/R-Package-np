@@ -288,6 +288,9 @@ test_that("npregbw NOMAD degree search backend improves over the baseline", {
   expect_identical(length(bw$degree.search$restart.degree.starts), 3L)
   expect_identical(length(bw$degree.search$restart.results), 3L)
   expect_identical(bw$degree.search$restart.results[[1L]]$restart, 1L)
+  expect_identical(length(bw$nomad.restart.fval), 3L)
+  expect_identical(length(bw$nomad.restart.results), 3L)
+  expect_identical(length(bw$nomad.restart.degree.starts), 3L)
   restart.objectives <- unlist(lapply(
     bw$degree.search$restart.results,
     function(x) if (is.null(x$objective)) NA_real_ else as.numeric(x$objective[1L])
@@ -295,6 +298,11 @@ test_that("npregbw NOMAD degree search backend improves over the baseline", {
   restart.objectives <- restart.objectives[is.finite(restart.objectives)]
   expect_true(length(restart.objectives) >= 1L)
   expect_lte(bw$degree.search$best.fval, min(restart.objectives) + 1e-10)
+  expect_identical(as.numeric(bw$nomad.restart.fval), as.numeric(unlist(lapply(
+    bw$nomad.restart.results,
+    function(x) if (is.null(x$objective)) NA_real_ else as.numeric(x$objective[1L])
+  ))))
+  expect_identical(bw$nomad.best.restart, which.min(bw$nomad.restart.fval))
 })
 
 test_that("npregbw automatic degree search defaults to NOMAD plus Powell", {
