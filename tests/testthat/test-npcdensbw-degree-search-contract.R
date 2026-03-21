@@ -244,7 +244,7 @@ test_that("npcdensbw direct nomad payload preserves CV metadata", {
 
   printed <- paste(capture.output(print(bw)), collapse = "\n")
   expect_false(grepl("Manual", printed, fixed = TRUE))
-  expect_false(grepl("achieved on multistart", printed, fixed = TRUE))
+  expect_match(printed, "achieved on multistart 1", fixed = TRUE)
 })
 
 test_that("npcdensbw nomad+powell payload does not inject phantom multistart totals", {
