@@ -117,16 +117,6 @@ npudenshat <- function(bws,
     ) / n.train
   }
 
-  if (identical(output, "apply")) {
-    if (is.null(y))
-      stop("argument 'y' is required when output='apply'")
-
-    out <- H %*% y
-    if (ncol(out) == 1L)
-      return(as.vector(out))
-    return(out)
-  }
-
   class(H) <- c("npudenshat", "matrix")
   attr(H, "bws") <- bws
   attr(H, "tdat") <- tdat

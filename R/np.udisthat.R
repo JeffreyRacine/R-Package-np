@@ -155,16 +155,6 @@ npudisthat <- function(bws,
 
   H <- scale_rows(H, rowSums(H))
 
-  if (identical(output, "apply")) {
-    if (is.null(y))
-      stop("argument 'y' is required when output='apply'")
-
-    out <- H %*% y
-    if (ncol(out) == 1L)
-      return(as.vector(out))
-    return(out)
-  }
-
   class(H) <- c("npudisthat", "matrix")
   attr(H, "bws") <- bws
   attr(H, "tdat") <- tdat
