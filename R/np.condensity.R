@@ -466,11 +466,20 @@ npcdens.default <- function(bws, txdat, tydat, ...){
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
+  use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
+    sc.bw,
+    caller_env = parent.frame()
+  )
+
   tbw <- if (!has.explicit.bws) {
-    .np_progress_select_bandwidth_enhanced(
-      "Selecting conditional density bandwidth",
+    if (use.outer.bandwidth.progress) {
+      .np_progress_select_bandwidth_enhanced(
+        "Selecting conditional density bandwidth",
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+      )
+    } else {
       .np_eval_bw_call(sc.bw, caller_env = parent.frame())
-    )
+    }
   } else {
     .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   }

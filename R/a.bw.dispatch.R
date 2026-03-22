@@ -80,6 +80,63 @@
   stop("bandwidth selector call evaluation failed", call. = FALSE)
 }
 
+.np_bw_call_uses_nomad_degree_search <- function(call_obj, caller_env = parent.frame()) {
+  if (!is.call(call_obj) || length(call_obj) < 1L)
+    return(FALSE)
+
+  fn_expr <- call_obj[[1L]]
+  fn <- .np_try_eval_in_frames(fn_expr, eval_env = caller_env)
+  if (!isTRUE(fn$ok) || !is.function(fn$value))
+    return(FALSE)
+
+  fn_def <- fn$value
+  fn_name <- if (is.symbol(fn_expr)) as.character(fn_expr) else NULL
+  if (!is.null(fn_name) && nzchar(fn_name)) {
+    default_name <- paste0(fn_name, ".default")
+    default_fn <- get0(default_name, envir = environment(fn_def), inherits = TRUE)
+    if (is.function(default_fn))
+      fn_def <- default_fn
+  }
+
+  matched <- tryCatch(
+    match.call(definition = fn_def, call = call_obj, expand.dots = FALSE),
+    error = function(e) NULL
+  )
+  if (is.null(matched))
+    return(FALSE)
+
+  defaults <- formals(fn_def)
+  arg_value <- function(name) {
+    expr <- matched[[name]]
+    if (is.null(expr) && !is.null(defaults[[name]]))
+      expr <- defaults[[name]]
+    if (is.null(expr))
+      return(NULL)
+    value <- .np_try_eval_in_frames(expr, eval_env = caller_env)
+    if (!isTRUE(value$ok))
+      return(NULL)
+    value$value
+  }
+
+  regtype <- arg_value("regtype")
+  if (is.null(regtype) || !identical(as.character(regtype)[1L], "lp"))
+    return(FALSE)
+
+  degree.select <- arg_value("degree.select")
+  if (is.null(degree.select))
+    return(FALSE)
+  degree.select <- as.character(degree.select)[1L]
+  if (!nzchar(degree.select) || identical(degree.select, "manual"))
+    return(FALSE)
+
+  search.engine <- arg_value("search.engine")
+  if (is.null(search.engine))
+    return(FALSE)
+  search.engine <- as.character(search.engine)[1L]
+
+  search.engine %in% c("nomad", "nomad+powell")
+}
+
 .np_bw_dispatch_target <- function(dots, data_arg_names = character(), eval_env = parent.frame()) {
   if (length(dots) == 0L)
     stop("invoked without arguments")
