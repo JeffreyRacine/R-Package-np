@@ -21,7 +21,11 @@ make_proper_test_bws <- function() {
     poxkertype = "Wang-Van Ryzin",
     pcykertype = "Gaussian",
     puykertype = "Aitchison-Aitken",
-    poykertype = "Wang-Van Ryzin"
+    poykertype = "Wang-Van Ryzin",
+    regtype = "lp",
+    degree = 3L,
+    regtype.engine = "lp",
+    degree.engine = 3L
   )
 }
 
@@ -81,6 +85,50 @@ test_that("proper finalizer repairs supported synthetic grids and preserves raw 
   expect_equal(unname(mass), rep(1, length(mass)), tolerance = 1e-8)
 })
 
+test_that("proper finalizer is a no-op for already-proper synthetic lc objects", {
+  raw <- c(-0.3, 0.2, 0.9, -0.1, 0.4, 1.1)
+  obj <- make_proper_test_object(condens = raw)
+  obj$bws$regtype <- "lc"
+  obj$bws$regtype.engine <- "lc"
+  obj$bws$degree <- NULL
+  obj$bws$degree.engine <- 0L
+
+  out <- getFromNamespace(".np_condens_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "project",
+    proper.control = list()
+  )
+
+  expect_true(isTRUE(out$proper.requested))
+  expect_false(isTRUE(out$proper.applied))
+  expect_identical(out$proper.info$reason, "already_proper")
+  expect_equal(out$condens, raw, tolerance = 1e-12)
+  expect_null(out$condens.raw)
+})
+
+test_that("proper finalizer is a no-op for already-proper synthetic lp-degree-zero objects", {
+  raw <- c(-0.3, 0.2, 0.9, -0.1, 0.4, 1.1)
+  obj <- make_proper_test_object(condens = raw)
+  obj$bws$regtype <- "lp"
+  obj$bws$regtype.engine <- "lp"
+  obj$bws$degree <- 0L
+  obj$bws$degree.engine <- 0L
+
+  out <- getFromNamespace(".np_condens_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "project",
+    proper.control = list()
+  )
+
+  expect_true(isTRUE(out$proper.requested))
+  expect_false(isTRUE(out$proper.applied))
+  expect_identical(out$proper.info$reason, "already_proper")
+  expect_equal(out$condens, raw, tolerance = 1e-12)
+  expect_null(out$condens.raw)
+})
+
 test_that("proper plan projects bootstrap-style density matrices slice-wise", {
   raw <- c(-0.3, 0.2, 0.9, -0.1, 0.4, 1.1)
   obj <- make_proper_test_object(condens = raw)
@@ -105,6 +153,27 @@ test_that("proper plan projects bootstrap-style density matrices slice-wise", {
     mass <- vapply(split.idx, function(idx) sum(w * projected[row, idx]), numeric(1))
     expect_equal(unname(mass), rep(1, length(mass)), tolerance = 1e-8)
   }
+})
+
+test_that("mode='slice' still defers to exact-grid repair on supported synthetic grids", {
+  raw <- c(-0.3, 0.2, 0.9, -0.1, 0.4, 1.1)
+  obj <- make_proper_test_object(condens = raw)
+
+  out.grid <- getFromNamespace(".np_condens_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "project",
+    proper.control = list()
+  )
+  out.slice <- getFromNamespace(".np_condens_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "project",
+    proper.control = list(mode = "slice")
+  )
+
+  expect_true(isTRUE(out.slice$proper.applied))
+  expect_equal(out.slice$condens, out.grid$condens, tolerance = 1e-12)
 })
 
 test_that("proper finalizer stores request-only metadata on unsupported geometry", {

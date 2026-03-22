@@ -35,3 +35,28 @@ test_that("autodispatch materialization resolves ..n placeholders by argument na
   expect_identical(prepared$tmpvals[[dat.ref]], dat)
   expect_identical(prepared$tmpvals[[bws.ref]], bw.j)
 })
+
+test_that("autodispatch materialization evaluates proper arguments eagerly", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  bws <- structure(list(x = 1), class = "conbandwidth")
+  proper.flag <- TRUE
+  proper.method <- "project"
+  proper.control <- list(mode = "slice", slice.grid.size = 21L)
+
+  mc <- quote(npcdens(
+    bws = bws,
+    proper = proper.flag,
+    proper.method = proper.method,
+    proper.control = proper.control
+  ))
+  prepared <- materialize(mc = mc, caller_env = environment(), comm = 1L)
+
+  proper.ref <- as.character(prepared$call$proper)
+  method.ref <- as.character(prepared$call$proper.method)
+  control.ref <- as.character(prepared$call$proper.control)
+
+  expect_identical(prepared$tmpvals[[proper.ref]], proper.flag)
+  expect_identical(prepared$tmpvals[[method.ref]], proper.method)
+  expect_identical(prepared$tmpvals[[control.ref]], proper.control)
+})

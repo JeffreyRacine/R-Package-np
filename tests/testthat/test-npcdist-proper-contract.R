@@ -21,7 +21,11 @@ make_proper_cdist_test_bws <- function() {
     poxkertype = "Wang-Van Ryzin",
     pcykertype = "Gaussian",
     puykertype = "Aitchison-Aitken",
-    poykertype = "Wang-Van Ryzin"
+    poykertype = "Wang-Van Ryzin",
+    regtype = "lp",
+    degree = 3L,
+    regtype.engine = "lp",
+    degree.engine = 3L
   )
 }
 
@@ -80,6 +84,50 @@ test_that("proper finalizer repairs supported synthetic grids and preserves raw 
     expect_true(all(diff(out$condist[idx]) >= -1e-10))
 })
 
+test_that("proper finalizer is a no-op for already-proper synthetic lc cdf objects", {
+  raw <- c(-0.3, 0.7, 0.4, -0.1, 0.8, 1.2)
+  obj <- make_proper_cdist_test_object(condist = raw)
+  obj$bws$regtype <- "lc"
+  obj$bws$regtype.engine <- "lc"
+  obj$bws$degree <- NULL
+  obj$bws$degree.engine <- 0L
+
+  out <- getFromNamespace(".np_condist_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "isotonic",
+    proper.control = list()
+  )
+
+  expect_true(isTRUE(out$proper.requested))
+  expect_false(isTRUE(out$proper.applied))
+  expect_identical(out$proper.info$reason, "already_proper")
+  expect_equal(out$condist, raw, tolerance = 1e-12)
+  expect_null(out$condist.raw)
+})
+
+test_that("proper finalizer is a no-op for already-proper synthetic lp-degree-zero cdf objects", {
+  raw <- c(-0.3, 0.7, 0.4, -0.1, 0.8, 1.2)
+  obj <- make_proper_cdist_test_object(condist = raw)
+  obj$bws$regtype <- "lp"
+  obj$bws$regtype.engine <- "lp"
+  obj$bws$degree <- 0L
+  obj$bws$degree.engine <- 0L
+
+  out <- getFromNamespace(".np_condist_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "isotonic",
+    proper.control = list()
+  )
+
+  expect_true(isTRUE(out$proper.requested))
+  expect_false(isTRUE(out$proper.applied))
+  expect_identical(out$proper.info$reason, "already_proper")
+  expect_equal(out$condist, raw, tolerance = 1e-12)
+  expect_null(out$condist.raw)
+})
+
 test_that("proper plan projects bootstrap-style distribution matrices slice-wise", {
   raw <- c(-0.3, 0.7, 0.4, -0.1, 0.8, 1.2)
   obj <- make_proper_cdist_test_object(condist = raw)
@@ -104,6 +152,27 @@ test_that("proper plan projects bootstrap-style distribution matrices slice-wise
     for (idx in split.idx)
       expect_true(all(diff(projected[row, idx]) >= -1e-10))
   }
+})
+
+test_that("mode='slice' still defers to exact-grid cdf repair on supported synthetic grids", {
+  raw <- c(-0.3, 0.7, 0.4, -0.1, 0.8, 1.2)
+  obj <- make_proper_cdist_test_object(condist = raw)
+
+  out.grid <- getFromNamespace(".np_condist_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "isotonic",
+    proper.control = list()
+  )
+  out.slice <- getFromNamespace(".np_condist_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "isotonic",
+    proper.control = list(mode = "slice")
+  )
+
+  expect_true(isTRUE(out.slice$proper.applied))
+  expect_equal(out.slice$condist, out.grid$condist, tolerance = 1e-12)
 })
 
 test_that("proper finalizer stores request-only metadata on unsupported geometry", {

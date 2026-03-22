@@ -1319,6 +1319,7 @@
      "regtype", "basis", "degree", "bernstein.basis",
      "nmulti", "bandwidth.compute", "remin", "itmax", "ftol", "tol", "small",
      "gradients", "residuals", "errors", "gradient.order",
+     "proper", "proper.method", "proper.control",
      "alpha", "alpha.iter", "alpha.max", "alpha.min", "alpha.tol",
      "constant", "iterate.diff.tol", "iterate.max", "iterate.Tikhonov", "iterate.Tikhonov.num",
      "optim.abstol", "optim.maxattempts", "optim.maxit", "optim.method", "optim.reltol",
