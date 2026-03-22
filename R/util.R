@@ -140,8 +140,11 @@ npValidateGlpDegree <- function(regtype, degree, ncon, argname = "degree") {
   if (!identical(regtype, "lp"))
     return(NULL)
 
-  if (is.null(degree))
-    degree <- rep.int(1L, ncon)
+  if (is.null(degree)) {
+    if (ncon == 0L)
+      return(integer(0))
+    stop(sprintf("%s must be supplied explicitly when regtype='lp'", argname))
+  }
 
   if (!length(degree) && ncon == 0L)
     return(integer(0))
@@ -167,6 +170,23 @@ npValidateGlpDegree <- function(regtype, degree, ncon, argname = "degree") {
                  argname, degree.max))
 
   as.integer(degree)
+}
+
+npSetupGlpDegree <- function(regtype,
+                             degree,
+                             ncon,
+                             degree.select = c("manual", "coordinate", "exhaustive")) {
+  if (!identical(regtype, "lp"))
+    return(degree)
+
+  degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
+  if (!is.null(degree) || identical(degree.select, "manual"))
+    return(degree)
+
+  if (ncon == 0L)
+    return(integer(0))
+
+  rep.int(1L, ncon)
 }
 
 npValidateGlpBernstein <- function(regtype, bernstein.basis, argname = "bernstein.basis") {

@@ -1492,8 +1492,10 @@ npscoefbw.default <-
     regtype.named <- any(mc.names == "regtype")
     bernstein.named <- any(mc.names == "bernstein.basis")
     cv.iterate.named <- any(mc.names == "cv.iterate")
+    regtype.value <- if (regtype.named) regtype else "lc"
+    degree.select.value <- if ("degree.select" %in% mc.names) degree.select else "manual"
     degree.search <- .npscoefbw_degree_search_controls(
-      regtype = regtype,
+      regtype = regtype.value,
       regtype.named = regtype.named,
       cv.iterate = cv.iterate,
       cv.iterate.named = cv.iterate.named,
@@ -1501,7 +1503,7 @@ npscoefbw.default <-
       ncon = sum(if (miss.z) untangle(xdat)$icon else untangle(zdat)$icon),
       nobs = NROW(xdat),
       basis = if ("basis" %in% mc.names) basis else "glp",
-      degree.select = if ("degree.select" %in% mc.names) degree.select else "manual",
+      degree.select = degree.select.value,
       search.engine = if ("search.engine" %in% mc.names) search.engine else "nomad+powell",
       degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
       degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
@@ -1511,6 +1513,12 @@ npscoefbw.default <-
       degree.verify = if ("degree.verify" %in% mc.names) degree.verify else FALSE,
       bernstein.basis = bernstein.basis,
       bernstein.named = bernstein.named
+    )
+    degree.setup <- npSetupGlpDegree(
+      regtype = regtype.value,
+      degree = if ("degree" %in% mc.names) degree else NULL,
+      ncon = sum(if (miss.z) untangle(xdat)$icon else untangle(zdat)$icon),
+      degree.select = degree.select.value
     )
 
     ## first grab dummy args for scbandwidth() and perform 'bootstrap'
@@ -1538,6 +1546,8 @@ npscoefbw.default <-
       nms <- mc.names[m]
       sbw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
+    if (!("degree" %in% names(sbw.args)) && !is.null(degree.setup))
+      sbw.args$degree <- degree.setup
     reg.args <- sbw.args[setdiff(names(sbw.args), c("bw", "nobs", "xdati", "ydati", "zdati", "xnames", "ynames", "znames", "bandwidth.compute"))]
     if (!is.null(degree.search))
       reg.args$bernstein.basis <- degree.search$bernstein.basis

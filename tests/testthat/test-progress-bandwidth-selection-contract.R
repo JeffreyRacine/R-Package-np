@@ -19,6 +19,12 @@ shadow_signature <- function(shadow) {
   )
 }
 
+shadow_stage_signature <- function(shadow) {
+  sig <- shadow_signature(shadow)
+  sig$line <- sub(", elapsed .*", "", sig$line)
+  sig
+}
+
 test_that("npudensbw bandwidth progress uses the enhanced multistart handoff", {
   set.seed(42)
   x <- rnorm(35)
@@ -54,7 +60,7 @@ test_that("npudensbw bandwidth progress uses the enhanced multistart handoff", {
   lines <- shadow_lines(single_line)
 
   expect_s3_class(single_line$value, "bandwidth")
-  expect_equal(shadow_signature(single_line), shadow_signature(legacy))
+  expect_equal(shadow_stage_signature(single_line), shadow_stage_signature(legacy))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/3\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
