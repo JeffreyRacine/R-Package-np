@@ -44,6 +44,8 @@ export(b.star
        ,npudensbw
        ,npudistbw
        ,npudens
+       ,npudenshat
+       ,npudisthat
        ,npudist
        ,npregbw
        ,npreg
@@ -57,8 +59,10 @@ export(b.star
        ,npplregbw
        ,npcdensbw
        ,npcdens
+       ,npcdenshat
        ,npcdist
        ,npcdistbw
+       ,npcdisthat
        ,npcopula
        ,npdeptest       
        ,npsdeptest

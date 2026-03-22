@@ -1,0 +1,61 @@
+\name{npudenshat}
+\alias{npudenshat}
+\title{Unconditional Density Hat Operator}
+\description{
+Constructs the unconditional density hat operator associated with
+\code{\link{npudens}} bandwidth objects. The returned operator maps a
+right-hand side \code{y} to \eqn{H y}; with \code{y = 1} this reproduces the
+fitted unconditional density.
+}
+\usage{
+npudenshat(bws,
+  tdat = stop("training data 'tdat' missing"),
+  edat,
+  y = NULL,
+  output = c("matrix", "apply"))
+}
+\arguments{
+  \item{bws}{A fitted unconditional density bandwidth object of class \code{"bandwidth"}.}
+
+  \item{tdat}{Training data used to construct the operator.}
+
+  \item{edat}{Optional evaluation data. If omitted, the operator is built on the training data.}
+
+  \item{y}{Optional right-hand side vector or matrix with one row per training observation.}
+
+  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
+}
+\details{
+For \code{output = "matrix"}, the return value is a matrix with class
+\code{c("npudenshat", "matrix")} and attributes storing the bandwidth object,
+training data, evaluation data, and call metadata.
+
+For \code{output = "apply"}, the function returns \code{H y} directly. Matrix
+right-hand sides are applied column-wise.
+
+This helper is intended for object-fed repeated evaluation once a bandwidth
+object has already been constructed. It does not perform bandwidth selection.
+}
+\value{
+Either a hat matrix of class \code{"npudenshat"} or the applied result
+\code{H y}, depending on \code{output}.
+}
+\examples{
+\dontrun{
+data(cps71)
+tx <- data.frame(age = cps71$age)
+
+bw <- npudensbw(dat = tx, bwtype = "fixed",
+                bandwidth.compute = FALSE, bws = 1.0)
+
+H <- npudenshat(bws = bw, tdat = tx)
+dens.hat <- npudenshat(bws = bw, tdat = tx,
+                       y = rep(1, nrow(tx)),
+                       output = "apply")
+dens.core <- fitted(npudens(bws = bw, tdat = tx))
+
+head(cbind(dens.core, dens.hat), n = 2L)
+}
+}
+\keyword{nonparametric}
+\keyword{density}
