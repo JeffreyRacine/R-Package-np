@@ -247,6 +247,109 @@ test_that("proper request on paired evaluation stores metadata without altering 
   expect_equal(fit.req$condens, fit.raw$condens, tolerance = 1e-12)
 })
 
+test_that("slice mode defers to exact-grid repair when common grids are supplied", {
+  set.seed(20260322)
+  x <- runif(70, -1, 1)
+  y <- sin(2 * pi * x) + rnorm(70, sd = 0.18)
+  y.grid <- seq(min(y) - 0.25, max(y) + 0.25, length.out = 60L)
+  x.grid <- c(-0.35, 0.35)
+  nd <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
+
+  bw <- npcdensbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.28, 0.22),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
+  )
+
+  fit.grid <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE
+  )
+  fit.slice <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE,
+    proper.control = list(mode = "slice")
+  )
+
+  expect_true(isTRUE(fit.slice$proper.applied))
+  expect_equal(fit.slice$condens, fit.grid$condens, tolerance = 1e-12)
+})
+
+test_that("slice mode on paired rows matches the internal explicit-grid oracle", {
+  set.seed(20260322)
+  x <- runif(80, -1, 1)
+  y <- cos(2 * pi * x) + rnorm(80, sd = 0.2)
+  nd <- rbind(
+    data.frame(y = c(-0.8, -0.1, 0.55), x = rep(-0.4, 3L)),
+    data.frame(y = c(-0.35, 0.15, 0.8, 1.1), x = rep(0.45, 4L))
+  )
+
+  bw <- npcdensbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.26, 0.2),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
+  )
+
+  ctrl <- list(mode = "slice", slice.grid.size = 21L, slice.extend.factor = 0)
+
+  fit.slice <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE,
+    proper.control = ctrl
+  )
+
+  build.grid <- getFromNamespace(".np_condens_build_slice_eval_grid", "np")
+  grid.eval <- build.grid(
+    object = fit.slice,
+    slice.context = list(
+      txdat = data.frame(x = x),
+      tydat = data.frame(y = y),
+      exdat = nd["x"],
+      eydat = nd["y"]
+    ),
+    proper.control = ctrl
+  )
+  oracle.fit <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = grid.eval$exdat,
+    eydat = grid.eval$eydat,
+    proper = TRUE
+  )
+
+  ypos <- match(nd$y, grid.eval$y.grid)
+  oracle.values <- numeric(nrow(nd))
+  for (i in seq_along(grid.eval$groups)) {
+    idx.req <- grid.eval$groups[[i]]
+    idx.grid <- grid.eval$grid.slices[[i]]
+    oracle.values[idx.req] <- oracle.fit$condens[idx.grid[ypos[idx.req]]]
+  }
+
+  expect_true(isTRUE(fit.slice$proper.applied))
+  expect_identical(fit.slice$proper.info$route, "slice")
+  expect_true(all(fit.slice$condens >= -1e-8))
+  expect_equal(fit.slice$condens, oracle.values, tolerance = 1e-10)
+})
+
 test_that("predict inherits proper request and validates newdata geometry", {
   set.seed(2)
   n <- 80L

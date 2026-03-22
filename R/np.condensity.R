@@ -179,6 +179,13 @@ npcdens.conbandwidth <- function(bws,
     npKernelBoundsCheckEval(eydat, bws$iycon, bws$cykerlb, bws$cykerub, argprefix = "cyker")
   }
 
+  proper.slice.context <- list(
+    txdat = txdat,
+    tydat = tydat,
+    exdat = if (no.exy) NULL else exdat,
+    eydat = if (no.exy) NULL else eydat
+  )
+
   ## grab the evaluation data before it is converted to numeric
   if(no.exy){
     txeval <- txdat
@@ -380,6 +387,7 @@ npcdens.conbandwidth <- function(bws,
     proper = proper.args$proper.requested,
     proper.method = proper.args$proper.method,
     proper.control = proper.args$proper.control,
+    slice.context = proper.slice.context,
     where = "npcdens()"
   )
 
