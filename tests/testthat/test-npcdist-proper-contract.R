@@ -198,3 +198,51 @@ test_that("proper finalizer stores request-only metadata on unsupported geometry
   expect_false(isTRUE(out.grad$proper.applied))
   expect_identical(out.grad$proper.info$reason, "gradients_unsupported")
 })
+
+test_that("apply='fitted' leaves explicit-evaluation synthetic distribution objects unchanged", {
+  raw <- c(-0.3, 0.7, 0.4, -0.1, 0.8, 1.2)
+  obj <- make_proper_cdist_test_object(condist = raw)
+
+  out <- getFromNamespace(".np_condist_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "isotonic",
+    proper.control = list(mode = "slice", apply = "fitted"),
+    slice.context = list(
+      txdat = data.frame(x = c(0.2, 0.8)),
+      tydat = data.frame(y = seq(-1, 1, length.out = 3L)),
+      exdat = obj$xeval,
+      eydat = obj$yeval
+    )
+  )
+
+  expect_true(isTRUE(out$proper.requested))
+  expect_false(isTRUE(out$proper.applied))
+  expect_identical(out$proper.info$reason, "scope_not_selected")
+  expect_true(isTRUE(out$proper.info$supported))
+  expect_equal(out$condist, raw, tolerance = 1e-12)
+})
+
+test_that("apply='fitted' also leaves exact-grid synthetic distribution objects unchanged", {
+  raw <- c(-0.3, 0.7, 0.4, -0.1, 0.8, 1.2)
+  obj <- make_proper_cdist_test_object(condist = raw)
+
+  out <- getFromNamespace(".np_condist_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "isotonic",
+    proper.control = list(mode = "slice", apply = "fitted"),
+    slice.context = list(
+      txdat = data.frame(x = c(0.2, 0.8)),
+      tydat = data.frame(y = seq(-1, 1, length.out = 3L)),
+      exdat = obj$xeval,
+      eydat = obj$yeval
+    )
+  )
+
+  expect_true(isTRUE(out$proper.requested))
+  expect_false(isTRUE(out$proper.applied))
+  expect_identical(out$proper.info$reason, "scope_not_selected")
+  expect_true(isTRUE(out$proper.info$supported))
+  expect_equal(out$condist, raw, tolerance = 1e-12)
+})

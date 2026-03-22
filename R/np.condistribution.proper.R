@@ -8,6 +8,7 @@
     not_requested = "proper-distribution repair was not requested",
     already_proper = "proper=TRUE was requested, but the estimator is already proper by construction",
     no_eval_grid = "proper=TRUE requires explicit evaluation data that define a full y-grid for each fixed x; paired row-wise evaluation is insufficient",
+    scope_not_selected = "proper=TRUE was requested, but 'proper.control$apply' does not target the values returned by this object",
     slice_disabled = "proper=TRUE slice repair is disabled by internal dispatcher controls",
     slice_context_missing = "proper=TRUE slice repair requires explicit evaluation and training data context",
     slice_invalid_master_grid = "proper=TRUE slice repair could not construct a valid internal y-grid",
@@ -334,6 +335,16 @@
   proper.method <- match.arg(as.character(proper.method)[1L], c("isotonic"))
   proper.control <- .np_condist_normalize_proper_control(proper.control)
 
+  if (!isTRUE(object$trainiseval) && identical(proper.control$apply, "fitted")) {
+    info <- .np_condist_make_reason_info(
+      reason = "scope_not_selected",
+      supported = TRUE,
+      slice.count = 0L,
+      grid.common = FALSE
+    )
+    return(list(applied = FALSE, reason = "scope_not_selected", proper.info = info))
+  }
+
   grid.out <- .np_condist_apply_proper_grid(
     object = object,
     proper.method = proper.method,
@@ -403,7 +414,8 @@
 
   if (!isTRUE(proper.out$applied)) {
     object$proper.info <- proper.out$proper.info
-    if (isTRUE(args$proper.control$fail.on.unsupported)) {
+    if (isTRUE(args$proper.control$fail.on.unsupported) &&
+        !isTRUE(proper.out$proper.info$supported)) {
       stop(.np_condist_proper_reason_message(
         reason = proper.out$reason,
         where = where
