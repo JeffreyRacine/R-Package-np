@@ -105,7 +105,9 @@ gsl.bs.default <- function(x,
 	attr(B, "x.max") <- x.max
 	attr(B, "intercept") <- intercept
 	attr(B, "knots") <- knots
-	attr(B, "class") <- c("gsl.bs","matrix")
+	# Keep "gsl.bs" as a compatibility superclass while crs remains the
+	# public owner of predict.gsl.bs.
+	attr(B, "class") <- c("npRmpi_gsl.bs","gsl.bs","matrix")
 
 	return(B)
 
@@ -165,7 +167,7 @@ bs.des     <- function(x,
 
 }
 
-predict.gsl.bs <- function(object,
+.npRmpi_predict_gsl_bs_impl <- function(object,
 													 newx=NULL,
 													 ...) {
 
@@ -206,4 +208,16 @@ predict.gsl.bs <- function(object,
 
 		return(B)
 
+}
+
+predict.npRmpi_gsl.bs <- function(object,
+																 newx=NULL,
+																 ...) {
+		.npRmpi_predict_gsl_bs_impl(object = object, newx = newx, ...)
+}
+
+predict.gsl.bs <- function(object,
+													 newx=NULL,
+													 ...) {
+		.npRmpi_predict_gsl_bs_impl(object = object, newx = newx, ...)
 }

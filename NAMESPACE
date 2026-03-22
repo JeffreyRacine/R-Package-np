@@ -356,4 +356,4 @@ S3method(npscoef, formula)
 S3method(npscoef, scbandwidth)
 
 S3method(gsl.bs, default)
-S3method(predict, gsl.bs)
+S3method(predict, npRmpi_gsl.bs)
