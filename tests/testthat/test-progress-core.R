@@ -531,6 +531,33 @@ test_that("single-line render uses ANSI erase when the console supports it", {
   expect_identical(output, paste0("\r\033[2K", line, "\r\033[2K\r"))
 })
 
+test_that("single-line render clears stale suffix across state handoff in non-ANSI mode", {
+  render <- getFromNamespace(".np_progress_render_single_line", "npRmpi")
+  output_width <- 120L
+  long <- "[npRmpi] Calling NOMAD (Nonsmooth Optimization by Mesh Adaptive Direct Search)... elapsed 0.0s"
+  short <- "[npRmpi] NOMAD search..."
+
+  output <- capture_single_line_output(
+    "npRmpi",
+    list(
+      .np_progress_output_width = function() output_width,
+      .np_progress_single_line_supports_ansi = function(con) FALSE
+    ),
+    {
+      render(list(render_line = long, last_width = 0L), event = "render")
+      render(list(render_line = short, last_width = 0L), event = "render")
+    }
+  )
+
+  expect_identical(
+    output,
+    paste0(
+      "\r", long,
+      "\r", short, strrep(" ", nchar(long, type = "width") - nchar(short, type = "width"))
+    )
+  )
+})
+
 test_that("single-line abort preserves the final line and terminates it", {
   render <- getFromNamespace(".np_progress_render_single_line", "npRmpi")
   line <- "[npRmpi] Bootstrap replications aborted"
