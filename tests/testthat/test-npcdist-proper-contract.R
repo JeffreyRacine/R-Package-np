@@ -136,6 +136,85 @@ test_that("proper explicit-grid fit repairs slices and preserves raw values", {
   expect_true(any(grepl("Proper distribution repair", capture.output(summary(fit.proper)), fixed = TRUE)))
 })
 
+test_that("proper request is a no-op for local-constant explicit-grid cdf fits", {
+  set.seed(20260322)
+  x <- runif(60, -1, 1)
+  y <- sin(2 * pi * x) + rnorm(60, sd = 0.15)
+  y.grid <- seq(min(y) - 0.2, max(y) + 0.2, length.out = 40L)
+  x.grid <- c(-0.4, 0.4)
+  nd <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
+
+  bw <- npcdistbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.3, 0.24),
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+
+  fit.raw <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"]
+  )
+  fit.req <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE
+  )
+
+  expect_true(isTRUE(fit.req$proper.requested))
+  expect_false(isTRUE(fit.req$proper.applied))
+  expect_identical(fit.req$proper.info$reason, "already_proper")
+  expect_equal(fit.req$condist, fit.raw$condist, tolerance = 1e-12)
+  expect_null(fit.req$condist.raw)
+})
+
+test_that("proper request is a no-op for degree-zero lp explicit-grid cdf fits", {
+  set.seed(20260322)
+  x <- runif(60, -1, 1)
+  y <- cos(2 * pi * x) + rnorm(60, sd = 0.15)
+  y.grid <- seq(min(y) - 0.2, max(y) + 0.2, length.out = 40L)
+  x.grid <- c(-0.25, 0.25)
+  nd <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
+
+  bw <- npcdistbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.27, 0.21),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 0L
+  )
+
+  fit.raw <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"]
+  )
+  fit.req <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE
+  )
+
+  expect_true(isTRUE(fit.req$proper.requested))
+  expect_false(isTRUE(fit.req$proper.applied))
+  expect_identical(fit.req$proper.info$reason, "already_proper")
+  expect_equal(fit.req$condist, fit.raw$condist, tolerance = 1e-12)
+  expect_null(fit.req$condist.raw)
+})
+
 test_that("proper request on paired evaluation stores metadata without altering fit", {
   set.seed(20260307)
   x <- runif(60)
@@ -144,7 +223,9 @@ test_that("proper request on paired evaluation stores metadata without altering 
     xdat = data.frame(x = x),
     ydat = data.frame(y = y),
     bws = c(0.25, 0.25),
-    bandwidth.compute = FALSE
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
   )
 
   fit.raw <- npcdist(
@@ -163,6 +244,110 @@ test_that("proper request on paired evaluation stores metadata without altering 
   expect_false(isTRUE(fit.req$proper.applied))
   expect_identical(fit.req$proper.info$reason, "no_eval_grid")
   expect_equal(fit.req$condist, fit.raw$condist, tolerance = 1e-12)
+})
+
+test_that("slice mode defers to exact-grid repair for cdf common grids", {
+  set.seed(20260322)
+  x <- runif(70, -1, 1)
+  y <- sin(2 * pi * x) + rnorm(70, sd = 0.18)
+  y.grid <- seq(min(y) - 0.25, max(y) + 0.25, length.out = 60L)
+  x.grid <- c(-0.35, 0.35)
+  nd <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
+
+  bw <- npcdistbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.28, 0.22),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
+  )
+
+  fit.grid <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE
+  )
+  fit.slice <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE,
+    proper.control = list(mode = "slice")
+  )
+
+  expect_true(isTRUE(fit.slice$proper.applied))
+  expect_equal(fit.slice$condist, fit.grid$condist, tolerance = 1e-12)
+})
+
+test_that("slice mode on paired cdf rows matches the internal explicit-grid oracle", {
+  set.seed(20260322)
+  x <- runif(80, -1, 1)
+  y <- cos(2 * pi * x) + rnorm(80, sd = 0.2)
+  nd <- rbind(
+    data.frame(y = c(-0.8, -0.1, 0.55), x = rep(-0.4, 3L)),
+    data.frame(y = c(-0.35, 0.15, 0.8, 1.1), x = rep(0.45, 4L))
+  )
+
+  bw <- npcdistbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.26, 0.2),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
+  )
+
+  ctrl <- list(mode = "slice", slice.grid.size = 21L, slice.extend.factor = 0)
+
+  fit.slice <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE,
+    proper.control = ctrl
+  )
+
+  build.grid <- getFromNamespace(".np_condist_build_slice_eval_grid", "np")
+  grid.eval <- build.grid(
+    object = fit.slice,
+    slice.context = list(
+      txdat = data.frame(x = x),
+      tydat = data.frame(y = y),
+      exdat = nd["x"],
+      eydat = nd["y"]
+    ),
+    proper.control = ctrl
+  )
+  oracle.fit <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = grid.eval$exdat,
+    eydat = grid.eval$eydat,
+    proper = TRUE
+  )
+
+  ypos <- match(nd$y, grid.eval$y.grid)
+  oracle.values <- numeric(nrow(nd))
+  for (i in seq_along(grid.eval$groups)) {
+    idx.req <- grid.eval$groups[[i]]
+    idx.grid <- grid.eval$grid.slices[[i]]
+    oracle.values[idx.req] <- oracle.fit$condist[idx.grid[ypos[idx.req]]]
+  }
+
+  expect_true(isTRUE(fit.slice$proper.applied))
+  expect_identical(fit.slice$proper.info$route, "slice")
+  expect_true(all(fit.slice$condist >= -1e-8))
+  expect_true(all(fit.slice$condist <= 1 + 1e-8))
+  expect_equal(fit.slice$condist, oracle.values, tolerance = 1e-10)
 })
 
 test_that("predict inherits proper request and validates newdata geometry", {

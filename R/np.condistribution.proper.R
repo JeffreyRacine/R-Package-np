@@ -6,7 +6,12 @@
   switch(
     as.character(reason),
     not_requested = "proper-distribution repair was not requested",
+    already_proper = "proper=TRUE was requested, but the estimator is already proper by construction",
     no_eval_grid = "proper=TRUE requires explicit evaluation data that define a full y-grid for each fixed x; paired row-wise evaluation is insufficient",
+    slice_disabled = "proper=TRUE slice repair is disabled by internal dispatcher controls",
+    slice_context_missing = "proper=TRUE slice repair requires explicit evaluation and training data context",
+    slice_invalid_master_grid = "proper=TRUE slice repair could not construct a valid internal y-grid",
+    slice_eval_failed = "proper=TRUE slice repair failed while evaluating the internal explicit-grid oracle",
     y_not_univariate_continuous = "proper=TRUE currently supports only univariate continuous y",
     gradients_unsupported = "proper=TRUE is currently unsupported when gradients=TRUE",
     x_slices_not_repeated = "proper=TRUE requires repeated fixed-x slices in the evaluation data",
@@ -29,7 +34,11 @@
     tol = 1e-10,
     grid.check = TRUE,
     store.raw = TRUE,
-    fail.on.unsupported = FALSE
+    fail.on.unsupported = FALSE,
+    mode = "grid",
+    apply = "evaluation",
+    slice.grid.size = 101L,
+    slice.extend.factor = 0.1
   )
 
   known <- names(ctrl)
@@ -47,6 +56,16 @@
   ctrl$fail.on.unsupported <- npValidateScalarLogical(
     ctrl$fail.on.unsupported,
     "proper.control$fail.on.unsupported"
+  )
+  ctrl$mode <- match.arg(as.character(ctrl$mode)[1L], c("grid", "slice"))
+  ctrl$apply <- match.arg(as.character(ctrl$apply)[1L], c("evaluation", "fitted", "both"))
+  ctrl$`slice.grid.size` <- npValidatePositiveInteger(
+    ctrl$`slice.grid.size`,
+    "proper.control$slice.grid.size"
+  )
+  ctrl$`slice.extend.factor` <- .np_condist_validate_nonnegative_finite_numeric(
+    ctrl$`slice.extend.factor`,
+    "proper.control$slice.extend.factor"
   )
 
   ctrl
@@ -256,9 +275,9 @@
   if (is.vector.input) as.vector(out[1L, ]) else out
 }
 
-.np_condist_apply_proper <- function(object,
-                                     proper.method = "isotonic",
-                                     proper.control = list()) {
+.np_condist_apply_proper_grid <- function(object,
+                                          proper.method = "isotonic",
+                                          proper.control = list()) {
   proper.method <- match.arg(as.character(proper.method)[1L], c("isotonic"))
   proper.control <- .np_condist_normalize_proper_control(proper.control)
 
@@ -308,10 +327,38 @@
   )
 }
 
+.np_condist_apply_proper <- function(object,
+                                     proper.method = "isotonic",
+                                     proper.control = list(),
+                                     slice.context = NULL) {
+  proper.method <- match.arg(as.character(proper.method)[1L], c("isotonic"))
+  proper.control <- .np_condist_normalize_proper_control(proper.control)
+
+  grid.out <- .np_condist_apply_proper_grid(
+    object = object,
+    proper.method = proper.method,
+    proper.control = proper.control
+  )
+  if (isTRUE(grid.out$applied))
+    return(grid.out)
+
+  if (!identical(proper.control$mode, "slice"))
+    return(grid.out)
+
+  .np_condist_apply_proper_slice(
+    object = object,
+    proper.method = proper.method,
+    proper.control = proper.control,
+    slice.context = slice.context,
+    grid.out = grid.out
+  )
+}
+
 .np_condist_finalize_proper_object <- function(object,
                                                proper = FALSE,
                                                proper.method = c("isotonic"),
                                                proper.control = list(),
+                                               slice.context = NULL,
                                                where = "npcdist()") {
   args <- .np_condist_validate_proper_args(
     proper = proper,
@@ -331,6 +378,14 @@
   if (!isTRUE(args$proper.requested))
     return(object)
 
+  if (.np_condist_is_already_proper_by_design(object$bws)) {
+    object$proper.info <- .np_condist_make_reason_info(
+      reason = "already_proper",
+      supported = TRUE
+    )
+    return(object)
+  }
+
   if (.np_condist_proper_shadow_enabled()) {
     object$proper.info <- .np_condist_make_reason_info(
       reason = "repair_disabled_shadow_mode",
@@ -342,7 +397,8 @@
   proper.out <- .np_condist_apply_proper(
     object = object,
     proper.method = args$proper.method,
-    proper.control = args$proper.control
+    proper.control = args$proper.control,
+    slice.context = slice.context
   )
 
   if (!isTRUE(proper.out$applied)) {
