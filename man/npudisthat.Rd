@@ -42,6 +42,7 @@ Either a hat matrix of class \code{"npudisthat"} or the applied result
 }
 \examples{
 \dontrun{
+npRmpi.init(nslaves = 1)
 data(cps71)
 tx <- data.frame(age = cps71$age)
 
@@ -55,6 +56,8 @@ dist.hat <- npudisthat(bws = bw, tdat = tx,
 dist.core <- fitted(npudist(bws = bw, tdat = tx))
 
 head(cbind(dist.core, dist.hat), n = 2L)
+
+npRmpi.quit()
 }
 }
 \keyword{nonparametric}

@@ -85,6 +85,7 @@ Either a hat matrix (class \code{"npreghat"}) or the applied result
 }
 \examples{
 \dontrun{
+npRmpi.init(nslaves = 1)
 data(cps71)
 bw <- npregbw(xdat = cps71$age, ydat = cps71$logwage,
               regtype = "ll", bandwidth.compute = FALSE, bws = 1.0)
@@ -92,6 +93,8 @@ H <- npreghat(bws = bw, txdat = data.frame(age = cps71$age))
 H.fitted <- H %*% cps71$logwage
 ghat <- npreg(bws = bw)
 head(cbind(fitted(ghat), H.fitted), n = 2L)
+
+npRmpi.quit()
 }
 }
 \keyword{nonparametric}

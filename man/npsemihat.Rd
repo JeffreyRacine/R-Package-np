@@ -88,6 +88,7 @@ Method-specific argument map:
 }
 \examples{
 \dontrun{
+npRmpi.init(nslaves = 1)
 set.seed(42)
 n <- 100
 x <- runif(n)
@@ -120,6 +121,8 @@ sH.fitted <- sH %*% y
 sfit <- npscoef(bws = sbw, txdat = tx, tydat = y, tzdat = tz,
                 iterate = FALSE)
 head(cbind(fitted(sfit), sH.fitted), n = 2L)
+
+npRmpi.quit()
 }
 }
 \keyword{nonparametric}

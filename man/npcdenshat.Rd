@@ -48,9 +48,10 @@ Either a hat matrix of class \code{"npcdenshat"} or the applied result
 }
 \examples{
 \dontrun{
+npRmpi.init(nslaves = 1)
 data(cps71)
 tx <- data.frame(age = cps71$age)
-ty <- data.frame(logwage = log(cps71$wage))
+ty <- data.frame(logwage = cps71$logwage)
 
 bw <- npcdensbw(xdat = tx, ydat = ty, bwtype = "fixed",
                 bandwidth.compute = FALSE, bws = c(1.0, 1.0))
@@ -62,6 +63,8 @@ dens.hat <- npcdenshat(bws = bw, txdat = tx, tydat = ty,
 dens.core <- fitted(npcdens(bws = bw, txdat = tx, tydat = ty))
 
 head(cbind(dens.core, dens.hat), n = 2L)
+
+npRmpi.quit()
 }
 }
 \keyword{nonparametric}

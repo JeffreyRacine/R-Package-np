@@ -48,9 +48,10 @@ Either a hat matrix of class \code{"npcdisthat"} or the applied result
 }
 \examples{
 \dontrun{
+npRmpi.init(nslaves = 1)
 data(cps71)
 tx <- data.frame(age = cps71$age)
-ty <- data.frame(logwage = log(cps71$wage))
+ty <- data.frame(logwage = cps71$logwage)
 
 bw <- npcdistbw(xdat = tx, ydat = ty, bwtype = "fixed",
                 bandwidth.compute = FALSE, bws = c(1.0, 1.0))
@@ -62,6 +63,8 @@ dist.hat <- npcdisthat(bws = bw, txdat = tx, tydat = ty,
 dist.core <- fitted(npcdist(bws = bw, txdat = tx, tydat = ty))
 
 head(cbind(dist.core, dist.hat), n = 2L)
+
+npRmpi.quit()
 }
 }
 \keyword{nonparametric}
