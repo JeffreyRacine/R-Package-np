@@ -430,6 +430,16 @@
   proper.method <- match.arg(as.character(proper.method)[1L], c("project"))
   proper.control <- .np_condens_normalize_proper_control(proper.control)
 
+  if (!isTRUE(object$trainiseval) && identical(proper.control$apply, "fitted")) {
+    info <- .np_condens_make_reason_info(
+      reason = "scope_not_selected",
+      supported = TRUE,
+      slice.count = 0L,
+      grid.common = FALSE
+    )
+    return(list(applied = FALSE, reason = "scope_not_selected", proper.info = info))
+  }
+
   grid.out <- .np_condens_apply_proper_grid(
     object = object,
     proper.method = proper.method,

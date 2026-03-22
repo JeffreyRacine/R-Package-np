@@ -363,6 +363,47 @@ test_that("apply='fitted' leaves explicit-evaluation npcdens objects unchanged",
   expect_equal(fit.req$condens, fit.raw$condens, tolerance = 1e-12)
 })
 
+test_that("apply='fitted' also leaves exact-grid npcdens evaluation objects unchanged", {
+  set.seed(20260322)
+  x <- runif(60, -1, 1)
+  y <- cos(2 * pi * x) + rnorm(60, sd = 0.15)
+  y.grid <- seq(min(y) - 0.2, max(y) + 0.2, length.out = 40L)
+  x.grid <- c(-0.25, 0.25)
+  nd <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
+
+  bw <- npcdensbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.27, 0.21),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
+  )
+
+  fit.raw <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"]
+  )
+  fit.req <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE,
+    proper.control = list(mode = "slice", apply = "fitted")
+  )
+
+  expect_true(isTRUE(fit.req$proper.requested))
+  expect_false(isTRUE(fit.req$proper.applied))
+  expect_identical(fit.req$proper.info$reason, "scope_not_selected")
+  expect_true(isTRUE(fit.req$proper.info$supported))
+  expect_equal(fit.req$condens, fit.raw$condens, tolerance = 1e-12)
+})
+
 test_that("slice mode defers to exact-grid repair when common grids are supplied", {
   set.seed(20260322)
   x <- runif(70, -1, 1)
