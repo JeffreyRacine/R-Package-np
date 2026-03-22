@@ -1082,6 +1082,14 @@ npregbw.default <-
       bernstein.basis = bernstein.value,
       bernstein.named = "bernstein.basis" %in% search.mc.names
     )
+    if (!is.null(degree.search) && is.null(reg.args$degree)) {
+      reg.args$degree <- npSetupGlpDegree(
+        regtype = regtype.value,
+        degree = NULL,
+        ncon = ncon,
+        degree.select = degree.select.value
+      )
+    }
 
     if (!is.null(degree.search)) {
       if (identical(degree.search$engine, "cell")) {

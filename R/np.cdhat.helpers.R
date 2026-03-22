@@ -72,27 +72,23 @@
 
 .npcdhat_make_xhat_matrix <- function(bws, txdat, exdat) {
   xbw <- .npcdhat_make_xbw(bws = bws, txdat = txdat)
+  spec <- npCanonicalConditionalRegSpec(
+    regtype = if (is.null(xbw$regtype)) "lc" else as.character(xbw$regtype),
+    basis = if (is.null(xbw$basis)) "glp" else xbw$basis,
+    degree = xbw$degree,
+    bernstein.basis = isTRUE(xbw$bernstein.basis),
+    ncon = xbw$ncon,
+    where = "npcdhat"
+  )
   regtype <- if (is.null(xbw$regtype.engine)) {
-    if (is.null(xbw$regtype)) "lc" else as.character(xbw$regtype)
+    as.character(spec$regtype.engine)
   } else {
     as.character(xbw$regtype.engine)
   }
-  basis <- if (is.null(xbw$basis.engine)) {
-    if (is.null(xbw$basis)) "glp" else xbw$basis
-  } else {
-    xbw$basis.engine
-  }
-  degree <- if (is.null(xbw$degree.engine)) {
-    if (xbw$ncon > 0L) {
-      npValidateGlpDegree(regtype = "lp", degree = xbw$degree, ncon = xbw$ncon)
-    } else {
-      integer(0)
-    }
-  } else {
-    as.integer(xbw$degree.engine)
-  }
+  basis <- if (is.null(xbw$basis.engine)) spec$basis.engine else xbw$basis.engine
+  degree <- if (is.null(xbw$degree.engine)) as.integer(spec$degree.engine) else as.integer(xbw$degree.engine)
   bernstein <- if (is.null(xbw$bernstein.basis.engine)) {
-    isTRUE(xbw$bernstein.basis)
+    isTRUE(spec$bernstein.basis.engine)
   } else {
     isTRUE(xbw$bernstein.basis.engine)
   }

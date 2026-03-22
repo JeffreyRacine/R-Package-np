@@ -1176,10 +1176,17 @@ npcdensbw.default <-
         stop("regtype='ll' uses canonical bernstein.basis=FALSE; use regtype='lp' for Bernstein LP")
     }
 
+    degree.select.value <- if ("degree.select" %in% mc.names) degree.select else "manual"
+    degree.setup <- npSetupGlpDegree(
+      regtype = regtype,
+      degree = degree,
+      ncon = sum(x.info$icon),
+      degree.select = degree.select.value
+    )
     spec <- npCanonicalConditionalRegSpec(
       regtype = regtype,
       basis = basis,
-      degree = degree,
+      degree = degree.setup,
       bernstein.basis = bernstein.basis,
       ncon = sum(x.info$icon),
       where = "npcdensbw"
@@ -1192,7 +1199,6 @@ npcdensbw.default <-
     search.mc.names <- names(mc)
     lp.dot.args <- list(...)
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
-    degree.select.value <- if ("degree.select" %in% search.mc.names) degree.select else "manual"
     search.engine.value <- if ("search.engine" %in% search.mc.names) search.engine else "nomad+powell"
     degree.min.value <- if ("degree.min" %in% search.mc.names) degree.min else NULL
     degree.max.value <- if ("degree.max" %in% search.mc.names) degree.max else NULL

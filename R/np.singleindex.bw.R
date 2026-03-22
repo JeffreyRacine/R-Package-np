@@ -776,7 +776,7 @@ npindexbw.default <-
       bandwidth.compute = bandwidth.compute,
       nobs = NROW(xdat),
       basis = basis,
-      degree.select = if ("degree.select" %in% mc.names) degree.select else "manual",
+      degree.select = degree.select.value,
       search.engine = if ("search.engine" %in% mc.names) search.engine else "nomad+powell",
       degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
       degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
@@ -787,11 +787,17 @@ npindexbw.default <-
       bernstein.basis = bernstein.basis,
       bernstein.named = "bernstein.basis" %in% mc.names
     )
+    degree.setup <- npSetupGlpDegree(
+      regtype = regtype,
+      degree = degree,
+      ncon = 1L,
+      degree.select = degree.select.value
+    )
     spec <- npResolveCanonicalConditionalRegSpec(
       mc.names = mc.names,
       regtype = regtype,
       basis = basis,
-      degree = degree,
+      degree = degree.setup,
       bernstein.basis = bernstein.basis,
       ncon = 1L,
       where = "npindexbw"

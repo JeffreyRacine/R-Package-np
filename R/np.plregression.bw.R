@@ -731,18 +731,25 @@ npplregbw.default =
     spec.mc.names <- dot.names
     if (!missing(degree))
       spec.mc.names <- c(spec.mc.names, "degree")
+    mc.names <- names(match.call(expand.dots = FALSE))
+    degree.select.value <- if ("degree.select" %in% mc.names) degree.select else "manual"
+    degree.setup <- npSetupGlpDegree(
+      regtype = regtype.arg,
+      degree = degree.arg,
+      ncon = sum(untangle(zdat)$icon),
+      degree.select = degree.select.value
+    )
 
     spec <- npResolveCanonicalConditionalRegSpec(
       mc.names = spec.mc.names,
       regtype = regtype.arg,
       basis = basis.arg,
-      degree = degree.arg,
+      degree = degree.setup,
       bernstein.basis = bernstein.arg,
       ncon = sum(untangle(zdat)$icon),
       where = "npplregbw"
     )
 
-    mc.names <- names(match.call(expand.dots = FALSE))
     random.seed.value <- .np_degree_extract_random_seed(dots)
     degree.search <- .npplregbw_degree_search_controls(
       regtype = regtype.arg,
@@ -751,7 +758,7 @@ npplregbw.default =
       ncon = sum(untangle(zdat)$icon),
       nobs = NROW(zdat),
       basis = spec$basis.engine,
-      degree.select = if ("degree.select" %in% mc.names) degree.select else "manual",
+      degree.select = degree.select.value,
       search.engine = if ("search.engine" %in% mc.names) search.engine else "nomad+powell",
       degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
       degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
