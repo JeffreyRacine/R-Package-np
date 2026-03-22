@@ -366,6 +366,103 @@ if (interactive()) plot(bw)
 
 detach(faithful)
 
+# EXAMPLE 3: Variations on local polynomial conditional distribution
+# estimation with proper = TRUE.
+
+data("Italy")
+
+Italy2 <- within(Italy, {
+  year <- as.numeric(as.character(year))
+})
+
+# Plot only: make the plotted surface proper on the plot evaluation grid.
+
+Fhat <- npcdist(gdp ~ year, data = Italy2,
+                regtype = "lp", degree = 3, nmulti = 1)
+
+plot(Fhat, proper = TRUE)
+
+# Fit an object whose fitted values are themselves proper.
+
+ctrl_fit <- list(
+  mode = "slice",
+  apply = "fitted",
+  slice.grid.size = 101L,
+  slice.extend.factor = 0.1
+)
+
+Fhat_fit <- npcdist(
+  gdp ~ year,
+  data = Italy2,
+  regtype = "lp",
+  degree = 3,
+  nmulti = 1,
+  proper = TRUE,
+  proper.control = ctrl_fit
+)
+
+fit_proper <- fitted(Fhat_fit)
+fit_raw <- Fhat_fit$condist.raw
+
+# Predict on a common explicit y-grid for several years, and render
+# those predictions proper.
+
+g.grid <- seq(min(Italy2$gdp), max(Italy2$gdp), length.out = 200)
+
+nd_grid <- expand.grid(
+  gdp = g.grid,
+  year = c(1955, 1975, 1995)
+)
+
+pred_grid <- predict(Fhat, newdata = nd_grid, proper = TRUE)
+
+# Predict on paired rows with different gdp grids by year, and still
+# make the predictions proper via slice mode.
+
+g1 <- seq(quantile(Italy2$gdp, 0.10),
+          quantile(Italy2$gdp, 0.60), length.out = 60)
+g2 <- seq(quantile(Italy2$gdp, 0.30),
+          quantile(Italy2$gdp, 0.90), length.out = 35)
+
+nd_slice <- rbind(
+  data.frame(gdp = g1, year = rep(1960, length(g1))),
+  data.frame(gdp = g2, year = rep(1985, length(g2)))
+)
+
+pred_slice <- predict(
+  Fhat,
+  newdata = nd_slice,
+  proper = TRUE,
+  proper.control = list(mode = "slice")
+)
+
+# One object that carries properization for fitted values and for later
+# predict() calls.
+
+ctrl_both <- list(
+  mode = "slice",
+  apply = "both",
+  slice.grid.size = 101L,
+  slice.extend.factor = 0.1
+)
+
+Fhat_both <- npcdist(
+  gdp ~ year,
+  data = Italy2,
+  regtype = "lp",
+  degree = 3,
+  nmulti = 1,
+  proper = TRUE,
+  proper.control = ctrl_both
+)
+
+fit_both <- fitted(Fhat_both)
+pred_both <- predict(
+  Fhat_both,
+  newdata = nd_slice,
+  proper.control = ctrl_both
+)
+
 } % enddontrun
 }
 \keyword{nonparametric}

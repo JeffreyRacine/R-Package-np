@@ -589,6 +589,109 @@ lines(age.eval,grad.lower.ci,lty=3)
 lines(age.eval,grad.upper.ci,lty=3)
 
 detach(cps71)
+
+# EXAMPLE 4: Variations on local polynomial conditional density
+# estimation with proper = TRUE.
+
+data("Italy")
+
+Italy2 <- within(Italy, {
+  year <- as.numeric(as.character(year))
+})
+
+# Plot only: make the plotted surface proper on the plot evaluation grid.
+
+fhat <- npcdens(gdp ~ year, data = Italy2,
+                regtype = "lp", degree = 3, nmulti = 1)
+
+plot(fhat, proper = TRUE)
+
+# Fit an object whose fitted values are themselves proper.
+
+ctrl_fit <- list(
+  mode = "slice",
+  apply = "fitted",
+  slice.grid.size = 101L,
+  slice.extend.factor = 0.1
+)
+
+fhat_fit <- npcdens(
+  gdp ~ year,
+  data = Italy2,
+  regtype = "lp",
+  degree = 3,
+  nmulti = 1,
+  proper = TRUE,
+  proper.control = ctrl_fit
+)
+
+fit_proper <- fitted(fhat_fit)
+fit_raw <- fhat_fit$condens.raw
+
+# Display the repaired and raw fitted values for cases where the raw
+# fitted density is negative.
+
+head(cbind(fit_proper, fit_raw)[which(fit_raw < 0), ])
+
+# Predict on a common explicit y-grid for several years, and render
+# those predictions proper.
+
+g.grid <- seq(min(Italy2$gdp), max(Italy2$gdp), length.out = 200)
+
+nd_grid <- expand.grid(
+  gdp = g.grid,
+  year = c(1955, 1975, 1995)
+)
+
+pred_grid <- predict(fhat, newdata = nd_grid, proper = TRUE)
+
+# Predict on paired rows with different gdp grids by year, and still
+# make the predictions proper via slice mode.
+
+g1 <- seq(quantile(Italy2$gdp, 0.10),
+          quantile(Italy2$gdp, 0.60), length.out = 60)
+g2 <- seq(quantile(Italy2$gdp, 0.30),
+          quantile(Italy2$gdp, 0.90), length.out = 35)
+
+nd_slice <- rbind(
+  data.frame(gdp = g1, year = rep(1960, length(g1))),
+  data.frame(gdp = g2, year = rep(1985, length(g2)))
+)
+
+pred_slice <- predict(
+  fhat,
+  newdata = nd_slice,
+  proper = TRUE,
+  proper.control = list(mode = "slice")
+)
+
+# One object that carries properization for fitted values and for later
+# predict() calls.
+
+ctrl_both <- list(
+  mode = "slice",
+  apply = "both",
+  slice.grid.size = 101L,
+  slice.extend.factor = 0.1
+)
+
+fhat_both <- npcdens(
+  gdp ~ year,
+  data = Italy2,
+  regtype = "lp",
+  degree = 3,
+  nmulti = 1,
+  proper = TRUE,
+  proper.control = ctrl_both
+)
+
+fit_both <- fitted(fhat_both)
+pred_both <- predict(
+  fhat_both,
+  newdata = nd_slice,
+  proper.control = ctrl_both
+)
+plot(fhat_both)
 } % enddontrun
 }
 
