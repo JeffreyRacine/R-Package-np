@@ -214,6 +214,38 @@ test_that("predict aliases newdata to the explicit-evaluation slice route for np
   )
 })
 
+test_that("predict newdata for npcdist is unchanged when proper apply='fitted' targets only fitted values", {
+  set.seed(20260322)
+  x <- runif(70, -1, 1)
+  y <- sin(2 * pi * x) + rnorm(70, sd = 0.2)
+  nd <- rbind(
+    data.frame(y = c(-0.7, -0.15, 0.45), x = rep(-0.35, 3L)),
+    data.frame(y = c(-0.25, 0.2, 0.75, 1.0), x = rep(0.4, 4L))
+  )
+  ctrl <- list(mode = "slice", apply = "fitted", slice.grid.size = 21L, slice.extend.factor = 0)
+
+  bw.cd <- npcdistbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.27, 0.21),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
+  )
+  fit.cd <- npcdist(
+    bws = bw.cd,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    proper = TRUE
+  )
+
+  expect_equal(
+    as.numeric(predict(fit.cd, newdata = nd, proper = FALSE)),
+    as.numeric(predict(fit.cd, newdata = nd, proper.control = ctrl)),
+    tolerance = 1e-12
+  )
+})
+
 test_that("predict aliases newdata to exdat/ezdat for default npscoef/npplreg", {
   set.seed(20260227)
   n <- 80

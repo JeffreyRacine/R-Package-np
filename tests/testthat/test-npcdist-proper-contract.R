@@ -246,6 +246,157 @@ test_that("proper request on paired evaluation stores metadata without altering 
   expect_equal(fit.req$condist, fit.raw$condist, tolerance = 1e-12)
 })
 
+test_that("slice mode can properize fitted npcdist values when apply='fitted'", {
+  set.seed(20260322)
+  x <- runif(36, -1, 1)
+  y <- sin(2 * pi * x) + rnorm(36, sd = 0.18)
+
+  bw <- npcdistbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.29, 0.23),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
+  )
+
+  ctrl <- list(mode = "slice", apply = "fitted", slice.grid.size = 31L, slice.extend.factor = 0)
+
+  fit.raw <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y)
+  )
+  fit.slice <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    proper = TRUE,
+    proper.control = ctrl
+  )
+
+  build.grid <- getFromNamespace(".np_condist_build_slice_eval_grid", "np")
+  grid.eval <- build.grid(
+    object = fit.raw,
+    slice.context = list(
+      txdat = data.frame(x = x),
+      tydat = data.frame(y = y),
+      exdat = data.frame(x = x),
+      eydat = data.frame(y = y)
+    ),
+    proper.control = ctrl
+  )
+
+  grid.proper <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = grid.eval$exdat,
+    eydat = grid.eval$eydat,
+    proper = TRUE
+  )
+
+  ypos <- match(y, grid.eval$y.grid)
+  oracle <- numeric(length(y))
+  for (i in seq_along(grid.eval$groups)) {
+    idx.req <- grid.eval$groups[[i]]
+    idx.grid <- grid.eval$grid.slices[[i]]
+    oracle[idx.req] <- grid.proper$condist[idx.grid[ypos[idx.req]]]
+  }
+
+  expect_true(isTRUE(fit.slice$proper.requested))
+  expect_true(isTRUE(fit.slice$proper.applied))
+  expect_identical(fit.slice$proper.info$route, "slice")
+  expect_identical(fit.slice$proper.info$apply.scope, "fitted")
+  expect_equal(fit.slice$condist.raw, fit.raw$condist, tolerance = 1e-12)
+  expect_equal(fit.slice$condist, oracle, tolerance = 1e-10)
+  expect_true(all(fit.slice$condist >= -1e-8))
+  expect_true(all(fit.slice$condist <= 1 + 1e-8))
+})
+
+test_that("apply='fitted' leaves explicit-evaluation npcdist objects unchanged", {
+  set.seed(20260322)
+  x <- runif(70, -1, 1)
+  y <- cos(2 * pi * x) + rnorm(70, sd = 0.2)
+  nd <- rbind(
+    data.frame(y = c(-0.8, -0.1, 0.55), x = rep(-0.4, 3L)),
+    data.frame(y = c(-0.35, 0.15, 0.8, 1.1), x = rep(0.45, 4L))
+  )
+
+  bw <- npcdistbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.26, 0.2),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
+  )
+
+  fit.raw <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"]
+  )
+  fit.req <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE,
+    proper.control = list(mode = "slice", apply = "fitted")
+  )
+
+  expect_true(isTRUE(fit.req$proper.requested))
+  expect_false(isTRUE(fit.req$proper.applied))
+  expect_identical(fit.req$proper.info$reason, "scope_not_selected")
+  expect_true(isTRUE(fit.req$proper.info$supported))
+  expect_equal(fit.req$condist, fit.raw$condist, tolerance = 1e-12)
+})
+
+test_that("apply='fitted' also leaves exact-grid npcdist evaluation objects unchanged", {
+  set.seed(20260322)
+  x <- runif(70, -1, 1)
+  y <- sin(2 * pi * x) + rnorm(70, sd = 0.18)
+  y.grid <- seq(min(y) - 0.25, max(y) + 0.25, length.out = 60L)
+  x.grid <- c(-0.35, 0.35)
+  nd <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
+
+  bw <- npcdistbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.28, 0.22),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
+  )
+
+  fit.raw <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"]
+  )
+  fit.req <- npcdist(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE,
+    proper.control = list(mode = "slice", apply = "fitted")
+  )
+
+  expect_true(isTRUE(fit.req$proper.requested))
+  expect_false(isTRUE(fit.req$proper.applied))
+  expect_identical(fit.req$proper.info$reason, "scope_not_selected")
+  expect_true(isTRUE(fit.req$proper.info$supported))
+  expect_equal(fit.req$condist, fit.raw$condist, tolerance = 1e-12)
+})
+
 test_that("slice mode defers to exact-grid repair for cdf common grids", {
   set.seed(20260322)
   x <- runif(70, -1, 1)
