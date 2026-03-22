@@ -50,7 +50,7 @@ Either a hat matrix of class \code{"npcdisthat"} or the applied result
 \dontrun{
 data(cps71)
 tx <- data.frame(age = cps71$age)
-ty <- data.frame(logwage = log(cps71$wage))
+ty <- data.frame(logwage = cps71$logwage)
 
 bw <- npcdistbw(xdat = tx, ydat = ty, bwtype = "fixed",
                 bandwidth.compute = FALSE, bws = c(1.0, 1.0))
