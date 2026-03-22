@@ -199,3 +199,51 @@ test_that("proper finalizer stores request-only metadata on unsupported geometry
   expect_false(isTRUE(out.grad$proper.applied))
   expect_identical(out.grad$proper.info$reason, "gradients_unsupported")
 })
+
+test_that("apply='fitted' leaves explicit-evaluation synthetic density objects unchanged", {
+  raw <- c(-0.3, 0.2, 0.9, -0.1, 0.4, 1.1)
+  obj <- make_proper_test_object(condens = raw)
+
+  out <- getFromNamespace(".np_condens_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "project",
+    proper.control = list(mode = "slice", apply = "fitted"),
+    slice.context = list(
+      txdat = data.frame(x = c(0.2, 0.8)),
+      tydat = data.frame(y = seq(-1, 1, length.out = 3L)),
+      exdat = obj$xeval,
+      eydat = obj$yeval
+    )
+  )
+
+  expect_true(isTRUE(out$proper.requested))
+  expect_false(isTRUE(out$proper.applied))
+  expect_identical(out$proper.info$reason, "scope_not_selected")
+  expect_true(isTRUE(out$proper.info$supported))
+  expect_equal(out$condens, raw, tolerance = 1e-12)
+})
+
+test_that("apply='fitted' also leaves exact-grid synthetic density objects unchanged", {
+  raw <- c(-0.3, 0.2, 0.9, -0.1, 0.4, 1.1)
+  obj <- make_proper_test_object(condens = raw)
+
+  out <- getFromNamespace(".np_condens_finalize_proper_object", "npRmpi")(
+    object = obj,
+    proper = TRUE,
+    proper.method = "project",
+    proper.control = list(mode = "slice", apply = "fitted"),
+    slice.context = list(
+      txdat = data.frame(x = c(0.2, 0.8)),
+      tydat = data.frame(y = seq(-1, 1, length.out = 3L)),
+      exdat = obj$xeval,
+      eydat = obj$yeval
+    )
+  )
+
+  expect_true(isTRUE(out$proper.requested))
+  expect_false(isTRUE(out$proper.applied))
+  expect_identical(out$proper.info$reason, "scope_not_selected")
+  expect_true(isTRUE(out$proper.info$supported))
+  expect_equal(out$condens, raw, tolerance = 1e-12)
+})
