@@ -9,7 +9,7 @@ test_that("fixed regression wild bootstrap matches remote and single-worker loca
   y <- x + rnorm(n, sd = 0.25 * sd(x))
   xdat <- data.frame(x = x)
   exdat <- data.frame(x = seq(min(x), max(x), length.out = 17L))
-  bw <- npregbw(y ~ x, regtype = "lp", bwtype = "fixed", nmulti = 1)
+  bw <- npregbw(y ~ x, regtype = "lp", degree = 1L, bwtype = "fixed", nmulti = 1)
 
   fit.mean <- as.vector(npreghat(
     bws = bw,
@@ -64,7 +64,7 @@ test_that("fixed regression inid bootstrap matches remote and single-worker loca
   y <- x + rnorm(n, sd = 0.25 * sd(x))
   xdat <- data.frame(x = x)
   exdat <- data.frame(x = seq(min(x), max(x), length.out = 17L))
-  bw <- npregbw(y ~ x, regtype = "lp", bwtype = "fixed", nmulti = 1)
+  bw <- npregbw(y ~ x, regtype = "lp", degree = 1L, bwtype = "fixed", nmulti = 1)
 
   boot.fun <- get(".np_inid_boot_from_regression", asNamespace("npRmpi"))
 

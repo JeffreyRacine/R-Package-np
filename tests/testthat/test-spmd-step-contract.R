@@ -120,7 +120,7 @@ test_that("SPMD opcode selection tags LL/LP CV routes for core bw families", {
   op.reg <- opcode.fun(mc = mc.reg, caller_env = environment())
   expect_identical(op.reg, "autodispatch.npregbw.cv_lllp")
 
-  mc.sc <- quote(npscoefbw(xdat = x, ydat = y, zdat = z, regtype = "lp", bwmethod = "cv.aic"))
+  mc.sc <- quote(npscoefbw(xdat = x, ydat = y, zdat = z, regtype = "lp", degree = 1L, bwmethod = "cv.aic"))
   op.sc <- opcode.fun(mc = mc.sc, caller_env = environment())
   expect_identical(op.sc, "autodispatch.npscoefbw.cv_lllp")
 
