@@ -566,6 +566,7 @@ npplregbw.plbandwidth =
         penalty.multiplier = 10
       )
       child.list <- vector("list", length(child.templates))
+      names(child.list) <- c("yzbw", names(xdat))
 
       for (i in seq_along(child.templates)) {
         resp <- child.responses[[i]]

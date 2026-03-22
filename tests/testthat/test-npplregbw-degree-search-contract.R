@@ -243,3 +243,39 @@ test_that("npplregbw automatic degree search defaults to NOMAD plus Powell", {
   expect_lte(auto$fval, auto$degree.search$baseline.fval + 1e-8)
   expect_equal(auto$fval, auto$degree.search$best.fval, tolerance = 1e-8)
 })
+
+test_that("npplreg explicit plbandwidth route preserves NOMAD child payload names", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260322)
+  n <- 40L
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- x1^2 + rnorm(n, sd = 0.1)
+
+  bw <- npplregbw(
+    xdat = data.frame(x1 = x1),
+    zdat = data.frame(x2 = x2),
+    ydat = y,
+    regtype = "lp",
+    degree.select = "coordinate",
+    search.engine = "nomad+powell",
+    degree.max = 2L,
+    nmulti = 1L
+  )
+
+  expect_identical(names(bw$bw), c("yzbw", "x1"))
+
+  fit <- npplreg(
+    bws = bw,
+    txdat = data.frame(x1 = x1),
+    tzdat = data.frame(x2 = x2),
+    tydat = y
+  )
+
+  expect_s3_class(fit, "plregression")
+  expect_equal(nrow(fit$evalx), n)
+})

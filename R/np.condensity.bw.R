@@ -849,7 +849,13 @@ npcdensbw.conbandwidth <-
         reg.args = final.reg.args
       )
       payload <- tbw
-      payload$method <- as.character(reg.args$bwmethod[1L])
+      payload$method <- if (!is.null(payload$method) && length(payload$method)) {
+        as.character(payload$method[1L])
+      } else if (!is.null(reg.args$bwmethod) && length(reg.args$bwmethod)) {
+        as.character(reg.args$bwmethod[1L])
+      } else {
+        "cv.ml"
+      }
       payload$pmethod <- bwmToPrint(payload$method)
       payload$fval <- as.numeric(best_record$objective)
       payload$ifval <- NA_real_
