@@ -112,12 +112,68 @@
     return(list(applied = FALSE, reason = "slice_disabled", proper.info = info))
   }
 
-  if (isTRUE(object$trainiseval) ||
-      is.null(slice.context) ||
-      is.null(slice.context$txdat) ||
-      is.null(slice.context$tydat) ||
-      is.null(slice.context$exdat) ||
-      is.null(slice.context$eydat)) {
+  target.context <- NULL
+  target.scope <- NULL
+
+  if (isTRUE(object$trainiseval)) {
+    if (!identical(proper.control$apply, "fitted") &&
+        !identical(proper.control$apply, "both")) {
+      return(grid.out)
+    }
+
+    if (is.null(slice.context) ||
+        is.null(slice.context$txdat) ||
+        is.null(slice.context$tydat)) {
+      info <- .np_condens_make_reason_info(
+        reason = "slice_context_missing",
+        supported = FALSE,
+        slice.count = 0L,
+        grid.common = FALSE
+      )
+      return(list(applied = FALSE, reason = "slice_context_missing", proper.info = info))
+    }
+
+    target.context <- list(
+      txdat = slice.context$txdat,
+      tydat = slice.context$tydat,
+      exdat = slice.context$txdat,
+      eydat = slice.context$tydat
+    )
+    target.scope <- "fitted"
+  } else {
+    if (identical(proper.control$apply, "fitted")) {
+      info <- .np_condens_make_reason_info(
+        reason = "scope_not_selected",
+        supported = TRUE,
+        slice.count = 0L,
+        grid.common = FALSE
+      )
+      return(list(applied = FALSE, reason = "scope_not_selected", proper.info = info))
+    }
+
+    if (is.null(slice.context) ||
+        is.null(slice.context$txdat) ||
+        is.null(slice.context$tydat) ||
+        is.null(slice.context$exdat) ||
+        is.null(slice.context$eydat)) {
+      info <- .np_condens_make_reason_info(
+        reason = "slice_context_missing",
+        supported = FALSE,
+        slice.count = 0L,
+        grid.common = FALSE
+      )
+      return(list(applied = FALSE, reason = "slice_context_missing", proper.info = info))
+    }
+
+    target.context <- slice.context
+    target.scope <- "evaluation"
+  }
+
+  if (is.null(target.context) ||
+      is.null(target.context$txdat) ||
+      is.null(target.context$tydat) ||
+      is.null(target.context$exdat) ||
+      is.null(target.context$eydat)) {
     info <- .np_condens_make_reason_info(
       reason = "slice_context_missing",
       supported = FALSE,
@@ -130,7 +186,7 @@
   grid.eval <- tryCatch(
     .np_condens_build_slice_eval_grid(
       object = object,
-      slice.context = slice.context,
+      slice.context = target.context,
       proper.control = proper.control
     ),
     error = function(e) e
@@ -152,8 +208,8 @@
   grid.fit <- tryCatch(
     npcdens(
       bws = object$bws,
-      txdat = slice.context$txdat,
-      tydat = slice.context$tydat,
+      txdat = target.context$txdat,
+      tydat = target.context$tydat,
       exdat = grid.eval$exdat,
       eydat = grid.eval$eydat,
       proper = FALSE
@@ -178,7 +234,7 @@
   if (!isTRUE(grid.proper$applied))
     return(grid.proper)
 
-  y.req <- as.double(slice.context$eydat[[1L]])
+  y.req <- as.double(target.context$eydat[[1L]])
   ypos <- match(y.req, grid.eval$y.grid)
   if (anyNA(ypos)) {
     info <- .np_condens_make_reason_info(
@@ -203,8 +259,9 @@
 
   info <- grid.proper$proper.info
   info$route <- "slice"
+  info$apply.scope <- target.scope
   info$internal.grid.size <- length(grid.eval$y.grid)
-  info$request.nobs <- nrow(slice.context$eydat)
+  info$request.nobs <- nrow(target.context$eydat)
 
   list(
     applied = TRUE,

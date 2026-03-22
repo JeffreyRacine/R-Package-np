@@ -8,6 +8,7 @@
     not_requested = "proper-density repair was not requested",
     already_proper = "proper=TRUE was requested, but the estimator is already proper by construction",
     no_eval_grid = "proper=TRUE requires explicit evaluation data that define a full y-grid for each fixed x; paired row-wise evaluation is insufficient",
+    scope_not_selected = "proper=TRUE was requested, but 'proper.control$apply' does not target the values returned by this object",
     slice_disabled = "proper=TRUE slice repair is disabled by internal dispatcher controls",
     slice_context_missing = "proper=TRUE slice repair requires explicit evaluation and training data context",
     slice_invalid_master_grid = "proper=TRUE slice repair could not construct a valid internal y-grid",
@@ -498,7 +499,8 @@
 
   if (!isTRUE(proper.out$applied)) {
     object$proper.info <- proper.out$proper.info
-    if (isTRUE(args$proper.control$fail.on.unsupported)) {
+    if (isTRUE(args$proper.control$fail.on.unsupported) &&
+        !isTRUE(proper.out$proper.info$supported)) {
       stop(.np_condens_proper_reason_message(
         reason = proper.out$reason,
         where = where
