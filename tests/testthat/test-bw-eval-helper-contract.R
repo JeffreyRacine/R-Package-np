@@ -84,3 +84,17 @@ test_that(".np_eval_bw_call reports underlying evaluation errors", {
     "np_missing_bw_arg_contract"
   )
 })
+
+test_that(".np_bw_call_uses_nomad_degree_search tolerates missing dummy formals", {
+  out <- local({
+    x1 <- rnorm(10)
+    x2 <- rnorm(10)
+    y <- x1 + rnorm(10)
+    .np_bw_call_uses_nomad_degree_search(
+      quote(npregbw(y ~ x1 + x2, nmulti = 2)),
+      caller_env = environment()
+    )
+  })
+
+  expect_false(out)
+})

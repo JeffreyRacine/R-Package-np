@@ -106,10 +106,19 @@
     return(FALSE)
 
   defaults <- formals(fn_def)
+  is_missing_arg <- function(z) missing(z)
+  arg_expr <- function(source, name) {
+    if (is.null(source) || is.null(names(source)) || !(name %in% names(source)))
+      return(NULL)
+    expr <- source[[name]]
+    if (is_missing_arg(expr))
+      return(NULL)
+    expr
+  }
   arg_value <- function(name) {
-    expr <- matched[[name]]
-    if (is.null(expr) && !is.null(defaults[[name]]))
-      expr <- defaults[[name]]
+    expr <- arg_expr(matched, name)
+    if (is.null(expr))
+      expr <- arg_expr(defaults, name)
     if (is.null(expr))
       return(NULL)
     value <- .np_try_eval_in_frames(expr, eval_env = caller_env)
