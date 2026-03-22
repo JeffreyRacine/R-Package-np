@@ -279,7 +279,12 @@
   For smooth coefficient plots (\code{npscoef}) under non-fixed bandwidths,
   \code{"exact"} can also be much more expensive than \code{"frozen"} on
   large jobs, because the coefficient field must be recomputed for each
-  bootstrap resample rather than reusing the original-sample geometry.
+  bootstrap resample rather than reusing the original-sample geometry. This
+  recomputation cannot in general be avoided without a more aggressive
+  approximation: for \code{npscoef} the local weighted systems that define the
+  coefficient vector depend on the bootstrap resample weights/counts at each
+  evaluation point, so unlike \code{npplreg} there is no single global
+  coefficient vector that can be updated once per draw.
   \code{inid} admits general heteroskedasticity of unknown form, though
   it does not allow for dependence. \code{fixed} conducts Kunsch's (1988)
   block bootstrap for dependent data, while \code{geom} conducts Politis

@@ -78,7 +78,12 @@ operator. The implementation is intentionally conservative: class and scalar
 argument contracts are validated explicitly, and unsupported iterative
 \code{npscoefhat()} paths fail fast. \code{npscoefhat()} inherits
 \code{regtype}/LP-basis controls from the supplied \code{scbandwidth}
-object.
+object. For non-fixed \code{npscoef} bootstrap plotting, these operators can
+support a frozen approximation, but they do not remove the need to recompute
+the local smooth-coefficient vector itself for each resample: the local
+weighted systems depend on the resample weights/counts at each evaluation
+point, so unlike \code{npplreg} there is no single global coefficient vector
+to update once per draw.
 
 Method-specific argument map:
 \code{npindexhat()} uses \code{s}; \code{fd.step} is accepted for compatibility but the current \code{s=1} route uses the canonical exact derivative operator;
