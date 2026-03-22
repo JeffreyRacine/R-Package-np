@@ -68,13 +68,14 @@ ivdata <- data.frame(y,z,w)
 ivdata <- ivdata[order(ivdata$z),]
 rm(y,z,w)
 mpi.bcast.Robj2slave(ivdata)
-mpi.bcast.cmd(attach(ivdata),
-              caller.execute=TRUE)
 
-t <- system.time(mpi.bcast.cmd(model.iv <- npregiv(y=y,z=z,w=w),
-                               caller.execute=TRUE))
+if (mpi.comm.rank(1L) == 0L) {
+  ## npregiv is a composite/orchestrator route: in profile mode keep the
+  ## orchestration on master and let leaf calls use the existing MPI path.
+  t <- system.time(model.iv <- with(ivdata, npregiv(y=y,z=z,w=w)))
 
-cat("Elapsed time =", t[3], "\n")
+  cat("Elapsed time =", t[3], "\n")
+}
 
 ## Clean up properly then quit()
 
