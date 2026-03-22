@@ -1,5 +1,6 @@
 np_try_eval_in_frames <- getFromNamespace(".np_try_eval_in_frames", "np")
 np_eval_bw_call <- getFromNamespace(".np_eval_bw_call", "np")
+np_bw_call_uses_nomad_degree_search <- getFromNamespace(".np_bw_call_uses_nomad_degree_search", "np")
 
 test_that(".np_try_eval_in_frames resolves symbols from eval env first", {
   env <- new.env(parent = emptyenv())
@@ -86,4 +87,18 @@ test_that(".np_eval_bw_call reports underlying evaluation errors", {
     np_eval_bw_call(call_obj, caller_env = new.env(parent = baseenv())),
     "np_missing_bw_arg_contract"
   )
+})
+
+test_that(".np_bw_call_uses_nomad_degree_search tolerates missing dummy formals", {
+  out <- local({
+    x1 <- rnorm(10)
+    x2 <- rnorm(10)
+    y <- x1 + rnorm(10)
+    np_bw_call_uses_nomad_degree_search(
+      quote(npregbw(y ~ x1 + x2, nmulti = 2)),
+      caller_env = environment()
+    )
+  })
+
+  expect_false(out)
 })

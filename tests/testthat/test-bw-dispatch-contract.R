@@ -31,3 +31,17 @@ test_that("bw object dispatch remains intact", {
   bw_dist1 <- npudistbw(bws = bw_dist0, dat = dat, bandwidth.compute = FALSE)
   expect_equal(as.numeric(bw_dist1$bw), as.numeric(bw_dist0$bw))
 })
+
+test_that("formula estimator fronts tolerate omitted legacy regtype defaults", {
+  set.seed(20260322)
+  n <- 40L
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- x1^2 + rnorm(n, sd = 0.1)
+
+  expect_s3_class(npreg(y ~ x1 + x2, nmulti = 1), "npregression")
+  expect_s3_class(npudens(~ y + x1, nmulti = 1), "npdensity")
+  expect_s3_class(npscoef(y ~ x1 | x2, nmulti = 1), "smoothcoefficient")
+  expect_s3_class(npindex(y ~ x1 + x2, nmulti = 1), "singleindex")
+  expect_s3_class(npplreg(y ~ x1 | x2, nmulti = 1), "plregression")
+})
