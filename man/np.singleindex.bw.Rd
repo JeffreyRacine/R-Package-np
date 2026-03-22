@@ -115,9 +115,10 @@ npindexbw(\dots)
   }
 
   \item{degree}{
-    optional integer degree vector for continuous predictors when
-    \code{regtype="lp"}. For single-index regression this is typically
-    length one.
+    integer degree vector for continuous predictors when
+    \code{regtype="lp"}. When \code{degree.select="manual"}, this must
+    be supplied explicitly. For single-index regression this is
+    typically length one.
   }
 
   \item{degree.select}{

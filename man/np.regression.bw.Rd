@@ -245,10 +245,11 @@ npregbw(\dots)
   \item{degree}{
     a user-supplied vector of fixed polynomial degrees for the
     continuous predictors (exactly one degree per continuous predictor),
-    relevant only when \code{regtype="lp"}. If omitted, the default is
-    degree one for each continuous predictor. Entries must be
-    non-negative integers in \code{[0,12]}. Bandwidth optimization
-    treats this vector as fixed input and optimizes only bandwidths.
+    relevant only when \code{regtype="lp"}. When
+    \code{degree.select="manual"}, this must be supplied explicitly.
+    Entries must be non-negative integers in \code{[0,12]}.
+    Bandwidth optimization treats this vector as fixed input and
+    optimizes only bandwidths.
   }
 
   \item{degree.select}{
