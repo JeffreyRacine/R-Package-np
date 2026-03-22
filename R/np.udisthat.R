@@ -56,29 +56,80 @@ npudisthat <- function(bws,
   }
 
   n.train <- nrow(tdat)
+  target.dist <- fitted(npudist(
+    bws = bws,
+    tdat = tdat,
+    edat = if (no.e) tdat else edat
+  ))
+
+  scale_rows <- function(x, probe.sum) {
+    x <- as.matrix(x)
+    probe.sum <- as.vector(probe.sum)
+    safe.sum <- probe.sum
+    safe.sum[abs(safe.sum) < .Machine$double.xmin] <- .Machine$double.xmin
+    scaled <- sweep(x, 1L, target.dist / safe.sum, "*")
+    if (ncol(scaled) == 1L)
+      scaled[, 1L, drop = FALSE]
+    else
+      scaled
+  }
+
   if (identical(output, "apply")) {
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
 
-    if (identical(bws$type, "fixed")) {
-      out <- .np_direct_operator_apply(
-        kbw = bws,
-        txdat = tdat,
-        exdat = if (no.e) tdat else edat,
-        operator = "integral",
-        rhs = y,
-        where = "npudisthat direct operator apply"
-      ) / n.train
+    rhs <- if (ncol(y) == 1L) {
+      y
     } else {
-      out <- .np_exact_operator_apply(
-        kbw = bws,
-        txdat = tdat,
-        exdat = if (no.e) tdat else edat,
-        operator = "integral",
-        rhs = y,
-        where = "npudisthat exact operator apply"
-      ) / n.train
+      lapply(seq_len(ncol(y)), function(j) y[, j, drop = FALSE])
     }
+
+    apply_one <- function(rhs.col) {
+      if (identical(bws$type, "fixed")) {
+        out <- .np_direct_operator_apply(
+          kbw = bws,
+          txdat = tdat,
+          exdat = if (no.e) tdat else edat,
+          operator = "integral",
+          rhs = rhs.col,
+          where = "npudisthat direct operator apply"
+        ) / n.train
+        probe.sum <- .np_direct_operator_apply(
+          kbw = bws,
+          txdat = tdat,
+          exdat = if (no.e) tdat else edat,
+          operator = "integral",
+          rhs = matrix(1.0, nrow = n.train, ncol = 1L),
+          where = "npudisthat direct operator probe"
+        ) / n.train
+      } else {
+        out <- .np_exact_operator_apply(
+          kbw = bws,
+          txdat = tdat,
+          exdat = if (no.e) tdat else edat,
+          operator = "integral",
+          rhs = rhs.col,
+          where = "npudisthat exact operator apply"
+        ) / n.train
+        probe.sum <- .np_exact_operator_apply(
+          kbw = bws,
+          txdat = tdat,
+          exdat = if (no.e) tdat else edat,
+          operator = "integral",
+          rhs = matrix(1.0, nrow = n.train, ncol = 1L),
+          where = "npudisthat exact operator probe"
+        ) / n.train
+      }
+
+      scale_rows(out, probe.sum)
+    }
+
+    out <- if (is.list(rhs)) {
+      do.call(cbind, lapply(rhs, apply_one))
+    } else {
+      apply_one(rhs)
+    }
+
     if (ncol(out) == 1L)
       return(as.vector(out))
     return(out)
@@ -101,6 +152,8 @@ npudisthat <- function(bws,
       where = "npudisthat exact operator"
     ) / n.train
   }
+
+  H <- scale_rows(H, rowSums(H))
 
   if (identical(output, "apply")) {
     if (is.null(y))

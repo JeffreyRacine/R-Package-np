@@ -60,25 +60,40 @@ npudenshat <- function(bws,
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
 
-    if (identical(bws$type, "fixed")) {
-      out <- .np_direct_operator_apply(
-        kbw = bws,
-        txdat = tdat,
-        exdat = if (no.e) tdat else edat,
-        operator = "normal",
-        rhs = y,
-        where = "npudenshat direct operator apply"
-      ) / n.train
+    rhs <- if (ncol(y) == 1L) {
+      y
     } else {
-      out <- .np_exact_operator_apply(
-        kbw = bws,
-        txdat = tdat,
-        exdat = if (no.e) tdat else edat,
-        operator = "normal",
-        rhs = y,
-        where = "npudenshat exact operator apply"
-      ) / n.train
+      lapply(seq_len(ncol(y)), function(j) y[, j, drop = FALSE])
     }
+
+    apply_one <- function(rhs.col) {
+      if (identical(bws$type, "fixed")) {
+        .np_direct_operator_apply(
+          kbw = bws,
+          txdat = tdat,
+          exdat = if (no.e) tdat else edat,
+          operator = "normal",
+          rhs = rhs.col,
+          where = "npudenshat direct operator apply"
+        ) / n.train
+      } else {
+        .np_exact_operator_apply(
+          kbw = bws,
+          txdat = tdat,
+          exdat = if (no.e) tdat else edat,
+          operator = "normal",
+          rhs = rhs.col,
+          where = "npudenshat exact operator apply"
+        ) / n.train
+      }
+    }
+
+    out <- if (is.list(rhs)) {
+      do.call(cbind, lapply(rhs, apply_one))
+    } else {
+      apply_one(rhs)
+    }
+
     if (ncol(out) == 1L)
       return(as.vector(out))
     return(out)
