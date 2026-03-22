@@ -6,6 +6,7 @@
   switch(
     as.character(reason),
     not_requested = "proper-density repair was not requested",
+    already_proper = "proper=TRUE was requested, but the estimator is already proper by construction",
     no_eval_grid = "proper=TRUE requires explicit evaluation data that define a full y-grid for each fixed x; paired row-wise evaluation is insufficient",
     y_not_univariate_continuous = "proper=TRUE currently supports only univariate continuous y",
     gradients_unsupported = "proper=TRUE is currently unsupported when gradients=TRUE",
@@ -425,6 +426,14 @@
 
   if (!isTRUE(args$proper.requested))
     return(object)
+
+  if (.np_condens_is_already_proper_by_design(object$bws)) {
+    object$proper.info <- .np_condens_make_reason_info(
+      reason = "already_proper",
+      supported = TRUE
+    )
+    return(object)
+  }
 
   if (.np_condens_proper_shadow_enabled()) {
     object$proper.info <- .np_condens_make_reason_info(

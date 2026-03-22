@@ -137,6 +137,85 @@ test_that("proper explicit-grid fit repairs slices and preserves raw values", {
   expect_true(any(grepl("Proper density repair", capture.output(summary(fit.proper)), fixed = TRUE)))
 })
 
+test_that("proper request is a no-op for local-constant explicit-grid fits", {
+  set.seed(20260322)
+  x <- runif(60, -1, 1)
+  y <- sin(2 * pi * x) + rnorm(60, sd = 0.15)
+  y.grid <- seq(min(y) - 0.2, max(y) + 0.2, length.out = 40L)
+  x.grid <- c(-0.4, 0.4)
+  nd <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
+
+  bw <- npcdensbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.3, 0.24),
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+
+  fit.raw <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"]
+  )
+  fit.req <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE
+  )
+
+  expect_true(isTRUE(fit.req$proper.requested))
+  expect_false(isTRUE(fit.req$proper.applied))
+  expect_identical(fit.req$proper.info$reason, "already_proper")
+  expect_equal(fit.req$condens, fit.raw$condens, tolerance = 1e-12)
+  expect_null(fit.req$condens.raw)
+})
+
+test_that("proper request is a no-op for degree-zero lp explicit-grid fits", {
+  set.seed(20260322)
+  x <- runif(60, -1, 1)
+  y <- cos(2 * pi * x) + rnorm(60, sd = 0.15)
+  y.grid <- seq(min(y) - 0.2, max(y) + 0.2, length.out = 40L)
+  x.grid <- c(-0.25, 0.25)
+  nd <- do.call(rbind, lapply(x.grid, function(xx) data.frame(y = y.grid, x = xx)))
+
+  bw <- npcdensbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.27, 0.21),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 0L
+  )
+
+  fit.raw <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"]
+  )
+  fit.req <- npcdens(
+    bws = bw,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    exdat = nd["x"],
+    eydat = nd["y"],
+    proper = TRUE
+  )
+
+  expect_true(isTRUE(fit.req$proper.requested))
+  expect_false(isTRUE(fit.req$proper.applied))
+  expect_identical(fit.req$proper.info$reason, "already_proper")
+  expect_equal(fit.req$condens, fit.raw$condens, tolerance = 1e-12)
+  expect_null(fit.req$condens.raw)
+})
+
 test_that("proper request on paired evaluation stores metadata without altering fit", {
   set.seed(20260307)
   x <- runif(60)
@@ -145,7 +224,9 @@ test_that("proper request on paired evaluation stores metadata without altering 
     xdat = data.frame(x = x),
     ydat = data.frame(y = y),
     bws = c(0.25, 0.25),
-    bandwidth.compute = FALSE
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 3L
   )
 
   fit.raw <- npcdens(
