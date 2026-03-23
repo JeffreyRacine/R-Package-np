@@ -383,6 +383,18 @@ npqreg.default <- function(bws, txdat, tydat, ...){
   no.txdat <- missing(txdat)
   no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "condbandwidth")
+  bws.formula <- (!no.bws) && inherits(bws, "formula")
+
+  if (bws.named && no.txdat && no.tydat && bws.formula) {
+    sc$`bws` <- NULL
+    sc$formula <- bws
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npcdistbw)
+    bws.named <- FALSE
+  } else {
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npcdistbw)
+  }
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
@@ -391,10 +403,6 @@ npqreg.default <- function(bws, txdat, tydat, ...){
 
   if(tydat.named)
     tydat <- toFrame(tydat)
-
-  sc.bw <- sc
-  
-  sc.bw[[1]] <- quote(npcdistbw)
 
   if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
