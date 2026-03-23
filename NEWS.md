@@ -9,3 +9,9 @@
   defaults to `nmulti=1`.
 - The empirical studies supporting this change are documented under
   `benchmarks/validation/`.
+- LP-capable front ends now accept `nomad=TRUE` as a documented
+  convenience preset for the recommended automatic NOMAD local-polynomial
+  route. Missing settings expand to the same long-form LP/NOMAD defaults
+  documented in the bandwidth help pages, and regression formula calls
+  such as `npreg(y ~ x, nomad = TRUE)` now carry that shortcut through
+  the internally computed bandwidth path.

@@ -146,7 +146,7 @@ npplregbw(\dots)
     immediately; in particular, \code{nomad=TRUE} currently requires
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
     search, \code{bernstein.basis=TRUE}, no explicit \code{degree},
-    and \code{search.engine %in% c("nomad", "nomad+powell")}.
+    and \code{search.engine \%in\% c("nomad", "nomad+powell")}.
   }
 
   \item{degree.min}{

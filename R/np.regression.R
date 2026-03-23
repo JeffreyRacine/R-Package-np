@@ -3,6 +3,8 @@ npreg <-
     args <- list(...)
 
     if (!missing(bws)){
+      if (inherits(bws, "formula") && is.null(args$txdat))
+        UseMethod("npreg", bws)
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$txdat))
           UseMethod("npreg",bws$formula)
@@ -24,9 +26,19 @@ npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
 
     tt <- terms(bws)
-    m <- match(c("formula", "data", "subset", "na.action"),
-               names(bws$call), nomatch = 0)
-    tmf <- bws$call[c(1,m)]
+    tmf <- if (!is.null(bws$call)) {
+      m <- match(c("formula", "data", "subset", "na.action"),
+                 names(bws$call), nomatch = 0)
+      bws$call[c(1, m)]
+    } else {
+      mc <- match.call(expand.dots = FALSE)
+      m <- match(c("bws", "data", "subset", "na.action"),
+                 names(mc), nomatch = 0)
+      tmf <- mc[c(1, m)]
+      if ("bws" %in% names(tmf))
+        names(tmf)[names(tmf) == "bws"] <- "formula"
+      tmf
+    }
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
     mf.args <- as.list(tmf)[-1L]
@@ -489,6 +501,25 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc.names <- names(sc)
   nomad <- npValidateScalarLogical(nomad, "nomad")
 
+  if (!missing(bws) &&
+      !isa(bws, "rbandwidth") &&
+      (inherits(bws, "formula") || is.call(bws))) {
+    dots <- list(...)
+    dots$nomad <- nomad
+    bw.args <- if (missing(txdat) && missing(tydat)) {
+      list(formula = bws)
+    } else {
+      list(xdat = txdat, ydat = tydat)
+    }
+    tbw <- do.call(npregbw, c(bw.args, dots))
+    reg.args <- list(bws = tbw)
+    if (!missing(txdat))
+      reg.args$txdat <- txdat
+    if (!missing(tydat))
+      reg.args$tydat <- tydat
+    return(do.call(npreg, c(reg.args, dots)))
+  }
+
   ## here we check to see if the function was called with tdat =
   ## if it was, we need to catch that and map it to dat =
   ## otherwise the call is passed unadulterated to npudensbw
@@ -502,14 +533,24 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "rbandwidth")
 
+  ## match.call() can normalize an originally unnamed formula first
+  ## argument into named bws=... . Rewrite the bw call so formula-driven
+  ## fits continue down the formula route instead of disabling search.
+  if (bws.named && no.txdat && no.tydat && inherits(bws, "formula")) {
+    sc$`bws` <- NULL
+    sc$formula <- bws
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npregbw)
+    bws.named <- FALSE
+  } else {
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npregbw)
+  }
+
   ## if bws was passed in explicitly, do not compute bandwidths
     
   if(txdat.named)
     txdat <- toFrame(txdat)
-
-  sc.bw <- sc
-  
-  sc.bw[[1]] <- quote(npregbw)
 
   if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
