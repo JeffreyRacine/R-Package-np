@@ -1,4 +1,4 @@
-test_that("npregbw NOMAD plus Powell progress keeps stage text on managed lines", {
+test_that("npregbw NOMAD plus Powell progress keeps lines compact and restart-oriented", {
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -36,7 +36,7 @@ test_that("npregbw NOMAD plus Powell progress keeps stage text on managed lines"
         degree.verify = FALSE,
         bwtype = "fixed",
         bwmethod = "cv.ls",
-        nmulti = 1L,
+        nmulti = 2L,
         max.bb.eval = 8
       )
     )
@@ -44,5 +44,14 @@ test_that("npregbw NOMAD plus Powell progress keeps stage text on managed lines"
 
   expect_false(any(grepl("^\\[np\\] Starting NOMAD automatic polynomial degree search at degree ", msgs)))
   expect_false(any(grepl("^\\[np\\] Refining NOMAD solution with one Powell hot start at degree ", msgs)))
-  expect_true(any(grepl("starting at degree \\(", msgs)))
+  expect_false(any(grepl("starting at degree \\(", msgs)))
+  expect_false(any(grepl("nomad\\+powell", msgs, ignore.case = TRUE)))
+  expect_false(any(grepl("eval [0-9]+", msgs)))
+  expect_false(any(grepl("fval=", msgs, fixed = TRUE)))
+  expect_true(any(grepl("^\\[np\\] Selecting degree and bandwidth \\(", msgs)))
+  expect_true(any(grepl("multistart [12]/2", msgs)))
+  expect_true(any(grepl("iteration [0-9]+", msgs)))
+  expect_true(any(grepl("[0-9]+\\.[0-9]+%, eta [0-9]+\\.[0-9]+s", msgs)))
+  expect_true(any(grepl("deg \\(", msgs)))
+  expect_true(any(grepl("best \\(", msgs)))
 })
