@@ -148,7 +148,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   ## if(tydat.named)
   ## tydat <- toFrame(tydat)
 
-  if(tydat.named)
+  if(tzdat.named)
     tzdat <- toFrame(tzdat)
 
   sc.bw <- sc
@@ -245,7 +245,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     tol <- as.double(tol)
     regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
 
-    miss.z <- missing(tzdat)
+    miss.z <- missing(tzdat) || is.null(tzdat)
 
     miss.ex = missing(exdat)
     miss.ey = missing(eydat)
