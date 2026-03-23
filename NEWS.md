@@ -10,3 +10,7 @@
 - The empirical studies supporting this mirror change are documented in
   `np-master/benchmarks/validation/`, with a summary note kept in this
   repository's `benchmarks/validation/` folder.
+- LP-capable front ends now accept `nomad=TRUE` as a documented
+  convenience preset for the recommended automatic NOMAD
+  local-polynomial route, mirroring the serial package defaults and
+  help-page guidance.

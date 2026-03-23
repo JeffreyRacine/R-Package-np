@@ -31,6 +31,7 @@ npindex(bws, \dots)
 \method{npindex}{default}(bws,
         txdat,
         tydat,
+        nomad = FALSE,
         \dots) 
 
 \method{npindex}{sibandwidth}(bws,
@@ -126,6 +127,16 @@ npindex(bws, \dots)
     \code{FALSE}.
   }
 
+  \item{nomad}{
+    logical shortcut passed through to \code{\link{npindexbw}} when
+    bandwidths are computed inside \code{npindex}. When \code{TRUE},
+    the single-index bandwidth route fills any missing values among
+    \code{regtype}, \code{search.engine}, \code{degree.select},
+    \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
+    \code{degree.verify}, and \code{bwtype} with the recommended
+    automatic LP NOMAD preset documented in \code{\link{npindexbw}}.
+  }
+
 
   \item{\dots}{
     additional arguments supplied to specify the parameters to the
@@ -144,6 +155,12 @@ npindex(bws, \dots)
 
   A matrix of gradients along with average derivatives are computed and
   returned if \code{gradients=TRUE} is used.
+
+  For practitioners who want the recommended automatic LP NOMAD route
+  without spelling out all LP tuning arguments,
+  \code{npindex(..., nomad=TRUE)} and \code{npindexbw(..., nomad=TRUE)}
+  expand missing settings to the same documented preset. Explicit
+  incompatible settings fail fast rather than being silently rewritten.
 
 }
 

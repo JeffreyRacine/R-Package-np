@@ -3,6 +3,8 @@ npreg <-
     args <- list(...)
 
     if (!missing(bws)){
+      if (inherits(bws, "formula") && is.null(args$txdat))
+        UseMethod("npreg", bws)
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$txdat))
           UseMethod("npreg",bws$formula)
@@ -24,9 +26,19 @@ npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
 
     tt <- terms(bws)
-    m <- match(c("formula", "data", "subset", "na.action"),
-               names(bws$call), nomatch = 0)
-    tmf <- bws$call[c(1,m)]
+    tmf <- if (!is.null(bws$call)) {
+      m <- match(c("formula", "data", "subset", "na.action"),
+                 names(bws$call), nomatch = 0)
+      bws$call[c(1, m)]
+    } else {
+      mc <- match.call(expand.dots = FALSE)
+      m <- match(c("bws", "data", "subset", "na.action"),
+                 names(mc), nomatch = 0)
+      tmf <- mc[c(1, m)]
+      if ("bws" %in% names(tmf))
+        names(tmf)[names(tmf) == "bws"] <- "formula"
+      tmf
+    }
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
     if (!missing(data) && !is.null(data))
@@ -594,6 +606,26 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   nomad <- npValidateScalarLogical(nomad, "nomad")
   if (.npRmpi_autodispatch_active() && !isTRUE(nomad))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
+  if (!missing(bws) &&
+      !isa(bws, "rbandwidth") &&
+      (inherits(bws, "formula") || is.call(bws))) {
+    dots <- list(...)
+    dots$nomad <- nomad
+    bw.args <- if (missing(txdat) && missing(tydat)) {
+      list(formula = bws)
+    } else {
+      list(xdat = txdat, ydat = tydat)
+    }
+    tbw <- do.call(npregbw, c(bw.args, dots))
+    reg.args <- list(bws = tbw)
+    if (!missing(txdat))
+      reg.args$txdat <- txdat
+    if (!missing(tydat))
+      reg.args$tydat <- tydat
+    return(do.call(npreg, c(reg.args, dots)))
+  }
+
   sc <- sys.call()
   sc.names <- names(sc)
 

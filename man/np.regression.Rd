@@ -24,7 +24,7 @@ npreg(bws, \dots)
 FALSE, \dots)
 
 
-\method{npreg}{default}(bws, txdat, tydat, \dots)
+\method{npreg}{default}(bws, txdat, tydat, nomad = FALSE, \dots)
 
 \method{npreg}{rbandwidth}(bws,
       txdat = stop("training data 'txdat' missing"),
@@ -114,6 +114,16 @@ FALSE, \dots)
     a logical value indicating that you want residuals computed and
     returned in the resulting \code{npregression} object. Defaults to
     \code{FALSE}.
+  }
+
+  \item{nomad}{
+    logical shortcut passed through to \code{\link{npregbw}} when
+    bandwidths are computed inside \code{npreg}. When \code{TRUE}, the
+    regression bandwidth route fills any missing values among
+    \code{regtype}, \code{search.engine}, \code{degree.select},
+    \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
+    \code{degree.verify}, and \code{bwtype} with the recommended
+    automatic LP NOMAD preset documented in \code{\link{npregbw}}.
   }
 
   \item{\dots}{
@@ -213,6 +223,11 @@ FALSE, \dots)
   cached cell-search backend or the direct
   \code{search.engine="nomad"}/\code{"nomad+powell"} route described in
   \code{\link{npregbw}}; the latter follows Hall and Racine (2015). For
+  practitioners who want that recommended route without spelling out all
+  LP tuning arguments, \code{npreg(..., nomad=TRUE)} and
+  \code{npregbw(..., nomad=TRUE)} expand missing settings to the same
+  documented automatic-LP NOMAD preset. Explicit incompatible settings
+  fail fast rather than being silently rewritten. For
   \code{bernstein.basis=TRUE}, evaluation points for continuous predictors
   must lie within training support; use \code{bernstein.basis=FALSE} for
   extrapolation. For \code{regtype="ll"} and \code{regtype="lp"}, the

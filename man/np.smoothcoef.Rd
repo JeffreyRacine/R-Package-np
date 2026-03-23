@@ -25,7 +25,7 @@ npscoef(bws, \dots)
 FALSE, \dots)
 
 
-\method{npscoef}{default}(bws, txdat, tydat, tzdat, \dots)
+\method{npscoef}{default}(bws, txdat, tydat, tzdat, nomad = FALSE, \dots)
 
 \method{npscoef}{scbandwidth}(bws,
         txdat = stop("training data 'txdat' missing"),
@@ -164,6 +164,17 @@ FALSE, \dots)
     desired tolerance on the relative convergence of backfit
     estimates. Defaults to \code{.Machine$double.eps}.
   }
+
+  \item{nomad}{
+    logical shortcut passed through to \code{\link{npscoefbw}} when
+    bandwidths are computed inside \code{npscoef}. When \code{TRUE},
+    the smooth-coefficient bandwidth route fills any missing values
+    among \code{regtype}, \code{search.engine},
+    \code{degree.select}, \code{bernstein.basis},
+    \code{degree.min}, \code{degree.max}, \code{degree.verify}, and
+    \code{bwtype} with the recommended automatic LP NOMAD preset
+    documented in \code{\link{npscoefbw}}.
+  }
   
   \item{\dots}{
     additional arguments supplied to specify the regression type,
@@ -256,6 +267,12 @@ FALSE, \dots)
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+
+  For practitioners who want the recommended automatic LP NOMAD route
+  without spelling out all LP tuning arguments,
+  \code{npscoef(..., nomad=TRUE)} and \code{npscoefbw(..., nomad=TRUE)}
+  expand missing settings to the same documented preset. Explicit
+  incompatible settings fail fast rather than being silently rewritten.
 
   Support for backfitted bandwidths is experimental and is limited in
   functionality. The code does not support asymptotic standard errors
