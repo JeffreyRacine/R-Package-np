@@ -149,7 +149,8 @@ npregivderiv(y,
   }. However, if local rather than global optima are encountered the
   resulting estimates can be overly noisy. To best guard against this
   eventuality set \code{nmulti} to a larger number than the default
-  \code{nmulti=5} for the first iteration.
+  \code{nmulti=min(2,p)} for the first iteration, where \code{p} is
+  the dimension of the current smoothing problem.
 
   Note that for subsequent Landweber-Fridman iterations, a \dQuote{warm
   start} strategy is employed. The optimal bandwidths from the previous
@@ -158,7 +159,7 @@ npregivderiv(y,
   iterations after the first successful one, these optimal bandwidths
   serve as the first of the multiple initial points (a warm start),
   while any remaining restarts are cold starts. If \code{nmulti} is not
-  explicitly supplied by the user, it defaults to 5 for the first
+  explicitly supplied by the user, it defaults to \code{min(2,p)} for the first
   iteration and to 1 for all subsequent iterations. This strategy
   provides a balance between computational efficiency and robustness,
   allowing the numerical optimizer to refine the structural bandwidths

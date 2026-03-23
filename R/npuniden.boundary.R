@@ -10,7 +10,7 @@ npuniden.boundary <- function(X=NULL,
                                   "beta1","beta2",
                                   "fb","fbl","fbu",
                                   "rigaussian","gamma"),
-                              nmulti=5,
+                              nmulti=1,
                               proper=FALSE) {
     kertype <- match.arg(kertype)
     cv <- match.arg(cv)

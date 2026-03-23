@@ -216,6 +216,13 @@ npValidateNonNegativeInteger <- function(value, argname) {
   as.integer(value)
 }
 
+npDefaultNmulti <- function(p) {
+  if (!is.numeric(p) || length(p) != 1L || is.na(p) ||
+      !is.finite(p) || p < 1 || p != floor(p))
+    stop("'p' must be a positive integer")
+  min(2L, as.integer(p))
+}
+
 npValidatePositiveInteger <- function(value, argname) {
   if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
       !is.finite(value) || value < 1 || value != floor(value))

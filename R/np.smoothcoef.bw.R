@@ -220,7 +220,7 @@ npscoefbw.scbandwidth <-
       zdat <- toFrame(zdat)
     
     if (missing(nmulti)){
-      nmulti <- min(5,length(bws$bw))
+      nmulti <- npDefaultNmulti(if (miss.z) NCOL(xdat) else NCOL(zdat))
     }
     regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
     cv.iterate <- npValidateScalarLogical(cv.iterate, "cv.iterate")
@@ -1170,7 +1170,7 @@ npscoefbw.scbandwidth <-
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
   ndeg <- length(degree.search$start.degree)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) 1L else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(NCOL(eval.zdat)) else max(1L, as.integer(opt.args$nmulti[1L]))
 
   bw_lower <- c(rep.int(1e-2, ncon), rep.int(0, ncat))
   bw_upper <- c(rep.int(1e6, ncon), setup$cat_upper * setup$bandwidth.scale.categorical)

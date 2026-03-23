@@ -125,7 +125,7 @@ npregbw.rbandwidth <-
     xdat <- toFrame(xdat)
 
     if (missing(nmulti)){
-      nmulti <- min(5,dim(xdat)[2])
+      nmulti <- npDefaultNmulti(dim(xdat)[2])
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     remin <- npValidateScalarLogical(remin, "remin")
@@ -634,7 +634,7 @@ npregbw.rbandwidth <-
   setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) 1L else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(xdat)[2]) else max(1L, as.integer(opt.args$nmulti[1L]))
 
   bw_lower <- c(rep.int(1e-2, ncon), rep.int(0, ncat))
   bw_upper <- c(rep.int(1e6, ncon), setup$cat_upper * setup$bandwidth.scale.categorical)

@@ -152,7 +152,7 @@ npplregbw.plbandwidth =
     ## z is n x p
 
     if (missing(nmulti)){
-      nmulti <- min(5,dim(zdat)[2])
+      nmulti <- npDefaultNmulti(dim(zdat)[2])
     }
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
     
@@ -480,7 +480,7 @@ npplregbw.plbandwidth =
   }), use.names = FALSE)
   bwdim <- length(child.start)
   ndeg <- length(degree.search$start.degree)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) 1L else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(zdat)[2]) else max(1L, as.integer(opt.args$nmulti[1L]))
 
   x0 <- c(child.start, as.integer(degree.search$start.degree))
   lb <- c(child.lower, degree.search$lower)

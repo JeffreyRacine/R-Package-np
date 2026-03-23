@@ -128,7 +128,7 @@ npudensbw.bandwidth <-
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
 
     if (missing(nmulti)){
-      nmulti <- min(5,dim(dat)[2])
+      nmulti <- npDefaultNmulti(dim(dat)[2])
     }
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
     .np_progress_bandwidth_set_total(nmulti)
