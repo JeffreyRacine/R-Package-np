@@ -127,6 +127,10 @@
     value$value
   }
 
+  nomad <- arg_value("nomad")
+  if (!is.null(nomad) && isTRUE(as.logical(nomad)[1L]))
+    return(TRUE)
+
   regtype <- arg_value("regtype")
   if (is.null(regtype) || !identical(as.character(regtype)[1L], "lp"))
     return(FALSE)

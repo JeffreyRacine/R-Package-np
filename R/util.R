@@ -209,6 +209,53 @@ npValidateScalarLogical <- function(value, argname) {
   value
 }
 
+.np_prepare_nomad_shortcut <- function(nomad,
+                                       call_names,
+                                       preset,
+                                       values,
+                                       where = "npregbw") {
+  call_names <- if (is.null(call_names)) character(0) else call_names[nzchar(call_names)]
+  nomad.enabled <- if ("nomad" %in% call_names) {
+    npValidateScalarLogical(nomad, "nomad")
+  } else {
+    FALSE
+  }
+
+  metadata <- list(
+    enabled = isTRUE(nomad.enabled),
+    where = where,
+    preset = "lp_nomad",
+    auto.filled = character(0),
+    user.supplied = character(0),
+    normalized.values = preset
+  )
+
+  if (!isTRUE(nomad.enabled))
+    return(list(enabled = FALSE, values = values, metadata = metadata))
+
+  auto.filled <- character(0)
+  user.supplied <- intersect(names(preset), call_names)
+
+  for (arg in names(preset)) {
+    if (!(arg %in% call_names)) {
+      values[[arg]] <- preset[[arg]]
+      auto.filled <- c(auto.filled, arg)
+    }
+  }
+
+  metadata$auto.filled <- auto.filled
+  metadata$user.supplied <- user.supplied
+  metadata$normalized.values <- values[names(preset)]
+
+  list(enabled = TRUE, values = values, metadata = metadata)
+}
+
+.np_attach_nomad_shortcut <- function(obj, metadata) {
+  if (isTRUE(metadata$enabled))
+    obj$nomad.shortcut <- metadata
+  obj
+}
+
 npValidateNonNegativeInteger <- function(value, argname) {
   if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
       !is.finite(value) || value < 0 || value != floor(value))
