@@ -41,6 +41,7 @@ npplreg.formula <-
     umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
     tmf.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt.xf))
     
+    response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
     txdat <- tmf.xf
     tzdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
@@ -100,6 +101,11 @@ npplreg.formula <-
     }
     pl.args$bws <- bws
     ev <- do.call(npplreg, c(pl.args, list(...)))
+
+    if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
+      if (!is.null(ev$bws))
+        ev$bws$ynames <- response.name
+    }
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)

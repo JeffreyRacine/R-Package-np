@@ -47,6 +47,7 @@ npindex.formula <-
         mf.args <- as.list(tmf)[-1L]
         umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
+        response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
         tydat <- model.response(tmf)
         txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
         has.eval <- !is.null(newdata)
@@ -92,6 +93,11 @@ npindex.formula <-
         }
         si.args$bws <- bws
         ev <- do.call(npindex, c(si.args, list(...)))
+
+        if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
+            if (!is.null(ev$bws))
+                ev$bws$ynames <- response.name
+        }
 
         ev$omit <- attr(umf,"na.action")
         ev$rows.omit <- as.vector(ev$omit)
