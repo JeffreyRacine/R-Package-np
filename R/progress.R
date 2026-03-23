@@ -1111,6 +1111,23 @@
 }
 
 .np_progress_format_unknown_total <- function(state, done = NULL, detail = NULL, now = .np_progress_now()) {
+  if (is.function(state$unknown_total_fields)) {
+    fields <- state$unknown_total_fields(
+      state = state,
+      done = done,
+      detail = detail,
+      now = now
+    )
+    if (length(fields)) {
+      return(sprintf(
+        "%s %s (%s)",
+        state$pkg_prefix,
+        state$label,
+        paste(as.character(fields), collapse = ", ")
+      ))
+    }
+  }
+
   elapsed <- max(0, now - state$started)
   line <- sprintf("%s %s... ", state$pkg_prefix, state$label)
 
@@ -1198,6 +1215,7 @@
     last_render_width = 0L,
     last_emitted_done = NULL,
     last_emitted_detail = NULL,
+    unknown_total_fields = NULL,
     message_muffled = FALSE,
     message_muffled_checked = FALSE
   )

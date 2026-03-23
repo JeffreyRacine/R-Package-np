@@ -234,7 +234,7 @@ test_that("automatic degree search emits staged progress output", {
   )
 
   expect_true(any(grepl("Automatic polynomial degree search baseline \\(0\\)", msgs)))
-  expect_true(any(grepl("Selecting polynomial degree and bw", msgs, fixed = TRUE)))
+  expect_true(any(grepl("Selecting degree and bandwidth", msgs, fixed = TRUE)))
   expect_true(any(grepl("exhaustive", msgs)))
   expect_true(any(grepl("best (", msgs, fixed = TRUE)))
 
