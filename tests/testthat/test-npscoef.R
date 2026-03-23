@@ -51,7 +51,7 @@ test_that("npscoef direct route accepts omitted tzdat with explicit bandwidths",
   y <- c(0.12, 0.25, 0.44, 0.61, 0.73, 0.95)
 
   bw <- npscoefbw(xdat = x, ydat = y, bws = 0.35, bandwidth.compute = FALSE)
-  fit <- npscoef(bws = bw, txdat = x, tydat = y)
+  fit <- npscoef(bws = bw, txdat = x, tydat = y, errors = FALSE, iterate = FALSE)
 
   expect_s3_class(fit, "smoothcoefficient")
   expect_equal(length(fit$mean), nrow(x))
@@ -70,8 +70,15 @@ test_that("npscoef explicit tzdat direct route matches stored-data route", {
     bandwidth.compute = FALSE
   )
 
-  fit.stored <- npscoef(bws = bw)
-  fit.direct <- npscoef(bws = bw, txdat = x, tydat = y, tzdat = z)
+  fit.stored <- npscoef(bws = bw, errors = FALSE, iterate = FALSE)
+  fit.direct <- npscoef(
+    bws = bw,
+    txdat = x,
+    tydat = y,
+    tzdat = z,
+    errors = FALSE,
+    iterate = FALSE
+  )
 
   expect_equal(fit.direct$mean, fit.stored$mean, tolerance = 0)
   expect_equal(fit.direct$bws$bw, fit.stored$bws$bw, tolerance = 0)
