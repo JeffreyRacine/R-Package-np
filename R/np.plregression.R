@@ -385,26 +385,24 @@ npplreg.plbandwidth <-
 
     Berr = sqrt(diag(Bvcov))
 
+    train.ply =  mmy$mean + resx %*% B
+    ply = if (no.exz) train.ply else mmy.eval$mean + resx.eval %*% B
+
     if (!no.ey) {
-      ply = mmy.eval$mean + resx.eval %*% B
-      RSQ = RSQfunc(tmp.ey,ply)
-      MSE = MSEfunc(tmp.ey,ply)
-      MAE = MAEfunc(tmp.ey,ply)
-      MAPE = MAPEfunc(tmp.ey,ply)
-      CORR = CORRfunc(tmp.ey,ply)
-      SIGN = SIGNfunc(tmp.ey,ply)
+      RSQ = RSQfunc(tmp.ey, ply)
+      MSE = MSEfunc(tmp.ey, ply)
+      MAE = MAEfunc(tmp.ey, ply)
+      MAPE = MAPEfunc(tmp.ey, ply)
+      CORR = CORRfunc(tmp.ey, ply)
+      SIGN = SIGNfunc(tmp.ey, ply)
 
     } else {
-      ply =  mmy$mean + resx %*% B
-      RSQ = RSQfunc(tmp.ty,ply)
-      MSE = MSEfunc(tmp.ty,ply)
-      MAE = MAEfunc(tmp.ty,ply)
-      MAPE = MAPEfunc(tmp.ty,ply)
-      CORR = CORRfunc(tmp.ty,ply)
-      SIGN = SIGNfunc(tmp.ty,ply)
-
-      if (!no.exz)
-        ply = mmy.eval$mean + resx.eval %*% B
+      RSQ = RSQfunc(tmp.ty, train.ply)
+      MSE = MSEfunc(tmp.ty, train.ply)
+      MAE = MAEfunc(tmp.ty, train.ply)
+      MAPE = MAPEfunc(tmp.ty, train.ply)
+      CORR = CORRfunc(tmp.ty, train.ply)
+      SIGN = SIGNfunc(tmp.ty, train.ply)
     }
 
     ev.args <- list(
@@ -421,7 +419,7 @@ npplreg.plbandwidth <-
       xtra = c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
     )
     if (residuals)
-      ev.args$resid <- tmp.ty - ply
+      ev.args$resid <- tmp.ty - train.ply
     ev <- do.call(plregression, ev.args)
 
     fit.elapsed <- proc.time()[3] - fit.start
