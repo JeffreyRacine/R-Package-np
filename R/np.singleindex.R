@@ -118,9 +118,10 @@ npindex.call <-
             bws = bws, ...)
   }
 
-npindex.default <- function(bws, txdat, tydat, ...){
+npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
+  nomad <- npValidateScalarLogical(nomad, "nomad")
 
   ## here we check to see if the function was called with tdat =
   ## if it was, we need to catch that and map it to dat =

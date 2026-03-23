@@ -34,6 +34,7 @@ npindexbw(\dots)
           degree = NULL,
           degree.select = c("manual", "coordinate", "exhaustive"),
           search.engine = c("nomad+powell", "cell", "nomad"),
+          nomad = FALSE,
           degree.min = NULL,
           degree.max = NULL,
           degree.start = NULL,
@@ -143,6 +144,23 @@ npindexbw(\dots)
     admissible degree grid using repeated fixed-degree solves.
     NOMAD-based search currently requires \code{degree.verify=FALSE}
     and the suggested package \pkg{crs} to be installed.
+  }
+
+  \item{nomad}{
+    logical shortcut for the recommended automatic local-polynomial
+    NOMAD route. When \code{TRUE}, any missing values among
+    \code{regtype}, \code{search.engine}, \code{degree.select},
+    \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
+    \code{degree.verify}, and \code{bwtype} are filled with
+    \code{regtype="lp"}, \code{search.engine="nomad+powell"},
+    \code{degree.select="coordinate"},
+    \code{bernstein.basis=TRUE}, \code{degree.min=0L},
+    \code{degree.max=10L}, \code{degree.verify=FALSE}, and
+    \code{bwtype="fixed"}. Explicit incompatible settings error
+    immediately; in particular, \code{nomad=TRUE} currently requires
+    \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
+    search, \code{bernstein.basis=TRUE}, no explicit \code{degree},
+    and \code{search.engine %in% c("nomad", "nomad+powell")}.
   }
 
   \item{degree.min}{
@@ -359,6 +377,25 @@ npindexbw(\dots)
   the better of the direct NOMAD and polished solutions. For the
   index-smoother local-polynomial component, this polynomial-adaptive
   joint-search route follows Hall and Racine (2015).
+
+  Setting \code{nomad=TRUE} is a convenience preset for this automatic
+  LP route, not a generic optimizer alias. For single-index bandwidth
+  selection it expands any missing values to the equivalent long-form
+  call
+  \preformatted{
+    npindexbw(...,
+              regtype = "lp",
+              search.engine = "nomad+powell",
+              degree.select = "coordinate",
+              bernstein.basis = TRUE,
+              degree.min = 0L,
+              degree.max = 10L,
+              degree.verify = FALSE,
+              bwtype = "fixed")
+  }
+  Compatible explicit tuning arguments are respected. Incompatible
+  explicit settings fail fast so the shortcut never silently changes
+  user-selected semantics.
   
 }
 

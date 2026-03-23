@@ -1,6 +1,7 @@
 % 
 \name{npplreg}
 \alias{npplreg}
+\alias{npplreg.default}
 \alias{npplreg.formula}
 \alias{npplreg.plbandwidth}
 
@@ -22,6 +23,12 @@ npplreg(bws, \dots)
 \method{npplreg}{formula}(bws, data = NULL, newdata = NULL, y.eval =
 FALSE, \dots)
 
+\method{npplreg}{default}(bws,
+        txdat,
+        tydat,
+        tzdat,
+        nomad = FALSE,
+        \dots)
 
 \method{npplreg}{plbandwidth}(bws,
         txdat = stop("training data txdat missing"),
@@ -115,6 +122,16 @@ FALSE, \dots)
     \code{FALSE}.
   }
 
+  \item{nomad}{
+    logical shortcut passed through to \code{\link{npplregbw}} when
+    bandwidths are computed inside \code{npplreg}. When \code{TRUE},
+    the partially linear bandwidth route fills any missing values among
+    \code{regtype}, \code{search.engine}, \code{degree.select},
+    \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
+    \code{degree.verify}, and \code{bwtype} with the recommended
+    automatic LP NOMAD preset documented in \code{\link{npplregbw}}.
+  }
+
   \item{\dots}{
     additional arguments supplied to specify the regression type,
     bandwidth type, kernel types, selection methods, and so on. To do
@@ -166,6 +183,12 @@ FALSE, \dots)
  kernel. Unordered discrete data types use a variation on Aitchison and
  Aitken's (1976) kernel, while ordered data types use a variation of the
  Wang and van Ryzin (1981) kernel.
+
+ For practitioners who want the recommended automatic LP NOMAD route
+ without spelling out all LP tuning arguments,
+ \code{npplreg(..., nomad=TRUE)} and \code{npplregbw(..., nomad=TRUE)}
+ expand missing settings to the same documented preset. Explicit
+ incompatible settings fail fast rather than being silently rewritten.
 }
 
 \value{
