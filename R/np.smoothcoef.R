@@ -155,7 +155,13 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   
   sc.bw[[1]] <- quote(npscoefbw)
 
-  if(bws.named){
+  bws.formula <- (!no.bws) && inherits(bws, "formula")
+  if (bws.formula) {
+    ib <- match("bws", names(sc.bw), nomatch = 0L)
+    if (ib > 0L) names(sc.bw)[ib] <- "formula"
+  }
+
+  if(bws.named && !bws.formula){
     sc.bw$bandwidth.compute <- FALSE
   }
 
