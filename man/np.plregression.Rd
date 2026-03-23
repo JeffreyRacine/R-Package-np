@@ -1,6 +1,7 @@
 % 
 \name{npplreg}
 \alias{npplreg}
+\alias{npplreg.default}
 \alias{npplreg.formula}
 \alias{npplreg.plbandwidth}
 
