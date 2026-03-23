@@ -402,8 +402,34 @@ test_that("shadow generalized-nn X-side row helper matches dense oracle and pres
   expect_equal(res.ll$streamed[9L], 0, tolerance = 1e-12)
 })
 
+locate_shadow_proof_src <- function(filename) {
+  candidates <- c(
+    testthat::test_path("..", "..", "src", filename),
+    testthat::test_path("..", "..", "..", "src", filename),
+    file.path(Sys.getenv("R_PACKAGE_DIR", ""), "src", filename),
+    file.path(Sys.getenv("R_PACKAGE_SOURCE", ""), "src", filename),
+    file.path(getwd(), "src", filename),
+    file.path(getwd(), "..", "src", filename)
+  )
+  candidates <- unique(candidates[nzchar(candidates)])
+  hits <- candidates[file.exists(candidates)]
+  if (length(hits) == 0L) {
+    return(NULL)
+  }
+  hits[[1L]]
+}
+
+read_shadow_proof_src <- function(filename) {
+  src_file <- locate_shadow_proof_src(filename)
+  skip_if(
+    is.null(src_file),
+    sprintf("source file src/%s unavailable in this test context", filename)
+  )
+  readLines(src_file, warn = FALSE)
+}
+
 test_that("shadow fixed-bandwidth X-side row helper stays row-streamed", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  lines <- read_shadow_proof_src("jksum.c")
   start <- grep("^int np_shadow_proof_conditional_x_weight_row_fixed\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
@@ -417,7 +443,7 @@ test_that("shadow fixed-bandwidth X-side row helper stays row-streamed", {
 })
 
 test_that("shadow generalized-nn X-side row helper stays row-streamed", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  lines <- read_shadow_proof_src("jksum.c")
   start <- grep("^int np_shadow_proof_conditional_x_weight_row_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
@@ -431,7 +457,7 @@ test_that("shadow generalized-nn X-side row helper stays row-streamed", {
 })
 
 test_that("fixed-bandwidth cvml LP stream avoids dense row storage", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  lines <- read_shadow_proof_src("jksum.c")
   start <- grep("^int np_conditional_density_cvml_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
@@ -445,7 +471,7 @@ test_that("fixed-bandwidth cvml LP stream avoids dense row storage", {
 })
 
 test_that("generalized-nn cvml LP stream avoids dense row storage", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  lines <- read_shadow_proof_src("jksum.c")
   start <- grep("^int np_conditional_density_cvml_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
@@ -459,7 +485,7 @@ test_that("generalized-nn cvml LP stream avoids dense row storage", {
 })
 
 test_that("generalized-nn cvls LP stream avoids dense row storage", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  lines <- read_shadow_proof_src("jksum.c")
   start <- grep("^int np_conditional_density_cvls_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
@@ -473,7 +499,7 @@ test_that("generalized-nn cvls LP stream avoids dense row storage", {
 })
 
 test_that("conditional density cvls production bypasses shadow block helpers", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  lines <- read_shadow_proof_src("jksum.c")
   start <- grep("^int np_conditional_density_cvls_lp_stream\\(", lines)
   stop <- grep("^int np_conditional_distribution_cvls_lp_stream\\(", lines)
 
@@ -490,7 +516,7 @@ test_that("conditional density cvls production bypasses shadow block helpers", {
 })
 
 test_that("fixed-bandwidth cvls LP stream avoids dense row storage", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  lines <- read_shadow_proof_src("jksum.c")
   start_matches <- grep("^int np_conditional_density_cvls_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
@@ -647,7 +673,7 @@ test_that("shadow distribution lp preserves ll canonicalization and tree parity"
 })
 
 test_that("fixed-bandwidth cdist cvls LP stream avoids dense row storage", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  lines <- read_shadow_proof_src("jksum.c")
   start_matches <- grep("^int np_conditional_distribution_cvls_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
@@ -662,7 +688,7 @@ test_that("fixed-bandwidth cdist cvls LP stream avoids dense row storage", {
 })
 
 test_that("generalized-nn cdist cvls LP stream avoids dense row storage", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  lines <- read_shadow_proof_src("jksum.c")
   start_matches <- grep("^int np_conditional_distribution_cvls_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
@@ -677,7 +703,7 @@ test_that("generalized-nn cdist cvls LP stream avoids dense row storage", {
 })
 
 test_that("kernelcv no longer references dense shadow proof helpers", {
-  lines <- readLines("/Users/jracine/Development/np-master/src/kernelcv.c", warn = FALSE)
+  lines <- read_shadow_proof_src("kernelcv.c")
 
   expect_false(any(grepl("np_shadow_cv_con_density_ml\\s*\\(", lines)))
   expect_false(any(grepl("np_shadow_cv_con_density_ls\\s*\\(", lines)))
