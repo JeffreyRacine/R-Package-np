@@ -33,7 +33,7 @@ npcdens(bws, \dots)
         proper.control = list(),
         \dots)
 
-\method{npcdens}{default}(bws, txdat, tydat, \dots)
+\method{npcdens}{default}(bws, txdat, tydat, nomad = FALSE, \dots)
 
 }
 
@@ -92,6 +92,16 @@ npcdens(bws, \dots)
   \item{gradients}{
     a logical value specifying whether to return estimates of the
     gradients at the evaluation points. Defaults to \code{FALSE}.
+  }
+
+  \item{nomad}{
+    logical shortcut passed through to \code{\link{npcdensbw}} when
+    bandwidths are computed inside \code{npcdens}. When \code{TRUE},
+    the bandwidth route fills any missing values among \code{regtype},
+    \code{search.engine}, \code{degree.select},
+    \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
+    \code{degree.verify}, and \code{bwtype} with the recommended
+    automatic LP NOMAD preset documented in \code{\link{npcdensbw}}.
   }
 
   \item{proper}{
@@ -161,6 +171,12 @@ npcdens(bws, \dots)
   kernel. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
+
+  For practitioners who want the recommended automatic LP NOMAD route
+  without spelling out all LP tuning arguments,
+  \code{npcdens(..., nomad=TRUE)} and \code{npcdensbw(..., nomad=TRUE)}
+  expand missing settings to the same documented preset. Explicit
+  incompatible settings fail fast rather than being silently rewritten.
 
 }
 \value{
