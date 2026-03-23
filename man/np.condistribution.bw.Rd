@@ -467,6 +467,10 @@ npcdistbw(\dots)
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
     search, \code{bernstein.basis=TRUE}, no explicit \code{degree},
     and \code{search.engine \%in\% c("nomad", "nomad+powell")}.
+    Returned bandwidth objects retain this normalized preset metadata in
+    \code{bw$nomad.shortcut} for a returned object \code{bw}; when
+    available, \code{nomad.time} and \code{powell.time} record the
+    direct-search and Powell-polish timing components.
   }
 
   \item{degree.min}{

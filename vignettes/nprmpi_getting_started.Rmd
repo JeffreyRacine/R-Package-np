@@ -65,6 +65,38 @@ here for local-polynomial-capable methods via
 `search.engine = "nomad+powell"`, but this package-side vignette stays
 operational rather than methodological.
 
+If you want the recommended route without spelling out all of the LP tuning
+arguments, use `nomad = TRUE`. This is a documented convenience preset, not a
+generic optimizer alias: it fills only missing LP degree-search controls and
+leaves compatible explicit overrides in place.
+
+```{r}
+npRmpi.init(nslaves = 1)
+
+set.seed(7)
+n <- 120
+x <- runif(n, -1, 1)
+y <- x + 0.4 * x^2 + rnorm(n, sd = 0.18)
+
+fit_nomad <- npreg(y ~ x, nomad = TRUE, degree.max = 1L, nmulti = 1L)
+fit_nomad$bws$nomad.shortcut
+
+bw_nomad_only <- npregbw(
+  y ~ x,
+  nomad = TRUE,
+  search.engine = "nomad",
+  degree.max = 1L,
+  nmulti = 1L
+)
+bw_nomad_only$nomad.shortcut
+
+npRmpi.quit()
+```
+
+The same convenience entry point is available for the other LP-capable families:
+`npcdens`, `npcdist`, `npplreg`, `npscoef`, and `npindex`, together with their
+corresponding `*bw` constructors.
+
 On current package sources, `spawn` is not the Windows entry path. There the
 practical starting point is `attach` mode under `mpiexec`.
 
