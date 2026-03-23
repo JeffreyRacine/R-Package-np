@@ -155,7 +155,14 @@
     dots$fit.mean.train <- object$mean
   }
 
-  do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
+  plot.args <- c(list(object = object, slot = "bws"), dots)
+  use.local.plot <- !.npRmpi_has_active_slave_pool(comm = 1L) &&
+    identical(as.character(dots$plot.behavior)[1L], "data")
+
+  if (use.local.plot)
+    return(.npRmpi_with_local_regression(do.call(.np_plot_from_slot, plot.args)))
+
+  do.call(.np_plot_from_slot, plot.args)
 }
 .np_plot_npdensity <- function(object, ...) {
   dots <- list(...)
