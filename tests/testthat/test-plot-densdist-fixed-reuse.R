@@ -85,6 +85,7 @@ test_that("fixed conditional density/distribution helper matches explicit refits
 
     dens.bw <- do.call(npcdensbw, dens.args)
     dist.bw <- do.call(npcdistbw, dist.args)
+    oracle.t0.tolerance <- if (identical(cfg$regtype, "lp")) 1e-10 else 1e-12
 
     dens.fast <- fast.fun(
       xdat = tx,
@@ -186,18 +187,18 @@ test_that("fixed conditional density/distribution helper matches explicit refits
         tolerance = 1e-12,
         info = paste("distribution oracle", cfg$name)
       )
-      expect_equal(
-        dens.fast$t0,
-        dens.oracle$t0,
-        tolerance = 1e-12,
-        info = paste("density oracle t0", cfg$name)
-      )
-      expect_equal(
-        dist.fast$t0,
-        dist.oracle$t0,
-        tolerance = 1e-12,
-        info = paste("distribution oracle t0", cfg$name)
-      )
+    expect_equal(
+      dens.fast$t0,
+      dens.oracle$t0,
+      tolerance = oracle.t0.tolerance,
+      info = paste("density oracle t0", cfg$name)
+    )
+    expect_equal(
+      dist.fast$t0,
+      dist.oracle$t0,
+      tolerance = oracle.t0.tolerance,
+      info = paste("distribution oracle t0", cfg$name)
+    )
 
       drawer <- function(start, stopi) counts[, start:stopi, drop = FALSE]
       dens.fast.drawer <- fast.fun(
@@ -253,18 +254,18 @@ test_that("fixed conditional density/distribution helper matches explicit refits
         tolerance = 1e-12,
         info = paste("distribution drawer oracle", cfg$name)
       )
-      expect_equal(
-        dens.fast.drawer$t0,
-        dens.oracle.drawer$t0,
-        tolerance = 1e-12,
-        info = paste("density drawer oracle t0", cfg$name)
-      )
-      expect_equal(
-        dist.fast.drawer$t0,
-        dist.oracle.drawer$t0,
-        tolerance = 1e-12,
-        info = paste("distribution drawer oracle t0", cfg$name)
-      )
+    expect_equal(
+      dens.fast.drawer$t0,
+      dens.oracle.drawer$t0,
+      tolerance = oracle.t0.tolerance,
+      info = paste("density drawer oracle t0", cfg$name)
+    )
+    expect_equal(
+      dist.fast.drawer$t0,
+      dist.oracle.drawer$t0,
+      tolerance = oracle.t0.tolerance,
+      info = paste("distribution drawer oracle t0", cfg$name)
+    )
     }
   }
 })

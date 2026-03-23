@@ -88,11 +88,13 @@ test_that("adaptive lp matrix hat matches apply and npreg on train and eval data
 
   for (degree in 1:3) {
     bw <- npregbw(
-      y ~ x,
+      xdat = tx,
+      ydat = y,
       regtype = "lp",
       degree = degree,
       bwtype = "adaptive_nn",
-      nmulti = 1L
+      bandwidth.compute = FALSE,
+      bws = 18L
     )
 
     fit.train <- npreg(bws = bw, txdat = tx, tydat = y, gradients = TRUE)
