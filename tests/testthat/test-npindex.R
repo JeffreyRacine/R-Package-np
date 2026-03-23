@@ -179,6 +179,34 @@ test_that("npindex supports residual and error branches with evaluation y data",
   }
 })
 
+test_that("predict.singleindex forwards explicit boot.num without changing fitted predictions", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260323)
+  n <- 60L
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(x1 + x2) + rnorm(n, sd = 0.05)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  nd <- tx[seq_len(8L), , drop = FALSE]
+
+  bw <- npindexbw(
+    xdat = tx,
+    ydat = y,
+    bws = c(1, 0.35, 0.45),
+    bandwidth.compute = FALSE,
+    method = "ichimura"
+  )
+  fit <- npindex(bws = bw, txdat = tx, tydat = y)
+
+  pred <- predict(fit, newdata = nd)
+  pred.se <- predict(fit, newdata = nd, se.fit = TRUE, boot.num = 10)
+
+  expect_equal(as.numeric(pred.se$fit), as.numeric(pred), tolerance = 0)
+  expect_equal(length(pred.se$se.fit), nrow(nd))
+})
+
 test_that("npindex bootstrap error SD recovery matches covariance diagonal reduction", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
