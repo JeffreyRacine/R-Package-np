@@ -82,7 +82,15 @@ fitted.npregression <- function(object, ...){
  object$mean 
 }
 residuals.npregression <- function(object, ...) {
- if(object$residuals) { return(object$resid) } else { return(npreg(bws = object$bws, residuals =TRUE)$resid) } 
+ if(object$residuals) {
+   return(object$resid)
+ } else {
+   call.residuals <- function() npreg(bws = object$bws, residuals = TRUE)$resid
+   if (.npRmpi_has_active_slave_pool(comm = 1L)) {
+     return(call.residuals())
+   }
+   return(.npRmpi_with_local_regression(call.residuals()))
+ }
 }
 se.npregression <- function(x) { x$merr }
 gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...) {
