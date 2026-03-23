@@ -139,12 +139,6 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       (explicit.sibandwidth || identical(degree.select.value, "manual")))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
-  if (inherits(bws, "formula")) {
-    dots <- list(...)
-    tbw <- do.call(npindexbw, c(list(formula = bws), dots))
-    return(npindex(bws = tbw, ...))
-  }
-
   sc <- sys.call()
   sc.names <- names(sc)
 
