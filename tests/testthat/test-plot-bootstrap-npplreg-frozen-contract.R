@@ -1,4 +1,6 @@
 npplreg_semiparam_frozen_contract_case <- function() {
+  skip_on_cran()
+
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess contract")
 
