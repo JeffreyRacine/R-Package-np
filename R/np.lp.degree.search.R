@@ -37,6 +37,10 @@
     stop("degree.min must contain non-negative integers")
   if (any(upper < lower))
     stop("degree.max must be greater than or equal to degree.min coordinate-wise")
+  if (any(upper > .np_glp_degree_hard_max))
+    stop(sprintf("degree.max must contain integers in [0,%d]", .np_glp_degree_hard_max))
+
+  .np_warn_high_glp_degree(upper, argname = "degree.max")
 
   candidates <- lapply(seq_len(ncon), function(j) seq.int(lower[j], upper[j]))
 

@@ -29,31 +29,38 @@ test_that("npcdens nomad shortcut matches the explicit density preset", {
     nmulti = 1L
   )
 
-  fit_short <- np::npcdens(
-    y ~ x,
-    data = dat,
-    nomad = TRUE,
-    degree.max = 1L,
-    nmulti = 1L
-  )
+  fit_short <- local({
+    npcdensbw <- np::npcdensbw
+    np::npcdens(
+      y ~ x,
+      data = dat,
+      nomad = TRUE,
+      degree.max = 1L,
+      nmulti = 1L
+    )
+  })
 
-  fit_long <- np::npcdens(
-    y ~ x,
-    data = dat,
-    regtype = "lp",
-    search.engine = "nomad+powell",
-    degree.select = "coordinate",
-    bernstein.basis = TRUE,
-    degree.min = 0L,
-    degree.max = 1L,
-    degree.verify = FALSE,
-    bwtype = "fixed",
-    nmulti = 1L
-  )
+  fit_long <- local({
+    npcdensbw <- np::npcdensbw
+    np::npcdens(
+      y ~ x,
+      data = dat,
+      regtype = "lp",
+      search.engine = "nomad+powell",
+      degree.select = "coordinate",
+      bernstein.basis = TRUE,
+      degree.min = 0L,
+      degree.max = 1L,
+      degree.verify = FALSE,
+      bwtype = "fixed",
+      nmulti = 1L
+    )
+  })
 
   expect_lt(max(abs(unname(bw_short$xbw) - unname(bw_long$xbw))), 5e-4)
   expect_lt(max(abs(unname(bw_short$ybw) - unname(bw_long$ybw))), 5e-4)
   expect_identical(as.integer(bw_short$degree), as.integer(bw_long$degree))
+  expect_true(isTRUE(bw_short$bernstein.basis))
   expect_true(is.list(bw_short$nomad.shortcut))
   expect_equal(fitted(fit_short), fitted(fit_long), tolerance = 5e-4)
   expect_true(is.list(fit_short$bws$nomad.shortcut))
@@ -90,31 +97,38 @@ test_that("npcdist nomad shortcut matches the explicit distribution preset", {
     nmulti = 1L
   )
 
-  fit_short <- np::npcdist(
-    y ~ x,
-    data = dat,
-    nomad = TRUE,
-    degree.max = 1L,
-    nmulti = 1L
-  )
+  fit_short <- local({
+    npcdistbw <- np::npcdistbw
+    np::npcdist(
+      y ~ x,
+      data = dat,
+      nomad = TRUE,
+      degree.max = 1L,
+      nmulti = 1L
+    )
+  })
 
-  fit_long <- np::npcdist(
-    y ~ x,
-    data = dat,
-    regtype = "lp",
-    search.engine = "nomad+powell",
-    degree.select = "coordinate",
-    bernstein.basis = TRUE,
-    degree.min = 0L,
-    degree.max = 1L,
-    degree.verify = FALSE,
-    bwtype = "fixed",
-    nmulti = 1L
-  )
+  fit_long <- local({
+    npcdistbw <- np::npcdistbw
+    np::npcdist(
+      y ~ x,
+      data = dat,
+      regtype = "lp",
+      search.engine = "nomad+powell",
+      degree.select = "coordinate",
+      bernstein.basis = TRUE,
+      degree.min = 0L,
+      degree.max = 1L,
+      degree.verify = FALSE,
+      bwtype = "fixed",
+      nmulti = 1L
+    )
+  })
 
   expect_equal(unname(bw_short$xbw), unname(bw_long$xbw), tolerance = 1e-8)
   expect_equal(unname(bw_short$ybw), unname(bw_long$ybw), tolerance = 1e-8)
   expect_identical(as.integer(bw_short$degree), as.integer(bw_long$degree))
+  expect_true(isTRUE(bw_short$bernstein.basis))
   expect_true(is.list(bw_short$nomad.shortcut))
   expect_equal(fitted(fit_short), fitted(fit_long), tolerance = 1e-8)
   expect_true(is.list(fit_short$bws$nomad.shortcut))

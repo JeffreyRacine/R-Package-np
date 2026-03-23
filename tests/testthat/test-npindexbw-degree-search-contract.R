@@ -273,23 +273,24 @@ test_that("npindexbw automatic degree search enforces pilot guardrails", {
     "bandwidth.compute=TRUE"
   )
 
-  expect_error(
-    npindexbw(
-      xdat = xdat,
-      ydat = y,
-      bws = c(1, 1, 0.3),
-      method = "ichimura",
-      regtype = "lp",
-      bernstein.basis = FALSE,
-      degree.select = "exhaustive",
-      search.engine = "cell",
-      degree.min = 0L,
-      degree.max = 4L,
-      bwtype = "fixed",
-      nmulti = 1L
-    ),
-    "degree.max <= 3"
+  bw <- npindexbw(
+    xdat = xdat,
+    ydat = y,
+    bws = c(1, 1, 0.3),
+    method = "ichimura",
+    regtype = "lp",
+    bernstein.basis = FALSE,
+    degree.select = "exhaustive",
+    search.engine = "cell",
+    degree.min = 0L,
+    degree.max = 4L,
+    bwtype = "fixed",
+    nmulti = 1L
   )
+
+  expect_s3_class(bw, "sibandwidth")
+  expect_false(isTRUE(bw$bernstein.basis))
+  expect_lte(max(as.integer(bw$degree)), 4L)
 })
 
 test_that("npindex forwards automatic LP degree search through npindexbw", {

@@ -966,9 +966,6 @@ npcdensbw.conbandwidth <-
     default.max = 3L
   )
 
-  if (!isTRUE(bern.auto) && any(bounds$upper > 3L))
-    stop("automatic degree search with bernstein.basis=FALSE currently requires degree.max <= 3")
-
   baseline.degree <- rep.int(0L, ncon)
   default.start.degree <- if (identical(search.engine, "cell")) {
     baseline.degree
@@ -1214,6 +1211,11 @@ npcdensbw.default <-
         stop("regtype='ll' uses canonical bernstein.basis=FALSE; use regtype='lp' for Bernstein LP")
     }
 
+    bernstein.value <- if (!is.null(nomad.shortcut$values$bernstein.basis)) {
+      nomad.shortcut$values$bernstein.basis
+    } else {
+      bernstein.basis
+    }
     degree.select.value <- if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else "manual"
     degree.setup <- npSetupGlpDegree(
       regtype = regtype,
@@ -1225,7 +1227,7 @@ npcdensbw.default <-
       regtype = regtype,
       basis = basis,
       degree = degree.setup,
-      bernstein.basis = bernstein.basis,
+      bernstein.basis = bernstein.value,
       ncon = sum(x.info$icon),
       where = "npcdensbw"
     )
@@ -1258,7 +1260,7 @@ npcdensbw.default <-
       degree.restarts = degree.restarts.value,
       degree.max.cycles = degree.max.cycles.value,
       degree.verify = degree.verify.value,
-      bernstein.basis = bernstein.basis,
+      bernstein.basis = bernstein.value,
       bernstein.named = bernstein.named
     )
 

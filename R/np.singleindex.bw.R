@@ -618,9 +618,6 @@ npindexbw.NULL <-
     default.max = 3L
   )
 
-  if (!isTRUE(bern.auto) && any(bounds$upper > 3L))
-    stop("automatic degree search with bernstein.basis=FALSE currently requires degree.max <= 3")
-
   baseline.degree <- 0L
   default.start.degree <- if (identical(search.engine, "cell")) baseline.degree else 1L
   start.degree <- if (is.null(degree.start)) {
