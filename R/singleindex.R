@@ -122,7 +122,7 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
     return(fitted(object))
   }
 
-  tr <- do.call(npindex, c(list(bws = object$bws, errors = se.fit, boot.num = 99), dots))
+  tr <- do.call(npindex, c(list(bws = object$bws, errors = se.fit), dots))
   if (se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr),
                 df = tr$nobs, residual.scale = tr$MSE))
