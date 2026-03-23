@@ -124,6 +124,8 @@ FALSE, \dots)
     \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
     \code{degree.verify}, and \code{bwtype} with the recommended
     automatic LP NOMAD preset documented in \code{\link{npregbw}}.
+    After fitting, inspect \code{fit$bws$nomad.shortcut} on the
+    returned object \code{fit} to see the normalized shortcut metadata.
   }
 
   \item{\dots}{

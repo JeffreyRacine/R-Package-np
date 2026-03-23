@@ -80,6 +80,36 @@ polynomial order and bandwidth. The modern route is to use
 `search.engine = "nomad+powell"` when you want the search to choose both
 together.
 
+If you want the recommended route without spelling out all of the LP tuning
+arguments, use `nomad = TRUE`. This is a documented convenience preset, not a
+generic optimizer alias: it fills only missing values among the LP degree-search
+controls and leaves compatible explicit overrides in place.
+
+```{r}
+if (requireNamespace("crs", quietly = TRUE)) {
+  set.seed(7)
+  n <- 120
+  x <- runif(n, -1, 1)
+  y <- x + 0.4 * x^2 + rnorm(n, sd = 0.18)
+
+  fit_nomad <- npreg(y ~ x, nomad = TRUE, degree.max = 1L, nmulti = 1L)
+  fit_nomad$bws$nomad.shortcut
+
+  # Tune one component explicitly while leaving the rest of the preset in place.
+  fit_nomad_direct <- npreg(
+    y ~ x,
+    nomad = TRUE,
+    search.engine = "nomad",
+    degree.max = 1L,
+    nmulti = 1L
+  )
+}
+```
+
+The same convenience entry point is available for the other LP-capable families:
+`npcdens`, `npcdist`, `npplreg`, `npscoef`, and `npindex`, together with their
+corresponding `*bw` constructors.
+
 Keep the first run modest and runnable. Fuller worked examples belong on the
 gallery rather than in this package vignette.
 
