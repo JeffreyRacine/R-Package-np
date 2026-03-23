@@ -125,7 +125,12 @@ predict.npregression <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
-  tr <- do.call(npreg, c(list(bws = object$bws), dots))
+  call.predict <- function() do.call(npreg, c(list(bws = object$bws), dots))
+  tr <- if (.npRmpi_has_active_slave_pool(comm = 1L)) {
+    call.predict()
+  } else {
+    .npRmpi_with_local_regression(call.predict())
+  }
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))
