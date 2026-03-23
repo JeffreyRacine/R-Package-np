@@ -110,6 +110,7 @@ test_that("npcdensbw NOMAD plus Powell progress mirrors shared restart detail", 
   expect_false(any(grepl("eval [0-9]+", msgs)))
   expect_false(any(grepl("fval=", msgs, fixed = TRUE)))
   expect_true(any(grepl("^\\[np\\] Selecting degree and bandwidth \\(", msgs)))
+  expect_true(any(grepl("^\\[np\\] Refining bandwidth \\(", msgs)))
   expect_true(any(grepl("multistart [12]/2", msgs)))
   expect_true(any(grepl("iteration [0-9]+", msgs)))
   expect_true(any(grepl("[0-9]+\\.[0-9]+%, eta [0-9]+\\.[0-9]+s", msgs)))
