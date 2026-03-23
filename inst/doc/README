@@ -1,0 +1,2 @@
+This directory is kept in the source tree so vignette installation has
+an existing inst/doc target during local source installs.
