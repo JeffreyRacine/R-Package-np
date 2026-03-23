@@ -168,7 +168,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   ## if(tydat.named)
   ## tydat <- toFrame(tydat)
 
-  if(tydat.named)
+  if(tzdat.named)
     tzdat <- toFrame(tzdat)
 
   sc.bw <- sc
@@ -271,7 +271,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     tol <- as.double(tol)
     regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
 
-    miss.z <- missing(tzdat)
+    miss.z <- missing(tzdat) || is.null(tzdat)
 
     miss.ex = missing(exdat)
     miss.ey = missing(eydat)
@@ -535,7 +535,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       )
       if (!leave.one.out.eval && !is.null(z.eval))
         ksum.args$exdat <- z.eval
-      main.ks <- do.call(npksum, ksum.args)$ksum
+      main.ks <- local_npksum(ksum.args)$ksum
       tyw.out <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw.out)) == 3L)
         dim(tyw.out) <- c(dim(tyw.out)[1L], dim(tyw.out)[3L])
@@ -554,7 +554,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         )
         if (!leave.one.out.eval && !is.null(z.eval))
           cov.args$exdat <- z.eval
-        s.out <- do.call(npksum, cov.args)$ksum
+        s.out <- local_npksum(cov.args)$ksum
       }
 
       list(tyw = tyw.out, tww = tww.out, s = s.out)
@@ -572,6 +572,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       NULL
     }
 
+    local_npksum <- function(args) {
+      .npRmpi_with_local_regression(do.call(npksum, args))
+    }
+
     lp_tensor_moments <- function(state, u2 = NULL) {
       tensor.train <- .npscoef_row_tensor_design(W.train, state$W.train)
       ytensor <- cbind(tydat, tensor.train)
@@ -585,7 +589,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       )
       if (!state$leave.one.out)
         ksum.args$exdat <- state$z.eval
-      main.ks <- do.call(npksum, ksum.args)$ksum
+      main.ks <- local_npksum(ksum.args)$ksum
       tyw.out <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw.out)) == 3L)
         dim(tyw.out) <- c(dim(tyw.out)[1L], dim(tyw.out)[3L])
@@ -604,7 +608,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         )
         if (!state$leave.one.out)
           cov.args$exdat <- state$z.eval
-        s.out <- do.call(npksum, cov.args)$ksum
+        s.out <- local_npksum(cov.args)$ksum
       }
 
       list(tyw = tyw.out, tww = tww.out, s = s.out)
@@ -650,11 +654,13 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         for (j in seq_len(n.part)) {
           partial <- W[,j] * coef.mat[j,] + resid
 
-          twww <- npksum(txdat=tzdat,
-                         tydat=cbind(partial * W[,j],W[,j]^2),
-                         weights=cbind(partial * W[,j],1),
-                         bws=bws,
-                         leave.one.out=leave.one.out)$ksum
+          twww <- .npRmpi_with_local_regression(npksum(
+            txdat=tzdat,
+            tydat=cbind(partial * W[,j],W[,j]^2),
+            weights=cbind(partial * W[,j],1),
+            bws=bws,
+            leave.one.out=leave.one.out
+          ))$ksum
 
           coef.mat[j,] <- twww[1,2,]/NZD(twww[2,2,])
           resid <- partial - W[,j] * coef.mat[j,]
