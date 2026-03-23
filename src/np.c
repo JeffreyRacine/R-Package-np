@@ -91,7 +91,7 @@ static void np_progress_signal(const char *event, const char *surface, const int
     return;
   }
 
-  PROTECT(fn = Rf_findVarInFrame(ns, Rf_install(".np_progress_signal_from_c")));
+  PROTECT(fn = Rf_findFun(Rf_install(".np_progress_signal_from_c"), ns));
   if (fn == R_UnboundValue) {
     UNPROTECT(2);
     return;
@@ -9525,8 +9525,12 @@ void np_quantile_conditional(double * tc_con,
   eq = alloc_vecd(num_obs_eval_alloc);
   eqerr = alloc_vecd(num_obs_eval_alloc);
 
-  if(do_gradients)
+  if(do_gradients) {
     g = alloc_matd(num_obs_eval_alloc, num_var);
+    for(j = 0; j < num_var; j++)
+      for(i = 0; i < num_obs_eval_alloc; i++)
+        g[j][i] = 0.0;
+  }
 
   /* in v_s_f order is creg, cvar, uvar, ovar, ureg, oreg  */
 
