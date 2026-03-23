@@ -1145,6 +1145,7 @@ npcdensbw.default <-
            degree = NULL,
            degree.select = c("manual", "coordinate", "exhaustive"),
            search.engine = c("nomad+powell", "cell", "nomad"),
+           nomad = FALSE,
            degree.min = NULL,
            degree.max = NULL,
            degree.start = NULL,
@@ -1165,12 +1166,68 @@ npcdensbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
-    regtype.named <- any(mc.names == "regtype")
+    nomad.shortcut <- .np_prepare_nomad_shortcut(
+      nomad = nomad,
+      call_names = mc.names,
+      preset = list(
+        regtype = "lp",
+        search.engine = "nomad+powell",
+        degree.select = "coordinate",
+        bernstein.basis = TRUE,
+        degree.min = 0L,
+        degree.max = 10L,
+        degree.verify = FALSE,
+        bwtype = "fixed"
+      ),
+      values = list(
+        regtype = if ("regtype" %in% mc.names) regtype else NULL,
+        search.engine = if ("search.engine" %in% mc.names) search.engine else NULL,
+        degree.select = if ("degree.select" %in% mc.names) degree.select else NULL,
+        bernstein.basis = if ("bernstein.basis" %in% mc.names) bernstein.basis else NULL,
+        degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
+        degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
+        degree.verify = if ("degree.verify" %in% mc.names) degree.verify else NULL,
+        bwtype = if ("bwtype" %in% mc.names) bwtype else NULL,
+        degree = if ("degree" %in% mc.names) degree else NULL
+      ),
+      where = "npcdensbw"
+    )
+
+    if (isTRUE(nomad.shortcut$enabled)) {
+      if ("degree" %in% mc.names)
+        stop("nomad=TRUE does not support an explicit degree; remove degree or set nomad=FALSE")
+      if ("regtype" %in% mc.names &&
+          !identical(as.character(match.arg(nomad.shortcut$values$regtype, c("lc", "ll", "lp")))[1L], "lp"))
+        stop("nomad=TRUE requires regtype='lp'")
+      if ("bwtype" %in% mc.names &&
+          !identical(as.character(match.arg(nomad.shortcut$values$bwtype, c("fixed", "generalized_nn", "adaptive_nn")))[1L], "fixed"))
+        stop("nomad=TRUE currently requires bwtype='fixed'")
+      if ("degree.select" %in% mc.names &&
+          identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
+        stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
+      if ("search.engine" %in% mc.names &&
+          !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
+              c("nomad", "nomad+powell")))
+        stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
+      if ("bernstein.basis" %in% mc.names &&
+          !isTRUE(npValidateGlpBernstein(regtype = "lp",
+                                        bernstein.basis = nomad.shortcut$values$bernstein.basis)))
+        stop("nomad=TRUE currently requires bernstein.basis=TRUE")
+      if ("degree.verify" %in% mc.names &&
+          isTRUE(npValidateScalarLogical(nomad.shortcut$values$degree.verify, "degree.verify")))
+        stop("nomad=TRUE currently requires degree.verify=FALSE")
+    }
+
+    regtype.named <- isTRUE(nomad.shortcut$enabled) || any(mc.names == "regtype")
     basis.named <- any(mc.names == "basis")
     degree.named <- any(mc.names == "degree")
-    bernstein.named <- any(mc.names == "bernstein.basis")
+    bernstein.named <- isTRUE(nomad.shortcut$enabled) || any(mc.names == "bernstein.basis")
 
-    regtype <- if (regtype.named) match.arg(regtype) else "lc"
+    regtype <- if (!is.null(nomad.shortcut$values$regtype)) {
+      match.arg(nomad.shortcut$values$regtype, c("lc", "ll", "lp"))
+    } else {
+      "lc"
+    }
     if (identical(regtype, "lc") && (basis.named || degree.named || bernstein.named))
       stop("regtype='lc' does not accept basis/degree/bernstein.basis; use regtype='lp' for local-polynomial controls")
     if (identical(regtype, "ll")) {
@@ -1182,7 +1239,7 @@ npcdensbw.default <-
         stop("regtype='ll' uses canonical bernstein.basis=FALSE; use regtype='lp' for Bernstein LP")
     }
 
-    degree.select.value <- if ("degree.select" %in% mc.names) degree.select else "manual"
+    degree.select.value <- if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else "manual"
     degree.setup <- npSetupGlpDegree(
       regtype = regtype,
       degree = degree,
@@ -1205,13 +1262,13 @@ npcdensbw.default <-
     search.mc.names <- names(mc)
     lp.dot.args <- list(...)
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
-    search.engine.value <- if ("search.engine" %in% search.mc.names) search.engine else "nomad+powell"
-    degree.min.value <- if ("degree.min" %in% search.mc.names) degree.min else NULL
-    degree.max.value <- if ("degree.max" %in% search.mc.names) degree.max else NULL
+    search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
+    degree.min.value <- nomad.shortcut$values$degree.min
+    degree.max.value <- nomad.shortcut$values$degree.max
     degree.start.value <- if ("degree.start" %in% search.mc.names) degree.start else NULL
     degree.restarts.value <- if ("degree.restarts" %in% search.mc.names) degree.restarts else 0L
     degree.max.cycles.value <- if ("degree.max.cycles" %in% search.mc.names) degree.max.cycles else 20L
-    degree.verify.value <- if ("degree.verify" %in% search.mc.names) degree.verify else FALSE
+    degree.verify.value <- if (!is.null(nomad.shortcut$values$degree.verify)) nomad.shortcut$values$degree.verify else FALSE
     degree.search <- .npcdensbw_degree_search_controls(
       regtype = regtype,
       regtype.named = regtype.named,
@@ -1377,6 +1434,7 @@ npcdensbw.default <-
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
     tbw$call <- mc
+    tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     return(tbw)
   }

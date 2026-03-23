@@ -438,10 +438,13 @@ npplreg.plbandwidth <-
   }
 
 
-npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
+npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   .npRmpi_require_active_slave_pool(where = "npplreg()")
   explicit.plbandwidth <- (!missing(bws)) && inherits(bws, "plbandwidth")
-  degree.select.value <- if ("degree.select" %in% names(list(...))) {
+  nomad <- npValidateScalarLogical(nomad, "nomad")
+  degree.select.value <- if (isTRUE(nomad)) {
+    "coordinate"
+  } else if ("degree.select" %in% names(list(...))) {
     match.arg(list(...)$degree.select, c("manual", "coordinate", "exhaustive"))
   } else {
     "manual"

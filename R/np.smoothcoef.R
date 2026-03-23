@@ -118,10 +118,13 @@ npscoef.call <-
   isa(bws, "scbandwidth") && identical(bws$type, "adaptive_nn")
 }
 
-npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
+npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   .npRmpi_require_active_slave_pool(where = "npscoef()")
   explicit.scbandwidth <- (!missing(bws)) && inherits(bws, "scbandwidth")
-  degree.select.value <- if ("degree.select" %in% names(list(...))) {
+  nomad <- npValidateScalarLogical(nomad, "nomad")
+  degree.select.value <- if (isTRUE(nomad)) {
+    "coordinate"
+  } else if ("degree.select" %in% names(list(...))) {
     match.arg(list(...)$degree.select, c("manual", "coordinate", "exhaustive"))
   } else {
     "manual"

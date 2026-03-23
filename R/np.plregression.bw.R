@@ -705,6 +705,7 @@ npplregbw.default =
            degree = NULL,
            degree.select = c("manual", "coordinate", "exhaustive"),
            search.engine = c("nomad+powell", "cell", "nomad"),
+           nomad = FALSE,
            degree.min = NULL,
            degree.max = NULL,
            degree.start = NULL,
@@ -724,16 +725,71 @@ npplregbw.default =
 
     dots <- list(...)
     dot.names <- names(dots)
-    regtype.arg <- if ("regtype" %in% dot.names) dots$regtype else "lc"
+    mc <- match.call(expand.dots = FALSE)
+    mc.names <- names(mc)
+    nomad.shortcut <- .np_prepare_nomad_shortcut(
+      nomad = nomad,
+      call_names = unique(c(mc.names, dot.names)),
+      preset = list(
+        regtype = "lp",
+        search.engine = "nomad+powell",
+        degree.select = "coordinate",
+        bernstein.basis = TRUE,
+        degree.min = 0L,
+        degree.max = 10L,
+        degree.verify = FALSE,
+        bwtype = "fixed"
+      ),
+      values = list(
+        regtype = if ("regtype" %in% dot.names) dots$regtype else NULL,
+        search.engine = if ("search.engine" %in% mc.names) search.engine else NULL,
+        degree.select = if ("degree.select" %in% mc.names) degree.select else NULL,
+        bernstein.basis = if ("bernstein.basis" %in% dot.names) dots$bernstein.basis else NULL,
+        degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
+        degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
+        degree.verify = if ("degree.verify" %in% mc.names) degree.verify else NULL,
+        bwtype = if ("bwtype" %in% dot.names) dots$bwtype else NULL,
+        degree = if (!missing(degree)) degree else NULL
+      ),
+      where = "npplregbw"
+    )
+
+    if (isTRUE(nomad.shortcut$enabled)) {
+      if (!missing(degree))
+        stop("nomad=TRUE does not support an explicit degree; remove degree or set nomad=FALSE")
+      if ("regtype" %in% dot.names &&
+          !identical(as.character(match.arg(nomad.shortcut$values$regtype, c("lc", "ll", "lp")))[1L], "lp"))
+        stop("nomad=TRUE requires regtype='lp'")
+      if ("bwtype" %in% dot.names &&
+          !identical(as.character(match.arg(nomad.shortcut$values$bwtype, c("fixed", "generalized_nn", "adaptive_nn")))[1L], "fixed"))
+        stop("nomad=TRUE currently requires bwtype='fixed'")
+      if ("degree.select" %in% mc.names &&
+          identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
+        stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
+      if ("search.engine" %in% mc.names &&
+          !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
+              c("nomad", "nomad+powell")))
+        stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
+      if ("bernstein.basis" %in% dot.names &&
+          !isTRUE(npValidateGlpBernstein(regtype = "lp",
+                                        bernstein.basis = nomad.shortcut$values$bernstein.basis)))
+        stop("nomad=TRUE currently requires bernstein.basis=TRUE")
+      if ("degree.verify" %in% mc.names &&
+          isTRUE(npValidateScalarLogical(nomad.shortcut$values$degree.verify, "degree.verify")))
+        stop("nomad=TRUE currently requires degree.verify=FALSE")
+    }
+
+    regtype.arg <- if (!is.null(nomad.shortcut$values$regtype)) nomad.shortcut$values$regtype else "lc"
     basis.arg <- if ("basis" %in% dot.names) dots$basis else "glp"
     degree.arg <- if (!missing(degree)) degree else NULL
-    bernstein.arg <- if ("bernstein.basis" %in% dot.names) dots$bernstein.basis else FALSE
+    bernstein.arg <- if (!is.null(nomad.shortcut$values$bernstein.basis)) nomad.shortcut$values$bernstein.basis else FALSE
 
     spec.mc.names <- dot.names
     if (!missing(degree))
       spec.mc.names <- c(spec.mc.names, "degree")
-    mc.names <- names(match.call(expand.dots = FALSE))
-    degree.select.value <- if ("degree.select" %in% mc.names) degree.select else "manual"
+    if (isTRUE(nomad.shortcut$enabled))
+      spec.mc.names <- unique(c(spec.mc.names, "regtype", "bernstein.basis"))
+    degree.select.value <- if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else "manual"
     degree.setup <- npSetupGlpDegree(
       regtype = regtype.arg,
       degree = degree.arg,
@@ -754,21 +810,21 @@ npplregbw.default =
     random.seed.value <- .np_degree_extract_random_seed(dots)
     degree.search <- .npplregbw_degree_search_controls(
       regtype = regtype.arg,
-      regtype.named = "regtype" %in% dot.names,
+      regtype.named = isTRUE(nomad.shortcut$enabled) || ("regtype" %in% dot.names),
       bandwidth.compute = bandwidth.compute,
       ncon = sum(untangle(zdat)$icon),
       nobs = NROW(zdat),
       basis = spec$basis.engine,
       degree.select = degree.select.value,
-      search.engine = if ("search.engine" %in% mc.names) search.engine else "nomad+powell",
-      degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
-      degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
+      search.engine = if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell",
+      degree.min = nomad.shortcut$values$degree.min,
+      degree.max = nomad.shortcut$values$degree.max,
       degree.start = if ("degree.start" %in% mc.names) degree.start else NULL,
       degree.restarts = if ("degree.restarts" %in% mc.names) degree.restarts else 0L,
       degree.max.cycles = if ("degree.max.cycles" %in% mc.names) degree.max.cycles else 20L,
-      degree.verify = if ("degree.verify" %in% mc.names) degree.verify else FALSE,
+      degree.verify = if (!is.null(nomad.shortcut$values$degree.verify)) nomad.shortcut$values$degree.verify else FALSE,
       bernstein.basis = bernstein.arg,
-      bernstein.named = "bernstein.basis" %in% dot.names
+      bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% dot.names)
     )
     if (.npRmpi_autodispatch_active() &&
         is.null(degree.search) &&
@@ -877,6 +933,7 @@ npplregbw.default =
         mc <- match.call(expand.dots = FALSE)
         environment(mc) <- parent.frame()
         tbw$call <- mc
+        tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
         return(tbw)
       }
     }
@@ -901,6 +958,7 @@ npplregbw.default =
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
     tbw$call <- mc
+    tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     return(tbw)
   }

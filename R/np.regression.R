@@ -588,10 +588,11 @@ npreg.rbandwidth <-
     return(ev)
   }
 
-npreg.default <- function(bws, txdat, tydat, ...){
+npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npreg()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
-  if (.npRmpi_autodispatch_active())
+  nomad <- npValidateScalarLogical(nomad, "nomad")
+  if (.npRmpi_autodispatch_active() && !isTRUE(nomad))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   sc <- sys.call()
   sc.names <- names(sc)

@@ -945,6 +945,7 @@ npregbw.default <-
            degree,
            degree.select = c("manual", "coordinate", "exhaustive"),
            search.engine = c("nomad+powell", "cell", "nomad"),
+           nomad = FALSE,
            degree.min = NULL,
            degree.max = NULL,
            degree.start = NULL,
@@ -985,10 +986,63 @@ npregbw.default <-
     xdat <- toFrame(xdat)
     yname <- deparse(substitute(ydat))
 
-    search.mc.names <- names(match.call(expand.dots = FALSE))
-    degree.select.value <- if ("degree.select" %in% search.mc.names) degree.select else "manual"
+    mc.names <- names(match.call(expand.dots = FALSE))
+    nomad.shortcut <- .np_prepare_nomad_shortcut(
+      nomad = nomad,
+      call_names = mc.names,
+      preset = list(
+        regtype = "lp",
+        search.engine = "nomad+powell",
+        degree.select = "coordinate",
+        bernstein.basis = TRUE,
+        degree.min = 0L,
+        degree.max = 10L,
+        degree.verify = FALSE,
+        bwtype = "fixed"
+      ),
+      values = list(
+        regtype = if ("regtype" %in% mc.names) regtype else NULL,
+        search.engine = if ("search.engine" %in% mc.names) search.engine else NULL,
+        degree.select = if ("degree.select" %in% mc.names) degree.select else NULL,
+        bernstein.basis = if ("bernstein.basis" %in% mc.names) bernstein.basis else NULL,
+        degree.min = if ("degree.min" %in% mc.names) degree.min else NULL,
+        degree.max = if ("degree.max" %in% mc.names) degree.max else NULL,
+        degree.verify = if ("degree.verify" %in% mc.names) degree.verify else NULL,
+        bwtype = if ("bwtype" %in% mc.names) bwtype else NULL,
+        degree = if ("degree" %in% mc.names) degree else NULL
+      ),
+      where = "npregbw"
+    )
+
+    if (isTRUE(nomad.shortcut$enabled)) {
+      if ("degree" %in% mc.names)
+        stop("nomad=TRUE does not support an explicit degree; remove degree or set nomad=FALSE")
+      if ("regtype" %in% mc.names &&
+          !identical(as.character(match.arg(nomad.shortcut$values$regtype, c("lc", "ll", "lp")))[1L], "lp"))
+        stop("nomad=TRUE requires regtype='lp'")
+      if ("bwtype" %in% mc.names &&
+          !identical(as.character(match.arg(nomad.shortcut$values$bwtype, c("fixed", "generalized_nn", "adaptive_nn")))[1L], "fixed"))
+        stop("nomad=TRUE currently requires bwtype='fixed'")
+      if ("degree.select" %in% mc.names &&
+          identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
+        stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
+      if ("search.engine" %in% mc.names &&
+          !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
+              c("nomad", "nomad+powell")))
+        stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
+      if ("bernstein.basis" %in% mc.names &&
+          !isTRUE(npValidateGlpBernstein(regtype = "lp",
+                                        bernstein.basis = nomad.shortcut$values$bernstein.basis)))
+        stop("nomad=TRUE currently requires bernstein.basis=TRUE")
+      if ("degree.verify" %in% mc.names &&
+          isTRUE(npValidateScalarLogical(nomad.shortcut$values$degree.verify, "degree.verify")))
+        stop("nomad=TRUE currently requires degree.verify=FALSE")
+    }
+
+    search.mc.names <- mc.names
+    degree.select.value <- if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else "manual"
     automatic.degree.search <- !identical(match.arg(degree.select.value, c("manual", "coordinate", "exhaustive")), "manual")
-    search.engine.value <- if ("search.engine" %in% search.mc.names) search.engine else "nomad+powell"
+    search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
 
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
       return(.npRmpi_autodispatch_call(
@@ -1001,7 +1055,13 @@ npregbw.default <-
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
     ## bandwidth() call
 
-    rb.args <- list(
+    margs <- c("regtype", "basis", "degree", "bernstein.basis", "bwmethod", "bwscaling", "bwtype",
+               "ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
+
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
+
+    bw.args <- list(
       bw = bws,
       nobs = dim(xdat)[1],
       xdati = untangle(xdat),
@@ -1010,64 +1070,46 @@ npregbw.default <-
       ynames = yname,
       bandwidth.compute = bandwidth.compute
     )
+    if (any.m) {
+      nms <- mc.names[m]
+      bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+    }
 
-    if (!missing(regtype)) rb.args$regtype <- regtype
-    if (!missing(basis)) rb.args$basis <- basis
-    if (!missing(degree)) rb.args$degree <- degree
-    if (!missing(bernstein.basis)) rb.args$bernstein.basis <- bernstein.basis
-    if (!missing(bwmethod)) rb.args$bwmethod <- bwmethod
-    if (!missing(bwscaling)) rb.args$bwscaling <- bwscaling
-    if (!missing(bwtype)) rb.args$bwtype <- bwtype
-    if (!missing(ckertype)) rb.args$ckertype <- ckertype
-    if (!missing(ckerorder)) rb.args$ckerorder <- ckerorder
-    if (!missing(ckerbound)) rb.args$ckerbound <- ckerbound
-    if (!missing(ckerlb)) rb.args$ckerlb <- ckerlb
-    if (!missing(ckerub)) rb.args$ckerub <- ckerub
-    if (!missing(ukertype)) rb.args$ukertype <- ukertype
-    if (!missing(okertype)) rb.args$okertype <- okertype
+    margs <- c("nmulti", "remin", "itmax", "ftol", "tol",
+               "small",
+               "lbc.dir", "dfc.dir", "cfac.dir","initc.dir",
+               "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir",
+               "lbc.init", "hbc.init", "cfac.init",
+               "lbd.init", "hbd.init", "dfac.init",
+               "scale.init.categorical.sample",
+               "transform.bounds",
+               "invalid.penalty",
+               "penalty.multiplier")
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
 
-    reg.args <- rb.args[setdiff(names(rb.args), c("bw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
+    if (any.m) {
+      nms <- mc.names[m]
+      opt.args <- mget(nms, envir = environment(), inherits = FALSE)
+    } else {
+      opt.args <- list()
+    }
 
-    opt.args <- list()
-    if (!missing(nmulti)) opt.args$nmulti <- nmulti
-    if (!missing(remin)) opt.args$remin <- remin
-    if (!missing(itmax)) opt.args$itmax <- itmax
-    if (!missing(ftol)) opt.args$ftol <- ftol
-    if (!missing(tol)) opt.args$tol <- tol
-    if (!missing(small)) opt.args$small <- small
-    if (!missing(lbc.dir)) opt.args$lbc.dir <- lbc.dir
-    if (!missing(dfc.dir)) opt.args$dfc.dir <- dfc.dir
-    if (!missing(cfac.dir)) opt.args$cfac.dir <- cfac.dir
-    if (!missing(initc.dir)) opt.args$initc.dir <- initc.dir
-    if (!missing(lbd.dir)) opt.args$lbd.dir <- lbd.dir
-    if (!missing(hbd.dir)) opt.args$hbd.dir <- hbd.dir
-    if (!missing(dfac.dir)) opt.args$dfac.dir <- dfac.dir
-    if (!missing(initd.dir)) opt.args$initd.dir <- initd.dir
-    if (!missing(lbc.init)) opt.args$lbc.init <- lbc.init
-    if (!missing(hbc.init)) opt.args$hbc.init <- hbc.init
-    if (!missing(cfac.init)) opt.args$cfac.init <- cfac.init
-    if (!missing(lbd.init)) opt.args$lbd.init <- lbd.init
-    if (!missing(hbd.init)) opt.args$hbd.init <- hbd.init
-    if (!missing(dfac.init)) opt.args$dfac.init <- dfac.init
-    if (!missing(scale.init.categorical.sample))
-      opt.args$scale.init.categorical.sample <- scale.init.categorical.sample
-    if (!missing(transform.bounds)) opt.args$transform.bounds <- transform.bounds
-    if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
-    if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
+    reg.args <- bw.args[setdiff(names(bw.args), c("bw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
 
     ncon <- sum(untangle(xdat)$icon)
-    regtype.value <- if ("regtype" %in% search.mc.names) regtype else "lc"
-    bernstein.value <- if ("bernstein.basis" %in% search.mc.names) bernstein.basis else TRUE
-    degree.min.value <- if ("degree.min" %in% search.mc.names) degree.min else NULL
-    degree.max.value <- if ("degree.max" %in% search.mc.names) degree.max else NULL
+    regtype.value <- if (!is.null(nomad.shortcut$values$regtype)) nomad.shortcut$values$regtype else "lc"
+    bernstein.value <- if (!is.null(nomad.shortcut$values$bernstein.basis)) nomad.shortcut$values$bernstein.basis else TRUE
+    degree.min.value <- nomad.shortcut$values$degree.min
+    degree.max.value <- nomad.shortcut$values$degree.max
     degree.start.value <- if ("degree.start" %in% search.mc.names) degree.start else NULL
     degree.restarts.value <- if ("degree.restarts" %in% search.mc.names) degree.restarts else 0L
     degree.max.cycles.value <- if ("degree.max.cycles" %in% search.mc.names) degree.max.cycles else 20L
-    degree.verify.value <- if ("degree.verify" %in% search.mc.names) degree.verify else FALSE
+    degree.verify.value <- if (!is.null(nomad.shortcut$values$degree.verify)) nomad.shortcut$values$degree.verify else FALSE
     degree.search <- .npregbw_degree_search_controls(
       regtype = regtype.value,
-      regtype.named = "regtype" %in% search.mc.names,
+      regtype.named = isTRUE(nomad.shortcut$enabled) || ("regtype" %in% search.mc.names),
       ncon = ncon,
       nobs = NROW(xdat),
       basis = if ("basis" %in% search.mc.names) basis else "glp",
@@ -1080,7 +1122,7 @@ npregbw.default <-
       degree.max.cycles = degree.max.cycles.value,
       degree.verify = degree.verify.value,
       bernstein.basis = bernstein.value,
-      bernstein.named = "bernstein.basis" %in% search.mc.names
+      bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% search.mc.names)
     )
     if (!is.null(degree.search) && is.null(reg.args$degree)) {
       reg.args$degree <- npSetupGlpDegree(
@@ -1162,6 +1204,7 @@ npregbw.default <-
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
     tbw$call <- mc
+    tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     return(tbw)
     

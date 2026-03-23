@@ -409,10 +409,11 @@ npcdens.conbandwidth <- function(bws,
 }
 
 
-npcdens.default <- function(bws, txdat, tydat, ...){
+npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npcdens()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
-  if (.npRmpi_autodispatch_active())
+  nomad <- npValidateScalarLogical(nomad, "nomad")
+  if (.npRmpi_autodispatch_active() && !isTRUE(nomad))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   sc <- sys.call()
   sc.names <- names(sc)
