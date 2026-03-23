@@ -335,6 +335,7 @@ npplregbw.plbandwidth =
                                     outer.args,
                                     opt.args,
                                     degree.search,
+                                    nomad.inner.nmulti = 0L,
                                     random.seed = 42L) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
@@ -570,6 +571,7 @@ npplregbw.plbandwidth =
     direction = "min",
     objective_name = "fval",
     nmulti = nomad.nmulti,
+    nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     degree_spec = list(
       initial = degree.search$start.degree,
@@ -703,6 +705,7 @@ npplregbw.default =
            degree.select = c("manual", "coordinate", "exhaustive"),
            search.engine = c("nomad+powell", "cell", "nomad"),
            nomad = FALSE,
+           nomad.nmulti = 0L,
            degree.min = NULL,
            degree.max = NULL,
            degree.start = NULL,
@@ -823,6 +826,16 @@ npplregbw.default =
       bernstein.basis = bernstein.arg,
       bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% dot.names)
     )
+    nomad.inner.named <- "nomad.nmulti" %in% mc.names
+    nomad.inner.nmulti <- if (nomad.inner.named) {
+      npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti")
+    } else {
+      0L
+    }
+    if (nomad.inner.named &&
+        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
+      stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
+    }
     if (.npRmpi_autodispatch_active() &&
         is.null(degree.search) &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
@@ -915,13 +928,14 @@ npplregbw.default =
             xdat = xdat,
             ydat = ydat,
             zdat = zdat,
-          bws = bws,
-          reg.args = reg.args,
-          outer.args = outer.args,
-          opt.args = opt.args,
-          degree.search = degree.search,
-          random.seed = random.seed.value
-        )
+            bws = bws,
+            reg.args = reg.args,
+            outer.args = outer.args,
+            opt.args = opt.args,
+            degree.search = degree.search,
+            nomad.inner.nmulti = nomad.inner.nmulti,
+            random.seed = random.seed.value
+          )
       }
         tbw <- .npplregbw_attach_degree_search(
           bws = search.result$best_payload,

@@ -764,6 +764,7 @@ npcdensbw.conbandwidth <-
                                     reg.args,
                                     opt.args,
                                     degree.search,
+                                    nomad.inner.nmulti = 0L,
                                     random.seed = 42L) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
@@ -945,6 +946,7 @@ npcdensbw.conbandwidth <-
     direction = objective.direction,
     objective_name = "fval",
     nmulti = nomad.nmulti,
+    nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     degree_spec = list(
       initial = degree.search$start.degree,
@@ -1143,6 +1145,7 @@ npcdensbw.default <-
            degree.select = c("manual", "coordinate", "exhaustive"),
            search.engine = c("nomad+powell", "cell", "nomad"),
            nomad = FALSE,
+           nomad.nmulti = 0L,
            degree.min = NULL,
            degree.max = NULL,
            degree.start = NULL,
@@ -1288,6 +1291,16 @@ npcdensbw.default <-
       bernstein.basis = bernstein.value,
       bernstein.named = bernstein.named
     )
+    nomad.inner.named <- "nomad.nmulti" %in% mc.names
+    nomad.inner.nmulti <- if (nomad.inner.named) {
+      npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti")
+    } else {
+      0L
+    }
+    if (nomad.inner.named &&
+        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
+      stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
+    }
 
     if (!is.null(degree.search)) {
       spec$bernstein.basis <- degree.search$bernstein.basis
@@ -1411,6 +1424,7 @@ npcdensbw.default <-
           reg.args = reg.args,
           opt.args = opt.args,
           degree.search = degree.search,
+          nomad.inner.nmulti = nomad.inner.nmulti,
           random.seed = random.seed.value
         )
       }

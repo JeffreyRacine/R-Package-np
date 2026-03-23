@@ -111,6 +111,7 @@ npcdistbw(\dots)
           degree.select = c("manual", "coordinate", "exhaustive"),
           search.engine = c("nomad+powell", "cell", "nomad"),
           nomad = FALSE,
+          nomad.nmulti = 0L,
           degree.min = NULL,
           degree.max = NULL,
           degree.start = NULL,
@@ -467,10 +468,25 @@ npcdistbw(\dots)
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
     search, \code{bernstein.basis=TRUE}, no explicit \code{degree},
     and \code{search.engine \%in\% c("nomad", "nomad+powell")}.
+    This shortcut does not change the meaning of \code{nmulti} or
+    \code{nomad.nmulti}: \code{nmulti} remains the outer restart count,
+    while \code{nomad.nmulti} controls inner
+    \code{crs::snomadr()} multistarts within each outer restart.
     Returned bandwidth objects retain this normalized preset metadata in
     \code{bw$nomad.shortcut} for a returned object \code{bw}; when
     available, \code{nomad.time} and \code{powell.time} record the
     direct-search and Powell-polish timing components.
+  }
+
+  \item{nomad.nmulti}{
+    non-negative integer controlling the inner
+    \code{crs::snomadr()} multistart count used within each outer
+    NOMAD restart when \code{regtype="lp"} and automatic degree search
+    uses \code{search.engine="nomad"} or \code{"nomad+powell"}.
+    Defaults to \code{0L}, which preserves the current one-start-per-
+    restart behavior. This does not replace \code{nmulti}:
+    \code{nmulti} controls outer restarts, while \code{nomad.nmulti}
+    controls inner NOMAD multistarts within each outer restart.
   }
 
   \item{degree.min}{
