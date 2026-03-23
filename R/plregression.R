@@ -123,6 +123,9 @@ residuals.plregression <- function(object, ...) {
  }
 }
 predict.plregression <- function(object, se.fit = FALSE, ...) {
+  if (isTRUE(se.fit))
+    stop("se.fit = TRUE is not implemented for 'plregression' objects", call. = FALSE)
+
   obj.bws <- .np_plreg_bws(object, where = "predict.plregression")
   dots <- list(...)
   has.formula.route <- !is.null(obj.bws$formula)
@@ -138,11 +141,7 @@ predict.plregression <- function(object, se.fit = FALSE, ...) {
   }
 
   tr <- do.call(npplreg, c(list(bws = obj.bws), dots))
-  if(se.fit)
-    return(list(fit = fitted(tr), se.fit = se(tr), 
-                df = tr$nobs, residual.scale = tr$MSE))
-  else
-    return(fitted(tr))
+  return(fitted(tr))
 }
 summary.plregression <- function(object, ...){
   obj.bws <- .np_plreg_bws(object, where = "summary.plregression")

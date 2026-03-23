@@ -55,3 +55,21 @@ test_that("plregression methods remain compatible with legacy objects lacking bw
   expect_type(predict(legacy), "double")
   expect_type(residuals(legacy), "double")
 })
+
+test_that("predict.plregression fail-fast is explicit and plain predict is unchanged", {
+  set.seed(13)
+  n <- 80
+  x1 <- runif(n)
+  z1 <- runif(n)
+  y <- x1^2 + 2 * z1 + rnorm(n, sd = 0.1)
+
+  bw_mat <- matrix(c(0.1, 0.1), nrow = 2, ncol = 1)
+  bw <- npplregbw(xdat = z1, zdat = x1, ydat = y, bws = bw_mat, bandwidth.compute = FALSE)
+  model <- npplreg(bws = bw)
+
+  expect_equal(as.numeric(predict(model)), as.numeric(fitted(model)), tolerance = 0)
+  expect_error(
+    predict(model, se.fit = TRUE),
+    "se.fit = TRUE is not implemented"
+  )
+})
