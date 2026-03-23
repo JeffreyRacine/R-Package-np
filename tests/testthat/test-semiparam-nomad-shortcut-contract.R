@@ -187,6 +187,18 @@ test_that("npindex nomad shortcut matches the explicit single-index preset", {
   expect_true(is.list(bw_short$nomad.shortcut))
   expect_equal(fitted(fit_short), fitted(fit_long), tolerance = 5e-4)
   expect_true(is.list(fit_short$bws$nomad.shortcut))
+
+  dat <- data.frame(y = y, x1 = xdat$x1, x2 = xdat$x2)
+  fit_formula <- np::npindex(
+    y ~ x1 + x2,
+    data = dat,
+    method = "ichimura",
+    nomad = TRUE,
+    degree.max = 1L,
+    nmulti = 1L
+  )
+  expect_true(is.list(fit_formula$bws$nomad.shortcut))
+  expect_true(isTRUE(fit_formula$bws$nomad.shortcut$enabled))
 })
 
 test_that("semiparametric nomad shortcuts fail fast on incompatible settings", {
