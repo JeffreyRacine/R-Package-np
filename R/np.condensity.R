@@ -411,6 +411,18 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   no.txdat <- missing(txdat)
   no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "conbandwidth")
+  bws.formula <- (!no.bws) && inherits(bws, "formula")
+
+  if (bws.named && no.txdat && no.tydat && bws.formula) {
+    sc$`bws` <- NULL
+    sc$formula <- bws
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npcdensbw)
+    bws.named <- FALSE
+  } else {
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npcdensbw)
+  }
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
@@ -419,10 +431,6 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
 
   if(tydat.named)
     tydat <- toFrame(tydat)
-
-  sc.bw <- sc
-  
-  sc.bw[[1]] <- quote(npcdensbw)
 
   if(bws.named){
     sc.bw$bandwidth.compute <- FALSE

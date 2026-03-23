@@ -216,15 +216,23 @@ npudist.default <- function(bws, tdat, ...){
   no.bws <- missing(bws)
   no.tdat <- missing(tdat)
   has.explicit.bws <- (!no.bws) && isa(bws, "dbandwidth")
+  bws.formula <- (!no.bws) && inherits(bws, "formula")
+
+  if (bws.named && no.tdat && bws.formula) {
+    sc$`bws` <- NULL
+    sc$formula <- bws
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npudistbw)
+    bws.named <- FALSE
+  } else {
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npudistbw)
+  }
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
   if(tdat.named)
     tdat <- toFrame(tdat)
-
-  sc.bw <- sc
-  
-  sc.bw[[1]] <- quote(npudistbw)
 
   if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
