@@ -44,6 +44,7 @@ npreg.formula <-
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
+    response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
     txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
     has.eval <- !is.null(newdata)
@@ -90,6 +91,11 @@ npreg.formula <-
     ev <- do.call(npreg, c(reg.args, list(...)))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
+
+    if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
+      if (!is.null(ev$bws))
+        ev$bws$ynames <- response.name
+    }
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
