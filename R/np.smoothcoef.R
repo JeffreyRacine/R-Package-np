@@ -135,7 +135,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   } else {
     "manual"
   }
-  if (.npRmpi_npscoef_should_localize(bws) &&
+  if (!missing(bws) &&
+      .npRmpi_npscoef_should_localize(bws) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
     return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   if (.npRmpi_autodispatch_active() &&
