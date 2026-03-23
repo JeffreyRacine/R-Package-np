@@ -375,7 +375,7 @@ npqreg.default <- function(bws, txdat, tydat, ...){
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
-  if (inherits(bws, "formula")) {
+  if (!missing(bws) && inherits(bws, "formula")) {
     dots <- list(...)
     tbw <- do.call(npcdistbw, c(list(formula = bws), dots))
     return(npqreg(bws = tbw, ...))
