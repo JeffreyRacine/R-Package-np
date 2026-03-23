@@ -83,3 +83,36 @@ test_that("predict.plregression fail-fast is explicit and plain predict is uncha
     "se.fit = TRUE is not implemented"
   )
 })
+
+test_that("npplreg residuals stay training-length when evaluation x/z are supplied", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  set.seed(20260323)
+  n <- 24L
+  x1 <- seq(0.1, 1.2, length.out = n)
+  z1 <- seq(0.2, 1.4, length.out = n)
+  y <- x1^2 + 2 * z1
+
+  bw <- npplregbw(
+    xdat = z1,
+    zdat = x1,
+    ydat = y,
+    bws = matrix(c(0.35, 0.35), nrow = 2),
+    bandwidth.compute = FALSE
+  )
+  ex <- data.frame(x1 = z1[c(2, 5, 8)])
+  ez <- data.frame(z1 = x1[c(3, 9, 15)])
+  ey <- y[c(3, 9, 15)]
+
+  train.fit <- npplreg(bws = bw, residuals = TRUE)
+  eval.fit.noey <- npplreg(bws = bw, residuals = TRUE, exdat = ex, ezdat = ez)
+  eval.fit.ey <- npplreg(bws = bw, residuals = TRUE, exdat = ex, ezdat = ez, eydat = ey)
+
+  expect_equal(length(eval.fit.noey$mean), nrow(ex), tolerance = 0)
+  expect_equal(length(eval.fit.ey$mean), nrow(ex), tolerance = 0)
+  expect_equal(length(eval.fit.noey$resid), length(y), tolerance = 0)
+  expect_equal(length(eval.fit.ey$resid), length(y), tolerance = 0)
+  expect_equal(as.numeric(eval.fit.noey$resid), as.numeric(train.fit$resid), tolerance = 0)
+  expect_equal(as.numeric(eval.fit.ey$resid), as.numeric(train.fit$resid), tolerance = 0)
+})
