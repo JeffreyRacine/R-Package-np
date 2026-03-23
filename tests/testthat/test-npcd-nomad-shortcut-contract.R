@@ -134,6 +134,38 @@ test_that("npcdist nomad shortcut matches the explicit distribution preset", {
   expect_true(is.list(fit_short$bws$nomad.shortcut))
 })
 
+test_that("npcdens and npcdist accept nomad.nmulti through the NOMAD shortcut route", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260323)
+  dat <- data.frame(x = sort(runif(14)), y = sort(runif(14)))
+
+  bw_cd <- np::npcdensbw(
+    y ~ x,
+    data = dat,
+    nomad = TRUE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 2L
+  )
+  bw_cdf <- np::npcdistbw(
+    y ~ x,
+    data = dat,
+    nomad = TRUE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 2L
+  )
+
+  expect_true(is.list(bw_cd$nomad.shortcut))
+  expect_true(is.list(bw_cdf$nomad.shortcut))
+  expect_true(isTRUE(bw_cd$bernstein.basis))
+  expect_true(isTRUE(bw_cdf$bernstein.basis))
+})
+
 test_that("npcdens and npcdist nomad shortcuts fail fast on incompatible settings", {
   x <- data.frame(x = seq(0, 1, length.out = 8))
   y <- data.frame(y = seq(0, 1, length.out = 8))
@@ -153,5 +185,9 @@ test_that("npcdens and npcdist nomad shortcuts fail fast on incompatible setting
   expect_error(
     np::npcdistbw(xdat = x, ydat = y, nomad = TRUE, search.engine = "cell"),
     "requires search.engine='nomad' or 'nomad\\+powell'"
+  )
+  expect_error(
+    np::npcdensbw(xdat = x, ydat = y, nomad.nmulti = 1L),
+    "nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad\\+powell'"
   )
 })

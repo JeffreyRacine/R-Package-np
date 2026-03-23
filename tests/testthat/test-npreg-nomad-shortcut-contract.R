@@ -93,6 +93,38 @@ test_that("npregbw nomad shortcut matches the explicit regression preset", {
                     bw_short$nomad.shortcut$auto.filled))
 })
 
+test_that("npreg and npregbw accept nomad.nmulti through the NOMAD shortcut route", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260323)
+  dat <- data.frame(x = sort(runif(14)))
+  dat$y <- sin(2 * pi * dat$x) + rnorm(nrow(dat), sd = 0.05)
+
+  bw <- np::npregbw(
+    y ~ x,
+    data = dat,
+    nomad = TRUE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 2L
+  )
+  fit <- np::npreg(
+    y ~ x,
+    data = dat,
+    nomad = TRUE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 2L
+  )
+
+  expect_s3_class(bw, "rbandwidth")
+  expect_true(is.list(fit$bws$nomad.shortcut))
+  expect_identical(as.integer(fit$bws$degree), as.integer(bw$degree))
+})
+
 test_that("npreg nomad shortcut matches the explicit regression preset", {
   skip_if_not_installed("crs")
 
@@ -157,5 +189,24 @@ test_that("npregbw nomad shortcut fails fast on incompatible explicit settings",
   expect_error(
     np::npregbw(xdat = x, ydat = y, nomad = TRUE, search.engine = "cell"),
     "requires search.engine='nomad' or 'nomad\\+powell'"
+  )
+
+  expect_error(
+    np::npregbw(xdat = x, ydat = y, nomad.nmulti = 1L),
+    "nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad\\+powell'"
+  )
+
+  expect_error(
+    np::npregbw(
+      xdat = x,
+      ydat = y,
+      regtype = "lp",
+      degree.select = "coordinate",
+      search.engine = "cell",
+      degree.min = 0L,
+      degree.max = 1L,
+      nomad.nmulti = 1L
+    ),
+    "nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad\\+powell'"
   )
 })

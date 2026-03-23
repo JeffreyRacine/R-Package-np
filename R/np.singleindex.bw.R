@@ -401,7 +401,8 @@ npindexbw.NULL <-
                                     template,
                                     reg.args,
                                     opt.args,
-                                    degree.search) {
+                                    degree.search,
+                                    nomad.inner.nmulti = 0L) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
 
@@ -570,6 +571,7 @@ npindexbw.NULL <-
     direction = "min",
     objective_name = "fval",
     nmulti = nomad.nmulti,
+    nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
     degree_spec = list(
       initial = degree.search$start.degree,
@@ -701,6 +703,7 @@ npindexbw.default <-
            degree.select = c("manual", "coordinate", "exhaustive"),
            search.engine = c("nomad+powell", "cell", "nomad"),
            nomad = FALSE,
+           nomad.nmulti = 0L,
            degree.min = NULL,
            degree.max = NULL,
            degree.start = NULL,
@@ -815,6 +818,16 @@ npindexbw.default <-
       bernstein.basis = if (!is.null(nomad.shortcut$values$bernstein.basis)) nomad.shortcut$values$bernstein.basis else bernstein.basis,
       bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% mc.names)
     )
+    nomad.inner.named <- "nomad.nmulti" %in% mc.names
+    nomad.inner.nmulti <- if (nomad.inner.named) {
+      npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti")
+    } else {
+      0L
+    }
+    if (nomad.inner.named &&
+        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
+      stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
+    }
     degree.setup <- npSetupGlpDegree(
       regtype = if (!is.null(nomad.shortcut$values$regtype)) nomad.shortcut$values$regtype else regtype,
       degree = degree,
@@ -924,7 +937,8 @@ npindexbw.default <-
           template = tbw,
           reg.args = reg.args,
           opt.args = utils::modifyList(opt.args, list(random.seed = random.seed.value)),
-          degree.search = degree.search
+          degree.search = degree.search,
+          nomad.inner.nmulti = nomad.inner.nmulti
         )
       }
       tbw <- .npindexbw_attach_degree_search(

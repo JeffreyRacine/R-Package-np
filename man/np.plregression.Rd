@@ -130,6 +130,10 @@ FALSE, \dots)
     \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
     \code{degree.verify}, and \code{bwtype} with the recommended
     automatic LP NOMAD preset documented in \code{\link{npplregbw}}.
+    Additional NOMAD tuning arguments such as \code{nomad.nmulti} may
+    also be supplied through \code{\dots}; \code{nmulti} remains the
+    outer restart count while \code{nomad.nmulti} controls inner
+    \code{crs::snomadr()} multistarts within each outer restart.
     After fitting, inspect \code{fit$bws$nomad.shortcut} on the
     returned object \code{fit} to see the normalized shortcut metadata.
   }

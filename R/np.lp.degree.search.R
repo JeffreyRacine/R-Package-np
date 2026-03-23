@@ -1325,6 +1325,7 @@
                              direction = c("min", "max"),
                              objective_name = "objective",
                              nmulti = 1L,
+                             nomad.inner.nmulti = 0L,
                              random.seed = 42L,
                              display.nomad.progress = FALSE,
                              degree_spec = NULL) {
@@ -1354,6 +1355,7 @@
   state$restart_eval_id <- 0L
 
   nomad.nmulti <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
+  nomad.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
   start_matrix <- .np_nomad_build_starts(
     x0 = x0,
     bbin = bbin,
@@ -1551,7 +1553,7 @@
           x0 = as.numeric(start_matrix[i, ]),
           lb = as.double(lb),
           ub = as.double(ub),
-          nmulti = 0L,
+          nmulti = nomad.inner.nmulti,
           random.seed = as.integer(random.seed),
           opts = list(),
           display.nomad.progress = display.nomad.progress,

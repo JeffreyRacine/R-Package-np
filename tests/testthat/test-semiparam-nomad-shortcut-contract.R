@@ -201,6 +201,51 @@ test_that("npindex nomad shortcut matches the explicit single-index preset", {
   expect_true(isTRUE(fit_formula$bws$nomad.shortcut$enabled))
 })
 
+test_that("semiparametric NOMAD shortcut routes accept nomad.nmulti", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260323)
+  n <- 18
+  dat <- data.frame(x = rnorm(n), z = sort(runif(n)))
+  dat$y <- 1 + 0.5 * dat$x + sin(2 * pi * dat$z) + rnorm(n, sd = 0.05)
+
+  fit_pl <- np::npplreg(
+    y ~ x | z,
+    data = dat,
+    nomad = TRUE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 2L
+  )
+  fit_sc <- np::npscoef(
+    txdat = data.frame(x = dat$x),
+    tzdat = data.frame(z = dat$z),
+    tydat = dat$y,
+    nomad = TRUE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 2L,
+    errors = FALSE,
+    betas = FALSE
+  )
+  fit_si <- np::npindex(
+    txdat = data.frame(x1 = dat$x, x2 = dat$z),
+    tydat = dat$y,
+    method = "ichimura",
+    nomad = TRUE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 2L
+  )
+
+  expect_true(is.list(fit_pl$bws$nomad.shortcut))
+  expect_true(is.list(fit_sc$bws$nomad.shortcut))
+  expect_true(is.list(fit_si$bws$nomad.shortcut))
+})
+
 test_that("semiparametric nomad shortcuts fail fast on incompatible settings", {
   xdat <- data.frame(x = runif(10))
   zdat <- data.frame(z = runif(10))
@@ -217,5 +262,9 @@ test_that("semiparametric nomad shortcuts fail fast on incompatible settings", {
   expect_error(
     np::npindexbw(xdat = data.frame(x1 = runif(10), x2 = runif(10)), ydat = y, nomad = TRUE, bwtype = "adaptive_nn"),
     "requires bwtype='fixed'"
+  )
+  expect_error(
+    np::npplregbw(xdat = xdat, zdat = zdat, ydat = y, nomad.nmulti = 1L),
+    "nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad\\+powell'"
   )
 })
