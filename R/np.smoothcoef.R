@@ -32,6 +32,7 @@ npscoef.formula <-
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
+    response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
     txdat <- tmf[, bws$chromoly[[2]], drop = FALSE]
     miss.z <- !(length(bws$chromoly) == 3)
@@ -88,6 +89,11 @@ npscoef.formula <-
     }
     sc.args$bws <- bws
     ev <- do.call(npscoef, c(sc.args, list(...)))
+
+    if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
+      if (!is.null(ev$bws))
+        ev$bws$ynames <- response.name
+    }
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
