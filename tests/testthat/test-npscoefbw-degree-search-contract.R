@@ -197,23 +197,24 @@ test_that("npscoefbw automatic degree search enforces pilot guardrails", {
     "bandwidth.compute=TRUE"
   )
 
-  expect_error(
-    npscoefbw(
-      xdat = xdat,
-      zdat = zdat,
-      ydat = y,
-      regtype = "lp",
-      bernstein.basis = FALSE,
-      degree.select = "exhaustive",
-      search.engine = "cell",
-      degree.min = 0L,
-      degree.max = 4L,
-      bwtype = "fixed",
-      bwmethod = "cv.ls",
-      nmulti = 1L
-    ),
-    "degree.max <= 3"
+  bw <- npscoefbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = y,
+    regtype = "lp",
+    bernstein.basis = FALSE,
+    degree.select = "exhaustive",
+    search.engine = "cell",
+    degree.min = 0L,
+    degree.max = 4L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
   )
+
+  expect_s3_class(bw, "scbandwidth")
+  expect_false(isTRUE(bw$bernstein.basis))
+  expect_lte(max(as.integer(bw$degree)), 4L)
 
   expect_error(
     npscoefbw(

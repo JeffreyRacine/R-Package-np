@@ -134,8 +134,31 @@ npRidgeSequenceFromBase <- function(n.train, ridge.base = 0.0, cap = 1.0) {
   unique(as.double(seq.out))
 }
 
+.np_glp_degree_hard_max <- 100L
+.np_glp_degree_warn_threshold <- 25L
+
+.np_warn_high_glp_degree <- function(value, argname = "degree") {
+  value <- as.integer(value)
+  if (!length(value))
+    return(invisible(NULL))
+
+  threshold <- .np_glp_degree_warn_threshold
+  if (any(value > threshold)) {
+    warning(
+      sprintf(
+        "%s contains unusually large polynomial degree values above %d; numerical instability is possible",
+        argname,
+        threshold
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(NULL)
+}
+
 npValidateGlpDegree <- function(regtype, degree, ncon, argname = "degree") {
-  degree.max <- 12L
+  degree.max <- .np_glp_degree_hard_max
 
   if (!identical(regtype, "lp"))
     return(NULL)
@@ -168,6 +191,8 @@ npValidateGlpDegree <- function(regtype, degree, ncon, argname = "degree") {
   if (any(degree > degree.max))
     stop(sprintf("%s must contain finite non-negative integers in [0,%d]",
                  argname, degree.max))
+
+  .np_warn_high_glp_degree(degree, argname = argname)
 
   as.integer(degree)
 }

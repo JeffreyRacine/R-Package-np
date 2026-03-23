@@ -167,22 +167,23 @@ test_that("npcdistbw automatic degree search enforces pilot guardrails", {
     "automatic degree search currently requires regtype='lp'"
   )
 
-  expect_error(
-    npcdistbw(
-      y ~ x,
-      data = dat,
-      regtype = "lp",
-      bernstein.basis = FALSE,
-      degree.select = "exhaustive",
-      search.engine = "cell",
-      degree.min = 0L,
-      degree.max = 4L,
-      bwtype = "fixed",
-      bwmethod = "cv.ls",
-      nmulti = 1L
-    ),
-    "degree.max <= 3"
+  bw <- npcdistbw(
+    y ~ x,
+    data = dat,
+    regtype = "lp",
+    bernstein.basis = FALSE,
+    degree.select = "exhaustive",
+    search.engine = "cell",
+    degree.min = 0L,
+    degree.max = 4L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
   )
+
+  expect_s3_class(bw, "condbandwidth")
+  expect_false(isTRUE(bw$bernstein.basis))
+  expect_lte(max(as.integer(bw$degree)), 4L)
 })
 
 test_that("npcdist forwards automatic LP degree search through npcdistbw", {

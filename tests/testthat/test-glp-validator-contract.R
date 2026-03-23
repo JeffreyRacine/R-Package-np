@@ -13,6 +13,14 @@ test_that("GLP validators handle non-numeric and missing inputs deterministicall
     npRmpi:::npValidateGlpDegree("lp", c(1, NA_real_), 2L),
     "finite non-negative integers"
   )
+  expect_warning(
+    expect_identical(npRmpi:::npValidateGlpDegree("lp", 30L, 1L), 30L),
+    "unusually large polynomial degree values above 25"
+  )
+  expect_error(
+    npRmpi:::npValidateGlpDegree("lp", 101L, 1L),
+    "\\[0,100\\]"
+  )
 
   expect_null(npRmpi:::npValidateGlpGradientOrder("lc", "a", 1L))
   expect_identical(npRmpi:::npValidateGlpGradientOrder("lp", NULL, 0L), integer(0))

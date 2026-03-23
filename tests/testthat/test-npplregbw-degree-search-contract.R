@@ -197,23 +197,24 @@ test_that("npplregbw automatic degree search enforces pilot guardrails", {
     "bandwidth.compute=TRUE"
   )
 
-  expect_error(
-    npplregbw(
-      xdat = xdat,
-      zdat = zdat,
-      ydat = y,
-      regtype = "lp",
-      bernstein.basis = FALSE,
-      degree.select = "exhaustive",
-      search.engine = "cell",
-      degree.min = 0L,
-      degree.max = 4L,
-      bwtype = "fixed",
-      bwmethod = "cv.ls",
-      nmulti = 1L
-    ),
-    "degree.max <= 3"
+  bw <- npplregbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = y,
+    regtype = "lp",
+    bernstein.basis = FALSE,
+    degree.select = "exhaustive",
+    search.engine = "cell",
+    degree.min = 0L,
+    degree.max = 4L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    nmulti = 1L
   )
+
+  expect_s3_class(bw, "plbandwidth")
+  expect_false(isTRUE(bw$bernstein.basis))
+  expect_lte(max(as.integer(bw$degree)), 4L)
 })
 
 test_that("npplreg forwards automatic LP degree search through npplregbw", {

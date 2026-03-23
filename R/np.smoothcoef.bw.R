@@ -439,9 +439,6 @@ npscoefbw.NULL <-
     default.max = 3L
   )
 
-  if (!isTRUE(bern.auto) && any(bounds$upper > 3L))
-    stop("automatic degree search with bernstein.basis=FALSE currently requires degree.max <= 3")
-
   baseline.degree <- rep.int(0L, ncon)
   default.start.degree <- if (identical(search.engine, "cell")) {
     baseline.degree
