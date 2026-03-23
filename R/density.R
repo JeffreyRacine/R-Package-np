@@ -79,7 +79,7 @@ predict.npdensity <- function(object, se.fit = FALSE, ...) {
   tr <- do.call(npudens, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
-                df = tr$nobs, log.likelihood = tr$ll))
+                df = tr$nobs, log.likelihood = tr$log_likelihood))
   else
     return(fitted(tr))
 }
