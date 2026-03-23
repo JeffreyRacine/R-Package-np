@@ -552,7 +552,7 @@ npudistbw(\dots)
   often be necessary}. This can be frustrating for users possessing
   large datasets. For exploratory purposes, you may wish to override the
   default search tolerances, say, setting ftol=.01 and tol=.01 and
-  conduct multistarting (the default is to restart min(5, ncol(dat))
+  conduct multistarting (the default is to restart min(2, ncol(dat))
   times) as is done for a number of examples. Once the procedure
   terminates, you can restart search with default tolerances using those
   bandwidths obtained from the less rigorous search (i.e., set

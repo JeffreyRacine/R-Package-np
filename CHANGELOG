@@ -1,3 +1,16 @@
+Changes in development after 0.70-1 [22-Mar-2026]
+
+* Reduced the default multistart cap from `min(5, p)` to `min(2, p)`
+  across the mirrored core bandwidth selectors, with the univariate
+  boundary density helper now defaulting to `nmulti=1`.
+
+* Aligned automatic LP degree-search NOMAD fallbacks with the same
+  `min(2, p)` cap when `nmulti` is not supplied explicitly.
+
+* Added benchmark-study documentation under `benchmarks/validation`
+  noting the source-of-truth empirical `nmulti` default decision from
+  `np-master`.
+
 Changes from Version 0.70-0 to 0.70-1 [06-Mar-2026]
 
 * Reactivated the public conditional LP/LL cross-validation routes mirrored

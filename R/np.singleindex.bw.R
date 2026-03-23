@@ -469,7 +469,7 @@ npindexbw.NULL <-
   lb <- c(-beta.bound, h.lower, degree.search$lower)
   ub <- c(beta.bound, h.upper, degree.search$upper)
   bbin <- c(rep.int(0L, length(beta.start)), if (isTRUE(h.integer)) 1L else 0L, 1L)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) 1L else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else max(1L, as.integer(opt.args$nmulti[1L]))
   baseline.record <- NULL
 
   .np_nomad_baseline_note(degree.search$start.degree)
@@ -938,7 +938,7 @@ npindexbw.sibandwidth <-
     xdat = toFrame(xdat)
 
     if (missing(nmulti)){
-      nmulti <- min(5,ncol(xdat))
+      nmulti <- npDefaultNmulti(ncol(xdat))
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     only.optimize.beta <- npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")

@@ -912,7 +912,7 @@ npregiv <- function(y,
 
     num.bw <- ncol(xdat)
 
-    if(is.null(nmulti)) nmulti <- min(5,num.bw)
+    if(is.null(nmulti)) nmulti <- npDefaultNmulti(num.bw)
 
     ## Which variables are categorical, which are discrete...
 
@@ -1135,9 +1135,6 @@ npregiv <- function(y,
     }
   }
 
-  nmulti.loop <- if(!is.null(nmulti)) nmulti else 1
-  nmulti <- if(!is.null(nmulti)) nmulti else 5
-
   ## Need to determine how many x, w, z are numeric
 
   z <- data.frame(z)
@@ -1154,6 +1151,9 @@ npregiv <- function(y,
       ## page)
       if(!is.null(zeval)&&!is.null(xeval)) zeval <- data.frame(zeval,xeval)
   }
+
+  nmulti.loop <- if(!is.null(nmulti)) nmulti else 1
+  nmulti <- if(!is.null(nmulti)) nmulti else npDefaultNmulti(max(NCOL(z), NCOL(w)))
 
   z.numeric <- vapply(seq_len(NCOL(z)), function(i) is.numeric(z[,i]), logical(1))
   num.z.numeric <- NCOL(as.data.frame(z[,z.numeric]))

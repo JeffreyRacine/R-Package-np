@@ -67,9 +67,6 @@ npregivderiv <- function(y,
 
   start.from <- match.arg(start.from)
 
-  nmulti.loop <- if(!is.null(nmulti)) nmulti else 1
-  nmulti <- if(!is.null(nmulti)) nmulti else 5
-
   if(iterate.max < 2) stop("iterate.max must be at least 2")
   if(constant <= 0 || constant >= 1) stop("constant must lie in the range (0,1)")
 
@@ -94,6 +91,9 @@ npregivderiv <- function(y,
   w <- data.frame(w)
   if(!is.null(x)) z <- data.frame(z,x)
   if(!is.null(xeval)) zeval <- data.frame(zeval,xeval)
+
+  nmulti.loop <- if(!is.null(nmulti)) nmulti else 1
+  nmulti <- if(!is.null(nmulti)) nmulti else npDefaultNmulti(max(NCOL(z), NCOL(w)))
 
   z.numeric <- vapply(seq_len(NCOL(z)), function(i) is.numeric(z[,i]), logical(1))
   num.z.numeric <- NCOL(as.data.frame(z[,z.numeric]))

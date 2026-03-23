@@ -33,7 +33,7 @@ npuniden.boundary(X = NULL,
                               "beta1","beta2",
                               "fb","fbl","fbu",
                               "rigaussian","gamma"),
-                  nmulti = 5,
+                  nmulti = 1,
                   proper = FALSE)
 }
 \arguments{
@@ -67,7 +67,8 @@ an optional grid used for the initial grid search when \code{cv="grid-hybrid"}
 an optional kernel specification (defaults to "gaussian1")
 }
   \item{nmulti}{
-number of multi-starts used when \code{cv="numeric"} (defaults to 5)
+number of multi-starts used when \code{cv="numeric"} (defaults to 1 for
+the univariate boundary problem)
 }
   \item{proper}{
 an optional logical value indicating whether to enforce proper density

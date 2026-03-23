@@ -150,7 +150,7 @@ npcdistbw.condbandwidth <-
     xdat = toFrame(xdat)
 
     if (missing(nmulti)){
-      nmulti <- min(5,(dim(ydat)[2]+dim(xdat)[2]))
+      nmulti <- npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2])
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     remin <- npValidateScalarLogical(remin, "remin")
@@ -948,7 +948,7 @@ npcdistbw.condbandwidth <-
   setup <- .npcdistbw_nomad_bw_setup(xdat = xdat, ydat = ydat, template = template)
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   ndeg <- length(degree.search$start.degree)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) 1L else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2]) else max(1L, as.integer(opt.args$nmulti[1L]))
   bw_lower <- c(rep.int(1e-2, length(setup$cont_flat)), rep.int(0, length(setup$cat_flat)))
   bw_upper <- c(rep.int(1e6, length(setup$cont_flat)), setup$cat_upper * setup$bandwidth.scale.categorical)
 

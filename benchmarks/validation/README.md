@@ -5,6 +5,15 @@ smoke-validation scripts.
 
 Scripts in this folder should prioritize coverage and diagnostics over timing.
 
+## `nmulti` Default-Cap Mirror
+
+- `nmulti_default_cap_summary.md`
+  - mirror note for the empirical default-choice decision adopted from
+    `np-master`,
+  - points to the source-of-truth serial study harnesses in
+    `../np-master/benchmarks/validation/` and records the rationale for
+    mirroring the same default cap in `npRmpi`.
+
 ## Triage First Steps
 
 - Confirm argument parity between compared runs.
