@@ -2782,27 +2782,8 @@
   Mfeat <- vector("list", neval)
   Zfeat <- vector("list", neval)
   t0 <- numeric(neval)
-  prep.label <- if (is.null(prep.label)) {
-    if (!is.null(counts.drawer)) "Preparing plot bootstrap block" else "Preparing plot bootstrap inid"
-  } else {
-    prep.label
-  }
-  prep.progress <- .np_plot_stage_progress_begin(total = neval, label = prep.label)
-  prep.progress.active <- TRUE
-  on.exit({
-    if (isTRUE(prep.progress.active))
-      .np_plot_progress_end(prep.progress)
-  }, add = TRUE)
 
   for (i in seq_len(neval)) {
-    if (i == 1L)
-      prep.progress$last_emit <- -Inf
-    prep.progress <- .np_progress_step(
-      state = prep.progress,
-      done = i - 1L,
-      detail = sprintf("eval %d/%d", i, neval)
-    )
-
     k <- as.double(kw[, i])
     WK <- W * k
     Zfeat[[i]] <- WK * ydat
@@ -2834,27 +2815,16 @@
         ridge.grid = ridge.grid
       )[1L]
     }
-    prep.progress <- .np_plot_progress_tick(state = prep.progress, done = i)
   }
-  .np_plot_progress_end(prep.progress)
-  prep.progress.active <- FALSE
 
-  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-  progress.label <- if (is.null(progress.label)) {
-    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
-  } else {
-    progress.label
-  }
-  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
-  on.exit({
-    .np_plot_progress_end(progress)
-  }, add = TRUE)
-
-  fill_chunk <- function(counts.chunk, start, stopi) {
+  compute_chunk <- function(counts.chunk) {
+    counts.chunk <- as.matrix(counts.chunk)
+    bsz <- ncol(counts.chunk)
+    out <- matrix(NA_real_, nrow = bsz, ncol = neval)
     for (i in seq_len(neval)) {
       Mvals <- crossprod(counts.chunk, Mfeat[[i]])
       Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      tmat[start:stopi, i] <<- if (p > 3L) {
+      out[, i] <- if (p > 3L) {
         .np_inid_lp_predict_chunk_general(
           Mvals = Mvals,
           Zvals = Zvals,
@@ -2870,34 +2840,136 @@
         )
       }
     }
+    out
   }
+
+  what.base <- if (isTRUE(gradients)) "inid-regression-localpoly-grad" else "inid-regression"
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
+    comm = 1L,
+    include.master = TRUE
+  )
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
-    progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
-  } else {
-    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
-    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      chunk.started <- .np_progress_now()
-      counts.chunk <- if (!is.null(counts.drawer)) {
-        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
-      } else {
-        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+
+    if (.npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = paste0(what.base, "-counts")
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
       }
-      fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
-      progress <- .np_plot_progress_tick(state = progress, done = stopi)
-      chunk.controller <- .np_plot_progress_chunk_observe(
-        controller = chunk.controller,
-        bsz = bsz,
-        elapsed.sec = .np_progress_now() - chunk.started
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = paste0(what.base, "-counts"),
+        progress.label = progress.label,
+        profile.where = paste0("mpi.applyLB:", what.base, "-counts"),
+        comm = 1L,
+        prefer.local.single_worker = prefer.local.single_worker,
+        required.bindings = list(
+          counts.mat = counts.mat,
+          compute_chunk = compute_chunk
+        )
       )
-      start <- stopi + 1L
     }
+
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = sprintf("%s fan-out returned incomplete results", paste0(what.base, "-counts")),
+        what = paste0(what.base, "-counts")
+      )
+  } else {
+    if (!is.null(counts.drawer) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = paste0(what.base, "-block")
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        counts.chunk <- .np_inid_counts_matrix(
+          n = n,
+          B = as.integer(task$bsz),
+          counts = counts.drawer(start, stopi)
+        )
+        compute_chunk(counts.chunk = counts.chunk)
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = paste0(what.base, "-block"),
+        progress.label = progress.label,
+        profile.where = paste0("mpi.applyLB:", what.base, "-block"),
+        comm = 1L,
+        prefer.local.single_worker = prefer.local.single_worker,
+        required.bindings = list(
+          n = n,
+          counts.drawer = counts.drawer,
+          compute_chunk = compute_chunk
+        )
+      )
+    }
+
+    if (!is.null(counts.drawer) && anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = sprintf("%s fan-out returned incomplete results", paste0(what.base, "-block")),
+        what = paste0(what.base, "-block")
+      )
+
+    prob <- rep.int(1 / n, n)
+    if (anyNA(tmat) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = what.base
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        set.seed(as.integer(task$seed))
+        bsz <- as.integer(task$bsz)
+        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        compute_chunk(counts.chunk = counts.chunk)
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = what.base,
+        progress.label = progress.label,
+        profile.where = paste0("mpi.applyLB:", what.base),
+        comm = 1L,
+        prefer.local.single_worker = prefer.local.single_worker,
+        required.bindings = list(
+          n = n,
+          prob = prob,
+          compute_chunk = compute_chunk
+        )
+      )
+    }
+
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = sprintf("%s fan-out returned incomplete results", what.base),
+        what = what.base
+      )
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
@@ -5967,8 +6039,7 @@
                                                                    B,
                                                                    cdf,
                                                                    counts = NULL,
-                                                                   counts.drawer = NULL,
-                                                                   progress.label = NULL) {
+                                                                   counts.drawer = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -6009,11 +6080,7 @@
 
   t0 <- numeric(neval)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-  progress.label <- if (is.null(progress.label)) {
-    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
-  } else {
-    progress.label
-  }
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
   progress <- .np_plot_progress_begin(total = neval, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -6035,8 +6102,7 @@
       bws = xbw,
       ydat = as.numeric(Gy[i, ]),
       B = B,
-      counts = counts.mat,
-      prefer.local.single_worker = TRUE
+      counts = counts.mat
     )
     t0[i] <- out$t0[1L]
     tmat[, i] <- out$t[, 1L]
