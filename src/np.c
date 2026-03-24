@@ -328,7 +328,7 @@ static void np_shadow_fill_matrix(double **dest, const double *src, int nrow, in
   int i, j;
   for(j = 0; j < ncol; j++)
     for(i = 0; i < nrow; i++)
-      dest[j][i] = src[j*nrow + i];
+      dest[j][i] = src[(size_t)j * (size_t)nrow + (size_t)i];
 }
 static int bwm_use_transform = 0;
 static int bwm_num_reg_continuous = 0;
@@ -1882,13 +1882,13 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
       for(i = 0; i < num_obs; i++) ipt_lookup_extern_X[ipt_extern_X[i]] = i;
       for(int j = 0; j < num_reg_unordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_ordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_continuous_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
     } else {
       ipt_extern_X = NULL;
       ipt_lookup_extern_X = NULL;
@@ -1905,13 +1905,13 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
       for(i = 0; i < num_obs; i++) ipt_lookup_extern_Y[ipt_extern_Y[i]] = i;
       for(int j = 0; j < num_var_unordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_Y_unordered_train_extern[j][i] = REAL(tyuno_r)[j*num_obs + ipt_extern_Y[i]];
+          matrix_Y_unordered_train_extern[j][i] = REAL(tyuno_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_Y[i]];
       for(int j = 0; j < num_var_ordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_Y_ordered_train_extern[j][i] = REAL(tyord_r)[j*num_obs + ipt_extern_Y[i]];
+          matrix_Y_ordered_train_extern[j][i] = REAL(tyord_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_Y[i]];
       for(int j = 0; j < num_var_continuous_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_Y_continuous_train_extern[j][i] = REAL(tycon_r)[j*num_obs + ipt_extern_Y[i]];
+          matrix_Y_continuous_train_extern[j][i] = REAL(tycon_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_Y[i]];
     } else {
       ipt_extern_Y = NULL;
       ipt_lookup_extern_Y = NULL;
@@ -2283,13 +2283,13 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
       for(i = 0; i < num_obs; i++) ipt_lookup_extern_X[ipt_extern_X[i]] = i;
       for(int j = 0; j < num_reg_unordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_ordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_continuous_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
     } else {
       ipt_extern_X = NULL;
       ipt_lookup_extern_X = NULL;
@@ -2522,13 +2522,13 @@ SEXP C_np_shadow_cv_yrow_conditional(SEXP tyuno,
       for(i = 0; i < num_obs; i++) ipt_lookup_extern_Y[ipt_extern_Y[i]] = i;
       for(int j = 0; j < num_var_unordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_Y_unordered_train_extern[j][i] = REAL(tyuno_r)[j*num_obs + ipt_extern_Y[i]];
+          matrix_Y_unordered_train_extern[j][i] = REAL(tyuno_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_Y[i]];
       for(int j = 0; j < num_var_ordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_Y_ordered_train_extern[j][i] = REAL(tyord_r)[j*num_obs + ipt_extern_Y[i]];
+          matrix_Y_ordered_train_extern[j][i] = REAL(tyord_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_Y[i]];
       for(int j = 0; j < num_var_continuous_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_Y_continuous_train_extern[j][i] = REAL(tycon_r)[j*num_obs + ipt_extern_Y[i]];
+          matrix_Y_continuous_train_extern[j][i] = REAL(tycon_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_Y[i]];
     } else {
       ipt_extern_Y = NULL;
       ipt_lookup_extern_Y = NULL;
@@ -2715,13 +2715,13 @@ SEXP C_np_shadow_cv_xweights_full_conditional(SEXP tyuno,
       for(i = 0; i < num_obs; i++) ipt_lookup_extern_X[ipt_extern_X[i]] = i;
       for(int j = 0; j < num_reg_unordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_ordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_continuous_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
     } else {
       ipt_extern_X = NULL;
       ipt_lookup_extern_X = NULL;

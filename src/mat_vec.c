@@ -19,12 +19,12 @@ double **alloc_tmatd(int nrows, int ncols)
 
 	/*	if(ncols == 0) ncols++;*/
 
-  if(ncols*nrows != 0) {
+  if(((size_t)ncols * (size_t)nrows) != 0) {
     if((m=(double**)malloc(sizeof(double*)*ncols))==NULL){
       error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
     }
 
-    if ((m[0]=(double*)malloc(sizeof(double)*nrows*ncols))==NULL){
+    if ((m[0]=(double*)malloc(sizeof(double) * (size_t)nrows * (size_t)ncols))==NULL){
       error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
     }
 
@@ -150,7 +150,7 @@ int *alloc_vecu(int nobs)
 
 	if(nobs != 0) {
 
-  if ((a=(int *)malloc(sizeof(unsigned)*nobs))==NULL)
+  if ((a=(int *)malloc(sizeof(int)*nobs))==NULL)
   {
     error("\nFATAL ERROR: Memory allocation failure (type INT_VECTOR). Program terminated.\n");
   }
@@ -161,4 +161,3 @@ int *alloc_vecu(int nobs)
 	}
 
 }
-
