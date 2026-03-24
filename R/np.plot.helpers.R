@@ -5574,23 +5574,32 @@
     if (is.null(n.total))
       n.total <- sum(weights)
   }
+  ones <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
   xydat <- .np_bind_data_frames_fast(xdat, ydat)
   exydat <- .np_bind_data_frames_fast(exdat, eydat)
 
-  den <- as.numeric(crossprod(weights, .np_plot_kernel_weights_direct(
-    bws = kbx,
-    txdat = xdat,
-    exdat = exdat,
-    operator = xop,
-    where = "direct conditional exact denominator kernel weights"
-  ))) / n.total
-  num <- as.numeric(crossprod(weights, .np_plot_kernel_weights_direct(
-    bws = kbxy,
-    txdat = xydat,
-    exdat = exydat,
-    operator = xyop,
-    where = "direct conditional exact numerator kernel weights"
-  ))) / n.total
+  den <- as.numeric(.np_plot_with_local_compiled_eval(
+    npksum(
+      txdat = xdat,
+      tydat = ones,
+      exdat = exdat,
+      bws = kbx,
+      weights = weights,
+      operator = xop,
+      bandwidth.divide = TRUE
+    )$ksum
+  )) / n.total
+  num <- as.numeric(.np_plot_with_local_compiled_eval(
+    npksum(
+      txdat = xydat,
+      tydat = ones,
+      exdat = exydat,
+      bws = kbxy,
+      weights = weights,
+      operator = xyop,
+      bandwidth.divide = TRUE
+    )$ksum
+  )) / n.total
 
   num / pmax(den, .Machine$double.eps)
 }
@@ -8249,6 +8258,7 @@ plotFactor <- function(f, y, ...){
   env$history <- list()
   env$active_id <- NULL
   env$active <- list()
+  env$counter <- 0L
   env
 })
 
@@ -8305,7 +8315,14 @@ plotFactor <- function(f, y, ...){
     start_proc = proc.time(),
     start_wall = Sys.time()
   )
-  active$id <- paste0(format(active$start_wall, "%Y%m%d%H%M%OS6"), "-", sample.int(1e8, 1L))
+  .npRmpi_profile_env$counter <- as.integer(.npRmpi_profile_env$counter) + 1L
+  active$id <- paste0(
+    format(active$start_wall, "%Y%m%d%H%M%OS6"),
+    "-",
+    active$rank,
+    "-",
+    .npRmpi_profile_env$counter
+  )
   .npRmpi_profile_env$active_id <- active$id
   .npRmpi_profile_env$active[[active$id]] <- active
   active
@@ -8423,6 +8440,7 @@ plotFactor <- function(f, y, ...){
   .npRmpi_profile_env$history <- list()
   .npRmpi_profile_env$active_id <- NULL
   .npRmpi_profile_env$active <- list()
+  .npRmpi_profile_env$counter <- 0L
   invisible(NULL)
 }
 
