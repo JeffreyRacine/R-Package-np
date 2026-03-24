@@ -2782,8 +2782,27 @@
   Mfeat <- vector("list", neval)
   Zfeat <- vector("list", neval)
   t0 <- numeric(neval)
+  prep.label <- if (is.null(prep.label)) {
+    if (!is.null(counts.drawer)) "Preparing plot bootstrap block" else "Preparing plot bootstrap inid"
+  } else {
+    prep.label
+  }
+  prep.progress <- .np_plot_stage_progress_begin(total = neval, label = prep.label)
+  prep.progress.active <- TRUE
+  on.exit({
+    if (isTRUE(prep.progress.active))
+      .np_plot_progress_end(prep.progress)
+  }, add = TRUE)
 
   for (i in seq_len(neval)) {
+    if (i == 1L)
+      prep.progress$last_emit <- -Inf
+    prep.progress <- .np_progress_step(
+      state = prep.progress,
+      done = i - 1L,
+      detail = sprintf("eval %d/%d", i, neval)
+    )
+
     k <- as.double(kw[, i])
     WK <- W * k
     Zfeat[[i]] <- WK * ydat
@@ -2815,16 +2834,27 @@
         ridge.grid = ridge.grid
       )[1L]
     }
+    prep.progress <- .np_plot_progress_tick(state = prep.progress, done = i)
   }
+  .np_plot_progress_end(prep.progress)
+  prep.progress.active <- FALSE
 
-  compute_chunk <- function(counts.chunk) {
-    counts.chunk <- as.matrix(counts.chunk)
-    bsz <- ncol(counts.chunk)
-    out <- matrix(NA_real_, nrow = bsz, ncol = neval)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  fill_chunk <- function(counts.chunk, start, stopi) {
     for (i in seq_len(neval)) {
       Mvals <- crossprod(counts.chunk, Mfeat[[i]])
       Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      out[, i] <- if (p > 3L) {
+      tmat[start:stopi, i] <<- if (p > 3L) {
         .np_inid_lp_predict_chunk_general(
           Mvals = Mvals,
           Zvals = Zvals,
@@ -2840,136 +2870,34 @@
         )
       }
     }
-    out
   }
-
-  what.base <- if (isTRUE(gradients)) "inid-regression-localpoly-grad" else "inid-regression"
-  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
-    B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
-    comm = 1L,
-    include.master = TRUE
-  )
-  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-
-    if (.npRmpi_bootstrap_fanout_enabled(
-          comm = 1L,
-          n = n,
-          B = B,
-          chunk.size = chunk.size,
-          what = paste0(what.base, "-counts")
-        )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-      worker <- function(task) {
-        start <- as.integer(task$start)
-        stopi <- start + as.integer(task$bsz) - 1L
-        compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
-      }
-      tmat <- .npRmpi_bootstrap_run_fanout(
-        tasks = tasks,
-        worker = worker,
-        ncol.out = neval,
-        what = paste0(what.base, "-counts"),
-        progress.label = progress.label,
-        profile.where = paste0("mpi.applyLB:", what.base, "-counts"),
-        comm = 1L,
-        prefer.local.single_worker = prefer.local.single_worker,
-        required.bindings = list(
-          counts.mat = counts.mat,
-          compute_chunk = compute_chunk
-        )
-      )
-    }
-
-    if (anyNA(tmat))
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = sprintf("%s fan-out returned incomplete results", paste0(what.base, "-counts")),
-        what = paste0(what.base, "-counts")
-      )
+    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+    progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
-    if (!is.null(counts.drawer) &&
-        .npRmpi_bootstrap_fanout_enabled(
-          comm = 1L,
-          n = n,
-          B = B,
-          chunk.size = chunk.size,
-          what = paste0(what.base, "-block")
-        )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-      worker <- function(task) {
-        start <- as.integer(task$start)
-        stopi <- start + as.integer(task$bsz) - 1L
-        counts.chunk <- .np_inid_counts_matrix(
-          n = n,
-          B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
-        )
-        compute_chunk(counts.chunk = counts.chunk)
+    chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      chunk.started <- .np_progress_now()
+      counts.chunk <- if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+      } else {
+        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
       }
-      tmat <- .npRmpi_bootstrap_run_fanout(
-        tasks = tasks,
-        worker = worker,
-        ncol.out = neval,
-        what = paste0(what.base, "-block"),
-        progress.label = progress.label,
-        profile.where = paste0("mpi.applyLB:", what.base, "-block"),
-        comm = 1L,
-        prefer.local.single_worker = prefer.local.single_worker,
-        required.bindings = list(
-          n = n,
-          counts.drawer = counts.drawer,
-          compute_chunk = compute_chunk
-        )
+      fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = bsz,
+        elapsed.sec = .np_progress_now() - chunk.started
       )
+      start <- stopi + 1L
     }
-
-    if (!is.null(counts.drawer) && anyNA(tmat))
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = sprintf("%s fan-out returned incomplete results", paste0(what.base, "-block")),
-        what = paste0(what.base, "-block")
-      )
-
-    prob <- rep.int(1 / n, n)
-    if (anyNA(tmat) &&
-        .npRmpi_bootstrap_fanout_enabled(
-          comm = 1L,
-          n = n,
-          B = B,
-          chunk.size = chunk.size,
-          what = what.base
-        )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-      worker <- function(task) {
-        set.seed(as.integer(task$seed))
-        bsz <- as.integer(task$bsz)
-        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-        compute_chunk(counts.chunk = counts.chunk)
-      }
-      tmat <- .npRmpi_bootstrap_run_fanout(
-        tasks = tasks,
-        worker = worker,
-        ncol.out = neval,
-        what = what.base,
-        progress.label = progress.label,
-        profile.where = paste0("mpi.applyLB:", what.base),
-        comm = 1L,
-        prefer.local.single_worker = prefer.local.single_worker,
-        required.bindings = list(
-          n = n,
-          prob = prob,
-          compute_chunk = compute_chunk
-        )
-      )
-    }
-
-    if (anyNA(tmat))
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = sprintf("%s fan-out returned incomplete results", what.base),
-        what = what.base
-      )
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
@@ -5474,6 +5402,65 @@
   stop(sprintf("%s returned unexpected operator shape", where))
 }
 
+.np_ksum_conditional_operator_fixed <- function(xdat,
+                                                ydat,
+                                                exdat,
+                                                eydat,
+                                                bws,
+                                                cdf) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  n <- nrow(xdat)
+
+  kbx <- .np_con_make_kbandwidth_x(bws = bws, xdat = xdat)
+  kbxy <- .np_con_make_kbandwidth_xy(bws = bws, xdat = xdat, ydat = ydat)
+  xop <- rep.int("normal", ncol(xdat))
+  yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
+  xyop <- c(xop, yop)
+  den.info <- .np_operator_kernel_weight_scale(
+    bws = kbx,
+    operator = xop,
+    nvars = ncol(xdat),
+    where = "direct conditional denominator kernel weights"
+  )
+  num.info <- .np_operator_kernel_weight_scale(
+    bws = kbxy,
+    operator = xyop,
+    nvars = ncol(xdat) + ncol(ydat),
+    where = "direct conditional numerator kernel weights"
+  )
+  Kden <- .np_plot_kernel_weights_direct(
+    bws = den.info$bws,
+    txdat = xdat,
+    exdat = exdat,
+    bandwidth.divide = TRUE,
+    operator = den.info$operator
+  )
+  Knum <- .np_plot_kernel_weights_direct(
+    bws = num.info$bws,
+    txdat = data.frame(xdat, ydat),
+    exdat = data.frame(exdat, eydat),
+    bandwidth.divide = TRUE,
+    operator = num.info$operator
+  )
+
+  if (!is.matrix(Kden))
+    Kden <- matrix(Kden, nrow = n)
+  if (!is.matrix(Knum))
+    Knum <- matrix(Knum, nrow = n)
+  if (nrow(Kden) != n || ncol(Kden) != nrow(exdat))
+    stop("direct conditional denominator kernel weights returned unexpected operator shape")
+  if (nrow(Knum) != n || ncol(Knum) != nrow(exdat))
+    stop("direct conditional numerator kernel weights returned unexpected operator shape")
+
+  list(
+    den = t(Kden) / (n * den.info$scale),
+    num = t(Knum) / (n * num.info$scale)
+  )
+}
+
 .np_operator_kernel_weight_scale <- function(bws, operator, nvars, where) {
   operator <- as.character(operator)
   if (length(operator) == 1L)
@@ -5980,7 +5967,8 @@
                                                                    B,
                                                                    cdf,
                                                                    counts = NULL,
-                                                                   counts.drawer = NULL) {
+                                                                   counts.drawer = NULL,
+                                                                   progress.label = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -6021,7 +6009,11 @@
 
   t0 <- numeric(neval)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
   progress <- .np_plot_progress_begin(total = neval, label = progress.label)
   on.exit({
     .np_plot_progress_end(progress)
@@ -6043,7 +6035,8 @@
       bws = xbw,
       ydat = as.numeric(Gy[i, ]),
       B = B,
-      counts = counts.mat
+      counts = counts.mat,
+      prefer.local.single_worker = TRUE
     )
     t0[i] <- out$t0[1L]
     tmat[, i] <- out$t[, 1L]
@@ -6869,144 +6862,62 @@
     stop("invalid conditional inid bootstrap dimensions")
   if (!.np_con_inid_ksum_eligible(bws))
     return(NULL)
-  # Use direct local kernel weights to avoid nested MPI-aware npksum() calls in helper fanout.
-  kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = xdat),
-                  error = function(e) NULL)
-  kbxy <- tryCatch(.np_con_make_kbandwidth_xy(bws = bws, xdat = xdat, ydat = ydat),
-                   error = function(e) NULL)
-  if (is.null(kbx) || is.null(kbxy))
+  ops <- tryCatch(
+    .np_ksum_conditional_operator_fixed(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      cdf = cdf
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(ops))
     return(NULL)
-
-  xop <- rep.int("normal", ncol(xdat))
-  yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
-  xyop <- c(xop, yop)
-
-  xydat <- .np_bind_data_frames_fast(xdat, ydat)
-  exydat <- .np_bind_data_frames_fast(exdat, eydat)
-  den.kw <- .np_plot_kernel_weights_direct(
-    bws = kbx,
-    txdat = xdat,
-    exdat = exdat,
-    operator = xop,
-    where = "direct conditional denominator kernel weights"
-  )
-  num.kw <- .np_plot_kernel_weights_direct(
-    bws = kbxy,
-    txdat = xydat,
-    exdat = exydat,
-    operator = xyop,
-    where = "direct conditional numerator kernel weights"
-  )
-  den0 <- colSums(den.kw) / n
-  num0 <- colSums(num.kw) / n
-  t0 <- num0 / pmax(den0, .Machine$double.eps)
+  t0 <- rowSums(ops$num) / pmax(rowSums(ops$den), .Machine$double.eps)
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    den <- crossprod(counts.mat, den.kw) / n
-    num <- crossprod(counts.mat, num.kw) / n
+    den <- t(ops$den %*% counts.mat)
+    num <- t(ops$num %*% counts.mat)
     return(list(t = num / pmax(den, .Machine$double.eps), t0 = t0))
   }
 
-  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
-    B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
-    comm = 1L,
-    include.master = TRUE
-  )
-  prob <- rep.int(1 / n, n)
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-  # Prebind closure inputs for worker serialization across MPI slaves.
-  den.kw.local <- den.kw
-  num.kw.local <- num.kw
-  counts.drawer.local <- counts.drawer
-  n.local <- n
-  prob.local <- prob
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
 
-  if (!is.null(counts.drawer) &&
-      .npRmpi_bootstrap_fanout_enabled(
-        comm = 1L,
-        n = n,
-        B = B,
-        chunk.size = chunk.size,
-        what = "inid-ksum-conditional-block"
-      )) {
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-    worker <- function(task) {
-      start <- as.integer(task$start)
-      stopi <- start + as.integer(task$bsz) - 1L
-      counts.chunk <- .np_inid_counts_matrix(
-        n = n.local,
-        B = as.integer(task$bsz),
-        counts = counts.drawer.local(start, stopi)
-      )
-      den <- crossprod(counts.chunk, den.kw.local) / n.local
-      num <- crossprod(counts.chunk, num.kw.local) / n.local
-      num / pmax(den, .Machine$double.eps)
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    counts.chunk <- if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
     }
-    tmat <- .npRmpi_bootstrap_run_fanout(
-      tasks = tasks,
-      worker = worker,
-      ncol.out = neval,
-      what = "inid-ksum-conditional-block",
-      progress.label = progress.label,
-      profile.where = "mpi.applyLB:inid-ksum-conditional-block",
-      comm = 1L,
-      required.bindings = list(
-        den.kw.local = den.kw.local,
-        num.kw.local = num.kw.local,
-        counts.drawer.local = counts.drawer.local,
-        n.local = n.local
-      )
+    den <- t(ops$den %*% counts.chunk)
+    num <- t(ops$num %*% counts.chunk)
+    tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
     )
+    start <- stopi + 1L
   }
-
-  if (!is.null(counts.drawer) && anyNA(tmat)) {
-    .npRmpi_bootstrap_fail_or_fallback(
-      msg = "inid-ksum-conditional-block fan-out returned incomplete results",
-      what = "inid-ksum-conditional-block"
-    )
-  }
-
-  if (anyNA(tmat) &&
-      .npRmpi_bootstrap_fanout_enabled(
-        comm = 1L,
-        n = n,
-        B = B,
-        chunk.size = chunk.size,
-        what = "inid-ksum-conditional"
-      )) {
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-    worker <- function(task) {
-      set.seed(as.integer(task$seed))
-      bsz <- as.integer(task$bsz)
-      counts.chunk <- stats::rmultinom(n = bsz, size = n.local, prob = prob.local)
-      den <- crossprod(counts.chunk, den.kw.local) / n.local
-      num <- crossprod(counts.chunk, num.kw.local) / n.local
-      num / pmax(den, .Machine$double.eps)
-    }
-    tmat <- .npRmpi_bootstrap_run_fanout(
-      tasks = tasks,
-      worker = worker,
-      ncol.out = neval,
-      what = "inid-ksum-conditional",
-      progress.label = progress.label,
-      profile.where = "mpi.applyLB:inid-ksum-conditional",
-      comm = 1L,
-      required.bindings = list(
-        den.kw.local = den.kw.local,
-        num.kw.local = num.kw.local,
-        prob.local = prob.local,
-        n.local = n.local
-      )
-    )
-  }
-
-  if (anyNA(tmat))
-    .npRmpi_bootstrap_fail_or_fallback(
-      msg = "inid-ksum-conditional fan-out returned incomplete results",
-      what = "inid-ksum-conditional"
-    )
 
   list(t = tmat, t0 = t0)
 }

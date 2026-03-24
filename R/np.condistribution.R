@@ -96,7 +96,12 @@ npcdist.condbandwidth <-
     )
     .npRmpi_require_active_slave_pool(where = "npcdist()")
     .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdist()")
-    if (.npRmpi_autodispatch_active()) {
+    use.local.compiled.adaptive.cvls <- identical(bws$method, "cv.ls") &&
+      identical(bws$type, "adaptive_nn")
+    keep_local_cvls_nn <- use.local.compiled.adaptive.cvls ||
+      (identical(bws$regtype.engine, "lp") &&
+       identical(bws$type, "generalized_nn"))
+    if (.npRmpi_autodispatch_active() && !keep_local_cvls_nn) {
       out <- .npRmpi_autodispatch_call(match.call(), parent.frame())
       if (inherits(out, "condistribution") &&
           !is.null(out$proper.requested) &&
@@ -342,7 +347,33 @@ npcdist.condbandwidth <-
     cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
     cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
     
-    myout <-
+    myout <- if (keep_local_cvls_nn) {
+      .npRmpi_with_local_cdist_eval(
+        .Call("C_np_density_conditional",
+              as.double(tyuno), as.double(tyord), as.double(tycon),
+              as.double(txuno), as.double(txord), as.double(txcon),
+              as.double(eyuno), as.double(eyord), as.double(eycon),
+              as.double(exuno), as.double(exord), as.double(excon),
+              as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                          bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                          bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+              as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
+              as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+              as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
+              as.integer(myopti),
+              as.integer(enrow),
+              as.integer(bws$xndim),
+              as.double(cxker.bounds.c$lb),
+              as.double(cxker.bounds.c$ub),
+              as.double(cyker.bounds.c$lb),
+              as.double(cyker.bounds.c$ub),
+              as.integer(reg.c$code),
+              as.integer(degree.c),
+              as.integer(bernstein.engine),
+              basis.code,
+              PACKAGE = "npRmpi")
+      )
+    } else {
       .Call("C_np_density_conditional",
             as.double(tyuno), as.double(tyord), as.double(tycon),
             as.double(txuno), as.double(txord), as.double(txcon),
@@ -366,6 +397,7 @@ npcdist.condbandwidth <-
             as.integer(bernstein.engine),
             basis.code,
             PACKAGE = "npRmpi")
+    }
     names(myout)[1] <- "condist"
 
     if(gradients){
@@ -412,8 +444,6 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npcdist()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdist()")
   nomad <- npValidateScalarLogical(nomad, "nomad")
-  if (.npRmpi_autodispatch_active() && !isTRUE(nomad))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   sc <- sys.call()
   sc.names <- names(sc)
 
@@ -429,6 +459,36 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   no.txdat <- missing(txdat)
   no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "condbandwidth")
+  bws.formula <- (!no.bws) && inherits(bws, "formula")
+  regtype.request <- if (has.explicit.bws) {
+    if (is.null(bws$regtype.engine)) {
+      if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    } else {
+      as.character(bws$regtype.engine)
+    }
+  } else if ("regtype" %in% sc.names) {
+    as.character(eval(sc$regtype, parent.frame()))
+  } else {
+    "lc"
+  }
+  bwtype.request <- if (has.explicit.bws) {
+    if (is.null(bws$type)) "fixed" else as.character(bws$type)
+  } else if ("bwtype" %in% sc.names) {
+    as.character(eval(sc$bwtype, parent.frame()))
+  } else {
+    "fixed"
+  }
+  keep_local_cvls_nn <- if (has.explicit.bws) {
+    identical(bws$method, "cv.ls") &&
+      (identical(bwtype.request[1L], "adaptive_nn") ||
+       ((identical(regtype.request[1L], "lp") || identical(regtype.request[1L], "ll")) &&
+        identical(bwtype.request[1L], "generalized_nn")))
+  } else {
+    (identical(regtype.request[1L], "lp") || identical(regtype.request[1L], "ll")) &&
+      identical(bwtype.request[1L] %in% c("generalized_nn", "adaptive_nn"), TRUE)
+  }
+  if (.npRmpi_autodispatch_active() && !isTRUE(nomad) && !keep_local_cvls_nn && !bws.formula)
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   ## autodispatch normalizes calls via match.call(), which can turn an
   ## originally unnamed formula first argument into named bws=... .
@@ -452,7 +512,7 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   if(tydat.named)
     tydat <- toFrame(tydat)
 
-  if(bws.named){
+  if(bws.named && !bws.formula){
     sc.bw$bandwidth.compute <- FALSE
   }
 

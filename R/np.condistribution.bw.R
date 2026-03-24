@@ -385,7 +385,7 @@ npcdistbw.condbandwidth <-
       cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
 
       if (bws$method != "normal-reference"){
-        myout <- if (use.local.compiled.adaptive.cvls) {
+        myout <- if (keep_local_cvls_nn) {
           .npRmpi_with_local_cdist_eval(
             .Call("C_np_distribution_conditional_bw",
                   as.double(yuno), as.double(yord), as.double(ycon),
