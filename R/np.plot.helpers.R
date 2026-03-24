@@ -4416,14 +4416,18 @@
     if (is.null(n.total))
       n.total <- sum(weights)
   }
-  kw <- .np_plot_kernel_weights_direct(
-    bws = bws,
-    txdat = xdat,
-    exdat = exdat,
-    operator = operator,
-    where = "direct unconditional exact kernel weights"
-  )
-  as.numeric(crossprod(weights, kw)) / n.total
+  ones <- matrix(1.0, nrow = nrow(xdat), ncol = 1L)
+  as.numeric(.np_plot_with_local_compiled_eval(
+    npksum(
+      txdat = xdat,
+      tydat = ones,
+      exdat = exdat,
+      bws = bws,
+      weights = weights,
+      operator = operator,
+      bandwidth.divide = TRUE
+    )$ksum
+  )) / n.total
 }
 
 .np_make_kbandwidth_unconditional <- function(bws, xdat) {
@@ -5128,19 +5132,142 @@
     progress.label
   }
 
-  # Use direct local kernel weights to avoid nested MPI-aware npksum() calls in helper fanout.
-  kw <- .np_plot_kernel_weights_direct(
-    bws = bws,
-    txdat = xdat,
-    exdat = exdat,
-    operator = operator,
-    where = "direct unconditional kernel weights"
+  if (is.null(bws$bw) || is.null(bws$xdati)) {
+    kw <- .np_plot_kernel_weights_direct(
+      bws = bws,
+      txdat = xdat,
+      exdat = exdat,
+      operator = operator,
+      where = "direct unconditional kernel weights"
+    )
+    t0 <- colSums(kw) / n
+
+    if (!is.null(counts)) {
+      counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+      return(list(t = crossprod(counts.mat, kw) / n, t0 = t0))
+    }
+
+    chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+      B = B,
+      chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
+      comm = 1L,
+      include.master = TRUE
+    )
+    prob <- rep.int(1 / n, n)
+    tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+    kw.local <- kw
+    counts.drawer.local <- counts.drawer
+    n.local <- n
+    prob.local <- prob
+
+    if (!is.null(counts.drawer) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-ksum-unconditional-block"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        counts.chunk <- .np_inid_counts_matrix(
+          n = n.local,
+          B = as.integer(task$bsz),
+          counts = counts.drawer.local(start, stopi)
+        )
+        crossprod(counts.chunk, kw.local) / n.local
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = "inid-ksum-unconditional-block",
+        progress.label = progress.label,
+        profile.where = "mpi.applyLB:inid-ksum-unconditional-block",
+        comm = 1L,
+        required.bindings = list(
+          kw.local = kw.local,
+          counts.drawer.local = counts.drawer.local,
+          n.local = n.local
+        )
+      )
+    }
+
+    if (!is.null(counts.drawer) && anyNA(tmat)) {
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-ksum-unconditional-block fan-out returned incomplete results",
+        what = "inid-ksum-unconditional-block"
+      )
+    }
+
+    if (anyNA(tmat) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-ksum-unconditional"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        set.seed(as.integer(task$seed))
+        bsz <- as.integer(task$bsz)
+        counts.chunk <- stats::rmultinom(n = bsz, size = n.local, prob = prob.local)
+        crossprod(counts.chunk, kw.local) / n.local
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = "inid-ksum-unconditional",
+        progress.label = progress.label,
+        profile.where = "mpi.applyLB:inid-ksum-unconditional",
+        comm = 1L,
+        required.bindings = list(
+          kw.local = kw.local,
+          prob.local = prob.local,
+          n.local = n.local
+        )
+      )
+    }
+
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-ksum-unconditional fan-out returned incomplete results",
+        what = "inid-ksum-unconditional"
+      )
+
+    return(list(t = tmat, t0 = t0))
+  }
+
+  K <- tryCatch(
+    .np_ksum_unconditional_operator_fixed(
+      xdat = xdat,
+      exdat = exdat,
+      bws = bws,
+      operator = operator
+    ),
+    error = function(e) NULL
   )
-  t0 <- colSums(kw) / n
+  if (is.null(K)) {
+    return(.np_inid_boot_from_hat_unconditional_frozen(
+      xdat = xdat,
+      exdat = exdat,
+      bws = bws,
+      B = B,
+      operator = operator,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
+  t0 <- rowSums(K)
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    return(list(t = crossprod(counts.mat, kw) / n, t0 = t0))
+    return(list(t = t(K %*% counts.mat), t0 = t0))
   }
 
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
@@ -5152,7 +5279,7 @@
   prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   # Prebind closure inputs for worker serialization across MPI slaves.
-  kw.local <- kw
+  K.local <- K
   counts.drawer.local <- counts.drawer
   n.local <- n
   prob.local <- prob
@@ -5174,7 +5301,7 @@
         B = as.integer(task$bsz),
         counts = counts.drawer.local(start, stopi)
       )
-      crossprod(counts.chunk, kw.local) / n.local
+      t(K.local %*% counts.chunk)
     }
     tmat <- .npRmpi_bootstrap_run_fanout(
       tasks = tasks,
@@ -5185,7 +5312,7 @@
       profile.where = "mpi.applyLB:inid-ksum-unconditional-block",
       comm = 1L,
       required.bindings = list(
-        kw.local = kw.local,
+        K.local = K.local,
         counts.drawer.local = counts.drawer.local,
         n.local = n.local
       )
@@ -5212,7 +5339,7 @@
       set.seed(as.integer(task$seed))
       bsz <- as.integer(task$bsz)
       counts.chunk <- stats::rmultinom(n = bsz, size = n.local, prob = prob.local)
-      crossprod(counts.chunk, kw.local) / n.local
+      t(K.local %*% counts.chunk)
     }
     tmat <- .npRmpi_bootstrap_run_fanout(
       tasks = tasks,
@@ -5223,7 +5350,7 @@
       profile.where = "mpi.applyLB:inid-ksum-unconditional",
       comm = 1L,
       required.bindings = list(
-        kw.local = kw.local,
+        K.local = K.local,
         prob.local = prob.local,
         n.local = n.local
       )
@@ -5347,6 +5474,59 @@
   stop(sprintf("%s returned unexpected operator shape", where))
 }
 
+.np_operator_kernel_weight_scale <- function(bws, operator, nvars, where) {
+  operator <- as.character(operator)
+  if (length(operator) == 1L)
+    operator <- rep.int(operator, nvars)
+  if (length(operator) != nvars)
+    stop(sprintf("%s requires one operator per column", where))
+
+  icon <- if (!is.null(bws$icon)) {
+    bws$icon
+  } else if (!is.null(bws$xdati$icon)) {
+    bws$xdati$icon
+  } else {
+    rep.int(FALSE, length(bws$bw))
+  }
+  ncon <- if (!is.null(bws$ncon)) bws$ncon else sum(icon)
+
+  bw.scale <- 1.0
+  if (ncon > 0L) {
+    con.ops <- operator[icon]
+    if (any(con.ops == "normal"))
+      bw.scale <- prod(bws$bw[icon][con.ops == "normal"])
+  }
+
+  list(bws = bws, scale = bw.scale, operator = operator)
+}
+
+.np_ksum_unconditional_operator_fixed <- function(xdat, exdat, bws, operator) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  op.info <- .np_operator_kernel_weight_scale(
+    bws = bws,
+    operator = operator,
+    nvars = ncol(xdat),
+    where = "direct unconditional kernel weights"
+  )
+  bws <- op.info$bws
+  n <- nrow(xdat)
+  kw <- .np_kernel_weights_direct(
+    bws = bws,
+    txdat = xdat,
+    exdat = exdat,
+    bandwidth.divide = TRUE,
+    operator = op.info$operator
+  )
+
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = n)
+  if (nrow(kw) != n || ncol(kw) != nrow(exdat))
+    stop("direct unconditional kernel weights returned unexpected operator shape")
+
+  t(kw) / (n * op.info$scale)
+}
+
 .np_con_xregtype <- function(bws) {
   regtype <- if (is.null(bws$regtype.engine)) bws$regtype else bws$regtype.engine
   if (is.null(regtype)) "lc" else as.character(regtype)
@@ -5403,8 +5583,13 @@
 
 .np_ksum_exact_state_build <- function(bws, exdat, operator) {
   exdat <- toFrame(exdat)
-  if (!isa(bws, "kbandwidth"))
-    bws <- kbandwidth(bws)
+
+  iuno <- if (!is.null(bws$iuno)) bws$iuno else bws$xdati$iuno
+  iord <- if (!is.null(bws$iord)) bws$iord else bws$xdati$iord
+  icon <- if (!is.null(bws$icon)) bws$icon else bws$xdati$icon
+  nuno <- if (!is.null(bws$nuno)) bws$nuno else sum(iuno)
+  nord <- if (!is.null(bws$nord)) bws$nord else sum(iord)
+  ncon <- if (!is.null(bws$ncon)) bws$ncon else sum(icon)
 
   operator <- as.character(operator)
   if (length(operator) == 1L)
@@ -5415,23 +5600,29 @@
     stop("invalid operator specification for exact ksum state")
 
   uo.operators <- c("normal", "convolution", "integral")
-  if (!all(operator[bws$iuno | bws$iord] %in% uo.operators))
+  if (!all(operator[iuno | iord] %in% uo.operators))
     stop("unordered and ordered variables may only use normal, convolution, or integral operators")
 
   exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
-  npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+  npKernelBoundsCheckEval(exdat, icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
 
   exm <- toMatrix(exdat)
-  bounds <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+  bounds <- npKernelBoundsMarshal(bws$ckerlb[icon], bws$ckerub[icon])
 
   list(
     bws = bws,
+    iuno = iuno,
+    iord = iord,
+    icon = icon,
+    nuno = nuno,
+    nord = nord,
+    ncon = ncon,
     operator.num = ALL_OPERATORS[operator],
-    euno = exm[, bws$iuno, drop = FALSE],
-    eord = exm[, bws$iord, drop = FALSE],
-    econ = exm[, bws$icon, drop = FALSE],
+    euno = exm[, iuno, drop = FALSE],
+    eord = exm[, iord, drop = FALSE],
+    econ = exm[, icon, drop = FALSE],
     enrow = nrow(exdat),
-    bw = as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+    bw = as.double(c(bws$bw[icon], bws$bw[iuno], bws$bw[iord])),
     xmcv = as.double(bws$xmcv),
     pad.num = as.double(attr(bws$xmcv, "pad.num")),
     cker.lb = as.double(bounds$lb),
@@ -5440,14 +5631,20 @@
 }
 
 .np_ksum_eval_exact_state <- function(state, txdat, weights) {
-  if (state$bws$nuno == 0L &&
-      state$bws$nord == 0L &&
+  bw.type <- as.character(state$bws$type)[1L]
+  cker.type <- as.character(state$bws$ckertype)[1L]
+  cker.order <- as.integer(state$bws$ckerorder[1L])
+  uker.type <- as.character(state$bws$ukertype)[1L]
+  oker.type <- as.character(state$bws$okertype)[1L]
+
+  if (state$nuno == 0L &&
+      state$nord == 0L &&
       is.matrix(txdat) &&
       typeof(txdat) == "double") {
     txm <- txdat
     tnrow <- nrow(txdat)
-  } else if (state$bws$nuno == 0L &&
-             state$bws$nord == 0L &&
+  } else if (state$nuno == 0L &&
+             state$nord == 0L &&
              is.data.frame(txdat)) {
     txm <- data.matrix(txdat)
     tnrow <- nrow(txdat)
@@ -5470,27 +5667,27 @@
   myopti <- list(
     num_obs_train = tnrow,
     num_obs_eval = state$enrow,
-    num_uno = state$bws$nuno,
-    num_ord = state$bws$nord,
-    num_con = state$bws$ncon,
+    num_uno = state$nuno,
+    num_ord = state$nord,
+    num_con = state$ncon,
     int_LARGE_SF = SF_ARB,
-    BANDWIDTH_reg_extern = switch(state$bws$type,
+    BANDWIDTH_reg_extern = switch(bw.type,
       fixed = BW_FIXED,
       generalized_nn = BW_GEN_NN,
       adaptive_nn = BW_ADAP_NN
     ),
     int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
-    kerneval = switch(state$bws$ckertype,
-      gaussian = CKER_GAUSS + state$bws$ckerorder / 2 - 1,
-      epanechnikov = CKER_EPAN + state$bws$ckerorder / 2 - 1,
+    kerneval = switch(cker.type,
+      gaussian = CKER_GAUSS + cker.order / 2 - 1,
+      epanechnikov = CKER_EPAN + cker.order / 2 - 1,
       uniform = CKER_UNI,
       "truncated gaussian" = CKER_TGAUSS
     ),
-    ukerneval = switch(state$bws$ukertype,
+    ukerneval = switch(uker.type,
       aitchisonaitken = UKER_AIT,
       liracine = UKER_LR
     ),
-    okerneval = switch(state$bws$okertype,
+    okerneval = switch(oker.type,
       wangvanryzin = OKER_WANG,
       liracine = OKER_LR,
       nliracine = OKER_NLR,
@@ -5521,9 +5718,9 @@
 
   .np_plot_with_local_compiled_eval(.Call(
     "C_np_kernelsum",
-    asDouble(txm[, state$bws$iuno, drop = FALSE]),
-    asDouble(txm[, state$bws$iord, drop = FALSE]),
-    asDouble(txm[, state$bws$icon, drop = FALSE]),
+    asDouble(txm[, state$iuno, drop = FALSE]),
+    asDouble(txm[, state$iord, drop = FALSE]),
+    asDouble(txm[, state$icon, drop = FALSE]),
     as.double(matrix(1.0, nrow = tnrow, ncol = 1L)),
     weights,
     asDouble(state$euno),
@@ -5533,9 +5730,9 @@
     state$xmcv,
     state$pad.num,
     as.integer(c(
-      state$operator.num[state$bws$icon],
-      state$operator.num[state$bws$iuno],
-      state$operator.num[state$bws$iord]
+      state$operator.num[state$icon],
+      state$operator.num[state$iuno],
+      state$operator.num[state$iord]
     )),
     as.integer(myopti),
     as.double(1.0),
