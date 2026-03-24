@@ -117,6 +117,7 @@ gradients.condistribution <- function(x, errors = FALSE, ...) {
 predict.condistribution <- function(object, se.fit = FALSE, ...) {
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
+  proper_arg <- dots[["proper", exact = TRUE]]
 
   if (!has.formula.route &&
       is.null(dots$exdat) &&
@@ -134,11 +135,14 @@ predict.condistribution <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
-  if (is.null(dots$proper) && isTRUE(object$proper.requested)) {
+  if (is.null(proper_arg) && isTRUE(object$proper.requested)) {
     dots$proper <- TRUE
+    proper_arg <- TRUE
   }
-  if (isTRUE(dots$proper)) {
-    proper.control <- if (is.null(dots$proper.control)) list() else dots$proper.control
+  if (isTRUE(proper_arg)) {
+    proper.control <- dots[["proper.control", exact = TRUE]]
+    if (is.null(proper.control))
+      proper.control <- list()
     if (is.null(proper.control$fail.on.unsupported))
       proper.control$fail.on.unsupported <- TRUE
     dots$proper.control <- proper.control
