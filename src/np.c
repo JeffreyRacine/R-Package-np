@@ -271,7 +271,7 @@ static void np_shadow_fill_matrix(double **dest, const double *src, int nrow, in
   int i, j;
   for(j = 0; j < ncol; j++)
     for(i = 0; i < nrow; i++)
-      dest[j][i] = src[j*nrow + i];
+      dest[j][i] = src[(size_t)j * (size_t)nrow + (size_t)i];
 }
 
 static int bwm_use_transform = 0;
@@ -2319,13 +2319,13 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
       for(i = 0; i < num_obs; i++) ipt_lookup_extern_X[ipt_extern_X[i]] = i;
       for(int j = 0; j < num_reg_unordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_ordered_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_continuous_extern; j++)
         for(i = 0; i < num_obs; i++)
-          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[j*num_obs + ipt_extern_X[i]];
+          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[(size_t)j * (size_t)num_obs + (size_t)ipt_extern_X[i]];
     } else {
       ipt_extern_X = NULL;
       ipt_lookup_extern_X = NULL;
@@ -2547,13 +2547,13 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
       for(i = 0; i < num_obs_train; i++) ipt_lookup_extern_X[ipt_extern_X[i]] = i;
       for(int j = 0; j < num_reg_unordered_extern; j++)
         for(i = 0; i < num_obs_train; i++)
-          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[j*num_obs_train + ipt_extern_X[i]];
+          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[(size_t)j * (size_t)num_obs_train + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_ordered_extern; j++)
         for(i = 0; i < num_obs_train; i++)
-          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[j*num_obs_train + ipt_extern_X[i]];
+          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[(size_t)j * (size_t)num_obs_train + (size_t)ipt_extern_X[i]];
       for(int j = 0; j < num_reg_continuous_extern; j++)
         for(i = 0; i < num_obs_train; i++)
-          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[j*num_obs_train + ipt_extern_X[i]];
+          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[(size_t)j * (size_t)num_obs_train + (size_t)ipt_extern_X[i]];
     } else {
       ipt_extern_X = NULL;
       ipt_lookup_extern_X = NULL;

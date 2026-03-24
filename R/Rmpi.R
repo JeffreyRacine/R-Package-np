@@ -5,7 +5,7 @@ mpi.finalize <- function(){
 
     is.master <- tryCatch(mpi.is.master(), error = function(e) NA)
     if (!is.na(is.master) && isTRUE(is.master))
-        print("Exiting Rmpi. Rmpi cannot be used unless relaunching R.")
+        message("Exiting Rmpi. Rmpi cannot be used unless relaunching R.")
 
     out <- tryCatch(.Call("mpi_finalize",PACKAGE = "npRmpi"), error = function(e) NULL)
     options(npRmpi.mpi.initialized = FALSE)
@@ -16,7 +16,7 @@ mpi.finalize <- function(){
 
 mpi.exit <- function(){
     if (mpi.is.master())
-    	print("Detaching Rmpi. Rmpi cannot be used unless relaunching R.")
+    	message("Detaching Rmpi. Rmpi cannot be used unless relaunching R.")
     .Call("mpi_finalize",PACKAGE = "npRmpi")
     options(npRmpi.mpi.initialized = FALSE)
     detach(package:npRmpi)
