@@ -19823,7 +19823,7 @@ double * log_likelihood
                          0, // no score
                          do_grad, // no ocg
                          bpso,
-                         0, // do not explicity suppress parallel
+                         1, // do not explicity suppress parallel
                          0, // ncol y
                          0, // ncol w
                          int_TREE_XY, // do tree
@@ -19876,7 +19876,7 @@ double * log_likelihood
                          0, // no score
                          do_grad, // no ocg
                          NULL, // bpso = TRUE for all xi
-                         0, //  do not explicity suppress parallel
+                         1, //  do not explicity suppress parallel
                          0,
                          0,
                          int_TREE_XY,
