@@ -98,6 +98,11 @@ npcdens.conbandwidth <- function(bws,
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
   keep_local_shadow_nn <- identical(bws$regtype.engine, "lp") &&
     identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
+  if (.npRmpi_autodispatch_active() &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+      identical(.npRmpi_safe_int(mpi.comm.size(0)), 1L)) {
+    return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
+  }
   if (.npRmpi_autodispatch_active() && !keep_local_shadow_nn) {
     out <- .npRmpi_autodispatch_call(match.call(), parent.frame())
     if (inherits(out, "condensity") &&
@@ -475,6 +480,13 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     as.character(eval(sc$bwtype, parent.frame()))
   } else {
     "fixed"
+  }
+  if (has.explicit.bws &&
+      .npRmpi_autodispatch_active() &&
+      !isTRUE(nomad) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+      identical(.npRmpi_safe_int(mpi.comm.size(0)), 1L)) {
+    return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   }
   keep_local_shadow_nn <- (identical(regtype.request[1L], "lp") ||
     identical(regtype.request[1L], "ll")) &&
