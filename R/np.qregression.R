@@ -76,6 +76,10 @@ npqreg.conbandwidth <-
     stop("incorrect bandwidth type: expected conditional distribution bandwidths instead of conditional density bandwidths")
   }
 
+.npRmpi_npqreg_should_localize <- function(bws) {
+  isa(bws, "condbandwidth")
+}
+
 npqreg.condbandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
@@ -108,6 +112,9 @@ npqreg.condbandwidth <-
     tol <- as.double(tol)
     small <- as.double(small)
     .npRmpi_require_active_slave_pool(where = "npqreg()")
+    if (.npRmpi_npqreg_should_localize(bws) &&
+        !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+      return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -372,6 +379,10 @@ npqreg.condbandwidth <-
 
 npqreg.default <- function(bws, txdat, tydat, ...){
   .npRmpi_require_active_slave_pool(where = "npqreg()")
+  if (!missing(bws) &&
+      .npRmpi_npqreg_should_localize(bws) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+    return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
