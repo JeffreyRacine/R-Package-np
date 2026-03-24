@@ -5061,6 +5061,46 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_udist_frozen_operator_matrix <- function(xdat,
+                                             exdat,
+                                             bws,
+                                             target.dist) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  target.dist <- as.vector(target.dist)
+
+  if (length(target.dist) != nrow(exdat))
+    stop("target.dist length must match the number of evaluation rows")
+
+  n.train <- nrow(xdat)
+  if (n.train < 1L)
+    stop("invalid unconditional frozen distribution training size")
+
+  H.raw <- .np_plot_with_local_compiled_eval(
+    if (identical(bws$type, "fixed")) {
+      .np_direct_operator_matrix(
+        kbw = bws,
+        txdat = xdat,
+        exdat = exdat,
+        operator = "integral",
+        where = "plot frozen unconditional distribution direct operator"
+      ) / n.train
+    } else {
+      .np_exact_operator_matrix(
+        kbw = bws,
+        txdat = xdat,
+        exdat = exdat,
+        operator = "integral",
+        where = "plot frozen unconditional distribution exact operator"
+      ) / n.train
+    }
+  )
+
+  probe.sum <- rowSums(H.raw)
+  probe.sum[abs(probe.sum) < .Machine$double.xmin] <- .Machine$double.xmin
+  sweep(H.raw, 1L, target.dist / probe.sum, "*")
+}
+
 .np_inid_boot_from_hat_unconditional_frozen <- function(xdat,
                                                         exdat,
                                                         bws,
@@ -5068,23 +5108,38 @@
                                                         operator,
                                                         counts = NULL,
                                                         counts.drawer = NULL,
-                                                        progress.label = NULL) {
+                                                        progress.label = NULL,
+                                                        target.dist = NULL) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
 
-  hat.fun <- switch(operator,
-                    normal = npudenshat,
-                    integral = npudisthat,
-                    stop("unsupported unconditional frozen bootstrap operator"))
-
-  H <- .np_plot_with_local_compiled_eval(
-    hat.fun(
-      bws = bws,
-      tdat = xdat,
-      edat = exdat,
-      output = "matrix"
-    )
-  )
+  H <- switch(operator,
+              normal = .np_plot_with_local_compiled_eval(
+                npudenshat(
+                  bws = bws,
+                  tdat = xdat,
+                  edat = exdat,
+                  output = "matrix"
+                )
+              ),
+              integral = if (!is.null(target.dist)) {
+                .np_udist_frozen_operator_matrix(
+                  xdat = xdat,
+                  exdat = exdat,
+                  bws = bws,
+                  target.dist = target.dist
+                )
+              } else {
+                .npRmpi_with_local_bootstrap(
+                  npudisthat(
+                    bws = bws,
+                    tdat = xdat,
+                    edat = exdat,
+                    output = "matrix"
+                  )
+                )
+              },
+              stop("unsupported unconditional frozen bootstrap operator"))
 
   .np_plot_boot_from_frozen_operator(
     H = H,
@@ -9943,7 +9998,8 @@ compute.bootstrap.errors.bandwidth =
               bws = bws,
               B = plot.errors.boot.num,
               operator = op,
-              counts.drawer = counts.drawer
+              counts.drawer = counts.drawer,
+              target.dist = if (isTRUE(cdf)) list(...)$target.dist else NULL
             )
           } else {
             .np_inid_boot_from_ksum_unconditional(
@@ -10085,7 +10141,8 @@ compute.bootstrap.errors.dbandwidth =
               bws = bws,
               B = plot.errors.boot.num,
               operator = "integral",
-              counts.drawer = counts.drawer
+              counts.drawer = counts.drawer,
+              target.dist = list(...)$target.dist
             )
           } else {
             .np_inid_boot_from_ksum_unconditional(
