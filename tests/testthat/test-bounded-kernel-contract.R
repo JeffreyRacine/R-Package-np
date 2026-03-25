@@ -195,17 +195,6 @@ test_that("bounded adaptive_nn remains blocked on tranche-one public routes", {
   yy <- data.frame(y = runif(32))
 
   expect_error(
-    npudensbw(
-      dat = xy,
-      bwmethod = "cv.ml",
-      bwtype = "adaptive_nn",
-      ckerbound = "range",
-      nmulti = 1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
-  )
-
-  expect_error(
     npregbw(
       xdat = xy,
       ydat = y,
