@@ -5009,6 +5009,8 @@ plotFactor <- function(f, y, ...){
   draw_one <- function(z, color) {
     if (is.null(z))
       return(invisible(FALSE))
+    if (!any(is.finite(z)))
+      return(invisible(FALSE))
     surf.args <- .np_plot_merge_override_args(
       list(
         x = x,
@@ -5030,15 +5032,23 @@ plotFactor <- function(f, y, ...){
       !is.null(lerr.all) &&
       !is.null(herr.all)) {
     band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+    drawn.bands <- character(0L)
     for (bn in c("pointwise", "simultaneous", "bonferroni")) {
-      draw_one(lerr.all[[bn]], band.cols[[bn]])
-      draw_one(herr.all[[bn]], band.cols[[bn]])
+      drawn.lower <- draw_one(lerr.all[[bn]], band.cols[[bn]])
+      drawn.upper <- draw_one(herr.all[[bn]], band.cols[[bn]])
+      if (isTRUE(drawn.lower) || isTRUE(drawn.upper))
+        drawn.bands <- c(drawn.bands, bn)
+    }
+    if (!length(drawn.bands)) {
+      return(invisible(FALSE))
     }
     legend3d.call <- .np_plot_merge_override_args(
       list(
         "topright",
-        legend = c("Pointwise", "Simultaneous", "Bonferroni"),
-        col = unname(band.cols),
+        legend = c(pointwise = "Pointwise",
+                   simultaneous = "Simultaneous",
+                   bonferroni = "Bonferroni")[drawn.bands],
+        col = unname(band.cols[drawn.bands]),
         lty = 1,
         lwd = 2,
         cex = 0.8,
