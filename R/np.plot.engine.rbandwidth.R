@@ -9,6 +9,7 @@
            neval = 50,
            common.scale = TRUE,
            perspective = TRUE,
+           renderer = c("base", "rgl"),
            gradients = FALSE,
            gradient.order = 1L,
            main = NULL,
@@ -62,6 +63,14 @@
     points.user.args <- .np_plot_user_args(dots, "points")
     persp.user.args <- .np_plot_user_args(dots, "persp")
     bxp.user.args <- .np_plot_user_args(dots, "bxp")
+    rgl.persp3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d.")
+    rgl.view3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.view3d", "rgl.view3d.")
+    rgl.par3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.par3d", "rgl.par3d.")
+    rgl.grid3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d.")
+    rgl.widget.user.args <- .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget.")
+    rgl.legend3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.legend3d", "rgl.legend3d.")
+    rgl.points3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.points3d.")
+    rgl.surface3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.surface3d.")
     if (!is.null(cex)) {
       if (is.null(plot.user.args$cex)) plot.user.args$cex <- cex
       if (is.null(points.user.args$cex)) points.user.args$cex <- cex
@@ -196,7 +205,24 @@
         .np_warning("some requested glp derivatives exceed polynomial degree; plotting NA for those components")
     }
 
-    if ((bws$ncon + bws$nord == 2) && (bws$nuno == 0) && perspective && !gradients &&
+    surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
+                                (bws$nuno == 0) &&
+                                !any(xor(bws$xdati$iord, bws$xdati$inumord)))
+    renderer <- .np_plot_validate_renderer_request(
+      renderer = renderer,
+      route = "plot.rbandwidth()",
+      perspective = perspective,
+      supported.route = surface.supported,
+      view = as.character(view)[1L],
+      gradients = gradients,
+      plot.errors.method = plot.errors.method,
+      plot.data.overlay = overlay.ok,
+      plot.behavior = plot.behavior,
+      allow.plot.errors = TRUE,
+      allow.plot.data.overlay = TRUE
+    )
+
+    if (surface.supported && perspective && !gradients &&
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
 
       view = match.arg(view)
@@ -385,6 +411,68 @@
         if (plot.behavior == "data")
           return ( list(r1 = r1) )
 
+      }
+
+      xlab.val <- scalar_default(xlab, gen.label(bws$xnames[1], "X1"))
+      ylab.val <- scalar_default(ylab, gen.label(bws$xnames[2], "X2"))
+      zlab.val <- scalar_default(zlab, gen.label(bws$ynames, "Conditional Mean"))
+
+      if (identical(renderer, "rgl")) {
+        rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
+        main.val <- scalar_default(main, "")
+        overlay.x1 <- xdat[,1]
+        overlay.x2 <- xdat[,2]
+        if (is.factor(overlay.x1) || is.ordered(overlay.x1))
+          overlay.x1 <- (bws$xdati$all.dlev[[1]])[as.integer(overlay.x1)]
+        if (is.factor(overlay.x2) || is.ordered(overlay.x2))
+          overlay.x2 <- (bws$xdati$all.dlev[[2]])[as.integer(overlay.x2)]
+        .np_plot_first_render_begin(first.render)
+        rgl.out <- .np_plot_render_surface_rgl(
+          x = x1.eval,
+          y = x2.eval,
+          z = treg,
+          zlim = zlim,
+          col = col,
+          border = scalar_default(border, "black"),
+          xlab = xlab.val,
+          ylab = ylab.val,
+          zlab = zlab.val,
+          theta = rgl.view$theta,
+          phi = rgl.view$phi,
+          main = main.val,
+          par3d.args = rgl.par3d.user.args,
+          view3d.args = rgl.view3d.user.args,
+          persp3d.args = rgl.persp3d.user.args,
+          grid3d.args = rgl.grid3d.user.args,
+          widget.args = rgl.widget.user.args,
+          draw.extras = function() {
+            if (plot.errors) {
+              .np_plot_error_surfaces_rgl(
+                x = x1.eval,
+                y = x2.eval,
+                plot.errors.type = plot.errors.type,
+                lerr = lerr,
+                herr = herr,
+                lerr.all = lerr.all,
+                herr.all = herr.all,
+                surface3d.args = rgl.surface3d.user.args,
+                legend3d.args = rgl.legend3d.user.args
+              )
+            }
+            if (overlay.ok) {
+              .np_plot_overlay_points_rgl(
+                x1 = overlay.x1,
+                x2 = overlay.x2,
+                y = ydat,
+                points3d.args = rgl.points3d.user.args
+              )
+            }
+          }
+        )
+        .np_plot_first_render_end(first.render)
+        if (!is.null(rgl.out))
+          return(rgl.out)
+        return(invisible(NULL))
       }
 
       dtheta = 5.0

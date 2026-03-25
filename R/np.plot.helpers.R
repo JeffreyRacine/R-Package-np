@@ -7576,8 +7576,310 @@ plotFactor <- function(f, y, ...){
   invisible(TRUE)
 }
 
+.np_plot_overlay_points_rgl <- function(x1,
+                                        x2,
+                                        y,
+                                        points3d.args = list()) {
+  if (is.null(x1) || is.null(x2) || is.null(y))
+    return(invisible(FALSE))
+
+  ok <- is.finite(x1) & is.finite(x2) & is.finite(y)
+  if (!any(ok))
+    return(invisible(FALSE))
+
+  point.args <- .np_plot_merge_override_args(
+    list(
+      x = x1[ok],
+      y = x2[ok],
+      z = y[ok],
+      color = grDevices::adjustcolor("gray20", alpha.f = 0.6),
+      alpha = 0.6,
+      size = 5
+    ),
+    points3d.args
+  )
+  do.call(rgl::points3d, point.args)
+  invisible(TRUE)
+}
+
+.np_plot_error_surfaces_rgl <- function(x,
+                                        y,
+                                        plot.errors.type,
+                                        lerr = NULL,
+                                        herr = NULL,
+                                        lerr.all = NULL,
+                                        herr.all = NULL,
+                                        surface3d.args = list(),
+                                        legend3d.args = list()) {
+  draw_one <- function(z, color) {
+    if (is.null(z))
+      return(invisible(FALSE))
+    if (!any(is.finite(z)))
+      return(invisible(FALSE))
+    surf.args <- .np_plot_merge_override_args(
+      list(
+        x = x,
+        y = y,
+        z = z,
+        color = color,
+        alpha = 0.2,
+        front = "lines",
+        back = "lines",
+        lit = FALSE
+      ),
+      surface3d.args
+    )
+    do.call(rgl::surface3d, surf.args)
+    invisible(TRUE)
+  }
+
+  if (identical(plot.errors.type, "all") &&
+      !is.null(lerr.all) &&
+      !is.null(herr.all)) {
+    band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+    drawn.bands <- character(0L)
+    for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+      drawn.lower <- draw_one(lerr.all[[bn]], band.cols[[bn]])
+      drawn.upper <- draw_one(herr.all[[bn]], band.cols[[bn]])
+      if (isTRUE(drawn.lower) || isTRUE(drawn.upper))
+        drawn.bands <- c(drawn.bands, bn)
+    }
+    if (!length(drawn.bands)) {
+      return(invisible(FALSE))
+    }
+    legend3d.call <- .np_plot_merge_override_args(
+      list(
+        "topright",
+        legend = c(pointwise = "Pointwise",
+                   simultaneous = "Simultaneous",
+                   bonferroni = "Bonferroni")[drawn.bands],
+        col = unname(band.cols[drawn.bands]),
+        lty = 1,
+        lwd = 2,
+        cex = 0.8,
+        bg = "white",
+        bty = "n"
+      ),
+      legend3d.args
+    )
+    do.call(rgl::legend3d, legend3d.call)
+    return(invisible(TRUE))
+  }
+
+  draw_one(lerr, "grey40")
+  draw_one(herr, "grey40")
+  invisible(TRUE)
+}
+
+.np_plot_match_renderer <- function(renderer) {
+  match.arg(renderer, c("base", "rgl"))
+}
+
+.np_plot_rgl_view_angles <- function(theta, phi) {
+  theta <- as.double(theta)[1L]
+  phi <- as.double(phi)[1L]
+
+  if (isTRUE(all.equal(theta, 0.0)) && isTRUE(all.equal(phi, 10.0))) {
+    phi <- -70.0
+  }
+
+  list(theta = theta, phi = phi)
+}
+
+.np_plot_rgl_surface_colors <- function(z, col = NULL, num.colors = 1000L) {
+  if (!is.null(col))
+    return(col)
+
+  z <- as.matrix(z)
+  z.range <- range(z, finite = TRUE)
+
+  if (!all(is.finite(z.range)))
+    return("lightblue")
+
+  if (isTRUE(all.equal(z.range[1L], z.range[2L]))) {
+    return(matrix("lightblue", nrow = nrow(z), ncol = ncol(z)))
+  }
+
+  colorlut <- grDevices::topo.colors(as.integer(num.colors))
+  scaled <- 1L + floor((length(colorlut) - 1L) * (z - z.range[1L]) / diff(z.range))
+  scaled[!is.finite(scaled)] <- 1L
+  scaled <- pmax.int(1L, pmin.int(length(colorlut), scaled))
+
+  matrix(colorlut[scaled], nrow = nrow(z), ncol = ncol(z))
+}
+
+.np_plot_validate_renderer_request <- function(renderer,
+                                               route,
+                                               perspective,
+                                               supported.route = TRUE,
+                                               view = "fixed",
+                                               gradients = FALSE,
+                                               coef = FALSE,
+                                               plot.errors.method = "none",
+                                               plot.data.overlay = FALSE,
+                                               plot.behavior = "plot",
+                                               allow.plot.errors = FALSE,
+                                               allow.plot.data.overlay = FALSE) {
+  renderer <- .np_plot_match_renderer(renderer)
+
+  if (!identical(renderer, "rgl"))
+    return(renderer)
+
+  if (!isTRUE(perspective)) {
+    stop("renderer='rgl' requires perspective=TRUE.", call. = FALSE)
+  }
+
+  if (!isTRUE(supported.route)) {
+    stop(sprintf(
+      "renderer='rgl' is currently implemented only for supported 2D surface routes in %s",
+      route
+    ), call. = FALSE)
+  }
+
+  if (isTRUE(gradients)) {
+    stop("renderer='rgl' does not yet support gradients=TRUE. Use renderer='base'.",
+         call. = FALSE)
+  }
+
+  if (isTRUE(coef)) {
+    stop("renderer='rgl' does not yet support coefficient-mode plots. Use renderer='base'.",
+         call. = FALSE)
+  }
+
+  if (!identical(as.character(view)[1L], "fixed")) {
+    stop("renderer='rgl' currently supports view='fixed' only in this rollout tranche.",
+         call. = FALSE)
+  }
+
+  if (!identical(as.character(plot.errors.method)[1L], "none")) {
+    if (!isTRUE(allow.plot.errors)) {
+      stop("renderer='rgl' does not yet support plot.errors.method != 'none'. Use renderer='base'.",
+           call. = FALSE)
+    }
+  }
+
+  if (isTRUE(plot.data.overlay)) {
+    if (!isTRUE(allow.plot.data.overlay)) {
+      stop("renderer='rgl' does not yet support plot.data.overlay=TRUE. Use renderer='base' or disable overlay.",
+           call. = FALSE)
+    }
+  }
+
+  if (!identical(as.character(plot.behavior)[1L], "plot")) {
+    stop("renderer='rgl' currently supports plot.behavior='plot' only in this rollout tranche.",
+         call. = FALSE)
+  }
+
+  if (!isTRUE(suppressWarnings(requireNamespace("rgl", quietly = TRUE)))) {
+    stop("renderer='rgl' requires the suggested package 'rgl'. Please install it with install.packages('rgl').",
+         call. = FALSE)
+  }
+
+  renderer
+}
+
+.np_plot_render_surface_rgl <- function(x,
+                                        y,
+                                        z,
+                                        xlab,
+                                        ylab,
+                                        zlab,
+                                        main,
+                                        theta,
+                                        phi,
+                                        col = NULL,
+                                        border = "black",
+                                        zlim = NULL,
+                                        par3d.args = list(),
+                                        view3d.args = list(),
+                                        persp3d.args = list(),
+                                        grid3d.args = list(),
+                                        widget.args = list(),
+                                        draw.extras = NULL) {
+  tryCatch({
+    old.opts <- options(
+      rgl.useNULL = TRUE,
+      rgl.printRglwidget = TRUE
+    )
+    on.exit(options(old.opts), add = TRUE)
+    old.env <- Sys.getenv("RGL_USE_NULL", unset = NA_character_)
+    Sys.setenv(RGL_USE_NULL = "TRUE")
+    on.exit({
+      if (is.na(old.env)) {
+        Sys.unsetenv("RGL_USE_NULL")
+      } else {
+        Sys.setenv(RGL_USE_NULL = old.env)
+      }
+    }, add = TRUE)
+    devices.before <- try(rgl::rgl.dev.list(), silent = TRUE)
+    if (inherits(devices.before, "try-error") || is.null(devices.before))
+      devices.before <- integer(0L)
+
+    rgl::open3d(useNULL = TRUE, silent = TRUE)
+    par3d.call <- .np_plot_merge_override_args(
+      list(windowRect = c(900, 100, 900 + 640, 100 + 640)),
+      par3d.args
+    )
+    do.call(rgl::par3d, par3d.call)
+
+    view3d.call <- .np_plot_merge_override_args(
+      list(theta = theta, phi = phi, fov = 80),
+      view3d.args
+    )
+    do.call(rgl::view3d, view3d.call)
+
+    persp3d.call <- .np_plot_merge_override_args(list(
+      x = x,
+      y = y,
+      z = z,
+      zlim = zlim,
+      xlab = xlab,
+      ylab = ylab,
+      zlab = zlab,
+      ticktype = "detailed",
+      border = border,
+      color = .np_plot_rgl_surface_colors(z = z, col = col),
+      alpha = 0.7,
+      back = "lines",
+      main = main
+    ), persp3d.args)
+    do.call(rgl::persp3d, persp3d.call)
+
+    if (!is.null(draw.extras))
+      draw.extras()
+
+    grid.side <- c("x", "y+", "z")
+    if (!is.null(grid3d.args$side)) {
+      grid.side <- grid3d.args$side
+      grid3d.args$side <- NULL
+    }
+    grid3d.call <- c(list(grid.side), grid3d.args)
+    do.call(rgl::grid3d, grid3d.call)
+    if (isTRUE(rgl::rgl.useNULL()) || isTRUE(getOption("rgl.printRglwidget"))) {
+      scene <- rgl::scene3d()
+      devices.after <- try(rgl::rgl.dev.list(), silent = TRUE)
+      if (inherits(devices.after, "try-error") || is.null(devices.after))
+        devices.after <- integer(0L)
+      new.devices <- setdiff(devices.after, devices.before)
+      if (length(new.devices))
+        try(rgl::close3d(dev = new.devices, silent = TRUE), silent = TRUE)
+      else
+        try(rgl::close3d(silent = TRUE), silent = TRUE)
+      widget <- do.call(rgl::rglwidget, c(list(x = scene), widget.args))
+      print(widget)
+      return(widget)
+    }
+    NULL
+  }, error = function(e) {
+    stop(sprintf("renderer='rgl' failed to draw the surface (%s)", conditionMessage(e)),
+         call. = FALSE)
+  })
+}
+
 .np_plot_user_args <- function(dots,
-                               type = c("plot", "points", "lines", "persp", "bxp")) {
+                               type = c("plot", "points", "lines", "persp", "bxp",
+                                        "rgl.persp3d", "rgl.view3d", "rgl.par3d",
+                                        "rgl.grid3d", "rgl.widget", "rgl.legend3d")) {
   if (is.null(dots) || !length(dots))
     return(list())
 
@@ -7589,11 +7891,47 @@ plotFactor <- function(f, y, ...){
                     lines = c("lty", "lwd", "col"),
                     persp = c("shade", "ltheta", "lphi", "expand", "nticks",
                               "box", "axes"),
+                    rgl.persp3d = c("alpha", "back", "front", "lit", "smooth",
+                                    "color",
+                                    "specular", "ambient", "emission",
+                                    "shininess", "polygon_offset", "fog",
+                                    "texture"),
+                    rgl.view3d = c("fov", "zoom"),
+                    rgl.par3d = c("windowRect"),
+                    rgl.grid3d = c("side", "at", "col", "lwd", "lty", "n"),
+                    rgl.widget = c("width", "height", "controllers"),
+                    rgl.legend3d = c("x", "y", "legend", "fill", "border",
+                                     "col", "text.col", "adj", "cex",
+                                     "pt.cex", "pch", "xjust", "yjust",
+                                     "x.intersp", "y.intersp", "merge",
+                                     "trace", "plot", "ncol", "horiz",
+                                     "title", "inset", "bg", "bty", "box.lwd",
+                                     "box.lty", "box.col", "pt.bg",
+                                     "lwd", "lty", "seg.len"),
                     bxp = c("boxfill", "outline", "notch", "varwidth",
                             "frame.plot", "horizontal", "at", "show.names",
                             "pars", "pch", "cex", "col", "bg"))
 
   dots[names(dots) %in% allowed]
+}
+
+.np_plot_extract_prefixed_args <- function(dots, prefix) {
+  if (is.null(dots) || !length(dots))
+    return(list())
+
+  hits <- startsWith(names(dots), prefix)
+  if (!any(hits))
+    return(list())
+
+  out <- dots[hits]
+  names(out) <- substring(names(out), nchar(prefix) + 1L)
+  out
+}
+
+.np_plot_collect_rgl_args <- function(dots, type, prefix) {
+  direct.args <- .np_plot_user_args(dots, type)
+  prefixed.args <- .np_plot_extract_prefixed_args(dots, prefix)
+  .np_plot_merge_override_args(direct.args, prefixed.args)
 }
 
 .np_plot_merge_user_args <- function(base.args, user.args) {
@@ -7602,10 +7940,32 @@ plotFactor <- function(f, y, ...){
   if (is.null(base.args) || !length(base.args))
     return(user.args)
 
-  dup <- intersect(names(user.args), names(base.args))
-  if (length(dup))
-    user.args <- user.args[setdiff(names(user.args), dup)]
+  base.names <- names(base.args)
+  user.names <- names(user.args)
+  dup <- intersect(user.names[!(is.na(user.names) | user.names == "")],
+                   base.names[!(is.na(base.names) | base.names == "")])
+  if (length(dup)) {
+    keep <- is.na(user.names) | user.names == "" | !(user.names %in% dup)
+    user.args <- user.args[keep]
+  }
   c(base.args, user.args)
+}
+
+.np_plot_merge_override_args <- function(base.args, override.args) {
+  if (is.null(override.args) || !length(override.args))
+    return(base.args)
+  if (is.null(base.args) || !length(base.args))
+    return(override.args)
+
+  base.names <- names(base.args)
+  override.names <- names(override.args)
+  dup <- intersect(override.names[!(is.na(override.names) | override.names == "")],
+                   base.names[!(is.na(base.names) | base.names == "")])
+  if (length(dup)) {
+    keep <- is.na(base.names) | base.names == "" | !(base.names %in% dup)
+    base.args <- base.args[keep]
+  }
+  c(base.args, override.args)
 }
 
 .np_plot_resolve_xydat <- function(bws, xdat, ydat, miss.xy) {

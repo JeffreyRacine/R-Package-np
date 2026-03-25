@@ -11,6 +11,7 @@
            neval = 50,
            common.scale = TRUE,
            perspective = TRUE,
+           renderer = c("base", "rgl"),
            gradients = FALSE,
            coef = FALSE,
            coef.index = 1L,
@@ -65,6 +66,14 @@
     points.user.args <- .np_plot_user_args(dots, "points")
     persp.user.args <- .np_plot_user_args(dots, "persp")
     bxp.user.args <- .np_plot_user_args(dots, "bxp")
+    rgl.persp3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d.")
+    rgl.view3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.view3d", "rgl.view3d.")
+    rgl.par3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.par3d", "rgl.par3d.")
+    rgl.grid3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d.")
+    rgl.widget.user.args <- .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget.")
+    rgl.legend3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.legend3d", "rgl.legend3d.")
+    rgl.points3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.points3d.")
+    rgl.surface3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.surface3d.")
     if (!is.null(cex)) {
       if (is.null(plot.user.args$cex)) plot.user.args$cex <- cex
       if (is.null(points.user.args$cex)) points.user.args$cex <- cex
@@ -214,7 +223,28 @@
       plot.data.overlay.missing = missing(plot.data.overlay)
     )
 
-    if ((sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord))== 2) && (sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0) && perspective && !gradients &&
+    surface.supported <- isTRUE(
+      (sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord)) == 2) &&
+      (sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0) &&
+      !any(xor(c(bws$xdati$iord, bws$zdati$iord),
+               c(bws$xdati$inumord, bws$zdati$inumord)))
+    )
+    renderer <- .np_plot_validate_renderer_request(
+      renderer = renderer,
+      route = "npscoef/npscoefbw",
+      perspective = perspective,
+      supported.route = surface.supported,
+      view = if (missing(view)) "fixed" else view,
+      gradients = FALSE,
+      coef = coef,
+      plot.errors.method = plot.errors.method,
+      plot.data.overlay = overlay.ok,
+      plot.behavior = plot.behavior,
+      allow.plot.errors = TRUE,
+      allow.plot.data.overlay = TRUE
+    )
+
+    if (surface.supported && perspective && !gradients &&
         !any(xor(c(bws$xdati$iord, bws$zdati$iord), c(bws$xdati$inumord, bws$zdati$inumord)))){
 
       view = match.arg(view)
@@ -281,6 +311,8 @@
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
+      lerr.all <- NULL
+      herr.all <- NULL
       
       treg = matrix(data = extract_scoef_value(tobj),
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
@@ -311,36 +343,53 @@
           boot.args$exdat <- x.eval[,1, drop = FALSE]
           boot.args$ezdat <- x.eval[,2, drop = FALSE]
         }
-        terr <- do.call(compute.bootstrap.errors, boot.args)[["boot.err"]]
+        terr.obj <- do.call(compute.bootstrap.errors, boot.args)
+        terr <- terr.obj[["boot.err"]]
+        terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
+        center.val <- if (pc) terr[,3] else tobj$mean
 
-        lerr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
-          -terr[,1],
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
-          +terr[,2],
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
 
       } else if (plot.errors.method == "asymptotic") {
-        terr[,1:2] <- .np_plot_asymptotic_error_from_se(
+        terr.obj <- .np_plot_asymptotic_error_from_se(
           se = tobj$merr,
           alpha = plot.errors.alpha,
           band.type = plot.errors.type,
           m = nrow(x.eval)
-        )$err
+        )
+        terr[,1:2] <- terr.obj$err
+        terr.all <- terr.obj$all.err
         lerr = matrix(data = tobj$mean - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
         herr = matrix(data = tobj$mean + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = tobj$mean - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = tobj$mean + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
 
       }
 
       if(is.null(zlim)) {
           zlim =
-              if (plot.errors)
+              if (plot.errors && plot.errors.type == "all" && !is.null(lerr.all))
+                  c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
+              else if (plot.errors)
                   c(min(lerr),max(herr))
               else
                   c(min(tobj$mean),max(tobj$mean))
@@ -364,6 +413,74 @@
         if (plot.behavior == "data")
           return ( list(r1 = r1) )
 
+      }
+
+      xlab.val <- scalar_default(xlab, gen.label(bws$xnames[1], "X1"))
+      ylab.val <- scalar_default(ylab, gen.label(x2.names[1], "X2"))
+      zlab.val <- scalar_default(zlab, gen.label(bws$ynames,"Conditional Mean"))
+
+      if (identical(renderer, "rgl")) {
+        rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
+        main.val <- scalar_default(main, "")
+        overlay.x1 <- xdat[,1]
+        if (is.factor(overlay.x1) || is.ordered(overlay.x1))
+          overlay.x1 <- (bws$xdati$all.dlev[[1]])[as.integer(overlay.x1)]
+        if (miss.z) {
+          overlay.x2 <- xdat[,2]
+          if (is.factor(overlay.x2) || is.ordered(overlay.x2))
+            overlay.x2 <- (bws$xdati$all.dlev[[2]])[as.integer(overlay.x2)]
+        } else {
+          overlay.x2 <- zdat[,1]
+          if (is.factor(overlay.x2) || is.ordered(overlay.x2))
+            overlay.x2 <- (bws$zdati$all.dlev[[1]])[as.integer(overlay.x2)]
+        }
+        .np_plot_first_render_begin(first.render)
+        rgl.out <- .np_plot_render_surface_rgl(
+          x = x1.eval,
+          y = x2.eval,
+          z = treg,
+          zlim = zlim,
+          col = col,
+          border = scalar_default(border, "black"),
+          xlab = xlab.val,
+          ylab = ylab.val,
+          zlab = zlab.val,
+          theta = rgl.view$theta,
+          phi = rgl.view$phi,
+          main = main.val,
+          par3d.args = rgl.par3d.user.args,
+          view3d.args = rgl.view3d.user.args,
+          persp3d.args = rgl.persp3d.user.args,
+          grid3d.args = rgl.grid3d.user.args,
+          widget.args = rgl.widget.user.args,
+          draw.extras = function() {
+            if (plot.errors) {
+              .np_plot_error_surfaces_rgl(
+                x = x1.eval,
+                y = x2.eval,
+                plot.errors.type = plot.errors.type,
+                lerr = lerr,
+                herr = herr,
+                lerr.all = lerr.all,
+                herr.all = herr.all,
+                surface3d.args = rgl.surface3d.user.args,
+                legend3d.args = rgl.legend3d.user.args
+              )
+            }
+            if (overlay.ok) {
+              .np_plot_overlay_points_rgl(
+                x1 = overlay.x1,
+                x2 = overlay.x2,
+                y = ydat,
+                points3d.args = rgl.points3d.user.args
+              )
+            }
+          }
+        )
+        .np_plot_first_render_end(first.render)
+        if (!is.null(rgl.out))
+          return(rgl.out)
+        return(invisible(NULL))
       }
 
       dtheta = 5.0

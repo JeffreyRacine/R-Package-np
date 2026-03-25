@@ -14,6 +14,22 @@
   }
   dots$persp <- NULL
 
+  if (!is.null(dots$renderer)) {
+    dots$renderer <- .np_plot_match_renderer(dots$renderer)
+    if (identical(dots$renderer, "rgl") &&
+        !identical(method, .np_plot_rbandwidth_engine) &&
+        !identical(method, .np_plot_bandwidth_engine) &&
+        !identical(method, .np_plot_dbandwidth_engine) &&
+        !identical(method, .np_plot_conbandwidth_engine) &&
+        !identical(method, .np_plot_condbandwidth_engine) &&
+        !identical(method, .np_plot_scbandwidth_engine) &&
+        !identical(method, .np_plot_plbandwidth_engine) &&
+        !identical(method, .np_plot_compat_dispatch)) {
+      stop("renderer='rgl' is not yet implemented for this plot route. Use renderer='base'.",
+           call. = FALSE)
+    }
+  }
+
   .npRmpi_require_active_slave_pool(where = where)
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = where)
 
@@ -44,23 +60,34 @@
 
 .np_plot_compat_dispatch <- function(bws, ...) {
   cls <- class(bws)
+  dots <- list(...)
+
+  if (!is.null(dots$renderer)) {
+    dots$renderer <- .np_plot_match_renderer(dots$renderer)
+    if (identical(dots$renderer, "rgl") &&
+        !any(c("rbandwidth", "bandwidth", "dbandwidth",
+               "conbandwidth", "condbandwidth", "scbandwidth", "plbandwidth") %in% cls)) {
+      stop("renderer='rgl' is not yet implemented for this plot route. Use renderer='base'.",
+           call. = FALSE)
+    }
+  }
 
   if ("rbandwidth" %in% cls)
-    return(.np_plot_rbandwidth_engine(bws = bws, ...))
+    return(do.call(.np_plot_rbandwidth_engine, c(list(bws = bws), dots)))
   if ("conbandwidth" %in% cls)
-    return(.np_plot_conbandwidth_engine(bws = bws, ...))
+    return(do.call(.np_plot_conbandwidth_engine, c(list(bws = bws), dots)))
   if ("condbandwidth" %in% cls)
-    return(.np_plot_condbandwidth_engine(bws = bws, ...))
+    return(do.call(.np_plot_condbandwidth_engine, c(list(bws = bws), dots)))
   if ("plbandwidth" %in% cls)
-    return(.np_plot_plbandwidth_engine(bws = bws, ...))
+    return(do.call(.np_plot_plbandwidth_engine, c(list(bws = bws), dots)))
   if ("sibandwidth" %in% cls)
-    return(.np_plot_sibandwidth_engine(bws = bws, ...))
+    return(do.call(.np_plot_sibandwidth_engine, c(list(bws = bws), dots)))
   if ("scbandwidth" %in% cls)
-    return(.np_plot_scbandwidth_engine(bws = bws, ...))
+    return(do.call(.np_plot_scbandwidth_engine, c(list(bws = bws), dots)))
   if ("dbandwidth" %in% cls)
-    return(.np_plot_dbandwidth_engine(bws = bws, ...))
+    return(do.call(.np_plot_dbandwidth_engine, c(list(bws = bws), dots)))
   if ("bandwidth" %in% cls)
-    return(.np_plot_bandwidth_engine(bws = bws, ...))
+    return(do.call(.np_plot_bandwidth_engine, c(list(bws = bws), dots)))
 
   stop("unsupported bandwidth class for plotting")
 }
