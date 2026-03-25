@@ -187,18 +187,43 @@ test_that("bounded generalized_nn is available for certified core public routes"
   expect_true(all(is.finite(as.numeric(fit.cdist$condist))))
 })
 
-test_that("deferred bounded public families remain blocked", {
+test_that("npplreg bounded generalized_nn is available while other deferred semiparametric families stay blocked", {
   set.seed(20260224)
   x <- runif(32)
   y <- cos(2 * pi * x)
   xy <- data.frame(x = x)
 
+  bw.pl <- npplregbw(
+    xdat = xy,
+    ydat = y,
+    zdat = xy,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  fit.pl <- npplreg(bws = bw.pl, txdat = xy, tydat = y, tzdat = xy)
+
+  expect_true(all(is.finite(as.numeric(unlist(lapply(bw.pl$bw, function(obj) obj$bw))))))
+  expect_true(all(is.finite(as.numeric(fit.pl$mean))))
+
   expect_error(
-    npplregbw(
+    npindexbw(
+      xdat = data.frame(x1 = x, x2 = x^2),
+      ydat = y,
+      method = "ichimura",
+      bwtype = "generalized_nn",
+      ckerbound = "range",
+      nmulti = 1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+
+  expect_error(
+    npscoefbw(
       xdat = xy,
       ydat = y,
       zdat = xy,
-      bwmethod = "cv.ls",
       bwtype = "generalized_nn",
       ckerbound = "range",
       nmulti = 1
