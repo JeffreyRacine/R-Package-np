@@ -73,13 +73,6 @@ npudist.dbandwidth <-
 
     fit.start <- proc.time()[3]
     .npRmpi_require_active_slave_pool(where = "npudist()")
-    if (.npRmpi_npudistbw_bounded_adaptive_requested(
-      bwtype = bws$type,
-      ckerbound = bws$ckerbound,
-      bandwidth.compute = TRUE
-    ))
-      stop("bounded adaptive_nn remains unsupported for npudist() in npRmpi",
-           call. = FALSE)
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

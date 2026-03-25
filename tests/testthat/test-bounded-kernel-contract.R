@@ -263,6 +263,149 @@ test_that("bounded adaptive_nn is available for certified non-distribution route
   expect_true(all(as.numeric(fit.cd$condens) >= 0))
 })
 
+.bounded_adaptive_udist_fitonly_fixture <- function() {
+  dat <- structure(list(x = c(0.0293716583400965, 0.0337911003734916,
+    0.0688598649576306, 0.146281852386892, 0.15000450075604, 0.168401539325714,
+    0.173830970656127, 0.201029423624277, 0.210880494909361, 0.216087364125997,
+    0.261414775624871, 0.332859222311527, 0.340369544224814, 0.398810388986021,
+    0.412044096272439, 0.460934564704075, 0.522144361166283, 0.529954593162984,
+    0.559345822315663, 0.573270461056381, 0.644053619122133, 0.668163585709408,
+    0.686013063415885, 0.689600103069097, 0.764754617586732, 0.80543372547254,
+    0.814246771391481, 0.830958560109138, 0.849165873136371, 0.849887294694781,
+    0.936625305796042, 0.97392991813831)), class = "data.frame", row.names = c(NA,
+    -32L))
+  bw <- structure(list(bw = 1, method = "cv.cdf", pmethod = "Least Squares Cross-Validation",
+    fval = 0.183985330074149, ifval = 1, num.feval = 75, fval.history = 0.183985330074149,
+    eval.history = 75, invalid.history = 7, scaling = FALSE,
+    pscaling = "Bandwidth Nearest Neighbor(s)", type = "adaptive_nn",
+    ptype = "Adaptive Nearest Neighbour", ckertype = "gaussian",
+    ckerorder = 2, ckerbound = "range", ckerlb = 0.0293716583400965,
+    ckerub = 0.97392991813831, pckertype = "Second-Order Gaussian (bounded/range)",
+    ukertype = "aitchisonaitken", pukertype = "Aitchison and Aitken",
+    okertype = "liracine", pokertype = "Li and Racine (normalized)",
+    nobs = 32L, ndim = 1L, ncon = 1L, nuno = 0L, nord = 0L, icon = c(x = TRUE),
+    iuno = c(x = FALSE), iord = c(x = FALSE), xnames = "x", xdati = list(
+      iord = c(x = FALSE), iuno = c(x = FALSE), icon = c(x = TRUE),
+      inumord = c(x = FALSE), all.lev = list(x = NULL), all.ulev = list(
+        x = NULL), all.dlev = list(x = NULL), all.nlev = list(
+        x = NULL), all.min = list(x = 0.0293716583400965),
+      all.max = list(x = 0.97392991813831)), sfactor = list(
+      x = 10.9247445704317), bandwidth = list(x = 1), nconfac = 0.314980262473718,
+    ncatfac = 0.0992125657480125, sdev = 0.290606529376362, sumNum = list(
+      x = 10.9247445704317), xmcv = structure(numeric(0), dim = c(0L,
+    0L), num.row = 0L, pad.num = 0.565213999172708), dati = list(
+      x = list(iord = c(x = FALSE), iuno = c(x = FALSE), icon = c(x = TRUE),
+        inumord = c(x = FALSE), all.lev = list(x = NULL),
+        all.ulev = list(x = NULL), all.dlev = list(x = NULL),
+        all.nlev = list(x = NULL), all.min = list(x = 0.0293716583400965),
+        all.max = list(x = 0.97392991813831))), varnames = list(
+      x = "x"), vartitle = list(x = ""), vartitleabb = list(
+      x = ""), rows.omit = NA, nobs.omit = 0, timing = 5.4e-05,
+    total.time = c(elapsed = 0.00700000000000001), klist = list(
+      x = list(ckertype = "gaussian", pckertype = "Second-Order Gaussian (bounded/range)",
+        ukertype = "aitchisonaitken", pukertype = "Aitchison and Aitken",
+        okertype = "liracine", pokertype = "Li and Racine (normalized)")),
+    call = npudistbw.NULL(dat = dat, ... = pairlist(bwtype = "adaptive_nn", bwmethod = "cv.cdf", ckerbound = "range", nmulti = 1))), class = "dbandwidth")
+  list(dat = dat, bw = bw)
+}
+
+.bounded_adaptive_cdist_fitonly_fixture <- function() {
+  x <- structure(list(x = c(0.0293716583400965, 0.0337911003734916,
+    0.146281852386892, 0.15000450075604, 0.168401539325714, 0.173830970656127,
+    0.201029423624277, 0.210880494909361, 0.261414775624871, 0.332859222311527,
+    0.340369544224814, 0.398810388986021, 0.412044096272439, 0.460934564704075,
+    0.522144361166283, 0.529954593162984, 0.573270461056381, 0.644053619122133,
+    0.668163585709408, 0.686013063415885, 0.689600103069097, 0.764754617586732,
+    0.80543372547254, 0.814246771391481, 0.830958560109138, 0.849887294694781,
+    0.936625305796042, 0.97392991813831)), class = "data.frame", row.names = c(NA,
+    -28L))
+  y <- structure(list(y = c(0.0647218793164939, 0.0688598649576306,
+    0.0753922816365957, 0.116926148533821, 0.141229883302003, 0.146168121369556,
+    0.185237535042688, 0.216087364125997, 0.237273563398048, 0.241650115931407,
+    0.280670147156343, 0.282998539274558, 0.41492543485947, 0.444256805581972,
+    0.452224941225722, 0.501736348960549, 0.506873786216602, 0.554796958575025,
+    0.559345822315663, 0.603990532224998, 0.627316205063835, 0.627725793980062,
+    0.714035893790424, 0.715121431509033, 0.849165873136371, 0.861479766201228,
+    0.869792656507343, 0.889108955627307)), class = "data.frame", row.names = c(NA,
+    -28L))
+  bw <- structure(list(xbw = 7, ybw = 1, method = "cv.ls",
+    pmethod = "Least Squares Cross-Validation", fval = 0.0556322703376515,
+    ifval = 1, num.feval = 179, num.feval.fast = 0, fval.history = 0.0556322703376515,
+    eval.history = 179, invalid.history = 10, scaling = FALSE,
+    pscaling = "Bandwidth Nearest Neighbor(s)", type = "adaptive_nn",
+    ptype = "Adaptive Nearest Neighbour", cxkertype = "gaussian",
+    cykertype = "gaussian", cxkerorder = 2, cykerorder = 2, cxkerbound = "range",
+    cxkerlb = 0.0293716583400965, cxkerub = 0.97392991813831,
+    cykerbound = "range", cykerlb = 0.0647218793164939, cykerub = 0.889108955627307,
+    pcxkertype = "Second-Order Gaussian (bounded/range)", pcykertype = "Second-Order Gaussian (bounded/range)",
+    uxkertype = "aitchisonaitken", uykertype = "aitchisonaitken",
+    puxkertype = "Aitchison and Aitken", puykertype = "Aitchison and Aitken",
+    oxkertype = "liracine", oykertype = "liracine", poxkertype = "Li and Racine",
+    poykertype = "Li and Racine (normalized)", nobs = 28L, xndim = 1L,
+    yndim = 1L, ndim = 2L, xncon = 1L, xnuno = 0L, xnord = 0L,
+    yncon = 1L, ynuno = 0L, ynord = 0L, ncon = 2L, ixcon = c(x = TRUE),
+    ixuno = c(x = FALSE), ixord = c(x = FALSE), iycon = c(y = TRUE),
+    iyuno = c(y = FALSE), iyord = c(y = FALSE), xnames = "x",
+    ynames = "y", xdati = list(iord = c(x = FALSE), iuno = c(x = FALSE),
+      icon = c(x = TRUE), inumord = c(x = FALSE), all.lev = list(
+        x = NULL), all.ulev = list(x = NULL), all.dlev = list(
+        x = NULL), all.nlev = list(x = NULL), all.min = list(
+        x = 0.0293716583400965), all.max = list(x = 0.97392991813831)),
+    ydati = list(iord = c(y = FALSE), iuno = c(y = FALSE), icon = c(y = TRUE),
+      inumord = c(y = FALSE), all.lev = list(y = NULL), all.ulev = list(
+        y = NULL), all.dlev = list(y = NULL), all.nlev = list(
+        y = NULL), all.min = list(y = 0.0647218793164939),
+      all.max = list(y = 0.889108955627307)), xmcv = structure(numeric(0), dim = c(0L,
+    0L), num.row = 0L, pad.num = -0.577228845077323), ymcv = structure(numeric(0), dim = c(0L,
+    0L), num.row = 0L, pad.num = 0.302938417806345), sfactor = list(
+      x = 42.3889978414751, y = 6.47952560003134), bandwidth = list(
+      x = 7, y = 1), nconfac = 0.573861375250308, ncatfac = 0.329316878004175,
+    sdev = c(xcon = 0.287764950469254, ycon = 0.268936528850516),
+    sumNum = list(x = 42.3889978414751, y = 6.47952560003134),
+    dati = list(x = list(iord = c(x = FALSE), iuno = c(x = FALSE),
+      icon = c(x = TRUE), inumord = c(x = FALSE), all.lev = list(
+        x = NULL), all.ulev = list(x = NULL), all.dlev = list(
+        x = NULL), all.nlev = list(x = NULL), all.min = list(
+        x = 0.0293716583400965), all.max = list(x = 0.97392991813831)),
+      y = list(iord = c(y = FALSE), iuno = c(y = FALSE), icon = c(y = TRUE),
+        inumord = c(y = FALSE), all.lev = list(y = NULL),
+        all.ulev = list(y = NULL), all.dlev = list(y = NULL),
+        all.nlev = list(y = NULL), all.min = list(y = 0.0647218793164939),
+        all.max = list(y = 0.889108955627307))), varnames = list(
+      x = "x", y = "y"), vartitle = list(x = "Explanatory",
+      y = "Dependent"), vartitleabb = list(x = "Exp.", y = "Dep."),
+    rows.omit = NA, nobs.omit = 0, timing = 8.2e-05, total.time = c(elapsed = 0.017),
+    regtype = "lc", pregtype = "Local-Constant", basis = "glp",
+    degree = 0L, bernstein.basis = FALSE, regtype.engine = "lc",
+    basis.engine = "glp", degree.engine = 0L, bernstein.basis.engine = FALSE,
+    klist = list(x = list(ckertype = "gaussian", ckerbound = "range",
+      ckerlb = 0.0293716583400965, ckerub = 0.97392991813831,
+      pckertype = "Second-Order Gaussian (bounded/range)",
+      ukertype = "aitchisonaitken", pukertype = "Aitchison and Aitken",
+      okertype = "liracine", pokertype = "Li and Racine"),
+      y = list(ckertype = "gaussian", ckerbound = "range",
+        ckerlb = 0.0647218793164939, ckerub = 0.889108955627307,
+        pckertype = "Second-Order Gaussian (bounded/range)",
+        ukertype = "aitchisonaitken", pukertype = "Aitchison and Aitken",
+        okertype = "liracine", pokertype = "Li and Racine (normalized)")),
+    call = npcdistbw.NULL(xdat = x, ydat = y, ... = pairlist(bwtype = "adaptive_nn", bwmethod = "cv.ls", cxkerbound = "range", cykerbound = "range", nmulti = 1))), class = "condbandwidth")
+  list(x = x, y = y, bw = bw)
+}
+
+test_that("bounded adaptive_nn fit-only remains available for distribution routes", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  ud.fixture <- .bounded_adaptive_udist_fitonly_fixture()
+  fit.ud <- npudist(bws = ud.fixture$bw, tdat = ud.fixture$dat)
+
+  cd.fixture <- .bounded_adaptive_cdist_fitonly_fixture()
+  fit.cdist <- npcdist(bws = cd.fixture$bw, txdat = cd.fixture$x, tydat = cd.fixture$y)
+
+  expect_true(all(is.finite(as.numeric(fit.ud$dist))))
+  expect_true(all(is.finite(as.numeric(fit.cdist$condist))))
+})
+
 test_that("deferred bounded public families remain blocked", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
