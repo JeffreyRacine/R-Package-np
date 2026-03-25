@@ -92,17 +92,197 @@ test_that("invalid fixed bounds are rejected with clear diagnostics", {
   )
 })
 
-test_that("finite bounds require fixed bwtype", {
+test_that("bounded generalized_nn is available for certified core public routes", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260224)
-  x <- runif(70)
+  x <- runif(36)
+  y <- cos(2 * pi * x) + rnorm(36, sd = 0.05)
+  xy <- data.frame(x = x)
+  yy <- data.frame(y = runif(36))
+
+  bw.ud.cvml <- npudensbw(
+    dat = xy,
+    bwmethod = "cv.ml",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  bw.ud.cvls <- npudensbw(
+    dat = xy,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  fit.ud <- npudens(bws = bw.ud.cvls, tdat = xy)
+
+  bw.dist <- npudistbw(
+    dat = xy,
+    bwmethod = "cv.cdf",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  fit.dist <- npudist(bws = bw.dist, tdat = xy)
+
+  bw.reg <- npregbw(
+    xdat = xy,
+    ydat = y,
+    regtype = "ll",
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  fit.reg <- npreg(bws = bw.reg, txdat = xy, tydat = y)
+
+  bw.cd.cvml <- npcdensbw(
+    xdat = xy,
+    ydat = yy,
+    bwmethod = "cv.ml",
+    bwtype = "generalized_nn",
+    cxkerbound = "range",
+    cykerbound = "range",
+    nmulti = 1
+  )
+  bw.cd.cvls <- npcdensbw(
+    xdat = xy,
+    ydat = yy,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    cxkerbound = "range",
+    cykerbound = "range",
+    nmulti = 1
+  )
+  fit.cd <- npcdens(bws = bw.cd.cvls, txdat = xy, tydat = yy)
+
+  bw.cdist <- npcdistbw(
+    xdat = xy,
+    ydat = yy,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    cxkerbound = "range",
+    cykerbound = "range",
+    nmulti = 1
+  )
+  fit.cdist <- npcdist(bws = bw.cdist, txdat = xy, tydat = yy)
+
+  expect_true(all(is.finite(as.numeric(bw.ud.cvml$bw))))
+  expect_true(is.finite(bw.ud.cvml$fval))
+  expect_true(all(is.finite(as.numeric(bw.ud.cvls$bw))))
+  expect_true(is.finite(bw.ud.cvls$fval))
+  expect_true(all(is.finite(as.numeric(fit.ud$dens))))
+
+  expect_true(all(is.finite(as.numeric(bw.dist$bw))))
+  expect_true(is.finite(bw.dist$fval))
+  expect_true(all(is.finite(as.numeric(fit.dist$dist))))
+
+  expect_true(all(is.finite(as.numeric(bw.reg$bw))))
+  expect_true(is.finite(bw.reg$fval))
+  expect_true(all(is.finite(as.numeric(fit.reg$mean))))
+
+  expect_true(all(is.finite(as.numeric(bw.cd.cvml$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.cd.cvml$ybw))))
+  expect_true(is.finite(bw.cd.cvml$fval))
+  expect_true(all(is.finite(as.numeric(bw.cd.cvls$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.cd.cvls$ybw))))
+  expect_true(is.finite(bw.cd.cvls$fval))
+  expect_true(all(is.finite(as.numeric(fit.cd$condens))))
+
+  expect_true(all(is.finite(as.numeric(bw.cdist$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.cdist$ybw))))
+  expect_true(is.finite(bw.cdist$fval))
+  expect_true(all(is.finite(as.numeric(fit.cdist$condist))))
+})
+
+test_that("bounded adaptive_nn remains blocked on tranche-one public routes", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260224)
+  x <- runif(32)
+  y <- cos(2 * pi * x)
+  xy <- data.frame(x = x)
+  yy <- data.frame(y = runif(32))
 
   expect_error(
     npudensbw(
-      dat = data.frame(x = x),
+      dat = xy,
       bwmethod = "cv.ml",
+      bwtype = "adaptive_nn",
+      ckerbound = "range",
+      nmulti = 1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+
+  expect_error(
+    npregbw(
+      xdat = xy,
+      ydat = y,
+      bwmethod = "cv.ls",
+      bwtype = "adaptive_nn",
+      ckerbound = "range",
+      nmulti = 1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+
+  expect_error(
+    npudistbw(
+      dat = xy,
+      bwmethod = "cv.cdf",
+      bwtype = "adaptive_nn",
+      ckerbound = "range",
+      nmulti = 1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+
+  expect_error(
+    npcdensbw(
+      xdat = xy,
+      ydat = yy,
+      bwmethod = "cv.ml",
+      bwtype = "adaptive_nn",
+      cxkerbound = "range",
+      cykerbound = "range",
+      nmulti = 1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+
+  expect_error(
+    npcdistbw(
+      xdat = xy,
+      ydat = yy,
+      bwmethod = "cv.ls",
+      bwtype = "adaptive_nn",
+      cxkerbound = "range",
+      cykerbound = "range",
+      nmulti = 1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+})
+
+test_that("deferred bounded public families remain blocked", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260224)
+  x <- runif(32)
+  y <- cos(2 * pi * x)
+  xy <- data.frame(x = x)
+
+  expect_error(
+    npplregbw(
+      xdat = xy,
+      ydat = y,
+      zdat = xy,
+      bwmethod = "cv.ls",
       bwtype = "generalized_nn",
       ckerbound = "range",
       nmulti = 1

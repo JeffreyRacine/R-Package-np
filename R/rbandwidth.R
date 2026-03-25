@@ -67,7 +67,10 @@ rbandwidth <-
     kerlb = ckerlb,
     kerub = ckerub,
     argprefix = "cker")
-  if (bwtype != "fixed" && cbounds$bound != "none")
+  bounded_nonfixed_supported <- identical(bwtype, "generalized_nn")
+  if (bwtype != "fixed" &&
+      cbounds$bound != "none" &&
+      !bounded_nonfixed_supported)
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
 
   ncon <- sum(xdati$icon)
