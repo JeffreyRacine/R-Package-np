@@ -79,6 +79,66 @@
         a logical value specifying whether bivariate continuous surfaces
         are displayed with \code{\link{persp}}-style plots when relevant.
       }
+      \item{\code{renderer}}{
+        the surface-rendering backend for eligible bivariate continuous
+        plots. \code{"base"} uses the existing base R
+        \code{\link{persp}} path. \code{"rgl"} is currently a
+        fail-closed backend for supported plain 2D surface routes in
+        \code{npreg}/\code{npregbw},
+        \code{npplreg}/\code{npplregbw},
+        \code{npscoef}/\code{npscoefbw},
+        \code{npudens}/\code{npudensbw},
+        \code{npudist}/\code{npudistbw},
+        \code{npcdens}/\code{npcdensbw}, and
+        \code{npcdist}/\code{npcdistbw}. In this tranche,
+        \code{renderer="rgl"} requires \code{perspective=TRUE},
+        \code{view="fixed"} and \code{plot.behavior="plot"};
+        unsupported combinations still error rather than falling back
+        silently. The suggested package
+        \code{rgl} must be installed when \code{renderer="rgl"} is
+        requested. When drawn, the \code{rgl} surface is displayed via
+        the active \code{rgl} backend, which on this rollout path is
+        typically the RStudio Viewer or a browser/WebGL window rather
+        than the base graphics plot pane. When \code{col} is omitted,
+        the \code{rgl} surface uses a value-based
+        \code{\link[grDevices]{topo.colors}} gradient. When the
+        inherited base-view defaults \code{theta=0} and \code{phi=10}
+        are left unchanged, the \code{rgl} backend remaps that default
+        camera to a more informative oblique view for this rollout
+        tranche. For the currently supported \code{npreg},
+        \code{npplreg}, and plain mean-surface
+        \code{npscoef} surface routes, \code{plot.data.overlay=TRUE}
+        adds observed data as an interactive point cloud. For all
+        currently supported \code{rgl} surface routes,
+        \code{plot.errors.method != "none"} adds interval surfaces;
+        \code{plot.errors.type="all"} draws pointwise,
+        simultaneous, and bonferroni band families with different
+        colors when those bands are available for the route.
+        Unsupervised and conditional density/distribution surface
+        routes do not use observed-data point overlays in this tranche.
+        For \code{npscoef}/\code{npscoefbw}, \code{renderer="rgl"}
+        currently applies only to the plain mean-surface route;
+        coefficient-mode plots remain on the base renderer.
+        Common
+        \code{rgl} display controls may be supplied
+        directly in \code{\dots} on supported routes, including surface
+        arguments such as \code{alpha}, \code{back}, and
+        \code{front}, and view arguments such as \code{fov} and
+        \code{zoom}. Additional backend-specific arguments may be
+        passed through using prefixed names in \code{\dots}, namely
+        \code{rgl.persp3d.<arg>}, \code{rgl.view3d.<arg>},
+        \code{rgl.par3d.<arg>}, \code{rgl.grid3d.<arg>}, and
+        \code{rgl.widget.<arg>}, and \code{rgl.legend3d.<arg>}. For
+        the new overlay layers,
+        \code{rgl.points3d.<arg>} customizes observed-point overlays
+        and \code{rgl.surface3d.<arg>} customizes interval surfaces.
+        When \code{plot.errors.type="all"} is used on supported
+        \code{rgl} routes, a matching interactive legend is drawn, and
+        \code{rgl.legend3d.<arg>} may be used to customize it, for
+        example \code{rgl.legend3d.bty="o"} to restore a legend box.
+        By default, these legends follow the base-graphics uncertainty
+        legend convention and are drawn without a surrounding box.
+      }
       \item{\code{gradients}, \code{gradient.order}}{
         derivative plotting controls for families that support
         gradients/derivatives.

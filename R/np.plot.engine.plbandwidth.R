@@ -11,6 +11,7 @@
            neval = 50,
            common.scale = TRUE,
            perspective = TRUE,
+           renderer = c("base", "rgl"),
            gradients = FALSE,
            coef = FALSE,
            main = NULL,
@@ -67,6 +68,14 @@
     points.user.args <- .np_plot_user_args(dots, "points")
     persp.user.args <- .np_plot_user_args(dots, "persp")
     bxp.user.args <- .np_plot_user_args(dots, "bxp")
+    rgl.persp3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d.")
+    rgl.view3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.view3d", "rgl.view3d.")
+    rgl.par3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.par3d", "rgl.par3d.")
+    rgl.grid3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d.")
+    rgl.widget.user.args <- .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget.")
+    rgl.legend3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.legend3d", "rgl.legend3d.")
+    rgl.points3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.points3d.")
+    rgl.surface3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.surface3d.")
     if (!is.null(cex)) {
       if (is.null(plot.user.args$cex)) plot.user.args$cex <- cex
       if (is.null(points.user.args$cex)) points.user.args$cex <- cex
@@ -194,6 +203,21 @@
     plot.errors = (plot.errors.method != "none")
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
+    if (identical(.np_plot_match_renderer(renderer), "rgl") && coef) {
+      .np_plot_validate_renderer_request(
+        renderer = renderer,
+        route = "npplreg/npplregbw",
+        perspective = perspective,
+        supported.route = TRUE,
+        view = if (missing(view)) "fixed" else view,
+        gradients = FALSE,
+        coef = coef,
+        plot.errors.method = plot.errors.method,
+        plot.data.overlay = FALSE,
+        plot.behavior = plot.behavior
+      )
+    }
+
     if (coef) {
       fit.coef <- if (identical(plot.errors.method, "asymptotic")) {
         npplreg(
@@ -243,9 +267,29 @@
       plot.data.overlay.missing = missing(plot.data.overlay)
     )
 
-    if ((nxcon + nxord == 1) && (nzcon + nzord == 1) && (nxuno + nzuno == 0) &&
-        perspective & !gradients & !any(xor(bws$xdati$iord, bws$xdati$inumord)) &
-        !any(xor(bws$zdati$iord, bws$zdati$inumord))){
+    surface.supported <-
+      (nxcon + nxord == 1) &&
+      (nzcon + nzord == 1) &&
+      (nxuno + nzuno == 0) &&
+      !any(xor(bws$xdati$iord, bws$xdati$inumord)) &&
+      !any(xor(bws$zdati$iord, bws$zdati$inumord))
+
+    renderer <- .np_plot_validate_renderer_request(
+      renderer = renderer,
+      route = "npplreg/npplregbw",
+      perspective = perspective,
+      supported.route = surface.supported,
+      view = if (missing(view)) "fixed" else view,
+      gradients = FALSE,
+      coef = coef,
+      plot.errors.method = plot.errors.method,
+      plot.data.overlay = overlay.ok,
+      plot.behavior = plot.behavior,
+      allow.plot.errors = TRUE,
+      allow.plot.data.overlay = TRUE
+    )
+
+    if (surface.supported && perspective && !gradients){
 
       view = match.arg(view)
       rotate = (view == "rotate")
@@ -297,6 +341,8 @@
       }
 
       terr = matrix(data = NA, nrow = nrow(x.eval), ncol = 3)
+      lerr.all <- NULL
+      herr.all <- NULL
       
       treg = matrix(data = tobj$mean,
         nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
@@ -314,9 +360,15 @@
           nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
         herr = matrix(data = tobj$mean + terr[,2],
           nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = tobj$mean - te[,1], nrow = x1.neval, ncol = z1.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = tobj$mean + te[,2], nrow = x1.neval, ncol = z1.neval, byrow = FALSE))
+        }
 
       } else if (plot.errors.method == "bootstrap"){
-        terr <- compute.bootstrap.errors(
+        terr.obj <- compute.bootstrap.errors(
           xdat = xdat, ydat = ydat, zdat = zdat,
           exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE],
           gradients = FALSE,
@@ -330,24 +382,31 @@
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
-          bws = bws)[["boot.err"]]
+          bws = bws)
+        terr <- terr.obj[["boot.err"]]
+        terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
+        center.val <- if(pc) terr[,3] else {tobj$mean}
 
-        lerr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
-          -terr[,1],
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
 
-        herr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
-          +terr[,2],
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = z1.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = z1.neval, byrow = FALSE))
+        }
 
       }
       
       if(is.null(zlim)) {
           zlim =
-              if (plot.errors && plot.errors.method == "asymptotic" && plot.errors.type == "all")
-                  compute.all.error.range(tobj$mean, terr.all)
+              if (plot.errors && plot.errors.type == "all" && !is.null(lerr.all))
+                  c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
               else if (plot.errors)
                   c(min(lerr),max(herr))
               else
@@ -381,6 +440,71 @@
 
       }
 
+      xlab.val <- scalar_default(xlab, gen.label(names(xdat)[1], "X1"))
+      ylab.val <- scalar_default(ylab, gen.label(names(zdat)[1], "Z1"))
+      zlab.val <- scalar_default(zlab, gen.label(names(ydat),"Conditional Mean"))
+
+      if (identical(renderer, "rgl")) {
+        rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
+        main.val <- scalar_default(main, "")
+        overlay.x1 <- xdat[,1]
+        if (is.factor(overlay.x1) || is.ordered(overlay.x1))
+          overlay.x1 <- (bws$xdati$all.dlev[[1]])[as.integer(overlay.x1)]
+        overlay.x2 <- zdat[,1]
+        if (is.factor(overlay.x2) || is.ordered(overlay.x2))
+          overlay.x2 <- (bws$zdati$all.dlev[[1]])[as.integer(overlay.x2)]
+        .np_plot_first_render_begin(first.render)
+        rgl.out <- .np_plot_render_surface_rgl(
+          x = x1.eval,
+          y = z1.eval,
+          z = treg,
+          zlim = zlim,
+          col = col,
+          border = scalar_default(border, "black"),
+          xlab = xlab.val,
+          ylab = ylab.val,
+          zlab = zlab.val,
+          theta = rgl.view$theta,
+          phi = rgl.view$phi,
+          main = main.val,
+          par3d.args = rgl.par3d.user.args,
+          view3d.args = rgl.view3d.user.args,
+          persp3d.args = rgl.persp3d.user.args,
+          grid3d.args = rgl.grid3d.user.args,
+          widget.args = rgl.widget.user.args,
+          draw.extras = function() {
+            if (plot.errors) {
+              .np_plot_error_surfaces_rgl(
+                x = x1.eval,
+                y = z1.eval,
+                plot.errors.type = plot.errors.type,
+                lerr = lerr,
+                herr = herr,
+                lerr.all = lerr.all,
+                herr.all = herr.all,
+                surface3d.args = rgl.surface3d.user.args,
+                legend3d.args = rgl.legend3d.user.args
+              )
+            }
+            if (overlay.ok) {
+              .np_plot_overlay_points_rgl(
+                x1 = overlay.x1,
+                x2 = overlay.x2,
+                y = ydat,
+                points3d.args = rgl.points3d.user.args
+              )
+            }
+          }
+        )
+        .np_plot_first_render_end(first.render)
+        if (!is.null(rgl.out))
+          return(rgl.out)
+        return(invisible(NULL))
+      }
+
+      main.val <- gen.tflabel(!is.null(main), main,
+                              paste("[theta= ", theta, ", phi= ", phi, "]", sep = ""))
+
       dtheta = 5.0
       dphi = 10.0
 
@@ -410,9 +534,9 @@
                              cex.lab = scalar_default(cex.lab, par()$cex.lab),
                              cex.main = scalar_default(cex.main, par()$cex.main),
                              cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                             xlab = scalar_default(xlab, gen.label(names(xdat)[1], "X1")),
-                             ylab = scalar_default(ylab, gen.label(names(xdat)[2], "Z1")),
-                             zlab = scalar_default(zlab, gen.label(names(ydat),"Conditional Mean")),
+                             xlab = xlab.val,
+                             ylab = ylab.val,
+                             zlab = zlab.val,
                              theta = i,
                              phi = phi,
                              main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
