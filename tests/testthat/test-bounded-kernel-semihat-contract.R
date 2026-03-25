@@ -235,3 +235,104 @@ test_that("semihat wrappers preserve infinite-bound parity and finite-bound eval
     "Invalid bounds for 'ckerbound'|Evaluation data violate 'ckerbound' bounds"
   )
 })
+
+test_that("bounded nonfixed semihat support is widened for pl, while index and scoef stay deferred", {
+  set.seed(20260325)
+  n <- 48L
+  x1 <- runif(n)
+  x2 <- runif(n)
+  z <- runif(n)
+  y_index <- sin(2 * pi * (0.7 * x1 - 0.4 * x2)) + rnorm(n, sd = 0.05)
+  y_pl <- 0.8 * x1 + cos(2 * pi * z) + rnorm(n, sd = 0.05)
+  y_sc <- (1 + sin(2 * pi * z)) * x1 + rnorm(n, sd = 0.05)
+
+  tx_index <- data.frame(x1 = x1, x2 = x2)
+  tx1 <- data.frame(x = x1)
+  tz <- data.frame(z = z)
+
+  expect_error(
+    npindexbw(
+      xdat = tx_index,
+      ydat = y_index,
+      method = "ichimura",
+      bwtype = "generalized_nn",
+      ckerbound = "range",
+      nmulti = 1,
+      itmax = 40,
+      tol = 0.1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+  expect_error(
+    npindexbw(
+      xdat = tx_index,
+      ydat = y_index,
+      method = "ichimura",
+      bwtype = "adaptive_nn",
+      ckerbound = "range",
+      nmulti = 1,
+      itmax = 40,
+      tol = 0.1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+
+  bw.pl.gnn <- npplregbw(
+    xdat = tx1,
+    ydat = y_pl,
+    zdat = tz,
+    regtype = "lc",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1,
+    itmax = 40,
+    tol = 0.1
+  )
+  bw.pl.adapt <- npplregbw(
+    xdat = tx1,
+    ydat = y_pl,
+    zdat = tz,
+    regtype = "lc",
+    bwtype = "adaptive_nn",
+    ckerbound = "range",
+    nmulti = 1,
+    itmax = 40,
+    tol = 0.1
+  )
+  fit.pl.gnn <- npplreg(bws = bw.pl.gnn, txdat = tx1, tydat = y_pl, tzdat = tz)
+  fit.pl.adapt <- npplreg(bws = bw.pl.adapt, txdat = tx1, tydat = y_pl, tzdat = tz)
+
+  expect_true(all(is.finite(as.numeric(unlist(lapply(bw.pl.gnn$bw, function(obj) obj$bw))))))
+  expect_true(all(is.finite(as.numeric(unlist(lapply(bw.pl.adapt$bw, function(obj) obj$bw))))))
+  expect_true(all(is.finite(as.numeric(fit.pl.gnn$mean))))
+  expect_true(all(is.finite(as.numeric(fit.pl.adapt$mean))))
+
+  expect_error(
+    npscoefbw(
+      xdat = tx1,
+      ydat = y_sc,
+      zdat = tz,
+      regtype = "lc",
+      bwtype = "generalized_nn",
+      ckerbound = "range",
+      nmulti = 1,
+      itmax = 40,
+      tol = 0.1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+  expect_error(
+    npscoefbw(
+      xdat = tx1,
+      ydat = y_sc,
+      zdat = tz,
+      regtype = "lc",
+      bwtype = "adaptive_nn",
+      ckerbound = "range",
+      nmulti = 1,
+      itmax = 40,
+      tol = 0.1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+})

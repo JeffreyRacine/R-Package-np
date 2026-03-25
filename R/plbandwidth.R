@@ -64,8 +64,6 @@ plbandwidth <-
       kerlb = ckerlb,
       kerub = ckerub,
       argprefix = "cker")
-    if (bwtype != "fixed" && cbounds$bound != "none")
-      stop("finite continuous kernel bounds require bwtype = \"fixed\"")
     ncon <- sum(zdati$icon)
     if (identical(spec$regtype.engine, "lp") && ncon > 0L && is.finite(nobs)) {
       lp.dim <- dim_basis(basis = spec$basis.engine,
