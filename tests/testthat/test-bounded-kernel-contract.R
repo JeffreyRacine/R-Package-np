@@ -263,6 +263,56 @@ test_that("bounded adaptive_nn is available for certified non-distribution route
   expect_true(all(as.numeric(fit.cd$condens) >= 0))
 })
 
+test_that("npplreg, npindex, and npscoef bounded generalized_nn are available", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260224)
+  x <- runif(32)
+  y <- cos(2 * pi * x)
+  y_sc <- (1 + sin(2 * pi * x)) * x + rnorm(32, sd = 0.05)
+  xy <- data.frame(x = x)
+
+  bw.pl <- npplregbw(
+    xdat = xy,
+    ydat = y,
+    zdat = xy,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  fit.pl <- npplreg(bws = bw.pl, txdat = xy, tydat = y, tzdat = xy)
+
+  bw.index <- npindexbw(
+    xdat = data.frame(x1 = x, x2 = x^2),
+    ydat = y,
+    method = "ichimura",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  fit.index <- npindex(bws = bw.index, txdat = data.frame(x1 = x, x2 = x^2), tydat = y)
+
+  bw.sc <- npscoefbw(
+    xdat = xy,
+    ydat = y_sc,
+    zdat = xy,
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  fit.sc <- npscoef(bws = bw.sc, txdat = xy, tydat = y_sc, tzdat = xy, iterate = FALSE)
+
+  expect_true(all(is.finite(as.numeric(unlist(lapply(bw.pl$bw, function(obj) obj$bw))))))
+  expect_true(all(is.finite(as.numeric(fit.pl$mean))))
+  expect_true(all(is.finite(as.numeric(bw.index$beta))))
+  expect_true(is.finite(as.numeric(bw.index$bw)))
+  expect_true(all(is.finite(as.numeric(fit.index$mean))))
+  expect_true(all(is.finite(as.numeric(bw.sc$bw))))
+  expect_true(all(is.finite(as.numeric(fit.sc$mean))))
+})
+
 .bounded_adaptive_udist_fitonly_fixture <- function() {
   dat <- structure(list(x = c(0.0293716583400965, 0.0337911003734916,
     0.0688598649576306, 0.146281852386892, 0.15000450075604, 0.168401539325714,
