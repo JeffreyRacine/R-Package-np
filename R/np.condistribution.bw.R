@@ -111,6 +111,18 @@ npcdistbw.formula <-
   force(expr)
 }
 
+.npRmpi_npcdistbw_bounded_adaptive_requested <- function(bwtype = NULL,
+                                                         cxkerbound = "none",
+                                                         cykerbound = "none",
+                                                         bandwidth.compute = TRUE) {
+  bwtype.ch <- tolower(as.character(bwtype)[1L])
+  cxkerbound.ch <- tolower(as.character(cxkerbound)[1L])
+  cykerbound.ch <- tolower(as.character(cykerbound)[1L])
+  isTRUE(bandwidth.compute) &&
+    identical(bwtype.ch, "adaptive_nn") &&
+    (!identical(cxkerbound.ch, "none") || !identical(cykerbound.ch, "none"))
+}
+
 npcdistbw.condbandwidth <-
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
@@ -212,6 +224,14 @@ npcdistbw.condbandwidth <-
       where = "npcdistbw"
     )
     .npRmpi_require_active_slave_pool(where = "npcdistbw()")
+    if (.npRmpi_npcdistbw_bounded_adaptive_requested(
+      bwtype = bws$type,
+      cxkerbound = bws$cxkerbound,
+      cykerbound = bws$cykerbound,
+      bandwidth.compute = bandwidth.compute
+    ))
+      stop("bounded adaptive_nn remains unsupported for npcdistbw() in npRmpi",
+           call. = FALSE)
     use.local.compiled.adaptive.cvls <- bandwidth.compute &&
       identical(bws$method, "cv.ls") &&
       identical(bws$type, "adaptive_nn")
@@ -1228,6 +1248,15 @@ npcdistbw.NULL <-
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
            bws, ...){
+    dots <- list(...)
+    if (.npRmpi_npcdistbw_bounded_adaptive_requested(
+      bwtype = dots$bwtype,
+      cxkerbound = if (is.null(dots$cxkerbound)) "none" else dots$cxkerbound,
+      cykerbound = if (is.null(dots$cykerbound)) "none" else dots$cykerbound,
+      bandwidth.compute = if (is.null(dots$bandwidth.compute)) TRUE else dots$bandwidth.compute
+    ))
+      stop("bounded adaptive_nn remains unsupported for npcdistbw() in npRmpi",
+           call. = FALSE)
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
 

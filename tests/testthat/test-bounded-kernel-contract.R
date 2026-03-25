@@ -197,7 +197,73 @@ test_that("bounded generalized_nn is available for certified core public routes"
   expect_true(all(is.finite(as.numeric(fit.cdist$condist))))
 })
 
-test_that("bounded adaptive_nn remains blocked on tranche-one public routes", {
+test_that("bounded adaptive_nn is available for certified non-distribution routes", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260325)
+  x <- runif(36)
+  y <- sin(2 * pi * x) + rnorm(36, sd = 0.05)
+  xy <- data.frame(x = x)
+  yy <- data.frame(y = runif(36))
+
+  bw.ud <- npudensbw(
+    dat = xy,
+    bwmethod = "cv.ml",
+    bwtype = "adaptive_nn",
+    ckerbound = "range",
+    nmulti = 1,
+    remin = FALSE,
+    itmax = 50,
+    tol = 0.1
+  )
+  fit.ud <- npudens(bws = bw.ud, tdat = xy)
+
+  bw.reg <- npregbw(
+    xdat = xy,
+    ydat = y,
+    regtype = "ll",
+    bwmethod = "cv.ls",
+    bwtype = "adaptive_nn",
+    ckerbound = "range",
+    nmulti = 1,
+    remin = FALSE,
+    itmax = 50,
+    tol = 0.1
+  )
+  fit.reg <- npreg(bws = bw.reg, txdat = xy, tydat = y, gradients = TRUE)
+
+  bw.cd <- npcdensbw(
+    xdat = xy,
+    ydat = yy,
+    bwmethod = "cv.ml",
+    bwtype = "adaptive_nn",
+    cxkerbound = "range",
+    cykerbound = "range",
+    nmulti = 1,
+    remin = FALSE,
+    itmax = 50,
+    tol = 0.1
+  )
+  fit.cd <- npcdens(bws = bw.cd, txdat = xy, tydat = yy)
+
+  expect_true(all(is.finite(as.numeric(bw.ud$bw))))
+  expect_true(is.finite(bw.ud$fval))
+  expect_true(all(is.finite(as.numeric(fit.ud$dens))))
+
+  expect_true(all(is.finite(as.numeric(bw.reg$bw))))
+  expect_true(is.finite(bw.reg$fval))
+  expect_true(all(is.finite(as.numeric(fit.reg$mean))))
+  expect_true(all(is.finite(as.numeric(fit.reg$gradients))))
+
+  expect_true(all(is.finite(as.numeric(bw.cd$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.cd$ybw))))
+  expect_true(is.finite(bw.cd$fval))
+  expect_true(all(is.finite(as.numeric(fit.cd$condens))))
+  expect_true(all(as.numeric(fit.cd$condens) >= 0))
+})
+
+test_that("deferred bounded public families remain blocked", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -205,30 +271,7 @@ test_that("bounded adaptive_nn remains blocked on tranche-one public routes", {
   x <- runif(32)
   y <- cos(2 * pi * x)
   xy <- data.frame(x = x)
-  yy <- data.frame(y = runif(32))
-
-  expect_error(
-    npudensbw(
-      dat = xy,
-      bwmethod = "cv.ml",
-      bwtype = "adaptive_nn",
-      ckerbound = "range",
-      nmulti = 1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
-  )
-
-  expect_error(
-    npregbw(
-      xdat = xy,
-      ydat = y,
-      bwmethod = "cv.ls",
-      bwtype = "adaptive_nn",
-      ckerbound = "range",
-      nmulti = 1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
-  )
+  yy <- data.frame(y = y)
 
   expect_error(
     npudistbw(
@@ -238,20 +281,7 @@ test_that("bounded adaptive_nn remains blocked on tranche-one public routes", {
       ckerbound = "range",
       nmulti = 1
     ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
-  )
-
-  expect_error(
-    npcdensbw(
-      xdat = xy,
-      ydat = yy,
-      bwmethod = "cv.ml",
-      bwtype = "adaptive_nn",
-      cxkerbound = "range",
-      cykerbound = "range",
-      nmulti = 1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
+    "bounded adaptive_nn remains unsupported for npudistbw\\(\\) in npRmpi"
   )
 
   expect_error(
@@ -264,18 +294,8 @@ test_that("bounded adaptive_nn remains blocked on tranche-one public routes", {
       cykerbound = "range",
       nmulti = 1
     ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
+    "bounded adaptive_nn remains unsupported for npcdistbw\\(\\) in npRmpi"
   )
-})
-
-test_that("deferred bounded public families remain blocked", {
-  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(), add = TRUE)
-
-  set.seed(20260224)
-  x <- runif(32)
-  y <- cos(2 * pi * x)
-  xy <- data.frame(x = x)
 
   expect_error(
     npplregbw(

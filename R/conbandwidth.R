@@ -122,7 +122,7 @@ conbandwidth <-
     kerlb = cykerlb,
     kerub = cykerub,
     argprefix = "cyker")
-  bounded_nonfixed_supported <- identical(bwtype, "generalized_nn")
+  bounded_nonfixed_supported <- bwtype %in% c("generalized_nn", "adaptive_nn")
   if (bwtype != "fixed" &&
       (cxbounds$bound != "none" || cybounds$bound != "none") &&
       !bounded_nonfixed_supported)

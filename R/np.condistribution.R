@@ -96,6 +96,14 @@ npcdist.condbandwidth <-
     )
     .npRmpi_require_active_slave_pool(where = "npcdist()")
     .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdist()")
+    if (.npRmpi_npcdistbw_bounded_adaptive_requested(
+      bwtype = bws$type,
+      cxkerbound = bws$cxkerbound,
+      cykerbound = bws$cykerbound,
+      bandwidth.compute = TRUE
+    ))
+      stop("bounded adaptive_nn remains unsupported for npcdist() in npRmpi",
+           call. = FALSE)
     use.local.compiled.adaptive.cvls <- identical(bws$method, "cv.ls") &&
       identical(bws$type, "adaptive_nn")
     keep_local_cvls_nn <- use.local.compiled.adaptive.cvls ||
