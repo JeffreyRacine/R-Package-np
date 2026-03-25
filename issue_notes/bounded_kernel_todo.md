@@ -36,6 +36,12 @@ Certified public `npRmpi` surface:
   - `npudistbw()`
   - `npcdistbw()`
 
+Release exception retained at closeout (2026-03-25):
+- selector-level bounded `adaptive_nn` remains unsupported for
+  `npudistbw()` / `npcdistbw()` in `npRmpi`
+- keep the explicit public errors in place until a deeper dedicated
+  MPI-selector campaign proves those routes safe
+
 This file is now the canonical `npRmpi` bounded-kernel status note plus the
 remaining MPI-aware backlog. The old statement “bounded public support is
 `bwtype = \"fixed\"` only” is no longer true.

@@ -29,6 +29,13 @@ This is deliberate containment. The estimator-side fit-only routes using
 precomputed bounded-adaptive bandwidth objects are already certified and should
 remain enabled.
 
+Closeout status (2026-03-25):
+
+- this deferred selector gap is the retained release exception for bounded
+  `adaptive_nn` in `npRmpi`
+- the explicit public errors are part of the accepted behavior for now and must
+  remain in place unless a future selector campaign certifies all MPI modes
+
 ## Why It Is Deferred
 
 Fresh proof tranches showed:
