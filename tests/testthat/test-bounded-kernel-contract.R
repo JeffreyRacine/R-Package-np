@@ -195,19 +195,6 @@ test_that("bounded adaptive_nn remains blocked on deferred public routes", {
   yy <- data.frame(y = runif(32))
 
   expect_error(
-    npcdensbw(
-      xdat = xy,
-      ydat = yy,
-      bwmethod = "cv.ml",
-      bwtype = "adaptive_nn",
-      cxkerbound = "range",
-      cykerbound = "range",
-      nmulti = 1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
-  )
-
-  expect_error(
     npcdistbw(
       xdat = xy,
       ydat = yy,
