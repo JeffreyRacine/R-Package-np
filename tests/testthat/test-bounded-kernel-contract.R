@@ -148,6 +148,17 @@ test_that("bounded generalized_nn is available for certified core public routes"
   )
   fit.cd <- npcdens(bws = bw.cd.cvls, txdat = xy, tydat = yy)
 
+  bw.cdist <- npcdistbw(
+    xdat = xy,
+    ydat = yy,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    cxkerbound = "range",
+    cykerbound = "range",
+    nmulti = 1
+  )
+  fit.cdist <- npcdist(bws = bw.cdist, txdat = xy, tydat = yy)
+
   expect_true(all(is.finite(as.numeric(bw.ud.cvml$bw))))
   expect_true(is.finite(bw.ud.cvml$fval))
   expect_true(all(is.finite(as.numeric(bw.ud.cvls$bw))))
@@ -169,6 +180,11 @@ test_that("bounded generalized_nn is available for certified core public routes"
   expect_true(all(is.finite(as.numeric(bw.cd.cvls$ybw))))
   expect_true(is.finite(bw.cd.cvls$fval))
   expect_true(all(is.finite(as.numeric(fit.cd$condens))))
+
+  expect_true(all(is.finite(as.numeric(bw.cdist$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.cdist$ybw))))
+  expect_true(is.finite(bw.cdist$fval))
+  expect_true(all(is.finite(as.numeric(fit.cdist$condist))))
 })
 
 test_that("bounded adaptive_nn remains blocked on tranche-one public routes", {
@@ -224,22 +240,35 @@ test_that("bounded adaptive_nn remains blocked on tranche-one public routes", {
     ),
     "finite continuous kernel bounds require bwtype = \"fixed\""
   )
-})
-
-test_that("deferred bounded public families remain blocked", {
-  set.seed(20260224)
-  x <- runif(32)
-  xy <- data.frame(x = x)
-  yy <- data.frame(y = runif(32))
 
   expect_error(
     npcdistbw(
       xdat = xy,
       ydat = yy,
       bwmethod = "cv.ls",
-      bwtype = "generalized_nn",
+      bwtype = "adaptive_nn",
       cxkerbound = "range",
       cykerbound = "range",
+      nmulti = 1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+})
+
+test_that("deferred bounded public families remain blocked", {
+  set.seed(20260224)
+  x <- runif(32)
+  y <- cos(2 * pi * x)
+  xy <- data.frame(x = x)
+
+  expect_error(
+    npplregbw(
+      xdat = xy,
+      ydat = y,
+      zdat = xy,
+      bwmethod = "cv.ls",
+      bwtype = "generalized_nn",
+      ckerbound = "range",
       nmulti = 1
     ),
     "finite continuous kernel bounds require bwtype = \"fixed\""

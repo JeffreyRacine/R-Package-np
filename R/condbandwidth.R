@@ -122,7 +122,10 @@ condbandwidth <-
     kerlb = cykerlb,
     kerub = cykerub,
     argprefix = "cyker")
-  if (bwtype != "fixed" && (cxbounds$bound != "none" || cybounds$bound != "none"))
+  bounded_nonfixed_supported <- identical(bwtype, "generalized_nn")
+  if (bwtype != "fixed" &&
+      (cxbounds$bound != "none" || cybounds$bound != "none") &&
+      !bounded_nonfixed_supported)
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
 
   pxorder = switch( cxkerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
