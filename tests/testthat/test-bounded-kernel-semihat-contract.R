@@ -236,7 +236,7 @@ test_that("semihat wrappers preserve infinite-bound parity and finite-bound eval
   )
 })
 
-test_that("bounded nonfixed semihat support is widened for pl, while index and scoef stay deferred", {
+test_that("bounded nonfixed semihat support is widened for pl and index, while scoef stays deferred", {
   set.seed(20260325)
   n <- 48L
   x1 <- runif(n)
@@ -250,32 +250,35 @@ test_that("bounded nonfixed semihat support is widened for pl, while index and s
   tx1 <- data.frame(x = x1)
   tz <- data.frame(z = z)
 
-  expect_error(
-    npindexbw(
-      xdat = tx_index,
-      ydat = y_index,
-      method = "ichimura",
-      bwtype = "generalized_nn",
-      ckerbound = "range",
-      nmulti = 1,
-      itmax = 40,
-      tol = 0.1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
+  bw.idx.gnn <- npindexbw(
+    xdat = tx_index,
+    ydat = y_index,
+    method = "ichimura",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1,
+    itmax = 40,
+    tol = 0.1
   )
-  expect_error(
-    npindexbw(
-      xdat = tx_index,
-      ydat = y_index,
-      method = "ichimura",
-      bwtype = "adaptive_nn",
-      ckerbound = "range",
-      nmulti = 1,
-      itmax = 40,
-      tol = 0.1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
+  bw.idx.adapt <- npindexbw(
+    xdat = tx_index,
+    ydat = y_index,
+    method = "ichimura",
+    bwtype = "adaptive_nn",
+    ckerbound = "range",
+    nmulti = 1,
+    itmax = 40,
+    tol = 0.1
   )
+  fit.idx.gnn <- npindex(bws = bw.idx.gnn, txdat = tx_index, tydat = y_index)
+  fit.idx.adapt <- npindex(bws = bw.idx.adapt, txdat = tx_index, tydat = y_index)
+
+  expect_true(all(is.finite(as.numeric(bw.idx.gnn$beta))))
+  expect_true(is.finite(as.numeric(bw.idx.gnn$bw)))
+  expect_true(all(is.finite(as.numeric(fit.idx.gnn$mean))))
+  expect_true(all(is.finite(as.numeric(bw.idx.adapt$beta))))
+  expect_true(is.finite(as.numeric(bw.idx.adapt$bw)))
+  expect_true(all(is.finite(as.numeric(fit.idx.adapt$mean))))
 
   bw.pl.gnn <- npplregbw(
     xdat = tx1,

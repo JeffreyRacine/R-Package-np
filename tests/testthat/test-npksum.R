@@ -49,3 +49,37 @@ test_that("npksum formula subset and na.action match explicit data path", {
 
   expect_identical(k_formula$ksum, k_explicit$ksum)
 })
+
+test_that("npksum bounded nonfixed helper path works for nearest-neighbor bandwidths", {
+  set.seed(20260325)
+  n <- 24
+  x <- runif(n)
+  y <- rnorm(n)
+  w <- cbind(y, 1.0)
+
+  k_gnn <- npksum(
+    txdat = x,
+    tydat = w,
+    weights = w,
+    leave.one.out = TRUE,
+    bandwidth.divide = TRUE,
+    bws = 6,
+    bwtype = "generalized_nn",
+    ckerbound = "range"
+  )
+  k_adapt <- npksum(
+    txdat = x,
+    tydat = w,
+    weights = w,
+    leave.one.out = TRUE,
+    bandwidth.divide = TRUE,
+    bws = 7,
+    bwtype = "adaptive_nn",
+    ckerbound = "range"
+  )
+
+  expect_s3_class(k_gnn, "npkernelsum")
+  expect_s3_class(k_adapt, "npkernelsum")
+  expect_true(all(is.finite(as.numeric(k_gnn$ksum))))
+  expect_true(all(is.finite(as.numeric(k_adapt$ksum))))
+})
