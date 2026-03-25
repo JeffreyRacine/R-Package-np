@@ -80,7 +80,8 @@ scbandwidth <-
     kerlb = ckerlb,
     kerub = ckerub,
     argprefix = "cker")
-  if (bwtype != "fixed" && cbounds$bound != "none")
+  bounded_nonfixed_supported <- bwtype %in% c("generalized_nn", "adaptive_nn")
+  if (bwtype != "fixed" && cbounds$bound != "none" && !bounded_nonfixed_supported)
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
   if (bwtype != "fixed" && (!bandwidth.compute || any(bw != 0)))
     bw <- .np_scbandwidth_manual_nn_validate(bw = bw, nobs = nobs, where = "scbandwidth")

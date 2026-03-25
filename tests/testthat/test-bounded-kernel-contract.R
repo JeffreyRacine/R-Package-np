@@ -187,10 +187,11 @@ test_that("bounded generalized_nn is available for certified core public routes"
   expect_true(all(is.finite(as.numeric(fit.cdist$condist))))
 })
 
-test_that("npplreg and npindex bounded generalized_nn are available while npscoef stays blocked", {
+test_that("npplreg, npindex, and npscoef bounded generalized_nn are available", {
   set.seed(20260224)
   x <- runif(32)
   y <- cos(2 * pi * x)
+  y_sc <- (1 + sin(2 * pi * x)) * x + rnorm(32, sd = 0.05)
   xy <- data.frame(x = x)
 
   bw.pl <- npplregbw(
@@ -213,24 +214,23 @@ test_that("npplreg and npindex bounded generalized_nn are available while npscoe
     nmulti = 1
   )
   fit.index <- npindex(bws = bw.index, txdat = data.frame(x1 = x, x2 = x^2), tydat = y)
+  bw.sc <- npscoefbw(
+    xdat = xy,
+    ydat = y_sc,
+    zdat = xy,
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  fit.sc <- npscoef(bws = bw.sc, txdat = xy, tydat = y_sc, tzdat = xy, iterate = FALSE)
 
   expect_true(all(is.finite(as.numeric(unlist(lapply(bw.pl$bw, function(obj) obj$bw))))))
   expect_true(all(is.finite(as.numeric(fit.pl$mean))))
   expect_true(all(is.finite(as.numeric(bw.index$beta))))
   expect_true(is.finite(as.numeric(bw.index$bw)))
   expect_true(all(is.finite(as.numeric(fit.index$mean))))
-
-  expect_error(
-    npscoefbw(
-      xdat = xy,
-      ydat = y,
-      zdat = xy,
-      bwtype = "generalized_nn",
-      ckerbound = "range",
-      nmulti = 1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
-  )
+  expect_true(all(is.finite(as.numeric(bw.sc$bw))))
+  expect_true(all(is.finite(as.numeric(fit.sc$mean))))
 })
 
 test_that("evaluation support violations are caught before native execution", {

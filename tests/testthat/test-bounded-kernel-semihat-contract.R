@@ -236,7 +236,7 @@ test_that("semihat wrappers preserve infinite-bound parity and finite-bound eval
   )
 })
 
-test_that("bounded nonfixed semihat support is widened for pl and index, while scoef stays deferred", {
+test_that("bounded nonfixed semihat support is widened for pl, index, and scoef", {
   set.seed(20260325)
   n <- 48L
   x1 <- runif(n)
@@ -310,32 +310,33 @@ test_that("bounded nonfixed semihat support is widened for pl and index, while s
   expect_true(all(is.finite(as.numeric(fit.pl.gnn$mean))))
   expect_true(all(is.finite(as.numeric(fit.pl.adapt$mean))))
 
-  expect_error(
-    npscoefbw(
-      xdat = tx1,
-      ydat = y_sc,
-      zdat = tz,
-      regtype = "lc",
-      bwtype = "generalized_nn",
-      ckerbound = "range",
-      nmulti = 1,
-      itmax = 40,
-      tol = 0.1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
+  bw.sc.gnn <- npscoefbw(
+    xdat = tx1,
+    ydat = y_sc,
+    zdat = tz,
+    regtype = "lc",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1,
+    itmax = 40,
+    tol = 0.1
   )
-  expect_error(
-    npscoefbw(
-      xdat = tx1,
-      ydat = y_sc,
-      zdat = tz,
-      regtype = "lc",
-      bwtype = "adaptive_nn",
-      ckerbound = "range",
-      nmulti = 1,
-      itmax = 40,
-      tol = 0.1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
+  bw.sc.adapt <- npscoefbw(
+    xdat = tx1,
+    ydat = y_sc,
+    zdat = tz,
+    regtype = "lc",
+    bwtype = "adaptive_nn",
+    ckerbound = "range",
+    nmulti = 1,
+    itmax = 40,
+    tol = 0.1
   )
+  fit.sc.gnn <- npscoef(bws = bw.sc.gnn, txdat = tx1, tydat = y_sc, tzdat = tz, iterate = FALSE)
+  fit.sc.adapt <- npscoef(bws = bw.sc.adapt, txdat = tx1, tydat = y_sc, tzdat = tz, iterate = FALSE)
+
+  expect_true(all(is.finite(as.numeric(bw.sc.gnn$bw))))
+  expect_true(all(is.finite(as.numeric(fit.sc.gnn$mean))))
+  expect_true(all(is.finite(as.numeric(bw.sc.adapt$bw))))
+  expect_true(all(is.finite(as.numeric(fit.sc.adapt$mean))))
 })
