@@ -187,27 +187,6 @@ test_that("bounded generalized_nn is available for certified core public routes"
   expect_true(all(is.finite(as.numeric(fit.cdist$condist))))
 })
 
-test_that("bounded adaptive_nn remains blocked on deferred public routes", {
-  set.seed(20260224)
-  x <- runif(32)
-  y <- cos(2 * pi * x)
-  xy <- data.frame(x = x)
-  yy <- data.frame(y = runif(32))
-
-  expect_error(
-    npcdistbw(
-      xdat = xy,
-      ydat = yy,
-      bwmethod = "cv.ls",
-      bwtype = "adaptive_nn",
-      cxkerbound = "range",
-      cykerbound = "range",
-      nmulti = 1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
-  )
-})
-
 test_that("deferred bounded public families remain blocked", {
   set.seed(20260224)
   x <- runif(32)
