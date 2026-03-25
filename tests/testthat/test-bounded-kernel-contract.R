@@ -108,6 +108,15 @@ test_that("bounded generalized_nn is available for certified core public routes"
   )
   fit.ud <- npudens(bws = bw.ud.cvls, tdat = xy)
 
+  bw.dist <- npudistbw(
+    dat = xy,
+    bwmethod = "cv.cdf",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+  fit.dist <- npudist(bws = bw.dist, tdat = xy)
+
   bw.reg <- npregbw(
     xdat = xy,
     ydat = y,
@@ -144,6 +153,10 @@ test_that("bounded generalized_nn is available for certified core public routes"
   expect_true(all(is.finite(as.numeric(bw.ud.cvls$bw))))
   expect_true(is.finite(bw.ud.cvls$fval))
   expect_true(all(is.finite(as.numeric(fit.ud$dens))))
+
+  expect_true(all(is.finite(as.numeric(bw.dist$bw))))
+  expect_true(is.finite(bw.dist$fval))
+  expect_true(all(is.finite(as.numeric(fit.dist$dist))))
 
   expect_true(all(is.finite(as.numeric(bw.reg$bw))))
   expect_true(is.finite(bw.reg$fval))
@@ -189,6 +202,17 @@ test_that("bounded adaptive_nn remains blocked on tranche-one public routes", {
   )
 
   expect_error(
+    npudistbw(
+      dat = xy,
+      bwmethod = "cv.cdf",
+      bwtype = "adaptive_nn",
+      ckerbound = "range",
+      nmulti = 1
+    ),
+    "finite continuous kernel bounds require bwtype = \"fixed\""
+  )
+
+  expect_error(
     npcdensbw(
       xdat = xy,
       ydat = yy,
@@ -206,13 +230,16 @@ test_that("deferred bounded public families remain blocked", {
   set.seed(20260224)
   x <- runif(32)
   xy <- data.frame(x = x)
+  yy <- data.frame(y = runif(32))
 
   expect_error(
-    npudistbw(
-      dat = xy,
-      bwmethod = "cv.cdf",
+    npcdistbw(
+      xdat = xy,
+      ydat = yy,
+      bwmethod = "cv.ls",
       bwtype = "generalized_nn",
-      ckerbound = "range",
+      cxkerbound = "range",
+      cykerbound = "range",
       nmulti = 1
     ),
     "finite continuous kernel bounds require bwtype = \"fixed\""
