@@ -7823,6 +7823,37 @@ plotFactor <- function(f, y, ...){
   list(theta = theta, phi = phi)
 }
 
+.np_plot_rotate_defaults <- function() {
+  list(
+    dtheta = 5.625,
+    sleep = 0.24
+  )
+}
+
+.np_plot_format_angle <- function(angle, digits = 1L) {
+  angle <- as.double(angle)[1L]
+  digits <- as.integer(digits)[1L]
+  if (is.na(digits) || digits < 0L)
+    digits <- 1L
+
+  rounded <- round(angle, digits = digits)
+  if (isTRUE(all.equal(rounded, round(rounded)))) {
+    return(format(round(rounded), trim = TRUE, scientific = FALSE))
+  }
+
+  formatC(rounded, format = "f", digits = digits)
+}
+
+.np_plot_theta_phi_label <- function(theta, phi) {
+  paste0(
+    "[theta= ",
+    .np_plot_format_angle(theta),
+    ", phi= ",
+    .np_plot_format_angle(phi),
+    "]"
+  )
+}
+
 .np_plot_rgl_surface_colors <- function(z, col = NULL, num.colors = 1000L) {
   if (!is.null(col))
     return(col)
