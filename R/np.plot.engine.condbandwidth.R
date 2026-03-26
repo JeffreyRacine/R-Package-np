@@ -469,8 +469,8 @@
         return(invisible(NULL))
       }
 
-      dtheta = 5.0
-      dphi = 10.0
+      rotate.defaults <- .np_plot_rotate_defaults()
+      dtheta = rotate.defaults$dtheta
       persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
       first.render.activity <- NULL
       first.render.pending <- TRUE
@@ -499,7 +499,8 @@
                              zlab = zlab.val,
                              theta = i,
                              phi = phi,
-                             main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                             main = gen.tflabel(!is.null(main), main,
+                                                .np_plot_theta_phi_label(theta = i, phi = phi)))
 
           if (isTRUE(first.render.pending)) {
             .np_plot_activity_end(first.render.activity)
@@ -608,7 +609,7 @@
           }
 
           rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)
-          Sys.sleep(0.5)
+          Sys.sleep(if (isTRUE(rotate)) rotate.defaults$sleep else 0.5)
       }
 
       if (plot.behavior == "plot-data")

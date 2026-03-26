@@ -429,10 +429,10 @@
       }
 
       main.val <- gen.tflabel(!is.null(main), main,
-                              paste("[theta= ", theta, ", phi= ", phi, "]", sep = ""))
+                              .np_plot_theta_phi_label(theta = theta, phi = phi))
 
-      dtheta = 2.0
-      rotation.sleep = 0.075
+      dtheta = 5.625
+      rotation.sleep = 0.24
 
       persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
       frame.theta <- (0:((360 %/% dtheta - 1L) * rotate)) * dtheta + theta
@@ -465,7 +465,8 @@
                              zlab = zlab.val,
                              theta = i,
                              phi = phi,
-                             main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                             main = gen.tflabel(!is.null(main), main,
+                                                .np_plot_theta_phi_label(theta = i, phi = phi)))
           persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
           persp.mat <- do.call(persp, persp.args)
           .np_plot_first_render_end(first.render)
