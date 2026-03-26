@@ -180,6 +180,57 @@ test_that("npreg inid ll/lp fast path matches explicit resample refits", {
   }
 })
 
+test_that("npindex bounded bootstrap plot-data supports bw and fit objects", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(32322)
+  n <- 36
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(x1 + x2) + rnorm(n, sd = 0.08)
+  tx <- data.frame(x1 = x1, x2 = x2)
+
+  bw <- npindexbw(
+    xdat = tx,
+    ydat = y,
+    method = "ichimura",
+    ckerbound = "range",
+    bws = c(1, 0.25, 0.25),
+    bandwidth.compute = FALSE
+  )
+  fit <- npindex(bws = bw, txdat = tx, tydat = y)
+
+  run_plot <- function(obj, boot.method) {
+    suppressWarnings(
+      plot(
+        obj,
+        xdat = tx,
+        ydat = y,
+        plot.behavior = "data",
+        perspective = FALSE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = boot.method,
+        plot.errors.boot.num = 5L,
+        plot.errors.type = "pointwise"
+      )
+    )
+  }
+
+  for (boot.method in c("inid", "geom", "wild")) {
+    out.bw <- run_plot(bw, boot.method)
+    out.fit <- run_plot(fit, boot.method)
+
+    expect_type(out.bw, "list")
+    expect_type(out.fit, "list")
+    expect_true(length(out.bw) > 0L, info = paste("bw", boot.method))
+    expect_true(length(out.fit) > 0L, info = paste("fit", boot.method))
+  }
+})
+
 test_that("npplreg inid fast path matches explicit resample refits", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)

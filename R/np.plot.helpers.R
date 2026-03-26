@@ -5513,7 +5513,6 @@
 .np_con_inid_ksum_eligible <- function(bws) {
   isTRUE(identical(bws$cxkertype, bws$cykertype)) &&
     isTRUE(identical(bws$cxkerorder, bws$cykerorder)) &&
-    isTRUE(identical(bws$cxkerbound, bws$cykerbound)) &&
     isTRUE(identical(bws$uxkertype, bws$uykertype)) &&
     isTRUE(identical(bws$oxkertype, bws$oykertype))
 }
@@ -5675,6 +5674,11 @@
               if (is.null(bws$cykerlb)) numeric(0) else bws$cykerlb)
   ckerub <- c(if (is.null(bws$cxkerub)) numeric(0) else bws$cxkerub,
               if (is.null(bws$cykerub)) numeric(0) else bws$cykerub)
+  joint.ckerbound <- if (identical(bws$cxkerbound, bws$cykerbound)) {
+    bws$cxkerbound
+  } else {
+    "fixed"
+  }
 
   kbandwidth.numeric(
     bw = c(bws$xbw, bws$ybw),
@@ -5684,7 +5688,7 @@
     bwtype = bws$type,
     ckertype = bws$cxkertype,
     ckerorder = bws$cxkerorder,
-    ckerbound = bws$cxkerbound,
+    ckerbound = joint.ckerbound,
     ckerlb = if (length(ckerlb)) ckerlb else NULL,
     ckerub = if (length(ckerub)) ckerub else NULL,
     ukertype = bws$uxkertype,

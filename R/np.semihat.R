@@ -237,33 +237,18 @@
 }
 
 .np_indexhat_kbw <- function(bws, idx.train) {
-  collapse_bound <- function(v, nm) {
-    if (is.null(v))
-      return(NULL)
-    vv <- as.double(v)
-    if (length(vv) <= 1L)
-      return(vv)
-    uu <- unique(vv)
-    if (length(uu) == 1L)
-      return(uu)
-    stop(sprintf("cannot collapse %s with %d distinct values to scalar helper bound",
-                 nm, length(uu)),
-         call. = FALSE)
-  }
-
   kbandwidth(
     bw = c(bws$bw),
     bwtype = bws$type,
     ckertype = bws$ckertype,
     ckerorder = bws$ckerorder,
     ckerbound = bws$ckerbound,
-    ckerlb = collapse_bound(bws$ckerlb, "ckerlb"),
-    ckerub = collapse_bound(bws$ckerub, "ckerub"),
     nobs = nrow(idx.train),
     xdati = untangle(idx.train),
     ydati = bws$ydati,
     xnames = "index",
-    ynames = bws$ynames
+    ynames = bws$ynames,
+    xdat = idx.train
   )
 }
 

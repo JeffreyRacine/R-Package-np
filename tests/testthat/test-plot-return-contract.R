@@ -90,6 +90,52 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
   expect_equal(dplotdata$cd1$yeval, ddata$cd1$yeval)
 })
 
+test_that("plot return contract: bounded conditional bootstrap data stays available", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(109)
+  n <- 60
+  x <- runif(n)
+  y <- runif(n)
+
+  cfit <- npcdens(y ~ x, cykerbound = "range")
+  cout <- suppressWarnings(plot(
+    cfit,
+    plot.behavior = "data",
+    view = "fixed",
+    plot.data.overlay = FALSE,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = 5L,
+    plot.errors.type = "pointwise"
+  ))
+
+  expect_s3_class(cout$cd1, "condensity")
+  expect_true(all(is.finite(cout$cd1$condens)))
+  expect_true(all(is.finite(cout$cd1$conderr)))
+
+  dfit <- npcdist(y ~ x, cykerbound = "range")
+  dout <- suppressWarnings(plot(
+    dfit,
+    plot.behavior = "data",
+    view = "fixed",
+    plot.data.overlay = FALSE,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = 5L,
+    plot.errors.type = "pointwise"
+  ))
+
+  expect_s3_class(dout$cd1, "condistribution")
+  expect_true(all(is.finite(dout$cd1$condist)))
+  expect_true(all(is.finite(dout$cd1$conderr)))
+})
+
 test_that("plot return contract: remaining public plot families return plot-data payloads", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
