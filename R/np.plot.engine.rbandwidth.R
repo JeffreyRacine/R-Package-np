@@ -431,8 +431,8 @@
       main.val <- gen.tflabel(!is.null(main), main,
                               paste("[theta= ", theta, ", phi= ", phi, "]", sep = ""))
 
-      dtheta = 5.0
-      dphi = 10.0
+      dtheta = 2.0
+      rotation.sleep = 0.075
 
       persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
       frame.theta <- (0:((360 %/% dtheta - 1L) * rotate)) * dtheta + theta
@@ -578,7 +578,7 @@
                       overlay.points.args))
 
           rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)
-          Sys.sleep(0.5)
+          Sys.sleep(if (isTRUE(rotate)) rotation.sleep else 0.5)
       }
 
       if (plot.behavior == "plot-data")
