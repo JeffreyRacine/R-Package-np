@@ -342,9 +342,11 @@
           }
         )
         .np_plot_first_render_end(first.render)
-        if (!is.null(rgl.out))
-          return(rgl.out)
-        return(invisible(NULL))
+        return(.np_plot_rgl_finalize(
+          rgl.out = rgl.out,
+          plot.behavior = plot.behavior,
+          plot.data = list(d1 = d1)
+        ))
       }
       
       # rows = constant x2

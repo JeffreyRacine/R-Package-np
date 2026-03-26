@@ -299,3 +299,91 @@ test_that("plot return contract: remaining public plot families return plot-data
   )
   expect_plot_modes_match(fit.pl, fields = c("mean", "merr"), perspective = FALSE)
 })
+
+test_that("plot return contract: rgl plot-data returns the usual data payload", {
+  skip_if_not_installed("rgl")
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  old.opts <- options(rgl.useNULL = TRUE, rgl.printRglwidget = TRUE)
+  on.exit(options(old.opts), add = TRUE)
+
+  set.seed(110)
+  n <- 50
+  x <- rnorm(n)
+  z <- rnorm(n)
+  y <- x - 0.5 * z + rnorm(n, sd = 0.1)
+
+  rfit <- npreg(
+    bws = npregbw(
+      xdat = data.frame(x = x, z = z),
+      ydat = y,
+      bws = c(0.55, 0.55),
+      bandwidth.compute = FALSE
+    ),
+    txdat = data.frame(x = x, z = z),
+    tydat = y
+  )
+
+  rdata <- suppressWarnings(plot(
+    rfit,
+    plot.behavior = "data",
+    renderer = "rgl",
+    view = "fixed",
+    plot.data.overlay = FALSE
+  ))
+
+  rplotdata <- suppressWarnings(plot(
+    rfit,
+    plot.behavior = "plot-data",
+    renderer = "rgl",
+    view = "fixed",
+    plot.data.overlay = FALSE
+  ))
+
+  expect_type(rplotdata, "list")
+  expect_named(rplotdata, names(rdata))
+  expect_s3_class(rplotdata$r1, "npregression")
+  expect_equal(rplotdata$r1$mean, rdata$r1$mean)
+  expect_equal(rplotdata$r1$eval, rdata$r1$eval)
+
+  cfit <- npcdens(
+    bws = npcdensbw(
+      xdat = data.frame(x = x),
+      ydat = data.frame(y = y),
+      bws = c(0.55, 0.55),
+      bandwidth.compute = FALSE,
+      regtype = "lp",
+      degree = 4L,
+      bernstein = TRUE
+    ),
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    proper = TRUE
+  )
+
+  cdata <- suppressWarnings(plot(
+    cfit,
+    plot.behavior = "data",
+    renderer = "rgl",
+    view = "fixed"
+  ))
+
+  cplotdata <- suppressWarnings(plot(
+    cfit,
+    plot.behavior = "plot-data",
+    renderer = "rgl",
+    view = "fixed"
+  ))
+
+  expect_type(cplotdata, "list")
+  expect_named(cplotdata, names(cdata))
+  expect_s3_class(cplotdata$cd1, "condensity")
+  expect_equal(cplotdata$cd1$condens, cdata$cd1$condens)
+  expect_equal(cplotdata$cd1$xeval, cdata$cd1$xeval)
+  expect_equal(cplotdata$cd1$yeval, cdata$cd1$yeval)
+})

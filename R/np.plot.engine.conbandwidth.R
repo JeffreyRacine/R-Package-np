@@ -460,9 +460,11 @@
           }
         )
         .np_plot_first_render_end(rgl.first.render)
-        if (!is.null(rgl.out))
-          return(rgl.out)
-        return(invisible(NULL))
+        return(.np_plot_rgl_finalize(
+          rgl.out = rgl.out,
+          plot.behavior = plot.behavior,
+          plot.data = list(cd1 = cd1)
+        ))
       }
 
       rotate.defaults <- .np_plot_rotate_defaults()

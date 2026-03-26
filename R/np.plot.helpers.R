@@ -7920,8 +7920,12 @@ plotFactor <- function(f, y, ...){
                                                allow.plot.errors = FALSE,
                                                allow.plot.data.overlay = FALSE) {
   renderer <- .np_plot_match_renderer(renderer)
+  plot.behavior <- as.character(plot.behavior)[1L]
 
   if (!identical(renderer, "rgl"))
+    return(renderer)
+
+  if (identical(plot.behavior, "data"))
     return(renderer)
 
   if (!isTRUE(perspective)) {
@@ -7964,8 +7968,8 @@ plotFactor <- function(f, y, ...){
     }
   }
 
-  if (!identical(as.character(plot.behavior)[1L], "plot")) {
-    stop("renderer='rgl' currently supports plot.behavior='plot' only in this rollout tranche.",
+  if (!(plot.behavior %in% c("plot", "plot-data"))) {
+    stop("renderer='rgl' currently supports plot.behavior %in% c('plot', 'plot-data', 'data') only in this rollout tranche.",
          call. = FALSE)
   }
 
@@ -7975,6 +7979,20 @@ plotFactor <- function(f, y, ...){
   }
 
   renderer
+}
+
+.np_plot_rgl_finalize <- function(rgl.out,
+                                  plot.behavior = "plot",
+                                  plot.data = NULL) {
+  plot.behavior <- as.character(plot.behavior)[1L]
+
+  if (identical(plot.behavior, "plot-data"))
+    return(plot.data)
+
+  if (!is.null(rgl.out))
+    return(rgl.out)
+
+  invisible(NULL)
 }
 
 .np_plot_render_surface_rgl <- function(x,
