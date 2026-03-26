@@ -508,7 +508,7 @@
       rotate.defaults <- .np_plot_rotate_defaults()
       dtheta = rotate.defaults$dtheta
 
-      persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
+      persp.col = .np_plot_persp_surface_colors(z = treg, col = col)
       frame.theta <- (0:((360 %/% dtheta - 1L) * rotate)) * dtheta + theta
       rotation.progress <- .np_plot_rotation_progress_begin(length(frame.theta))
       on.exit(.np_plot_rotation_progress_end(rotation.progress), add = TRUE)
