@@ -5073,7 +5073,7 @@ plotFactor <- function(f, y, ...){
   if (!is.finite(zspan) || zspan <= 0) {
     zspan <- max(1, abs(zfloor))
   }
-  ztop <- zfloor + 0.03 * zspan
+  ztop <- zfloor + 0.02 * zspan
 
   lower <- trans3d(x1[ok], x2[ok], rep.int(zfloor, sum(ok)), persp.mat)
   upper <- trans3d(x1[ok], x2[ok], rep.int(ztop, sum(ok)), persp.mat)
@@ -5113,7 +5113,7 @@ plotFactor <- function(f, y, ...){
   if (!is.finite(zspan) || zspan <= 0) {
     zspan <- max(1, abs(zfloor))
   }
-  ztop <- zfloor + 0.03 * zspan
+  ztop <- zfloor + 0.02 * zspan
 
   args <- .np_plot_merge_override_args(
     list(
