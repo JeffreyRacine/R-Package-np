@@ -133,3 +133,26 @@ test_that("plot condistribution supports asymptotic and bootstrap errors on prop
   for (idx in split.idx)
     expect_true(all(diff(boot$cd1$condist[idx]) >= -1e-8))
 })
+
+test_that("plot condistribution bootstrap supports mixed-bound fixed helper path", {
+  set.seed(42)
+  n <- 60L
+  x <- runif(n)
+  y <- runif(n)
+
+  fit <- npcdist(y ~ x, cykerbound = "range")
+  out <- suppressWarnings(plot(
+    fit,
+    plot.behavior = "data",
+    view = "fixed",
+    plot.data.overlay = FALSE,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = 5L,
+    plot.errors.type = "pointwise"
+  ))
+
+  expect_s3_class(out$cd1, "condistribution")
+  expect_true(all(is.finite(out$cd1$condist)))
+  expect_true(all(is.finite(out$cd1$conderr)))
+})

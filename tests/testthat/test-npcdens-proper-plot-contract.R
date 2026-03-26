@@ -127,3 +127,26 @@ test_that("plot condensity supports asymptotic and bootstrap errors on proper gr
   }, numeric(1))
   expect_equal(unname(mass), rep(1, length(mass)), tolerance = 1e-8)
 })
+
+test_that("plot condensity bootstrap supports mixed-bound fixed helper path", {
+  set.seed(42)
+  n <- 60L
+  x <- runif(n)
+  y <- runif(n)
+
+  fit <- npcdens(y ~ x, cykerbound = "range")
+  out <- suppressWarnings(plot(
+    fit,
+    plot.behavior = "data",
+    view = "fixed",
+    plot.data.overlay = FALSE,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = 5L,
+    plot.errors.type = "pointwise"
+  ))
+
+  expect_s3_class(out$cd1, "condensity")
+  expect_true(all(is.finite(out$cd1$condens)))
+  expect_true(all(is.finite(out$cd1$conderr)))
+})

@@ -255,48 +255,22 @@
   ckerbound <- resolve_choice(bws$ckerbound, c("none", "range", "fixed"))
   ukertype <- resolve_choice(bws$ukertype, c("aitchisonaitken", "liracine"))
   okertype <- resolve_choice(bws$okertype, c("liracine", "wangvanryzin", "racineliyan", "nliracine"))
-
-  out <- list(
+  kbandwidth.numeric(
     bw = c(bws$bw),
-    scaling = FALSE,
-    type = bwtype,
-    ptype = bwtToPrint(bwtype),
+    bwtype = bwtype,
+    bwscaling = FALSE,
     ckertype = ckertype,
     ckerorder = bws$ckerorder,
     ckerbound = ckerbound,
-    ckerlb = collapse_bound(bws$ckerlb, "ckerlb"),
-    ckerub = collapse_bound(bws$ckerub, "ckerub"),
-    pckertype = cktToPrint(
-      ckertype,
-      order = switch(
-        bws$ckerorder / 2,
-        "Second-Order",
-        "Fourth-Order",
-        "Sixth-Order",
-        "Eighth-Order"
-      ),
-      kerbound = ckerbound
-    ),
     ukertype = ukertype,
-    pukertype = uktToPrint(ukertype),
     okertype = okertype,
-    pokertype = oktToPrint(okertype),
     nobs = nrow(idx.train),
-    ndim = 1L,
-    ncon = 1L,
-    nuno = 0L,
-    nord = 0L,
-    icon = TRUE,
-    iuno = FALSE,
-    iord = FALSE,
     xdati = untangle(idx.train),
     ydati = bws$ydati,
     xnames = "index",
     ynames = bws$ynames,
-    xmcv = mcvConstruct(untangle(idx.train))
+    xdat = idx.train
   )
-  class(out) <- "kbandwidth"
-  out
 }
 
 .np_indexhat_core <- function(bws,
