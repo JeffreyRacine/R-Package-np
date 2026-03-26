@@ -4997,6 +4997,139 @@ plotFactor <- function(f, y, ...){
   invisible(TRUE)
 }
 
+.np_plot_match_flag <- function(value, argname) {
+  value <- as.logical(value)[1L]
+  if (is.na(value)) {
+    stop(sprintf("%s must be TRUE or FALSE.", argname), call. = FALSE)
+  }
+  value
+}
+
+.np_plot_axis_is_continuous <- function(x) {
+  !is.factor(x)
+}
+
+.np_plot_validate_rug_request <- function(plot.rug,
+                                          route,
+                                          supported.route = FALSE,
+                                          renderer = "base",
+                                          reason = "supported plot routes for the selected renderer") {
+  plot.rug <- .np_plot_match_flag(plot.rug, "plot.rug")
+
+  if (!isTRUE(plot.rug))
+    return(FALSE)
+
+  renderer <- .np_plot_match_renderer(renderer)
+
+  if (!isTRUE(supported.route)) {
+    stop(sprintf("plot.rug=TRUE is currently implemented only for %s in %s.",
+                 reason, route),
+         call. = FALSE)
+  }
+
+  TRUE
+}
+
+.np_plot_draw_rug_1d <- function(x,
+                                 rug.args = list()) {
+  if (is.null(x))
+    return(invisible(FALSE))
+
+  x <- as.vector(x)
+  ok <- is.finite(x)
+  if (!any(ok))
+    return(invisible(FALSE))
+
+  args <- .np_plot_merge_override_args(
+    list(
+      x = x[ok],
+      col = grDevices::adjustcolor("gray20", alpha.f = 0.6),
+      quiet = TRUE
+    ),
+    rug.args
+  )
+  do.call(graphics::rug, args)
+  invisible(TRUE)
+}
+
+.np_plot_draw_floor_rug_persp <- function(x1,
+                                          x2,
+                                          zlim,
+                                          persp.mat,
+                                          segments.args = list()) {
+  if (is.null(x1) || is.null(x2) || is.null(zlim) || is.null(persp.mat))
+    return(invisible(FALSE))
+
+  ok <- is.finite(x1) & is.finite(x2)
+  if (!any(ok))
+    return(invisible(FALSE))
+
+  zlim <- as.double(zlim)
+  if (length(zlim) < 2L || !all(is.finite(zlim)))
+    return(invisible(FALSE))
+
+  zfloor <- zlim[1L]
+  zspan <- diff(range(zlim))
+  if (!is.finite(zspan) || zspan <= 0) {
+    zspan <- max(1, abs(zfloor))
+  }
+  ztop <- zfloor + 0.03 * zspan
+
+  lower <- trans3d(x1[ok], x2[ok], rep.int(zfloor, sum(ok)), persp.mat)
+  upper <- trans3d(x1[ok], x2[ok], rep.int(ztop, sum(ok)), persp.mat)
+
+  args <- .np_plot_merge_override_args(
+    list(
+      x0 = lower$x,
+      y0 = lower$y,
+      x1 = upper$x,
+      y1 = upper$y,
+      col = grDevices::adjustcolor("gray20", alpha.f = 0.55),
+      lwd = 1.25
+    ),
+    segments.args
+  )
+  do.call(graphics::segments, args)
+  invisible(TRUE)
+}
+
+.np_plot_draw_floor_rug_rgl <- function(x1,
+                                        x2,
+                                        zlim,
+                                        segments3d.args = list()) {
+  if (is.null(x1) || is.null(x2) || is.null(zlim))
+    return(invisible(FALSE))
+
+  ok <- is.finite(x1) & is.finite(x2)
+  if (!any(ok))
+    return(invisible(FALSE))
+
+  zlim <- as.double(zlim)
+  if (length(zlim) < 2L || !all(is.finite(zlim)))
+    return(invisible(FALSE))
+
+  zfloor <- zlim[1L]
+  zspan <- diff(range(zlim))
+  if (!is.finite(zspan) || zspan <= 0) {
+    zspan <- max(1, abs(zfloor))
+  }
+  ztop <- zfloor + 0.03 * zspan
+
+  args <- .np_plot_merge_override_args(
+    list(
+      x = rbind(x1[ok], x1[ok]),
+      y = rbind(x2[ok], x2[ok]),
+      z = rbind(rep.int(zfloor, sum(ok)), rep.int(ztop, sum(ok))),
+      color = grDevices::adjustcolor("gray20", alpha.f = 0.55),
+      alpha = 0.55,
+      lwd = 2
+    ),
+    segments3d.args
+  )
+  do.call(rgl::segments3d, args)
+  invisible(TRUE)
+}
+
 .np_plot_error_surfaces_rgl <- function(x,
                                         y,
                                         plot.errors.type,

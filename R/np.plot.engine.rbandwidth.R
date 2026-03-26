@@ -49,6 +49,7 @@
            plot.bxp.out = TRUE,
            plot.par.mfrow = TRUE,
            plot.data.overlay = TRUE,
+           plot.rug = FALSE,
            ...,
            random.seed){
 
@@ -203,6 +204,21 @@
       plot.behavior = plot.behavior,
       allow.plot.errors = TRUE,
       allow.plot.data.overlay = TRUE
+    )
+    plot.rug <- .np_plot_validate_rug_request(
+      plot.rug = plot.rug,
+      route = "plot.rbandwidth()",
+      supported.route = if (identical(renderer, "rgl")) {
+        isTRUE(surface.supported && perspective)
+      } else {
+        isTRUE(all(vapply(xdat, .np_plot_axis_is_continuous, logical(1L))))
+      },
+      renderer = renderer,
+      reason = if (identical(renderer, "rgl")) {
+        "supported rgl surface routes"
+      } else {
+        "supported continuous base plot routes"
+      }
     )
 
     if (surface.supported && perspective && !gradients){
@@ -376,6 +392,13 @@
           grid3d.args = rgl.grid3d.user.args,
           widget.args = rgl.widget.user.args,
           draw.extras = function() {
+            if (plot.rug) {
+              .np_plot_draw_floor_rug_rgl(
+                x1 = overlay.x1,
+                x2 = overlay.x2,
+                zlim = zlim
+              )
+            }
             if (plot.errors) {
               .np_plot_error_surfaces_rgl(
                 x = x1.eval,
@@ -446,6 +469,14 @@
           persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
           persp.mat <- do.call(persp, persp.args)
           .np_plot_first_render_end(first.render)
+          if (plot.rug) {
+            .np_plot_draw_floor_rug_persp(
+              x1 = overlay.x1,
+              x2 = overlay.x2,
+              zlim = zlim,
+              persp.mat = persp.mat
+            )
+          }
 
           if (plot.errors){
             par(new = TRUE)
@@ -749,6 +780,8 @@
                                 col = plot.args$col)
               do.call(lines, line.args)
             }
+            if (plot.rug)
+              .np_plot_draw_rug_1d(xdat[,i])
           } else if (overlay.ok && xi.factor) {
             axis.labels <- levels(ei)
             axis.at <- seq_along(axis.labels)
@@ -796,6 +829,8 @@
             .np_plot_first_render_begin(first.render)
             do.call(plot.fun, plot.args)
             .np_plot_first_render_end(first.render)
+            if (plot.rug && !xi.factor)
+              .np_plot_draw_rug_1d(xdat[,i])
           }
 
           ## error plotting evaluation
@@ -969,6 +1004,8 @@
                                 col = plot.args$col)
               do.call(lines, line.args)
             }
+            if (plot.rug)
+              .np_plot_draw_rug_1d(xdat[,i])
           } else if (overlay.ok && xi.factor) {
             axis.labels <- levels(allei[,i])
             axis.at <- seq_along(axis.labels)
@@ -1015,6 +1052,8 @@
             .np_plot_first_render_begin(first.render)
             do.call(plot.fun, plot.args)
             .np_plot_first_render_end(first.render)
+            if (plot.rug && !xi.factor)
+              .np_plot_draw_rug_1d(xdat[,i])
           }
 
           ## error plotting evaluation

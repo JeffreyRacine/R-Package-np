@@ -167,6 +167,23 @@
         \code{...} (for example \code{pch}, \code{cex}, \code{col}, and
         \code{bg}). Default is \code{TRUE}.
       }
+      \item{\code{plot.rug}}{
+        logical; when \code{TRUE}, draw a rug-style support cue for the
+        plotted coordinates. In this rollout tranche,
+        \code{plot.rug=TRUE} is implemented only for supported
+        continuous base-rendered routes and supported
+        \code{renderer="rgl"} surface routes in the currently
+        certified regression, unconditional density, and unconditional
+        distribution plot families; unsupported route/geometry
+        combinations still fail clearly rather than being ignored
+        silently.
+        This option is distinct from \code{plot.data.overlay}:
+        \code{plot.rug} shows where observations lie in the plotted
+        covariate support, while \code{plot.data.overlay} is the
+        regression-only 3D response overlay used on supported surface
+        plots. On supported regression surfaces, both options may be
+        used together. Default is \code{FALSE}.
+      }
       \item{\code{plot.errors.method}}{
         one of \code{"none"}, \code{"bootstrap"}, or
         \code{"asymptotic"}.
