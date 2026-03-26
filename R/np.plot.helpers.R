@@ -5249,6 +5249,37 @@ plotFactor <- function(f, y, ...){
   )
 }
 
+.np_plot_persp_surface_colors <- function(z, col = NULL, num.colors = 1000L) {
+  if (!is.null(col))
+    return(col)
+
+  z <- as.matrix(z)
+  z.range <- range(z, finite = TRUE)
+
+  if (!all(is.finite(z.range)))
+    return("lightblue")
+
+  if (nrow(z) < 2L || ncol(z) < 2L)
+    return("lightblue")
+
+  if (isTRUE(all.equal(z.range[1L], z.range[2L])))
+    return("lightblue")
+
+  zfacet <- 0.25 * (
+    z[-1L, -1L, drop = FALSE] +
+      z[-1L, -ncol(z), drop = FALSE] +
+      z[-nrow(z), -1L, drop = FALSE] +
+      z[-nrow(z), -ncol(z), drop = FALSE]
+  )
+
+  colorlut <- grDevices::topo.colors(as.integer(num.colors))
+  scaled <- 1L + floor((length(colorlut) - 1L) * (zfacet - z.range[1L]) / diff(z.range))
+  scaled[!is.finite(scaled)] <- 1L
+  scaled <- pmax.int(1L, pmin.int(length(colorlut), scaled))
+
+  as.vector(matrix(colorlut[scaled], nrow = nrow(zfacet), ncol = ncol(zfacet)))
+}
+
 .np_plot_rgl_surface_colors <- function(z, col = NULL, num.colors = 1000L) {
   if (!is.null(col))
     return(col)
