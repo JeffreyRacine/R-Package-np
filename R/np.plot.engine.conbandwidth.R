@@ -51,6 +51,7 @@
            proper = FALSE,
            proper.method = c("project"),
            proper.control = list(),
+           plot.rug = FALSE,
            ...,
            random.seed){
 
@@ -189,6 +190,21 @@
       plot.errors.method = plot.errors.method,
       plot.behavior = plot.behavior,
       allow.plot.errors = TRUE
+    )
+    plot.rug <- .np_plot_validate_rug_request(
+      plot.rug = plot.rug,
+      route = "plot.conbandwidth()",
+      supported.route = if (identical(renderer, "rgl")) {
+        isTRUE(surface.supported && perspective)
+      } else {
+        TRUE
+      },
+      renderer = renderer,
+      reason = if (identical(renderer, "rgl")) {
+        "supported rgl surface routes"
+      } else {
+        "supported base plot routes"
+      }
     )
 
     if (surface.supported &
@@ -421,6 +437,13 @@
           grid3d.args = rgl.grid3d.user.args,
           widget.args = rgl.widget.user.args,
           draw.extras = function() {
+            if (plot.rug) {
+              .np_plot_draw_floor_rug_rgl(
+                x1 = xdat[,1],
+                x2 = if (quantreg) xdat[,2] else ydat[,1],
+                zlim = zlim
+              )
+            }
             if (plot.errors) {
               .np_plot_error_surfaces_rgl(
                 x = x1.eval,
@@ -456,23 +479,31 @@
           i <- frame.theta[[frame.idx]]
           if (isTRUE(first.render.pending))
             first.render.activity <- .np_plot_activity_begin("Rendering plot surface")
-          persp(x1.eval,
-                x2.eval,
-                tdens,
-                zlim = zlim,
-                col = persp.col,
-                border = scalar_default(border, "black"),
-                ticktype = "detailed",
-                cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                cex.main = scalar_default(cex.main, par()$cex.main),
-                cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                xlab = xlab.val,
-                ylab = ylab.val,
-                zlab = zlab.val,
-                theta = i,
-                phi = phi,
-                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+          persp.mat <- persp(x1.eval,
+                             x2.eval,
+                             tdens,
+                             zlim = zlim,
+                             col = persp.col,
+                             border = scalar_default(border, "black"),
+                             ticktype = "detailed",
+                             cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                             cex.lab = scalar_default(cex.lab, par()$cex.lab),
+                             cex.main = scalar_default(cex.main, par()$cex.main),
+                             cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                             xlab = xlab.val,
+                             ylab = ylab.val,
+                             zlab = zlab.val,
+                             theta = i,
+                             phi = phi,
+                             main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+          if (plot.rug) {
+            .np_plot_draw_floor_rug_persp(
+              x1 = xdat[,1],
+              x2 = if (quantreg) xdat[,2] else ydat[,1],
+              zlim = zlim,
+              persp.mat = persp.mat
+            )
+          }
 
           if (isTRUE(first.render.pending)) {
             .np_plot_activity_end(first.render.activity)
@@ -827,6 +858,8 @@
               if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
             )
             do.call(plot.fun, plot.args)
+            if (plot.rug && !xi.factor)
+              .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
             ## error plotting evaluation
             if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
@@ -1050,6 +1083,8 @@
                 if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
               )
               do.call(plot.fun, plot.args)
+              if (plot.rug && !xi.factor)
+                .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
               ## error plotting evaluation
               if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
@@ -1178,6 +1213,8 @@
               if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
             )
             do.call(plot.fun, plot.args)
+            if (plot.rug && !xi.factor)
+              .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
             ## error plotting evaluation
             if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){

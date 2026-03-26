@@ -167,6 +167,26 @@
         \code{...} (for example \code{pch}, \code{cex}, \code{col}, and
         \code{bg}). Default is \code{TRUE}.
       }
+      \item{\code{plot.rug}}{
+        logical; when \code{TRUE}, draw a rug-style support cue for the
+        plotted coordinates. For ordinary 1D base plots this behaves
+        like a standard rug. For eligible 2D surface plots, the base
+        renderer draws short floor-rug ticks and
+        \code{renderer="rgl"} draws the analogous 3D floor-rug ticks
+        on supported surface routes. In this rollout tranche,
+        \code{plot.rug=TRUE} is implemented across the current base
+        plot families and across supported \code{rgl} surface routes;
+        unsupported renderer/geometry combinations still fail clearly
+        rather than being ignored silently. On mixed base plot layouts,
+        rug marks are drawn for continuous panels and omitted for
+        categorical panels.
+        This option is distinct from \code{plot.data.overlay}:
+        \code{plot.rug} shows where observations lie in the plotted
+        covariate support, while \code{plot.data.overlay} is the
+        regression-only 3D response overlay used on supported surface
+        plots. On supported regression surfaces, both options may be
+        used together. Default is \code{FALSE}.
+      }
       \item{\code{plot.errors.method}}{
         one of \code{"none"}, \code{"bootstrap"}, or
         \code{"asymptotic"}.

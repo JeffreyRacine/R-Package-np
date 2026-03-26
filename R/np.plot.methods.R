@@ -14,6 +14,23 @@
   }
   dots$persp <- NULL
 
+  if (!is.null(dots$plot.rug)) {
+    dots$plot.rug <- .np_plot_match_flag(dots$plot.rug, "plot.rug")
+    if (isTRUE(dots$plot.rug) &&
+        !identical(method, .np_plot_rbandwidth_engine) &&
+        !identical(method, .np_plot_bandwidth_engine) &&
+        !identical(method, .np_plot_dbandwidth_engine) &&
+        !identical(method, .np_plot_conbandwidth_engine) &&
+        !identical(method, .np_plot_condbandwidth_engine) &&
+        !identical(method, .np_plot_plbandwidth_engine) &&
+        !identical(method, .np_plot_scbandwidth_engine) &&
+        !identical(method, .np_plot_sibandwidth_engine) &&
+        !identical(method, .np_plot_compat_dispatch)) {
+      stop("plot.rug=TRUE is not yet implemented for this plot route.",
+           call. = FALSE)
+    }
+  }
+
   if (!is.null(dots$renderer)) {
     dots$renderer <- .np_plot_match_renderer(dots$renderer)
     if (identical(dots$renderer, "rgl") &&
@@ -68,6 +85,17 @@
         !any(c("rbandwidth", "bandwidth", "dbandwidth",
                "conbandwidth", "condbandwidth", "scbandwidth", "plbandwidth") %in% cls)) {
       stop("renderer='rgl' is not yet implemented for this plot route. Use renderer='base'.",
+           call. = FALSE)
+    }
+  }
+
+  if (!is.null(dots$plot.rug)) {
+    dots$plot.rug <- .np_plot_match_flag(dots$plot.rug, "plot.rug")
+    if (isTRUE(dots$plot.rug) &&
+        !any(c("rbandwidth", "bandwidth", "dbandwidth",
+               "conbandwidth", "condbandwidth",
+               "plbandwidth", "scbandwidth", "sibandwidth") %in% cls)) {
+      stop("plot.rug=TRUE is not yet implemented for this plot route.",
            call. = FALSE)
     }
   }
@@ -193,6 +221,11 @@
 }
 .np_plot_npdensity <- function(object, ...) {
   dots <- list(...)
+  plot.rug <- FALSE
+  if (!is.null(dots$plot.rug)) {
+    plot.rug <- .np_plot_match_flag(dots$plot.rug, "plot.rug")
+    dots$plot.rug <- NULL
+  }
 
   direct.args <- c("plot.behavior", "plot.errors.method", "plot.errors.type",
                    "plot.errors.boot.num", "plot.errors.boot.method",
@@ -221,6 +254,15 @@
                            xlab = xlab.val,
                            ylab = ylab.val),
                       dots))
+      if (isTRUE(plot.rug)) {
+        .np_plot_validate_rug_request(
+          plot.rug = TRUE,
+          route = "plot.npdensity()",
+          supported.route = TRUE,
+          renderer = "base"
+        )
+        .np_plot_draw_rug_1d(as.numeric(ex))
+      }
       return(invisible(object))
     }
   }
