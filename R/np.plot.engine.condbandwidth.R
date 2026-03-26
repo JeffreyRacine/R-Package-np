@@ -470,7 +470,7 @@
 
       rotate.defaults <- .np_plot_rotate_defaults()
       dtheta = rotate.defaults$dtheta
-      persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
+      persp.col = .np_plot_persp_surface_colors(z = tdens, col = col)
       first.render.activity <- NULL
       first.render.pending <- TRUE
       on.exit(.np_plot_activity_end(first.render.activity), add = TRUE)

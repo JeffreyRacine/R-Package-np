@@ -526,7 +526,7 @@
       rotate.defaults <- .np_plot_rotate_defaults()
       dtheta = rotate.defaults$dtheta
 
-      persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
+      persp.col = .np_plot_persp_surface_colors(z = treg, col = col)
       overlay.x1 <- xdat[,1]
       if (is.factor(overlay.x1) || is.ordered(overlay.x1))
         overlay.x1 <- (bws$xdati$all.dlev[[1]])[as.integer(overlay.x1)]
