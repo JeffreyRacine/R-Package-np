@@ -432,7 +432,7 @@
                               paste("[theta= ", theta, ", phi= ", phi, "]", sep = ""))
 
       dtheta = 2.0
-      rotation.sleep = 0.075
+      rotation.frame.interval = 0.09
 
       persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
       frame.theta <- (0:((360 %/% dtheta - 1L) * rotate)) * dtheta + theta
@@ -447,7 +447,9 @@
         overlay.x2 <- (bws$xdati$all.dlev[[2]])[as.integer(overlay.x2)]
 
         for (frame.idx in seq_along(frame.theta)){
+          frame.started <- proc.time()[["elapsed"]]
           i <- frame.theta[[frame.idx]]
+          hold.level <- try(grDevices::dev.hold(), silent = TRUE)
           .np_plot_first_render_begin(first.render)
           persp.args <- list(x = x1.eval,
                              y = x2.eval,
@@ -577,8 +579,17 @@
                            persp.mat = persp.mat),
                       overlay.points.args))
 
+          if (!inherits(hold.level, "try-error"))
+            try(grDevices::dev.flush(), silent = TRUE)
+
           rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)
-          Sys.sleep(if (isTRUE(rotate)) rotation.sleep else 0.5)
+          frame.elapsed <- proc.time()[["elapsed"]] - frame.started
+          sleep.sec <- if (isTRUE(rotate)) {
+            if (frame.idx == 1L) 0.0 else max(0.0, rotation.frame.interval - frame.elapsed)
+          } else {
+            0.5
+          }
+          Sys.sleep(sleep.sec)
       }
 
       if (plot.behavior == "plot-data")
