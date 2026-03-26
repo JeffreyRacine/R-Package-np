@@ -20,6 +20,11 @@
         !identical(method, .np_plot_rbandwidth_engine) &&
         !identical(method, .np_plot_bandwidth_engine) &&
         !identical(method, .np_plot_dbandwidth_engine) &&
+        !identical(method, .np_plot_conbandwidth_engine) &&
+        !identical(method, .np_plot_condbandwidth_engine) &&
+        !identical(method, .np_plot_plbandwidth_engine) &&
+        !identical(method, .np_plot_scbandwidth_engine) &&
+        !identical(method, .np_plot_sibandwidth_engine) &&
         !identical(method, .np_plot_compat_dispatch)) {
       stop("plot.rug=TRUE is not yet implemented for this plot route.",
            call. = FALSE)
@@ -61,7 +66,9 @@
   if (!is.null(dots$plot.rug)) {
     dots$plot.rug <- .np_plot_match_flag(dots$plot.rug, "plot.rug")
     if (isTRUE(dots$plot.rug) &&
-        !any(c("rbandwidth", "bandwidth", "dbandwidth") %in% cls)) {
+        !any(c("rbandwidth", "bandwidth", "dbandwidth",
+               "conbandwidth", "condbandwidth",
+               "plbandwidth", "scbandwidth", "sibandwidth") %in% cls)) {
       stop("plot.rug=TRUE is not yet implemented for this plot route.",
            call. = FALSE)
     }

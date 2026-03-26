@@ -150,13 +150,13 @@
       supported.route = if (identical(renderer, "rgl")) {
         isTRUE(surface.supported && perspective)
       } else {
-        isTRUE(all(vapply(xdat, .np_plot_axis_is_continuous, logical(1L))))
+        TRUE
       },
       renderer = renderer,
       reason = if (identical(renderer, "rgl")) {
         "supported rgl surface routes"
       } else {
-        "supported continuous base plot routes"
+        "supported base plot routes"
       }
     )
 

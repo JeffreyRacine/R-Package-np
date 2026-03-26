@@ -34,6 +34,7 @@
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = NULL,
            plot.par.mfrow = TRUE,
+           plot.rug = FALSE,
            ...,
            random.seed){
 
@@ -91,6 +92,13 @@
     plot.errors = (plot.errors.method != "none")
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
+    plot.rug <- .np_plot_validate_rug_request(
+      plot.rug = plot.rug,
+      route = "plot.sibandwidth()",
+      supported.route = TRUE,
+      renderer = "base",
+      reason = "supported base plot routes"
+    )
 
     plot.layout <- .np_plot_layout_begin(
       plot.behavior = plot.behavior,
@@ -245,6 +253,8 @@
           .np_plot_first_render_begin(first.render)
           do.call(plot, plot.args)
           .np_plot_first_render_end(first.render)
+          if (plot.rug)
+            .np_plot_draw_rug_1d(tobj$index)
           if (plot.errors.type == "all") {
             sorted.all.err <- lapply(temp.all.err, function(err) {
               if (is.null(err)) return(NULL)
@@ -297,6 +307,8 @@
           .np_plot_first_render_begin(first.render)
           do.call(plot, plot.args)
           .np_plot_first_render_end(first.render)
+          if (plot.rug)
+            .np_plot_draw_rug_1d(tobj$index)
         }
       }
 
@@ -406,6 +418,8 @@
             .np_plot_first_render_begin(first.render)
             do.call(plot, plot.args)
             .np_plot_first_render_end(first.render)
+            if (plot.rug)
+              .np_plot_draw_rug_1d(tobj$index)
             
             if (plot.errors){
               if (plot.errors.type == "all") {
