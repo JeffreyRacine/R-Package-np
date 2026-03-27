@@ -355,7 +355,10 @@
 
       rotate.defaults <- .np_plot_rotate_defaults()
       dtheta = rotate.defaults$dtheta
-      persp.col = .np_plot_persp_surface_colors(z = tdens, col = col)
+      persp.col = grDevices::adjustcolor(
+        .np_plot_persp_surface_colors(z = tdens, col = col),
+        alpha.f = 0.5
+      )
       frame.theta <- (0:((360 %/% dtheta - 1L) * rotate)) * dtheta + theta
       rotation.progress <- .np_plot_rotation_progress_begin(length(frame.theta))
       on.exit(.np_plot_rotation_progress_end(rotation.progress), add = TRUE)
@@ -374,6 +377,7 @@
                              cex.lab = scalar_default(cex.lab, par()$cex.lab),
                              cex.main = scalar_default(cex.main, par()$cex.main),
                              cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                             lwd = 0.8 * scalar_default(lwd, par()$lwd),
                              xlab = xlab.val,
                              ylab = ylab.val,
                              zlab = zlab.val,
@@ -392,95 +396,22 @@
           }
 
           if (plot.errors){
-            par(new = TRUE)
-            if (plot.errors.type == "all" && !is.null(lerr.all)) {
-              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
-              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
-                persp(x1.eval,
-                      x2.eval,
-                      lerr.all[[bn]],
-                      zlim = zlim,
-                      cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                      cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                      cex.main = scalar_default(cex.main, par()$cex.main),
-                      cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                      col = persp.col,
-                      border = band.cols[bn],
-                      ticktype = "detailed",
-                      xlab = "",
-                      ylab = "",
-                      zlab = "",
-                      theta = i,
-                      phi = phi,
-                      lwd = scalar_default(lwd, par()$lwd))
-                par(new = TRUE)
-              }
-            } else {
-              persp(x1.eval,
-                    x2.eval,
-                    lerr,
-                    zlim = zlim,
-                    cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                    cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                    cex.main = scalar_default(cex.main, par()$cex.main),
-                    cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                    col = persp.col,
-                    border = scalar_default(border, "grey"),
-                    ticktype = "detailed",
-                    xlab = "",
-                    ylab = "",
-                    zlab = "",
-                    theta = i,
-                    phi = phi,
-                    lwd = scalar_default(lwd, par()$lwd))
-              par(new = TRUE)
-            }
-
-            par(new = TRUE)
-            if (plot.errors.type == "all" && !is.null(herr.all)) {
-              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
-              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
-                persp(x1.eval,
-                      x2.eval,
-                      herr.all[[bn]],
-                      zlim = zlim,
-                      cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                      cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                      cex.main = scalar_default(cex.main, par()$cex.main),
-                      cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                      col = persp.col,
-                      border = band.cols[bn],
-                      ticktype = "detailed",
-                      xlab = "",
-                      ylab = "",
-                      zlab = "",
-                      theta = i,
-                      phi = phi,
-                      lwd = scalar_default(lwd, par()$lwd))
-                if (bn != "bonferroni") par(new = TRUE)
-              }
+            .np_plot_draw_error_wireframes_persp(
+              x = x1.eval,
+              y = x2.eval,
+              persp.mat = persp.mat,
+              plot.errors.type = plot.errors.type,
+              lerr = lerr,
+              herr = herr,
+              lerr.all = lerr.all,
+              herr.all = herr.all,
+              border = scalar_default(border, "grey"),
+              lwd = scalar_default(lwd, par()$lwd)
+            )
+            if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all))
               legend("topleft",
                      legend = c("Pointwise","Simultaneous","Bonferroni"),
-                     lty = 1, col = c("red","green3","blue"), lwd = 2, bty = "n")
-            } else {
-              persp(x1.eval,
-                    x2.eval,
-                    herr,
-                    zlim = zlim,
-                    cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                    cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                    cex.main = scalar_default(cex.main, par()$cex.main),
-                    cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                    col = persp.col,
-                    border = scalar_default(border, "grey"),
-                    ticktype = "detailed",
-                    xlab = "",
-                    ylab = "",
-                    zlab = "",
-                    theta = i,
-                    phi = phi,
-                    lwd = scalar_default(lwd, par()$lwd))
-            }
+                     lty = 1, col = c("red","green3","blue"), lwd = 2.15 * scalar_default(lwd, par()$lwd), bty = "n")
           }
 
           rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)

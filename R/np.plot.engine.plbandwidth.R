@@ -528,7 +528,10 @@
       rotate.defaults <- .np_plot_rotate_defaults()
       dtheta = rotate.defaults$dtheta
 
-      persp.col = .np_plot_persp_surface_colors(z = treg, col = col)
+      persp.col = grDevices::adjustcolor(
+        .np_plot_persp_surface_colors(z = treg, col = col),
+        alpha.f = 0.5
+      )
       overlay.x1 <- xdat[,1]
       if (is.factor(overlay.x1) || is.ordered(overlay.x1))
         overlay.x1 <- (bws$xdati$all.dlev[[1]])[as.integer(overlay.x1)]
@@ -554,6 +557,7 @@
                              cex.lab = scalar_default(cex.lab, par()$cex.lab),
                              cex.main = scalar_default(cex.main, par()$cex.main),
                              cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                             lwd = 0.8 * scalar_default(lwd, par()$lwd),
                              xlab = scalar_default(xlab, gen.label(names(xdat)[1], "X1")),
                              ylab = scalar_default(ylab, gen.label(names(xdat)[2], "Z1")),
                              zlab = scalar_default(zlab, gen.label(names(ydat),"Conditional Mean")),
@@ -574,42 +578,22 @@
           }
 
           if (plot.errors){
-            par(new = TRUE)
-            persp(x1.eval,
-                  z1.eval,
-                  lerr,
-                  zlim = zlim,
-                  cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                  cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                  cex.main = scalar_default(cex.main, par()$cex.main),
-                  cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                  col = persp.col,
-                  border = scalar_default(border, "grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = scalar_default(lwd, par()$lwd))
-            par(new = TRUE)
-            persp(x1.eval,
-                  z1.eval,
-                  herr,
-                  zlim = zlim,
-                  cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                  cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                  cex.main = scalar_default(cex.main, par()$cex.main),
-                  cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                  col = persp.col,
-                  border = scalar_default(border, "grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = scalar_default(lwd, par()$lwd))
+            .np_plot_draw_error_wireframes_persp(
+              x = x1.eval,
+              y = z1.eval,
+              persp.mat = persp.mat,
+              plot.errors.type = plot.errors.type,
+              lerr = lerr,
+              herr = herr,
+              lerr.all = lerr.all,
+              herr.all = herr.all,
+              border = scalar_default(border, "grey"),
+              lwd = scalar_default(lwd, par()$lwd)
+            )
+            if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all))
+              legend("topleft",
+                     legend = c("Pointwise","Simultaneous","Bonferroni"),
+                     lty = 1, col = c("red","green3","blue"), lwd = 2.15 * scalar_default(lwd, par()$lwd), bty = "n")
           }
           if (overlay.ok)
             do.call(.np_plot_overlay_points_persp,
