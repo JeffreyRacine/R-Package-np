@@ -7,6 +7,14 @@ suppressPackageStartupMessages({
 
 options(np.messages = FALSE)
 
+blas_string <- function() {
+  blas <- sessionInfo()$BLAS
+  if (is.null(blas) || length(blas) == 0L || is.na(blas[1L]) || !nzchar(blas[1L])) {
+    return("unknown")
+  }
+  as.character(blas[1L])
+}
+
 seed <- as.integer(Sys.getenv("NP_BENCH_SEED", "42"))
 times_fit <- as.integer(Sys.getenv("NP_BENCH_TIMES_FIT", "100"))
 times_bw <- as.integer(Sys.getenv("NP_BENCH_TIMES_BW", "20"))
@@ -126,11 +134,19 @@ fit_file <- file.path(out_dir, "fit_bench.csv")
 bw_file <- file.path(out_dir, "bw_bench.csv")
 validation_file <- file.path(out_dir, "validation.csv")
 meta_file <- file.path(out_dir, "session_info.txt")
+provenance_file <- file.path(out_dir, "provenance.txt")
 
 write.csv(fit_results, fit_file, row.names = FALSE)
 write.csv(bw_results, bw_file, row.names = FALSE)
 write.csv(validation, validation_file, row.names = FALSE)
 writeLines(capture.output(sessionInfo()), con = meta_file)
+writeLines(
+  c(
+    paste0("R.version.string=", R.version.string),
+    paste0("BLAS=", blas_string())
+  ),
+  con = provenance_file
+)
 
 message("")
 message("Fit-path summary (ms):")
@@ -147,3 +163,4 @@ message("  ", fit_file)
 message("  ", bw_file)
 message("  ", validation_file)
 message("  ", meta_file)
+message("  ", provenance_file)
