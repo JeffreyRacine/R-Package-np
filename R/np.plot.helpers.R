@@ -7739,6 +7739,72 @@ plotFactor <- function(f, y, ...){
   invisible(TRUE)
 }
 
+.np_plot_draw_box_grid_persp <- function(xlim,
+                                         ylim,
+                                         zlim,
+                                         persp.mat,
+                                         grid.args = list()) {
+  if (is.null(xlim) || is.null(ylim) || is.null(zlim) || is.null(persp.mat))
+    return(invisible(FALSE))
+
+  xlim <- as.double(xlim)
+  ylim <- as.double(ylim)
+  zlim <- as.double(zlim)
+
+  if (length(xlim) < 2L || length(ylim) < 2L || length(zlim) < 2L)
+    return(invisible(FALSE))
+  if (!all(is.finite(c(xlim, ylim, zlim))))
+    return(invisible(FALSE))
+
+  x.at <- pretty(xlim, n = 5L)
+  y.at <- pretty(ylim, n = 5L)
+  z.at <- pretty(zlim, n = 5L)
+
+  x.at <- x.at[x.at >= min(xlim) & x.at <= max(xlim)]
+  y.at <- y.at[y.at >= min(ylim) & y.at <= max(ylim)]
+  z.at <- z.at[z.at >= min(zlim) & z.at <= max(zlim)]
+
+  draw_segment <- function(x0, y0, z0, x1, y1, z1) {
+    pts <- trans3d(c(x0, x1), c(y0, y1), c(z0, z1), persp.mat)
+    seg.args <- .np_plot_merge_override_args(
+      list(
+        x0 = pts$x[1L],
+        y0 = pts$y[1L],
+        x1 = pts$x[2L],
+        y1 = pts$y[2L],
+        col = grDevices::adjustcolor("grey60", alpha.f = 0.45),
+        lwd = 0.9
+      ),
+      grid.args
+    )
+    do.call(graphics::segments, seg.args)
+  }
+
+  xmin <- min(xlim)
+  xmax <- max(xlim)
+  ymin <- min(ylim)
+  ymax <- max(ylim)
+  zmin <- min(zlim)
+  zmax <- max(zlim)
+
+  for (yy in y.at)
+    draw_segment(xmin, yy, zmin, xmax, yy, zmin)
+  for (xx in x.at)
+    draw_segment(xx, ymin, zmin, xx, ymax, zmin)
+
+  for (yy in y.at)
+    draw_segment(xmin, yy, zmin, xmin, yy, zmax)
+  for (zz in z.at)
+    draw_segment(xmin, ymin, zz, xmin, ymax, zz)
+
+  for (xx in x.at)
+    draw_segment(xx, ymax, zmin, xx, ymax, zmax)
+  for (zz in z.at)
+    draw_segment(xmin, ymax, zz, xmax, ymax, zz)
+
+  invisible(TRUE)
+}
+
 .np_plot_error_surfaces_rgl <- function(x,
                                         y,
                                         plot.errors.type,
@@ -7816,7 +7882,7 @@ plotFactor <- function(f, y, ...){
   theta <- as.double(theta)[1L]
   phi <- as.double(phi)[1L]
 
-  if (isTRUE(all.equal(theta, 0.0)) && isTRUE(all.equal(phi, 10.0))) {
+  if (isTRUE(all.equal(theta, 0.0)) && isTRUE(all.equal(phi, 20.0))) {
     phi <- -70.0
   }
 

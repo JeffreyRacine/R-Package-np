@@ -33,7 +33,7 @@
            lty = NULL,
            lwd = NULL,
            theta = 0.0,
-           phi = 10.0,
+           phi = 20.0,
            view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
@@ -568,6 +568,12 @@
           persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
           persp.mat <- do.call(persp, persp.args)
           .np_plot_first_render_end(first.render)
+          .np_plot_draw_box_grid_persp(
+            xlim = range(x1.eval, finite = TRUE),
+            ylim = range(z1.eval, finite = TRUE),
+            zlim = zlim,
+            persp.mat = persp.mat
+          )
           if (plot.rug) {
             .np_plot_draw_floor_rug_persp(
               x1 = overlay.x1,

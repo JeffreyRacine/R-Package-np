@@ -102,7 +102,7 @@
         than the base graphics plot pane. When \code{col} is omitted,
         the \code{rgl} surface uses a value-based
         \code{\link[grDevices]{topo.colors}} gradient. When the
-        inherited base-view defaults \code{theta=0} and \code{phi=10}
+        inherited base-view defaults \code{theta=0} and \code{phi=20}
         are left unchanged, the \code{rgl} backend remaps that default
         camera to a more informative oblique view for this rollout
         tranche. For the currently supported \code{npreg},

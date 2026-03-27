@@ -31,7 +31,7 @@
            lty = NULL,
            lwd = NULL,
            theta = 0.0,
-           phi = 10.0,
+           phi = 20.0,
            tau = 0.5,
            view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
@@ -506,6 +506,12 @@
                              phi = phi,
                              main = gen.tflabel(!is.null(main), main,
                                                 .np_plot_theta_phi_label(theta = i, phi = phi)))
+          .np_plot_draw_box_grid_persp(
+            xlim = range(x1.eval, finite = TRUE),
+            ylim = range(x2.eval, finite = TRUE),
+            zlim = zlim,
+            persp.mat = persp.mat
+          )
           if (plot.rug) {
             .np_plot_draw_floor_rug_persp(
               x1 = xdat[,1],
