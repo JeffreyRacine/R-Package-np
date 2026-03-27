@@ -30,10 +30,19 @@ parse_args <- function(args) {
   out
 }
 
+blas_string <- function() {
+  blas <- sessionInfo()$BLAS
+  if (is.null(blas) || length(blas) == 0L || is.na(blas[1L]) || !nzchar(blas[1L])) {
+    return("unknown")
+  }
+  as.character(blas[1L])
+}
+
 main <- function(args = commandArgs(trailingOnly = TRUE)) {
   cfg <- parse_args(args)
   script <- "/Users/jracine/Development/np-npRmpi/benchmarks/perf/oneoff/bench_oneoff_param_nprmpi.R"
   log_dir <- dirname(cfg$out_manifest)
+  provenance_file <- paste0(sub("\\.csv$", "", cfg$out_manifest), "_provenance.txt")
 
   real_funs <- c("npcmstest", "npconmode", "npqreg")
   synth_funs <- c("npcopula", "npdeneqtest", "npdeptest", "npregiv", "npsdeptest", "npsigtest", "npsymtest", "npunitest")
@@ -77,8 +86,18 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   }
 
   m <- do.call(rbind, rows)
+  writeLines(
+    c(
+      paste0("R.version.string=", R.version.string),
+      paste0("BLAS=", blas_string())
+    ),
+    con = provenance_file
+  )
   write.csv(m, cfg$out_manifest, row.names = FALSE)
   if (cfg$show_progress) {
+    cat("R.version.string=", R.version.string, "\n", sep = "")
+    cat("BLAS=", blas_string(), "\n", sep = "")
+    cat("provenance:", provenance_file, "\n")
     cat("manifest:", cfg$out_manifest, "\n")
     print(m)
   }

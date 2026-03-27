@@ -45,6 +45,19 @@ R CMD INSTALL "npRmpi_${VERSION}.tar.gz"
 R -q -e 'library(npRmpi); sessionInfo()'
 ```
 
+## Timing Provenance
+
+When collecting timing or regression artifacts, always record:
+
+```bash
+R -q -e 'cat("R.version.string =", R.version.string, "\n"); cat("BLAS =", sessionInfo()$BLAS, "\n")'
+```
+
+On macOS CRAN-binary R, `sessionInfo()$BLAS` reflects the active
+`libRblas.dylib` choice. On Apple Silicon, that choice can materially affect
+BLAS-heavy timings, so treat `R.version.string` and `sessionInfo()$BLAS` as
+part of the benchmark environment.
+
 ## Check
 
 ```bash
