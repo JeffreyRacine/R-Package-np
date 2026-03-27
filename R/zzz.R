@@ -1,5 +1,50 @@
 .npRmpi_embedded_backend_version <- "0.7-3.3"
 
+.npRmpi_reassert_plot_methods <- function() {
+  ns <- asNamespace("npRmpi")
+  graphics.ns <- asNamespace("graphics")
+  plot.classes <- c(
+    "bandwidth",
+    "dbandwidth",
+    "rbandwidth",
+    "conbandwidth",
+    "condbandwidth",
+    "plbandwidth",
+    "sibandwidth",
+    "scbandwidth",
+    "npdensity",
+    "npdistribution",
+    "npregression",
+    "npregiv",
+    "npregivderiv",
+    "plregression",
+    "condensity",
+    "condistribution",
+    "qregression",
+    "singleindex",
+    "smoothcoefficient"
+  )
+
+  for (cls in plot.classes) {
+    method.name <- paste0("plot.", cls)
+    if (exists(method.name, envir = ns, inherits = FALSE)) {
+      registerS3method(
+        "plot",
+        cls,
+        get(method.name, envir = ns, inherits = FALSE),
+        envir = graphics.ns
+      )
+    }
+  }
+
+  invisible(TRUE)
+}
+
+.npRmpi_after_np_load <- function() {
+  tryCatch(.npRmpi_reassert_plot_methods(), error = function(e) invisible(e))
+  invisible(TRUE)
+}
+
 .npRmpi_try_dynload <- function(lib, pkg) {
   dll <- paste0(pkg, .Platform$dynlib.ext)
   candidates <- unique(c(
@@ -105,6 +150,15 @@
                                        inherits = FALSE)(),
                                    error = function(e) invisible(e)),
             action = "append")
+    setHook(packageEvent("np", "onLoad"),
+            function(...) tryCatch(get(".npRmpi_after_np_load",
+                                       envir = asNamespace("npRmpi"),
+                                       mode = "function",
+                                       inherits = FALSE)(),
+                                   error = function(e) invisible(e)),
+            action = "append")
+    if ("np" %in% loadedNamespaces())
+      .npRmpi_after_np_load()
 	    return(invisible())
 	  }
 
@@ -159,4 +213,13 @@
                                      inherits = FALSE)(),
                                  error = function(e) invisible(e)),
           action = "append")
+  setHook(packageEvent("np", "onLoad"),
+          function(...) tryCatch(get(".npRmpi_after_np_load",
+                                     envir = asNamespace("npRmpi"),
+                                     mode = "function",
+                                     inherits = FALSE)(),
+                                 error = function(e) invisible(e)),
+          action = "append")
+  if ("np" %in% loadedNamespaces())
+    .npRmpi_after_np_load()
 }

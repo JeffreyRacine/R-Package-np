@@ -25,6 +25,7 @@ npreg <-
 npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
 
+    mc <- match.call(expand.dots = FALSE)
     tt <- terms(bws)
     tmf <- if (!is.null(bws$call)) {
       m <- match(c("formula", "data", "subset", "na.action"),
@@ -91,6 +92,19 @@ npreg.formula <-
         reg.args$eydat <- eydat
     }
     ev <- do.call(npreg, c(reg.args, list(...)))
+    if (!is.null(ev$bws)) {
+      bw.call <- mc[c(1, match(c("bws", "data", "subset", "na.action"),
+                               names(mc), nomatch = 0))]
+      if ("bws" %in% names(bw.call))
+        names(bw.call)[names(bw.call) == "bws"] <- "formula"
+      bw.call[[1L]] <- quote(npregbw)
+      environment(bw.call) <- parent.frame()
+      ev$bws$call <- bw.call
+      ev$bws$formula <- bws
+      ev$bws$terms <- attr(tmf, "terms")
+      ev$bws$rows.omit <- as.vector(attr(tmf, "na.action"))
+      ev$bws$nobs.omit <- length(ev$bws$rows.omit)
+    }
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
 

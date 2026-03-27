@@ -67,6 +67,55 @@ test_that("autodispatch keeps formula bws usable for condensity plot()", {
   expect_false(grepl("\\.__npRmpi_autod_", paste(deparse(fit$bws$call), collapse = " ")))
 })
 
+test_that("autodispatch keeps npreg formula fits plotable", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(44)
+  n <- 80
+  d <- data.frame(
+    x1 = runif(n),
+    x2 = runif(n)
+  )
+  d$y <- sin(pi * (d$x1 + d$x2))^4 * sin(pi * d$x1)^2 + rnorm(n, sd = 0.1)
+
+  fit <- npreg(y ~ x1 + x2, data = d, nomad = TRUE, nmulti = 1)
+
+  expect_false(is.null(fit$bws$formula))
+  expect_identical(as.character(fit$bws$call[[1L]]), "npregbw")
+
+  pdf(file = tempfile(fileext = ".pdf"))
+  on.exit(dev.off(), add = TRUE)
+  expect_error(plot(fit), NA)
+})
+
+test_that("npRmpi plot methods stay registered after np namespace loads", {
+  skip_if_not_installed("np")
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(45)
+  n <- 80
+  x <- runif(n, -1, 1)
+  y <- rbeta(n, 1, 1)
+
+  fit <- npreg(y ~ x, nomad = TRUE, nmulti = 1)
+
+  expect_true("np" %in% loadedNamespaces())
+  meth <- getS3method("plot", "npregression")
+  expect_identical(environmentName(environment(meth)), "npRmpi")
+
+  pdf(file = tempfile(fileext = ".pdf"))
+  on.exit(dev.off(), add = TRUE)
+  expect_error(plot(fit), NA)
+})
+
 test_that("autodispatch default condensity plot options stay scalar-safe", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
