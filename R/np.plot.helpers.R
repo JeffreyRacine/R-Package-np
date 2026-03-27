@@ -7152,14 +7152,19 @@ draw.all.error.types <- function(ex, center, all.err,
                 lty = lty, col = col)
   }
 
-  draw_one(all.err$pointwise, "red")
-  draw_one(all.err$simultaneous, "green3")
-  draw_one(all.err$bonferroni, "blue")
+  band.cols <- .np_plot_all_band_colors()
+
+  draw_one(all.err$pointwise, band.cols[["pointwise"]])
+  draw_one(all.err$simultaneous, band.cols[["simultaneous"]])
+  draw_one(all.err$bonferroni, band.cols[["bonferroni"]])
 
   if (add.legend) {
     legend(legend.loc,
            legend = c("Pointwise","Simultaneous","Bonferroni"),
-           lty = 2, col = c("red","green3","blue"), lwd = 2, bty = "n")
+           lty = 2,
+           col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
+           lwd = 2,
+           bty = "n")
   }
 }
 
@@ -7839,11 +7844,18 @@ plotFactor <- function(f, y, ...){
   if (identical(plot.errors.type, "all") &&
       !is.null(lerr.all) &&
       !is.null(herr.all)) {
-    band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+    band.cols <- .np_plot_all_band_colors()
+    band.alpha <- .np_plot_all_band_alpha()
     drawn.bands <- character(0L)
     for (bn in c("pointwise", "simultaneous", "bonferroni")) {
-      drawn.lower <- draw_one(lerr.all[[bn]], band.cols[[bn]])
-      drawn.upper <- draw_one(herr.all[[bn]], band.cols[[bn]])
+      drawn.lower <- draw_one(
+        lerr.all[[bn]],
+        grDevices::adjustcolor(band.cols[[bn]], alpha.f = band.alpha[[bn]])
+      )
+      drawn.upper <- draw_one(
+        herr.all[[bn]],
+        grDevices::adjustcolor(band.cols[[bn]], alpha.f = band.alpha[[bn]])
+      )
       if (isTRUE(drawn.lower) || isTRUE(drawn.upper))
         drawn.bands <- c(drawn.bands, bn)
     }
@@ -7926,15 +7938,16 @@ plotFactor <- function(f, y, ...){
 
   z <- as.matrix(z)
   z.range <- range(z, finite = TRUE)
+  palette_fun <- function(n) grDevices::hcl.colors(as.integer(n), palette = "viridis")
 
   if (!all(is.finite(z.range)))
-    return("lightblue")
+    return(palette_fun(1L))
 
   if (nrow(z) < 2L || ncol(z) < 2L)
-    return("lightblue")
+    return(palette_fun(1L))
 
   if (isTRUE(all.equal(z.range[1L], z.range[2L])))
-    return("lightblue")
+    return(palette_fun(1L))
 
   zfacet <- 0.25 * (
     z[-1L, -1L, drop = FALSE] +
@@ -7943,7 +7956,7 @@ plotFactor <- function(f, y, ...){
       z[-nrow(z), -ncol(z), drop = FALSE]
   )
 
-  colorlut <- grDevices::topo.colors(as.integer(num.colors))
+  colorlut <- palette_fun(num.colors)
   scaled <- 1L + floor((length(colorlut) - 1L) * (zfacet - z.range[1L]) / diff(z.range))
   scaled[!is.finite(scaled)] <- 1L
   scaled <- pmax.int(1L, pmin.int(length(colorlut), scaled))
@@ -7951,15 +7964,32 @@ plotFactor <- function(f, y, ...){
   as.vector(matrix(colorlut[scaled], nrow = nrow(zfacet), ncol = ncol(zfacet)))
 }
 
+.np_plot_all_band_colors <- function() {
+  c(
+    pointwise = "#D55E00",
+    simultaneous = "#7B3294",
+    bonferroni = "#0072B2"
+  )
+}
+
+.np_plot_all_band_alpha <- function() {
+  c(
+    pointwise = 0.14,
+    simultaneous = 0.10,
+    bonferroni = 0.08
+  )
+}
+
 .np_plot_error_wire_alpha <- function(plot.errors.type) {
   plot.errors.type <- as.character(plot.errors.type)[1L]
+  band.alpha <- .np_plot_all_band_alpha()
 
   switch(
     plot.errors.type,
-    pointwise = 0.10,
-    simultaneous = 0.05,
-    bonferroni = 0.01,
-    0.10
+    pointwise = band.alpha[["pointwise"]],
+    simultaneous = band.alpha[["simultaneous"]],
+    bonferroni = band.alpha[["bonferroni"]],
+    band.alpha[["pointwise"]]
   )
 }
 
@@ -8036,8 +8066,8 @@ plotFactor <- function(f, y, ...){
 
   if (identical(as.character(plot.errors.type)[1L], "all") &&
       !is.null(lerr.all) && !is.null(herr.all)) {
-    band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
-    band.alpha <- c(pointwise = 0.10, simultaneous = 0.05, bonferroni = 0.01)
+    band.cols <- .np_plot_all_band_colors()
+    band.alpha <- .np_plot_all_band_alpha()
     band.lwd <- 2.15 * lwd
 
     for (bn in c("pointwise", "simultaneous", "bonferroni")) {
@@ -8094,15 +8124,16 @@ plotFactor <- function(f, y, ...){
 
   z <- as.matrix(z)
   z.range <- range(z, finite = TRUE)
+  palette_fun <- function(n) grDevices::hcl.colors(as.integer(n), palette = "viridis")
 
   if (!all(is.finite(z.range)))
-    return("lightblue")
+    return(palette_fun(1L))
 
   if (isTRUE(all.equal(z.range[1L], z.range[2L]))) {
-    return(matrix("lightblue", nrow = nrow(z), ncol = ncol(z)))
+    return(matrix(palette_fun(1L), nrow = nrow(z), ncol = ncol(z)))
   }
 
-  colorlut <- grDevices::topo.colors(as.integer(num.colors))
+  colorlut <- palette_fun(num.colors)
   scaled <- 1L + floor((length(colorlut) - 1L) * (z - z.range[1L]) / diff(z.range))
   scaled[!is.finite(scaled)] <- 1L
   scaled <- pmax.int(1L, pmin.int(length(colorlut), scaled))
@@ -8259,7 +8290,7 @@ plotFactor <- function(f, y, ...){
       ticktype = "detailed",
       border = border,
       color = .np_plot_rgl_surface_colors(z = z, col = col),
-      alpha = 0.7,
+      alpha = 0.6,
       back = "lines",
       main = main
     ), persp3d.args)

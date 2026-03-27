@@ -298,7 +298,7 @@
 
       if (identical(renderer, "rgl")) {
         rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
-        main.val <- scalar_default(main, "")
+        main.val <- if (!is.null(main)) main else NULL
         .np_plot_first_render_begin(first.render)
         rgl.out <- .np_plot_render_surface_rgl(
           x = x1.eval,
@@ -382,8 +382,7 @@
                              zlab = zlab.val,
                              theta = i,
                              phi = phi,
-                             main = gen.tflabel(!is.null(main), main,
-                                                .np_plot_theta_phi_label(theta = i, phi = phi)))
+                             main = scalar_default(main, ""))
           .np_plot_first_render_end(first.render)
           .np_plot_draw_box_grid_persp(
             xlim = range(x1.eval, finite = TRUE),
@@ -413,10 +412,15 @@
               border = scalar_default(border, "grey"),
               lwd = scalar_default(lwd, par()$lwd)
             )
-            if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all))
-              legend("topleft",
+            if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
+              band.cols <- .np_plot_all_band_colors()
+              legend("topright",
                      legend = c("Pointwise","Simultaneous","Bonferroni"),
-                     lty = 1, col = c("red","green3","blue"), lwd = 2.15 * scalar_default(lwd, par()$lwd), bty = "n")
+                     lty = 1,
+                     col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
+                     lwd = 2.15 * scalar_default(lwd, par()$lwd),
+                     bty = "n")
+            }
           }
 
           rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)

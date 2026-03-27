@@ -101,7 +101,7 @@
         typically the RStudio Viewer or a browser/WebGL window rather
         than the base graphics plot pane. When \code{col} is omitted,
         the \code{rgl} surface uses a value-based
-        \code{\link[grDevices]{topo.colors}} gradient. When the
+        \code{\link[grDevices]{hcl.colors}(..., "viridis")} gradient. When the
         inherited base-view defaults \code{theta=0} and \code{phi=20}
         are left unchanged, the \code{rgl} backend remaps that default
         camera to a more informative oblique view for this rollout
@@ -112,8 +112,9 @@
         currently supported \code{rgl} surface routes,
         \code{plot.errors.method != "none"} adds interval surfaces;
         \code{plot.errors.type="all"} draws pointwise,
-        simultaneous, and bonferroni band families with different
-        colors when those bands are available for the route.
+        simultaneous, and bonferroni band families with distinct,
+        colorblind-safer colors when those bands are available for
+        the route.
         Unsupervised and conditional density/distribution surface
         routes do not use observed-data point overlays in this tranche.
         For \code{npscoef}/\code{npscoefbw}, \code{renderer="rgl"}
