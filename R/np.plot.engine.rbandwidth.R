@@ -365,7 +365,7 @@
 
       if (identical(renderer, "rgl")) {
         rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
-        main.val <- scalar_default(main, "")
+        main.val <- if (!is.null(main)) main else NULL
         overlay.x1 <- xdat[,1]
         overlay.x2 <- xdat[,2]
         if (is.factor(overlay.x1) || is.ordered(overlay.x1))
@@ -430,8 +430,7 @@
         ))
       }
 
-      main.val <- gen.tflabel(!is.null(main), main,
-                              .np_plot_theta_phi_label(theta = theta, phi = phi))
+      main.val <- if (!is.null(main)) main else NULL
 
       dtheta = 5.625
       rotation.sleep = 0.24
@@ -471,8 +470,7 @@
                              zlab = zlab.val,
                              theta = i,
                              phi = phi,
-                             main = gen.tflabel(!is.null(main), main,
-                                                .np_plot_theta_phi_label(theta = i, phi = phi)))
+                             main = main.val)
           persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
           persp.mat <- do.call(persp, persp.args)
           .np_plot_first_render_end(first.render)
@@ -506,9 +504,13 @@
             )
 
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
-              legend("topleft",
+              band.cols <- .np_plot_all_band_colors()
+              legend("topright",
                      legend = c("Pointwise","Simultaneous","Bonferroni"),
-                     lty = 1, col = c("red","green3","blue"), lwd = 2.15 * scalar_default(lwd, par()$lwd), bty = "n")
+                     lty = 1,
+                     col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
+                     lwd = 2.15 * scalar_default(lwd, par()$lwd),
+                     bty = "n")
             }
           }
           if (overlay.ok)
