@@ -5187,7 +5187,7 @@ plotFactor <- function(f, y, ...){
                    bonferroni = "Bonferroni")[drawn.bands],
         col = unname(band.cols[drawn.bands]),
         lty = 1,
-        lwd = 2,
+        lwd = 2.15,
         cex = 0.8,
         bg = "white",
         bty = "n"
@@ -5225,11 +5225,11 @@ plotFactor <- function(f, y, ...){
   )
 }
 
-.np_plot_format_angle <- function(angle, digits = 1L) {
+.np_plot_format_angle <- function(angle, digits = 0L) {
   angle <- as.double(angle)[1L]
   digits <- as.integer(digits)[1L]
   if (is.na(digits) || digits < 0L)
-    digits <- 1L
+    digits <- 0L
 
   rounded <- round(angle, digits = digits)
   if (isTRUE(all.equal(rounded, round(rounded)))) {
@@ -5278,6 +5278,143 @@ plotFactor <- function(f, y, ...){
   scaled <- pmax.int(1L, pmin.int(length(colorlut), scaled))
 
   as.vector(matrix(colorlut[scaled], nrow = nrow(zfacet), ncol = ncol(zfacet)))
+}
+
+.np_plot_error_wire_alpha <- function(plot.errors.type) {
+  plot.errors.type <- as.character(plot.errors.type)[1L]
+
+  switch(
+    plot.errors.type,
+    pointwise = 0.10,
+    simultaneous = 0.05,
+    bonferroni = 0.01,
+    0.10
+  )
+}
+
+.np_plot_wireframe_templates_persp <- function(x, y) {
+  x <- as.double(x)
+  y <- as.double(y)
+
+  nx <- length(x)
+  ny <- length(y)
+
+  list(
+    row_x = matrix(rep(x, ny), nrow = nx, ncol = ny),
+    row_y = matrix(rep(y, each = nx), nrow = nx, ncol = ny),
+    col_x = matrix(rep(x, each = ny), nrow = ny, ncol = nx),
+    col_y = matrix(rep(y, nx), nrow = ny, ncol = nx),
+    nx = nx,
+    ny = ny
+  )
+}
+
+.np_plot_project_wire_matrix_persp <- function(xmat, ymat, zmat, pmat) {
+  tr <- cbind(
+    as.vector(xmat),
+    as.vector(ymat),
+    as.vector(zmat),
+    1
+  ) %*% pmat
+
+  list(
+    x = matrix(tr[, 1L] / tr[, 4L], nrow = nrow(xmat), ncol = ncol(xmat)),
+    y = matrix(tr[, 2L] / tr[, 4L], nrow = nrow(ymat), ncol = ncol(ymat))
+  )
+}
+
+.np_plot_draw_wire_surface_persp <- function(templates,
+                                             zmat,
+                                             persp.mat,
+                                             col,
+                                             lwd = 0.8) {
+  row_pts <- .np_plot_project_wire_matrix_persp(
+    xmat = templates$row_x,
+    ymat = templates$row_y,
+    zmat = zmat,
+    pmat = persp.mat
+  )
+
+  for (j in seq_len(templates$ny))
+    graphics::lines(row_pts$x[, j], row_pts$y[, j], col = col, lwd = lwd)
+
+  col_pts <- .np_plot_project_wire_matrix_persp(
+    xmat = templates$col_x,
+    ymat = templates$col_y,
+    zmat = t(zmat),
+    pmat = persp.mat
+  )
+
+  for (i in seq_len(templates$nx))
+    graphics::lines(col_pts$x[, i], col_pts$y[, i], col = col, lwd = lwd)
+
+  invisible(NULL)
+}
+
+.np_plot_draw_error_wireframes_persp <- function(x,
+                                                 y,
+                                                 persp.mat,
+                                                 plot.errors.type,
+                                                 lerr = NULL,
+                                                 herr = NULL,
+                                                 lerr.all = NULL,
+                                                 herr.all = NULL,
+                                                 border = "grey",
+                                                 lwd = 0.8) {
+  templates <- .np_plot_wireframe_templates_persp(x = x, y = y)
+
+  if (identical(as.character(plot.errors.type)[1L], "all") &&
+      !is.null(lerr.all) && !is.null(herr.all)) {
+    band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+    band.alpha <- c(pointwise = 0.10, simultaneous = 0.05, bonferroni = 0.01)
+    band.lwd <- 2.15 * lwd
+
+    for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+      band.col <- grDevices::adjustcolor(band.cols[[bn]], alpha.f = band.alpha[[bn]])
+
+      .np_plot_draw_wire_surface_persp(
+        templates = templates,
+        zmat = lerr.all[[bn]],
+        persp.mat = persp.mat,
+        col = band.col,
+        lwd = band.lwd
+      )
+
+      .np_plot_draw_wire_surface_persp(
+        templates = templates,
+        zmat = herr.all[[bn]],
+        persp.mat = persp.mat,
+        col = band.col,
+        lwd = band.lwd
+      )
+    }
+
+    return(invisible(NULL))
+  }
+
+  wire.col <- grDevices::adjustcolor(
+    "black",
+    alpha.f = max(.np_plot_error_wire_alpha(plot.errors.type = plot.errors.type), 0.18)
+  )
+  wire.lwd <- 2.0 * lwd
+
+  .np_plot_draw_wire_surface_persp(
+    templates = templates,
+    zmat = lerr,
+    persp.mat = persp.mat,
+    col = wire.col,
+    lwd = wire.lwd
+  )
+
+  .np_plot_draw_wire_surface_persp(
+    templates = templates,
+    zmat = herr,
+    persp.mat = persp.mat,
+    col = wire.col,
+    lwd = wire.lwd
+  )
+
+  invisible(NULL)
 }
 
 .np_plot_rgl_surface_colors <- function(z, col = NULL, num.colors = 1000L) {
