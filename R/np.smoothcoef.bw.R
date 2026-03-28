@@ -402,9 +402,6 @@ npscoefbw.NULL <-
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
-  nomad.ctx <- .npscoefbw_nomad_context_prepare(xdat = xdat, ydat = ydat, zdat = zdat)
-  on.exit(.npscoefbw_nomad_context_cleanup(nomad.ctx), add = TRUE)
-
   eval_fun <- function(point) {
     point <- as.numeric(point)
     degree <- as.integer(round(point[ncon + ncat + seq_len(ndeg)]))
@@ -425,8 +422,10 @@ npscoefbw.NULL <-
       reg.args = eval.reg.args
     )
 
-    out <- .npscoefbw_eval_collective(
-      data = nomad.ctx,
+    out <- .npscoefbw_eval_only(
+      xdat = xdat,
+      ydat = ydat,
+      zdat = zdat,
       bws = tbw,
       invalid.penalty = "baseline",
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
@@ -435,8 +434,7 @@ npscoefbw.NULL <-
     list(
       objective = out$objective,
       degree = degree,
-      num.feval = out$num.feval,
-      timing.profile = out$timing.profile
+      num.feval = out$num.feval
     )
   }
 
