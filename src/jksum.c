@@ -8361,7 +8361,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    num_reg_unordered,
                                    num_reg_ordered))
     return DBL_MAX;
-
   /* Canonical CVAIC parity: LP(degree=1) should follow the LL-equivalent
      objective branch for bandwidth search. */
   int int_ll_cv = int_ll;
@@ -8424,7 +8423,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     
     return(DBL_MAX);
   }
-
   if(int_ll_cv == LL_LP){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
     const int *glp_terms = NULL;
@@ -8452,7 +8450,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         goto finish_cv_path;
       }
     }
-
     if(!np_glp_cv_cache.ready){
       cv = DBL_MAX;
       goto finish_cv_path;
@@ -8491,7 +8488,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                           &ov_cont_hmin,
                                                           &ov_cont_k0,
                                                           &ov_cont_from_cache);
-
       if(use_canonical_glp_kernel && !all_large_gate){
         NPRegCvLpResult glp_result =
           np_regression_cv_glp_rawbasis_fixed(LL_LP,
