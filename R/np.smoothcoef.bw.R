@@ -220,6 +220,47 @@ npscoefbw.NULL <-
   invisible(NULL)
 }
 
+.npscoefbw_eval_only <- function(xdat,
+                                 ydat,
+                                 zdat,
+                                 bws,
+                                 invalid.penalty = c("baseline", "large"),
+                                 penalty.multiplier = 10) {
+  invalid.penalty <- match.arg(invalid.penalty)
+  base.penalty <- switch(
+    invalid.penalty,
+    baseline = if (is.finite(bws$fval[1L])) as.numeric(bws$fval[1L]) else 1,
+    large = 1
+  )
+  base.penalty <- max(abs(base.penalty), 1)
+  penalty <- penalty.multiplier * base.penalty
+
+  fit <- tryCatch(
+    .npRmpi_with_local_regression(
+      npscoef(
+        bws = bws,
+        txdat = xdat,
+        tydat = ydat,
+        tzdat = zdat,
+        leave.one.out = TRUE,
+        iterate = FALSE,
+        betas = FALSE,
+        errors = FALSE
+      )
+    ),
+    error = function(e) e
+  )
+
+  if (inherits(fit, "error") || is.null(fit$mean) || any(!is.finite(fit$mean))) {
+    return(list(objective = penalty, num.feval = 1L))
+  }
+
+  list(
+    objective = as.numeric(mean((as.double(ydat) - as.double(fit$mean))^2)),
+    num.feval = 1L
+  )
+}
+
 .npscoefbw_eval_collective <- function(data,
                                        bws,
                                        invalid.penalty = c("baseline", "large"),
