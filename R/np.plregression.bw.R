@@ -439,11 +439,6 @@ npplregbw.plbandwidth =
     out
   }
 
-  child.contexts <- lapply(child.responses, function(resp) {
-    .npregbw_nomad_context_prepare(xdat = zdat, ydat = resp$values)
-  })
-  on.exit(invisible(lapply(child.contexts, .npregbw_nomad_context_cleanup)), add = TRUE)
-
   child_eval_payload <- function(bw.matrix, degree, penalty.multiplier) {
     total.objective <- 0
     total.feval <- 0
@@ -464,8 +459,9 @@ npplregbw.plbandwidth =
         reg.args = child.reg.args,
         yname = resp$name
       )
-      out <- .npregbw_eval_collective(
-        data = child.contexts[[i]],
+      out <- .npregbw_eval_only(
+        xdat = zdat,
+        ydat = resp$values,
         bws = tbw,
         invalid.penalty = "baseline",
         penalty.multiplier = penalty.multiplier
