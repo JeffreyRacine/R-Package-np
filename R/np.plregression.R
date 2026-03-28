@@ -276,8 +276,10 @@ npplreg.plbandwidth <-
     .npRmpi_require_active_slave_pool(where = "npplreg()")
     if (.npRmpi_autodispatch_active() &&
         is.null(bws$degree.search) &&
-        !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+        !isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
+      result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+      return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
+    }
 
     txdat = toFrame(txdat)
     tzdat = toFrame(tzdat)

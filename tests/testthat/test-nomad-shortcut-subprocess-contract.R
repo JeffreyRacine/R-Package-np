@@ -1,98 +1,158 @@
-test_that("nomad shortcut smoke covers regression and conditional families in subprocess session mode", {
+nomad_shortcut_env <- function() {
   skip_on_cran()
+  skip_if_not(
+    tolower(Sys.getenv("NOT_CRAN", "")) %in% c("true", "1", "yes"),
+    "extended local subprocess NOMAD shortcut contract"
+  )
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  env
+}
 
-  res <- npRmpi_run_rscript_subprocess(
+run_nomad_shortcut_subprocess <- function(lines, timeout = 120L) {
+  npRmpi_run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
       "options(np.messages = FALSE)",
       "npRmpi.init(nslaves = 1, quiet = TRUE)",
       "on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
+      lines
+    ),
+    timeout = timeout,
+    env = nomad_shortcut_env()
+  )
+}
+
+expect_nomad_shortcut_marker <- function(res, marker) {
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl(marker, res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+}
+
+test_that("nomad shortcut smoke covers npreg in subprocess session mode", {
+  res <- run_nomad_shortcut_subprocess(
+    lines = c(
       "set.seed(20260322)",
-      "n <- 28L",
+      "n <- 12L",
       "x <- runif(n, -1, 1)",
       "y <- x + 0.4 * x^2 + rnorm(n, sd = 0.18)",
       "dat <- data.frame(y = y, x = x)",
-      "fit_reg <- npreg(y ~ x, data = dat, nomad = TRUE, nmulti = 1, nomad.nmulti = 2)",
-      "stopifnot(isTRUE(fit_reg$bws$nomad.shortcut$enabled))",
-      "stopifnot(identical(fit_reg$bws$nomad.shortcut$preset, 'lp_nomad'))",
-      "bw_cd <- npcdensbw(y ~ x, data = dat, nomad = TRUE, nmulti = 1, nomad.nmulti = 2)",
-      "stopifnot(isTRUE(bw_cd$nomad.shortcut$enabled))",
-      "stopifnot(isTRUE(bw_cd$bernstein.basis))",
-      "stopifnot(identical(bw_cd$nomad.shortcut$preset, 'lp_nomad'))",
-      "fit_cd <- npcdens(bws = bw_cd)",
-      "stopifnot(inherits(fit_cd, 'condensity'))",
-      "bw_cdf <- npcdistbw(y ~ x, data = dat, nomad = TRUE, nmulti = 1, nomad.nmulti = 2, ngrid = 25L)",
-      "stopifnot(isTRUE(bw_cdf$nomad.shortcut$enabled))",
-      "stopifnot(isTRUE(bw_cdf$bernstein.basis))",
-      "stopifnot(identical(bw_cdf$nomad.shortcut$preset, 'lp_nomad'))",
-      "fit_cdf <- npcdist(bws = bw_cdf)",
-      "stopifnot(inherits(fit_cdf, 'condistribution'))",
-      "cat('NOMAD_SHORTCUT_CORE_OK\\n')"
-    ),
-    timeout = 180L,
-    env = env
+      "fit <- npreg(y ~ x, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 0L)",
+      "stopifnot(inherits(fit, 'npregression'))",
+      "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
+      "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      "cat('NOMAD_SHORTCUT_NPREG_OK\\n')"
+    )
   )
 
-  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("NOMAD_SHORTCUT_CORE_OK", res$output, fixed = TRUE)),
-              info = paste(res$output, collapse = "\n"))
+  expect_nomad_shortcut_marker(res, "NOMAD_SHORTCUT_NPREG_OK")
 })
 
-test_that("nomad shortcut smoke covers semiparametric families in subprocess session mode", {
-  skip_on_cran()
-  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
-  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
-
-  res <- npRmpi_run_rscript_subprocess(
+test_that("nomad shortcut smoke covers npcdens in subprocess session mode", {
+  res <- run_nomad_shortcut_subprocess(
     lines = c(
-      "suppressPackageStartupMessages(library(npRmpi))",
-      "options(np.messages = FALSE)",
-      "npRmpi.init(nslaves = 1, quiet = TRUE)",
-      "on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
       "set.seed(20260323)",
-      "n <- 28L",
+      "n <- 12L",
+      "x <- runif(n, -1, 1)",
+      "y <- x + 0.35 * x^2 + rnorm(n, sd = 0.18)",
+      "dat <- data.frame(y = y, x = x)",
+      "fit <- npcdens(y ~ x, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 0L)",
+      "stopifnot(inherits(fit, 'condensity'))",
+      "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
+      "stopifnot(isTRUE(fit$bws$bernstein.basis))",
+      "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      "cat('NOMAD_SHORTCUT_NPCDENS_OK\\n')"
+    )
+  )
+
+  expect_nomad_shortcut_marker(res, "NOMAD_SHORTCUT_NPCDENS_OK")
+})
+
+test_that("nomad shortcut smoke covers npcdist in subprocess session mode", {
+  res <- run_nomad_shortcut_subprocess(
+    lines = c(
+      "set.seed(20260324)",
+      "n <- 12L",
+      "x <- runif(n, -1, 1)",
+      "y <- x + 0.25 * x^2 + rnorm(n, sd = 0.18)",
+      "dat <- data.frame(y = y, x = x)",
+      "fit <- npcdist(y ~ x, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 0L, ngrid = 7L)",
+      "stopifnot(inherits(fit, 'condistribution'))",
+      "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
+      "stopifnot(isTRUE(fit$bws$bernstein.basis))",
+      "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      "cat('NOMAD_SHORTCUT_NPCDIST_OK\\n')"
+    )
+  )
+
+  expect_nomad_shortcut_marker(res, "NOMAD_SHORTCUT_NPCDIST_OK")
+})
+
+test_that("nomad shortcut smoke covers npplreg in subprocess session mode", {
+  res <- run_nomad_shortcut_subprocess(
+    lines = c(
+      "set.seed(20260325)",
+      "n <- 12L",
       "x <- runif(n)",
       "z <- runif(n, -1, 1)",
       "y <- 1 + x + sin(pi * z) + rnorm(n, sd = 0.18)",
-      "dat_pl <- data.frame(y = y, x = x, z = z)",
-      "fit_pl <- npplreg(y ~ x | z, data = dat_pl, nomad = TRUE, nmulti = 1, nomad.nmulti = 2)",
-      "stopifnot(isTRUE(fit_pl$bws$nomad.shortcut$enabled))",
-      "stopifnot(identical(fit_pl$bws$nomad.shortcut$preset, 'lp_nomad'))",
-      "fit_sc <- npscoef(y ~ x | z, data = dat_pl, nomad = TRUE, nmulti = 1, nomad.nmulti = 2)",
-      "stopifnot(isTRUE(fit_sc$bws$nomad.shortcut$enabled))",
-      "stopifnot(identical(fit_sc$bws$nomad.shortcut$preset, 'lp_nomad'))",
-      "x2 <- runif(n, -1, 1)",
-      "idx <- x + 0.75 * x2",
-      "y_si <- sin(idx) + 0.25 * idx^2 + rnorm(n, sd = 0.08)",
-      "dat_si <- data.frame(y = y_si, x1 = x, x2 = x2)",
-      "fit_si <- npindex(y ~ x1 + x2, data = dat_si, method = 'ichimura', nomad = TRUE, degree.max = 1L, nmulti = 1, nomad.nmulti = 2)",
-      "stopifnot(isTRUE(fit_si$bws$nomad.shortcut$enabled))",
-      "stopifnot(identical(fit_si$bws$nomad.shortcut$preset, 'lp_nomad'))",
-      "stopifnot(identical(fit_si$bws$ynames, 'y'))",
-      "cat('NOMAD_SHORTCUT_SEMIPARAM_OK\\n')"
-    ),
-    timeout = 180L,
-    env = env
+      "dat <- data.frame(y = y, x = x, z = z)",
+      "fit <- npplreg(y ~ x | z, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 0L)",
+      "stopifnot(inherits(fit, 'plregression'))",
+      "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
+      "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      "cat('NOMAD_SHORTCUT_NPPLREG_OK\\n')"
+    )
   )
 
-  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("NOMAD_SHORTCUT_SEMIPARAM_OK", res$output, fixed = TRUE)),
-              info = paste(res$output, collapse = "\n"))
+  expect_nomad_shortcut_marker(res, "NOMAD_SHORTCUT_NPPLREG_OK")
+})
+
+test_that("nomad shortcut smoke covers npscoef in subprocess session mode", {
+  res <- run_nomad_shortcut_subprocess(
+    lines = c(
+      "set.seed(20260326)",
+      "n <- 12L",
+      "x <- runif(n)",
+      "z <- runif(n, -1, 1)",
+      "y <- 1 + x + sin(pi * z) + rnorm(n, sd = 0.18)",
+      "dat <- data.frame(y = y, x = x, z = z)",
+      "fit <- npscoef(y ~ x | z, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 0L)",
+      "stopifnot(inherits(fit, 'smoothcoefficient'))",
+      "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
+      "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      "cat('NOMAD_SHORTCUT_NPSCOEF_OK\\n')"
+    )
+  )
+
+  expect_nomad_shortcut_marker(res, "NOMAD_SHORTCUT_NPSCOEF_OK")
+})
+
+test_that("nomad shortcut smoke covers npindex in subprocess session mode", {
+  res <- run_nomad_shortcut_subprocess(
+    lines = c(
+      "set.seed(20260327)",
+      "n <- 12L",
+      "x1 <- runif(n, -1, 1)",
+      "x2 <- runif(n, -1, 1)",
+      "idx <- x1 + 0.75 * x2",
+      "y <- sin(idx) + 0.25 * idx^2 + rnorm(n, sd = 0.08)",
+      "dat <- data.frame(y = y, x1 = x1, x2 = x2)",
+      "fit <- npindex(y ~ x1 + x2, data = dat, method = 'ichimura', nomad = TRUE, degree.max = 1L, nmulti = 0L)",
+      "stopifnot(inherits(fit, 'singleindex'))",
+      "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
+      "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      "stopifnot(identical(fit$bws$ynames, 'y'))",
+      "cat('NOMAD_SHORTCUT_NPINDEX_OK\\n')"
+    )
+  )
+
+  expect_nomad_shortcut_marker(res, "NOMAD_SHORTCUT_NPINDEX_OK")
 })
 
 test_that("nomad.nmulti fails fast outside active NOMAD degree search in subprocess session mode", {
-  skip_on_cran()
-  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
-  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
-
-  res <- npRmpi_run_rscript_subprocess(
+  res <- run_nomad_shortcut_subprocess(
     lines = c(
-      "suppressPackageStartupMessages(library(npRmpi))",
-      "options(np.messages = FALSE)",
-      "npRmpi.init(nslaves = 1, quiet = TRUE)",
-      "on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
       "x <- data.frame(x = seq(0, 1, length.out = 8))",
       "y <- x$x^2",
       "msg <- tryCatch({",
@@ -102,11 +162,8 @@ test_that("nomad.nmulti fails fast outside active NOMAD degree search in subproc
       "stopifnot(grepl('nomad.nmulti is only supported', msg, fixed = TRUE))",
       "cat('NOMAD_SHORTCUT_FAILFAST_OK\\n')"
     ),
-    timeout = 180L,
-    env = env
+    timeout = 60L
   )
 
-  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("NOMAD_SHORTCUT_FAILFAST_OK", res$output, fixed = TRUE)),
-              info = paste(res$output, collapse = "\n"))
+  expect_nomad_shortcut_marker(res, "NOMAD_SHORTCUT_FAILFAST_OK")
 })

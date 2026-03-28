@@ -281,6 +281,52 @@ npValidateScalarLogical <- function(value, argname) {
   obj
 }
 
+.npRmpi_restore_nomad_fit_bws_metadata <- function(result, bws) {
+  if (!is.list(result) || !is.list(result$bws) || !is.list(bws))
+    return(result)
+
+  if (is.null(result$bws$degree.search) && is.list(bws$degree.search))
+    result$bws$degree.search <- bws$degree.search
+
+  if (is.null(result$bws$nomad.shortcut) && is.list(bws$nomad.shortcut))
+    result$bws$nomad.shortcut <- bws$nomad.shortcut
+
+  result
+}
+
+.np_nomad_validate_inner_multistart <- function(call_names = character(),
+                                                dot.args = list(),
+                                                nomad.nmulti = 0L,
+                                                regtype,
+                                                automatic.degree.search,
+                                                search.engine) {
+  if (is.null(call_names))
+    call_names <- character()
+  dot.names <- names(dot.args)
+  if (is.null(dot.names))
+    dot.names <- character()
+
+  inner.named <- ("nomad.nmulti" %in% call_names) || ("nomad.nmulti" %in% dot.names)
+  inner.raw <- if ("nomad.nmulti" %in% dot.names) dot.args[["nomad.nmulti"]] else nomad.nmulti
+  inner.nmulti <- if (inner.named) {
+    npValidateNonNegativeInteger(inner.raw, "nomad.nmulti")
+  } else {
+    0L
+  }
+
+  regtype.value <- if (length(regtype)) as.character(regtype)[1L] else ""
+  search.engine.value <- if (length(search.engine)) as.character(search.engine)[1L] else ""
+
+  if (inner.named &&
+      (!identical(regtype.value, "lp") ||
+       !isTRUE(automatic.degree.search) ||
+       !(search.engine.value %in% c("nomad", "nomad+powell")))) {
+    stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
+  }
+
+  list(named = inner.named, nmulti = inner.nmulti)
+}
+
 npValidateNonNegativeInteger <- function(value, argname) {
   if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
       !is.finite(value) || value < 0 || value != floor(value))

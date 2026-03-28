@@ -839,8 +839,10 @@ npscoef.scbandwidth <-
     if (.npRmpi_npscoef_should_localize(bws) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    if (.npRmpi_autodispatch_active()) {
+      result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+      return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
+    }
 
     .np_scoef_fit_internal(
       bws = bws,

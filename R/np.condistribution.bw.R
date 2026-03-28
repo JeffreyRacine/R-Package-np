@@ -1564,16 +1564,16 @@ npcdistbw.default <-
       bernstein.basis = bernstein.value,
       bernstein.named = bernstein.named
     )
-    nomad.inner.named <- "nomad.nmulti" %in% search.mc.names
-    nomad.inner.nmulti <- if (nomad.inner.named) {
-      npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti")
-    } else {
-      0L
-    }
-    if (nomad.inner.named &&
-        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
-      stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
-    }
+    nomad.inner <- .np_nomad_validate_inner_multistart(
+      call_names = search.mc.names,
+      dot.args = lp.dot.args,
+      nomad.nmulti = nomad.nmulti,
+      regtype = regtype,
+      automatic.degree.search = !is.null(degree.search),
+      search.engine = if (is.null(degree.search)) "" else degree.search$engine
+    )
+    nomad.inner.named <- nomad.inner$named
+    nomad.inner.nmulti <- nomad.inner$nmulti
 
     if (!is.null(degree.search)) {
       spec$bernstein.basis <- degree.search$bernstein.basis

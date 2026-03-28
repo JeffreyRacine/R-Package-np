@@ -73,13 +73,39 @@ npregbw.NULL <-
            ydat = stop("invoked without data 'ydat'"),
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npregbw()")
+    mc <- match.call(expand.dots = FALSE)
     dots <- list(...)
-    automatic.degree.search <- isTRUE(dots$nomad) ||
-      (!is.null(dots$degree.select) &&
-         !identical(as.character(dots$degree.select[[1L]]), "manual"))
+    dot.names <- names(dots)
+    degree.select.value <- if ("degree.select" %in% dot.names) {
+      match.arg(as.character(dots$degree.select[[1L]]), c("manual", "coordinate", "exhaustive"))
+    } else {
+      "manual"
+    }
+    automatic.degree.search <- isTRUE(dots$nomad) || !identical(degree.select.value, "manual")
+    regtype.value <- if ("regtype" %in% dot.names) {
+      match.arg(as.character(dots$regtype[[1L]]), c("lc", "ll", "lp"))
+    } else if (isTRUE(dots$nomad)) {
+      "lp"
+    } else {
+      "lc"
+    }
+    search.engine.value <- if ("search.engine" %in% dot.names) {
+      match.arg(as.character(dots$search.engine[[1L]]), c("nomad+powell", "cell", "nomad"))
+    } else if (isTRUE(dots$nomad)) {
+      "nomad+powell"
+    } else {
+      "nomad+powell"
+    }
+    .np_nomad_validate_inner_multistart(
+      call_names = names(mc),
+      dot.args = dots,
+      regtype = regtype.value,
+      automatic.degree.search = automatic.degree.search,
+      search.engine = search.engine.value
+    )
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
       return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
+        .npRmpi_autodispatch_as_generic_call("npregbw", mc),
         parent.frame()))
 
     xdat <- toFrame(xdat)
@@ -89,7 +115,6 @@ npregbw.NULL <-
     tbw <- npregbw.default(xdat = xdat, ydat = ydat, bws = bws, ...)
 
     ## clean up (possible) inconsistencies due to recursion ...
-    mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
     tbw$call <- mc
 
@@ -1013,6 +1038,17 @@ npregbw.default <-
     degree.select.value <- if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else "manual"
     automatic.degree.search <- !identical(match.arg(degree.select.value, c("manual", "coordinate", "exhaustive")), "manual")
     search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
+    regtype.value.early <- if (!is.null(nomad.shortcut$values$regtype)) nomad.shortcut$values$regtype else "lc"
+    nomad.inner <- .np_nomad_validate_inner_multistart(
+      call_names = search.mc.names,
+      dot.args = lp.dot.args,
+      nomad.nmulti = nomad.nmulti,
+      regtype = regtype.value.early,
+      automatic.degree.search = automatic.degree.search,
+      search.engine = search.engine.value
+    )
+    nomad.inner.named <- nomad.inner$named
+    nomad.inner.nmulti <- nomad.inner$nmulti
 
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
       return(.npRmpi_autodispatch_call(
@@ -1094,16 +1130,6 @@ npregbw.default <-
       bernstein.basis = bernstein.value,
       bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% search.mc.names)
     )
-    nomad.inner.named <- "nomad.nmulti" %in% search.mc.names
-    nomad.inner.nmulti <- if (nomad.inner.named) {
-      npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti")
-    } else {
-      0L
-    }
-    if (nomad.inner.named &&
-        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
-      stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
-    }
     if (!is.null(degree.search) && is.null(reg.args$degree)) {
       reg.args$degree <- npSetupGlpDegree(
         regtype = regtype.value,

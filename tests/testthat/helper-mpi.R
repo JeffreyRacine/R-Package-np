@@ -82,7 +82,8 @@ npRmpi_subprocess_env <- local({
   function(extra = character()) {
     if (is.null(lib.path.cache) || !dir.exists(lib.path.cache)) {
       installed.pkg <- tryCatch(find.package("npRmpi"), error = function(e) "")
-      if (nzchar(installed.pkg)) {
+      if (nzchar(installed.pkg) &&
+          file.exists(file.path(installed.pkg, "Meta", "package.rds"))) {
         lib.path.cache <<- dirname(installed.pkg)
       }
     }

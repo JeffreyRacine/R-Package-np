@@ -105,6 +105,7 @@ npcdens.conbandwidth <- function(bws,
   }
   if (.npRmpi_autodispatch_active() && !keep_local_shadow_nn) {
     out <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+    out <- .npRmpi_restore_nomad_fit_bws_metadata(out, bws)
     if (inherits(out, "condensity") &&
         !is.null(out$proper.requested) &&
         !is.null(out$proper.applied) &&

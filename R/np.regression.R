@@ -237,6 +237,7 @@ npreg.rbandwidth <-
           if (is.null(result$bws$timing.profile) && is.list(bws$timing.profile))
             result$bws$timing.profile <- bws$timing.profile
         }
+        result <- .npRmpi_restore_nomad_fit_bws_metadata(result, bws)
       }
       return(result)
     }

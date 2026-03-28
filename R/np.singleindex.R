@@ -290,11 +290,14 @@ npindex.sibandwidth <-
         dots
       )
       result <- do.call(npindex, local.args)
-      return(.npRmpi_autodispatch_tag_result(result, mode = "auto"))
+      result <- .npRmpi_autodispatch_tag_result(result, mode = "auto")
+      return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
     }
     if (.npRmpi_autodispatch_active() &&
-        !(isTRUE(gradients) && identical(bws$type, "generalized_nn")))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+        !(isTRUE(gradients) && identical(bws$type, "generalized_nn"))) {
+      result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+      return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
+    }
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)

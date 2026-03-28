@@ -91,19 +91,41 @@ npscoefbw.NULL <-
            zdat = NULL,
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")
-    search.dots <- match.call(expand.dots = FALSE)$...
-    nomad.requested <- "nomad" %in% names(search.dots) &&
-      isTRUE(eval(search.dots$nomad, parent.frame()))
-    degree.select.value <- if ("degree.select" %in% names(search.dots)) {
-      match.arg(eval(search.dots$degree.select, parent.frame()),
+    mc <- match.call(expand.dots = FALSE)
+    dots <- list(...)
+    dot.names <- names(dots)
+    nomad.requested <- "nomad" %in% dot.names && isTRUE(dots$nomad)
+    degree.select.value <- if ("degree.select" %in% dot.names) {
+      match.arg(as.character(dots$degree.select[[1L]]),
                 c("manual", "coordinate", "exhaustive"))
     } else {
       "manual"
     }
     automatic.degree.search <- isTRUE(nomad.requested) ||
       !identical(degree.select.value, "manual")
+    regtype.value <- if ("regtype" %in% dot.names) {
+      match.arg(as.character(dots$regtype[[1L]]), c("lc", "ll", "lp"))
+    } else if (isTRUE(nomad.requested)) {
+      "lp"
+    } else {
+      "lc"
+    }
+    search.engine.value <- if ("search.engine" %in% dot.names) {
+      match.arg(as.character(dots$search.engine[[1L]]), c("nomad+powell", "cell", "nomad"))
+    } else if (isTRUE(nomad.requested)) {
+      "nomad+powell"
+    } else {
+      "nomad+powell"
+    }
+    .np_nomad_validate_inner_multistart(
+      call_names = names(mc),
+      dot.args = dots,
+      regtype = regtype.value,
+      automatic.degree.search = automatic.degree.search,
+      search.engine = search.engine.value
+    )
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(mc, parent.frame()))
 
     miss.z <- missing(zdat)
 
@@ -121,7 +143,6 @@ npscoefbw.NULL <-
     tbw <- do.call(npscoefbw.default, c(bw.args, list(...)))
 
     ## clean up (possible) inconsistencies due to recursion ...
-    mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
     tbw$call <- mc
 
@@ -1576,6 +1597,7 @@ npscoefbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
+    dots <- list(...)
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
       call_names = mc.names,
@@ -1653,16 +1675,16 @@ npscoefbw.default <-
       bernstein.basis = if (!is.null(nomad.shortcut$values$bernstein.basis)) nomad.shortcut$values$bernstein.basis else bernstein.basis,
       bernstein.named = bernstein.named
     )
-    nomad.inner.named <- "nomad.nmulti" %in% mc.names
-    nomad.inner.nmulti <- if (nomad.inner.named) {
-      npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti")
-    } else {
-      0L
-    }
-    if (nomad.inner.named &&
-        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
-      stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
-    }
+    nomad.inner <- .np_nomad_validate_inner_multistart(
+      call_names = mc.names,
+      dot.args = dots,
+      nomad.nmulti = nomad.nmulti,
+      regtype = regtype.value,
+      automatic.degree.search = !is.null(degree.search),
+      search.engine = if (is.null(degree.search)) "" else degree.search$engine
+    )
+    nomad.inner.named <- nomad.inner$named
+    nomad.inner.nmulti <- nomad.inner$nmulti
     degree.setup <- npSetupGlpDegree(
       regtype = regtype.value,
       degree = if ("degree" %in% mc.names) degree else NULL,
