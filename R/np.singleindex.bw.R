@@ -620,13 +620,27 @@ npindexbw.NULL <-
     if (!ok.design)
       return(invalid.penalty)
 
-    .npindex_lp_loo_fit(
-      index = index,
-      ydat = ydat,
-      h = h,
-      bws = bws,
-      spec = spec
-    )
+    if (identical(bws$method, "kleinspady") &&
+        .npRmpi_has_active_slave_pool(comm = 1L) &&
+        !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+      .npRmpi_with_local_regression(
+        .npindex_lp_loo_fit(
+          index = index,
+          ydat = ydat,
+          h = h,
+          bws = bws,
+          spec = spec
+        )
+      )
+    } else {
+      .npindex_lp_loo_fit(
+        index = index,
+        ydat = ydat,
+        h = h,
+        bws = bws,
+        spec = spec
+      )
+    }
   }
 
   if (any(!is.finite(fit.loo)))
