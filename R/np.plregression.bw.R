@@ -122,14 +122,18 @@ npplregbw.NULL =
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
     search.dots <- match.call(expand.dots = FALSE)$...
+    nomad.requested <- "nomad" %in% names(search.dots) &&
+      isTRUE(eval(search.dots$nomad, parent.frame()))
     degree.select.value <- if ("degree.select" %in% names(search.dots)) {
       match.arg(eval(search.dots$degree.select, parent.frame()),
                 c("manual", "coordinate", "exhaustive"))
     } else {
       "manual"
     }
+    automatic.degree.search <- isTRUE(nomad.requested) ||
+      !identical(degree.select.value, "manual")
     if (.npRmpi_autodispatch_active() &&
-        identical(degree.select.value, "manual") &&
+        !isTRUE(automatic.degree.search) &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -414,6 +418,11 @@ npplregbw.plbandwidth =
     out
   }
 
+  child.contexts <- lapply(child.responses, function(resp) {
+    .npregbw_nomad_context_prepare(xdat = zdat, ydat = resp$values)
+  })
+  on.exit(invisible(lapply(child.contexts, .npregbw_nomad_context_cleanup)), add = TRUE)
+
   child_eval_payload <- function(bw.matrix, degree, penalty.multiplier) {
     total.objective <- 0
     total.feval <- 0
@@ -434,9 +443,8 @@ npplregbw.plbandwidth =
         reg.args = child.reg.args,
         yname = resp$name
       )
-      out <- .npregbw_eval_only(
-        xdat = zdat,
-        ydat = resp$values,
+      out <- .npregbw_eval_collective(
+        data = child.contexts[[i]],
         bws = tbw,
         invalid.penalty = "baseline",
         penalty.multiplier = penalty.multiplier
@@ -462,7 +470,8 @@ npplregbw.plbandwidth =
     list(
       objective = out$objective,
       degree = degree,
-      num.feval = out$num.feval
+      num.feval = out$num.feval,
+      timing.profile = out$timing.profile
     )
   }
 
@@ -521,6 +530,8 @@ npplregbw.plbandwidth =
     }
 
     direct.payload <- build_direct_payload()
+    if (is.null(direct.payload$timing.profile) && is.list(best_record$timing.profile))
+      direct.payload$timing.profile <- best_record$timing.profile
     direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
@@ -690,6 +701,8 @@ npplregbw.plbandwidth =
     bws$powell.time <- as.numeric(search_result$powell.time[1L])
   if (!is.null(search_result$optim.time) && is.finite(search_result$optim.time))
     bws$total.time <- as.numeric(search_result$optim.time[1L])
+  if (is.null(bws$timing.profile) && is.list(search_result$best$timing.profile))
+    bws$timing.profile <- search_result$best$timing.profile
   bws <- .np_attach_nomad_restart_summary(bws, search_result)
   bws$degree.search <- metadata
   bws

@@ -60,3 +60,41 @@ test_that("autodispatch materialization evaluates proper arguments eagerly", {
   expect_identical(prepared$tmpvals[[method.ref]], proper.method)
   expect_identical(prepared$tmpvals[[control.ref]], proper.control)
 })
+
+test_that("autodispatch materialization preserves explicit NULL arguments without shifting later args", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  xdat <- data.frame(x = 1:3)
+  ydat <- c(1, 2, 3)
+  gydat <- NULL
+  bws <- structure(list(tag = "dummy"), class = "condbandwidth")
+
+  mc <- quote(npcdistbw(
+    xdat = xdat,
+    ydat = ydat,
+    gydat = gydat,
+    bws = bws,
+    bandwidth.compute = TRUE,
+    nmulti = 0L,
+    remin = FALSE,
+    itmax = 1L
+  ))
+
+  prepared <- materialize(mc = mc, caller_env = environment(), comm = 1L)
+  call.args <- as.list(prepared$call)
+
+  expect_true("gydat" %in% names(call.args))
+  expect_true(is.null(call.args$gydat))
+
+  bws.ref <- as.character(prepared$call$bws)
+  compute.ref <- as.character(prepared$call$bandwidth.compute)
+  nmulti.ref <- as.character(prepared$call$nmulti)
+  remin.ref <- as.character(prepared$call$remin)
+  itmax.ref <- as.character(prepared$call$itmax)
+
+  expect_false(identical(bws.ref, "bws"))
+  expect_identical(prepared$tmpvals[[compute.ref]], TRUE)
+  expect_identical(prepared$tmpvals[[nmulti.ref]], 0L)
+  expect_identical(prepared$tmpvals[[remin.ref]], FALSE)
+  expect_identical(prepared$tmpvals[[itmax.ref]], 1L)
+})

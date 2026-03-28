@@ -207,8 +207,39 @@ npreg.rbandwidth <-
       result <- do.call(npreg, local.args)
       return(.npRmpi_autodispatch_tag_result(result, mode = "auto"))
     }
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    if (.npRmpi_autodispatch_active()) {
+      result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+      if (is.list(result) && is.list(bws)) {
+        has.nomad.optim <- (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) ||
+          (!is.null(bws$powell.time) && is.finite(bws$powell.time))
+        if ((is.null(result$nomad.time) || !is.finite(result$nomad.time)) &&
+            !is.null(bws$nomad.time) && is.finite(bws$nomad.time))
+          result$nomad.time <- as.double(bws$nomad.time)
+        if ((is.null(result$powell.time) || !is.finite(result$powell.time)) &&
+            !is.null(bws$powell.time) && is.finite(bws$powell.time))
+          result$powell.time <- as.double(bws$powell.time)
+        if (has.nomad.optim &&
+            !is.null(bws$total.time) && is.finite(bws$total.time))
+          result$optim.time <- as.double(bws$total.time)
+        if (is.finite(result$optim.time) &&
+            !is.null(result$fit.time) && is.finite(result$fit.time))
+          result$total.time <- as.double(result$optim.time) + as.double(result$fit.time)
+        if (is.list(result$bws)) {
+          if ((is.null(result$bws$nomad.time) || !is.finite(result$bws$nomad.time)) &&
+              !is.null(bws$nomad.time) && is.finite(bws$nomad.time))
+            result$bws$nomad.time <- as.double(bws$nomad.time)
+          if ((is.null(result$bws$powell.time) || !is.finite(result$bws$powell.time)) &&
+              !is.null(bws$powell.time) && is.finite(bws$powell.time))
+            result$bws$powell.time <- as.double(bws$powell.time)
+          if ((is.null(result$bws$total.time) || !is.finite(result$bws$total.time)) &&
+              !is.null(bws$total.time) && is.finite(bws$total.time))
+            result$bws$total.time <- as.double(bws$total.time)
+          if (is.null(result$bws$timing.profile) && is.list(bws$timing.profile))
+            result$bws$timing.profile <- bws$timing.profile
+        }
+      }
+      return(result)
+    }
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)

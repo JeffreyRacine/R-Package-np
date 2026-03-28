@@ -92,7 +92,7 @@ test_that("autodispatch keeps npreg formula fits plotable", {
   expect_error(plot(fit), NA)
 })
 
-test_that("npRmpi plot methods stay registered after np namespace loads", {
+test_that("npRmpi S3 methods stay registered after np namespace loads", {
   skip_if_not_installed("np")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
@@ -108,8 +108,16 @@ test_that("npRmpi plot methods stay registered after np namespace loads", {
   fit <- npreg(y ~ x, nomad = TRUE, nmulti = 1)
 
   expect_true("np" %in% loadedNamespaces())
-  meth <- getS3method("plot", "npregression")
-  expect_identical(environmentName(environment(meth)), "npRmpi")
+  for (spec in list(
+    c("plot", "npregression"),
+    c("summary", "npregression"),
+    c("summary", "rbandwidth"),
+    c("print", "npregression"),
+    c("predict", "npregression")
+  )) {
+    meth <- getS3method(spec[1L], spec[2L])
+    expect_identical(environmentName(environment(meth)), "npRmpi")
+  }
 
   pdf(file = tempfile(fileext = ".pdf"))
   on.exit(dev.off(), add = TRUE)

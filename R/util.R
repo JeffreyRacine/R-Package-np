@@ -1474,18 +1474,14 @@ genTimingStr <- function(x){
     as.double(x$powell.time) else NA_real_
   fit.time <- if (!is.null(x$fit.time) && !is.na(x$fit.time))
     as.double(x$fit.time) else NA_real_
-
-  if (is.finite(nomad.time) || is.finite(powell.time)) {
-    detail <- character(0)
-    if (is.finite(nomad.time))
-      detail <- c(detail, paste("NOMAD ", format(nomad.time), "s", sep = ""))
-    if (is.finite(powell.time))
-      detail <- c(detail, paste("Powell ", format(powell.time), "s", sep = ""))
-    if (is.finite(fit.time))
-      detail <- c(detail, paste("fit ", format(fit.time), "s", sep = ""))
-
-    return(paste("\nEstimation Time: ", format(x$total.time), " seconds (",
-                 paste(detail, collapse = ", "), ")", sep = ""))
+  if ((!is.finite(nomad.time) || !is.finite(powell.time)) &&
+      is.list(x$bws)) {
+    if (!is.finite(nomad.time) &&
+        !is.null(x$bws$nomad.time) && !is.na(x$bws$nomad.time))
+      nomad.time <- as.double(x$bws$nomad.time)
+    if (!is.finite(powell.time) &&
+        !is.null(x$bws$powell.time) && !is.na(x$bws$powell.time))
+      powell.time <- as.double(x$bws$powell.time)
   }
 
   .npRmpiTimingProfileRecord <- function() {
@@ -1589,6 +1585,20 @@ genTimingStr <- function(x){
       "s, comm_ratio=", ratio.pct,
       ", comm_calls=", ifelse(is.finite(calls), calls, "NA")
     )
+  }
+
+  if (is.finite(nomad.time) || is.finite(powell.time)) {
+    detail <- character(0)
+    if (is.finite(nomad.time))
+      detail <- c(detail, paste("NOMAD ", format(nomad.time), "s", sep = ""))
+    if (is.finite(powell.time))
+      detail <- c(detail, paste("Powell ", format(powell.time), "s", sep = ""))
+    if (is.finite(fit.time))
+      detail <- c(detail, paste("fit ", format(fit.time), "s", sep = ""))
+
+    return(paste("\nEstimation Time: ", format(x$total.time), " seconds (",
+                 paste(detail, collapse = ", "), ")",
+                 .npRmpiTimingSessionStr(), .npRmpiTimingProfileStr(), sep = ""))
   }
 
   if (!is.null(x$optim.time) && !is.na(x$optim.time) &&

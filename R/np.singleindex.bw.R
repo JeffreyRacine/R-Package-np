@@ -72,7 +72,18 @@ npindexbw.NULL <-
            ydat = stop("training data ydat missing"),
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
-    if (.npRmpi_autodispatch_active())
+    search.dots <- match.call(expand.dots = FALSE)$...
+    nomad.requested <- "nomad" %in% names(search.dots) &&
+      isTRUE(eval(search.dots$nomad, parent.frame()))
+    degree.select.value <- if ("degree.select" %in% names(search.dots)) {
+      match.arg(eval(search.dots$degree.select, parent.frame()),
+                c("manual", "coordinate", "exhaustive"))
+    } else {
+      "manual"
+    }
+    automatic.degree.search <- isTRUE(nomad.requested) ||
+      !identical(degree.select.value, "manual")
+    if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat <- toFrame(xdat)
@@ -187,6 +198,98 @@ npindexbw.NULL <-
   force(expr)
 }
 
+.npindex_lp_loo_fit_block <- function(idx,
+                                      index,
+                                      ydat,
+                                      h,
+                                      bws,
+                                      spec) {
+  idx <- as.integer(idx)
+  if (!length(idx))
+    return(list(index = idx, fitted = numeric(0L)))
+
+  index <- as.double(index)
+  ydat <- as.double(ydat)
+  n <- length(index)
+  index.df <- data.frame(index = index)
+  kbw <- kbandwidth(
+    bw = c(h),
+    bwtype = bws$type,
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    ckerbound = bws$ckerbound,
+    ckerlb = bws$ckerlb,
+    ckerub = bws$ckerub,
+    nobs = n,
+    xdati = untangle(index.df),
+    ydati = untangle(data.frame(ydat)),
+    xnames = "index",
+    ynames = bws$ynames
+  )
+  degree <- as.integer(spec$degree.engine)
+  W <- W.lp(
+    xdat = index.df,
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+  W.eval.block <- W.lp(
+    xdat = index.df,
+    exdat = index.df[idx, , drop = FALSE],
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+  if (!is.matrix(W))
+    W <- matrix(W, nrow = n)
+  if (!is.matrix(W.eval.block))
+    W.eval.block <- matrix(W.eval.block, nrow = length(idx))
+
+  kw <- .np_kernel_weights_direct(
+    bws = kbw,
+    txdat = index.df,
+    exdat = index.df[idx, , drop = FALSE],
+    bandwidth.divide = TRUE,
+    kernel.pow = 1.0
+  )
+  kw[cbind(idx, seq_along(idx))] <- 0.0
+
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = 0.0, cap = 1.0)
+  fit.block <- double(length(idx))
+
+  for (jj in seq_along(idx)) {
+    w <- kw[, jj]
+    XtWy0 <- sum(w * ydat)
+    lc.mean <- XtWy0 / NZD(sum(w))
+    A <- crossprod(W, W * w)
+    z <- crossprod(W, ydat * w)
+    solved <- FALSE
+
+    for (ridge in ridge.grid) {
+      Ar <- A
+      zr <- z
+      if (ridge > 0) {
+        diag(Ar) <- diag(Ar) + ridge
+        zr[1L] <- XtWy0 + ridge * XtWy0 / NZD(A[1L, 1L])
+      }
+
+      coef <- tryCatch(chol2inv(chol(Ar)) %*% zr, error = function(e) NULL)
+      if (!is.null(coef) && all(is.finite(coef))) {
+        alpha <- min(1.0, ridge)
+        fit.block[jj] <- (1.0 - alpha) * drop(W.eval.block[jj, , drop = FALSE] %*% coef) +
+          alpha * lc.mean
+        solved <- TRUE
+        break
+      }
+    }
+
+    if (!solved)
+      fit.block[jj] <- lc.mean
+  }
+
+  list(index = idx, fitted = fit.block)
+}
+
 .npindex_lp_loo_fit <- function(index,
                                 ydat,
                                 h,
@@ -198,6 +301,32 @@ npindexbw.NULL <-
   n <- length(index)
   if (length(ydat) != n)
     stop("index and ydat must have the same length")
+
+  if (.npRmpi_autodispatch_active() &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    slave.num <- mpi.comm.size(1L) - 1L
+    if (slave.num > 0L) {
+      blocks <- Filter(length, .splitIndices(n, min(as.integer(n), as.integer(slave.num))))
+      pieces <- mpi.apply(
+        blocks,
+        .npindex_lp_loo_fit_block,
+        index = index,
+        ydat = ydat,
+        h = h,
+        bws = bws,
+        spec = spec,
+        comm = 1L
+      )
+      fit.loo <- double(n)
+      for (piece in pieces) {
+        if (inherits(piece, "try-error"))
+          stop(conditionMessage(attr(piece, "condition", exact = TRUE)), call. = FALSE)
+        fit.loo[as.integer(piece$index)] <- as.double(piece$fitted)
+      }
+      return(fit.loo)
+    }
+  }
 
   index.df <- data.frame(index = index)
   kbw <- kbandwidth(
@@ -706,6 +835,8 @@ npindexbw.NULL <-
     bws$powell.time <- as.numeric(search_result$powell.time[1L])
   if (!is.null(search_result$optim.time) && is.finite(search_result$optim.time))
     bws$total.time <- as.numeric(search_result$optim.time[1L])
+  if (is.null(bws$timing.profile) && is.list(search_result$best$timing.profile))
+    bws$timing.profile <- search_result$best$timing.profile
   bws <- .np_attach_nomad_restart_summary(bws, search_result)
   bws$degree.search <- metadata
   bws

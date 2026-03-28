@@ -468,7 +468,7 @@ npcdistbw.condbandwidth <-
             nbw[gbw_idx]=nbw[gbw_idx]*mysd*nconfac
           }
         }
-        myout= list( bw = nbw, fval = c(NA,NA) )
+        myout= list( bw = nbw, fval = c(NA,NA,NA) )
         total.time <- NA
       }
 
@@ -496,6 +496,7 @@ npcdistbw.condbandwidth <-
 
       tbw$fval = myout$fval[1]
       tbw$ifval = myout$fval[2]
+      tbw$initial.fval <- if (length(myout$fval) >= 3L) myout$fval[3L] else NA_real_
       tbw$num.feval <- sum(myout$eval.history[is.finite(myout$eval.history)])
       tbw$num.feval.fast <- myout$fast.history[1]
       tbw$fval.history <- myout$fval.history
@@ -549,6 +550,7 @@ npcdistbw.condbandwidth <-
       apply_bw_meta(tl = tl, dfactor = dfactor)
     }
   
+    initial.fval <- tbw$initial.fval
     tbw <- condbandwidth(xbw = tbw$xbw,
                          ybw = tbw$ybw,
                          bwmethod = tbw$method,
@@ -600,6 +602,7 @@ npcdistbw.condbandwidth <-
                          bernstein.basis.engine = tbw$bernstein.basis.engine)
 
     tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
+    tbw$initial.fval <- if (!is.null(initial.fval)) initial.fval else NA_real_
 
     tbw
   }
@@ -641,6 +644,84 @@ npcdistbw.condbandwidth <-
   )
 
   do.call(npcdistbw.condbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
+}
+
+.npcdistbw_nomad_context_prepare <- function(xdat, ydat, gydat = NULL) {
+  ctx <- list(xdat = xdat, ydat = ydat, gydat = gydat)
+  if (.npRmpi_autodispatch_active() &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    mc <- match.call()
+    mc[[1L]] <- get(".npcdistbw_nomad_context_prepare", envir = asNamespace("npRmpi"), inherits = FALSE)
+    return(.npRmpi_autodispatch_call(mc, parent.frame()))
+  }
+  ctx
+}
+
+.npcdistbw_nomad_context_cleanup <- function(ctx, comm = 1L) {
+  ref <- .npRmpi_autodispatch_remote_ref(ctx)
+  if (!is.null(ref))
+    .npRmpi_autodispatch_cleanup(ref, comm = comm)
+  invisible(NULL)
+}
+
+.npcdistbw_eval_collective <- function(data,
+                                       bws,
+                                       do.full.integral = FALSE,
+                                       ngrid = 100L,
+                                       invalid.penalty = c("baseline", "dbmax"),
+                                       penalty.multiplier = 10) {
+  invalid.penalty <- match.arg(invalid.penalty)
+
+  if (!is.list(data) || is.null(data$xdat) || is.null(data$ydat))
+    stop("invalid NOMAD conditional-distribution context")
+
+  if (.npRmpi_autodispatch_active() &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    xdat <- data$xdat
+    ydat <- data$ydat
+    gydat <- data$gydat
+    mc <- substitute(
+      npcdistbw(
+        xdat = xdat,
+        ydat = ydat,
+        gydat = gydat,
+        bws = bws,
+        bandwidth.compute = TRUE,
+        do.full.integral = DO_FULL,
+        ngrid = NGRID,
+        invalid.penalty = INVALID,
+        penalty.multiplier = PENALTY,
+        nmulti = 0L,
+        remin = FALSE,
+        itmax = 1L
+      ),
+      list(
+        DO_FULL = do.full.integral,
+        NGRID = ngrid,
+        INVALID = invalid.penalty,
+        PENALTY = penalty.multiplier
+      )
+    )
+    bw.out <- .npRmpi_manual_distributed_call(mc, caller_env = environment())
+    return(list(
+      objective = as.numeric(if (!is.null(bw.out$initial.fval)) bw.out$initial.fval else bw.out$fval[1L]),
+      num.feval = as.integer(max(1L, bw.out$num.feval[1L])),
+      timing.profile = bw.out$timing.profile
+    ))
+  }
+
+  .npcdistbw_eval_only(
+    xdat = data$xdat,
+    ydat = data$ydat,
+    gydat = data$gydat,
+    bws = bws,
+    do.full.integral = do.full.integral,
+    ngrid = ngrid,
+    invalid.penalty = invalid.penalty,
+    penalty.multiplier = penalty.multiplier
+  )
 }
 
 .npcdistbw_eval_only <- function(xdat,
@@ -991,6 +1072,8 @@ npcdistbw.condbandwidth <-
   baseline.record <- NULL
 
   .np_nomad_baseline_note(degree.search$start.degree)
+  nomad.ctx <- .npcdistbw_nomad_context_prepare(xdat = xdat, ydat = ydat, gydat = opt.args$gydat)
+  on.exit(.npcdistbw_nomad_context_cleanup(nomad.ctx), add = TRUE)
 
   eval_fun <- function(point) {
     point <- as.numeric(point)
@@ -1015,10 +1098,8 @@ npcdistbw.condbandwidth <-
       reg.args = eval.reg.args
     )
 
-    out <- .npcdistbw_eval_only(
-      xdat = xdat,
-      ydat = ydat,
-      gydat = opt.args$gydat,
+    out <- .npcdistbw_eval_collective(
+      data = nomad.ctx,
       bws = tbw,
       do.full.integral = if (is.null(opt.args$do.full.integral)) FALSE else opt.args$do.full.integral,
       ngrid = if (is.null(opt.args$ngrid)) 100L else opt.args$ngrid,
@@ -1029,7 +1110,8 @@ npcdistbw.condbandwidth <-
     list(
       objective = out$objective,
       degree = degree,
-      num.feval = out$num.feval
+      num.feval = out$num.feval,
+      timing.profile = out$timing.profile
     )
   }
 
@@ -1075,6 +1157,8 @@ npcdistbw.condbandwidth <-
     }
 
     direct.payload <- build_direct_payload()
+    if (is.null(direct.payload$timing.profile) && is.list(best_record$timing.profile))
+      direct.payload$timing.profile <- best_record$timing.profile
     direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
@@ -1239,6 +1323,8 @@ npcdistbw.condbandwidth <-
     bws$powell.time <- as.numeric(search_result$powell.time[1L])
   if (!is.null(search_result$optim.time) && is.finite(search_result$optim.time))
     bws$total.time <- as.numeric(search_result$optim.time[1L])
+  if (is.null(bws$timing.profile) && is.list(search_result$best$timing.profile))
+    bws$timing.profile <- search_result$best$timing.profile
   bws <- .np_attach_nomad_restart_summary(bws, search_result)
   bws$degree.search <- metadata
   bws

@@ -92,13 +92,17 @@ npscoefbw.NULL <-
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")
     search.dots <- match.call(expand.dots = FALSE)$...
+    nomad.requested <- "nomad" %in% names(search.dots) &&
+      isTRUE(eval(search.dots$nomad, parent.frame()))
     degree.select.value <- if ("degree.select" %in% names(search.dots)) {
       match.arg(eval(search.dots$degree.select, parent.frame()),
                 c("manual", "coordinate", "exhaustive"))
     } else {
       "manual"
     }
-    if (.npRmpi_autodispatch_active() && identical(degree.select.value, "manual"))
+    automatic.degree.search <- isTRUE(nomad.requested) ||
+      !identical(degree.select.value, "manual")
+    if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     miss.z <- missing(zdat)
@@ -176,12 +180,29 @@ npscoefbw.NULL <-
   .np_degree_search_engine_controls(search.engine)
 }
 
-.npscoefbw_eval_only <- function(xdat,
-                                 ydat,
-                                 zdat,
-                                 bws,
-                                 invalid.penalty = c("baseline", "large"),
-                                 penalty.multiplier = 10) {
+.npscoefbw_nomad_context_prepare <- function(xdat, ydat, zdat = NULL) {
+  ctx <- list(xdat = xdat, ydat = ydat, zdat = zdat)
+  if (.npRmpi_autodispatch_active() &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    mc <- match.call()
+    mc[[1L]] <- get(".npscoefbw_nomad_context_prepare", envir = asNamespace("npRmpi"), inherits = FALSE)
+    return(.npRmpi_autodispatch_call(mc, parent.frame()))
+  }
+  ctx
+}
+
+.npscoefbw_nomad_context_cleanup <- function(ctx, comm = 1L) {
+  ref <- .npRmpi_autodispatch_remote_ref(ctx)
+  if (!is.null(ref))
+    .npRmpi_autodispatch_cleanup(ref, comm = comm)
+  invisible(NULL)
+}
+
+.npscoefbw_eval_collective <- function(data,
+                                       bws,
+                                       invalid.penalty = c("baseline", "large"),
+                                       penalty.multiplier = 10) {
   invalid.penalty <- match.arg(invalid.penalty)
   base.penalty <- switch(
     invalid.penalty,
@@ -191,21 +212,65 @@ npscoefbw.NULL <-
   base.penalty <- max(abs(base.penalty), 1)
   penalty <- penalty.multiplier * base.penalty
 
-  fit <- tryCatch(
-    .npRmpi_with_local_regression(
-      npscoef(
-        bws = bws,
-        txdat = xdat,
-        tydat = ydat,
-        tzdat = zdat,
-        leave.one.out = TRUE,
-        iterate = FALSE,
-        betas = FALSE,
-        errors = FALSE
+  if (!is.list(data) || is.null(data$xdat) || is.null(data$ydat))
+    stop("invalid NOMAD smooth-coefficient context")
+
+  fit <- if (.npRmpi_autodispatch_active() &&
+             !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+             !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    xdat <- data$xdat
+    ydat <- data$ydat
+    zdat <- data$zdat
+    mc <- if (is.null(zdat)) {
+      substitute(
+        npscoef(
+          bws = bws,
+          txdat = xdat,
+          tydat = ydat,
+          leave.one.out = TRUE,
+          iterate = FALSE,
+          betas = FALSE,
+          errors = FALSE
+        )
       )
-    ),
-    error = function(e) e
-  )
+    } else {
+      substitute(
+        npscoef(
+          bws = bws,
+          txdat = xdat,
+          tydat = ydat,
+          tzdat = zdat,
+          leave.one.out = TRUE,
+          iterate = FALSE,
+          betas = FALSE,
+          errors = FALSE
+        )
+      )
+    }
+    tryCatch(
+      .npRmpi_manual_distributed_call(mc, caller_env = environment()),
+      error = function(e) e
+    )
+  } else {
+    xdat <- data$xdat
+    ydat <- data$ydat
+    zdat <- data$zdat
+    tryCatch(
+      .npRmpi_with_local_regression(
+        npscoef(
+          bws = bws,
+          txdat = xdat,
+          tydat = ydat,
+          tzdat = zdat,
+          leave.one.out = TRUE,
+          iterate = FALSE,
+          betas = FALSE,
+          errors = FALSE
+        )
+      ),
+      error = function(e) e
+    )
+  }
 
   if (inherits(fit, "error") || is.null(fit$mean) || any(!is.finite(fit$mean))) {
     return(list(objective = penalty, num.feval = 1L))
@@ -213,7 +278,8 @@ npscoefbw.NULL <-
 
   list(
     objective = as.numeric(mean((as.double(ydat) - as.double(fit$mean))^2)),
-    num.feval = 1L
+    num.feval = 1L,
+    timing.profile = fit$timing.profile
   )
 }
 
@@ -274,6 +340,9 @@ npscoefbw.NULL <-
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
+  nomad.ctx <- .npscoefbw_nomad_context_prepare(xdat = xdat, ydat = ydat, zdat = zdat)
+  on.exit(.npscoefbw_nomad_context_cleanup(nomad.ctx), add = TRUE)
+
   eval_fun <- function(point) {
     point <- as.numeric(point)
     degree <- as.integer(round(point[ncon + ncat + seq_len(ndeg)]))
@@ -294,10 +363,8 @@ npscoefbw.NULL <-
       reg.args = eval.reg.args
     )
 
-    out <- .npscoefbw_eval_only(
-      xdat = xdat,
-      ydat = ydat,
-      zdat = zdat,
+    out <- .npscoefbw_eval_collective(
+      data = nomad.ctx,
       bws = tbw,
       invalid.penalty = "baseline",
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
@@ -306,7 +373,8 @@ npscoefbw.NULL <-
     list(
       objective = out$objective,
       degree = degree,
-      num.feval = out$num.feval
+      num.feval = out$num.feval,
+      timing.profile = out$timing.profile
     )
   }
 
@@ -341,6 +409,8 @@ npscoefbw.NULL <-
     }
 
     direct.payload <- build_direct_payload()
+    if (is.null(direct.payload$timing.profile) && is.list(best_record$timing.profile))
+      direct.payload$timing.profile <- best_record$timing.profile
     direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
@@ -508,6 +578,8 @@ npscoefbw.NULL <-
     bws$powell.time <- as.numeric(search_result$powell.time[1L])
   if (!is.null(search_result$optim.time) && is.finite(search_result$optim.time))
     bws$total.time <- as.numeric(search_result$optim.time[1L])
+  if (is.null(bws$timing.profile) && is.list(search_result$best$timing.profile))
+    bws$timing.profile <- search_result$best$timing.profile
   bws <- .np_attach_nomad_restart_summary(bws, search_result)
   bws$degree.search <- metadata
   bws

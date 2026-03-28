@@ -1,38 +1,61 @@
 .npRmpi_embedded_backend_version <- "0.7-3.3"
 
-.npRmpi_reassert_plot_methods <- function() {
-  ns <- asNamespace("npRmpi")
-  graphics.ns <- asNamespace("graphics")
-  plot.classes <- c(
-    "bandwidth",
-    "dbandwidth",
-    "rbandwidth",
-    "conbandwidth",
-    "condbandwidth",
-    "plbandwidth",
-    "sibandwidth",
-    "scbandwidth",
-    "npdensity",
-    "npdistribution",
-    "npregression",
-    "npregiv",
-    "npregivderiv",
-    "plregression",
-    "condensity",
-    "condistribution",
-    "qregression",
-    "singleindex",
-    "smoothcoefficient"
+.npRmpi_s3_generic_namespace <- function(generic) {
+  switch(
+    generic,
+    "plot" = "graphics",
+    "predict" = "stats",
+    "fitted" = "stats",
+    "residuals" = "stats",
+    "coef" = "stats",
+    "vcov" = "stats",
+    "quantile" = "stats",
+    "print" = "base",
+    "summary" = "base",
+    "mode" = "base",
+    "as.double" = "base",
+    NULL
   )
+}
 
-  for (cls in plot.classes) {
-    method.name <- paste0("plot.", cls)
-    if (exists(method.name, envir = ns, inherits = FALSE)) {
+.npRmpi_reassert_s3_methods <- function(generics = NULL) {
+  ns <- asNamespace("npRmpi")
+  s3 <- getNamespaceInfo(ns, "S3methods")
+
+  if (is.null(s3) || !length(s3))
+    return(invisible(TRUE))
+
+  if (is.null(dim(s3)))
+    s3 <- matrix(s3, ncol = 4L)
+
+  if (is.null(generics)) {
+    generics <- unique(as.character(s3[, 1L]))
+  } else {
+    generics <- unique(as.character(generics))
+  }
+
+  for (generic in generics) {
+    generic.pkg <- .npRmpi_s3_generic_namespace(generic)
+    if (is.null(generic.pkg))
+      next
+
+    generic.ns <- asNamespace(generic.pkg)
+    rows <- which(as.character(s3[, 1L]) == generic)
+    if (!length(rows))
+      next
+
+    for (row in rows) {
+      cls <- as.character(s3[row, 2L])
+      method.name <- as.character(s3[row, 3L])
+
+      if (!nzchar(method.name) || !exists(method.name, envir = ns, inherits = FALSE))
+        next
+
       registerS3method(
-        "plot",
+        generic,
         cls,
         get(method.name, envir = ns, inherits = FALSE),
-        envir = graphics.ns
+        envir = generic.ns
       )
     }
   }
@@ -40,8 +63,22 @@
   invisible(TRUE)
 }
 
+.npRmpi_reassert_plot_methods <- function() {
+  .npRmpi_reassert_s3_methods("plot")
+}
+
 .npRmpi_after_np_load <- function() {
-  tryCatch(.npRmpi_reassert_plot_methods(), error = function(e) invisible(e))
+  tryCatch(.npRmpi_reassert_s3_methods(), error = function(e) invisible(e))
+  invisible(TRUE)
+}
+
+.npRmpi_after_np_attach <- function() {
+  tryCatch(.npRmpi_after_np_load(), error = function(e) invisible(e))
+  tryCatch(get(".npRmpi_warn_pkg_conflict_once",
+               envir = asNamespace("npRmpi"),
+               mode = "function",
+               inherits = FALSE)(),
+           error = function(e) invisible(e))
   invisible(TRUE)
 }
 
@@ -144,7 +181,7 @@
       options(npRmpi.embedded.backend.version = .npRmpi_embedded_backend_version)
 
     setHook(packageEvent("np", "attach"),
-            function(...) tryCatch(get(".npRmpi_warn_pkg_conflict_once",
+            function(...) tryCatch(get(".npRmpi_after_np_attach",
                                        envir = asNamespace("npRmpi"),
                                        mode = "function",
                                        inherits = FALSE)(),
@@ -207,7 +244,7 @@
     options(npRmpi.embedded.backend.version = .npRmpi_embedded_backend_version)
 
   setHook(packageEvent("np", "attach"),
-          function(...) tryCatch(get(".npRmpi_warn_pkg_conflict_once",
+          function(...) tryCatch(get(".npRmpi_after_np_attach",
                                      envir = asNamespace("npRmpi"),
                                      mode = "function",
                                      inherits = FALSE)(),

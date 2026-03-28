@@ -1292,7 +1292,7 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(rbw_r)));
-  PROTECT(out_fval = allocVector(REALSXP, 2));
+  PROTECT(out_fval = allocVector(REALSXP, 3));
   PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
   PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
@@ -1824,7 +1824,7 @@ SEXP C_np_distribution_bw(SEXP myuno,
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
-  PROTECT(out_fval = allocVector(REALSXP, 2));
+  PROTECT(out_fval = allocVector(REALSXP, 3));
   PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
   PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
@@ -1925,7 +1925,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   resolve_bounds_or_default(cykerlb_r, cykerub_r, ncon_y, &cykerlb_p, &cykerub_p);
 
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
-  PROTECT(out_fval = allocVector(REALSXP, 2));
+  PROTECT(out_fval = allocVector(REALSXP, 3));
   PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
   PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
@@ -2037,7 +2037,7 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   resolve_bounds_or_default(cykerlb_r, cykerub_r, ncon_y, &cykerlb_p, &cykerub_p);
 
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
-  PROTECT(out_fval = allocVector(REALSXP, 2));
+  PROTECT(out_fval = allocVector(REALSXP, 3));
   PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
   PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
@@ -4308,6 +4308,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   fval[0] = fret;
   fval[1] = iImproved;
+  fval[2] = fret_initial;
 
   /* end return data */
 
@@ -5341,6 +5342,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   fval[0] = -fret;
   fval[1] = iImproved;
+  fval[2] = -fret_initial;
   objective_function_fast[0] = fast_eval_total;
   /* end return data */
 
@@ -6412,6 +6414,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   fval[0] = fret;
   fval[1] = iImproved;
+  fval[2] = fret_initial;
   objective_function_fast[0] = fast_eval_total;
   /* end return data */
 
@@ -8255,6 +8258,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   fval[0] = fret;
   fval[1] = iImproved;
+  fval[2] = fret_initial;
   objective_function_fast[0] = fast_eval_total;
   /* end return data */
 

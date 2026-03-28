@@ -1459,10 +1459,13 @@
       degree <- as.integer(result$degree)
       if (!is.null(result$num.feval))
         num.feval <- as.numeric(result$num.feval[1L])
+      extra.fields <- result[setdiff(names(result), c("objective", "degree", "num.feval"))]
+    } else {
+      extra.fields <- list()
     }
 
     state$eval_id <- state$eval_id + 1L
-    rec <- list(
+    rec <- c(list(
       eval_id = state$eval_id,
       degree = degree,
       objective = objective,
@@ -1471,7 +1474,7 @@
       message = msg,
       elapsed = proc.time()[3L] - started,
       num.feval = num.feval
-    )
+    ), extra.fields)
     if (is.null(state$baseline_record))
       state$baseline_record <- rec
     state$record_trace(rec)

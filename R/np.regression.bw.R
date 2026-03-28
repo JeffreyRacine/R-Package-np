@@ -73,7 +73,11 @@ npregbw.NULL <-
            ydat = stop("invoked without data 'ydat'"),
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npregbw()")
-    if (.npRmpi_autodispatch_active())
+    dots <- list(...)
+    automatic.degree.search <- isTRUE(dots$nomad) ||
+      (!is.null(dots$degree.select) &&
+         !identical(as.character(dots$degree.select[[1L]]), "manual"))
+    if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
         parent.frame()))
@@ -277,23 +281,23 @@ npregbw.rbandwidth <-
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac)
 
-        cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+      cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
-        system.time(myout <-
-          .Call("C_np_regression_bw",
-                as.double(runo), as.double(rord), as.double(rcon), as.double(ydat),
-                as.double(mysd),
-                as.integer(myopti), as.double(myoptd),
-                as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-                as.integer(max(1, nmulti)),
-                as.integer(penalty_mode),
-                as.double(penalty.multiplier),
-                as.integer(degree.c),
-                as.integer(isTRUE(tbw$bernstein.basis)),
-                as.integer(npLpBasisCode(tbw$basis)),
-                as.double(cker.bounds.c$lb),
-                as.double(cker.bounds.c$ub),
-                PACKAGE = "npRmpi"))[1]
+      system.time(myout <-
+        .Call("C_np_regression_bw",
+              as.double(runo), as.double(rord), as.double(rcon), as.double(ydat),
+              as.double(mysd),
+              as.integer(myopti), as.double(myoptd),
+              as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+              as.integer(max(1, nmulti)),
+              as.integer(penalty_mode),
+              as.double(penalty.multiplier),
+              as.integer(degree.c),
+              as.integer(isTRUE(tbw$bernstein.basis)),
+              as.integer(npLpBasisCode(tbw$basis)),
+              as.double(cker.bounds.c$lb),
+              as.double(cker.bounds.c$ub),
+              PACKAGE = "npRmpi"))[1]
       
 
       rorder = numeric(ncol)
@@ -303,6 +307,7 @@ npregbw.rbandwidth <-
       tbw$bw <- myout$bw[rorder]
       tbw$fval <- myout$fval[1]
       tbw$ifval <- myout$fval[2]
+      tbw$initial.fval <- if (length(myout$fval) >= 3L) myout$fval[3L] else NA_real_
       tbw$num.feval <- sum(myout$eval.history[is.finite(myout$eval.history)])
       tbw$num.feval.fast <- myout$fast.history[1]
       tbw$fval.history <- myout$fval.history
@@ -312,6 +317,7 @@ npregbw.rbandwidth <-
     }
 
     tbw$total.time <- proc.time()[3] - elapsed.start
+    initial.fval <- tbw$initial.fval
 
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
 
@@ -379,6 +385,7 @@ npregbw.rbandwidth <-
                       bandwidth.compute = bandwidth.compute,
                       timing = tbw$timing,
                       total.time = tbw$total.time)
+    tbw$initial.fval <- if (!is.null(initial.fval)) initial.fval else NA_real_
     tbw
   }
 
@@ -416,135 +423,91 @@ npregbw.rbandwidth <-
   do.call(npregbw.rbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
 }
 
+.npregbw_nomad_context_prepare <- function(xdat, ydat) {
+  ctx <- list(xdat = xdat, ydat = ydat)
+  if (.npRmpi_autodispatch_active() &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    mc <- match.call()
+    mc[[1L]] <- get(".npregbw_nomad_context_prepare", envir = asNamespace("npRmpi"), inherits = FALSE)
+    return(.npRmpi_autodispatch_call(mc, parent.frame()))
+  }
+  ctx
+}
+
+.npregbw_nomad_context_cleanup <- function(ctx, comm = 1L) {
+  ref <- .npRmpi_autodispatch_remote_ref(ctx)
+  if (!is.null(ref))
+    .npRmpi_autodispatch_cleanup(ref, comm = comm)
+  invisible(NULL)
+}
+
+.npregbw_eval_collective <- function(data,
+                                     bws,
+                                     invalid.penalty = c("baseline", "dbmax"),
+                                     penalty.multiplier = 10) {
+  invalid.penalty <- match.arg(invalid.penalty)
+  if (.npRmpi_autodispatch_active() &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    if (!is.list(data) || is.null(data$xdat) || is.null(data$ydat))
+      stop("invalid NOMAD regression context")
+    xdat <- data$xdat
+    ydat <- data$ydat
+    mc <- substitute(
+      npregbw(
+        xdat = xdat,
+        ydat = ydat,
+        bws = bws,
+        bandwidth.compute = TRUE,
+        invalid.penalty = INVALID,
+        penalty.multiplier = PENALTY,
+        nmulti = 0L,
+        remin = FALSE,
+        itmax = 1L
+      ),
+      list(INVALID = invalid.penalty, PENALTY = penalty.multiplier)
+    )
+    bw.out <- .npRmpi_manual_distributed_call(mc, caller_env = environment())
+    return(list(
+      objective = as.numeric(if (!is.null(bw.out$initial.fval)) bw.out$initial.fval else bw.out$fval[1L]),
+      num.feval = as.integer(max(1L, bw.out$num.feval[1L])),
+      timing.profile = bw.out$timing.profile
+    ))
+  }
+
+  if (!is.list(data) || is.null(data$xdat) || is.null(data$ydat))
+    stop("invalid NOMAD regression context")
+
+  .npregbw_eval_only(
+    xdat = data$xdat,
+    ydat = data$ydat,
+    bws = bws,
+    invalid.penalty = invalid.penalty,
+    penalty.multiplier = penalty.multiplier
+  )
+}
+
 .npregbw_eval_only <- function(xdat,
                                ydat,
                                bws,
                                invalid.penalty = c("baseline", "dbmax"),
                                penalty.multiplier = 10) {
-  invalid.penalty <- match.arg(invalid.penalty)
-
-  xdat <- toFrame(xdat)
-  if (!(is.vector(ydat) || is.factor(ydat)))
-    stop("'ydat' must be a vector")
-
-  if (length(bws$bw) != dim(xdat)[2])
-    stop("length of bandwidth vector does not match number of columns of 'xdat'")
-
-  keep.rows <- rep_len(TRUE, nrow(xdat))
-  rows.omit <- attr(na.omit(data.frame(xdat, ydat)), "na.action")
-  if (length(rows.omit) > 0L)
-    keep.rows[as.integer(rows.omit)] <- FALSE
-
-  xdat <- xdat[keep.rows,, drop = FALSE]
-  ydat <- ydat[keep.rows]
-
-  if (is.factor(ydat))
-    ydat <- dlev(ydat)[as.integer(ydat)]
-  else
-    ydat <- as.double(ydat)
-
-  xmat <- toMatrix(xdat)
-  runo <- xmat[, bws$iuno, drop = FALSE]
-  rcon <- xmat[, bws$icon, drop = FALSE]
-  rord <- xmat[, bws$iord, drop = FALSE]
-
-  mysd <- EssDee(rcon)
-  nrow <- dim(xmat)[1L]
-  nconfac <- nrow^(-1.0 / (2.0 * bws$ckerorder + bws$ncon))
-  ncatfac <- nrow^(-2.0 / (2.0 * bws$ckerorder + bws$ncon))
-
-  penalty_mode <- if (match.arg(invalid.penalty) == "baseline") 1L else 0L
-  reg.c <- npRegtypeToC(regtype = bws$regtype,
-                        degree = bws$degree,
-                        ncon = bws$ncon,
-                        context = "npregbw")
-  degree.c <- if (bws$ncon > 0) as.integer(bws$degree) else integer(1L)
-
-  myopti <- list(
-    num_obs_train = nrow,
-    iMultistart = IMULTI_FALSE,
-    iNum_Multistart = 0L,
-    int_use_starting_values = USE_START_YES,
-    int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
-    BANDWIDTH_reg_extern = switch(bws$type,
-      fixed = BW_FIXED,
-      generalized_nn = BW_GEN_NN,
-      adaptive_nn = BW_ADAP_NN),
-    itmax = 0L,
-    int_RESTART_FROM_MIN = RE_MIN_FALSE,
-    int_MINIMIZE_IO = IO_MIN_TRUE,
-    bwmethod = switch(bws$method,
-      cv.aic = BWM_CVAIC,
-      cv.ls = BWM_CVLS),
-    kerneval = switch(bws$ckertype,
-      gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-      uniform = CKER_UNI,
-      "truncated gaussian" = CKER_TGAUSS),
-    ukerneval = switch(bws$ukertype,
-      aitchisonaitken = UKER_AIT,
-      liracine = UKER_LR),
-    okerneval = switch(bws$okertype,
-      wangvanryzin = OKER_WANG,
-      liracine = OKER_LR,
-      racineliyan = OKER_RLY),
-    nuno = bws$nuno,
-    nord = bws$nord,
-    ncon = bws$ncon,
-    regtype = reg.c$code,
-    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
-    scale.init.categorical.sample = FALSE,
-    dfc.dir = 0,
-    transform.bounds = FALSE
+  bw.out <- npregbw(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws,
+    bandwidth.compute = TRUE,
+    invalid.penalty = invalid.penalty,
+    itmax = 1L,
+    nmulti = 0L,
+    penalty.multiplier = penalty.multiplier,
+    remin = FALSE
   )
-
-  myoptd <- list(
-    ftol = 0,
-    tol = 0,
-    small = 0,
-    lbc.dir = 0,
-    cfac.dir = 0,
-    initc.dir = 0,
-    lbd.dir = 0,
-    hbd.dir = 0,
-    dfac.dir = 0,
-    initd.dir = 0,
-    lbc.init = 0,
-    hbc.init = 0,
-    cfac.init = 0,
-    lbd.init = 0,
-    hbd.init = 0,
-    dfac.init = 0,
-    nconfac = nconfac,
-    ncatfac = ncatfac
-  )
-
-  cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
-
-  out <- .npRmpi_with_local_regression(.Call(
-    "C_np_regression_bw_eval",
-    as.double(runo),
-    as.double(rord),
-    as.double(rcon),
-    as.double(ydat),
-    as.double(mysd),
-    as.integer(myopti),
-    as.double(myoptd),
-    as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-    as.integer(1L),
-    as.integer(penalty_mode),
-    as.double(penalty.multiplier),
-    as.integer(degree.c),
-    as.integer(isTRUE(bws$bernstein.basis)),
-    as.integer(npLpBasisCode(bws$basis)),
-    as.double(cker.bounds.c$lb),
-    as.double(cker.bounds.c$ub),
-    PACKAGE = "npRmpi"
-  ))
 
   list(
-    objective = as.numeric(out$fval[1L]),
-    num.feval = 1L
+    objective = as.numeric(if (!is.null(bw.out$initial.fval)) bw.out$initial.fval else bw.out$fval[1L]),
+    num.feval = as.integer(max(1L, bw.out$num.feval[1L]))
   )
 }
 
@@ -685,6 +648,9 @@ npregbw.rbandwidth <-
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
+  nomad.ctx <- .npregbw_nomad_context_prepare(xdat = xdat, ydat = ydat)
+  on.exit(.npregbw_nomad_context_cleanup(nomad.ctx), add = TRUE)
+
   eval_fun <- function(point) {
     point <- as.numeric(point)
     degree <- as.integer(round(point[ncon + ncat + seq_len(ncon)]))
@@ -705,9 +671,8 @@ npregbw.rbandwidth <-
       yname = yname
     )
 
-    out <- .npregbw_eval_only(
-      xdat = xdat,
-      ydat = ydat,
+    out <- .npregbw_eval_collective(
+      data = nomad.ctx,
       bws = tbw,
       invalid.penalty = "baseline",
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
@@ -716,7 +681,8 @@ npregbw.rbandwidth <-
     list(
       objective = out$objective,
       degree = degree,
-      num.feval = out$num.feval
+      num.feval = out$num.feval,
+      timing.profile = out$timing.profile
     )
   }
 
@@ -759,6 +725,8 @@ npregbw.rbandwidth <-
     }
 
     direct.payload <- build_direct_payload()
+    if (is.null(direct.payload$timing.profile) && is.list(best_record$timing.profile))
+      direct.payload$timing.profile <- best_record$timing.profile
     direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
@@ -919,6 +887,8 @@ npregbw.rbandwidth <-
     bws$powell.time <- as.numeric(search_result$powell.time[1L])
   if (!is.null(search_result$optim.time) && is.finite(search_result$optim.time))
     bws$total.time <- as.numeric(search_result$optim.time[1L])
+  if (is.null(bws$timing.profile) && is.list(search_result$best$timing.profile))
+    bws$timing.profile <- search_result$best$timing.profile
   bws <- .np_attach_nomad_restart_summary(bws, search_result)
   bws$degree.search <- metadata
   bws

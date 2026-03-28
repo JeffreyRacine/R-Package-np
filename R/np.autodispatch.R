@@ -1468,6 +1468,10 @@
       out[[i]] <- as.name(ref)
       next
     }
+    if (is.null(val)) {
+      out[i] <- list(NULL)
+      next
+    }
     idx <- idx + 1L
     tmp <- sprintf(".__npRmpi_autod_%s_%d", nm, idx)
 
