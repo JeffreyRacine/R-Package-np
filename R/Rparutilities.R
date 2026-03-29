@@ -108,11 +108,12 @@ mpi.spawn.Rslaves <-
 	if (.Platform$OS=="windows"){
 		stop("Spawning is not implemented on Windows. Launch with mpiexec and use npRmpi.init(mode=\"attach\").")
     } else {
-        tmp <- paste(Sys.getpid(), "+", comm, sep="")   
+        tmp <- paste(Sys.getpid(), "+", comm, sep="")
+        lib.path.arg <- paste(.libPaths(), collapse = .Platform$path.sep)
         if (needlog)
-            arg <- c(Rscript, tmp, "needlog", R.home())
+            arg <- c(Rscript, tmp, "needlog", R.home(), lib.path.arg)
         else
-            arg <- c(Rscript, tmp , "nolog", R.home())  
+            arg <- c(Rscript, tmp , "nolog", R.home(), lib.path.arg)
         if (!is.null(hosts)){
             hosts <- as.integer(hosts)
             if (any(is.na(hosts)))

@@ -1,11 +1,14 @@
 #!/bin/sh
 if [ $# -lt 4 ]; then
-	echo "Need 4 arguments" > err.log
+	echo "Need at least 4 arguments" > err.log
 	exit 1
 fi
 
 Rscript="$1"
 R_HOME="$4"
+if [ $# -ge 5 ] && [ -n "$5" ]; then
+	export R_LIBS="$5"
+fi
 
 if [ ! -r "$Rscript" ]; then
 	echo "$Rscript" "does not exist or is not readable!" > err.log
