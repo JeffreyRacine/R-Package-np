@@ -1278,7 +1278,6 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
   }
 
   if (.npRmpi_has_active_slave_pool(comm = 1L) &&
-      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     start.bw <- .npregbw_nomad_point_to_bw(x0[seq_len(ncon + ncat)], template = template, setup = setup)
     prep <- .npregbw_nomad_shadow_prepare_args(
@@ -1327,7 +1326,13 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       )
     )
 
-    search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
+    if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
+      search.result <- eval(mc, envir = environment())
+    } else {
+      # Prime the first spawned-worker broadcast before the rank-wide NOMAD search.
+      .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = TRUE)
+      search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
+    }
     best.solution <- NULL
     if (!is.null(search.result$best.restart) &&
         is.finite(search.result$best.restart) &&

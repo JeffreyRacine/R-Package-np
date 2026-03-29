@@ -1716,6 +1716,8 @@ SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
   SEXP rbw_r = R_NilValue, degree_i = R_NilValue;
   int i;
   double val;
+  int degree_ok;
+  int bw_ok;
 
   if (!np_regression_nomad_shadow.active)
     error("resident npreg NOMAD shadow state is not active");
@@ -1732,7 +1734,11 @@ SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     error("resident npreg NOMAD shadow received degree vector of unexpected length");
   }
 
-  if (!np_regression_nomad_shadow_refresh_degree(INTEGER(degree_i))) {
+  degree_ok = np_regression_nomad_shadow_refresh_degree(INTEGER(degree_i)) ? 1 : 0;
+  if (comm[1] != MPI_COMM_NULL)
+    MPI_Allreduce(MPI_IN_PLACE, &degree_ok, 1, MPI_INT, MPI_MIN, comm[1]);
+
+  if (!degree_ok) {
     bwm_eval_count += 1.0;
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
@@ -1744,7 +1750,39 @@ SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
   for (i = 0; i < np_regression_nomad_shadow.num_var; i++)
     np_regression_nomad_shadow.vector_scale_factor[i + 1] = REAL(rbw_r)[i];
 
+  bw_ok = np_bw_candidate_is_admissible(
+    np_regression_nomad_shadow.num_var,
+    bwm_use_transform,
+    KERNEL_reg_extern,
+    KERNEL_reg_unordered_extern,
+    BANDWIDTH_reg_extern,
+    BANDWIDTH_reg_extern,
+    0,
+    num_obs_train_extern,
+    0,
+    0,
+    0,
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    num_categories_extern,
+    np_regression_nomad_shadow.vector_scale_factor
+  ) ? 1 : 0;
+  if (comm[1] != MPI_COMM_NULL)
+    MPI_Allreduce(MPI_IN_PLACE, &bw_ok, 1, MPI_INT, MPI_MIN, comm[1]);
+
+  if (!bw_ok) {
+    bwm_eval_count += 1.0;
+    bwm_invalid_count += 1.0;
+    bwm_maybe_signal_activity();
+    val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
+    UNPROTECT(2);
+    return ScalarReal(val);
+  }
+
   val = bwmfunc_wrapper(np_regression_nomad_shadow.vector_scale_factor);
+  if (comm[1] != MPI_COMM_NULL)
+    MPI_Bcast(&val, 1, MPI_DOUBLE, 0, comm[1]);
 
   UNPROTECT(2);
   return ScalarReal(val);
