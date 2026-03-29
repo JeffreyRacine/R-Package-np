@@ -197,6 +197,68 @@ npscoefbw.NULL <-
   do.call(npscoefbw.scbandwidth, scbw.args)
 }
 
+.npscoefbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, zdat, bws, reg.args, opt.args) {
+  old.messages <- getOption("np.messages")
+  rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+
+  if (!isTRUE(rank == 0L))
+    options(np.messages = FALSE)
+
+  on.exit(options(np.messages = old.messages), add = TRUE)
+
+  .npRmpi_with_local_regression(
+    .npscoefbw_run_fixed_degree(
+      xdat = xdat,
+      ydat = ydat,
+      zdat = zdat,
+      bws = bws,
+      reg.args = reg.args,
+      opt.args = opt.args
+    )
+  )
+}
+
+.npscoefbw_run_fixed_degree_collective <- function(xdat,
+                                                   ydat,
+                                                   zdat,
+                                                   bws,
+                                                   reg.args,
+                                                   opt.args,
+                                                   comm = 1L) {
+  if (.npRmpi_has_active_slave_pool(comm = comm) &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    mc <- substitute(
+      npRmpi:::.npscoefbw_run_fixed_degree_bcast_payload(
+        XDAT,
+        YDAT,
+        ZDAT,
+        BWS,
+        REGARGS,
+        OPTARGS
+      ),
+      list(
+        XDAT = xdat,
+        YDAT = ydat,
+        ZDAT = zdat,
+        BWS = bws,
+        REGARGS = reg.args,
+        OPTARGS = opt.args
+      )
+    )
+    return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
+  }
+
+  .npscoefbw_run_fixed_degree(
+    xdat = xdat,
+    ydat = ydat,
+    zdat = zdat,
+    bws = bws,
+    reg.args = reg.args,
+    opt.args = opt.args
+  )
+}
+
 .npscoefbw_nomad_controls <- function(search.engine) {
   .np_degree_search_engine_controls(search.engine)
 }
@@ -481,8 +543,9 @@ npscoefbw.NULL <-
       hot.opt.args <- opt.args
       hot.opt.args$nmulti <- 1L
       powell.start <- proc.time()[3L]
-      hot.payload <- .np_nomad_with_powell_progress(degree, local({
-        .npscoefbw_run_fixed_degree(
+      hot.payload <- .np_nomad_with_powell_progress(
+        degree,
+        .npscoefbw_run_fixed_degree_collective(
           xdat = xdat,
           ydat = ydat,
           zdat = zdat,
@@ -490,7 +553,7 @@ npscoefbw.NULL <-
           reg.args = hot.reg.args,
           opt.args = hot.opt.args
         )
-      }))
+      )
       powell.elapsed <- proc.time()[3L] - powell.start
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&

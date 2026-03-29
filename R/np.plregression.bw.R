@@ -339,6 +339,73 @@ npplregbw.plbandwidth =
   )
 }
 
+.npplregbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, zdat, bws, reg.args, outer.args, opt.args) {
+  old.messages <- getOption("np.messages")
+  rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+
+  if (!isTRUE(rank == 0L))
+    options(np.messages = FALSE)
+
+  on.exit(options(np.messages = old.messages), add = TRUE)
+
+  .npRmpi_with_local_regression(
+    .npplregbw_run_fixed_degree(
+      xdat = xdat,
+      ydat = ydat,
+      zdat = zdat,
+      bws = bws,
+      reg.args = reg.args,
+      outer.args = outer.args,
+      opt.args = opt.args
+    )
+  )
+}
+
+.npplregbw_run_fixed_degree_collective <- function(xdat,
+                                                   ydat,
+                                                   zdat,
+                                                   bws,
+                                                   reg.args,
+                                                   outer.args,
+                                                   opt.args,
+                                                   comm = 1L) {
+  if (.npRmpi_has_active_slave_pool(comm = comm) &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    mc <- substitute(
+      npRmpi:::.npplregbw_run_fixed_degree_bcast_payload(
+        XDAT,
+        YDAT,
+        ZDAT,
+        BWS,
+        REGARGS,
+        OUTERARGS,
+        OPTARGS
+      ),
+      list(
+        XDAT = xdat,
+        YDAT = ydat,
+        ZDAT = zdat,
+        BWS = bws,
+        REGARGS = reg.args,
+        OUTERARGS = outer.args,
+        OPTARGS = opt.args
+      )
+    )
+    return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
+  }
+
+  .npplregbw_run_fixed_degree(
+    xdat = xdat,
+    ydat = ydat,
+    zdat = zdat,
+    bws = bws,
+    reg.args = reg.args,
+    outer.args = outer.args,
+    opt.args = opt.args
+  )
+}
+
 .npplregbw_child_responses <- function(xdat, ydat, yname = deparse(substitute(ydat))) {
   xdat <- toFrame(xdat)
   yvec <- as.double(ydat)
@@ -565,7 +632,7 @@ npplregbw.plbandwidth =
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
         degree,
-        .npplregbw_run_fixed_degree(
+        .npplregbw_run_fixed_degree_collective(
           xdat = xdat,
           ydat = ydat,
           zdat = zdat,

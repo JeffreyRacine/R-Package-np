@@ -2703,8 +2703,17 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
   for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
     np_conditional_density_nomad_shadow.vector_scale_factor[i + 1] = REAL(rbw_r)[i];
 
-  np_conditional_density_nomad_shadow_refresh_penalty();
+  if (np_conditional_density_nomad_shadow.penalty_mode == 1) {
+    bwm_penalty_mode = 0;
+    bwm_penalty_value = DBL_MAX;
+  }
   val = bwmfunc_wrapper(np_conditional_density_nomad_shadow.vector_scale_factor);
+
+  if ((!R_FINITE(val) || val == DBL_MAX) &&
+      np_conditional_density_nomad_shadow.penalty_mode == 1) {
+    np_conditional_density_nomad_shadow_refresh_penalty();
+    val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
+  }
 
   if ((BANDWIDTH_den_extern == BW_FIXED) &&
       (!np_bw_candidate_is_admissible(
