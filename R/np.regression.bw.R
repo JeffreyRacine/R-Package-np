@@ -613,7 +613,8 @@ npregbw.rbandwidth <-
                                   yname,
                                   degree.search,
                                   nomad.inner.nmulti = 0L,
-                                  random.seed = 42L) {
+                                  random.seed = 42L,
+                                  nomad.opts = list()) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
 
@@ -781,6 +782,7 @@ npregbw.rbandwidth <-
     nmulti = nomad.nmulti,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
+    nomad.opts = nomad.opts,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
@@ -1170,7 +1172,14 @@ npregbw.default <-
           yname = yname,
           degree.search = degree.search,
           nomad.inner.nmulti = nomad.inner.nmulti,
-          random.seed = random.seed.value
+          random.seed = random.seed.value,
+          nomad.opts = list(
+            DIRECTION_TYPE = "ORTHO 2N",
+            QUAD_MODEL_SEARCH = "no",
+            NM_SEARCH = "no",
+            SPECULATIVE_SEARCH = "no",
+            EVAL_OPPORTUNISTIC = "no"
+          )
         )
       }
       tbw <- .npregbw_attach_degree_search(

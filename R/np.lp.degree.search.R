@@ -1328,7 +1328,8 @@
                              nomad.inner.nmulti = 0L,
                              random.seed = 42L,
                              display.nomad.progress = FALSE,
-                             degree_spec = NULL) {
+                             degree_spec = NULL,
+                             nomad.opts = list()) {
   engine <- match.arg(engine)
   direction <- match.arg(direction)
   .np_nomad_require_crs()
@@ -1356,6 +1357,7 @@
 
   nomad.nmulti <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
   nomad.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
+  nomad.opts <- if (is.null(nomad.opts)) list() else nomad.opts
   start_matrix <- .np_nomad_build_starts(
     x0 = x0,
     bbin = bbin,
@@ -1545,6 +1547,13 @@
     nomad.start <- proc.time()[3L]
     solution_i <- tryCatch(
       {
+        solver.opts <- utils::modifyList(
+          list(
+            SEED = as.integer(random.seed),
+            RNG_ALT_SEEDING = TRUE
+          ),
+          nomad.opts
+        )
         crs::snomadr(
           eval.f = wrapped_eval,
           n = length(x0),
@@ -1555,7 +1564,7 @@
           ub = as.double(ub),
           nmulti = nomad.inner.nmulti,
           random.seed = as.integer(random.seed),
-          opts = list(),
+          opts = solver.opts,
           display.nomad.progress = display.nomad.progress,
           snomadr.environment = environment(wrapped_eval)
         )
