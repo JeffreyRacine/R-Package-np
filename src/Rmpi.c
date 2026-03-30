@@ -375,10 +375,7 @@ SEXP mpi_gather(SEXP sexp_sdata,
                         RAW(sexp_rdata), len, MPI_BYTE, root, comm[commn]));
                 break;
 	default:
-		PROTECT(sexp_sdata=AS_NUMERIC(sexp_sdata));
-		mpi_errhandler(MPI_Bcast(REAL(sexp_sdata), 1, datatype[0], root, comm[commn]));
-		UNPROTECT(1);
-		break;		
+		error("mpi_gather: unsupported type code; only types 1-4 are supported");
 	}
 
 	if (INTEGER(sexp_type)[0]==3)
@@ -441,10 +438,7 @@ SEXP mpi_gatherv(SEXP sexp_sdata,
                 break;
 
 	default:
-		PROTECT(sexp_sdata=AS_NUMERIC(sexp_sdata));
-		mpi_errhandler(MPI_Bcast(REAL(sexp_sdata), 1, datatype[0], rank, comm[commn]));
-		UNPROTECT(1);
-		break;	
+		error("mpi_gatherv: unsupported type code; only types 1-4 are supported");
 	}
 	if (rank == root)
 		Free(displs);
@@ -495,10 +489,7 @@ SEXP mpi_scatter(SEXP sexp_sdata,
                 break;
 
 	default:
-		PROTECT(sexp_sdata=AS_NUMERIC(sexp_sdata));
-		mpi_errhandler(MPI_Bcast(REAL(sexp_sdata), 1, datatype[0], root, comm[commn]));
-		UNPROTECT(1);
-		break;		
+		error("mpi_scatter: unsupported type code; only types 1-4 are supported");
 	}
         if (INTEGER(sexp_type)[0]==3)
                 return sexp_rdata2;
@@ -560,10 +551,7 @@ SEXP mpi_scatterv(SEXP sexp_sdata,
                 break;
 
 	default:
-		PROTECT(sexp_sdata=AS_NUMERIC(sexp_sdata));
-		mpi_errhandler(MPI_Bcast(REAL(sexp_sdata), 1, datatype[0], rank, comm[commn]));
-		UNPROTECT(1);
-		break;		
+		error("mpi_scatterv: unsupported type code; only types 1-4 are supported");
 	}
 	if (rank == root)
 
