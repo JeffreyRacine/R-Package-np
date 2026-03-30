@@ -1251,6 +1251,9 @@ SEXP mpi_sendrecv(SEXP sexp_senddata,
                         recvcount, MPI_BYTE, source,recvtag,
                         comm[commn], &status[statusn]);
 		    break;
+                default:
+                    error("mpi_sendrecv: unsupported recv type %d for send type %d",
+                        recvtype, sendtype);
                 }
 	    break;
         case 2:
@@ -1283,7 +1286,9 @@ SEXP mpi_sendrecv(SEXP sexp_senddata,
                         recvcount, MPI_BYTE, source,recvtag,
                         comm[commn], &status[statusn]);
                     break;
-
+                default:
+                    error("mpi_sendrecv: unsupported recv type %d for send type %d",
+                        recvtype, sendtype);
                 }
             break;
         case 3: 
@@ -1319,7 +1324,9 @@ SEXP mpi_sendrecv(SEXP sexp_senddata,
                         recvcount, MPI_BYTE, source,recvtag,
                         comm[commn], &status[statusn]);
                     break;
-
+                default:
+                    error("mpi_sendrecv: unsupported recv type %d for send type %d",
+                        recvtype, sendtype);
           	}
    		break;
  	case 4:
@@ -1352,9 +1359,13 @@ SEXP mpi_sendrecv(SEXP sexp_senddata,
                         recvcount, MPI_BYTE, source,recvtag,
                         comm[commn], &status[statusn]);
                     break;
+                default:
+                    error("mpi_sendrecv: unsupported recv type %d for send type %d",
+                        recvtype, sendtype);
                 }
             break;
-
+        default:
+            error("mpi_sendrecv: unsupported send type %d", sendtype);
 	    }
     if (recvtype==3)
 	return sexp_recvdata2;
@@ -1371,13 +1382,10 @@ SEXP mpi_sendrecv_replace(SEXP sexp_data,
         SEXP sexp_comm, 
         SEXP sexp_status)
 {
-        int slen;
         int len=LENGTH(sexp_data), type=INTEGER(sexp_type)[0];
         int dest=INTEGER(sexp_dest)[0], sendtag=INTEGER(sexp_sendtag)[0];
         int source=INTEGER(sexp_source)[0],recvtag=INTEGER(sexp_recvtag)[0];
         int commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"),statusn=rmpi_require_index(sexp_status, STATUS_MAXSIZE, "status");
-	char *srdata;
-	SEXP sexp_data2 = NULL;
 
         switch (type){
         case 1:
@@ -1390,16 +1398,7 @@ SEXP mpi_sendrecv_replace(SEXP sexp_data,
                 break;
 
         case 3:
-                slen=LENGTH(STRING_ELT(sexp_data,0));
-		PROTECT (sexp_data2  = allocVector (STRSXP, 1));
-		srdata= (char *)Calloc((size_t)slen + 1, char);
-		memcpy(srdata, CHAR(STRING_ELT(sexp_data,0)), (size_t)slen);
-		srdata[slen] = '\0';
-                MPI_Sendrecv_replace(srdata, slen,MPI_CHAR, dest, sendtag, source, recvtag, 
-				comm[commn], &status[statusn]); 
-		UNPROTECT(1);
-		Free(srdata); 
-                break;
+                error("mpi_sendrecv_replace: character type is unsupported");
  	case 4:
                 MPI_Sendrecv_replace(RAW(sexp_data), len, MPI_BYTE, dest,
                 sendtag, source, recvtag, comm[commn], &status[statusn]);
@@ -1413,10 +1412,7 @@ SEXP mpi_sendrecv_replace(SEXP sexp_data,
                 UNPROTECT(1);
                 break;
 	    }
-    if (type==3)
-	return sexp_data2;
-	else
-          	return sexp_data;
+    return sexp_data;
 }
 
 /************ cart dim *************************************/
