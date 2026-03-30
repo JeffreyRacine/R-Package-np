@@ -904,6 +904,8 @@ SEXP mpi_reduce(SEXP sexp_send,
 			Free(recv);
 			break;
 		}
+	default:
+		error("mpi_reduce: only integer and double types are supported");
 	}
 	
 	UNPROTECT(1);			
@@ -991,6 +993,8 @@ SEXP mpi_allreduce(SEXP sexp_send,
 			Free(recv);
 			break;
 		}
+	default:
+		error("mpi_allreduce: only integer and double types are supported");
 	}
 	
 	UNPROTECT(1);			
