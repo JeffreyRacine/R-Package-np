@@ -774,14 +774,11 @@ SEXP mpi_send(SEXP sexp_data,
 		MPI_Send(CHAR2(STRING_ELT(sexp_data,0)),slen, MPI_CHAR, dest, tag, comm[commn]); 
 		break;
         case 4:
-                MPI_Send(RAW(sexp_data),len, MPI_BYTE, dest, tag, comm[commn]);                
+                mpi_errhandler(MPI_Send(RAW(sexp_data),len, MPI_BYTE, dest, tag, comm[commn]));
                 break;
 
 	default:
-		PROTECT(sexp_data=AS_NUMERIC(sexp_data));
-		mpi_errhandler(MPI_Send(REAL(sexp_data), 1, datatype[0], dest, tag, comm[commn]));
-		UNPROTECT(1);
-		break;		
+		error("mpi_send: unsupported type %d", type);
 	}
 	return R_NilValue;
 }
@@ -822,11 +819,7 @@ SEXP mpi_recv(SEXP sexp_data,
                 break;
 
 	default:
-		PROTECT(sexp_data=AS_NUMERIC(sexp_data));
-		mpi_errhandler(MPI_Recv(REAL(sexp_data), 1, datatype[0], source, tag, comm[commn],
-			&status[statusn]));
-		UNPROTECT(1);
-		break;		
+		error("mpi_recv: unsupported type %d", type);
 	}
         if (INTEGER(sexp_type)[0]==3)
                 return sexp_data2;
