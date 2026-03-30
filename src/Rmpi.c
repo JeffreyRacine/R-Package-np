@@ -727,17 +727,14 @@ SEXP mpi_bcast(SEXP sexp_data,
 	case 5:
 		if (buffunit <= 0)
 			error("mpi_bcast: buffunit must be positive for type=5");
-		MPI_Type_contiguous(buffunit, MPI_DOUBLE, xdouble);
-		MPI_Type_commit(xdouble);
+		mpi_errhandler(MPI_Type_contiguous(buffunit, MPI_DOUBLE, xdouble));
+		mpi_errhandler(MPI_Type_commit(xdouble));
 		if ((xlen % buffunit) > 0) len=1+(xlen/buffunit); else len=xlen/buffunit;
         mpi_errhandler(MPI_Bcast(REAL(sexp_data), len, xdouble[0], rank, comm[commn]));
 		MPI_Type_free(xdouble);
 		break;
 	default:
-		PROTECT(sexp_data=AS_NUMERIC(sexp_data));
-		mpi_errhandler(MPI_Bcast(REAL(sexp_data), 1, datatype[0], rank, comm[commn]));
-		UNPROTECT(1);
-		break;		
+		error("mpi_bcast: unsupported type %d", type);
 	}
 	if (errcode!=MPI_SUCCESS){
 		int errmsglen;
