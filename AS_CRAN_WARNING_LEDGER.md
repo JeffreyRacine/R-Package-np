@@ -74,6 +74,20 @@ Run bundle: `/Users/jracine/Development/tmp/np_semihat_fix_20260331_live_promoti
 7. Compiler warning interpretation:
 - warnings such as `-Wunused-but-set-variable` and `-Wmaybe-uninitialized` are diagnostics and did not cause this `ERROR` termination.
 
+## Win-Builder Refresh Disposition (2026-03-23)
+1. oldrelease (R 4.4.3):
+- URL: `https://win-builder.r-project.org/wUqA3lnnJu1V`
+2. release refresh:
+- URL: `https://win-builder.r-project.org/yJCf5YLo8jFI`
+- disposition: `1 NOTE` only; tests pass; compiled code clean.
+3. devel refresh:
+- URL: `https://win-builder.r-project.org/SP81r7OJ1ZYV`
+- disposition: `1 NOTE` only; tests pass; compiled code clean.
+4. Evidence source:
+- `/Users/jracine/Development/PRE_RELEASE_ISSUES_2026-03-23.md`
+- referenced ingest root:
+  - `/tmp/winbuilder_results_20260323_np_nprmpi_refresh_1`
+
 ## Cleared In This Refresh
 1. `top-level files` warning from non-package artifacts (`archive`, `cran-comments.md`) cleared via `.Rbuildignore`.
 2. `hidden files/directories` note from local artifacts (`.DS_Store`, `.Rlib`) cleared via `.Rbuildignore`.
