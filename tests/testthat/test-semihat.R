@@ -788,6 +788,7 @@ test_that("npscoefhat selected adaptive-nn owner preserves integer support and h
 
   tol <- sqrt(.Machine$double.eps)
   upper <- n - 1L
+  round_half_to_even <- getFromNamespace(".np_round_half_to_even", "np")
 
   for (regtype in c("lc", "ll", "lp")) {
     bw_args <- list(
@@ -805,7 +806,7 @@ test_that("npscoefhat selected adaptive-nn owner preserves integer support and h
     }
 
     bw <- do.call(npscoefbw, bw_args)
-    expect_true(all(abs(bw$bw - .np_round_half_to_even(bw$bw)) <= tol), info = regtype)
+    expect_true(all(abs(bw$bw - round_half_to_even(bw$bw)) <= tol), info = regtype)
     expect_true(all(bw$bw >= 1 & bw$bw <= upper), info = regtype)
 
     hat.apply <- npscoefhat(

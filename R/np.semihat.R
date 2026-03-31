@@ -262,6 +262,8 @@
     ckertype = ckertype,
     ckerorder = bws$ckerorder,
     ckerbound = ckerbound,
+    ckerlb = collapse_bound(bws$ckerlb, "ckerlb"),
+    ckerub = collapse_bound(bws$ckerub, "ckerub"),
     ukertype = ukertype,
     okertype = okertype,
     nobs = nrow(idx.train),
