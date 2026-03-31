@@ -197,6 +197,10 @@ npscoefbw.NULL <-
   do.call(npscoefbw.scbandwidth, scbw.args)
 }
 
+.npscoefbw_worker_opt_args <- function(opt.args) {
+  opt.args[setdiff(names(opt.args), "zdat")]
+}
+
 .npscoefbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, zdat, bws, reg.args, opt.args) {
   old.messages <- getOption("np.messages")
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
@@ -225,6 +229,7 @@ npscoefbw.NULL <-
                                                    reg.args,
                                                    opt.args,
                                                    comm = 1L) {
+  worker.opt.args <- .npscoefbw_worker_opt_args(opt.args)
   if (.npRmpi_has_active_slave_pool(comm = comm) &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
@@ -243,7 +248,7 @@ npscoefbw.NULL <-
         ZDAT = zdat,
         BWS = bws,
         REGARGS = reg.args,
-        OPTARGS = opt.args
+        OPTARGS = worker.opt.args
       )
     )
     return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
@@ -255,7 +260,7 @@ npscoefbw.NULL <-
     zdat = zdat,
     bws = bws,
     reg.args = reg.args,
-    opt.args = opt.args
+    opt.args = worker.opt.args
   )
 }
 
