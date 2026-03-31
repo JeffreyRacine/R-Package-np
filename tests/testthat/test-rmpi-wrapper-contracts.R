@@ -114,6 +114,30 @@ test_that("wrapper quarantined routes fail fast with explicit errors in session 
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("supported string wrapper routes stay green in session subprocess", {
+  env <- wrapper_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for wrapper contract")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = wrapper_session_lines(c(
+      "rank <- mpi.comm.rank(0L)",
+      "stopifnot(identical(as.character(mpi_sendrecv('abc', sendtype = 3L, dest = rank, sendtag = 31L, recvdata = string(4), recvtype = 3L, source = rank, recvtag = 31L, comm = 0L, status = 0L)), 'abc'))",
+      "stopifnot(identical(as.character(mpi.bcast('abc', type = 3L, rank = 0L, comm = 0L)), 'abc'))",
+      "stopifnot(identical(as.character(mpi_gather('abc', type = 3L, rdata = string(4), root = 0L, comm = 0L)), 'abc'))",
+      "stopifnot(identical(as.character(mpi_gatherv('abc', type = 3L, rdata = string(4), rcounts = 3L, root = 0L, comm = 0L)), 'abc'))",
+      "stopifnot(identical(as.character(mpi_scatter('abc', type = 3L, rdata = string(4), root = 0L, comm = 0L)), 'abc'))",
+      "stopifnot(identical(as.character(mpi_scatterv('abc', scounts = 3L, type = 3L, rdata = string(4), root = 0L, comm = 0L)), 'abc'))",
+      "cat('WRAPPER_SESSION_STRING_OK\\n')"
+    )),
+    timeout = 45L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("WRAPPER_SESSION_STRING_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("wrapper attach smoke stays green under mpiexec when enabled", {
   skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
               "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode wrapper smoke")
@@ -227,4 +251,88 @@ test_that("wrapper profile smoke stays green under mpiexec when enabled", {
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("WRAPPER_PROFILE_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
+})
+
+test_that("supported string send/recv and bcast stay green under profile mpiexec when enabled", {
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
+              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode wrapper smoke")
+
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  env <- wrapper_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for wrapper contract")
+
+  lib.path <- wrapper_subprocess_lib(env)
+  skip_if(is.null(lib.path), "local npRmpi install unavailable for wrapper contract")
+  profile.path <- file.path(lib.path, "npRmpi", "Rprofile")
+  skip_if(!file.exists(profile.path), "npRmpi profile template unavailable in subprocess lib")
+
+  out.dir <- tempfile("npRmpi-wrapper-profile-string-")
+  dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+  on.exit(unlink(out.dir, recursive = TRUE, force = TRUE), add = TRUE)
+  recv.path <- file.path(out.dir, "recv_rank1.txt")
+  bcast0.path <- file.path(out.dir, "bcast_rank0.txt")
+  bcast1.path <- file.path(out.dir, "bcast_rank1.txt")
+
+  script <- tempfile("npRmpi-wrapper-profile-string-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "if (mpi.comm.rank(0L) == 0L) {",
+    "  mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)",
+    "  mpi.bcast.cmd({",
+    "    ns <- asNamespace('npRmpi')",
+    "    mpi_send <- get('mpi.send', envir = ns, inherits = FALSE)",
+    "    mpi_recv <- get('mpi.recv', envir = ns, inherits = FALSE)",
+    "    rank <- mpi.comm.rank(0L)",
+    "    if (rank == 0L) {",
+    "      mpi_send('abc', type = 3L, dest = 1L, tag = 11L, comm = 0L)",
+    "    } else {",
+    "      out <- mpi_recv(string(4), type = 3L, source = 0L, tag = 11L, comm = 0L, status = 0L)",
+    sprintf("      writeLines(out, %s)", deparse(recv.path)),
+    "    }",
+    "  }, caller.execute = TRUE)",
+    "  mpi.bcast.cmd({",
+    "    rank <- mpi.comm.rank(0L)",
+    "    out <- mpi.bcast(if (rank == 0L) 'abc' else string(4), type = 3L, rank = 0L, comm = 0L)",
+    "    if (rank == 0L) {",
+    sprintf("      writeLines(out, %s)", deparse(bcast0.path)),
+    "    } else {",
+    sprintf("      writeLines(out, %s)", deparse(bcast1.path)),
+    "    }",
+    "  }, caller.execute = TRUE)",
+    "  mpi.bcast.cmd(mpi.quit(), caller.execute = TRUE)",
+    "}"
+  ), script, useBytes = TRUE)
+
+  run_once <- function(iface) {
+    run_wrapper_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 60L,
+      env = c(
+        env,
+        sprintf("R_PROFILE_USER=%s", profile.path),
+        "R_PROFILE=",
+        "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=60",
+        sprintf("FI_TCP_IFACE=%s", iface),
+        "FI_PROVIDER=tcp",
+        sprintf("FI_SOCKETS_IFACE=%s", iface)
+      )
+    )
+  }
+
+  res <- run_once("en0")
+  if (res$status != 0L)
+    res <- run_once("lo0")
+
+  if (res$status != 0L && .wrapper_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for profile-mode wrapper smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(file.exists(recv.path))
+  expect_equal(readLines(recv.path, warn = FALSE), "abc")
+  expect_equal(readLines(bcast0.path, warn = FALSE), "abc")
+  expect_equal(readLines(bcast1.path, warn = FALSE), "abc")
 })
