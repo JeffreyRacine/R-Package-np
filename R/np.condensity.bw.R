@@ -930,7 +930,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   ndeg <- length(degree.search$start.degree)
 
-  npRmpi:::npRmpiNomadShadowPrepareConditionalDensity(
+  npRmpiNomadShadowPrepareConditionalDensity(
     c.uno = prep$c.uno,
     c.ord = prep$c.ord,
     c.con = prep$c.con,
@@ -955,7 +955,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   mpi.barrier(1L)
   on.exit({
     mpi.barrier(1L)
-    npRmpi:::npRmpiNomadShadowClearConditionalDensity()
+    npRmpiNomadShadowClearConditionalDensity()
   }, add = TRUE)
 
   eval_fun <- function(point) {
@@ -967,7 +967,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     flat.bw <- c(bw_vec[x.offset + which(template$ixcon)], bw_vec[which(template$iycon)],
                  bw_vec[which(template$iyuno)], bw_vec[which(template$iyord)],
                  bw_vec[x.offset + which(template$ixuno)], bw_vec[x.offset + which(template$ixord)])
-    out <- npRmpi:::npRmpiNomadShadowEvalConditionalDensity(
+    out <- npRmpiNomadShadowEvalConditionalDensity(
       bw = as.double(flat.bw),
       degree = as.integer(degree)
     )
@@ -1255,7 +1255,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     )
 
     mc <- substitute(
-      npRmpi:::npRmpiNomadShadowSearchConditionalDensity(
+      get("npRmpiNomadShadowSearchConditionalDensity", envir = asNamespace("npRmpi"), inherits = FALSE)(
         TEMPLATE,
         SETUP,
         PREP,

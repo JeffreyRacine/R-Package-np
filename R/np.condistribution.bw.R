@@ -677,7 +677,7 @@ npcdistbw.condbandwidth <-
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     mc <- substitute(
-      npRmpi:::.npcdistbw_run_fixed_degree_bcast_payload(
+      get(".npcdistbw_run_fixed_degree_bcast_payload", envir = asNamespace("npRmpi"), inherits = FALSE)(
         XDAT,
         YDAT,
         BWS,

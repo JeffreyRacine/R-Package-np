@@ -481,7 +481,7 @@ npregbw.rbandwidth <-
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     mc <- substitute(
-      npRmpi:::.npregbw_run_fixed_degree_bcast_payload(
+      get(".npregbw_run_fixed_degree_bcast_payload", envir = asNamespace("npRmpi"), inherits = FALSE)(
         XDAT,
         YDAT,
         BWS,
@@ -878,7 +878,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   )
 
   mc <- substitute(
-    npRmpi:::npRmpiNomadShadowPrepareRegression(
+    get("npRmpiNomadShadowPrepareRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
       RUNO,
       RORD,
       RCON,
@@ -932,7 +932,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
 .npregbw_nomad_shadow_eval <- function(shadow, bw, degree, broadcast = TRUE) {
   flat.bw <- c(bw[shadow$icon], bw[shadow$iuno], bw[shadow$iord])
   mc <- substitute(
-    npRmpi:::npRmpiNomadShadowEvalRegression(
+    get("npRmpiNomadShadowEvalRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
       BW,
       DEGREE
     ),
@@ -953,7 +953,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   if (is.null(shadow) || !isTRUE(shadow$active))
     return(invisible(NULL))
 
-  mc <- quote(npRmpi:::npRmpiNomadShadowClearRegression())
+  mc <- quote(get("npRmpiNomadShadowClearRegression", envir = asNamespace("npRmpi"), inherits = FALSE)())
   if (isTRUE(broadcast)) {
     .npRmpi_bcast_cmd_expr(mc, comm = shadow$comm, caller.execute = TRUE)
   } else {
@@ -1073,7 +1073,7 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
 
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
-  npRmpi:::npRmpiNomadShadowPrepareRegression(
+  npRmpiNomadShadowPrepareRegression(
     runo = prep$runo,
     rord = prep$rord,
     rcon = prep$rcon,
@@ -1093,7 +1093,7 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
   mpi.barrier(1L)
   on.exit({
     mpi.barrier(1L)
-    npRmpi:::npRmpiNomadShadowClearRegression()
+    npRmpiNomadShadowClearRegression()
   }, add = TRUE)
 
   eval_fun <- function(point) {
@@ -1102,7 +1102,7 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
     degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
     bw_vec <- .npregbw_nomad_point_to_bw(point[seq_len(ncon + ncat)], template = template, setup = setup)
     flat.bw <- c(bw_vec[template$icon], bw_vec[template$iuno], bw_vec[template$iord])
-    out <- npRmpi:::npRmpiNomadShadowEvalRegression(
+    out <- npRmpiNomadShadowEvalRegression(
       bw = as.double(flat.bw),
       degree = as.integer(degree)
     )
@@ -1297,7 +1297,7 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
     )
 
     mc <- substitute(
-      npRmpi:::npRmpiNomadShadowSearchRegression(
+      get("npRmpiNomadShadowSearchRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
         XDAT,
         YDAT,
         TEMPLATE,
@@ -1387,7 +1387,7 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
     degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
     bw_vec <- .npregbw_nomad_point_to_bw(point[seq_len(ncon + ncat)], template = template, setup = setup)
     flat.bw <- c(bw_vec[template$icon], bw_vec[template$iuno], bw_vec[template$iord])
-    out <- npRmpi:::npRmpiNomadEvalOnlyRegression(
+    out <- npRmpiNomadEvalOnlyRegression(
       runo = prep$runo,
       rord = prep$rord,
       rcon = prep$rcon,

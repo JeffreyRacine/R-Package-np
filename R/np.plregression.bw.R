@@ -373,7 +373,7 @@ npplregbw.plbandwidth =
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     mc <- substitute(
-      npRmpi:::.npplregbw_run_fixed_degree_bcast_payload(
+      get(".npplregbw_run_fixed_degree_bcast_payload", envir = asNamespace("npRmpi"), inherits = FALSE)(
         XDAT,
         YDAT,
         ZDAT,
