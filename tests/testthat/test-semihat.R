@@ -948,6 +948,33 @@ test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
       expect_equal(as.vector(hy), as.vector(fit$mean), tolerance = 1e-8, info = paste(bt, cfg$regtype, "apply"))
     }
   }
+
+  sibw.bad.bounds <- npindexbw(
+    xdat = tx,
+    ydat = y,
+    bws = c(1, 1, 0.22),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "tensor",
+    degree = 2L,
+    bernstein.basis = TRUE,
+    bwtype = "fixed",
+    ckertype = "epanechnikov",
+    ckerorder = 2L,
+    ckerbound = "fixed",
+    ckerlb = 0.0,
+    ckerub = 1.0
+  )
+  expect_error(
+    npindexhat(
+      bws = sibw.bad.bounds,
+      txdat = tx,
+      exdat = ex,
+      s = 0L,
+      output = "matrix"
+    ),
+    "Invalid bounds for 'ckerbound'|Evaluation data violate 'ckerbound' bounds"
+  )
 })
 
 test_that("npscoefhat apply mode matches green core fits across bwtypes", {

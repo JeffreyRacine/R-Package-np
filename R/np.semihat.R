@@ -237,12 +237,46 @@
 }
 
 .np_indexhat_kbw <- function(bws, idx.train) {
-  kbandwidth(
+  resolve_choice <- function(value, choices, default = choices[1L]) {
+    if (is.null(value) || !length(value))
+      return(default)
+    cand <- as.character(value)[1L]
+    if (!cand %in% choices)
+      return(default)
+    cand
+  }
+
+  collapse_bound <- function(v, nm) {
+    if (is.null(v))
+      return(NULL)
+    vv <- as.double(v)
+    if (length(vv) <= 1L)
+      return(vv)
+    uu <- unique(vv)
+    if (length(uu) == 1L)
+      return(uu)
+    stop(sprintf("cannot collapse %s with %d distinct values to scalar helper bound",
+                 nm, length(uu)),
+         call. = FALSE)
+  }
+
+  bwtype <- resolve_choice(bws$type, c("fixed", "generalized_nn", "adaptive_nn"))
+  ckertype <- resolve_choice(bws$ckertype, c("gaussian", "truncated gaussian", "epanechnikov", "uniform"))
+  ckerbound <- resolve_choice(bws$ckerbound, c("none", "range", "fixed"))
+  ukertype <- resolve_choice(bws$ukertype, c("aitchisonaitken", "liracine"))
+  okertype <- resolve_choice(bws$okertype, c("liracine", "wangvanryzin", "racineliyan", "nliracine"))
+
+  kbandwidth.numeric(
     bw = c(bws$bw),
-    bwtype = bws$type,
-    ckertype = bws$ckertype,
+    bwtype = bwtype,
+    bwscaling = FALSE,
+    ckertype = ckertype,
     ckerorder = bws$ckerorder,
-    ckerbound = bws$ckerbound,
+    ckerbound = ckerbound,
+    ckerlb = collapse_bound(bws$ckerlb, "ckerlb"),
+    ckerub = collapse_bound(bws$ckerub, "ckerub"),
+    ukertype = ukertype,
+    okertype = okertype,
     nobs = nrow(idx.train),
     xdati = untangle(idx.train),
     ydati = bws$ydati,
