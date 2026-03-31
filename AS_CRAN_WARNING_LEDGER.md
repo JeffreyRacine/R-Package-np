@@ -35,6 +35,24 @@ Validation summary: `/Users/jracine/Development/tmp/npRmpi_wrapper_string_contra
 - full `R CMD check --as-cran` passed with tests enabled on the wrapper-hardening closeout tree;
 - live repo was promoted to the exact tested tree and rebuilt successfully.
 
+## Win-Builder Result Disposition
+1. oldrelease (R 4.4.3):
+- URL: `https://win-builder.r-project.org/whIxNg5rQr8Q`
+- disposition: historical ingested oldrelease result on file; no longer the missing gap in the canonical tracker.
+2. release refresh (post-fix, 2026-03-23):
+- URL: `https://win-builder.r-project.org/k9oT51cHnqxt`
+- disposition: `1 NOTE` only; tests pass; compiled code clean.
+- evidence source:
+  - `/Users/jracine/Development/PRE_RELEASE_ISSUES_2026-03-23.md`
+  - referenced ingest root:
+    - `/tmp/winbuilder_results_20260323_np_nprmpi_refresh_1`
+
+## Win-Builder Reading
+- The previously missing `npRmpi` release-result disposition is now filled by the
+  refreshed release result above.
+- Current release-hygiene focus is therefore local ledger accuracy plus any
+  future resubmissions, not a missing `npRmpi` release link.
+
 ## Gate Policy
 - Any *new* warning/note not listed here is treated as a regression.
 
