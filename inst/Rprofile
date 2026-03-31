@@ -103,8 +103,10 @@ if (mpi.comm.size(0) > 1)
 if (mpi.comm.rank(0) > 0) {
   options(echo = FALSE)
   .comm <- 1
+  .npRmpi_ns <- asNamespace("npRmpi")
+  .npRmpi_worker_loop <- get(".npRmpi_worker_loop", envir = .npRmpi_ns, inherits = FALSE)
   mpi.barrier(0)
-  npRmpi:::.npRmpi_worker_loop(
+  .npRmpi_worker_loop(
     comm = .comm,
     nonblock = .nonblock,
     sleep = .sleep,
