@@ -394,6 +394,11 @@ npindexbw.NULL <-
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     slave.num <- mpi.comm.size(1L) - 1L
     if (slave.num > 0L) {
+      worker.spec <- list(
+        degree.engine = spec$degree.engine,
+        basis.engine = spec$basis.engine,
+        bernstein.basis.engine = spec$bernstein.basis.engine
+      )
       blocks <- Filter(length, .splitIndices(n, min(as.integer(n), as.integer(slave.num))))
       pieces <- mpi.apply(
         blocks,
@@ -402,7 +407,7 @@ npindexbw.NULL <-
         ydat = ydat,
         h = h,
         bws = bws,
-        spec = spec,
+        spec = worker.spec,
         comm = 1L
       )
       fit.loo <- double(n)
