@@ -275,6 +275,7 @@ test_that("wild fanout fails fast on dispatch timeout when worker replies stall"
     mpi.any.tag = function() 0L,
     mpi.bcast.cmd = function(...) invisible(NULL),
     mpi.bcast.Robj = function(...) invisible(NULL),
+    mpi.send.Robj = function(...) invisible(NULL),
     mpi.iprobe = function(source, tag, comm = 1L) FALSE,
     .package = "npRmpi"
   )
