@@ -1253,6 +1253,35 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       invalid.penalty = "baseline",
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     )
+    # Workers only need the fields consumed by the shadow NOMAD search.
+    search.template <- list(
+      scaling = isTRUE(template$scaling),
+      ybw = template$ybw,
+      xbw = template$xbw,
+      iycon = template$iycon,
+      ixcon = template$ixcon,
+      iyuno = template$iyuno,
+      iyord = template$iyord,
+      ixuno = template$ixuno,
+      ixord = template$ixord
+    )
+    search.setup <- list(
+      cont_flat = setup$cont_flat,
+      cont_scale = setup$cont_scale,
+      cat_flat = setup$cat_flat,
+      ncatfac = setup$ncatfac,
+      bandwidth.scale.categorical = setup$bandwidth.scale.categorical
+    )
+    search.degree <- list(
+      engine = degree.search$engine,
+      start.degree = degree.search$start.degree,
+      candidates = degree.search$candidates,
+      lower = degree.search$lower,
+      upper = degree.search$upper,
+      basis = degree.search$basis,
+      nobs = degree.search$nobs,
+      start.user = degree.search$start.user
+    )
 
     mc <- substitute(
       get("npRmpiNomadShadowSearchConditionalDensity", envir = asNamespace("npRmpi"), inherits = FALSE)(
@@ -1269,10 +1298,10 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
         RSEED
       ),
       list(
-        TEMPLATE = template,
-        SETUP = setup,
+        TEMPLATE = search.template,
+        SETUP = search.setup,
         PREP = prep,
-        DEGREESEARCH = degree.search,
+        DEGREESEARCH = search.degree,
         X0 = x0,
         BBIN = bbin,
         LB = lb,
