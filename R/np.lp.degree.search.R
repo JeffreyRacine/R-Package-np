@@ -1285,32 +1285,15 @@
   if (is.null(state))
     return(state)
 
-  now <- .np_progress_now()
   state$label <- .np_nomad_powell_progress_label()
   state$nomad_current_degree <- as.integer(degree)
   state$nomad_best_record <- best_record
-  state$start_note_pending <- FALSE
-
-  line <- .np_progress_format_line(
+  .np_progress_step_at(
     state = state,
+    now = .np_progress_now(),
     done = state$last_done,
-    now = now
+    force = TRUE
   )
-
-  if (!identical(line, state$last_line)) {
-    state <- .np_progress_render(
-      state = state,
-      line = line,
-      event = "update",
-      now = now,
-      done = state$last_done
-    )
-    state$last_emit <- now
-    state$last_emitted_done <- state$last_done
-    state$last_emitted_detail <- NULL
-  }
-
-  state
 }
 
 .np_nomad_with_powell_progress <- function(degree, expr) {
