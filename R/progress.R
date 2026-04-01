@@ -1531,6 +1531,12 @@
     return(invisible(NULL))
   }
 
+  # NOMAD restart search is unknown-bound even when inner helpers expose a
+  # local multistart count; do not synthesize percent/ETA from that count.
+  if (!is.null(state$nomad_nmulti) && is.function(state$unknown_total_fields)) {
+    return(invisible(NULL))
+  }
+
   if (.np_progress_bandwidth_enhanced_state(state)) {
     .np_progress_runtime$bandwidth_state <- .np_progress_bandwidth_register_nmulti(
       state = state,
