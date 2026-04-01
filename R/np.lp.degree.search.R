@@ -1292,18 +1292,17 @@
   state$start_note_pending <- FALSE
 
   if (identical(state$renderer, "single_line") &&
-      isTRUE(state$rendered) &&
-      !is.null(state$last_line)) {
-    state <- .np_progress_render(
-      state = state,
-      line = state$last_line,
-      event = "finish",
-      now = now,
-      done = state$last_done
-    )
+      isTRUE(state$capability$rstudio)) {
+    if (isTRUE(state$rendered)) {
+      con <- .np_progress_single_line_connection()
+      base::cat("\n", file = con, sep = "")
+      flush(con)
+      flush.console()
+    }
+    state$renderer <- "legacy"
     state$rendered <- FALSE
     state$last_render_width <- 0L
-    state$last_line <- NULL
+    .np_progress_registry$last_single_line_width <- 0L
   }
 
   line <- .np_progress_format_line(
