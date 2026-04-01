@@ -11,6 +11,27 @@ shadow_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
+test_that("unknown-bound NOMAD restart detail drops synthetic percent and eta", {
+  nomad_detail <- getFromNamespace(".np_nomad_progress_detail", "npRmpi")
+
+  line <- nomad_detail(
+    current_degree = 5L,
+    best_record = list(degree = 1L),
+    iteration = 77L,
+    cumulative_iteration = 1234L,
+    restart_index = 2L,
+    nmulti = 2L,
+    restart_durations = c(18.8),
+    elapsed = 18.8
+  )
+
+  expect_identical(
+    line,
+    "multistart 2/2, iteration 77 (1234), elapsed 18.8s, deg (5), best (1)"
+  )
+  expect_false(grepl("%|eta ", line))
+})
+
 test_that("dark-launched bandwidth engine preserves nmulti=1 iteration heartbeats", {
   select_bw <- getFromNamespace(".np_progress_select_bandwidth", "npRmpi")
   activity_bw <- getFromNamespace(".np_progress_bandwidth_activity_step", "npRmpi")

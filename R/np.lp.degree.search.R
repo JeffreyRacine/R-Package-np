@@ -1157,6 +1157,7 @@
 .np_nomad_progress_detail <- function(current_degree,
                                       best_record,
                                       iteration = NULL,
+                                      cumulative_iteration = NULL,
                                       restart_index = NULL,
                                       nmulti = 1L,
                                       restart_durations = numeric(),
@@ -1172,36 +1173,22 @@
     }
   }
 
-  if (!is.null(iteration) && is.finite(iteration) && iteration >= 1L)
-    fields <- c(fields, sprintf("iteration %s", format(iteration)))
+  cumulative_iteration <- suppressWarnings(as.integer(cumulative_iteration)[1L])
+  if (!is.null(iteration) && is.finite(iteration) && iteration >= 1L) {
+    if (!is.na(cumulative_iteration) &&
+        cumulative_iteration >= 1L &&
+        cumulative_iteration != iteration) {
+      fields <- c(
+        fields,
+        sprintf("iteration %s (%s)", format(iteration), format(cumulative_iteration))
+      )
+    } else {
+      fields <- c(fields, sprintf("iteration %s", format(iteration)))
+    }
+  }
 
   if (is.finite(elapsed) && !is.na(elapsed) && elapsed >= 0)
     fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
-
-  completed <- length(restart_durations)
-  elapsed <- suppressWarnings(as.numeric(elapsed)[1L])
-  if (!is.na(nmulti) && nmulti > 1L && completed >= 1L &&
-      is.finite(elapsed) && !is.na(elapsed) && elapsed >= 0) {
-    est.total <- mean(restart_durations) * nmulti
-    base.share <- 100 * completed / nmulti
-    pct <- base.share
-    eta <- 0
-
-    if (is.finite(est.total) && !is.na(est.total) && est.total > 0) {
-      pct.calc <- 100 * elapsed / est.total
-      pct.upper <- if (completed < nmulti) 99.9 else 100.0
-      pct <- max(base.share, min(pct.upper, pct.calc))
-      if (completed < nmulti) {
-        eta <- max(0, est.total - elapsed)
-      }
-    }
-
-    fields <- c(
-      fields,
-      sprintf("%s%%", .np_progress_fmt_num(pct)),
-      sprintf("eta %ss", .np_progress_fmt_num(eta))
-    )
-  }
 
   if (!is.null(current_degree))
     fields <- c(fields, sprintf("deg %s", .np_degree_format_degree(current_degree)))
@@ -1235,6 +1222,7 @@
     current_degree = state$nomad_current_degree,
     best_record = state$nomad_best_record,
     iteration = done,
+    cumulative_iteration = state$nomad_eval_id,
     restart_index = state$nomad_restart_index,
     nmulti = state$nomad_nmulti,
     restart_durations = state$nomad_restart_durations,
@@ -1257,6 +1245,7 @@
   state$nomad_restart_durations <- numeric()
   state$nomad_current_degree <- as.integer(baseline_degree)
   state$nomad_best_record <- best_record
+  state$nomad_eval_id <- 0L
   state$start_note <- if (state$nomad_nmulti > 1L) {
     sprintf(
       "%s %s (multistart 1/%s)",
@@ -1484,6 +1473,7 @@
     state$restart_eval_id <- state$restart_eval_id + 1L
     state$progress_state$nomad_current_degree <- degree
     state$progress_state$nomad_best_record <- state$best_record
+    state$progress_state$nomad_eval_id <- state$eval_id
     state$progress_state$nomad_restart_index <- state$current_restart
     state$progress_state$nomad_restart_durations <- state$restart_durations
     state$progress_state <- .np_degree_progress_step(
