@@ -35,7 +35,12 @@ test_that("NOMAD plus Powell timing is carried through bandwidth and fit summari
   expect_true(is.finite(bw$nomad.time))
   expect_true(is.finite(bw$powell.time))
   expect_true(is.finite(bw$total.time))
-  expect_gte(bw$total.time + 1e-8, bw$nomad.time + bw$powell.time)
+  expect_equal(as.double(bw$total.time),
+               as.double(bw$nomad.time + bw$powell.time),
+               tolerance = 1e-8)
+  expect_equal(as.double(bw$degree.search$optim.time),
+               as.double(bw$nomad.time + bw$powell.time),
+               tolerance = 1e-8)
   expect_equal(fit$optim.time, bw$total.time, tolerance = 1e-8)
   expect_equal(fit$nomad.time, bw$nomad.time, tolerance = 1e-8)
   expect_equal(fit$powell.time, bw$powell.time, tolerance = 1e-8)

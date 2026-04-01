@@ -378,6 +378,12 @@ test_that("npindexbw automatic degree search defaults to NOMAD plus Powell", {
   expect_true(isTRUE(bw$degree.search$completed))
   expect_true(is.finite(bw$nomad.time))
   expect_true(is.finite(bw$powell.time))
+  expect_equal(as.double(bw$total.time),
+               as.double(bw$nomad.time + bw$powell.time),
+               tolerance = 1e-8)
+  expect_equal(as.double(bw$degree.search$optim.time),
+               as.double(bw$nomad.time + bw$powell.time),
+               tolerance = 1e-8)
 })
 
 test_that("npindexbw NOMAD degree search fails fast when crs is unavailable", {

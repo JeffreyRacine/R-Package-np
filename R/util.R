@@ -281,9 +281,104 @@ npValidateScalarLogical <- function(value, argname) {
   obj
 }
 
+.np_nomad_sum_time <- function(nomad.time = NULL,
+                               powell.time = NULL,
+                               fallback = NULL) {
+  pieces <- c(
+    if (!is.null(nomad.time) && length(nomad.time)) as.double(nomad.time[1L]) else NA_real_,
+    if (!is.null(powell.time) && length(powell.time)) as.double(powell.time[1L]) else NA_real_
+  )
+
+  if (any(is.finite(pieces)))
+    return(sum(pieces, na.rm = TRUE))
+
+  if (!is.null(fallback) && length(fallback) && is.finite(as.double(fallback[1L])))
+    return(as.double(fallback[1L]))
+
+  NA_real_
+}
+
+.npRmpi_reconcile_nomad_search_timing <- function(search.result) {
+  if (!is.list(search.result))
+    return(search.result)
+
+  optim.time <- .np_nomad_sum_time(
+    nomad.time = search.result$nomad.time,
+    powell.time = search.result$powell.time,
+    fallback = search.result$optim.time
+  )
+
+  if (is.finite(optim.time))
+    search.result$optim.time <- optim.time
+
+  search.result
+}
+
+.npRmpi_reconcile_nomad_bws_timing <- function(bws) {
+  if (!is.list(bws))
+    return(bws)
+
+  optim.time <- .np_nomad_sum_time(
+    nomad.time = bws$nomad.time,
+    powell.time = bws$powell.time,
+    fallback = bws$total.time
+  )
+
+  if (is.finite(optim.time))
+    bws$total.time <- optim.time
+
+  if (is.list(bws$degree.search)) {
+    degree.optim <- .np_nomad_sum_time(
+      nomad.time = bws$degree.search$nomad.time,
+      powell.time = bws$degree.search$powell.time,
+      fallback = bws$degree.search$optim.time
+    )
+    if (is.finite(degree.optim))
+      bws$degree.search$optim.time <- degree.optim
+  }
+
+  bws
+}
+
 .npRmpi_restore_nomad_fit_bws_metadata <- function(result, bws) {
   if (!is.list(result) || !is.list(result$bws) || !is.list(bws))
     return(result)
+
+  bws <- .npRmpi_reconcile_nomad_bws_timing(bws)
+  result$bws <- .npRmpi_reconcile_nomad_bws_timing(result$bws)
+
+  if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time))
+    result$nomad.time <- as.double(bws$nomad.time)
+
+  if (!is.null(bws$powell.time) && is.finite(bws$powell.time))
+    result$powell.time <- as.double(bws$powell.time)
+
+  optim.time <- .np_nomad_sum_time(
+    nomad.time = result$nomad.time,
+    powell.time = result$powell.time,
+    fallback = bws$total.time
+  )
+  if (is.finite(optim.time))
+    result$optim.time <- optim.time
+
+  if (is.finite(result$optim.time) &&
+      !is.null(result$fit.time) &&
+      is.finite(result$fit.time))
+    result$total.time <- as.double(result$optim.time) + as.double(result$fit.time)
+
+  if ((is.null(result$bws$nomad.time) || !is.finite(result$bws$nomad.time)) &&
+      !is.null(bws$nomad.time) && is.finite(bws$nomad.time))
+    result$bws$nomad.time <- as.double(bws$nomad.time)
+
+  if ((is.null(result$bws$powell.time) || !is.finite(result$bws$powell.time)) &&
+      !is.null(bws$powell.time) && is.finite(bws$powell.time))
+    result$bws$powell.time <- as.double(bws$powell.time)
+
+  if ((is.null(result$bws$total.time) || !is.finite(result$bws$total.time)) &&
+      !is.null(bws$total.time) && is.finite(bws$total.time))
+    result$bws$total.time <- as.double(bws$total.time)
+
+  result$bws <- .npRmpi_reconcile_nomad_bws_timing(result$bws)
 
   if (is.null(result$bws$degree.search) && is.list(bws$degree.search))
     result$bws$degree.search <- bws$degree.search

@@ -1339,7 +1339,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       search.result$best_payload <- payload_result
     }
 
-    return(search.result)
+    return(.npRmpi_reconcile_nomad_search_timing(search.result))
   }
 
   .np_nomad_baseline_note(degree.search$start.degree)

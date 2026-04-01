@@ -29,6 +29,16 @@ expect_nomad_shortcut_marker <- function(res, marker) {
               info = paste(res$output, collapse = "\n"))
 }
 
+nomad_shortcut_timing_lines <- function(fit_expr = "fit") {
+  c(
+    sprintf("stopifnot(is.finite(%s$bws$nomad.time))", fit_expr),
+    sprintf("stopifnot(is.finite(%s$bws$powell.time))", fit_expr),
+    sprintf("stopifnot(isTRUE(all.equal(as.double(%s$bws$total.time), as.double(%s$bws$nomad.time + %s$bws$powell.time), tolerance = 1e-8)))", fit_expr, fit_expr, fit_expr),
+    sprintf("if (!is.null(%s$optim.time) && length(%s$optim.time)) stopifnot(isTRUE(all.equal(as.double(%s$optim.time), as.double(%s$bws$total.time), tolerance = 1e-8)))", fit_expr, fit_expr, fit_expr, fit_expr),
+    sprintf("if (!is.null(%s$total.time) && length(%s$total.time) && !is.null(%s$fit.time) && length(%s$fit.time) && !is.null(%s$optim.time) && length(%s$optim.time)) stopifnot(isTRUE(all.equal(as.double(%s$total.time), as.double(%s$optim.time + %s$fit.time), tolerance = 1e-8)))", fit_expr, fit_expr, fit_expr, fit_expr, fit_expr, fit_expr, fit_expr, fit_expr, fit_expr)
+  )
+}
+
 test_that("nomad shortcut smoke covers npreg in subprocess session mode", {
   res <- run_nomad_shortcut_subprocess(
     lines = c(
@@ -41,6 +51,7 @@ test_that("nomad shortcut smoke covers npreg in subprocess session mode", {
       "stopifnot(inherits(fit, 'npregression'))",
       "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
       "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      nomad_shortcut_timing_lines(),
       "cat('NOMAD_SHORTCUT_NPREG_OK\\n')"
     )
   )
@@ -61,6 +72,7 @@ test_that("nomad shortcut smoke covers npcdens in subprocess session mode", {
       "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
       "stopifnot(isTRUE(fit$bws$bernstein.basis))",
       "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      nomad_shortcut_timing_lines(),
       "cat('NOMAD_SHORTCUT_NPCDENS_OK\\n')"
     )
   )
@@ -81,6 +93,7 @@ test_that("nomad shortcut smoke covers npcdist in subprocess session mode", {
       "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
       "stopifnot(isTRUE(fit$bws$bernstein.basis))",
       "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      nomad_shortcut_timing_lines(),
       "cat('NOMAD_SHORTCUT_NPCDIST_OK\\n')"
     )
   )
@@ -101,6 +114,7 @@ test_that("nomad shortcut smoke covers npplreg in subprocess session mode", {
       "stopifnot(inherits(fit, 'plregression'))",
       "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
       "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      nomad_shortcut_timing_lines(),
       "cat('NOMAD_SHORTCUT_NPPLREG_OK\\n')"
     )
   )
@@ -121,6 +135,7 @@ test_that("nomad shortcut smoke covers npscoef in subprocess session mode", {
       "stopifnot(inherits(fit, 'smoothcoefficient'))",
       "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
       "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
+      nomad_shortcut_timing_lines(),
       "cat('NOMAD_SHORTCUT_NPSCOEF_OK\\n')"
     )
   )
@@ -143,6 +158,7 @@ test_that("nomad shortcut smoke covers npindex in subprocess session mode", {
       "stopifnot(isTRUE(fit$bws$nomad.shortcut$enabled))",
       "stopifnot(identical(fit$bws$nomad.shortcut$preset, 'lp_nomad'))",
       "stopifnot(identical(fit$bws$ynames, 'y'))",
+      nomad_shortcut_timing_lines(),
       "cat('NOMAD_SHORTCUT_NPINDEX_OK\\n')"
     )
   )
