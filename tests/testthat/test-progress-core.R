@@ -482,6 +482,19 @@ test_that("single-line fit preserves readable coordinator bandwidth fields at 80
   )
 })
 
+test_that("single-line fit preserves restart and cumulative iteration in NOMAD lines", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+
+  line <- "[np] Bandwidth selection (multistart 2/2, iteration 31 (128), elapsed 10.6s, deg (1), best (0))"
+  fitted <- fit(line, max_width = 80)
+
+  expect_lte(nchar(fitted, type = "width"), 80L)
+  expect_identical(
+    fitted,
+    "[np] Bandwidth selection (2/2, iter 31 (128), elapsed 10.6s, deg (1), best (0))"
+  )
+})
+
 test_that("single-line fit compacts plot bootstrap labels so prep detail survives", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 
