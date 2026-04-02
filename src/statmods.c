@@ -1909,10 +1909,6 @@ double *vector_continuous_stddev)
 
             if(vector_continuous_stddev[i] <= DBL_MIN)
             {
-#ifdef MPI2
-              /* Since program terminates, clean up */
-              MPI_Finalize();
-#endif
               error("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i);
             }
 
@@ -1925,10 +1921,6 @@ double *vector_continuous_stddev)
 
             if(vector_continuous_stddev[i+num_reg_continuous] <= DBL_MIN)
             {
-#ifdef MPI2
-              /* Since program terminates, clean up */
-              MPI_Finalize();
-#endif
               error("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i+num_reg_continuous);
             }
             

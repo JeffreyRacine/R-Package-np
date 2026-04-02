@@ -265,10 +265,6 @@ double *kernel_sum)
 		matrix_bandwidth,
 		lambda) == 1)
 	{
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
 		error("\n** Error: invalid bandwidth.");
 	}
 
@@ -13445,15 +13441,11 @@ double *SIGN){
                       matrix_X_continuous_train,
                       matrix_X_continuous_eval,
                       NULL,					 // Not used 
-                      matrix_bandwidth,
-                      lambda,
-                      matrix_bandwidth_deriv)==1){
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
-  }
+	                      matrix_bandwidth,
+	                      lambda,
+	                      matrix_bandwidth_deriv)==1){
+	    error("\n** Error: invalid bandwidth.");
+	  }
 
   for(l = 0, hprod = 1.0; l < num_reg_continuous; l++)
     hprod *= matrix_bandwidth[l][0];
@@ -18823,16 +18815,12 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                            vector_scale_factor,
                            NULL, NULL,
                            matrix_X_continuous_train,
-                           matrix_X_continuous_eval,
-                           NULL,
-                           matrix_bandwidth,
-                           lambda)==1){
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
-  }
+	                           matrix_X_continuous_eval,
+	                           NULL,
+	                           matrix_bandwidth,
+	                           lambda)==1){
+	    error("\n** Error: invalid bandwidth.");
+	  }
 
   kernel_weighted_sum_np(kernel_c,
                          kernel_u,
@@ -19745,16 +19733,12 @@ double * log_likelihood
                            matrix_XY_continuous_train + num_X_continuous,
                            matrix_XY_continuous_eval + num_X_continuous,
                            matrix_XY_continuous_train,
-                           matrix_XY_continuous_eval,
-                           matrix_bandwidth_Y,
-                           matrix_bandwidth_X,
-                           lambda)==1){
-#ifdef MPI2
-    MPI_Barrier(comm[1]);
-    MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
-  }
+	                           matrix_XY_continuous_eval,
+	                           matrix_bandwidth_Y,
+	                           matrix_bandwidth_X,
+	                           lambda)==1){
+	    error("\n** Error: invalid bandwidth.");
+	  }
 
 
   // relevant dimensions for partial tree search

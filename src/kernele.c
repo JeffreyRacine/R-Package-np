@@ -211,11 +211,7 @@ double *log_likelihood)
 		lambda,
 		matrix_bandwidth_deriv) == 1)
 	{
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
+	    error("\n** Error: invalid bandwidth.");
 	}
 
 	/* Initialize constants for various kernels required for asymptotic standard errors */
@@ -2118,11 +2114,7 @@ int itmax)
 		lambda,
 		matrix_bandwidth_deriv) == 1)
 	{
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
+	    error("\n** Error: invalid bandwidth.");
 	}
 
 	/* Conduct the estimation */
@@ -2534,11 +2526,7 @@ double *SIGN)
 		lambda,
 		matrix_bandwidth_deriv) == 1)
 	{
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
+	    error("\n** Error: invalid bandwidth.");
 	}
 
 	#ifndef MPI2
@@ -10733,11 +10721,7 @@ double *log_likelihood)
 		matrix_bandwidth_reg,
 		lambda) == 1)
 	{
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
+	    error("\n** Error: invalid bandwidth.");
 	}
 
 	/* Initialize constants for various kernels required for asymptotic standard errors */
@@ -11435,11 +11419,7 @@ int itmax)
 		matrix_bandwidth_reg,
 		lambda) == 1)
 	{
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
+	    error("\n** Error: invalid bandwidth.");
 	}
 
 	#ifndef MPI2
@@ -12666,10 +12646,6 @@ int itmax)
 		matrix_bandwidth_reg,
 		lambda) == 1)
 	{
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
 		error("\n** Error: invalid bandwidth.");
 	}
 
@@ -13011,11 +12987,7 @@ double *log_likelihood)
 		matrix_bandwidth_reg,
 		lambda) == 1)
 	{
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
+	    error("\n** Error: invalid bandwidth.");
 	}
 
 	/* Initialize constants for various kernels required for asymptotic standard errors */
@@ -14491,11 +14463,7 @@ int itmax)
 		matrix_bandwidth_reg,
 		lambda) == 1)
 	{
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
+	    error("\n** Error: invalid bandwidth.");
 	}
 
 	/* Initialize constants for various kernels required for asymptotic standard errors */
@@ -17477,13 +17445,9 @@ double  initd_dir)
 			matrix_bandwidth_var,
 			matrix_bandwidth_reg,
 			lambda) == 1)
-		{
-#ifdef MPI2
-			MPI_Barrier(comm[1]);
-			MPI_Finalize();
-#endif
-      error("\n** Error: invalid bandwidth.");
-		}
+			{
+	      error("\n** Error: invalid bandwidth.");
+			}
 
 	}
 

@@ -994,6 +994,8 @@
       },
       character(1)
     )
+    if (!is.na(rank) && rank != 0L)
+      return(local)
     stop(
       sprintf("%s ACK mismatch [opcode=%s seq_id=%d]: %s",
               where, envelope$opcode, as.integer(envelope$seq_id),
@@ -1819,16 +1821,6 @@
       comm = COMM,
       where = WHERE
     )
-    if (!isTRUE(ans$ok)) {
-      ack <- ans$ack
-      stop(
-        sprintf("SPMD dispatch failed [opcode=%s seq_id=%s]: %s",
-                as.character(ack$opcode)[1L],
-                as.integer(ack$seq_id),
-                as.character(ans$error)[1L]),
-        call. = FALSE
-      )
-    }
     ans$result
   }, list(ENVELOPE = envelope,
           PAYLOAD = payload,

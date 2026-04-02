@@ -342,9 +342,7 @@ SEXP mpi_gather(SEXP sexp_sdata,
 				   SEXP sexp_rdata,
 				   SEXP sexp_root,
 				   SEXP sexp_comm){
-	int len, rlen, commn=INTEGER(sexp_comm)[0], root=INTEGER(sexp_root)[0];
-	char *rdata;
-	SEXP sexp_rdata2 = NULL;
+	int len, commn=INTEGER(sexp_comm)[0], root=INTEGER(sexp_root)[0];
 
 	switch (INTEGER(sexp_type)[0]){
 	case 1:
@@ -358,17 +356,7 @@ SEXP mpi_gather(SEXP sexp_sdata,
 			REAL(sexp_rdata), len, MPI_DOUBLE, root, comm[commn]));
 		break;
 	case 3: 
-		len=LENGTH(STRING_ELT(sexp_sdata,0));
-		rlen=LENGTH(STRING_ELT(sexp_rdata,0));
-
-        	PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
-        	rdata = (char *)Calloc((size_t)rlen + 1, char);
-                MPI_Gather(CHAR2 (STRING_ELT ((sexp_sdata),0)), len, MPI_CHAR,
-                        rdata, len, MPI_CHAR, root, comm[commn]);
-        	SET_STRING_ELT(sexp_rdata2, 0, mkChar(rdata));
-        	UNPROTECT(1);
-		Free(rdata);
-		break;
+		error("mpi_gather: character collectives are unsupported; use mpi.gather.Robj() or raw serialization");
 	case 4:
                 len=LENGTH(sexp_sdata);
                 mpi_errhandler(MPI_Gather(RAW(sexp_sdata), len, MPI_BYTE,
@@ -378,10 +366,7 @@ SEXP mpi_gather(SEXP sexp_sdata,
 		error("mpi_gather: unsupported type code; only types 1-4 are supported");
 	}
 
-	if (INTEGER(sexp_type)[0]==3)
-		return sexp_rdata2;
-	else
-		return sexp_rdata;
+	return sexp_rdata;
 }
 
 SEXP mpi_gatherv(SEXP sexp_sdata,
@@ -390,10 +375,8 @@ SEXP mpi_gatherv(SEXP sexp_sdata,
 				   SEXP sexp_recvcounts,
 				   SEXP sexp_root,
 				   SEXP sexp_comm){
-	int len, rlen, commn=INTEGER(sexp_comm)[0], root=INTEGER(sexp_root)[0];
+	int len, commn=INTEGER(sexp_comm)[0], root=INTEGER(sexp_root)[0];
 	int *displs=NULL, gsize, rank, i;
-	char *rdata;
-	SEXP sexp_rdata2 = NULL;
 	
 	MPI_Comm_size(comm[commn], &gsize);
 	MPI_Comm_rank(comm[commn], &rank);
@@ -413,23 +396,12 @@ SEXP mpi_gatherv(SEXP sexp_sdata,
 		break;
 	case 2:
 		len=LENGTH(sexp_sdata);
-		mpi_errhandler(MPI_Gatherv(REAL(sexp_sdata), len, MPI_DOUBLE, 
-			REAL(sexp_rdata), INTEGER(sexp_recvcounts), displs, 
-				MPI_DOUBLE, root, comm[commn]));
+		mpi_errhandler(MPI_Gatherv(REAL(sexp_sdata), len, MPI_DOUBLE,
+				REAL(sexp_rdata), INTEGER(sexp_recvcounts), displs,
+					MPI_DOUBLE, root, comm[commn]));
 		break;
 	case 3:
-		len=LENGTH(STRING_ELT(sexp_sdata,0));	
-		rlen=LENGTH(STRING_ELT(sexp_rdata,0));
-        
-                PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
-                rdata = (char *)Calloc((size_t)rlen + 1, char);
-                MPI_Gatherv(CHAR2 (STRING_ELT ((sexp_sdata),0)),len,MPI_CHAR,
-		     rdata, INTEGER(sexp_recvcounts),
-		     displs, MPI_CHAR, root, comm[commn]);
-                SET_STRING_ELT(sexp_rdata2, 0, mkChar(rdata));
-                UNPROTECT(1);
-		Free(rdata);
-		break;
+		error("mpi_gatherv: character collectives are unsupported; use mpi.gather.Robj() or raw serialization");
 	case 4:
                 len=LENGTH(sexp_sdata);
                 mpi_errhandler(MPI_Gatherv(RAW(sexp_sdata), len, MPI_BYTE,
@@ -443,10 +415,7 @@ SEXP mpi_gatherv(SEXP sexp_sdata,
 	if (rank == root)
 		Free(displs);
 
-	if (INTEGER(sexp_type)[0]==3)
-		return sexp_rdata2;
-	else
-		return sexp_rdata;
+	return sexp_rdata;
 }
 
 SEXP mpi_scatter(SEXP sexp_sdata,
@@ -567,9 +536,7 @@ SEXP mpi_allgather(SEXP sexp_sdata,
 				   SEXP sexp_type,
 				   SEXP sexp_rdata,
 				   SEXP sexp_comm){
-	int len, rlen, commn=INTEGER(sexp_comm)[0];
-	char *rdata;
-	SEXP sexp_rdata2 = NULL;
+	int len, commn=INTEGER(sexp_comm)[0];
 	
 	switch (INTEGER(sexp_type)[0]){
 	case 1:
@@ -583,17 +550,7 @@ SEXP mpi_allgather(SEXP sexp_sdata,
 			REAL(sexp_rdata), len, MPI_DOUBLE, comm[commn]));
 		break;
 	case 3:
-	 	len=LENGTH(STRING_ELT(sexp_sdata,0));
-                rlen=LENGTH(STRING_ELT(sexp_rdata,0));
-
-                PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
-                rdata = (char *)Calloc((size_t)rlen + 1, char);
-                MPI_Allgather(CHAR2 (STRING_ELT ((sexp_sdata),0)),len,
-			MPI_CHAR,rdata, len, MPI_CHAR, comm[commn]);
-                SET_STRING_ELT(sexp_rdata2, 0, mkChar(rdata));
-                UNPROTECT(1);
-		Free(rdata);
-		break;
+		error("mpi_allgather: character collectives are unsupported; use mpi.allgather.Robj() or raw serialization");
  	case 4:
                 len=LENGTH(sexp_sdata);
                 mpi_errhandler(MPI_Allgather(RAW(sexp_sdata), len, MPI_BYTE,
@@ -601,16 +558,10 @@ SEXP mpi_allgather(SEXP sexp_sdata,
                 break;
 
 	default:
-		PROTECT(sexp_sdata=AS_NUMERIC(sexp_sdata));
-		mpi_errhandler(MPI_Bcast(REAL(sexp_sdata), 1, datatype[0], 0, comm[commn]));
-		UNPROTECT(1);
-		break;
+		error("mpi_allgather: unsupported type code; only types 1-4 are supported");
 	}
 
-        if (INTEGER(sexp_type)[0]==3)
-                return sexp_rdata2;
-        else
-                return sexp_rdata;
+        return sexp_rdata;
 }
 
 SEXP mpi_allgatherv(SEXP sexp_sdata,
@@ -618,9 +569,7 @@ SEXP mpi_allgatherv(SEXP sexp_sdata,
 				   SEXP sexp_rdata,
 				   SEXP sexp_recvcounts,
 				   SEXP sexp_comm){
-	int len, rlen, commn=INTEGER(sexp_comm)[0], *displs, gsize, i;
-	char *rdata;
-	SEXP sexp_rdata2 = NULL;
+	int len, commn=INTEGER(sexp_comm)[0], *displs, gsize, i;
 	
 	MPI_Comm_size(comm[commn], &gsize);
 	displs=(int *)Calloc(gsize, int);
@@ -642,17 +591,7 @@ SEXP mpi_allgatherv(SEXP sexp_sdata,
 				MPI_DOUBLE, comm[commn]));
 		break;
 	case 3:
-	 	len=LENGTH(STRING_ELT(sexp_sdata,0));
-                rlen=LENGTH(STRING_ELT(sexp_rdata,0));
-
-                PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
-                rdata = (char *)Calloc((size_t)rlen + 1, char);
-                MPI_Allgatherv(CHAR2 (STRING_ELT ((sexp_sdata),0)),len, MPI_CHAR, rdata,
-		      INTEGER(sexp_recvcounts), displs, MPI_CHAR, comm[commn]);
-                SET_STRING_ELT(sexp_rdata2, 0, mkChar(rdata));
-                UNPROTECT(1);
-		Free(rdata);
-		break;
+		error("mpi_allgatherv: character collectives are unsupported; use mpi.allgather.Robj() or raw serialization");
  	case 4:
                 len=LENGTH(sexp_sdata);
                 mpi_errhandler(MPI_Allgatherv(RAW(sexp_sdata), len, MPI_BYTE,
@@ -661,16 +600,10 @@ SEXP mpi_allgatherv(SEXP sexp_sdata,
                 break;
 
 	default:
-		PROTECT(sexp_sdata=AS_NUMERIC(sexp_sdata));
-		mpi_errhandler(MPI_Bcast(REAL(sexp_sdata), 1, datatype[0], 0, comm[commn]));
-		UNPROTECT(1);
-		break;	
+		error("mpi_allgatherv: unsupported type code; only types 1-4 are supported");
 	}
 	Free(displs);
-        if (INTEGER(sexp_type)[0]==3)
-                return sexp_rdata2;
-        else
-                return sexp_rdata;
+        return sexp_rdata;
 }
 
 SEXP mpi_bcast(SEXP sexp_data,
@@ -1485,37 +1418,7 @@ SEXP mpi_isend(SEXP sexp_data,
                           SEXP sexp_tag,
                           SEXP sexp_comm,
                           SEXP sexp_request){
-        int slen,len=LENGTH(sexp_data),type=INTEGER(sexp_type)[0], dest=INTEGER(sexp_dest)[0];
-        int commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"), tag=INTEGER(sexp_tag)[0], requestn=rmpi_require_index(sexp_request, REQUEST_MAXSIZE, "request");
-        
-        switch (type){
-        case 1:
-                mpi_errhandler(MPI_Isend(INTEGER(sexp_data), len, MPI_INT, dest, tag, 
-			comm[commn], &request[requestn]));
-                break;
-        case 2:
-
-                mpi_errhandler(MPI_Isend(REAL(sexp_data), len, MPI_DOUBLE, dest, tag, comm[commn], 
-			&request[requestn]));
-                break;
-        case 3:
-                slen=LENGTH(STRING_ELT(sexp_data,0));
-                mpi_errhandler(MPI_Isend(CHAR2(STRING_ELT(sexp_data,0)),slen, MPI_CHAR, dest, 
-			tag, comm[commn], &request[requestn]));
-                break;
-	case 4:
-
-                mpi_errhandler(MPI_Isend(RAW(sexp_data), len, MPI_BYTE, dest, tag, comm[commn],
-                        &request[requestn]));
-                break;
-
-        default:
-                PROTECT(sexp_data=AS_NUMERIC(sexp_data));
-                mpi_errhandler(MPI_Isend(REAL(sexp_data), 1, datatype[0], dest, tag, comm[commn], 
-			&request[requestn]));
-                UNPROTECT(1);
-                break;
-        }
+        error("mpi_isend: nonblocking requests are unsupported pending an ownership-safe redesign");
         return R_NilValue;
 }
 
@@ -1525,35 +1428,7 @@ SEXP mpi_irecv(SEXP sexp_data,
                           SEXP sexp_tag,
                           SEXP sexp_comm,
                           SEXP sexp_request){
-        int slen,len=LENGTH(sexp_data),type=INTEGER(sexp_type)[0], source=INTEGER(sexp_source)[0];
-        int commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"), tag=INTEGER(sexp_tag)[0], requestn=rmpi_require_index(sexp_request, REQUEST_MAXSIZE, "request");
-
-        switch (type){
-        case 1:
-                mpi_errhandler(MPI_Irecv(INTEGER(sexp_data), len, MPI_INT, source, tag, 
-			comm[commn], &request[requestn]));
-                break;
-        case 2:
-                mpi_errhandler(MPI_Irecv(REAL(sexp_data), len, MPI_DOUBLE, source, tag, comm[commn], 
-			&request[requestn]));
-                break;
-        case 3:
-                slen=LENGTH(STRING_ELT(sexp_data,0));
-                        mpi_errhandler(MPI_Irecv(CHAR2(STRING_ELT(sexp_data,0)),slen, MPI_CHAR, 
-				source, tag, comm[commn], &request[requestn]));
-                break;
- 	case 4:
-                mpi_errhandler(MPI_Irecv(RAW(sexp_data), len, MPI_BYTE, source, tag, comm[commn],
-                        &request[requestn]));
-                break;
-
-        default:
-                PROTECT(sexp_data=AS_NUMERIC(sexp_data));
-                mpi_errhandler(MPI_Irecv(REAL(sexp_data), 1, datatype[0], source, tag, comm[commn], 
-			&request[requestn]));
-                UNPROTECT(1);
-                break;
-        }
+        error("mpi_irecv: nonblocking requests are unsupported pending an ownership-safe redesign");
         return R_NilValue;
 }
 

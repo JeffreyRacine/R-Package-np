@@ -484,24 +484,15 @@ mpi.allreduce <- function(x,type=2,
 }
 
 mpi.isend <- function (x, type,  dest, tag, comm=1, request=0){
-    #mpi.realloc.request(request+1)
-    invisible(.Call("mpi_isend", .force.type(x,type), as.integer(type), as.integer(dest), 
-    as.integer(tag), as.integer(comm), as.integer(request), PACKAGE = "npRmpi"))
+    stop("mpi.isend is temporarily unsupported in npRmpi; use blocking mpi.send() or mpi.send.Robj() instead")
 }
 
 mpi.irecv <- function (x, type, source, tag, comm=1, request=0){
-    #mpi.realloc.request(request+1)
-    if (type==3)
-    stop ("Character receiver is not supported")
-    invisible(.Call("mpi_irecv", x, as.integer(type), as.integer(source), 
-    as.integer(tag), as.integer(comm), as.integer(request),
-    PACKAGE = "npRmpi"))
+    stop("mpi.irecv is temporarily unsupported in npRmpi; use blocking mpi.recv() or mpi.recv.Robj() instead")
 }
 
 mpi.isend.Robj <- function(obj, dest, tag, comm=1,request=0){
-    mpi.isend(x=serialize(obj, NULL), type=4, dest=dest, tag=tag, 
-        comm=comm,request=request)
-	#invisible(gc())
+    stop("mpi.isend.Robj is temporarily unsupported in npRmpi; use blocking mpi.send.Robj() instead")
 }
 
 mpi.wait <- function(request, status=0)

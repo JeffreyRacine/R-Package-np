@@ -40,8 +40,13 @@ wrapper_session_lines <- function(lines) {
     "mpi_allreduce <- get('mpi.allreduce', envir = ns, inherits = FALSE)",
     "mpi_gather <- get('mpi.gather', envir = ns, inherits = FALSE)",
     "mpi_gatherv <- get('mpi.gatherv', envir = ns, inherits = FALSE)",
+    "mpi_allgather <- get('mpi.allgather', envir = ns, inherits = FALSE)",
+    "mpi_allgatherv <- get('mpi.allgatherv', envir = ns, inherits = FALSE)",
     "mpi_scatter <- get('mpi.scatter', envir = ns, inherits = FALSE)",
     "mpi_scatterv <- get('mpi.scatterv', envir = ns, inherits = FALSE)",
+    "mpi_isend <- get('mpi.isend', envir = ns, inherits = FALSE)",
+    "mpi_irecv <- get('mpi.irecv', envir = ns, inherits = FALSE)",
+    "mpi_isend_Robj <- get('mpi.isend.Robj', envir = ns, inherits = FALSE)",
     "npRmpi.init(nslaves = 1L, quiet = TRUE)",
     "on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
     lines
@@ -61,6 +66,8 @@ test_that("wrapper preserved self and collective routes stay green in session su
       "stopifnot(identical(as.numeric(mpi_allreduce(3.25, type = 2L, op = 'sum', comm = 0L)), 3.25))",
       "stopifnot(identical(as.integer(mpi_gather(7L, type = 1L, rdata = integer(1), root = 0L, comm = 0L)), 7L))",
       "stopifnot(identical(as.integer(mpi_gatherv(as.raw(7), type = 4L, rdata = raw(1), rcounts = 1L, root = 0L, comm = 0L)), 7L))",
+      "stopifnot(identical(as.integer(mpi_allgather(7L, type = 1L, rdata = integer(1), comm = 0L)), 7L))",
+      "stopifnot(identical(as.integer(mpi_allgatherv(as.raw(7), type = 4L, rdata = raw(1), rcounts = 1L, comm = 0L)), 7L))",
       "stopifnot(identical(as.integer(mpi_scatter(7L, type = 1L, rdata = integer(1), root = 0L, comm = 0L)), 7L))",
       "stopifnot(identical(as.integer(mpi_scatterv(as.raw(7), scounts = 1L, type = 4L, rdata = raw(1), root = 0L, comm = 0L)), 7L))",
       "stopifnot(identical(as.numeric(mpi_sendrecv_replace(3.25, type = 5L, dest = rank, sendtag = 41L, source = rank, recvtag = 41L, comm = 0L, status = 0L)), 3.25))",
@@ -90,8 +97,17 @@ test_that("wrapper quarantined routes fail fast with explicit errors in session 
       "msg_replace <- tryCatch({ mpi_sendrecv_replace('x', type = 3L, dest = 0L, sendtag = 1L, source = 0L, recvtag = 1L, comm = 0L, status = 0L); '' }, error = conditionMessage)",
       "msg_gather <- tryCatch({ mpi_gather(as.raw(1), type = 5L, rdata = raw(1), root = 0L, comm = 0L); '' }, error = conditionMessage)",
       "msg_gatherv <- tryCatch({ mpi_gatherv(as.raw(1), type = 5L, rdata = raw(1), rcounts = 1L, root = 0L, comm = 0L); '' }, error = conditionMessage)",
+      "msg_allgather <- tryCatch({ mpi_allgather(as.raw(1), type = 5L, rdata = raw(1), comm = 0L); '' }, error = conditionMessage)",
+      "msg_allgatherv <- tryCatch({ mpi_allgatherv(as.raw(1), type = 5L, rdata = raw(1), rcounts = 1L, comm = 0L); '' }, error = conditionMessage)",
+      "msg_gather_chr <- tryCatch({ mpi_gather('abc', type = 3L, rdata = string(4), root = 0L, comm = 0L); '' }, error = conditionMessage)",
+      "msg_gatherv_chr <- tryCatch({ mpi_gatherv('abc', type = 3L, rdata = string(4), rcounts = 3L, root = 0L, comm = 0L); '' }, error = conditionMessage)",
+      "msg_allgather_chr <- tryCatch({ mpi_allgather('abc', type = 3L, rdata = string(4), comm = 0L); '' }, error = conditionMessage)",
+      "msg_allgatherv_chr <- tryCatch({ mpi_allgatherv('abc', type = 3L, rdata = string(4), rcounts = 3L, comm = 0L); '' }, error = conditionMessage)",
       "msg_scatter <- tryCatch({ mpi_scatter(as.raw(1), type = 5L, rdata = raw(1), root = 0L, comm = 0L); '' }, error = conditionMessage)",
       "msg_scatterv <- tryCatch({ mpi_scatterv(as.raw(1), scounts = 1L, type = 5L, rdata = raw(1), root = 0L, comm = 0L); '' }, error = conditionMessage)",
+      "msg_isend <- tryCatch({ mpi_isend(1L, type = 1L, dest = 0L, tag = 1L, comm = 0L, request = 0L); '' }, error = conditionMessage)",
+      "msg_irecv <- tryCatch({ mpi_irecv(integer(1), type = 1L, source = 0L, tag = 1L, comm = 0L, request = 0L); '' }, error = conditionMessage)",
+      "msg_isend_robj <- tryCatch({ mpi_isend_Robj(list(a = 1L), dest = 0L, tag = 1L, comm = 0L, request = 0L); '' }, error = conditionMessage)",
       "stopifnot(identical(msg_send, 'mpi_send: unsupported type 5'))",
       "stopifnot(identical(msg_recv, 'mpi_recv: unsupported type 5'))",
       "stopifnot(identical(msg_bcast, 'mpi_bcast: unsupported type 6'))",
@@ -101,8 +117,17 @@ test_that("wrapper quarantined routes fail fast with explicit errors in session 
       "stopifnot(identical(msg_replace, 'mpi_sendrecv_replace: character type is unsupported'))",
       "stopifnot(identical(msg_gather, 'mpi_gather: unsupported type code; only types 1-4 are supported'))",
       "stopifnot(identical(msg_gatherv, 'mpi_gatherv: unsupported type code; only types 1-4 are supported'))",
+      "stopifnot(identical(msg_allgather, 'mpi_allgather: unsupported type code; only types 1-4 are supported'))",
+      "stopifnot(identical(msg_allgatherv, 'mpi_allgatherv: unsupported type code; only types 1-4 are supported'))",
+      "stopifnot(identical(msg_gather_chr, 'mpi_gather: character collectives are unsupported; use mpi.gather.Robj() or raw serialization'))",
+      "stopifnot(identical(msg_gatherv_chr, 'mpi_gatherv: character collectives are unsupported; use mpi.gather.Robj() or raw serialization'))",
+      "stopifnot(identical(msg_allgather_chr, 'mpi_allgather: character collectives are unsupported; use mpi.allgather.Robj() or raw serialization'))",
+      "stopifnot(identical(msg_allgatherv_chr, 'mpi_allgatherv: character collectives are unsupported; use mpi.allgather.Robj() or raw serialization'))",
       "stopifnot(identical(msg_scatter, 'mpi_scatter: unsupported type code; only types 1-4 are supported'))",
       "stopifnot(identical(msg_scatterv, 'mpi_scatterv: unsupported type code; only types 1-4 are supported'))",
+      "stopifnot(identical(msg_isend, 'mpi.isend is temporarily unsupported in npRmpi; use blocking mpi.send() or mpi.send.Robj() instead'))",
+      "stopifnot(identical(msg_irecv, 'mpi.irecv is temporarily unsupported in npRmpi; use blocking mpi.recv() or mpi.recv.Robj() instead'))",
+      "stopifnot(identical(msg_isend_robj, 'mpi.isend.Robj is temporarily unsupported in npRmpi; use blocking mpi.send.Robj() instead'))",
       "cat('WRAPPER_SESSION_NEGATIVE_OK\\n')"
     )),
     timeout = 45L,
@@ -114,7 +139,7 @@ test_that("wrapper quarantined routes fail fast with explicit errors in session 
               info = paste(res$output, collapse = "\n"))
 })
 
-test_that("supported string wrapper routes stay green in session subprocess", {
+test_that("supported string sendrecv, broadcast, and scatter routes stay green in session subprocess", {
   env <- wrapper_subprocess_env()
   skip_if(is.null(env), "local npRmpi install unavailable for wrapper contract")
 
@@ -123,8 +148,6 @@ test_that("supported string wrapper routes stay green in session subprocess", {
       "rank <- mpi.comm.rank(0L)",
       "stopifnot(identical(as.character(mpi_sendrecv('abc', sendtype = 3L, dest = rank, sendtag = 31L, recvdata = string(4), recvtype = 3L, source = rank, recvtag = 31L, comm = 0L, status = 0L)), 'abc'))",
       "stopifnot(identical(as.character(mpi.bcast('abc', type = 3L, rank = 0L, comm = 0L)), 'abc'))",
-      "stopifnot(identical(as.character(mpi_gather('abc', type = 3L, rdata = string(4), root = 0L, comm = 0L)), 'abc'))",
-      "stopifnot(identical(as.character(mpi_gatherv('abc', type = 3L, rdata = string(4), rcounts = 3L, root = 0L, comm = 0L)), 'abc'))",
       "stopifnot(identical(as.character(mpi_scatter('abc', type = 3L, rdata = string(4), root = 0L, comm = 0L)), 'abc'))",
       "stopifnot(identical(as.character(mpi_scatterv('abc', scounts = 3L, type = 3L, rdata = string(4), root = 0L, comm = 0L)), 'abc'))",
       "cat('WRAPPER_SESSION_STRING_OK\\n')"
