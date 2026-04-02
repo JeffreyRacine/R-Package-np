@@ -25,6 +25,7 @@ double **alloc_tmatd(int nrows, int ncols)
     }
 
     if ((m[0]=(double*)malloc(sizeof(double) * (size_t)nrows * (size_t)ncols))==NULL){
+      free(m);
       error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
     }
 
@@ -61,6 +62,7 @@ double **alloc_matd(int nrows, int ncols)
 
     for(i=0;i<ncols;i++) {
       if((m[i]=(double*)malloc(sizeof(double)*nrows))==NULL) {
+        free_mat(m, i);
         error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
       }
     }

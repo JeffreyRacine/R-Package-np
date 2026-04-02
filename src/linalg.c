@@ -59,6 +59,9 @@ MATRIX  _mat_creat( int row, int col )
 	{
 		if ((*((double **)(&mat->matrix) + i) = (double *)malloc(sizeof(double) * col)) == NULL)
 		{
+			while (--i >= 0)
+				free(*((double **)(&mat->matrix) + i));
+			free(mat);
 			error("mat: malloc error\n" );
 		}
 	}
@@ -267,8 +270,11 @@ MATRIX mat_inv( MATRIX a , MATRIX C)
 
 	A = (double *)malloc((size_t)n * (size_t)n * sizeof(double));
 	ipiv = (int *)malloc((size_t)n * sizeof(int));
-	if ((A == NULL) || (ipiv == NULL))
+	if ((A == NULL) || (ipiv == NULL)) {
+		free(A);
+		free(ipiv);
 		error("mat_inv: malloc error\n");
+	}
 
 	/* Copy to LAPACK column-major dense storage. */
 	for (j = 0; j < n; j++)
@@ -295,8 +301,11 @@ MATRIX mat_inv( MATRIX a , MATRIX C)
 	if (lwork < n)
 		lwork = n;
 	work = (double *)malloc((size_t)lwork * sizeof(double));
-	if (work == NULL)
+	if (work == NULL) {
+		free(A);
+		free(ipiv);
 		error("mat_inv: malloc error\n");
+	}
 
 	F77_CALL(dgetri)(&n, A, &n, ipiv, work, &lwork, &info);
 	free(work);
@@ -367,8 +376,12 @@ MATRIX mat_solve( MATRIX A, MATRIX B, MATRIX X)
 	Ac = (double *)malloc((size_t)n * (size_t)n * sizeof(double));
 	Bc = (double *)malloc((size_t)n * (size_t)nrhs * sizeof(double));
 	ipiv = (int *)malloc((size_t)n * sizeof(int));
-	if ((Ac == NULL) || (Bc == NULL) || (ipiv == NULL))
+	if ((Ac == NULL) || (Bc == NULL) || (ipiv == NULL)) {
+		free(Ac);
+		free(Bc);
+		free(ipiv);
 		error("mat_solve: malloc error\n");
+	}
 
 	/* Copy A,B to LAPACK column-major dense storage. */
 	for (j = 0; j < n; j++)
@@ -412,8 +425,11 @@ int mat_is_nonsingular( MATRIX A )
 
 	Ac = (double *)malloc((size_t)n * (size_t)n * sizeof(double));
 	ipiv = (int *)malloc((size_t)n * sizeof(int));
-	if ((Ac == NULL) || (ipiv == NULL))
+	if ((Ac == NULL) || (ipiv == NULL)) {
+		free(Ac);
+		free(ipiv);
 		error("mat_is_nonsingular: malloc error\n");
+	}
 
 	for (j = 0; j < n; j++)
 		for (i = 0; i < n; i++)
@@ -443,8 +459,12 @@ double mat_inv00( MATRIX A, int *ok )
 	Ac = (double *)malloc((size_t)n * (size_t)n * sizeof(double));
 	bc = (double *)calloc((size_t)n, sizeof(double));
 	ipiv = (int *)malloc((size_t)n * sizeof(int));
-	if ((Ac == NULL) || (bc == NULL) || (ipiv == NULL))
+	if ((Ac == NULL) || (bc == NULL) || (ipiv == NULL)) {
+		free(Ac);
+		free(bc);
+		free(ipiv);
 		error("mat_inv00: malloc error\n");
+	}
 
 	for (j = 0; j < n; j++)
 		for (i = 0; i < n; i++)
