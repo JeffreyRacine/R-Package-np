@@ -983,7 +983,30 @@ SEXP C_np_dim_basis(SEXP basis_code,
 
 SEXP C_np_set_seed(SEXP seed)
 {
-  int num = asInteger(seed);
+  int num = 0;
+
+  if (XLENGTH(seed) != 1)
+    error("C_np_set_seed: seed must have length 1");
+
+  if (TYPEOF(seed) == INTSXP) {
+    const int raw = INTEGER(seed)[0];
+    if (raw == NA_INTEGER)
+      error("C_np_set_seed: seed must be finite");
+    if (raw == INT_MIN)
+      error("C_np_set_seed: seed must be representable after abs()");
+    num = abs(raw);
+  } else if (TYPEOF(seed) == REALSXP) {
+    const double raw = REAL(seed)[0];
+    const double normalized = fabs(raw);
+    if (!R_finite(raw))
+      error("C_np_set_seed: seed must be finite");
+    if (normalized > (double)INT_MAX || normalized != floor(normalized))
+      error("C_np_set_seed: seed must be representable as a non-negative integer after abs()");
+    num = (int) normalized;
+  } else {
+    error("C_np_set_seed: seed must be numeric");
+  }
+
   np_set_seed(&num);
   return R_NilValue;
 }

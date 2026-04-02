@@ -803,8 +803,20 @@ matrix.sd <- function(x, na.rm=FALSE) {
   else sd(as.vector(x), na.rm=na.rm)
 }
 
+.np_validate_seed_scalar <- function(seed) {
+  if (is.null(seed) || length(seed) != 1L || !is.numeric(seed) || is.na(seed) || !is.finite(seed))
+    stop("'seed' must be a single finite numeric value", call. = FALSE)
+
+  normalized <- abs(as.double(seed)[1L])
+
+  if (normalized > .Machine$integer.max || normalized != floor(normalized))
+    stop("'seed' must be representable as a non-negative integer after abs()", call. = FALSE)
+
+  as.integer(normalized)
+}
+
 npseed <- function(seed){
-  .Call("C_np_set_seed", as.integer(abs(seed))[1L], PACKAGE = "npRmpi")
+  .Call("C_np_set_seed", .np_validate_seed_scalar(seed), PACKAGE = "npRmpi")
   invisible()
 }
 
