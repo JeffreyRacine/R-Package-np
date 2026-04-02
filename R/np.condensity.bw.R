@@ -913,7 +913,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
                                                       ub,
                                                       nomad.nmulti = 1L,
                                                       nomad.inner.nmulti = 0L,
-                                                      random.seed = 42L) {
+                                                      random.seed = 42L,
+                                                      use.runtime.bandwidth.progress = FALSE) {
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   old.messages <- getOption("np.messages")
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -985,6 +986,14 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     )
   }
 
+  external.progress <- if (isTRUE(use.runtime.bandwidth.progress) &&
+                           isTRUE(rank == 0L) &&
+                           !is.null(.np_progress_runtime$bandwidth_state)) {
+    .np_progress_runtime$bandwidth_state
+  } else {
+    NULL
+  }
+
   search.result <- .np_nomad_search(
     engine = degree.search$engine,
     baseline_record = NULL,
@@ -1006,6 +1015,9 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     nmulti = nomad.nmulti,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
+    progress_state = external.progress,
+    manage_progress_lifecycle = is.null(external.progress),
+    bind_bandwidth_runtime = !is.null(external.progress),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
@@ -1228,7 +1240,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       hot.reg.args$degree.engine <- degree
       hot.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
       hot.opt.args <- opt.args
-      hot.opt.args$nmulti <- 0L
+      hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("disable_multistart")
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
         degree,
@@ -1311,7 +1323,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
         UB,
         NOMADNMULTI,
         INNERNMULTI,
-        RSEED
+        RSEED,
+        RPROGRESS
       ),
       list(
         TEMPLATE = search.template,
@@ -1324,42 +1337,48 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
         UB = ub,
         NOMADNMULTI = nomad.nmulti,
         INNERNMULTI = nomad.inner.nmulti,
-        RSEED = random.seed
+        RSEED = random.seed,
+        RPROGRESS = TRUE
       )
     )
 
-    search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
-    if (!is.null(search.result$num.feval.total))
-      nomad.num.feval.total <- as.numeric(search.result$num.feval.total[1L])
-    if (!is.null(search.result$num.feval.fast.total))
-      nomad.num.feval.fast.total <- as.numeric(search.result$num.feval.fast.total[1L])
-    best.solution <- NULL
-    if (!is.null(search.result$best.restart) &&
-        is.finite(search.result$best.restart) &&
-        length(search.result$restart.results) >= as.integer(search.result$best.restart)) {
-      best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
-    }
+    return(.np_progress_select_bandwidth(
+      .np_degree_progress_label(),
+      {
+        search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
+        if (!is.null(search.result$num.feval.total))
+          nomad.num.feval.total <- as.numeric(search.result$num.feval.total[1L])
+        if (!is.null(search.result$num.feval.fast.total))
+          nomad.num.feval.fast.total <- as.numeric(search.result$num.feval.fast.total[1L])
+        best.solution <- NULL
+        if (!is.null(search.result$best.restart) &&
+            is.finite(search.result$best.restart) &&
+            length(search.result$restart.results) >= as.integer(search.result$best.restart)) {
+          best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
+        }
 
-    payload_result <- build_payload(
-      point = search.result$best_point,
-      best_record = search.result$best,
-      solution = best.solution,
-      interrupted = !isTRUE(search.result$completed)
-    )
+        payload_result <- build_payload(
+          point = search.result$best_point,
+          best_record = search.result$best,
+          solution = best.solution,
+          interrupted = !isTRUE(search.result$completed)
+        )
 
-    if (is.list(payload_result) && !is.null(payload_result$payload)) {
-      search.result$best_payload <- payload_result$payload
-      if (!is.null(payload_result$powell.time))
-        search.result$powell.time <- as.numeric(payload_result$powell.time[1L])
-      if (!is.null(payload_result$objective) &&
-          .np_degree_better(payload_result$objective, search.result$best$objective, direction = objective.direction)) {
-        search.result$best$objective <- as.numeric(payload_result$objective[1L])
+        if (is.list(payload_result) && !is.null(payload_result$payload)) {
+          search.result$best_payload <- payload_result$payload
+          if (!is.null(payload_result$powell.time))
+            search.result$powell.time <- as.numeric(payload_result$powell.time[1L])
+          if (!is.null(payload_result$objective) &&
+              .np_degree_better(payload_result$objective, search.result$best$objective, direction = objective.direction)) {
+            search.result$best$objective <- as.numeric(payload_result$objective[1L])
+          }
+        } else {
+          search.result$best_payload <- payload_result
+        }
+
+        .npRmpi_reconcile_nomad_search_timing(search.result)
       }
-    } else {
-      search.result$best_payload <- payload_result
-    }
-
-    return(.npRmpi_reconcile_nomad_search_timing(search.result))
+    ))
   }
 
   .np_nomad_baseline_note(degree.search$start.degree)

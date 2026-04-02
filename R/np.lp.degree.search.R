@@ -1260,6 +1260,35 @@
   state
 }
 
+.np_nomad_progress_configure <- function(state,
+                                         nmulti,
+                                         baseline_degree,
+                                         best_record) {
+  if (is.null(state))
+    return(state)
+
+  state$label <- .np_degree_progress_label()
+  state$unknown_total_fields <- .np_nomad_progress_fields
+  state$nomad_nmulti <- max(1L, suppressWarnings(as.integer(nmulti)[1L]))
+  state$nomad_restart_index <- 1L
+  state$nomad_restart_durations <- numeric()
+  state$nomad_current_degree <- as.integer(baseline_degree)
+  state$nomad_best_record <- best_record
+  state$nomad_eval_id <- 0L
+  state$start_note <- if (state$nomad_nmulti > 1L) {
+    sprintf(
+      "%s %s (multistart 1/%s)",
+      state$pkg_prefix,
+      state$label,
+      format(state$nomad_nmulti)
+    )
+  } else {
+    sprintf("%s %s...", state$pkg_prefix, state$label)
+  }
+
+  state
+}
+
 .np_nomad_baseline_note <- function(degree) {
   invisible(NULL)
 }
@@ -1272,10 +1301,45 @@
   "Refining bandwidth"
 }
 
+.np_nomad_powell_hotstart_nmulti <- function(strategy = c("disable_multistart",
+                                                          "single_iteration")) {
+  strategy <- match.arg(strategy)
+  switch(strategy,
+         disable_multistart = 0L,
+         single_iteration = 1L)
+}
+
 .np_nomad_powell_context_label <- function(degree) {
   sprintf(
     "Refining NOMAD solution with one Powell hot start at degree %s",
     .np_degree_format_degree(degree)
+  )
+}
+
+.np_nomad_powell_progress_detail <- function(current_degree,
+                                             best_record,
+                                             elapsed = NULL) {
+  fields <- character()
+
+  if (is.finite(elapsed) && !is.na(elapsed) && elapsed >= 0)
+    fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
+
+  if (!is.null(current_degree))
+    fields <- c(fields, sprintf("deg %s", .np_degree_format_degree(current_degree)))
+
+  fields <- c(fields, .np_degree_progress_best_degree_detail(best_record = best_record))
+
+  paste(fields, collapse = ", ")
+}
+
+.np_nomad_powell_progress_fields <- function(state,
+                                             done = NULL,
+                                             detail = NULL,
+                                             now = .np_progress_now()) {
+  .np_nomad_powell_progress_detail(
+    current_degree = state$nomad_current_degree,
+    best_record = state$nomad_best_record,
+    elapsed = max(0, now - state$started)
   )
 }
 
@@ -1286,6 +1350,7 @@
     return(state)
 
   state$label <- .np_nomad_powell_progress_label()
+  state$unknown_total_fields <- .np_nomad_powell_progress_fields
   state$nomad_current_degree <- as.integer(degree)
   state$nomad_best_record <- best_record
   .np_progress_step_at(
@@ -1317,6 +1382,9 @@
                              nomad.inner.nmulti = 0L,
                              random.seed = 42L,
                              display.nomad.progress = FALSE,
+                             progress_state = NULL,
+                             manage_progress_lifecycle = is.null(progress_state),
+                             bind_bandwidth_runtime = FALSE,
                              degree_spec = NULL,
                              nomad.opts = list()) {
   engine <- match.arg(engine)
@@ -1343,6 +1411,14 @@
   state$best_restart_index <- NA_integer_
   state$restart_durations <- numeric()
   state$restart_eval_id <- 0L
+
+  set_progress_state <- function(value) {
+    state$progress_state <- value
+    if (isTRUE(bind_bandwidth_runtime)) {
+      .np_progress_runtime$bandwidth_state <- value
+    }
+    invisible(value)
+  }
 
   nomad.nmulti <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
   nomad.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
@@ -1471,16 +1547,18 @@
     state$record_trace(rec)
     state$update_best(rec, point = point)
     state$restart_eval_id <- state$restart_eval_id + 1L
-    state$progress_state$nomad_current_degree <- degree
-    state$progress_state$nomad_best_record <- state$best_record
-    state$progress_state$nomad_eval_id <- state$eval_id
-    state$progress_state$nomad_restart_index <- state$current_restart
-    state$progress_state$nomad_restart_durations <- state$restart_durations
-    state$progress_state <- .np_degree_progress_step(
-      state = state$progress_state,
-      done = state$restart_eval_id,
-      detail = NULL
-    )
+    if (!is.null(state$progress_state)) {
+      state$progress_state$nomad_current_degree <- degree
+      state$progress_state$nomad_best_record <- state$best_record
+      state$progress_state$nomad_eval_id <- state$eval_id
+      state$progress_state$nomad_restart_index <- state$current_restart
+      state$progress_state$nomad_restart_durations <- state$restart_durations
+      set_progress_state(.np_degree_progress_step(
+        state = state$progress_state,
+        done = state$restart_eval_id,
+        detail = NULL
+      ))
+    }
 
     if (identical(status, "ok")) {
       if (identical(direction, "min")) {
@@ -1493,15 +1571,26 @@
     if (identical(direction, "min")) Inf else .Machine$double.xmax
   }
 
-  state$progress_state <- .np_nomad_progress_begin(
-    nmulti = nomad.nmulti,
-    baseline_degree = if (is.null(start_degree)) {
-      if (is.null(baseline_record)) integer(0) else baseline_record$degree
-    } else {
-      as.integer(start_degree)
-    },
-    best_record = state$best_record
-  )
+  baseline.degree <- if (is.null(start_degree)) {
+    if (is.null(baseline_record)) integer(0) else baseline_record$degree
+  } else {
+    as.integer(start_degree)
+  }
+
+  if (is.null(progress_state)) {
+    set_progress_state(.np_nomad_progress_begin(
+      nmulti = nomad.nmulti,
+      baseline_degree = baseline.degree,
+      best_record = state$best_record
+    ))
+  } else {
+    set_progress_state(.np_nomad_progress_configure(
+      state = progress_state,
+      nmulti = nomad.nmulti,
+      baseline_degree = baseline.degree,
+      best_record = state$best_record
+    ))
+  }
 
   restart_results <- vector("list", nomad.nmulti)
   best_solution <- NULL
@@ -1519,16 +1608,18 @@
     }
 
     if (i > 1L) {
-      state$progress_state$nomad_current_degree <- restart_degree
-      state$progress_state$nomad_best_record <- state$best_record
-      state$progress_state$nomad_restart_index <- i
-      state$progress_state$nomad_restart_durations <- state$restart_durations
-      state$progress_state <- .np_degree_progress_step(
-        state = state$progress_state,
-        done = NULL,
-        detail = NULL,
-        force = TRUE
-      )
+      if (!is.null(state$progress_state)) {
+        state$progress_state$nomad_current_degree <- restart_degree
+        state$progress_state$nomad_best_record <- state$best_record
+        state$progress_state$nomad_restart_index <- i
+        state$progress_state$nomad_restart_durations <- state$restart_durations
+        set_progress_state(.np_degree_progress_step(
+          state = state$progress_state,
+          done = NULL,
+          detail = NULL,
+          force = TRUE
+        ))
+      }
     }
 
     pre_restart_best <- if (is.null(state$best_record) || is.null(state$best_record$objective)) {
@@ -1574,7 +1665,8 @@
     restart.elapsed <- proc.time()[3L] - nomad.start
     nomad.elapsed <- nomad.elapsed + restart.elapsed
     state$restart_durations <- c(state$restart_durations, restart.elapsed)
-    state$progress_state$nomad_restart_durations <- state$restart_durations
+    if (!is.null(state$progress_state))
+      state$progress_state$nomad_restart_durations <- state$restart_durations
 
     restart_results[[i]] <- list(
       restart = i,
@@ -1640,11 +1732,11 @@
     })
 
   if (identical(engine, "nomad+powell") && !is.null(state$progress_state)) {
-    state$progress_state <- .np_nomad_progress_enter_powell(
+    set_progress_state(.np_nomad_progress_enter_powell(
       state = state$progress_state,
       degree = state$best_record$degree,
       best_record = state$best_record
-    )
+    ))
   }
 
   payload_result <- tryCatch(
@@ -1656,10 +1748,10 @@
     ),
     error = function(e) {
       if (!is.null(state$progress_state)) {
-        state$progress_state <- .np_progress_abort(
+        set_progress_state(.np_progress_abort(
           state = state$progress_state,
           detail = conditionMessage(e)
-        )
+        ))
       }
       stop(e)
     }
@@ -1679,11 +1771,13 @@
   if (!is.null(state$progress_state)) {
     state$progress_state$nomad_current_degree <- state$best_record$degree
     state$progress_state$nomad_best_record <- state$best_record
-    state$progress_state <- .np_degree_progress_end(
-      state = state$progress_state,
-      detail = NULL,
-      interrupted = state$interrupted
-    )
+    if (isTRUE(manage_progress_lifecycle)) {
+      set_progress_state(.np_degree_progress_end(
+        state = state$progress_state,
+        detail = NULL,
+        interrupted = state$interrupted
+      ))
+    }
   }
 
   list(

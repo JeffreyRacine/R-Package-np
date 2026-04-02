@@ -647,7 +647,7 @@ npscoefbw.NULL <-
       hot.reg.args$degree <- degree
       hot.reg.args$bernstein.basis <- degree.search$bernstein.basis
       hot.opt.args <- opt.args
-      hot.opt.args$nmulti <- 1L
+      hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("single_iteration")
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
         degree,
