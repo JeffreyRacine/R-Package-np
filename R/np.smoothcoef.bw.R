@@ -268,6 +268,99 @@ npscoefbw.NULL <-
   .np_degree_search_engine_controls(search.engine)
 }
 
+.npscoefbw_fast_eligible <- function(sbw, eval.zdat) {
+  if (!identical(sbw$type, "fixed"))
+    return(FALSE)
+
+  tdati <- if (is.null(sbw$zdati)) sbw$xdati else sbw$zdati
+  eval.zdat <- toFrame(eval.zdat)
+
+  fast_largeh_tol <- getOption("np.largeh.rel.tol", 1e-3)
+  if (!is.numeric(fast_largeh_tol) || length(fast_largeh_tol) != 1L ||
+      is.na(fast_largeh_tol) || !is.finite(fast_largeh_tol) ||
+      fast_largeh_tol <= 0 || fast_largeh_tol >= 0.1)
+    fast_largeh_tol <- 1e-3
+
+  fast_disc_tol <- getOption("np.disc.upper.rel.tol", 1e-2)
+  if (!is.numeric(fast_disc_tol) || length(fast_disc_tol) != 1L ||
+      is.na(fast_disc_tol) || !is.finite(fast_disc_tol) ||
+      fast_disc_tol <= 0 || fast_disc_tol >= 0.5)
+    fast_disc_tol <- 1e-2
+
+  cont_utol <- switch(
+    sbw$ckertype,
+    gaussian = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
+    "truncated gaussian" = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
+    epanechnikov = sqrt(fast_largeh_tol),
+    uniform = 1.0 - 32.0 * .Machine$double.eps,
+    0.0
+  )
+
+  cont_hmin <- numeric(0)
+  if (any(sbw$icon) && is.finite(cont_utol) && cont_utol > 0) {
+    zcon <- eval.zdat[, sbw$icon, drop = FALSE]
+    cont_hmin <- vapply(zcon, function(col) {
+      vals <- as.double(col)
+      vals <- vals[is.finite(vals)]
+      if (!length(vals))
+        return(Inf)
+      diff(range(vals)) / cont_utol
+    }, numeric(1))
+  }
+
+  disc_upper_tol <- function(upper) {
+    max(fast_disc_tol * abs(upper),
+        16.0 * .Machine$double.eps * max(1.0, abs(upper)))
+  }
+
+  uno_upper <- numeric(0)
+  if (any(sbw$iuno)) {
+    uno_idx <- which(sbw$iuno)
+    uno_upper <- vapply(uno_idx, function(i) {
+      uMaxL(tdati$all.nlev[[i]], kertype = sbw$ukertype)
+    }, numeric(1))
+  }
+
+  ord_upper <- numeric(0)
+  if (any(sbw$iord)) {
+    ord_idx <- which(sbw$iord)
+    ord_upper <- vapply(ord_idx, function(i) {
+      oMaxL(tdati$all.nlev[[i]], kertype = sbw$okertype)
+    }, numeric(1))
+  }
+
+  bwv <- sbw$bandwidth[[1L]]
+  if (!length(bwv) || length(bwv) != length(sbw$icon))
+    return(FALSE)
+
+  if (any(sbw$icon)) {
+    bw_cont <- bwv[sbw$icon]
+    if (any(!is.finite(bw_cont)) || any(bw_cont <= 0) ||
+        any(bw_cont < cont_hmin))
+      return(FALSE)
+  }
+
+  if (any(sbw$iuno)) {
+    bw_uno <- bwv[sbw$iuno]
+    ok_uno <- mapply(function(bw, upper) {
+      is.finite(bw) && abs(bw - upper) <= disc_upper_tol(upper)
+    }, bw = bw_uno, upper = uno_upper, SIMPLIFY = TRUE, USE.NAMES = FALSE)
+    if (!all(ok_uno))
+      return(FALSE)
+  }
+
+  if (any(sbw$iord)) {
+    bw_ord <- bwv[sbw$iord]
+    ok_ord <- mapply(function(bw, upper) {
+      is.finite(bw) && abs(bw - upper) <= disc_upper_tol(upper)
+    }, bw = bw_ord, upper = ord_upper, SIMPLIFY = TRUE, USE.NAMES = FALSE)
+    if (!all(ok_ord))
+      return(FALSE)
+  }
+
+  TRUE
+}
+
 .npscoefbw_nomad_context_prepare <- function(xdat, ydat, zdat = NULL) {
   ctx <- list(xdat = xdat, ydat = ydat, zdat = zdat)
   if (.npRmpi_autodispatch_active() &&
@@ -319,12 +412,13 @@ npscoefbw.NULL <-
   )
 
   if (inherits(fit, "error") || is.null(fit$mean) || any(!is.finite(fit$mean))) {
-    return(list(objective = penalty, num.feval = 1L))
+    return(list(objective = penalty, num.feval = 1L, num.feval.fast = 0L))
   }
 
   list(
     objective = as.numeric(mean((as.double(ydat) - as.double(fit$mean))^2)),
-    num.feval = 1L
+    num.feval = 1L,
+    num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = if (is.null(zdat)) xdat else zdat)) 1L else 0L
   )
 }
 
@@ -466,6 +560,8 @@ npscoefbw.NULL <-
   ub <- c(bw_upper, degree.search$upper)
   bbin <- c(rep.int(0L, ncon + ncat), rep.int(1L, ndeg))
   baseline.record <- NULL
+  nomad.num.feval.total <- 0
+  nomad.num.feval.fast.total <- 0
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -497,11 +593,14 @@ npscoefbw.NULL <-
       invalid.penalty = "baseline",
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     )
+    nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
 
     list(
       objective = out$objective,
       degree = degree,
-      num.feval = out$num.feval
+      num.feval = out$num.feval,
+      num.feval.fast = out$num.feval.fast
     )
   }
 
@@ -527,11 +626,13 @@ npscoefbw.NULL <-
       )
       tbw$fval <- as.numeric(best_record$objective)
       tbw$ifval <- as.numeric(best_record$objective)
-      tbw$num.feval <- if (!is.null(solution$bbe)) as.numeric(solution$bbe) else as.numeric(best_record$num.feval)
-      tbw$num.feval.fast <- 0
+      tbw$num.feval <- as.numeric(nomad.num.feval.total)
+      tbw$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
       tbw$numimp <- 0
       tbw$fval.vector <- as.numeric(best_record$objective)
       tbw$total.time <- NA_real_
+      if (!is.null(tbw$method) && length(tbw$method))
+        tbw$pmethod <- bwmToPrint(as.character(tbw$method[1L]))
       tbw
     }
 
@@ -560,6 +661,12 @@ npscoefbw.NULL <-
         )
       )
       powell.elapsed <- proc.time()[3L] - powell.start
+      direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
+      direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+      hot.payload$num.feval <- direct.payload$num.feval
+      hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+      if (!is.null(hot.payload$method) && length(hot.payload$method))
+        hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
@@ -1000,39 +1107,7 @@ npscoefbw.scbandwidth <-
     }
 
     npscoef_fast_eligible <- function(sbw) {
-      if (!identical(sbw$type, "fixed"))
-        return(FALSE)
-
-      bwv <- sbw$bandwidth[[1L]]
-      if (!length(bwv) || length(bwv) != length(dati$icon))
-        return(FALSE)
-
-      if (any(dati$icon)) {
-        bw_cont <- bwv[dati$icon]
-        if (any(!is.finite(bw_cont)) || any(bw_cont <= 0) ||
-            any(bw_cont < cont_hmin))
-          return(FALSE)
-      }
-
-      if (any(dati$iuno)) {
-        bw_uno <- bwv[dati$iuno]
-        ok_uno <- mapply(function(bw, upper) {
-          is.finite(bw) && abs(bw - upper) <= disc_upper_tol(upper)
-        }, bw = bw_uno, upper = uno_upper, SIMPLIFY = TRUE, USE.NAMES = FALSE)
-        if (!all(ok_uno))
-          return(FALSE)
-      }
-
-      if (any(dati$iord)) {
-        bw_ord <- bwv[dati$iord]
-        ok_ord <- mapply(function(bw, upper) {
-          is.finite(bw) && abs(bw - upper) <= disc_upper_tol(upper)
-        }, bw = bw_ord, upper = ord_upper, SIMPLIFY = TRUE, USE.NAMES = FALSE)
-        if (!all(ok_ord))
-          return(FALSE)
-      }
-
-      TRUE
+      .npscoefbw_fast_eligible(sbw = sbw, eval.zdat = zdat.df)
     }
 
     solve_cv_moment_system <- function(tyw, tww, W.eval.design, maxPenalty, Wz.eval = NULL) {

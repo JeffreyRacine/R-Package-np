@@ -624,6 +624,8 @@ npregbw.rbandwidth <-
     bws = tbw,
     bandwidth.compute = FALSE
   )
+  if (!is.null(payload$method) && length(payload$method))
+    payload$pmethod <- bwmToPrint(as.character(payload$method[1L]))
   payload$timing <- core$timing
   payload$total.time <- total.time
   payload
@@ -825,7 +827,8 @@ npregbw.rbandwidth <-
 
   list(
     objective = out$objective,
-    num.feval = 1L
+    num.feval = out$num.feval,
+    num.feval.fast = out$num.feval.fast
   )
 }
 
@@ -1280,6 +1283,8 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
     mpi.barrier(1L)
     npRmpiNomadShadowClearRegression()
   }, add = TRUE)
+  nomad.num.feval.total <- 0
+  nomad.num.feval.fast.total <- 0
 
   eval_fun <- function(point) {
     point <- as.numeric(point)
@@ -1291,11 +1296,14 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       bw = as.double(flat.bw),
       degree = as.integer(degree)
     )
+    nomad.num.feval.total <<- nomad.num.feval.total + 1L
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out[2L])
 
     list(
-      objective = as.numeric(out),
+      objective = as.numeric(out[1L]),
       degree = degree,
-      num.feval = 1L
+      num.feval = 1L,
+      num.feval.fast = as.numeric(out[2L])
     )
   }
 
@@ -1339,6 +1347,8 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
 
   search.result$best_payload <- NULL
   search.result$powell.time <- NA_real_
+  search.result$num.feval.total <- as.numeric(nomad.num.feval.total)
+  search.result$num.feval.fast.total <- as.numeric(nomad.num.feval.fast.total)
   search.result
 }
 
@@ -1396,6 +1406,8 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
   ub <- c(bw_upper, degree.search$upper)
   bbin <- c(rep.int(0L, ncon + ncat), rep.int(1L, ncon))
   baseline.record <- NULL
+  nomad.num.feval.total <- 0
+  nomad.num.feval.fast.total <- 0
 
   build_payload <- function(point, best_record, solution, interrupted) {
     point <- as.numeric(point)
@@ -1423,10 +1435,10 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
         bw = as.numeric(final.tbw$bw),
         objective = as.numeric(best_record$objective),
         ifval = as.numeric(best_record$objective),
-        num.feval = if (!is.null(solution$bbe)) as.numeric(solution$bbe) else as.numeric(best_record$num.feval),
-        num.feval.fast = 0,
+        num.feval = as.numeric(nomad.num.feval.total),
+        num.feval.fast = as.numeric(nomad.num.feval.fast.total),
         fval.history = as.numeric(best_record$objective),
-        eval.history = if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1,
+        eval.history = if (isTRUE(nomad.num.feval.total > 0)) rep(1, max(1L, as.integer(nomad.num.feval.total))) else 1,
         invalid.history = 0,
         timing = NA_real_
       ),
@@ -1449,6 +1461,10 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
         )
       }))
       powell.elapsed <- proc.time()[3L] - powell.start
+      direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
+      direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+      hot.payload$num.feval <- direct.payload$num.feval
+      hot.payload$num.feval.fast <- direct.payload$num.feval.fast
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
@@ -1515,6 +1531,10 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = TRUE)
       search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
     }
+    if (!is.null(search.result$num.feval.total))
+      nomad.num.feval.total <- as.numeric(search.result$num.feval.total[1L])
+    if (!is.null(search.result$num.feval.fast.total))
+      nomad.num.feval.fast.total <- as.numeric(search.result$num.feval.fast.total[1L])
     best.solution <- NULL
     if (!is.null(search.result$best.restart) &&
         is.finite(search.result$best.restart) &&
@@ -1579,11 +1599,14 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       ckerlb = prep$ckerlb,
       ckerub = prep$ckerub
     )
+    nomad.num.feval.total <<- nomad.num.feval.total + 1L
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$fast.history[1L])
 
     list(
       objective = as.numeric(out$fval[1L]),
       degree = degree,
-      num.feval = 1L
+      num.feval = 1L,
+      num.feval.fast = as.numeric(out$fast.history[1L])
     )
   }
 

@@ -203,6 +203,36 @@ npindexbw.NULL <-
   candidate$value
 }
 
+.npindexbw_fast_eligible <- function(h, bws, eval.index) {
+  if (!identical(bws$type, "fixed"))
+    return(FALSE)
+
+  fast_largeh_tol <- getOption("np.largeh.rel.tol", 1e-3)
+  if (!is.numeric(fast_largeh_tol) || length(fast_largeh_tol) != 1L ||
+      is.na(fast_largeh_tol) || !is.finite(fast_largeh_tol) ||
+      fast_largeh_tol <= 0 || fast_largeh_tol >= 0.1)
+    fast_largeh_tol <- 1e-3
+
+  cont_utol <- switch(
+    bws$ckertype,
+    gaussian = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
+    "truncated gaussian" = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
+    epanechnikov = sqrt(fast_largeh_tol),
+    uniform = 1.0 - 32.0 * .Machine$double.eps,
+    0.0
+  )
+
+  if (!is.finite(cont_utol) || cont_utol <= 0 || !is.finite(h) || h <= 0)
+    return(FALSE)
+
+  vals <- as.double(eval.index)
+  vals <- vals[is.finite(vals)]
+  if (!length(vals))
+    return(FALSE)
+
+  h >= (diff(range(vals)) / cont_utol)
+}
+
 .npindex_selector_with_local_kernelsum <- function(expr) {
   if (!isTRUE(.npRmpi_autodispatch_active()))
     return(force(expr))
@@ -280,9 +310,12 @@ npindexbw.NULL <-
   )
 
   if (is.null(out) || !is.finite(out$objective[1L]))
-    return(as.numeric(invalid.penalty))
+    return(list(objective = as.numeric(invalid.penalty), num.feval.fast = 0L))
 
-  as.numeric(out$objective[1L])
+  list(
+    objective = as.numeric(out$objective[1L]),
+    num.feval.fast = as.numeric(out$num.feval.fast[1L])
+  )
 }
 
 .npindex_lp_loo_fit_block <- function(idx,
@@ -570,7 +603,7 @@ npindexbw.NULL <-
 
   h.candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bws$type, nobs = nobs)
   if (!h.candidate$ok)
-    return(invalid.penalty)
+    return(list(objective = invalid.penalty, num.feval.fast = 0L))
   h <- h.candidate$value
 
   index <- xmat %*% c(1, beta)
@@ -607,7 +640,7 @@ npindexbw.NULL <-
       error = function(e) NULL
     )
     if (is.null(tww))
-      return(invalid.penalty)
+      return(list(objective = invalid.penalty, num.feval.fast = 0L))
     tww[1, 2, ] / NZD(tww[2, 2, ])
   } else {
     ok.design <- tryCatch({
@@ -623,7 +656,7 @@ npindexbw.NULL <-
     }, error = function(e) FALSE)
 
     if (!ok.design)
-      return(invalid.penalty)
+      return(list(objective = invalid.penalty, num.feval.fast = 0L))
 
     if (identical(bws$method, "kleinspady") &&
         .npRmpi_has_active_slave_pool(comm = 1L) &&
@@ -649,16 +682,22 @@ npindexbw.NULL <-
   }
 
   if (any(!is.finite(fit.loo)))
-    return(invalid.penalty)
+    return(list(objective = invalid.penalty, num.feval.fast = 0L))
 
   if (identical(bws$method, "ichimura")) {
-    return(mean((ydat - fit.loo)^2))
+    return(list(
+      objective = mean((ydat - fit.loo)^2),
+      num.feval.fast = if (.npindexbw_fast_eligible(h = h, bws = bws, eval.index = index)) 1L else 0L
+    ))
   }
 
   floor <- sqrt(.Machine$double.eps)
   fit.loo[fit.loo < floor] <- floor
   fit.loo[fit.loo > 1 - floor] <- 1 - floor
-  -mean(ydat * log(fit.loo) + (1.0 - ydat) * log1p(-fit.loo))
+  list(
+    objective = -mean(ydat * log(fit.loo) + (1.0 - ydat) * log1p(-fit.loo)),
+    num.feval.fast = if (.npindexbw_fast_eligible(h = h, bws = bws, eval.index = index)) 1L else 0L
+  )
 }
 
 .npindexbw_nomad_search <- function(xdat,
@@ -719,6 +758,8 @@ npindexbw.NULL <-
   bbin <- c(rep.int(0L, length(beta.start)), if (isTRUE(h.integer)) 1L else 0L, 1L)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else max(1L, as.integer(opt.args$nmulti[1L]))
   baseline.record <- NULL
+  nomad.num.feval.total <- 0
+  nomad.num.feval.fast.total <- 0
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -747,10 +788,13 @@ npindexbw.NULL <-
       bws = baseline.bws,
       spec = eval.spec
     )
+    nomad.num.feval.total <<- nomad.num.feval.total + 1L
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(objective$num.feval.fast[1L])
     list(
-      objective = as.numeric(objective),
+      objective = as.numeric(objective$objective[1L]),
       degree = as.integer(degree),
-      num.feval = 1
+      num.feval = 1,
+      num.feval.fast = as.numeric(objective$num.feval.fast[1L])
     )
   }
 
@@ -778,14 +822,18 @@ npindexbw.NULL <-
         reg.args = final.reg.args
       )
       tbw$fval <- as.numeric(best_record$objective)
-      tbw$num.feval <- if (!is.null(solution$bbe)) as.numeric(solution$bbe) else as.numeric(best_record$num.feval)
+      tbw$num.feval <- as.numeric(nomad.num.feval.total)
+      tbw$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
       tbw$total.time <- NA_real_
-      npindexbw.sibandwidth(
+      payload <- npindexbw.sibandwidth(
         xdat = xdat,
         ydat = ydat,
         bws = tbw,
         bandwidth.compute = FALSE
       )
+      if (!is.null(payload$method) && length(payload$method))
+        payload$pmethod <- bwmToPrint(as.character(payload$method[1L]))
+      payload
     }
 
     direct.payload <- build_direct_payload()
@@ -814,6 +862,12 @@ npindexbw.NULL <-
         )
       )
       powell.elapsed <- proc.time()[3L] - powell.start
+      direct.payload$num.feval <- as.numeric(nomad.num.feval.total) + as.numeric(hot.payload$num.feval[1L])
+      direct.payload$num.feval.fast <- as.numeric(nomad.num.feval.fast.total) + as.numeric(hot.payload$num.feval.fast[1L])
+      hot.payload$num.feval <- direct.payload$num.feval
+      hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+      if (!is.null(hot.payload$method) && length(hot.payload$method))
+        hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
@@ -821,6 +875,8 @@ npindexbw.NULL <-
       }
     }
 
+    direct.payload$num.feval <- as.numeric(nomad.num.feval.total)
+    direct.payload$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
@@ -1403,6 +1459,8 @@ npindexbw.sibandwidth <-
               }
 
               t.ret <- mean((ydat-fit.loo)^2)
+              if (is.finite(t.ret) && .npindexbw_fast_eligible(h = h, bws = bws, eval.index = index))
+                num.feval.fast.overall <<- num.feval.fast.overall + 1L
               return(t.ret)
 
             }
@@ -1502,6 +1560,8 @@ npindexbw.sibandwidth <-
               ## ifelse(ydat==1, log(ks.loo), log(1-ks.loo)) but avoids
               ## branchy ifelse and uses stable log1p for the second term.
               t.ret <- -mean(ydat * log(ks.loo) + (1.0 - ydat) * log1p(-ks.loo))
+              if (is.finite(t.ret) && .npindexbw_fast_eligible(h = h, bws = bws, eval.index = index))
+                num.feval.fast.overall <<- num.feval.fast.overall + 1L
               return(t.ret)
 
             }
@@ -1525,6 +1585,7 @@ npindexbw.sibandwidth <-
           numimp <- 0
           fval.value <- numeric(nmulti)
           num.feval.overall <- 0
+          num.feval.fast.overall <- 0L
 
           if(bws$method == "ichimura"){
             optim.fn <- if(only.optimize.beta) ichimura.nobw else ichimura
@@ -1637,6 +1698,7 @@ npindexbw.sibandwidth <-
           bws$fval <- fval.min
           bws$ifval <- best
           bws$num.feval <- num.feval.overall
+          bws$num.feval.fast <- num.feval.fast.overall
           bws$numimp <- numimp
           bws$fval.vector <- fval.value
         }
@@ -1667,6 +1729,7 @@ npindexbw.sibandwidth <-
                        fval = bws$fval,
                        ifval = bws$ifval,
                        num.feval = bws$num.feval,
+                       num.feval.fast = bws$num.feval.fast,
                        numimp = bws$numimp,
                        fval.vector = bws$fval.vector,
                        nobs = bws$nobs,

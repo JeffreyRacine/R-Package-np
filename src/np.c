@@ -1713,9 +1713,9 @@ SEXP C_np_regression_nomad_shadow_prepare(SEXP runo,
 
 SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
 {
-  SEXP rbw_r = R_NilValue, degree_i = R_NilValue;
+  SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   int i;
-  double val;
+  double val, fast = 0.0;
   int degree_ok;
   int bw_ok;
 
@@ -1743,8 +1743,11 @@ SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
     val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
-    UNPROTECT(2);
-    return ScalarReal(val);
+    PROTECT(out = allocVector(REALSXP, 2));
+    REAL(out)[0] = val;
+    REAL(out)[1] = 0.0;
+    UNPROTECT(3);
+    return out;
   }
 
   for (i = 0; i < np_regression_nomad_shadow.num_var; i++)
@@ -1776,16 +1779,25 @@ SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
     val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
-    UNPROTECT(2);
-    return ScalarReal(val);
+    PROTECT(out = allocVector(REALSXP, 2));
+    REAL(out)[0] = val;
+    REAL(out)[1] = 0.0;
+    UNPROTECT(3);
+    return out;
   }
 
   val = bwmfunc_wrapper(np_regression_nomad_shadow.vector_scale_factor);
+  fast = bwm_fast_eval_count;
   if (comm[1] != MPI_COMM_NULL)
     MPI_Bcast(&val, 1, MPI_DOUBLE, 0, comm[1]);
+  if (comm[1] != MPI_COMM_NULL)
+    MPI_Bcast(&fast, 1, MPI_DOUBLE, 0, comm[1]);
 
-  UNPROTECT(2);
-  return ScalarReal(val);
+  PROTECT(out = allocVector(REALSXP, 2));
+  REAL(out)[0] = val;
+  REAL(out)[1] = fast;
+  UNPROTECT(3);
+  return out;
 }
 
 SEXP C_np_regression_nomad_shadow_clear(void)
@@ -2710,9 +2722,9 @@ SEXP C_np_density_conditional_nomad_shadow_prepare(SEXP c_uno,
 
 SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
 {
-  SEXP rbw_r = R_NilValue, degree_i = R_NilValue;
+  SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   int i;
-  double val;
+  double val, fast = 0.0;
 
   if (!np_conditional_density_nomad_shadow.active)
     error("resident npcdens NOMAD shadow state is not active");
@@ -2734,8 +2746,11 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
     val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
-    UNPROTECT(2);
-    return ScalarReal(-val);
+    PROTECT(out = allocVector(REALSXP, 2));
+    REAL(out)[0] = -val;
+    REAL(out)[1] = 0.0;
+    UNPROTECT(3);
+    return out;
   }
 
   for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
@@ -2746,6 +2761,7 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     bwm_penalty_value = DBL_MAX;
   }
   val = bwmfunc_wrapper(np_conditional_density_nomad_shadow.vector_scale_factor);
+  fast = bwm_fast_eval_count;
 
   if ((!R_FINITE(val) || val == DBL_MAX) &&
       np_conditional_density_nomad_shadow.penalty_mode == 1) {
@@ -2772,10 +2788,14 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
           num_categories_extern,
           np_conditional_density_nomad_shadow.vector_scale_factor))) {
     val = DBL_MAX;
+    fast = 0.0;
   }
 
-  UNPROTECT(2);
-  return ScalarReal(-val);
+  PROTECT(out = allocVector(REALSXP, 2));
+  REAL(out)[0] = -val;
+  REAL(out)[1] = fast;
+  UNPROTECT(3);
+  return out;
 }
 
 SEXP C_np_density_conditional_nomad_shadow_clear(void)

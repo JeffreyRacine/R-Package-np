@@ -20,6 +20,7 @@ plbandwidth <-
            fval = NA,
            ifval = NA,
            num.feval = NA,
+           num.feval.fast = NA,
            rows.omit = NA,
            bandwidth.compute = TRUE,
            total.time = NA,...){
@@ -139,6 +140,7 @@ plbandwidth <-
       fval = fval,
       ifval = ifval,
       num.feval = num.feval,
+      num.feval.fast = num.feval.fast,
       sfactor = sfactor,
       bandwidth = bandwidth,
       sumNum = sumNum,
@@ -210,10 +212,17 @@ summary.plbandwidth <- function(object, ...){
   cat(genOmitStr(object))
   cat(genBwSelStr(object))
 
-  scale <- genBwScaleStrs(object)
-  nm <- unlist(object$varnames[c("y","x")])
+  child.labels <- c(object$ynames, object$xnames)
+  scale.blocks <- vapply(
+    seq_along(object$bw),
+    function(i) {
+      paste0("\n\n", child.labels[[i]], " on z:",
+             paste(genBwScaleStrs(object$bw[[i]]), collapse = ""))
+    },
+    character(1L)
+  )
 
-  cat(paste("\n\n", nm, " on z:", scale, sep=""))
+  cat(scale.blocks)
   
   cat(genBwKerStrs(object))
   cat(genTimingStr(object))
