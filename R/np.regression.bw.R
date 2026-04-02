@@ -564,26 +564,49 @@ npregbw.rbandwidth <-
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
-  out <- .npRmpi_with_local_regression(.Call(
-    if (isTRUE(eval.only)) "C_np_regression_bw_eval" else "C_np_regression_bw",
-    as.double(runo),
-    as.double(rord),
-    as.double(rcon),
-    as.double(ydat),
-    as.double(mysd),
-    as.integer(myopti),
-    as.double(myoptd),
-    as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-    as.integer(if (isTRUE(eval.only)) 1L else max(1L, nmulti)),
-    as.integer(penalty_mode),
-    as.double(penalty.multiplier),
-    as.integer(degree.c),
-    as.integer(isTRUE(bws$bernstein.basis)),
-    as.integer(npLpBasisCode(bws$basis)),
-    as.double(cker.bounds.c$lb),
-    as.double(cker.bounds.c$ub),
-    PACKAGE = "npRmpi"
-  ))
+  if (isTRUE(eval.only)) {
+    out <- .npRmpi_with_local_regression(.Call(
+      C_np_regression_bw_eval,
+      as.double(runo),
+      as.double(rord),
+      as.double(rcon),
+      as.double(ydat),
+      as.double(mysd),
+      as.integer(myopti),
+      as.double(myoptd),
+      as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+      as.integer(1L),
+      as.integer(penalty_mode),
+      as.double(penalty.multiplier),
+      as.integer(degree.c),
+      as.integer(isTRUE(bws$bernstein.basis)),
+      as.integer(npLpBasisCode(bws$basis)),
+      as.double(cker.bounds.c$lb),
+      as.double(cker.bounds.c$ub),
+      PACKAGE = "npRmpi"
+    ))
+  } else {
+    out <- .npRmpi_with_local_regression(.Call(
+      C_np_regression_bw,
+      as.double(runo),
+      as.double(rord),
+      as.double(rcon),
+      as.double(ydat),
+      as.double(mysd),
+      as.integer(myopti),
+      as.double(myoptd),
+      as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+      as.integer(max(1L, nmulti)),
+      as.integer(penalty_mode),
+      as.double(penalty.multiplier),
+      as.integer(degree.c),
+      as.integer(isTRUE(bws$bernstein.basis)),
+      as.integer(npLpBasisCode(bws$basis)),
+      as.double(cker.bounds.c$lb),
+      as.double(cker.bounds.c$ub),
+      PACKAGE = "npRmpi"
+    ))
+  }
 
   rorder <- numeric(length(bws$bw))
   ord.idx <- seq_along(bws$bw)
