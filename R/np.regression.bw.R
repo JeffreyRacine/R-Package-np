@@ -1542,12 +1542,30 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
     }
 
-    payload_result <- build_payload(
-      point = search.result$best_point,
-      best_record = search.result$best,
-      solution = best.solution,
-      interrupted = !isTRUE(search.result$completed)
-    )
+    payload_result <- if (identical(degree.search$engine, "nomad+powell")) {
+      local({
+        .np_progress_bandwidth_set_context(
+          .np_nomad_powell_context_label(search.result$best$degree)
+        )
+        on.exit(.np_progress_bandwidth_set_context(NULL), add = TRUE)
+        .np_progress_select_bandwidth_enhanced(
+          .np_nomad_powell_progress_label(),
+          build_payload(
+            point = search.result$best_point,
+            best_record = search.result$best,
+            solution = best.solution,
+            interrupted = !isTRUE(search.result$completed)
+          )
+        )
+      })
+    } else {
+      build_payload(
+        point = search.result$best_point,
+        best_record = search.result$best,
+        solution = best.solution,
+        interrupted = !isTRUE(search.result$completed)
+      )
+    }
 
     if (is.list(payload_result) && !is.null(payload_result$payload)) {
       search.result$best_payload <- payload_result$payload
