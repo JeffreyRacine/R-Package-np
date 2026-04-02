@@ -1,12 +1,50 @@
 #include <math.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #include <R.h>
 #include "headers.h"
 #include "tree.h"
 
+static size_t np_tree_size_mul_or_die(size_t a, size_t b, const char *what)
+{
+  if ((a != 0) && (b > (SIZE_MAX / a)))
+    error("%s: allocation size overflow", what);
+  return a * b;
+}
+
+static size_t np_tree_size_mul3_or_die(size_t a, size_t b, size_t c, const char *what)
+{
+  return np_tree_size_mul_or_die(np_tree_size_mul_or_die(a, b, what), c, what);
+}
+
+static void *np_tree_malloc_bytes_or_die(size_t nbytes, const char *what)
+{
+  void *ptr;
+
+  if (nbytes == 0)
+    return NULL;
+
+  ptr = malloc(nbytes);
+  if (ptr == NULL)
+    error("%s: memory allocation failed", what);
+
+  return ptr;
+}
+
+static void *np_tree_malloc_array_or_die(size_t count, size_t elem_size, const char *what)
+{
+  return np_tree_malloc_bytes_or_die(np_tree_size_mul_or_die(count, elem_size, what), what);
+}
+
+static void *np_tree_malloc_array3_or_die(size_t a, size_t b, size_t c, const char *what)
+{
+  return np_tree_malloc_bytes_or_die(np_tree_size_mul3_or_die(a, b, c, what), what);
+}
+
 static int *realloc_int_or_die(int *ptr, size_t n)
 {
-  int *tmp = (int *)realloc(ptr, n * sizeof(int));
+  int *tmp = (int *)realloc(ptr, np_tree_size_mul_or_die(n, sizeof(int), "realloc_int_or_die"));
   if (tmp == NULL)
     error("realloc_int_or_die: memory allocation failed");
   return tmp;
@@ -38,19 +76,17 @@ void build_kdtree(double ** p, int nump, int ndim, int nbucket, int * ip, KDT **
   
   int numnode = MIN(2*MAX(nump,nbucket) - (nbucket-1)*nf - 1, maxnode);
 
-  *kdt = (KDT *)malloc(sizeof(KDT));
-  if(!(*kdt != NULL))
-    error("!(*kdt != NULL)");
+  *kdt = (KDT *)np_tree_malloc_array_or_die(1, sizeof(KDT), "build_kdtree");
 
   kdx = *kdt;
 
-  kdx->kdn = (KDN *)malloc(numnode*sizeof(KDN));
-  if(!(kdx->kdn != NULL))
-    error("!(kdx->kdn != NULL)");
+  kdx->kdn = (KDN *)np_tree_malloc_array_or_die((size_t)numnode, sizeof(KDN), "build_kdtree kdn");
 
-  kdx->bb = (double *)malloc(numnode*2*ndim*sizeof(double));
-  if(!(kdx->bb != NULL))
-    error("!(kdx->bb != NULL)");
+  kdx->bb = (double *)np_tree_malloc_array3_or_die(
+    (size_t)numnode,
+    np_tree_size_mul_or_die(2u, (size_t)ndim, "build_kdtree bb"),
+    sizeof(double),
+    "build_kdtree bb");
 
   for(int i = 0; i < numnode; i++){
     kdx->kdn[i].bb = kdx->bb+2*i*ndim;
