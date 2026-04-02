@@ -52,13 +52,19 @@ run-profile:
 	@for d in $(DEMOS); do \
 		echo "[profile][np=$(NP)] $$d"; \
 		out_file=$${d}_npRmpi_profile.Rout; \
+		batch_file=$${out_file}.batch; \
 		tmp_file=$${out_file}.tmp; \
-		if /opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env R_PROFILE_USER $(RPROFILE) -env R_PROFILE '' -env NP_RMPI_PROFILE_RECV_TIMEOUT_SEC $(TIMEOUT_SEC) $(MPI_ENV_FI) $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R > "$$tmp_file" 2>&1; then \
-			{ $(PROVENANCE_CMD); cat "$$tmp_file"; } > "$$out_file"; \
-			rm -f "$$tmp_file"; \
+		if /opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env R_PROFILE_USER $(RPROFILE) -env R_PROFILE '' -env NP_RMPI_PROFILE_RECV_TIMEOUT_SEC $(TIMEOUT_SEC) $(MPI_ENV_FI) $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R "$$batch_file" > "$$tmp_file" 2>&1; then \
+			if test ! -s "$$batch_file"; then \
+				rm -f "$$tmp_file" "$$batch_file"; \
+				echo "[profile][np=$(NP)] $$d FAILED (empty batch transcript)"; \
+				exit 1; \
+			fi; \
+			{ $(PROVENANCE_CMD); cat "$$batch_file"; if test -s "$$tmp_file"; then cat "$$tmp_file"; fi; } > "$$out_file"; \
+			rm -f "$$tmp_file" "$$batch_file"; \
 			: ; \
 		else \
-			rm -f "$$tmp_file"; \
+			rm -f "$$tmp_file" "$$batch_file"; \
 			echo "[profile][np=$(NP)] $$d FAILED"; \
 			exit 1; \
 		fi; \
