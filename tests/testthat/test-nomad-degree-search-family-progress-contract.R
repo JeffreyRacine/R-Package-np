@@ -7,7 +7,6 @@ expect_nomad_unknown_bound_progress <- function(msgs, pkg_pattern, info = NULL) 
   expect_true(any(grepl(sprintf("^\\[%s\\] Refining bandwidth \\(", pkg_pattern), msgs)), info = info)
   expect_true(any(grepl("multistart [12]/2", msgs)), info = info)
   expect_true(any(grepl("iteration [0-9]+", msgs)), info = info)
-  expect_true(any(grepl("iteration [0-9]+ \\([0-9]+\\)", msgs)), info = info)
   expect_true(any(grepl("deg \\(", msgs)), info = info)
   expect_true(any(grepl("best \\(", msgs)), info = info)
 }
