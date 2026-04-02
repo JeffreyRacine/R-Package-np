@@ -409,7 +409,8 @@ npregbw.rbandwidth <-
 
   list(
     objective = out$objective,
-    num.feval = 1L
+    num.feval = out$num.feval,
+    num.feval.fast = out$num.feval.fast
   )
 }
 
@@ -602,6 +603,8 @@ npregbw.rbandwidth <-
     bws = tbw,
     bandwidth.compute = FALSE
   )
+  if (!is.null(payload$method) && length(payload$method))
+    payload$pmethod <- bwmToPrint(as.character(payload$method[1L]))
   payload$timing <- core$timing
   payload$total.time <- total.time
   payload
@@ -790,6 +793,8 @@ npregbw.rbandwidth <-
   ub <- c(bw_upper, degree.search$upper)
   bbin <- c(rep.int(0L, ncon + ncat), rep.int(1L, ncon))
   baseline.record <- NULL
+  nomad.num.feval.total <- 0
+  nomad.num.feval.fast.total <- 0
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -820,6 +825,8 @@ npregbw.rbandwidth <-
       invalid.penalty = "baseline",
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     )
+    nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
 
     list(
       objective = out$objective,
@@ -854,8 +861,8 @@ npregbw.rbandwidth <-
         bw = as.numeric(final.tbw$bw),
         objective = as.numeric(best_record$objective),
         ifval = as.numeric(best_record$objective),
-        num.feval = if (!is.null(solution$bbe)) as.numeric(solution$bbe) else as.numeric(best_record$num.feval),
-        num.feval.fast = 0,
+        num.feval = as.numeric(nomad.num.feval.total),
+        num.feval.fast = as.numeric(nomad.num.feval.fast.total),
         fval.history = as.numeric(best_record$objective),
         eval.history = if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1,
         invalid.history = 0,
@@ -879,6 +886,13 @@ npregbw.rbandwidth <-
         )
       }))
       powell.elapsed <- proc.time()[3L] - powell.start
+
+      direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
+      direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+      hot.payload$num.feval <- direct.payload$num.feval
+      hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+      if (!is.null(hot.payload$method) && length(hot.payload$method))
+        hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
 
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&

@@ -741,7 +741,8 @@ npcdistbw.condbandwidth <-
 
   list(
     objective = as.numeric(out$fval[1L]),
-    num.feval = 1L
+    num.feval = 1L,
+    num.feval.fast = as.numeric(out$fast.history[1L])
   )
 }
 
@@ -900,6 +901,8 @@ npcdistbw.condbandwidth <-
   ub <- c(bw_upper, degree.search$upper)
   bbin <- c(rep.int(0L, bwdim), rep.int(1L, ndeg))
   baseline.record <- NULL
+  nomad.num.feval.total <- 0
+  nomad.num.feval.fast.total <- 0
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -936,6 +939,8 @@ npcdistbw.condbandwidth <-
       invalid.penalty = "baseline",
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     )
+    nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
 
     list(
       objective = out$objective,
@@ -969,20 +974,23 @@ npcdistbw.condbandwidth <-
       )
       tbw$fval <- as.numeric(best_record$objective)
       tbw$ifval <- as.numeric(best_record$objective)
-      tbw$num.feval <- if (!is.null(solution$bbe)) as.numeric(solution$bbe) else as.numeric(best_record$num.feval)
-      tbw$num.feval.fast <- 0
+      tbw$num.feval <- as.numeric(nomad.num.feval.total)
+      tbw$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
       tbw$fval.history <- as.numeric(best_record$objective)
       tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
       tbw$invalid.history <- 0
       tbw$timing <- NA_real_
       tbw$total.time <- NA_real_
 
-      npcdistbw.condbandwidth(
+      payload <- npcdistbw.condbandwidth(
         xdat = xdat,
         ydat = ydat,
         bws = tbw,
         bandwidth.compute = FALSE
       )
+      if (!is.null(payload$method) && length(payload$method))
+        payload$pmethod <- bwmToPrint(as.character(payload$method[1L]))
+      payload
     }
 
     direct.payload <- build_direct_payload()
@@ -1011,6 +1019,12 @@ npcdistbw.condbandwidth <-
         )
       )
       powell.elapsed <- proc.time()[3L] - powell.start
+      direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
+      direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+      hot.payload$num.feval <- direct.payload$num.feval
+      hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+      if (!is.null(hot.payload$method) && length(hot.payload$method))
+        hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {

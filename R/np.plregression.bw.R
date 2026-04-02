@@ -195,6 +195,9 @@ npplregbw.plbandwidth =
     num.feval <- sum(sapply(bws$bw, function(bwi) {
       if (is.null(bwi$num.feval) || identical(bwi$num.feval, NA)) 0 else bwi$num.feval
     }))
+    num.feval.fast <- sum(sapply(bws$bw, function(bwi) {
+      if (is.null(bwi$num.feval.fast) || identical(bwi$num.feval.fast, NA)) 0 else bwi$num.feval.fast
+    }))
     fval <- {
       fv <- unlist(lapply(bws$bw, function(bwi) bwi$fval))
       if (length(fv) == 0 || all(!is.finite(fv))) NA else sum(fv[is.finite(fv)])
@@ -223,6 +226,7 @@ npplregbw.plbandwidth =
                        nobs = bws$nobs,
                        fval = fval,
                        num.feval = num.feval,
+                       num.feval.fast = num.feval.fast,
                        rows.omit = rows.omit,
                        total.time = total.time)
 
@@ -260,6 +264,9 @@ npplregbw.plbandwidth =
       },
       num.feval = sum(sapply(plband, function(bwi) {
         if (is.null(bwi$num.feval) || identical(bwi$num.feval, NA)) 0 else bwi$num.feval
+      })),
+      num.feval.fast = sum(sapply(plband, function(bwi) {
+        if (is.null(bwi$num.feval.fast) || identical(bwi$num.feval.fast, NA)) 0 else bwi$num.feval.fast
       })),
       xdati = untangle(xdat),
       ydati = untangle(data.frame(ydat)),
@@ -485,6 +492,8 @@ npplregbw.plbandwidth =
   ub <- c(child.upper, degree.search$upper)
   bbin <- c(rep.int(0L, bwdim), rep.int(1L, ndeg))
   baseline.record <- NULL
+  nomad.num.feval.total <- 0
+  nomad.num.feval.fast.total <- 0
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -502,6 +511,7 @@ npplregbw.plbandwidth =
   child_eval_payload <- function(bw.matrix, degree, penalty.multiplier) {
     total.objective <- 0
     total.feval <- 0
+    total.feval.fast <- 0
     child.payloads <- vector("list", length(child.templates))
 
     for (i in seq_along(child.templates)) {
@@ -528,10 +538,22 @@ npplregbw.plbandwidth =
       )
       total.objective <- total.objective + out$objective
       total.feval <- total.feval + out$num.feval
-      child.payloads[[i]] <- list(bws = tbw, objective = out$objective, response = resp)
+      total.feval.fast <- total.feval.fast + out$num.feval.fast
+      child.payloads[[i]] <- list(
+        bws = tbw,
+        objective = out$objective,
+        response = resp,
+        num.feval = out$num.feval,
+        num.feval.fast = out$num.feval.fast
+      )
     }
 
-    list(objective = total.objective, num.feval = total.feval, child.payloads = child.payloads)
+    list(
+      objective = total.objective,
+      num.feval = total.feval,
+      num.feval.fast = total.feval.fast,
+      child.payloads = child.payloads
+    )
   }
 
   eval_fun <- function(point) {
@@ -544,10 +566,13 @@ npplregbw.plbandwidth =
       degree = degree,
       penalty.multiplier = 10
     )
+    nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
     list(
       objective = out$objective,
       degree = degree,
-      num.feval = out$num.feval
+      num.feval = out$num.feval,
+      num.feval.fast = out$num.feval.fast
     )
   }
 
@@ -571,8 +596,8 @@ npplregbw.plbandwidth =
         tbw <- child.out$child.payloads[[i]]$bws
         tbw$fval <- as.numeric(child.out$child.payloads[[i]]$objective)
         tbw$ifval <- as.numeric(child.out$child.payloads[[i]]$objective)
-        tbw$num.feval <- 1
-        tbw$num.feval.fast <- 0
+        tbw$num.feval <- as.numeric(child.out$child.payloads[[i]]$num.feval)
+        tbw$num.feval.fast <- as.numeric(child.out$child.payloads[[i]]$num.feval.fast)
         tbw$fval.history <- as.numeric(child.out$child.payloads[[i]]$objective)
         tbw$eval.history <- 1
         tbw$invalid.history <- 0
@@ -584,6 +609,8 @@ npplregbw.plbandwidth =
           bws = tbw,
           bandwidth.compute = FALSE
         )
+        if (!is.null(child.list[[i]]$method) && length(child.list[[i]]$method))
+          child.list[[i]]$pmethod <- bwmToPrint(as.character(child.list[[i]]$method[1L]))
       }
 
       plbw.args <- c(
@@ -591,7 +618,8 @@ npplregbw.plbandwidth =
           bws = child.list,
           nobs = dim(xdat)[1],
           fval = child.out$objective,
-          num.feval = if (!is.null(solution$bbe)) as.numeric(solution$bbe) else child.out$num.feval,
+          num.feval = as.numeric(nomad.num.feval.total),
+          num.feval.fast = as.numeric(nomad.num.feval.fast.total),
           xdati = untangle(xdat),
           ydati = untangle(data.frame(ydat)),
           zdati = untangle(zdat),
@@ -633,6 +661,10 @@ npplregbw.plbandwidth =
         )
       )
       powell.elapsed <- proc.time()[3L] - powell.start
+      direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
+      direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+      hot.payload$num.feval <- direct.payload$num.feval
+      hot.payload$num.feval.fast <- direct.payload$num.feval.fast
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
