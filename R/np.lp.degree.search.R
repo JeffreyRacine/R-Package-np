@@ -1272,10 +1272,45 @@
   "Refining bandwidth"
 }
 
+.np_nomad_powell_hotstart_nmulti <- function(strategy = c("disable_multistart",
+                                                          "single_iteration")) {
+  strategy <- match.arg(strategy)
+  switch(strategy,
+         disable_multistart = 0L,
+         single_iteration = 1L)
+}
+
 .np_nomad_powell_context_label <- function(degree) {
   sprintf(
     "Refining NOMAD solution with one Powell hot start at degree %s",
     .np_degree_format_degree(degree)
+  )
+}
+
+.np_nomad_powell_progress_detail <- function(current_degree,
+                                             best_record,
+                                             elapsed = NULL) {
+  fields <- character()
+
+  if (is.finite(elapsed) && !is.na(elapsed) && elapsed >= 0)
+    fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
+
+  if (!is.null(current_degree))
+    fields <- c(fields, sprintf("deg %s", .np_degree_format_degree(current_degree)))
+
+  fields <- c(fields, .np_degree_progress_best_degree_detail(best_record = best_record))
+
+  paste(fields, collapse = ", ")
+}
+
+.np_nomad_powell_progress_fields <- function(state,
+                                             done = NULL,
+                                             detail = NULL,
+                                             now = .np_progress_now()) {
+  .np_nomad_powell_progress_detail(
+    current_degree = state$nomad_current_degree,
+    best_record = state$nomad_best_record,
+    elapsed = max(0, now - state$started)
   )
 }
 
@@ -1286,6 +1321,7 @@
     return(state)
 
   state$label <- .np_nomad_powell_progress_label()
+  state$unknown_total_fields <- .np_nomad_powell_progress_fields
   state$nomad_current_degree <- as.integer(degree)
   state$nomad_best_record <- best_record
   .np_progress_step_at(

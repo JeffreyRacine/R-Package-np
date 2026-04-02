@@ -874,7 +874,7 @@ npregbw.rbandwidth <-
 
     if (identical(degree.search$engine, "nomad+powell")) {
       hot.opt.args <- opt.args
-      hot.opt.args$nmulti <- 0L
+      hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("disable_multistart")
 
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(degree, local({
