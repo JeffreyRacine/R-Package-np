@@ -7,7 +7,7 @@ npseed(seed)
 }
 
 \arguments{
-  \item{seed}{an integer seed for the random number generator.}
+  \item{seed}{a single finite numeric value that is representable as a non-negative integer after applying \code{abs()}.}
 }
 \value{
   None.
@@ -34,6 +34,10 @@ npseed(seed)
   \code{\link{npcmstest}} (via \code{\link{npregbw}}),
   \code{\link{npqcmstest}} (via \code{\link{npregbw}}),
   \code{\link{npsigtest}} (via \code{\link{npregbw}}).
+
+  Invalid inputs such as missing values, non-finite values, non-scalars,
+  and values that cannot be represented as integers are rejected with an
+  explicit error.
 }
 
 \seealso{
