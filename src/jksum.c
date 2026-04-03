@@ -13428,7 +13428,7 @@ double *SIGN){
     }
 
     if(all_large_gate &&
-       ((int_ll_est == LL_LL) || (int_ll_est == LL_LP))){
+       ((int_ll_est == LL_LC) || (int_ll_est == LL_LL) || (int_ll_est == LL_LP))){
       double kconst = 1.0;
       int kconst_ok = 1;
       const double ridge_eps = 1.0/(double)MAX(1, num_obs_train);
@@ -13460,7 +13460,18 @@ double *SIGN){
       if(!isfinite(kconst) || (kconst <= 0.0))
         kconst_ok = 0;
 
-      if(kconst_ok && int_ll_est == LL_LL){
+      if(kconst_ok && (int_ll_est == LL_LC) && (!do_grad)){
+        const double sk = ((double)num_obs_train)*kconst;
+        const double sefac = (sk*hprod > 0.0) ?
+          sqrt(MAX(0.0, sigma2hat) * K_INT_KERNEL_P / (sk*hprod)) : 0.0;
+
+        for(i = 0; i < num_obs_eval; i++){
+          mean[i] = ymean;
+          mean_stderr[i] = sefac;
+        }
+
+        estimation_shortcut_done = 1;
+      } else if(kconst_ok && int_ll_est == LL_LL){
         const int k = num_reg_continuous + 1;
         MATRIX XtX = mat_creat(k, k, UNDEFINED);
         MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
