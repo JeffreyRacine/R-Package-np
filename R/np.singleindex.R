@@ -441,11 +441,56 @@ npindex.sibandwidth <-
       npreg.idx.args$bernstein.basis <- spec$bernstein.basis.engine
     }
 
+    fast.largeh <- FALSE
+    fast.largeh.eval.mean <- NULL
+    fast.largeh.train.mean <- NULL
+    if (identical(regtype, "lc") && !gradients && !errors && identical(bws$type, "fixed")) {
+      gate.index <- if (no.ex) index else c(index, index.eval)
+      fast.largeh <- .npindexbw_fast_eligible(
+        h = as.double(bws$bw),
+        bws = bws,
+        eval.index = gate.index
+      )
+      if (fast.largeh) {
+        fast.largeh.eval.mean <- {
+          tww.fast <- npksum(
+            txdat = as.matrix(txdat) %*% as.matrix(bws$beta),
+            tydat = as.matrix(data.frame(tydat, 1)),
+            weights = as.matrix(data.frame(tydat, 1)),
+            exdat = matrix(index.eval[1L], nrow = 1L),
+            bws = bws$bw,
+            bwtype = bws$type,
+            ckertype = bws$ckertype,
+            ckerorder = bws$ckerorder
+          )$ksum
+          as.double(tww.fast[1, 2, 1L] / NZD(tww.fast[2, 2, 1L]))
+        }
+
+        if (!no.ex && (no.ey || residuals)) {
+          fast.largeh.train.mean <- {
+            tww.fast <- npksum(
+              txdat = as.matrix(txdat) %*% as.matrix(bws$beta),
+              tydat = as.matrix(data.frame(tydat, 1)),
+              weights = as.matrix(data.frame(tydat, 1)),
+              exdat = matrix(index[1L], nrow = 1L),
+              bws = bws$bw,
+              bwtype = bws$type,
+              ckertype = bws$ckertype,
+              ckerorder = bws$ckerorder
+            )$ksum
+            as.double(tww.fast[1, 2, 1L] / NZD(tww.fast[2, 2, 1L]))
+          }
+        }
+      }
+    }
+
     ## Next, if no gradients are requested, use (faster) npksum
 
     if(gradients==FALSE) {
       if (identical(regtype, "lc")) {
-        if (identical(bws$type, "fixed")) {
+        if (fast.largeh) {
+          index.mean <- rep.int(fast.largeh.eval.mean, length(index.eval))
+        } else if (identical(bws$type, "fixed")) {
           tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
                         tydat=as.matrix(data.frame(tydat,1)),
                         weights=as.matrix(data.frame(tydat,1)),
@@ -473,7 +518,9 @@ npindex.sibandwidth <-
           ## if evaluation x's are different from training but no y's
           ## are specified
 
-          if (identical(bws$type, "fixed")) {
+          if (fast.largeh) {
+            index.tmean <- rep.int(fast.largeh.train.mean, length(tydat))
+          } else if (identical(bws$type, "fixed")) {
             tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
                           tydat=as.matrix(data.frame(tydat,1)),
                           weights=as.matrix(data.frame(tydat,1)),
@@ -769,14 +816,14 @@ npindex.sibandwidth <-
         MSE = MSEfunc(eydat,index.mean)
         MAE = MAEfunc(eydat,index.mean)
         MAPE = MAPEfunc(eydat,index.mean)
-        CORR = CORRfunc(eydat,index.mean)
+        CORR = if (fast.largeh) suppressWarnings(CORRfunc(eydat,index.mean)) else CORRfunc(eydat,index.mean)
         SIGN = SIGNfunc(eydat,index.mean)
       } else {
         RSQ = RSQfunc(tydat,index.tmean)
         MSE = MSEfunc(tydat,index.tmean)
         MAE = MAEfunc(tydat,index.tmean)
         MAPE = MAPEfunc(tydat,index.tmean)
-        CORR = CORRfunc(tydat,index.tmean)
+        CORR = if (fast.largeh) suppressWarnings(CORRfunc(tydat,index.tmean)) else CORRfunc(tydat,index.tmean)
         SIGN = SIGNfunc(tydat,index.tmean)
       }
       strgof = "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN),"
