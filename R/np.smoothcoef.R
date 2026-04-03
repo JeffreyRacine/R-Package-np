@@ -503,6 +503,39 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       list(coef = coef.out, theta = theta.out, ridge = ridge)
     }
 
+    solve_single_moment_system <- function(tyw.vec, tww.mat) {
+      ncoef <- length(tyw.vec)
+      ridge.grid <- npRidgeSequenceAdditive(n.train = tnrow, cap = 1.0)
+      ridge <- ridge.grid[1L]
+      ridge.idx <- 1L
+
+      repeat {
+        ridge.val <- ridge * tyw.vec[1L] / NZD(tww.mat[1L, 1L])
+        theta <- fast_moment_solve(
+          tww.slice = tww.mat,
+          tyw.slice = tyw.vec,
+          ridge.add = ridge,
+          ridge.val = ridge.val
+        )
+        if (is.null(theta)) {
+          theta <- tryCatch(
+            solve(
+              tww.mat + diag(rep(ridge, ncoef)),
+              tyw.vec + c(ridge.val, rep(0, ncoef - 1L))
+            ),
+            error = function(e) e
+          )
+        }
+        if (!inherits(theta, "error"))
+          return(list(coef = as.double(theta), ridge = ridge))
+
+        ridge.idx <- ridge.idx + 1L
+        if (ridge.idx > length(ridge.grid))
+          return(list(coef = rep(maxPenalty, ncoef), ridge = ridge))
+        ridge <- ridge.grid[ridge.idx]
+      }
+    }
+
     lc_moments <- function(z.eval, leave.one.out.eval, u2 = NULL) {
       yW.local <- cbind(tydat, W.train)
       ksum.args <- list(
@@ -538,6 +571,48 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       }
 
       list(tyw = tyw.out, tww = tww.out, s = s.out)
+    }
+
+    do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex && identical(reg.engine, "lc"))
+    gate.zdat <- if (miss.ex) tzdat else rbind(tzdat, ezdat)
+    fast.largeh <- identical(reg.engine, "lc") &&
+      !leave.one.out &&
+      identical(bws$type, "fixed") &&
+      !do.iterate &&
+      .npscoefbw_fast_eligible(bws, eval.zdat = gate.zdat)
+
+    lc_fast_global_moments <- function(z.eval.one, u2 = NULL) {
+      yW.local <- cbind(tydat, W.train)
+      ksum.args <- list(
+        txdat = tzdat,
+        tydat = yW.local,
+        weights = yW.local,
+        exdat = z.eval.one,
+        bws = bws,
+        bandwidth.divide = TRUE
+      )
+      main.ks <- do.call(npksum, ksum.args)$ksum
+      out <- list(
+        tyw = as.double(main.ks[-1L, 1L, 1L]),
+        tww = main.ks[-1L, -1L, 1L, drop = TRUE]
+      )
+
+      if (!is.null(u2)) {
+        cov.args <- list(
+          txdat = tzdat,
+          tydat = W.train,
+          weights = W.train * as.double(u2),
+          exdat = z.eval.one,
+          bws = bws,
+          bandwidth.divide = TRUE,
+          kernel.pow = 2
+        )
+        out$s <- do.call(npksum, cov.args)$ksum[, , 1L, drop = TRUE]
+      } else {
+        out$s <- NULL
+      }
+
+      out
     }
 
     lp_state <- if (identical(reg.engine, "lp")) {
@@ -590,7 +665,18 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       list(tyw = tyw.out, tww = tww.out, s = s.out)
     }
 
-    if (identical(reg.engine, "lc")) {
+    moments <- NULL
+    if (fast.largeh) {
+      eval.z.one <- if (miss.ex) tzdat[1L, , drop = FALSE] else ezdat[1L, , drop = FALSE]
+      fast.eval <- lc_fast_global_moments(z.eval.one = eval.z.one)
+      fast.solve <- solve_single_moment_system(
+        tyw.vec = fast.eval$tyw,
+        tww.mat = fast.eval$tww
+      )
+      coef.vec <- fast.solve$coef
+      coef.mat <- matrix(coef.vec, nrow = length(coef.vec), ncol = enrow)
+      ridge <- rep.int(fast.solve$ridge, enrow)
+    } else if (identical(reg.engine, "lc")) {
       moments <- lc_moments(
         z.eval = if (miss.ex) NULL else ezdat,
         leave.one.out.eval = leave.one.out
@@ -610,12 +696,13 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       )
     }
 
-    coef.mat <- solver$coef
-    ridge <- solver$ridge
+    if (!fast.largeh) {
+      coef.mat <- solver$coef
+      ridge <- solver$ridge
+    }
 
     if (iterate && !is.null(bws$bw.fitted) && miss.ex && !identical(reg.engine, "lc"))
       .np_warning("iterate=TRUE currently supports regtype='lc' for npscoef; using iterate=FALSE")
-    do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex && identical(reg.engine, "lc"))
     if (do.iterate){
       resid <- tydat - sapply(seq_len(enrow), function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })
 
@@ -672,7 +759,33 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
 
     if (errors || (residuals && miss.ex)) {
       if (errors) {
-        if (miss.ex && !do.iterate) {
+        if (fast.largeh) {
+          if (miss.ex) {
+            train.solve <- fast.solve
+            mean.fit <- mean
+          } else {
+            train.fast <- lc_fast_global_moments(z.eval.one = tzdat[1L, , drop = FALSE])
+            train.solve <- solve_single_moment_system(
+              tyw.vec = train.fast$tyw,
+              tww.mat = train.fast$tww
+            )
+            mean.fit <- as.vector(W.train %*% train.solve$coef)
+          }
+          resid <- tydat - mean.fit
+          u2.W <- resid^2
+          s.fast <- lc_fast_global_moments(
+            z.eval.one = if (miss.ex) tzdat[1L, , drop = FALSE] else ezdat[1L, , drop = FALSE],
+            u2 = u2.W
+          )$s
+          cm.fast <- safe_chol2inv(fast.eval$tww, fast.solve$ridge, 1.0 / nrow(txdat))
+          merr <- rep(NA_real_, enrow)
+          beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
+          if (!is.null(cm.fast)) {
+            vcv.beta.fast <- cm.fast %*% s.fast %*% cm.fast
+            merr <- sqrt(pmax(rowSums((W %*% vcv.beta.fast) * W), 0.0))
+            beta.se[] <- rep(sqrt(pmax(diag(vcv.beta.fast), 0.0)), each = enrow)
+          }
+        } else if (miss.ex && !do.iterate) {
           mean.fit <- mean
           resid <- tydat - mean.fit
           u2.W <- resid^2
@@ -723,8 +836,9 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       }
     }
 
-    beta.se <- NULL
-    if(errors){
+    if (!errors)
+      beta.se <- NULL
+    if(errors && !fast.largeh){
       u2 <- as.double(u2.W)
       merr <- rep(NA_real_, enrow)
       beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
