@@ -72,6 +72,11 @@ Completed/accepted in live `np-master`:
    - `lc` estimator-side large-`h` handling is complete and validated,
    - canonical `ll/lp` estimator-side large-`h` handling is complete and validated,
    - higher-degree or alternate-basis `lp` large-`h` work remains outside this accepted tranche.
+5. `npudens`:
+   - estimator-side large-`h` handling is now complete and validated in live `np-master`.
+6. `npudist`:
+   - remains open future work,
+   - beneficiary diagnostics showed the estimator-side `OP_INTEGRAL` route still needs a dedicated follow-on before live promotion.
 
 ## Merge Readiness (2026-02-24)
 1. Technical risk for merging this modernization tranche to `master` is moderate/acceptable if merge hygiene is followed.
