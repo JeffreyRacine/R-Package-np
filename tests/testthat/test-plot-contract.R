@@ -566,6 +566,7 @@ test_that("plot contract: scbandwidth perspective bootstrap uses z evaluation co
   x1.eval <- seq(tq(xdat[, 1L], 0.0)[1L], tq(xdat[, 1L], 0.0)[2L], length.out = neval)
   x2.eval <- seq(tq(zdat[, 1L], 0.0)[1L], tq(zdat[, 1L], 0.0)[2L], length.out = neval)
   x.eval <- expand.grid(x1.eval, x2.eval)
+  colnames(x.eval) <- c("x", "z")
 
   trace(
     what = "compute.bootstrap.errors.scbandwidth",
@@ -597,6 +598,53 @@ test_that("plot contract: scbandwidth perspective bootstrap uses z evaluation co
 
   expect_equal(cap$exdat, x.eval[, 1, drop = FALSE])
   expect_equal(cap$ezdat, x.eval[, 2, drop = FALSE])
+})
+
+test_that("plot contract: npscoef fitted perspective path preserves semantic z eval name", {
+  skip_if_not_installed("np")
+
+  set.seed(108)
+  n <- 120
+  x <- runif(n)
+  z <- runif(n, min = -2, max = 2)
+  y <- x * exp(z) * (1 + rnorm(n, sd = 0.15))
+
+  fit <- npscoef(
+    y ~ x | z,
+    nomad = TRUE,
+    nmulti = 0L
+  )
+
+  np.ns <- asNamespace("np")
+  cap <- new.env(parent = emptyenv())
+  cap$tzdat.names <- NULL
+  cap$ezdat.names <- NULL
+
+  trace(
+    what = ".np_scoef_fit_internal",
+    where = np.ns,
+    tracer = bquote({
+      if (!missing(tzdat) && !missing(ezdat) && !is.null(tzdat) && !is.null(ezdat)) {
+        assign("tzdat.names", colnames(as.data.frame(tzdat)), envir = .(cap))
+        assign("ezdat.names", colnames(as.data.frame(ezdat)), envir = .(cap))
+      }
+    }),
+    print = FALSE
+  )
+  on.exit(try(untrace(".np_scoef_fit_internal", where = np.ns), silent = TRUE), add = TRUE)
+
+  out <- suppressWarnings(plot(
+    fit,
+    view = "fixed",
+    renderer = "base",
+    plot.behavior = "data",
+    plot.data.overlay = FALSE,
+    plot.errors.method = "none"
+  ))
+
+  expect_type(out, "list")
+  expect_identical(cap$tzdat.names, "z")
+  expect_identical(cap$ezdat.names, "z")
 })
 
 test_that("plot contract: bootstrap defaults are wild for regression-class and inid for unsupervised engines", {
