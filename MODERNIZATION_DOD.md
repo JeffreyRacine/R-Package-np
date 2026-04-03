@@ -77,6 +77,9 @@ Completed/accepted in live `np-master`:
 6. `npudist`:
    - remains open future work,
    - beneficiary diagnostics showed the estimator-side `OP_INTEGRAL` route still needs a dedicated follow-on before live promotion.
+7. `npcdens`:
+   - estimator-side large-`h` handling is complete and validated in live `np-master`,
+   - the family closes by audit and installed proof because fitted and `predict()` already inherit the accepted native large-`h` machinery with no new splice required.
 
 ## Merge Readiness (2026-02-24)
 1. Technical risk for merging this modernization tranche to `master` is moderate/acceptable if merge hygiene is followed.
