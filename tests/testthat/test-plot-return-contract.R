@@ -300,6 +300,58 @@ test_that("plot return contract: remaining public plot families return plot-data
   expect_plot_modes_match(fit.pl, fields = c("mean", "merr"), perspective = FALSE)
 })
 
+test_that("plot return contract: npRmpi npscoef fitted perspective path preserves semantic z eval name", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(108)
+  n <- 120
+  x <- runif(n)
+  z <- runif(n, min = -2, max = 2)
+  y <- x * exp(z) * (1 + rnorm(n, sd = 0.15))
+
+  fit <- npscoef(
+    y ~ x | z,
+    nomad = TRUE,
+    nmulti = 0L
+  )
+
+  npRmpi.ns <- asNamespace("npRmpi")
+  cap <- new.env(parent = emptyenv())
+  cap$tzdat.names <- NULL
+  cap$ezdat.names <- NULL
+
+  trace(
+    what = ".np_scoef_fit_internal",
+    where = npRmpi.ns,
+    tracer = bquote({
+      if (!missing(tzdat) && !missing(ezdat) && !is.null(tzdat) && !is.null(ezdat)) {
+        assign("tzdat.names", colnames(as.data.frame(tzdat)), envir = .(cap))
+        assign("ezdat.names", colnames(as.data.frame(ezdat)), envir = .(cap))
+      }
+    }),
+    print = FALSE
+  )
+  on.exit(try(untrace(".np_scoef_fit_internal", where = npRmpi.ns), silent = TRUE), add = TRUE)
+
+  out <- suppressWarnings(plot(
+    fit,
+    view = "fixed",
+    renderer = "base",
+    plot.behavior = "data",
+    plot.data.overlay = FALSE,
+    plot.errors.method = "none"
+  ))
+
+  expect_type(out, "list")
+  expect_identical(cap$tzdat.names, "z")
+  expect_identical(cap$ezdat.names, "z")
+})
+
 test_that("plot return contract: rgl plot-data returns the usual data payload", {
   skip_if_not_installed("rgl")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")

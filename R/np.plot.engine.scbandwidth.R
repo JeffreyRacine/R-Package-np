@@ -300,6 +300,10 @@
       }
 
       x.eval <- expand.grid(x1.eval, x2.eval)
+      colnames(x.eval) <- c(
+        colnames(xdat)[1L],
+        if (!miss.z) colnames(zdat)[1L] else colnames(xdat)[2L]
+      )
       
       if (is.ordered(xdat[,1]))
         x1.eval <- (bws$xdati$all.dlev[[1]])[as.integer(x1.eval)]
