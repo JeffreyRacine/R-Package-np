@@ -55,7 +55,23 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 4. Remaining highest-priority near-term work:
    - doc/codoc triage for pre-existing `man/*.Rd` drift,
    - win-builder closure before release candidate,
-   - optional performance-governance backfills for selected checkpoints where ROI warrants.
+   - optional performance-governance backfills for selected checkpoints where ROI warrants,
+   - `npscoef` canonical `ll/lp` estimator-side large-`h` port remains future work after tmp-only rehearsal rejected unaffected-route regressions.
+
+## Large-H Estimator Port Status (2026-04-03)
+Completed/accepted in live `np-master`:
+1. `npreg`:
+   - estimator-side large-`h` handling is complete across active regression paths,
+   - `lc` was the missing live seam and is now ported,
+   - `ll`/`lp` already had accepted estimator-side large-`h` handling in `src/jksum.c`.
+2. `npindex`:
+   - `lc` estimator-side large-`h` handling is complete,
+   - non-`lc` routes close by inheritance through `npreg` after family audit.
+3. `npplreg`:
+   - large-`h` status is complete by inheritance through child `npreg` fits; no separate estimator splice was required.
+4. `npscoef`:
+   - `lc` estimator-side large-`h` handling is complete and validated,
+   - canonical `ll/lp` remains deferred future work; no live `ll/lp` port was accepted from the rejected tmp rehearsal.
 
 ## Merge Readiness (2026-02-24)
 1. Technical risk for merging this modernization tranche to `master` is moderate/acceptable if merge hygiene is followed.
