@@ -4995,8 +4995,10 @@ const int keep_kw_owner_local){
   const NP_GateOverrideCtx gate_ctx_empty = {0};
   const NP_GateOverrideCtx * const gate_ctx =
     np_gate_ctx_is_sane(gate_ctx_raw) ? gate_ctx_raw : &gate_ctx_empty;
+  const int caller_override_active =
+    ((gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_OVERRIDE));
   const int disable_gate_features =
-    (!np_partial_gate_features_enabled) ||
+    ((!np_partial_gate_features_enabled) && (!caller_override_active)) ||
     ((gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE));
   assert(np_gate_ctx_is_sane(gate_ctx));
   
@@ -18754,6 +18756,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                               double *pdf,
                                               double *pdf_stderr,
                                               double *log_likelihood){
+  NP_GateOverrideCtx gate_ctx_local;
+  np_gate_ctx_clear(&gate_ctx_local);
 
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
 
@@ -18763,6 +18767,10 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs_train:1);
 
   int * operator = NULL;
+  int gate_override_active = 0;
+  int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
+  double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
+  double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
 
 	double INT_KERNEL_P;					 /* Integral of K(z)^2 */
 	double K_INT_KERNEL_P;				 /*  K^p */
@@ -18826,61 +18834,193 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                            vector_scale_factor,
                            NULL, NULL,
                            matrix_X_continuous_train,
-	                           matrix_X_continuous_eval,
+                           matrix_X_continuous_eval,
 	                           NULL,
 	                           matrix_bandwidth,
 	                           lambda)==1){
 	    error("\n** Error: invalid bandwidth.");
 	  }
 
-  kernel_weighted_sum_np(kernel_c,
-                         kernel_u,
-                         kernel_o,
-                         BANDWIDTH_den,
-                         num_obs_train,
-                         num_obs_eval,
-                         num_reg_unordered,
-                         num_reg_ordered,
-                         num_reg_continuous,
-                         0, // don't leave one out 
-                         0,
-                         1, // kernel_pow = 1
-                         1, // bandwidth_divide = FALSE when not adaptive
-                         0, 
-                         0, // symmetric
-                         0, // gather-scatter sum
-                         0, // do not drop train
-                         0, // do not drop train
-                         operator, // dens or dist
-                         OP_NOOP, // no permutations
-                         0, // no score
-                         0, // no ocg
-                         NULL,
-                         0, //  explicity suppress parallel
-                         0,
-                         0,
-                         int_TREE_X,
-                         0,
-                         kdt_extern_X,
-                         NULL, NULL, NULL,
-                         matrix_X_unordered_train,
-                         matrix_X_ordered_train,
-                         matrix_X_continuous_train,
-                         matrix_X_unordered_eval,
-                         matrix_X_ordered_eval,
-                         matrix_X_continuous_eval,
-                         NULL, // no ys
-                         NULL, // no weights
-                         NULL, // no sgn
-                         vector_scale_factor,
-                         1,matrix_bandwidth,matrix_bandwidth,lambda,
-                         num_categories,
-                         matrix_categorical_vals, // if dist mcv (possibly) necessary
-                         NULL, // no ocg
-                         pdf,  // weighted sum
-                         NULL, // no permutations
-                         NULL, // do not return kernel weights
-                         NULL);
+  if((num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
+    int ok_all = 1;
+
+    if(num_reg_continuous > 0){
+      const double rel_tol = np_cont_largeh_rel_tol();
+      ov_cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+      ov_cont_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+      ov_cont_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+      ok_all = (ov_cont_ok != NULL) && (ov_cont_hmin != NULL) && (ov_cont_k0 != NULL);
+
+      if(ok_all){
+        for(i = 0; i < num_reg_continuous; i++){
+          const int kern = kernel_c[i];
+          double xmin = DBL_MAX, xmax = -DBL_MAX;
+
+          ov_cont_ok[i] = 0;
+          ov_cont_hmin[i] = DBL_MAX;
+          ov_cont_k0[i] = 0.0;
+          if(!np_cont_largeh_kernel_supported(kern)) continue;
+
+          for(int j = 0; j < num_obs_train; j++){
+            const double v = matrix_X_continuous_train[i][j];
+            if(!isfinite(v)) continue;
+            xmin = MIN(xmin, v);
+            xmax = MAX(xmax, v);
+          }
+
+          for(int j = 0; j < num_obs_eval; j++){
+            const double v = matrix_X_continuous_eval[i][j];
+            if(!isfinite(v)) continue;
+            xmin = MIN(xmin, v);
+            xmax = MAX(xmax, v);
+          }
+
+          if(xmax >= xmin){
+            const double utol = np_cont_largeh_utol(kern, rel_tol);
+            if(utol > 0.0 && isfinite(utol)){
+              ov_cont_ok[i] = 1;
+              ov_cont_hmin[i] = (xmax - xmin)/utol;
+              ov_cont_k0[i] = np_cont_largeh_k0(kern);
+            }
+          }
+        }
+      }
+    }
+
+    if(ok_all && num_reg_unordered > 0){
+      ov_disc_uno_ok = (int *)calloc((size_t)num_reg_unordered, sizeof(int));
+      ov_disc_uno_const = (double *)malloc((size_t)num_reg_unordered*sizeof(double));
+      ok_all = (ov_disc_uno_ok != NULL) && (ov_disc_uno_const != NULL);
+      if(ok_all){
+        double (* const ukf[])(int, double, int) = {
+          np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
+          np_score_uaa, np_score_unli_racine
+        };
+        const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
+        for(i = 0; i < num_reg_unordered; i++){
+          const int ku = kernel_u[i];
+          const int ncat = (num_categories != NULL) ? num_categories[i] : 0;
+          const double lam = lambda[i];
+          ov_disc_uno_ok[i] = 0;
+          ov_disc_uno_const[i] = 0.0;
+          if(ku < 0 || ku >= nuk) continue;
+          if(!np_disc_near_upper(ku, lam, ncat)) continue;
+          {
+            const double ks = ukf[ku](1, lam, ncat);
+            const double kd = ukf[ku](0, lam, ncat);
+            if(np_disc_near_const_kernel(ks, kd)){
+              ov_disc_uno_ok[i] = 1;
+              ov_disc_uno_const[i] = 0.5*(ks + kd);
+            }
+          }
+        }
+      }
+    }
+
+    if(ok_all && num_reg_ordered > 0){
+      ov_disc_ord_ok = (int *)calloc((size_t)num_reg_ordered, sizeof(int));
+      ov_disc_ord_const = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
+      ok_all = (ov_disc_ord_ok != NULL) && (ov_disc_ord_const != NULL);
+      if(ok_all){
+        double (* const okf[])(double, double, double, double, double) = {
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
+        };
+        const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
+        for(i = 0; i < num_reg_ordered; i++){
+          const int oi = i + num_reg_unordered;
+          const int ko = kernel_o[i];
+          const int ncat = (num_categories != NULL) ? num_categories[oi] : 0;
+          const double lam = lambda[oi];
+          ov_disc_ord_ok[i] = 0;
+          ov_disc_ord_const[i] = 0.0;
+          if(ko < 0 || ko >= nok) continue;
+          if(ncat <= 0 || matrix_categorical_vals == NULL) continue;
+          if(!np_disc_ordered_near_upper(ko, lam)) continue;
+          {
+            const double cl = matrix_categorical_vals[oi][0];
+            const double ch = matrix_categorical_vals[oi][ncat - 1];
+            const double k0 = okf[ko](cl, cl, lam, cl, ch);
+            const double k1 = okf[ko](cl, ch, lam, cl, ch);
+            if(np_disc_near_const_kernel(k0, k1)){
+              ov_disc_ord_ok[i] = 1;
+              ov_disc_ord_const[i] = 0.5*(k0 + k1);
+            }
+          }
+        }
+      }
+    }
+
+    if(ok_all){
+      np_gate_ctx_set(&gate_ctx_local,
+                      num_reg_continuous,
+                      num_reg_unordered,
+                      num_reg_ordered,
+                      kernel_c,
+                      kernel_u,
+                      kernel_o,
+                      operator,
+                      ov_cont_ok,
+                      ov_cont_hmin,
+                      ov_cont_k0,
+                      ov_disc_uno_ok,
+                      ov_disc_uno_const,
+                      ov_disc_ord_ok,
+                      ov_disc_ord_const);
+      gate_override_active = 1;
+    }
+  }
+
+  kernel_weighted_sum_np_ctx(kernel_c,
+                             kernel_u,
+                             kernel_o,
+                             BANDWIDTH_den,
+                             num_obs_train,
+                             num_obs_eval,
+                             num_reg_unordered,
+                             num_reg_ordered,
+                             num_reg_continuous,
+                             0, // don't leave one out
+                             0,
+                             1, // kernel_pow = 1
+                             1, // bandwidth_divide = FALSE when not adaptive
+                             0,
+                             0, // symmetric
+                             0, // gather-scatter sum
+                             0, // do not drop train
+                             0, // do not drop train
+                             operator, // dens or dist
+                             OP_NOOP, // no permutations
+                             0, // no score
+                             0, // no ocg
+                             NULL,
+                             0, // explicity suppress parallel
+                             0,
+                             0,
+                             int_TREE_X,
+                             0,
+                             kdt_extern_X,
+                             NULL, NULL, NULL,
+                             matrix_X_unordered_train,
+                             matrix_X_ordered_train,
+                             matrix_X_continuous_train,
+                             matrix_X_unordered_eval,
+                             matrix_X_ordered_eval,
+                             matrix_X_continuous_eval,
+                             NULL, // no ys
+                             NULL, // no weights
+                             NULL, // no sgn
+                             vector_scale_factor,
+                             1,matrix_bandwidth,matrix_bandwidth,lambda,
+                             num_categories,
+                             matrix_categorical_vals, // if dist mcv (possibly) necessary
+                             NULL, // no ocg
+                             pdf,  // weighted sum
+                             NULL, // no permutations
+                             NULL, // do not return kernel weights
+                             &gate_ctx_local); // no permutation kernel weights
 
   if((BANDWIDTH_den == BW_FIXED) && (dop == OP_NORMAL)){
     for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){      
@@ -18915,6 +19055,14 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   free(kernel_o);
   free(lambda);
   free_mat(matrix_bandwidth, num_reg_continuous);
+  if(gate_override_active) np_gate_ctx_clear(&gate_ctx_local);
+  if(ov_cont_ok != NULL) free(ov_cont_ok);
+  if(ov_cont_hmin != NULL) free(ov_cont_hmin);
+  if(ov_cont_k0 != NULL) free(ov_cont_k0);
+  if(ov_disc_uno_ok != NULL) free(ov_disc_uno_ok);
+  if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
+  if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
+  if(ov_disc_ord_const != NULL) free(ov_disc_ord_const);
 
 }
 

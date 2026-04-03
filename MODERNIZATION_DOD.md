@@ -80,6 +80,11 @@ Completed/accepted in live `np-npRmpi`:
    - `lc` estimator-side large-`h` handling is complete and validated across serial-source-of-truth porting and MPI route proof,
    - canonical `ll/lp` estimator-side large-`h` handling is complete and validated across session, attach, and profile/manual-broadcast route proof,
    - higher-degree or alternate-basis `lp` large-`h` work remains outside this accepted tranche.
+5. `npudens`:
+   - estimator-side large-`h` handling is now complete and validated in live `np-npRmpi`.
+6. `npudist`:
+   - remains open future work,
+   - beneficiary diagnostics showed the estimator-side `OP_INTEGRAL` route still needs a dedicated follow-on before live promotion.
 
 ## Branch Readiness (2026-02-24)
 1. Technical risk for keeping this modernization tranche as the active `npRmpi` branch baseline is moderate/acceptable if standard gates keep running.
