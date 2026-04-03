@@ -164,8 +164,58 @@
 }
 
 .npRmpi_autodispatch_as_generic_call <- function(generic, mc) {
+  mc <- .npRmpi_autodispatch_expand_dots_call(mc)
   args <- as.list(mc)[-1L]
   as.call(c(list(as.name(generic)), args))
+}
+
+.npRmpi_autodispatch_expand_dots_call <- function(mc) {
+  if (!is.call(mc) || length(mc) < 2L)
+    return(mc)
+
+  head <- mc[[1L]]
+  args <- as.list(mc)[-1L]
+  arg.names <- names(args)
+
+  if (is.null(arg.names) || !any(arg.names == "..."))
+    return(mc)
+
+  out.args <- list()
+  out.names <- character(0)
+
+  append_arg <- function(val, nm) {
+    out.args[[length(out.args) + 1L]] <<- val
+    out.names[[length(out.names) + 1L]] <<- if (is.null(nm)) "" else nm
+  }
+
+  for (i in seq_along(args)) {
+    nm <- arg.names[[i]]
+    val <- args[[i]]
+
+    dots.like <- identical(nm, "...") && (
+      is.pairlist(val) ||
+      is.list(val) ||
+      (is.call(val) &&
+         length(val) >= 1L &&
+         is.symbol(val[[1L]]) &&
+         as.character(val[[1L]]) %in% c("pairlist", "list"))
+    )
+
+    if (dots.like) {
+      dot.args <- if (is.call(val)) as.list(val)[-1L] else as.list(val)
+      dot.names <- names(dot.args)
+      if (!length(dot.args))
+        next
+      for (j in seq_along(dot.args))
+        append_arg(dot.args[[j]], if (is.null(dot.names)) "" else dot.names[[j]])
+      next
+    }
+
+    append_arg(val, nm)
+  }
+
+  names(out.args) <- out.names
+  as.call(c(list(head), out.args))
 }
 
 .npRmpi_autodispatch_active <- function() {
@@ -1375,6 +1425,7 @@
 }
 
 .npRmpi_autodispatch_materialize_call <- function(mc, caller_env, comm = 1L) {
+  mc <- .npRmpi_autodispatch_expand_dots_call(mc)
   arg.list <- as.list(mc)
   nms <- names(arg.list)
   targets <- .npRmpi_autodispatch_target_args()
@@ -1672,6 +1723,7 @@
                                           caller_env = parent.frame(),
                                           comm = 1L,
                                           warn_nested = FALSE) {
+  mc <- .npRmpi_autodispatch_expand_dots_call(mc)
   t.start <- proc.time()
   start.wall <- Sys.time()
   comm.elapsed <- 0.0

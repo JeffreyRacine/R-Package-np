@@ -98,3 +98,82 @@ test_that("autodispatch materialization preserves explicit NULL arguments withou
   expect_identical(prepared$tmpvals[[remin.ref]], FALSE)
   expect_identical(prepared$tmpvals[[itmax.ref]], 1L)
 })
+
+test_that("autodispatch helpers leave calls without deferred dots unchanged", {
+  genericize <- getFromNamespace(".npRmpi_autodispatch_as_generic_call", "npRmpi")
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  xdat <- data.frame(x = 1:3)
+  ydat <- c(1, 2, 3)
+  bws <- 0
+  mc <- quote(npregbw.NULL(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws,
+    regtype = "lc",
+    bwmethod = "cv.ls"
+  ))
+
+  rebuilt <- genericize("npregbw", mc)
+  expect_identical(rebuilt, quote(npregbw(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws,
+    regtype = "lc",
+    bwmethod = "cv.ls"
+  )))
+
+  prepared <- materialize(mc = rebuilt, caller_env = environment(), comm = 1L)
+  call.args <- as.list(prepared$call)[-1L]
+
+  expect_false("..." %in% names(call.args))
+  expect_true(all(c("xdat", "ydat", "bws", "regtype", "bwmethod") %in% names(call.args)))
+  expect_identical(prepared$tmpvals[[as.character(prepared$call$regtype)]], "lc")
+  expect_identical(prepared$call$bwmethod, "cv.ls")
+})
+
+test_that("autodispatch generic-call rebuild expands deferred dots from method match.call", {
+  genericize <- getFromNamespace(".npRmpi_autodispatch_as_generic_call", "npRmpi")
+
+  mc <- quote(npregbw.NULL(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws,
+    ... = pairlist(regtype = "ll", bwmethod = "cv.aic")
+  ))
+
+  rebuilt <- genericize("npregbw", mc)
+  rebuilt.args <- as.list(rebuilt)[-1L]
+
+  expect_identical(as.character(rebuilt[[1L]]), "npregbw")
+  expect_true(all(c("xdat", "ydat", "bws", "regtype", "bwmethod") %in% names(rebuilt.args)))
+  expect_false("..." %in% names(rebuilt.args))
+  expect_identical(rebuilt.args$regtype, "ll")
+  expect_identical(rebuilt.args$bwmethod, "cv.aic")
+})
+
+test_that("autodispatch materialization expands deferred dots before shipping attach calls", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  xdat <- data.frame(x1 = 1:3, x2 = 4:6)
+  ydat <- c(0, 1, 0)
+  bws <- 0
+  mc <- quote(npindexbw.NULL(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws,
+    ... = pairlist(method = "kleinspady", regtype = "ll")
+  ))
+
+  prepared <- materialize(mc = mc, caller_env = environment(), comm = 1L)
+  call.args <- as.list(prepared$call)[-1L]
+
+  expect_true(all(c("xdat", "ydat", "bws", "method", "regtype") %in% names(call.args)))
+  expect_false("..." %in% names(call.args))
+
+  method.ref <- as.character(prepared$call$method)
+  regtype.ref <- as.character(prepared$call$regtype)
+
+  expect_identical(prepared$tmpvals[[method.ref]], "kleinspady")
+  expect_identical(prepared$tmpvals[[regtype.ref]], "ll")
+})
