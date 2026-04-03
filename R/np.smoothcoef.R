@@ -560,6 +560,9 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     local_npksum <- function(args) {
       .npRmpi_with_local_regression(do.call(npksum, args))
     }
+    lp1_local_npksum <- function(...) {
+      local_npksum(list(...))
+    }
 
     lc_moments <- function(z.eval, leave.one.out.eval, u2 = NULL) {
       yW.local <- cbind(tydat, W.train)
@@ -612,11 +615,19 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
 
     do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex && identical(reg.engine, "lc"))
     gate.zdat <- if (miss.ex) tzdat else rbind(tzdat, ezdat)
-    fast.largeh <- identical(reg.engine, "lc") &&
+    fast.largeh.lc <- identical(reg.engine, "lc") &&
       !leave.one.out &&
       identical(bws$type, "fixed") &&
       !do.iterate &&
       .npscoefbw_fast_eligible(bws, eval.zdat = gate.zdat)
+    fast.largeh.lp1 <- identical(reg.engine, "lp") &&
+      !leave.one.out &&
+      identical(bws$type, "fixed") &&
+      identical(spec$basis.engine, "glp") &&
+      !isTRUE(spec$bernstein.basis.engine) &&
+      all(as.integer(spec$degree.engine) == 1L) &&
+      .npscoefbw_fast_eligible(bws, eval.zdat = gate.zdat)
+    fast.largeh <- fast.largeh.lc || fast.largeh.lp1
 
     lc_fast_global_moments <- function(z.eval.one, u2 = NULL) {
       yW.local <- cbind(tydat, W.train)
@@ -691,7 +702,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     }
 
     moments <- NULL
-    if (fast.largeh) {
+    if (fast.largeh.lc) {
       eval.z.one <- if (miss.ex) tzdat[1L, , drop = FALSE] else ezdat[1L, , drop = FALSE]
       fast.eval <- lc_fast_global_moments(z.eval.one = eval.z.one)
       fast.solve <- solve_single_moment_system(
@@ -701,6 +712,20 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       coef.vec <- fast.solve$coef
       coef.mat <- matrix(coef.vec, nrow = length(coef.vec), ncol = enrow)
       ridge <- rep.int(fast.solve$ridge, enrow)
+    } else if (fast.largeh.lp1) {
+      fast.eval <- .npscoef_lp1_largeh_global_fit(
+        bws = bws,
+        tzdat = tzdat,
+        ezdat = if (miss.ex) tzdat else ezdat,
+        W.train = W.train,
+        tydat = tydat,
+        leave.one.out = leave.one.out,
+        where = "npscoef",
+        solver = solve_single_moment_system,
+        ksum_fun = lp1_local_npksum
+      )
+      coef.mat <- fast.eval$coef
+      ridge <- rep.int(fast.eval$ridge, enrow)
     } else if (identical(reg.engine, "lc")) {
       moments <- lc_moments(
         z.eval = if (miss.ex) NULL else ezdat,
@@ -780,7 +805,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
 
     if (errors || (residuals && miss.ex)) {
       if (errors) {
-        if (fast.largeh) {
+        if (fast.largeh.lc) {
           if (miss.ex) {
             train.solve <- fast.solve
             mean.fit <- mean
@@ -805,6 +830,51 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
             vcv.beta.fast <- cm.fast %*% s.fast %*% cm.fast
             merr <- sqrt(pmax(rowSums((W %*% vcv.beta.fast) * W), 0.0))
             beta.se[] <- rep(sqrt(pmax(diag(vcv.beta.fast), 0.0)), each = enrow)
+          }
+        } else if (fast.largeh.lp1) {
+          if (miss.ex) {
+            train.fast <- fast.eval
+            mean.fit <- mean
+          } else {
+            train.fast <- .npscoef_lp1_largeh_global_fit(
+              bws = bws,
+              tzdat = tzdat,
+              ezdat = tzdat,
+              W.train = W.train,
+              tydat = tydat,
+              leave.one.out = leave.one.out,
+              where = "npscoef",
+              solver = solve_single_moment_system,
+              ksum_fun = lp1_local_npksum
+            )
+            mean.fit <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop = FALSE] %*% train.fast$coef[,i] })
+          }
+          resid <- tydat - mean.fit
+          u2.W <- resid^2
+          s.fast <- .npscoef_lp1_largeh_global_fit(
+            bws = bws,
+            tzdat = tzdat,
+            ezdat = if (miss.ex) tzdat else ezdat,
+            W.train = W.train,
+            tydat = tydat,
+            u2 = u2.W,
+            leave.one.out = leave.one.out,
+            where = "npscoef",
+            solver = solve_single_moment_system,
+            ksum_fun = lp1_local_npksum
+          )$s
+          cm.fast <- safe_chol2inv(fast.eval$tww, fast.eval$ridge, 1.0 / nrow(txdat))
+          merr <- rep(NA_real_, enrow)
+          beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
+          if (!is.null(cm.fast)) {
+            vcv.theta.fast <- cm.fast %*% s.fast %*% cm.fast
+            for (i in seq_len(enrow)) {
+              trans.i <- kronecker(diag(ncol(W)), matrix(fast.eval$lp_state$W.eval[i,], nrow = 1L))
+              vcv.beta.fast <- trans.i %*% vcv.theta.fast %*% t(trans.i)
+              w.i <- W[i,, drop = FALSE]
+              merr[i] <- sqrt(max(drop(w.i %*% vcv.beta.fast %*% t(w.i)), 0.0))
+              beta.se[i,] <- sqrt(pmax(diag(vcv.beta.fast), 0.0))
+            }
           }
         } else if (miss.ex && !do.iterate) {
           mean.fit <- mean

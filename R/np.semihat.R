@@ -759,6 +759,84 @@
   do.call(cbind, lapply(seq_len(ncol(X)), function(j) Z * X[, j]))
 }
 
+.npscoef_lp1_largeh_global_fit <- function(bws,
+                                           tzdat,
+                                           ezdat,
+                                           W.train,
+                                           tydat,
+                                           u2 = NULL,
+                                           leave.one.out = FALSE,
+                                           where = "npscoef",
+                                           solver,
+                                           ksum_fun = npksum) {
+  if (missing(solver) || !is.function(solver))
+    stop("LP1 large-h global fit requires a solver function", call. = FALSE)
+  if (!is.function(ksum_fun))
+    stop("LP1 large-h global fit requires a ksum function", call. = FALSE)
+
+  lp_state <- .npscoef_lp_state(
+    bws = bws,
+    tzdat = tzdat,
+    ezdat = ezdat,
+    leave.one.out = leave.one.out,
+    where = where
+  )
+  spec <- lp_state$spec
+  if (!identical(spec$regtype.engine, "lp") ||
+      !identical(spec$basis.engine, "glp") ||
+      isTRUE(spec$bernstein.basis.engine) ||
+      any(as.integer(spec$degree.engine) != 1L)) {
+    stop("LP1 large-h global fit called outside canonical degree-1 raw glp regime",
+         call. = FALSE)
+  }
+
+  tensor.train <- .npscoef_row_tensor_design(W.train, lp_state$W.train)
+  z.eval.one <- lp_state$z.eval[1L, , drop = FALSE]
+
+  ytensor <- cbind(tydat, tensor.train)
+  main.ks <- ksum_fun(
+    txdat = lp_state$z.train,
+    tydat = ytensor,
+    weights = ytensor,
+    exdat = z.eval.one,
+    bws = lp_state$rbw,
+    bandwidth.divide = TRUE
+  )$ksum
+  tyw <- as.double(main.ks[-1L, 1L, 1L])
+  tww <- main.ks[-1L, -1L, 1L, drop = TRUE]
+
+  solve.out <- solver(tyw, tww)
+  theta <- as.double(solve.out$coef)
+  theta.mat <- matrix(theta,
+                      nrow = ncol(lp_state$W.eval),
+                      ncol = ncol(W.train))
+  coef <- t(lp_state$W.eval %*% theta.mat)
+
+  out <- list(
+    lp_state = lp_state,
+    coef = coef,
+    theta = theta,
+    ridge = solve.out$ridge,
+    tww = tww
+  )
+
+  if (!is.null(u2)) {
+    out$s <- ksum_fun(
+      txdat = lp_state$z.train,
+      tydat = tensor.train,
+      weights = tensor.train * as.double(u2),
+      exdat = z.eval.one,
+      bws = lp_state$rbw,
+      bandwidth.divide = TRUE,
+      kernel.pow = 2
+    )$ksum[, , 1L, drop = TRUE]
+  } else {
+    out$s <- NULL
+  }
+
+  out
+}
+
 .npscoef_effective_weight_state <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
   state <- .npscoef_lp_state(
     bws = bws,

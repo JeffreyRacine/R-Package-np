@@ -63,8 +63,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 4. Remaining highest-priority near-term work:
    - doc/codoc triage for pre-existing `man/*.Rd` drift,
    - win-builder closure before release candidate,
-   - optional performance-governance backfills and mode-specific perf characterization where ROI warrants,
-   - `npscoef` canonical `ll/lp` estimator-side large-`h` port remains future work after tmp-only serial rehearsal rejected unaffected-route regressions.
+   - optional performance-governance backfills and mode-specific perf characterization where ROI warrants.
 
 ## Large-H Estimator Port Status (2026-04-03)
 Completed/accepted in live `np-npRmpi`:
@@ -79,7 +78,8 @@ Completed/accepted in live `np-npRmpi`:
    - large-`h` status is complete by inheritance through child `npreg` fits; no separate estimator splice was required.
 4. `npscoef`:
    - `lc` estimator-side large-`h` handling is complete and validated across serial-source-of-truth porting and MPI route proof,
-   - canonical `ll/lp` remains deferred future work; no live `ll/lp` port was accepted.
+   - canonical `ll/lp` estimator-side large-`h` handling is complete and validated across session, attach, and profile/manual-broadcast route proof,
+   - higher-degree or alternate-basis `lp` large-`h` work remains outside this accepted tranche.
 
 ## Branch Readiness (2026-02-24)
 1. Technical risk for keeping this modernization tranche as the active `npRmpi` branch baseline is moderate/acceptable if standard gates keep running.
