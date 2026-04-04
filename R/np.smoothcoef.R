@@ -120,6 +120,22 @@ npscoef.call <-
     do.call(npscoef, c(call.args, list(...)))
   }
 
+.np_scoef_fit_progress_begin <- function(handoff = FALSE, detail = NULL) {
+  state <- .np_progress_begin(
+    "Fitting smooth coefficient model",
+    surface = "bandwidth"
+  )
+
+  if (isTRUE(handoff)) {
+    state <- .np_progress_show_now(
+      state = state,
+      detail = detail
+    )
+  }
+
+  state
+}
+
 npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   sc <- sys.call()
   sc.names <- names(sc)
@@ -214,6 +230,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       call.args <- c(call.args, list(tzdat))
     }
   }
+  if (!has.explicit.bws)
+    call.args$.np_fit_progress_handoff <- TRUE
   do.call(npscoef, c(call.args, list(...)))
 
 }
@@ -250,6 +268,34 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     maxiter <- as.integer(maxiter)
     tol <- as.double(tol)
     regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+    dots <- list(...)
+    fit.progress.allow <- !isFALSE(dots$.np_fit_progress_allow) &&
+      isTRUE(.np_progress_enabled(domain = "bandwidth"))
+    fit.progress.handoff <- fit.progress.allow && isTRUE(dots$.np_fit_progress_handoff)
+    fit.progress <- NULL
+    fit.progress.active <- FALSE
+    fit.progress.step <- NULL
+    if (isTRUE(fit.progress.allow)) {
+      fit.progress <- .np_scoef_fit_progress_begin(
+        handoff = fit.progress.handoff,
+        detail = if (fit.progress.handoff) "building moments" else NULL
+      )
+      fit.progress.active <- TRUE
+      fit.progress.counter <- 0L
+      fit.progress.step <- function(detail) {
+        fit.progress.counter <<- fit.progress.counter + 1L
+        fit.progress <<- .np_progress_step(
+          fit.progress,
+          done = fit.progress.counter,
+          detail = detail
+        )
+        invisible(NULL)
+      }
+      on.exit({
+        if (isTRUE(fit.progress.active))
+          .np_progress_abort(fit.progress)
+      }, add = TRUE)
+    }
 
     miss.z <- missing(tzdat) || is.null(tzdat)
 
@@ -450,7 +496,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       NULL
     }
 
-    solve_moment_system <- function(tyw, tww, W.eval.design, Wz.eval = NULL) {
+    solve_moment_system <- function(tyw, tww, W.eval.design, Wz.eval = NULL, progress_detail = NULL) {
       neval.local <- ncol(tyw)
       ncoef <- nrow(tyw)
       pcoef <- ncol(W.eval.design)
@@ -497,6 +543,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
               matrix(theta.ii, nrow = ncol(Wz.eval), ncol = pcoef)
             ))
           }
+          if (!is.null(fit.progress.step))
+            fit.progress.step(progress_detail)
         }
       }
 
@@ -677,10 +725,14 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     if (fast.largeh.lc) {
       eval.z.one <- if (miss.ex) tzdat[1L, , drop = FALSE] else ezdat[1L, , drop = FALSE]
       fast.eval <- lc_fast_global_moments(z.eval.one = eval.z.one)
+      if (!is.null(fit.progress.step))
+        fit.progress.step("solving global coefficients")
       fast.solve <- solve_single_moment_system(
         tyw.vec = fast.eval$tyw,
         tww.mat = fast.eval$tww
       )
+      if (!is.null(fit.progress.step))
+        fit.progress.step("assembling fitted values")
       coef.vec <- fast.solve$coef
       coef.mat <- matrix(coef.vec, nrow = length(coef.vec), ncol = enrow)
       ridge <- rep.int(fast.solve$ridge, enrow)
@@ -695,6 +747,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         where = "npscoef",
         solver = solve_single_moment_system
       )
+      if (!is.null(fit.progress.step))
+        fit.progress.step("solving global coefficients")
       coef.mat <- fast.eval$coef
       ridge <- rep.int(fast.eval$ridge, enrow)
     } else if (identical(reg.engine, "lc")) {
@@ -705,7 +759,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       solver <- solve_moment_system(
         tyw = moments$tyw,
         tww = moments$tww,
-        W.eval.design = W
+        W.eval.design = W,
+        progress_detail = "solving coefficient rows"
       )
     } else {
       moments <- lp_tensor_moments(lp_state)
@@ -713,7 +768,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         tyw = moments$tyw,
         tww = moments$tww,
         W.eval.design = W,
-        Wz.eval = lp_state$W.eval
+        Wz.eval = lp_state$W.eval,
+        progress_detail = "solving coefficient rows"
       )
     }
 
@@ -751,6 +807,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
 
           ## estimate new full residuals
           resid <- partial - W[,j] * coef.mat[j,]
+          if (!is.null(fit.progress.step))
+            fit.progress.step(sprintf("backfit cycle %d partial %d/%d", i, j, n.part))
           ## repeat for consistency ?
         }
         max.err <- max(abs(resid.old - resid)/aydat)
@@ -798,6 +856,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
             z.eval.one = if (miss.ex) tzdat[1L, , drop = FALSE] else ezdat[1L, , drop = FALSE],
             u2 = u2.W
           )$s
+          if (!is.null(fit.progress.step))
+            fit.progress.step("estimating standard errors")
           cm.fast <- safe_chol2inv(fast.eval$tww, fast.solve$ridge, 1.0 / nrow(txdat))
           merr <- rep(NA_real_, enrow)
           beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
@@ -836,6 +896,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
             where = "npscoef",
             solver = solve_single_moment_system
           )$s
+          if (!is.null(fit.progress.step))
+            fit.progress.step("estimating standard errors")
           cm.fast <- safe_chol2inv(fast.eval$tww, fast.eval$ridge, 1.0 / nrow(txdat))
           merr <- rep(NA_real_, enrow)
           beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
@@ -923,6 +985,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         w.i <- W[i,,drop=FALSE]
         merr[i] <- sqrt(max(drop(w.i %*% vcv.beta %*% t(w.i)), 0.0))
         beta.se[i,] <- sqrt(pmax(diag(vcv.beta), 0.0))
+        if (!is.null(fit.progress.step))
+          fit.progress.step("estimating standard errors")
       }
 
     }
@@ -959,6 +1023,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     ev$fit.time <- fit.elapsed
     ev$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
     ev$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
+    if (isTRUE(fit.progress.active)) {
+      fit.progress <- .np_progress_end(fit.progress)
+      fit.progress.active <- FALSE
+    }
     ev
 
   }

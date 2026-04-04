@@ -698,7 +698,8 @@ npscoefbw.scbandwidth <-
             bws = bws, txdat = xdat, tydat = ydat,
             leave.one.out = TRUE, iterate = TRUE,
             maxiter = backfit.maxiter, tol = backfit.tol,
-            betas = TRUE
+            betas = TRUE,
+            .np_fit_progress_allow = FALSE
           )
           if (!miss.z)
             scoef.loo.args$tzdat <- zdat
@@ -858,7 +859,14 @@ npscoefbw.scbandwidth <-
             bws$bw.fitted <- matrix(data = bws$bw, nrow = length(bws$bw), ncol = n.part)
             ## obtain matrix of alpha.hat | h0 and beta.hat | h0
 
-            scoef.args <- list(bws = bws, txdat = xdat, tydat = ydat, iterate = FALSE, betas = TRUE)
+            scoef.args <- list(
+              bws = bws,
+              txdat = xdat,
+              tydat = ydat,
+              iterate = FALSE,
+              betas = TRUE,
+              .np_fit_progress_allow = FALSE
+            )
             if (!miss.z)
               scoef.args$tzdat <- zdat
             scoef <- do.call(npscoef, scoef.args)
@@ -895,7 +903,8 @@ npscoefbw.scbandwidth <-
                   scoef.args <- list(
                     bws = bws, txdat = xdat, tydat = ydat,
                     iterate = TRUE, maxiter = backfit.maxiter,
-                    tol = backfit.tol, betas = TRUE
+                    tol = backfit.tol, betas = TRUE,
+                    .np_fit_progress_allow = FALSE
                   )
                   if (!miss.z)
                     scoef.args$tzdat <- zdat
@@ -934,7 +943,8 @@ npscoefbw.scbandwidth <-
             scoef.loo.args <- list(
               bws = bws, txdat = xdat, tydat = ydat,
               iterate = TRUE, maxiter = backfit.maxiter,
-              tol = backfit.tol, leave.one.out = TRUE
+              tol = backfit.tol, leave.one.out = TRUE,
+              .np_fit_progress_allow = FALSE
             )
             if (!miss.z)
               scoef.loo.args$tzdat <- zdat
@@ -1181,7 +1191,8 @@ npscoefbw.scbandwidth <-
       leave.one.out = TRUE,
       iterate = FALSE,
       betas = FALSE,
-      errors = FALSE
+      errors = FALSE,
+      .np_fit_progress_allow = FALSE
     ),
     error = function(e) e
   )
