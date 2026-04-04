@@ -347,6 +347,27 @@ npValidateScalarLogical <- function(value, argname) {
   bws <- .npRmpi_reconcile_nomad_bws_timing(bws)
   result$bws <- .npRmpi_reconcile_nomad_bws_timing(result$bws)
 
+  # Fit objects should preserve the selected bandwidth object's telemetry and labels.
+  bandwidth.metadata.fields <- c(
+    "method",
+    "pmethod",
+    "fval",
+    "ifval",
+    "num.feval",
+    "num.feval.fast",
+    "fval.history",
+    "eval.history",
+    "invalid.history",
+    "timing",
+    "timing.profile",
+    "degree.search",
+    "nomad.shortcut"
+  )
+  for (field in bandwidth.metadata.fields) {
+    if (!is.null(bws[[field]]))
+      result$bws[[field]] <- bws[[field]]
+  }
+
   if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time))
     result$nomad.time <- as.double(bws$nomad.time)
 
@@ -379,12 +400,6 @@ npValidateScalarLogical <- function(value, argname) {
     result$bws$total.time <- as.double(bws$total.time)
 
   result$bws <- .npRmpi_reconcile_nomad_bws_timing(result$bws)
-
-  if (is.null(result$bws$degree.search) && is.list(bws$degree.search))
-    result$bws$degree.search <- bws$degree.search
-
-  if (is.null(result$bws$nomad.shortcut) && is.list(bws$nomad.shortcut))
-    result$bws$nomad.shortcut <- bws$nomad.shortcut
 
   result
 }

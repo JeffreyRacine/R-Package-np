@@ -1738,7 +1738,7 @@ SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
 {
   SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   int i;
-  double val, fast = 0.0;
+  double val, fast = 0.0, fast_before = 0.0;
   int degree_ok;
   int bw_ok;
 
@@ -1809,8 +1809,11 @@ SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     return out;
   }
 
+  fast_before = np_fastcv_alllarge_hits_get();
   val = bwmfunc_wrapper(np_regression_nomad_shadow.vector_scale_factor);
-  fast = bwm_fast_eval_count;
+  fast = np_fastcv_alllarge_hits_get() - fast_before;
+  if (fast < 0.0)
+    fast = 0.0;
   if (comm[1] != MPI_COMM_NULL)
     MPI_Bcast(&val, 1, MPI_DOUBLE, 0, comm[1]);
   if (comm[1] != MPI_COMM_NULL)
@@ -2747,7 +2750,7 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
 {
   SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   int i;
-  double val, fast = 0.0;
+  double val, fast = 0.0, fast_before = 0.0;
 
   if (!np_conditional_density_nomad_shadow.active)
     error("resident npcdens NOMAD shadow state is not active");
@@ -2783,8 +2786,11 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     bwm_penalty_mode = 0;
     bwm_penalty_value = DBL_MAX;
   }
+  fast_before = np_fastcv_alllarge_hits_get();
   val = bwmfunc_wrapper(np_conditional_density_nomad_shadow.vector_scale_factor);
-  fast = bwm_fast_eval_count;
+  fast = np_fastcv_alllarge_hits_get() - fast_before;
+  if (fast < 0.0)
+    fast = 0.0;
 
   if ((!R_FINITE(val) || val == DBL_MAX) &&
       np_conditional_density_nomad_shadow.penalty_mode == 1) {
