@@ -128,6 +128,28 @@ npplreg.call <-
             bws = bws, ...)
   }
 
+.np_plreg_fit_progress_targets <- function(xnames) {
+  c("y~z", sprintf("%s~z", xnames))
+}
+
+.np_plreg_fit_progress_begin <- function(xnames, handoff = FALSE) {
+  state <- .np_progress_begin(
+    "Fitting partially linear regression",
+    total = length(.np_plreg_fit_progress_targets(xnames)),
+    surface = "bandwidth"
+  )
+
+  if (isTRUE(handoff)) {
+    state <- .np_progress_show_now(
+      state = state,
+      done = 0L,
+      detail = paste("starting", .np_plreg_fit_progress_targets(xnames)[1L])
+    )
+  }
+
+  state
+}
+
 .np_plot_plreg_local_fit <-
   function(bws,
            xdat,
@@ -273,8 +295,15 @@ npplreg.plbandwidth <-
 
     fit.start <- proc.time()[3]
     residuals <- npValidateScalarLogical(residuals, "residuals")
+    dots <- list(...)
+    fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     .npRmpi_require_active_slave_pool(where = "npplreg()")
-    if (.npRmpi_autodispatch_active() &&
+    use.master.fit.progress <- .npRmpi_autodispatch_active() &&
+      is.null(bws$degree.search) &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      isTRUE(.np_progress_enabled(domain = "bandwidth"))
+    if (!use.master.fit.progress &&
+        .npRmpi_autodispatch_active() &&
         is.null(bws$degree.search) &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
       result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
@@ -358,6 +387,21 @@ npplreg.plbandwidth <-
     B = double(ncol)
     resx = matrix(data = 0, nrow = nrow, ncol = ncol)
     resx.eval = matrix(data = 0, nrow = nrow.eval, ncol = ncol)
+    fit.progress.targets <- .np_plreg_fit_progress_targets(names(txdat))
+    fit.progress <- .np_plreg_fit_progress_begin(
+      xnames = names(txdat),
+      handoff = fit.progress.handoff
+    )
+    fit.progress.active <- TRUE
+    on.exit({
+      if (isTRUE(fit.progress.active))
+        .np_progress_abort(fit.progress)
+    }, add = TRUE)
+    fit.progress <- .np_progress_step(
+      fit.progress,
+      done = 1L,
+      detail = fit.progress.targets[1L]
+    )
 
     for (i in seq_len(ncol)) {
       mm = npreg(txdat=tzdat, tydat=txdat[,i], bws = bws$bw[[i+1]])
@@ -379,6 +423,12 @@ npplreg.plbandwidth <-
           resx.eval[,i] <- exdat[,i] - mm$mean
         }
       }
+
+      fit.progress <- .np_progress_step(
+        fit.progress,
+        done = i + 1L,
+        detail = fit.progress.targets[i + 1L]
+      )
     }
 
     B = coef((model = lm(resy ~ resx - 1)))
@@ -440,6 +490,8 @@ npplreg.plbandwidth <-
     
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
+    fit.progress <- .np_progress_end(fit.progress)
+    fit.progress.active <- FALSE
     return(ev)
   }
 
@@ -543,5 +595,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       call.args <- c(call.args, list(tzdat))
     }
   }
+  if (!has.explicit.bws)
+    call.args$.np_fit_progress_handoff <- TRUE
   do.call(npplreg, c(call.args, list(...)))
 }
