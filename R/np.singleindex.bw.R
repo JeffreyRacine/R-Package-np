@@ -606,8 +606,6 @@ npindexbw.NULL <-
       }
     }
 
-    direct.payload$num.feval <- as.numeric(nomad.num.feval.total)
-    direct.payload$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
