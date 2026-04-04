@@ -5200,6 +5200,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     KERNEL_ordered_reg_np[l - (num_reg_continuous + num_reg_unordered)] = KERNEL_ordered_reg[l - (num_reg_continuous + num_reg_unordered)] + OP_OFUN_OFFSETS[operator[l]];
 
   const int num_xt = is_adaptive?num_obs_eval:num_obs_train;
+  const int progress_total = is_adaptive ? num_obs_train : num_obs_eval;
   const int ws_step = is_adaptive? 0 :
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
 
@@ -6401,6 +6402,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
               tprod_mp[ii*num_xt + i];
       }
     }
+
+    np_progress_fit_loop_step(j + 1, progress_total);
     
   }
 
@@ -20004,6 +20007,7 @@ double * log_likelihood
                         NULL, NULL, NULL);
 
   // xy
+  np_progress_fit_set_offset(0);
   np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cXY,
                          kernel_uXY,
@@ -20057,6 +20061,7 @@ double * log_likelihood
   //x - we assume x is in xy tree order
   //  - we also reuse kernels and operators because we can
 
+  np_progress_fit_set_offset((BANDWIDTH_den == BW_ADAP_NN) ? num_obs_train : num_obs_eval);
   np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cXY,
                          kernel_uXY,

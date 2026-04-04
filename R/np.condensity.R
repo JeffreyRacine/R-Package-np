@@ -87,7 +87,9 @@ npcdens.conbandwidth <- function(bws,
                                  proper.control = list(),
                                  ...){
 
+  dots <- list(...)
   fit.start <- proc.time()[3]
+  fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
   gradients <- npValidateScalarLogical(gradients, "gradients")
   proper.args <- .np_condens_validate_proper_args(
     proper = proper,
@@ -324,8 +326,12 @@ npcdens.conbandwidth <- function(bws,
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
-  
-  myout <-
+
+  myout <- .np_with_compiled_fit_progress(
+    label = "Fitting conditional density",
+    total = .np_condensdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
+    handoff = fit.progress.handoff,
+    handoff.detail = if (fit.progress.handoff) "starting" else NULL,
     .Call("C_np_density_conditional",
           as.double(tyuno), as.double(tyord), as.double(tycon),
           as.double(txuno), as.double(txord), as.double(txcon),
@@ -349,6 +355,7 @@ npcdens.conbandwidth <- function(bws,
           as.integer(bernstein.engine),
           basis.code,
           PACKAGE = "np")
+  )
 
   if(gradients){
     myout$congrad = matrix(data=myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE) 
@@ -474,5 +481,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       call.args <- c(call.args, list(tydat))
     }
   }
+  if (!has.explicit.bws)
+    call.args$.np_fit_progress_handoff <- TRUE
   do.call(npcdens, c(call.args, list(...)))
 }

@@ -418,6 +418,57 @@ test_that("compiled progress bridge feeds unknown-total bandwidth activity updat
   expect_true(any(grepl("^\\[np\\] Selecting conditional density bandwidth\\.\\.\\. iteration 128, elapsed [0-9]+\\.[0-9]s$", lines)))
 })
 
+test_that("compiled progress bridge feeds fit updates on the bandwidth surface", {
+  fit_begin <- getFromNamespace(".np_fit_progress_begin", "np")
+  fit_finish <- getFromNamespace(".np_fit_progress_finish", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.known.sec = 0,
+    np.progress.interval.known.sec = 0
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      fit_begin("Fitting density", total = 3L, handoff = TRUE, detail = "starting")
+      .Call(
+        "C_np_progress_signal",
+        "fit_step",
+        "bandwidth",
+        1L,
+        3L,
+        PACKAGE = "np"
+      )
+      .Call(
+        "C_np_progress_signal",
+        "fit_step",
+        "bandwidth",
+        3L,
+        3L,
+        PACKAGE = "np"
+      )
+      fit_finish()
+    },
+    now = progress_time_values(c(0, 1.1, 2.2, 3.3, 4.4))
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+
+  expect_true(any(grepl(
+    "^\\[np\\] Fitting density 0/3 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    lines
+  )))
+  expect_true(any(grepl(
+    "^\\[np\\] Fitting density 1/3 \\([0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$",
+    lines
+  )))
+  expect_true(any(grepl(
+    "^\\[np\\] Fitting density 3/3 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    lines
+  )))
+})
+
 test_that("single-line fit drops detail before truncating", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 

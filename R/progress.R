@@ -120,6 +120,7 @@
   env$bandwidth_state <- NULL
   env$bandwidth_old_messages <- NULL
   env$bandwidth_context_label <- NULL
+  env$fit_state <- NULL
   env$iv_depth <- 0L
   env$iv_label <- NULL
   env$iv_state <- NULL
@@ -1519,6 +1520,148 @@
   invisible(NULL)
 }
 
+.np_fit_progress_begin <- function(label, total, handoff = FALSE, detail = NULL) {
+  total <- suppressWarnings(as.integer(total)[1L])
+  if (is.na(total) || total < 1L) {
+    .np_progress_runtime$fit_state <- NULL
+    return(invisible(NULL))
+  }
+
+  state <- .np_progress_begin(
+    label = label,
+    total = total,
+    domain = "bandwidth",
+    surface = "bandwidth"
+  )
+
+  if (isTRUE(handoff)) {
+    state <- .np_progress_show_now(
+      state = state,
+      done = 0L,
+      detail = detail
+    )
+  }
+
+  .np_progress_runtime$fit_state <- state
+  invisible(state)
+}
+
+.np_fit_progress_step <- function(done = NULL, detail = NULL) {
+  state <- .np_progress_runtime$fit_state
+
+  if (is.null(state)) {
+    return(invisible(NULL))
+  }
+
+  if (!is.null(done)) {
+    done <- suppressWarnings(as.integer(done)[1L])
+    if (is.na(done) || done < 1L) {
+      done <- NULL
+    }
+  }
+
+  .np_progress_runtime$fit_state <- .np_progress_step(
+    state = state,
+    done = done,
+    detail = detail
+  )
+
+  invisible(NULL)
+}
+
+.np_fit_progress_finish <- function(detail = NULL) {
+  state <- .np_progress_runtime$fit_state
+
+  if (is.null(state)) {
+    return(invisible(NULL))
+  }
+
+  .np_progress_end(state, detail = detail)
+  .np_progress_runtime$fit_state <- NULL
+  invisible(NULL)
+}
+
+.np_fit_progress_abort <- function(detail = NULL) {
+  state <- .np_progress_runtime$fit_state
+
+  if (is.null(state)) {
+    return(invisible(NULL))
+  }
+
+  .np_progress_abort(state, detail = detail)
+  .np_progress_runtime$fit_state <- NULL
+  invisible(NULL)
+}
+
+.np_with_compiled_fit_progress <- function(label, total, handoff = FALSE, handoff.detail = NULL, expr) {
+  total <- suppressWarnings(as.integer(total)[1L])
+  fit.progress.active <- FALSE
+  c.progress.active <- FALSE
+
+  on.exit({
+    if (isTRUE(c.progress.active)) {
+      .Call("C_np_progress_fit_end", PACKAGE = "np")
+      c.progress.active <- FALSE
+    }
+
+    if (isTRUE(fit.progress.active)) {
+      .np_fit_progress_abort()
+      fit.progress.active <- FALSE
+    }
+  }, add = TRUE)
+
+  if (isTRUE(.np_progress_enabled(domain = "bandwidth")) &&
+      !is.na(total) && total >= 1L) {
+    .np_fit_progress_begin(
+      label = label,
+      total = total,
+      handoff = handoff,
+      detail = handoff.detail
+    )
+    fit.progress.active <- TRUE
+    .Call("C_np_progress_fit_begin", total, PACKAGE = "np")
+    c.progress.active <- TRUE
+  }
+
+  value <- force(expr)
+
+  if (isTRUE(c.progress.active)) {
+    .Call("C_np_progress_fit_end", PACKAGE = "np")
+    c.progress.active <- FALSE
+  }
+
+  if (isTRUE(fit.progress.active)) {
+    .np_fit_progress_finish()
+    fit.progress.active <- FALSE
+  }
+
+  value
+}
+
+.np_densdist_fit_total <- function(bws, tnrow, enrow) {
+  if (identical(as.character(bws$type)[1L], "adaptive_nn")) {
+    as.integer(tnrow)
+  } else {
+    as.integer(enrow)
+  }
+}
+
+.np_condensdist_fit_total <- function(bws, tnrow, enrow) {
+  reg.engine <- if (is.null(bws$regtype.engine)) {
+    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  } else {
+    as.character(bws$regtype.engine)
+  }
+  base.total <- .np_densdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow)
+  lp.route <- identical(reg.engine, "lp") && isTRUE(bws$xncon > 0L)
+
+  if (isTRUE(lp.route)) {
+    as.integer(enrow)
+  } else {
+    as.integer(2L * base.total)
+  }
+}
+
 .np_progress_bandwidth_detail <- function(done, total) {
   NULL
 }
@@ -1719,6 +1862,11 @@
 
   if (identical(event, "bandwidth_activity_step") && identical(surface, "bandwidth")) {
     .np_progress_bandwidth_activity_step(done = current)
+    return(invisible(TRUE))
+  }
+
+  if (identical(event, "fit_step") && identical(surface, "bandwidth")) {
+    .np_fit_progress_step(done = current)
     return(invisible(TRUE))
   }
 

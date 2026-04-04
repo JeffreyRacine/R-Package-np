@@ -72,7 +72,9 @@ npudens.bandwidth <-
            tdat = stop("invoked without training data 'tdat'"),
            edat, ...){
 
+  dots <- list(...)
   fit.start <- proc.time()[3]
+  fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
 
   no.e = missing(edat)
 
@@ -175,8 +177,12 @@ npudens.bandwidth <-
       old.dens = FALSE,
       int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO)
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
-  
-  myout <-
+
+  myout <- .np_with_compiled_fit_progress(
+    label = "Fitting density",
+    total = .np_densdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
+    handoff = fit.progress.handoff,
+    handoff.detail = if (fit.progress.handoff) "starting" else NULL,
     .Call("C_np_density",
           as.double(tuno), as.double(tord), as.double(tcon),
           as.double(euno), as.double(eord), as.double(econ),
@@ -188,6 +194,7 @@ npudens.bandwidth <-
           as.double(cker.bounds.c$lb),
           as.double(cker.bounds.c$ub),
           PACKAGE = "np")
+  )
 
   ## For purely categorical density with zero bandwidths, the variance of
   ## the sample proportion is p(1-p)/n. The C routine returns p/n; fix here.
@@ -272,5 +279,7 @@ npudens.default <- function(bws, tdat, ...){
       call.args <- c(call.args, list(tdat))
     }
   }
+  if (!has.explicit.bws)
+    call.args$.np_fit_progress_handoff <- TRUE
   do.call(npudens, c(call.args, list(...)))
 }
