@@ -811,9 +811,25 @@
           if (!is.null(panel.ylim))
             plot.args$ylim <- panel.ylim
           plot.args$xlab <- scalar_default(xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
-          plot.args$ylab <- scalar_default(ylab, paste(
-            if (gradients) paste("Derivative order ", plot.gradient.order.label[i], " component ", i, " of", sep = "") else "",
-            gen.label(bws$ynames, "Conditional Mean")))
+          response.label <- gen.label(bws$ynames, "Conditional Mean")
+          predictor.label <- gen.label(bws$xnames[i], paste("X", i, sep = ""))
+          default.ylab <- if (gradients) {
+            if (xi.factor) {
+              paste("Delta", response.label, "/ Delta", predictor.label)
+            } else if (plot.gradient.order.label[i] > 1L) {
+              paste0("d^", plot.gradient.order.label[i], " ",
+                     response.label,
+                     " / d ",
+                     predictor.label,
+                     "^",
+                     plot.gradient.order.label[i])
+            } else {
+              paste("d", response.label, "/ d", predictor.label)
+            }
+          } else {
+            paste("", response.label)
+          }
+          plot.args$ylab <- scalar_default(ylab, default.ylab)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
             plot.args$lty <- scalar_default(lty, par()$lty)
@@ -1033,9 +1049,25 @@
             plot.args$y <- data.eval[,i]
           plot.args$ylim <- c(y.min, y.max)
           plot.args$xlab <- scalar_default(xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
-          plot.args$ylab <- scalar_default(ylab, paste(
-            if (gradients) paste("Derivative order ", plot.gradient.order.label[i], " component ", i, " of", sep = "") else "",
-            gen.label(bws$ynames, "Conditional Mean")))
+          response.label <- gen.label(bws$ynames, "Conditional Mean")
+          predictor.label <- gen.label(bws$xnames[i], paste("X", i, sep = ""))
+          default.ylab <- if (gradients) {
+            if (xi.factor) {
+              paste("Delta", response.label, "/ Delta", predictor.label)
+            } else if (plot.gradient.order.label[i] > 1L) {
+              paste0("d^", plot.gradient.order.label[i], " ",
+                     response.label,
+                     " / d ",
+                     predictor.label,
+                     "^",
+                     plot.gradient.order.label[i])
+            } else {
+              paste("d", response.label, "/ d", predictor.label)
+            }
+          } else {
+            paste("", response.label)
+          }
+          plot.args$ylab <- scalar_default(ylab, default.ylab)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
             plot.args$lty <- scalar_default(lty, par()$lty)
