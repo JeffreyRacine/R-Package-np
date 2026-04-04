@@ -124,6 +124,25 @@ npindex.call <-
             bws = bws, ...)
   }
 
+.np_index_regression_bandwidth <- function(index.df, ydat, bws, spec) {
+  bw.args <- list(
+    xdat = index.df,
+    ydat = ydat,
+    bws = bws$bw,
+    bandwidth.compute = FALSE,
+    bwtype = bws$type,
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    regtype = spec$regtype.engine
+  )
+  if (identical(spec$regtype.engine, "lp")) {
+    bw.args$basis <- spec$basis.engine
+    bw.args$degree <- spec$degree.engine
+    bw.args$bernstein.basis <- spec$bernstein.basis.engine
+  }
+  do.call(npregbw, bw.args)
+}
+
 npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
@@ -199,6 +218,8 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       call.args <- c(call.args, list(tydat))
     }
   }
+  if (no.bws || bws.formula || is.call(bws))
+    call.args$.np_fit_progress_handoff <- TRUE
   do.call(npindex, c(call.args, list(...)))
 }
 
@@ -214,6 +235,8 @@ npindex.sibandwidth <-
            residuals = FALSE, ...) {
 
     fit.start <- proc.time()[3]
+    dots <- list(...)
+    fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     errors <- npValidateScalarLogical(errors, "errors")
@@ -364,6 +387,33 @@ npindex.sibandwidth <-
       npreg.idx.args$degree <- spec$degree.engine
       npreg.idx.args$bernstein.basis <- spec$bernstein.basis.engine
     }
+    npreg.idx.bw <- if (identical(regtype, "lp")) {
+      .np_index_regression_bandwidth(
+        index.df = index.df,
+        ydat = tydat,
+        bws = bws,
+        spec = spec
+      )
+    } else {
+      NULL
+    }
+    next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE) {
+      args <- c(
+        list(
+          bws = npreg.idx.bw,
+          txdat = index.df,
+          tydat = tydat,
+          gradients = gradients,
+          warn.glp.gradient = FALSE
+        ),
+        if (!is.null(exdat)) list(exdat = exdat) else list()
+      )
+      if (fit.progress.handoff) {
+        args$.np_fit_progress_handoff <- TRUE
+        fit.progress.handoff <<- FALSE
+      }
+      args
+    }
 
     fast.largeh <- FALSE
     fast.largeh.eval.mean <- NULL
@@ -450,25 +500,25 @@ npindex.sibandwidth <-
 
         }
       } else {
-        model <- do.call(npreg, c(npreg.idx.args, list(
+        model <- do.call(npreg, next_npreg_fit_args(
           exdat = index.eval.df,
           gradients = FALSE
-        )))
+        ))
         index.mean <- model$mean
 
         if (!no.ex && (no.ey || residuals)) {
-          model <- do.call(npreg, c(npreg.idx.args, list(
+          model <- do.call(npreg, next_npreg_fit_args(
             gradients = FALSE
-          )))
+          ))
           index.tmean <- model$mean
         }
       }
 
     } else if(gradients==TRUE) {
-      model <- do.call(npreg, c(npreg.idx.args, list(
+      model <- do.call(npreg, next_npreg_fit_args(
         exdat = index.eval.df,
         gradients = TRUE
-      )))
+      ))
 
       index.mean <- model$mean
 
@@ -485,9 +535,9 @@ npindex.sibandwidth <-
         ## are specified. Also, needed for variance-covariance matrix
         ## (uses on ly the training data)
 
-        model <- do.call(npreg, c(npreg.idx.args, list(
+        model <- do.call(npreg, next_npreg_fit_args(
           gradients = TRUE
-        )))
+        ))
 
         index.tmean <- model$mean
 
