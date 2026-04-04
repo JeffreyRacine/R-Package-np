@@ -141,6 +141,14 @@ npreg.call <-
     return(ev)
   }
 
+.np_reg_fit_total <- function(bws, tnrow, enrow) {
+  if (identical(as.character(bws$type)[1L], "adaptive_nn")) {
+    as.integer(tnrow)
+  } else {
+    as.integer(enrow)
+  }
+}
+
 npreg.rbandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
@@ -153,6 +161,7 @@ npreg.rbandwidth <-
     residuals <- npValidateScalarLogical(residuals, "residuals")
     .npRmpi_require_active_slave_pool(where = "npreg()")
     dots <- list(...)
+    fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     regtype.raw <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
     basis.raw <- npValidateLpBasis(regtype = regtype.raw, basis = bws$basis)
     degree.raw <- npValidateGlpDegree(regtype = regtype.raw,
@@ -564,11 +573,17 @@ npreg.rbandwidth <-
       no.ey &&
       .npRmpi_has_active_slave_pool(comm = 1L)
 
-    myout <- if (use.local.regression) {
-      .npRmpi_with_local_regression(call_regression())
-    } else {
-      call_regression()
-    }
+    myout <- .np_with_compiled_fit_progress(
+      label = "Fitting regression",
+      total = .np_reg_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
+      handoff = fit.progress.handoff,
+      handoff.detail = if (fit.progress.handoff) "starting" else NULL,
+      if (use.local.regression) {
+        .npRmpi_with_local_regression(call_regression())
+      } else {
+        call_regression()
+      }
+    )
 
     if (mean.override) {
       myout$mean <- .np_regression_lc_mean_from_kernel_weights(
@@ -675,6 +690,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       reg.args$txdat <- txdat
     if (!missing(tydat))
       reg.args$tydat <- tydat
+    dots$.np_fit_progress_handoff <- TRUE
     return(do.call(npreg, c(reg.args, dots)))
   }
 
@@ -755,6 +771,8 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       call.args <- c(call.args, list(tydat))
     }
   }
+  if (!has.explicit.bws)
+    call.args$.np_fit_progress_handoff <- TRUE
   ev <- do.call(npreg, c(call.args, list(...)))
 
   ev$call <- match.call(expand.dots = FALSE)

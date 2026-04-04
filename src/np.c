@@ -228,6 +228,11 @@ void np_progress_fit_loop_step(const int done, const int natural_total)
   np_progress_fit_maybe_signal(fit_progress_offset + done);
 }
 
+int np_progress_fit_is_active(void)
+{
+  return fit_progress_active;
+}
+
 SEXP C_np_progress_fit_begin(SEXP total)
 {
   np_progress_fit_activate(Rf_asInteger(total));
