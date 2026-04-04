@@ -70,6 +70,11 @@ static int np_mpi_local_regression_saved_rank = 0;
 static int np_mpi_local_regression_saved_nproc = 1;
 static MPI_Comm np_mpi_local_regression_saved_comm1 = MPI_COMM_NULL;
 #endif
+static int fit_progress_active = 0;
+static int fit_progress_total = 0;
+static int fit_progress_offset = 0;
+static clock_t fit_progress_last_signal_clock = 0;
+static int fit_progress_last_signal_eval = 0;
 
 static void np_progress_signal(const char *event, const char *surface, const int current, const int total)
 {
@@ -141,6 +146,98 @@ static void np_progress_bandwidth_activity_step(const int done)
     return;
 
   np_progress_signal("bandwidth_activity_step", "bandwidth", done, 0);
+}
+
+static void np_progress_fit_clear_state(void)
+{
+  fit_progress_active = 0;
+  fit_progress_total = 0;
+  fit_progress_offset = 0;
+  fit_progress_last_signal_clock = 0;
+  fit_progress_last_signal_eval = 0;
+}
+
+static void np_progress_fit_activate(const int total)
+{
+  np_progress_fit_clear_state();
+
+  if (total < 1)
+    return;
+
+  fit_progress_active = 1;
+  fit_progress_total = total;
+}
+
+void np_progress_fit_set_offset(const int offset)
+{
+  if (!fit_progress_active)
+    return;
+
+  fit_progress_offset = MAX(0, offset);
+  fit_progress_last_signal_clock = 0;
+  fit_progress_last_signal_eval = fit_progress_offset;
+}
+
+static void np_progress_fit_maybe_signal(const int global_done)
+{
+  const clock_t now = clock();
+  const double signal_after_sec = 0.5;
+  const int signal_every_evals = 64;
+  double since_last = 0.0;
+  int bounded_done = global_done;
+
+  if (!fit_progress_active || fit_progress_total < 1 || global_done < 1)
+    return;
+
+  if (bounded_done > fit_progress_total)
+    bounded_done = fit_progress_total;
+
+  if (bounded_done < fit_progress_total) {
+    if (bounded_done <= fit_progress_last_signal_eval)
+      return;
+
+    if (fit_progress_last_signal_eval > 0) {
+      if ((fit_progress_last_signal_clock > 0) && (now > fit_progress_last_signal_clock)) {
+        since_last = ((double)(now - fit_progress_last_signal_clock)) / (double)CLOCKS_PER_SEC;
+
+        if ((bounded_done - fit_progress_last_signal_eval) < signal_every_evals &&
+            since_last < signal_after_sec)
+          return;
+      }
+    }
+  }
+
+  np_progress_signal("fit_step", "bandwidth", bounded_done, fit_progress_total);
+  fit_progress_last_signal_eval = bounded_done;
+  fit_progress_last_signal_clock = now;
+}
+
+void np_progress_fit_step(const int done)
+{
+  np_progress_fit_maybe_signal(done);
+}
+
+void np_progress_fit_loop_step(const int done, const int natural_total)
+{
+  if (!fit_progress_active || natural_total <= 1)
+    return;
+
+  if ((fit_progress_offset + natural_total) > fit_progress_total)
+    return;
+
+  np_progress_fit_maybe_signal(fit_progress_offset + done);
+}
+
+SEXP C_np_progress_fit_begin(SEXP total)
+{
+  np_progress_fit_activate(Rf_asInteger(total));
+  return R_NilValue;
+}
+
+SEXP C_np_progress_fit_end(void)
+{
+  np_progress_fit_clear_state();
+  return R_NilValue;
 }
 
 /* Some externals for numerical routines */
@@ -8821,6 +8918,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           pdf_deriv_stderr[i][j] = (graderr_one != NULL) ? graderr_one[i][0] : 0.0;
         }
       }
+
+      np_progress_fit_step(j + 1);
     }
 
     int_cker_bound_extern = saved_cker_bound;
@@ -9188,6 +9287,7 @@ void np_density(double * tuno, double * tord, double * tcon,
   } else {
     const int dop = (dens_or_dist == NP_DO_DENS) ? OP_NORMAL : OP_INTEGRAL;
 
+      np_progress_fit_set_offset(0);
       kernel_estimate_dens_dist_categorical_np(KERNEL_den_extern,
                                                KERNEL_den_unordered_extern,
                                                KERNEL_den_ordered_extern,

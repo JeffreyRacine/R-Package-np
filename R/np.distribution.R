@@ -71,7 +71,9 @@ npudist.dbandwidth <-
            tdat = stop("invoked without training data 'tdat'"),
            edat, ...){
 
+    dots <- list(...)
     fit.start <- proc.time()[3]
+    fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     .npRmpi_require_active_slave_pool(where = "npudist()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -178,8 +180,11 @@ npudist.dbandwidth <-
       int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO)
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
-    
-    myout <-
+    myout <- .np_with_compiled_fit_progress(
+      label = "Fitting distribution",
+      total = .np_densdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
+      handoff = fit.progress.handoff,
+      handoff.detail = if (fit.progress.handoff) "starting" else NULL,
       .Call("C_np_density",
             as.double(tuno), as.double(tord), as.double(tcon),
             as.double(euno), as.double(eord), as.double(econ),
@@ -191,6 +196,7 @@ npudist.dbandwidth <-
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
             PACKAGE = "npRmpi")
+    )
     names(myout)[1] <- "dist"
 
     fit.elapsed <- proc.time()[3] - fit.start
@@ -270,5 +276,7 @@ npudist.default <- function(bws, tdat, ...){
       call.args <- c(call.args, list(tdat))
     }
   }
+  if (!has.explicit.bws)
+    call.args$.np_fit_progress_handoff <- TRUE
   do.call(npudist, c(call.args, list(...)))
 }

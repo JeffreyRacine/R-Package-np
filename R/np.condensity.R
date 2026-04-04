@@ -87,7 +87,9 @@ npcdens.conbandwidth <- function(bws,
                                  proper.control = list(),
                                  ...){
 
+  dots <- list(...)
   fit.start <- proc.time()[3]
+  fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
   gradients <- npValidateScalarLogical(gradients, "gradients")
   proper.args <- .np_condens_validate_proper_args(
     proper = proper,
@@ -349,9 +351,39 @@ npcdens.conbandwidth <- function(bws,
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
-  
-  myout <- if (keep_local_shadow_nn) {
-    .npRmpi_with_local_regression(
+
+  myout <- .np_with_compiled_fit_progress(
+    label = "Fitting conditional density",
+    total = .np_condensdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
+    handoff = fit.progress.handoff,
+    handoff.detail = if (fit.progress.handoff) "starting" else NULL,
+    if (keep_local_shadow_nn) {
+      .npRmpi_with_local_regression(
+        .Call("C_np_density_conditional",
+              as.double(tyuno), as.double(tyord), as.double(tycon),
+              as.double(txuno), as.double(txord), as.double(txcon),
+              as.double(eyuno), as.double(eyord), as.double(eycon),
+              as.double(exuno), as.double(exord), as.double(excon),
+              as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                          bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                          bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+              as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
+              as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+              as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
+              as.integer(myopti),
+              as.integer(enrow),
+              as.integer(bws$xndim),
+              as.double(cxker.bounds.c$lb),
+              as.double(cxker.bounds.c$ub),
+              as.double(cyker.bounds.c$lb),
+              as.double(cyker.bounds.c$ub),
+              as.integer(reg.c$code),
+              as.integer(degree.c),
+              as.integer(bernstein.engine),
+              basis.code,
+              PACKAGE = "npRmpi")
+      )
+    } else {
       .Call("C_np_density_conditional",
             as.double(tyuno), as.double(tyord), as.double(tycon),
             as.double(txuno), as.double(txord), as.double(txcon),
@@ -375,32 +407,8 @@ npcdens.conbandwidth <- function(bws,
             as.integer(bernstein.engine),
             basis.code,
             PACKAGE = "npRmpi")
-    )
-  } else {
-    .Call("C_np_density_conditional",
-          as.double(tyuno), as.double(tyord), as.double(tycon),
-          as.double(txuno), as.double(txord), as.double(txcon),
-          as.double(eyuno), as.double(eyord), as.double(eycon),
-          as.double(exuno), as.double(exord), as.double(excon),
-          as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                      bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                      bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-          as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
-          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-          as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
-          as.integer(myopti),
-          as.integer(enrow),
-          as.integer(bws$xndim),
-          as.double(cxker.bounds.c$lb),
-          as.double(cxker.bounds.c$ub),
-          as.double(cyker.bounds.c$lb),
-          as.double(cyker.bounds.c$ub),
-          as.integer(reg.c$code),
-          as.integer(degree.c),
-          as.integer(bernstein.engine),
-          basis.code,
-          PACKAGE = "npRmpi")
-  }
+    }
+  )
 
   if(gradients){
     myout$congrad = matrix(data=myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE) 
@@ -559,5 +567,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       call.args <- c(call.args, list(tydat))
     }
   }
+  if (!has.explicit.bws)
+    call.args$.np_fit_progress_handoff <- TRUE
   do.call(npcdens, c(call.args, list(...)))
 }
