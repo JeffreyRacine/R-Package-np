@@ -7,6 +7,7 @@
 #include <float.h>
 #include <time.h>
 #include <stdint.h>
+#include <Rinternals.h>
 
 #include "tree.h"
 

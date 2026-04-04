@@ -13162,6 +13162,8 @@ double *SIGN){
 
   const int bwmdim = (BANDWIDTH_reg==BW_GEN_NN)?num_obs_eval:
     ((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_train:1);
+  const int fit_progress_total =
+    (BANDWIDTH_reg == BW_ADAP_NN) ? num_obs_train : num_obs_eval;
 
   int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
@@ -13473,6 +13475,7 @@ double *SIGN){
         for(i = 0; i < num_obs_eval; i++){
           mean[i] = ymean;
           mean_stderr[i] = sefac;
+          np_progress_fit_loop_step(i + 1, fit_progress_total);
         }
 
         estimation_shortcut_done = 1;
@@ -13543,6 +13546,7 @@ double *SIGN){
                 yhat += BETA[j+1][0]*matrix_X_continuous_eval[j][i];
               mean[i] = yhat;
               mean_stderr[i] = sefac;
+              np_progress_fit_loop_step(i + 1, fit_progress_total);
             }
 
             if(do_grad){
@@ -13775,6 +13779,7 @@ double *SIGN){
                   if(do_gerr) gradient_stderr[l][i] = 0.0;
                 }
               }
+              np_progress_fit_loop_step(i + 1, fit_progress_total);
             }
             estimation_shortcut_done = 1;
           }
@@ -14315,6 +14320,8 @@ double *SIGN){
           if(do_gerr) gradient_stderr[l][j] = 0.0;
         }
       }
+
+      np_progress_fit_loop_step(j + 1, fit_progress_total);
     }
 
     mat_free(KWM);
@@ -14734,6 +14741,8 @@ double *SIGN){
         }
 
       }
+
+      np_progress_fit_loop_step(j + 1, fit_progress_total);
     }
     
     for(int ii = 0; ii < (nrc1); ii++){

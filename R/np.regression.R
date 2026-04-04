@@ -125,6 +125,14 @@ npreg.call <-
     return(ev)
   }
 
+.np_reg_fit_total <- function(bws, tnrow, enrow) {
+  if (identical(as.character(bws$type)[1L], "adaptive_nn")) {
+    as.integer(tnrow)
+  } else {
+    as.integer(enrow)
+  }
+}
+
 npreg.rbandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
@@ -137,6 +145,7 @@ npreg.rbandwidth <-
     no.ex = missing(exdat)
     no.ey = missing(eydat)
     dots <- list(...)
+    fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     npRejectLegacyLpArgs(names(dots), where = "npreg")
     warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
@@ -419,7 +428,11 @@ npreg.rbandwidth <-
       integer(1)
     }
 
-    myout <-
+    myout <- .np_with_compiled_fit_progress(
+      label = "Fitting regression",
+      total = .np_reg_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
+      handoff = fit.progress.handoff,
+      handoff.detail = if (fit.progress.handoff) "starting" else NULL,
       .Call("C_np_regression",
             asDouble(tuno), asDouble(tord), asDouble(tcon), asDouble(tydat),
             asDouble(euno), asDouble(eord), asDouble(econ), asDouble(eydat),
@@ -437,6 +450,7 @@ npreg.rbandwidth <-
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
             PACKAGE = "np")
+    )
 
     if (gradients){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 
@@ -523,6 +537,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       reg.args$txdat <- txdat
     if (!missing(tydat))
       reg.args$tydat <- tydat
+    dots$.np_fit_progress_handoff <- TRUE
     return(do.call(npreg, c(reg.args, dots)))
   }
 
@@ -600,6 +615,8 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       call.args <- c(call.args, list(tydat))
     }
   }
+  if (!has.explicit.bws)
+    call.args$.np_fit_progress_handoff <- TRUE
   ev <- do.call(npreg, c(call.args, list(...)))
 
   ev$call <- match.call(expand.dots = FALSE)
