@@ -10,6 +10,25 @@ condensdist_fit_progress_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
+expect_condensdist_clean_powell_surface <- function(lines, pkg_pattern = "npRmpi", info = NULL) {
+  powell.lines <- grep(sprintf("^\\[%s\\] Refining bandwidth \\(", pkg_pattern), lines, value = TRUE)
+  detail.info <- if (!is.null(info)) info else paste(lines, collapse = "\n")
+
+  expect_true(length(powell.lines) > 0L, info = detail.info)
+  expect_true(
+    any(grepl(
+      sprintf("^\\[%s\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, degree \\([0-9]+\\)(, iter [0-9]+)?\\)$", pkg_pattern),
+      powell.lines
+    )),
+    info = paste(c(detail.info, powell.lines), collapse = "\n")
+  )
+  expect_false(any(grepl("best \\(", powell.lines)), info = paste(c(detail.info, powell.lines), collapse = "\n"))
+  expect_false(
+    any(grepl(sprintf("^\\[%s\\] Bandwidth selection \\(Refining NOMAD solution", pkg_pattern), lines)),
+    info = detail.info
+  )
+}
+
 normalize_condensdist_progress_output <- function(output) {
   text <- paste(output, collapse = "\n")
   text <- gsub("\r", "\n", text, fixed = TRUE)
@@ -549,6 +568,7 @@ test_that("npcdens nomad to powell to fit route preserves single-line fit handof
   bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", lines)
 
   expect_s3_class(actual$value, "condensity")
+  expect_condensdist_clean_powell_surface(lines, pkg_pattern = "npRmpi")
   expect_true(length(bandwidth.pos) > 0L)
   expect_true(length(powell.pos) > 0L)
   expect_true(length(fit.start.pos) == 1L)
@@ -698,6 +718,7 @@ test_that("session npcdens nomad route keeps visible powell handoff in subproces
   )
 
   expect_identical(actual$status, 0L, info = paste(actual$raw, collapse = "\n"))
+  expect_condensdist_clean_powell_surface(block, pkg_pattern = "npRmpi")
   expect_true(length(bandwidth.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_true(length(powell.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_identical(length(fit.start.pos), 1L, info = paste(block, collapse = "\n"))
@@ -749,6 +770,7 @@ test_that("attach npcdens nomad route keeps visible powell handoff in subprocess
   )
 
   expect_identical(actual$status, 0L, info = paste(actual$raw, collapse = "\n"))
+  expect_condensdist_clean_powell_surface(block, pkg_pattern = "npRmpi")
   expect_true(length(bandwidth.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_true(length(powell.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_identical(length(fit.start.pos), 1L, info = paste(block, collapse = "\n"))
@@ -791,6 +813,7 @@ test_that("profile npcdens nomad route keeps visible powell handoff in subproces
   )
 
   expect_identical(actual$status, 0L, info = paste(actual$raw, collapse = "\n"))
+  expect_condensdist_clean_powell_surface(block, pkg_pattern = "npRmpi")
   expect_true(length(bandwidth.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_true(length(powell.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_identical(length(fit.start.pos), 1L, info = paste(block, collapse = "\n"))
