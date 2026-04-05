@@ -632,20 +632,24 @@ test_that("bandwidth lines compact semantically before ellipsizing", {
   fit_line <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
   line <- "[npRmpi] Bandwidth selection (multistart 2/2, iteration 32, elapsed 11.2s, 62.3%, eta 6.8s)"
 
-  fitted <- fit_line(line, max_width = 62L)
+  fitted <- fit_line(line, max_width = 80L)
 
-  expect_match(fitted, "2/2", fixed = TRUE)
-  expect_match(fitted, "iter 32", fixed = TRUE)
-  expect_false(grepl("2/\\.\\.\\.", fitted, fixed = TRUE))
+  expect_lte(nchar(fitted, type = "width"), 80L)
+  expect_identical(
+    fitted,
+    "[npRmpi] Bandwidth selection (2/2, iter 32, elapsed 11.2s, 62.3%, eta 6.8s)"
+  )
 })
 
 test_that("NOMAD bandwidth lines preserve restart and cumulative iteration", {
   fit_line <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
   line <- "[npRmpi] Bandwidth selection (multistart 2/2, iteration 32 (188), elapsed 11.2s, deg (1), best (0))"
 
-  fitted <- fit_line(line, max_width = 80L)
+  fitted <- fit_line(line, max_width = 84L)
 
-  expect_match(fitted, "2/2", fixed = TRUE)
-  expect_match(fitted, "iter 32 (188)", fixed = TRUE)
-  expect_false(grepl("2/\\.\\.\\.", fitted, fixed = TRUE))
+  expect_lte(nchar(fitted, type = "width"), 84L)
+  expect_identical(
+    fitted,
+    "[npRmpi] Bandwidth selection (2/2, iter 32 (188), elapsed 11.2s, deg (1), best (0))"
+  )
 })

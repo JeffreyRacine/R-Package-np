@@ -446,21 +446,11 @@
     }
   }
 
-  short_prefix <- sub("Bandwidth selection", "Bandwidth sel", prefix, fixed = TRUE)
   fields_abbrev <- abbreviate_fields(fields)
-  fields_drop_eta <- drop_last_field(fields_abbrev)
-  fields_drop_eta_pct <- drop_last_field(fields_drop_eta)
-
-  render_prefix <- function(prefix_text, parts) {
-    sprintf("%s (%s)", prefix_text, paste(parts, collapse = ", "))
-  }
 
   candidates <- list(
     render(fields),
-    render(fields_abbrev),
-    render_prefix(short_prefix, fields_abbrev),
-    render_prefix(short_prefix, fields_drop_eta),
-    render_prefix(short_prefix, fields_drop_eta_pct)
+    render(fields_abbrev)
   )
 
   for (candidate in candidates) {
@@ -1744,6 +1734,17 @@
     return(invisible(NULL))
   }
 
+  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+    attach.size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) NA_integer_)
+    attach.rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) NA_integer_)
+
+    if (!is.na(attach.size) && attach.size > 1L &&
+        !is.na(attach.rank) && attach.rank != 0L) {
+      .np_progress_runtime$fit_state <- NULL
+      return(invisible(NULL))
+    }
+  }
+
   state <- .np_progress_begin(
     label = label,
     total = total,
@@ -1944,29 +1945,41 @@
 
 .np_progress_select_bandwidth <- function(label, expr) {
   starting <- !.np_progress_bandwidth_active()
+  worker_silent <- FALSE
   if (starting) {
     .np_progress_runtime$bandwidth_old_messages <- getOption("np.messages", TRUE)
     .np_progress_runtime$force_enabled <- isTRUE(.np_progress_runtime$bandwidth_old_messages)
     options(np.messages = FALSE)
     .np_progress_runtime$bandwidth_label <- as.character(label)[1L]
-    .np_progress_runtime$bandwidth_state <- .np_progress_begin(
-      label = .np_progress_runtime$bandwidth_label,
-      domain = "general",
-      surface = "bandwidth"
-    )
-    if (.np_progress_bandwidth_enhanced_enabled()) {
-      .np_progress_runtime$bandwidth_state <- .np_progress_bandwidth_initialize_state(
-        .np_progress_runtime$bandwidth_state
+
+    if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+      attach.size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) NA_integer_)
+      attach.rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) NA_integer_)
+
+      worker_silent <- !is.na(attach.size) && attach.size > 1L &&
+        !is.na(attach.rank) && attach.rank != 0L
+    }
+
+    if (!worker_silent) {
+      .np_progress_runtime$bandwidth_state <- .np_progress_begin(
+        label = .np_progress_runtime$bandwidth_label,
+        domain = "general",
+        surface = "bandwidth"
       )
-      context_label <- .np_progress_runtime$bandwidth_context_label
-      if (!is.null(context_label) && nzchar(context_label)) {
-        .np_progress_bandwidth_set_coordinator(total_groups = 1L, local_total = 1L)
-        .np_progress_bandwidth_set_coordinator_group(1L, context_label)
-        .np_progress_runtime$bandwidth_state$start_note_grace_sec <- 0
-        .np_progress_runtime$bandwidth_state <- .np_progress_maybe_emit_start_note(
-          .np_progress_runtime$bandwidth_state,
-          now = .np_progress_runtime$bandwidth_state$started
+      if (.np_progress_bandwidth_enhanced_enabled()) {
+        .np_progress_runtime$bandwidth_state <- .np_progress_bandwidth_initialize_state(
+          .np_progress_runtime$bandwidth_state
         )
+        context_label <- .np_progress_runtime$bandwidth_context_label
+        if (!is.null(context_label) && nzchar(context_label)) {
+          .np_progress_bandwidth_set_coordinator(total_groups = 1L, local_total = 1L)
+          .np_progress_bandwidth_set_coordinator_group(1L, context_label)
+          .np_progress_runtime$bandwidth_state$start_note_grace_sec <- 0
+          .np_progress_runtime$bandwidth_state <- .np_progress_maybe_emit_start_note(
+            .np_progress_runtime$bandwidth_state,
+            now = .np_progress_runtime$bandwidth_state$started
+          )
+        }
       }
     }
   }

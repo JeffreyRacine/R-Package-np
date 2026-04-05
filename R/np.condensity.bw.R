@@ -1342,43 +1342,56 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       )
     )
 
-    return(.np_progress_select_bandwidth(
-      .np_degree_progress_label(),
-      {
-        search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
-        if (!is.null(search.result$num.feval.total))
-          nomad.num.feval.total <- as.numeric(search.result$num.feval.total[1L])
-        if (!is.null(search.result$num.feval.fast.total))
-          nomad.num.feval.fast.total <- as.numeric(search.result$num.feval.fast.total[1L])
-        best.solution <- NULL
-        if (!is.null(search.result$best.restart) &&
-            is.finite(search.result$best.restart) &&
-            length(search.result$restart.results) >= as.integer(search.result$best.restart)) {
-          best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
-        }
+    search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
+    if (!is.null(search.result$num.feval.total))
+      nomad.num.feval.total <- as.numeric(search.result$num.feval.total[1L])
+    if (!is.null(search.result$num.feval.fast.total))
+      nomad.num.feval.fast.total <- as.numeric(search.result$num.feval.fast.total[1L])
+    best.solution <- NULL
+    if (!is.null(search.result$best.restart) &&
+        is.finite(search.result$best.restart) &&
+        length(search.result$restart.results) >= as.integer(search.result$best.restart)) {
+      best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
+    }
 
-        payload_result <- build_payload(
-          point = search.result$best_point,
-          best_record = search.result$best,
-          solution = best.solution,
-          interrupted = !isTRUE(search.result$completed)
+    payload_result <- if (identical(degree.search$engine, "nomad+powell")) {
+      local({
+        .np_progress_bandwidth_set_context(
+          .np_nomad_powell_context_label(search.result$best$degree)
         )
+        on.exit(.np_progress_bandwidth_set_context(NULL), add = TRUE)
+        .np_progress_select_bandwidth_enhanced(
+          .np_nomad_powell_progress_label(),
+          build_payload(
+            point = search.result$best_point,
+            best_record = search.result$best,
+            solution = best.solution,
+            interrupted = !isTRUE(search.result$completed)
+          )
+        )
+      })
+    } else {
+      build_payload(
+        point = search.result$best_point,
+        best_record = search.result$best,
+        solution = best.solution,
+        interrupted = !isTRUE(search.result$completed)
+      )
+    }
 
-        if (is.list(payload_result) && !is.null(payload_result$payload)) {
-          search.result$best_payload <- payload_result$payload
-          if (!is.null(payload_result$powell.time))
-            search.result$powell.time <- as.numeric(payload_result$powell.time[1L])
-          if (!is.null(payload_result$objective) &&
-              .np_degree_better(payload_result$objective, search.result$best$objective, direction = objective.direction)) {
-            search.result$best$objective <- as.numeric(payload_result$objective[1L])
-          }
-        } else {
-          search.result$best_payload <- payload_result
-        }
-
-        .npRmpi_reconcile_nomad_search_timing(search.result)
+    if (is.list(payload_result) && !is.null(payload_result$payload)) {
+      search.result$best_payload <- payload_result$payload
+      if (!is.null(payload_result$powell.time))
+        search.result$powell.time <- as.numeric(payload_result$powell.time[1L])
+      if (!is.null(payload_result$objective) &&
+          .np_degree_better(payload_result$objective, search.result$best$objective, direction = objective.direction)) {
+        search.result$best$objective <- as.numeric(payload_result$objective[1L])
       }
-    ))
+    } else {
+      search.result$best_payload <- payload_result
+    }
+
+    return(.npRmpi_reconcile_nomad_search_timing(search.result))
   }
 
   .np_nomad_baseline_note(degree.search$start.degree)
