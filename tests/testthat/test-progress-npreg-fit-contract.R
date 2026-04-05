@@ -43,6 +43,22 @@ npreg_case_progress_lines <- function(lines, case = "npreg") {
   block[grepl("^\\[npRmpi\\] ", block)]
 }
 
+expect_npreg_powell_progress_surface <- function(lines) {
+  powell.lines <- lines[grepl("^\\[npRmpi\\] Refining bandwidth \\(", lines)]
+  info <- paste(lines, collapse = "\n")
+
+  expect_true(length(powell.lines) > 0L, info = info)
+  expect_false(any(grepl(
+    "^\\[npRmpi\\] Bandwidth selection \\(Refining NOMAD solution",
+    lines
+  )), info = info)
+  expect_false(any(grepl("best (", powell.lines, fixed = TRUE)), info = info)
+  expect_true(any(grepl(
+    "^\\[npRmpi\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, degree \\([^)]*\\), iter [0-9]+\\)$",
+    powell.lines
+  )), info = info)
+}
+
 ensure_npreg_subprocess_nprmpi_lib <- local({
   lib.path.cache <- NULL
 
@@ -525,7 +541,9 @@ test_that("npreg nomad to powell to fit route preserves single-line fit handoff"
     np.messages = TRUE,
     np.tree = FALSE,
     np.progress.start.grace.known.sec = 0,
-    np.progress.interval.known.sec = 0
+    np.progress.start.grace.unknown.sec = 0,
+    np.progress.interval.known.sec = 0,
+    np.progress.interval.unknown.sec = 0
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -533,13 +551,8 @@ test_that("npreg nomad to powell to fit route preserves single-line fit handoff"
     npreg(
       y ~ x,
       data = fixture$dat,
-      regtype = "lp",
-      degree.select = "coordinate",
-      degree.min = 0L,
+      nomad = TRUE,
       degree.max = 1L,
-      search.engine = "nomad+powell",
-      bwtype = "fixed",
-      bwmethod = "cv.ls",
       nmulti = 1L
     ),
     now = npreg_fit_progress_time_counter()
@@ -562,6 +575,7 @@ test_that("npreg nomad to powell to fit route preserves single-line fit handoff"
   expect_true(length(powell.pos) > 0L)
   expect_true(length(fit.start.pos) == 1L)
   expect_true(length(fit.finish.pos) >= 1L)
+  expect_npreg_powell_progress_surface(lines)
   expect_lt(max(bandwidth.pos), fit.start.pos[[1L]])
   expect_lt(max(powell.pos), fit.start.pos[[1L]])
   expect_lt(fit.start.pos[[1L]], fit.finish.pos[[1L]])
@@ -619,6 +633,7 @@ test_that("session npreg nomad route keeps visible powell handoff in subprocess"
   expect_true(length(bandwidth.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_true(length(powell.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_identical(length(fit.start.pos), 1L, info = paste(block, collapse = "\n"))
+  expect_npreg_powell_progress_surface(block)
   expect_lt(max(bandwidth.pos), fit.start.pos[[1L]])
   expect_lt(max(powell.pos), fit.start.pos[[1L]])
 })
@@ -636,6 +651,7 @@ test_that("attach npreg nomad route does not duplicate fit-start lines in subpro
   )
 
   expect_identical(actual$status, 0L, info = paste(actual$raw, collapse = "\n"))
+  expect_npreg_powell_progress_surface(block)
   expect_identical(length(fit.start.pos), 1L, info = paste(block, collapse = "\n"))
 })
 
@@ -657,6 +673,7 @@ test_that("profile npreg nomad route keeps visible powell handoff in subprocess"
   expect_true(length(bandwidth.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_true(length(powell.pos) > 0L, info = paste(block, collapse = "\n"))
   expect_identical(length(fit.start.pos), 1L, info = paste(block, collapse = "\n"))
+  expect_npreg_powell_progress_surface(block)
   expect_lt(max(bandwidth.pos), fit.start.pos[[1L]])
   expect_lt(max(powell.pos), fit.start.pos[[1L]])
 })

@@ -1385,6 +1385,7 @@
                              progress_state = NULL,
                              manage_progress_lifecycle = is.null(progress_state),
                              bind_bandwidth_runtime = FALSE,
+                             handoff_before_build = FALSE,
                              degree_spec = NULL,
                              nomad.opts = list()) {
   engine <- match.arg(engine)
@@ -1737,6 +1738,17 @@
       degree = state$best_record$degree,
       best_record = state$best_record
     ))
+  }
+
+  if (isTRUE(handoff_before_build) && !is.null(state$progress_state)) {
+    state$progress_state$nomad_current_degree <- state$best_record$degree
+    state$progress_state$nomad_best_record <- state$best_record
+    set_progress_state(.np_degree_progress_end(
+      state = state$progress_state,
+      detail = NULL,
+      interrupted = state$interrupted
+    ))
+    state$progress_state <- NULL
   }
 
   payload_result <- tryCatch(

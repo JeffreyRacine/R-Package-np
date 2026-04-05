@@ -1253,6 +1253,84 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   point
 }
 
+.npregbw_powell_progress_fields <- function(state,
+                                            done = NULL,
+                                            detail = NULL,
+                                            now = .np_progress_now()) {
+  fields <- character()
+  elapsed <- max(0, now - state$started)
+
+  fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
+
+  if (!is.null(state$nomad_current_degree)) {
+    fields <- c(
+      fields,
+      sprintf("degree %s", .np_degree_format_degree(state$nomad_current_degree))
+    )
+  }
+
+  if (!is.null(done)) {
+    done <- suppressWarnings(as.integer(done)[1L])
+    if (!is.na(done) && done >= 1L) {
+      fields <- c(fields, sprintf("iter %s", format(done)))
+    }
+  }
+
+  fields
+}
+
+.npregbw_with_powell_refinement_progress <- function(degree, expr) {
+  old.state <- .np_progress_runtime$bandwidth_state
+  worker_silent <- FALSE
+  active.state <- NULL
+
+  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+    attach.size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) NA_integer_)
+    attach.rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) NA_integer_)
+
+    worker_silent <- !is.na(attach.size) && attach.size > 1L &&
+      !is.na(attach.rank) && attach.rank != 0L
+  }
+
+  on.exit({
+    current.state <- .np_progress_runtime$bandwidth_state
+    if (!is.null(active.state) && !is.null(current.state)) {
+      .np_progress_end(current.state)
+    }
+    .np_progress_runtime$bandwidth_state <- old.state
+  }, add = TRUE)
+
+  if (!worker_silent) {
+    active.state <- .np_progress_begin(
+      label = .np_nomad_powell_progress_label(),
+      domain = "general",
+      surface = "bandwidth"
+    )
+    active.state$unknown_total_fields <- .npregbw_powell_progress_fields
+    active.state$nomad_current_degree <- as.integer(degree)
+    active.state <- .np_progress_show_now(active.state)
+    .np_progress_runtime$bandwidth_state <- active.state
+  } else {
+    .np_progress_runtime$bandwidth_state <- NULL
+  }
+
+  value <- force(expr)
+
+  if (!is.null(active.state) && is.list(value) && !is.null(value$num.feval)) {
+    done <- suppressWarnings(as.integer(value$num.feval[1L]))
+    if (!is.na(done) && done >= 1L && !is.null(.np_progress_runtime$bandwidth_state)) {
+      .np_progress_runtime$bandwidth_state <- .np_progress_step_at(
+        state = .np_progress_runtime$bandwidth_state,
+        now = .np_progress_now(),
+        done = done,
+        force = TRUE
+      )
+    }
+  }
+
+  value
+}
+
 npRmpiNomadShadowSearchRegression <- function(xdat,
                                               ydat,
                                               template,
@@ -1330,8 +1408,14 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
     )
   }
 
+  search.engine.used <- if (identical(degree.search$engine, "nomad+powell")) {
+    "nomad"
+  } else {
+    degree.search$engine
+  }
+
   search.result <- .np_nomad_search(
-    engine = degree.search$engine,
+    engine = search.engine.used,
     baseline_record = NULL,
     start_degree = degree.search$start.degree,
     x0 = x0,
@@ -1351,6 +1435,7 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
     nmulti = nomad.nmulti,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
+    handoff_before_build = identical(degree.search$engine, "nomad+powell"),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",
@@ -1367,6 +1452,9 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       user_supplied = degree.search$start.user
     )
   )
+  if (!identical(search.engine.used, degree.search$engine)) {
+    search.result$method <- degree.search$engine
+  }
 
   search.result$best_payload <- NULL
   search.result$powell.time <- NA_real_
@@ -1475,7 +1563,7 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       hot.opt.args <- opt.args
       hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("disable_multistart")
       powell.start <- proc.time()[3L]
-      hot.payload <- .np_nomad_with_powell_progress(degree, local({
+      hot.payload <- .npregbw_with_powell_refinement_progress(degree, local({
         .npregbw_run_fixed_degree_source_of_truth_collective(
           xdat = xdat,
           ydat = ydat,
@@ -1565,30 +1653,12 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
     }
 
-    payload_result <- if (identical(degree.search$engine, "nomad+powell")) {
-      local({
-        .np_progress_bandwidth_set_context(
-          .np_nomad_powell_context_label(search.result$best$degree)
-        )
-        on.exit(.np_progress_bandwidth_set_context(NULL), add = TRUE)
-        .np_progress_select_bandwidth_enhanced(
-          .np_nomad_powell_progress_label(),
-          build_payload(
-            point = search.result$best_point,
-            best_record = search.result$best,
-            solution = best.solution,
-            interrupted = !isTRUE(search.result$completed)
-          )
-        )
-      })
-    } else {
-      build_payload(
-        point = search.result$best_point,
-        best_record = search.result$best,
-        solution = best.solution,
-        interrupted = !isTRUE(search.result$completed)
-      )
-    }
+    payload_result <- build_payload(
+      point = search.result$best_point,
+      best_record = search.result$best,
+      solution = best.solution,
+      interrupted = !isTRUE(search.result$completed)
+    )
 
     if (is.list(payload_result) && !is.null(payload_result$payload)) {
       search.result$best_payload <- payload_result$payload
@@ -1651,8 +1721,14 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
     )
   }
 
-  .np_nomad_search(
-    engine = degree.search$engine,
+  search.engine.used <- if (identical(degree.search$engine, "nomad+powell")) {
+    "nomad"
+  } else {
+    degree.search$engine
+  }
+
+  search.result <- .np_nomad_search(
+    engine = search.engine.used,
     baseline_record = baseline.record,
     start_degree = degree.search$start.degree,
     x0 = x0,
@@ -1666,6 +1742,7 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
     nmulti = nomad.nmulti,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
+    handoff_before_build = identical(degree.search$engine, "nomad+powell"),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",
@@ -1682,6 +1759,12 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       user_supplied = degree.search$start.user
     )
   )
+
+  if (!identical(search.engine.used, degree.search$engine)) {
+    search.result$method <- degree.search$engine
+  }
+
+  search.result
 }
 
 .npregbw_degree_search_controls <- function(regtype,
