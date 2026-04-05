@@ -51,6 +51,9 @@ npindexbw(\dots)
           optim.reltol,
           random.seed,
           regtype = c("lc", "ll", "lp"),
+          lbc.init = 0.5,
+          hbc.init = 1.5,
+          cfac.init = 1.059224,
           \dots)
 
 \method{npindexbw}{sibandwidth}(xdat = stop("training data xdat missing"),
@@ -65,6 +68,9 @@ npindexbw(\dots)
           optim.method = c("Nelder-Mead", "BFGS", "CG"),
           optim.reltol = sqrt(.Machine$double.eps),
           random.seed = 42,
+          lbc.init = 0.5,
+          hbc.init = 1.5,
+          cfac.init = 1.059224,
           \dots)
 
 }
@@ -222,6 +228,27 @@ npindexbw(\dots)
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
     points. Defaults to \code{min(2,ncol(xdat))}.
+  }
+
+  \item{lbc.init}{
+    lower bound for random fixed-bandwidth start factors for the index
+    bandwidth \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults
+    to \code{0.5}. Nearest-neighbor start laws are unchanged by this
+    control.
+  }
+
+  \item{hbc.init}{
+    upper bound for random fixed-bandwidth start factors for the index
+    bandwidth \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults
+    to \code{1.5}. Must be greater than or equal to \code{lbc.init}.
+  }
+
+  \item{cfac.init}{
+    deterministic fixed-bandwidth start factor for the index bandwidth
+    \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults to
+    \code{1.059224}. For automatic LP NOMAD search, this same fixed-bandwidth
+    start law seeds the internal initial \eqn{h} coordinate before the
+    unchanged beta-start logic is applied.
   }
 
    \item{only.optimize.beta}{

@@ -65,6 +65,12 @@ npscoefbw(\dots)
           random.seed,
           regtype,
           ukertype,
+          lbc.init = 0.5,
+          hbc.init = 1.5,
+          cfac.init = 1.0,
+          lbd.init = 0.5,
+          hbd.init = 1.5,
+          dfac.init = 1.0,
           \dots)
 
 \method{npscoefbw}{scbandwidth}(xdat = stop("invoked without data 'xdat'"),
@@ -84,6 +90,12 @@ npscoefbw(\dots)
           optim.method = c("Nelder-Mead", "BFGS", "CG"),
           optim.reltol = sqrt(.Machine$double.eps),
           random.seed = 42,
+          lbc.init = 0.5,
+          hbc.init = 1.5,
+          cfac.init = 1.0,
+          lbd.init = 0.5,
+          hbd.init = 1.5,
+          dfac.init = 1.0,
           \dots)
 }
 
@@ -344,6 +356,47 @@ npscoefbw(\dots)
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
     points. Defaults to \code{min(2,ncol(xdat))}.
+  }
+
+  \item{lbc.init}{
+    lower bound for random fixed-bandwidth start factors for continuous
+    coordinates. Used only when \code{bwtype="fixed"}. Defaults to
+    \code{0.5}. Nearest-neighbor start laws are unchanged by this
+    control.
+  }
+
+  \item{hbc.init}{
+    upper bound for random fixed-bandwidth start factors for continuous
+    coordinates. Used only when \code{bwtype="fixed"}. Defaults to
+    \code{1.5}. Must be greater than or equal to \code{lbc.init}.
+  }
+
+  \item{cfac.init}{
+    deterministic fixed-bandwidth start factor for continuous
+    coordinates. Used only when \code{bwtype="fixed"}. Defaults to
+    \code{1.0}.
+  }
+
+  \item{lbd.init}{
+    lower bound for random fixed-bandwidth start factors for ordered
+    and unordered categorical coordinates. Used only when
+    \code{bwtype="fixed"}. Defaults to \code{0.5}. Values must not
+    exceed \code{2} so that categorical fixed starts remain within
+    lawful bandwidth bounds.
+  }
+
+  \item{hbd.init}{
+    upper bound for random fixed-bandwidth start factors for ordered
+    and unordered categorical coordinates. Used only when
+    \code{bwtype="fixed"}. Defaults to \code{1.5}. Must be greater than
+    or equal to \code{lbd.init} and must not exceed \code{2}.
+  }
+
+  \item{dfac.init}{
+    deterministic fixed-bandwidth start factor for ordered and
+    unordered categorical coordinates. Used only when
+    \code{bwtype="fixed"}. Defaults to \code{1.0}. Values must not
+    exceed \code{2}.
   }
 
   \item{okertype}{

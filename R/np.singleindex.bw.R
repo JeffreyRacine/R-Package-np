@@ -166,18 +166,49 @@ npindexbw.NULL <-
   list(ok = (k >= lower) && (k <= upper), value = as.double(k))
 }
 
-.npindex_default_start_bandwidth <- function(fit, bwtype, nobs) {
+.npindexbw_h_start_controls <- function(lbc.init = 0.5,
+                                        hbc.init = 1.5,
+                                        cfac.init = 1.059224,
+                                        where = "npindexbw") {
+  lbc.init <- npValidatePositiveFiniteNumeric(lbc.init, "lbc.init")
+  hbc.init <- npValidatePositiveFiniteNumeric(hbc.init, "hbc.init")
+  cfac.init <- npValidatePositiveFiniteNumeric(cfac.init, "cfac.init")
+
+  if (hbc.init < lbc.init) {
+    stop(sprintf("%s: 'hbc.init' must be greater than or equal to 'lbc.init'", where),
+         call. = FALSE)
+  }
+
+  list(
+    lbc.init = as.double(lbc.init),
+    hbc.init = as.double(hbc.init),
+    cfac.init = as.double(cfac.init)
+  )
+}
+
+.npindex_start_bandwidth_scale <- function(fit, nobs) {
+  EssDee(fit) * nobs^(-1 / 5)
+}
+
+.npindex_default_start_bandwidth <- function(fit,
+                                             bwtype,
+                                             nobs,
+                                             start.controls = .npindexbw_h_start_controls()) {
   if (identical(bwtype, "fixed")) {
-    return(1.059224 * EssDee(fit) * nobs^(-1 / 5))
+    return(start.controls$cfac.init * .npindex_start_bandwidth_scale(fit = fit, nobs = nobs))
   }
 
   lower <- 2L
   max(lower, min(max(1L, as.integer(nobs) - 1L), .np_round_half_to_even(sqrt(nobs))))
 }
 
-.npindex_random_start_bandwidth <- function(fit, bwtype, nobs) {
+.npindex_random_start_bandwidth <- function(fit,
+                                            bwtype,
+                                            nobs,
+                                            start.controls = .npindexbw_h_start_controls()) {
   if (identical(bwtype, "fixed")) {
-    return(runif(1, min = 0.5, max = 1.5) * EssDee(fit) * nobs^(-1 / 5))
+    return(runif(1, min = start.controls$lbc.init, max = start.controls$hbc.init) *
+             .npindex_start_bandwidth_scale(fit = fit, nobs = nobs))
   }
 
   upper <- max(1L, as.integer(nobs) - 1L)
@@ -203,8 +234,16 @@ npindexbw.NULL <-
   candidate$value
 }
 
-.npindexbw_nomad_fixed_h_scale <- function(fit, h.start.raw, nobs) {
-  scale <- .npindex_default_start_bandwidth(fit = fit, bwtype = "fixed", nobs = nobs)
+.npindexbw_nomad_fixed_h_scale <- function(fit,
+                                           h.start.raw,
+                                           nobs,
+                                           start.controls = .npindexbw_h_start_controls()) {
+  scale <- .npindex_default_start_bandwidth(
+    fit = fit,
+    bwtype = "fixed",
+    nobs = nobs,
+    start.controls = start.controls
+  )
   if (!is.finite(scale) || scale <= 0) {
     scale <- max(
       if (is.finite(h.start.raw)) abs(as.double(h.start.raw)) else 0,
@@ -219,7 +258,8 @@ npindexbw.NULL <-
                                                baseline.bws,
                                                degree.search,
                                                nmulti,
-                                               random.seed) {
+                                               random.seed,
+                                               h.start.controls = .npindexbw_h_start_controls()) {
   p <- ncol(xmat)
   nobs <- nrow(xmat)
   beta.free <- if (p > 1L) seq_len(p - 1L) else integer(0)
@@ -249,7 +289,12 @@ npindexbw.NULL <-
     beta.start.raw[!is.finite(beta.start.raw)] <- 0
 
   if (isTRUE(all.equal(as.double(baseline.bws$bw[1L]), 0))) {
-    h.start.raw <- .npindex_default_start_bandwidth(fit = fit.proxy, bwtype = "fixed", nobs = nobs)
+    h.start.raw <- .npindex_default_start_bandwidth(
+      fit = fit.proxy,
+      bwtype = "fixed",
+      nobs = nobs,
+      start.controls = h.start.controls
+    )
   } else {
     h.start.raw <- .npindex_finalize_bandwidth(
       h = baseline.bws$bw[1L],
@@ -261,7 +306,12 @@ npindexbw.NULL <-
   if (!is.finite(h.start.raw) || h.start.raw <= 0)
     h.start.raw <- 1e-3
 
-  h.scale <- .npindexbw_nomad_fixed_h_scale(fit = fit.proxy, h.start.raw = h.start.raw, nobs = nobs)
+  h.scale <- .npindexbw_nomad_fixed_h_scale(
+    fit = fit.proxy,
+    h.start.raw = h.start.raw,
+    nobs = nobs,
+    start.controls = h.start.controls
+  )
   degree.starts <- .np_lp_nomad_build_degree_starts(
     initial = degree.search$start.degree,
     lower = degree.search$lower,
@@ -290,7 +340,12 @@ npindexbw.NULL <-
         start_matrix.raw[j, beta.free] <- beta.rand
       }
 
-      h.rand <- .npindex_random_start_bandwidth(fit = fit.proxy, bwtype = "fixed", nobs = nobs)
+      h.rand <- .npindex_random_start_bandwidth(
+        fit = fit.proxy,
+        bwtype = "fixed",
+        nobs = nobs,
+        start.controls = h.start.controls
+      )
       if (!is.finite(h.rand) || h.rand <= 0)
         h.rand <- h.start.raw
       start_matrix.raw[j, h.col] <- h.rand
@@ -849,6 +904,12 @@ npindexbw.NULL <-
 
   p <- ncol(x.clean)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else max(1L, as.integer(opt.args$nmulti[1L]))
+  h.start.controls <- .npindexbw_h_start_controls(
+    lbc.init = if (is.null(opt.args$lbc.init)) 0.5 else opt.args$lbc.init,
+    hbc.init = if (is.null(opt.args$hbc.init)) 1.5 else opt.args$hbc.init,
+    cfac.init = if (is.null(opt.args$cfac.init)) 1.059224 else opt.args$cfac.init,
+    where = "npindexbw"
+  )
   fixed.nomad <- identical(baseline.bws$type, "fixed")
   fixed.setup <- if (fixed.nomad) {
     .npindexbw_nomad_fixed_start_setup(
@@ -857,7 +918,8 @@ npindexbw.NULL <-
       baseline.bws = baseline.bws,
       degree.search = degree.search,
       nmulti = nomad.nmulti,
-      random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L
+      random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
+      h.start.controls = h.start.controls
     )
   } else {
     NULL
@@ -1243,6 +1305,9 @@ npindexbw.default <-
            optim.reltol,
            random.seed,
            regtype = c("lc", "ll", "lp"),
+           lbc.init = 0.5,
+           hbc.init = 1.5,
+           cfac.init = 1.059224,
            ...){
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
     search.mc.names <- names(match.call(expand.dots = FALSE))
@@ -1400,15 +1465,17 @@ npindexbw.default <-
     if (tbw$method == "kleinspady" && !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
+    margs <- c("nmulti","random.seed", "optim.method", "optim.maxattempts",
+               "optim.reltol", "optim.abstol", "optim.maxit", "only.optimize.beta",
+               "lbc.init", "hbc.init", "cfac.init")
+
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
     bwsel.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
-    if (!missing(nmulti)) bwsel.args$nmulti <- nmulti
-    if (!missing(random.seed)) bwsel.args$random.seed <- random.seed
-    if (!missing(optim.method)) bwsel.args$optim.method <- optim.method
-    if (!missing(optim.maxattempts)) bwsel.args$optim.maxattempts <- optim.maxattempts
-    if (!missing(optim.reltol)) bwsel.args$optim.reltol <- optim.reltol
-    if (!missing(optim.abstol)) bwsel.args$optim.abstol <- optim.abstol
-    if (!missing(optim.maxit)) bwsel.args$optim.maxit <- optim.maxit
-    if (!missing(only.optimize.beta)) bwsel.args$only.optimize.beta <- only.optimize.beta
+    if (any.m) {
+      nms <- mc.names[m]
+      bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+    }
 
     if (bandwidth.compute && !is.null(degree.search)) {
       reg.args <- list(
@@ -1480,10 +1547,9 @@ npindexbw.default <-
         search_result = search.result
       )
     } else if (bandwidth.compute) {
-      opt.args <- bwsel.args
       tbw <- .np_progress_select_bandwidth_enhanced(
         "Selecting single-index bandwidth",
-        do.call(npindexbw.sibandwidth, opt.args)
+        do.call(npindexbw.sibandwidth, bwsel.args)
       )
     }
 
@@ -1508,6 +1574,9 @@ npindexbw.sibandwidth <-
            optim.method = c("Nelder-Mead", "BFGS", "CG"),
            optim.reltol = sqrt(.Machine$double.eps),
            random.seed = 42,
+           lbc.init = 0.5,
+           hbc.init = 1.5,
+           cfac.init = 1.059224,
            ...){
     ## Save seed prior to setting
 
@@ -1527,6 +1596,12 @@ npindexbw.sibandwidth <-
     optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
     optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
+    h.start.controls <- .npindexbw_h_start_controls(
+      lbc.init = lbc.init,
+      hbc.init = hbc.init,
+      cfac.init = cfac.init,
+      where = "npindexbw"
+    )
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -1817,7 +1892,12 @@ npindexbw.sibandwidth <-
               } else { beta = numeric(0) }
 
               if (bws$bw == 0)
-                h <- .npindex_default_start_bandwidth(fit = fit, bwtype = bws$type, nobs = nobs)
+                h <- .npindex_default_start_bandwidth(
+                  fit = fit,
+                  bwtype = bws$type,
+                  nobs = nobs,
+                  start.controls = h.start.controls
+                )
               else
                 h <- .npindex_finalize_bandwidth(h = bws$bw, bwtype = bws$type, nobs = nobs)
             } else {
@@ -1826,7 +1906,12 @@ npindexbw.sibandwidth <-
               beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
               beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
               if (!only.optimize.beta)
-                h <- .npindex_random_start_bandwidth(fit = fit, bwtype = bws$type, nobs = nobs)
+                h <- .npindex_random_start_bandwidth(
+                  fit = fit,
+                  bwtype = bws$type,
+                  nobs = nobs,
+                  start.controls = h.start.controls
+                )
             }
 
             optim.parm <- if(only.optimize.beta) beta else c(beta,h)
@@ -1850,7 +1935,12 @@ npindexbw.sibandwidth <-
               beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
               beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
               if(!only.optimize.beta)
-                h <- .npindex_random_start_bandwidth(fit = fit, bwtype = bws$type, nobs = nobs)
+                h <- .npindex_random_start_bandwidth(
+                  fit = fit,
+                  bwtype = bws$type,
+                  nobs = nobs,
+                  start.controls = h.start.controls
+                )
 
               if(optim.return$convergence == 1){
                 if(optim.control$maxit < (2^32/10))

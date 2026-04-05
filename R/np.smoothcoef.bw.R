@@ -837,9 +837,92 @@ npscoefbw.NULL <-
   }, numeric(1))
 }
 
-.npscoef_default_start_bandwidth <- function(param, bwtype, nobs) {
+.npscoefbw_start_controls <- function(lbc.init = 0.5,
+                                     hbc.init = 1.5,
+                                     cfac.init = 1.0,
+                                     lbd.init = 0.5,
+                                     hbd.init = 1.5,
+                                     dfac.init = 1.0,
+                                     where = "npscoefbw") {
+  lbc.init <- npValidatePositiveFiniteNumeric(lbc.init, "lbc.init")
+  hbc.init <- npValidatePositiveFiniteNumeric(hbc.init, "hbc.init")
+  cfac.init <- npValidatePositiveFiniteNumeric(cfac.init, "cfac.init")
+  lbd.init <- npValidatePositiveFiniteNumeric(lbd.init, "lbd.init")
+  hbd.init <- npValidatePositiveFiniteNumeric(hbd.init, "hbd.init")
+  dfac.init <- npValidatePositiveFiniteNumeric(dfac.init, "dfac.init")
+
+  if (hbc.init < lbc.init) {
+    stop(sprintf("%s: 'hbc.init' must be greater than or equal to 'lbc.init'", where),
+         call. = FALSE)
+  }
+  if (hbd.init < lbd.init) {
+    stop(sprintf("%s: 'hbd.init' must be greater than or equal to 'lbd.init'", where),
+         call. = FALSE)
+  }
+  if (lbd.init > 2 || hbd.init > 2 || dfac.init > 2) {
+    stop(sprintf("%s: categorical start factors must be less than or equal to 2", where),
+         call. = FALSE)
+  }
+
+  list(
+    lbc.init = as.double(lbc.init),
+    hbc.init = as.double(hbc.init),
+    cfac.init = as.double(cfac.init),
+    lbd.init = as.double(lbd.init),
+    hbd.init = as.double(hbd.init),
+    dfac.init = as.double(dfac.init)
+  )
+}
+
+.npscoef_start_factor_vector <- function(param,
+                                         icon = NULL,
+                                         iord = NULL,
+                                         iuno = NULL,
+                                         continuous.factor,
+                                         categorical.factor,
+                                         where = "npscoefbw") {
+  ndim <- length(param)
+  if (is.null(icon) || is.null(iord) || is.null(iuno))
+    return(rep.int(as.double(continuous.factor), ndim))
+
+  icon <- as.logical(icon)
+  iord <- as.logical(iord)
+  iuno <- as.logical(iuno)
+
+  if (length(icon) != ndim || length(iord) != ndim || length(iuno) != ndim) {
+    stop(sprintf("%s: invalid fixed-start coordinate map", where), call. = FALSE)
+  }
+
+  cat.mask <- iord | iuno
+  factor <- rep_len(NA_real_, ndim)
+  factor[icon] <- as.double(continuous.factor)
+  factor[cat.mask] <- as.double(categorical.factor)
+
+  if (anyNA(factor)) {
+    stop(sprintf("%s: unsupported fixed-start coordinate type", where), call. = FALSE)
+  }
+
+  factor
+}
+
+.npscoef_default_start_bandwidth <- function(param,
+                                             bwtype,
+                                             nobs,
+                                             start.controls = .npscoefbw_start_controls(),
+                                             icon = NULL,
+                                             iord = NULL,
+                                             iuno = NULL) {
   if (identical(bwtype, "fixed"))
-    return(as.double(param))
+    return(as.double(
+      param * .npscoef_start_factor_vector(
+        param = param,
+        icon = icon,
+        iord = iord,
+        iuno = iuno,
+        continuous.factor = start.controls$cfac.init,
+        categorical.factor = start.controls$dfac.init
+      )
+    ))
 
   lower <- 2L
   upper <- max(1L, as.integer(nobs) - 1L)
@@ -847,9 +930,34 @@ npscoefbw.NULL <-
   rep.int(as.double(start), length(param))
 }
 
-.npscoef_random_start_bandwidth <- function(param, bwtype, nobs) {
-  if (identical(bwtype, "fixed"))
-    return(as.double(runif(length(param), min = 0.5, max = 1.5) * param))
+.npscoef_random_start_bandwidth <- function(param,
+                                            bwtype,
+                                            nobs,
+                                            start.controls = .npscoefbw_start_controls(),
+                                            icon = NULL,
+                                            iord = NULL,
+                                            iuno = NULL) {
+  if (identical(bwtype, "fixed")) {
+    draws <- .npscoef_start_factor_vector(
+      param = param,
+      icon = icon,
+      iord = iord,
+      iuno = iuno,
+      continuous.factor = start.controls$lbc.init,
+      categorical.factor = start.controls$lbd.init
+    )
+
+    for (ii in seq_along(draws)) {
+      if (!is.null(icon) && !is.null(iord) && !is.null(iuno) &&
+          !isTRUE(as.logical(icon)[ii])) {
+        draws[ii] <- runif(1L, min = start.controls$lbd.init, max = start.controls$hbd.init)
+      } else {
+        draws[ii] <- runif(1L, min = start.controls$lbc.init, max = start.controls$hbc.init)
+      }
+    }
+
+    return(as.double(draws * param))
+  }
 
   upper <- max(1L, as.integer(nobs) - 1L)
   .npscoef_nn_candidate_bandwidth(
@@ -911,6 +1019,12 @@ npscoefbw.scbandwidth <-
            optim.method = c("Nelder-Mead", "BFGS", "CG"),
            optim.reltol = sqrt(.Machine$double.eps),
            random.seed = 42,
+           lbc.init = 0.5,
+           hbc.init = 1.5,
+           cfac.init = 1.0,
+           lbd.init = 0.5,
+           hbd.init = 1.5,
+           dfac.init = 1.0,
            ...){
     ## Save seed prior to setting
 
@@ -939,6 +1053,15 @@ npscoefbw.scbandwidth <-
     optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
     optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
+    start.controls <- .npscoefbw_start_controls(
+      lbc.init = lbc.init,
+      hbc.init = hbc.init,
+      cfac.init = cfac.init,
+      lbd.init = lbd.init,
+      hbd.init = hbd.init,
+      dfac.init = dfac.init,
+      where = "npscoefbw"
+    )
     if (cv.iterate)
       cv.num.iterations <- npValidatePositiveInteger(cv.num.iterations, "cv.num.iterations")
     spec <- .npscoef_canonical_spec(
@@ -1485,7 +1608,15 @@ npscoefbw.scbandwidth <-
             cv_progress_begin()
             
             if (i == 1) {
-              tbw <- .npscoef_default_start_bandwidth(param = x.scale, bwtype = bws$type, nobs = n)
+              tbw <- .npscoef_default_start_bandwidth(
+                param = x.scale,
+                bwtype = bws$type,
+                nobs = n,
+                start.controls = start.controls,
+                icon = dati$icon,
+                iord = dati$iord,
+                iuno = dati$iuno
+              )
               if (all(bws$bw != 0) &&
                   .npscoef_candidate_is_admissible(param = bws$bw, bwtype = bws$type, nobs = n)) {
                 tbw <- .npscoef_finalize_bandwidth(
@@ -1496,7 +1627,15 @@ npscoefbw.scbandwidth <-
                 )
               }
             } else {
-              tbw <- .npscoef_random_start_bandwidth(param = x.scale, bwtype = bws$type, nobs = n)
+              tbw <- .npscoef_random_start_bandwidth(
+                param = x.scale,
+                bwtype = bws$type,
+                nobs = n,
+                start.controls = start.controls,
+                icon = dati$icon,
+                iord = dati$iord,
+                iuno = dati$iuno
+              )
             }
 
             suppressWarnings(optim.return <- optim(tbw,
@@ -1507,7 +1646,15 @@ npscoefbw.scbandwidth <-
             attempts <- 0
             while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
               attempts <- attempts + 1
-              tbw <- .npscoef_random_start_bandwidth(param = x.scale, bwtype = bws$type, nobs = n)
+              tbw <- .npscoef_random_start_bandwidth(
+                param = x.scale,
+                bwtype = bws$type,
+                nobs = n,
+                start.controls = start.controls,
+                icon = dati$icon,
+                iord = dati$iord,
+                iuno = dati$iuno
+              )
               optim.control <- lapply(optim.control, '*', 10.0)
               suppressWarnings(optim.return <- optim(tbw,
                                                      fn = overall.cv.ls,
@@ -1776,6 +1923,12 @@ npscoefbw.default <-
            random.seed,
            regtype,
            ukertype,
+           lbc.init = 0.5,
+           hbc.init = 1.5,
+           cfac.init = 1.0,
+           lbd.init = 0.5,
+           hbd.init = 1.5,
+           dfac.init = 1.0,
            ...){
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")
     if (!missing(bwmethod) && identical(match.arg(bwmethod, c("cv.ls", "manual")), "manual") &&
@@ -1926,6 +2079,8 @@ npscoefbw.default <-
     margs <- c("zdat",
                "nmulti",
                "random.seed",
+               "lbc.init", "hbc.init", "cfac.init",
+               "lbd.init", "hbd.init", "dfac.init",
                "cv.iterate",
                "cv.num.iterations",
                "backfit.iterate",

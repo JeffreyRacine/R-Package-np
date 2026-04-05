@@ -81,6 +81,10 @@ test_that("bandwidth wrappers reject invalid scalar control flags", {
     npindexbw_sibandwidth(xdat = dat, ydat = dat$x, bws = bws, optim.maxit = 0),
     "'optim.maxit' must be a positive integer"
   )
+  expect_error(
+    npindexbw_sibandwidth(xdat = dat, ydat = dat$x, bws = bws, lbc.init = 0.6, hbc.init = 0.5),
+    "'hbc.init' must be greater than or equal to 'lbc.init'"
+  )
 
   expect_error(
     npscoefbw_scbandwidth(xdat = dat, ydat = dat$x, bws = bws, cv.iterate = c(TRUE, FALSE)),
@@ -89,6 +93,14 @@ test_that("bandwidth wrappers reject invalid scalar control flags", {
   expect_error(
     npscoefbw_scbandwidth(xdat = dat, ydat = dat$x, bws = bws, backfit.tol = 0),
     "'backfit.tol' must be a positive finite numeric scalar"
+  )
+  expect_error(
+    npscoefbw_scbandwidth(xdat = dat, ydat = dat$x, bws = bws, lbc.init = 0.8, hbc.init = 0.6),
+    "'hbc.init' must be greater than or equal to 'lbc.init'"
+  )
+  expect_error(
+    npscoefbw_scbandwidth(xdat = dat, ydat = dat$x, bws = bws, hbd.init = 2.1),
+    "categorical start factors must be less than or equal to 2"
   )
 
   expect_error(
