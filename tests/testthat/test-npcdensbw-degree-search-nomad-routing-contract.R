@@ -27,3 +27,18 @@ test_that("npcdensbw NOMAD degree search fails fast when crs is unavailable", {
     "crs missing"
   )
 })
+
+test_that("npcdensbw NOMAD shadow search keeps collective routing in manual-broadcast context", {
+  body_text <- paste(
+    deparse(body(get(".npcdensbw_nomad_search", envir = asNamespace("npRmpi"), inherits = FALSE))),
+    collapse = "\n"
+  )
+
+  expect_true(grepl(".npRmpi_has_active_slave_pool(comm = 1L)", body_text, fixed = TRUE))
+  expect_match(body_text, "getOption\\(\"npRmpi\\.local\\.regression\\.mode\",\\s*FALSE\\)")
+  expect_true(grepl("if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))", body_text, fixed = TRUE))
+  expect_true(grepl("search.result <- eval(mc, envir = environment())", body_text, fixed = TRUE))
+  expect_true(grepl("search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L,", body_text, fixed = TRUE))
+  expect_true(grepl("caller.execute = TRUE)", body_text, fixed = TRUE))
+  expect_false(grepl("!isTRUE(.npRmpi_autodispatch_called_from_bcast())", body_text, fixed = TRUE))
+})

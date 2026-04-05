@@ -1357,7 +1357,6 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   }
 
   if (.npRmpi_has_active_slave_pool(comm = 1L) &&
-      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     start.bw <- .npcdensbw_nomad_point_to_bw(x0[seq_len(bwdim)], template = template, setup = setup)
     prep <- .npcdensbw_nomad_shadow_prepare_args(
@@ -1429,7 +1428,11 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       )
     )
 
-    search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
+    if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
+      search.result <- eval(mc, envir = environment())
+    } else {
+      search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
+    }
     if (!is.null(search.result$num.feval.total))
       nomad.num.feval.total <- as.numeric(search.result$num.feval.total[1L])
     if (!is.null(search.result$num.feval.fast.total))
