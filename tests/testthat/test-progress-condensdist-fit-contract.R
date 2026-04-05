@@ -10,6 +10,25 @@ condensdist_fit_progress_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
+expect_condensdist_clean_powell_surface <- function(lines, pkg_pattern = "np", info = NULL) {
+  powell.lines <- grep(sprintf("^\\[%s\\] Refining bandwidth \\(", pkg_pattern), lines, value = TRUE)
+  detail.info <- if (!is.null(info)) info else paste(lines, collapse = "\n")
+
+  expect_true(length(powell.lines) > 0L, info = detail.info)
+  expect_true(
+    any(grepl(
+      sprintf("^\\[%s\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, degree \\([0-9]+\\)(, iter [0-9]+)?\\)$", pkg_pattern),
+      powell.lines
+    )),
+    info = paste(c(detail.info, powell.lines), collapse = "\n")
+  )
+  expect_false(any(grepl("best \\(", powell.lines)), info = paste(c(detail.info, powell.lines), collapse = "\n"))
+  expect_false(
+    any(grepl(sprintf("^\\[%s\\] Bandwidth selection \\(Refining NOMAD solution", pkg_pattern), lines)),
+    info = detail.info
+  )
+}
+
 make_condensdist_fit_progress_fixture <- function() {
   set.seed(20260404)
   n <- 18L
@@ -150,6 +169,7 @@ test_that("npcdens nomad to powell to fit route preserves single-line fit handof
   bandwidth.pos <- grep("^\\[np\\] Selecting degree and bandwidth", lines)
 
   expect_s3_class(actual$value, "condensity")
+  expect_condensdist_clean_powell_surface(lines, pkg_pattern = "np")
   expect_true(length(bandwidth.pos) > 0L)
   expect_true(length(powell.pos) > 0L)
   expect_true(length(fit.start.pos) == 1L)
