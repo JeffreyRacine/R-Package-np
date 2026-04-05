@@ -860,15 +860,56 @@
   )
 }
 
-.np_nomad_require_crs <- function() {
-  ok <- tryCatch({
-    suppressPackageStartupMessages(loadNamespace("crs"))
-    TRUE
-  }, error = function(e) FALSE)
+.np_nomad_require_crs <- function(version_fn = utils::packageVersion,
+                                  load_namespace = loadNamespace,
+                                  minimum_version = "0.15-41") {
+  minimum_version_label <- as.character(minimum_version)[1L]
+  minimum_version <- package_version(minimum_version_label)
 
-  if (!isTRUE(ok)) {
+  current_version <- tryCatch(
+    version_fn("crs"),
+    error = function(e) NULL
+  )
+
+  if (is.null(current_version)) {
     stop(
-      "automatic degree search with search.engine='nomad' requires the 'crs' package; install.packages('crs')",
+      sprintf(
+        "automatic degree search with search.engine='nomad' requires the 'crs' package (>= %s); install.packages('crs')",
+        minimum_version_label
+      ),
+      call. = FALSE
+    )
+  }
+
+  current_version <- package_version(as.character(current_version))
+
+  if (current_version < minimum_version) {
+    stop(
+      sprintf(
+        "automatic degree search with search.engine='nomad' requires 'crs' (>= %s); installed version is %s",
+        minimum_version_label,
+        as.character(current_version)
+      ),
+      call. = FALSE
+    )
+  }
+
+  load_result <- tryCatch(
+    {
+      suppressPackageStartupMessages(load_namespace("crs"))
+      TRUE
+    },
+    error = function(e) e
+  )
+
+  if (inherits(load_result, "error")) {
+    stop(
+      sprintf(
+        "automatic degree search with search.engine='nomad' requires 'crs' (>= %s); failed to load installed version %s: %s",
+        minimum_version_label,
+        as.character(current_version),
+        conditionMessage(load_result)
+      ),
       call. = FALSE
     )
   }
