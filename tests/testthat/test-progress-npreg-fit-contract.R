@@ -19,6 +19,22 @@ npreg_fit_progress_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
+expect_np_npreg_powell_progress_surface <- function(lines) {
+  powell.lines <- lines[grepl("^\\[np\\] Refining bandwidth \\(", lines)]
+  info <- paste(lines, collapse = "\n")
+
+  expect_true(length(powell.lines) > 0L, info = info)
+  expect_false(any(grepl(
+    "^\\[np\\] Refining NOMAD solution with one Powell hot start at degree ",
+    lines
+  )), info = info)
+  expect_false(any(grepl("best (", powell.lines, fixed = TRUE)), info = info)
+  expect_true(any(grepl(
+    "^\\[np\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, degree \\([^)]*\\), iter [0-9]+\\)$",
+    powell.lines
+  )), info = info)
+}
+
 make_npreg_fit_progress_fixture <- function() {
   set.seed(20260404)
   n <- 24L
@@ -142,7 +158,9 @@ test_that("npreg nomad to powell to fit route preserves single-line fit handoff"
     np.messages = TRUE,
     np.tree = FALSE,
     np.progress.start.grace.known.sec = 0,
-    np.progress.interval.known.sec = 0
+    np.progress.start.grace.unknown.sec = 0,
+    np.progress.interval.known.sec = 0,
+    np.progress.interval.unknown.sec = 0
   )
   on.exit(options(old_opts), add = TRUE)
 
@@ -150,13 +168,8 @@ test_that("npreg nomad to powell to fit route preserves single-line fit handoff"
     npreg(
       y ~ x,
       data = fixture$dat,
-      regtype = "lp",
-      degree.select = "coordinate",
-      degree.min = 0L,
+      nomad = TRUE,
       degree.max = 1L,
-      search.engine = "nomad+powell",
-      bwtype = "fixed",
-      bwmethod = "cv.ls",
       nmulti = 1L
     ),
     force_renderer = "single_line",
@@ -180,6 +193,7 @@ test_that("npreg nomad to powell to fit route preserves single-line fit handoff"
   expect_true(length(powell.pos) > 0L)
   expect_true(length(fit.start.pos) == 1L)
   expect_true(length(fit.finish.pos) >= 1L)
+  expect_np_npreg_powell_progress_surface(lines)
   expect_lt(max(bandwidth.pos), fit.start.pos[[1L]])
   expect_lt(max(powell.pos), fit.start.pos[[1L]])
   expect_lt(fit.start.pos[[1L]], fit.finish.pos[[1L]])
