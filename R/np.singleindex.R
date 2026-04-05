@@ -264,6 +264,7 @@ npindex.sibandwidth <-
     fit.start <- proc.time()[3]
     dots <- list(...)
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
+    fit.progress.allow <- isTRUE(.np_progress_enabled(domain = "bandwidth"))
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     errors <- npValidateScalarLogical(errors, "errors")
@@ -438,6 +439,14 @@ npindex.sibandwidth <-
     index.eval.df <- data.frame(index = as.vector(index.eval))
 
     regtype <- spec$regtype.engine
+    lc.fixed.progress.route <- identical(bws$method, "ichimura") &&
+      identical(regtype, "lc") &&
+      identical(bws$type, "fixed") &&
+      !gradients &&
+      !errors &&
+      !residuals &&
+      (no.ex || (!no.ex && no.ey)) &&
+      (fit.progress.allow || fit.progress.handoff)
     npreg.idx.args <- list(
       txdat = if (gradients) index.df else index,
       tydat = tydat,
@@ -453,7 +462,7 @@ npindex.sibandwidth <-
       npreg.idx.args$degree <- spec$degree.engine
       npreg.idx.args$bernstein.basis <- spec$bernstein.basis.engine
     }
-    npreg.idx.bw <- if (identical(regtype, "lp")) {
+    npreg.idx.bw <- if (identical(regtype, "lp") || lc.fixed.progress.route) {
       .np_index_regression_bw_state(
         index.df = index.df,
         ydat = tydat,
@@ -463,7 +472,7 @@ npindex.sibandwidth <-
       NULL
     }
     next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE) {
-      args <- if (identical(regtype, "lp")) {
+      args <- if (identical(regtype, "lp") || lc.fixed.progress.route) {
         c(
           list(
             bws = npreg.idx.bw,
@@ -491,7 +500,8 @@ npindex.sibandwidth <-
     fast.largeh <- FALSE
     fast.largeh.eval.mean <- NULL
     fast.largeh.train.mean <- NULL
-    if (identical(regtype, "lc") && !gradients && !errors && identical(bws$type, "fixed")) {
+    if (identical(regtype, "lc") && !gradients && !errors &&
+        identical(bws$type, "fixed") && !lc.fixed.progress.route) {
       gate.index <- if (no.ex) index else c(index, index.eval)
       fast.largeh <- .npindexbw_fast_eligible(
         h = as.double(bws$bw),
@@ -534,7 +544,7 @@ npindex.sibandwidth <-
     ## Next, if no gradients are requested, use (faster) npksum
 
     if(gradients==FALSE) {
-      if (identical(regtype, "lc")) {
+      if (identical(regtype, "lc") && !lc.fixed.progress.route) {
         if (fast.largeh) {
           index.mean <- rep.int(fast.largeh.eval.mean, length(index.eval))
         } else if (identical(bws$type, "fixed")) {
