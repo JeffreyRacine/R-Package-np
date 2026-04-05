@@ -168,6 +168,114 @@ npindexbw.NULL <-
   candidate$value
 }
 
+.npindexbw_nomad_fixed_h_scale <- function(fit, h.start.raw, nobs) {
+  scale <- .npindex_default_start_bandwidth(fit = fit, bwtype = "fixed", nobs = nobs)
+  if (!is.finite(scale) || scale <= 0) {
+    scale <- max(
+      if (is.finite(h.start.raw)) abs(as.double(h.start.raw)) else 0,
+      1e-3
+    )
+  }
+  as.double(scale)
+}
+
+.npindexbw_nomad_fixed_start_setup <- function(xmat,
+                                               ydat,
+                                               baseline.bws,
+                                               degree.search,
+                                               nmulti,
+                                               random.seed) {
+  p <- ncol(xmat)
+  nobs <- nrow(xmat)
+  beta.free <- if (p > 1L) seq_len(p - 1L) else integer(0)
+  h.col <- length(beta.free) + 1L
+  degree.col <- h.col + 1L
+
+  ols.fit <- lm(ydat ~ xmat, x = TRUE)
+  fit.proxy <- as.double(fitted(ols.fit))
+  fit.proxy[!is.finite(fit.proxy)] <- mean(ydat[is.finite(ydat)])
+  fit.proxy[!is.finite(fit.proxy)] <- 0
+
+  ols.beta <- if (length(beta.free)) {
+    as.double(coef(ols.fit)[3:ncol(ols.fit$x)])
+  } else {
+    numeric(0)
+  }
+  if (length(ols.beta))
+    ols.beta[!is.finite(ols.beta)] <- 0
+
+  beta.start.raw <- if (length(beta.free)) {
+    beta.user <- as.double(baseline.bws$beta[beta.free + 1L])
+    if (setequal(beta.user, c(0))) ols.beta else beta.user
+  } else {
+    numeric(0)
+  }
+  if (length(beta.start.raw))
+    beta.start.raw[!is.finite(beta.start.raw)] <- 0
+
+  if (isTRUE(all.equal(as.double(baseline.bws$bw[1L]), 0))) {
+    h.start.raw <- .npindex_default_start_bandwidth(fit = fit.proxy, bwtype = "fixed", nobs = nobs)
+  } else {
+    h.start.raw <- .npindex_finalize_bandwidth(
+      h = baseline.bws$bw[1L],
+      bwtype = "fixed",
+      nobs = nobs,
+      where = "npindexbw"
+    )
+  }
+  if (!is.finite(h.start.raw) || h.start.raw <= 0)
+    h.start.raw <- 1e-3
+
+  h.scale <- .npindexbw_nomad_fixed_h_scale(fit = fit.proxy, h.start.raw = h.start.raw, nobs = nobs)
+  degree.starts <- .np_lp_nomad_build_degree_starts(
+    initial = degree.search$start.degree,
+    lower = degree.search$lower,
+    upper = degree.search$upper,
+    basis = degree.search$basis,
+    nobs = degree.search$nobs,
+    nmulti = nmulti,
+    random.seed = random.seed,
+    user_supplied = isTRUE(degree.search$start.user)
+  )
+
+  start_matrix.raw <- matrix(0, nrow = nmulti, ncol = degree.col)
+  if (length(beta.free))
+    start_matrix.raw[1L, beta.free] <- beta.start.raw
+  start_matrix.raw[1L, h.col] <- h.start.raw
+  start_matrix.raw[, degree.col] <- as.integer(degree.starts[, 1L])
+
+  if (nmulti > 1L) {
+    seed.state <- .np_seed_enter(random.seed)
+    on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+
+    for (j in 2:nmulti) {
+      if (length(beta.free)) {
+        beta.rand <- runif(length(ols.beta), min = 0.5, max = 1.5) * ols.beta
+        beta.rand[!is.finite(beta.rand)] <- 0
+        start_matrix.raw[j, beta.free] <- beta.rand
+      }
+
+      h.rand <- .npindex_random_start_bandwidth(fit = fit.proxy, bwtype = "fixed", nobs = nobs)
+      if (!is.finite(h.rand) || h.rand <= 0)
+        h.rand <- h.start.raw
+      start_matrix.raw[j, h.col] <- h.rand
+    }
+  }
+
+  start_matrix.point <- start_matrix.raw
+  start_matrix.point[, h.col] <- start_matrix.point[, h.col] / h.scale
+
+  list(
+    beta.free = beta.free,
+    ols.beta = ols.beta,
+    h.col = h.col,
+    degree.col = degree.col,
+    h.scale = h.scale,
+    start_matrix.raw = start_matrix.raw,
+    start_matrix.point = start_matrix.point
+  )
+}
+
 .npindexbw_fast_eligible <- function(h, bws, eval.index) {
   if (!identical(bws$type, "fixed"))
     return(FALSE)
@@ -471,32 +579,104 @@ npindexbw.NULL <-
     y.clean <- as.double(y.clean)
 
   p <- ncol(x.clean)
-  beta.free <- if (p > 1L) seq_len(p - 1L) else integer(0)
-  beta.start <- if (length(beta.free)) as.double(baseline.bws$beta[beta.free + 1L]) else numeric(0)
-  h.start <- as.double(baseline.bws$bw[1L])
-  beta.bound <- if (length(beta.start)) pmax(10, 10 * abs(beta.start)) else numeric(0)
-  h.lower <- if (identical(baseline.bws$type, "fixed")) 1e-3 else 2
-  h.upper <- if (identical(baseline.bws$type, "fixed")) {
-    max(1e6, abs(h.start) * 1e3, 1)
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else max(1L, as.integer(opt.args$nmulti[1L]))
+  fixed.nomad <- identical(baseline.bws$type, "fixed")
+  fixed.setup <- if (fixed.nomad) {
+    .npindexbw_nomad_fixed_start_setup(
+      xmat = x.clean,
+      ydat = y.clean,
+      baseline.bws = baseline.bws,
+      degree.search = degree.search,
+      nmulti = nomad.nmulti,
+      random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L
+    )
+  } else {
+    NULL
+  }
+  beta.free <- if (fixed.nomad) fixed.setup$beta.free else if (p > 1L) seq_len(p - 1L) else integer(0)
+  beta.start <- if (fixed.nomad) {
+    if (length(beta.free)) as.double(fixed.setup$start_matrix.raw[1L, beta.free]) else numeric(0)
+  } else {
+    if (length(beta.free)) as.double(baseline.bws$beta[beta.free + 1L]) else numeric(0)
+  }
+  h.start.raw <- if (fixed.nomad) {
+    as.double(fixed.setup$start_matrix.raw[1L, fixed.setup$h.col])
+  } else {
+    as.double(baseline.bws$bw[1L])
+  }
+  beta.lower <- if (length(beta.start)) {
+    if (fixed.nomad) {
+      pmin(0.5 * fixed.setup$ols.beta, 1.5 * fixed.setup$ols.beta)
+    } else {
+      -pmax(10, 10 * abs(beta.start))
+    }
+  } else {
+    numeric(0)
+  }
+  beta.upper <- if (length(beta.start)) {
+    if (fixed.nomad) {
+      pmax(0.5 * fixed.setup$ols.beta, 1.5 * fixed.setup$ols.beta)
+    } else {
+      pmax(10, 10 * abs(beta.start))
+    }
+  } else {
+    numeric(0)
+  }
+  h.lower.raw <- if (fixed.nomad) 1e-3 else 2
+  h.upper.raw <- if (fixed.nomad) {
+    max(1e6, abs(h.start.raw) * 1e3, 1)
   } else {
     max(2L, as.integer(nrow(x.clean)) - 1L)
   }
+  gamma.start <- if (fixed.nomad) fixed.setup$start_matrix.point[1L, fixed.setup$h.col] else NA_real_
+  h.lower <- if (fixed.nomad) {
+    0.5
+  } else {
+    h.lower.raw
+  }
+  h.upper <- if (fixed.nomad) {
+    1.5
+  } else {
+    h.upper.raw
+  }
   h.integer <- !identical(baseline.bws$type, "fixed")
 
-  x0 <- c(beta.start, h.start, as.integer(degree.search$start.degree))
-  lb <- c(-beta.bound, h.lower, degree.search$lower)
-  ub <- c(beta.bound, h.upper, degree.search$upper)
+  x0 <- if (fixed.nomad) {
+    as.numeric(fixed.setup$start_matrix.point[1L, ])
+  } else {
+    c(beta.start, h.start.raw, as.integer(degree.search$start.degree))
+  }
+  lb <- c(beta.lower, h.lower, degree.search$lower)
+  ub <- c(beta.upper, h.upper, degree.search$upper)
   bbin <- c(rep.int(0L, length(beta.start)), if (isTRUE(h.integer)) 1L else 0L, 1L)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else max(1L, as.integer(opt.args$nmulti[1L]))
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
+  point_h_to_raw <- function(h.point) {
+    h.raw <- if (fixed.nomad) as.double(h.point) * fixed.setup$h.scale else as.double(h.point)
+    as.double(h.raw)
+  }
+
+  point_to_public <- function(point) {
+    point <- as.numeric(point)
+    if (length(point) >= (length(beta.free) + 1L))
+      point[length(beta.free) + 1L] <- point_h_to_raw(point[length(beta.free) + 1L])
+    point
+  }
+
+  bandwidth_point_to_public <- function(point) {
+    point <- as.numeric(point)
+    if (length(point))
+      point[length(point)] <- point_h_to_raw(point[length(point)])
+    point
+  }
+
   point_to_bws <- function(point) {
     beta.tail <- if (length(beta.free)) as.double(point[seq_along(beta.free)]) else numeric(0)
-    h <- as.double(point[length(beta.free) + 1L])
+    h <- point_h_to_raw(point[length(beta.free) + 1L])
     h <- .npindex_finalize_bandwidth(h = h, bwtype = baseline.bws$type, nobs = nrow(x.clean), where = "npindexbw")
     c(1.0, beta.tail, h)
   }
@@ -609,7 +789,7 @@ npindexbw.NULL <-
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
-  .np_nomad_search(
+  search.result <- .np_nomad_search(
     engine = degree.search$engine,
     baseline_record = baseline.record,
     start_degree = degree.search$start.degree,
@@ -633,6 +813,29 @@ npindexbw.NULL <-
       user_supplied = degree.search$start.user
     )
   )
+
+  if (fixed.nomad) {
+    if (!is.null(search.result$restart.starts)) {
+      search.result$restart.starts <- lapply(search.result$restart.starts, point_to_public)
+    }
+    if (!is.null(search.result$restart.bandwidth.starts)) {
+      search.result$restart.bandwidth.starts <- lapply(search.result$restart.bandwidth.starts, bandwidth_point_to_public)
+    }
+    if (!is.null(search.result$best_point) && length(search.result$best_point)) {
+      search.result$best_point <- point_to_public(search.result$best_point)
+    }
+    if (!is.null(search.result$restart.results) && length(search.result$restart.results)) {
+      search.result$restart.results <- lapply(search.result$restart.results, function(rec) {
+        if (!is.null(rec$start) && length(rec$start))
+          rec$start <- point_to_public(rec$start)
+        if (!is.null(rec$solution) && length(rec$solution))
+          rec$solution <- point_to_public(rec$solution)
+        rec
+      })
+    }
+  }
+
+  search.result
 }
 
 .npindexbw_degree_search_controls <- function(regtype,
