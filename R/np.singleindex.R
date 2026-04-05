@@ -463,16 +463,24 @@ npindex.sibandwidth <-
       NULL
     }
     next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE) {
-      args <- c(
-        list(
-          bws = npreg.idx.bw,
-          txdat = index.df,
-          tydat = tydat,
-          gradients = gradients,
-          warn.glp.gradient = FALSE
-        ),
-        if (!is.null(exdat)) list(exdat = exdat) else list()
-      )
+      args <- if (identical(regtype, "lp")) {
+        c(
+          list(
+            bws = npreg.idx.bw,
+            txdat = index.df,
+            tydat = tydat,
+            gradients = gradients,
+            warn.glp.gradient = FALSE
+          ),
+          if (!is.null(exdat)) list(exdat = exdat) else list()
+        )
+      } else {
+        c(
+          npreg.idx.args,
+          list(gradients = gradients),
+          if (!is.null(exdat)) list(exdat = exdat) else list()
+        )
+      }
       if (fit.progress.handoff) {
         args$.np_fit_progress_handoff <- TRUE
         fit.progress.handoff <<- FALSE
