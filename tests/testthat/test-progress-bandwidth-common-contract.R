@@ -11,6 +11,18 @@ shadow_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
+test_that("bandwidth compaction never abbreviates the Bandwidth selection prefix", {
+  compact_bandwidth <- getFromNamespace(".np_progress_compact_bandwidth_line", "np")
+
+  compacted <- compact_bandwidth(
+    "[np] Bandwidth selection (multistart 2/2, iteration 84, elapsed 10.0s, 99.9%, eta 0.0s)",
+    max_width = 74L
+  )
+
+  expect_true(grepl("Bandwidth selection \\(", compacted))
+  expect_false(grepl("Bandwidth sel \\(", compacted))
+})
+
 test_that("unknown-bound NOMAD restart detail drops synthetic percent and eta", {
   nomad_detail <- getFromNamespace(".np_nomad_progress_detail", "np")
 
