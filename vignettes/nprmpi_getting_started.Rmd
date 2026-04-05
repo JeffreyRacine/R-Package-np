@@ -71,7 +71,8 @@ generic optimizer alias: it fills only missing LP degree-search controls and
 leaves compatible explicit overrides in place.
 
 ```{r}
-if (requireNamespace("crs", quietly = TRUE)) {
+if (requireNamespace("crs", quietly = TRUE) &&
+    utils::packageVersion("crs") >= package_version("0.15-41")) {
   npRmpi.init(nslaves = 1)
 
   set.seed(7)
