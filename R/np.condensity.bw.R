@@ -852,6 +852,29 @@ npcdensbw.conbandwidth <-
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
+  direct.meta.context <- if (is.recursive(bws) &&
+                             !is.null(bws$nconfac) &&
+                             !is.null(bws$ncatfac) &&
+                             !is.null(bws$sdev) &&
+                             !identical(bws$nconfac, NA) &&
+                             !identical(bws$ncatfac, NA) &&
+                             !identical(bws$sdev, NA)) {
+    list(
+      nconfac = bws$nconfac,
+      ncatfac = bws$ncatfac,
+      sdev = bws$sdev
+    )
+  } else {
+    txmat <- toMatrix(xdat)
+    tymat <- toMatrix(ydat)
+    xcon <- txmat[, template$ixcon, drop = FALSE]
+    ycon <- tymat[, template$iycon, drop = FALSE]
+    list(
+      nconfac = nrow(xdat)^(-1.0 / (2.0 * template$cxkerorder + template$ncon)),
+      ncatfac = nrow(xdat)^(-2.0 / (2.0 * template$cxkerorder + template$ncon)),
+      sdev = EssDee(data.frame(xcon, ycon))
+    )
+  }
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -919,6 +942,10 @@ npcdensbw.conbandwidth <-
         reg.args = final.reg.args
       )
       payload <- tbw
+      payload$nconfac <- direct.meta.context$nconfac
+      payload$ncatfac <- direct.meta.context$ncatfac
+      payload$sdev <- direct.meta.context$sdev
+      payload <- .np_refresh_xy_bandwidth_metadata(payload)
       payload$method <- if (!is.null(payload$method) && length(payload$method)) {
         as.character(payload$method[1L])
       } else if (!is.null(reg.args$bwmethod) && length(reg.args$bwmethod)) {
