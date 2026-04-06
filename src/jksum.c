@@ -18680,6 +18680,7 @@ double *cv){
 
   int * operator = NULL;
   int gate_override_active = 0;
+  int all_large_gate = 0;
   int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
@@ -18875,6 +18876,36 @@ double *cv){
       gate_override_active = 1;
     }
   }
+
+  all_large_gate = (BANDWIDTH_den == BW_FIXED) && gate_override_active;
+  if(all_large_gate){
+    for(i = 0; i < num_reg_continuous; i++){
+      const double bw = matrix_bandwidth[i][0];
+      if((ov_cont_ok == NULL) || (!ov_cont_ok[i]) || (!isfinite(bw)) ||
+         (bw <= 0.0) || (bw < ov_cont_hmin[i])){
+        all_large_gate = 0;
+        break;
+      }
+    }
+  }
+  if(all_large_gate){
+    for(i = 0; i < num_reg_unordered; i++){
+      if((ov_disc_uno_ok == NULL) || (!ov_disc_uno_ok[i])){
+        all_large_gate = 0;
+        break;
+      }
+    }
+  }
+  if(all_large_gate){
+    for(i = 0; i < num_reg_ordered; i++){
+      if((ov_disc_ord_ok == NULL) || (!ov_disc_ord_ok[i])){
+        all_large_gate = 0;
+        break;
+      }
+    }
+  }
+  if(all_large_gate)
+    np_fastcv_alllarge_hits++;
 
   kernel_weighted_sum_np_ctx(kernel_c,
                          kernel_u,
