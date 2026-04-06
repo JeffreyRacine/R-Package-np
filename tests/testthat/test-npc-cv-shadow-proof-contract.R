@@ -702,6 +702,138 @@ test_that("generalized-nn cdist cvls LP stream avoids dense row storage", {
   expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_obs|num_obs_train_extern)[^\\)]*(num_obs|num_obs_train_extern)", body))
 })
 
+test_that("LP all-large conditional fast helpers stay memory-lean", {
+  lines <- read_shadow_proof_src("jksum.c")
+  start <- grep("^static int np_conditional_lp_all_large_ctx_prepare\\(", lines)
+  stop <- grep("^int np_conditional_density_cvml_lp_stream\\(", lines)
+
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_lt(start, stop)
+
+  body <- paste(lines[start:(stop - 1L)], collapse = "\n")
+
+  expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_train|num_obs_train_extern)[^\\)]*(num_train|num_obs_train_extern)", body))
+  expect_false(grepl("\\bdiag\\s*\\(", body))
+})
+
+test_that("shadow density LP all-large fixed objectives stay exact and count fast hits", {
+  set.seed(615)
+  n <- 48L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rbeta(n, 1 + x$x, 2 - x$x))
+  degree <- 1L
+
+  bw.ll.ml <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.17, 1e6),
+    bandwidth.compute = FALSE,
+    regtype = "ll",
+    bwmethod = "cv.ml"
+  )
+  bw.lp.ml <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.17, 1e6),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwmethod = "cv.ml"
+  )
+  bw.ll.ls <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.17, 1e6),
+    bandwidth.compute = FALSE,
+    regtype = "ll",
+    bwmethod = "cv.ls"
+  )
+  bw.lp.ls <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.17, 1e6),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwmethod = "cv.ls"
+  )
+
+  sh.ll.ml <- call_shadow_density(bw.ll.ml, x, y, criterion = "cv.ml", compare_old = FALSE)
+  sh.lp.ml <- call_shadow_density(bw.lp.ml, x, y, criterion = "cv.ml", compare_old = FALSE)
+  sh.ll.ls <- call_shadow_density(bw.ll.ls, x, y, criterion = "cv.ls", compare_old = FALSE)
+  sh.lp.ls <- call_shadow_density(bw.lp.ls, x, y, criterion = "cv.ls", compare_old = FALSE)
+
+  ev.ll.ml <- np:::.npcdensbw_eval_only(x, y, bw.ll.ml)
+  ev.lp.ml <- np:::.npcdensbw_eval_only(x, y, bw.lp.ml)
+  ev.ll.ls <- np:::.npcdensbw_eval_only(x, y, bw.ll.ls)
+  ev.lp.ls <- np:::.npcdensbw_eval_only(x, y, bw.lp.ls)
+
+  expect_equal(-ev.ll.ml$objective, sh.ll.ml$new, tolerance = 1e-10)
+  expect_equal(-ev.lp.ml$objective, sh.lp.ml$new, tolerance = 1e-10)
+  expect_equal(-ev.ll.ls$objective, sh.ll.ls$new, tolerance = 1e-10)
+  expect_equal(-ev.lp.ls$objective, sh.lp.ls$new, tolerance = 1e-10)
+  expect_equal(ev.ll.ml$objective, ev.lp.ml$objective, tolerance = 1e-10)
+  expect_equal(ev.ll.ls$objective, ev.lp.ls$objective, tolerance = 1e-10)
+  expect_gt(ev.ll.ml$num.feval.fast, 0)
+  expect_gt(ev.lp.ml$num.feval.fast, 0)
+  expect_gt(ev.ll.ls$num.feval.fast, 0)
+  expect_gt(ev.lp.ls$num.feval.fast, 0)
+})
+
+test_that("shadow distribution LP all-large fixed objective stays exact and counts fast hits", {
+  set.seed(616)
+  n <- 44L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rbeta(n, 1 + x$x, 2 - x$x))
+  degree <- 1L
+
+  bw.ll <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.17, 1e6),
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.17, 1e6),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree
+  )
+
+  sh.ll <- call_shadow_distribution(
+    bw.ll,
+    x,
+    y,
+    yeval = y,
+    cdfontrain = TRUE,
+    compare_old = FALSE
+  )
+  sh.lp <- call_shadow_distribution(
+    bw.lp,
+    x,
+    y,
+    yeval = y,
+    cdfontrain = TRUE,
+    compare_old = FALSE
+  )
+
+  ev.ll <- np:::.npcdistbw_eval_only(x, y, bws = bw.ll, do.full.integral = TRUE)
+  ev.lp <- np:::.npcdistbw_eval_only(x, y, bws = bw.lp, do.full.integral = TRUE)
+
+  expect_equal(ev.ll$objective, sh.ll$new, tolerance = 1e-10)
+  expect_equal(ev.lp$objective, sh.lp$new, tolerance = 1e-10)
+  expect_equal(ev.ll$objective, ev.lp$objective, tolerance = 1e-10)
+  expect_gt(ev.ll$num.feval.fast, 0)
+  expect_gt(ev.lp$num.feval.fast, 0)
+})
+
 test_that("kernelcv no longer references dense shadow proof helpers", {
   lines <- read_shadow_proof_src("kernelcv.c")
 
