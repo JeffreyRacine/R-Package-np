@@ -41,3 +41,34 @@ test_that("npcdensbw direct nomad payload preserves CV metadata", {
   expect_false(grepl("Manual", printed, fixed = TRUE))
   expect_match(printed, "achieved on multistart 1", fixed = TRUE)
 })
+
+test_that("npcdens direct nomad payload retains summary bandwidth metadata", {
+  skip_if_not_installed("crs")
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, npRmpi.autodispatch = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(42)
+  n <- 500L
+  x <- runif(n)
+  y <- rbeta(n, 1 + x, 2 - x)
+
+  fit <- npcdens(
+    y ~ x,
+    nomad = TRUE,
+    search.engine = "nomad",
+    cykerbound = "range"
+  )
+
+  expect_false(identical(fit$bws$sumNum, NA))
+  expect_false(identical(fit$bws$bandwidth, NA))
+  expect_false(identical(fit$bws$sfactor, NA))
+  expect_gt(as.numeric(fit$bws$num.feval.fast[1L]), 0)
+
+  summary_text <- expect_warning(capture.output(summary(fit$bws)), NA)
+  summary_text <- paste(summary_text, collapse = "\n")
+  expect_match(summary_text, "Exp\\. Var\\. Name:", perl = TRUE)
+  expect_match(summary_text, "Dep\\. Var\\. Name:", perl = TRUE)
+})
