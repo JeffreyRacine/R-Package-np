@@ -1,0 +1,78 @@
+test_that("npRmpi LP all-large fixed conditional routes match serial np and count fast hits", {
+  skip_on_cran()
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(np))",
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "options(np.messages = FALSE)",
+      "npRmpi.init(nslaves = 1, quiet = TRUE)",
+      "on.exit(try(npRmpi.quit(), silent = TRUE), add = TRUE)",
+      "tol <- 1e-10",
+      "set.seed(615)",
+      "n <- 48L",
+      "x <- data.frame(x = runif(n))",
+      "y <- data.frame(y = rbeta(n, 1 + x$x, 2 - x$x))",
+      "deg <- 1L",
+      "bw_np_ll_ml  <- np::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'll', bwmethod = 'cv.ml')",
+      "bw_np_lp_ml  <- np::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'lp', basis = 'glp', degree = deg, bwmethod = 'cv.ml')",
+      "bw_np_ll_ls  <- np::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'll', bwmethod = 'cv.ls')",
+      "bw_np_lp_ls  <- np::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'lp', basis = 'glp', degree = deg, bwmethod = 'cv.ls')",
+      "bw_np_ctrl   <- np::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 0.35), bandwidth.compute = FALSE, regtype = 'll', bwmethod = 'cv.ml')",
+      "bw_mpi_ll_ml <- npRmpi::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'll', bwmethod = 'cv.ml')",
+      "bw_mpi_lp_ml <- npRmpi::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'lp', basis = 'glp', degree = deg, bwmethod = 'cv.ml')",
+      "bw_mpi_ll_ls <- npRmpi::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'll', bwmethod = 'cv.ls')",
+      "bw_mpi_lp_ls <- npRmpi::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'lp', basis = 'glp', degree = deg, bwmethod = 'cv.ls')",
+      "bw_mpi_ctrl  <- npRmpi::npcdensbw(xdat = x, ydat = y, bws = c(0.17, 0.35), bandwidth.compute = FALSE, regtype = 'll', bwmethod = 'cv.ml')",
+      "out_np_ll_ml  <- np:::.npcdensbw_eval_only(x, y, bw_np_ll_ml)",
+      "out_np_lp_ml  <- np:::.npcdensbw_eval_only(x, y, bw_np_lp_ml)",
+      "out_np_ll_ls  <- np:::.npcdensbw_eval_only(x, y, bw_np_ll_ls)",
+      "out_np_lp_ls  <- np:::.npcdensbw_eval_only(x, y, bw_np_lp_ls)",
+      "out_np_ctrl   <- np:::.npcdensbw_eval_only(x, y, bw_np_ctrl)",
+      "out_mpi_ll_ml <- npRmpi:::.npcdensbw_eval_only(x, y, bw_mpi_ll_ml)",
+      "out_mpi_lp_ml <- npRmpi:::.npcdensbw_eval_only(x, y, bw_mpi_lp_ml)",
+      "out_mpi_ll_ls <- npRmpi:::.npcdensbw_eval_only(x, y, bw_mpi_ll_ls)",
+      "out_mpi_lp_ls <- npRmpi:::.npcdensbw_eval_only(x, y, bw_mpi_lp_ls)",
+      "out_mpi_ctrl  <- npRmpi:::.npcdensbw_eval_only(x, y, bw_mpi_ctrl)",
+      "stopifnot(abs(out_np_ll_ml$objective - out_mpi_ll_ml$objective) < tol)",
+      "stopifnot(abs(out_np_lp_ml$objective - out_mpi_lp_ml$objective) < tol)",
+      "stopifnot(abs(out_np_ll_ls$objective - out_mpi_ll_ls$objective) < tol)",
+      "stopifnot(abs(out_np_lp_ls$objective - out_mpi_lp_ls$objective) < tol)",
+      "stopifnot(abs(out_mpi_ll_ml$objective - out_mpi_lp_ml$objective) < tol)",
+      "stopifnot(abs(out_mpi_ll_ls$objective - out_mpi_lp_ls$objective) < tol)",
+      "stopifnot(as.integer(out_mpi_ll_ml$num.feval.fast) > 0L, as.integer(out_mpi_lp_ml$num.feval.fast) > 0L)",
+      "stopifnot(as.integer(out_mpi_ll_ls$num.feval.fast) > 0L, as.integer(out_mpi_lp_ls$num.feval.fast) > 0L)",
+      "stopifnot(identical(as.integer(out_mpi_ctrl$num.feval.fast), 0L))",
+      "set.seed(616)",
+      "n <- 44L",
+      "x <- data.frame(x = runif(n))",
+      "y <- data.frame(y = rbeta(n, 1 + x$x, 2 - x$x))",
+      "bw_np_ll <- np::npcdistbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'll')",
+      "bw_np_lp <- np::npcdistbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'lp', basis = 'glp', degree = 1L)",
+      "bw_np_cd_ctrl <- np::npcdistbw(xdat = x, ydat = y, bws = c(0.17, 0.35), bandwidth.compute = FALSE, regtype = 'll')",
+      "bw_mpi_ll <- npRmpi::npcdistbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'll')",
+      "bw_mpi_lp <- npRmpi::npcdistbw(xdat = x, ydat = y, bws = c(0.17, 1e6), bandwidth.compute = FALSE, regtype = 'lp', basis = 'glp', degree = 1L)",
+      "bw_mpi_cd_ctrl <- npRmpi::npcdistbw(xdat = x, ydat = y, bws = c(0.17, 0.35), bandwidth.compute = FALSE, regtype = 'll')",
+      "out_np_cd_ll <- np:::.npcdistbw_eval_only(x, y, bws = bw_np_ll, do.full.integral = TRUE)",
+      "out_np_cd_lp <- np:::.npcdistbw_eval_only(x, y, bws = bw_np_lp, do.full.integral = TRUE)",
+      "out_np_cd_ctrl <- np:::.npcdistbw_eval_only(x, y, bws = bw_np_cd_ctrl, do.full.integral = TRUE)",
+      "out_mpi_cd_ll <- npRmpi:::.npcdistbw_eval_only(x, y, bws = bw_mpi_ll, do.full.integral = TRUE)",
+      "out_mpi_cd_lp <- npRmpi:::.npcdistbw_eval_only(x, y, bws = bw_mpi_lp, do.full.integral = TRUE)",
+      "out_mpi_cd_ctrl <- npRmpi:::.npcdistbw_eval_only(x, y, bws = bw_mpi_cd_ctrl, do.full.integral = TRUE)",
+      "stopifnot(abs(out_np_cd_ll$objective - out_mpi_cd_ll$objective) < tol)",
+      "stopifnot(abs(out_np_cd_lp$objective - out_mpi_cd_lp$objective) < tol)",
+      "stopifnot(abs(out_mpi_cd_ll$objective - out_mpi_cd_lp$objective) < tol)",
+      "stopifnot(as.integer(out_mpi_cd_ll$num.feval.fast) > 0L, as.integer(out_mpi_cd_lp$num.feval.fast) > 0L)",
+      "stopifnot(identical(as.integer(out_mpi_cd_ctrl$num.feval.fast), 0L))",
+      "cat('NPC_LARGEH_LP_FAST_MPI_OK\\n')"
+    ),
+    timeout = 90L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("NPC_LARGEH_LP_FAST_MPI_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
