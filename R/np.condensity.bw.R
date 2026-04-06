@@ -625,7 +625,7 @@ npcdensbw.conbandwidth <-
 
   list(
     objective = as.numeric(out$fval[1L]),
-    num.feval = 1L,
+    num.feval = as.numeric(out$eval.history[1L]),
     num.feval.fast = as.numeric(out$fast.history[1L])
   )
 }

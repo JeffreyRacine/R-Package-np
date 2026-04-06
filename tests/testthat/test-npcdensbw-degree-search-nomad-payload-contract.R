@@ -69,3 +69,40 @@ test_that("npcdens direct nomad payload retains summary bandwidth metadata", {
   expect_match(summary_text, "Exp\\. Var\\. Name:", perl = TRUE)
   expect_match(summary_text, "Dep\\. Var\\. Name:", perl = TRUE)
 })
+
+test_that("npcdens fast accounting counts baseline probes as evaluations", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+  suppressPackageStartupMessages(library(np))
+
+  set.seed(42)
+  n <- 250L
+  x <- runif(n)
+  y <- runif(n)
+
+  fit <- np::npcdens(
+    y ~ x,
+    nomad = TRUE,
+    search.engine = "nomad",
+    cykerbound = "range"
+  )
+
+  expect_gt(as.numeric(fit$bws$num.feval.fast[1L]), 0)
+  expect_lte(
+    as.numeric(fit$bws$num.feval.fast[1L]),
+    as.numeric(fit$bws$num.feval[1L])
+  )
+
+  ev <- np:::.npcdensbw_eval_only(
+    data.frame(x = x),
+    data.frame(y = y),
+    fit$bws,
+    invalid.penalty = "baseline",
+    penalty.multiplier = 10
+  )
+
+  expect_equal(as.numeric(ev$num.feval), 2)
+  expect_equal(as.numeric(ev$num.feval.fast), 2)
+})

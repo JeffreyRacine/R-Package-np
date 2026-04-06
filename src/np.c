@@ -6304,6 +6304,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     double baseline;
     if (pmult < 1.0) pmult = 1.0;
     baseline = bwmfunc_raw(vector_scale_factor);
+    /* Penalty-baseline probes are real objective evaluations and must be
+       included in the evaluation/invalid accounting. */
+    bwm_eval_count += 1.0;
+    if (!R_FINITE(baseline) || baseline == DBL_MAX)
+      bwm_invalid_count += 1.0;
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
       double *tmp = alloc_vecd(num_all_var + 1);
       for (i = 1; i <= num_all_var; i++)
@@ -6321,6 +6326,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
         tmp[idx] = 0.5;
       }
       baseline = bwmfunc_raw(tmp);
+      bwm_eval_count += 1.0;
+      if (!R_FINITE(baseline) || baseline == DBL_MAX)
+        bwm_invalid_count += 1.0;
       safe_free(tmp);
     }
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
