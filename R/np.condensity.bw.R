@@ -680,7 +680,7 @@ npcdensbw.conbandwidth <-
 
   list(
     objective = as.numeric(out$fval[1L]),
-    num.feval = 1L,
+    num.feval = as.numeric(out$eval.history[1L]),
     num.feval.fast = as.numeric(out$fast.history[1L])
   )
 }
@@ -975,14 +975,14 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       bw = as.double(flat.bw),
       degree = as.integer(degree)
     )
-    nomad.num.feval.total <<- nomad.num.feval.total + 1L
-    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out[2L])
+    nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out[2L])
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out[3L])
 
     list(
       objective = as.numeric(out[1L]),
       degree = degree,
-      num.feval = 1L,
-      num.feval.fast = as.numeric(out[2L])
+      num.feval = as.numeric(out[2L]),
+      num.feval.fast = as.numeric(out[3L])
     )
   }
 

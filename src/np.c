@@ -2116,6 +2116,9 @@ static void np_conditional_density_nomad_shadow_refresh_penalty(void)
       pmult = 1.0;
 
     baseline = bwmfunc_raw(np_conditional_density_nomad_shadow.vector_scale_factor);
+    bwm_eval_count += 1.0;
+    if (!R_FINITE(baseline) || baseline == DBL_MAX)
+      bwm_invalid_count += 1.0;
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
       double *tmp = alloc_vecd(np_conditional_density_nomad_shadow.num_all_var + 1);
       if (tmp == NULL)
@@ -2134,6 +2137,9 @@ static void np_conditional_density_nomad_shadow_refresh_penalty(void)
         tmp[idx] = 0.5;
       }
       baseline = bwmfunc_raw(tmp);
+      bwm_eval_count += 1.0;
+      if (!R_FINITE(baseline) || baseline == DBL_MAX)
+        bwm_invalid_count += 1.0;
       safe_free(tmp);
     }
 
@@ -2852,7 +2858,7 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
 {
   SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   int i;
-  double val, fast = 0.0, fast_before = 0.0;
+  double val, fast = 0.0, fast_before = 0.0, evals = 0.0, eval_before = 0.0;
 
   if (!np_conditional_density_nomad_shadow.active)
     error("resident npcdens NOMAD shadow state is not active");
@@ -2874,9 +2880,10 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
     val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
-    PROTECT(out = allocVector(REALSXP, 2));
+    PROTECT(out = allocVector(REALSXP, 3));
     REAL(out)[0] = -val;
-    REAL(out)[1] = 0.0;
+    REAL(out)[1] = 1.0;
+    REAL(out)[2] = 0.0;
     UNPROTECT(3);
     return out;
   }
@@ -2888,16 +2895,23 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     bwm_penalty_mode = 0;
     bwm_penalty_value = DBL_MAX;
   }
+  eval_before = bwm_eval_count;
   fast_before = np_fastcv_alllarge_hits_get();
   val = bwmfunc_wrapper(np_conditional_density_nomad_shadow.vector_scale_factor);
   fast = np_fastcv_alllarge_hits_get() - fast_before;
+  evals = bwm_eval_count - eval_before;
   if (fast < 0.0)
     fast = 0.0;
+  if (evals < 0.0)
+    evals = 0.0;
 
   if ((!R_FINITE(val) || val == DBL_MAX) &&
       np_conditional_density_nomad_shadow.penalty_mode == 1) {
     np_conditional_density_nomad_shadow_refresh_penalty();
     val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
+    evals = bwm_eval_count - eval_before;
+    if (evals < 0.0)
+      evals = 0.0;
   }
 
   if ((BANDWIDTH_den_extern == BW_FIXED) &&
@@ -2922,9 +2936,10 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     fast = 0.0;
   }
 
-  PROTECT(out = allocVector(REALSXP, 2));
+  PROTECT(out = allocVector(REALSXP, 3));
   REAL(out)[0] = -val;
-  REAL(out)[1] = fast;
+  REAL(out)[1] = evals;
+  REAL(out)[2] = fast;
   UNPROTECT(3);
   return out;
 }
@@ -6773,6 +6788,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     double baseline;
     if (pmult < 1.0) pmult = 1.0;
     baseline = bwmfunc_raw(vector_scale_factor);
+    /* Penalty-baseline probes are real objective evaluations and must be
+       included in the evaluation/invalid accounting. */
+    bwm_eval_count += 1.0;
+    if (!R_FINITE(baseline) || baseline == DBL_MAX)
+      bwm_invalid_count += 1.0;
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
       double *tmp = alloc_vecd(num_all_var + 1);
       for (i = 1; i <= num_all_var; i++)
@@ -6790,6 +6810,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
         tmp[idx] = 0.5;
       }
       baseline = bwmfunc_raw(tmp);
+      bwm_eval_count += 1.0;
+      if (!R_FINITE(baseline) || baseline == DBL_MAX)
+        bwm_invalid_count += 1.0;
       safe_free(tmp);
     }
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
