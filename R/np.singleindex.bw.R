@@ -786,19 +786,21 @@ npindexbw.NULL <-
 
   fit.loo <- if (identical(spec$regtype.engine, "lc")) {
     tww <- tryCatch(
-      npksum(
-        txdat = index,
-        tydat = wmat,
-        weights = wmat,
-        leave.one.out = TRUE,
-        bandwidth.divide = TRUE,
-        bws = c(h),
-        bwtype = bws$type,
-        ckertype = bws$ckertype,
-        ckerorder = bws$ckerorder,
-        ckerbound = bws$ckerbound,
-        ckerlb = bws$ckerlb,
-        ckerub = bws$ckerub
+      .npRmpi_with_local_regression(
+        npksum(
+          txdat = index,
+          tydat = wmat,
+          weights = wmat,
+          leave.one.out = TRUE,
+          bandwidth.divide = TRUE,
+          bws = c(h),
+          bwtype = bws$type,
+          ckertype = bws$ckertype,
+          ckerorder = bws$ckerorder,
+          ckerbound = bws$ckerbound,
+          ckerlb = bws$ckerlb,
+          ckerub = bws$ckerub
+        )
       )$ksum,
       error = function(e) NULL
     )
