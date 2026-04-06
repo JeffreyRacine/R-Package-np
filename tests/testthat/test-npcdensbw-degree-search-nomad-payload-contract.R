@@ -73,7 +73,7 @@ test_that("npcdens direct nomad payload retains summary bandwidth metadata", {
   expect_match(summary_text, "Dep\\. Var\\. Name:", perl = TRUE)
 })
 
-test_that("npcdens fast accounting counts baseline probes as evaluations", {
+test_that("npcdens NOMAD accounting is owner-level on fast-path fits", {
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -107,6 +107,6 @@ test_that("npcdens fast accounting counts baseline probes as evaluations", {
     penalty.multiplier = 10
   )
 
-  expect_equal(as.numeric(ev$num.feval), 2)
-  expect_equal(as.numeric(ev$num.feval.fast), 2)
+  expect_equal(as.numeric(ev$num.feval), 1)
+  expect_equal(as.numeric(ev$num.feval.fast), 1)
 })

@@ -893,7 +893,7 @@ npcdistbw.condbandwidth <-
   list(
     objective = as.numeric(out$fval[1L]),
     num.feval = 1L,
-    num.feval.fast = as.numeric(out$fast.history[1L])
+    num.feval.fast = as.numeric(as.numeric(out$fast.history[1L]) > 0)
   )
 }
 
