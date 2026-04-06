@@ -5444,6 +5444,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   objective_function_values[0]=fret;
   objective_function_evals[0]=bwm_eval_count;
   objective_function_invalid[0]=bwm_invalid_count;
+  bwm_snapshot_fast_counters();
   fast_eval_total += bwm_fast_eval_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
@@ -5605,6 +5606,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
       objective_function_values[iMs_counter]=fret;
       objective_function_evals[iMs_counter]=bwm_eval_count;
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
+      bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
       np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
