@@ -55,6 +55,14 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/oneoff/run_oneoff_suite.
   --out_manifest=/tmp/nprmpi_oneoff_suite_manifest.csv
 ```
 
+Operational note:
+
+- the suite runner is designed to launch each child benchmark in an isolated
+  MPI process rather than reusing slave state across cases;
+- for custom one-off wrappers, prefer the same pattern: detached child launch,
+  `NP_RMPI_NO_REUSE_SLAVES=1`, and explicit child cleanup/finalization on exit
+  (`npRmpi.quit(force = TRUE)` and, where available, `mpi.finalize()`).
+
 ## Canonical Implementation Directive (2026-03-05)
 
 This repository follows a strict canonical execution rule:
