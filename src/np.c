@@ -1331,6 +1331,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         int * myopti, double * myoptd, double * myans, double * fval,
                         double * objective_function_values, double * objective_function_evals,
                         double * objective_function_invalid, double * timing,
+                        double * objective_function_fast,
                         int * penalty_mode, double * penalty_mult,
                         double * ckerlb, double * ckerub);
 void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
@@ -3603,7 +3604,7 @@ SEXP C_np_distribution_bw(SEXP myuno,
   SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
-  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -3635,32 +3636,36 @@ SEXP C_np_distribution_bw(SEXP myuno,
   PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
+  PROTECT(out_fast = allocVector(REALSXP, 1));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_distribution_bw(REAL(myuno_r), REAL(myord_r), REAL(mycon_r),
                      REAL(myeuno_r), REAL(myeord_r), REAL(myecon_r), REAL(mysd_r),
                      INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                      REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
+                     REAL(out_fast),
                      &pmode, &pmult, ckerlb_p, ckerub_p);
 
-  PROTECT(out = allocVector(VECSXP, 6));
+  PROTECT(out = allocVector(VECSXP, 7));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
   SET_VECTOR_ELT(out, 3, out_eval_hist);
   SET_VECTOR_ELT(out, 4, out_invalid_hist);
   SET_VECTOR_ELT(out, 5, out_timing);
+  SET_VECTOR_ELT(out, 6, out_fast);
 
-  PROTECT(out_names = allocVector(STRSXP, 6));
+  PROTECT(out_names = allocVector(STRSXP, 7));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
   SET_STRING_ELT(out_names, 3, mkChar("eval.history"));
   SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
+  SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(20);
+  UNPROTECT(21);
   return out;
 }
 
@@ -4936,6 +4941,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         int * myopti, double * myoptd, double * myans, double * fval,
                         double * objective_function_values, double * objective_function_evals,
                         double * objective_function_invalid, double * timing,
+                        double * objective_function_fast,
                         int * penalty_mode, double * penalty_mult,
                         double * ckerlb, double * ckerub){
   int_nn_k_min_extern = 1;
@@ -4959,6 +4965,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int dfc_dir;
   
   int i,j;
+  double fast_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int enforce_fixed_feasibility;
@@ -5437,6 +5444,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   objective_function_values[0]=fret;
   objective_function_evals[0]=bwm_eval_count;
   objective_function_invalid[0]=bwm_invalid_count;
+  fast_eval_total += bwm_fast_eval_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
   if(iMultistart == IMULTI_TRUE){
@@ -5597,6 +5605,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
       objective_function_values[iMs_counter]=fret;
       objective_function_evals[iMs_counter]=bwm_eval_count;
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
+      fast_eval_total += bwm_fast_eval_count;
       np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
@@ -5662,6 +5671,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   fval[0] = fret;
   fval[1] = iImproved;
+  objective_function_fast[0] = fast_eval_total;
 
   /* end return data */
 
