@@ -15,6 +15,7 @@ test_that("npudens exposes unconditional fast counts in bandwidth summary", {
 
   expect_true(is.finite(as.numeric(fit$bws$num.feval[1L])))
   expect_true(is.finite(as.numeric(fit$bws$num.feval.fast[1L])))
+  expect_gt(as.numeric(fit$bws$num.feval.fast[1L]), 0)
   expect_lte(as.numeric(fit$bws$num.feval.fast[1L]), as.numeric(fit$bws$num.feval[1L]))
 
   txt <- paste(capture.output(summary(fit$bws)), collapse = "\n")
