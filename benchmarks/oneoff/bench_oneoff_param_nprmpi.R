@@ -353,7 +353,12 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   dir.create(dirname(cfg$out_summary), recursive = TRUE, showWarnings = FALSE)
 
   npRmpi.init(nslaves = cfg$nslaves)
-  on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)
+  on.exit({
+    try(npRmpi.quit(force = TRUE), silent = TRUE)
+    if (exists("mpi.finalize", mode = "function")) {
+      try(mpi.finalize(), silent = TRUE)
+    }
+  }, add = TRUE)
 
   options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
 

@@ -53,19 +53,31 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
     out_raw <- if (is_real) sprintf("/tmp/nprmpi_oneoff_%s_raw.csv", fun) else sprintf("/tmp/nprmpi_oneoff_%s_n%d_raw.csv", fun, n_value)
     out_sum <- if (is_real) sprintf("/tmp/nprmpi_oneoff_%s_summary.csv", fun) else sprintf("/tmp/nprmpi_oneoff_%s_n%d_summary.csv", fun, n_value)
 
-    args <- c(script,
-              paste0("--fun=", fun),
-              paste0("--n=", if (is_real) 100L else n_value),
-              paste0("--nslaves=", cfg$nslaves),
-              paste0("--times=", cfg$times),
-              paste0("--seed_policy=", cfg$seed_policy),
-              paste0("--base_seed=", cfg$base_seed),
-              paste0("--out_raw=", out_raw),
-              paste0("--out_summary=", out_sum),
-              "--show_progress=FALSE")
+    args <- c(
+      paste0("--fun=", fun),
+      paste0("--n=", if (is_real) 100L else n_value),
+      paste0("--nslaves=", cfg$nslaves),
+      paste0("--times=", cfg$times),
+      paste0("--seed_policy=", cfg$seed_policy),
+      paste0("--base_seed=", cfg$base_seed),
+      paste0("--out_raw=", out_raw),
+      paste0("--out_summary=", out_sum),
+      "--show_progress=FALSE"
+    )
 
-    env <- c(sprintf("FI_TCP_IFACE=%s", cfg$iface))
-    rc <- system2("Rscript", args, env = env)
+    launcher <- if (nzchar(Sys.which("setsid"))) "setsid" else NULL
+    cmd <- paste(
+      c(
+        sprintf("FI_TCP_IFACE=%s", cfg$iface),
+        "NP_RMPI_NO_REUSE_SLAVES=1",
+        launcher,
+        "Rscript",
+        script,
+        args
+      ),
+      collapse = " "
+    )
+    rc <- system(cmd)
     data.frame(fun = fun, n = if (is_real) NA_integer_ else n_value, out_raw = out_raw, out_summary = out_sum, rc = rc, stringsAsFactors = FALSE)
   }
 
