@@ -1,7 +1,7 @@
 library(testthat)
 library(npRmpi)
 
-np_check_filter <- Sys.getenv("NP_CHECK_FILTER", unset = "check-core-smoke")
+np_check_filter <- Sys.getenv("NP_CHECK_FILTER", unset = "check-minimal")
 np_check_full <- identical(Sys.getenv("NP_CHECK_FULL", unset = ""), "1")
 
 local({
