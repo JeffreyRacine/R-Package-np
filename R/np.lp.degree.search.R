@@ -874,7 +874,11 @@
   if (is.null(current_version)) {
     stop(
       sprintf(
-        "automatic degree search with search.engine='nomad' requires the 'crs' package (>= %s); install.packages('crs')",
+        paste(
+          "automatic degree search with search.engine='nomad' requires the",
+          "suggested package 'crs' (>= %s) to provide the NOMAD backend;",
+          "install.packages('crs')"
+        ),
         minimum_version_label
       ),
       call. = FALSE

@@ -233,7 +233,10 @@ FALSE, \dots)
   LP tuning arguments, \code{npreg(..., nomad=TRUE)} and
   \code{npregbw(..., nomad=TRUE)} expand missing settings to the same
   documented automatic-LP NOMAD preset. Explicit incompatible settings
-  fail fast rather than being silently rewritten. For
+  fail fast rather than being silently rewritten. The direct NOMAD
+  backend is provided by the suggested package \code{crs}, so install
+  \code{crs} before using \code{search.engine="nomad"},
+  \code{"nomad+powell"}, or \code{nomad=TRUE}. For
   \code{bernstein.basis=TRUE}, evaluation points for continuous predictors
   must lie within training support; use \code{bernstein.basis=FALSE} for
   extrapolation. For \code{regtype="ll"} and \code{regtype="lp"}, the

@@ -596,7 +596,11 @@ npregbw(\dots)
   draws from a reduced degree proposal box whose candidates are screened
   using \code{dim_basis()}. This heuristic is used only to obtain
   feasible, numerically safer, and quicker initial evaluations; it does
-  not restrict the admissible degree region searched by NOMAD.
+  not restrict the admissible degree region searched by NOMAD. The
+  direct NOMAD backend is provided by the suggested package
+  \code{crs}, so install \code{crs} before using
+  \code{search.engine="nomad"}, \code{"nomad+powell"}, or
+  \code{nomad=TRUE}.
 
   Setting \code{nomad=TRUE} is a convenience preset for this automatic
   LP route, not a generic optimizer alias. For regression it expands any
