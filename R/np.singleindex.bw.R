@@ -736,10 +736,17 @@ npindexbw.NULL <-
     point
   }
 
-  point_to_bws <- function(point) {
+  point_to_param <- function(point) {
     beta.tail <- if (length(beta.free)) as.double(point[seq_along(beta.free)]) else numeric(0)
     h <- point_h_to_raw(point[length(beta.free) + 1L])
     h <- .npindex_finalize_bandwidth(h = h, bwtype = baseline.bws$type, nobs = nrow(x.clean), where = "npindexbw")
+    c(beta.tail, h)
+  }
+
+  point_to_bws <- function(point) {
+    param <- point_to_param(point)
+    beta.tail <- if (length(beta.free)) param[seq_along(beta.free)] else numeric(0)
+    h <- param[length(beta.free) + 1L]
     c(1.0, beta.tail, h)
   }
 
@@ -755,7 +762,7 @@ npindexbw.NULL <-
     eval.spec$bernstein.basis.engine <- degree.search$bernstein.basis
     eval.spec$basis.engine <- reg.args$basis.engine
     objective <- .npindexbw_eval_objective(
-      param = point_to_bws(point),
+      param = point_to_param(point),
       xmat = x.clean,
       ydat = y.clean,
       bws = baseline.bws,
