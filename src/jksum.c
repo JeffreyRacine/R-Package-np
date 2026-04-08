@@ -5137,7 +5137,7 @@ const int keep_kw_owner_local){
   const int ws_step = is_adaptive? 0 :
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
 
-  double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, **m = NULL;
+  double *lambda = NULL, **matrix_bandwidth = NULL, **matrix_alt_bandwidth = NULL, **m = NULL;
   double *tprod = NULL, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
   double *perm_kbuf = NULL, *kw_work = NULL;
   int use_disc_profile_cache = 0, disc_nprof = 0, disc_mark_token = 1;
