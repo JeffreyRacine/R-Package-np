@@ -711,7 +711,8 @@ npcdistbw.condbandwidth <-
                                  do.full.integral = FALSE,
                                  ngrid = 100L,
                                  invalid.penalty = c("baseline", "dbmax"),
-                                 penalty.multiplier = 10) {
+                                 penalty.multiplier = 10,
+                                 force.local = TRUE) {
   invalid.penalty <- match.arg(invalid.penalty)
 
   ydat <- toFrame(ydat)
@@ -859,36 +860,45 @@ npcdistbw.condbandwidth <-
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
 
-  out <- .Call(
-    "C_np_distribution_conditional_bw_eval",
-    as.double(yuno),
-    as.double(yord),
-    as.double(ycon),
-    as.double(xuno),
-    as.double(xord),
-    as.double(xcon),
-    as.double(gyuno),
-    as.double(gyord),
-    as.double(gycon),
-    as.double(mysd),
-    as.integer(myopti),
-    as.double(myoptd),
-    as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-    as.integer(1L),
-    as.integer(penalty_mode),
-    as.double(penalty.multiplier),
-    as.integer(degree.code),
-    as.integer(bernstein.engine),
-    as.integer(basis.code),
-    as.integer(reg.code),
-    as.double(cxker.bounds.c$lb),
-    as.double(cxker.bounds.c$ub),
-    as.double(cyker.bounds.c$lb),
-    as.double(cyker.bounds.c$ub),
-    PACKAGE = "npRmpi"
-  )
+  eval_call <- function() {
+    .Call(
+      "C_np_distribution_conditional_bw_eval",
+      as.double(yuno),
+      as.double(yord),
+      as.double(ycon),
+      as.double(xuno),
+      as.double(xord),
+      as.double(xcon),
+      as.double(gyuno),
+      as.double(gyord),
+      as.double(gycon),
+      as.double(mysd),
+      as.integer(myopti),
+      as.double(myoptd),
+      as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                  bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                  bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+      as.integer(1L),
+      as.integer(penalty_mode),
+      as.double(penalty.multiplier),
+      as.integer(degree.code),
+      as.integer(bernstein.engine),
+      as.integer(basis.code),
+      as.integer(reg.code),
+      as.double(cxker.bounds.c$lb),
+      as.double(cxker.bounds.c$ub),
+      as.double(cyker.bounds.c$lb),
+      as.double(cyker.bounds.c$ub),
+      PACKAGE = "npRmpi"
+    )
+  }
+  out <- if (isTRUE(force.local) &&
+             .npRmpi_has_active_slave_pool(comm = 1L) &&
+             !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    .npRmpi_with_local_cdist_eval(eval_call())
+  } else {
+    eval_call()
+  }
 
   list(
     objective = as.numeric(out$fval[1L]),
@@ -998,6 +1008,142 @@ npcdistbw.condbandwidth <-
   point
 }
 
+npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
+                                                           ydat,
+                                                           template,
+                                                           setup,
+                                                           reg.args,
+                                                           opt.args,
+                                                           degree.search,
+                                                           x0,
+                                                           bbin,
+                                                           lb,
+                                                           ub,
+                                                           nomad.nmulti = 1L,
+                                                           nomad.inner.nmulti = 0L,
+                                                           random.seed = 42L,
+                                                           use.runtime.bandwidth.progress = FALSE) {
+  rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+  old.messages <- getOption("np.messages")
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+
+  if (!isTRUE(rank == 0L))
+    options(np.messages = FALSE)
+  options(npRmpi.autodispatch.disable = TRUE)
+  on.exit(options(np.messages = old.messages), add = TRUE)
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+
+  set.seed(as.integer(random.seed))
+  if (isTRUE(rank == 0L))
+    .np_nomad_baseline_note(degree.search$start.degree)
+
+  bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
+  ndeg <- length(degree.search$start.degree)
+  nomad.num.feval.total <- 0
+  nomad.num.feval.fast.total <- 0
+
+  eval_fun <- function(point) {
+    point <- as.numeric(point)
+    degree <- as.integer(round(point[bwdim + seq_len(ndeg)]))
+    degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
+    bw_vec <- .npcdistbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
+
+    eval.reg.args <- reg.args
+    eval.reg.args$regtype <- "lp"
+    eval.reg.args$pregtype <- "Local-Polynomial"
+    eval.reg.args$degree <- degree
+    eval.reg.args$bernstein.basis <- degree.search$bernstein.basis
+    eval.reg.args$regtype.engine <- "lp"
+    eval.reg.args$degree.engine <- degree
+    eval.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
+
+    tbw <- .npcdistbw_build_condbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bw_vec,
+      bandwidth.compute = FALSE,
+      reg.args = eval.reg.args
+    )
+
+    out <- .npcdistbw_eval_only(
+      xdat = xdat,
+      ydat = ydat,
+      gydat = opt.args$gydat,
+      bws = tbw,
+      do.full.integral = if (is.null(opt.args$do.full.integral)) FALSE else opt.args$do.full.integral,
+      ngrid = if (is.null(opt.args$ngrid)) 100L else opt.args$ngrid,
+      invalid.penalty = "baseline",
+      penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier,
+      force.local = FALSE
+    )
+    nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
+
+    list(
+      objective = out$objective,
+      degree = degree,
+      num.feval = out$num.feval,
+      num.feval.fast = out$num.feval.fast
+    )
+  }
+
+  external.progress <- if (isTRUE(use.runtime.bandwidth.progress) &&
+                           isTRUE(rank == 0L) &&
+                           !is.null(.np_progress_runtime$bandwidth_state)) {
+    .np_progress_runtime$bandwidth_state
+  } else {
+    NULL
+  }
+  search.engine.used <- if (identical(degree.search$engine, "nomad+powell")) {
+    "nomad"
+  } else {
+    degree.search$engine
+  }
+
+  search.result <- .np_nomad_search(
+    engine = search.engine.used,
+    baseline_record = NULL,
+    start_degree = degree.search$start.degree,
+    x0 = x0,
+    bbin = bbin,
+    lb = lb,
+    ub = ub,
+    eval_fun = eval_fun,
+    build_payload = function(point, best_record, solution, interrupted) {
+      list(
+        payload = NULL,
+        objective = as.numeric(best_record$objective),
+        powell.time = NA_real_
+      )
+    },
+    direction = "min",
+    objective_name = "fval",
+    nmulti = nomad.nmulti,
+    nomad.inner.nmulti = nomad.inner.nmulti,
+    random.seed = random.seed,
+    progress_state = external.progress,
+    manage_progress_lifecycle = is.null(external.progress),
+    bind_bandwidth_runtime = !is.null(external.progress),
+    handoff_before_build = identical(degree.search$engine, "nomad+powell"),
+    degree_spec = list(
+      initial = degree.search$start.degree,
+      lower = degree.search$lower,
+      upper = degree.search$upper,
+      basis = degree.search$basis,
+      nobs = degree.search$nobs,
+      user_supplied = degree.search$start.user
+    )
+  )
+  if (!identical(search.engine.used, degree.search$engine))
+    search.result$method <- degree.search$engine
+
+  search.result$best_payload <- NULL
+  search.result$powell.time <- NA_real_
+  search.result$num.feval.total <- as.numeric(nomad.num.feval.total)
+  search.result$num.feval.fast.total <- as.numeric(nomad.num.feval.fast.total)
+  search.result
+}
+
 .npcdistbw_nomad_search <- function(xdat,
                                     ydat,
                                     bws,
@@ -1053,8 +1199,6 @@ npcdistbw.condbandwidth <-
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
-
-  .np_nomad_baseline_note(degree.search$start.degree)
 
   eval_fun <- function(point) {
     point <- as.numeric(point)
@@ -1187,6 +1331,115 @@ npcdistbw.condbandwidth <-
 
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
+
+  if (.npRmpi_has_active_slave_pool(comm = 1L) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    search.template <- list(
+      scaling = isTRUE(template$scaling),
+      ybw = template$ybw,
+      xbw = template$xbw
+    )
+    search.setup <- list(
+      cont_flat = setup$cont_flat,
+      cont_scale = setup$cont_scale,
+      cat_flat = setup$cat_flat,
+      ncatfac = setup$ncatfac,
+      bandwidth.scale.categorical = setup$bandwidth.scale.categorical
+    )
+    search.degree <- list(
+      engine = degree.search$engine,
+      start.degree = degree.search$start.degree,
+      candidates = degree.search$candidates,
+      lower = degree.search$lower,
+      upper = degree.search$upper,
+      basis = degree.search$basis,
+      nobs = degree.search$nobs,
+      start.user = degree.search$start.user,
+      bernstein.basis = degree.search$bernstein.basis
+    )
+    search.opt.args <- list(
+      gydat = opt.args$gydat,
+      do.full.integral = opt.args$do.full.integral,
+      ngrid = opt.args$ngrid,
+      penalty.multiplier = opt.args$penalty.multiplier
+    )
+
+    mc <- substitute(
+      get("npRmpiNomadShadowSearchConditionalDistribution", envir = asNamespace("npRmpi"), inherits = FALSE)(
+        XDAT,
+        YDAT,
+        TEMPLATE,
+        SETUP,
+        REGARGS,
+        OPTARGS,
+        DEGREESEARCH,
+        X0,
+        BBIN,
+        LB,
+        UB,
+        NOMADNMULTI,
+        INNERNMULTI,
+        RSEED,
+        RPROGRESS
+      ),
+      list(
+        XDAT = xdat,
+        YDAT = ydat,
+        TEMPLATE = search.template,
+        SETUP = search.setup,
+        REGARGS = reg.args,
+        OPTARGS = search.opt.args,
+        DEGREESEARCH = search.degree,
+        X0 = x0,
+        BBIN = bbin,
+        LB = lb,
+        UB = ub,
+        NOMADNMULTI = nomad.nmulti,
+        INNERNMULTI = nomad.inner.nmulti,
+        RSEED = random.seed,
+        RPROGRESS = TRUE
+      )
+    )
+
+    if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
+      search.result <- eval(mc, envir = environment())
+    } else {
+      search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
+    }
+    if (!is.null(search.result$num.feval.total))
+      nomad.num.feval.total <- as.numeric(search.result$num.feval.total[1L])
+    if (!is.null(search.result$num.feval.fast.total))
+      nomad.num.feval.fast.total <- as.numeric(search.result$num.feval.fast.total[1L])
+    best.solution <- NULL
+    if (!is.null(search.result$best.restart) &&
+        is.finite(search.result$best.restart) &&
+        length(search.result$restart.results) >= as.integer(search.result$best.restart)) {
+      best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
+    }
+
+    payload_result <- build_payload(
+      point = search.result$best_point,
+      best_record = search.result$best,
+      solution = best.solution,
+      interrupted = !isTRUE(search.result$completed)
+    )
+
+    if (is.list(payload_result) && !is.null(payload_result$payload)) {
+      search.result$best_payload <- payload_result$payload
+      if (!is.null(payload_result$powell.time))
+        search.result$powell.time <- as.numeric(payload_result$powell.time[1L])
+      if (!is.null(payload_result$objective) &&
+          .np_degree_better(payload_result$objective, search.result$best$objective, direction = "min")) {
+        search.result$best$objective <- as.numeric(payload_result$objective[1L])
+      }
+    } else {
+      search.result$best_payload <- payload_result
+    }
+
+    return(.npRmpi_reconcile_nomad_search_timing(search.result))
+  }
+
+  .np_nomad_baseline_note(degree.search$start.degree)
 
   .np_nomad_search(
     engine = degree.search$engine,
