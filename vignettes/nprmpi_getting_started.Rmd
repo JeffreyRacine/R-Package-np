@@ -68,7 +68,10 @@ operational rather than methodological.
 If you want the recommended route without spelling out all of the LP tuning
 arguments, use `nomad = TRUE`. This is a documented convenience preset, not a
 generic optimizer alias: it fills only missing LP degree-search controls and
-leaves compatible explicit overrides in place.
+leaves compatible explicit overrides in place. This route uses the optional
+NOMAD backend provided by the suggested package `crs`, so install `crs` first
+if you want to use `nomad = TRUE` or
+`search.engine = "nomad"`/`"nomad+powell"`.
 
 ```{r}
 if (requireNamespace("crs", quietly = TRUE) &&

@@ -14,7 +14,11 @@ test_that(".np_nomad_require_crs fails fast when crs is missing", {
         NULL
       }
     ),
-    "requires the 'crs' package \\(>= 0\\.15-41\\); install\\.packages\\('crs'\\)"
+    paste(
+      "requires the suggested package 'crs'",
+      "\\(>= 0\\.15-41\\) to provide the NOMAD backend;",
+      "install\\.packages\\('crs'\\)"
+    )
   )
 
   expect_false(loaded)
