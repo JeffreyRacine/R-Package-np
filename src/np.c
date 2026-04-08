@@ -166,11 +166,12 @@ static void np_progress_signal(const char *event, const char *surface, const int
     return;
   }
 
-  PROTECT(fn = Rf_findFun(Rf_install(".np_progress_signal_from_c"), ns));
-  if (fn == R_UnboundValue) {
-    UNPROTECT(2);
+  if (!R_existsVarInFrame(ns, Rf_install(".np_progress_signal_from_c"))) {
+    UNPROTECT(1);
     return;
   }
+
+  PROTECT(fn = Rf_findFun(Rf_install(".np_progress_signal_from_c"), ns));
 
   PROTECT(event_s = Rf_mkString(event));
   PROTECT(surface_s = Rf_mkString(surface));
