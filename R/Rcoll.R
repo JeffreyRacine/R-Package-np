@@ -1,3 +1,43 @@
+.npRmpi_validate_raw_length <- function(n, caller) {
+    if (length(n) != 1L || is.na(n))
+        stop(sprintf("%s: expected a single non-missing length value", caller))
+    n <- as.integer(n)
+    if (n < 0L)
+        stop(sprintf("%s: expected a non-negative length value", caller))
+    n
+}
+
+.npRmpi_validate_rcounts <- function(rcounts, size, total_len, caller) {
+    if (length(rcounts) != size)
+        stop(sprintf("%s: expected %d receive counts, got %d", caller, size, length(rcounts)))
+    if (any(is.na(rcounts)))
+        stop(sprintf("%s: receive counts contain NA", caller))
+    rcounts <- as.integer(rcounts)
+    if (any(rcounts < 0L))
+        stop(sprintf("%s: receive counts must be non-negative", caller))
+    if (sum(rcounts) != total_len)
+        stop(sprintf("%s: receive counts sum %d but payload length is %d",
+                     caller, sum(rcounts), total_len))
+    rcounts
+}
+
+.npRmpi_split_raw_by_counts <- function(allbiobj, rcounts, caller) {
+    size <- length(rcounts)
+    rcounts <- .npRmpi_validate_rcounts(rcounts, size, length(allbiobj), caller)
+    pos <- c(0L, cumsum(rcounts))
+    cutobj <- vector("list", size)
+    for (i in seq_len(size)) {
+        if (rcounts[i] == 0L) {
+            cutobj[[i]] <- raw(0)
+        } else {
+            start <- pos[i] + 1L
+            stopifnot(start <= pos[i + 1L])
+            cutobj[[i]] <- allbiobj[start:pos[i + 1L]]
+        }
+    }
+    cutobj
+}
+
 ### Copyright (C) 2002 Hao Yu
 mpi.probe <- function(source, tag, comm=1, status=0){
     .Call("mpi_probe", as.integer(source), as.integer(tag), 
@@ -44,19 +84,23 @@ mpi.scatterv <- function(x, scounts, type, rdata, root=0, comm=1){
 
 mpi.scatter.Robj <- function(obj=NULL, root=0, comm=1){
     if (mpi.comm.rank(comm) == root){
-		size<-mpi.comm.size(comm)
+			size<-mpi.comm.size(comm)
         #subobj<-lapply(obj,serialize, connection=NULL)
-		subobj<-lapply(seq_len(size), function(i) serialize(obj[[i]], NULL))
-
-		sublen<-unlist(lapply(subobj,length))
+			subobj<-lapply(seq_len(size), function(i) serialize(obj[[i]], NULL))
+	
+			sublen<-unlist(lapply(subobj,length))
         #newsubobj<-strings.link(subobj,string(sum(sublen)+1))
-		newsubobj<-c(subobj,recursive=TRUE)
-        strnum<-mpi.scatter(sublen,type=1,rdata=integer(1),root=root,comm=comm)
-		outobj<-unserialize(mpi.scatterv(newsubobj,scounts=sublen,type= 4,
+			newsubobj<-c(subobj,recursive=TRUE)
+        strnum <- .npRmpi_validate_raw_length(
+            mpi.scatter(sublen,type=1,rdata=integer(1),root=root,comm=comm),
+            "mpi.scatter.Robj")
+			outobj<-unserialize(mpi.scatterv(newsubobj,scounts=sublen,type= 4,
                 rdata=raw(strnum),root=root, comm=comm))
     }
     else {
-        strnum<-mpi.scatter(integer(1),type=1,rdata=integer(1),root=root,comm=comm)
+        strnum <- .npRmpi_validate_raw_length(
+            mpi.scatter(integer(1),type=1,rdata=integer(1),root=root,comm=comm),
+            "mpi.scatter.Robj")
         outobj<-unserialize(mpi.scatterv(raw(strnum),scounts=0, type=4,
                 rdata=raw(strnum), root=root, comm=comm))
     }
@@ -86,13 +130,10 @@ mpi.gather.Robj <- function(obj=NULL, root=0, comm=1, ...){
             root=root,comm=comm)
         allbiobj<-mpi.gatherv(biobj,type=4,rdata=raw(sum(rcounts))
                         ,rcounts=rcounts,root=root,comm=comm)
-    pos=c(0,cumsum(rcounts))
-    cutobj=list()
-    for(i in seq_len(size))
-        cutobj[[i]]=allbiobj[(pos[i]+1):pos[i+1]]
-		out <- sapply(cutobj,unserialize, ...)
-		gc()
-		out
+    cutobj <- .npRmpi_split_raw_by_counts(allbiobj, rcounts, "mpi.gather.Robj")
+			out <- sapply(cutobj,unserialize, ..., USE.NAMES = FALSE)
+			gc()
+			out
     }
     else {
          mpi.gather(bilen,type=1,rdata=integer(1),root=root,comm=comm)
@@ -109,11 +150,8 @@ mpi.allgather.Robj <- function(obj=NULL, comm=1){
     rcounts<-mpi.allgather(bilen,type=1,rdata=integer(size),comm=comm)
     allbiobj<-mpi.allgatherv(biobj,type=4,rdata=raw(sum(rcounts))
         ,rcounts=rcounts,comm=comm)
-    pos=c(0,cumsum(rcounts))
-    cutobj=list()
-    for(i in seq_len(size))
-          cutobj[[i]]=allbiobj[(pos[i]+1):pos[i+1]]
-    out <- sapply(cutobj,unserialize)
+    cutobj <- .npRmpi_split_raw_by_counts(allbiobj, rcounts, "mpi.allgather.Robj")
+    out <- sapply(cutobj,unserialize, USE.NAMES = FALSE)
 	gc()
 	out
    # bistrcut<-sapply(rcounts,string)
@@ -581,11 +619,16 @@ mpi.request.maxsize <- function()
     .Call("mpi_undefined", PACKAGE = "npRmpi")
 
 .force.type <- function(x, type){ 
+    if (length(type) != 1L || is.na(type))
+        stop(".force.type: 'type' must be a single non-missing integer code")
+    type <- as.integer(type)
+    if (!(type %in% 1:5))
+        return(x)
     switch(type,
         as.integer(x),
         as.double(x),
         as.character(x),
-		as.raw(x),
+			as.raw(x),
 		as.double(x))
 }
 #.mpi.serialize<- function(obj){
