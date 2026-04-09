@@ -143,14 +143,24 @@ mpi.cartdim.get <- function(comm=3) {
         .Call("mpi_cartdim_get",as.integer(comm), PACKAGE = "npRmpi")
 }
 
+.npRmpi_parse_cart_get <- function(out, maxdims, caller = "mpi.cart.get") {
+        maxdims <- as.integer(maxdims)
+        if (length(maxdims) != 1L || is.na(maxdims) || maxdims < 1L)
+                stop(sprintf("%s: 'maxdims' must be a single positive integer", caller))
+        expected <- 3L * maxdims
+        if (length(out) != expected)
+                stop(sprintf("%s: expected %d values from mpi_cart_get(), got %d",
+                             caller, expected, length(out)))
+        idx <- seq_len(maxdims)
+        list(dims = out[idx],
+             periods = out[maxdims + idx],
+             coords = out[2L * maxdims + idx])
+}
+
 mpi.cart.get <- function(comm=3, maxdims) {
 
         out <- .Call("mpi_cart_get",as.integer(comm), as.integer(maxdims), PACKAGE = "npRmpi")
-        idx <- seq_len(maxdims)
-        dims <- out[idx]
-        periods <- out[maxdims + idx]
-        coords <- out[2L * maxdims + idx]
-        list(dims=dims,periods=periods,coords=coords)
+        .npRmpi_parse_cart_get(out, maxdims, caller = "mpi.cart.get")
 }
 
 mpi.cart.rank <- function(comm=3, coords) {

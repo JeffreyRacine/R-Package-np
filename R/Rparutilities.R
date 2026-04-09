@@ -1,5 +1,12 @@
 ### Copyright (C) 2002 Hao Yu 
 
+.npRmpi_tail_slave_indices <- function(size, caller = "slave.hostinfo") {
+    size <- as.integer(size)
+    if (length(size) != 1L || is.na(size) || size < 2L)
+        stop(sprintf("%s: 'size' must be an integer >= 2", caller))
+    seq.int(max(1L, size - 2L), size - 1L)
+}
+
 mpi.hostinfo <- function(comm=1){
     if (mpi.comm.size(comm)==0){
         err <-paste("It seems no members running on comm", comm)
@@ -41,17 +48,17 @@ slave.hostinfo <- function(comm=1, short=TRUE){
         cat(rank0, "of size", size, "is running on:",master, "\n")
         slavename <- paste("slave", ranks,sep="")
         ranks <- paste("(rank ",ranks, ", comm ",slavecomm,")", sep="")
-		if (short && size > 8){
-          for (i in seq_len(3L)) {
-            cat(slavename[i], ranks[i], "of size",size, 
-          "is running on:",slavehost[i], "\n")	
-		  }
-		  cat("... ... ...\n")
-		  for (i in (size-2):(size-1)){
-		    cat(slavename[i], ranks[i], "of size",size, 
-          "is running on:",slavehost[i], "\n")
-		  }
-		}
+			if (short && size > 8){
+	          for (i in seq_len(3L)) {
+	            cat(slavename[i], ranks[i], "of size",size, 
+	          "is running on:",slavehost[i], "\n")	
+			  }
+			  cat("... ... ...\n")
+			  for (i in .npRmpi_tail_slave_indices(size)){
+			    cat(slavename[i], ranks[i], "of size",size, 
+	          "is running on:",slavehost[i], "\n")
+			  }
+			}
 		else {
           for (i in seq_len(size - 1L)){
             cat(slavename[i], ranks[i], "of size",size, 
