@@ -361,8 +361,347 @@ npscoefbw.NULL <-
   TRUE
 }
 
+.npscoefbw_nomad_lp_context_local <- function(xdat, ydat, zdat = NULL) {
+  miss.z <- is.null(zdat)
+  xdat <- toFrame(xdat)
+
+  if (!(is.vector(ydat) || is.factor(ydat)))
+    stop("'ydat' must be a vector or a factor")
+
+  if (!miss.z)
+    zdat <- toFrame(zdat)
+
+  keep.rows <- rep_len(TRUE, nrow(xdat))
+  train.df <- data.frame(xdat, ydat)
+  if (!miss.z)
+    train.df <- data.frame(train.df, zdat)
+  rows.omit <- attr(na.omit(train.df), "na.action")
+  if (length(rows.omit) > 0L)
+    keep.rows[as.integer(rows.omit)] <- FALSE
+
+  if (!any(keep.rows))
+    stop("Data has no rows without NAs")
+
+  xdat <- xdat[keep.rows, , drop = FALSE]
+  ydat <- ydat[keep.rows]
+  if (!miss.z)
+    zdat <- zdat[keep.rows, , drop = FALSE]
+
+  yvec <- if (is.factor(ydat)) {
+    dlev(ydat)[as.integer(ydat)]
+  } else {
+    as.double(ydat)
+  }
+
+  xmat <- toMatrix(xdat)
+  if (qr(xmat)$rank < ncol(xmat))
+    stop("columns of the independent variable (xdat) are linearly dependent")
+
+  zdf <- if (miss.z) xdat else if (is.data.frame(zdat)) zdat else as.data.frame(zdat)
+
+  list(
+    xdat = xdat,
+    xmat = xmat,
+    ydat = yvec,
+    zdat.df = zdf,
+    W = cbind(1.0, xmat),
+    n = nrow(xmat)
+  )
+}
+
+.npscoefbw_normalize_nomad_scbw <- function(scbw, eval.zdat, bw = scbw$bw) {
+  rbw <- .npscoef_make_regbw(
+    bws = scbw,
+    zdat = eval.zdat,
+    bw = bw
+  )
+  scbw$bw <- rbw$bw
+  scbw$bandwidth[[1L]] <- rbw$bandwidth[[1L]]
+  scbw$sfactor[[1L]] <- rbw$sfactor[[1L]]
+  scbw$nconfac <- rbw$nconfac
+  scbw$ncatfac <- rbw$ncatfac
+  scbw$sdev <- rbw$sdev
+  scbw
+}
+
+.npscoefbw_nomad_lp_npksum <- function(args, localize = TRUE) {
+  if (isTRUE(localize))
+    return(.npRmpi_with_local_regression(do.call(npksum, args)))
+  do.call(npksum, args)
+}
+
+.npscoefbw_nomad_solve_cv_moment_system <- function(tyw,
+                                                    tww,
+                                                    W.eval.design,
+                                                    maxPenalty,
+                                                    n.train,
+                                                    Wz.eval = NULL) {
+  neval <- ncol(tyw)
+  ncoef <- nrow(tyw)
+  pcoef <- ncol(W.eval.design)
+  coef.out <- matrix(maxPenalty, nrow = pcoef, ncol = neval)
+  ridge.grid <- npRidgeSequenceAdditive(n.train = n.train, cap = 1.0)
+  ridge <- rep.int(ridge.grid[1L], neval)
+  ridge.idx <- rep.int(1L, neval)
+  doridge <- rep.int(TRUE, neval)
+
+  while (any(doridge)) {
+    iloo <- seq_len(neval)[doridge]
+    for (ii in iloo) {
+      doridge[ii] <- FALSE
+      ridge.val <- ridge[ii] * tyw[, ii][1L] / NZD(tww[, , ii][1L, 1L])
+      theta.ii <- tryCatch(
+        solve(
+          tww[, , ii] + diag(rep(ridge[ii], ncoef)),
+          tyw[, ii] + c(ridge.val, rep(0, ncoef - 1L))
+        ),
+        error = function(e) e
+      )
+      if (inherits(theta.ii, "error")) {
+        ridge.idx[ii] <- ridge.idx[ii] + 1L
+        if (ridge.idx[ii] <= length(ridge.grid)) {
+          ridge[ii] <- ridge.grid[ridge.idx[ii]]
+          doridge[ii] <- TRUE
+        }
+        theta.ii <- rep(maxPenalty, ncoef)
+      }
+
+      if (is.null(Wz.eval)) {
+        coef.out[, ii] <- theta.ii
+      } else {
+        coef.out[, ii] <- as.vector(crossprod(
+          Wz.eval[ii, ],
+          matrix(theta.ii, nrow = ncol(Wz.eval), ncol = pcoef)
+        ))
+      }
+    }
+  }
+
+  coef.out
+}
+
+.npscoefbw_nomad_lp_eval_subset <- function(ctx,
+                                            bws,
+                                            idx,
+                                            maxPenalty,
+                                            localize = TRUE) {
+  idx <- as.integer(idx)
+  if (!length(idx))
+    return(list(sse = 0.0, invalid = 0L))
+
+  lp_state <- .npscoef_lp_state(
+    bws = bws,
+    tzdat = ctx$zdat.df,
+    ezdat = ctx$zdat.df[idx, , drop = FALSE],
+    leave.one.out = FALSE,
+    where = "npscoefbw"
+  )
+  tensor.train <- .npscoef_row_tensor_design(ctx$W, lp_state$W.train)
+  ytensor <- cbind(ctx$ydat, tensor.train)
+  main.ks <- .npscoefbw_nomad_lp_npksum(
+    args = list(
+      txdat = lp_state$z.train,
+      exdat = lp_state$z.eval,
+      tydat = ytensor,
+      weights = ytensor,
+      bws = lp_state$rbw,
+      leave.one.out = FALSE,
+      bandwidth.divide = TRUE
+    ),
+    localize = localize
+  )$ksum
+  kw.self <- .np_kernel_weights_direct(
+    bws = lp_state$rbw,
+    txdat = lp_state$z.train,
+    exdat = lp_state$z.eval,
+    bandwidth.divide = TRUE,
+    kernel.pow = 1.0
+  )
+  bwv <- lp_state$rbw$bandwidth[[1L]]
+  bw.divisor <- if (any(lp_state$rbw$icon))
+    prod(as.double(bwv[lp_state$rbw$icon]))
+  else
+    1.0
+
+  for (jj in seq_along(idx)) {
+    main.ks[, , jj] <- main.ks[, , jj] -
+      (kw.self[idx[jj], jj] / bw.divisor) * tcrossprod(ytensor[idx[jj], ], ytensor[idx[jj], ])
+  }
+
+  tyw <- main.ks[-1L, 1L, , drop = FALSE]
+  if (length(dim(tyw)) == 3L)
+    dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
+  tww <- main.ks[-1L, -1L, , drop = FALSE]
+  coef.block <- .npscoefbw_nomad_solve_cv_moment_system(
+    tyw = tyw,
+    tww = tww,
+    W.eval.design = ctx$W[idx, , drop = FALSE],
+    Wz.eval = lp_state$W.eval,
+    maxPenalty = maxPenalty,
+    n.train = ctx$n
+  )
+  mean.block <- rowSums(ctx$W[idx, , drop = FALSE] * t(coef.block))
+
+  if (any(!is.finite(mean.block)) || any(mean.block == maxPenalty)) {
+    return(list(sse = 0.0, invalid = 1L))
+  }
+
+  list(
+    sse = as.numeric(sum((ctx$ydat[idx] - mean.block)^2)),
+    invalid = 0L
+  )
+}
+
+.npscoefbw_nomad_lp_eval_collective_local <- function(ctx,
+                                                      bws,
+                                                      invalid.penalty = c("baseline", "large"),
+                                                      penalty.multiplier = 10,
+                                                      comm = 1L) {
+  invalid.penalty <- match.arg(invalid.penalty)
+  base.penalty <- switch(
+    invalid.penalty,
+    baseline = if (is.finite(bws$fval[1L])) as.numeric(bws$fval[1L]) else 1,
+    large = 1
+  )
+  base.penalty <- max(abs(base.penalty), 1)
+  penalty <- penalty.multiplier * base.penalty
+
+  if (!is.list(ctx) || is.null(ctx$W) || is.null(ctx$ydat) || is.null(ctx$zdat.df))
+    stop("invalid NOMAD smooth-coefficient context")
+
+  if (!validateBandwidthTF(bws)) {
+    return(list(
+      objective = penalty,
+      num.feval = 1L,
+      num.feval.fast = 0L
+    ))
+  }
+
+  rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) 0L)
+  size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) 1L)
+  if (!is.finite(rank) || is.na(rank) || rank < 0L)
+    rank <- 0L
+  if (!is.finite(size) || is.na(size) || size < 1L)
+    size <- 1L
+
+  assignments <- .splitIndices(ctx$n, size)
+  local.indices <- if (length(assignments) >= (rank + 1L))
+    as.integer(assignments[[rank + 1L]])
+  else
+    integer(0L)
+
+  local.out <- tryCatch(
+    .npscoefbw_nomad_lp_eval_subset(
+      ctx = ctx,
+      bws = bws,
+      idx = local.indices,
+      maxPenalty = sqrt(.Machine$double.xmax),
+      localize = TRUE
+    ),
+    error = function(e) list(sse = 0.0, invalid = 1L)
+  )
+
+  totals <- mpi.allreduce(
+    as.double(c(local.out$sse, local.out$invalid)),
+    type = 2,
+    op = "sum",
+    comm = comm
+  )
+
+  if (totals[2L] > 0) {
+    return(list(
+      objective = penalty,
+      num.feval = 1L,
+      num.feval.fast = 0L
+    ))
+  }
+
+  list(
+    objective = as.numeric(totals[1L] / ctx$n),
+    num.feval = 1L,
+    num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L
+  )
+}
+
+.npscoefbw_nomad_lp_eval_direct <- function(ctx,
+                                            bws,
+                                            invalid.penalty = c("baseline", "large"),
+                                            penalty.multiplier = 10,
+                                            localize = TRUE) {
+  invalid.penalty <- match.arg(invalid.penalty)
+  base.penalty <- switch(
+    invalid.penalty,
+    baseline = if (is.finite(bws$fval[1L])) as.numeric(bws$fval[1L]) else 1,
+    large = 1
+  )
+  base.penalty <- max(abs(base.penalty), 1)
+  penalty <- penalty.multiplier * base.penalty
+
+  if (!is.list(ctx) || is.null(ctx$W) || is.null(ctx$ydat) || is.null(ctx$zdat.df))
+    stop("invalid NOMAD smooth-coefficient context")
+
+  if (!validateBandwidthTF(bws))
+    return(list(
+      objective = penalty,
+      num.feval = 1L,
+      num.feval.fast = 0L
+    ))
+
+  maxPenalty <- sqrt(.Machine$double.xmax)
+
+  result <- tryCatch({
+    lp_state <- .npscoef_lp_state(
+      bws = bws,
+      tzdat = ctx$zdat.df,
+      ezdat = ctx$zdat.df,
+      leave.one.out = TRUE,
+      where = "npscoefbw"
+    )
+    tensor.train <- .npscoef_row_tensor_design(ctx$W, lp_state$W.train)
+    ytensor <- cbind(ctx$ydat, tensor.train)
+    main.ks <- .npscoefbw_nomad_lp_npksum(
+      args = list(
+        txdat = lp_state$z.train,
+        tydat = ytensor,
+        weights = ytensor,
+        bws = lp_state$rbw,
+        leave.one.out = TRUE,
+        bandwidth.divide = TRUE
+      ),
+      localize = localize
+    )$ksum
+    tyw <- main.ks[-1L, 1L, , drop = FALSE]
+    if (length(dim(tyw)) == 3L)
+      dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
+    tww <- main.ks[-1L, -1L, , drop = FALSE]
+    coef.loo <- .npscoefbw_nomad_solve_cv_moment_system(
+      tyw = tyw,
+      tww = tww,
+      W.eval.design = ctx$W,
+      Wz.eval = lp_state$W.eval,
+      maxPenalty = maxPenalty,
+      n.train = ctx$n
+    )
+    mean.loo <- rowSums(ctx$W * t(coef.loo))
+
+    if (any(!is.finite(mean.loo)) || any(mean.loo == maxPenalty)) {
+      list(objective = penalty, num.feval = 1L, num.feval.fast = 0L)
+    } else {
+      list(
+        objective = as.numeric(mean((ctx$ydat - mean.loo)^2)),
+        num.feval = 1L,
+        num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L
+      )
+    }
+  }, error = function(e) {
+    list(objective = penalty, num.feval = 1L, num.feval.fast = 0L)
+  })
+
+  result
+}
+
 .npscoefbw_nomad_context_prepare <- function(xdat, ydat, zdat = NULL) {
-  ctx <- list(xdat = xdat, ydat = ydat, zdat = zdat)
+  ctx <- .npscoefbw_nomad_lp_context_local(xdat = xdat, ydat = ydat, zdat = zdat)
   if (.npRmpi_autodispatch_active() &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
@@ -378,6 +717,186 @@ npscoefbw.NULL <-
   if (!is.null(ref))
     .npRmpi_autodispatch_cleanup(ref, comm = comm)
   invisible(NULL)
+}
+
+.npscoefbw_nomad_pool_start <- function(ctx, comm = 1L) {
+  if (!.npRmpi_has_active_slave_pool(comm = comm) ||
+      isTRUE(.npRmpi_autodispatch_called_from_bcast()) ||
+      isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    return(NULL)
+  }
+
+  ref <- .npRmpi_autodispatch_remote_ref(ctx)
+  if (is.null(ref))
+    stop("invalid NOMAD smooth-coefficient context: missing remote reference")
+
+  req.base <- 61100L
+  res.base <- 61200L
+
+  mc <- substitute({
+    get(".npscoefbw_nomad_slave_loop", envir = asNamespace("npRmpi"), inherits = FALSE)(
+      REF = REF,
+      COMM = COMM,
+      REQ_BASE = REQ_BASE,
+      RES_BASE = RES_BASE
+    )
+  }, list(
+    REF = ref,
+    COMM = comm,
+    REQ_BASE = req.base,
+    RES_BASE = res.base
+  ))
+  .npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = FALSE)
+
+  list(
+    comm = comm,
+    req.base = req.base,
+    res.base = res.base,
+    nslaves = max(0L, .npRmpi_safe_int(mpi.comm.size(comm)) - 1L)
+  )
+}
+
+.npscoefbw_nomad_pool_stop <- function(pool) {
+  if (is.null(pool) || !is.list(pool) || is.null(pool$nslaves) || pool$nslaves < 1L)
+    return(invisible(NULL))
+
+  for (rk in seq_len(pool$nslaves)) {
+    mpi.send.Robj(
+      obj = list(type = "stop"),
+      dest = rk,
+      tag = pool$req.base + rk,
+      comm = pool$comm
+    )
+  }
+
+  invisible(NULL)
+}
+
+.npscoefbw_nomad_slave_loop <- function(REF,
+                                        COMM = 1L,
+                                        REQ_BASE = 61100L,
+                                        RES_BASE = 61200L) {
+  rank <- tryCatch(as.integer(mpi.comm.rank(COMM)), error = function(e) 0L)
+  if (isTRUE(rank == 0L))
+    return(invisible(NULL))
+
+  old.messages <- getOption("np.messages")
+  options(np.messages = FALSE)
+  on.exit(options(np.messages = old.messages), add = TRUE)
+
+  ctx <- get(REF, envir = .GlobalEnv, inherits = FALSE)
+
+  repeat {
+    msg <- mpi.recv.Robj(source = 0L, tag = REQ_BASE + rank, comm = COMM)
+    if (is.list(msg) && identical(msg$type, "stop"))
+      break
+
+    out <- tryCatch(
+      .npscoefbw_nomad_lp_eval_subset(
+        ctx = ctx,
+        bws = msg$bws,
+        idx = as.integer(msg$idx),
+        maxPenalty = sqrt(.Machine$double.xmax),
+        localize = TRUE
+      ),
+      error = function(e) list(sse = 0.0, invalid = 1L)
+    )
+
+    mpi.send.Robj(
+      obj = out,
+      dest = 0L,
+      tag = RES_BASE + rank,
+      comm = COMM
+    )
+  }
+
+  invisible(NULL)
+}
+
+.npscoefbw_eval_pool <- function(ctx,
+                                 bws,
+                                 pool,
+                                 invalid.penalty = c("baseline", "large"),
+                                 penalty.multiplier = 10) {
+  invalid.penalty <- match.arg(invalid.penalty)
+  base.penalty <- switch(
+    invalid.penalty,
+    baseline = if (is.finite(bws$fval[1L])) as.numeric(bws$fval[1L]) else 1,
+    large = 1
+  )
+  base.penalty <- max(abs(base.penalty), 1)
+  penalty <- penalty.multiplier * base.penalty
+
+  if (!validateBandwidthTF(bws)) {
+    return(list(
+      objective = penalty,
+      num.feval = 1L,
+      num.feval.fast = 0L
+    ))
+  }
+
+  if (is.null(pool) || !is.list(pool) || is.null(pool$nslaves) || pool$nslaves < 1L) {
+    return(.npscoefbw_nomad_lp_eval_direct(
+      ctx = ctx,
+      bws = bws,
+      invalid.penalty = invalid.penalty,
+      penalty.multiplier = penalty.multiplier,
+      localize = TRUE
+    ))
+  }
+
+  size <- pool$nslaves + 1L
+  assignments <- .splitIndices(ctx$n, size)
+  local.indices <- if (length(assignments)) as.integer(assignments[[1L]]) else integer(0L)
+
+  for (rk in seq_len(pool$nslaves)) {
+    mpi.send.Robj(
+      obj = list(
+        type = "eval",
+        bws = bws,
+        idx = as.integer(assignments[[rk + 1L]])
+      ),
+      dest = rk,
+      tag = pool$req.base + rk,
+      comm = pool$comm
+    )
+  }
+
+  local.out <- tryCatch(
+    .npscoefbw_nomad_lp_eval_subset(
+      ctx = ctx,
+      bws = bws,
+      idx = local.indices,
+      maxPenalty = sqrt(.Machine$double.xmax),
+      localize = TRUE
+    ),
+    error = function(e) list(sse = 0.0, invalid = 1L)
+  )
+
+  worker.out <- lapply(seq_len(pool$nslaves), function(rk) {
+    mpi.recv.Robj(
+      source = rk,
+      tag = pool$res.base + rk,
+      comm = pool$comm
+    )
+  })
+
+  invalid.total <- local.out$invalid + sum(vapply(worker.out, `[[`, numeric(1), "invalid"))
+  if (invalid.total > 0) {
+    return(list(
+      objective = penalty,
+      num.feval = 1L,
+      num.feval.fast = 0L
+    ))
+  }
+
+  total.sse <- local.out$sse + sum(vapply(worker.out, `[[`, numeric(1), "sse"))
+
+  list(
+    objective = as.numeric(total.sse / ctx$n),
+    num.feval = 1L,
+    num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L
+  )
 }
 
 .npscoefbw_eval_only <- function(xdat,
@@ -426,87 +945,57 @@ npscoefbw.NULL <-
 .npscoefbw_eval_collective <- function(data,
                                        bws,
                                        invalid.penalty = c("baseline", "large"),
-                                       penalty.multiplier = 10) {
-  invalid.penalty <- match.arg(invalid.penalty)
-  base.penalty <- switch(
-    invalid.penalty,
-    baseline = if (is.finite(bws$fval[1L])) as.numeric(bws$fval[1L]) else 1,
-    large = 1
-  )
-  base.penalty <- max(abs(base.penalty), 1)
-  penalty <- penalty.multiplier * base.penalty
-
-  if (!is.list(data) || is.null(data$xdat) || is.null(data$ydat))
+                                       penalty.multiplier = 10,
+                                       comm = 1L) {
+  if (!is.list(data))
     stop("invalid NOMAD smooth-coefficient context")
 
-  fit <- if (.npRmpi_autodispatch_active() &&
-             !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
-             !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
-    xdat <- data$xdat
-    ydat <- data$ydat
-    zdat <- data$zdat
-    mc <- if (is.null(zdat)) {
-      substitute(
-        npscoef(
-          bws = bws,
-          txdat = xdat,
-          tydat = ydat,
-          leave.one.out = TRUE,
-          iterate = FALSE,
-          betas = FALSE,
-          errors = FALSE,
-          .np_fit_progress_allow = FALSE
-        )
+  if (.npRmpi_has_active_slave_pool(comm = comm) &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    ref <- .npRmpi_autodispatch_remote_ref(data)
+    if (is.null(ref))
+      stop("invalid NOMAD smooth-coefficient context: missing remote reference")
+    mc <- substitute({
+      old.messages <- getOption("np.messages")
+      rank <- tryCatch(as.integer(mpi.comm.rank(COMM)), error = function(e) 0L)
+      if (!isTRUE(rank == 0L))
+        options(np.messages = FALSE)
+      on.exit(options(np.messages = old.messages), add = TRUE)
+      ctx.local <- get(REF, envir = .GlobalEnv, inherits = FALSE)
+      get(".npscoefbw_nomad_lp_eval_collective_local", envir = asNamespace("npRmpi"), inherits = FALSE)(
+        ctx = ctx.local,
+        bws = BWS,
+        invalid.penalty = INVALID,
+        penalty.multiplier = PMULT,
+        comm = COMM
       )
-    } else {
-      substitute(
-        npscoef(
-          bws = bws,
-          txdat = xdat,
-          tydat = ydat,
-          tzdat = zdat,
-          leave.one.out = TRUE,
-          iterate = FALSE,
-          betas = FALSE,
-          errors = FALSE,
-          .np_fit_progress_allow = FALSE
-        )
-      )
-    }
-    tryCatch(
-      .npRmpi_manual_distributed_call(mc, caller_env = environment()),
-      error = function(e) e
-    )
-  } else {
-    xdat <- data$xdat
-    ydat <- data$ydat
-    zdat <- data$zdat
-    tryCatch(
-      .npRmpi_with_local_regression(
-        npscoef(
-          bws = bws,
-          txdat = xdat,
-          tydat = ydat,
-          tzdat = zdat,
-          leave.one.out = TRUE,
-          iterate = FALSE,
-          betas = FALSE,
-          errors = FALSE,
-          .np_fit_progress_allow = FALSE
-        )
-      ),
-      error = function(e) e
-    )
+    }, list(
+      REF = ref,
+      BWS = bws,
+      INVALID = invalid.penalty,
+      PMULT = penalty.multiplier,
+      COMM = comm
+    ))
+    return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
   }
 
-  if (inherits(fit, "error") || is.null(fit$mean) || any(!is.finite(fit$mean))) {
-    return(list(objective = penalty, num.feval = 1L))
+  if (.npRmpi_safe_int(mpi.comm.size(comm)) > 1L) {
+    return(.npscoefbw_nomad_lp_eval_collective_local(
+      ctx = data,
+      bws = bws,
+      invalid.penalty = invalid.penalty,
+      penalty.multiplier = penalty.multiplier,
+      comm = comm
+    ))
   }
 
-  list(
-    objective = as.numeric(mean((as.double(ydat) - as.double(fit$mean))^2)),
-    num.feval = 1L,
-    timing.profile = fit$timing.profile
+  .npscoefbw_nomad_lp_eval_direct(
+    ctx = data,
+    bws = bws,
+    invalid.penalty = invalid.penalty,
+    penalty.multiplier = penalty.multiplier,
+    localize = TRUE
   )
 }
 
@@ -566,6 +1055,10 @@ npscoefbw.NULL <-
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
+  ctx <- .npscoefbw_nomad_context_prepare(xdat = xdat, ydat = ydat, zdat = zdat)
+  on.exit(.npscoefbw_nomad_context_cleanup(ctx, comm = 1L), add = TRUE)
+  pool <- .npscoefbw_nomad_pool_start(ctx, comm = 1L)
+  on.exit(.npscoefbw_nomad_pool_stop(pool), add = TRUE)
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -588,12 +1081,16 @@ npscoefbw.NULL <-
       bandwidth.compute = FALSE,
       reg.args = eval.reg.args
     )
+    tbw <- .npscoefbw_normalize_nomad_scbw(
+      scbw = tbw,
+      eval.zdat = eval.zdat,
+      bw = bw_vec
+    )
 
-    out <- .npscoefbw_eval_only(
-      xdat = xdat,
-      ydat = ydat,
-      zdat = zdat,
+    out <- .npscoefbw_eval_pool(
+      ctx = ctx,
       bws = tbw,
+      pool = pool,
       invalid.penalty = "baseline",
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     )
@@ -627,6 +1124,11 @@ npscoefbw.NULL <-
         bws = bw_vec,
         bandwidth.compute = FALSE,
         reg.args = final.reg.args
+      )
+      tbw <- .npscoefbw_normalize_nomad_scbw(
+        scbw = tbw,
+        eval.zdat = eval.zdat,
+        bw = bw_vec
       )
       tbw$fval <- as.numeric(best_record$objective)
       tbw$ifval <- as.numeric(best_record$objective)
