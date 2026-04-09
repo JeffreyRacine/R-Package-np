@@ -129,7 +129,7 @@ int gsl_bspline_deriv(double *x,
 	gsl_bspline_free(bw);
 	gsl_vector_free(dBorder);
 	gsl_matrix_free(dB);
-	/*  gsl_vector_free(quantile_vec);*/
+	gsl_vector_free(quantile_vec);
 	gsl_bspline_deriv_free(derivWS);
 
 	return(0);
