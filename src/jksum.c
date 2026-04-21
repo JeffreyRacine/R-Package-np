@@ -16582,6 +16582,72 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
   return 0;
 }
 
+static int np_conditional_y_scalar_eval_from_ctx(NPConditionalYRowCtx *ctx,
+                                                 double eval_y,
+                                                 double *row_out){
+  const int num_train = num_obs_train_extern;
+  NPConditionalBoundState bounds_state;
+  int j;
+
+  if((ctx == NULL) || (!ctx->ready) || (row_out == NULL))
+    return 1;
+  if(num_var_unordered_extern != 0)
+    return 1;
+  if(num_var_ordered_extern != 0)
+    return 1;
+  if(num_var_continuous_extern != 1)
+    return 1;
+  if(BANDWIDTH_den_extern != BW_FIXED)
+    return 1;
+
+  memset(row_out, 0, (size_t)num_train*sizeof(double));
+
+  ctx->eval_ycon_one[0][0] = eval_y;
+  ctx->matrix_bandwidth_eval_one[0][0] = ctx->matrix_bandwidth_y[0][0];
+
+  np_conditional_push_bounds(int_cyker_bound_extern,
+                             vector_cykerlb_extern,
+                             vector_cykerub_extern,
+                             &bounds_state);
+  if(np_shadow_conditional_kernel_row(ctx->kernel_cy,
+                                      ctx->kernel_uy,
+                                      ctx->kernel_oy,
+                                      ctx->operator_y,
+                                      BANDWIDTH_den_extern,
+                                      num_train,
+                                      num_var_unordered_extern,
+                                      num_var_ordered_extern,
+                                      num_var_continuous_extern,
+                                      matrix_Y_unordered_train_extern,
+                                      matrix_Y_ordered_train_extern,
+                                      matrix_Y_continuous_train_extern,
+                                      ctx->eval_yuno_one,
+                                      ctx->eval_yord_one,
+                                      ctx->eval_ycon_one,
+                                      ctx->vsfy,
+                                      1,
+                                      ctx->matrix_bandwidth_y,
+                                      ctx->matrix_bandwidth_eval_one,
+                                      ctx->lambday,
+                                      num_categories_extern_Y,
+                                      matrix_categorical_vals_extern_Y,
+                                      int_TREE_Y,
+                                      kdt_extern_Y,
+                                      ctx->kw,
+                                      NULL) != 0){
+    np_conditional_pop_bounds(&bounds_state);
+    return 1;
+  }
+  np_conditional_pop_bounds(&bounds_state);
+
+  for(j = 0; j < num_train; j++){
+    const int orig_j = (int_TREE_Y == NP_TREE_TRUE) ? ipt_extern_Y[j] : j;
+    row_out[orig_j] = ctx->kw[j];
+  }
+
+  return 0;
+}
+
 static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_factor,
                                                         int eval_idx,
                                                         int drop_eval_self,
@@ -17276,6 +17342,135 @@ cleanup_yweight_eval_block:
 
 static int np_conditional_lp_cvls_block_size(void){
   return 64;
+}
+
+#define NP_BOUNDED_CVLS_I1_GRID_POINTS 81
+#define NP_BOUNDED_CVLS_I1_MODE_BOOK 1
+#define NP_BOUNDED_CVLS_I1_MODE_FULL 0
+
+static int np_conditional_density_cvls_bounded_scalar_route_ok(void){
+  const double lb =
+    (vector_cykerlb_extern != NULL) ? vector_cykerlb_extern[0] : DBL_MAX;
+  const double ub =
+    (vector_cykerub_extern != NULL) ? vector_cykerub_extern[0] : DBL_MAX;
+
+  if(BANDWIDTH_den_extern != BW_FIXED)
+    return 0;
+  if(int_cyker_bound_extern == 0)
+    return 0;
+  if(num_var_continuous_extern != 1)
+    return 0;
+  if(num_var_unordered_extern != 0)
+    return 0;
+  if(num_var_ordered_extern != 0)
+    return 0;
+  if((vector_cykerlb_extern == NULL) || (vector_cykerub_extern == NULL))
+    return 0;
+  if((!R_FINITE(lb)) || (!R_FINITE(ub)) || (!(ub > lb)))
+    return 0;
+
+  return 1;
+}
+
+static void np_fill_trapezoid_rule(double a,
+                                   double b,
+                                   int n,
+                                   double *grid,
+                                   double *weights){
+  const double step = (b - a)/(double)(n - 1);
+  int i;
+
+  for(i = 0; i < n; i++){
+    grid[i] = a + ((double)i)*step;
+    weights[i] = step;
+  }
+  weights[0] *= 0.5;
+  weights[n - 1] *= 0.5;
+}
+
+static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *vector_scale_factor,
+                                                                         double *cv,
+                                                                         int i1_mode){
+  const int num_obs = num_obs_train_extern;
+  const int q = NP_BOUNDED_CVLS_I1_GRID_POINTS;
+  const double lb = vector_cykerlb_extern[0];
+  const double ub = vector_cykerub_extern[0];
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0};
+  double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *grid = NULL, *weights = NULL;
+  double **ygridblock = NULL;
+  int i, m;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
+    return 1;
+  if(!np_conditional_density_cvls_bounded_scalar_route_ok())
+    return 1;
+  if((i1_mode != NP_BOUNDED_CVLS_I1_MODE_BOOK) &&
+     (i1_mode != NP_BOUNDED_CVLS_I1_MODE_FULL))
+    return 1;
+
+  xrow = alloc_vecd(MAX(1, num_obs));
+  if(i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL)
+    xrow_full = alloc_vecd(MAX(1, num_obs));
+  yrow = alloc_vecd(MAX(1, num_obs));
+  grid = alloc_vecd(MAX(2, q));
+  weights = alloc_vecd(MAX(2, q));
+  ygridblock = alloc_matd(num_obs, q);
+  if((xrow == NULL) || (yrow == NULL) || (grid == NULL) || (weights == NULL) || (ygridblock == NULL) ||
+     ((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xrow_full == NULL)))
+    goto cleanup_bounded_cvls_quad;
+
+  if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
+    goto cleanup_bounded_cvls_quad;
+  if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
+    goto cleanup_bounded_cvls_quad;
+
+  /* Evaluate the bounded I1 term by integrating the pointwise estimator itself,
+     bypassing the suspect bounded-convolution shortcut on this narrow surface. */
+  np_fill_trapezoid_rule(lb, ub, q, grid, weights);
+  for(m = 0; m < q; m++){
+    if(np_conditional_y_scalar_eval_from_ctx(&yctx, grid[m], ygridblock[m]) != 0)
+      goto cleanup_bounded_cvls_quad;
+  }
+
+  *cv = 0.0;
+  for(i = 0; i < num_obs; i++){
+    const double * const xuse =
+      (i1_mode == NP_BOUNDED_CVLS_I1_MODE_BOOK) ? xrow : xrow_full;
+    double lin;
+    double quad = 0.0;
+
+    if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
+      goto cleanup_bounded_cvls_quad;
+    if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) &&
+       (np_conditional_x_weight_row_full_stream_core(vector_scale_factor, i, xrow_full) != 0))
+      goto cleanup_bounded_cvls_quad;
+    if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
+      goto cleanup_bounded_cvls_quad;
+
+    lin = np_blas_ddot_int(num_obs, xrow, yrow);
+    for(m = 0; m < q; m++){
+      const double fit = np_blas_ddot_int(num_obs, xuse, ygridblock[m]);
+      quad += weights[m]*fit*fit;
+    }
+    *cv += quad - 2.0*lin;
+  }
+
+  *cv /= (double)num_obs;
+  status = 0;
+
+cleanup_bounded_cvls_quad:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  np_glp_cv_clear_extern();
+  if(xrow != NULL) free(xrow);
+  if(xrow_full != NULL) free(xrow_full);
+  if(yrow != NULL) free(yrow);
+  if(grid != NULL) free(grid);
+  if(weights != NULL) free(weights);
+  if(ygridblock != NULL) free_mat(ygridblock, q);
+  return status;
 }
 
 static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_factor,
@@ -18366,6 +18561,11 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
+
+  if(np_conditional_density_cvls_bounded_scalar_route_ok())
+    return np_conditional_density_cvls_bounded_i1_quadrature_row_stream(vector_scale_factor,
+                                                                        cv,
+                                                                        NP_BOUNDED_CVLS_I1_MODE_BOOK);
 
   if((BANDWIDTH_den_extern == BW_FIXED) &&
      (np_conditional_density_cvls_lp_all_large_stream(vector_scale_factor, cv) == 0)){
