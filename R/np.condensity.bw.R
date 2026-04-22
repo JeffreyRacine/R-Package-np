@@ -1612,11 +1612,9 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   )
 
   baseline.degree <- rep.int(0L, ncon)
-  default.start.degree <- if (identical(search.engine, "cell")) {
-    baseline.degree
-  } else {
-    rep.int(1L, ncon)
-  }
+  # Density/distribution degree search should anchor on the local-constant
+  # baseline unless the user explicitly requests another start.
+  default.start.degree <- baseline.degree
   start.degree <- if (is.null(degree.start)) {
     pmax(bounds$lower, pmin(bounds$upper, default.start.degree))
   } else {
