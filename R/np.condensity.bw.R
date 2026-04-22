@@ -90,12 +90,10 @@ npcdensbw.formula <-
   if (!bounded.y)
     return(invisible(TRUE))
 
-  if (bws$yncon != 1L ||
-      bws$ynuno != 0L ||
-      bws$ynord != 0L) {
+  if (bws$yncon < 1L || bws$yncon > 2L) {
     stop(
       sprintf(
-        "%s bounded response cv.ls currently supports only one continuous response variable and no discrete response components",
+        "%s bounded response cv.ls currently supports up to two continuous response variables with optional ordered/unordered discrete response components",
         where
       ),
       call. = FALSE

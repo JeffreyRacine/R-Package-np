@@ -35,6 +35,11 @@ bounded_pair_convolution_exact <- function(y.eval, y.train, h, lb, ub) {
   )$value / (h * gy.eval * gy.train)
 }
 
+bounded_scalar_kernel <- function(y.eval, y.train, h, lb, ub) {
+  denom <- h * (pnorm((ub - y.eval) / h) - pnorm((lb - y.eval) / h))
+  dnorm((y.eval - y.train) / h) / denom
+}
+
 test_that("bounded conditional y-convolution row matches direct integration at the upper boundary", {
   set.seed(20260320)
   n <- 28L
@@ -78,7 +83,7 @@ test_that("bounded conditional y-convolution row matches direct integration at t
   expect_equal(as.numeric(yconv.row), exact.row, tolerance = 1e-6)
 })
 
-test_that("bounded conditional cv.ls fixed-point objective matches direct integration", {
+test_that("bounded conditional cv.ls fixed-point objective matches direct delete-one quadrature", {
   set.seed(20260320)
   n <- 24L
   x <- runif(n)
@@ -109,23 +114,28 @@ test_that("bounded conditional cv.ls fixed-point objective matches direct integr
     dnorm((y[i] - y[j]) / h[1]) / denom
   }))
 
-  w.full <- Kx / rowSums(Kx)
   w.loo <- Kx
   diag(w.loo) <- 0
   w.loo <- w.loo / rowSums(w.loo)
 
   f.loo <- rowSums(Ky * w.loo)
-  Ky.conv <- outer(
-    y,
+  q <- 81L
+  grid <- seq(y.lb, y.ub, length.out = q)
+  trap <- diff(grid)[1] * c(0.5, rep(1, q - 2L), 0.5)
+  Ky.grid <- outer(
+    grid,
     y,
     Vectorize(function(y.eval, y.train) {
-      bounded_pair_convolution_exact(y.eval, y.train, h[1], y.lb, y.ub)
+      bounded_scalar_kernel(y.eval, y.train, h[1], y.lb, y.ub)
     })
   )
 
   intsq <- vapply(
     seq_len(n),
-    function(i) as.numeric(w.full[i, ] %*% Ky.conv %*% w.full[i, ]),
+    function(i) {
+      fit <- as.numeric(Ky.grid %*% w.loo[i, ])
+      sum(trap * fit^2)
+    },
     numeric(1)
   )
 

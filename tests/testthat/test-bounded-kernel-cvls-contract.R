@@ -51,32 +51,47 @@ test_that("bounded unconditional cv.ls scalar quadrature supports generalized an
   expect_true(is.finite(as.numeric(bw.ad$fval)))
 })
 
-test_that("bounded unconditional cv.ls fails fast for unsupported data shapes", {
+test_that("bounded unconditional cv.ls admits mixed and bivariate continuous bounded data", {
   set.seed(20260421)
-  multi <- data.frame(x1 = runif(24L), x2 = runif(24L))
   mixed <- data.frame(x = runif(24L), g = factor(sample(c("a", "b"), 24L, replace = TRUE)))
-
-  expect_error(
-    npudensbw(
-      dat = multi,
-      bwmethod = "cv.ls",
-      bwtype = "adaptive_nn",
-      ckerbound = "range",
-      nmulti = 1
-    ),
-    "bounded npudens cv\\.ls currently supports only one continuous variable"
+  multi <- data.frame(x1 = runif(24L), x2 = runif(24L))
+  combo <- data.frame(
+    x1 = runif(24L),
+    x2 = runif(24L),
+    u = factor(sample(c("a", "b"), 24L, replace = TRUE)),
+    o = ordered(sample(1:3, 24L, replace = TRUE))
   )
 
-  expect_error(
-    npudensbw(
-      dat = mixed,
-      bwmethod = "cv.ls",
-      bwtype = "generalized_nn",
-      ckerbound = "range",
-      nmulti = 1
-    ),
-    "bounded npudens cv\\.ls currently supports only one continuous variable"
+  bw.mixed <- npudensbw(
+    dat = mixed,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
   )
+
+  bw.multi <- npudensbw(
+    dat = multi,
+    bwmethod = "cv.ls",
+    bwtype = "adaptive_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+
+  bw.combo <- npudensbw(
+    dat = combo,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    ckerbound = "range",
+    nmulti = 1
+  )
+
+  expect_true(all(is.finite(as.numeric(bw.mixed$bw))))
+  expect_true(is.finite(as.numeric(bw.mixed$fval)))
+  expect_true(all(is.finite(as.numeric(bw.multi$bw))))
+  expect_true(is.finite(as.numeric(bw.multi$fval)))
+  expect_true(all(is.finite(as.numeric(bw.combo$bw))))
+  expect_true(is.finite(as.numeric(bw.combo$fval)))
 })
 
 test_that("bounded conditional cv.ls remains finite for gaussian order 2 and 4", {
@@ -220,34 +235,84 @@ test_that("bounded conditional cv.ls scalar quadrature supports generalized and 
   expect_true(is.finite(as.numeric(bw.ad$fval)))
 })
 
-test_that("bounded conditional cv.ls fails fast for unsupported response shapes", {
+test_that("bounded conditional cv.ls admits mixed and bivariate continuous bounded responses", {
   set.seed(20260421)
   n <- 32L
   xdat <- data.frame(x = runif(n))
-  ymulti <- data.frame(y1 = runif(n), y2 = runif(n))
   ymixed <- data.frame(y = runif(n), g = factor(sample(c("a", "b"), n, replace = TRUE)))
+  ymulti <- data.frame(y1 = runif(n), y2 = runif(n))
+  ycombo <- data.frame(
+    y1 = runif(n),
+    y2 = runif(n),
+    u = factor(sample(c("a", "b"), n, replace = TRUE)),
+    o = ordered(sample(1:3, n, replace = TRUE))
+  )
+
+  bw.mixed <- npcdensbw(
+    xdat = xdat,
+    ydat = ymixed,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    cykerbound = "range",
+    nmulti = 1
+  )
+
+  bw.multi <- npcdensbw(
+    xdat = xdat,
+    ydat = ymulti,
+    bwmethod = "cv.ls",
+    bwtype = "adaptive_nn",
+    cykerbound = "range",
+    nmulti = 1
+  )
+
+  bw.combo <- npcdensbw(
+    xdat = xdat,
+    ydat = ycombo,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    cykerbound = "range",
+    nmulti = 1
+  )
+
+  expect_true(all(is.finite(as.numeric(bw.mixed$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.mixed$ybw))))
+  expect_true(is.finite(as.numeric(bw.mixed$fval)))
+  expect_true(all(is.finite(as.numeric(bw.multi$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.multi$ybw))))
+  expect_true(is.finite(as.numeric(bw.multi$fval)))
+  expect_true(all(is.finite(as.numeric(bw.combo$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.combo$ybw))))
+  expect_true(is.finite(as.numeric(bw.combo$fval)))
+})
+
+test_that("bounded cv.ls still fails fast beyond two continuous bounded variables", {
+  set.seed(20260421)
+  n <- 24L
+  xdat <- data.frame(x = runif(n))
+  y3 <- data.frame(y1 = runif(n), y2 = runif(n), y3 = runif(n))
+  d3 <- data.frame(x1 = runif(n), x2 = runif(n), x3 = runif(n))
 
   expect_error(
     npcdensbw(
       xdat = xdat,
-      ydat = ymulti,
+      ydat = y3,
       bwmethod = "cv.ls",
-      bwtype = "adaptive_nn",
+      bwtype = "fixed",
       cykerbound = "range",
       nmulti = 1
     ),
-    "bounded response cv\\.ls currently supports only one continuous response variable"
+    "supports up to two continuous response variables"
   )
 
   expect_error(
-    npcdensbw(
-      xdat = xdat,
-      ydat = ymixed,
+    npudensbw(
+      dat = d3,
       bwmethod = "cv.ls",
-      bwtype = "generalized_nn",
-      cykerbound = "range",
+      bwtype = "fixed",
+      ckerbound = "range",
       nmulti = 1
     ),
-    "bounded response cv\\.ls currently supports only one continuous response variable"
+    "supports up to two continuous variables"
   )
 })

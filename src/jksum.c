@@ -17386,15 +17386,34 @@ static int np_conditional_lp_cvls_block_size(void){
 }
 
 #define NP_BOUNDED_CVLS_I1_GRID_POINTS 81
+#define NP_BOUNDED_CVLS_I1_GRID_POINTS_2D 31
 #define NP_BOUNDED_CVLS_I1_MODE_BOOK 1
 #define NP_BOUNDED_CVLS_I1_MODE_FULL 0
 
-static int np_conditional_density_cvls_bounded_scalar_route_ok(void){
-  const double lb =
-    (vector_cykerlb_extern != NULL) ? vector_cykerlb_extern[0] : DBL_MAX;
-  const double ub =
-    (vector_cykerub_extern != NULL) ? vector_cykerub_extern[0] : DBL_MAX;
+static int np_bounded_cvls_continuous_support_ok(const int ncon,
+                                                 const double *lb,
+                                                 const double *ub){
+  int d;
 
+  if((ncon < 1) || (ncon > 2))
+    return 0;
+  if((lb == NULL) || (ub == NULL))
+    return 0;
+
+  for(d = 0; d < ncon; d++){
+    if((!R_FINITE(lb[d])) || (!R_FINITE(ub[d])) || (!(ub[d] > lb[d])))
+      return 0;
+  }
+
+  return 1;
+}
+
+static int np_bounded_cvls_grid_points(const int ncon){
+  return (ncon == 1) ? NP_BOUNDED_CVLS_I1_GRID_POINTS :
+    NP_BOUNDED_CVLS_I1_GRID_POINTS_2D;
+}
+
+static int np_conditional_density_cvls_bounded_scalar_route_ok(void){
   if(int_cyker_bound_extern == 0)
     return 0;
   if(num_var_continuous_extern != 1)
@@ -17403,12 +17422,9 @@ static int np_conditional_density_cvls_bounded_scalar_route_ok(void){
     return 0;
   if(num_var_ordered_extern != 0)
     return 0;
-  if((vector_cykerlb_extern == NULL) || (vector_cykerub_extern == NULL))
-    return 0;
-  if((!R_FINITE(lb)) || (!R_FINITE(ub)) || (!(ub > lb)))
-    return 0;
-
-  return 1;
+  return np_bounded_cvls_continuous_support_ok(num_var_continuous_extern,
+                                               vector_cykerlb_extern,
+                                               vector_cykerub_extern);
 }
 
 static void np_fill_trapezoid_rule(double a,
@@ -17430,11 +17446,6 @@ static void np_fill_trapezoid_rule(double a,
 static int np_density_cvls_bounded_scalar_route_ok(const int num_reg_unordered,
                                                    const int num_reg_ordered,
                                                    const int num_reg_continuous){
-  const double lb =
-    (vector_ckerlb_extern != NULL) ? vector_ckerlb_extern[0] : DBL_MAX;
-  const double ub =
-    (vector_ckerub_extern != NULL) ? vector_ckerub_extern[0] : DBL_MAX;
-
   if(int_cker_bound_extern == 0)
     return 0;
   if(num_reg_continuous != 1)
@@ -17443,12 +17454,109 @@ static int np_density_cvls_bounded_scalar_route_ok(const int num_reg_unordered,
     return 0;
   if(num_reg_ordered != 0)
     return 0;
-  if((vector_ckerlb_extern == NULL) || (vector_ckerub_extern == NULL))
-    return 0;
-  if((!R_FINITE(lb)) || (!R_FINITE(ub)) || (!(ub > lb)))
-    return 0;
+  return np_bounded_cvls_continuous_support_ok(num_reg_continuous,
+                                               vector_ckerlb_extern,
+                                               vector_ckerub_extern);
+}
 
-  return 1;
+static int np_conditional_density_cvls_bounded_general_route_ok(void){
+  if(int_cyker_bound_extern == 0)
+    return 0;
+  return np_bounded_cvls_continuous_support_ok(num_var_continuous_extern,
+                                               vector_cykerlb_extern,
+                                               vector_cykerub_extern);
+}
+
+static int np_density_cvls_bounded_general_route_ok(const int num_reg_continuous){
+  if(int_cker_bound_extern == 0)
+    return 0;
+  return np_bounded_cvls_continuous_support_ok(num_reg_continuous,
+                                               vector_ckerlb_extern,
+                                               vector_ckerub_extern);
+}
+
+static int np_bounded_cvls_eval_count(const int ncon,
+                                      const int nuno,
+                                      const int nord,
+                                      const int q,
+                                      const int *num_categories,
+                                      size_t *total_out){
+  size_t total = 1;
+  int l;
+
+  if(total_out == NULL)
+    return 1;
+  if((ncon < 1) || (ncon > 2) || (q < 2))
+    return 1;
+
+  for(l = 0; l < ncon; l++){
+    if(total > (SIZE_MAX/(size_t)q))
+      return 1;
+    total *= (size_t)q;
+  }
+
+  for(l = 0; l < (nuno + nord); l++){
+    const int ncat = num_categories[l];
+    if(ncat <= 0)
+      return 1;
+    if(total > (SIZE_MAX/(size_t)ncat))
+      return 1;
+    total *= (size_t)ncat;
+  }
+
+  *total_out = total;
+  return 0;
+}
+
+static void np_bounded_cvls_fill_eval_block(const size_t eval_start,
+                                            const int block_rows,
+                                            const int ncon,
+                                            const int nuno,
+                                            const int nord,
+                                            const int q,
+                                            double **cont_grid,
+                                            double **cont_weight,
+                                            int *num_categories,
+                                            double **matrix_categorical_vals,
+                                            double **eval_uno,
+                                            double **eval_ord,
+                                            double **eval_con,
+                                            double *eval_weight){
+  const int ndisc = nuno + nord;
+  size_t disc_total = 1;
+  int l, b;
+
+  for(l = 0; l < ndisc; l++)
+    disc_total *= (size_t)num_categories[l];
+
+  for(b = 0; b < block_rows; b++){
+    size_t idx = eval_start + (size_t)b;
+    size_t disc_idx = (ndisc > 0) ? (idx % disc_total) : 0;
+    size_t cont_idx = (ndisc > 0) ? (idx / disc_total) : idx;
+    double w = 1.0;
+
+    for(l = 0; l < ncon; l++){
+      const int g = (int)(cont_idx % (size_t)q);
+      cont_idx /= (size_t)q;
+      eval_con[l][b] = cont_grid[l][g];
+      w *= cont_weight[l][g];
+    }
+
+    for(l = 0; l < nuno; l++){
+      const int lev = (int)(disc_idx % (size_t)num_categories[l]);
+      disc_idx /= (size_t)num_categories[l];
+      eval_uno[l][b] = matrix_categorical_vals[l][lev];
+    }
+
+    for(l = 0; l < nord; l++){
+      const int cat_idx = l + nuno;
+      const int lev = (int)(disc_idx % (size_t)num_categories[cat_idx]);
+      disc_idx /= (size_t)num_categories[cat_idx];
+      eval_ord[l][b] = matrix_categorical_vals[cat_idx][lev];
+    }
+
+    eval_weight[b] = w;
+  }
 }
 
 static int np_density_cvls_bounded_i1_quadrature(const int KERNEL_den,
@@ -17558,6 +17666,179 @@ cleanup_density_bounded_quad:
   return status;
 }
 
+static int np_density_cvls_bounded_i1_quadrature_general(const int KERNEL_den,
+                                                         const int KERNEL_unordered_den,
+                                                         const int KERNEL_ordered_den,
+                                                         const int BANDWIDTH_den,
+                                                         const int num_obs,
+                                                         const int num_reg_unordered,
+                                                         const int num_reg_ordered,
+                                                         const int num_reg_continuous,
+                                                         double **matrix_X_unordered,
+                                                         double **matrix_X_ordered,
+                                                         double **matrix_X_continuous,
+                                                         double *vector_scale_factor,
+                                                         int *num_categories,
+                                                         double **matrix_categorical_vals,
+                                                         double *cv1){
+  const int ncon = num_reg_continuous;
+  const int nuno = num_reg_unordered;
+  const int nord = num_reg_ordered;
+  const int q = np_bounded_cvls_grid_points(ncon);
+  const int block_size = 64;
+  size_t total_eval = 0;
+  double **cont_grid = NULL, **cont_weight = NULL;
+  double **eval_xuno = NULL, **eval_xord = NULL, **eval_xcon = NULL;
+  double **matrix_bandwidth = NULL;
+  double *lambda = NULL, *eval_weight = NULL;
+  int bw_rows, d;
+  int status = 1;
+
+  if((cv1 == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
+    return 1;
+  if((BANDWIDTH_den != BW_FIXED) &&
+     (BANDWIDTH_den != BW_GEN_NN) &&
+     (BANDWIDTH_den != BW_ADAP_NN))
+    return 1;
+  if(!np_density_cvls_bounded_general_route_ok(num_reg_continuous))
+    return 1;
+  if(np_bounded_cvls_eval_count(ncon,
+                                nuno,
+                                nord,
+                                q,
+                                num_categories,
+                                &total_eval) != 0)
+    return 1;
+
+  bw_rows =
+    (BANDWIDTH_den == BW_FIXED) ? 1 :
+    ((BANDWIDTH_den == BW_GEN_NN) ? block_size : num_obs);
+
+  cont_grid = alloc_matd(q, ncon);
+  cont_weight = alloc_matd(q, ncon);
+  if(nuno > 0) eval_xuno = alloc_matd(block_size, nuno);
+  if(nord > 0) eval_xord = alloc_matd(block_size, nord);
+  eval_xcon = alloc_matd(block_size, ncon);
+  matrix_bandwidth = alloc_matd(bw_rows, ncon);
+  lambda = alloc_vecd(nuno + nord);
+  eval_weight = alloc_vecd(block_size);
+
+  if((cont_grid == NULL) || (cont_weight == NULL) || (eval_xcon == NULL) ||
+     (matrix_bandwidth == NULL) || (lambda == NULL) || (eval_weight == NULL) ||
+     ((nuno > 0) && (eval_xuno == NULL)) ||
+     ((nord > 0) && (eval_xord == NULL)))
+    goto cleanup_density_bounded_quad_general;
+
+  for(d = 0; d < ncon; d++)
+    np_fill_trapezoid_rule(vector_ckerlb_extern[d],
+                           vector_ckerub_extern[d],
+                           q,
+                           cont_grid[d],
+                           cont_weight[d]);
+
+  *cv1 = 0.0;
+  for(size_t eval_start = 0; eval_start < total_eval; ){
+    const int eb = (int)MIN((size_t)block_size, total_eval - eval_start);
+    int b, i, l;
+
+    np_bounded_cvls_fill_eval_block(eval_start,
+                                    eb,
+                                    ncon,
+                                    nuno,
+                                    nord,
+                                    q,
+                                    cont_grid,
+                                    cont_weight,
+                                    num_categories,
+                                    matrix_categorical_vals,
+                                    eval_xuno,
+                                    eval_xord,
+                                    eval_xcon,
+                                    eval_weight);
+
+    if(kernel_bandwidth_mean(KERNEL_den,
+                             BANDWIDTH_den,
+                             num_obs,
+                             eb,
+                             0,
+                             0,
+                             0,
+                             ncon,
+                             nuno,
+                             nord,
+                             0,
+                             vector_scale_factor,
+                             NULL,
+                             NULL,
+                             matrix_X_continuous,
+                             eval_xcon,
+                             NULL,
+                             matrix_bandwidth,
+                             lambda) == 1)
+      goto cleanup_density_bounded_quad_general;
+
+    for(b = 0; b < eb; b++){
+      double fit = 0.0;
+
+      for(i = 0; i < num_obs; i++){
+        double prod = 1.0;
+
+        for(d = 0; d < ncon; d++){
+          const int bw_idx =
+            (BANDWIDTH_den == BW_FIXED) ? 0 :
+            ((BANDWIDTH_den == BW_GEN_NN) ? b : i);
+          const double h = matrix_bandwidth[d][bw_idx];
+          const double eval_x = eval_xcon[d][b];
+          const double invnorm =
+            np_cker_invnorm(KERNEL_den,
+                            eval_x,
+                            h,
+                            vector_ckerlb_extern[d],
+                            vector_ckerub_extern[d]);
+
+          if(!(h > 0.0) || !isfinite(h))
+            goto cleanup_density_bounded_quad_general;
+          prod *= invnorm*np_cker_base_eval(KERNEL_den,
+                                            (eval_x - matrix_X_continuous[d][i])/h)/h;
+        }
+
+        for(l = 0; l < nuno; l++)
+          prod *= kernel_unordered(KERNEL_unordered_den,
+                                   eval_xuno[l][b],
+                                   matrix_X_unordered[l][i],
+                                   lambda[l],
+                                   num_categories[l]);
+
+        for(l = 0; l < nord; l++)
+          prod *= kernel_ordered(KERNEL_ordered_den,
+                                 eval_xord[l][b],
+                                 matrix_X_ordered[l][i],
+                                 lambda[l + nuno]);
+
+        fit += prod;
+      }
+
+      fit /= (double)num_obs;
+      *cv1 += eval_weight[b]*fit*fit;
+    }
+
+    eval_start += (size_t)eb;
+  }
+
+  status = 0;
+
+cleanup_density_bounded_quad_general:
+  if(cont_grid != NULL) free_mat(cont_grid, ncon);
+  if(cont_weight != NULL) free_mat(cont_weight, ncon);
+  if(eval_xuno != NULL) free_mat(eval_xuno, nuno);
+  if(eval_xord != NULL) free_mat(eval_xord, nord);
+  if(eval_xcon != NULL) free_mat(eval_xcon, ncon);
+  if(matrix_bandwidth != NULL) free_mat(matrix_bandwidth, ncon);
+  if(lambda != NULL) free(lambda);
+  if(eval_weight != NULL) free(eval_weight);
+  return status;
+}
+
 static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *vector_scale_factor,
                                                                          double *cv,
                                                                          int i1_mode){
@@ -17643,6 +17924,182 @@ cleanup_bounded_cvls_quad:
   if(grid != NULL) free(grid);
   if(weights != NULL) free(weights);
   if(ygridblock != NULL) free_mat(ygridblock, q);
+  return status;
+}
+
+static int np_conditional_y_eval_any_block_stream_core(double *vector_scale_factor,
+                                                       int block_rows,
+                                                       double **matrix_Y_unordered_eval,
+                                                       double **matrix_Y_ordered_eval,
+                                                       double **matrix_Y_continuous_eval,
+                                                       double **rows_out){
+  int b;
+
+  if((rows_out == NULL) || (vector_scale_factor == NULL) || (block_rows <= 0))
+    return 1;
+
+  if((int_TREE_Y != NP_TREE_TRUE) && (BANDWIDTH_den_extern != BW_ADAP_NN)){
+    return np_conditional_y_eval_block_stream_op_core(vector_scale_factor,
+                                                      0,
+                                                      block_rows,
+                                                      OP_NORMAL,
+                                                      matrix_Y_unordered_eval,
+                                                      matrix_Y_ordered_eval,
+                                                      matrix_Y_continuous_eval,
+                                                      block_rows,
+                                                      rows_out);
+  }
+
+  for(b = 0; b < block_rows; b++){
+    if(np_conditional_y_eval_row_stream_op_core(vector_scale_factor,
+                                                b,
+                                                OP_NORMAL,
+                                                matrix_Y_unordered_eval,
+                                                matrix_Y_ordered_eval,
+                                                matrix_Y_continuous_eval,
+                                                block_rows,
+                                                0,
+                                                rows_out[b]) != 0)
+      return 1;
+  }
+
+  return 0;
+}
+
+static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(double *vector_scale_factor,
+                                                                                 double *cv,
+                                                                                 int i1_mode){
+  const int num_obs = num_obs_train_extern;
+  const int ncon = num_var_continuous_extern;
+  const int nuno = num_var_unordered_extern;
+  const int nord = num_var_ordered_extern;
+  const int q = np_bounded_cvls_grid_points(ncon);
+  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(), 64));
+  size_t total_eval = 0;
+  NPConditionalYRowCtx yctx = {0};
+  double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *eval_weight = NULL;
+  double **cont_grid = NULL, **cont_weight = NULL;
+  double **eval_yuno = NULL, **eval_yord = NULL, **eval_ycon = NULL, **yevalblock = NULL;
+  int i, d;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
+    return 1;
+  if(!np_conditional_density_cvls_bounded_general_route_ok())
+    return 1;
+  if((i1_mode != NP_BOUNDED_CVLS_I1_MODE_BOOK) &&
+     (i1_mode != NP_BOUNDED_CVLS_I1_MODE_FULL))
+    return 1;
+  if(np_bounded_cvls_eval_count(ncon,
+                                nuno,
+                                nord,
+                                q,
+                                num_categories_extern_Y,
+                                &total_eval) != 0)
+    return 1;
+
+  xrow = alloc_vecd(MAX(1, num_obs));
+  if(i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL)
+    xrow_full = alloc_vecd(MAX(1, num_obs));
+  yrow = alloc_vecd(MAX(1, num_obs));
+  eval_weight = alloc_vecd(block_size);
+  cont_grid = alloc_matd(q, ncon);
+  cont_weight = alloc_matd(q, ncon);
+  if(nuno > 0) eval_yuno = alloc_matd(block_size, nuno);
+  if(nord > 0) eval_yord = alloc_matd(block_size, nord);
+  eval_ycon = alloc_matd(block_size, ncon);
+  yevalblock = alloc_matd(num_obs, block_size);
+
+  if((xrow == NULL) || (yrow == NULL) || (eval_weight == NULL) ||
+     (cont_grid == NULL) || (cont_weight == NULL) || (eval_ycon == NULL) ||
+     (yevalblock == NULL) ||
+     ((nuno > 0) && (eval_yuno == NULL)) ||
+     ((nord > 0) && (eval_yord == NULL)) ||
+     ((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xrow_full == NULL)))
+    goto cleanup_bounded_cvls_quad_general;
+
+  for(d = 0; d < ncon; d++)
+    np_fill_trapezoid_rule(vector_cykerlb_extern[d],
+                           vector_cykerub_extern[d],
+                           q,
+                           cont_grid[d],
+                           cont_weight[d]);
+
+  if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
+    goto cleanup_bounded_cvls_quad_general;
+
+  *cv = 0.0;
+  for(i = 0; i < num_obs; i++){
+    const double * const xuse =
+      (i1_mode == NP_BOUNDED_CVLS_I1_MODE_BOOK) ? xrow : xrow_full;
+    double lin;
+    double quad = 0.0;
+    size_t eval_start = 0;
+
+    if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xrow) != 0)
+      goto cleanup_bounded_cvls_quad_general;
+    if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) &&
+       (np_conditional_x_weight_row_full_stream_core(vector_scale_factor, i, xrow_full) != 0))
+      goto cleanup_bounded_cvls_quad_general;
+    if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
+      goto cleanup_bounded_cvls_quad_general;
+
+    lin = np_blas_ddot_int(num_obs, xrow, yrow);
+
+    while(eval_start < total_eval){
+      const int eb = (int)MIN((size_t)block_size, total_eval - eval_start);
+      int b;
+
+      np_bounded_cvls_fill_eval_block(eval_start,
+                                      eb,
+                                      ncon,
+                                      nuno,
+                                      nord,
+                                      q,
+                                      cont_grid,
+                                      cont_weight,
+                                      num_categories_extern_Y,
+                                      matrix_categorical_vals_extern_Y,
+                                      eval_yuno,
+                                      eval_yord,
+                                      eval_ycon,
+                                      eval_weight);
+
+      if(np_conditional_y_eval_any_block_stream_core(vector_scale_factor,
+                                                     eb,
+                                                     eval_yuno,
+                                                     eval_yord,
+                                                     eval_ycon,
+                                                     yevalblock) != 0)
+        goto cleanup_bounded_cvls_quad_general;
+
+      for(b = 0; b < eb; b++){
+        const double fit = np_blas_ddot_int(num_obs, xuse, yevalblock[b]);
+        quad += eval_weight[b]*fit*fit;
+      }
+
+      eval_start += (size_t)eb;
+    }
+
+    *cv += quad - 2.0*lin;
+  }
+
+  *cv /= (double)num_obs;
+  status = 0;
+
+cleanup_bounded_cvls_quad_general:
+  np_conditional_yrow_ctx_clear(&yctx);
+  np_glp_cv_clear_extern();
+  if(xrow != NULL) free(xrow);
+  if(xrow_full != NULL) free(xrow_full);
+  if(yrow != NULL) free(yrow);
+  if(eval_weight != NULL) free(eval_weight);
+  if(cont_grid != NULL) free_mat(cont_grid, ncon);
+  if(cont_weight != NULL) free_mat(cont_weight, ncon);
+  if(eval_yuno != NULL) free_mat(eval_yuno, nuno);
+  if(eval_yord != NULL) free_mat(eval_yord, nord);
+  if(eval_ycon != NULL) free_mat(eval_ycon, ncon);
+  if(yevalblock != NULL) free_mat(yevalblock, block_size);
   return status;
 }
 
@@ -18739,8 +19196,12 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     return np_conditional_density_cvls_bounded_i1_quadrature_row_stream(vector_scale_factor,
                                                                         cv,
                                                                         NP_BOUNDED_CVLS_I1_MODE_BOOK);
+  if(np_conditional_density_cvls_bounded_general_route_ok())
+    return np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(vector_scale_factor,
+                                                                                cv,
+                                                                                NP_BOUNDED_CVLS_I1_MODE_BOOK);
   if(int_cyker_bound_extern != 0)
-    error("bounded npcdens cv.ls currently supports only one continuous response variable and no discrete response components");
+    error("bounded npcdens cv.ls currently supports up to two continuous response variables");
 
   if((BANDWIDTH_den_extern == BW_FIXED) &&
      (np_conditional_density_cvls_lp_all_large_stream(vector_scale_factor, cv) == 0)){
@@ -19686,6 +20147,8 @@ double *cv){
     np_density_cvls_bounded_scalar_route_ok(num_reg_unordered,
                                             num_reg_ordered,
                                             num_reg_continuous);
+  const int bounded_general_quadrature =
+    np_density_cvls_bounded_general_route_ok(num_reg_continuous);
 
   int i;
   int status = 1;
@@ -19767,9 +20230,26 @@ double *cv){
                                              vector_scale_factor,
                                              &cv1) != 0)
       goto cleanup_density_convolution_cv;
+  } else if(bounded_general_quadrature) {
+    if(np_density_cvls_bounded_i1_quadrature_general(KERNEL_den,
+                                                     KERNEL_unordered_den,
+                                                     KERNEL_ordered_den,
+                                                     BANDWIDTH_den,
+                                                     num_obs,
+                                                     num_reg_unordered,
+                                                     num_reg_ordered,
+                                                     num_reg_continuous,
+                                                     matrix_X_unordered,
+                                                     matrix_X_ordered,
+                                                     matrix_X_continuous,
+                                                     vector_scale_factor,
+                                                     num_categories,
+                                                     matrix_categorical_vals,
+                                                     &cv1) != 0)
+      goto cleanup_density_convolution_cv;
   } else {
     if(int_cker_bound_extern){
-      error("bounded npudens cv.ls currently supports only one continuous variable and no discrete components");
+      error("bounded npudens cv.ls currently supports up to two continuous variables");
     }
 
     kernel_weighted_sum_np_ctx(kernel_c,
