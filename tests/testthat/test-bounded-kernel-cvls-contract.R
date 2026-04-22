@@ -21,6 +21,64 @@ test_that("bounded cv.ls remains finite for gaussian order 2 and 4", {
   }
 })
 
+test_that("bounded unconditional cv.ls scalar quadrature supports generalized and adaptive NN bwtypes", {
+  set.seed(20260421)
+  dat <- data.frame(x = runif(48L))
+
+  bw.gnn <- npudensbw(
+    dat = dat,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    ckertype = "epanechnikov",
+    ckerorder = 6L,
+    ckerbound = "range",
+    nmulti = 1
+  )
+
+  bw.ad <- npudensbw(
+    dat = dat,
+    bwmethod = "cv.ls",
+    bwtype = "adaptive_nn",
+    ckertype = "gaussian",
+    ckerorder = 8L,
+    ckerbound = "range",
+    nmulti = 1
+  )
+
+  expect_true(is.finite(as.numeric(bw.gnn$bw[1])))
+  expect_true(is.finite(as.numeric(bw.gnn$fval)))
+  expect_true(is.finite(as.numeric(bw.ad$bw[1])))
+  expect_true(is.finite(as.numeric(bw.ad$fval)))
+})
+
+test_that("bounded unconditional cv.ls fails fast for unsupported data shapes", {
+  set.seed(20260421)
+  multi <- data.frame(x1 = runif(24L), x2 = runif(24L))
+  mixed <- data.frame(x = runif(24L), g = factor(sample(c("a", "b"), 24L, replace = TRUE)))
+
+  expect_error(
+    npudensbw(
+      dat = multi,
+      bwmethod = "cv.ls",
+      bwtype = "adaptive_nn",
+      ckerbound = "range",
+      nmulti = 1
+    ),
+    "bounded npudens cv\\.ls currently supports only one continuous variable"
+  )
+
+  expect_error(
+    npudensbw(
+      dat = mixed,
+      bwmethod = "cv.ls",
+      bwtype = "generalized_nn",
+      ckerbound = "range",
+      nmulti = 1
+    ),
+    "bounded npudens cv\\.ls currently supports only one continuous variable"
+  )
+})
+
 test_that("bounded conditional cv.ls remains finite for gaussian order 2 and 4", {
   set.seed(20260224)
   n <- 70
@@ -145,8 +203,9 @@ test_that("bounded conditional cv.ls scalar quadrature supports generalized and 
     ydat = ydat,
     bwmethod = "cv.ls",
     bwtype = "adaptive_nn",
-    cxkertype = "uniform",
+    cxkertype = "gaussian",
     cykertype = "epanechnikov",
+    cxkerorder = 2L,
     cykerorder = 6L,
     cxkerbound = "range",
     cykerbound = "range",
