@@ -2029,6 +2029,21 @@ static inline double np_cker_invnorm(const int kernel,
   return 1.0/den;
 }
 
+static inline double np_cker_base_eval(const int kernel,
+                                       const double z){
+  static double (* const kbase[])(double) = {
+    np_gauss2, np_gauss4, np_gauss6, np_gauss8,
+    np_epan2, np_epan4, np_epan6, np_epan8,
+    np_rect, np_tgauss2
+  };
+  int k0 = kernel % 10;
+
+  if(k0 < 0 || k0 > 9)
+    k0 = 0;
+
+  return kbase[k0](z);
+}
+
 double np_cdf_owang_van_ryzin(const double y, const double x, const double lambda, const double cl, const double ch){
   if(x == y) return 1.0 - 0.5*lambda;
   const int cxy = (int)fabs(x-y);
@@ -16541,6 +16556,98 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
   return 0;
 }
 
+static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
+                                                    int eval_idx,
+                                                    int operator_code,
+                                                    double **matrix_Y_unordered_eval,
+                                                    double **matrix_Y_ordered_eval,
+                                                    double **matrix_Y_continuous_eval,
+                                                    int num_eval,
+                                                    int map_train_tree_index,
+                                                    double *row_out);
+
+static int np_conditional_y_scalar_eval_from_ctx(double *vector_scale_factor,
+                                                 NPConditionalYRowCtx *ctx,
+                                                 double eval_y,
+                                                 double *row_out){
+  const int num_train = num_obs_train_extern;
+  NPConditionalBoundState bounds_state;
+  int j;
+
+  if((ctx == NULL) || (!ctx->ready) || (row_out == NULL) || (vector_scale_factor == NULL))
+    return 1;
+  if(num_var_unordered_extern != 0)
+    return 1;
+  if(num_var_ordered_extern != 0)
+    return 1;
+  if(num_var_continuous_extern != 1)
+    return 1;
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
+    return 1;
+
+  ctx->eval_ycon_one[0][0] = eval_y;
+
+  if(BANDWIDTH_den_extern != BW_FIXED){
+    return np_conditional_y_eval_row_stream_op_core(vector_scale_factor,
+                                                    0,
+                                                    OP_NORMAL,
+                                                    NULL,
+                                                    NULL,
+                                                    ctx->eval_ycon_one,
+                                                    1,
+                                                    0,
+                                                    row_out);
+  }
+
+  memset(row_out, 0, (size_t)num_train*sizeof(double));
+
+  ctx->matrix_bandwidth_eval_one[0][0] = ctx->matrix_bandwidth_y[0][0];
+
+  np_conditional_push_bounds(int_cyker_bound_extern,
+                             vector_cykerlb_extern,
+                             vector_cykerub_extern,
+                             &bounds_state);
+  if(np_shadow_conditional_kernel_row(ctx->kernel_cy,
+                                      ctx->kernel_uy,
+                                      ctx->kernel_oy,
+                                      ctx->operator_y,
+                                      BANDWIDTH_den_extern,
+                                      num_train,
+                                      num_var_unordered_extern,
+                                      num_var_ordered_extern,
+                                      num_var_continuous_extern,
+                                      matrix_Y_unordered_train_extern,
+                                      matrix_Y_ordered_train_extern,
+                                      matrix_Y_continuous_train_extern,
+                                      ctx->eval_yuno_one,
+                                      ctx->eval_yord_one,
+                                      ctx->eval_ycon_one,
+                                      ctx->vsfy,
+                                      1,
+                                      ctx->matrix_bandwidth_y,
+                                      ctx->matrix_bandwidth_eval_one,
+                                      ctx->lambday,
+                                      num_categories_extern_Y,
+                                      matrix_categorical_vals_extern_Y,
+                                      int_TREE_Y,
+                                      kdt_extern_Y,
+                                      ctx->kw,
+                                      NULL) != 0){
+    np_conditional_pop_bounds(&bounds_state);
+    return 1;
+  }
+  np_conditional_pop_bounds(&bounds_state);
+
+  for(j = 0; j < num_train; j++){
+    const int orig_j = (int_TREE_Y == NP_TREE_TRUE) ? ipt_extern_Y[j] : j;
+    row_out[orig_j] = ctx->kw[j];
+  }
+
+  return 0;
+}
+
 static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_factor,
                                                         int eval_idx,
                                                         int drop_eval_self,
@@ -17674,6 +17781,265 @@ cleanup_yweight_eval_block:
   return status;
 }
 
+#define NP_BOUNDED_CVLS_I1_GRID_POINTS 81
+#define NP_BOUNDED_CVLS_I1_MODE_BOOK 1
+#define NP_BOUNDED_CVLS_I1_MODE_FULL 0
+
+static int np_conditional_density_cvls_bounded_scalar_route_ok(void){
+  const double lb =
+    (vector_cykerlb_extern != NULL) ? vector_cykerlb_extern[0] : DBL_MAX;
+  const double ub =
+    (vector_cykerub_extern != NULL) ? vector_cykerub_extern[0] : DBL_MAX;
+
+  if(int_cyker_bound_extern == 0)
+    return 0;
+  if(num_var_continuous_extern != 1)
+    return 0;
+  if(num_var_unordered_extern != 0)
+    return 0;
+  if(num_var_ordered_extern != 0)
+    return 0;
+  if((vector_cykerlb_extern == NULL) || (vector_cykerub_extern == NULL))
+    return 0;
+  if((!R_FINITE(lb)) || (!R_FINITE(ub)) || (!(ub > lb)))
+    return 0;
+
+  return 1;
+}
+
+static void np_fill_trapezoid_rule(double a,
+                                   double b,
+                                   int n,
+                                   double *grid,
+                                   double *weights){
+  const double step = (b - a)/(double)(n - 1);
+  int i;
+
+  for(i = 0; i < n; i++){
+    grid[i] = a + ((double)i)*step;
+    weights[i] = step;
+  }
+  weights[0] *= 0.5;
+  weights[n - 1] *= 0.5;
+}
+
+static int np_density_cvls_bounded_scalar_route_ok(const int num_reg_unordered,
+                                                   const int num_reg_ordered,
+                                                   const int num_reg_continuous){
+  const double lb =
+    (vector_ckerlb_extern != NULL) ? vector_ckerlb_extern[0] : DBL_MAX;
+  const double ub =
+    (vector_ckerub_extern != NULL) ? vector_ckerub_extern[0] : DBL_MAX;
+
+  if(int_cker_bound_extern == 0)
+    return 0;
+  if(num_reg_continuous != 1)
+    return 0;
+  if(num_reg_unordered != 0)
+    return 0;
+  if(num_reg_ordered != 0)
+    return 0;
+  if((vector_ckerlb_extern == NULL) || (vector_ckerub_extern == NULL))
+    return 0;
+  if((!R_FINITE(lb)) || (!R_FINITE(ub)) || (!(ub > lb)))
+    return 0;
+
+  return 1;
+}
+
+static int np_density_cvls_bounded_i1_quadrature(const int KERNEL_den,
+                                                 const int BANDWIDTH_den,
+                                                 const int num_obs,
+                                                 const int num_reg_unordered,
+                                                 const int num_reg_ordered,
+                                                 const int num_reg_continuous,
+                                                 double **matrix_X_continuous,
+                                                 double *vector_scale_factor,
+                                                 double *cv1){
+  const int q = NP_BOUNDED_CVLS_I1_GRID_POINTS;
+  const double lb = vector_ckerlb_extern[0];
+  const double ub = vector_ckerub_extern[0];
+  const double * const train_x = matrix_X_continuous[0];
+  double *grid = NULL, *weights = NULL;
+  double **matrix_eval_continuous = NULL;
+  double **matrix_bandwidth = NULL;
+  double *lambda = NULL;
+  int m;
+  int status = 1;
+
+  if((cv1 == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
+    return 1;
+  if((BANDWIDTH_den != BW_FIXED) &&
+     (BANDWIDTH_den != BW_GEN_NN) &&
+     (BANDWIDTH_den != BW_ADAP_NN))
+    return 1;
+  if(!np_density_cvls_bounded_scalar_route_ok(num_reg_unordered,
+                                              num_reg_ordered,
+                                              num_reg_continuous))
+    return 1;
+
+  grid = alloc_vecd(MAX(2, q));
+  weights = alloc_vecd(MAX(2, q));
+  matrix_eval_continuous = alloc_matd(q, 1);
+  matrix_bandwidth = alloc_matd((BANDWIDTH_den == BW_ADAP_NN) ? num_obs :
+                                ((BANDWIDTH_den == BW_GEN_NN) ? q : 1),
+                                1);
+  if((num_reg_unordered + num_reg_ordered) > 0)
+    lambda = alloc_vecd(num_reg_unordered + num_reg_ordered);
+  if((grid == NULL) || (weights == NULL) || (matrix_eval_continuous == NULL) ||
+     (matrix_bandwidth == NULL))
+    goto cleanup_density_bounded_quad;
+
+  np_fill_trapezoid_rule(lb, ub, q, grid, weights);
+  for(m = 0; m < q; m++)
+    matrix_eval_continuous[0][m] = grid[m];
+
+  if(kernel_bandwidth_mean(KERNEL_den,
+                           BANDWIDTH_den,
+                           num_obs,
+                           q,
+                           0,
+                           0,
+                           0,
+                           1,
+                           0,
+                           0,
+                           0,
+                           vector_scale_factor,
+                           NULL,
+                           NULL,
+                           matrix_X_continuous,
+                           matrix_eval_continuous,
+                           NULL,
+                           matrix_bandwidth,
+                           lambda) == 1)
+    goto cleanup_density_bounded_quad;
+
+  *cv1 = 0.0;
+  for(m = 0; m < q; m++){
+    double fit = 0.0;
+
+    if((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)){
+      const double h = matrix_bandwidth[0][(BANDWIDTH_den == BW_FIXED) ? 0 : m];
+      const double invnorm = np_cker_invnorm(KERNEL_den, grid[m], h, lb, ub);
+
+      if(!(h > 0.0) || !isfinite(h))
+        goto cleanup_density_bounded_quad;
+      for(int i = 0; i < num_obs; i++)
+        fit += invnorm*np_cker_base_eval(KERNEL_den, (grid[m] - train_x[i])/h)/h;
+      fit /= (double)num_obs;
+    } else {
+      for(int i = 0; i < num_obs; i++){
+        const double h = matrix_bandwidth[0][i];
+        const double invnorm = np_cker_invnorm(KERNEL_den, grid[m], h, lb, ub);
+
+        if(!(h > 0.0) || !isfinite(h))
+          goto cleanup_density_bounded_quad;
+        fit += invnorm*np_cker_base_eval(KERNEL_den, (grid[m] - train_x[i])/h) /
+          ((double)num_obs*h);
+      }
+    }
+
+    *cv1 += weights[m]*fit*fit;
+  }
+
+  status = 0;
+
+cleanup_density_bounded_quad:
+  if(grid != NULL) free(grid);
+  if(weights != NULL) free(weights);
+  if(matrix_eval_continuous != NULL) free_mat(matrix_eval_continuous, 1);
+  if(matrix_bandwidth != NULL) free_mat(matrix_bandwidth, 1);
+  if(lambda != NULL) free(lambda);
+  return status;
+}
+
+static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *vector_scale_factor,
+                                                                         double *cv,
+                                                                         int i1_mode){
+  const int num_obs = num_obs_train_extern;
+  const int q = NP_BOUNDED_CVLS_I1_GRID_POINTS;
+  const double lb = vector_cykerlb_extern[0];
+  const double ub = vector_cykerub_extern[0];
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0};
+  double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *grid = NULL, *weights = NULL;
+  double **ygridblock = NULL;
+  int i, m;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
+    return 1;
+  if(!np_conditional_density_cvls_bounded_scalar_route_ok())
+    return 1;
+  if((i1_mode != NP_BOUNDED_CVLS_I1_MODE_BOOK) &&
+     (i1_mode != NP_BOUNDED_CVLS_I1_MODE_FULL))
+    return 1;
+
+  xrow = alloc_vecd(MAX(1, num_obs));
+  if(i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL)
+    xrow_full = alloc_vecd(MAX(1, num_obs));
+  yrow = alloc_vecd(MAX(1, num_obs));
+  grid = alloc_vecd(MAX(2, q));
+  weights = alloc_vecd(MAX(2, q));
+  ygridblock = alloc_matd(num_obs, q);
+  if((xrow == NULL) || (yrow == NULL) || (grid == NULL) || (weights == NULL) || (ygridblock == NULL) ||
+     ((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xrow_full == NULL)))
+    goto cleanup_bounded_cvls_quad;
+
+  if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
+    goto cleanup_bounded_cvls_quad;
+  if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
+    goto cleanup_bounded_cvls_quad;
+
+  np_fill_trapezoid_rule(lb, ub, q, grid, weights);
+  for(m = 0; m < q; m++){
+    if(np_conditional_y_scalar_eval_from_ctx(vector_scale_factor,
+                                             &yctx,
+                                             grid[m],
+                                             ygridblock[m]) != 0)
+      goto cleanup_bounded_cvls_quad;
+  }
+
+  *cv = 0.0;
+  for(i = 0; i < num_obs; i++){
+    const double * const xuse =
+      (i1_mode == NP_BOUNDED_CVLS_I1_MODE_BOOK) ? xrow : xrow_full;
+    double lin;
+    double quad = 0.0;
+
+    if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
+      goto cleanup_bounded_cvls_quad;
+    if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) &&
+       (np_conditional_x_weight_row_full_stream_core(vector_scale_factor, i, xrow_full) != 0))
+      goto cleanup_bounded_cvls_quad;
+    if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
+      goto cleanup_bounded_cvls_quad;
+
+    lin = np_blas_ddot_int(num_obs, xrow, yrow);
+    for(m = 0; m < q; m++){
+      const double fit = np_blas_ddot_int(num_obs, xuse, ygridblock[m]);
+      quad += weights[m]*fit*fit;
+    }
+    *cv += quad - 2.0*lin;
+  }
+
+  *cv /= (double)num_obs;
+  status = 0;
+
+cleanup_bounded_cvls_quad:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  np_glp_cv_clear_extern();
+  if(xrow != NULL) free(xrow);
+  if(xrow_full != NULL) free(xrow_full);
+  if(yrow != NULL) free(yrow);
+  if(grid != NULL) free(grid);
+  if(weights != NULL) free(weights);
+  if(ygridblock != NULL) free_mat(ygridblock, q);
+  return status;
+}
+
 typedef struct {
   int ready;
   int num_train;
@@ -18301,6 +18667,13 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
+
+  if(np_conditional_density_cvls_bounded_scalar_route_ok())
+    return np_conditional_density_cvls_bounded_i1_quadrature_row_stream(vector_scale_factor,
+                                                                        cv,
+                                                                        NP_BOUNDED_CVLS_I1_MODE_BOOK);
+  if(int_cyker_bound_extern != 0)
+    error("bounded npcdens cv.ls currently supports only one continuous response variable and no discrete response components");
 
   if((BANDWIDTH_den_extern == BW_FIXED) &&
      (np_conditional_density_cvls_lp_all_large_stream(vector_scale_factor, cv) == 0)){
@@ -19289,8 +19662,13 @@ double *cv){
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs:1);
+  const int bounded_scalar_quadrature =
+    np_density_cvls_bounded_scalar_route_ok(num_reg_unordered,
+                                            num_reg_ordered,
+                                            num_reg_continuous);
 
   int i;
+  int status = 1;
 
   int * operator = NULL;
   int gate_override_active = 0;
@@ -19361,61 +19739,75 @@ double *cv){
     error("\n** Error: invalid bandwidth.");
   }
 
+  if(bounded_scalar_quadrature){
+    if(np_density_cvls_bounded_i1_quadrature(KERNEL_den,
+                                             BANDWIDTH_den,
+                                             num_obs,
+                                             num_reg_unordered,
+                                             num_reg_ordered,
+                                             num_reg_continuous,
+                                             matrix_X_continuous,
+                                             vector_scale_factor,
+                                             &cv1) != 0)
+      goto cleanup_density_convolution_cv;
+  } else {
+    if(int_cker_bound_extern){
+      error("bounded npudens cv.ls currently supports only one continuous variable and no discrete components");
+    }
 
-  kernel_weighted_sum_np_ctx(kernel_c,
-                         kernel_u,
-                         kernel_o,
-                         BANDWIDTH_den,
-                         num_obs,
-                         num_obs,
-                         num_reg_unordered,
-                         num_reg_ordered,
-                         num_reg_continuous,
-                         0, // don't leave one out 
-                         0,
-                         1, // kernel_pow = 1
-                         1, // bandwidth_divide = FALSE when not adaptive
-                         0, 
-                         0, // symmetric
-                         0, // gather-scatter sum
-                         0, // do not drop train
-                         0, // do not drop train
-                         operator, // convolution
-                         OP_NOOP, // no permutations
-                         0, // no score
-                         0, // no ocg
-                         NULL,
-                         0, //  explicity suppress parallel
-                         0,
-                         0,
-                         int_TREE_X,
-                         0,
-                         kdt_extern_X,
-                         NULL, NULL, NULL,
-                         matrix_X_unordered,
-                         matrix_X_ordered,
-                         matrix_X_continuous,
-                         matrix_X_unordered,
-                         matrix_X_ordered,
-                         matrix_X_continuous,
-                         NULL, // no ys
-                         NULL, // no weights
-                         NULL, // no sgn
-                         vector_scale_factor,
-                         1,matrix_bandwidth,matrix_bandwidth,lambda,
-                         num_categories,
-                         matrix_categorical_vals,
-                         NULL, // no ocg
-                         res,  // weighted sum
-                         NULL, // no permutations
-                         NULL, // do not return kernel weights
-                         &gate_x_ctx);
-  
-  
+    kernel_weighted_sum_np_ctx(kernel_c,
+                           kernel_u,
+                           kernel_o,
+                           BANDWIDTH_den,
+                           num_obs,
+                           num_obs,
+                           num_reg_unordered,
+                           num_reg_ordered,
+                           num_reg_continuous,
+                           0, // don't leave one out
+                           0,
+                           1, // kernel_pow = 1
+                           1, // bandwidth_divide = FALSE when not adaptive
+                           0,
+                           0, // symmetric
+                           0, // gather-scatter sum
+                           0, // do not drop train
+                           0, // do not drop train
+                           operator, // convolution
+                           OP_NOOP, // no permutations
+                           0, // no score
+                           0, // no ocg
+                           NULL,
+                           0, //  explicity suppress parallel
+                           0,
+                           0,
+                           int_TREE_X,
+                           0,
+                           kdt_extern_X,
+                           NULL, NULL, NULL,
+                           matrix_X_unordered,
+                           matrix_X_ordered,
+                           matrix_X_continuous,
+                           matrix_X_unordered,
+                           matrix_X_ordered,
+                           matrix_X_continuous,
+                           NULL, // no ys
+                           NULL, // no weights
+                           NULL, // no sgn
+                           vector_scale_factor,
+                           1,matrix_bandwidth,matrix_bandwidth,lambda,
+                           num_categories,
+                           matrix_categorical_vals,
+                           NULL, // no ocg
+                           res,  // weighted sum
+                           NULL, // no permutations
+                           NULL, // do not return kernel weights
+                           &gate_x_ctx);
 
-  for(i = 0, cv1 = 0.0; i < num_obs; i++) cv1 += res[i];
+    for(i = 0, cv1 = 0.0; i < num_obs; i++) cv1 += res[i];
 
-  cv1 /= num_obs*num_obs;
+    cv1 /= num_obs*num_obs;
+  }
 
   // then the cross term
   for(i = 0; i < num_reg; i++)
@@ -19594,7 +19986,9 @@ double *cv){
   cv2 /= num_obs*(num_obs-1.0);
 
   *cv = cv1 - 2.0*cv2;
+  status = 0;
 
+cleanup_density_convolution_cv:
   free(operator);
   free(kernel_c);
   free(kernel_u);
@@ -19610,7 +20004,7 @@ double *cv){
   if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
   if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
   if(ov_disc_ord_const != NULL) free(ov_disc_ord_const);
-  return(0);
+  return(status);
 
 }
 

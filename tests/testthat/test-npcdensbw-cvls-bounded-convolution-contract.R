@@ -1,19 +1,11 @@
 library(npRmpi)
 
-bounded_pair_convolution_exact_nprmpi <- function(y.eval, y.train, h, lb, ub) {
-  gy.eval <- pnorm((ub - y.eval) / h) - pnorm((lb - y.eval) / h)
-  gy.train <- pnorm((ub - y.train) / h) - pnorm((lb - y.train) / h)
-
-  integrate(
-    function(u) dnorm(u) * dnorm(u + (y.eval - y.train) / h),
-    lower = (lb - y.eval) / h,
-    upper = (ub - y.eval) / h,
-    subdivisions = 4000L,
-    rel.tol = 1e-10
-  )$value / (h * gy.eval * gy.train)
+bounded_scalar_kernel_nprmpi <- function(y.eval, y.train, h, lb, ub) {
+  denom <- h * (pnorm((ub - y.eval) / h) - pnorm((lb - y.eval) / h))
+  dnorm((y.eval - y.train) / h) / denom
 }
 
-test_that("bounded conditional cv.ls fixed-point objective matches direct integration", {
+test_that("bounded conditional cv.ls fixed-point objective matches direct delete-one quadrature", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
@@ -55,17 +47,23 @@ test_that("bounded conditional cv.ls fixed-point objective matches direct integr
   w.loo <- w.loo / rowSums(w.loo)
 
   f.loo <- rowSums(Ky * w.loo)
-  Ky.conv <- outer(
-    y,
+  q <- 81L
+  grid <- seq(y.lb, y.ub, length.out = q)
+  trap <- diff(grid)[1] * c(0.5, rep(1, q - 2L), 0.5)
+  Ky.grid <- outer(
+    grid,
     y,
     Vectorize(function(y.eval, y.train) {
-      bounded_pair_convolution_exact_nprmpi(y.eval, y.train, h[1], y.lb, y.ub)
+      bounded_scalar_kernel_nprmpi(y.eval, y.train, h[1], y.lb, y.ub)
     })
   )
 
   intsq <- vapply(
     seq_len(n),
-    function(i) as.numeric(w.full[i, ] %*% Ky.conv %*% w.full[i, ]),
+    function(i) {
+      fit <- as.numeric(Ky.grid %*% w.loo[i, ])
+      sum(trap * fit^2)
+    },
     numeric(1)
   )
 

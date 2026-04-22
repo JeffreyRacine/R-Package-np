@@ -73,6 +73,39 @@ npcdensbw.formula <-
     tbw
   }
 
+.npcdensbw_assert_bounded_cvls_supported <- function(bws,
+                                                     where = "npcdensbw()") {
+  method <- if (!is.null(bws$method) && length(bws$method)) {
+    as.character(bws$method[1L])
+  } else {
+    "cv.ml"
+  }
+
+  if (!identical(method, "cv.ls"))
+    return(invisible(TRUE))
+
+  cykerlb <- if (is.null(bws$cykerlb)) numeric(0L) else bws$cykerlb[bws$iycon]
+  cykerub <- if (is.null(bws$cykerub)) numeric(0L) else bws$cykerub[bws$iycon]
+  bounded.y <- length(cykerlb) > 0L && any(is.finite(cykerlb) | is.finite(cykerub))
+
+  if (!bounded.y)
+    return(invisible(TRUE))
+
+  if (bws$yncon != 1L ||
+      bws$ynuno != 0L ||
+      bws$ynord != 0L) {
+    stop(
+      sprintf(
+        "%s bounded response cv.ls currently supports only one continuous response variable and no discrete response components",
+        where
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
 npcdensbw.conbandwidth <- 
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
@@ -165,6 +198,7 @@ npcdensbw.conbandwidth <-
       ncon = bws$xncon,
       where = "npcdensbw"
     )
+    .npcdensbw_assert_bounded_cvls_supported(bws, where = "npcdensbw()")
     .npRmpi_require_active_slave_pool(where = "npcdensbw()")
     keep_local_shadow_nn <- bandwidth.compute &&
       identical(spec$regtype.engine, "lp") &&
@@ -571,6 +605,8 @@ npcdensbw.conbandwidth <-
   degree.code <- if (bws$xncon > 0L) as.integer(bws$degree.engine) else integer(0L)
   basis.code <- as.integer(npLpBasisCode(bws$basis.engine))
   bernstein.engine <- isTRUE(bws$bernstein.basis.engine)
+
+  .npcdensbw_assert_bounded_cvls_supported(bws, where = ".npcdensbw_eval_only()")
 
   myopti <- list(
     num_obs_train = nrow,

@@ -86,6 +86,39 @@ npudensbw.NULL <-
     tbw
   }
 
+.npudensbw_assert_bounded_cvls_supported <- function(bws,
+                                                     where = "npudensbw()") {
+  method <- if (!is.null(bws$method) && length(bws$method)) {
+    as.character(bws$method[1L])
+  } else {
+    "cv.ml"
+  }
+
+  if (!identical(method, "cv.ls"))
+    return(invisible(TRUE))
+
+  ckerlb <- if (is.null(bws$ckerlb)) numeric(0L) else bws$ckerlb[bws$icon]
+  ckerub <- if (is.null(bws$ckerub)) numeric(0L) else bws$ckerub[bws$icon]
+  bounded.x <- length(ckerlb) > 0L && any(is.finite(ckerlb) | is.finite(ckerub))
+
+  if (!bounded.x)
+    return(invisible(TRUE))
+
+  if (bws$ncon != 1L ||
+      bws$nuno != 0L ||
+      bws$nord != 0L) {
+    stop(
+      sprintf(
+        "%s bounded npudens cv.ls currently supports only one continuous variable and no discrete components",
+        where
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
 npudensbw.bandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
            bws,
@@ -220,6 +253,8 @@ npudensbw.bandwidth <-
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac)
       cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+
+      .npudensbw_assert_bounded_cvls_supported(tbw, where = "npudensbw()")
 
       if (bws$method != "normal-reference"){
         myout <-
