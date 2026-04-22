@@ -104,12 +104,10 @@ npudensbw.NULL <-
   if (!bounded.x)
     return(invisible(TRUE))
 
-  if (bws$ncon != 1L ||
-      bws$nuno != 0L ||
-      bws$nord != 0L) {
+  if (bws$ncon < 1L || bws$ncon > 2L) {
     stop(
       sprintf(
-        "%s bounded npudens cv.ls currently supports only one continuous variable and no discrete components",
+        "%s bounded npudens cv.ls currently supports up to two continuous variables with optional ordered/unordered discrete components",
         where
       ),
       call. = FALSE
