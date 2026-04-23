@@ -298,7 +298,8 @@ npcdensbw.conbandwidth <-
         int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
-        transform.bounds = transform.bounds)
+        transform.bounds = transform.bounds,
+        cvls.i1.rescue = if (isTRUE(tbw$cvls.i1.rescue)) 1L else 0L)
       
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
@@ -380,6 +381,8 @@ npcdensbw.conbandwidth <-
       tbw$timing <- myout$timing
       tbw$total.time <- total.time
     }
+
+    tbw$cvls.i1.rescue <- isTRUE(bws$cvls.i1.rescue)
     
     ## bandwidth metadata
     tbw$sfactor <- tbw$bandwidth <- list(x = tbw$xbw, y = tbw$ybw)
@@ -474,6 +477,7 @@ npcdensbw.conbandwidth <-
                         basis.engine = tbw$basis.engine,
                         degree.engine = tbw$degree.engine,
                         bernstein.basis.engine = tbw$bernstein.basis.engine)
+    tbw$cvls.i1.rescue <- isTRUE(bws$cvls.i1.rescue)
     
     tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
     tbw <- .npcdensbw_restore_explicit_fixed_y_bounds(tbw, bws)
@@ -506,6 +510,7 @@ npcdensbw.conbandwidth <-
   )
 
   tbw <- do.call(conbandwidth, bw.args)
+  tbw$cvls.i1.rescue <- isTRUE(reg.args$cvls.i1.rescue)
   .npcdensbw_restore_explicit_fixed_y_bounds(tbw, reg.args)
 }
 
@@ -659,7 +664,8 @@ npcdensbw.conbandwidth <-
     int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
-    transform.bounds = FALSE
+    transform.bounds = FALSE,
+    cvls.i1.rescue = if (isTRUE(bws$cvls.i1.rescue)) 1L else 0L
   )
 
   myoptd <- list(
@@ -1315,6 +1321,7 @@ npcdensbw.default <-
            penalty.multiplier,
            remin,
            scale.init.categorical.sample,
+           cvls.i1.rescue = FALSE,
            small,
            tol,
            transform.bounds,
@@ -1348,6 +1355,7 @@ npcdensbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
+    cvls.i1.rescue <- npValidateScalarLogical(cvls.i1.rescue, "cvls.i1.rescue")
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
       call_names = mc.names,
@@ -1527,6 +1535,7 @@ npcdensbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     reg.args <- bw.args[setdiff(names(bw.args), c("xbw", "ybw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
+    reg.args$cvls.i1.rescue <- cvls.i1.rescue
 
     ## next grab dummies for actual bandwidth selection and perform call
 

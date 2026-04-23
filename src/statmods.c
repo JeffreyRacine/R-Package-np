@@ -30,6 +30,8 @@ extern int int_ROBUST;
 extern int int_nn_k_min_extern;
 extern int *vector_X_support_count_extern;
 extern int *vector_Y_support_count_extern;
+extern double nconfac_extern;
+extern double *vector_continuous_stddev_extern;
 
 
 #include <math.h>
