@@ -869,6 +869,78 @@ static void np_copy_scale_factor(double *dest, const double *src, int n)
     dest[i] = src[i];
 }
 
+extern double *vector_continuous_stddev_extern;
+extern double nconfac_extern;
+
+static double np_fixed_continuous_floor_cv(const int continuous_index,
+                                           const double temp_pow)
+{
+  const double scale_pow =
+    (R_FINITE(nconfac_extern) && (nconfac_extern > 0.0)) ? nconfac_extern : temp_pow;
+
+  if (int_LARGE_SF == SF_NORMAL)
+    return 0.01;
+
+  if ((vector_continuous_stddev_extern != NULL) &&
+      R_FINITE(vector_continuous_stddev_extern[continuous_index]) &&
+      (vector_continuous_stddev_extern[continuous_index] > 0.0)) {
+    return 0.01 * vector_continuous_stddev_extern[continuous_index] * scale_pow;
+  }
+
+  return 0.01 * scale_pow;
+}
+
+static double np_fixed_continuous_temp_pow_cv(
+  int KERNEL,
+  int num_obs,
+  int num_var_continuous,
+  int num_reg_continuous)
+{
+  const double dim = (double) num_reg_continuous + num_var_continuous;
+
+  switch (KERNEL) {
+    case 0:
+    case 4:
+    case 8:
+      return 1.0 / pow((double) num_obs, 2.0 / (4.0 + dim));
+    case 1:
+    case 5:
+      return 1.0 / pow((double) num_obs, 2.0 / (8.0 + dim));
+    case 2:
+    case 6:
+      return 1.0 / pow((double) num_obs, 2.0 / (12.0 + dim));
+    case 3:
+    case 7:
+      return 1.0 / pow((double) num_obs, 2.0 / (16.0 + dim));
+    default:
+      return DBL_MAX;
+  }
+}
+
+static int np_fixed_continuous_floor_ok_cv(
+  int KERNEL,
+  int num_obs,
+  int num_var_continuous,
+  int num_reg_continuous,
+  double *candidate)
+{
+  int i;
+  const double temp_pow = np_fixed_continuous_temp_pow_cv(
+    KERNEL,
+    num_obs,
+    num_var_continuous,
+    num_reg_continuous);
+  const int total_continuous = num_reg_continuous + num_var_continuous;
+
+  for (i = 1; i <= total_continuous; i++) {
+    const double bw_floor = np_fixed_continuous_floor_cv(i - 1, temp_pow);
+    if (candidate[i] < bw_floor)
+      return 0;
+  }
+
+  return 1;
+}
+
 static int np_bw_candidate_is_admissible(
   int n,
   int use_transform,
@@ -920,6 +992,15 @@ static int np_bw_candidate_is_admissible(
   if (tmp != NULL)
     safe_free(tmp);
 
+  if ((invalid == 0) &&
+      !np_fixed_continuous_floor_ok_cv(
+        KERNEL,
+        num_obs,
+        num_var_continuous,
+        num_reg_continuous,
+        candidate))
+    invalid = 1;
+
   return (invalid == 0);
 }
 
@@ -948,6 +1029,7 @@ int *vector_glp_degree_extern=NULL;
 int *vector_glp_gradient_order_extern=NULL;
 int int_glp_bernstein_extern=0;
 int int_glp_basis_extern=1;
+int int_bounded_cvls_i1_rescue_extern=0;
 
 int KERNEL_reg_extern=0;
 int KERNEL_reg_unordered_extern=0;
@@ -6317,7 +6399,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_use_starting_values= myopti[CBW_USTARTI];
   int_LARGE_SF=myopti[CBW_LSFI];
   BANDWIDTH_den_extern=myopti[CBW_DENI];
-  enforce_fixed_feasibility = (BANDWIDTH_den_extern == BW_FIXED);
+  enforce_fixed_feasibility = ((BANDWIDTH_den_extern == BW_FIXED) && (!eval_only));
   int_RESTART_FROM_MIN = myopti[CBW_REMINI];
   int_MINIMIZE_IO = myopti[CBW_MINIOI];
 
@@ -6334,6 +6416,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? *glp_bernstein : 0;
   int_glp_basis_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? *glp_basis : 1;
+  int_bounded_cvls_i1_rescue_extern = myopti[CBW_CVLS_I1_RESCUEI];
   need_y_side = (ibwmfunc == CBWM_CVLS) || ((ibwmfunc == CBWM_CVML) && (int_ll_extern == LL_LP));
   bwm_use_transform = myopti[CBW_TBNDI];
   if (BANDWIDTH_den_extern != BW_FIXED)
@@ -7411,7 +7494,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int_use_starting_values= myopti[CDBW_USTARTI];
   int_LARGE_SF=myopti[CDBW_LSFI];
   BANDWIDTH_den_extern=myopti[CDBW_DENI];
-  enforce_fixed_feasibility = (BANDWIDTH_den_extern == BW_FIXED);
+  enforce_fixed_feasibility = ((BANDWIDTH_den_extern == BW_FIXED) && (!eval_only));
   int_RESTART_FROM_MIN = myopti[CDBW_REMINI];
   int_MINIMIZE_IO = myopti[CDBW_MINIOI];
 
@@ -9489,7 +9572,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   BANDWIDTH_reg_extern=myopti[RBW_REGI];
   BANDWIDTH_den_extern=0;
-  enforce_fixed_feasibility = (BANDWIDTH_reg_extern == BW_FIXED);
+  enforce_fixed_feasibility = ((BANDWIDTH_reg_extern == BW_FIXED) && (!eval_only));
 
   itmax=myopti[RBW_ITMAXI];
   int_RESTART_FROM_MIN = myopti[RBW_REMINI];

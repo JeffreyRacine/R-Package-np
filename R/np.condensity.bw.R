@@ -147,6 +147,9 @@ npcdensbw.conbandwidth <-
     scale.init.categorical.sample <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
+    if (is.null(bws$cvls.i1.rescue))
+      bws$cvls.i1.rescue <- FALSE
+    bws$cvls.i1.rescue <- npValidateScalarLogical(bws$cvls.i1.rescue, "bws$cvls.i1.rescue")
     itmax <- npValidatePositiveInteger(itmax, "itmax")
     ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
     tol <- npValidatePositiveFiniteNumeric(tol, "tol")
@@ -311,7 +314,8 @@ npcdensbw.conbandwidth <-
         int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
-        transform.bounds = transform.bounds)
+        transform.bounds = transform.bounds,
+        cvls.i1.rescue = if (isTRUE(tbw$cvls.i1.rescue)) 1L else 0L)
       
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
@@ -321,7 +325,9 @@ npcdensbw.conbandwidth <-
         nconfac = nconfac, ncatfac = ncatfac)
 
       cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
-      cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
+      cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
+                                                    bws$cykerub[bws$iycon],
+                                                    bws$cykerbound)
 
       if (bws$method != "normal-reference"){
         myout <- if (keep_local_shadow_nn) {
@@ -416,6 +422,7 @@ npcdensbw.conbandwidth <-
       tbw$timing <- myout$timing
       tbw$total.time <- total.time
     }
+    tbw$cvls.i1.rescue <- isTRUE(bws$cvls.i1.rescue)
     
     ## bandwidth metadata
     tbw$sfactor <- tbw$bandwidth <- list(x = tbw$xbw, y = tbw$ybw)
@@ -514,6 +521,8 @@ npcdensbw.conbandwidth <-
 
     tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
     tbw$initial.fval <- if (!is.null(initial.fval)) initial.fval else NA_real_
+    tbw$cvls.i1.rescue <- isTRUE(bws$cvls.i1.rescue)
+    tbw <- .npcdensbw_restore_explicit_fixed_y_bounds(tbw, bws)
 
     tbw
            
@@ -544,7 +553,9 @@ npcdensbw.conbandwidth <-
     reg.args
   )
 
-  do.call(conbandwidth, bw.args)
+  tbw <- do.call(conbandwidth, bw.args)
+  tbw$cvls.i1.rescue <- isTRUE(reg.args$cvls.i1.rescue)
+  .npcdensbw_restore_explicit_fixed_y_bounds(tbw, reg.args)
 }
 
 .npcdensbw_run_fixed_degree <- function(xdat, ydat, bws, reg.args, opt.args) {
@@ -557,6 +568,59 @@ npcdensbw.conbandwidth <-
   )
 
   do.call(npcdensbw.conbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
+}
+
+.npcdensbw_is_explicit_fixed_all_infinite <- function(kerlb, kerub, kerbound) {
+  if (is.null(kerbound) || !identical(as.character(kerbound)[1L], "fixed"))
+    return(FALSE)
+  if (is.null(kerlb) || is.null(kerub))
+    return(FALSE)
+
+  lb <- as.double(kerlb)
+  ub <- as.double(kerub)
+
+  length(lb) > 0L &&
+    length(ub) > 0L &&
+    all(is.infinite(lb) & lb < 0) &&
+    all(is.infinite(ub) & ub > 0)
+}
+
+.npcdensbw_restore_explicit_fixed_y_bounds <- function(tbw, reg.args) {
+  if (!.npcdensbw_is_explicit_fixed_all_infinite(reg.args$cykerlb,
+                                                 reg.args$cykerub,
+                                                 reg.args$cykerbound)) {
+    return(tbw)
+  }
+  if (!identical(tbw$cykerbound, "none") || !any(tbw$iycon))
+    return(tbw)
+
+  icon.idx <- which(tbw$iycon)
+  pyorder <- switch(tbw$cykerorder / 2,
+                    "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order")
+
+  tbw$cykerbound <- "fixed"
+  tbw$cykerlb[icon.idx] <- -Inf
+  tbw$cykerub[icon.idx] <- Inf
+  tbw$pcykertype <- cktToPrint(tbw$cykertype, order = pyorder, kerbound = "fixed")
+
+  if (!is.null(tbw$klist$y)) {
+    tbw$klist$y$ckerbound <- "fixed"
+    tbw$klist$y$ckerlb <- tbw$cykerlb
+    tbw$klist$y$ckerub <- tbw$cykerub
+    tbw$klist$y$pckertype <- tbw$pcykertype
+  }
+
+  tbw
+}
+
+.npcdensbw_marshal_y_bounds <- function(kerlb, kerub, kerbound) {
+  if (.npcdensbw_is_explicit_fixed_all_infinite(kerlb, kerub, kerbound)) {
+    sentinel <- .Machine$double.xmax / 4
+    n <- max(length(kerlb), length(kerub))
+    return(list(lb = rep.int(-sentinel, n), ub = rep.int(sentinel, n)))
+  }
+
+  npKernelBoundsMarshal(kerlb, kerub)
 }
 
 .npcdensbw_eval_only <- function(xdat,
@@ -656,7 +720,8 @@ npcdensbw.conbandwidth <-
     int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
-    transform.bounds = FALSE
+    transform.bounds = FALSE,
+    cvls.i1.rescue = if (isTRUE(bws$cvls.i1.rescue)) 1L else 0L
   )
 
   myoptd <- list(
@@ -682,7 +747,9 @@ npcdensbw.conbandwidth <-
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
-  cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
+  cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
+                                                bws$cykerub[bws$iycon],
+                                                bws$cykerbound)
 
   out <- .Call(
     "C_np_density_conditional_bw_eval",
@@ -875,7 +942,8 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
     int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
-    transform.bounds = FALSE
+    transform.bounds = FALSE,
+    cvls.i1.rescue = if (isTRUE(bws$cvls.i1.rescue)) 1L else 0L
   )
 
   myoptd <- list(
@@ -901,7 +969,9 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
-  cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
+  cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
+                                                bws$cykerub[bws$iycon],
+                                                bws$cykerbound)
   if (is.null(start.bw)) {
     start.bw <- c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
                   bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
@@ -1784,6 +1854,7 @@ npcdensbw.default <-
            penalty.multiplier,
            remin,
            scale.init.categorical.sample,
+           cvls.i1.rescue = FALSE,
            small,
            tol,
            transform.bounds,
@@ -1816,6 +1887,7 @@ npcdensbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
+    cvls.i1.rescue <- npValidateScalarLogical(cvls.i1.rescue, "cvls.i1.rescue")
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
       call_names = mc.names,
@@ -1995,6 +2067,7 @@ npcdensbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     reg.args <- bw.args[setdiff(names(bw.args), c("xbw", "ybw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
+    reg.args$cvls.i1.rescue <- cvls.i1.rescue
     tbw <- do.call(conbandwidth, bw.args)
     .npRmpi_require_active_slave_pool(where = "npcdensbw()")
     keep_local_shadow_nn <- bandwidth.compute &&
