@@ -10,7 +10,7 @@ chisq_support_fixture <- function(n, seed) {
 test_that("npcdensbw stores the cv.ls I1 rescue toggle on conditional bandwidth objects", {
   dat <- chisq_support_fixture(n = 40L, seed = 20260423L)
 
-  bw_off <- npcdensbw(
+  bw_default <- npcdensbw(
     xdat = dat$x,
     ydat = dat$y,
     bws = c(0.35, 0.35),
@@ -27,9 +27,19 @@ test_that("npcdensbw stores the cv.ls I1 rescue toggle on conditional bandwidth 
     bwtype = "fixed",
     cvls.i1.rescue = TRUE
   )
+  bw_off <- npcdensbw(
+    xdat = dat$x,
+    ydat = dat$y,
+    bws = c(0.35, 0.35),
+    bandwidth.compute = FALSE,
+    bwmethod = "cv.ls",
+    bwtype = "fixed",
+    cvls.i1.rescue = FALSE
+  )
 
-  expect_false(isTRUE(bw_off$cvls.i1.rescue))
+  expect_true(isTRUE(bw_default$cvls.i1.rescue))
   expect_true(isTRUE(bw_on$cvls.i1.rescue))
+  expect_false(isTRUE(bw_off$cvls.i1.rescue))
 })
 
 test_that("cv.ls I1 rescue leaves resolved bounded objectives unchanged", {

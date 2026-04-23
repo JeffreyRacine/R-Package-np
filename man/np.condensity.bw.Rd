@@ -92,6 +92,7 @@ npcdensbw(\dots)
           penalty.multiplier,
           remin,
           scale.init.categorical.sample,
+          cvls.i1.rescue = TRUE,
           small,
           tol,
           transform.bounds,
@@ -373,6 +374,14 @@ npcdensbw(\dots)
     applies an internal transformation that maps the unconstrained
     search to the feasible bandwidth domain. Defaults to
     \code{FALSE}.}
+
+  \item{cvls.i1.rescue}{
+    a logical value that when set to \code{TRUE} enables a deterministic
+    rescue pass for one-dimensional bounded \code{cv.ls} \eqn{I_1}
+    quadrature when the coarse grid appears unresolved. Defaults to
+    \code{TRUE}. Set to \code{FALSE} to recover the legacy coarse-grid
+    evaluation exactly.
+  }
 
   \item{uxkertype}{
     character string used to specify the unordered categorical
