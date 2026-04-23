@@ -17389,7 +17389,7 @@ static int np_conditional_lp_cvls_block_size(void){
 #define NP_BOUNDED_CVLS_I1_GRID_POINTS_2D 31
 #define NP_BOUNDED_CVLS_I1_MODE_BOOK 1
 #define NP_BOUNDED_CVLS_I1_MODE_FULL 0
-#define NP_BOUNDED_CVLS_ONE_SIDED_EXTEND_FACTOR 2.0
+#define NP_BOUNDED_CVLS_ONE_SIDED_EXTEND_FACTOR 1.0
 
 static int np_bounded_cvls_continuous_support_ok(const int ncon,
                                                  const double *lb,
@@ -17411,7 +17411,11 @@ static int np_bounded_cvls_continuous_support_ok(const int ncon,
 
 static int np_bounded_cvls_bound_is_effectively_infinite(const double x){
   const double sentinel = 0.5*DBL_MAX;
-  return (!R_FINITE(x)) || (fabs(x) >= sentinel);
+  const double route_sentinel = 0.25*DBL_MAX;
+  const double ax = fabs(x);
+  return (!R_FINITE(x)) ||
+    (ax >= sentinel) ||
+    (fabs(ax - route_sentinel) <= route_sentinel*(8.0*DBL_EPSILON));
 }
 
 static void np_bounded_cvls_conditional_effective_integration_bounds(const int ncon,

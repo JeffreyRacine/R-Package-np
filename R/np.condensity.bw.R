@@ -308,7 +308,9 @@ npcdensbw.conbandwidth <-
         nconfac = nconfac, ncatfac = ncatfac)
 
       cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
-      cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
+      cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
+                                                    bws$cykerub[bws$iycon],
+                                                    bws$cykerbound)
 
       if (bws$method != "normal-reference"){
         myout <-
@@ -474,6 +476,7 @@ npcdensbw.conbandwidth <-
                         bernstein.basis.engine = tbw$bernstein.basis.engine)
     
     tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
+    tbw <- .npcdensbw_restore_explicit_fixed_y_bounds(tbw, bws)
 
     tbw
   }
@@ -502,7 +505,61 @@ npcdensbw.conbandwidth <-
     reg.args
   )
 
-  do.call(conbandwidth, bw.args)
+  tbw <- do.call(conbandwidth, bw.args)
+  .npcdensbw_restore_explicit_fixed_y_bounds(tbw, reg.args)
+}
+
+.npcdensbw_is_explicit_fixed_all_infinite <- function(kerlb, kerub, kerbound) {
+  if (is.null(kerbound) || !identical(as.character(kerbound)[1L], "fixed"))
+    return(FALSE)
+  if (is.null(kerlb) || is.null(kerub))
+    return(FALSE)
+
+  lb <- as.double(kerlb)
+  ub <- as.double(kerub)
+
+  length(lb) > 0L &&
+    length(ub) > 0L &&
+    all(is.infinite(lb) & lb < 0) &&
+    all(is.infinite(ub) & ub > 0)
+}
+
+.npcdensbw_restore_explicit_fixed_y_bounds <- function(tbw, reg.args) {
+  if (!.npcdensbw_is_explicit_fixed_all_infinite(reg.args$cykerlb,
+                                                 reg.args$cykerub,
+                                                 reg.args$cykerbound)) {
+    return(tbw)
+  }
+  if (!identical(tbw$cykerbound, "none") || !any(tbw$iycon))
+    return(tbw)
+
+  icon.idx <- which(tbw$iycon)
+  pyorder <- switch(tbw$cykerorder / 2,
+                    "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order")
+
+  tbw$cykerbound <- "fixed"
+  tbw$cykerlb[icon.idx] <- -Inf
+  tbw$cykerub[icon.idx] <- Inf
+  tbw$pcykertype <- cktToPrint(tbw$cykertype, order = pyorder, kerbound = "fixed")
+
+  if (!is.null(tbw$klist$y)) {
+    tbw$klist$y$ckerbound <- "fixed"
+    tbw$klist$y$ckerlb <- tbw$cykerlb
+    tbw$klist$y$ckerub <- tbw$cykerub
+    tbw$klist$y$pckertype <- tbw$pcykertype
+  }
+
+  tbw
+}
+
+.npcdensbw_marshal_y_bounds <- function(kerlb, kerub, kerbound) {
+  if (.npcdensbw_is_explicit_fixed_all_infinite(kerlb, kerub, kerbound)) {
+    sentinel <- .Machine$double.xmax / 4
+    n <- max(length(kerlb), length(kerub))
+    return(list(lb = rep.int(-sentinel, n), ub = rep.int(sentinel, n)))
+  }
+
+  npKernelBoundsMarshal(kerlb, kerub)
 }
 
 .npcdensbw_eval_only <- function(xdat,
@@ -628,7 +685,9 @@ npcdensbw.conbandwidth <-
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
-  cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
+  cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
+                                                bws$cykerub[bws$iycon],
+                                                bws$cykerbound)
 
   out <- .Call(
     "C_np_density_conditional_bw_eval",
