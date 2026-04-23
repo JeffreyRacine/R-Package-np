@@ -17389,6 +17389,7 @@ static int np_conditional_lp_cvls_block_size(void){
 #define NP_BOUNDED_CVLS_I1_GRID_POINTS_2D 31
 #define NP_BOUNDED_CVLS_I1_MODE_BOOK 1
 #define NP_BOUNDED_CVLS_I1_MODE_FULL 0
+#define NP_BOUNDED_CVLS_ONE_SIDED_EXTEND_FACTOR 2.0
 
 static int np_bounded_cvls_continuous_support_ok(const int ncon,
                                                  const double *lb,
@@ -17406,6 +17407,52 @@ static int np_bounded_cvls_continuous_support_ok(const int ncon,
   }
 
   return 1;
+}
+
+static int np_bounded_cvls_bound_is_effectively_infinite(const double x){
+  const double sentinel = 0.5*DBL_MAX;
+  return (!R_FINITE(x)) || (fabs(x) >= sentinel);
+}
+
+static void np_bounded_cvls_conditional_effective_integration_bounds(const int ncon,
+                                                                     double **train_continuous,
+                                                                     const int num_obs,
+                                                                     const double *support_lb,
+                                                                     const double *support_ub,
+                                                                     double *quad_lb,
+                                                                     double *quad_ub){
+  int d, i;
+
+  for(d = 0; d < ncon; d++){
+    const double * const train_y = train_continuous[d];
+    double ymin = train_y[0];
+    double ymax = train_y[0];
+    double span;
+    double ext;
+
+    for(i = 1; i < num_obs; i++){
+      if(train_y[i] < ymin)
+        ymin = train_y[i];
+      if(train_y[i] > ymax)
+        ymax = train_y[i];
+    }
+
+    /* Keep finite support edges intact and extend only infinite sides
+       numerically. This avoids Inf/DBL_MAX quadrature-grid dilution while
+       preserving the bounded-kernel evaluation path. */
+    span = ymax - ymin;
+    if((span > 0.0) && R_FINITE(span))
+      ext = NP_BOUNDED_CVLS_ONE_SIDED_EXTEND_FACTOR*span;
+    else {
+      const double scale = MAX(1.0, MAX(fabs(ymin), fabs(ymax)));
+      ext = NP_BOUNDED_CVLS_ONE_SIDED_EXTEND_FACTOR*scale;
+    }
+
+    quad_lb[d] = np_bounded_cvls_bound_is_effectively_infinite(support_lb[d]) ?
+      (ymin - ext) : support_lb[d];
+    quad_ub[d] = np_bounded_cvls_bound_is_effectively_infinite(support_ub[d]) ?
+      (ymax + ext) : support_ub[d];
+  }
 }
 
 static int np_bounded_cvls_grid_points(const int ncon){
@@ -17844,8 +17891,8 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
                                                                          int i1_mode){
   const int num_obs = num_obs_train_extern;
   const int q = NP_BOUNDED_CVLS_I1_GRID_POINTS;
-  const double lb = vector_cykerlb_extern[0];
-  const double ub = vector_cykerub_extern[0];
+  double quad_lb[2] = {0.0, 0.0};
+  double quad_ub[2] = {0.0, 0.0};
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
   double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *grid = NULL, *weights = NULL;
@@ -17877,9 +17924,19 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
     goto cleanup_bounded_cvls_quad;
 
+  np_bounded_cvls_conditional_effective_integration_bounds(
+    1,
+    matrix_Y_continuous_train_extern,
+    num_obs,
+    vector_cykerlb_extern,
+    vector_cykerub_extern,
+    quad_lb,
+    quad_ub
+  );
+
   /* Evaluate the bounded I1 term by integrating the pointwise estimator itself,
      bypassing the suspect bounded-convolution shortcut on this narrow surface. */
-  np_fill_trapezoid_rule(lb, ub, q, grid, weights);
+  np_fill_trapezoid_rule(quad_lb[0], quad_ub[0], q, grid, weights);
   for(m = 0; m < q; m++){
     if(np_conditional_y_scalar_eval_from_ctx(vector_scale_factor,
                                              &yctx,
@@ -17980,6 +18037,8 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *eval_weight = NULL;
   double **cont_grid = NULL, **cont_weight = NULL;
   double **eval_yuno = NULL, **eval_yord = NULL, **eval_ycon = NULL, **yevalblock = NULL;
+  double quad_lb[2] = {0.0, 0.0};
+  double quad_ub[2] = {0.0, 0.0};
   int i, d;
   int status = 1;
 
@@ -18018,9 +18077,19 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
      ((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xrow_full == NULL)))
     goto cleanup_bounded_cvls_quad_general;
 
+  np_bounded_cvls_conditional_effective_integration_bounds(
+    ncon,
+    matrix_Y_continuous_train_extern,
+    num_obs,
+    vector_cykerlb_extern,
+    vector_cykerub_extern,
+    quad_lb,
+    quad_ub
+  );
+
   for(d = 0; d < ncon; d++)
-    np_fill_trapezoid_rule(vector_cykerlb_extern[d],
-                           vector_cykerub_extern[d],
+    np_fill_trapezoid_rule(quad_lb[d],
+                           quad_ub[d],
                            q,
                            cont_grid[d],
                            cont_weight[d]);
