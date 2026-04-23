@@ -148,7 +148,7 @@ npcdensbw.conbandwidth <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
     if (is.null(bws$cvls.i1.rescue))
-      bws$cvls.i1.rescue <- FALSE
+      bws$cvls.i1.rescue <- TRUE
     bws$cvls.i1.rescue <- npValidateScalarLogical(bws$cvls.i1.rescue, "bws$cvls.i1.rescue")
     itmax <- npValidatePositiveInteger(itmax, "itmax")
     ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
@@ -1854,7 +1854,7 @@ npcdensbw.default <-
            penalty.multiplier,
            remin,
            scale.init.categorical.sample,
-           cvls.i1.rescue = FALSE,
+           cvls.i1.rescue = TRUE,
            small,
            tol,
            transform.bounds,
