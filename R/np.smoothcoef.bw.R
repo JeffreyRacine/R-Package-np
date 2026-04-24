@@ -355,7 +355,7 @@ npscoefbw.scbandwidth <-
     cv.iterate <- npValidateScalarLogical(cv.iterate, "cv.iterate")
     backfit.iterate <- npValidateScalarLogical(backfit.iterate, "backfit.iterate")
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
-    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
     backfit.maxiter <- npValidatePositiveInteger(backfit.maxiter, "backfit.maxiter")
     backfit.tol <- npValidatePositiveFiniteNumeric(backfit.tol, "backfit.tol")
@@ -1431,7 +1431,7 @@ npscoefbw.scbandwidth <-
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
   ndeg <- length(degree.search$start.degree)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(NCOL(eval.zdat)) else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(NCOL(eval.zdat)) else npValidateNmulti(opt.args$nmulti[1L])
 
   cont_lower <- npResolveScaleFactorLowerBound(
     template$scale.factor.lower.bound,

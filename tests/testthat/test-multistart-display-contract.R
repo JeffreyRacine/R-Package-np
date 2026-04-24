@@ -36,13 +36,13 @@ test_that("bandwidth summaries ignore malformed ifval and prefer NOMAD best rest
   )
 })
 
-test_that("nmulti zero progress avoids legacy redraw output", {
+test_that("single-start progress avoids legacy redraw output", {
   set.seed(1)
   x <- runif(20)
   y <- x + rnorm(20, sd = 0.1)
 
   out <- capture.output(
-    npcdensbw(y ~ x, regtype = "ll", bwtype = "adaptive_nn", nmulti = 0, itmax = 1)
+    npcdensbw(y ~ x, regtype = "ll", bwtype = "adaptive_nn", nmulti = 1, itmax = 1)
   )
 
   expect_false(any(grepl("Multistart 1 of 1", out, fixed = TRUE)))

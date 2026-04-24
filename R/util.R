@@ -302,6 +302,10 @@ npValidatePositiveInteger <- function(value, argname) {
   as.integer(value)
 }
 
+npValidateNmulti <- function(value, argname = "nmulti") {
+  npValidatePositiveInteger(value, argname)
+}
+
 npValidatePositiveFiniteNumeric <- function(value, argname) {
   if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
       !is.finite(value) || value <= 0)

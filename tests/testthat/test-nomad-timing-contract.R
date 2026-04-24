@@ -65,9 +65,9 @@ test_that("NOMAD timing is consistent across supported serial families", {
     degree.max = 1L,
     bwtype = "fixed",
     bwmethod = "cv.ls",
-    nmulti = 0L
+    nmulti = 1L
   ))
-  fit_reg <- quiet_nomad_eval(npreg(y ~ x, data = d1, nomad = TRUE, degree.max = 1L, nmulti = 0L))
+  fit_reg <- quiet_nomad_eval(npreg(y ~ x, data = d1, nomad = TRUE, degree.max = 1L, nmulti = 1L))
   expect_nomad_bw_timing(bw_reg)
   expect_nomad_fit_timing(fit_reg)
 
@@ -80,9 +80,9 @@ test_that("NOMAD timing is consistent across supported serial families", {
     degree.max = 1L,
     bwtype = "fixed",
     bwmethod = "cv.ls",
-    nmulti = 0L
+    nmulti = 1L
   ))
-  fit_cdens <- quiet_nomad_eval(npcdens(y ~ x, data = d1, nomad = TRUE, degree.max = 1L, nmulti = 0L))
+  fit_cdens <- quiet_nomad_eval(npcdens(y ~ x, data = d1, nomad = TRUE, degree.max = 1L, nmulti = 1L))
   expect_nomad_bw_timing(bw_cdens)
   expect_nomad_fit_timing(fit_cdens)
 
@@ -95,9 +95,9 @@ test_that("NOMAD timing is consistent across supported serial families", {
     degree.max = 1L,
     bwtype = "fixed",
     bwmethod = "cv.ls",
-    nmulti = 0L
+    nmulti = 1L
   ))
-  fit_cdist <- quiet_nomad_eval(npcdist(y ~ x, data = d1, nomad = TRUE, degree.max = 1L, nmulti = 0L, ngrid = 7L))
+  fit_cdist <- quiet_nomad_eval(npcdist(y ~ x, data = d1, nomad = TRUE, degree.max = 1L, nmulti = 1L, ngrid = 7L))
   expect_nomad_bw_timing(bw_cdist)
   expect_nomad_fit_timing(fit_cdist)
 
@@ -110,9 +110,9 @@ test_that("NOMAD timing is consistent across supported serial families", {
     degree.max = 1L,
     bwtype = "fixed",
     bwmethod = "cv.ls",
-    nmulti = 0L
+    nmulti = 1L
   ))
-  fit_pl <- quiet_nomad_eval(npplreg(y ~ x | z, data = d2, nomad = TRUE, degree.max = 1L, nmulti = 0L))
+  fit_pl <- quiet_nomad_eval(npplreg(y ~ x | z, data = d2, nomad = TRUE, degree.max = 1L, nmulti = 1L))
   expect_nomad_bw_timing(bw_pl)
   expect_nomad_fit_timing(fit_pl)
 
@@ -125,9 +125,9 @@ test_that("NOMAD timing is consistent across supported serial families", {
     degree.max = 1L,
     bwtype = "fixed",
     bwmethod = "cv.ls",
-    nmulti = 0L
+    nmulti = 1L
   ))
-  fit_sc <- quiet_nomad_eval(npscoef(y ~ x | z, data = d2, nomad = TRUE, degree.max = 1L, nmulti = 0L))
+  fit_sc <- quiet_nomad_eval(npscoef(y ~ x | z, data = d2, nomad = TRUE, degree.max = 1L, nmulti = 1L))
   expect_nomad_bw_timing(bw_sc)
   expect_nomad_fit_timing(fit_sc)
 
@@ -140,9 +140,9 @@ test_that("NOMAD timing is consistent across supported serial families", {
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
-    nmulti = 0L
+    nmulti = 1L
   ))
-  fit_si <- quiet_nomad_eval(npindex(y ~ x1 + x2, data = d3, method = "ichimura", nomad = TRUE, degree.max = 1L, nmulti = 0L))
+  fit_si <- quiet_nomad_eval(npindex(y ~ x1 + x2, data = d3, method = "ichimura", nomad = TRUE, degree.max = 1L, nmulti = 1L))
   expect_nomad_bw_timing(bw_si)
   expect_nomad_fit_timing(fit_si)
 })

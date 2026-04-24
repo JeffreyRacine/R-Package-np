@@ -106,7 +106,7 @@ test_that("public npcdistbw cv.ls keeps lc on the legacy objective", {
     ydat = y,
     regtype = "lc",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
   shadow <- call_public_cdist_cvls_shadow(bw.lc, x, y, yeval = public_cdist_eval_grid(y))
@@ -126,7 +126,7 @@ test_that("public npcdistbw cv.ls fixed LP/LL route activates with ll == lp pari
     ydat = y,
     regtype = "ll",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
   bw.lp <- npcdistbw(
@@ -136,7 +136,7 @@ test_that("public npcdistbw cv.ls fixed LP/LL route activates with ll == lp pari
     basis = "glp",
     degree = degree,
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
 
@@ -156,7 +156,7 @@ test_that("public npcdistbw cv.ls generalized-nn LP route activates with ll == l
     regtype = "ll",
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
   bw.lp <- npcdistbw(
@@ -167,7 +167,7 @@ test_that("public npcdistbw cv.ls generalized-nn LP route activates with ll == l
     degree = degree,
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
 
@@ -189,7 +189,7 @@ test_that("public npcdistbw cv.ls adaptive-nn LP route activates with ll == lp p
     regtype = "ll",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
   bw.lp <- npcdistbw(
@@ -200,7 +200,7 @@ test_that("public npcdistbw cv.ls adaptive-nn LP route activates with ll == lp p
     degree = degree,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
 

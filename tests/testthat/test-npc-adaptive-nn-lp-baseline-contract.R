@@ -11,7 +11,7 @@ test_that("adaptive-nn conditional density lp matches ll and stays off the searc
     regtype = "ll",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp <- npcdensbw(
     y ~ x,
@@ -20,7 +20,7 @@ test_that("adaptive-nn conditional density lp matches ll and stays off the searc
     degree = 1L,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
 
   expect_true(is.finite(bw.ll$fval))
@@ -51,7 +51,7 @@ test_that("adaptive-nn conditional distribution lp matches ll and stays off the 
     regtype = "ll",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp <- npcdistbw(
     y ~ x,
@@ -60,7 +60,7 @@ test_that("adaptive-nn conditional distribution lp matches ll and stays off the 
     degree = 1L,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0
+    nmulti = 1
   )
 
   expect_true(is.finite(bw.ll$fval))

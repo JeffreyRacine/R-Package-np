@@ -154,7 +154,7 @@ npplregbw.plbandwidth =
     if (missing(nmulti)){
       nmulti <- npDefaultNmulti(dim(zdat)[2])
     }
-    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    nmulti <- npValidateNmulti(nmulti)
     
     xdat = toFrame(xdat)
     zdat = toFrame(zdat)
@@ -176,7 +176,7 @@ npplregbw.plbandwidth =
     total.groups <- 1L + ncol(xdat)
     .np_progress_bandwidth_set_coordinator(
       total_groups = total.groups,
-      local_total = max(1L, nmulti)
+      local_total = nmulti
     )
     total.time <-
       system.time({
@@ -494,7 +494,7 @@ npplregbw.plbandwidth =
   }), use.names = FALSE)
   bwdim <- length(child.start)
   ndeg <- length(degree.search$start.degree)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(zdat)[2]) else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(zdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
 
   x0 <- c(child.start, as.integer(degree.search$start.degree))
   lb <- c(child.lower, degree.search$lower)
@@ -894,7 +894,7 @@ npplregbw.default =
     any.m <- any(m != 0)
 
     if (bandwidth.compute) {
-      if (!missing(nmulti)) nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+      if (!missing(nmulti)) nmulti <- npValidateNmulti(nmulti)
       if (!missing(remin)) remin <- npValidateScalarLogical(remin, "remin")
       if (!missing(itmax)) itmax <- npValidatePositiveInteger(itmax, "itmax")
       if (!missing(ftol)) ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")

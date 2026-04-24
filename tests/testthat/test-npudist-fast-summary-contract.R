@@ -45,7 +45,7 @@ test_that("npudist counts forced large-h unconditional evaluations as fast", {
     dat = dat,
     bws = bw_big,
     bandwidth.compute = TRUE,
-    nmulti = 0L,
+    nmulti = 1L,
     itmax = 1L,
     ckerbound = "fixed",
     ckerlb = 0,

@@ -431,6 +431,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define BW_D_INITD 15
 #define BW_NCONFD     16
 #define BW_NCATFD     17
+#define BW_MEMFACD    18
+#define BW_SFLOORD    19
 
 // distribution defines
 #define DBW_NOBSI   0

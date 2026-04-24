@@ -142,7 +142,7 @@ npregbw.rbandwidth <-
       if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
     )
     lbc.init <- npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound)
-    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
 
     if (!(is.vector(ydat) || is.factor(ydat)))
@@ -231,7 +231,7 @@ npregbw.rbandwidth <-
 
     if (bandwidth.compute){
       myopti = list(num_obs_train = dim(xdat)[1], 
-        iMultistart = (if (nmulti==0) IMULTI_FALSE else IMULTI_TRUE),
+        iMultistart = IMULTI_TRUE,
         iNum_Multistart = nmulti,
         int_use_starting_values = (if (all(bws$bw==0)) USE_START_NO else USE_START_YES),
         int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
@@ -270,7 +270,8 @@ npregbw.rbandwidth <-
         lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
         lbc.init = lbc.init, hbc.init = hbc.init, cfac.init = cfac.init, 
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
-        nconfac = nconfac, ncatfac = ncatfac)
+        nconfac = nconfac, ncatfac = ncatfac,
+        scale.factor.lower.bound = scale.factor.lower.bound)
 
         cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
@@ -280,7 +281,7 @@ npregbw.rbandwidth <-
                 as.double(mysd),
                 as.integer(myopti), as.double(myoptd),
                 as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-                as.integer(max(1, nmulti)),
+                as.integer(nmulti),
                 as.integer(penalty_mode),
                 as.double(penalty.multiplier),
                 as.integer(degree.c),
@@ -429,7 +430,7 @@ npregbw.rbandwidth <-
 .npregbw_call_fixed_degree_core <- function(xdat,
                                             ydat,
                                             bws,
-                                            nmulti = 0L,
+                                            nmulti = 1L,
                                             itmax = 0L,
                                             remin = FALSE,
                                             scale.init.categorical.sample = FALSE,
@@ -501,7 +502,7 @@ npregbw.rbandwidth <-
 
   myopti <- list(
     num_obs_train = nrow,
-    iMultistart = if (nmulti == 0L) IMULTI_FALSE else IMULTI_TRUE,
+    iMultistart = IMULTI_TRUE,
     iNum_Multistart = nmulti,
     int_use_starting_values = if (all(bws$bw == 0)) USE_START_NO else USE_START_YES,
     int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
@@ -876,7 +877,7 @@ npregbw.rbandwidth <-
   setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(xdat)[2]) else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
 
   cont_lower <- npResolveScaleFactorLowerBound(template$scale.factor.lower.bound,
                                                argname = "template$scale.factor.lower.bound")

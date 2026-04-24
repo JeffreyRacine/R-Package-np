@@ -875,6 +875,27 @@ static void np_copy_scale_factor(double *dest, const double *src, int n)
     dest[i] = src[i];
 }
 
+static void np_copy_scale_factor_for_raw(double *dest, const double *src, int n)
+{
+  np_copy_scale_factor(dest, src, n);
+  if (bwm_use_transform)
+    bwm_to_constrained(dest, n);
+}
+
+static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
+{
+  double val;
+
+  if (!bwm_use_transform)
+    return bwmfunc_raw(vector_scale_factor);
+
+  double *tmp = alloc_vecd(n + 1);
+  np_copy_scale_factor_for_raw(tmp, vector_scale_factor, n);
+  val = bwmfunc_raw(tmp);
+  safe_free(tmp);
+  return val;
+}
+
 extern double *vector_continuous_stddev_extern;
 extern double nconfac_extern;
 
@@ -998,9 +1019,6 @@ static int np_bw_candidate_is_admissible_with_floor(
     num_categories,
     candidate);
 
-  if (tmp != NULL)
-    safe_free(tmp);
-
   if ((invalid == 0) &&
       !np_fixed_continuous_floor_ok_cv_with_coeff(
         KERNEL,
@@ -1010,6 +1028,9 @@ static int np_bw_candidate_is_admissible_with_floor(
         candidate,
         floor_coeff))
     invalid = 1;
+
+  if (tmp != NULL)
+    safe_free(tmp);
 
   return (invalid == 0);
 }
@@ -1565,6 +1586,9 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  if (XLENGTH(myoptd_r) <= RBW_SFLOORD)
+    error("C_np_regression_bw: myoptd is missing scale.factor.lower.bound");
 
   ncon = (int)INTEGER(myopti_i)[REG_NCONI];
   ckerlb_p = REAL(ckerlb_r);
@@ -3674,6 +3698,9 @@ SEXP C_np_density_bw(SEXP myuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  if (XLENGTH(myoptd_r) <= BW_SFLOORD)
+    error("C_np_density_bw: myoptd is missing scale.factor.lower.bound");
+
   ncon = (int)INTEGER(myopti_i)[BW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
@@ -4387,6 +4414,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   num_obs_train_extern = myopti[BW_NOBSI];
   iMultistart = myopti[BW_IMULTII];
   iNum_Multistart = myopti[BW_NMULTII];
+  if (iNum_Multistart < 1)
+    error("C_np_density_bw: nmulti must be a positive integer");
 
   KERNEL_den_extern = myopti[BW_CKRNEVI];
   KERNEL_den_unordered_extern = myopti[BW_UKRNEVI];
@@ -4435,6 +4464,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   nconfac_extern = myoptd[BW_NCONFD];
   ncatfac_extern = myoptd[BW_NCATFD];
+  bwm_set_scale_factor_lower_bound(myoptd[BW_SFLOORD]);
 
 /* Allocate memory for objects */
 
@@ -4642,14 +4672,13 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     double pmult = penalty_mult[0];
     double baseline;
     if (pmult < 1.0) pmult = 1.0;
-    baseline = bwmfunc_raw(vector_scale_factor);
+    baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
     bwm_eval_count += 1.0;
     if (!R_FINITE(baseline) || baseline == DBL_MAX)
       bwm_invalid_count += 1.0;
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
       double *tmp = alloc_vecd(num_var + 1);
-      for (i = 1; i <= num_var; i++)
-        tmp[i] = vector_scale_factor[i];
+      np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var);
       for (i = 1; i <= num_reg_continuous_extern; i++)
         tmp[i] *= 2.0;
       for (i = 0; i < num_reg_unordered_extern; i++) {
@@ -4929,10 +4958,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
         if (np_bw_candidate_is_admissible(
               num_var,
               bwm_use_transform,
-              KERNEL_reg_extern,
-              KERNEL_reg_unordered_extern,
-              BANDWIDTH_reg_extern,
-              BANDWIDTH_reg_extern,
+              KERNEL_den_extern,
+              KERNEL_den_unordered_extern,
+              BANDWIDTH_den_extern,
+              BANDWIDTH_den_extern,
               0,
               num_obs_train_extern,
               0,
@@ -5128,6 +5157,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   iMultistart = myopti[DBW_IMULTII];
   iNum_Multistart = myopti[DBW_NMULTII];
+  if (iNum_Multistart < 1)
+    error("C_np_distribution_bw: nmulti must be a positive integer");
 
   KERNEL_den_extern = myopti[DBW_CKRNEVI];
   KERNEL_den_unordered_extern = myopti[DBW_UKRNEVI];
@@ -5431,11 +5462,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     double pmult = penalty_mult[0];
     double baseline;
     if (pmult < 1.0) pmult = 1.0;
-    baseline = bwmfunc_raw(vector_scale_factor);
+    baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
       double *tmp = alloc_vecd(num_var + 1);
-      for (i = 1; i <= num_var; i++)
-        tmp[i] = vector_scale_factor[i];
+      np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var);
       for (i = 1; i <= num_reg_continuous_extern; i++)
         tmp[i] *= 2.0;
       for (i = 0; i < num_reg_unordered_extern; i++) {
@@ -5923,6 +5953,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   num_obs_train_extern = myopti[CBW_NOBSI];
   iMultistart = myopti[CBW_IMULTII];
   iNum_Multistart = myopti[CBW_NMULTII];
+  if (!eval_only && iNum_Multistart < 1)
+    error("C_np_density_conditional_bw: nmulti must be a positive integer");
 
   KERNEL_reg_extern = myopti[CBW_CXKRNEVI];
   KERNEL_den_extern = myopti[CBW_CYKRNEVI];
@@ -6471,7 +6503,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     double pmult = penalty_mult[0];
     double baseline;
     if (pmult < 1.0) pmult = 1.0;
-    baseline = bwmfunc_raw(vector_scale_factor);
+    baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
     /* Penalty-baseline probes are real objective evaluations and must be
        included in the evaluation/invalid accounting. */
     bwm_eval_count += 1.0;
@@ -6479,8 +6511,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       bwm_invalid_count += 1.0;
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
       double *tmp = alloc_vecd(num_all_var + 1);
-      for (i = 1; i <= num_all_var; i++)
-        tmp[i] = vector_scale_factor[i];
+      np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_all_var);
       for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
         tmp[i] *= 2.0;
       for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
@@ -7028,6 +7059,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   iMultistart = myopti[CDBW_IMULTII];
   iNum_Multistart = myopti[CDBW_NMULTII];
+  if (!eval_only && iNum_Multistart < 1)
+    error("C_np_distribution_conditional_bw: nmulti must be a positive integer");
 
   KERNEL_reg_extern = myopti[CDBW_CXKRNEVI];
   KERNEL_den_extern = myopti[CDBW_CYKRNEVI];
@@ -7560,11 +7593,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     double pmult = penalty_mult[0];
     double baseline;
     if (pmult < 1.0) pmult = 1.0;
-    baseline = bwmfunc_raw(vector_scale_factor);
+    baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
       double *tmp = alloc_vecd(num_all_var + 1);
-      for (i = 1; i <= num_all_var; i++)
-        tmp[i] = vector_scale_factor[i];
+      np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_all_var);
       for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
         tmp[i] *= 2.0;
       for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
@@ -9130,6 +9162,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   num_obs_train_extern = myopti[RBW_NOBSI];
   iMultistart = myopti[RBW_IMULTII];
   iNum_Multistart = myopti[RBW_NMULTII];
+  if (!eval_only && iNum_Multistart < 1)
+    error("C_np_regression_bw: nmulti must be a positive integer");
 
   KERNEL_reg_extern = myopti[RBW_CKRNEVI];
   KERNEL_reg_unordered_extern = myopti[RBW_UKRNEVI];

@@ -612,7 +612,7 @@ test_that("plot contract: npscoef fitted perspective path preserves semantic z e
   fit <- npscoef(
     y ~ x | z,
     nomad = TRUE,
-    nmulti = 0L
+    nmulti = 1L
   )
 
   np.ns <- asNamespace("np")

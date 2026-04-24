@@ -89,6 +89,7 @@ npregivderiv <- function(y,
   if(!is.null(x)) z <- data.frame(z,x)
   if(!is.null(xeval)) zeval <- data.frame(zeval,xeval)
 
+  if(!is.null(nmulti)) nmulti <- npValidateNmulti(nmulti)
   nmulti.loop <- if(!is.null(nmulti)) nmulti else 1
   nmulti <- if(!is.null(nmulti)) nmulti else npDefaultNmulti(max(NCOL(z), NCOL(w)))
 

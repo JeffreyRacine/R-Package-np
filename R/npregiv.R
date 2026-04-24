@@ -60,6 +60,7 @@ npregiv <- function(y,
 
   ptm.start <- proc.time()
   cl <- match.call()
+  if(!is.null(nmulti)) nmulti <- npValidateNmulti(nmulti)
 
   ## This function was constructed initially by Samuele Centorrino
   ## <samuele.centorrino@univ-tlse1.fr> to reproduce illustrations in
@@ -894,7 +895,7 @@ npregiv <- function(y,
     if(is.null(ydat)) stop("Error: You must provide y data")
     if(is.null(xdat)) stop("Error: You must provide X data")
     if(is.null(degree) || any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
-    if(!is.null(nmulti) && nmulti < 1) stop(paste("Error: nmulti must be a positive integer (minimum 1)\nnmulti is (", nmulti, ")\n",sep=""))
+    if(!is.null(nmulti)) nmulti <- npValidateNmulti(nmulti)
 
     bwmethod = match.arg(bwmethod)
 

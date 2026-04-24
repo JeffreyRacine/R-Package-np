@@ -34,7 +34,7 @@ phase1_npcdens_cvls_fixed_cases <- local({
         regtype = "lc",
         bwtype = "fixed",
         bwmethod = "cv.ls",
-        nmulti = 0L
+        nmulti = 1L
       ),
       bw.ll = npcdensbw(
         xdat = dat$x,
@@ -42,7 +42,7 @@ phase1_npcdens_cvls_fixed_cases <- local({
         regtype = "ll",
         bwtype = "fixed",
         bwmethod = "cv.ls",
-        nmulti = 0L
+        nmulti = 1L
       ),
       bw.lp = npcdensbw(
         xdat = dat$x,
@@ -52,7 +52,7 @@ phase1_npcdens_cvls_fixed_cases <- local({
         degree = degree1,
         bwtype = "fixed",
         bwmethod = "cv.ls",
-        nmulti = 0L
+        nmulti = 1L
       ),
       bw.d2 = npcdensbw(
         xdat = dat$x,
@@ -62,7 +62,7 @@ phase1_npcdens_cvls_fixed_cases <- local({
         degree = degree2,
         bwtype = "fixed",
         bwmethod = "cv.ls",
-        nmulti = 0L
+        nmulti = 1L
       )
     )
 
@@ -117,7 +117,7 @@ test_that("phase1 npcdensbw cv.ls fixed avoids boundary collapse on bounded supp
     degree = 1L,
     bwtype = "fixed",
     bwmethod = "cv.ls",
-    nmulti = 0L,
+    nmulti = 1L,
     cykerbound = "fixed",
     cykerlb = 0,
     cykerub = 1

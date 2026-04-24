@@ -34,7 +34,7 @@ phase1_npcdens_cvls_gnn_cases <- local({
         regtype = "lc",
         bwtype = "generalized_nn",
         bwmethod = "cv.ls",
-        nmulti = 0L,
+        nmulti = 1L,
         itmax = 1L
       ),
       bw.ll = npcdensbw(
@@ -43,7 +43,7 @@ phase1_npcdens_cvls_gnn_cases <- local({
         regtype = "ll",
         bwtype = "generalized_nn",
         bwmethod = "cv.ls",
-        nmulti = 0L,
+        nmulti = 1L,
         itmax = 1L
       ),
       bw.lp = npcdensbw(
@@ -54,7 +54,7 @@ phase1_npcdens_cvls_gnn_cases <- local({
         degree = degree1,
         bwtype = "generalized_nn",
         bwmethod = "cv.ls",
-        nmulti = 0L,
+        nmulti = 1L,
         itmax = 1L
       ),
       bw.d2 = npcdensbw(
@@ -65,7 +65,7 @@ phase1_npcdens_cvls_gnn_cases <- local({
         degree = degree2,
         bwtype = "generalized_nn",
         bwmethod = "cv.ls",
-        nmulti = 0L,
+        nmulti = 1L,
         itmax = 1L
       )
     )
@@ -122,7 +122,7 @@ test_that("phase1 npcdensbw cv.ls generalized-nn avoids search-boundary collapse
     degree = 1L,
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
-    nmulti = 0L
+    nmulti = 1L
   )
   fit <- npcdens(bws = bw)
 

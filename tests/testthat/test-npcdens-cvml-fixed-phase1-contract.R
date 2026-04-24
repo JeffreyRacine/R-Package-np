@@ -22,7 +22,7 @@ test_that("phase1 npcdensbw cv.ml fixed lc matches the frozen public baseline", 
     regtype = "lc",
     bwtype = "fixed",
     bwmethod = "cv.ml",
-    nmulti = 0L
+    nmulti = 1L
   )
 
   expect_true(is.finite(bw.lc$fval))
@@ -39,7 +39,7 @@ test_that("phase1 npcdensbw cv.ml fixed keeps ll on canonical lp degree-1 glp", 
     regtype = "ll",
     bwtype = "fixed",
     bwmethod = "cv.ml",
-    nmulti = 0L
+    nmulti = 1L
   )
   bw.lp <- npcdensbw(
     xdat = dat$x,
@@ -49,7 +49,7 @@ test_that("phase1 npcdensbw cv.ml fixed keeps ll on canonical lp degree-1 glp", 
     degree = degree,
     bwtype = "fixed",
     bwmethod = "cv.ml",
-    nmulti = 0L
+    nmulti = 1L
   )
 
   expect_identical(bw.ll$regtype.engine, "lp")
@@ -75,7 +75,7 @@ test_that("phase1 npcdensbw cv.ml fixed lp degree-2 succeeds on a higher-order f
     degree = degree1,
     bwtype = "fixed",
     bwmethod = "cv.ml",
-    nmulti = 0L
+    nmulti = 1L
   )
   bw.d2 <- npcdensbw(
     xdat = dat$x,
@@ -85,7 +85,7 @@ test_that("phase1 npcdensbw cv.ml fixed lp degree-2 succeeds on a higher-order f
     degree = degree2,
     bwtype = "fixed",
     bwmethod = "cv.ml",
-    nmulti = 0L
+    nmulti = 1L
   )
 
   expect_identical(as.integer(bw.d2$degree.engine), degree2)
@@ -107,7 +107,7 @@ test_that("phase1 npcdensbw cv.ml fixed avoids boundary collapse on bounded supp
     degree = 1L,
     bwtype = "fixed",
     bwmethod = "cv.ml",
-    nmulti = 0L,
+    nmulti = 1L,
     cykerbound = "fixed",
     cykerlb = 0,
     cykerub = 1

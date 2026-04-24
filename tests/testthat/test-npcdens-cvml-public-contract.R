@@ -110,7 +110,7 @@ test_that("public npcdensbw cv.ml keeps lc on the legacy objective", {
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- data.frame(y1 = rnorm(n))
 
-  bw.lc <- npcdensbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ml", nmulti = 0)
+  bw.lc <- npcdensbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ml", nmulti = 1)
   shadow <- call_public_cvml_shadow(bw.lc, x, y)
 
   expect_equal(-bw.lc$fval, shadow$old, tolerance = 1e-10)
@@ -128,7 +128,7 @@ test_that("public npcdensbw cv.ml fixed LP/LL route activates with ll == lp pari
     ydat = y,
     regtype = "ll",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp <- npcdensbw(
     xdat = x,
@@ -137,7 +137,7 @@ test_that("public npcdensbw cv.ml fixed LP/LL route activates with ll == lp pari
     basis = "glp",
     degree = degree,
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
  
   expect_equal(-bw.ll$fval, -bw.lp$fval, tolerance = 1e-8)
@@ -157,7 +157,7 @@ test_that("public npcdensbw cv.ml fixed LP route preserves tree parity", {
     basis = "glp",
     degree = degree,
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
 
   old_opt <- getOption("np.tree")
@@ -171,7 +171,7 @@ test_that("public npcdensbw cv.ml fixed LP route preserves tree parity", {
     basis = "glp",
     degree = degree,
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
 
   expect_equal(-bw.tree$fval, -bw.serial$fval, tolerance = 1e-8)
@@ -190,7 +190,7 @@ test_that("public npcdensbw cv.ml generalized-nn LP route activates with ll == l
     regtype = "ll",
     bwtype = "generalized_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp <- npcdensbw(
     xdat = x,
@@ -200,7 +200,7 @@ test_that("public npcdensbw cv.ml generalized-nn LP route activates with ll == l
     degree = degree,
     bwtype = "generalized_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
 
   expect_true(is.finite(bw.ll$fval))
@@ -221,7 +221,7 @@ test_that("public npcdensbw cv.ml adaptive-nn LP route activates with ll == lp p
     regtype = "ll",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp <- npcdensbw(
     xdat = x,
@@ -231,7 +231,7 @@ test_that("public npcdensbw cv.ml adaptive-nn LP route activates with ll == lp p
     degree = degree,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
 
   expect_true(is.finite(bw.ll$fval))

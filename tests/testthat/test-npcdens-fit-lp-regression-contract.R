@@ -6,10 +6,10 @@ test_that("npcdens formula fit keeps lc ll and lp estimator paths live", {
   x <- rnorm(n)
   y <- x + rnorm(n)
 
-  fit.lc <- npcdens(y ~ x, regtype = "lc", nmulti = 0)
-  fit.ll <- npcdens(y ~ x, regtype = "ll", nmulti = 0)
-  fit.lp0 <- npcdens(y ~ x, regtype = "lp", degree = 0L, nmulti = 0)
-  fit.lp2 <- npcdens(y ~ x, regtype = "lp", degree = 2L, nmulti = 0)
+  fit.lc <- npcdens(y ~ x, regtype = "lc", nmulti = 1)
+  fit.ll <- npcdens(y ~ x, regtype = "ll", nmulti = 1)
+  fit.lp0 <- npcdens(y ~ x, regtype = "lp", degree = 0L, nmulti = 1)
+  fit.lp2 <- npcdens(y ~ x, regtype = "lp", degree = 2L, nmulti = 1)
 
   expect_true(all(is.finite(fitted(fit.lc))))
   expect_true(all(is.finite(fitted(fit.ll))))

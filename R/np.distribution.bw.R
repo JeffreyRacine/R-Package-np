@@ -152,7 +152,9 @@ npudistbw.dbandwidth <-
     small <- npValidatePositiveFiniteNumeric(small, "small")
     memfac <- npValidatePositiveFiniteNumeric(memfac, "memfac")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
+      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+    )
     lbc.init <- npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound)
 
     nofi <- missing(do.full.integral)
@@ -161,7 +163,7 @@ npudistbw.dbandwidth <-
     if (missing(nmulti)){
       nmulti <- npDefaultNmulti(dim(dat)[2])
     }
-    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
 
     if (length(bws$bw) != dim(dat)[2])
@@ -245,7 +247,7 @@ npudistbw.dbandwidth <-
     if (bandwidth.compute){
       myopti = list(num_obs_train = dim(dat)[1],
         num_obs_eval = nog,
-        iMultistart = (if (nmulti==0) IMULTI_FALSE else IMULTI_TRUE),
+        iMultistart = IMULTI_TRUE,
         iNum_Multistart = nmulti,
         int_use_starting_values = (if (all(bws$bw==0)) USE_START_NO else USE_START_YES),
         int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
@@ -294,7 +296,7 @@ npudistbw.dbandwidth <-
                 as.double(guno), as.double(gord), as.double(gcon), as.double(mysd),
                 as.integer(myopti), as.double(myoptd),
                 as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-                as.integer(max(1, nmulti)),
+                as.integer(nmulti),
                 as.integer(penalty_mode),
                 as.double(penalty.multiplier),
                 as.double(cker.bounds.c$lb),
