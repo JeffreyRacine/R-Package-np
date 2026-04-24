@@ -731,13 +731,13 @@ npcdensbw.conbandwidth <-
   nrow <- nrow(ymat)
   nconfac <- nrow^(-1.0 / (2.0 * bws$cxkerorder + bws$ncon))
   ncatfac <- nrow^(-2.0 / (2.0 * bws$cxkerorder + bws$ncon))
-
-  penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
   scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
     bws$scale.factor.lower.bound,
     fallback = 0.1,
     argname = "bws$scale.factor.lower.bound"
   )
+
+  penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
   reg.code <- if (identical(bws$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
   degree.code <- if (bws$xncon > 0L) as.integer(bws$degree.engine) else integer(0L)
   basis.code <- as.integer(npLpBasisCode(bws$basis.engine))
@@ -882,6 +882,13 @@ npRmpiNomadShadowPrepareConditionalDensity <- function(c.uno,
                                                        cxkerub,
                                                        cykerlb,
                                                        cykerub) {
+  if (length(myoptd) <= 19L) {
+    rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+    if (isTRUE(rank == 0L))
+      stop("resident npcdens NOMAD shadow options are missing scale.factor.lower.bound", call. = FALSE)
+    return(FALSE)
+  }
+
   ok <- .Call(
     "C_np_density_conditional_nomad_shadow_prepare",
     c.uno,
@@ -970,6 +977,11 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   nrow <- nrow(ymat)
   nconfac <- nrow^(-1.0 / (2.0 * bws$cxkerorder + bws$ncon))
   ncatfac <- nrow^(-2.0 / (2.0 * bws$cxkerorder + bws$ncon))
+  scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
+    bws$scale.factor.lower.bound,
+    fallback = 0.1,
+    argname = "bws$scale.factor.lower.bound"
+  )
 
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
   reg.code <- if (identical(bws$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
@@ -1050,7 +1062,8 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
     hbd.init = 0,
     dfac.init = 0,
     nconfac = nconfac,
-    ncatfac = ncatfac
+    ncatfac = ncatfac,
+    scale.factor.lower.bound = scale.factor.lower.bound
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])

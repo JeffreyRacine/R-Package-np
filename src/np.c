@@ -1717,6 +1717,7 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
 
   nconfac_extern = myoptd[RBW_NCONFD];
   ncatfac_extern = myoptd[RBW_NCATFD];
+  bwm_set_scale_factor_lower_bound(myoptd[RBW_SFLOORD]);
   dfc_dir = myopti[RBW_DFC_DIRI];
   lbc_dir = myoptd[RBW_LBC_DIRD];
   c_dir = myoptd[RBW_C_DIRD];
@@ -2010,21 +2011,25 @@ SEXP C_np_regression_nomad_shadow_prepare(SEXP runo,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
-  ok = np_regression_nomad_shadow_prepare_internal(REAL(runo_r),
-                                                   REAL(rord_r),
-                                                   REAL(rcon_r),
-                                                   REAL(y_r),
-                                                   REAL(mysd_r),
-                                                   INTEGER(myopti_i),
-                                                   REAL(myoptd_r),
-                                                   REAL(rbw_r),
-                                                   INTEGER(penalty_mode_i),
-                                                   REAL(penalty_mult_r),
-                                                   INTEGER(glp_degree_i),
-                                                   INTEGER(glp_bernstein_i),
-                                                   INTEGER(glp_basis_i),
-                                                   REAL(ckerlb_r),
-                                                   REAL(ckerub_r));
+  if (XLENGTH(myoptd_r) <= RBW_SFLOORD) {
+    ok = 0;
+  } else {
+    ok = np_regression_nomad_shadow_prepare_internal(REAL(runo_r),
+                                                     REAL(rord_r),
+                                                     REAL(rcon_r),
+                                                     REAL(y_r),
+                                                     REAL(mysd_r),
+                                                     INTEGER(myopti_i),
+                                                     REAL(myoptd_r),
+                                                     REAL(rbw_r),
+                                                     INTEGER(penalty_mode_i),
+                                                     REAL(penalty_mult_r),
+                                                     INTEGER(glp_degree_i),
+                                                     INTEGER(glp_bernstein_i),
+                                                     INTEGER(glp_basis_i),
+                                                     REAL(ckerlb_r),
+                                                     REAL(ckerub_r));
+  }
 
   ok = np_mpi_comm1_all_ok(ok);
   if (!ok)
@@ -2571,6 +2576,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   nconfac_extern = myoptd[CBW_NCONFD];
   ncatfac_extern = myoptd[CBW_NCATFD];
   dbl_memfac_ccdf_extern = myoptd[CBW_MEMFACD];
+  bwm_set_scale_factor_lower_bound(myoptd[CBW_SFLOORD]);
   dfc_dir = myopti[CBW_DFC_DIRI];
   lbc_dir = myoptd[CBW_LBC_DIRD];
   c_dir = myoptd[CBW_C_DIRD];
@@ -3033,26 +3039,30 @@ SEXP C_np_density_conditional_nomad_shadow_prepare(SEXP c_uno,
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
-  ok = np_conditional_density_nomad_shadow_prepare_internal(REAL(c_uno_r),
-                                                            REAL(c_ord_r),
-                                                            REAL(c_con_r),
-                                                            REAL(u_uno_r),
-                                                            REAL(u_ord_r),
-                                                            REAL(u_con_r),
-                                                            REAL(mysd_r),
-                                                            INTEGER(myopti_i),
-                                                            REAL(myoptd_r),
-                                                            REAL(rbw_r),
-                                                            INTEGER(penalty_mode_i),
-                                                            REAL(penalty_mult_r),
-                                                            INTEGER(glp_degree_i),
-                                                            INTEGER(glp_bernstein_i),
-                                                            INTEGER(glp_basis_i),
-                                                            INTEGER(regtype_i),
-                                                            REAL(cxkerlb_r),
-                                                            REAL(cxkerub_r),
-                                                            REAL(cykerlb_r),
-                                                            REAL(cykerub_r));
+  if (XLENGTH(myoptd_r) <= CBW_SFLOORD) {
+    ok = 0;
+  } else {
+    ok = np_conditional_density_nomad_shadow_prepare_internal(REAL(c_uno_r),
+                                                              REAL(c_ord_r),
+                                                              REAL(c_con_r),
+                                                              REAL(u_uno_r),
+                                                              REAL(u_ord_r),
+                                                              REAL(u_con_r),
+                                                              REAL(mysd_r),
+                                                              INTEGER(myopti_i),
+                                                              REAL(myoptd_r),
+                                                              REAL(rbw_r),
+                                                              INTEGER(penalty_mode_i),
+                                                              REAL(penalty_mult_r),
+                                                              INTEGER(glp_degree_i),
+                                                              INTEGER(glp_bernstein_i),
+                                                              INTEGER(glp_basis_i),
+                                                              INTEGER(regtype_i),
+                                                              REAL(cxkerlb_r),
+                                                              REAL(cxkerub_r),
+                                                              REAL(cykerlb_r),
+                                                              REAL(cykerub_r));
+  }
 
   ok = np_mpi_comm1_all_ok(ok);
   if (!ok)

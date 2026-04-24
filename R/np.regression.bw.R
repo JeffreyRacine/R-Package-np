@@ -890,6 +890,13 @@ npRmpiNomadShadowPrepareRegression <- function(runo,
                                                basis,
                                                ckerlb,
                                                ckerub) {
+  if (length(myoptd) <= 18L) {
+    rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+    if (isTRUE(rank == 0L))
+      stop("resident npreg NOMAD shadow options are missing scale.factor.lower.bound", call. = FALSE)
+    return(FALSE)
+  }
+
   ok <- .Call(
     "C_np_regression_nomad_shadow_prepare",
     runo,
@@ -1007,6 +1014,10 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   nrow <- dim(xmat)[1L]
   nconfac <- nrow^(-1.0 / (2.0 * bws$ckerorder + bws$ncon))
   ncatfac <- nrow^(-2.0 / (2.0 * bws$ckerorder + bws$ncon))
+  scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
+    bws$scale.factor.lower.bound,
+    argname = "bws$scale.factor.lower.bound"
+  )
 
   penalty_mode <- if (match.arg(invalid.penalty) == "baseline") 1L else 0L
   reg.c <- npRegtypeToC(regtype = bws$regtype,
@@ -1071,7 +1082,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     hbd.init = 0,
     dfac.init = 0,
     nconfac = nconfac,
-    ncatfac = ncatfac
+    ncatfac = ncatfac,
+    scale.factor.lower.bound = scale.factor.lower.bound
   )
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
