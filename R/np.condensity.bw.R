@@ -103,6 +103,61 @@ npcdensbw.formula <-
   invisible(TRUE)
 }
 
+.npcdensbw_validate_scale_factor_lower_bound <- function(value,
+                                                         argname = "scale.factor.lower.bound") {
+  if (length(value) != 1L || !is.numeric(value) || is.na(value) ||
+      !is.finite(value) || value < 0) {
+    stop(sprintf("%s must be a single nonnegative finite numeric value", argname),
+         call. = FALSE)
+  }
+
+  as.double(value)
+}
+
+.npcdensbw_resolve_scale_factor_lower_bound <- function(value,
+                                                        fallback = 0.01,
+                                                        argname = "scale.factor.lower.bound") {
+  if (is.null(value))
+    return(as.double(fallback))
+
+  .npcdensbw_validate_scale_factor_lower_bound(value, argname = argname)
+}
+
+.npcdensbw_effective_continuous_start_lower <- function(lbc.init,
+                                                        scale.factor.lower.bound) {
+  max(as.double(lbc.init), as.double(scale.factor.lower.bound))
+}
+
+.npcdensbw_apply_continuous_search_floor <- function(tbw,
+                                                     xdat,
+                                                     ydat,
+                                                     scale.factor.lower.bound) {
+  tbw$scale.factor.lower.bound <- as.double(scale.factor.lower.bound)
+
+  if (!isTRUE(tbw$bandwidth.compute) || !identical(tbw$type, "fixed") || tbw$ncon < 1L)
+    return(tbw)
+
+  if (isTRUE(tbw$scaling)) {
+    floor.values <- rep(as.double(scale.factor.lower.bound), tbw$ncon)
+  } else {
+    xcon <- xdat[, tbw$ixcon, drop = FALSE]
+    ycon <- ydat[, tbw$iycon, drop = FALSE]
+    mysd <- EssDee(data.frame(xcon, ycon))
+    nconfac <- nrow(xdat)^(-1.0 / (2.0 * tbw$cxkerorder + tbw$ncon))
+    floor.values <- as.double(scale.factor.lower.bound) * mysd * nconfac
+  }
+
+  if (tbw$xncon > 0L) {
+    tbw$xbw[tbw$ixcon] <- pmax(tbw$xbw[tbw$ixcon], floor.values[seq_len(tbw$xncon)])
+  }
+  if (tbw$yncon > 0L) {
+    idx <- tbw$xncon + seq_len(tbw$yncon)
+    tbw$ybw[tbw$iycon] <- pmax(tbw$ybw[tbw$iycon], floor.values[idx])
+  }
+
+  tbw
+}
+
 npcdensbw.conbandwidth <- 
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
@@ -130,6 +185,7 @@ npcdensbw.conbandwidth <-
            penalty.multiplier = 10,
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
+           scale.factor.lower.bound = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
@@ -147,10 +203,16 @@ npcdensbw.conbandwidth <-
     remin <- npValidateScalarLogical(remin, "remin")
     scale.init.categorical.sample <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
+    scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
+      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound,
+      fallback = 0.01,
+      argname = "scale.factor.lower.bound"
+    )
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
     if (is.null(bws$cvls.i1.rescue))
       bws$cvls.i1.rescue <- TRUE
     bws$cvls.i1.rescue <- npValidateScalarLogical(bws$cvls.i1.rescue, "bws$cvls.i1.rescue")
+    bws$scale.factor.lower.bound <- scale.factor.lower.bound
     itmax <- npValidatePositiveInteger(itmax, "itmax")
     ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
     tol <- npValidatePositiveFiniteNumeric(tol, "tol")
@@ -307,9 +369,11 @@ npcdensbw.conbandwidth <-
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
         lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
-        lbc.init = lbc.init, hbc.init = hbc.init, cfac.init = cfac.init, 
+        lbc.init = .npcdensbw_effective_continuous_start_lower(lbc.init, tbw$scale.factor.lower.bound),
+        hbc.init = hbc.init, cfac.init = cfac.init, 
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
-        nconfac = nconfac, ncatfac = ncatfac)
+        nconfac = nconfac, ncatfac = ncatfac,
+        scale.factor.lower.bound = tbw$scale.factor.lower.bound)
 
       cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
       cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
@@ -386,6 +450,7 @@ npcdensbw.conbandwidth <-
     }
 
     tbw$cvls.i1.rescue <- isTRUE(bws$cvls.i1.rescue)
+    tbw$scale.factor.lower.bound <- bws$scale.factor.lower.bound
     
     ## bandwidth metadata
     tbw$sfactor <- tbw$bandwidth <- list(x = tbw$xbw, y = tbw$ybw)
@@ -481,6 +546,7 @@ npcdensbw.conbandwidth <-
                         degree.engine = tbw$degree.engine,
                         bernstein.basis.engine = tbw$bernstein.basis.engine)
     tbw$cvls.i1.rescue <- isTRUE(bws$cvls.i1.rescue)
+    tbw$scale.factor.lower.bound <- bws$scale.factor.lower.bound
     
     tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
     tbw <- .npcdensbw_restore_explicit_fixed_y_bounds(tbw, bws)
@@ -514,6 +580,13 @@ npcdensbw.conbandwidth <-
 
   tbw <- do.call(conbandwidth, bw.args)
   tbw$cvls.i1.rescue <- isTRUE(reg.args$cvls.i1.rescue)
+  tbw$scale.factor.lower.bound <- reg.args$scale.factor.lower.bound
+  tbw <- .npcdensbw_apply_continuous_search_floor(
+    tbw,
+    xdat = xdat,
+    ydat = ydat,
+    scale.factor.lower.bound = reg.args$scale.factor.lower.bound
+  )
   .npcdensbw_restore_explicit_fixed_y_bounds(tbw, reg.args)
 }
 
@@ -610,6 +683,11 @@ npcdensbw.conbandwidth <-
   ncatfac <- nrow^(-2.0 / (2.0 * bws$cxkerorder + bws$ncon))
 
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
+  scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
+    bws$scale.factor.lower.bound,
+    fallback = 0.01,
+    argname = "bws$scale.factor.lower.bound"
+  )
   reg.code <- if (identical(bws$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
   degree.code <- if (bws$xncon > 0L) as.integer(bws$degree.engine) else integer(0L)
   basis.code <- as.integer(npLpBasisCode(bws$basis.engine))
@@ -690,7 +768,8 @@ npcdensbw.conbandwidth <-
     hbd.init = 0,
     dfac.init = 0,
     nconfac = nconfac,
-    ncatfac = ncatfac
+    ncatfac = ncatfac,
+    scale.factor.lower.bound = scale.factor.lower.bound
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
@@ -834,6 +913,14 @@ npcdensbw.conbandwidth <-
   point
 }
 
+.npcdensbw_nomad_continuous_lower_bound <- function(template) {
+  .npcdensbw_resolve_scale_factor_lower_bound(
+    template$scale.factor.lower.bound,
+    fallback = 0.01,
+    argname = "template$scale.factor.lower.bound"
+  )
+}
+
 .npcdensbw_powell_progress_fields <- function(state,
                                               done = NULL,
                                               detail = NULL,
@@ -934,7 +1021,8 @@ npcdensbw.conbandwidth <-
   ndeg <- length(degree.search$start.degree)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2]) else max(1L, as.integer(opt.args$nmulti[1L]))
   objective.direction <- "max"
-  bw_lower <- c(rep.int(1e-2, length(setup$cont_flat)), rep.int(0, length(setup$cat_flat)))
+  cont_lower <- .npcdensbw_nomad_continuous_lower_bound(template)
+  bw_lower <- c(rep.int(cont_lower, length(setup$cont_flat)), rep.int(0, length(setup$cat_flat)))
   bw_upper <- c(rep.int(1e6, length(setup$cont_flat)), setup$cat_upper * setup$bandwidth.scale.categorical)
 
   x0 <- c(
@@ -1324,6 +1412,7 @@ npcdensbw.default <-
            penalty.multiplier,
            remin,
            scale.init.categorical.sample,
+           scale.factor.lower.bound = NULL,
            cvls.i1.rescue = TRUE,
            small,
            tol,
@@ -1359,6 +1448,11 @@ npcdensbw.default <-
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
     cvls.i1.rescue <- npValidateScalarLogical(cvls.i1.rescue, "cvls.i1.rescue")
+    scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
+      scale.factor.lower.bound,
+      fallback = 0.01,
+      argname = "scale.factor.lower.bound"
+    )
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
       call_names = mc.names,
@@ -1539,6 +1633,7 @@ npcdensbw.default <-
     }
     reg.args <- bw.args[setdiff(names(bw.args), c("xbw", "ybw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
     reg.args$cvls.i1.rescue <- cvls.i1.rescue
+    reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
 
     ## next grab dummies for actual bandwidth selection and perform call
 
