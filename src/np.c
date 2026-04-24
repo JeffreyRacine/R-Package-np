@@ -3088,7 +3088,7 @@ SEXP C_np_density_conditional_nomad_shadow_prepare(SEXP c_uno,
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
   if (XLENGTH(myopti_i) <= CBW_CVLS_QUAD_POINTSI ||
-      XLENGTH(myoptd_r) <= CBW_QUAD_EXTD) {
+      XLENGTH(myoptd_r) <= CBW_CVLS_ADAPTIVE_FLOOR_TOLD) {
     ok = 0;
   } else {
     ok = np_conditional_density_nomad_shadow_prepare_internal(REAL(c_uno_r),
@@ -4025,6 +4025,11 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
+  if (XLENGTH(myopti_i) <= CBW_CVLS_QUAD_POINTSI)
+    error("C_np_density_conditional_bw: myopti is missing cvls.quadrature.points");
+  if (XLENGTH(myoptd_r) <= CBW_CVLS_ADAPTIVE_FLOOR_TOLD)
+    error("C_np_density_conditional_bw: myoptd is missing cvls.quadrature adaptive controls");
+
   ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
   ncon_y = (int)INTEGER(myopti_i)[CDBW_CNCONI];
   resolve_bounds_or_default(cxkerlb_r, cxkerub_r, ncon_x, &cxkerlb_p, &cxkerub_p);
@@ -4136,11 +4141,6 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   PROTECT(cxkerub_r = coerceVector(cxkerub, REALSXP));
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
-
-  if (XLENGTH(myopti_i) <= CBW_CVLS_QUAD_POINTSI)
-    error("C_np_density_conditional_bw: myopti is missing cvls.quadrature.points");
-  if (XLENGTH(myoptd_r) <= CBW_CVLS_ADAPTIVE_FLOOR_TOLD)
-    error("C_np_density_conditional_bw: myoptd is missing cvls.quadrature adaptive controls");
 
   ncon_x = (int)INTEGER(myopti_i)[CBW_UNCONI];
   ncon_y = (int)INTEGER(myopti_i)[CBW_CNCONI];
