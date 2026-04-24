@@ -25,7 +25,7 @@ test_that("phase1 npcdensbw cv.ls generalized-nn lc matches the frozen public ba
     regtype = "lc",
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
-    nmulti = 0L,
+    nmulti = 1L,
     itmax = 1L
   )
 
@@ -46,7 +46,7 @@ test_that("phase1 npcdensbw cv.ls generalized-nn keeps ll on canonical lp degree
     regtype = "ll",
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
-    nmulti = 0L,
+    nmulti = 1L,
     itmax = 1L
   )
   bw.lp <- npcdensbw(
@@ -57,7 +57,7 @@ test_that("phase1 npcdensbw cv.ls generalized-nn keeps ll on canonical lp degree
     degree = degree,
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
-    nmulti = 0L,
+    nmulti = 1L,
     itmax = 1L
   )
 
@@ -87,7 +87,7 @@ test_that("phase1 npcdensbw cv.ls generalized-nn lp degree-2 succeeds on a highe
     degree = degree1,
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
-    nmulti = 0L,
+    nmulti = 1L,
     itmax = 1L
   )
   bw.d2 <- npcdensbw(
@@ -98,7 +98,7 @@ test_that("phase1 npcdensbw cv.ls generalized-nn lp degree-2 succeeds on a highe
     degree = degree2,
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
-    nmulti = 0L,
+    nmulti = 1L,
     itmax = 1L
   )
 
@@ -125,7 +125,7 @@ test_that("phase1 npcdensbw cv.ls generalized-nn avoids search-boundary collapse
     degree = 1L,
     bwtype = "generalized_nn",
     bwmethod = "cv.ls",
-    nmulti = 0L
+    nmulti = 1L
   )
   fit <- npcdens(bws = bw)
 

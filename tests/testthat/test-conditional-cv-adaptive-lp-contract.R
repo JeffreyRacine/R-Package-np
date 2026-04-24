@@ -50,7 +50,7 @@ test_that("adaptive public conditional density CV LS separates lc from LP while 
     regtype = "lc",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0
+    nmulti = 1
   )
   bw.ll <- npcdensbw(
     xdat = fixture$x,
@@ -58,7 +58,7 @@ test_that("adaptive public conditional density CV LS separates lc from LP while 
     regtype = "ll",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp1 <- npcdensbw(
     xdat = fixture$x,
@@ -68,7 +68,7 @@ test_that("adaptive public conditional density CV LS separates lc from LP while 
     degree = fixture$degree1,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp2 <- npcdensbw(
     xdat = fixture$x,
@@ -78,7 +78,7 @@ test_that("adaptive public conditional density CV LS separates lc from LP while 
     degree = fixture$degree2,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0
+    nmulti = 1
   )
 
   expect_equal(bw.ll$fval, bw.lp1$fval, tolerance = 1e-8)
@@ -98,7 +98,7 @@ test_that("adaptive public conditional density CV ML separates lc from LP while 
     regtype = "lc",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
   bw.ll <- npcdensbw(
     xdat = fixture$x,
@@ -106,7 +106,7 @@ test_that("adaptive public conditional density CV ML separates lc from LP while 
     regtype = "ll",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp1 <- npcdensbw(
     xdat = fixture$x,
@@ -116,7 +116,7 @@ test_that("adaptive public conditional density CV ML separates lc from LP while 
     degree = fixture$degree1,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp2 <- npcdensbw(
     xdat = fixture$x,
@@ -126,7 +126,7 @@ test_that("adaptive public conditional density CV ML separates lc from LP while 
     degree = fixture$degree2,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
 
   expect_equal(bw.ll$fval, bw.lp1$fval, tolerance = 1e-8)
@@ -146,7 +146,7 @@ test_that("adaptive public conditional distribution CV LS separates lc from LP w
     regtype = "lc",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
   bw.ll <- npcdistbw(
@@ -155,7 +155,7 @@ test_that("adaptive public conditional distribution CV LS separates lc from LP w
     regtype = "ll",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
   bw.lp1 <- npcdistbw(
@@ -166,7 +166,7 @@ test_that("adaptive public conditional distribution CV LS separates lc from LP w
     degree = fixture$degree1,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
   bw.lp2 <- npcdistbw(
@@ -177,7 +177,7 @@ test_that("adaptive public conditional distribution CV LS separates lc from LP w
     degree = fixture$degree2,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ls",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1L
   )
 

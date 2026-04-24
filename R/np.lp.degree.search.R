@@ -1039,7 +1039,7 @@
   lower <- as.integer(lower)
   upper <- as.integer(upper)
   q <- length(lower)
-  nstart <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
+  nstart <- npValidateNmulti(nmulti)
 
   if (!q)
     return(matrix(integer(0), nrow = nstart, ncol = 0L))
@@ -1110,7 +1110,7 @@
   if (length(ub) != n || length(bbin) != n)
     stop("NOMAD start construction requires matching lengths for x0/bbin/lb/ub")
 
-  nstart <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
+  nstart <- npValidateNmulti(nmulti)
   starts <- matrix(0, nrow = nstart, ncol = n)
 
   seed.state <- .np_seed_enter(random.seed)
@@ -1285,7 +1285,7 @@
   )
 
   state$unknown_total_fields <- .np_nomad_progress_fields
-  state$nomad_nmulti <- max(1L, suppressWarnings(as.integer(nmulti)[1L]))
+  state$nomad_nmulti <- npValidateNmulti(nmulti)
   state$nomad_restart_index <- 1L
   state$nomad_restart_durations <- numeric()
   state$nomad_current_degree <- as.integer(baseline_degree)
@@ -1314,7 +1314,7 @@
 
   state$label <- .np_degree_progress_label()
   state$unknown_total_fields <- .np_nomad_progress_fields
-  state$nomad_nmulti <- max(1L, suppressWarnings(as.integer(nmulti)[1L]))
+  state$nomad_nmulti <- npValidateNmulti(nmulti)
   state$nomad_restart_index <- 1L
   state$nomad_restart_durations <- numeric()
   state$nomad_current_degree <- as.integer(baseline_degree)
@@ -1466,7 +1466,7 @@
     invisible(value)
   }
 
-  nomad.nmulti <- max(1L, npValidateNonNegativeInteger(nmulti, "nmulti"))
+  nomad.nmulti <- npValidateNmulti(nmulti)
   nomad.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
   nomad.opts <- if (is.null(nomad.opts)) list() else nomad.opts
   start_matrix <- .np_nomad_build_starts(

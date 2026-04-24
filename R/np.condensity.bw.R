@@ -218,7 +218,7 @@ npcdensbw.conbandwidth <-
     small <- npValidatePositiveFiniteNumeric(small, "small")
     memfac <- npValidatePositiveFiniteNumeric(memfac, "memfac")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
-    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
     if (length(bws$ybw) != dim(ydat)[2])
       stop(paste("length of bandwidth vector does not match number of columns of", "'ydat'"))
@@ -329,7 +329,7 @@ npcdensbw.conbandwidth <-
 
     if (bandwidth.compute){
       myopti = list(num_obs_train = nrow,
-        iMultistart = (if (nmulti==0) IMULTI_FALSE else IMULTI_TRUE),
+        iMultistart = IMULTI_TRUE,
         iNum_Multistart = nmulti,
         int_use_starting_values = (if (all(bws$ybw==0) && all(bws$xbw==0)) USE_START_NO else USE_START_YES),
         int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
@@ -404,7 +404,7 @@ npcdensbw.conbandwidth <-
                   as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
                               bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
                               bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-                  as.integer(max(1, nmulti)),
+                  as.integer(nmulti),
                   as.integer(penalty_mode),
                   as.double(penalty.multiplier),
                   as.integer(degree.code),
@@ -426,7 +426,7 @@ npcdensbw.conbandwidth <-
                 as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
                             bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
                             bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-                as.integer(max(1, nmulti)),
+                as.integer(nmulti),
                 as.integer(penalty_mode),
                 as.double(penalty.multiplier),
                 as.integer(degree.code),
@@ -1432,7 +1432,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   setup <- .npcdensbw_nomad_bw_setup(xdat = xdat, ydat = ydat, template = template)
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   ndeg <- length(degree.search$start.degree)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2]) else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
   objective.direction <- "max"
   cont_lower <- .npcdensbw_nomad_continuous_lower_bound(template)
   bw_lower <- c(rep.int(cont_lower, length(setup$cont_flat)), rep.int(0, length(setup$cat_flat)))

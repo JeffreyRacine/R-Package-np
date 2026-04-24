@@ -41,6 +41,29 @@ extern  MPI_Status status;
 extern MPI_Comm	*comm;
 #endif
 
+static int np_mpi_rank_failure_injected(const char *env_name){
+#ifdef MPI2
+  const char *value = getenv(env_name);
+  char *end = NULL;
+  long rank;
+
+  if((value == NULL) || (value[0] == '\0') || strcmp(value, "0") == 0)
+    return 0;
+  if(strcmp(value, "all") == 0)
+    return 1;
+
+  errno = 0;
+  rank = strtol(value, &end, 10);
+  if((errno != 0) || (end == value) || (*end != '\0'))
+    return 0;
+
+  return ((int)rank == my_rank);
+#else
+  (void)env_name;
+  return 0;
+#endif
+}
+
 extern int int_DEBUG;
 extern int int_VERBOSE;
 extern int int_TAYLOR;
@@ -8020,6 +8043,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
   const double epsilon = 1.0/(double)MAX(1, num_obs);
   int i, j, a, b, l, sf_flag = 0;
+  int local_fail = 0;
   int nterms = glp_nterms_in;
   const int *terms = glp_terms_in;
   double **basis = glp_basis_in;
@@ -8040,6 +8064,8 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   const int use_mpi_transport = 0;
 #endif
 
+#define NP_GLP_CV_FAIL() do { local_fail = 1; goto glp_cv_collective_gate; } while(0)
+
   if((num_obs <= 0) || (num_reg_continuous <= 0))
     return result;
 
@@ -8049,7 +8075,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     basis_local = (double **)malloc((size_t)nterms*sizeof(double *));
     ones = alloc_vecd(num_obs);
     if((terms_local == NULL) || (basis_local == NULL) || (ones == NULL))
-      goto cleanup_glp_cv;
+      NP_GLP_CV_FAIL();
     for(i = 0; i < num_obs; i++)
       ones[i] = 1.0;
     basis_local[0] = ones;
@@ -8062,13 +8088,13 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   }
 
   if((terms == NULL) || (basis == NULL) || (nterms <= 0))
-    goto cleanup_glp_cv;
+    NP_GLP_CV_FAIL();
 
   if((sf_flag = (int_LARGE_SF == 0))){
     int_LARGE_SF = 1;
     vsf = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
     if(vsf == NULL)
-      goto cleanup_glp_cv;
+      NP_GLP_CV_FAIL();
     for(l = 0; l < num_reg_continuous; l++)
       vsf[l] = matrix_bandwidth[l][0];
   } else {
@@ -8098,14 +8124,14 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
      (eval_u == NULL) || (eval_o == NULL) || (eval_c == NULL) ||
      (matrix_bandwidth_eval == NULL) || (KWM == NULL) || (XTKY == NULL) ||
      (DELTA == NULL) || (SHIFT == NULL) || (SHIFTINV == NULL) || (TMP == NULL))
-    goto cleanup_glp_cv;
+    NP_GLP_CV_FAIL();
 
 #ifdef MPI2
   if(use_mpi_transport){
     moments_local = (double *)calloc((size_t)num_obs, (size_t)nterms*(size_t)nterms*sizeof(double));
     rhs_local = (double *)calloc((size_t)num_obs, (size_t)nterms*sizeof(double));
     if((moments_local == NULL) || (rhs_local == NULL))
-      goto cleanup_glp_cv;
+      NP_GLP_CV_FAIL();
   }
 #endif
 
@@ -8190,7 +8216,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   NULL,
                                   kw,
                                   NULL) != 0)
-      goto cleanup_glp_cv;
+      NP_GLP_CV_FAIL();
 
     if(use_mpi_transport){
       double * const sj = moments_acc + (size_t)j*(size_t)nterms*(size_t)nterms;
@@ -8237,12 +8263,27 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     }
   }
 
+glp_cv_collective_gate:
+#ifdef MPI2
+  if(use_mpi_transport && np_mpi_rank_failure_injected("NP_RMPI_INJECT_GLP_CV_FAIL_RANK"))
+    local_fail = 1;
+#endif
+
 #ifdef MPI2
   if(use_mpi_transport){
+    int any_fail = 0;
+
+    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(any_fail)
+      goto cleanup_glp_cv;
+
     MPI_Allreduce(moments_local, moments, num_obs*nterms*nterms, MPI_DOUBLE, MPI_SUM, comm[1]);
     MPI_Allreduce(rhs_local, rhs, num_obs*nterms, MPI_DOUBLE, MPI_SUM, comm[1]);
   }
 #endif
+
+  if(local_fail)
+    goto cleanup_glp_cv;
 
   result.cv = 0.0;
   result.traceH = 0.0;
@@ -8325,6 +8366,8 @@ cleanup_glp_cv:
     result.cv = DBL_MAX;
     result.traceH = 0.0;
   }
+
+#undef NP_GLP_CV_FAIL
 
   return result;
 }
@@ -19463,6 +19506,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   double *block_terms = NULL;
   int i0, j0, ii, jj;
   int status = 1;
+  int local_fail = 0;
 #ifdef MPI2
   const int use_parallel_blocks = (iNum_Processors > 1);
 #else
@@ -19508,10 +19552,10 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   }
   if((xblock == NULL) || (xblock_full == NULL) || (yblock == NULL) || (yconvblock == NULL) ||
      (use_parallel_blocks && (block_terms == NULL)))
-    goto cleanup_cvls_lp_block;
+    local_fail = 1;
 
   *cv = 0.0;
-  for(i0 = 0; i0 < num_obs; i0 += block_size){
+  for(i0 = 0; i0 < num_obs && !local_fail; i0 += block_size){
     const int ib = MIN(block_size, num_obs - i0);
     const int block_id = i0 / block_size;
     double lin = 0.0;
@@ -19520,14 +19564,20 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     if(use_parallel_blocks && ((block_id % iNum_Processors) != my_rank))
       continue;
 
-    if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
-      goto cleanup_cvls_lp_block;
+    if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0){
+      local_fail = 1;
+      break;
+    }
 
-    if(np_conditional_x_weight_block_full_stream_core(vector_scale_factor, i0, ib, xblock_full) != 0)
-      goto cleanup_cvls_lp_block;
+    if(np_conditional_x_weight_block_full_stream_core(vector_scale_factor, i0, ib, xblock_full) != 0){
+      local_fail = 1;
+      break;
+    }
 
-    if(np_conditional_y_block_stream_op_core(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0)
-      goto cleanup_cvls_lp_block;
+    if(np_conditional_y_block_stream_op_core(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0){
+      local_fail = 1;
+      break;
+    }
 
     for(ii = 0; ii < ib; ii++)
       lin += np_blas_ddot_int(num_obs, xblock[ii], yblock[ii]);
@@ -19535,8 +19585,10 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     for(j0 = 0; j0 < num_obs; j0 += block_size){
       const int jb = MIN(block_size, num_obs - j0);
 
-      if(np_conditional_y_block_stream_op_core(vector_scale_factor, j0, jb, OP_CONVOLUTION, yconvblock) != 0)
-        goto cleanup_cvls_lp_block;
+      if(np_conditional_y_block_stream_op_core(vector_scale_factor, j0, jb, OP_CONVOLUTION, yconvblock) != 0){
+        local_fail = 1;
+        break;
+      }
 
       for(ii = 0; ii < ib; ii++){
         double * const ai = xblock_full[ii];
@@ -19560,12 +19612,24 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
 
 #ifdef MPI2
   if(use_parallel_blocks){
+    int any_fail = 0;
+
+    if(np_mpi_rank_failure_injected("NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK"))
+      local_fail = 1;
+
+    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(any_fail)
+      goto cleanup_cvls_lp_block;
+
     MPI_Allreduce(MPI_IN_PLACE, block_terms, nblocks, MPI_DOUBLE, MPI_SUM, comm[1]);
     *cv = 0.0;
     for(ii = 0; ii < nblocks; ii++)
       *cv += block_terms[ii];
   }
 #endif
+
+  if(local_fail)
+    goto cleanup_cvls_lp_block;
 
   *cv /= (double)num_obs;
   status = 0;

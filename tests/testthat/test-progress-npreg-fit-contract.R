@@ -173,7 +173,7 @@ run_npreg_session_progress_contract <- function(timeout = 120L) {
       "dat <- data.frame(x = seq(-0.9, 0.9, length.out = n))",
       "dat$y <- sin(2 * pi * dat$x) + 0.35 * dat$x",
       "cat('CASE_START npreg\\n')",
-      "fit <- npreg(y ~ x, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 0L)",
+      "fit <- npreg(y ~ x, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 1L)",
       "stopifnot(inherits(fit, 'npregression'))",
       "cat('CASE_DONE npreg\\n')"
     ),
@@ -220,7 +220,7 @@ run_npreg_attach_progress_contract <- function(timeout = 120L) {
     "  dat <- data.frame(x = seq(-0.9, 0.9, length.out = n))",
     "  dat$y <- sin(2 * pi * dat$x) + 0.35 * dat$x",
     "  cat('CASE_START npreg\\n')",
-    "  fit <- npreg(y ~ x, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 0L)",
+    "  fit <- npreg(y ~ x, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 1L)",
     "  stopifnot(inherits(fit, 'npregression'))",
     "  cat('CASE_DONE npreg\\n')",
     "}"
@@ -299,7 +299,7 @@ run_npreg_profile_progress_contract <- function(timeout = 120L) {
     "dat$y <- sin(2 * pi * dat$x) + 0.35 * dat$x",
     "mpi.bcast.Robj2slave(dat)",
     "cat('CASE_START npreg\\n')",
-    "fit <- mpi.bcast.cmd(npreg(y ~ x, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 0L), caller.execute = TRUE)",
+    "fit <- mpi.bcast.cmd(npreg(y ~ x, data = dat, nomad = TRUE, degree.max = 1L, nmulti = 1L), caller.execute = TRUE)",
     "stopifnot(inherits(fit, 'npregression'))",
     "cat('CASE_DONE npreg\\n')",
     "mpi.bcast.cmd(mpi.quit(), caller.execute = TRUE)"

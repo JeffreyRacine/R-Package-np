@@ -60,7 +60,7 @@ test_that("fixed mixed-data bandwidth summaries label continuous scale factors c
     ydat = ydat,
     regtype = "lc",
     bwmethod = "cv.aic",
-    nmulti = 0
+    nmulti = 1
   )
 
   s <- paste(capture.output(summary(bw)), collapse = "\n")

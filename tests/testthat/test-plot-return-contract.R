@@ -317,7 +317,7 @@ test_that("plot return contract: npRmpi npscoef fitted perspective path preserve
   fit <- npscoef(
     y ~ x | z,
     nomad = TRUE,
-    nmulti = 0L
+    nmulti = 1L
   )
 
   npRmpi.ns <- asNamespace("npRmpi")

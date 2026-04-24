@@ -930,7 +930,7 @@ npindexbw.NULL <-
     y.clean <- as.double(y.clean)
 
   p <- ncol(x.clean)
-  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else max(1L, as.integer(opt.args$nmulti[1L]))
+  nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else npValidateNmulti(opt.args$nmulti[1L])
   scale.factor.lower.bound <- npResolveScaleFactorLowerBound(opt.args$scale.factor.lower.bound)
   h.start.controls <- .npindexbw_h_start_controls(
     lbc.init = npEffectiveContinuousStartLower(
@@ -1641,7 +1641,7 @@ npindexbw.sibandwidth <-
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     only.optimize.beta <- npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
-    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
     optim.maxattempts <- npValidatePositiveInteger(optim.maxattempts, "optim.maxattempts")
     optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
@@ -2033,6 +2033,7 @@ npindexbw.sibandwidth <-
                   optim.control$abstol <-  10.0*optim.control$abstol
               }
               
+              optim.parm <- if(only.optimize.beta) beta else c(beta,h)
               optim.base.args$par <- optim.parm
               optim.base.args$control <- optim.control
               if (!only.optimize.beta && ("h" %in% names(optim.base.args))) {

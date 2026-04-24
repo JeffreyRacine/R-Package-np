@@ -75,7 +75,7 @@ test_that("autodispatch materialization preserves explicit NULL arguments withou
     gydat = gydat,
     bws = bws,
     bandwidth.compute = TRUE,
-    nmulti = 0L,
+    nmulti = 1L,
     remin = FALSE,
     itmax = 1L
   ))

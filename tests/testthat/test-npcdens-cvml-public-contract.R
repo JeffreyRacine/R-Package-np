@@ -9,7 +9,7 @@ test_that("public npcdensbw cv.ml keeps lc adjacency live during containment", {
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- data.frame(y1 = sin(2 * pi * x$x1) + rnorm(n, sd = 0.15))
 
-  bw.lc <- npcdensbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ml", nmulti = 0)
+  bw.lc <- npcdensbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ml", nmulti = 1)
   fit.lc <- npcdens(bws = bw.lc)
 
   expect_true(is.finite(bw.lc$fval))
@@ -31,7 +31,7 @@ test_that("public npcdensbw cv.ml fixed LP/LL route activates with ll == lp pari
     ydat = y,
     regtype = "ll",
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
   bw.lp <- npcdensbw(
     xdat = x,
@@ -40,7 +40,7 @@ test_that("public npcdensbw cv.ml fixed LP/LL route activates with ll == lp pari
     basis = "glp",
     degree = degree,
     bwmethod = "cv.ml",
-    nmulti = 0
+    nmulti = 1
   )
 
   expect_true(is.finite(bw.ll$fval))
@@ -64,7 +64,7 @@ test_that("public npcdensbw cv.ml generalized-nn LP route activates with ll == l
     regtype = "ll",
     bwtype = "generalized_nn",
     bwmethod = "cv.ml",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1
   )
   bw.lp <- npcdensbw(
@@ -75,7 +75,7 @@ test_that("public npcdensbw cv.ml generalized-nn LP route activates with ll == l
     degree = degree,
     bwtype = "generalized_nn",
     bwmethod = "cv.ml",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1
   )
 
@@ -100,7 +100,7 @@ test_that("public npcdensbw cv.ml adaptive-nn LP route activates with ll == lp p
     regtype = "ll",
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1
   )
   bw.lp <- npcdensbw(
@@ -111,7 +111,7 @@ test_that("public npcdensbw cv.ml adaptive-nn LP route activates with ll == lp p
     degree = degree,
     bwtype = "adaptive_nn",
     bwmethod = "cv.ml",
-    nmulti = 0,
+    nmulti = 1,
     itmax = 1
   )
 
