@@ -1350,7 +1350,7 @@
                                                           "single_iteration")) {
   strategy <- match.arg(strategy)
   switch(strategy,
-         disable_multistart = 0L,
+         disable_multistart = 1L,
          single_iteration = 1L)
 }
 

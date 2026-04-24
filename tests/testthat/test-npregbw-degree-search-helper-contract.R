@@ -114,6 +114,13 @@ test_that("NOMAD mixed starts preserve user start 1 and expose prefix-stable res
   expect_identical(starts4[seq_len(2L), , drop = FALSE], starts2)
 })
 
+test_that("NOMAD Powell hot-start helpers never emit zero public multistarts", {
+  hot_nmulti <- getFromNamespace(".np_nomad_powell_hotstart_nmulti", "npRmpi")
+
+  expect_identical(hot_nmulti("disable_multistart"), 1L)
+  expect_identical(hot_nmulti("single_iteration"), 1L)
+})
+
 test_that("coordinate search skips incumbent cell revisits within a sweep", {
   degree_search <- getFromNamespace(".np_degree_search", "npRmpi")
 
