@@ -81,8 +81,11 @@ compact_window_clone_bw <- function(bw, bound, lb = NULL, ub = NULL) {
     degree.engine = bw$degree.engine,
     bernstein.basis.engine = bw$bernstein.basis.engine
   )
-  out$cvls.i1.rescue <- bw$cvls.i1.rescue
   out$scale.factor.lower.bound <- bw$scale.factor.lower.bound
+  out$cvls.quadrature.adaptive <- bw$cvls.quadrature.adaptive
+  out$cvls.quadrature.adaptive.tol <- bw$cvls.quadrature.adaptive.tol
+  out$cvls.quadrature.adaptive.grid.hy.ratio <- bw$cvls.quadrature.adaptive.grid.hy.ratio
+  out$cvls.quadrature.adaptive.floor.tol <- bw$cvls.quadrature.adaptive.floor.tol
   out$cvls.quadrature.extend.factor <- bw$cvls.quadrature.extend.factor
   out$cvls.quadrature.points <- bw$cvls.quadrature.points
   out
@@ -122,10 +125,10 @@ test_that("one-sided fixed infinite bounds use the configured span surrogate", {
     cykerlb = -Inf,
     cykerub = max(dat$y$y) + 0.25
   )
-  bw_upper_span1 <- bw_upper
-  bw_upper_span1$cvls.quadrature.extend.factor <- 1
-  bw_lower_span1 <- bw_lower
-  bw_lower_span1$cvls.quadrature.extend.factor <- 1
+  bw_upper_span2 <- bw_upper
+  bw_upper_span2$cvls.quadrature.extend.factor <- 2
+  bw_lower_span2 <- bw_lower
+  bw_lower_span2$cvls.quadrature.extend.factor <- 2
 
   upper_span1 <- compact_window_span_bounds(dat$y$y, 0, Inf, factor = 1)
   upper_span2 <- compact_window_span_bounds(dat$y$y, 0, Inf, factor = 2)
@@ -134,8 +137,8 @@ test_that("one-sided fixed infinite bounds use the configured span surrogate", {
 
   upper_obj <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_upper)$objective
   lower_obj <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_lower)$objective
-  upper_obj_factor1 <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_upper_span1)$objective
-  lower_obj_factor1 <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_lower_span1)$objective
+  upper_obj_factor2 <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_upper_span2)$objective
+  lower_obj_factor2 <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_lower_span2)$objective
 
   upper_obj_span1 <- np:::.npcdensbw_eval_only(
     dat$x, dat$y, compact_window_clone_bw(bw_upper, "fixed", upper_span1[["lb"]], upper_span1[["ub"]])
@@ -151,13 +154,13 @@ test_that("one-sided fixed infinite bounds use the configured span surrogate", {
     dat$x, dat$y, compact_window_clone_bw(bw_lower, "fixed", lower_span2[["lb"]], lower_span2[["ub"]])
   )$objective
 
-  expect_equal(upper_obj, upper_obj_span2, tolerance = 1e-12)
-  expect_equal(upper_obj_factor1, upper_obj_span1, tolerance = 1e-12)
-  expect_gt(abs(upper_obj - upper_obj_factor1), 1e-8)
+  expect_equal(upper_obj, upper_obj_span1, tolerance = 1e-12)
+  expect_equal(upper_obj_factor2, upper_obj_span2, tolerance = 1e-12)
+  expect_gt(abs(upper_obj - upper_obj_factor2), 1e-8)
 
-  expect_equal(lower_obj, lower_obj_span2, tolerance = 1e-12)
-  expect_equal(lower_obj_factor1, lower_obj_span1, tolerance = 1e-12)
-  expect_gt(abs(lower_obj - lower_obj_factor1), 1e-8)
+  expect_equal(lower_obj, lower_obj_span1, tolerance = 1e-12)
+  expect_equal(lower_obj_factor2, lower_obj_span2, tolerance = 1e-12)
+  expect_gt(abs(lower_obj - lower_obj_factor2), 1e-8)
 })
 
 test_that("explicit fixed [-Inf, Inf] survives and uses the configured span surrogate", {
@@ -179,13 +182,13 @@ test_that("explicit fixed [-Inf, Inf] survives and uses the configured span surr
     cykerub = Inf
   )
 
-  bw_two_inf_span1 <- bw_two_inf
-  bw_two_inf_span1$cvls.quadrature.extend.factor <- 1
+  bw_two_inf_span2 <- bw_two_inf
+  bw_two_inf_span2$cvls.quadrature.extend.factor <- 2
 
   span1 <- compact_window_span_bounds(dat$y$y, -Inf, Inf, factor = 1)
   span2 <- compact_window_span_bounds(dat$y$y, -Inf, Inf, factor = 2)
   obj_two_inf <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_two_inf)$objective
-  obj_two_inf_factor1 <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_two_inf_span1)$objective
+  obj_two_inf_factor2 <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_two_inf_span2)$objective
   obj_none <- np:::.npcdensbw_eval_only(
     dat$x,
     dat$y,
@@ -206,7 +209,7 @@ test_that("explicit fixed [-Inf, Inf] survives and uses the configured span surr
   expect_true(is.infinite(bw_two_inf$cykerlb[which(bw_two_inf$iycon)][1L]))
   expect_true(is.infinite(bw_two_inf$cykerub[which(bw_two_inf$iycon)][1L]))
   expect_gt(abs(obj_two_inf - obj_none), 1e-8)
-  expect_equal(obj_two_inf, obj_span2, tolerance = 1e-12)
-  expect_equal(obj_two_inf_factor1, obj_span1, tolerance = 1e-12)
-  expect_gt(abs(obj_two_inf - obj_two_inf_factor1), 1e-8)
+  expect_equal(obj_two_inf, obj_span1, tolerance = 1e-12)
+  expect_equal(obj_two_inf_factor2, obj_span2, tolerance = 1e-12)
+  expect_gt(abs(obj_two_inf - obj_two_inf_factor2), 1e-8)
 })

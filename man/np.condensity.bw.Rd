@@ -47,6 +47,10 @@ npcdensbw(\dots)
           remin = TRUE,
           scale.init.categorical.sample = FALSE,
           scale.factor.lower.bound = NULL,
+          cvls.quadrature.adaptive = NULL,
+          cvls.quadrature.adaptive.tol = NULL,
+          cvls.quadrature.adaptive.grid.hy.ratio = NULL,
+          cvls.quadrature.adaptive.floor.tol = NULL,
           cvls.quadrature.extend.factor = NULL,
           cvls.quadrature.points = NULL,
           small = 1.490116e-05,
@@ -96,9 +100,12 @@ npcdensbw(\dots)
           remin,
           scale.init.categorical.sample,
           scale.factor.lower.bound = NULL,
-          cvls.i1.rescue = TRUE,
-          cvls.quadrature.extend.factor = 2,
-          cvls.quadrature.points = c(81L, 31L),
+          cvls.quadrature.adaptive = TRUE,
+          cvls.quadrature.adaptive.tol = 1e-10,
+          cvls.quadrature.adaptive.grid.hy.ratio = 8,
+          cvls.quadrature.adaptive.floor.tol = sqrt(.Machine$double.eps),
+          cvls.quadrature.extend.factor = 1,
+          cvls.quadrature.points = c(243L, 93L),
           small,
           tol,
           transform.bounds,
@@ -394,28 +401,48 @@ npcdensbw(\dots)
     search initialization.
   }
 
-  \item{cvls.i1.rescue}{
-    a logical value that when set to \code{TRUE} enables a deterministic
-    rescue pass for one-dimensional bounded \code{cv.ls} \eqn{I_1}
-    quadrature when the coarse grid appears unresolved. Defaults to
-    \code{TRUE}. Set to \code{FALSE} to recover the legacy coarse-grid
-    evaluation exactly.
+  \item{cvls.quadrature.adaptive}{
+    a logical value that when set to \code{TRUE} enables deterministic
+    sample-\eqn{y} adaptive augmentation for one-dimensional bounded
+    \code{cv.ls} \eqn{I_1} quadrature when the uniform grid appears
+    unresolved, the response bandwidth is at the fixed-bandwidth floor, or
+    the measured \eqn{I_1} term is numerically degenerate. Defaults to
+    \code{TRUE}.
+  }
+
+  \item{cvls.quadrature.adaptive.tol}{
+    a nonnegative finite scalar giving the absolute tolerance below which the
+    bounded \code{cv.ls} \eqn{I_1} term is treated as numerically degenerate
+    for adaptive quadrature. Defaults to \code{1e-10}.
+  }
+
+  \item{cvls.quadrature.adaptive.grid.hy.ratio}{
+    a nonnegative finite scalar controlling the grid-resolution trigger for
+    adaptive bounded \code{cv.ls} quadrature. Adaptive augmentation is used
+    when the uniform grid step divided by the response bandwidth is at least
+    this value. Defaults to \code{8}; \code{0} forces this trigger whenever
+    the grid step and response bandwidth are finite and positive.
+  }
+
+  \item{cvls.quadrature.adaptive.floor.tol}{
+    a nonnegative finite relative tolerance used to decide whether the
+    response bandwidth candidate is at the active continuous fixed-bandwidth
+    floor for adaptive bounded \code{cv.ls} quadrature. Defaults to
+    \code{sqrt(.Machine$double.eps)}.
   }
 
   \item{cvls.quadrature.extend.factor}{
     a positive finite scalar controlling the finite numerical integration
     window used by bounded conditional-density \code{cv.ls} quadrature when
     one or both continuous response-side bounds are infinite. Finite bounds
-    are used literally. Defaults to \code{2}; set to \code{1} to recover the
-    previous compact span extension.
+    are used literally. Defaults to \code{1}.
   }
 
   \item{cvls.quadrature.points}{
     a two-element integer vector giving the bounded \code{cv.ls} quadrature
     point counts for one and two continuous response variables, respectively.
-    Defaults to \code{c(81L, 31L)}, matching the historical compiled grid
-    sizes. For two continuous response variables, the second entry is used
-    per dimension.
+    Defaults to \code{c(243L, 93L)}. For two continuous response variables,
+    the second entry is used per dimension.
   }
 
   \item{uxkertype}{

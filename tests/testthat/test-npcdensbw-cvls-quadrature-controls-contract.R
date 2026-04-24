@@ -7,7 +7,11 @@ quadrature_control_fixture <- function(n = 48L, seed = 20260424L) {
   list(x = x, y = y)
 }
 
-quadrature_control_bw <- function(dat, cykerlb = 0, cykerub = Inf, ...) {
+quadrature_control_bw <- function(dat,
+                                  cykerlb = 0,
+                                  cykerub = Inf,
+                                  cvls.quadrature.adaptive = FALSE,
+                                  ...) {
   npcdensbw(
     xdat = dat$x,
     ydat = dat$y,
@@ -23,7 +27,7 @@ quadrature_control_bw <- function(dat, cykerlb = 0, cykerub = Inf, ...) {
     cykerbound = "fixed",
     cykerlb = cykerlb,
     cykerub = cykerub,
-    cvls.i1.rescue = FALSE,
+    cvls.quadrature.adaptive = cvls.quadrature.adaptive,
     ...
   )
 }
@@ -35,6 +39,10 @@ test_that("npcdensbw validates cv.ls quadrature controls", {
   expect_no_error(quadrature_control_bw(dat, cvls.quadrature.extend.factor = 1))
   expect_no_error(quadrature_control_bw(dat, cvls.quadrature.extend.factor = 2))
   expect_no_error(quadrature_control_bw(dat, cvls.quadrature.points = c(41L, 17L)))
+  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.adaptive = TRUE))
+  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.adaptive.tol = 0))
+  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.adaptive.grid.hy.ratio = 0))
+  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.adaptive.floor.tol = 0))
 
   bad_extend <- list(0, -1, NA_real_, NaN, Inf, "2", c(1, 2))
   for (value in bad_extend) {
@@ -51,6 +59,30 @@ test_that("npcdensbw validates cv.ls quadrature controls", {
       "cvls.quadrature.points"
     )
   }
+
+  bad_logical <- list(NA, c(TRUE, FALSE), 1)
+  for (value in bad_logical) {
+    expect_error(
+      quadrature_control_bw(dat, cvls.quadrature.adaptive = value),
+      "cvls.quadrature.adaptive"
+    )
+  }
+
+  bad_nonnegative <- list(NA_real_, NaN, Inf, -1, "1", c(1, 2))
+  for (value in bad_nonnegative) {
+    expect_error(
+      quadrature_control_bw(dat, cvls.quadrature.adaptive.tol = value),
+      "cvls.quadrature.adaptive.tol"
+    )
+    expect_error(
+      quadrature_control_bw(dat, cvls.quadrature.adaptive.grid.hy.ratio = value),
+      "cvls.quadrature.adaptive.grid.hy.ratio"
+    )
+    expect_error(
+      quadrature_control_bw(dat, cvls.quadrature.adaptive.floor.tol = value),
+      "cvls.quadrature.adaptive.floor.tol"
+    )
+  }
 })
 
 test_that("npcdensbw stores cv.ls quadrature controls and old objects use defaults", {
@@ -60,17 +92,30 @@ test_that("npcdensbw stores cv.ls quadrature controls and old objects use defaul
   bw_explicit <- quadrature_control_bw(
     dat,
     cvls.quadrature.extend.factor = 1.5,
-    cvls.quadrature.points = c(43L, 19L)
+    cvls.quadrature.points = c(43L, 19L),
+    cvls.quadrature.adaptive = TRUE,
+    cvls.quadrature.adaptive.tol = 2e-10,
+    cvls.quadrature.adaptive.grid.hy.ratio = 4,
+    cvls.quadrature.adaptive.floor.tol = 1e-7
   )
 
-  expect_equal(bw_default$cvls.quadrature.extend.factor, 2)
-  expect_identical(unname(bw_default$cvls.quadrature.points), c(81L, 31L))
+  expect_equal(bw_default$cvls.quadrature.extend.factor, 1)
+  expect_identical(unname(bw_default$cvls.quadrature.points), c(243L, 93L))
+  expect_false(isTRUE(bw_default$cvls.quadrature.adaptive))
   expect_equal(bw_explicit$cvls.quadrature.extend.factor, 1.5)
   expect_identical(unname(bw_explicit$cvls.quadrature.points), c(43L, 19L))
+  expect_true(isTRUE(bw_explicit$cvls.quadrature.adaptive))
+  expect_equal(bw_explicit$cvls.quadrature.adaptive.tol, 2e-10)
+  expect_equal(bw_explicit$cvls.quadrature.adaptive.grid.hy.ratio, 4)
+  expect_equal(bw_explicit$cvls.quadrature.adaptive.floor.tol, 1e-7)
 
   bw_old <- bw_default
   bw_old$cvls.quadrature.extend.factor <- NULL
   bw_old$cvls.quadrature.points <- NULL
+  bw_old$cvls.quadrature.adaptive <- NULL
+  bw_old$cvls.quadrature.adaptive.tol <- NULL
+  bw_old$cvls.quadrature.adaptive.grid.hy.ratio <- NULL
+  bw_old$cvls.quadrature.adaptive.floor.tol <- NULL
   expect_true(is.finite(np:::.npcdensbw_eval_only(dat$x, dat$y, bw_old)$objective))
 })
 
