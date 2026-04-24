@@ -42,6 +42,7 @@ test_that("attach quit path contains idempotent state guard and ACK collection",
   expect_match(txt, "npRmpi\\.attach\\.close\\.state")
   expect_match(txt, "\\.npRmpi_attach_collect_close_acks\\(")
   expect_match(txt, "\\.npRmpi_attach_send_close_release\\(")
+  expect_match(txt, "isTRUE\\(ack\\.info\\$ok\\) && isTRUE\\(release\\.info\\$ok\\)")
   expect_match(txt, "mpi\\.barrier\\(0\\)")
   expect_match(txt, "\\.npRmpi_attach_state_reset\\(")
 })

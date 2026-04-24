@@ -634,7 +634,7 @@ npRmpi.quit <- function(force = FALSE,
         call. = FALSE
       )
     }
-    if (isTRUE(ack.info$ok))
+    if (isTRUE(ack.info$ok) && isTRUE(release.info$ok))
       .npRmpi_safe(mpi.barrier(0), fallback = NULL)
 
     if (comm != 0L) {
