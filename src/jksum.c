@@ -19528,8 +19528,10 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     return np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(vector_scale_factor,
                                                                                 cv,
                                                                                 NP_BOUNDED_CVLS_I1_MODE_BOOK);
-  if(int_cyker_bound_extern != 0)
-    error("bounded npcdens cv.ls currently supports up to two continuous response variables");
+  if(int_cyker_bound_extern != 0){
+    np_bwm_set_deferred_error("bounded npcdens cv.ls currently supports up to two continuous response variables");
+    return 1;
+  }
 
   if((BANDWIDTH_den_extern == BW_FIXED) &&
      (np_conditional_density_cvls_lp_all_large_stream(vector_scale_factor, cv) == 0)){
