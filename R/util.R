@@ -309,6 +309,31 @@ npValidatePositiveFiniteNumeric <- function(value, argname) {
   as.double(value)
 }
 
+npValidateScaleFactorLowerBound <- function(value,
+                                            argname = "scale.factor.lower.bound") {
+  if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
+      !is.finite(value) || value < 0) {
+    stop(sprintf("'%s' must be a nonnegative finite numeric scalar", argname),
+         call. = FALSE)
+  }
+
+  as.double(value)
+}
+
+npResolveScaleFactorLowerBound <- function(value,
+                                           fallback = 0.01,
+                                           argname = "scale.factor.lower.bound") {
+  if (is.null(value))
+    return(as.double(fallback))
+
+  npValidateScaleFactorLowerBound(value, argname = argname)
+}
+
+npEffectiveContinuousStartLower <- function(lbc.init,
+                                            scale.factor.lower.bound) {
+  max(as.double(lbc.init), as.double(scale.factor.lower.bound))
+}
+
 npValidateLpBasis <- function(regtype, basis, argname = "basis") {
   if (!identical(regtype, "lp"))
     return("glp")

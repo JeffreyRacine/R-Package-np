@@ -261,7 +261,10 @@ npscoefbw.NULL <-
   )
 }
 
-.npscoef_candidate_is_admissible <- function(param, bwtype, nobs) {
+.npscoef_candidate_is_admissible <- function(param,
+                                            bwtype,
+                                            nobs,
+                                            lower = NULL) {
   candidate <- .npscoef_nn_candidate_bandwidth(
     param = param,
     bwtype = bwtype,
@@ -269,12 +272,19 @@ npscoefbw.NULL <-
   )
   if (any(!is.finite(candidate)))
     return(FALSE)
-  if (identical(bwtype, "fixed"))
+  if (identical(bwtype, "fixed")) {
+    if (!is.null(lower))
+      return(all(candidate >= lower))
     return(all(candidate > 0))
+  }
   TRUE
 }
 
-.npscoef_finalize_bandwidth <- function(param, bwtype, nobs, where = "npscoefbw") {
+.npscoef_finalize_bandwidth <- function(param,
+                                        bwtype,
+                                        nobs,
+                                        lower = NULL,
+                                        where = "npscoefbw") {
   candidate <- .npscoef_nn_candidate_bandwidth(param = param, bwtype = bwtype, nobs = nobs)
   if (any(!is.finite(candidate))) {
     if (identical(bwtype, "fixed")) {
@@ -291,6 +301,10 @@ npscoefbw.NULL <-
   }
   if (identical(bwtype, "fixed") && any(candidate <= 0)) {
     stop(sprintf("%s: bandwidth must be strictly positive", where), call. = FALSE)
+  }
+  if (identical(bwtype, "fixed") && !is.null(lower) && any(candidate < lower)) {
+    stop(sprintf("%s: bandwidth is below the continuous scale-factor lower bound", where),
+         call. = FALSE)
   }
   as.double(candidate)
 }
@@ -319,6 +333,7 @@ npscoefbw.scbandwidth <-
            lbd.init = 0.5,
            hbd.init = 1.5,
            dfac.init = 1.0,
+           scale.factor.lower.bound = NULL,
            ...){
     
     ## Save seed prior to setting
@@ -348,6 +363,10 @@ npscoefbw.scbandwidth <-
     optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
     optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
+    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
+      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+    )
+    lbc.init <- npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound)
     start.controls <- .npscoefbw_start_controls(
       lbc.init = lbc.init,
       hbc.init = hbc.init,
@@ -758,7 +777,9 @@ npscoefbw.scbandwidth <-
           overall.cv.ls <- function(param) {
             cv_state$objective_fast <- FALSE
             sbw <- apply_bw_to_scbw(bws, param)
-            if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
+            if (!validateBandwidthTF(sbw) ||
+                (!is.null(fixed.lower) && any(param < fixed.lower)) ||
+                ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
             cv_state$objective_fast <- npscoef_fast_eligible(sbw)
 
@@ -831,7 +852,9 @@ npscoefbw.scbandwidth <-
             cv_state$objective_fast <- FALSE
             sbw <- apply_bw_to_scbw(bws, param)
 
-            if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
+            if (!validateBandwidthTF(sbw) ||
+                (!is.null(fixed.lower) && any(param < fixed.lower)) ||
+                ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
             cv_state$objective_fast <- npscoef_fast_eligible(sbw)
             
@@ -890,6 +913,13 @@ npscoefbw.scbandwidth <-
               return(0.5*uMaxL(dati$all.nlev[[i]], kertype = bws$ukertype)*
                      (if (bws$scaling) ncatfac else 1.0))       
           })
+          fixed.lower <- if (identical(bws$type, "fixed")) {
+            out <- rep.int(0, length(x.scale))
+            out[dati$icon] <- x.scale[dati$icon] * start.controls$lbc.init
+            out
+          } else {
+            NULL
+          }
 
           optim.control <- list(abstol = optim.abstol,
                                 reltol = optim.reltol,
@@ -910,11 +940,13 @@ npscoefbw.scbandwidth <-
                 iuno = dati$iuno
               )
               if (all(bws$bw != 0) &&
-                  .npscoef_candidate_is_admissible(param = bws$bw, bwtype = bws$type, nobs = n)) {
+                  .npscoef_candidate_is_admissible(param = bws$bw, bwtype = bws$type, nobs = n,
+                                                   lower = fixed.lower)) {
                 tbw <- .npscoef_finalize_bandwidth(
                   param = bws$bw,
                   bwtype = bws$type,
                   nobs = n,
+                  lower = fixed.lower,
                   where = "npscoefbw"
                 )
               }
@@ -963,12 +995,14 @@ npscoefbw.scbandwidth <-
             if (.npscoef_candidate_is_admissible(
               param = optim.return$par,
               bwtype = bws$type,
-              nobs = n
+              nobs = n,
+              lower = fixed.lower
             ) && (!have_best || optim.return$value < fval.min)) {
               param <- .npscoef_finalize_bandwidth(
                 param = optim.return$par,
                 bwtype = bws$type,
                 nobs = n,
+                lower = fixed.lower,
                 where = "npscoefbw"
               )
               min.overall <- optim.return$value
@@ -1169,6 +1203,7 @@ npscoefbw.scbandwidth <-
                        bandwidth.compute = bandwidth.compute,
                        optim.method = optim.method,
                        total.time = total.time)
+    bws$scale.factor.lower.bound <- scale.factor.lower.bound
 
     bws
   }
@@ -1198,7 +1233,12 @@ npscoefbw.scbandwidth <-
     reg.args
   )
 
-  do.call(scbandwidth, sbw.args)
+  out <- do.call(scbandwidth, sbw.args)
+  if (!is.null(reg.args$scale.factor.lower.bound))
+    out$scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
+      reg.args$scale.factor.lower.bound
+    )
+  out
 }
 
 .npscoefbw_run_fixed_degree <- function(xdat, ydat, zdat, bws, reg.args, opt.args) {
@@ -1393,7 +1433,11 @@ npscoefbw.scbandwidth <-
   ndeg <- length(degree.search$start.degree)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(NCOL(eval.zdat)) else max(1L, as.integer(opt.args$nmulti[1L]))
 
-  bw_lower <- c(rep.int(1e-2, ncon), rep.int(0, ncat))
+  cont_lower <- npResolveScaleFactorLowerBound(
+    template$scale.factor.lower.bound,
+    argname = "template$scale.factor.lower.bound"
+  )
+  bw_lower <- c(rep.int(cont_lower, ncon), rep.int(0, ncat))
   bw_upper <- c(rep.int(1e6, ncon), setup$cat_upper * setup$bandwidth.scale.categorical)
 
   x0 <- c(
@@ -1711,6 +1755,7 @@ npscoefbw.default <-
            lbd.init = 0.5,
            hbd.init = 1.5,
            dfac.init = 1.0,
+           scale.factor.lower.bound = NULL,
            ...){
 
     if (!missing(bwmethod) && identical(match.arg(bwmethod, c("cv.ls", "manual")), "manual") &&
@@ -1821,13 +1866,15 @@ npscoefbw.default <-
       ncon = sum(if (miss.z) untangle(xdat)$icon else untangle(zdat)$icon),
       degree.select = degree.select.value
     )
+    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
 
     ## first grab dummy args for scbandwidth() and perform 'bootstrap'
     ## bandwidth call
 
     margs <- c("regtype", "basis", "degree", "bernstein.basis",
                "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
-               "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
+               "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
+               "scale.factor.lower.bound")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
@@ -1853,6 +1900,7 @@ npscoefbw.default <-
     if (!is.null(degree.search))
       reg.args$bernstein.basis <- degree.search$bernstein.basis
     tbw <- do.call(scbandwidth, sbw.args)
+    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
 
     ## next grab dummies for actual bandwidth selection and perform call
     margs <- c("zdat",
@@ -1860,6 +1908,7 @@ npscoefbw.default <-
                "random.seed",
                "lbc.init", "hbc.init", "cfac.init",
                "lbd.init", "hbd.init", "dfac.init",
+               "scale.factor.lower.bound",
                "cv.iterate",
                "cv.num.iterations",
                "backfit.iterate",
@@ -1877,6 +1926,8 @@ npscoefbw.default <-
       opt.args <- list()
     }
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
+    reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
 
     if (!is.null(degree.search)) {
       if (identical(degree.search$engine, "cell")) {

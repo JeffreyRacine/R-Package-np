@@ -462,6 +462,13 @@ static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;
 static int *bwm_kernel_unordered_vec = NULL;
 static int bwm_kernel_unordered_len = 0;
+static double bwm_scale_factor_lower_bound = 0.01;
+
+static void bwm_set_scale_factor_lower_bound(double value)
+{
+  bwm_scale_factor_lower_bound =
+    (R_FINITE(value) && (value >= 0.0)) ? value : 0.01;
+}
 
 static int np_has_finite_cker_bounds(const double *lb, const double *ub, const int n)
 {
@@ -1042,7 +1049,7 @@ static int np_bw_candidate_is_admissible(
     num_reg_ordered,
     num_categories,
     vector_scale_factor,
-    0.01);
+    bwm_scale_factor_lower_bound);
 }
 
 int * ipt_lookup_extern_X;
@@ -5171,6 +5178,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   ncatfac_extern = myoptd[DBW_NCATFD];
 
   dbl_memfac_dls_extern = myoptd[DBW_MEMORYD];
+  bwm_set_scale_factor_lower_bound(myoptd[DBW_SFLOORD]);
 
 /* Allocate memory for objects */
 
@@ -7115,6 +7123,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   nconfac_extern = myoptd[CDBW_NCONFD];
   ncatfac_extern = myoptd[CDBW_NCATFD];
+  bwm_set_scale_factor_lower_bound(myoptd[CDBW_SFLOORD]);
 
 /* Allocate memory for objects */
 
@@ -9177,6 +9186,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   nconfac_extern = myoptd[RBW_NCONFD];
   ncatfac_extern = myoptd[RBW_NCATFD];
+  bwm_set_scale_factor_lower_bound(myoptd[RBW_SFLOORD]);
 
   imsnum = 0;
   imstot = iNum_Multistart;

@@ -52,6 +52,7 @@ npcdistbw(\dots)
           penalty.multiplier = 10,
           remin = TRUE,
           scale.init.categorical.sample = FALSE,
+          scale.factor.lower.bound = NULL,
           small = 1.490116e-05,
           tol = 1.490116e-04,
           transform.bounds = FALSE,
@@ -101,6 +102,7 @@ npcdistbw(\dots)
           penalty.multiplier,
           remin,
           scale.init.categorical.sample,
+          scale.factor.lower.bound = NULL,
           small,
           tol,
           transform.bounds,
@@ -377,6 +379,14 @@ npcdistbw(\dots)
     \eqn{n} the number of observations, \eqn{P}{P} the order of the
     kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
     Details}
+
+  \item{scale.factor.lower.bound}{
+    an optional nonnegative scalar controlling the hard lower bound used
+    for continuous fixed-bandwidth search candidates. When omitted, the
+    legacy coefficient \code{0.01} is used. Larger values impose a
+    stricter search floor. This argument affects search admissibility
+    and search-start sanitization only; explicit bandwidths supplied for
+    storage when \code{bandwidth.compute = FALSE} are not rewritten.}
 
   \item{small}{
     a small number used to bracket a minimum (it is hopeless to ask for

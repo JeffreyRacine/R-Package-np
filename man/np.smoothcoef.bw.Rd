@@ -71,6 +71,7 @@ npscoefbw(\dots)
           lbd.init = 0.5,
           hbd.init = 1.5,
           dfac.init = 1.0,
+          scale.factor.lower.bound = NULL,
           \dots)
 
 \method{npscoefbw}{scbandwidth}(xdat = stop("invoked without data 'xdat'"),
@@ -96,6 +97,7 @@ npscoefbw(\dots)
           lbd.init = 0.5,
           hbd.init = 1.5,
           dfac.init = 1.0,
+          scale.factor.lower.bound = NULL,
           \dots)
 }
 
@@ -376,6 +378,16 @@ npscoefbw(\dots)
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
     \code{1.0}.
   }
+
+  \item{scale.factor.lower.bound}{
+    an optional nonnegative scalar controlling the hard lower bound used
+    for continuous fixed-bandwidth search candidates. When omitted, the
+    legacy coefficient \code{0.01} is used; the existing
+    \code{lbc.init=0.5} default is therefore unchanged unless the user
+    requests a larger value or a smaller \code{lbc.init}. This argument
+    affects search admissibility and search-start sanitization only;
+    explicit bandwidths supplied for storage when
+    \code{bandwidth.compute = FALSE} are not rewritten.}
 
   \item{lbd.init}{
     lower bound for random fixed-bandwidth start factors for ordered

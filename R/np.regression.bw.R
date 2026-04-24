@@ -116,6 +116,7 @@ npregbw.rbandwidth <-
            penalty.multiplier = 10,
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
+           scale.factor.lower.bound = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
@@ -137,6 +138,10 @@ npregbw.rbandwidth <-
     tol <- npValidatePositiveFiniteNumeric(tol, "tol")
     small <- npValidatePositiveFiniteNumeric(small, "small")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
+    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
+      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+    )
+    lbc.init <- npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound)
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
     .np_progress_bandwidth_set_total(nmulti)
 
@@ -369,6 +374,7 @@ npregbw.rbandwidth <-
                       bandwidth.compute = bandwidth.compute,
                       timing = tbw$timing,
                       total.time = tbw$total.time)
+    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
     tbw
   }
 
@@ -390,7 +396,13 @@ npregbw.rbandwidth <-
     ),
     reg.args
   )
-  do.call(rbandwidth, bw.args)
+  out <- do.call(rbandwidth, bw.args)
+  if (!is.null(reg.args$scale.factor.lower.bound)) {
+    out$scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
+      reg.args$scale.factor.lower.bound
+    )
+  }
+  out
 }
 
 .npregbw_eval_only <- function(xdat,
@@ -441,8 +453,13 @@ npregbw.rbandwidth <-
                                             invalid.penalty = c("baseline", "dbmax"),
                                             penalty.multiplier = 10,
                                             transform.bounds = FALSE,
+                                            scale.factor.lower.bound = NULL,
                                             eval.only = FALSE) {
   invalid.penalty <- match.arg(invalid.penalty)
+  scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
+    if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+  )
+  lbc.init <- npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound)
 
   xdat <- toFrame(xdat)
   if (!(is.vector(ydat) || is.factor(ydat)))
@@ -538,7 +555,8 @@ npregbw.rbandwidth <-
     hbd.init = hbd.init,
     dfac.init = dfac.init,
     nconfac = nconfac,
-    ncatfac = ncatfac
+    ncatfac = ncatfac,
+    scale.factor.lower.bound = scale.factor.lower.bound
   )
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
@@ -670,6 +688,7 @@ npregbw.rbandwidth <-
     invalid.penalty = opt.value("invalid.penalty", "baseline"),
     penalty.multiplier = opt.value("penalty.multiplier", 10),
     transform.bounds = opt.value("transform.bounds", FALSE),
+    scale.factor.lower.bound = opt.value("scale.factor.lower.bound", NULL),
     eval.only = FALSE
   )
 
@@ -859,7 +878,9 @@ npregbw.rbandwidth <-
   ncat <- length(setup$cat_idx)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(xdat)[2]) else max(1L, as.integer(opt.args$nmulti[1L]))
 
-  bw_lower <- c(rep.int(1e-2, ncon), rep.int(0, ncat))
+  cont_lower <- npResolveScaleFactorLowerBound(template$scale.factor.lower.bound,
+                                               argname = "template$scale.factor.lower.bound")
+  bw_lower <- c(rep.int(cont_lower, ncon), rep.int(0, ncat))
   bw_upper <- c(rep.int(1e6, ncon), setup$cat_upper * setup$bandwidth.scale.categorical)
 
   point.start <- if (all(template$bw == 0)) {
@@ -1201,6 +1222,7 @@ npregbw.default <-
            regtype,
            remin,
            scale.init.categorical.sample,
+           scale.factor.lower.bound = NULL,
            small,
            tol,
            transform.bounds = FALSE,
@@ -1212,6 +1234,7 @@ npregbw.default <-
     lp.dot.args <- list(...)
     npRejectLegacyLpArgs(names(lp.dot.args), where = "npregbw")
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
+    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
 
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
@@ -1301,6 +1324,7 @@ npregbw.default <-
                "lbd.init", "hbd.init", "dfac.init", 
                "scale.init.categorical.sample",
                "transform.bounds",
+               "scale.factor.lower.bound",
                "invalid.penalty",
                "penalty.multiplier")
     m <- match(margs, mc.names, nomatch = 0)
@@ -1315,6 +1339,8 @@ npregbw.default <-
 
     reg.args <- bw.args[setdiff(names(bw.args), c("bw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
+    reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
 
     ncon <- sum(untangle(xdat)$icon)
     search.mc.names <- mc.names

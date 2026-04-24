@@ -130,6 +130,7 @@ npudistbw.dbandwidth <-
            penalty.multiplier = 10,
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
+           scale.factor.lower.bound = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
@@ -151,6 +152,8 @@ npudistbw.dbandwidth <-
     small <- npValidatePositiveFiniteNumeric(small, "small")
     memfac <- npValidatePositiveFiniteNumeric(memfac, "memfac")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
+    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    lbc.init <- npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound)
 
     nofi <- missing(do.full.integral)
     nogi <- missing(ngrid)
@@ -280,7 +283,8 @@ npudistbw.dbandwidth <-
         lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
         lbc.init = lbc.init, hbc.init = hbc.init, cfac.init = cfac.init, 
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
-        nconfac = nconfac, ncatfac = ncatfac, memfac = memfac)
+        nconfac = nconfac, ncatfac = ncatfac, memfac = memfac,
+        scale.factor.lower.bound = scale.factor.lower.bound)
       cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
       if (bws$method != "normal-reference"){
@@ -386,6 +390,7 @@ npudistbw.dbandwidth <-
                       bandwidth.compute = bandwidth.compute,
                       timing = tbw$timing,
                       total.time = tbw$total.time)
+    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
     
     tbw
   }
@@ -428,6 +433,7 @@ npudistbw.default <-
            penalty.multiplier,
            remin,
            scale.init.categorical.sample,
+           scale.factor.lower.bound = NULL,
            small,
            tol,
            transform.bounds,
@@ -476,7 +482,7 @@ npudistbw.default <-
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
                "lbc.init", "hbc.init", "cfac.init", 
                "lbd.init", "hbd.init", "dfac.init", 
-               "scale.init.categorical.sample", "memfac",
+               "scale.init.categorical.sample", "scale.factor.lower.bound", "memfac",
                "transform.bounds",
                "invalid.penalty",
                "penalty.multiplier")
