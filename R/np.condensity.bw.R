@@ -882,7 +882,7 @@ npRmpiNomadShadowPrepareConditionalDensity <- function(c.uno,
                                                        cxkerub,
                                                        cykerlb,
                                                        cykerub) {
-  .Call(
+  ok <- .Call(
     "C_np_density_conditional_nomad_shadow_prepare",
     c.uno,
     c.ord,
@@ -906,6 +906,15 @@ npRmpiNomadShadowPrepareConditionalDensity <- function(c.uno,
     cykerub,
     PACKAGE = "npRmpi"
   )
+
+  if (isTRUE(ok))
+    return(TRUE)
+
+  rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+  if (isTRUE(rank == 0L))
+    stop("failed to prepare resident npcdens NOMAD shadow state", call. = FALSE)
+
+  FALSE
 }
 
 npRmpiNomadShadowEvalConditionalDensity <- function(bw, degree) {
@@ -1112,7 +1121,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   ndeg <- length(degree.search$start.degree)
 
-  npRmpiNomadShadowPrepareConditionalDensity(
+  prepared <- npRmpiNomadShadowPrepareConditionalDensity(
     c.uno = prep$c.uno,
     c.ord = prep$c.ord,
     c.con = prep$c.con,
@@ -1134,6 +1143,14 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     cykerlb = prep$cykerlb,
     cykerub = prep$cykerub
   )
+  if (!isTRUE(prepared))
+    return(list(
+      best_payload = NULL,
+      powell.time = NA_real_,
+      num.feval.total = 0,
+      num.feval.fast.total = 0,
+      method = degree.search$engine
+    ))
   mpi.barrier(1L)
   on.exit({
     mpi.barrier(1L)

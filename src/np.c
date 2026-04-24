@@ -1,6 +1,7 @@
 /* Copyright (C) Jeff Racine, 1995-2004 */
 
 #include <float.h>
+#include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
@@ -327,6 +328,7 @@ static int bwm_progress_last_signal_eval = 0;
 
 typedef struct {
   int active;
+  int owned;
   int num_var;
   int num_reg_continuous;
   int num_reg_unordered;
@@ -338,10 +340,12 @@ typedef struct {
   double *vector_scale_factor;
 } NPRegressionNomadShadowCtx;
 
-static NPRegressionNomadShadowCtx np_regression_nomad_shadow = {0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL};
+static NPRegressionNomadShadowCtx np_regression_nomad_shadow =
+  {0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL};
 
 typedef struct {
   int active;
+  int owned;
   int num_all_var;
   int num_reg_continuous;
   int num_var_continuous;
@@ -370,12 +374,48 @@ typedef struct {
 } NPConditionalDensityNomadShadowCtx;
 
 static NPConditionalDensityNomadShadowCtx np_conditional_density_nomad_shadow =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, NULL, NULL, NULL, NULL, NULL, NULL,
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, NULL, NULL, NULL, NULL, NULL, NULL,
    NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 
 static void np_regression_nomad_shadow_clear_internal(void);
 static void np_conditional_density_nomad_shadow_clear_internal(void);
 static void np_conditional_density_nomad_shadow_refresh_penalty(void);
+
+static int np_mpi_comm1_all_ok(const int local_ok)
+{
+#ifdef MPI2
+  int global_ok = local_ok ? 1 : 0;
+  if (comm[1] != MPI_COMM_NULL)
+    MPI_Allreduce(MPI_IN_PLACE, &global_ok, 1, MPI_INT, MPI_MIN, comm[1]);
+  return global_ok;
+#else
+  return local_ok ? 1 : 0;
+#endif
+}
+
+static int np_mpi_rank_failure_injected(const char *env_name)
+{
+#ifdef MPI2
+  const char *value = getenv(env_name);
+  char *end = NULL;
+  long rank;
+
+  if ((value == NULL) || (value[0] == '\0') || strcmp(value, "0") == 0)
+    return 0;
+  if (strcmp(value, "all") == 0)
+    return 1;
+
+  errno = 0;
+  rank = strtol(value, &end, 10);
+  if ((errno != 0) || (end == value) || (*end != '\0'))
+    return 0;
+
+  return ((int)rank == my_rank);
+#else
+  (void)env_name;
+  return 0;
+#endif
+}
 
 static void resolve_bounds_or_default(SEXP lb_r, SEXP ub_r, int ncon, double ** lb_p, double ** ub_p)
 {
@@ -1463,7 +1503,7 @@ SEXP C_np_shadow_reset_state(void)
 
 static void np_regression_nomad_shadow_clear_internal(void)
 {
-  if (!np_regression_nomad_shadow.active)
+  if (!np_regression_nomad_shadow.active && !np_regression_nomad_shadow.owned)
     return;
 
   if (kdt_extern_X != NULL)
@@ -1532,6 +1572,7 @@ static void np_regression_nomad_shadow_clear_internal(void)
   np_reg_cv_core_clear_extern();
 
   np_regression_nomad_shadow.active = 0;
+  np_regression_nomad_shadow.owned = 0;
   np_regression_nomad_shadow.num_var = 0;
   np_regression_nomad_shadow.num_reg_continuous = 0;
   np_regression_nomad_shadow.num_reg_unordered = 0;
@@ -1604,6 +1645,7 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
   double *vsfh = NULL;
 
   np_regression_nomad_shadow_clear_internal();
+  np_regression_nomad_shadow.owned = 1;
   num_reg_continuous_extern = myopti[RBW_NCONI];
   num_reg_unordered_extern = myopti[RBW_NUNOI];
   num_reg_ordered_extern = myopti[RBW_NORDI];
@@ -1909,6 +1951,9 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
   }
   bwm_reset_counters();
 
+  if (np_mpi_rank_failure_injected("NP_RMPI_INJECT_REG_SHADOW_PREPARE_FAIL_RANK"))
+    goto fail;
+
   np_regression_nomad_shadow.ipt = ipt;
   ipt = NULL;
   free_mat(matrix_y, num_var + 1);
@@ -1981,12 +2026,13 @@ SEXP C_np_regression_nomad_shadow_prepare(SEXP runo,
                                                    REAL(ckerlb_r),
                                                    REAL(ckerub_r));
 
+  ok = np_mpi_comm1_all_ok(ok);
+  if (!ok)
+    np_regression_nomad_shadow_clear_internal();
+
   UNPROTECT(15);
 
-  if (!ok)
-    error("failed to prepare resident npreg NOMAD shadow state");
-
-  return ScalarLogical(1);
+  return ScalarLogical(ok ? 1 : 0);
 }
 
 SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
@@ -2093,7 +2139,7 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   const int num_all_uvar = num_reg_unordered_extern + num_var_unordered_extern;
   const int num_all_ovar = num_reg_ordered_extern + num_var_ordered_extern;
 
-  if (!np_conditional_density_nomad_shadow.active)
+  if (!np_conditional_density_nomad_shadow.active && !np_conditional_density_nomad_shadow.owned)
     return;
 
   if (kdt_extern_X != NULL)
@@ -2238,6 +2284,7 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   np_reset_y_side_extern();
 
   np_conditional_density_nomad_shadow.active = 0;
+  np_conditional_density_nomad_shadow.owned = 0;
   np_conditional_density_nomad_shadow.num_all_var = 0;
   np_conditional_density_nomad_shadow.num_reg_continuous = 0;
   np_conditional_density_nomad_shadow.num_var_continuous = 0;
@@ -2381,6 +2428,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   double lbd_init, hbd_init, d_init;
 
   np_conditional_density_nomad_shadow_clear_internal();
+  np_conditional_density_nomad_shadow.owned = 1;
 
   num_var_unordered_extern = myopti[CBW_CNUNOI];
   num_var_ordered_extern = myopti[CBW_CNORDI];
@@ -2902,6 +2950,9 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
 
   np_conditional_density_nomad_shadow_refresh_penalty();
 
+  if (np_mpi_rank_failure_injected("NP_RMPI_INJECT_CDEN_SHADOW_PREPARE_FAIL_RANK"))
+    goto fail;
+
   np_conditional_density_nomad_shadow.ipt_x = ipt_X;
   np_conditional_density_nomad_shadow.ipt_y = need_y_side ? ipt_Y : NULL;
   np_conditional_density_nomad_shadow.ipt_xy = ipt_XY;
@@ -3003,12 +3054,13 @@ SEXP C_np_density_conditional_nomad_shadow_prepare(SEXP c_uno,
                                                             REAL(cykerlb_r),
                                                             REAL(cykerub_r));
 
+  ok = np_mpi_comm1_all_ok(ok);
+  if (!ok)
+    np_conditional_density_nomad_shadow_clear_internal();
+
   UNPROTECT(20);
 
-  if (!ok)
-    error("failed to prepare resident npcdens NOMAD shadow state");
-
-  return ScalarLogical(1);
+  return ScalarLogical(ok ? 1 : 0);
 }
 
 SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)

@@ -890,7 +890,7 @@ npRmpiNomadShadowPrepareRegression <- function(runo,
                                                basis,
                                                ckerlb,
                                                ckerub) {
-  .Call(
+  ok <- .Call(
     "C_np_regression_nomad_shadow_prepare",
     runo,
     rord,
@@ -909,6 +909,15 @@ npRmpiNomadShadowPrepareRegression <- function(runo,
     ckerub,
     PACKAGE = "npRmpi"
   )
+
+  if (isTRUE(ok))
+    return(TRUE)
+
+  rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+  if (isTRUE(rank == 0L))
+    stop("failed to prepare resident npreg NOMAD shadow state", call. = FALSE)
+
+  FALSE
 }
 
 npRmpiNomadShadowEvalRegression <- function(bw, degree) {
@@ -1382,7 +1391,7 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
 
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
-  npRmpiNomadShadowPrepareRegression(
+  prepared <- npRmpiNomadShadowPrepareRegression(
     runo = prep$runo,
     rord = prep$rord,
     rcon = prep$rcon,
@@ -1399,6 +1408,14 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
     ckerlb = prep$ckerlb,
     ckerub = prep$ckerub
   )
+  if (!isTRUE(prepared))
+    return(list(
+      best_payload = NULL,
+      powell.time = NA_real_,
+      num.feval.total = 0,
+      num.feval.fast.total = 0,
+      method = degree.search$engine
+    ))
   mpi.barrier(1L)
   on.exit({
     mpi.barrier(1L)
