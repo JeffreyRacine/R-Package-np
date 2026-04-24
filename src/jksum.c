@@ -203,6 +203,42 @@ extern double ** matrix_categorical_vals_extern_X;
 extern double ** matrix_categorical_vals_extern_Y;
 extern double ** matrix_categorical_vals_extern_XY;
 
+static size_t np_jksum_size_mul_or_die(size_t a, size_t b, const char *what)
+{
+  if ((a != 0) && (b > (SIZE_MAX / a)))
+    error("%s: allocation size overflow", what);
+  return a * b;
+}
+
+static size_t np_jksum_size_mul3_or_die(size_t a, size_t b, size_t c, const char *what)
+{
+  return np_jksum_size_mul_or_die(np_jksum_size_mul_or_die(a, b, what), c, what);
+}
+
+static void *np_jksum_malloc_bytes_or_die(size_t nbytes, const char *what)
+{
+  void *ptr;
+
+  if (nbytes == 0)
+    return NULL;
+
+  ptr = malloc(nbytes);
+  if (ptr == NULL)
+    error("%s: memory allocation failed", what);
+
+  return ptr;
+}
+
+static void *np_jksum_malloc_array_or_die(size_t count, size_t elem_size, const char *what)
+{
+  return np_jksum_malloc_bytes_or_die(np_jksum_size_mul_or_die(count, elem_size, what), what);
+}
+
+static void *np_jksum_malloc_array3_or_die(size_t a, size_t b, size_t c, const char *what)
+{
+  return np_jksum_malloc_bytes_or_die(np_jksum_size_mul3_or_die(a, b, c, what), what);
+}
+
 int kernel_convolution_weighted_sum(
 int KERNEL_reg,
 int KERNEL_unordered_reg,
@@ -10169,38 +10205,32 @@ double * cv){
 #endif
 
   // allocate some pointers
-  matrix_wX_continuous_eval = (double **)malloc(num_reg_continuous*sizeof(double *));
-  matrix_wX_unordered_eval = (double **)malloc(num_reg_unordered*sizeof(double *));
-  matrix_wX_ordered_eval = (double **)malloc(num_reg_ordered*sizeof(double *));
+  matrix_wX_continuous_eval = (double **)np_jksum_malloc_array_or_die((size_t)num_reg_continuous, sizeof(double *), "np_kernel_estimate_density_categorical_leave_one_out_cv matrix_wX_continuous_eval");
+  matrix_wX_unordered_eval = (double **)np_jksum_malloc_array_or_die((size_t)num_reg_unordered, sizeof(double *), "np_kernel_estimate_density_categorical_leave_one_out_cv matrix_wX_unordered_eval");
+  matrix_wX_ordered_eval = (double **)np_jksum_malloc_array_or_die((size_t)num_reg_ordered, sizeof(double *), "np_kernel_estimate_density_categorical_leave_one_out_cv matrix_wX_ordered_eval");
  
-  double * mean = (double *)malloc(num_obs_wx_alloc*sizeof(double));
-  
-  if(mean == NULL)
-    error("failed to allocate mean");
+  double * mean = (double *)np_jksum_malloc_array_or_die((size_t)num_obs_wx_alloc, sizeof(double), "np_kernel_estimate_density_categorical_leave_one_out_cv mean");
 
   double ofac = num_obs_train - 1.0;
 
-  operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
-
-  if(operator == NULL)
-    error("failed to allocate operator");
+  operator = (int *)np_jksum_malloc_array_or_die((size_t)(num_reg_continuous+num_reg_unordered+num_reg_ordered), sizeof(int), "np_kernel_estimate_density_categorical_leave_one_out_cv operator");
 
   for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
     operator[i] = OP_INTEGRAL;
 
   int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
-  kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous);
+  kernel_c = (int *)np_jksum_malloc_array_or_die((size_t)num_reg_continuous, sizeof(int), "np_kernel_estimate_density_categorical_leave_one_out_cv kernel_c");
 
   for(i = 0; i < num_reg_continuous; i++)
     kernel_c[i] = KERNEL_den;
 
-  kernel_u = (int *)malloc(sizeof(int)*num_reg_unordered);
+  kernel_u = (int *)np_jksum_malloc_array_or_die((size_t)num_reg_unordered, sizeof(int), "np_kernel_estimate_density_categorical_leave_one_out_cv kernel_u");
 
   for(i = 0; i < num_reg_unordered; i++)
     kernel_u[i] = KERNEL_den_unordered;
 
-  kernel_o = (int *)malloc(sizeof(int)*num_reg_ordered);
+  kernel_o = (int *)np_jksum_malloc_array_or_die((size_t)num_reg_ordered, sizeof(int), "np_kernel_estimate_density_categorical_leave_one_out_cv kernel_o");
 
   for(i = 0; i < num_reg_ordered; i++)
     kernel_o[i] = KERNEL_den_ordered;
@@ -10305,10 +10335,7 @@ double * cv){
   
   *cv = 0;
 
-  double * kwx = (double *)malloc(num_obs_train_alloc*num_obs_wx_alloc*sizeof(double));
-
-  if(kwx == NULL)
-    error("failed to allocate kwx, try reducing num_obs_eval");
+  double * kwx = (double *)np_jksum_malloc_array3_or_die((size_t)num_obs_train_alloc, (size_t)num_obs_wx_alloc, sizeof(double), "np_kernel_estimate_density_categorical_leave_one_out_cv kwx");
 
   for(iwx = 0; iwx < nwx; iwx++){
     const int64_t wxo = iwx*wx;
@@ -20568,13 +20595,10 @@ double *cv){
   num_obs_alloc = num_obs;
 #endif
 
-  double * res = (double *)malloc(num_obs_alloc*sizeof(double));
+  double * res = (double *)np_jksum_malloc_array_or_die((size_t)num_obs_alloc, sizeof(double), "np_kernel_estimate_density_categorical_convolution_cv rho");
   double cv1, cv2;
-  
-  if(res == NULL)
-    error("failed to allocate rho");
 
-  operator = (int *)malloc(sizeof(int)*num_reg);
+  operator = (int *)np_jksum_malloc_array_or_die((size_t)num_reg, sizeof(int), "np_kernel_estimate_density_categorical_convolution_cv operator");
 
   // first the convolution portion
   for(i = 0; i < num_reg; i++)
@@ -20582,17 +20606,17 @@ double *cv){
 
   int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
-  kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous);
+  kernel_c = (int *)np_jksum_malloc_array_or_die((size_t)num_reg_continuous, sizeof(int), "np_kernel_estimate_density_categorical_convolution_cv kernel_c");
 
   for(i = 0; i < num_reg_continuous; i++)
     kernel_c[i] = KERNEL_den;
 
-  kernel_u = (int *)malloc(sizeof(int)*num_reg_unordered);
+  kernel_u = (int *)np_jksum_malloc_array_or_die((size_t)num_reg_unordered, sizeof(int), "np_kernel_estimate_density_categorical_convolution_cv kernel_u");
 
   for(i = 0; i < num_reg_unordered; i++)
     kernel_u[i] = KERNEL_unordered_den;
 
-  kernel_o = (int *)malloc(sizeof(int)*num_reg_ordered);
+  kernel_o = (int *)np_jksum_malloc_array_or_die((size_t)num_reg_ordered, sizeof(int), "np_kernel_estimate_density_categorical_convolution_cv kernel_o");
 
   for(i = 0; i < num_reg_ordered; i++)
     kernel_o[i] = KERNEL_ordered_den;
@@ -21959,9 +21983,9 @@ double * log_likelihood
   const double gfac = sqrt(DIFF_KER_PPM/INT_KERNEL_P);
 
   if(do_grad && (num_X_ordered > 0)){
-    otabs = (struct th_table *)malloc(num_X_ordered*sizeof(struct th_table));
-    matrix_ordered_indices = (int **)malloc(num_oXY*sizeof(int *));
-    int * tc = (int *)malloc(num_X_ordered*num_obs_eval*sizeof(int));
+    otabs = (struct th_table *)np_jksum_malloc_array_or_die((size_t)num_X_ordered, sizeof(struct th_table), "np_kernel_estimate_con_dens_dist_categorical otabs");
+    matrix_ordered_indices = (int **)np_jksum_malloc_array_or_die((size_t)num_oXY, sizeof(int *), "np_kernel_estimate_con_dens_dist_categorical matrix_ordered_indices");
+    int * tc = (int *)np_jksum_malloc_array3_or_die((size_t)num_X_ordered, (size_t)num_obs_eval, sizeof(int), "np_kernel_estimate_con_dens_dist_categorical ordered index buffer");
     for(l = 0; l < num_X_ordered; l++)
       matrix_ordered_indices[l] = tc + l*num_obs_eval;
 
@@ -22003,25 +22027,25 @@ double * log_likelihood
   }
 
 
-  operator_XY = (int *)malloc(sizeof(int)*num_XY);
-  operator_X = (int *)malloc(sizeof(int)*num_X);
+  operator_XY = (int *)np_jksum_malloc_array_or_die((size_t)num_XY, sizeof(int), "np_kernel_estimate_con_dens_dist_categorical operator_XY");
+  operator_X = (int *)np_jksum_malloc_array_or_die((size_t)num_X, sizeof(int), "np_kernel_estimate_con_dens_dist_categorical operator_X");
 
-  kernel_cXY = (int *)malloc(sizeof(int)*num_cXY);
-  kernel_uXY = (int *)malloc(sizeof(int)*num_uXY);
-  kernel_oXY = (int *)malloc(sizeof(int)*num_oXY);
+  kernel_cXY = (int *)np_jksum_malloc_array_or_die((size_t)num_cXY, sizeof(int), "np_kernel_estimate_con_dens_dist_categorical kernel_cXY");
+  kernel_uXY = (int *)np_jksum_malloc_array_or_die((size_t)num_uXY, sizeof(int), "np_kernel_estimate_con_dens_dist_categorical kernel_uXY");
+  kernel_oXY = (int *)np_jksum_malloc_array_or_die((size_t)num_oXY, sizeof(int), "np_kernel_estimate_con_dens_dist_categorical kernel_oXY");
 
-  vsf_XY = (double *)malloc(num_XY*sizeof(double));
-  vsf_X = (double *)malloc(num_X*sizeof(double));
+  vsf_XY = (double *)np_jksum_malloc_array_or_die((size_t)num_XY, sizeof(double), "np_kernel_estimate_con_dens_dist_categorical vsf_XY");
+  vsf_X = (double *)np_jksum_malloc_array_or_die((size_t)num_X, sizeof(double), "np_kernel_estimate_con_dens_dist_categorical vsf_X");
 
-  ksd = (double *)malloc(num_obs_eval_alloc*sizeof(double));
-  ksn = (double *)malloc(num_obs_eval_alloc*sizeof(double));
+  ksd = (double *)np_jksum_malloc_array_or_die((size_t)num_obs_eval_alloc, sizeof(double), "np_kernel_estimate_con_dens_dist_categorical ksd");
+  ksn = (double *)np_jksum_malloc_array_or_die((size_t)num_obs_eval_alloc, sizeof(double), "np_kernel_estimate_con_dens_dist_categorical ksn");
 
-  icX = (int *)malloc(sizeof(int)*num_X_continuous);
+  icX = (int *)np_jksum_malloc_array_or_die((size_t)num_X_continuous, sizeof(int), "np_kernel_estimate_con_dens_dist_categorical icX");
 
   if(do_grad){
-    permn = (double *)malloc(num_X*num_obs_eval_alloc*sizeof(double));
-    permd = (double *)malloc(num_X*num_obs_eval_alloc*sizeof(double));
-    bpso = (int *)malloc(num_XY*sizeof(int));
+    permn = (double *)np_jksum_malloc_array3_or_die((size_t)num_X, (size_t)num_obs_eval_alloc, sizeof(double), "np_kernel_estimate_con_dens_dist_categorical permn");
+    permd = (double *)np_jksum_malloc_array3_or_die((size_t)num_X, (size_t)num_obs_eval_alloc, sizeof(double), "np_kernel_estimate_con_dens_dist_categorical permd");
+    bpso = (int *)np_jksum_malloc_array_or_die((size_t)num_XY, sizeof(int), "np_kernel_estimate_con_dens_dist_categorical bpso");
 
     // only enable gradients for 'X' variables
     for(i = 0; i < num_X_continuous; i++)
