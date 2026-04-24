@@ -178,6 +178,9 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor, double **rhs_cols
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor, double *cv);
+void np_bwm_set_deferred_error(const char *msg);
+const char *np_bwm_get_deferred_error(void);
+void np_bwm_clear_deferred_error(void);
 double cv_func_regression_categorical_ls_nn(double *vector_scale_factor);
 
 int kernel_estimate_regression_categorical_no_stderr(int int_compute_gradient, int int_ll, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_reg, int int_WEIGHTS, int *var_index_int, int num_var_test_int, double **matrix_weights_K, double ***matrix_weights_K_deriv, int num_obs_train, int num_obs_eval, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double **matrix_bandwidth, double **matrix_bandwidth_deriv, double *vector_Y, double *lambda, int *num_categories, double *mean, double **gradient);

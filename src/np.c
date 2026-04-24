@@ -463,6 +463,22 @@ static double bwm_penalty_value = DBL_MAX;
 static int *bwm_kernel_unordered_vec = NULL;
 static int bwm_kernel_unordered_len = 0;
 static double bwm_scale_factor_lower_bound = 0.1;
+static const char *bwm_deferred_error = NULL;
+
+void np_bwm_set_deferred_error(const char *msg)
+{
+  bwm_deferred_error = msg;
+}
+
+const char *np_bwm_get_deferred_error(void)
+{
+  return bwm_deferred_error;
+}
+
+void np_bwm_clear_deferred_error(void)
+{
+  bwm_deferred_error = NULL;
+}
 
 static void bwm_set_scale_factor_lower_bound(double value)
 {
@@ -2067,6 +2083,8 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
   int i, nscale = 0;
   double *prod_vsf = NULL;
 
+  np_bwm_clear_deferred_error();
+
   tyuno_r = PROTECT(coerceVector(tyuno, REALSXP));
   tyord_r = PROTECT(coerceVector(tyord, REALSXP));
   tycon_r = PROTECT(coerceVector(tycon, REALSXP));
@@ -2437,6 +2455,7 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
   if(shadow_continuous_stddev != NULL) safe_free(shadow_continuous_stddev);
   np_glp_cv_clear_extern();
   np_shadow_state_active = 0;
+  np_bwm_clear_deferred_error();
 
   UNPROTECT(13);
   return out;
@@ -4395,6 +4414,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int itmax, iter;
   int int_use_starting_values;
   int scale_cat;
+  const char *bw_error_msg = NULL;
 
   int * ipt = NULL;  // point permutation, see tree.c
   int old_bw;
@@ -5020,8 +5040,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   }
 
   if (enforce_fixed_feasibility) {
-    if (!have_start_best)
-      error("C_np_density_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!have_start_best) {
+      bw_error_msg = "C_np_density_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      goto cleanup_np_density_bw;
+    }
     if (!np_bw_candidate_is_admissible(
           num_var,
           bwm_use_transform,
@@ -5038,8 +5060,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
           num_reg_unordered_extern,
           num_reg_ordered_extern,
           num_categories_extern,
-          vector_scale_factor))
-      error("C_np_density_bw: optimizer returned an infeasible fixed-bandwidth candidate");
+          vector_scale_factor)) {
+      bw_error_msg = "C_np_density_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      goto cleanup_np_density_bw;
+    }
   }
 
   if (bwm_use_transform)
@@ -5061,6 +5085,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   /* end return data */
 
+cleanup_np_density_bw:
   /* Free data objects */
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
@@ -5088,6 +5113,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   np_reset_y_side_extern();
+
+  if (bw_error_msg != NULL)
+    error("%s", bw_error_msg);
 
   return ;
   
@@ -5135,6 +5163,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int int_use_starting_values, cdfontrain;
 
   int scale_cat;
+  const char *bw_error_msg = NULL;
 
   int * ipt = NULL, * ipe = NULL;
 
@@ -5799,8 +5828,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   }
 
   if (enforce_fixed_feasibility) {
-    if (!have_start_best)
-      error("C_np_distribution_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!have_start_best) {
+      bw_error_msg = "C_np_distribution_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      goto cleanup_np_distribution_bw;
+    }
     if (!np_bw_candidate_is_admissible(
           num_var,
           bwm_use_transform,
@@ -5817,8 +5848,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
           num_reg_unordered_extern,
           num_reg_ordered_extern,
           num_categories_extern,
-          vector_scale_factor))
-      error("C_np_distribution_bw: optimizer returned an infeasible fixed-bandwidth candidate");
+          vector_scale_factor)) {
+      bw_error_msg = "C_np_distribution_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      goto cleanup_np_distribution_bw;
+    }
   }
 
   if (bwm_use_transform)
@@ -5840,6 +5873,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   /* end return data */
 
+cleanup_np_distribution_bw:
   /* Free data objects */
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
@@ -5876,6 +5910,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   np_reset_y_side_extern();
+
+  if (bw_error_msg != NULL)
+    error("%s", bw_error_msg);
 
   return ;
   
@@ -5928,6 +5965,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int itmax, iter;
   int int_use_starting_values, ibwmfunc, old_cdens, scale_cat;
   int need_y_side;
+  const char *bw_error_msg = NULL;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
 
@@ -6480,6 +6518,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   spinner(0);
 
+  np_bwm_clear_deferred_error();
   bwmfunc_raw = bwmfunc;
   bwm_num_reg_continuous = num_var_continuous_extern + num_reg_continuous_extern;
   bwm_num_reg_unordered = num_var_unordered_extern + num_reg_unordered_extern;
@@ -6645,6 +6684,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     have_start_best = 1;
     fret_start_best = fret;
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
+  }
+
+  if (np_bwm_get_deferred_error() != NULL) {
+    bw_error_msg = np_bwm_get_deferred_error();
+    goto cleanup_np_density_conditional_bw;
   }
 
   if (enforce_fixed_feasibility) {
@@ -6852,9 +6896,16 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     free(vector_scale_factor_multistart);
   }
 
+  if (np_bwm_get_deferred_error() != NULL) {
+    bw_error_msg = np_bwm_get_deferred_error();
+    goto cleanup_np_density_conditional_bw;
+  }
+
   if (enforce_fixed_feasibility) {
-    if (!have_start_best)
-      error("C_np_density_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!have_start_best) {
+      bw_error_msg = "C_np_density_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      goto cleanup_np_density_conditional_bw;
+    }
     if (!np_bw_candidate_is_admissible_with_floor(
           num_all_var,
           bwm_use_transform,
@@ -6872,8 +6923,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
           num_reg_ordered_extern,
           num_categories_extern,
           vector_scale_factor,
-          scale_factor_lower_bound))
-      error("C_np_density_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate");
+          scale_factor_lower_bound)) {
+      bw_error_msg = "C_np_density_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      goto cleanup_np_density_conditional_bw;
+    }
   }
 
   if (bwm_use_transform)
@@ -6894,6 +6947,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   objective_function_fast[0] = fast_eval_total;
   /* end return data */
 
+cleanup_np_density_conditional_bw:
   /* Free data objects */
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
@@ -6984,6 +7038,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_glp_basis_extern = 1;
   np_glp_cv_clear_extern();
 
+  if (bw_error_msg != NULL) {
+    np_bwm_clear_deferred_error();
+    error("%s", bw_error_msg);
+  }
+
   return ;
 }
 
@@ -7033,6 +7092,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int int_use_starting_values, ibwmfunc;
   int cdfontrain;
   int scale_cat;
+  const char *bw_error_msg = NULL;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
 
@@ -7929,8 +7989,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   }
 
   if (enforce_fixed_feasibility) {
-    if (!have_start_best)
-      error("C_np_distribution_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!have_start_best) {
+      bw_error_msg = "C_np_distribution_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      goto cleanup_np_distribution_conditional_bw;
+    }
     if (!np_bw_candidate_is_admissible(
           num_all_var,
           bwm_use_transform,
@@ -7947,8 +8009,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
           num_reg_unordered_extern,
           num_reg_ordered_extern,
           num_categories_extern,
-          vector_scale_factor))
-      error("C_np_distribution_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate");
+          vector_scale_factor)) {
+      bw_error_msg = "C_np_distribution_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      goto cleanup_np_distribution_conditional_bw;
+    }
   }
 
   if (bwm_use_transform)
@@ -7969,6 +8033,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   objective_function_fast[0] = fast_eval_total;
   /* end return data */
 
+cleanup_np_distribution_conditional_bw:
   /* Free data objects */
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
@@ -8056,6 +8121,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
   np_glp_cv_clear_extern();
+
+  if (bw_error_msg != NULL)
+    error("%s", bw_error_msg);
 
   return ;
 }
@@ -9151,6 +9219,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int int_use_starting_values;
 
   int scale_cat;
+  const char *bw_error_msg = NULL;
 
   num_reg_continuous_extern = myopti[RBW_NCONI];
   num_reg_unordered_extern = myopti[RBW_NUNOI];
@@ -9719,10 +9788,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
         if (np_bw_candidate_is_admissible(
               num_var,
               bwm_use_transform,
-              KERNEL_den_extern,
-              KERNEL_den_unordered_extern,
-              BANDWIDTH_den_extern,
-              BANDWIDTH_den_extern,
+              KERNEL_reg_extern,
+              KERNEL_reg_unordered_extern,
+              BANDWIDTH_reg_extern,
+              BANDWIDTH_reg_extern,
               0,
               num_obs_train_extern,
               0,
@@ -9782,8 +9851,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   }
 
   if (enforce_fixed_feasibility) {
-    if (!have_start_best)
-      error("C_np_regression_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
+    if (!have_start_best) {
+      bw_error_msg = "C_np_regression_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      goto cleanup_np_regression_bw_mode;
+    }
     if (!np_bw_candidate_is_admissible(
           num_var,
           bwm_use_transform,
@@ -9800,8 +9871,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
           num_reg_unordered_extern,
           num_reg_ordered_extern,
           num_categories_extern,
-          vector_scale_factor))
-      error("C_np_regression_bw: optimizer returned an infeasible fixed-bandwidth candidate");
+          vector_scale_factor)) {
+      bw_error_msg = "C_np_regression_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      goto cleanup_np_regression_bw_mode;
+    }
   }
 
   if (bwm_use_transform)
@@ -9821,6 +9894,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   objective_function_fast[0] = fast_eval_total;
   /* end return data */
 
+cleanup_np_regression_bw_mode:
   /* Free data objects */
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
@@ -9858,6 +9932,9 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
   int_nn_k_min_extern = 1;
+
+  if (bw_error_msg != NULL)
+    error("%s", bw_error_msg);
 
   //fprintf(stderr,"\nNP TOASTY\n");
   return ;
