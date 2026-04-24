@@ -40,6 +40,7 @@ npplregbw(\dots)
           degree.restarts = 0L,
           degree.max.cycles = 20L,
           degree.verify = FALSE,
+          scale.factor.lower.bound = NULL,
           ftol,
           itmax,
           nmulti,
@@ -240,6 +241,15 @@ npplregbw(\dots)
     cross-validation function. Defaults to \code{1.49e-08
       (sqrt(DBL_EPSILON))}
   }
+
+  \item{scale.factor.lower.bound}{
+    an optional nonnegative scalar controlling the hard lower bound used
+    for continuous fixed-bandwidth search candidates in the
+    nonparametric \code{zdat} bandwidth searches. When omitted, the
+    legacy coefficient \code{0.01} is used. Larger values impose a
+    stricter search floor. This argument affects search admissibility
+    and search-start sanitization only; explicit bandwidths supplied for
+    storage when \code{bandwidth.compute = FALSE} are not rewritten.}
 
   \item{formula}{
     a symbolic description of variables on which bandwidth selection is

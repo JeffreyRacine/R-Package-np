@@ -54,6 +54,7 @@ npindexbw(\dots)
           lbc.init = 0.5,
           hbc.init = 1.5,
           cfac.init = 1.059224,
+          scale.factor.lower.bound = NULL,
           \dots)
 
 \method{npindexbw}{sibandwidth}(xdat = stop("training data xdat missing"),
@@ -71,6 +72,7 @@ npindexbw(\dots)
           lbc.init = 0.5,
           hbc.init = 1.5,
           cfac.init = 1.059224,
+          scale.factor.lower.bound = NULL,
           \dots)
 
 }
@@ -250,6 +252,16 @@ npindexbw(\dots)
     start law seeds the internal initial \eqn{h} coordinate before the
     unchanged beta-start logic is applied.
   }
+
+  \item{scale.factor.lower.bound}{
+    an optional nonnegative scalar controlling the hard lower bound used
+    for the fixed-bandwidth index-bandwidth search coordinate. When
+    omitted, the legacy coefficient \code{0.01} is used; the existing
+    \code{lbc.init=0.5} default is therefore unchanged unless the user
+    requests a larger value or a smaller \code{lbc.init}. This argument
+    affects search admissibility and search-start sanitization only;
+    explicit bandwidths supplied for storage when
+    \code{bandwidth.compute = FALSE} are not rewritten.}
 
    \item{only.optimize.beta}{
      signals the routine to only minimize the objective function with

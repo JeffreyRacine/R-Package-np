@@ -839,8 +839,16 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
   child.setup <- search.state$child.setup
   child.point.length <- search.state$child.point.length
 
-  child.lower <- unlist(lapply(child.setup, function(setup) {
-    c(rep.int(1e-2, length(setup$cont_idx)), rep.int(0, length(setup$cat_idx)))
+  child_cont_lower <- function(i) {
+    npResolveScaleFactorLowerBound(
+      child.templates[[i]]$scale.factor.lower.bound,
+      argname = "child scale.factor.lower.bound"
+    )
+  }
+
+  child.lower <- unlist(lapply(seq_along(child.setup), function(i) {
+    c(rep.int(child_cont_lower(i), length(child.setup[[i]]$cont_idx)),
+      rep.int(0, length(child.setup[[i]]$cat_idx)))
   }), use.names = FALSE)
   child.upper <- unlist(lapply(child.setup, function(setup) {
     c(rep.int(1e6, length(setup$cont_idx)), setup$cat_upper * setup$bandwidth.scale.categorical)
@@ -850,7 +858,8 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
     point.start <- if (all(raw == 0)) NULL else .npregbw_nomad_bw_to_point(raw, template = child.templates[[i]], setup = child.setup[[i]])
     .np_nomad_complete_start_point(
       point = point.start,
-      lower = c(rep.int(1e-2, length(child.setup[[i]]$cont_idx)), rep.int(0, length(child.setup[[i]]$cat_idx))),
+      lower = c(rep.int(child_cont_lower(i), length(child.setup[[i]]$cont_idx)),
+                rep.int(0, length(child.setup[[i]]$cat_idx))),
       upper = c(rep.int(1e6, length(child.setup[[i]]$cont_idx)), child.setup[[i]]$cat_upper * child.setup[[i]]$bandwidth.scale.categorical),
       ncont = length(child.setup[[i]]$cont_idx)
     )
@@ -1263,6 +1272,7 @@ npplregbw.default =
            degree.restarts = 0L,
            degree.max.cycles = 20L,
            degree.verify = FALSE,
+           scale.factor.lower.bound = NULL,
            ftol, itmax, nmulti, remin, small, tol,
            ...){
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
@@ -1347,6 +1357,7 @@ npplregbw.default =
       ncon = sum(untangle(zdat)$icon),
       degree.select = degree.select.value
     )
+    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
 
     spec <- npResolveCanonicalConditionalRegSpec(
       mc.names = spec.mc.names,
@@ -1397,7 +1408,8 @@ npplregbw.default =
       basis = spec$basis.engine,
       degree = spec$degree.engine,
       bernstein.basis = spec$bernstein.basis.engine,
-      bandwidth.compute = FALSE
+      bandwidth.compute = FALSE,
+      scale.factor.lower.bound = scale.factor.lower.bound
     )
     if (!is.null(degree.search))
       reg.args$bernstein.basis <- degree.search$bernstein.basis
@@ -1413,11 +1425,13 @@ npplregbw.default =
     outer.args$basis <- spec$basis
     outer.args$degree <- spec$degree
     outer.args$bernstein.basis <- spec$bernstein.basis
+    outer.args$scale.factor.lower.bound <- scale.factor.lower.bound
 
     opt.args <- list()
     margs <- c("regtype", "basis", "degree", "bernstein.basis",
                "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
+               "scale.factor.lower.bound",
                "ftol", "itmax", "nmulti", "remin", "small", "tol")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
@@ -1433,6 +1447,7 @@ npplregbw.default =
         nms <- mc.names[m]
         opt.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
       }
+      opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
 
       if (!is.null(degree.search)) {
         if (identical(degree.search$engine, "cell")) {

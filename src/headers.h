@@ -381,6 +381,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define RBW_D_INITD 15
 #define RBW_NCONFD   16
 #define RBW_NCATFD   17
+#define RBW_SFLOORD  18
 
 #define MPI_RANKI 0
 #define MPI_NUMPI 1
@@ -469,6 +470,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define DBW_NCONFD     16
 #define DBW_NCATFD     17
 #define DBW_MEMORYD     18
+#define DBW_SFLOORD     19
 
 
 #define CBW_NOBSI   0
@@ -578,6 +580,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CDBW_D_INITD 16
 #define CDBW_NCONFD     17
 #define CDBW_NCATFD     18
+#define CDBW_SFLOORD    19
 
 #define CDBWM_CVLS 0
 

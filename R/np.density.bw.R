@@ -142,6 +142,7 @@ npudensbw.bandwidth <-
            penalty.multiplier = 10,
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
+           scale.factor.lower.bound = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
@@ -157,6 +158,8 @@ npudensbw.bandwidth <-
     tol <- npValidatePositiveFiniteNumeric(tol, "tol")
     small <- npValidatePositiveFiniteNumeric(small, "small")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
+    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    lbc.init <- npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound)
     if (!missing(nmulti))
       nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
     .npRmpi_require_active_slave_pool(where = "npudensbw()")
@@ -249,7 +252,8 @@ npudensbw.bandwidth <-
         lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
         lbc.init = lbc.init, hbc.init = hbc.init, cfac.init = cfac.init, 
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
-        nconfac = nconfac, ncatfac = ncatfac)
+        nconfac = nconfac, ncatfac = ncatfac, memfac = 0,
+        scale.factor.lower.bound = scale.factor.lower.bound)
       cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
       .npudensbw_assert_bounded_cvls_supported(tbw, where = "npudensbw()")
@@ -356,6 +360,7 @@ npudensbw.bandwidth <-
                      bandwidth.compute = bandwidth.compute,
                      timing = tbw$timing,
                      total.time = tbw$total.time)
+    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
     
     tbw
   }
@@ -394,6 +399,7 @@ npudensbw.default <-
            penalty.multiplier,
            remin,
            scale.init.categorical.sample,
+           scale.factor.lower.bound = NULL,
            small,
            tol,
            transform.bounds,
@@ -462,6 +468,8 @@ npudensbw.default <-
     if (!missing(dfac.init)) opt.args$dfac.init <- dfac.init
     if (!missing(scale.init.categorical.sample))
       opt.args$scale.init.categorical.sample <- scale.init.categorical.sample
+    if (!missing(scale.factor.lower.bound))
+      opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
     if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
     if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
     tbw <- .np_progress_select_bandwidth_enhanced(
