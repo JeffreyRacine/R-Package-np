@@ -8,7 +8,7 @@ test_that("Powell hot-start respects fixed continuous lower bound", {
   on.exit(options(old_opts), add = TRUE)
 
   floor_value <- function(y, n, p = 2L, q = 1L) {
-    0.01 * npRmpi:::EssDee(y) * n^(-1 / (2 * p + q))
+    0.1 * npRmpi:::EssDee(y) * n^(-1 / (2 * p + q))
   }
 
   set.seed(600007)

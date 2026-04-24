@@ -477,7 +477,7 @@ npValidateScaleFactorLowerBound <- function(value,
 }
 
 npResolveScaleFactorLowerBound <- function(value,
-                                           fallback = 0.01,
+                                           fallback = 0.1,
                                            argname = "scale.factor.lower.bound") {
   if (is.null(value))
     return(as.double(fallback))

@@ -116,7 +116,7 @@ npcdensbw.formula <-
 }
 
 .npcdensbw_resolve_scale_factor_lower_bound <- function(value,
-                                                        fallback = 0.01,
+                                                        fallback = 0.1,
                                                         argname = "scale.factor.lower.bound") {
   if (is.null(value))
     return(as.double(fallback))
@@ -204,7 +204,7 @@ npcdensbw.conbandwidth <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
     scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
       if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound,
-      fallback = 0.01,
+      fallback = 0.1,
       argname = "scale.factor.lower.bound"
     )
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
@@ -735,7 +735,7 @@ npcdensbw.conbandwidth <-
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
   scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
     bws$scale.factor.lower.bound,
-    fallback = 0.01,
+    fallback = 0.1,
     argname = "bws$scale.factor.lower.bound"
   )
   reg.code <- if (identical(bws$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
@@ -1316,7 +1316,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
 .npcdensbw_nomad_continuous_lower_bound <- function(template) {
   .npcdensbw_resolve_scale_factor_lower_bound(
     template$scale.factor.lower.bound,
-    fallback = 0.01,
+    fallback = 0.1,
     argname = "template$scale.factor.lower.bound"
   )
 }
@@ -1976,7 +1976,7 @@ npcdensbw.default <-
     cvls.i1.rescue <- npValidateScalarLogical(cvls.i1.rescue, "cvls.i1.rescue")
     scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
       scale.factor.lower.bound,
-      fallback = 0.01,
+      fallback = 0.1,
       argname = "scale.factor.lower.bound"
     )
     nomad.shortcut <- .np_prepare_nomad_shortcut(

@@ -246,7 +246,7 @@ npplregbw(\dots)
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates in the
     nonparametric \code{zdat} bandwidth searches. When omitted, the
-    legacy coefficient \code{0.01} is used. Larger values impose a
+    default coefficient \code{0.1} is used. Larger values impose a
     stricter search floor. This argument affects search admissibility
     and search-start sanitization only; explicit bandwidths supplied for
     storage when \code{bandwidth.compute = FALSE} are not rewritten.}

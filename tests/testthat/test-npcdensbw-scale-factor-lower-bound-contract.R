@@ -34,20 +34,24 @@ make_bad_seed_bandwidth <- function(scale.factor.lower.bound = NULL) {
   )
 }
 
-test_that("omitted scale-factor floor matches explicit legacy 0.01", {
+test_that("omitted scale-factor floor matches explicit default 0.1", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   default_case <- make_bad_seed_bandwidth()
+  strict_case <- make_bad_seed_bandwidth(scale.factor.lower.bound = 0.1)
   legacy_case <- make_bad_seed_bandwidth(scale.factor.lower.bound = 0.01)
 
   obj_default <- npRmpi:::.npcdensbw_eval_only(default_case$data$x, default_case$data$y, default_case$bw)$objective
+  obj_strict <- npRmpi:::.npcdensbw_eval_only(strict_case$data$x, strict_case$data$y, strict_case$bw)$objective
   obj_legacy <- npRmpi:::.npcdensbw_eval_only(legacy_case$data$x, legacy_case$data$y, legacy_case$bw)$objective
 
-  expect_equal(default_case$bw$scale.factor.lower.bound, 0.01, tolerance = 0)
+  expect_equal(default_case$bw$scale.factor.lower.bound, 0.1, tolerance = 0)
+  expect_equal(strict_case$bw$scale.factor.lower.bound, 0.1, tolerance = 0)
   expect_equal(legacy_case$bw$scale.factor.lower.bound, 0.01, tolerance = 0)
+  expect_equal(obj_default, obj_strict, tolerance = 1e-12)
   expect_equal(obj_default, obj_legacy, tolerance = 1e-12)
 })
 

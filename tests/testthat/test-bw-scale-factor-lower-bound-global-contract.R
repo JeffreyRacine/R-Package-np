@@ -1,5 +1,10 @@
 suppressPackageStartupMessages(library(npRmpi))
 
+test_that("omitted generic scale-factor floor defaults to 0.1", {
+  expect_equal(npRmpi:::npResolveScaleFactorLowerBound(NULL), 0.1, tolerance = 0)
+  expect_equal(npRmpi:::npResolveScaleFactorLowerBound(0.01), 0.01, tolerance = 0)
+})
+
 test_that("scale.factor.lower.bound is accepted across npRmpi bandwidth selectors", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
