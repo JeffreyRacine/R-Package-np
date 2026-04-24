@@ -125,6 +125,8 @@ extern int *vector_glp_gradient_order_extern;
 extern int int_glp_bernstein_extern;
 extern int int_glp_basis_extern;
 extern int int_bounded_cvls_i1_rescue_extern;
+extern int int_bounded_cvls_quadrature_points_extern;
+extern double double_bounded_cvls_quadrature_extend_factor_extern;
 
 extern int KERNEL_reg_extern;
 extern int KERNEL_reg_unordered_extern;
@@ -17390,14 +17392,10 @@ static int np_conditional_lp_cvls_block_size(void){
 #define NP_BOUNDED_CVLS_I1_GRID_POINTS_2D 31
 #define NP_BOUNDED_CVLS_I1_MODE_BOOK 1
 #define NP_BOUNDED_CVLS_I1_MODE_FULL 0
-#define NP_BOUNDED_CVLS_ONE_SIDED_EXTEND_FACTOR 1.0
+#define NP_BOUNDED_CVLS_DEFAULT_EXTEND_FACTOR 2.0
 #define NP_BOUNDED_CVLS_I1_RESCUE_ABS_TOL 1.0e-10
 #define NP_BOUNDED_CVLS_I1_RESCUE_GRID_HY_RATIO_TRIGGER 8.0
 #define NP_BOUNDED_CVLS_I1_RESCUE_STAGE1_INTERVAL_KNOTS 5
-#define NP_BOUNDED_CVLS_I1_RESCUE_STAGE1_MAX_POINTS \
-  (NP_BOUNDED_CVLS_I1_GRID_POINTS + \
-   (NP_BOUNDED_CVLS_I1_GRID_POINTS - 1) * NP_BOUNDED_CVLS_I1_RESCUE_STAGE1_INTERVAL_KNOTS)
-#define NP_BOUNDED_CVLS_I1_RESCUE_STAGE2_GRID_POINTS 243
 
 static int np_bounded_cvls_continuous_support_ok(const int ncon,
                                                  const double *lb,
@@ -17434,6 +17432,10 @@ static void np_bounded_cvls_conditional_effective_integration_bounds(const int n
                                                                      double *quad_lb,
                                                                      double *quad_ub){
   int d, i;
+  double extend_factor = double_bounded_cvls_quadrature_extend_factor_extern;
+
+  if((!R_FINITE(extend_factor)) || (extend_factor <= 0.0))
+    extend_factor = NP_BOUNDED_CVLS_DEFAULT_EXTEND_FACTOR;
 
   for(d = 0; d < ncon; d++){
     const double * const train_y = train_continuous[d];
@@ -17454,10 +17456,10 @@ static void np_bounded_cvls_conditional_effective_integration_bounds(const int n
        preserving the bounded-kernel evaluation path. */
     span = ymax - ymin;
     if((span > 0.0) && R_FINITE(span))
-      ext = NP_BOUNDED_CVLS_ONE_SIDED_EXTEND_FACTOR*span;
+      ext = extend_factor*span;
     else {
       const double scale = MAX(1.0, MAX(fabs(ymin), fabs(ymax)));
-      ext = NP_BOUNDED_CVLS_ONE_SIDED_EXTEND_FACTOR*scale;
+      ext = extend_factor*scale;
     }
 
     quad_lb[d] = np_bounded_cvls_bound_is_effectively_infinite(support_lb[d]) ?
@@ -17470,6 +17472,13 @@ static void np_bounded_cvls_conditional_effective_integration_bounds(const int n
 static int np_bounded_cvls_grid_points(const int ncon){
   return (ncon == 1) ? NP_BOUNDED_CVLS_I1_GRID_POINTS :
     NP_BOUNDED_CVLS_I1_GRID_POINTS_2D;
+}
+
+static int np_bounded_cvls_conditional_grid_points(const int ncon){
+  if(int_bounded_cvls_quadrature_points_extern >= 2)
+    return int_bounded_cvls_quadrature_points_extern;
+
+  return np_bounded_cvls_grid_points(ncon);
 }
 
 static int np_conditional_density_cvls_bounded_scalar_route_ok(void){
@@ -18127,15 +18136,15 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
                                                                          double *cv,
                                                                          int i1_mode){
   const int num_obs = num_obs_train_extern;
-  const int q = NP_BOUNDED_CVLS_I1_GRID_POINTS;
-  const int q_rescue_max = NP_BOUNDED_CVLS_I1_RESCUE_STAGE1_MAX_POINTS;
+  const int q = np_bounded_cvls_conditional_grid_points(1);
+  const int q_rescue_max = q + (q - 1) * NP_BOUNDED_CVLS_I1_RESCUE_STAGE1_INTERVAL_KNOTS;
+  const int q_rescue_stage2 = 3 * q;
   double quad_lb[2] = {0.0, 0.0};
   double quad_ub[2] = {0.0, 0.0};
-  double base_grid[NP_BOUNDED_CVLS_I1_GRID_POINTS];
-  double base_weights[NP_BOUNDED_CVLS_I1_GRID_POINTS];
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
   double *xrow = NULL, *xrow_full = NULL, *yrow = NULL;
+  double *base_grid = NULL, *base_weights = NULL;
   double *rescue_grid = NULL, *rescue_weights = NULL;
   double **ygridblock = NULL, **rescue_ygridblock = NULL;
   double hy = 0.0;
@@ -18151,13 +18160,19 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   if((i1_mode != NP_BOUNDED_CVLS_I1_MODE_BOOK) &&
      (i1_mode != NP_BOUNDED_CVLS_I1_MODE_FULL))
     return 1;
+  if((q < 2) || (q > ((INT_MAX - NP_BOUNDED_CVLS_I1_RESCUE_STAGE1_INTERVAL_KNOTS) /
+                      (NP_BOUNDED_CVLS_I1_RESCUE_STAGE1_INTERVAL_KNOTS + 1))))
+    return 1;
 
   xrow = alloc_vecd(MAX(1, num_obs));
   if(i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL)
     xrow_full = alloc_vecd(MAX(1, num_obs));
   yrow = alloc_vecd(MAX(1, num_obs));
+  base_grid = alloc_vecd(q);
+  base_weights = alloc_vecd(q);
   ygridblock = alloc_matd(num_obs, q);
-  if((xrow == NULL) || (yrow == NULL) || (ygridblock == NULL) ||
+  if((xrow == NULL) || (yrow == NULL) || (base_grid == NULL) || (base_weights == NULL) ||
+     (ygridblock == NULL) ||
      ((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xrow_full == NULL)))
     goto cleanup_bounded_cvls_quad;
 
@@ -18227,7 +18242,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
       if(i1_mean <= NP_BOUNDED_CVLS_I1_RESCUE_ABS_TOL){
         np_fill_trapezoid_rule(quad_lb[0],
                                quad_ub[0],
-                               NP_BOUNDED_CVLS_I1_RESCUE_STAGE2_GRID_POINTS,
+                               q_rescue_stage2,
                                rescue_grid,
                                rescue_weights);
         (void)np_conditional_density_cvls_bounded_i1_eval_on_grid(
@@ -18236,7 +18251,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
           &yctx,
           rescue_grid,
           rescue_weights,
-          NP_BOUNDED_CVLS_I1_RESCUE_STAGE2_GRID_POINTS,
+          q_rescue_stage2,
           i1_mode,
           xrow,
           xrow_full,
@@ -18257,6 +18272,8 @@ cleanup_bounded_cvls_quad:
   if(xrow != NULL) free(xrow);
   if(xrow_full != NULL) free(xrow_full);
   if(yrow != NULL) free(yrow);
+  if(base_grid != NULL) free(base_grid);
+  if(base_weights != NULL) free(base_weights);
   if(ygridblock != NULL) free_mat(ygridblock, q);
   if(rescue_grid != NULL) free(rescue_grid);
   if(rescue_weights != NULL) free(rescue_weights);
@@ -18310,7 +18327,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   const int ncon = num_var_continuous_extern;
   const int nuno = num_var_unordered_extern;
   const int nord = num_var_ordered_extern;
-  const int q = np_bounded_cvls_grid_points(ncon);
+  const int q = np_bounded_cvls_conditional_grid_points(ncon);
   const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(), 64));
   size_t total_eval = 0;
   NPConditionalYRowCtx yctx = {0};

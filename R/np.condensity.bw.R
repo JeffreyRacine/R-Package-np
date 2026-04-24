@@ -123,6 +123,52 @@ npcdensbw.formula <-
   .npcdensbw_validate_scale_factor_lower_bound(value, argname = argname)
 }
 
+.npcdensbw_validate_cvls_quadrature_extend_factor <- function(value,
+                                                              argname = "cvls.quadrature.extend.factor") {
+  if (length(value) != 1L || !is.numeric(value) || is.na(value) ||
+      !is.finite(value) || value <= 0) {
+    stop(sprintf("%s must be a single positive finite numeric value", argname),
+         call. = FALSE)
+  }
+
+  as.double(value)
+}
+
+.npcdensbw_resolve_cvls_quadrature_extend_factor <- function(value,
+                                                             fallback = 2,
+                                                             argname = "cvls.quadrature.extend.factor") {
+  if (is.null(value))
+    return(as.double(fallback))
+
+  .npcdensbw_validate_cvls_quadrature_extend_factor(value, argname = argname)
+}
+
+.npcdensbw_validate_cvls_quadrature_points <- function(value,
+                                                       argname = "cvls.quadrature.points") {
+  if (length(value) != 2L || !is.numeric(value) || anyNA(value) ||
+      any(!is.finite(value)) || any(value < 2) ||
+      any(abs(value - round(value)) > sqrt(.Machine$double.eps))) {
+    stop(sprintf("%s must be a two-element finite integer vector with entries at least 2", argname),
+         call. = FALSE)
+  }
+
+  as.integer(round(value))
+}
+
+.npcdensbw_resolve_cvls_quadrature_points <- function(value,
+                                                      fallback = c(81L, 31L),
+                                                      argname = "cvls.quadrature.points") {
+  if (is.null(value))
+    return(as.integer(fallback))
+
+  .npcdensbw_validate_cvls_quadrature_points(value, argname = argname)
+}
+
+.npcdensbw_effective_cvls_quadrature_points <- function(points, yncon) {
+  points <- .npcdensbw_resolve_cvls_quadrature_points(points)
+  if (as.integer(yncon) >= 2L) points[[2L]] else points[[1L]]
+}
+
 .npcdensbw_effective_continuous_start_lower <- function(lbc.init,
                                                         scale.factor.lower.bound) {
   max(as.double(lbc.init), as.double(scale.factor.lower.bound))
@@ -186,6 +232,8 @@ npcdensbw.conbandwidth <-
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
            scale.factor.lower.bound = NULL,
+           cvls.quadrature.extend.factor = NULL,
+           cvls.quadrature.points = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
@@ -208,11 +256,23 @@ npcdensbw.conbandwidth <-
       fallback = 0.1,
       argname = "scale.factor.lower.bound"
     )
+    cvls.quadrature.extend.factor <- .npcdensbw_resolve_cvls_quadrature_extend_factor(
+      if (is.null(cvls.quadrature.extend.factor)) bws$cvls.quadrature.extend.factor else cvls.quadrature.extend.factor,
+      fallback = 2,
+      argname = "cvls.quadrature.extend.factor"
+    )
+    cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
+      if (is.null(cvls.quadrature.points)) bws$cvls.quadrature.points else cvls.quadrature.points,
+      fallback = c(81L, 31L),
+      argname = "cvls.quadrature.points"
+    )
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
     if (is.null(bws$cvls.i1.rescue))
       bws$cvls.i1.rescue <- TRUE
     bws$cvls.i1.rescue <- npValidateScalarLogical(bws$cvls.i1.rescue, "bws$cvls.i1.rescue")
     bws$scale.factor.lower.bound <- scale.factor.lower.bound
+    bws$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
+    bws$cvls.quadrature.points <- cvls.quadrature.points
     itmax <- npValidatePositiveInteger(itmax, "itmax")
     ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
     tol <- npValidatePositiveFiniteNumeric(tol, "tol")
@@ -364,7 +424,9 @@ npcdensbw.conbandwidth <-
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds,
-        cvls.i1.rescue = if (isTRUE(tbw$cvls.i1.rescue)) 1L else 0L)
+        cvls.i1.rescue = if (isTRUE(tbw$cvls.i1.rescue)) 1L else 0L,
+        cvls.quadrature.points =
+          .npcdensbw_effective_cvls_quadrature_points(tbw$cvls.quadrature.points, tbw$yncon))
       
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
@@ -373,7 +435,8 @@ npcdensbw.conbandwidth <-
         hbc.init = hbc.init, cfac.init = cfac.init, 
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac,
-        scale.factor.lower.bound = tbw$scale.factor.lower.bound)
+        scale.factor.lower.bound = tbw$scale.factor.lower.bound,
+        cvls.quadrature.extend.factor = tbw$cvls.quadrature.extend.factor)
 
       cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
       cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
@@ -547,6 +610,8 @@ npcdensbw.conbandwidth <-
                         bernstein.basis.engine = tbw$bernstein.basis.engine)
     tbw$cvls.i1.rescue <- isTRUE(bws$cvls.i1.rescue)
     tbw$scale.factor.lower.bound <- bws$scale.factor.lower.bound
+    tbw$cvls.quadrature.extend.factor <- bws$cvls.quadrature.extend.factor
+    tbw$cvls.quadrature.points <- bws$cvls.quadrature.points
     
     tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
     tbw <- .npcdensbw_restore_explicit_fixed_y_bounds(tbw, bws)
@@ -581,6 +646,8 @@ npcdensbw.conbandwidth <-
   tbw <- do.call(conbandwidth, bw.args)
   tbw$cvls.i1.rescue <- isTRUE(reg.args$cvls.i1.rescue)
   tbw$scale.factor.lower.bound <- reg.args$scale.factor.lower.bound
+  tbw$cvls.quadrature.extend.factor <- reg.args$cvls.quadrature.extend.factor
+  tbw$cvls.quadrature.points <- reg.args$cvls.quadrature.points
   tbw <- .npcdensbw_apply_continuous_search_floor(
     tbw,
     xdat = xdat,
@@ -688,6 +755,16 @@ npcdensbw.conbandwidth <-
     fallback = 0.1,
     argname = "bws$scale.factor.lower.bound"
   )
+  cvls.quadrature.extend.factor <- .npcdensbw_resolve_cvls_quadrature_extend_factor(
+    bws$cvls.quadrature.extend.factor,
+    fallback = 2,
+    argname = "bws$cvls.quadrature.extend.factor"
+  )
+  cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
+    bws$cvls.quadrature.points,
+    fallback = c(81L, 31L),
+    argname = "bws$cvls.quadrature.points"
+  )
   reg.code <- if (identical(bws$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
   degree.code <- if (bws$xncon > 0L) as.integer(bws$degree.engine) else integer(0L)
   basis.code <- as.integer(npLpBasisCode(bws$basis.engine))
@@ -746,7 +823,9 @@ npcdensbw.conbandwidth <-
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
     transform.bounds = FALSE,
-    cvls.i1.rescue = if (isTRUE(bws$cvls.i1.rescue)) 1L else 0L
+    cvls.i1.rescue = if (isTRUE(bws$cvls.i1.rescue)) 1L else 0L,
+    cvls.quadrature.points =
+      .npcdensbw_effective_cvls_quadrature_points(cvls.quadrature.points, bws$yncon)
   )
 
   myoptd <- list(
@@ -769,7 +848,8 @@ npcdensbw.conbandwidth <-
     dfac.init = 0,
     nconfac = nconfac,
     ncatfac = ncatfac,
-    scale.factor.lower.bound = scale.factor.lower.bound
+    scale.factor.lower.bound = scale.factor.lower.bound,
+    cvls.quadrature.extend.factor = cvls.quadrature.extend.factor
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
@@ -1414,6 +1494,8 @@ npcdensbw.default <-
            scale.init.categorical.sample,
            scale.factor.lower.bound = NULL,
            cvls.i1.rescue = TRUE,
+           cvls.quadrature.extend.factor = 2,
+           cvls.quadrature.points = c(81L, 31L),
            small,
            tol,
            transform.bounds,
@@ -1452,6 +1534,16 @@ npcdensbw.default <-
       scale.factor.lower.bound,
       fallback = 0.1,
       argname = "scale.factor.lower.bound"
+    )
+    cvls.quadrature.extend.factor <- .npcdensbw_resolve_cvls_quadrature_extend_factor(
+      cvls.quadrature.extend.factor,
+      fallback = 2,
+      argname = "cvls.quadrature.extend.factor"
+    )
+    cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
+      cvls.quadrature.points,
+      fallback = c(81L, 31L),
+      argname = "cvls.quadrature.points"
     )
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
@@ -1634,6 +1726,8 @@ npcdensbw.default <-
     reg.args <- bw.args[setdiff(names(bw.args), c("xbw", "ybw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
     reg.args$cvls.i1.rescue <- cvls.i1.rescue
     reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    reg.args$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
+    reg.args$cvls.quadrature.points <- cvls.quadrature.points
 
     ## next grab dummies for actual bandwidth selection and perform call
 
