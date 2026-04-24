@@ -519,6 +519,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CBW_D_INITD 16
 #define CBW_NCONFD     17
 #define CBW_NCATFD     18
+#define CBW_SFLOORD    19
 
 
 #define CBWM_CVML 0

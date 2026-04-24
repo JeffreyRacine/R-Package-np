@@ -872,22 +872,23 @@ static void np_copy_scale_factor(double *dest, const double *src, int n)
 extern double *vector_continuous_stddev_extern;
 extern double nconfac_extern;
 
-static double np_fixed_continuous_floor_cv(const int continuous_index,
-                                           const double temp_pow)
+static double np_fixed_continuous_floor_cv_with_coeff(const int continuous_index,
+                                                      const double temp_pow,
+                                                      const double floor_coeff)
 {
   const double scale_pow =
     (R_FINITE(nconfac_extern) && (nconfac_extern > 0.0)) ? nconfac_extern : temp_pow;
 
   if (int_LARGE_SF == SF_NORMAL)
-    return 0.01;
+    return floor_coeff;
 
   if ((vector_continuous_stddev_extern != NULL) &&
       R_FINITE(vector_continuous_stddev_extern[continuous_index]) &&
       (vector_continuous_stddev_extern[continuous_index] > 0.0)) {
-    return 0.01 * vector_continuous_stddev_extern[continuous_index] * scale_pow;
+    return floor_coeff * vector_continuous_stddev_extern[continuous_index] * scale_pow;
   }
 
-  return 0.01 * scale_pow;
+  return floor_coeff * scale_pow;
 }
 
 static double np_fixed_continuous_temp_pow_cv(
@@ -917,12 +918,13 @@ static double np_fixed_continuous_temp_pow_cv(
   }
 }
 
-static int np_fixed_continuous_floor_ok_cv(
+static int np_fixed_continuous_floor_ok_cv_with_coeff(
   int KERNEL,
   int num_obs,
   int num_var_continuous,
   int num_reg_continuous,
-  double *candidate)
+  double *candidate,
+  double floor_coeff)
 {
   int i;
   const double temp_pow = np_fixed_continuous_temp_pow_cv(
@@ -933,7 +935,7 @@ static int np_fixed_continuous_floor_ok_cv(
   const int total_continuous = num_reg_continuous + num_var_continuous;
 
   for (i = 1; i <= total_continuous; i++) {
-    const double bw_floor = np_fixed_continuous_floor_cv(i - 1, temp_pow);
+    const double bw_floor = np_fixed_continuous_floor_cv_with_coeff(i - 1, temp_pow, floor_coeff);
     if (candidate[i] < bw_floor)
       return 0;
   }
@@ -941,7 +943,7 @@ static int np_fixed_continuous_floor_ok_cv(
   return 1;
 }
 
-static int np_bw_candidate_is_admissible(
+static int np_bw_candidate_is_admissible_with_floor(
   int n,
   int use_transform,
   int KERNEL,
@@ -957,7 +959,8 @@ static int np_bw_candidate_is_admissible(
   int num_reg_unordered,
   int num_reg_ordered,
   int *num_categories,
-  double *vector_scale_factor)
+  double *vector_scale_factor,
+  double floor_coeff)
 {
   double *candidate = vector_scale_factor;
   double *tmp = NULL;
@@ -993,15 +996,54 @@ static int np_bw_candidate_is_admissible(
     safe_free(tmp);
 
   if ((invalid == 0) &&
-      !np_fixed_continuous_floor_ok_cv(
+      !np_fixed_continuous_floor_ok_cv_with_coeff(
         KERNEL,
         num_obs,
         num_var_continuous,
         num_reg_continuous,
-        candidate))
+        candidate,
+        floor_coeff))
     invalid = 1;
 
   return (invalid == 0);
+}
+
+static int np_bw_candidate_is_admissible(
+  int n,
+  int use_transform,
+  int KERNEL,
+  int KERNEL_unordered_liracine,
+  int BANDWIDTH,
+  int BANDWIDTH_den_ml,
+  int REGRESSION_ML,
+  int num_obs,
+  int num_var_continuous,
+  int num_var_unordered,
+  int num_var_ordered,
+  int num_reg_continuous,
+  int num_reg_unordered,
+  int num_reg_ordered,
+  int *num_categories,
+  double *vector_scale_factor)
+{
+  return np_bw_candidate_is_admissible_with_floor(
+    n,
+    use_transform,
+    KERNEL,
+    KERNEL_unordered_liracine,
+    BANDWIDTH,
+    BANDWIDTH_den_ml,
+    REGRESSION_ML,
+    num_obs,
+    num_var_continuous,
+    num_var_unordered,
+    num_var_ordered,
+    num_reg_continuous,
+    num_reg_unordered,
+    num_reg_ordered,
+    num_categories,
+    vector_scale_factor,
+    0.01);
 }
 
 int * ipt_lookup_extern_X;
@@ -6322,6 +6364,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   double lbd_dir, hbd_dir, d_dir, initd_dir;
   double lbc_init, hbc_init, c_init; 
   double lbd_init, hbd_init, d_init;
+  double scale_factor_lower_bound;
   int dfc_dir;
   
   int i,j;
@@ -6432,6 +6475,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   tol=myoptd[CBW_TOLD];
   small=myoptd[CBW_SMALLD];
   dbl_memfac_ccdf_extern = myoptd[CBW_MEMFACD];
+  scale_factor_lower_bound = myoptd[CBW_SFLOORD];
+  if (!R_FINITE(scale_factor_lower_bound) || scale_factor_lower_bound < 0.0)
+    scale_factor_lower_bound = 0.01;
 
   dfc_dir = myopti[CBW_DFC_DIRI];
   lbc_dir = myoptd[CBW_LBC_DIRD];
@@ -6944,7 +6990,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   have_multistart_best = 0;
   fret_start_best = DBL_MAX;
   if (enforce_fixed_feasibility &&
-      np_bw_candidate_is_admissible(
+      np_bw_candidate_is_admissible_with_floor(
         num_all_var,
         bwm_use_transform,
         KERNEL_den_extern,
@@ -6960,7 +7006,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
         num_reg_unordered_extern,
         num_reg_ordered_extern,
         num_categories_extern,
-        vector_scale_factor)) {
+        vector_scale_factor,
+        scale_factor_lower_bound)) {
     have_start_best = 1;
     fret_start_best = fret_initial;
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
@@ -7021,7 +7068,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   }
 
   if (enforce_fixed_feasibility &&
-      np_bw_candidate_is_admissible(
+      np_bw_candidate_is_admissible_with_floor(
         num_all_var,
         bwm_use_transform,
         KERNEL_den_extern,
@@ -7037,7 +7084,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
         num_reg_unordered_extern,
         num_reg_ordered_extern,
         num_categories_extern,
-        vector_scale_factor) &&
+        vector_scale_factor,
+        scale_factor_lower_bound) &&
       ((!have_start_best) || (fret < fret_start_best))) {
     have_start_best = 1;
     fret_start_best = fret;
@@ -7187,7 +7235,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       /* If this run resulted in an improved minimum save information */
       
       if (enforce_fixed_feasibility) {
-        if (np_bw_candidate_is_admissible(
+        if (np_bw_candidate_is_admissible_with_floor(
               num_all_var,
               bwm_use_transform,
               KERNEL_den_extern,
@@ -7203,7 +7251,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
               num_reg_unordered_extern,
               num_reg_ordered_extern,
               num_categories_extern,
-              vector_scale_factor) &&
+              vector_scale_factor,
+              scale_factor_lower_bound) &&
             ((!have_multistart_best) || (fret < fret_best))) {
           fret_best = fret;
           have_multistart_best = 1;
@@ -7251,7 +7300,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if (enforce_fixed_feasibility) {
     if (!have_start_best)
       error("C_np_density_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate");
-    if (!np_bw_candidate_is_admissible(
+    if (!np_bw_candidate_is_admissible_with_floor(
           num_all_var,
           bwm_use_transform,
           KERNEL_den_extern,
@@ -7267,7 +7316,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
           num_reg_unordered_extern,
           num_reg_ordered_extern,
           num_categories_extern,
-          vector_scale_factor))
+          vector_scale_factor,
+          scale_factor_lower_bound))
       error("C_np_density_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate");
   }
 

@@ -46,6 +46,7 @@ npcdensbw(\dots)
           penalty.multiplier = 10,
           remin = TRUE,
           scale.init.categorical.sample = FALSE,
+          scale.factor.lower.bound = NULL,
           small = 1.490116e-05,
           tol = 1.490116e-04,
           transform.bounds = FALSE,
@@ -92,6 +93,7 @@ npcdensbw(\dots)
           penalty.multiplier,
           remin,
           scale.init.categorical.sample,
+          scale.factor.lower.bound = NULL,
           cvls.i1.rescue = TRUE,
           small,
           tol,
@@ -374,6 +376,19 @@ npcdensbw(\dots)
     applies an internal transformation that maps the unconstrained
     search to the feasible bandwidth domain. Defaults to
     \code{FALSE}.}
+
+  \item{scale.factor.lower.bound}{
+    an optional nonnegative scalar controlling the hard lower bound used
+    for continuous fixed-bandwidth search candidates in
+    \code{npcdensbw(..., bandwidth.compute = TRUE)}. When omitted, the
+    legacy coefficient \code{0.01} is used. Larger values, such as
+    \code{0.1}, impose a stricter search floor. This argument affects
+    search admissibility and search-start sanitization only; explicit
+    bandwidths supplied for storage when \code{bandwidth.compute = FALSE}
+    are not rewritten. This differs from \code{lbc.init}, which controls
+    the lower bound for continuous starting scale factors in Powell-style
+    search initialization.
+  }
 
   \item{cvls.i1.rescue}{
     a logical value that when set to \code{TRUE} enables a deterministic
