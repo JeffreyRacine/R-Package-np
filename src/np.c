@@ -462,12 +462,12 @@ static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;
 static int *bwm_kernel_unordered_vec = NULL;
 static int bwm_kernel_unordered_len = 0;
-static double bwm_scale_factor_lower_bound = 0.01;
+static double bwm_scale_factor_lower_bound = 0.1;
 
 static void bwm_set_scale_factor_lower_bound(double value)
 {
   bwm_scale_factor_lower_bound =
-    (R_FINITE(value) && (value >= 0.0)) ? value : 0.01;
+    (R_FINITE(value) && (value >= 0.0)) ? value : 0.1;
 }
 
 static int np_has_finite_cker_bounds(const double *lb, const double *ub, const int n)
@@ -5999,7 +5999,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   dbl_memfac_ccdf_extern = myoptd[CBW_MEMFACD];
   scale_factor_lower_bound = myoptd[CBW_SFLOORD];
   if (!R_FINITE(scale_factor_lower_bound) || scale_factor_lower_bound < 0.0)
-    scale_factor_lower_bound = 0.01;
+    scale_factor_lower_bound = 0.1;
 
   dfc_dir = myopti[CBW_DFC_DIRI];
   lbc_dir = myoptd[CBW_LBC_DIRD];

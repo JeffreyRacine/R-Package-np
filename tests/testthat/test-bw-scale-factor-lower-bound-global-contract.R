@@ -1,5 +1,10 @@
 library(np)
 
+test_that("omitted generic scale-factor floor defaults to 0.1", {
+  expect_equal(np:::npResolveScaleFactorLowerBound(NULL), 0.1, tolerance = 0)
+  expect_equal(np:::npResolveScaleFactorLowerBound(0.01), 0.01, tolerance = 0)
+})
+
 test_that("scale.factor.lower.bound is accepted across bandwidth selectors", {
   set.seed(20260423)
   n <- 32L

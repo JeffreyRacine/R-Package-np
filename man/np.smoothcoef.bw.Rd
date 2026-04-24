@@ -382,7 +382,7 @@ npscoefbw(\dots)
   \item{scale.factor.lower.bound}{
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates. When omitted, the
-    legacy coefficient \code{0.01} is used; the existing
+    default coefficient \code{0.1} is used; the existing
     \code{lbc.init=0.5} default is therefore unchanged unless the user
     requests a larger value or a smaller \code{lbc.init}. This argument
     affects search admissibility and search-start sanitization only;

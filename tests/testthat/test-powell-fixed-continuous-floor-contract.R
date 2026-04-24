@@ -4,7 +4,7 @@ test_that("Powell hot-start respects fixed continuous lower bound", {
   skip_if_not_installed("crs")
 
   floor_value <- function(y, n, p = 2L, q = 1L) {
-    0.01 * np:::EssDee(y) * n^(-1 / (2 * p + q))
+    0.1 * np:::EssDee(y) * n^(-1 / (2 * p + q))
   }
 
   set.seed(600007)
