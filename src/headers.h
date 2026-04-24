@@ -505,7 +505,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CBW_SCATI 24
 #define CBW_DFC_DIRI 25
 #define CBW_TBNDI 26
-#define CBW_CVLS_I1_RESCUEI 27
+#define CBW_CVLS_QUAD_ADAPTIVEI 27
 #define CBW_CVLS_QUAD_POINTSI 28
 
 #define CBW_FTOLD  0
@@ -529,6 +529,9 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CBW_NCATFD     18
 #define CBW_SFLOORD    19
 #define CBW_QUAD_EXTD  20
+#define CBW_CVLS_ADAPTIVE_TOLD 21
+#define CBW_CVLS_ADAPTIVE_GRID_HY_RATIOD 22
+#define CBW_CVLS_ADAPTIVE_FLOOR_TOLD 23
 
 
 #define CBWM_CVML 0

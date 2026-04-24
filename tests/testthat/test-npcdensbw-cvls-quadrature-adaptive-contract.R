@@ -7,7 +7,7 @@ chisq_support_fixture <- function(n, seed) {
   list(x = data.frame(x = x), y = data.frame(y = y))
 }
 
-test_that("npcdensbw stores the cv.ls I1 rescue toggle on conditional bandwidth objects", {
+test_that("npcdensbw stores the cv.ls adaptive quadrature toggle on conditional bandwidth objects", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
@@ -30,7 +30,7 @@ test_that("npcdensbw stores the cv.ls I1 rescue toggle on conditional bandwidth 
     bandwidth.compute = FALSE,
     bwmethod = "cv.ls",
     bwtype = "fixed",
-    cvls.i1.rescue = TRUE
+    cvls.quadrature.adaptive = TRUE
   )
   bw_off <- npcdensbw(
     xdat = dat$x,
@@ -39,15 +39,29 @@ test_that("npcdensbw stores the cv.ls I1 rescue toggle on conditional bandwidth 
     bandwidth.compute = FALSE,
     bwmethod = "cv.ls",
     bwtype = "fixed",
-    cvls.i1.rescue = FALSE
+    cvls.quadrature.adaptive = FALSE
   )
 
-  expect_true(isTRUE(bw_default$cvls.i1.rescue))
-  expect_true(isTRUE(bw_on$cvls.i1.rescue))
-  expect_false(isTRUE(bw_off$cvls.i1.rescue))
+  expect_false("cvls.i1.rescue" %in% names(formals(getS3method("npcdensbw", "default"))))
+  expect_false("cvls.i1.rescue" %in% names(bw_default))
+  expect_error(
+    npcdensbw(
+      xdat = dat$x,
+      ydat = dat$y,
+      bws = c(0.35, 0.35),
+      bandwidth.compute = FALSE,
+      bwmethod = "cv.ls",
+      bwtype = "fixed",
+      cvls.i1.rescue = FALSE
+    ),
+    "cvls.i1.rescue has been removed"
+  )
+  expect_true(isTRUE(bw_default$cvls.quadrature.adaptive))
+  expect_true(isTRUE(bw_on$cvls.quadrature.adaptive))
+  expect_false(isTRUE(bw_off$cvls.quadrature.adaptive))
 })
 
-test_that("cv.ls I1 rescue leaves resolved bounded objectives unchanged", {
+test_that("cv.ls adaptive quadrature toggle disables all adaptive triggers", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
@@ -70,20 +84,22 @@ test_that("cv.ls I1 rescue leaves resolved bounded objectives unchanged", {
     cykerbound = "fixed",
     cykerlb = 0,
     cykerub = Inf,
-    cvls.i1.rescue = FALSE
+    cvls.quadrature.adaptive = FALSE
   )
-  bw_on <- bw_off
-  bw_on$cvls.i1.rescue <- TRUE
+  bw_off_triggered <- bw_off
+  bw_off_triggered$cvls.quadrature.adaptive.tol <- 1e6
+  bw_off_triggered$cvls.quadrature.adaptive.grid.hy.ratio <- 0
+  bw_off_triggered$cvls.quadrature.adaptive.floor.tol <- 1e6
 
   obj_off <- npRmpi:::.npcdensbw_eval_only(dat$x, dat$y, bw_off)$objective
-  obj_on <- npRmpi:::.npcdensbw_eval_only(dat$x, dat$y, bw_on)$objective
+  obj_off_triggered <- npRmpi:::.npcdensbw_eval_only(dat$x, dat$y, bw_off_triggered)$objective
 
   expect_true(is.finite(obj_off))
-  expect_true(is.finite(obj_on))
-  expect_equal(obj_on, obj_off, tolerance = 1e-12)
+  expect_true(is.finite(obj_off_triggered))
+  expect_equal(obj_off_triggered, obj_off, tolerance = 1e-12)
 })
 
-test_that("cv.ls I1 rescue penalizes the known bad one-sided tiny-hy candidate", {
+test_that("cv.ls adaptive quadrature penalizes the known bad one-sided tiny-hy candidate", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
@@ -106,10 +122,12 @@ test_that("cv.ls I1 rescue penalizes the known bad one-sided tiny-hy candidate",
     cykerbound = "fixed",
     cykerlb = 0,
     cykerub = Inf,
-    cvls.i1.rescue = FALSE
+    cvls.quadrature.adaptive = FALSE,
+    cvls.quadrature.extend.factor = 2,
+    cvls.quadrature.points = c(81L, 31L)
   )
   bw_on <- bw_off
-  bw_on$cvls.i1.rescue <- TRUE
+  bw_on$cvls.quadrature.adaptive <- TRUE
 
   obj_off <- npRmpi:::.npcdensbw_eval_only(dat$x, dat$y, bw_off)$objective
   obj_on <- npRmpi:::.npcdensbw_eval_only(dat$x, dat$y, bw_on)$objective

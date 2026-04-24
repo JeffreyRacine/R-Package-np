@@ -136,7 +136,7 @@ npcdensbw.formula <-
 }
 
 .npcdensbw_resolve_cvls_quadrature_extend_factor <- function(value,
-                                                             fallback = 2,
+                                                             fallback = 1,
                                                              argname = "cvls.quadrature.extend.factor") {
   if (is.null(value))
     return(as.double(fallback))
@@ -157,12 +157,69 @@ npcdensbw.formula <-
 }
 
 .npcdensbw_resolve_cvls_quadrature_points <- function(value,
-                                                      fallback = c(81L, 31L),
+                                                      fallback = c(243L, 93L),
                                                       argname = "cvls.quadrature.points") {
   if (is.null(value))
     return(as.integer(fallback))
 
   .npcdensbw_validate_cvls_quadrature_points(value, argname = argname)
+}
+
+.npcdensbw_validate_cvls_quadrature_adaptive <- function(value,
+                                                         argname = "cvls.quadrature.adaptive") {
+  if (length(value) != 1L || !is.logical(value) || is.na(value)) {
+    stop(sprintf("%s must be a single logical value", argname),
+         call. = FALSE)
+  }
+
+  value
+}
+
+.npcdensbw_resolve_cvls_quadrature_adaptive <- function(value,
+                                                        fallback = TRUE,
+                                                        argname = "cvls.quadrature.adaptive") {
+  if (is.null(value))
+    return(.npcdensbw_validate_cvls_quadrature_adaptive(fallback, argname))
+
+  .npcdensbw_validate_cvls_quadrature_adaptive(value, argname = argname)
+}
+
+.npcdensbw_validate_cvls_quadrature_adaptive_numeric <- function(value,
+                                                                argname) {
+  if (length(value) != 1L || !is.numeric(value) || is.na(value) ||
+      !is.finite(value) || value < 0) {
+    stop(sprintf("%s must be a single nonnegative finite numeric value", argname),
+         call. = FALSE)
+  }
+
+  as.double(value)
+}
+
+.npcdensbw_resolve_cvls_quadrature_adaptive_tol <- function(value,
+                                                            fallback = 1e-10,
+                                                            argname = "cvls.quadrature.adaptive.tol") {
+  if (is.null(value))
+    return(as.double(fallback))
+
+  .npcdensbw_validate_cvls_quadrature_adaptive_numeric(value, argname = argname)
+}
+
+.npcdensbw_resolve_cvls_quadrature_adaptive_grid_hy_ratio <- function(value,
+                                                                      fallback = 8,
+                                                                      argname = "cvls.quadrature.adaptive.grid.hy.ratio") {
+  if (is.null(value))
+    return(as.double(fallback))
+
+  .npcdensbw_validate_cvls_quadrature_adaptive_numeric(value, argname = argname)
+}
+
+.npcdensbw_resolve_cvls_quadrature_adaptive_floor_tol <- function(value,
+                                                                  fallback = sqrt(.Machine$double.eps),
+                                                                  argname = "cvls.quadrature.adaptive.floor.tol") {
+  if (is.null(value))
+    return(as.double(fallback))
+
+  .npcdensbw_validate_cvls_quadrature_adaptive_numeric(value, argname = argname)
 }
 
 .npcdensbw_effective_cvls_quadrature_points <- function(points, yncon) {
@@ -233,6 +290,10 @@ npcdensbw.conbandwidth <-
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
            scale.factor.lower.bound = NULL,
+           cvls.quadrature.adaptive = NULL,
+           cvls.quadrature.adaptive.tol = NULL,
+           cvls.quadrature.adaptive.grid.hy.ratio = NULL,
+           cvls.quadrature.adaptive.floor.tol = NULL,
            cvls.quadrature.extend.factor = NULL,
            cvls.quadrature.points = NULL,
            small = 1.490116e-05,
@@ -242,6 +303,11 @@ npcdensbw.conbandwidth <-
     elapsed.start <- proc.time()[3]
     ydat = toFrame(ydat)
     xdat = toFrame(xdat)
+
+    mc.expanded <- match.call(expand.dots = TRUE)
+    if ("cvls.i1.rescue" %in% names(mc.expanded))
+      stop("cvls.i1.rescue has been removed; use cvls.quadrature.adaptive",
+           call. = FALSE)
 
     if (missing(nmulti)){
       nmulti <- npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2])
@@ -255,21 +321,42 @@ npcdensbw.conbandwidth <-
       fallback = 0.1,
       argname = "scale.factor.lower.bound"
     )
+    cvls.quadrature.adaptive <- .npcdensbw_resolve_cvls_quadrature_adaptive(
+      if (is.null(cvls.quadrature.adaptive)) bws$cvls.quadrature.adaptive else cvls.quadrature.adaptive,
+      fallback = TRUE,
+      argname = "cvls.quadrature.adaptive"
+    )
+    cvls.quadrature.adaptive.tol <- .npcdensbw_resolve_cvls_quadrature_adaptive_tol(
+      if (is.null(cvls.quadrature.adaptive.tol)) bws$cvls.quadrature.adaptive.tol else cvls.quadrature.adaptive.tol,
+      fallback = 1e-10,
+      argname = "cvls.quadrature.adaptive.tol"
+    )
+    cvls.quadrature.adaptive.grid.hy.ratio <- .npcdensbw_resolve_cvls_quadrature_adaptive_grid_hy_ratio(
+      if (is.null(cvls.quadrature.adaptive.grid.hy.ratio)) bws$cvls.quadrature.adaptive.grid.hy.ratio else cvls.quadrature.adaptive.grid.hy.ratio,
+      fallback = 8,
+      argname = "cvls.quadrature.adaptive.grid.hy.ratio"
+    )
+    cvls.quadrature.adaptive.floor.tol <- .npcdensbw_resolve_cvls_quadrature_adaptive_floor_tol(
+      if (is.null(cvls.quadrature.adaptive.floor.tol)) bws$cvls.quadrature.adaptive.floor.tol else cvls.quadrature.adaptive.floor.tol,
+      fallback = sqrt(.Machine$double.eps),
+      argname = "cvls.quadrature.adaptive.floor.tol"
+    )
     cvls.quadrature.extend.factor <- .npcdensbw_resolve_cvls_quadrature_extend_factor(
       if (is.null(cvls.quadrature.extend.factor)) bws$cvls.quadrature.extend.factor else cvls.quadrature.extend.factor,
-      fallback = 2,
+      fallback = 1,
       argname = "cvls.quadrature.extend.factor"
     )
     cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
       if (is.null(cvls.quadrature.points)) bws$cvls.quadrature.points else cvls.quadrature.points,
-      fallback = c(81L, 31L),
+      fallback = c(243L, 93L),
       argname = "cvls.quadrature.points"
     )
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
-    if (is.null(bws$cvls.i1.rescue))
-      bws$cvls.i1.rescue <- TRUE
-    bws$cvls.i1.rescue <- npValidateScalarLogical(bws$cvls.i1.rescue, "bws$cvls.i1.rescue")
     bws$scale.factor.lower.bound <- scale.factor.lower.bound
+    bws$cvls.quadrature.adaptive <- cvls.quadrature.adaptive
+    bws$cvls.quadrature.adaptive.tol <- cvls.quadrature.adaptive.tol
+    bws$cvls.quadrature.adaptive.grid.hy.ratio <- cvls.quadrature.adaptive.grid.hy.ratio
+    bws$cvls.quadrature.adaptive.floor.tol <- cvls.quadrature.adaptive.floor.tol
     bws$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
     bws$cvls.quadrature.points <- cvls.quadrature.points
     itmax <- npValidatePositiveInteger(itmax, "itmax")
@@ -437,7 +524,7 @@ npcdensbw.conbandwidth <-
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds,
-        cvls.i1.rescue = if (isTRUE(tbw$cvls.i1.rescue)) 1L else 0L,
+        cvls.quadrature.adaptive = if (isTRUE(tbw$cvls.quadrature.adaptive)) 1L else 0L,
         cvls.quadrature.points =
           .npcdensbw_effective_cvls_quadrature_points(tbw$cvls.quadrature.points, tbw$yncon))
       
@@ -449,7 +536,10 @@ npcdensbw.conbandwidth <-
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac,
         scale.factor.lower.bound = tbw$scale.factor.lower.bound,
-        cvls.quadrature.extend.factor = tbw$cvls.quadrature.extend.factor)
+        cvls.quadrature.extend.factor = tbw$cvls.quadrature.extend.factor,
+        cvls.quadrature.adaptive.tol = tbw$cvls.quadrature.adaptive.tol,
+        cvls.quadrature.adaptive.grid.hy.ratio = tbw$cvls.quadrature.adaptive.grid.hy.ratio,
+        cvls.quadrature.adaptive.floor.tol = tbw$cvls.quadrature.adaptive.floor.tol)
 
       cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
       cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
@@ -549,7 +639,6 @@ npcdensbw.conbandwidth <-
       tbw$timing <- myout$timing
       tbw$total.time <- total.time
     }
-    tbw$cvls.i1.rescue <- isTRUE(bws$cvls.i1.rescue)
     tbw$scale.factor.lower.bound <- bws$scale.factor.lower.bound
     
     ## bandwidth metadata
@@ -648,8 +737,11 @@ npcdensbw.conbandwidth <-
                         bernstein.basis.engine = tbw$bernstein.basis.engine)
     tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
     tbw$initial.fval <- if (!is.null(initial.fval)) initial.fval else NA_real_
-    tbw$cvls.i1.rescue <- isTRUE(bws$cvls.i1.rescue)
     tbw$scale.factor.lower.bound <- bws$scale.factor.lower.bound
+    tbw$cvls.quadrature.adaptive <- isTRUE(bws$cvls.quadrature.adaptive)
+    tbw$cvls.quadrature.adaptive.tol <- bws$cvls.quadrature.adaptive.tol
+    tbw$cvls.quadrature.adaptive.grid.hy.ratio <- bws$cvls.quadrature.adaptive.grid.hy.ratio
+    tbw$cvls.quadrature.adaptive.floor.tol <- bws$cvls.quadrature.adaptive.floor.tol
     tbw$cvls.quadrature.extend.factor <- bws$cvls.quadrature.extend.factor
     tbw$cvls.quadrature.points <- bws$cvls.quadrature.points
     tbw <- .npcdensbw_restore_explicit_fixed_y_bounds(tbw, bws)
@@ -682,8 +774,11 @@ npcdensbw.conbandwidth <-
   )
 
   tbw <- do.call(conbandwidth, bw.args)
-  tbw$cvls.i1.rescue <- isTRUE(reg.args$cvls.i1.rescue)
   tbw$scale.factor.lower.bound <- reg.args$scale.factor.lower.bound
+  tbw$cvls.quadrature.adaptive <- isTRUE(reg.args$cvls.quadrature.adaptive)
+  tbw$cvls.quadrature.adaptive.tol <- reg.args$cvls.quadrature.adaptive.tol
+  tbw$cvls.quadrature.adaptive.grid.hy.ratio <- reg.args$cvls.quadrature.adaptive.grid.hy.ratio
+  tbw$cvls.quadrature.adaptive.floor.tol <- reg.args$cvls.quadrature.adaptive.floor.tol
   tbw$cvls.quadrature.extend.factor <- reg.args$cvls.quadrature.extend.factor
   tbw$cvls.quadrature.points <- reg.args$cvls.quadrature.points
   tbw <- .npcdensbw_apply_continuous_search_floor(
@@ -805,13 +900,33 @@ npcdensbw.conbandwidth <-
   )
   cvls.quadrature.extend.factor <- .npcdensbw_resolve_cvls_quadrature_extend_factor(
     bws$cvls.quadrature.extend.factor,
-    fallback = 2,
+    fallback = 1,
     argname = "bws$cvls.quadrature.extend.factor"
   )
   cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
     bws$cvls.quadrature.points,
-    fallback = c(81L, 31L),
+    fallback = c(243L, 93L),
     argname = "bws$cvls.quadrature.points"
+  )
+  cvls.quadrature.adaptive <- .npcdensbw_resolve_cvls_quadrature_adaptive(
+    bws$cvls.quadrature.adaptive,
+    fallback = TRUE,
+    argname = "bws$cvls.quadrature.adaptive"
+  )
+  cvls.quadrature.adaptive.tol <- .npcdensbw_resolve_cvls_quadrature_adaptive_tol(
+    bws$cvls.quadrature.adaptive.tol,
+    fallback = 1e-10,
+    argname = "bws$cvls.quadrature.adaptive.tol"
+  )
+  cvls.quadrature.adaptive.grid.hy.ratio <- .npcdensbw_resolve_cvls_quadrature_adaptive_grid_hy_ratio(
+    bws$cvls.quadrature.adaptive.grid.hy.ratio,
+    fallback = 8,
+    argname = "bws$cvls.quadrature.adaptive.grid.hy.ratio"
+  )
+  cvls.quadrature.adaptive.floor.tol <- .npcdensbw_resolve_cvls_quadrature_adaptive_floor_tol(
+    bws$cvls.quadrature.adaptive.floor.tol,
+    fallback = sqrt(.Machine$double.eps),
+    argname = "bws$cvls.quadrature.adaptive.floor.tol"
   )
 
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
@@ -873,7 +988,7 @@ npcdensbw.conbandwidth <-
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
     transform.bounds = FALSE,
-    cvls.i1.rescue = if (isTRUE(bws$cvls.i1.rescue)) 1L else 0L,
+    cvls.quadrature.adaptive = if (isTRUE(cvls.quadrature.adaptive)) 1L else 0L,
     cvls.quadrature.points =
       .npcdensbw_effective_cvls_quadrature_points(cvls.quadrature.points, bws$yncon)
   )
@@ -899,7 +1014,10 @@ npcdensbw.conbandwidth <-
     nconfac = nconfac,
     ncatfac = ncatfac,
     scale.factor.lower.bound = scale.factor.lower.bound,
-    cvls.quadrature.extend.factor = cvls.quadrature.extend.factor
+    cvls.quadrature.extend.factor = cvls.quadrature.extend.factor,
+    cvls.quadrature.adaptive.tol = cvls.quadrature.adaptive.tol,
+    cvls.quadrature.adaptive.grid.hy.ratio = cvls.quadrature.adaptive.grid.hy.ratio,
+    cvls.quadrature.adaptive.floor.tol = cvls.quadrature.adaptive.floor.tol
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
@@ -962,7 +1080,7 @@ npRmpiNomadShadowPrepareConditionalDensity <- function(c.uno,
                                                        cxkerub,
                                                        cykerlb,
                                                        cykerub) {
-  if (length(myoptd) <= 20L || length(myopti) <= 28L) {
+  if (length(myoptd) <= 23L || length(myopti) <= 28L) {
     rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
     if (isTRUE(rank == 0L))
       stop("resident npcdens NOMAD shadow options are missing quadrature controls", call. = FALSE)
@@ -1064,13 +1182,33 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   )
   cvls.quadrature.extend.factor <- .npcdensbw_resolve_cvls_quadrature_extend_factor(
     bws$cvls.quadrature.extend.factor,
-    fallback = 2,
+    fallback = 1,
     argname = "bws$cvls.quadrature.extend.factor"
   )
   cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
     bws$cvls.quadrature.points,
-    fallback = c(81L, 31L),
+    fallback = c(243L, 93L),
     argname = "bws$cvls.quadrature.points"
+  )
+  cvls.quadrature.adaptive <- .npcdensbw_resolve_cvls_quadrature_adaptive(
+    bws$cvls.quadrature.adaptive,
+    fallback = TRUE,
+    argname = "bws$cvls.quadrature.adaptive"
+  )
+  cvls.quadrature.adaptive.tol <- .npcdensbw_resolve_cvls_quadrature_adaptive_tol(
+    bws$cvls.quadrature.adaptive.tol,
+    fallback = 1e-10,
+    argname = "bws$cvls.quadrature.adaptive.tol"
+  )
+  cvls.quadrature.adaptive.grid.hy.ratio <- .npcdensbw_resolve_cvls_quadrature_adaptive_grid_hy_ratio(
+    bws$cvls.quadrature.adaptive.grid.hy.ratio,
+    fallback = 8,
+    argname = "bws$cvls.quadrature.adaptive.grid.hy.ratio"
+  )
+  cvls.quadrature.adaptive.floor.tol <- .npcdensbw_resolve_cvls_quadrature_adaptive_floor_tol(
+    bws$cvls.quadrature.adaptive.floor.tol,
+    fallback = sqrt(.Machine$double.eps),
+    argname = "bws$cvls.quadrature.adaptive.floor.tol"
   )
 
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
@@ -1130,7 +1268,7 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
     transform.bounds = FALSE,
-    cvls.i1.rescue = if (isTRUE(bws$cvls.i1.rescue)) 1L else 0L,
+    cvls.quadrature.adaptive = if (isTRUE(cvls.quadrature.adaptive)) 1L else 0L,
     cvls.quadrature.points =
       .npcdensbw_effective_cvls_quadrature_points(cvls.quadrature.points, bws$yncon)
   )
@@ -1156,7 +1294,10 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
     nconfac = nconfac,
     ncatfac = ncatfac,
     scale.factor.lower.bound = scale.factor.lower.bound,
-    cvls.quadrature.extend.factor = cvls.quadrature.extend.factor
+    cvls.quadrature.extend.factor = cvls.quadrature.extend.factor,
+    cvls.quadrature.adaptive.tol = cvls.quadrature.adaptive.tol,
+    cvls.quadrature.adaptive.grid.hy.ratio = cvls.quadrature.adaptive.grid.hy.ratio,
+    cvls.quadrature.adaptive.floor.tol = cvls.quadrature.adaptive.floor.tol
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
@@ -2063,9 +2204,12 @@ npcdensbw.default <-
            remin,
            scale.init.categorical.sample,
            scale.factor.lower.bound = NULL,
-           cvls.i1.rescue = TRUE,
-           cvls.quadrature.extend.factor = 2,
-           cvls.quadrature.points = c(81L, 31L),
+           cvls.quadrature.adaptive = TRUE,
+           cvls.quadrature.adaptive.tol = 1e-10,
+           cvls.quadrature.adaptive.grid.hy.ratio = 8,
+           cvls.quadrature.adaptive.floor.tol = sqrt(.Machine$double.eps),
+           cvls.quadrature.extend.factor = 1,
+           cvls.quadrature.points = c(243L, 93L),
            small,
            tol,
            transform.bounds,
@@ -2098,7 +2242,30 @@ npcdensbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
-    cvls.i1.rescue <- npValidateScalarLogical(cvls.i1.rescue, "cvls.i1.rescue")
+    mc.expanded <- match.call(expand.dots = TRUE)
+    if ("cvls.i1.rescue" %in% names(mc.expanded))
+      stop("cvls.i1.rescue has been removed; use cvls.quadrature.adaptive",
+           call. = FALSE)
+    cvls.quadrature.adaptive <- .npcdensbw_resolve_cvls_quadrature_adaptive(
+      cvls.quadrature.adaptive,
+      fallback = TRUE,
+      argname = "cvls.quadrature.adaptive"
+    )
+    cvls.quadrature.adaptive.tol <- .npcdensbw_resolve_cvls_quadrature_adaptive_tol(
+      cvls.quadrature.adaptive.tol,
+      fallback = 1e-10,
+      argname = "cvls.quadrature.adaptive.tol"
+    )
+    cvls.quadrature.adaptive.grid.hy.ratio <- .npcdensbw_resolve_cvls_quadrature_adaptive_grid_hy_ratio(
+      cvls.quadrature.adaptive.grid.hy.ratio,
+      fallback = 8,
+      argname = "cvls.quadrature.adaptive.grid.hy.ratio"
+    )
+    cvls.quadrature.adaptive.floor.tol <- .npcdensbw_resolve_cvls_quadrature_adaptive_floor_tol(
+      cvls.quadrature.adaptive.floor.tol,
+      fallback = sqrt(.Machine$double.eps),
+      argname = "cvls.quadrature.adaptive.floor.tol"
+    )
     scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
       scale.factor.lower.bound,
       fallback = 0.1,
@@ -2106,12 +2273,12 @@ npcdensbw.default <-
     )
     cvls.quadrature.extend.factor <- .npcdensbw_resolve_cvls_quadrature_extend_factor(
       cvls.quadrature.extend.factor,
-      fallback = 2,
+      fallback = 1,
       argname = "cvls.quadrature.extend.factor"
     )
     cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
       cvls.quadrature.points,
-      fallback = c(81L, 31L),
+      fallback = c(243L, 93L),
       argname = "cvls.quadrature.points"
     )
     nomad.shortcut <- .np_prepare_nomad_shortcut(
@@ -2293,8 +2460,11 @@ npcdensbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     reg.args <- bw.args[setdiff(names(bw.args), c("xbw", "ybw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
-    reg.args$cvls.i1.rescue <- cvls.i1.rescue
     reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    reg.args$cvls.quadrature.adaptive <- cvls.quadrature.adaptive
+    reg.args$cvls.quadrature.adaptive.tol <- cvls.quadrature.adaptive.tol
+    reg.args$cvls.quadrature.adaptive.grid.hy.ratio <- cvls.quadrature.adaptive.grid.hy.ratio
+    reg.args$cvls.quadrature.adaptive.floor.tol <- cvls.quadrature.adaptive.floor.tol
     reg.args$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
     reg.args$cvls.quadrature.points <- cvls.quadrature.points
     tbw <- do.call(conbandwidth, bw.args)
@@ -2316,6 +2486,10 @@ npcdensbw.default <-
                "lbd.init", "hbd.init", "dfac.init", 
                "scale.init.categorical.sample",
                "transform.bounds",
+               "cvls.quadrature.adaptive",
+               "cvls.quadrature.adaptive.tol",
+               "cvls.quadrature.adaptive.grid.hy.ratio",
+               "cvls.quadrature.adaptive.floor.tol",
                "cvls.quadrature.extend.factor",
                "cvls.quadrature.points",
                "invalid.penalty",
