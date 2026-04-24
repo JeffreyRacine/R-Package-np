@@ -39,6 +39,7 @@ static MPI_Request *request;
 static int COMM_MAXSIZE=10;
 static int STATUS_MAXSIZE=2000;
 static int REQUEST_MAXSIZE=2000;
+static int INFO_MAXSIZE=1;
 static MPI_Datatype *xdouble;
 
 #ifndef XLENGTH
@@ -250,17 +251,20 @@ SEXP mpi_proc_null(void){
 }
 
 SEXP mpi_info_create(SEXP sexp_info){
-	return AsInt(erreturn(mpi_errhandler(MPI_Info_create( &info[INTEGER(sexp_info)[0]]))));
+	int infon = rmpi_require_index(sexp_info, INFO_MAXSIZE, "info");
+	return AsInt(erreturn(mpi_errhandler(MPI_Info_create(&info[infon]))));
 }
 
 SEXP mpi_info_set(SEXP sexp_info, SEXP sexp_key, SEXP sexp_value){
-	return AsInt(erreturn(mpi_errhandler(MPI_Info_set(info[INTEGER(sexp_info)[0]],
+	int infon = rmpi_require_index(sexp_info, INFO_MAXSIZE, "info");
+	return AsInt(erreturn(mpi_errhandler(MPI_Info_set(info[infon],
 		CHAR2( STRING_ELT (sexp_key,0)), CHAR2(STRING_ELT(sexp_value,0))))));
 }
 
 SEXP mpi_info_get(SEXP sexp_info, SEXP sexp_key, SEXP sexp_valuelen){
 	int flag;
 	int valuelen = INTEGER(sexp_valuelen)[0];
+	int infon = rmpi_require_index(sexp_info, INFO_MAXSIZE, "info");
 	char *value;
 	SEXP sexp_value;
 
@@ -268,7 +272,7 @@ SEXP mpi_info_get(SEXP sexp_info, SEXP sexp_key, SEXP sexp_valuelen){
 		error("mpi_info_get: valuelen must be non-negative");
     	PROTECT (sexp_value  = allocVector (STRSXP, 1));
  	value = (char *)Calloc((size_t)valuelen + 1, char);
-	mpi_errhandler(MPI_Info_get(info[INTEGER(sexp_info)[0]], 
+	mpi_errhandler(MPI_Info_get(info[infon],
 			CHAR2( STRING_ELT (sexp_key,0)), 
 			valuelen, value, &flag));
         SET_STRING_ELT(sexp_value, 0, mkChar(value));
@@ -278,7 +282,8 @@ SEXP mpi_info_get(SEXP sexp_info, SEXP sexp_key, SEXP sexp_valuelen){
 }
 
 SEXP mpi_info_free(SEXP sexp_info){
-	return AsInt(erreturn(mpi_errhandler(MPI_Info_free( &info[INTEGER(sexp_info)[0]]))));
+	int infon = rmpi_require_index(sexp_info, INFO_MAXSIZE, "info");
+	return AsInt(erreturn(mpi_errhandler(MPI_Info_free(&info[infon]))));
 }
 
 SEXP mpi_realloc_comm(SEXP sexp_newncomm){
@@ -342,7 +347,7 @@ SEXP mpi_gather(SEXP sexp_sdata,
 				   SEXP sexp_rdata,
 				   SEXP sexp_root,
 				   SEXP sexp_comm){
-	int len, commn=INTEGER(sexp_comm)[0], root=INTEGER(sexp_root)[0];
+	int len, commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"), root=INTEGER(sexp_root)[0];
 
 	switch (INTEGER(sexp_type)[0]){
 	case 1:
@@ -375,7 +380,7 @@ SEXP mpi_gatherv(SEXP sexp_sdata,
 				   SEXP sexp_recvcounts,
 				   SEXP sexp_root,
 				   SEXP sexp_comm){
-	int len, commn=INTEGER(sexp_comm)[0], root=INTEGER(sexp_root)[0];
+	int len, commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"), root=INTEGER(sexp_root)[0];
 	int *displs=NULL, gsize, rank, i;
 	
 	MPI_Comm_size(comm[commn], &gsize);
@@ -424,7 +429,7 @@ SEXP mpi_scatter(SEXP sexp_sdata,
 				   SEXP sexp_root,
 				   SEXP sexp_comm){
 	int 	len, rlen;
-	int	commn=INTEGER(sexp_comm)[0], root=INTEGER(sexp_root)[0];
+	int	commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"), root=INTEGER(sexp_root)[0];
 	char 	*rdata;
 	SEXP 	sexp_rdata2 = NULL;
 
@@ -472,7 +477,7 @@ SEXP mpi_scatterv(SEXP sexp_sdata,
 				  SEXP sexp_rdata,
 				  SEXP sexp_root,
 				  SEXP sexp_comm){
-	int len, rlen, commn=INTEGER(sexp_comm)[0], root=INTEGER(sexp_root)[0];
+	int len, rlen, commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"), root=INTEGER(sexp_root)[0];
 	int gsize,rank,i,*displs=NULL;
     	char *rdata;
 	SEXP sexp_rdata2 = NULL;
@@ -536,7 +541,7 @@ SEXP mpi_allgather(SEXP sexp_sdata,
 				   SEXP sexp_type,
 				   SEXP sexp_rdata,
 				   SEXP sexp_comm){
-	int len, commn=INTEGER(sexp_comm)[0];
+	int len, commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
 	
 	switch (INTEGER(sexp_type)[0]){
 	case 1:
@@ -569,7 +574,7 @@ SEXP mpi_allgatherv(SEXP sexp_sdata,
 				   SEXP sexp_rdata,
 				   SEXP sexp_recvcounts,
 				   SEXP sexp_comm){
-	int len, commn=INTEGER(sexp_comm)[0], *displs, gsize, i;
+	int len, commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"), *displs, gsize, i;
 	
 	MPI_Comm_size(comm[commn], &gsize);
 	displs=(int *)Calloc(gsize, int);
@@ -613,7 +618,7 @@ SEXP mpi_bcast(SEXP sexp_data,
 			   SEXP sexp_buffunit){
 
 	int len=LENGTH(sexp_data), type=INTEGER(sexp_type)[0];
-	int rank=INTEGER(sexp_rank)[0], root,  commn=INTEGER(sexp_comm)[0],slen;
+	int rank=INTEGER(sexp_rank)[0], root,  commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"),slen;
 	int buffunit=INTEGER(sexp_buffunit)[0],errcode=0;
 	char *rdata;
 	SEXP sexp_data2 = NULL;
@@ -751,7 +756,7 @@ SEXP mpi_reduce(SEXP sexp_send,
 				SEXP sexp_dest,
 				SEXP sexp_comm){
 	int len=LENGTH(sexp_send), type=INTEGER(sexp_type)[0], dest=INTEGER(sexp_dest)[0];
-	int commn=INTEGER(sexp_comm)[0], intop = INTEGER(sexp_op)[0];
+	int commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"), intop = INTEGER(sexp_op)[0];
 	MPI_Op op= MPI_SUM;
 	SEXP sexp_recv = NULL;
 
@@ -838,7 +843,7 @@ SEXP mpi_allreduce(SEXP sexp_send,
 				   SEXP sexp_type,
 				   SEXP sexp_op,
 				   SEXP sexp_comm){
-	int len=LENGTH(sexp_send), type=INTEGER(sexp_type)[0], commn=INTEGER(sexp_comm)[0];
+	int len=LENGTH(sexp_send), type=INTEGER(sexp_type)[0], commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
 	int intop = INTEGER(sexp_op)[0];
 	MPI_Op op = MPI_SUM;
 	SEXP sexp_recv = NULL;
@@ -1057,8 +1062,8 @@ SEXP mpi_comm_spawn (SEXP sexp_slave,
 					 SEXP sexp_intercomm,
 					 SEXP sexp_quiet){
     int i, nslave = INTEGER (sexp_nslave)[0], len = LENGTH (sexp_argv);
-	int infon=INTEGER(sexp_info)[0], root=INTEGER(sexp_root)[0];
-	int intercommn=INTEGER(sexp_intercomm)[0], *slaverrcode, realns;
+	int infon=rmpi_require_index(sexp_info, INFO_MAXSIZE, "info"), root=INTEGER(sexp_root)[0];
+	int intercommn=rmpi_require_index(sexp_intercomm, COMM_MAXSIZE, "intercommunicator"), *slaverrcode, realns;
     int quiet = INTEGER(sexp_quiet)[0];
 
 	slaverrcode = (int *)Calloc(nslave, int);
@@ -1340,10 +1345,10 @@ SEXP mpi_sendrecv_replace(SEXP sexp_data,
 
 SEXP mpi_cart_create(SEXP sexp_comm_old,  SEXP sexp_dims, SEXP sexp_periods, SEXP sexp_reorder, 
            SEXP sexp_comm_cart) {
-        int comm_old = INTEGER(sexp_comm_old)[0];
+        int comm_old = rmpi_require_index(sexp_comm_old, COMM_MAXSIZE, "communicator");
         int ndims = LENGTH(sexp_dims);
         int reorder = INTEGER(sexp_reorder)[0];
-        int comm_cart = INTEGER(sexp_comm_cart)[0];
+        int comm_cart = rmpi_require_index(sexp_comm_cart, COMM_MAXSIZE, "cartesian communicator");
         int retcode; 
         retcode=erreturn(mpi_errhandler(MPI_Cart_create(comm[comm_old], ndims, 
                 INTEGER(sexp_dims), INTEGER(sexp_periods), reorder, &comm[comm_cart])));    
@@ -1359,14 +1364,14 @@ SEXP mpi_dims_create(SEXP sexp_nnodes, SEXP sexp_ndims, SEXP sexp_dims) {
 
 
 SEXP mpi_cartdim_get(SEXP sexp_comm) {
-        int comm2 = INTEGER(sexp_comm)[0];
+        int comm2 = rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
         int ndims;
         mpi_errhandler(MPI_Cartdim_get(comm[comm2], &ndims));
         return AsInt(ndims);    
 }
 
 SEXP mpi_cart_get(SEXP sexp_comm, SEXP sexp_maxdims) {
-        int comm2 = INTEGER(sexp_comm)[0];
+        int comm2 = rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
         int maxdims = INTEGER(sexp_maxdims)[0];
         SEXP dims_periods_coords;
 
@@ -1381,14 +1386,14 @@ SEXP mpi_cart_get(SEXP sexp_comm, SEXP sexp_maxdims) {
 
 
 SEXP mpi_cart_rank(SEXP sexp_comm, SEXP sexp_coords){
-        int comm2 = INTEGER(sexp_comm)[0];      
+        int comm2 = rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
         int rank;
         mpi_errhandler(MPI_Cart_rank(comm[comm2], INTEGER(sexp_coords), &rank));
         return AsInt(rank);
 }
 
 SEXP mpi_cart_coords(SEXP sexp_comm, SEXP sexp_rank, SEXP sexp_maxdims) {
-        int comm2 = INTEGER(sexp_comm)[0];
+        int comm2 = rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
         int rank = INTEGER(sexp_rank)[0];
         int maxdims = INTEGER(sexp_maxdims)[0];
         SEXP coords;
@@ -1400,7 +1405,7 @@ SEXP mpi_cart_coords(SEXP sexp_comm, SEXP sexp_rank, SEXP sexp_maxdims) {
 
 
 SEXP mpi_cart_shift(SEXP sexp_comm, SEXP sexp_direction, SEXP sexp_disp) {
-        int comm2 = INTEGER(sexp_comm)[0];
+        int comm2 = rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
         int direction = INTEGER(sexp_direction)[0];
         int disp = INTEGER(sexp_disp)[0];
         SEXP rank_source_dest;  
