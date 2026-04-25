@@ -95,6 +95,49 @@ test_that("cv.ls quadrature grid modes are stable finite objective controls", {
   expect_gt(abs(obj_uniform - obj_sample), 1e-10)
 })
 
+test_that("hybrid cv.ls grid is honored for scalar continuous plus discrete responses", {
+  set.seed(20260425)
+  n <- 42L
+  xdat <- data.frame(x = runif(n))
+  ydat <- data.frame(
+    y = 0.25 + rchisq(n, df = 3),
+    z = factor(sample(letters[1:3], n, replace = TRUE))
+  )
+
+  bw_uniform <- npcdensbw(
+    xdat = xdat,
+    ydat = ydat,
+    bws = c(0.36, 0.24, 0.31),
+    bandwidth.compute = FALSE,
+    bwmethod = "cv.ls",
+    bwtype = "fixed",
+    regtype = "lp",
+    degree = 0,
+    cxkerbound = "fixed",
+    cxkerlb = 0,
+    cxkerub = 1,
+    cykerbound = "fixed",
+    cykerlb = 0,
+    cykerub = Inf,
+    cvls.quadrature.grid = "uniform",
+    cvls.quadrature.points = c(41L, 17L)
+  )
+  bw_hybrid <- bw_uniform
+  bw_hybrid$cvls.quadrature.grid <- "hybrid"
+  bw_sample <- bw_uniform
+  bw_sample$cvls.quadrature.grid <- "sample"
+
+  obj_uniform <- np:::.npcdensbw_eval_only(xdat, ydat, bw_uniform)$objective
+  obj_hybrid <- np:::.npcdensbw_eval_only(xdat, ydat, bw_hybrid)$objective
+  obj_sample <- np:::.npcdensbw_eval_only(xdat, ydat, bw_sample)$objective
+
+  expect_true(is.finite(obj_uniform))
+  expect_true(is.finite(obj_hybrid))
+  expect_true(is.finite(obj_sample))
+  expect_gt(abs(obj_uniform - obj_hybrid), 1e-10)
+  expect_gt(abs(obj_uniform - obj_sample), 1e-10)
+})
+
 test_that("hybrid cv.ls grid improves the known bad one-sided tiny-hy candidate", {
   dat <- chisq_support_fixture(n = 400L, seed = 600007L)
 

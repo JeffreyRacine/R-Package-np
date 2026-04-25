@@ -18594,7 +18594,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   const int ncon = num_var_continuous_extern;
   const int nuno = num_var_unordered_extern;
   const int nord = num_var_ordered_extern;
-  const int q = np_bounded_cvls_conditional_grid_points(ncon);
+  int q = np_bounded_cvls_conditional_grid_points(ncon);
   const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(), 64));
   size_t total_eval = 0;
   NPConditionalYRowCtx yctx = {0};
@@ -18613,12 +18613,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   if((i1_mode != NP_BOUNDED_CVLS_I1_MODE_BOOK) &&
      (i1_mode != NP_BOUNDED_CVLS_I1_MODE_FULL))
     return 1;
-  if(np_bounded_cvls_eval_count(ncon,
-                                nuno,
-                                nord,
-                                q,
-                                num_categories_extern_Y,
-                                &total_eval) != 0)
+  if(q < 2)
     return 1;
 
   xrow = alloc_vecd(MAX(1, num_obs));
@@ -18652,12 +18647,36 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
     quad_ub
   );
 
-  for(d = 0; d < ncon; d++)
-    np_fill_trapezoid_rule(quad_lb[d],
-                           quad_ub[d],
-                           q,
-                           cont_grid[d],
-                           cont_weight[d]);
+  if((ncon == 1) &&
+     (int_bounded_cvls_quadrature_grid_extern != NP_BOUNDED_CVLS_GRID_UNIFORM)){
+    int q_actual = 0;
+    if(np_bounded_cvls_build_conditional_grid_1d(
+         matrix_Y_continuous_train_extern[0],
+         num_obs,
+         quad_lb[0],
+         quad_ub[0],
+         q,
+         cont_grid[0],
+         cont_weight[0],
+         &q_actual) != 0)
+      goto cleanup_bounded_cvls_quad_general;
+    q = q_actual;
+  } else {
+    for(d = 0; d < ncon; d++)
+      np_fill_trapezoid_rule(quad_lb[d],
+                             quad_ub[d],
+                             q,
+                             cont_grid[d],
+                             cont_weight[d]);
+  }
+
+  if(np_bounded_cvls_eval_count(ncon,
+                                nuno,
+                                nord,
+                                q,
+                                num_categories_extern_Y,
+                                &total_eval) != 0)
+    goto cleanup_bounded_cvls_quad_general;
 
   if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
     goto cleanup_bounded_cvls_quad_general;
