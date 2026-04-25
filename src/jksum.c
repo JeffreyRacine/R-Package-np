@@ -16586,6 +16586,10 @@ fail_yrow_ctx_prepare:
   return 1;
 }
 
+static int np_conditional_y_scalar_fixed_row_direct(NPConditionalYRowCtx *ctx,
+                                                    double eval_y,
+                                                    double *row_out);
+
 static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
                                         int eval_idx,
                                         double *row_out){
@@ -16609,6 +16613,16 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
       row_out[j] = 1.0;
     return 0;
   }
+
+  if((BANDWIDTH_den_extern == BW_FIXED) &&
+     (int_TREE_Y != NP_TREE_TRUE) &&
+     (ctx->num_var_tot == 1) &&
+     (num_var_continuous_extern == 1) &&
+     (num_var_unordered_extern == 0) &&
+     (num_var_ordered_extern == 0))
+    return np_conditional_y_scalar_fixed_row_direct(ctx,
+                                                    matrix_Y_continuous_train_extern[0][eval_idx],
+                                                    row_out);
 
   for(l = 0; l < num_var_unordered_extern; l++)
     ctx->eval_yuno_one[l][0] = matrix_Y_unordered_train_extern[l][eval_pos];
@@ -16673,6 +16687,63 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
                                                     int map_train_tree_index,
                                                     double *row_out);
 
+static int np_conditional_y_scalar_fixed_row_direct(NPConditionalYRowCtx *ctx,
+                                                    double eval_y,
+                                                    double *row_out){
+  const int num_train = num_obs_train_extern;
+  const double *train_y = (matrix_Y_continuous_train_extern != NULL) ?
+    matrix_Y_continuous_train_extern[0] : NULL;
+  const double lb = (vector_cykerlb_extern != NULL) ? vector_cykerlb_extern[0] : R_NegInf;
+  const double ub = (vector_cykerub_extern != NULL) ? vector_cykerub_extern[0] : R_PosInf;
+  double h, invnorm;
+  int all_largeh = 0;
+  double max_largeh_abs = 0.0, largeh_k0 = 0.0;
+  int j;
+
+  if((ctx == NULL) || (!ctx->ready) || (row_out == NULL) || (train_y == NULL))
+    return 1;
+  if(BANDWIDTH_den_extern != BW_FIXED)
+    return 1;
+  if(int_TREE_Y == NP_TREE_TRUE)
+    return 1;
+  if((num_var_continuous_extern != 1) ||
+     (num_var_unordered_extern != 0) ||
+     (num_var_ordered_extern != 0))
+    return 1;
+  if((ctx->matrix_bandwidth_y == NULL) || (ctx->matrix_bandwidth_y[0] == NULL))
+    return 1;
+
+  h = ctx->matrix_bandwidth_y[0][0];
+  if(!(h > 0.0) || !R_FINITE(h) || !R_FINITE(eval_y))
+    return 1;
+
+  invnorm = np_cker_invnorm(KERNEL_den_extern, eval_y, h, lb, ub);
+
+  if(np_cont_largeh_kernel_supported(KERNEL_den_extern)){
+    const double utol = np_cont_largeh_utol(KERNEL_den_extern, np_cont_largeh_rel_tol());
+    if((utol > 0.0) && R_FINITE(utol)){
+      all_largeh = 1;
+      max_largeh_abs = utol*fabs(h);
+      largeh_k0 = np_cont_largeh_k0(KERNEL_den_extern);
+    }
+  }
+
+  for(j = 0; j < num_train; j++){
+    const double diff = eval_y - train_y[j];
+    if(all_largeh && (fabs(diff) > max_largeh_abs))
+      all_largeh = 0;
+    row_out[j] = invnorm*np_cker_base_eval(KERNEL_den_extern, diff/h)/h;
+  }
+
+  if(all_largeh){
+    const double kval = invnorm*largeh_k0/h;
+    for(j = 0; j < num_train; j++)
+      row_out[j] = kval;
+  }
+
+  return 0;
+}
+
 static int np_conditional_y_scalar_eval_from_ctx(double *vector_scale_factor,
                                                  NPConditionalYRowCtx *ctx,
                                                  double eval_y,
@@ -16693,6 +16764,9 @@ static int np_conditional_y_scalar_eval_from_ctx(double *vector_scale_factor,
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
+
+  if(np_conditional_y_scalar_fixed_row_direct(ctx, eval_y, row_out) == 0)
+    return 0;
 
   ctx->eval_ycon_one[0][0] = eval_y;
 

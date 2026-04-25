@@ -119,7 +119,7 @@ test_that("bounded conditional cv.ls fixed-point objective matches direct delete
   w.loo <- w.loo / rowSums(w.loo)
 
   f.loo <- rowSums(Ky * w.loo)
-  q <- 81L
+  q <- bw$cvls.quadrature.points[1]
   grid <- seq(y.lb, y.ub, length.out = q)
   trap <- diff(grid)[1] * c(0.5, rep(1, q - 2L), 0.5)
   Ky.grid <- outer(
