@@ -96,7 +96,7 @@ test_that("npcdensbw stores cv.ls quadrature controls and old objects use defaul
 
   expect_identical(bw_default$cvls.quadrature.grid, "hybrid")
   expect_equal(bw_default$cvls.quadrature.extend.factor, 1)
-  expect_identical(unname(bw_default$cvls.quadrature.points), c(243L, 93L))
+  expect_identical(unname(bw_default$cvls.quadrature.points), c(81L, 31L))
   expect_identical(bw_explicit$cvls.quadrature.grid, "sample")
   expect_equal(bw_explicit$cvls.quadrature.extend.factor, 1.5)
   expect_identical(unname(bw_explicit$cvls.quadrature.points), c(43L, 19L))
@@ -106,6 +106,40 @@ test_that("npcdensbw stores cv.ls quadrature controls and old objects use defaul
   bw_old$cvls.quadrature.extend.factor <- NULL
   bw_old$cvls.quadrature.points <- NULL
   expect_true(is.finite(np:::.npcdensbw_eval_only(dat$x, dat$y, bw_old)$objective))
+})
+
+test_that("explicit infinite response bounds warn when quadrature points are implicit", {
+  dat <- quadrature_control_fixture(n = 12L)
+
+  expect_warning(
+    np:::.npcdensbw_warn_infinite_response_quadrature(
+      kerlb = 0,
+      kerub = Inf,
+      kerbound = "fixed",
+      points.supplied = FALSE,
+      where = "npcdensbw()"
+    ),
+    "fixed infinite response bounds",
+    fixed = TRUE
+  )
+  expect_silent(
+    np:::.npcdensbw_warn_infinite_response_quadrature(
+      kerlb = 0,
+      kerub = Inf,
+      kerbound = "fixed",
+      points.supplied = TRUE,
+      where = "npcdensbw()"
+    )
+  )
+  expect_silent(
+    np:::.npcdensbw_warn_infinite_response_quadrature(
+      kerlb = 0,
+      kerub = max(dat$y$y),
+      kerbound = "fixed",
+      points.supplied = FALSE,
+      where = "npcdensbw()"
+    )
+  )
 })
 
 test_that("finite response bounds are invariant to cv.ls quadrature extend factor", {

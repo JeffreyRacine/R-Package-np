@@ -99,7 +99,7 @@ npcdensbw(\dots)
           scale.factor.lower.bound = NULL,
           cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
           cvls.quadrature.extend.factor = 1,
-          cvls.quadrature.points = c(243L, 93L),
+          cvls.quadrature.points = c(81L, 31L),
           small,
           tol,
           transform.bounds,
@@ -415,9 +415,15 @@ npcdensbw(\dots)
   \item{cvls.quadrature.points}{
     a two-element integer vector giving the bounded \code{cv.ls} quadrature
     point counts for one and two continuous response variables, respectively.
-    Defaults to \code{c(243L, 93L)}. For two continuous response variables,
+    Defaults to \code{c(81L, 31L)}. For two continuous response variables,
     the second entry is used per dimension.
   }
+
+  When response-side bounds are set explicitly to fixed infinite endpoints,
+  bounded \code{cv.ls} uses a finite numerical quadrature surrogate over the
+  data range extended by \code{cvls.quadrature.extend.factor}. In that edge
+  case, callers who want tighter agreement with the ordinary unbounded
+  convolution route should set \code{cvls.quadrature.points} explicitly.
 
   \item{uxkertype}{
     character string used to specify the unordered categorical

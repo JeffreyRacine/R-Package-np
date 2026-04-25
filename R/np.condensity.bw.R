@@ -156,7 +156,7 @@ npcdensbw.formula <-
 }
 
 .npcdensbw_resolve_cvls_quadrature_points <- function(value,
-                                                      fallback = c(243L, 93L),
+                                                      fallback = c(81L, 31L),
                                                       argname = "cvls.quadrature.points") {
   if (is.null(value))
     return(as.integer(fallback))
@@ -332,7 +332,7 @@ npcdensbw.conbandwidth <-
     )
     cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
       if (is.null(cvls.quadrature.points)) bws$cvls.quadrature.points else cvls.quadrature.points,
-      fallback = c(243L, 93L),
+      fallback = c(81L, 31L),
       argname = "cvls.quadrature.points"
     )
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
@@ -738,6 +738,37 @@ npcdensbw.conbandwidth <-
     all(is.infinite(ub) & ub > 0)
 }
 
+.npcdensbw_has_explicit_fixed_infinite_y_bound <- function(kerlb, kerub, kerbound) {
+  if (is.null(kerbound) || !any(as.character(kerbound) == "fixed", na.rm = TRUE))
+    return(FALSE)
+  if (is.null(kerlb) || is.null(kerub))
+    return(FALSE)
+
+  lb <- as.double(kerlb)
+  ub <- as.double(kerub)
+
+  (length(lb) > 0L && any(is.infinite(lb))) ||
+    (length(ub) > 0L && any(is.infinite(ub)))
+}
+
+.npcdensbw_warn_infinite_response_quadrature <- function(kerlb,
+                                                         kerub,
+                                                         kerbound,
+                                                         points.supplied,
+                                                         where = "npcdensbw()") {
+  if (isTRUE(points.supplied))
+    return(invisible(FALSE))
+
+  if (!.npcdensbw_has_explicit_fixed_infinite_y_bound(kerlb, kerub, kerbound))
+    return(invisible(FALSE))
+
+  warning(sprintf(
+    "%s with fixed infinite response bounds uses a finite cv.ls quadrature surrogate; consider setting cvls.quadrature.points explicitly for this edge case",
+    where
+  ), call. = FALSE)
+  invisible(TRUE)
+}
+
 .npcdensbw_restore_explicit_fixed_y_bounds <- function(tbw, reg.args) {
   if (!.npcdensbw_is_explicit_fixed_all_infinite(reg.args$cykerlb,
                                                  reg.args$cykerub,
@@ -828,7 +859,7 @@ npcdensbw.conbandwidth <-
   )
   cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
     bws$cvls.quadrature.points,
-    fallback = c(243L, 93L),
+    fallback = c(81L, 31L),
     argname = "bws$cvls.quadrature.points"
   )
   cvls.quadrature.grid <- .npcdensbw_resolve_cvls_quadrature_grid(
@@ -1571,7 +1602,7 @@ npcdensbw.default <-
            scale.factor.lower.bound = NULL,
            cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
            cvls.quadrature.extend.factor = 1,
-           cvls.quadrature.points = c(243L, 93L),
+           cvls.quadrature.points = c(81L, 31L),
            small,
            tol,
            transform.bounds,
@@ -1644,7 +1675,7 @@ npcdensbw.default <-
     )
     cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
       cvls.quadrature.points,
-      fallback = c(243L, 93L),
+      fallback = c(81L, 31L),
       argname = "cvls.quadrature.points"
     )
     nomad.shortcut <- .np_prepare_nomad_shortcut(
@@ -1830,6 +1861,16 @@ npcdensbw.default <-
     reg.args$cvls.quadrature.grid <- cvls.quadrature.grid
     reg.args$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
     reg.args$cvls.quadrature.points <- cvls.quadrature.points
+    reg.bwmethod <- if (is.null(reg.args$bwmethod)) "cv.ls" else reg.args$bwmethod
+    if (isTRUE(bandwidth.compute) &&
+        identical(as.character(reg.bwmethod)[1L], "cv.ls")) {
+      .npcdensbw_warn_infinite_response_quadrature(
+        reg.args$cykerlb,
+        reg.args$cykerub,
+        reg.args$cykerbound,
+        points.supplied = "cvls.quadrature.points" %in% mc.names
+      )
+    }
 
     ## next grab dummies for actual bandwidth selection and perform call
 

@@ -104,7 +104,8 @@ test_that("one-sided fixed infinite bounds use the configured span surrogate", {
     cxkerub = 1,
     cykerbound = "fixed",
     cykerlb = 0,
-    cykerub = Inf
+    cykerub = Inf,
+    cvls.quadrature.points = c(81L, 31L)
   )
 
   bw_lower <- npcdensbw(
@@ -120,7 +121,8 @@ test_that("one-sided fixed infinite bounds use the configured span surrogate", {
     cxkerub = 1,
     cykerbound = "fixed",
     cykerlb = -Inf,
-    cykerub = max(dat$y$y) + 0.25
+    cykerub = max(dat$y$y) + 0.25,
+    cvls.quadrature.points = c(81L, 31L)
   )
   bw_upper_span2 <- bw_upper
   bw_upper_span2$cvls.quadrature.extend.factor <- 2
@@ -176,7 +178,8 @@ test_that("explicit fixed [-Inf, Inf] survives and uses the configured span surr
     cxkerub = 1,
     cykerbound = "fixed",
     cykerlb = -Inf,
-    cykerub = Inf
+    cykerub = Inf,
+    cvls.quadrature.points = c(81L, 31L)
   )
 
   bw_two_inf_span2 <- bw_two_inf

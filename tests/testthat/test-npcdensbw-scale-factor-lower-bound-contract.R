@@ -83,6 +83,7 @@ test_that("explicit 0.1 floor keeps nomad and nomad+powell aligned on bad seed",
     bernstein.basis = TRUE,
     nmulti = 2,
     scale.factor.lower.bound = 0.1,
+    cvls.quadrature.points = c(81L, 31L),
     cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
     cykerbound = "fixed", cykerlb = 0, cykerub = Inf
   )
