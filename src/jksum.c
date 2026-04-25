@@ -18721,7 +18721,7 @@ static int np_density_cvls_bounded_i1_quadrature_general(const int KERNEL_den,
   const int ncon = num_reg_continuous;
   const int nuno = num_reg_unordered;
   const int nord = num_reg_ordered;
-  const int q = np_bounded_cvls_conditional_grid_points(ncon);
+  const int q = np_bounded_cvls_grid_points(ncon);
   const int block_size = 64;
   size_t total_eval = 0;
   double **cont_grid = NULL, **cont_weight = NULL;

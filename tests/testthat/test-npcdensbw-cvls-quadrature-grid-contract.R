@@ -1,5 +1,19 @@
 library(npRmpi)
 
+test_that("unconditional bounded cv.ls quadrature uses source-of-truth fixed grid", {
+  src <- testthat::test_path("..", "..", "src", "jksum.c")
+  skip_if_not(file.exists(src), "source file unavailable")
+
+  lines <- readLines(src, warn = FALSE)
+  start <- grep("np_density_cvls_bounded_i1_quadrature_general", lines, fixed = TRUE)[1L]
+  skip_if(is.na(start), "bounded density quadrature helper unavailable")
+  end <- start + grep("const int block_size", lines[start:length(lines)], fixed = TRUE)[1L] - 1L
+  helper_header <- paste(lines[start:end], collapse = "\n")
+
+  expect_match(helper_header, "const int q = np_bounded_cvls_grid_points\\(ncon\\);")
+  expect_false(grepl("np_bounded_cvls_conditional_grid_points", helper_header, fixed = TRUE))
+})
+
 chisq_support_fixture <- function(n, seed) {
   set.seed(seed)
   x <- runif(n, 0, 1)
