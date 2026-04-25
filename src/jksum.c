@@ -198,6 +198,33 @@ static double np_blas_ddot_int(const int n, const double *x, const double *y){
   return F77_CALL(ddot)(&n, x, &inc, y, &inc);
 }
 
+static void np_blas_dgemv_trans_int(const int nrow,
+                                    const int ncol,
+                                    const double *a,
+                                    const double *x,
+                                    double *y){
+  const char trans = 'T';
+  const int inc = 1;
+  const double alpha = 1.0;
+  const double beta = 0.0;
+
+  if((nrow <= 0) || (ncol <= 0) || (a == NULL) || (x == NULL) || (y == NULL))
+    return;
+
+  F77_CALL(dgemv)(&trans,
+                  &nrow,
+                  &ncol,
+                  &alpha,
+                  a,
+                  &nrow,
+                  x,
+                  &inc,
+                  &beta,
+                  y,
+                  &inc
+                  FCONE);
+}
+
 extern int * ipt_lookup_extern_X;
 extern int * ipt_lookup_extern_Y;
 extern int * ipt_lookup_extern_XY;
@@ -18234,6 +18261,7 @@ static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_sc
                                                                double *xrow_full,
                                                                double *yrow,
                                                                double **ygridblock,
+                                                               double *fit_grid,
                                                                double *cv,
                                                                double *i1_mean){
   const int num_obs = num_obs_train_extern;
@@ -18241,7 +18269,7 @@ static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_sc
 
   if((vector_scale_factor == NULL) || (xctx == NULL) || (yctx == NULL) ||
      (grid == NULL) || (weights == NULL) || (xrow == NULL) || (yrow == NULL) ||
-     (ygridblock == NULL) || (cv == NULL) || (i1_mean == NULL))
+     (ygridblock == NULL) || (fit_grid == NULL) || (cv == NULL) || (i1_mean == NULL))
     return 1;
   if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xrow_full == NULL))
     return 1;
@@ -18273,10 +18301,9 @@ static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_sc
       return 1;
 
     lin = np_blas_ddot_int(num_obs, xrow, yrow);
-    for(m = 0; m < q; m++){
-      const double fit = np_blas_ddot_int(num_obs, xuse, ygridblock[m]);
-      quad += weights[m]*fit*fit;
-    }
+    np_blas_dgemv_trans_int(num_obs, q, ygridblock[0], xuse, fit_grid);
+    for(m = 0; m < q; m++)
+      quad += weights[m]*fit_grid[m]*fit_grid[m];
     *i1_mean += quad;
     *cv += quad - 2.0*lin;
   }
@@ -18670,7 +18697,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   double quad_ub[2] = {0.0, 0.0};
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
-  double *xrow = NULL, *xrow_full = NULL, *yrow = NULL;
+  double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *fit_grid = NULL;
   double *base_grid = NULL, *base_weights = NULL;
   double *rescue_grid = NULL, *rescue_weights = NULL;
   double **ygridblock = NULL, **rescue_ygridblock = NULL;
@@ -18695,10 +18722,12 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   if(i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL)
     xrow_full = alloc_vecd(MAX(1, num_obs));
   yrow = alloc_vecd(MAX(1, num_obs));
+  fit_grid = alloc_vecd(q_rescue_max);
   base_grid = alloc_vecd(q);
   base_weights = alloc_vecd(q);
-  ygridblock = alloc_matd(num_obs, q);
-  if((xrow == NULL) || (yrow == NULL) || (base_grid == NULL) || (base_weights == NULL) ||
+  ygridblock = alloc_tmatd(num_obs, q);
+  if((xrow == NULL) || (yrow == NULL) || (fit_grid == NULL) ||
+     (base_grid == NULL) || (base_weights == NULL) ||
      (ygridblock == NULL) ||
      ((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xrow_full == NULL)))
     goto cleanup_bounded_cvls_quad;
@@ -18732,6 +18761,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
                                                          xrow_full,
                                                          yrow,
                                                          ygridblock,
+                                                         fit_grid,
                                                          cv,
                                                          &i1_mean) != 0)
     goto cleanup_bounded_cvls_quad;
@@ -18741,7 +18771,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   if(np_bounded_cvls_quadrature_adaptive_needed(i1_mean, base_step, hy, vector_scale_factor)){
     rescue_grid = alloc_vecd(q_rescue_max);
     rescue_weights = alloc_vecd(q_rescue_max);
-    rescue_ygridblock = alloc_matd(num_obs, q_rescue_max);
+    rescue_ygridblock = alloc_tmatd(num_obs, q_rescue_max);
 
     if((rescue_grid != NULL) && (rescue_weights != NULL) && (rescue_ygridblock != NULL) &&
        (np_bounded_cvls_build_adaptive_grid_1d(matrix_Y_continuous_train_extern[0],
@@ -18764,6 +18794,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
                                                             xrow_full,
                                                             yrow,
                                                             rescue_ygridblock,
+                                                            fit_grid,
                                                             cv,
                                                             &i1_mean) == 0)){
       if(i1_mean <= double_bounded_cvls_quadrature_adaptive_tol_extern){
@@ -18784,6 +18815,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
           xrow_full,
           yrow,
           rescue_ygridblock,
+          fit_grid,
           cv,
           &i1_mean
         );
@@ -18799,12 +18831,13 @@ cleanup_bounded_cvls_quad:
   if(xrow != NULL) free(xrow);
   if(xrow_full != NULL) free(xrow_full);
   if(yrow != NULL) free(yrow);
+  if(fit_grid != NULL) free(fit_grid);
   if(base_grid != NULL) free(base_grid);
   if(base_weights != NULL) free(base_weights);
-  if(ygridblock != NULL) free_mat(ygridblock, q);
+  if(ygridblock != NULL) free_tmat(ygridblock);
   if(rescue_grid != NULL) free(rescue_grid);
   if(rescue_weights != NULL) free(rescue_weights);
-  if(rescue_ygridblock != NULL) free_mat(rescue_ygridblock, q_rescue_max);
+  if(rescue_ygridblock != NULL) free_tmat(rescue_ygridblock);
   return status;
 }
 
@@ -18858,7 +18891,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(), 64));
   size_t total_eval = 0;
   NPConditionalYRowCtx yctx = {0};
-  double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *eval_weight = NULL;
+  double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *eval_weight = NULL, *fit_block = NULL;
   double **cont_grid = NULL, **cont_weight = NULL;
   double **eval_yuno = NULL, **eval_yord = NULL, **eval_ycon = NULL, **yevalblock = NULL;
   double quad_lb[2] = {0.0, 0.0};
@@ -18886,14 +18919,15 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
     xrow_full = alloc_vecd(MAX(1, num_obs));
   yrow = alloc_vecd(MAX(1, num_obs));
   eval_weight = alloc_vecd(block_size);
+  fit_block = alloc_vecd(block_size);
   cont_grid = alloc_matd(q, ncon);
   cont_weight = alloc_matd(q, ncon);
   if(nuno > 0) eval_yuno = alloc_matd(block_size, nuno);
   if(nord > 0) eval_yord = alloc_matd(block_size, nord);
   eval_ycon = alloc_matd(block_size, ncon);
-  yevalblock = alloc_matd(num_obs, block_size);
+  yevalblock = alloc_tmatd(num_obs, block_size);
 
-  if((xrow == NULL) || (yrow == NULL) || (eval_weight == NULL) ||
+  if((xrow == NULL) || (yrow == NULL) || (eval_weight == NULL) || (fit_block == NULL) ||
      (cont_grid == NULL) || (cont_weight == NULL) || (eval_ycon == NULL) ||
      (yevalblock == NULL) ||
      ((nuno > 0) && (eval_yuno == NULL)) ||
@@ -18966,10 +19000,9 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
                                                      yevalblock) != 0)
         goto cleanup_bounded_cvls_quad_general;
 
-      for(b = 0; b < eb; b++){
-        const double fit = np_blas_ddot_int(num_obs, xuse, yevalblock[b]);
-        quad += eval_weight[b]*fit*fit;
-      }
+      np_blas_dgemv_trans_int(num_obs, eb, yevalblock[0], xuse, fit_block);
+      for(b = 0; b < eb; b++)
+        quad += eval_weight[b]*fit_block[b]*fit_block[b];
 
       eval_start += (size_t)eb;
     }
@@ -18987,12 +19020,13 @@ cleanup_bounded_cvls_quad_general:
   if(xrow_full != NULL) free(xrow_full);
   if(yrow != NULL) free(yrow);
   if(eval_weight != NULL) free(eval_weight);
+  if(fit_block != NULL) free(fit_block);
   if(cont_grid != NULL) free_mat(cont_grid, ncon);
   if(cont_weight != NULL) free_mat(cont_weight, ncon);
   if(eval_yuno != NULL) free_mat(eval_yuno, nuno);
   if(eval_yord != NULL) free_mat(eval_yord, nord);
   if(eval_ycon != NULL) free_mat(eval_ycon, ncon);
-  if(yevalblock != NULL) free_mat(yevalblock, block_size);
+  if(yevalblock != NULL) free_tmat(yevalblock);
   return status;
 }
 
