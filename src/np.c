@@ -1155,13 +1155,9 @@ int *vector_glp_degree_extern=NULL;
 int *vector_glp_gradient_order_extern=NULL;
 int int_glp_bernstein_extern=0;
 int int_glp_basis_extern=1;
-int int_bounded_cvls_quadrature_adaptive_extern=1;
+int int_bounded_cvls_quadrature_grid_extern=1;
 int int_bounded_cvls_quadrature_points_extern=0;
 double double_bounded_cvls_quadrature_extend_factor_extern=1.0;
-double double_bounded_cvls_quadrature_adaptive_tol_extern=1.0e-10;
-double double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern=8.0;
-double double_bounded_cvls_quadrature_adaptive_floor_tol_extern=1.4901161193847656e-08;
-double double_bounded_cvls_scale_factor_lower_bound_extern=0.1;
 
 int KERNEL_reg_extern=0;
 int KERNEL_reg_unordered_extern=0;
@@ -2166,6 +2162,8 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   const int num_all_uvar = num_reg_unordered_extern + num_var_unordered_extern;
   const int num_all_ovar = num_reg_ordered_extern + num_var_ordered_extern;
 
+  np_bounded_cvls_conditional_quad_context_clear_extern();
+
   if (!np_conditional_density_nomad_shadow.active && !np_conditional_density_nomad_shadow.owned)
     return;
 
@@ -2565,7 +2563,10 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP) ? *glp_bernstein : 0;
   int_glp_basis_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP) ? *glp_basis : 1;
-  int_bounded_cvls_quadrature_adaptive_extern = myopti[CBW_CVLS_QUAD_ADAPTIVEI] ? 1 : 0;
+  int_bounded_cvls_quadrature_grid_extern = myopti[CBW_CVLS_QUAD_GRIDI];
+  if ((int_bounded_cvls_quadrature_grid_extern < 0) ||
+      (int_bounded_cvls_quadrature_grid_extern > 2))
+    goto fail;
   int_bounded_cvls_quadrature_points_extern = myopti[CBW_CVLS_QUAD_POINTSI];
   if (int_bounded_cvls_quadrature_points_extern < 2)
     int_bounded_cvls_quadrature_points_extern = 0;
@@ -2603,27 +2604,9 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   ncatfac_extern = myoptd[CBW_NCATFD];
   dbl_memfac_ccdf_extern = myoptd[CBW_MEMFACD];
   bwm_set_scale_factor_lower_bound(myoptd[CBW_SFLOORD]);
-  double_bounded_cvls_scale_factor_lower_bound_extern = myoptd[CBW_SFLOORD];
-  if (!R_FINITE(double_bounded_cvls_scale_factor_lower_bound_extern) ||
-      double_bounded_cvls_scale_factor_lower_bound_extern < 0.0)
-    double_bounded_cvls_scale_factor_lower_bound_extern = 0.1;
   double_bounded_cvls_quadrature_extend_factor_extern = myoptd[CBW_QUAD_EXTD];
   if (!R_FINITE(double_bounded_cvls_quadrature_extend_factor_extern) ||
       double_bounded_cvls_quadrature_extend_factor_extern <= 0.0)
-    goto fail;
-  double_bounded_cvls_quadrature_adaptive_tol_extern = myoptd[CBW_CVLS_ADAPTIVE_TOLD];
-  if (!R_FINITE(double_bounded_cvls_quadrature_adaptive_tol_extern) ||
-      double_bounded_cvls_quadrature_adaptive_tol_extern < 0.0)
-    goto fail;
-  double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern =
-    myoptd[CBW_CVLS_ADAPTIVE_GRID_HY_RATIOD];
-  if (!R_FINITE(double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern) ||
-      double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern < 0.0)
-    goto fail;
-  double_bounded_cvls_quadrature_adaptive_floor_tol_extern =
-    myoptd[CBW_CVLS_ADAPTIVE_FLOOR_TOLD];
-  if (!R_FINITE(double_bounded_cvls_quadrature_adaptive_floor_tol_extern) ||
-      double_bounded_cvls_quadrature_adaptive_floor_tol_extern < 0.0)
     goto fail;
   dfc_dir = myopti[CBW_DFC_DIRI];
   lbc_dir = myoptd[CBW_LBC_DIRD];
@@ -2889,6 +2872,10 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
                                  matrix_X_continuous_train_extern)))
     goto fail;
 
+  if ((ibwmfunc == CBWM_CVLS) && (int_ll_extern == LL_LP) &&
+      (np_bounded_cvls_conditional_quad_context_prepare_extern() != 0))
+    goto fail;
+
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,
                                     int_RANDOM_SEED,
@@ -3088,7 +3075,7 @@ SEXP C_np_density_conditional_nomad_shadow_prepare(SEXP c_uno,
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
   if (XLENGTH(myopti_i) <= CBW_CVLS_QUAD_POINTSI ||
-      XLENGTH(myoptd_r) <= CBW_CVLS_ADAPTIVE_FLOOR_TOLD) {
+      XLENGTH(myoptd_r) <= CBW_QUAD_EXTD) {
     ok = 0;
   } else {
     ok = np_conditional_density_nomad_shadow_prepare_internal(REAL(c_uno_r),
@@ -4027,8 +4014,8 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
 
   if (XLENGTH(myopti_i) <= CBW_CVLS_QUAD_POINTSI)
     error("C_np_density_conditional_bw: myopti is missing cvls.quadrature.points");
-  if (XLENGTH(myoptd_r) <= CBW_CVLS_ADAPTIVE_FLOOR_TOLD)
-    error("C_np_density_conditional_bw: myoptd is missing cvls.quadrature adaptive controls");
+  if (XLENGTH(myoptd_r) <= CBW_QUAD_EXTD)
+    error("C_np_density_conditional_bw: myoptd is missing cvls.quadrature.extend.factor");
 
   ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
   ncon_y = (int)INTEGER(myopti_i)[CDBW_CNCONI];
@@ -6564,6 +6551,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   /* Ensure optional Y-only categorical arrays are reset each call */
   num_categories_extern_Y = NULL;
   matrix_categorical_vals_extern_Y = NULL;
+  np_bounded_cvls_conditional_quad_context_clear_extern();
 
   num_var_unordered_extern = myopti[CBW_CNUNOI];
   num_var_ordered_extern = myopti[CBW_CNORDI];
@@ -6640,7 +6628,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? *glp_bernstein : 0;
   int_glp_basis_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? *glp_basis : 1;
-  int_bounded_cvls_quadrature_adaptive_extern = myopti[CBW_CVLS_QUAD_ADAPTIVEI] ? 1 : 0;
+  int_bounded_cvls_quadrature_grid_extern = myopti[CBW_CVLS_QUAD_GRIDI];
+  if ((int_bounded_cvls_quadrature_grid_extern < 0) ||
+      (int_bounded_cvls_quadrature_grid_extern > 2))
+    error("C_np_density_conditional_bw: cvls.quadrature.grid is invalid");
   int_bounded_cvls_quadrature_points_extern = myopti[CBW_CVLS_QUAD_POINTSI];
   if (int_bounded_cvls_quadrature_points_extern < 2)
     int_bounded_cvls_quadrature_points_extern = 0;
@@ -6662,25 +6653,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   scale_factor_lower_bound = myoptd[CBW_SFLOORD];
   if (!R_FINITE(scale_factor_lower_bound) || scale_factor_lower_bound < 0.0)
     scale_factor_lower_bound = 0.1;
-  double_bounded_cvls_scale_factor_lower_bound_extern = scale_factor_lower_bound;
   double_bounded_cvls_quadrature_extend_factor_extern = myoptd[CBW_QUAD_EXTD];
   if (!R_FINITE(double_bounded_cvls_quadrature_extend_factor_extern) ||
       double_bounded_cvls_quadrature_extend_factor_extern <= 0.0)
     error("C_np_density_conditional_bw: cvls.quadrature.extend.factor must be positive and finite");
-  double_bounded_cvls_quadrature_adaptive_tol_extern = myoptd[CBW_CVLS_ADAPTIVE_TOLD];
-  if (!R_FINITE(double_bounded_cvls_quadrature_adaptive_tol_extern) ||
-      double_bounded_cvls_quadrature_adaptive_tol_extern < 0.0)
-    error("C_np_density_conditional_bw: cvls.quadrature.adaptive.tol must be nonnegative and finite");
-  double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern =
-    myoptd[CBW_CVLS_ADAPTIVE_GRID_HY_RATIOD];
-  if (!R_FINITE(double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern) ||
-      double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern < 0.0)
-    error("C_np_density_conditional_bw: cvls.quadrature.adaptive.grid.hy.ratio must be nonnegative and finite");
-  double_bounded_cvls_quadrature_adaptive_floor_tol_extern =
-    myoptd[CBW_CVLS_ADAPTIVE_FLOOR_TOLD];
-  if (!R_FINITE(double_bounded_cvls_quadrature_adaptive_floor_tol_extern) ||
-      double_bounded_cvls_quadrature_adaptive_floor_tol_extern < 0.0)
-    error("C_np_density_conditional_bw: cvls.quadrature.adaptive.floor.tol must be nonnegative and finite");
 
   dfc_dir = myopti[CBW_DFC_DIRI];
   lbc_dir = myoptd[CBW_LBC_DIRD];
@@ -7024,6 +7000,13 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     vector_continuous_stddev[j] = mysd[j];
 
   vector_continuous_stddev_extern = vector_continuous_stddev;
+
+  if((ibwmfunc == CBWM_CVLS) && (int_ll_extern == LL_LP)){
+    if(np_bounded_cvls_conditional_quad_context_prepare_extern() != 0){
+      bw_error_msg = "C_np_density_conditional_bw: failed to prepare bounded cv.ls quadrature context";
+      goto cleanup_np_density_conditional_bw;
+    }
+  }
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -7559,6 +7542,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
 cleanup_np_density_conditional_bw:
   /* Free data objects */
+
+  np_bounded_cvls_conditional_quad_context_clear_extern();
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
   free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);

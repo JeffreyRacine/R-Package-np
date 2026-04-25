@@ -82,10 +82,7 @@ compact_window_clone_bw <- function(bw, bound, lb = NULL, ub = NULL) {
     bernstein.basis.engine = bw$bernstein.basis.engine
   )
   out$scale.factor.lower.bound <- bw$scale.factor.lower.bound
-  out$cvls.quadrature.adaptive <- bw$cvls.quadrature.adaptive
-  out$cvls.quadrature.adaptive.tol <- bw$cvls.quadrature.adaptive.tol
-  out$cvls.quadrature.adaptive.grid.hy.ratio <- bw$cvls.quadrature.adaptive.grid.hy.ratio
-  out$cvls.quadrature.adaptive.floor.tol <- bw$cvls.quadrature.adaptive.floor.tol
+  out$cvls.quadrature.grid <- bw$cvls.quadrature.grid
   out$cvls.quadrature.extend.factor <- bw$cvls.quadrature.extend.factor
   out$cvls.quadrature.points <- bw$cvls.quadrature.points
   out
@@ -114,7 +111,7 @@ test_that("one-sided fixed infinite bounds use the configured span surrogate", {
     cykerbound = "fixed",
     cykerlb = 0,
     cykerub = Inf,
-    cvls.quadrature.adaptive = FALSE,
+    cvls.quadrature.grid = "uniform",
     cvls.quadrature.points = c(31L, 17L)
   )
 
@@ -133,7 +130,7 @@ test_that("one-sided fixed infinite bounds use the configured span surrogate", {
     cykerbound = "fixed",
     cykerlb = -Inf,
     cykerub = max(dat$y$y) + 0.25,
-    cvls.quadrature.adaptive = FALSE,
+    cvls.quadrature.grid = "uniform",
     cvls.quadrature.points = c(31L, 17L)
   )
   bw_upper_span2 <- bw_upper
@@ -197,7 +194,7 @@ test_that("explicit fixed [-Inf, Inf] survives and uses the configured span surr
     cykerbound = "fixed",
     cykerlb = -Inf,
     cykerub = Inf,
-    cvls.quadrature.adaptive = FALSE,
+    cvls.quadrature.grid = "uniform",
     cvls.quadrature.points = c(31L, 17L)
   )
   bw_two_inf_span2 <- bw_two_inf

@@ -173,6 +173,8 @@ int np_shadow_cv_con_density_ls(double *vector_scale_factor, double *cv);
 int np_shadow_cv_con_distribution_ls(double *vector_scale_factor, double *cv);
 int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor, int eval_idx, double *row_out);
 int np_regression_lp_apply_matrix(double *vector_scale_factor, double **rhs_cols, int n_rhs, double *fitted_out);
+int np_bounded_cvls_conditional_quad_context_prepare_extern(void);
+void np_bounded_cvls_conditional_quad_context_clear_extern(void);
 void np_bwm_set_deferred_error(const char *msg);
 const char *np_bwm_get_deferred_error(void);
 void np_bwm_clear_deferred_error(void);
@@ -505,7 +507,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CBW_SCATI 24
 #define CBW_DFC_DIRI 25
 #define CBW_TBNDI 26
-#define CBW_CVLS_QUAD_ADAPTIVEI 27
+#define CBW_CVLS_QUAD_GRIDI 27
 #define CBW_CVLS_QUAD_POINTSI 28
 
 #define CBW_FTOLD  0
@@ -529,9 +531,6 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CBW_NCATFD     18
 #define CBW_SFLOORD    19
 #define CBW_QUAD_EXTD  20
-#define CBW_CVLS_ADAPTIVE_TOLD 21
-#define CBW_CVLS_ADAPTIVE_GRID_HY_RATIOD 22
-#define CBW_CVLS_ADAPTIVE_FLOOR_TOLD 23
 
 
 #define CBWM_CVML 0

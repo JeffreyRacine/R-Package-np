@@ -47,10 +47,7 @@ npcdensbw(\dots)
           remin = TRUE,
           scale.init.categorical.sample = FALSE,
           scale.factor.lower.bound = NULL,
-          cvls.quadrature.adaptive = NULL,
-          cvls.quadrature.adaptive.tol = NULL,
-          cvls.quadrature.adaptive.grid.hy.ratio = NULL,
-          cvls.quadrature.adaptive.floor.tol = NULL,
+          cvls.quadrature.grid = NULL,
           cvls.quadrature.extend.factor = NULL,
           cvls.quadrature.points = NULL,
           small = 1.490116e-05,
@@ -100,12 +97,9 @@ npcdensbw(\dots)
           remin,
           scale.init.categorical.sample,
           scale.factor.lower.bound = NULL,
-          cvls.quadrature.adaptive = TRUE,
-          cvls.quadrature.adaptive.tol = 1e-10,
-          cvls.quadrature.adaptive.grid.hy.ratio = 8,
-          cvls.quadrature.adaptive.floor.tol = sqrt(.Machine$double.eps),
+          cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
           cvls.quadrature.extend.factor = 1,
-          cvls.quadrature.points = c(243L, 93L),
+          cvls.quadrature.points = c(81L, 31L),
           small,
           tol,
           transform.bounds,
@@ -401,34 +395,14 @@ npcdensbw(\dots)
     search initialization.
   }
 
-  \item{cvls.quadrature.adaptive}{
-    a logical value that when set to \code{TRUE} enables deterministic
-    sample-\eqn{y} adaptive augmentation for one-dimensional bounded
-    \code{cv.ls} \eqn{I_1} quadrature when the uniform grid appears
-    unresolved, the response bandwidth is at the fixed-bandwidth floor, or
-    the measured \eqn{I_1} term is numerically degenerate. Defaults to
-    \code{TRUE}.
-  }
-
-  \item{cvls.quadrature.adaptive.tol}{
-    a nonnegative finite scalar giving the absolute tolerance below which the
-    bounded \code{cv.ls} \eqn{I_1} term is treated as numerically degenerate
-    for adaptive quadrature. Defaults to \code{1e-10}.
-  }
-
-  \item{cvls.quadrature.adaptive.grid.hy.ratio}{
-    a nonnegative finite scalar controlling the grid-resolution trigger for
-    adaptive bounded \code{cv.ls} quadrature. Adaptive augmentation is used
-    when the uniform grid step divided by the response bandwidth is at least
-    this value. Defaults to \code{8}; \code{0} forces this trigger whenever
-    the grid step and response bandwidth are finite and positive.
-  }
-
-  \item{cvls.quadrature.adaptive.floor.tol}{
-    a nonnegative finite relative tolerance used to decide whether the
-    response bandwidth candidate is at the active continuous fixed-bandwidth
-    floor for adaptive bounded \code{cv.ls} quadrature. Defaults to
-    \code{sqrt(.Machine$double.eps)}.
+  \item{cvls.quadrature.grid}{
+    character string specifying the one-dimensional bounded \code{cv.ls}
+    \eqn{I_1} quadrature grid. \code{"uniform"} uses only evenly spaced
+    nodes over the finite quadrature window, \code{"sample"} uses
+    deterministic ranked sample-\eqn{y} nodes, and \code{"hybrid"} uses a
+    fixed-size merge of uniform and ranked sample-\eqn{y} nodes. The default
+    is \code{"hybrid"} for scalar continuous responses and \code{"uniform"}
+    for two continuous responses.
   }
 
   \item{cvls.quadrature.extend.factor}{
@@ -441,9 +415,15 @@ npcdensbw(\dots)
   \item{cvls.quadrature.points}{
     a two-element integer vector giving the bounded \code{cv.ls} quadrature
     point counts for one and two continuous response variables, respectively.
-    Defaults to \code{c(243L, 93L)}. For two continuous response variables,
+    Defaults to \code{c(81L, 31L)}. For two continuous response variables,
     the second entry is used per dimension.
   }
+
+  When response-side bounds are set explicitly to fixed infinite endpoints,
+  bounded \code{cv.ls} uses a finite numerical quadrature surrogate over the
+  data range extended by \code{cvls.quadrature.extend.factor}. In that edge
+  case, callers who want tighter agreement with the ordinary unbounded
+  convolution route should set \code{cvls.quadrature.points} explicitly.
 
   \item{uxkertype}{
     character string used to specify the unordered categorical
