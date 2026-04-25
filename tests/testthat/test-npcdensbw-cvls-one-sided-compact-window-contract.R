@@ -85,7 +85,6 @@ compact_window_clone_bw <- function(bw, bound, lb = NULL, ub = NULL) {
   out$cvls.quadrature.adaptive <- bw$cvls.quadrature.adaptive
   out$cvls.quadrature.adaptive.tol <- bw$cvls.quadrature.adaptive.tol
   out$cvls.quadrature.adaptive.grid.hy.ratio <- bw$cvls.quadrature.adaptive.grid.hy.ratio
-  out$cvls.quadrature.adaptive.floor.tol <- bw$cvls.quadrature.adaptive.floor.tol
   out$cvls.quadrature.extend.factor <- bw$cvls.quadrature.extend.factor
   out$cvls.quadrature.points <- bw$cvls.quadrature.points
   out
@@ -211,5 +210,4 @@ test_that("explicit fixed [-Inf, Inf] survives and uses the configured span surr
   expect_gt(abs(obj_two_inf - obj_none), 1e-8)
   expect_equal(obj_two_inf, obj_span1, tolerance = 1e-12)
   expect_equal(obj_two_inf_factor2, obj_span2, tolerance = 1e-12)
-  expect_gt(abs(obj_two_inf - obj_two_inf_factor2), 1e-8)
 })

@@ -79,7 +79,6 @@ test_that("cv.ls adaptive quadrature toggle disables all adaptive triggers", {
   bw_off_triggered <- bw_off
   bw_off_triggered$cvls.quadrature.adaptive.tol <- 1e6
   bw_off_triggered$cvls.quadrature.adaptive.grid.hy.ratio <- 0
-  bw_off_triggered$cvls.quadrature.adaptive.floor.tol <- 1e6
 
   obj_off <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_off)$objective
   obj_off_triggered <- np:::.npcdensbw_eval_only(dat$x, dat$y, bw_off_triggered)$objective

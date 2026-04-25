@@ -50,7 +50,6 @@ npcdensbw(\dots)
           cvls.quadrature.adaptive = NULL,
           cvls.quadrature.adaptive.tol = NULL,
           cvls.quadrature.adaptive.grid.hy.ratio = NULL,
-          cvls.quadrature.adaptive.floor.tol = NULL,
           cvls.quadrature.extend.factor = NULL,
           cvls.quadrature.points = NULL,
           small = 1.490116e-05,
@@ -103,7 +102,6 @@ npcdensbw(\dots)
           cvls.quadrature.adaptive = TRUE,
           cvls.quadrature.adaptive.tol = 1e-10,
           cvls.quadrature.adaptive.grid.hy.ratio = 8,
-          cvls.quadrature.adaptive.floor.tol = sqrt(.Machine$double.eps),
           cvls.quadrature.extend.factor = 1,
           cvls.quadrature.points = c(243L, 93L),
           small,
@@ -422,13 +420,6 @@ npcdensbw(\dots)
     when the uniform grid step divided by the response bandwidth is at least
     this value. Defaults to \code{8}; \code{0} forces this trigger whenever
     the grid step and response bandwidth are finite and positive.
-  }
-
-  \item{cvls.quadrature.adaptive.floor.tol}{
-    a nonnegative finite relative tolerance used to decide whether the
-    response bandwidth candidate is at the active continuous fixed-bandwidth
-    floor for adaptive bounded \code{cv.ls} quadrature. Defaults to
-    \code{sqrt(.Machine$double.eps)}.
   }
 
   \item{cvls.quadrature.extend.factor}{

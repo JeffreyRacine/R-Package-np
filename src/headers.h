@@ -166,6 +166,8 @@ double np_kernel_estimate_regression_categorical_ls_aic(int int_ll, int bwm, int
 int np_glp_cv_prepare_extern(const int int_ll, const int num_obs, const int ncon, double **matrix_X_continuous_train);
 void np_glp_cv_clear_extern(void);
 void np_reg_cv_core_clear_extern(void);
+int np_bounded_cvls_conditional_quad_context_prepare_extern(void);
+void np_bounded_cvls_conditional_quad_context_clear_extern(void);
 int np_shadow_proof_cv_con_density_ml(double *vector_scale_factor, double *cv);
 int np_shadow_proof_cv_con_density_ls(double *vector_scale_factor, double *cv);
 int np_shadow_proof_cv_con_distribution_ls(double *vector_scale_factor, double *cv);
@@ -536,7 +538,6 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CBW_QUAD_EXTD  20
 #define CBW_CVLS_ADAPTIVE_TOLD 21
 #define CBW_CVLS_ADAPTIVE_GRID_HY_RATIOD 22
-#define CBW_CVLS_ADAPTIVE_FLOOR_TOLD 23
 
 
 #define CBWM_CVML 0

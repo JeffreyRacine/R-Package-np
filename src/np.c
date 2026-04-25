@@ -1119,7 +1119,6 @@ int int_bounded_cvls_quadrature_points_extern=0;
 double double_bounded_cvls_quadrature_extend_factor_extern=1.0;
 double double_bounded_cvls_quadrature_adaptive_tol_extern=1.0e-10;
 double double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern=8.0;
-double double_bounded_cvls_quadrature_adaptive_floor_tol_extern=1.4901161193847656e-08;
 double double_bounded_cvls_scale_factor_lower_bound_extern=0.1;
 
 int KERNEL_reg_extern=0;
@@ -3916,7 +3915,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
 
   if (XLENGTH(myopti_i) <= CBW_CVLS_QUAD_POINTSI)
     error("C_np_density_conditional_bw: myopti is missing cvls.quadrature.points");
-  if (XLENGTH(myoptd_r) <= CBW_CVLS_ADAPTIVE_FLOOR_TOLD)
+  if (XLENGTH(myoptd_r) <= CBW_CVLS_ADAPTIVE_GRID_HY_RATIOD)
     error("C_np_density_conditional_bw: myoptd is missing cvls.quadrature adaptive controls");
 
   ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
@@ -5986,6 +5985,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   /* Ensure optional Y-only categorical arrays are reset each call */
   num_categories_extern_Y = NULL;
   matrix_categorical_vals_extern_Y = NULL;
+  np_bounded_cvls_conditional_quad_context_clear_extern();
 
   num_var_unordered_extern = myopti[CBW_CNUNOI];
   num_var_ordered_extern = myopti[CBW_CNORDI];
@@ -6098,12 +6098,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if (!R_FINITE(double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern) ||
       double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern < 0.0)
     error("C_np_density_conditional_bw: cvls.quadrature.adaptive.grid.hy.ratio must be nonnegative and finite");
-  double_bounded_cvls_quadrature_adaptive_floor_tol_extern =
-    myoptd[CBW_CVLS_ADAPTIVE_FLOOR_TOLD];
-  if (!R_FINITE(double_bounded_cvls_quadrature_adaptive_floor_tol_extern) ||
-      double_bounded_cvls_quadrature_adaptive_floor_tol_extern < 0.0)
-    error("C_np_density_conditional_bw: cvls.quadrature.adaptive.floor.tol must be nonnegative and finite");
-
   dfc_dir = myopti[CBW_DFC_DIRI];
   lbc_dir = myoptd[CBW_LBC_DIRD];
   c_dir = myoptd[CBW_C_DIRD];
@@ -6448,6 +6442,13 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   vector_continuous_stddev_extern = vector_continuous_stddev;
   np_refresh_support_counts_extern();
   np_validate_nonfixed_support_counts_extern("C_np_density_conditional_bw", BANDWIDTH_den_extern);
+
+  if((ibwmfunc == CBWM_CVLS) && (int_ll_extern == LL_LP)){
+    if(np_bounded_cvls_conditional_quad_context_prepare_extern() != 0){
+      bw_error_msg = "C_np_density_conditional_bw: failed to prepare bounded cv.ls quadrature context";
+      goto cleanup_np_density_conditional_bw;
+    }
+  }
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -6982,6 +6983,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
 cleanup_np_density_conditional_bw:
   /* Free data objects */
+
+  np_bounded_cvls_conditional_quad_context_clear_extern();
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
   free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);

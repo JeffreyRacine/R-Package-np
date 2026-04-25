@@ -129,7 +129,6 @@ extern int int_bounded_cvls_quadrature_points_extern;
 extern double double_bounded_cvls_quadrature_extend_factor_extern;
 extern double double_bounded_cvls_quadrature_adaptive_tol_extern;
 extern double double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern;
-extern double double_bounded_cvls_quadrature_adaptive_floor_tol_extern;
 extern double double_bounded_cvls_scale_factor_lower_bound_extern;
 extern double *vector_continuous_stddev_extern;
 extern double nconfac_extern;
@@ -17675,44 +17674,178 @@ static int np_fill_trapezoid_rule_nonuniform(const double *grid,
   return 0;
 }
 
-static double np_bounded_cvls_adaptive_response_floor(void){
-  double floor_coeff = double_bounded_cvls_scale_factor_lower_bound_extern;
-  const int sd_index = num_reg_continuous_extern;
-  const double scale_pow =
-    (R_FINITE(nconfac_extern) && (nconfac_extern > 0.0)) ? nconfac_extern : 1.0;
+static int np_bounded_cvls_build_adaptive_grid_1d(const double *train_y,
+                                                  const int num_obs,
+                                                  const double *base_grid,
+                                                  const int q_base,
+                                                  double *grid_out,
+                                                  int *q_out);
 
-  if((!R_FINITE(floor_coeff)) || (floor_coeff < 0.0))
-    floor_coeff = 0.1;
+typedef struct {
+  int ready;
+  int required;
+  int q;
+  int q_rescue;
+  int q_stage2;
+  int num_obs;
+  double quad_lb[2];
+  double quad_ub[2];
+  double base_step;
+  int lower_effectively_infinite;
+  int upper_effectively_infinite;
+  double *base_grid;
+  double *base_weights;
+  double *rescue_grid;
+  double *rescue_weights;
+  double *stage2_grid;
+  double *stage2_weights;
+} NPBoundedCVLSConditionalQuadContext;
 
-  if(int_LARGE_SF == SF_NORMAL)
-    return floor_coeff;
+static NPBoundedCVLSConditionalQuadContext np_bounded_cvls_conditional_quad_ctx = {
+  0, 0, 0, 0, 0, 0, {0.0, 0.0}, {0.0, 0.0}, 0.0, 0, 0,
+  NULL, NULL, NULL, NULL, NULL, NULL
+};
 
-  if((vector_continuous_stddev_extern != NULL) &&
-     (sd_index >= 0) &&
-     R_FINITE(vector_continuous_stddev_extern[sd_index]) &&
-     (vector_continuous_stddev_extern[sd_index] > 0.0))
-    return floor_coeff * vector_continuous_stddev_extern[sd_index] * scale_pow;
+void np_bounded_cvls_conditional_quad_context_clear_extern(void){
+  if(np_bounded_cvls_conditional_quad_ctx.base_grid != NULL)
+    free(np_bounded_cvls_conditional_quad_ctx.base_grid);
+  if(np_bounded_cvls_conditional_quad_ctx.base_weights != NULL)
+    free(np_bounded_cvls_conditional_quad_ctx.base_weights);
+  if(np_bounded_cvls_conditional_quad_ctx.rescue_grid != NULL)
+    free(np_bounded_cvls_conditional_quad_ctx.rescue_grid);
+  if(np_bounded_cvls_conditional_quad_ctx.rescue_weights != NULL)
+    free(np_bounded_cvls_conditional_quad_ctx.rescue_weights);
+  if(np_bounded_cvls_conditional_quad_ctx.stage2_grid != NULL)
+    free(np_bounded_cvls_conditional_quad_ctx.stage2_grid);
+  if(np_bounded_cvls_conditional_quad_ctx.stage2_weights != NULL)
+    free(np_bounded_cvls_conditional_quad_ctx.stage2_weights);
 
-  return floor_coeff * scale_pow;
+  np_bounded_cvls_conditional_quad_ctx.ready = 0;
+  np_bounded_cvls_conditional_quad_ctx.required = 0;
+  np_bounded_cvls_conditional_quad_ctx.q = 0;
+  np_bounded_cvls_conditional_quad_ctx.q_rescue = 0;
+  np_bounded_cvls_conditional_quad_ctx.q_stage2 = 0;
+  np_bounded_cvls_conditional_quad_ctx.num_obs = 0;
+  np_bounded_cvls_conditional_quad_ctx.quad_lb[0] = 0.0;
+  np_bounded_cvls_conditional_quad_ctx.quad_lb[1] = 0.0;
+  np_bounded_cvls_conditional_quad_ctx.quad_ub[0] = 0.0;
+  np_bounded_cvls_conditional_quad_ctx.quad_ub[1] = 0.0;
+  np_bounded_cvls_conditional_quad_ctx.base_step = 0.0;
+  np_bounded_cvls_conditional_quad_ctx.lower_effectively_infinite = 0;
+  np_bounded_cvls_conditional_quad_ctx.upper_effectively_infinite = 0;
+  np_bounded_cvls_conditional_quad_ctx.base_grid = NULL;
+  np_bounded_cvls_conditional_quad_ctx.base_weights = NULL;
+  np_bounded_cvls_conditional_quad_ctx.rescue_grid = NULL;
+  np_bounded_cvls_conditional_quad_ctx.rescue_weights = NULL;
+  np_bounded_cvls_conditional_quad_ctx.stage2_grid = NULL;
+  np_bounded_cvls_conditional_quad_ctx.stage2_weights = NULL;
 }
 
-static int np_bounded_cvls_adaptive_response_floor_hit(const double *vector_scale_factor){
-  const int sf_index = num_reg_continuous_extern + 1;
-  const double candidate =
-    (vector_scale_factor != NULL) ? vector_scale_factor[sf_index] : NA_REAL;
-  const double floor_value = np_bounded_cvls_adaptive_response_floor();
-  double tol = double_bounded_cvls_quadrature_adaptive_floor_tol_extern;
-  double allowance;
+int np_bounded_cvls_conditional_quad_context_prepare_extern(void){
+  const int num_obs = num_obs_train_extern;
+  const int q = np_bounded_cvls_conditional_grid_points(1);
+  int q_rescue_max = 0;
+  int q_stage2 = 0;
 
-  if(num_var_continuous_extern < 1)
-    return 0;
-  if(!R_FINITE(candidate) || !R_FINITE(floor_value))
-    return 0;
-  if((!R_FINITE(tol)) || (tol < 0.0))
-    tol = sqrt(DBL_EPSILON);
+  np_bounded_cvls_conditional_quad_context_clear_extern();
 
-  allowance = tol * MAX(1.0, fabs(floor_value));
-  return candidate <= (floor_value + allowance);
+  if(!np_conditional_density_cvls_bounded_scalar_route_ok())
+    return 0;
+  if((matrix_Y_continuous_train_extern == NULL) ||
+     (matrix_Y_continuous_train_extern[0] == NULL) ||
+     (vector_cykerlb_extern == NULL) ||
+     (vector_cykerub_extern == NULL) ||
+     (num_obs <= 0) ||
+     (q < 2))
+    return 1;
+  if((q > ((INT_MAX - NP_BOUNDED_CVLS_ADAPTIVE_STAGE1_INTERVAL_KNOTS) /
+           (NP_BOUNDED_CVLS_ADAPTIVE_STAGE1_INTERVAL_KNOTS + 1))) ||
+     (q > (INT_MAX / 3)))
+    return 1;
+  q_rescue_max =
+    q + (q - 1) * NP_BOUNDED_CVLS_ADAPTIVE_STAGE1_INTERVAL_KNOTS;
+  q_stage2 = 3 * q;
+
+  np_bounded_cvls_conditional_quad_ctx.base_grid = alloc_vecd(q);
+  np_bounded_cvls_conditional_quad_ctx.base_weights = alloc_vecd(q);
+  if((np_bounded_cvls_conditional_quad_ctx.base_grid == NULL) ||
+     (np_bounded_cvls_conditional_quad_ctx.base_weights == NULL)){
+    np_bounded_cvls_conditional_quad_context_clear_extern();
+    return 1;
+  }
+
+  np_bounded_cvls_conditional_effective_integration_bounds(
+    1,
+    matrix_Y_continuous_train_extern,
+    num_obs,
+    vector_cykerlb_extern,
+    vector_cykerub_extern,
+    np_bounded_cvls_conditional_quad_ctx.quad_lb,
+    np_bounded_cvls_conditional_quad_ctx.quad_ub
+  );
+
+  np_fill_trapezoid_rule(np_bounded_cvls_conditional_quad_ctx.quad_lb[0],
+                         np_bounded_cvls_conditional_quad_ctx.quad_ub[0],
+                         q,
+                         np_bounded_cvls_conditional_quad_ctx.base_grid,
+                         np_bounded_cvls_conditional_quad_ctx.base_weights);
+
+  np_bounded_cvls_conditional_quad_ctx.ready = 1;
+  np_bounded_cvls_conditional_quad_ctx.required = 1;
+  np_bounded_cvls_conditional_quad_ctx.q = q;
+  np_bounded_cvls_conditional_quad_ctx.num_obs = num_obs;
+  np_bounded_cvls_conditional_quad_ctx.base_step =
+    np_bounded_cvls_conditional_quad_ctx.base_grid[1] -
+    np_bounded_cvls_conditional_quad_ctx.base_grid[0];
+  np_bounded_cvls_conditional_quad_ctx.lower_effectively_infinite =
+    np_bounded_cvls_bound_is_effectively_infinite(vector_cykerlb_extern[0]);
+  np_bounded_cvls_conditional_quad_ctx.upper_effectively_infinite =
+    np_bounded_cvls_bound_is_effectively_infinite(vector_cykerub_extern[0]);
+
+  if((q_rescue_max > q) && (q_stage2 > q)){
+    np_bounded_cvls_conditional_quad_ctx.rescue_grid = alloc_vecd(q_rescue_max);
+    np_bounded_cvls_conditional_quad_ctx.rescue_weights = alloc_vecd(q_rescue_max);
+    np_bounded_cvls_conditional_quad_ctx.stage2_grid = alloc_vecd(q_stage2);
+    np_bounded_cvls_conditional_quad_ctx.stage2_weights = alloc_vecd(q_stage2);
+
+    if((np_bounded_cvls_conditional_quad_ctx.rescue_grid != NULL) &&
+       (np_bounded_cvls_conditional_quad_ctx.rescue_weights != NULL) &&
+       (np_bounded_cvls_conditional_quad_ctx.stage2_grid != NULL) &&
+       (np_bounded_cvls_conditional_quad_ctx.stage2_weights != NULL) &&
+       (np_bounded_cvls_build_adaptive_grid_1d(matrix_Y_continuous_train_extern[0],
+                                               num_obs,
+                                               np_bounded_cvls_conditional_quad_ctx.base_grid,
+                                               q,
+                                               np_bounded_cvls_conditional_quad_ctx.rescue_grid,
+                                               &np_bounded_cvls_conditional_quad_ctx.q_rescue) == 0) &&
+       (np_fill_trapezoid_rule_nonuniform(np_bounded_cvls_conditional_quad_ctx.rescue_grid,
+                                          np_bounded_cvls_conditional_quad_ctx.q_rescue,
+                                          np_bounded_cvls_conditional_quad_ctx.rescue_weights) == 0)){
+      np_bounded_cvls_conditional_quad_ctx.q_stage2 = q_stage2;
+      np_fill_trapezoid_rule(np_bounded_cvls_conditional_quad_ctx.quad_lb[0],
+                             np_bounded_cvls_conditional_quad_ctx.quad_ub[0],
+                             q_stage2,
+                             np_bounded_cvls_conditional_quad_ctx.stage2_grid,
+                             np_bounded_cvls_conditional_quad_ctx.stage2_weights);
+    } else {
+      if(np_bounded_cvls_conditional_quad_ctx.rescue_grid != NULL)
+        free(np_bounded_cvls_conditional_quad_ctx.rescue_grid);
+      if(np_bounded_cvls_conditional_quad_ctx.rescue_weights != NULL)
+        free(np_bounded_cvls_conditional_quad_ctx.rescue_weights);
+      if(np_bounded_cvls_conditional_quad_ctx.stage2_grid != NULL)
+        free(np_bounded_cvls_conditional_quad_ctx.stage2_grid);
+      if(np_bounded_cvls_conditional_quad_ctx.stage2_weights != NULL)
+        free(np_bounded_cvls_conditional_quad_ctx.stage2_weights);
+      np_bounded_cvls_conditional_quad_ctx.rescue_grid = NULL;
+      np_bounded_cvls_conditional_quad_ctx.rescue_weights = NULL;
+      np_bounded_cvls_conditional_quad_ctx.stage2_grid = NULL;
+      np_bounded_cvls_conditional_quad_ctx.stage2_weights = NULL;
+      np_bounded_cvls_conditional_quad_ctx.q_rescue = 0;
+      np_bounded_cvls_conditional_quad_ctx.q_stage2 = 0;
+    }
+  }
+
+  return 0;
 }
 
 static int np_bounded_cvls_quadrature_adaptive_needed(const double i1_mean,
@@ -17723,7 +17856,6 @@ static int np_bounded_cvls_quadrature_adaptive_needed(const double i1_mean,
   double grid_hy_ratio = double_bounded_cvls_quadrature_adaptive_grid_hy_ratio_extern;
   int degenerate_i1;
   int underresolved_grid = 0;
-  int floor_hit;
 
   if(int_bounded_cvls_quadrature_adaptive_extern == 0)
     return 0;
@@ -17740,9 +17872,7 @@ static int np_bounded_cvls_quadrature_adaptive_needed(const double i1_mean,
       ((grid_step / hy) >= grid_hy_ratio);
   }
 
-  floor_hit = np_bounded_cvls_adaptive_response_floor_hit(vector_scale_factor);
-
-  return degenerate_i1 || underresolved_grid || floor_hit;
+  return degenerate_i1 && underresolved_grid;
 }
 
 static int np_bounded_cvls_build_adaptive_grid_1d(const double *train_y,
@@ -18344,23 +18474,30 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
                                                                          double *cv,
                                                                          int i1_mode){
   const int num_obs = num_obs_train_extern;
-  const int q = np_bounded_cvls_conditional_grid_points(1);
-  const int q_rescue_max = q + (q - 1) * NP_BOUNDED_CVLS_ADAPTIVE_STAGE1_INTERVAL_KNOTS;
-  const int q_rescue_stage2 = 3 * q;
+  const NPBoundedCVLSConditionalQuadContext *quad_ctx =
+    &np_bounded_cvls_conditional_quad_ctx;
   const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(), 64));
+  int q = 0;
+  int q_rescue_max = 0;
+  int q_rescue_stage2 = 0;
+  int use_quad_context = 0;
   double quad_lb[2] = {0.0, 0.0};
   double quad_ub[2] = {0.0, 0.0};
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
   double *yrow = NULL, *fit_block = NULL, *lin_block = NULL;
   double **xblock = NULL, **xblock_full = NULL;
-  double *base_grid = NULL, *base_weights = NULL;
-  double *rescue_grid = NULL, *rescue_weights = NULL;
+  const double *base_grid = NULL, *base_weights = NULL;
+  double *base_grid_local = NULL, *base_weights_local = NULL;
+  const double *rescue_grid = NULL, *rescue_weights = NULL;
+  const double *stage2_grid = NULL, *stage2_weights = NULL;
+  double *rescue_grid_local = NULL, *rescue_weights_local = NULL;
   double **ygridblock = NULL, **rescue_ygridblock = NULL;
   double hy = 0.0;
   double i1_mean = 0.0;
   double base_step = 0.0;
   int q_rescue = 0;
+  int q_rescue_block = 0;
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
@@ -18370,11 +18507,46 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   if((i1_mode != NP_BOUNDED_CVLS_I1_MODE_BOOK) &&
      (i1_mode != NP_BOUNDED_CVLS_I1_MODE_FULL))
     return 1;
+  if((quad_ctx->ready != 0) &&
+     (quad_ctx->num_obs == num_obs) &&
+     (quad_ctx->q >= 2) &&
+     (quad_ctx->base_grid != NULL) &&
+     (quad_ctx->base_weights != NULL)){
+    use_quad_context = 1;
+    q = quad_ctx->q;
+    base_grid = quad_ctx->base_grid;
+    base_weights = quad_ctx->base_weights;
+    quad_lb[0] = quad_ctx->quad_lb[0];
+    quad_ub[0] = quad_ctx->quad_ub[0];
+    base_step = quad_ctx->base_step;
+    if((quad_ctx->q_rescue >= 2) &&
+       (quad_ctx->rescue_grid != NULL) &&
+       (quad_ctx->rescue_weights != NULL)){
+      rescue_grid = quad_ctx->rescue_grid;
+      rescue_weights = quad_ctx->rescue_weights;
+      q_rescue = quad_ctx->q_rescue;
+    }
+    if((quad_ctx->q_stage2 >= 2) &&
+       (quad_ctx->stage2_grid != NULL) &&
+       (quad_ctx->stage2_weights != NULL)){
+      stage2_grid = quad_ctx->stage2_grid;
+      stage2_weights = quad_ctx->stage2_weights;
+    }
+  } else {
+    if(quad_ctx->required != 0){
+      np_bwm_set_deferred_error("bounded npcdens cv.ls quadrature context is missing");
+      return 1;
+    }
+    q = np_bounded_cvls_conditional_grid_points(1);
+  }
   if((q < 2) || (q > ((INT_MAX - NP_BOUNDED_CVLS_ADAPTIVE_STAGE1_INTERVAL_KNOTS) /
                       (NP_BOUNDED_CVLS_ADAPTIVE_STAGE1_INTERVAL_KNOTS + 1))))
     return 1;
+  q_rescue_max = q + (q - 1) * NP_BOUNDED_CVLS_ADAPTIVE_STAGE1_INTERVAL_KNOTS;
+  q_rescue_stage2 = 3 * q;
   if(q_rescue_max > (INT_MAX / block_size))
     return 1;
+  q_rescue_block = q_rescue_max;
 
   xblock = alloc_tmatd(num_obs, block_size);
   if(i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL)
@@ -18382,8 +18554,12 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   yrow = alloc_vecd(MAX(1, num_obs));
   fit_block = alloc_vecd(q_rescue_max*block_size);
   lin_block = alloc_vecd(block_size);
-  base_grid = alloc_vecd(q);
-  base_weights = alloc_vecd(q);
+  if(!use_quad_context){
+    base_grid_local = alloc_vecd(q);
+    base_weights_local = alloc_vecd(q);
+    base_grid = base_grid_local;
+    base_weights = base_weights_local;
+  }
   ygridblock = alloc_tmatd(num_obs, q);
   if((xblock == NULL) || (yrow == NULL) || (fit_block == NULL) || (lin_block == NULL) ||
      (base_grid == NULL) || (base_weights == NULL) ||
@@ -18396,19 +18572,22 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
     goto cleanup_bounded_cvls_quad;
 
-  np_bounded_cvls_conditional_effective_integration_bounds(
-    1,
-    matrix_Y_continuous_train_extern,
-    num_obs,
-    vector_cykerlb_extern,
-    vector_cykerub_extern,
-    quad_lb,
-    quad_ub
-  );
+  if(!use_quad_context){
+    np_bounded_cvls_conditional_effective_integration_bounds(
+      1,
+      matrix_Y_continuous_train_extern,
+      num_obs,
+      vector_cykerlb_extern,
+      vector_cykerub_extern,
+      quad_lb,
+      quad_ub
+    );
 
-  /* Evaluate the bounded I1 term by integrating the pointwise estimator itself,
-     bypassing the suspect bounded-convolution shortcut on this narrow surface. */
-  np_fill_trapezoid_rule(quad_lb[0], quad_ub[0], q, base_grid, base_weights);
+    /* Evaluate the bounded I1 term by integrating the pointwise estimator itself,
+       bypassing the suspect bounded-convolution shortcut on this narrow surface. */
+    np_fill_trapezoid_rule(quad_lb[0], quad_ub[0], q, base_grid_local, base_weights_local);
+    base_step = base_grid[1] - base_grid[0];
+  }
   if(np_conditional_density_cvls_bounded_i1_eval_on_grid(vector_scale_factor,
                                                          &xctx,
                                                          &yctx,
@@ -18428,22 +18607,26 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
     goto cleanup_bounded_cvls_quad;
 
   hy = yctx.matrix_bandwidth_y[0][0];
-  base_step = base_grid[1] - base_grid[0];
   if(np_bounded_cvls_quadrature_adaptive_needed(i1_mean, base_step, hy, vector_scale_factor)){
-    rescue_grid = alloc_vecd(q_rescue_max);
-    rescue_weights = alloc_vecd(q_rescue_max);
-    rescue_ygridblock = alloc_tmatd(num_obs, q_rescue_max);
+    if(rescue_grid == NULL || rescue_weights == NULL){
+      rescue_grid_local = alloc_vecd(q_rescue_max);
+      rescue_weights_local = alloc_vecd(q_rescue_max);
+      rescue_grid = rescue_grid_local;
+      rescue_weights = rescue_weights_local;
+    }
+    rescue_ygridblock = alloc_tmatd(num_obs, q_rescue_block);
 
     if((rescue_grid != NULL) && (rescue_weights != NULL) && (rescue_ygridblock != NULL) &&
-       (np_bounded_cvls_build_adaptive_grid_1d(matrix_Y_continuous_train_extern[0],
-                                               num_obs,
-                                               base_grid,
-                                               q,
-                                               rescue_grid,
-                                               &q_rescue) == 0) &&
-       (np_fill_trapezoid_rule_nonuniform(rescue_grid,
-                                          q_rescue,
-                                          rescue_weights) == 0) &&
+       ((q_rescue >= 2) ||
+        ((np_bounded_cvls_build_adaptive_grid_1d(matrix_Y_continuous_train_extern[0],
+                                                 num_obs,
+                                                 base_grid,
+                                                 q,
+                                                 rescue_grid_local,
+                                                 &q_rescue) == 0) &&
+         (np_fill_trapezoid_rule_nonuniform(rescue_grid_local,
+                                            q_rescue,
+                                            rescue_weights_local) == 0))) &&
        (np_conditional_density_cvls_bounded_i1_eval_on_grid(vector_scale_factor,
                                                             &xctx,
                                                             &yctx,
@@ -18461,17 +18644,23 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
                                                             cv,
                                                             &i1_mean) == 0)){
       if(i1_mean <= double_bounded_cvls_quadrature_adaptive_tol_extern){
-        np_fill_trapezoid_rule(quad_lb[0],
-                               quad_ub[0],
-                               q_rescue_stage2,
-                               rescue_grid,
-                               rescue_weights);
+        const double *stage2_grid_use = stage2_grid;
+        const double *stage2_weights_use = stage2_weights;
+        if((stage2_grid_use == NULL) || (stage2_weights_use == NULL)){
+          np_fill_trapezoid_rule(quad_lb[0],
+                                 quad_ub[0],
+                                 q_rescue_stage2,
+                                 rescue_grid_local,
+                                 rescue_weights_local);
+          stage2_grid_use = rescue_grid_local;
+          stage2_weights_use = rescue_weights_local;
+        }
         (void)np_conditional_density_cvls_bounded_i1_eval_on_grid(
           vector_scale_factor,
           &xctx,
           &yctx,
-          rescue_grid,
-          rescue_weights,
+          stage2_grid_use,
+          stage2_weights_use,
           q_rescue_stage2,
           i1_mode,
           xblock,
@@ -18498,11 +18687,11 @@ cleanup_bounded_cvls_quad:
   if(yrow != NULL) free(yrow);
   if(fit_block != NULL) free(fit_block);
   if(lin_block != NULL) free(lin_block);
-  if(base_grid != NULL) free(base_grid);
-  if(base_weights != NULL) free(base_weights);
+  if(base_grid_local != NULL) free(base_grid_local);
+  if(base_weights_local != NULL) free(base_weights_local);
   if(ygridblock != NULL) free_tmat(ygridblock);
-  if(rescue_grid != NULL) free(rescue_grid);
-  if(rescue_weights != NULL) free(rescue_weights);
+  if(rescue_grid_local != NULL) free(rescue_grid_local);
+  if(rescue_weights_local != NULL) free(rescue_weights_local);
   if(rescue_ygridblock != NULL) free_tmat(rescue_ygridblock);
   return status;
 }
