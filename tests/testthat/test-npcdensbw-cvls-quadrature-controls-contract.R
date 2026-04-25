@@ -10,7 +10,6 @@ quadrature_control_fixture <- function(n = 48L, seed = 20260424L) {
 quadrature_control_bw <- function(dat,
                                   cykerlb = 0,
                                   cykerub = Inf,
-                                  cvls.quadrature.adaptive = FALSE,
                                   ...) {
   npcdensbw(
     xdat = dat$x,
@@ -27,7 +26,6 @@ quadrature_control_bw <- function(dat,
     cykerbound = "fixed",
     cykerlb = cykerlb,
     cykerub = cykerub,
-    cvls.quadrature.adaptive = cvls.quadrature.adaptive,
     ...
   )
 }
@@ -39,13 +37,26 @@ test_that("npcdensbw validates cv.ls quadrature controls", {
   expect_no_error(quadrature_control_bw(dat, cvls.quadrature.extend.factor = 1))
   expect_no_error(quadrature_control_bw(dat, cvls.quadrature.extend.factor = 2))
   expect_no_error(quadrature_control_bw(dat, cvls.quadrature.points = c(41L, 17L)))
-  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.adaptive = TRUE))
-  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.adaptive.tol = 0))
-  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.adaptive.grid.hy.ratio = 0))
-  expect_error(
-    quadrature_control_bw(dat, cvls.quadrature.adaptive.floor.tol = 0),
-    "cvls.quadrature.adaptive.floor.tol has been removed"
+  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.grid = "hybrid"))
+  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.grid = "uniform"))
+  expect_no_error(quadrature_control_bw(dat, cvls.quadrature.grid = "sample"))
+
+  removed_args <- list(
+    cvls.i1.rescue = FALSE,
+    cvls.quadrature.adaptive = TRUE,
+    cvls.quadrature.adaptive.tol = 0,
+    cvls.quadrature.adaptive.grid.hy.ratio = 0,
+    cvls.quadrature.adaptive.floor.tol = 0
   )
+  for (nm in names(removed_args)) {
+    args <- list(dat)
+    args[[nm]] <- removed_args[[nm]]
+    expect_error(
+      do.call(quadrature_control_bw, args),
+      sprintf("%s has been removed", nm),
+      fixed = TRUE
+    )
+  }
 
   bad_extend <- list(0, -1, NA_real_, NaN, Inf, "2", c(1, 2))
   for (value in bad_extend) {
@@ -63,23 +74,11 @@ test_that("npcdensbw validates cv.ls quadrature controls", {
     )
   }
 
-  bad_logical <- list(NA, c(TRUE, FALSE), 1)
-  for (value in bad_logical) {
+  bad_grid <- list(NA, c("hybrid", "uniform"), TRUE, "adaptive")
+  for (value in bad_grid) {
     expect_error(
-      quadrature_control_bw(dat, cvls.quadrature.adaptive = value),
-      "cvls.quadrature.adaptive"
-    )
-  }
-
-  bad_nonnegative <- list(NA_real_, NaN, Inf, -1, "1", c(1, 2))
-  for (value in bad_nonnegative) {
-    expect_error(
-      quadrature_control_bw(dat, cvls.quadrature.adaptive.tol = value),
-      "cvls.quadrature.adaptive.tol"
-    )
-    expect_error(
-      quadrature_control_bw(dat, cvls.quadrature.adaptive.grid.hy.ratio = value),
-      "cvls.quadrature.adaptive.grid.hy.ratio"
+      quadrature_control_bw(dat, cvls.quadrature.grid = value),
+      "cvls.quadrature.grid"
     )
   }
 })
@@ -90,28 +89,22 @@ test_that("npcdensbw stores cv.ls quadrature controls and old objects use defaul
   bw_default <- quadrature_control_bw(dat)
   bw_explicit <- quadrature_control_bw(
     dat,
+    cvls.quadrature.grid = "sample",
     cvls.quadrature.extend.factor = 1.5,
-    cvls.quadrature.points = c(43L, 19L),
-    cvls.quadrature.adaptive = TRUE,
-    cvls.quadrature.adaptive.tol = 2e-10,
-    cvls.quadrature.adaptive.grid.hy.ratio = 4
+    cvls.quadrature.points = c(43L, 19L)
   )
 
+  expect_identical(bw_default$cvls.quadrature.grid, "hybrid")
   expect_equal(bw_default$cvls.quadrature.extend.factor, 1)
   expect_identical(unname(bw_default$cvls.quadrature.points), c(243L, 93L))
-  expect_false(isTRUE(bw_default$cvls.quadrature.adaptive))
+  expect_identical(bw_explicit$cvls.quadrature.grid, "sample")
   expect_equal(bw_explicit$cvls.quadrature.extend.factor, 1.5)
   expect_identical(unname(bw_explicit$cvls.quadrature.points), c(43L, 19L))
-  expect_true(isTRUE(bw_explicit$cvls.quadrature.adaptive))
-  expect_equal(bw_explicit$cvls.quadrature.adaptive.tol, 2e-10)
-  expect_equal(bw_explicit$cvls.quadrature.adaptive.grid.hy.ratio, 4)
 
   bw_old <- bw_default
+  bw_old$cvls.quadrature.grid <- NULL
   bw_old$cvls.quadrature.extend.factor <- NULL
   bw_old$cvls.quadrature.points <- NULL
-  bw_old$cvls.quadrature.adaptive <- NULL
-  bw_old$cvls.quadrature.adaptive.tol <- NULL
-  bw_old$cvls.quadrature.adaptive.grid.hy.ratio <- NULL
   expect_true(is.finite(np:::.npcdensbw_eval_only(dat$x, dat$y, bw_old)$objective))
 })
 
@@ -168,7 +161,23 @@ test_that("cv.ls quadrature point vector controls one- and two-dimensional grids
   obj_2d_default <- np:::.npcdensbw_eval_only(x2, y2, bw_2d_default)$objective
   obj_2d_coarse <- np:::.npcdensbw_eval_only(x2, y2, bw_2d_coarse)$objective
 
+  expect_identical(bw_2d_default$cvls.quadrature.grid, "uniform")
   expect_true(is.finite(obj_2d_default))
   expect_true(is.finite(obj_2d_coarse))
   expect_gt(abs(obj_2d_default - obj_2d_coarse), 1e-10)
+  expect_error(
+    npcdensbw(
+      xdat = x2,
+      ydat = y2,
+      bws = c(0.16, 0.18, 0.22),
+      bandwidth.compute = FALSE,
+      bwmethod = "cv.ls",
+      bwtype = "fixed",
+      regtype = "lc",
+      cxkerbound = "range",
+      cykerbound = "range",
+      cvls.quadrature.grid = "hybrid"
+    ),
+    "scalar continuous responses"
+  )
 })
