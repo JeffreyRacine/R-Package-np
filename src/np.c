@@ -961,6 +961,15 @@ static double np_fixed_continuous_temp_pow_cv(
   }
 }
 
+static int np_fixed_continuous_below_floor_cv(double candidate, double floor)
+{
+  /* NOMAD/Powell handoffs can land exactly on this floor up to roundoff. */
+  const double scale = fmax(1.0, fmax(fabs(candidate), fabs(floor)));
+  const double tol = 64.0 * DBL_EPSILON * scale;
+
+  return candidate < (floor - tol);
+}
+
 static int np_fixed_continuous_floor_ok_cv_with_coeff(
   int KERNEL,
   int num_obs,
@@ -979,7 +988,7 @@ static int np_fixed_continuous_floor_ok_cv_with_coeff(
 
   for (i = 1; i <= total_continuous; i++) {
     const double bw_floor = np_fixed_continuous_floor_cv_with_coeff(i - 1, temp_pow, floor_coeff);
-    if (candidate[i] < bw_floor)
+    if (np_fixed_continuous_below_floor_cv(candidate[i], bw_floor))
       return 0;
   }
 
