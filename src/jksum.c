@@ -150,6 +150,7 @@ extern int int_glp_basis_extern;
 extern int int_bounded_cvls_quadrature_grid_extern;
 extern int int_bounded_cvls_quadrature_points_extern;
 extern double double_bounded_cvls_quadrature_extend_factor_extern;
+extern double double_bounded_cvls_quadrature_ratios_extern[3];
 
 extern int KERNEL_reg_extern;
 extern int KERNEL_reg_unordered_extern;
@@ -18215,6 +18216,141 @@ static int np_bounded_cvls_fill_uniform_nodes_1d(const double lb,
   return 0;
 }
 
+static int np_bounded_cvls_node_exists_1d(const double *grid,
+                                          const int n,
+                                          const double value){
+  int i;
+
+  for(i = 0; i < n; i++){
+    if(grid[i] == value)
+      return 1;
+  }
+
+  return 0;
+}
+
+static void np_bounded_cvls_append_unique_node_1d(double *grid,
+                                                  int *count,
+                                                  const int q_target,
+                                                  const double value){
+  if((grid == NULL) || (count == NULL) || (*count >= q_target) ||
+     !R_FINITE(value))
+    return;
+
+  if(!np_bounded_cvls_node_exists_1d(grid, *count, value))
+    grid[(*count)++] = value;
+}
+
+static void np_bounded_cvls_fill_remaining_uniform_nodes_1d(const double lb,
+                                                            const double ub,
+                                                            const int q_target,
+                                                            double *grid,
+                                                            int *count){
+  int pass;
+
+  if((grid == NULL) || (count == NULL) || (q_target < 2) || !(ub > lb))
+    return;
+
+  for(pass = 1; (*count < q_target) && (pass <= 8); pass++){
+    const int q_try = MAX(q_target, q_target*(pass + 1));
+    const double step = (ub - lb)/(double)(q_try - 1);
+    int i;
+
+    if(!R_FINITE(step) || !(step > 0.0))
+      return;
+
+    for(i = 0; (i < q_try) && (*count < q_target); i++){
+      const double value = lb + ((double)i)*step;
+      np_bounded_cvls_append_unique_node_1d(grid, count, q_target, value);
+    }
+  }
+}
+
+static int np_bounded_cvls_largest_remainder_index(const double rem0,
+                                                   const double rem1,
+                                                   const double rem2){
+  if((rem1 >= rem0) && (rem1 >= rem2))
+    return 1;
+  if((rem2 >= rem0) && (rem2 >= rem1))
+    return 2;
+  return 0;
+}
+
+static void np_bounded_cvls_split_hybrid_counts(const int q_target,
+                                                int *q_uniform,
+                                                int *q_sample,
+                                                int *q_gl){
+  double r0 = double_bounded_cvls_quadrature_ratios_extern[0];
+  double r1 = double_bounded_cvls_quadrature_ratios_extern[1];
+  double r2 = double_bounded_cvls_quadrature_ratios_extern[2];
+  double raw0, raw1, raw2, rem0, rem1, rem2;
+  int c0, c1, c2, total;
+
+  if((!R_FINITE(r0)) || (!R_FINITE(r1)) || (!R_FINITE(r2)) ||
+     (r0 < 0.0) || (r1 < 0.0) || (r2 < 0.0) ||
+     (fabs(r0 + r1 + r2 - 1.0) > 1.0e-8)){
+    r0 = 0.20;
+    r1 = 0.55;
+    r2 = 0.25;
+  }
+
+  raw0 = ((double)q_target)*r0;
+  raw1 = ((double)q_target)*r1;
+  raw2 = ((double)q_target)*r2;
+
+  c0 = (int)floor(raw0);
+  c1 = (int)floor(raw1);
+  c2 = (int)floor(raw2);
+  rem0 = raw0 - (double)c0;
+  rem1 = raw1 - (double)c1;
+  rem2 = raw2 - (double)c2;
+
+  total = c0 + c1 + c2;
+  while(total < q_target){
+    const int idx = np_bounded_cvls_largest_remainder_index(rem0, rem1, rem2);
+    if(idx == 1){
+      c1++;
+      rem1 = -1.0;
+    } else if(idx == 2){
+      c2++;
+      rem2 = -1.0;
+    } else {
+      c0++;
+      rem0 = -1.0;
+    }
+    total++;
+  }
+
+  while(total > q_target){
+    if((c0 >= c1) && (c0 >= c2) && (c0 > 0))
+      c0--;
+    else if((c1 >= c0) && (c1 >= c2) && (c1 > 0))
+      c1--;
+    else if(c2 > 0)
+      c2--;
+    total--;
+  }
+
+  if((c2 > 0) && (c2 < 2)){
+    if(c1 > 0)
+      c1--;
+    else if(c0 > 0)
+      c0--;
+    c2++;
+  }
+  if((c2 % 2) != 0){
+    c2--;
+    if(c1 >= c0)
+      c1++;
+    else
+      c0++;
+  }
+
+  *q_uniform = c0;
+  *q_sample = c1;
+  *q_gl = c2;
+}
+
 static int np_bounded_cvls_build_conditional_grid_1d(const double *train_y,
                                                      const int num_obs,
                                                      const double lb,
@@ -18226,6 +18362,7 @@ static int np_bounded_cvls_build_conditional_grid_1d(const double *train_y,
   int grid_mode = int_bounded_cvls_quadrature_grid_extern;
   double *sample_work = NULL;
   double *sample_nodes = NULL;
+  double *gl_breaks = NULL;
   int n_unique = 0;
   int status = 1;
 
@@ -18271,6 +18408,75 @@ static int np_bounded_cvls_build_conditional_grid_1d(const double *train_y,
     goto cleanup_build_conditional_grid_1d;
 
   {
+    const double inv_sqrt3 = 0.57735026918962576451;
+    int q_uniform_target = 0;
+    int q_sample_target = 0;
+    int q_gl_target = 0;
+    int count = 0;
+    int q_sample = 0;
+    int q_breaks = 0;
+    int i;
+
+    np_bounded_cvls_split_hybrid_counts(q_target,
+                                        &q_uniform_target,
+                                        &q_sample_target,
+                                        &q_gl_target);
+
+    if((q_uniform_target >= 2) &&
+       (np_bounded_cvls_fill_uniform_nodes_1d(lb, ub, q_uniform_target, grid_out) == 0)){
+      count = q_uniform_target;
+    }
+
+    if((q_sample_target >= 2) &&
+       (np_bounded_cvls_ranked_sample_nodes_1d(sample_work,
+                                              n_unique,
+                                              q_sample_target,
+                                              sample_nodes,
+                                              &q_sample) == 0)){
+      for(i = 0; i < q_sample; i++)
+        np_bounded_cvls_append_unique_node_1d(grid_out, &count, q_target, sample_nodes[i]);
+    }
+
+    if(q_gl_target >= 2){
+      const int q_intervals = q_gl_target/2;
+      gl_breaks = alloc_vecd(q_intervals + 1);
+      if((gl_breaks != NULL) &&
+         (np_bounded_cvls_ranked_sample_nodes_1d(sample_work,
+                                                n_unique,
+                                                q_intervals + 1,
+                                                gl_breaks,
+                                                &q_breaks) == 0)){
+        for(i = 0; i < q_breaks - 1; i++){
+          const double a = gl_breaks[i];
+          const double b = gl_breaks[i + 1];
+
+          if(b > a){
+            const double mid = 0.5*(a + b);
+            const double half = 0.5*(b - a);
+
+            np_bounded_cvls_append_unique_node_1d(grid_out, &count, q_target,
+                                                  mid - inv_sqrt3*half);
+            np_bounded_cvls_append_unique_node_1d(grid_out, &count, q_target,
+                                                  mid + inv_sqrt3*half);
+          }
+        }
+      }
+    }
+
+    count = np_bounded_cvls_unique_sorted_inplace(grid_out, count);
+    np_bounded_cvls_fill_remaining_uniform_nodes_1d(lb, ub, q_target, grid_out, &count);
+    count = np_bounded_cvls_unique_sorted_inplace(grid_out, count);
+
+    if(count == q_target){
+      *q_out = count;
+      if(np_fill_trapezoid_rule_nonuniform(grid_out, *q_out, weights_out) != 0)
+        goto cleanup_build_conditional_grid_1d;
+      status = 0;
+      goto cleanup_build_conditional_grid_1d;
+    }
+  }
+
+  {
     const int q_uniform_start = MAX(2, (q_target + 1)/2);
     int q_uniform;
 
@@ -18308,6 +18514,7 @@ static int np_bounded_cvls_build_conditional_grid_1d(const double *train_y,
 cleanup_build_conditional_grid_1d:
   if(sample_work != NULL) free(sample_work);
   if(sample_nodes != NULL) free(sample_nodes);
+  if(gl_breaks != NULL) free(gl_breaks);
   return status;
 }
 

@@ -60,6 +60,10 @@ test_that("npcdensbw stores the cv.ls quadrature grid mode on conditional bandwi
   expect_false("cvls.quadrature.adaptive" %in% names(formals(getS3method("npcdensbw", "default"))))
   expect_false("cvls.i1.rescue" %in% names(bw_default))
   expect_false("cvls.quadrature.adaptive" %in% names(bw_default))
+  expect_equal(
+    eval(formals(getS3method("npcdensbw", "default"))$cvls.quadrature.ratios),
+    c(0.20, 0.55, 0.25)
+  )
   expect_error(
     npcdensbw(
       xdat = dat$x,
@@ -73,8 +77,66 @@ test_that("npcdensbw stores the cv.ls quadrature grid mode on conditional bandwi
     "cvls.i1.rescue has been removed"
   )
   expect_identical(bw_default$cvls.quadrature.grid, "hybrid")
+  expect_equal(bw_default$cvls.quadrature.ratios, c(0.20, 0.55, 0.25))
   expect_identical(bw_hybrid$cvls.quadrature.grid, "hybrid")
   expect_identical(bw_uniform$cvls.quadrature.grid, "uniform")
+})
+
+test_that("cv.ls hybrid quadrature ratios validate and persist", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old_opts <- options(npRmpi.autodispatch = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  dat <- chisq_support_fixture(n = 40L, seed = 20260426L)
+
+  bw <- npcdensbw(
+    xdat = dat$x,
+    ydat = dat$y,
+    bws = c(0.35, 0.35),
+    bandwidth.compute = FALSE,
+    bwmethod = "cv.ls",
+    bwtype = "fixed",
+    cvls.quadrature.ratios = c(0.2, 0.5, 0.3)
+  )
+
+  expect_equal(bw$cvls.quadrature.ratios, c(0.2, 0.5, 0.3))
+  expect_error(
+    npcdensbw(
+      xdat = dat$x,
+      ydat = dat$y,
+      bws = c(0.35, 0.35),
+      bandwidth.compute = FALSE,
+      bwmethod = "cv.ls",
+      bwtype = "fixed",
+      cvls.quadrature.ratios = c(0.5, 0.5)
+    ),
+    "three-element"
+  )
+  expect_error(
+    npcdensbw(
+      xdat = dat$x,
+      ydat = dat$y,
+      bws = c(0.35, 0.35),
+      bandwidth.compute = FALSE,
+      bwmethod = "cv.ls",
+      bwtype = "fixed",
+      cvls.quadrature.ratios = c(0.5, -0.1, 0.6)
+    ),
+    "non-negative"
+  )
+  expect_error(
+    npcdensbw(
+      xdat = dat$x,
+      ydat = dat$y,
+      bws = c(0.35, 0.35),
+      bandwidth.compute = FALSE,
+      bwmethod = "cv.ls",
+      bwtype = "fixed",
+      cvls.quadrature.ratios = c(0.5, 0.25, 0.2)
+    ),
+    "summing to one"
+  )
 })
 
 test_that("cv.ls quadrature grid modes are stable finite objective controls", {

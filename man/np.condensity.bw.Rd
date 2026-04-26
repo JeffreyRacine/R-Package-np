@@ -50,6 +50,7 @@ npcdensbw(\dots)
           cvls.quadrature.grid = NULL,
           cvls.quadrature.extend.factor = NULL,
           cvls.quadrature.points = NULL,
+          cvls.quadrature.ratios = NULL,
           small = 1.490116e-05,
           tol = 1.490116e-04,
           transform.bounds = FALSE,
@@ -100,6 +101,7 @@ npcdensbw(\dots)
           cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
           cvls.quadrature.extend.factor = 1,
           cvls.quadrature.points = c(81L, 31L),
+          cvls.quadrature.ratios = c(0.20, 0.55, 0.25),
           small,
           tol,
           transform.bounds,
@@ -400,7 +402,7 @@ npcdensbw(\dots)
     \eqn{I_1} quadrature grid. \code{"uniform"} uses only evenly spaced
     nodes over the finite quadrature window, \code{"sample"} uses
     deterministic ranked sample-\eqn{y} nodes, and \code{"hybrid"} uses a
-    fixed-size merge of uniform and ranked sample-\eqn{y} nodes. The default
+    fixed-size merge controlled by \code{cvls.quadrature.ratios}. The default
     is \code{"hybrid"} for scalar continuous responses and \code{"uniform"}
     for two continuous responses.
   }
@@ -417,6 +419,16 @@ npcdensbw(\dots)
     point counts for one and two continuous response variables, respectively.
     Defaults to \code{c(81L, 31L)}. For two continuous response variables,
     the second entry is used per dimension.
+  }
+
+  \item{cvls.quadrature.ratios}{
+    a three-element non-negative numeric vector summing to one, giving the
+    uniform, ranked sample-\eqn{y}, and composite Gauss-Legendre proportions
+    used by the scalar bounded \code{cv.ls} \code{"hybrid"} quadrature grid.
+    Defaults to \code{c(0.20, 0.55, 0.25)}, which gives an \code{8/23/10}
+    split when \code{cvls.quadrature.points = c(41L, 31L)} and the nearest
+    deterministic exact-count split at other scalar grid sizes. The setting is
+    ignored by explicit \code{"uniform"} and \code{"sample"} grid modes.
   }
 
   When response-side bounds are set explicitly to fixed infinite endpoints,
