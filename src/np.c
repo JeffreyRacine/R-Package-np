@@ -1126,6 +1126,9 @@ int int_glp_basis_extern=1;
 int int_bounded_cvls_quadrature_grid_extern=1;
 int int_bounded_cvls_quadrature_points_extern=0;
 double double_bounded_cvls_quadrature_extend_factor_extern=1.0;
+double double_bounded_cvls_quadrature_ratios_extern[3]={
+  0.20, 0.55, 0.25
+};
 double double_bounded_cvls_scale_factor_lower_bound_extern=0.1;
 
 int KERNEL_reg_extern=0;
@@ -6099,6 +6102,19 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if (!R_FINITE(double_bounded_cvls_quadrature_extend_factor_extern) ||
       double_bounded_cvls_quadrature_extend_factor_extern <= 0.0)
     error("C_np_density_conditional_bw: cvls.quadrature.extend.factor must be positive and finite");
+  double_bounded_cvls_quadrature_ratios_extern[0] = myoptd[CBW_QUAD_RATIO_UNIFORMD];
+  double_bounded_cvls_quadrature_ratios_extern[1] = myoptd[CBW_QUAD_RATIO_SAMPLED];
+  double_bounded_cvls_quadrature_ratios_extern[2] = myoptd[CBW_QUAD_RATIO_GLD];
+  if (!R_FINITE(double_bounded_cvls_quadrature_ratios_extern[0]) ||
+      !R_FINITE(double_bounded_cvls_quadrature_ratios_extern[1]) ||
+      !R_FINITE(double_bounded_cvls_quadrature_ratios_extern[2]) ||
+      (double_bounded_cvls_quadrature_ratios_extern[0] < 0.0) ||
+      (double_bounded_cvls_quadrature_ratios_extern[1] < 0.0) ||
+      (double_bounded_cvls_quadrature_ratios_extern[2] < 0.0) ||
+      (fabs(double_bounded_cvls_quadrature_ratios_extern[0] +
+            double_bounded_cvls_quadrature_ratios_extern[1] +
+            double_bounded_cvls_quadrature_ratios_extern[2] - 1.0) > 1.0e-8))
+    error("C_np_density_conditional_bw: cvls.quadrature.ratios must be non-negative and sum to one");
   dfc_dir = myopti[CBW_DFC_DIRI];
   lbc_dir = myoptd[CBW_LBC_DIRD];
   c_dir = myoptd[CBW_C_DIRD];

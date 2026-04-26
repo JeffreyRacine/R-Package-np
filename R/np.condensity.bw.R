@@ -164,6 +164,28 @@ npcdensbw.formula <-
   .npcdensbw_validate_cvls_quadrature_points(value, argname = argname)
 }
 
+.npcdensbw_validate_cvls_quadrature_ratios <- function(value,
+                                                      argname = "cvls.quadrature.ratios") {
+  if (length(value) != 3L || !is.numeric(value) || anyNA(value) ||
+      any(!is.finite(value)) || any(value < 0) ||
+      !isTRUE(all.equal(sum(value), 1, tolerance = 1e-8))) {
+    stop(sprintf("%s must be a three-element non-negative numeric vector summing to one",
+                 argname),
+         call. = FALSE)
+  }
+
+  as.double(value)
+}
+
+.npcdensbw_resolve_cvls_quadrature_ratios <- function(value,
+                                                     fallback = c(0.20, 0.55, 0.25),
+                                                     argname = "cvls.quadrature.ratios") {
+  if (is.null(value))
+    return(as.double(fallback))
+
+  .npcdensbw_validate_cvls_quadrature_ratios(value, argname = argname)
+}
+
 .npcdensbw_resolve_cvls_quadrature_grid <- function(value,
                                                     fallback = "hybrid",
                                                     argname = "cvls.quadrature.grid") {
@@ -276,6 +298,7 @@ npcdensbw.conbandwidth <-
            cvls.quadrature.grid = NULL,
            cvls.quadrature.extend.factor = NULL,
            cvls.quadrature.points = NULL,
+           cvls.quadrature.ratios = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
@@ -335,11 +358,17 @@ npcdensbw.conbandwidth <-
       fallback = c(81L, 31L),
       argname = "cvls.quadrature.points"
     )
+    cvls.quadrature.ratios <- .npcdensbw_resolve_cvls_quadrature_ratios(
+      if (is.null(cvls.quadrature.ratios)) bws$cvls.quadrature.ratios else cvls.quadrature.ratios,
+      fallback = c(0.20, 0.55, 0.25),
+      argname = "cvls.quadrature.ratios"
+    )
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
     bws$scale.factor.lower.bound <- scale.factor.lower.bound
     bws$cvls.quadrature.grid <- cvls.quadrature.grid
     bws$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
     bws$cvls.quadrature.points <- cvls.quadrature.points
+    bws$cvls.quadrature.ratios <- cvls.quadrature.ratios
     itmax <- npValidatePositiveInteger(itmax, "itmax")
     ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
     tol <- npValidatePositiveFiniteNumeric(tol, "tol")
@@ -503,7 +532,10 @@ npcdensbw.conbandwidth <-
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac,
         scale.factor.lower.bound = tbw$scale.factor.lower.bound,
-        cvls.quadrature.extend.factor = tbw$cvls.quadrature.extend.factor)
+        cvls.quadrature.extend.factor = tbw$cvls.quadrature.extend.factor,
+        cvls.quadrature.ratios.uniform = tbw$cvls.quadrature.ratios[[1L]],
+        cvls.quadrature.ratios.sample = tbw$cvls.quadrature.ratios[[2L]],
+        cvls.quadrature.ratios.gl = tbw$cvls.quadrature.ratios[[3L]])
 
       cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
       cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
@@ -678,6 +710,7 @@ npcdensbw.conbandwidth <-
     tbw$cvls.quadrature.grid <- bws$cvls.quadrature.grid
     tbw$cvls.quadrature.extend.factor <- bws$cvls.quadrature.extend.factor
     tbw$cvls.quadrature.points <- bws$cvls.quadrature.points
+    tbw$cvls.quadrature.ratios <- bws$cvls.quadrature.ratios
     
     tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
     tbw <- .npcdensbw_restore_explicit_fixed_y_bounds(tbw, bws)
@@ -714,6 +747,7 @@ npcdensbw.conbandwidth <-
   tbw$cvls.quadrature.grid <- reg.args$cvls.quadrature.grid
   tbw$cvls.quadrature.extend.factor <- reg.args$cvls.quadrature.extend.factor
   tbw$cvls.quadrature.points <- reg.args$cvls.quadrature.points
+  tbw$cvls.quadrature.ratios <- reg.args$cvls.quadrature.ratios
   tbw <- .npcdensbw_apply_continuous_search_floor(
     tbw,
     xdat = xdat,
@@ -862,6 +896,11 @@ npcdensbw.conbandwidth <-
     fallback = c(81L, 31L),
     argname = "bws$cvls.quadrature.points"
   )
+  cvls.quadrature.ratios <- .npcdensbw_resolve_cvls_quadrature_ratios(
+    bws$cvls.quadrature.ratios,
+    fallback = c(0.20, 0.55, 0.25),
+    argname = "bws$cvls.quadrature.ratios"
+  )
   cvls.quadrature.grid <- .npcdensbw_resolve_cvls_quadrature_grid(
     bws$cvls.quadrature.grid,
     fallback = .npcdensbw_cvls_quadrature_grid_fallback(bws$yncon),
@@ -956,7 +995,10 @@ npcdensbw.conbandwidth <-
     nconfac = nconfac,
     ncatfac = ncatfac,
     scale.factor.lower.bound = scale.factor.lower.bound,
-    cvls.quadrature.extend.factor = cvls.quadrature.extend.factor
+    cvls.quadrature.extend.factor = cvls.quadrature.extend.factor,
+    cvls.quadrature.ratios.uniform = cvls.quadrature.ratios[[1L]],
+    cvls.quadrature.ratios.sample = cvls.quadrature.ratios[[2L]],
+    cvls.quadrature.ratios.gl = cvls.quadrature.ratios[[3L]]
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
@@ -1603,6 +1645,7 @@ npcdensbw.default <-
            cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
            cvls.quadrature.extend.factor = 1,
            cvls.quadrature.points = c(81L, 31L),
+           cvls.quadrature.ratios = c(0.20, 0.55, 0.25),
            small,
            tol,
            transform.bounds,
@@ -1677,6 +1720,11 @@ npcdensbw.default <-
       cvls.quadrature.points,
       fallback = c(81L, 31L),
       argname = "cvls.quadrature.points"
+    )
+    cvls.quadrature.ratios <- .npcdensbw_resolve_cvls_quadrature_ratios(
+      cvls.quadrature.ratios,
+      fallback = c(0.20, 0.55, 0.25),
+      argname = "cvls.quadrature.ratios"
     )
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
@@ -1861,6 +1909,7 @@ npcdensbw.default <-
     reg.args$cvls.quadrature.grid <- cvls.quadrature.grid
     reg.args$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
     reg.args$cvls.quadrature.points <- cvls.quadrature.points
+    reg.args$cvls.quadrature.ratios <- cvls.quadrature.ratios
     reg.bwmethod <- if (is.null(reg.args$bwmethod)) "cv.ls" else reg.args$bwmethod
     if (isTRUE(bandwidth.compute) &&
         identical(as.character(reg.bwmethod)[1L], "cv.ls")) {
