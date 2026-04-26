@@ -118,6 +118,40 @@ test_that("npcdensbw stores cv.ls quadrature controls and old objects use defaul
   expect_true(is.finite(npRmpi:::.npcdensbw_eval_only(dat$x, dat$y, bw_old)$objective))
 })
 
+test_that("resident npcdens NOMAD shadow accepts cv.ls quadrature controls", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old_opts <- options(npRmpi.autodispatch = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  dat <- quadrature_control_fixture(n = 18L)
+  bw <- quadrature_control_bw(
+    dat,
+    cvls.quadrature.grid = "uniform",
+    cvls.quadrature.points = c(41L, 17L),
+    cvls.quadrature.extend.factor = 1.5
+  )
+  prep <- npRmpi:::.npcdensbw_nomad_shadow_prepare_args(
+    xdat = dat$x,
+    ydat = dat$y,
+    bws = bw,
+    invalid.penalty = "baseline"
+  )
+
+  expect_length(prep$myopti, 29L)
+  expect_length(prep$myoptd, 21L)
+  expect_equal(prep$myopti[[28L]], 0L)
+  expect_equal(prep$myopti[[29L]], 41L)
+  expect_equal(prep$myoptd[[21L]], 1.5)
+
+  prepare_body <- paste(
+    deparse(body(npRmpi:::npRmpiNomadShadowPrepareConditionalDensity)),
+    collapse = "\n"
+  )
+  expect_match(prepare_body, "length\\(myoptd\\) <= 20L")
+  expect_false(grepl("length(myoptd) <= 23L", prepare_body, fixed = TRUE))
+})
+
 test_that("explicit infinite response bounds warn when quadrature points are implicit", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)

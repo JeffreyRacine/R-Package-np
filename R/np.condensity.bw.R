@@ -1070,7 +1070,7 @@ npRmpiNomadShadowPrepareConditionalDensity <- function(c.uno,
                                                        cxkerub,
                                                        cykerlb,
                                                        cykerub) {
-  if (length(myoptd) <= 23L || length(myopti) <= 28L) {
+  if (length(myoptd) <= 20L || length(myopti) <= 28L) {
     rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
     if (isTRUE(rank == 0L))
       stop("resident npcdens NOMAD shadow options are missing quadrature controls", call. = FALSE)
