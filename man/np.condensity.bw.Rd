@@ -100,7 +100,7 @@ npcdensbw(\dots)
           scale.factor.lower.bound = NULL,
           cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
           cvls.quadrature.extend.factor = 1,
-          cvls.quadrature.points = c(81L, 31L),
+          cvls.quadrature.points = c(100L, 50L),
           cvls.quadrature.ratios = c(0.20, 0.55, 0.25),
           small,
           tol,
@@ -417,7 +417,7 @@ npcdensbw(\dots)
   \item{cvls.quadrature.points}{
     a two-element integer vector giving the bounded \code{cv.ls} quadrature
     point counts for one and two continuous response variables, respectively.
-    Defaults to \code{c(81L, 31L)}. For two continuous response variables,
+    Defaults to \code{c(100L, 50L)}. For two continuous response variables,
     the second entry is used per dimension.
   }
 
@@ -425,8 +425,8 @@ npcdensbw(\dots)
     a three-element non-negative numeric vector summing to one, giving the
     uniform, ranked sample-\eqn{y}, and composite Gauss-Legendre proportions
     used by the scalar bounded \code{cv.ls} \code{"hybrid"} quadrature grid.
-    Defaults to \code{c(0.20, 0.55, 0.25)}, which gives an \code{8/23/10}
-    split when \code{cvls.quadrature.points = c(41L, 31L)} and the nearest
+    Defaults to \code{c(0.20, 0.55, 0.25)}, which gives an \code{20/55/25}
+    split when \code{cvls.quadrature.points = c(100L, 50L)} and the nearest
     deterministic exact-count split at other scalar grid sizes. The setting is
     ignored by explicit \code{"uniform"} and \code{"sample"} grid modes.
   }

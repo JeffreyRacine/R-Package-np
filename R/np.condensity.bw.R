@@ -157,7 +157,7 @@ npcdensbw.formula <-
 }
 
 .npcdensbw_resolve_cvls_quadrature_points <- function(value,
-                                                      fallback = c(81L, 31L),
+                                                      fallback = c(100L, 50L),
                                                       argname = "cvls.quadrature.points") {
   if (is.null(value))
     return(as.integer(fallback))
@@ -355,7 +355,7 @@ npcdensbw.conbandwidth <-
     )
     cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
       if (is.null(cvls.quadrature.points)) bws$cvls.quadrature.points else cvls.quadrature.points,
-      fallback = c(81L, 31L),
+      fallback = c(100L, 50L),
       argname = "cvls.quadrature.points"
     )
     cvls.quadrature.ratios <- .npcdensbw_resolve_cvls_quadrature_ratios(
@@ -942,7 +942,7 @@ npcdensbw.conbandwidth <-
   )
   cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
     bws$cvls.quadrature.points,
-    fallback = c(81L, 31L),
+    fallback = c(100L, 50L),
     argname = "bws$cvls.quadrature.points"
   )
   cvls.quadrature.ratios <- .npcdensbw_resolve_cvls_quadrature_ratios(
@@ -1219,7 +1219,7 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   )
   cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
     bws$cvls.quadrature.points,
-    fallback = c(81L, 31L),
+    fallback = c(100L, 50L),
     argname = "bws$cvls.quadrature.points"
   )
   cvls.quadrature.ratios <- .npcdensbw_resolve_cvls_quadrature_ratios(
@@ -2233,7 +2233,7 @@ npcdensbw.default <-
            scale.factor.lower.bound = NULL,
            cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
            cvls.quadrature.extend.factor = 1,
-           cvls.quadrature.points = c(81L, 31L),
+           cvls.quadrature.points = c(100L, 50L),
            cvls.quadrature.ratios = c(0.20, 0.55, 0.25),
            small,
            tol,
@@ -2305,7 +2305,7 @@ npcdensbw.default <-
     )
     cvls.quadrature.points <- .npcdensbw_resolve_cvls_quadrature_points(
       cvls.quadrature.points,
-      fallback = c(81L, 31L),
+      fallback = c(100L, 50L),
       argname = "cvls.quadrature.points"
     )
     cvls.quadrature.ratios <- .npcdensbw_resolve_cvls_quadrature_ratios(

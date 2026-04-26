@@ -106,7 +106,7 @@ test_that("npcdensbw stores cv.ls quadrature controls and old objects use defaul
 
   expect_identical(bw_default$cvls.quadrature.grid, "hybrid")
   expect_equal(bw_default$cvls.quadrature.extend.factor, 1)
-  expect_identical(unname(bw_default$cvls.quadrature.points), c(81L, 31L))
+  expect_identical(unname(bw_default$cvls.quadrature.points), c(100L, 50L))
   expect_identical(bw_explicit$cvls.quadrature.grid, "sample")
   expect_equal(bw_explicit$cvls.quadrature.extend.factor, 1.5)
   expect_identical(unname(bw_explicit$cvls.quadrature.points), c(43L, 19L))
@@ -223,7 +223,7 @@ test_that("cv.ls quadrature point vector controls one- and two-dimensional grids
 
   dat <- quadrature_control_fixture(n = 40L)
 
-  bw_1d_default <- quadrature_control_bw(dat, cvls.quadrature.points = c(81L, 31L))
+  bw_1d_default <- quadrature_control_bw(dat, cvls.quadrature.points = c(100L, 50L))
   bw_1d_coarse <- quadrature_control_bw(dat, cvls.quadrature.points = c(41L, 31L))
   obj_1d_default <- npRmpi:::.npcdensbw_eval_only(dat$x, dat$y, bw_1d_default)$objective
   obj_1d_coarse <- npRmpi:::.npcdensbw_eval_only(dat$x, dat$y, bw_1d_coarse)$objective
@@ -246,7 +246,7 @@ test_that("cv.ls quadrature point vector controls one- and two-dimensional grids
     regtype = "lc",
     cxkerbound = "range",
     cykerbound = "range",
-    cvls.quadrature.points = c(81L, 31L)
+    cvls.quadrature.points = c(100L, 50L)
   )
   bw_2d_coarse <- bw_2d_default
   bw_2d_coarse$cvls.quadrature.points <- c(81L, 17L)
