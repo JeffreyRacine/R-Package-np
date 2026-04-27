@@ -548,26 +548,32 @@ npcdensbw.conbandwidth <-
 
       if (bws$method != "normal-reference"){
         myout <-
-          .Call("C_np_density_conditional_bw",
-                as.double(yuno), as.double(yord), as.double(ycon),
-                as.double(xuno), as.double(xord), as.double(xcon),
-                as.double(mysd),
-                as.integer(myopti), as.double(myoptd),
-                as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                            bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                            bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-                as.integer(nmulti),
-                as.integer(penalty_mode),
-                as.double(penalty.multiplier),
-                as.integer(degree.code),
-                as.integer(bernstein.engine),
-                as.integer(basis.code),
-                as.integer(reg.code),
-                as.double(cxker.bounds.c$lb),
-                as.double(cxker.bounds.c$ub),
-                as.double(cyker.bounds.c$lb),
-                as.double(cyker.bounds.c$ub),
-                PACKAGE="np")
+          npWithLocalLinearRawBasisSearchError(
+            .Call("C_np_density_conditional_bw",
+                  as.double(yuno), as.double(yord), as.double(ycon),
+                  as.double(xuno), as.double(xord), as.double(xcon),
+                  as.double(mysd),
+                  as.integer(myopti), as.double(myoptd),
+                  as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                              bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                              bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+                  as.integer(nmulti),
+                  as.integer(penalty_mode),
+                  as.double(penalty.multiplier),
+                  as.integer(degree.code),
+                  as.integer(bernstein.engine),
+                  as.integer(basis.code),
+                  as.integer(reg.code),
+                  as.double(cxker.bounds.c$lb),
+                  as.double(cxker.bounds.c$ub),
+                  as.double(cyker.bounds.c$lb),
+                  as.double(cyker.bounds.c$ub),
+                  PACKAGE="np"),
+            where = "npcdensbw",
+            spec = spec,
+            bwmethod = bws$method,
+            ncon = tbw$xncon
+          )
         total.time <- proc.time()[3] - elapsed.start
       } else {
         nbw = double(yncol+xncol)
