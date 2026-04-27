@@ -137,18 +137,19 @@ npscoefbw.NULL <-
                                      lbd.init = 0.5,
                                      hbd.init = 1.5,
                                      dfac.init = 1.0,
+                                     scale.factor.lower.bound = 0,
                                      where = "npscoefbw") {
-  lbc.init <- npValidatePositiveFiniteNumeric(lbc.init, "lbc.init")
-  hbc.init <- npValidatePositiveFiniteNumeric(hbc.init, "hbc.init")
-  cfac.init <- npValidatePositiveFiniteNumeric(cfac.init, "cfac.init")
+  cont.start <- npContinuousSearchStartControls(
+    lbc.init,
+    hbc.init,
+    cfac.init,
+    scale.factor.lower.bound,
+    where = where
+  )
   lbd.init <- npValidatePositiveFiniteNumeric(lbd.init, "lbd.init")
   hbd.init <- npValidatePositiveFiniteNumeric(hbd.init, "hbd.init")
   dfac.init <- npValidatePositiveFiniteNumeric(dfac.init, "dfac.init")
 
-  if (hbc.init < lbc.init) {
-    stop(sprintf("%s: 'hbc.init' must be greater than or equal to 'lbc.init'", where),
-         call. = FALSE)
-  }
   if (hbd.init < lbd.init) {
     stop(sprintf("%s: 'hbd.init' must be greater than or equal to 'lbd.init'", where),
          call. = FALSE)
@@ -159,9 +160,9 @@ npscoefbw.NULL <-
   }
 
   list(
-    lbc.init = as.double(lbc.init),
-    hbc.init = as.double(hbc.init),
-    cfac.init = as.double(cfac.init),
+    lbc.init = cont.start$lbc.init,
+    hbc.init = cont.start$hbc.init,
+    cfac.init = cont.start$cfac.init,
     lbd.init = as.double(lbd.init),
     hbd.init = as.double(hbd.init),
     dfac.init = as.double(dfac.init)
@@ -366,7 +367,6 @@ npscoefbw.scbandwidth <-
     scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
       if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
     )
-    lbc.init <- npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound)
     start.controls <- .npscoefbw_start_controls(
       lbc.init = lbc.init,
       hbc.init = hbc.init,
@@ -374,6 +374,7 @@ npscoefbw.scbandwidth <-
       lbd.init = lbd.init,
       hbd.init = hbd.init,
       dfac.init = dfac.init,
+      scale.factor.lower.bound = scale.factor.lower.bound,
       where = "npscoefbw"
     )
     if (cv.iterate)

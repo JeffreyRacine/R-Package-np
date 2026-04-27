@@ -67,6 +67,28 @@ test_that("continuous search starts reject hbc below the effective lower endpoin
       hbc.init = 0.5
     )
   )
+
+  dat$z <- rnorm(nrow(dat))
+
+  expect_bad_hbc_error(
+    npscoefbw(
+      y ~ x | z,
+      data = dat,
+      scale.factor.lower.bound = 1,
+      lbc.init = 0.1,
+      hbc.init = 0.5
+    )
+  )
+
+  expect_bad_hbc_error(
+    npindexbw(
+      y ~ x + z,
+      data = dat,
+      scale.factor.lower.bound = 1,
+      lbc.init = 0.1,
+      hbc.init = 0.5
+    )
+  )
 })
 
 test_that("explicit bandwidth objects are not clamped by the search floor", {
