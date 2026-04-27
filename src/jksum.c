@@ -18416,74 +18416,108 @@ static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_sc
                                                                double **xblock,
                                                                double **xblock_full,
                                                                double *yrow,
-                                                               double **ygridblock,
-                                                               double *fit_block,
-                                                               double *lin_block,
-                                                               const int block_size,
-                                                               double *cv,
-                                                               double *i1_mean){
-  const int num_obs = num_obs_train_extern;
-  int i0, m;
+	                                                               double **ygridblock,
+	                                                               double *fit_block,
+	                                                               double *lin_block,
+	                                                               const int block_size,
+	                                                               double *cv,
+	                                                               double *i1_mean){
+	  const int num_obs = num_obs_train_extern;
+	  double local_cv = 0.0, local_i1_mean = 0.0;
+	  int i0, m;
+	  int local_fail = 0;
+#ifdef MPI2
+	  const int use_parallel_blocks = (iNum_Processors > 1) && !np_mpi_local_regression_active();
+#else
+	  const int use_parallel_blocks = 0;
+#endif
 
-  if((vector_scale_factor == NULL) || (xctx == NULL) || (yctx == NULL) ||
-     (grid == NULL) || (weights == NULL) || (xblock == NULL) || (yrow == NULL) ||
-     (ygridblock == NULL) || (fit_block == NULL) || (lin_block == NULL) ||
-     (cv == NULL) || (i1_mean == NULL))
-    return 1;
+	  if((vector_scale_factor == NULL) || (xctx == NULL) || (yctx == NULL) ||
+	     (grid == NULL) || (weights == NULL) || (xblock == NULL) || (yrow == NULL) ||
+	     (ygridblock == NULL) || (fit_block == NULL) || (lin_block == NULL) ||
+	     (cv == NULL) || (i1_mean == NULL))
+	    return 1;
   if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xblock_full == NULL))
     return 1;
   if((q < 2) || (block_size <= 0))
     return 1;
 
-  for(m = 0; m < q; m++){
-    if(np_conditional_y_scalar_eval_from_ctx(vector_scale_factor,
-                                             yctx,
-                                             grid[m],
-                                             ygridblock[m]) != 0)
-      return 1;
-  }
+	  for(m = 0; m < q; m++){
+	    if(np_conditional_y_scalar_eval_from_ctx(vector_scale_factor,
+	                                             yctx,
+	                                             grid[m],
+	                                             ygridblock[m]) != 0)
+	      local_fail = 1;
+	  }
 
-  *cv = 0.0;
-  *i1_mean = 0.0;
-  for(i0 = 0; i0 < num_obs; i0 += block_size){
-    const int ib = MIN(block_size, num_obs - i0);
-    double ** const xuse =
-      (i1_mode == NP_BOUNDED_CVLS_I1_MODE_BOOK) ? xblock : xblock_full;
-    int b;
+	  for(i0 = 0; (i0 < num_obs) && !local_fail; i0 += block_size){
+	    const int ib = MIN(block_size, num_obs - i0);
+	    const int block_id = i0 / block_size;
+	    double ** const xuse =
+	      (i1_mode == NP_BOUNDED_CVLS_I1_MODE_BOOK) ? xblock : xblock_full;
+	    int b;
 
-    for(b = 0; b < ib; b++){
-      const int i = i0 + b;
+	    if(use_parallel_blocks && ((block_id % iNum_Processors) != my_rank))
+	      continue;
 
-      if(np_conditional_xrow_from_ctx(xctx, i, xblock[b]) != 0)
-        return 1;
-      if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) &&
-         (np_conditional_x_weight_row_full_stream_core(vector_scale_factor, i, xblock_full[b]) != 0))
-        return 1;
-      if(np_conditional_yrow_from_ctx(yctx, i, yrow) != 0)
-        return 1;
+	    for(b = 0; b < ib; b++){
+	      const int i = i0 + b;
 
-      lin_block[b] = np_blas_ddot_int(num_obs, xblock[b], yrow);
-    }
+	      if(np_conditional_xrow_from_ctx(xctx, i, xblock[b]) != 0){
+	        local_fail = 1;
+	        break;
+	      }
+	      if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) &&
+	         (np_conditional_x_weight_row_full_stream_core(vector_scale_factor, i, xblock_full[b]) != 0)){
+	        local_fail = 1;
+	        break;
+	      }
+	      if(np_conditional_yrow_from_ctx(yctx, i, yrow) != 0){
+	        local_fail = 1;
+	        break;
+	      }
 
-    np_blas_dgemm_tn_int(q, ib, num_obs, ygridblock[0], xuse[0], fit_block);
+	      lin_block[b] = np_blas_ddot_int(num_obs, xblock[b], yrow);
+	    }
+	    if(local_fail)
+	      break;
 
-    for(b = 0; b < ib; b++){
-      double quad = 0.0;
-      const int offset = b*q;
+	    np_blas_dgemm_tn_int(q, ib, num_obs, ygridblock[0], xuse[0], fit_block);
 
-      for(m = 0; m < q; m++){
-        const double fit = fit_block[offset + m];
-        quad += weights[m]*fit*fit;
-      }
-      *i1_mean += quad;
-      *cv += quad - 2.0*lin_block[b];
-    }
-  }
+	    for(b = 0; b < ib; b++){
+	      double quad = 0.0;
+	      const int offset = b*q;
 
-  *i1_mean /= (double)num_obs;
-  *cv /= (double)num_obs;
+	      for(m = 0; m < q; m++){
+	        const double fit = fit_block[offset + m];
+	        quad += weights[m]*fit*fit;
+	      }
+	      local_i1_mean += quad;
+	      local_cv += quad - 2.0*lin_block[b];
+	    }
+	  }
 
-  return 0;
+#ifdef MPI2
+	  if(use_parallel_blocks){
+	    int any_fail = 0;
+	    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+	    if(any_fail)
+	      return 1;
+	    MPI_Allreduce(&local_cv, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
+	    MPI_Allreduce(&local_i1_mean, i1_mean, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
+	  } else
+#endif
+	  {
+	    if(local_fail)
+	      return 1;
+	    *cv = local_cv;
+	    *i1_mean = local_i1_mean;
+	  }
+
+	  *i1_mean /= (double)num_obs;
+	  *cv /= (double)num_obs;
+
+	  return 0;
 }
 
 static int np_density_cvls_bounded_general_route_ok(const int num_reg_continuous){
@@ -19049,8 +19083,15 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   double **eval_yuno = NULL, **eval_yord = NULL, **eval_ycon = NULL, **yevalblock = NULL;
   double quad_lb[2] = {0.0, 0.0};
   double quad_ub[2] = {0.0, 0.0};
+  double local_cv = 0.0;
   int i0, d;
   int status = 1;
+  int local_fail = 0;
+#ifdef MPI2
+  const int use_parallel_blocks = (iNum_Processors > 1) && !np_mpi_local_regression_active();
+#else
+  const int use_parallel_blocks = 0;
+#endif
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
@@ -19130,30 +19171,41 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
     goto cleanup_bounded_cvls_quad_general;
 
-  *cv = 0.0;
-  for(i0 = 0; i0 < num_obs; i0 += block_size){
+  for(i0 = 0; (i0 < num_obs) && !local_fail; i0 += block_size){
     const int ib = MIN(block_size, num_obs - i0);
+    const int block_id = i0 / block_size;
     double ** const xuse =
       (i1_mode == NP_BOUNDED_CVLS_I1_MODE_BOOK) ? xblock : xblock_full;
     size_t eval_start = 0;
     int b;
 
+    if(use_parallel_blocks && ((block_id % iNum_Processors) != my_rank))
+      continue;
+
     for(b = 0; b < ib; b++){
       const int i = i0 + b;
 
-      if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xblock[b]) != 0)
-        goto cleanup_bounded_cvls_quad_general;
+      if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xblock[b]) != 0){
+        local_fail = 1;
+        break;
+      }
       if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) &&
-         (np_conditional_x_weight_row_full_stream_core(vector_scale_factor, i, xblock_full[b]) != 0))
-        goto cleanup_bounded_cvls_quad_general;
-      if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
-        goto cleanup_bounded_cvls_quad_general;
+         (np_conditional_x_weight_row_full_stream_core(vector_scale_factor, i, xblock_full[b]) != 0)){
+        local_fail = 1;
+        break;
+      }
+      if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0){
+        local_fail = 1;
+        break;
+      }
 
       lin_block[b] = np_blas_ddot_int(num_obs, xblock[b], yrow);
       quad_block[b] = 0.0;
     }
+    if(local_fail)
+      break;
 
-    while(eval_start < total_eval){
+    while((eval_start < total_eval) && !local_fail){
       const int eb = (int)MIN((size_t)block_size, total_eval - eval_start);
 
       np_bounded_cvls_fill_eval_block(eval_start,
@@ -19176,8 +19228,10 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
                                                      eval_yuno,
                                                      eval_yord,
                                                      eval_ycon,
-                                                     yevalblock) != 0)
-        goto cleanup_bounded_cvls_quad_general;
+                                                     yevalblock) != 0){
+        local_fail = 1;
+        break;
+      }
 
       np_blas_dgemm_tn_int(eb, ib, num_obs, yevalblock[0], xuse[0], fit_block);
       for(b = 0; b < ib; b++){
@@ -19192,9 +19246,26 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
 
       eval_start += (size_t)eb;
     }
+    if(local_fail)
+      break;
 
     for(b = 0; b < ib; b++)
-      *cv += quad_block[b] - 2.0*lin_block[b];
+      local_cv += quad_block[b] - 2.0*lin_block[b];
+  }
+
+#ifdef MPI2
+  if(use_parallel_blocks){
+    int any_fail = 0;
+    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(any_fail)
+      goto cleanup_bounded_cvls_quad_general;
+    MPI_Allreduce(&local_cv, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
+  } else
+#endif
+  {
+    if(local_fail)
+      goto cleanup_bounded_cvls_quad_general;
+    *cv = local_cv;
   }
 
   *cv /= (double)num_obs;
@@ -19695,8 +19766,15 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
   double *xrow = NULL, *yrow = NULL;
+  double local_cv = 0.0;
   int i, j;
   int status = 1;
+  int local_fail = 0;
+#ifdef MPI2
+  const int use_parallel_rows = (iNum_Processors > 1) && !np_mpi_local_regression_active();
+#else
+  const int use_parallel_rows = 0;
+#endif
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
@@ -19724,20 +19802,30 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
       goto cleanup_cvml_lp_stream;
   }
 
-  *cv = 0.0;
-  for(i = 0; i < num_obs; i++){
+  for(i = 0; (i < num_obs) && !local_fail; i++){
     double fit = 0.0;
 
+    if(use_parallel_rows && ((i % iNum_Processors) != my_rank))
+      continue;
+
     if(use_cached_gnn){
-      if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
-        goto cleanup_cvml_lp_stream;
-      if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
-        goto cleanup_cvml_lp_stream;
+      if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0){
+        local_fail = 1;
+        break;
+      }
+      if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0){
+        local_fail = 1;
+        break;
+      }
     } else {
-      if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xrow) != 0)
-        goto cleanup_cvml_lp_stream;
-      if(np_conditional_y_row_stream_core(vector_scale_factor, i, yrow) != 0)
-        goto cleanup_cvml_lp_stream;
+      if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xrow) != 0){
+        local_fail = 1;
+        break;
+      }
+      if(np_conditional_y_row_stream_core(vector_scale_factor, i, yrow) != 0){
+        local_fail = 1;
+        break;
+      }
     }
 
     for(j = 0; j < num_obs; j++)
@@ -19745,12 +19833,27 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
 
     /* Match bkcde's default smooth penalty for negative LP delete-one densities. */
     if(fit > DBL_MIN){
-      *cv -= log(fit);
+      local_cv -= log(fit);
     } else if(fit < -DBL_MIN){
-      *cv += log(-fit) - 2.0*log(DBL_MIN);
+      local_cv += log(-fit) - 2.0*log(DBL_MIN);
     } else {
-      *cv -= log(DBL_MIN);
+      local_cv -= log(DBL_MIN);
     }
+  }
+
+#ifdef MPI2
+  if(use_parallel_rows){
+    int any_fail = 0;
+    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(any_fail)
+      goto cleanup_cvml_lp_stream;
+    MPI_Allreduce(&local_cv, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
+  } else
+#endif
+  {
+    if(local_fail)
+      goto cleanup_cvml_lp_stream;
+    *cv = local_cv;
   }
 
   status = 0;
