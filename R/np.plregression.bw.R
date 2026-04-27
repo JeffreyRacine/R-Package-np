@@ -1,6 +1,7 @@
 npplregbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
+    npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npplregbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat", "zdat"),
                                      eval_env = parent.frame())
@@ -468,9 +469,9 @@ npplregbw.plbandwidth =
   }, integer(1L))
 
   child_cont_lower <- function(i) {
-    npResolveScaleFactorLowerBound(
-      child.templates[[i]]$scale.factor.lower.bound,
-      argname = "child scale.factor.lower.bound"
+    npGetScaleFactorSearchLower(
+      child.templates[[i]],
+      argname = "child scale.factor.search.lower"
     )
   }
 
@@ -734,7 +735,7 @@ npplregbw.default =
            degree.restarts = 0L,
            degree.max.cycles = 20L,
            degree.verify = FALSE,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            ftol, itmax, nmulti, remin, small, tol,
            ...){
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
@@ -818,7 +819,7 @@ npplregbw.default =
       ncon = sum(untangle(zdat)$icon),
       degree.select = degree.select.value
     )
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
 
     spec <- npResolveCanonicalConditionalRegSpec(
       mc.names = spec.mc.names,
@@ -866,7 +867,7 @@ npplregbw.default =
       degree = spec$degree.engine,
       bernstein.basis = spec$bernstein.basis.engine,
       bandwidth.compute = FALSE,
-      scale.factor.lower.bound = scale.factor.lower.bound
+      scale.factor.search.lower = scale.factor.search.lower
     )
     if (!is.null(degree.search))
       reg.args$bernstein.basis <- degree.search$bernstein.basis
@@ -882,13 +883,13 @@ npplregbw.default =
     outer.args$basis <- spec$basis
     outer.args$degree <- spec$degree
     outer.args$bernstein.basis <- spec$bernstein.basis
-    outer.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    outer.args$scale.factor.search.lower <- scale.factor.search.lower
 
     opt.args <- list()
     margs <- c("regtype", "basis", "degree", "bernstein.basis",
                "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
-               "scale.factor.lower.bound",
+               "scale.factor.search.lower",
                "ftol", "itmax", "nmulti", "remin", "small", "tol")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
@@ -904,7 +905,7 @@ npplregbw.default =
         nms <- mc.names[m]
         opt.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
       }
-      opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
+      opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
       if (!is.null(degree.search)) {
         if (identical(degree.search$engine, "cell")) {

@@ -313,8 +313,35 @@ npValidatePositiveFiniteNumeric <- function(value, argname) {
   as.double(value)
 }
 
+npScaleFactorSearchOldNames <- c(
+  "cfac.init",
+  "lbc.init",
+  "hbc.init",
+  "scale.factor.lower.bound"
+)
+
+npScaleFactorSearchNewNames <- c(
+  cfac.init = "scale.factor.init",
+  lbc.init = "scale.factor.init.lower",
+  hbc.init = "scale.factor.init.upper",
+  scale.factor.lower.bound = "scale.factor.search.lower"
+)
+
+npRejectRenamedScaleFactorSearchArgs <- function(arg.names,
+                                                 where = "bandwidth search") {
+  old <- intersect(npScaleFactorSearchOldNames, arg.names)
+  if (!length(old))
+    return(invisible(NULL))
+
+  messages <- sprintf("'%s' has been renamed to '%s'",
+                      old,
+                      unname(npScaleFactorSearchNewNames[old]))
+  stop(sprintf("%s: %s", where, paste(messages, collapse = "; ")),
+       call. = FALSE)
+}
+
 npValidateScaleFactorLowerBound <- function(value,
-                                            argname = "scale.factor.lower.bound") {
+                                            argname = "scale.factor.search.lower") {
   if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
       !is.finite(value) || value < 0) {
     stop(sprintf("'%s' must be a nonnegative finite numeric scalar", argname),
@@ -326,58 +353,104 @@ npValidateScaleFactorLowerBound <- function(value,
 
 npResolveScaleFactorLowerBound <- function(value,
                                            fallback = 0.1,
-                                           argname = "scale.factor.lower.bound") {
+                                           argname = "scale.factor.search.lower") {
   if (is.null(value))
     return(as.double(fallback))
 
   npValidateScaleFactorLowerBound(value, argname = argname)
 }
 
-npEffectiveContinuousStartLower <- function(lbc.init,
-                                            scale.factor.lower.bound) {
-  max(as.double(lbc.init), as.double(scale.factor.lower.bound))
+npResolveScaleFactorSearchLower <- function(value,
+                                            fallback = 0.1,
+                                            argname = "scale.factor.search.lower") {
+  npResolveScaleFactorLowerBound(value, fallback = fallback, argname = argname)
 }
 
-npEffectiveContinuousStartPoint <- function(cfac.init,
-                                            scale.factor.lower.bound) {
-  max(as.double(cfac.init), as.double(scale.factor.lower.bound))
+npGetScaleFactorSearchLower <- function(object,
+                                        fallback = 0.1,
+                                        argname = "scale.factor.search.lower") {
+  new <- object[["scale.factor.search.lower"]]
+  old <- object[["scale.factor.lower.bound"]]
+
+  if (!is.null(new) && !is.null(old)) {
+    new.value <- npResolveScaleFactorSearchLower(new, fallback = fallback,
+                                                 argname = "scale.factor.search.lower")
+    old.value <- npResolveScaleFactorSearchLower(old, fallback = fallback,
+                                                 argname = "scale.factor.lower.bound")
+    if (!identical(new.value, old.value)) {
+      stop(sprintf(
+        "%s conflicts with legacy 'scale.factor.lower.bound' (%.15g versus %.15g)",
+        argname,
+        new.value,
+        old.value
+      ), call. = FALSE)
+    }
+    return(new.value)
+  }
+
+  if (!is.null(new))
+    return(npResolveScaleFactorSearchLower(new, fallback = fallback,
+                                           argname = argname))
+
+  npResolveScaleFactorSearchLower(old, fallback = fallback,
+                                  argname = "scale.factor.lower.bound")
 }
 
-npContinuousSearchStartControls <- function(lbc.init,
-                                            hbc.init,
-                                            cfac.init,
-                                            scale.factor.lower.bound,
+npSetScaleFactorSearchLower <- function(object, value, fallback = 0.1) {
+  object[["scale.factor.search.lower"]] <-
+    npResolveScaleFactorSearchLower(value, fallback = fallback)
+  object[["scale.factor.lower.bound"]] <- NULL
+  object
+}
+
+npEffectiveContinuousStartLower <- function(scale.factor.init.lower,
+                                            scale.factor.search.lower) {
+  max(as.double(scale.factor.init.lower), as.double(scale.factor.search.lower))
+}
+
+npEffectiveContinuousStartPoint <- function(scale.factor.init,
+                                            scale.factor.search.lower) {
+  max(as.double(scale.factor.init), as.double(scale.factor.search.lower))
+}
+
+npContinuousSearchStartControls <- function(scale.factor.init.lower,
+                                            scale.factor.init.upper,
+                                            scale.factor.init,
+                                            scale.factor.search.lower,
                                             where = "bandwidth search") {
-  lbc.raw <- npValidatePositiveFiniteNumeric(lbc.init, "lbc.init")
-  hbc.init <- npValidatePositiveFiniteNumeric(hbc.init, "hbc.init")
-  cfac.raw <- npValidatePositiveFiniteNumeric(cfac.init, "cfac.init")
-  scale.factor.lower.bound <- npValidateScaleFactorLowerBound(
-    scale.factor.lower.bound,
-    "scale.factor.lower.bound"
+  lbc.raw <- npValidatePositiveFiniteNumeric(scale.factor.init.lower,
+                                             "scale.factor.init.lower")
+  scale.factor.init.upper <- npValidatePositiveFiniteNumeric(scale.factor.init.upper,
+                                             "scale.factor.init.upper")
+  cfac.raw <- npValidatePositiveFiniteNumeric(scale.factor.init,
+                                             "scale.factor.init")
+  scale.factor.search.lower <- npValidateScaleFactorLowerBound(
+    scale.factor.search.lower,
+    "scale.factor.search.lower"
   )
 
   lbc.effective <- npEffectiveContinuousStartLower(
     lbc.raw,
-    scale.factor.lower.bound
+    scale.factor.search.lower
   )
   cfac.effective <- npEffectiveContinuousStartPoint(
     cfac.raw,
-    scale.factor.lower.bound
+    scale.factor.search.lower
   )
 
-  if (hbc.init < lbc.effective) {
+  if (scale.factor.init.upper < lbc.effective) {
     stop(sprintf(
-      "%s: 'hbc.init' must be greater than or equal to max('lbc.init', 'scale.factor.lower.bound') (effective lower %.15g; hbc.init %.15g)",
+      "%s: 'scale.factor.init.upper' must be greater than or equal to max('scale.factor.init.lower', 'scale.factor.search.lower') (effective lower %.15g; scale.factor.init.upper %.15g)",
       where,
       lbc.effective,
-      hbc.init
+      scale.factor.init.upper
     ), call. = FALSE)
   }
 
   list(
-    lbc.init = lbc.effective,
-    hbc.init = hbc.init,
-    cfac.init = cfac.effective
+    scale.factor.init.lower = lbc.effective,
+    scale.factor.init.upper = scale.factor.init.upper,
+    scale.factor.init = cfac.effective
   )
 }
 

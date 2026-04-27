@@ -11,7 +11,7 @@ scale_floor_fixture <- function(n = 20L) {
 expect_bad_hbc_error <- function(expr) {
   expect_error(
     expr,
-    regexp = "hbc\\.init.*max\\('lbc\\.init', 'scale\\.factor\\.lower\\.bound'\\)"
+    regexp = "scale\\.factor\\.init\\.upper.*max\\('scale\\.factor\\.init\\.lower', 'scale\\.factor\\.search\\.lower'\\)"
   )
 }
 
@@ -22,9 +22,9 @@ test_that("continuous search starts reject hbc below the effective lower endpoin
     npregbw(
       y ~ x,
       data = dat,
-      scale.factor.lower.bound = 1,
-      lbc.init = 0.1,
-      hbc.init = 0.5
+      scale.factor.search.lower = 1,
+      scale.factor.init.lower = 0.1,
+      scale.factor.init.upper = 0.5
     )
   )
 
@@ -32,9 +32,9 @@ test_that("continuous search starts reject hbc below the effective lower endpoin
     npudensbw(
       ~ x,
       data = dat,
-      scale.factor.lower.bound = 1,
-      lbc.init = 0.1,
-      hbc.init = 0.5
+      scale.factor.search.lower = 1,
+      scale.factor.init.lower = 0.1,
+      scale.factor.init.upper = 0.5
     )
   )
 
@@ -42,9 +42,9 @@ test_that("continuous search starts reject hbc below the effective lower endpoin
     npudistbw(
       ~ x,
       data = dat,
-      scale.factor.lower.bound = 1,
-      lbc.init = 0.1,
-      hbc.init = 0.5
+      scale.factor.search.lower = 1,
+      scale.factor.init.lower = 0.1,
+      scale.factor.init.upper = 0.5
     )
   )
 
@@ -52,9 +52,9 @@ test_that("continuous search starts reject hbc below the effective lower endpoin
     npcdensbw(
       y ~ x,
       data = dat,
-      scale.factor.lower.bound = 1,
-      lbc.init = 0.1,
-      hbc.init = 0.5
+      scale.factor.search.lower = 1,
+      scale.factor.init.lower = 0.1,
+      scale.factor.init.upper = 0.5
     )
   )
 
@@ -62,9 +62,9 @@ test_that("continuous search starts reject hbc below the effective lower endpoin
     npcdistbw(
       y ~ x,
       data = dat,
-      scale.factor.lower.bound = 1,
-      lbc.init = 0.1,
-      hbc.init = 0.5
+      scale.factor.search.lower = 1,
+      scale.factor.init.lower = 0.1,
+      scale.factor.init.upper = 0.5
     )
   )
 
@@ -74,9 +74,9 @@ test_that("continuous search starts reject hbc below the effective lower endpoin
     npscoefbw(
       y ~ x | z,
       data = dat,
-      scale.factor.lower.bound = 1,
-      lbc.init = 0.1,
-      hbc.init = 0.5
+      scale.factor.search.lower = 1,
+      scale.factor.init.lower = 0.1,
+      scale.factor.init.upper = 0.5
     )
   )
 
@@ -84,9 +84,9 @@ test_that("continuous search starts reject hbc below the effective lower endpoin
     npindexbw(
       y ~ x + z,
       data = dat,
-      scale.factor.lower.bound = 1,
-      lbc.init = 0.1,
-      hbc.init = 0.5
+      scale.factor.search.lower = 1,
+      scale.factor.init.lower = 0.1,
+      scale.factor.init.upper = 0.5
     )
   )
 })
@@ -101,7 +101,7 @@ test_that("explicit bandwidth objects are not clamped by the search floor", {
     bws = tiny,
     bandwidth.compute = FALSE,
     bwtype = "fixed",
-    scale.factor.lower.bound = 1
+    scale.factor.search.lower = 1
   )
   expect_equal(reg$bw[1L], tiny, tolerance = 0)
 
@@ -110,7 +110,7 @@ test_that("explicit bandwidth objects are not clamped by the search floor", {
     bws = tiny,
     bandwidth.compute = FALSE,
     bwtype = "fixed",
-    scale.factor.lower.bound = 1
+    scale.factor.search.lower = 1
   )
   expect_equal(dens$bw[1L], tiny, tolerance = 0)
 
@@ -119,7 +119,7 @@ test_that("explicit bandwidth objects are not clamped by the search floor", {
     bws = tiny,
     bandwidth.compute = FALSE,
     bwtype = "fixed",
-    scale.factor.lower.bound = 1
+    scale.factor.search.lower = 1
   )
   expect_equal(dist$bw[1L], tiny, tolerance = 0)
 
@@ -129,7 +129,7 @@ test_that("explicit bandwidth objects are not clamped by the search floor", {
     bws = c(tiny, tiny),
     bandwidth.compute = FALSE,
     bwtype = "fixed",
-    scale.factor.lower.bound = 1
+    scale.factor.search.lower = 1
   )
   expect_equal(cdens$ybw[1L], tiny, tolerance = 0)
   expect_equal(cdens$xbw[1L], tiny, tolerance = 0)
@@ -140,7 +140,7 @@ test_that("explicit bandwidth objects are not clamped by the search floor", {
     bws = c(tiny, tiny),
     bandwidth.compute = FALSE,
     bwtype = "fixed",
-    scale.factor.lower.bound = 1
+    scale.factor.search.lower = 1
   )
   expect_equal(cdist$ybw[1L], tiny, tolerance = 0)
   expect_equal(cdist$xbw[1L], tiny, tolerance = 0)

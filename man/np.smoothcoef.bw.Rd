@@ -65,13 +65,13 @@ npscoefbw(\dots)
           random.seed,
           regtype,
           ukertype,
-          lbc.init = 0.5,
-          hbc.init = 1.5,
-          cfac.init = 1.0,
+          scale.factor.init.lower = 0.5,
+          scale.factor.init.upper = 1.5,
+          scale.factor.init = 1.0,
           lbd.init = 0.5,
           hbd.init = 1.5,
           dfac.init = 1.0,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           \dots)
 
 \method{npscoefbw}{scbandwidth}(xdat = stop("invoked without data 'xdat'"),
@@ -91,13 +91,13 @@ npscoefbw(\dots)
           optim.method = c("Nelder-Mead", "BFGS", "CG"),
           optim.reltol = sqrt(.Machine$double.eps),
           random.seed = 42,
-          lbc.init = 0.5,
-          hbc.init = 1.5,
-          cfac.init = 1.0,
+          scale.factor.init.lower = 0.5,
+          scale.factor.init.upper = 1.5,
+          scale.factor.init = 1.0,
           lbd.init = 0.5,
           hbd.init = 1.5,
           dfac.init = 1.0,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           \dots)
 }
 
@@ -360,34 +360,34 @@ npscoefbw(\dots)
     points. Defaults to \code{min(2,ncol(xdat))}.
   }
 
-  \item{lbc.init}{
+  \item{scale.factor.init.lower}{
     lower bound for random fixed-bandwidth start factors for continuous
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
     \code{0.5}. Nearest-neighbor start laws are unchanged by this
     control. The effective lower endpoint is
-    \code{max(lbc.init, scale.factor.lower.bound)}.
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
 
-  \item{hbc.init}{
+  \item{scale.factor.init.upper}{
     upper bound for random fixed-bandwidth start factors for continuous
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
     \code{1.5}. Must be greater than or equal to
-    \code{max(lbc.init, scale.factor.lower.bound)}.
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
 
-  \item{cfac.init}{
+  \item{scale.factor.init}{
     deterministic fixed-bandwidth start factor for continuous
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{1.0}. If \code{scale.factor.lower.bound} is larger, the
+    \code{1.0}. If \code{scale.factor.search.lower} is larger, the
     effective first search start is raised to that floor.
   }
 
-  \item{scale.factor.lower.bound}{
+  \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates. When omitted, the
     default coefficient \code{0.1} is used; the existing
-    \code{lbc.init=0.5} default is therefore unchanged unless the user
-    requests a larger value or a smaller \code{lbc.init}. This argument
+    \code{scale.factor.init.lower=0.5} default is therefore unchanged unless the user
+    requests a larger value or a smaller \code{scale.factor.init.lower}. This argument
     affects search admissibility and search-start sanitization only;
     explicit bandwidths supplied for storage when
     \code{bandwidth.compute = FALSE} are not rewritten.}
@@ -523,6 +523,9 @@ npscoefbw(\dots)
 }
 
 \details{
+
+The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
   For S3 plotting help, use \code{methods("plot")} and query

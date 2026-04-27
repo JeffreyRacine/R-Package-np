@@ -5,9 +5,9 @@ npscoef_default_start_bandwidth <- getFromNamespace(".npscoef_default_start_band
 npscoef_random_start_bandwidth <- getFromNamespace(".npscoef_random_start_bandwidth", "np")
 
 test_that("npscoefbw surfaces fixed-start controls as formal arguments", {
-  expect_true(all(c("lbc.init", "hbc.init", "cfac.init", "lbd.init", "hbd.init", "dfac.init") %in%
+  expect_true(all(c("scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init", "lbd.init", "hbd.init", "dfac.init") %in%
                     names(formals(npscoefbw_default))))
-  expect_true(all(c("lbc.init", "hbc.init", "cfac.init", "lbd.init", "hbd.init", "dfac.init") %in%
+  expect_true(all(c("scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init", "lbd.init", "hbd.init", "dfac.init") %in%
                     names(formals(npscoefbw_scbandwidth))))
 })
 
@@ -51,9 +51,9 @@ test_that("npscoefbw fixed start helpers split continuous and categorical contro
   iord <- c(FALSE, TRUE, FALSE)
   iuno <- c(FALSE, FALSE, FALSE)
   controls <- npscoefbw_start_controls(
-    lbc.init = 0.7,
-    hbc.init = 0.9,
-    cfac.init = 1.2,
+    scale.factor.init.lower = 0.7,
+    scale.factor.init.upper = 0.9,
+    scale.factor.init = 1.2,
     lbd.init = 1.1,
     hbd.init = 1.3,
     dfac.init = 0.8
@@ -94,9 +94,9 @@ test_that("npscoefbw fixed start helpers split continuous and categorical contro
 test_that("npscoefbw nearest-neighbor start helpers ignore fixed-start controls", {
   param <- c(8, 8, 8)
   controls <- npscoefbw_start_controls(
-    lbc.init = 0.7,
-    hbc.init = 0.9,
-    cfac.init = 1.2,
+    scale.factor.init.lower = 0.7,
+    scale.factor.init.upper = 0.9,
+    scale.factor.init = 1.2,
     lbd.init = 1.1,
     hbd.init = 1.3,
     dfac.init = 0.8

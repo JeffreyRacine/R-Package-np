@@ -25,12 +25,12 @@ npcdensbw(\dots)
           bws,
           bandwidth.compute = TRUE,
           cfac.dir = 2.5*(3.0-sqrt(5)),
-          cfac.init = 0.5,
+          scale.factor.init = 0.5,
           dfac.dir = 0.25*(3.0-sqrt(5)),
           dfac.init = 0.375,
           dfc.dir = 3,
           ftol = 1.490116e-07,
-          hbc.init = 2.0,
+          scale.factor.init.upper = 2.0,
           hbd.dir = 1,
           hbd.init = 0.9,
           initc.dir = 1.0,
@@ -38,7 +38,7 @@ npcdensbw(\dots)
           invalid.penalty = c("baseline","dbmax"),
           itmax = 10000,
           lbc.dir = 0.5,
-          lbc.init = 0.1,
+          scale.factor.init.lower = 0.1,
           lbd.dir = 0.1,
           lbd.init = 0.1,
           memfac = 500,
@@ -46,7 +46,7 @@ npcdensbw(\dots)
           penalty.multiplier = 10,
           remin = TRUE,
           scale.init.categorical.sample = FALSE,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           cvls.quadrature.grid = NULL,
           cvls.quadrature.extend.factor = NULL,
           cvls.quadrature.points = NULL,
@@ -64,7 +64,7 @@ npcdensbw(\dots)
           bwscaling,
           bwtype,
           cfac.dir,
-          cfac.init,
+          scale.factor.init,
           cxkerbound,
           cxkerlb,
           cxkerorder,
@@ -79,7 +79,7 @@ npcdensbw(\dots)
           dfac.init,
           dfc.dir,
           ftol,
-          hbc.init,
+          scale.factor.init.upper,
           hbd.dir,
           hbd.init,
           initc.dir,
@@ -87,7 +87,7 @@ npcdensbw(\dots)
           invalid.penalty,
           itmax,
           lbc.dir,
-          lbc.init,
+          scale.factor.init.lower,
           lbd.dir,
           lbd.init,
           memfac,
@@ -97,7 +97,7 @@ npcdensbw(\dots)
           penalty.multiplier,
           remin,
           scale.init.categorical.sample,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
           cvls.quadrature.extend.factor = 1,
           cvls.quadrature.points = c(100L, 50L),
@@ -204,7 +204,7 @@ npcdensbw(\dots)
 
   \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{cfac.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.lower.bound} is larger, the effective first search start is raised to that floor. See Details}
+  \item{scale.factor.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.search.lower} is larger, the effective first search start is raised to that floor. See Details}
 
   \item{cxkerbound}{
     character string controlling continuous-kernel support handling for
@@ -291,7 +291,7 @@ npcdensbw(\dots)
     (1.0e+01*sqrt(.Machine$double.eps)).
   }
 
-  \item{hbc.init}{upper endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. It must be no smaller than \code{max(lbc.init, scale.factor.lower.bound)}. See Details}
+  \item{scale.factor.init.upper}{upper endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. It must be no smaller than \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
 
   \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
 
@@ -314,7 +314,7 @@ npcdensbw(\dots)
 
   \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{lbc.init}{lower endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. The effective lower endpoint is \code{max(lbc.init, scale.factor.lower.bound)}. See Details}
+  \item{scale.factor.init.lower}{lower endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. The effective lower endpoint is \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
 
   \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
 
@@ -384,7 +384,7 @@ npcdensbw(\dots)
     search to the feasible bandwidth domain. Defaults to
     \code{FALSE}.}
 
-  \item{scale.factor.lower.bound}{
+  \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates in
     \code{npcdensbw(..., bandwidth.compute = TRUE)}. When omitted, the
@@ -393,7 +393,7 @@ npcdensbw(\dots)
     search admissibility and search-start sanitization only; explicit
     bandwidths supplied for storage when \code{bandwidth.compute = FALSE}
     are not rewritten. Final fixed-bandwidth search candidates must also have
-    a finite valid raw objective value. This differs from \code{lbc.init}, which controls
+    a finite valid raw objective value. This differs from \code{scale.factor.init.lower}, which controls
     the lower bound for continuous starting scale factors in Powell-style
     search initialization.
   }
@@ -620,6 +620,9 @@ npcdensbw(\dots)
 }
 
 \details{
+
+The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
   For S3 plotting help, use \code{methods("plot")} and query

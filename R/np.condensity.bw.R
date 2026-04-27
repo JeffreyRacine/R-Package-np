@@ -1,6 +1,7 @@
 npcdensbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
+    npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npcdensbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat"),
                                      eval_env = parent.frame())
@@ -104,7 +105,7 @@ npcdensbw.formula <-
 }
 
 .npcdensbw_validate_scale_factor_lower_bound <- function(value,
-                                                         argname = "scale.factor.lower.bound") {
+                                                         argname = "scale.factor.search.lower") {
   if (length(value) != 1L || !is.numeric(value) || is.na(value) ||
       !is.finite(value) || value < 0) {
     stop(sprintf("%s must be a single nonnegative finite numeric value", argname),
@@ -116,7 +117,7 @@ npcdensbw.formula <-
 
 .npcdensbw_resolve_scale_factor_lower_bound <- function(value,
                                                         fallback = 0.1,
-                                                        argname = "scale.factor.lower.bound") {
+                                                        argname = "scale.factor.search.lower") {
   if (is.null(value))
     return(as.double(fallback))
 
@@ -235,20 +236,20 @@ npcdensbw.formula <-
 .npcdensbw_apply_continuous_search_floor <- function(tbw,
                                                      xdat,
                                                      ydat,
-                                                     scale.factor.lower.bound) {
-  tbw$scale.factor.lower.bound <- as.double(scale.factor.lower.bound)
+                                                     scale.factor.search.lower) {
+  tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
   if (!isTRUE(tbw$bandwidth.compute) || !identical(tbw$type, "fixed") || tbw$ncon < 1L)
     return(tbw)
 
   if (isTRUE(tbw$scaling)) {
-    floor.values <- rep(as.double(scale.factor.lower.bound), tbw$ncon)
+    floor.values <- rep(as.double(scale.factor.search.lower), tbw$ncon)
   } else {
     xcon <- xdat[, tbw$ixcon, drop = FALSE]
     ycon <- ydat[, tbw$iycon, drop = FALSE]
     mysd <- EssDee(data.frame(xcon, ycon))
     nconfac <- nrow(xdat)^(-1.0 / (2.0 * tbw$cxkerorder + tbw$ncon))
-    floor.values <- as.double(scale.factor.lower.bound) * mysd * nconfac
+    floor.values <- as.double(scale.factor.search.lower) * mysd * nconfac
   }
 
   if (tbw$xncon > 0L) {
@@ -268,12 +269,12 @@ npcdensbw.conbandwidth <-
            bws,
            bandwidth.compute = TRUE,
            cfac.dir = 2.5*(3.0-sqrt(5)),
-           cfac.init = 0.5,
+           scale.factor.init = 0.5,
            dfac.dir = 0.25*(3.0-sqrt(5)),
            dfac.init = 0.375,
            dfc.dir = 3,
            ftol = 1.490116e-07,
-           hbc.init = 2.0,
+           scale.factor.init.upper = 2.0,
            hbd.dir = 1,
            hbd.init = 0.9,
            initc.dir = 1.0,
@@ -281,7 +282,7 @@ npcdensbw.conbandwidth <-
            invalid.penalty = c("baseline","dbmax"),
            itmax = 10000,
            lbc.dir = 0.5,
-           lbc.init = 0.1,
+           scale.factor.init.lower = 0.1,
            lbd.dir = 0.1,
            lbd.init = 0.1,
            memfac = 500.0,
@@ -289,7 +290,7 @@ npcdensbw.conbandwidth <-
            penalty.multiplier = 10,
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            cvls.quadrature.grid = NULL,
            cvls.quadrature.extend.factor = NULL,
            cvls.quadrature.points = NULL,
@@ -328,10 +329,10 @@ npcdensbw.conbandwidth <-
     remin <- npValidateScalarLogical(remin, "remin")
     scale.init.categorical.sample <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
-    scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
-      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound,
+    scale.factor.search.lower <- .npcdensbw_resolve_scale_factor_lower_bound(
+      if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower,
       fallback = 0.1,
-      argname = "scale.factor.lower.bound"
+      argname = "scale.factor.search.lower"
     )
     cvls.quadrature.grid <- .npcdensbw_resolve_cvls_quadrature_grid(
       if (is.null(cvls.quadrature.grid)) bws$cvls.quadrature.grid else cvls.quadrature.grid,
@@ -359,7 +360,7 @@ npcdensbw.conbandwidth <-
       argname = "cvls.quadrature.ratios"
     )
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
-    bws$scale.factor.lower.bound <- scale.factor.lower.bound
+    bws <- npSetScaleFactorSearchLower(bws, scale.factor.search.lower)
     bws$cvls.quadrature.grid <- cvls.quadrature.grid
     bws$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
     bws$cvls.quadrature.points <- cvls.quadrature.points
@@ -467,10 +468,10 @@ npcdensbw.conbandwidth <-
 
     if (bandwidth.compute){
       cont.start <- npContinuousSearchStartControls(
-        lbc.init,
-        hbc.init,
-        cfac.init,
-        tbw$scale.factor.lower.bound,
+        scale.factor.init.lower,
+        scale.factor.init.upper,
+        scale.factor.init,
+        tbw$scale.factor.search.lower,
         where = "npcdensbw"
       )
       myopti = list(num_obs_train = nrow,
@@ -529,12 +530,12 @@ npcdensbw.conbandwidth <-
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
         lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
-        lbc.init = cont.start$lbc.init,
-        hbc.init = cont.start$hbc.init,
-        cfac.init = cont.start$cfac.init,
+        lbc.init = cont.start$scale.factor.init.lower,
+        hbc.init = cont.start$scale.factor.init.upper,
+        cfac.init = cont.start$scale.factor.init,
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac,
-        scale.factor.lower.bound = tbw$scale.factor.lower.bound,
+        scale.factor.lower.bound = tbw$scale.factor.search.lower,
         cvls.quadrature.extend.factor = tbw$cvls.quadrature.extend.factor,
         cvls.quadrature.ratios.uniform = tbw$cvls.quadrature.ratios[[1L]],
         cvls.quadrature.ratios.sample = tbw$cvls.quadrature.ratios[[2L]],
@@ -614,7 +615,7 @@ npcdensbw.conbandwidth <-
       tbw$total.time <- total.time
     }
 
-    tbw$scale.factor.lower.bound <- bws$scale.factor.lower.bound
+    tbw <- npSetScaleFactorSearchLower(tbw, npGetScaleFactorSearchLower(bws))
     
     ## bandwidth metadata
     tbw$sfactor <- tbw$bandwidth <- list(x = tbw$xbw, y = tbw$ybw)
@@ -709,7 +710,7 @@ npcdensbw.conbandwidth <-
                         basis.engine = tbw$basis.engine,
                         degree.engine = tbw$degree.engine,
                         bernstein.basis.engine = tbw$bernstein.basis.engine)
-    tbw$scale.factor.lower.bound <- bws$scale.factor.lower.bound
+    tbw <- npSetScaleFactorSearchLower(tbw, npGetScaleFactorSearchLower(bws))
     tbw$cvls.quadrature.grid <- bws$cvls.quadrature.grid
     tbw$cvls.quadrature.extend.factor <- bws$cvls.quadrature.extend.factor
     tbw$cvls.quadrature.points <- bws$cvls.quadrature.points
@@ -746,7 +747,7 @@ npcdensbw.conbandwidth <-
   )
 
   tbw <- do.call(conbandwidth, bw.args)
-  tbw$scale.factor.lower.bound <- reg.args$scale.factor.lower.bound
+  tbw$scale.factor.search.lower <- reg.args$scale.factor.search.lower
   tbw$cvls.quadrature.grid <- reg.args$cvls.quadrature.grid
   tbw$cvls.quadrature.extend.factor <- reg.args$cvls.quadrature.extend.factor
   tbw$cvls.quadrature.points <- reg.args$cvls.quadrature.points
@@ -755,7 +756,7 @@ npcdensbw.conbandwidth <-
     tbw,
     xdat = xdat,
     ydat = ydat,
-    scale.factor.lower.bound = reg.args$scale.factor.lower.bound
+    scale.factor.search.lower = reg.args$scale.factor.search.lower
   )
   .npcdensbw_restore_explicit_fixed_y_bounds(tbw, reg.args)
 }
@@ -884,10 +885,10 @@ npcdensbw.conbandwidth <-
   ncatfac <- nrow^(-2.0 / (2.0 * bws$cxkerorder + bws$ncon))
 
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
-  scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
-    bws$scale.factor.lower.bound,
+  scale.factor.search.lower <- .npcdensbw_resolve_scale_factor_lower_bound(
+    npGetScaleFactorSearchLower(bws),
     fallback = 0.1,
-    argname = "bws$scale.factor.lower.bound"
+    argname = "bws$scale.factor.search.lower"
   )
   cvls.quadrature.extend.factor <- .npcdensbw_resolve_cvls_quadrature_extend_factor(
     bws$cvls.quadrature.extend.factor,
@@ -997,7 +998,7 @@ npcdensbw.conbandwidth <-
     dfac.init = 0,
     nconfac = nconfac,
     ncatfac = ncatfac,
-    scale.factor.lower.bound = scale.factor.lower.bound,
+    scale.factor.lower.bound = scale.factor.search.lower,
     cvls.quadrature.extend.factor = cvls.quadrature.extend.factor,
     cvls.quadrature.ratios.uniform = cvls.quadrature.ratios[[1L]],
     cvls.quadrature.ratios.sample = cvls.quadrature.ratios[[2L]],
@@ -1146,10 +1147,10 @@ npcdensbw.conbandwidth <-
 }
 
 .npcdensbw_nomad_continuous_lower_bound <- function(template) {
-  .npcdensbw_resolve_scale_factor_lower_bound(
-    template$scale.factor.lower.bound,
+  npGetScaleFactorSearchLower(
+    template,
     fallback = 0.1,
-    argname = "template$scale.factor.lower.bound"
+    argname = "template$scale.factor.search.lower"
   )
 }
 
@@ -1611,7 +1612,7 @@ npcdensbw.default <-
            bwscaling,
            bwtype,
            cfac.dir,
-           cfac.init,
+           scale.factor.init,
            cxkerbound,
            cxkerlb,
            cxkerorder,
@@ -1626,7 +1627,7 @@ npcdensbw.default <-
            dfac.init,
            dfc.dir,
            ftol,
-           hbc.init,
+           scale.factor.init.upper,
            hbd.dir,
            hbd.init,
            initc.dir,
@@ -1634,7 +1635,7 @@ npcdensbw.default <-
            invalid.penalty,
            itmax,
            lbc.dir,
-           lbc.init,
+           scale.factor.init.lower,
            lbd.dir,
            lbd.init,
            memfac,
@@ -1644,7 +1645,7 @@ npcdensbw.default <-
            penalty.multiplier,
            remin,
            scale.init.categorical.sample,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
            cvls.quadrature.extend.factor = 1,
            cvls.quadrature.points = c(100L, 50L),
@@ -1709,10 +1710,10 @@ npcdensbw.default <-
       sum(y.info$icon),
       argname = "cvls.quadrature.grid"
     )
-    scale.factor.lower.bound <- .npcdensbw_resolve_scale_factor_lower_bound(
-      scale.factor.lower.bound,
+    scale.factor.search.lower <- .npcdensbw_resolve_scale_factor_lower_bound(
+      scale.factor.search.lower,
       fallback = 0.1,
-      argname = "scale.factor.lower.bound"
+      argname = "scale.factor.search.lower"
     )
     cvls.quadrature.extend.factor <- .npcdensbw_resolve_cvls_quadrature_extend_factor(
       cvls.quadrature.extend.factor,
@@ -1908,7 +1909,7 @@ npcdensbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     reg.args <- bw.args[setdiff(names(bw.args), c("xbw", "ybw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
-    reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    reg.args$scale.factor.search.lower <- scale.factor.search.lower
     reg.args$cvls.quadrature.grid <- cvls.quadrature.grid
     reg.args$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
     reg.args$cvls.quadrature.points <- cvls.quadrature.points
@@ -1931,7 +1932,7 @@ npcdensbw.default <-
                "tol", "small", "memfac",
                "lbc.dir", "dfc.dir", "cfac.dir","initc.dir", 
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
-               "lbc.init", "hbc.init", "cfac.init", 
+               "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init", 
                "lbd.init", "hbd.init", "dfac.init", 
                "scale.init.categorical.sample",
                "transform.bounds",

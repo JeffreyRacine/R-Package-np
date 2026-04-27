@@ -6,8 +6,8 @@ npindex_random_start_bandwidth <- getFromNamespace(".npindex_random_start_bandwi
 npindex_nomad_fixed_start_setup <- getFromNamespace(".npindexbw_nomad_fixed_start_setup", "np")
 
 test_that("npindexbw surfaces fixed-h start controls as formal arguments", {
-  expect_true(all(c("lbc.init", "hbc.init", "cfac.init") %in% names(formals(npindexbw_default))))
-  expect_true(all(c("lbc.init", "hbc.init", "cfac.init") %in% names(formals(npindexbw_sibandwidth))))
+  expect_true(all(c("scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init") %in% names(formals(npindexbw_default))))
+  expect_true(all(c("scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init") %in% names(formals(npindexbw_sibandwidth))))
 })
 
 test_that("npindexbw fixed-h helper replays legacy defaults", {
@@ -32,7 +32,7 @@ test_that("npindexbw fixed-h helper replays legacy defaults", {
 
 test_that("npindexbw fixed-h helper honors explicit overrides", {
   fit <- c(-1.5, -0.25, 0.1, 0.8, 1.7)
-  controls <- npindexbw_h_start_controls(lbc.init = 0.7, hbc.init = 0.9, cfac.init = 1.2)
+  controls <- npindexbw_h_start_controls(scale.factor.init.lower = 0.7, scale.factor.init.upper = 0.9, scale.factor.init = 1.2)
 
   expect_equal(
     npindex_default_start_bandwidth(fit = fit, bwtype = "fixed", nobs = 80L, start.controls = controls),
@@ -52,7 +52,7 @@ test_that("npindexbw fixed-h helper honors explicit overrides", {
 
 test_that("npindexbw nearest-neighbor h starts ignore fixed-h controls", {
   fit <- c(-1.5, -0.25, 0.1, 0.8, 1.7)
-  controls <- npindexbw_h_start_controls(lbc.init = 0.7, hbc.init = 0.9, cfac.init = 1.2)
+  controls <- npindexbw_h_start_controls(scale.factor.init.lower = 0.7, scale.factor.init.upper = 0.9, scale.factor.init = 1.2)
 
   expect_equal(
     npindex_default_start_bandwidth(fit = fit, bwtype = "generalized_nn", nobs = 80L, start.controls = controls),
@@ -108,7 +108,7 @@ test_that("npindexbw fixed NOMAD start setup preserves beta starts and replays d
     degree.search = degree.search,
     nmulti = 4L,
     random.seed = 42L,
-    h.start.controls = npindexbw_h_start_controls(lbc.init = 0.7, hbc.init = 0.9, cfac.init = 1.2)
+    h.start.controls = npindexbw_h_start_controls(scale.factor.init.lower = 0.7, scale.factor.init.upper = 0.9, scale.factor.init = 1.2)
   )
 
   expect_equal(custom$start_matrix.raw[, legacy$beta.free, drop = FALSE],

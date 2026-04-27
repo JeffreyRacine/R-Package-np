@@ -40,7 +40,7 @@ npplregbw(\dots)
           degree.restarts = 0L,
           degree.max.cycles = 20L,
           degree.verify = FALSE,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           ftol,
           itmax,
           nmulti,
@@ -242,7 +242,7 @@ npplregbw(\dots)
       (sqrt(DBL_EPSILON))}
   }
 
-  \item{scale.factor.lower.bound}{
+  \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates in the
     nonparametric \code{zdat} bandwidth searches. When omitted, the
@@ -295,6 +295,9 @@ npplregbw(\dots)
 }
 
 \details{
+
+The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
   For S3 plotting help, use \code{methods("plot")} and query

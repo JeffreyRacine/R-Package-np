@@ -5,7 +5,7 @@ test_that("omitted generic scale-factor floor defaults to 0.1", {
   expect_equal(np:::npResolveScaleFactorLowerBound(0.01), 0.01, tolerance = 0)
 })
 
-test_that("scale.factor.lower.bound is accepted across bandwidth selectors", {
+test_that("scale.factor.search.lower is accepted across bandwidth selectors", {
   set.seed(20260423)
   n <- 32L
   x <- runif(n)
@@ -13,7 +13,7 @@ test_that("scale.factor.lower.bound is accepted across bandwidth selectors", {
   y <- sin(2 * pi * x) + rnorm(n, sd = 0.25)
 
   expect_floor <- function(object, expected = 0.2) {
-    expect_equal(object$scale.factor.lower.bound, expected, tolerance = 0)
+    expect_equal(object$scale.factor.search.lower, expected, tolerance = 0)
     invisible(object)
   }
 
@@ -22,7 +22,7 @@ test_that("scale.factor.lower.bound is accepted across bandwidth selectors", {
     bwtype = "fixed",
     nmulti = 1L,
     itmax = 10L,
-    scale.factor.lower.bound = 0.2
+    scale.factor.search.lower = 0.2
   )
 
   expect_floor(do.call(npregbw, c(
@@ -51,7 +51,7 @@ test_that("scale.factor.lower.bound is accepted across bandwidth selectors", {
   )))
 })
 
-test_that("scale.factor.lower.bound propagates through semiparametric selectors", {
+test_that("scale.factor.search.lower propagates through semiparametric selectors", {
   set.seed(20260424)
   n <- 32L
   x <- runif(n)
@@ -66,10 +66,10 @@ test_that("scale.factor.lower.bound propagates through semiparametric selectors"
     bwtype = "fixed",
     nmulti = 1L,
     itmax = 10L,
-    scale.factor.lower.bound = 0.2
+    scale.factor.search.lower = 0.2
   )
   expect_equal(
-    unname(vapply(pl$bw, function(bwi) bwi$scale.factor.lower.bound, numeric(1L))),
+    unname(vapply(pl$bw, function(bwi) bwi$scale.factor.search.lower, numeric(1L))),
     rep(0.2, length(pl$bw)),
     tolerance = 0
   )
@@ -82,9 +82,9 @@ test_that("scale.factor.lower.bound propagates through semiparametric selectors"
     bwtype = "fixed",
     nmulti = 1L,
     optim.maxit = 10L,
-    scale.factor.lower.bound = 0.2
+    scale.factor.search.lower = 0.2
   )
-  expect_equal(si$scale.factor.lower.bound, 0.2, tolerance = 0)
+  expect_equal(si$scale.factor.search.lower, 0.2, tolerance = 0)
 
   sc <- npscoefbw(
     xdat = data.frame(x = x),
@@ -94,7 +94,7 @@ test_that("scale.factor.lower.bound propagates through semiparametric selectors"
     bwtype = "fixed",
     nmulti = 1L,
     optim.maxit = 10L,
-    scale.factor.lower.bound = 0.2
+    scale.factor.search.lower = 0.2
   )
-  expect_equal(sc$scale.factor.lower.bound, 0.2, tolerance = 0)
+  expect_equal(sc$scale.factor.search.lower, 0.2, tolerance = 0)
 })

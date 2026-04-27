@@ -1,6 +1,7 @@
 npscoefbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
+    npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npscoefbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat", "zdat"),
                                      eval_env = parent.frame())
@@ -131,19 +132,19 @@ npscoefbw.NULL <-
   }, numeric(1))
 }
 
-.npscoefbw_start_controls <- function(lbc.init = 0.5,
-                                     hbc.init = 1.5,
-                                     cfac.init = 1.0,
+.npscoefbw_start_controls <- function(scale.factor.init.lower = 0.5,
+                                     scale.factor.init.upper = 1.5,
+                                     scale.factor.init = 1.0,
                                      lbd.init = 0.5,
                                      hbd.init = 1.5,
                                      dfac.init = 1.0,
-                                     scale.factor.lower.bound = 0,
+                                     scale.factor.search.lower = 0,
                                      where = "npscoefbw") {
   cont.start <- npContinuousSearchStartControls(
-    lbc.init,
-    hbc.init,
-    cfac.init,
-    scale.factor.lower.bound,
+    scale.factor.init.lower,
+    scale.factor.init.upper,
+    scale.factor.init,
+    scale.factor.search.lower,
     where = where
   )
   lbd.init <- npValidatePositiveFiniteNumeric(lbd.init, "lbd.init")
@@ -160,9 +161,9 @@ npscoefbw.NULL <-
   }
 
   list(
-    lbc.init = cont.start$lbc.init,
-    hbc.init = cont.start$hbc.init,
-    cfac.init = cont.start$cfac.init,
+    scale.factor.init.lower = cont.start$scale.factor.init.lower,
+    scale.factor.init.upper = cont.start$scale.factor.init.upper,
+    scale.factor.init = cont.start$scale.factor.init,
     lbd.init = as.double(lbd.init),
     hbd.init = as.double(hbd.init),
     dfac.init = as.double(dfac.init)
@@ -214,7 +215,7 @@ npscoefbw.NULL <-
         icon = icon,
         iord = iord,
         iuno = iuno,
-        continuous.factor = start.controls$cfac.init,
+        continuous.factor = start.controls$scale.factor.init,
         categorical.factor = start.controls$dfac.init
       )
     ))
@@ -238,7 +239,7 @@ npscoefbw.NULL <-
       icon = icon,
       iord = iord,
       iuno = iuno,
-      continuous.factor = start.controls$lbc.init,
+      continuous.factor = start.controls$scale.factor.init.lower,
       categorical.factor = start.controls$lbd.init
     )
 
@@ -247,7 +248,7 @@ npscoefbw.NULL <-
           !isTRUE(as.logical(icon)[ii])) {
         draws[ii] <- runif(1L, min = start.controls$lbd.init, max = start.controls$hbd.init)
       } else {
-        draws[ii] <- runif(1L, min = start.controls$lbc.init, max = start.controls$hbc.init)
+        draws[ii] <- runif(1L, min = start.controls$scale.factor.init.lower, max = start.controls$scale.factor.init.upper)
       }
     }
 
@@ -328,13 +329,13 @@ npscoefbw.scbandwidth <-
            optim.method = c("Nelder-Mead", "BFGS", "CG"),
            optim.reltol = sqrt(.Machine$double.eps),
            random.seed = 42,
-           lbc.init = 0.5,
-           hbc.init = 1.5,
-           cfac.init = 1.0,
+           scale.factor.init.lower = 0.5,
+           scale.factor.init.upper = 1.5,
+           scale.factor.init = 1.0,
            lbd.init = 0.5,
            hbd.init = 1.5,
            dfac.init = 1.0,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            ...){
     
     ## Save seed prior to setting
@@ -364,17 +365,17 @@ npscoefbw.scbandwidth <-
     optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
     optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
     )
     start.controls <- .npscoefbw_start_controls(
-      lbc.init = lbc.init,
-      hbc.init = hbc.init,
-      cfac.init = cfac.init,
+      scale.factor.init.lower = scale.factor.init.lower,
+      scale.factor.init.upper = scale.factor.init.upper,
+      scale.factor.init = scale.factor.init,
       lbd.init = lbd.init,
       hbd.init = hbd.init,
       dfac.init = dfac.init,
-      scale.factor.lower.bound = scale.factor.lower.bound,
+      scale.factor.search.lower = scale.factor.search.lower,
       where = "npscoefbw"
     )
     if (cv.iterate)
@@ -916,7 +917,7 @@ npscoefbw.scbandwidth <-
           })
           fixed.lower <- if (identical(bws$type, "fixed")) {
             out <- rep.int(0, length(x.scale))
-            out[dati$icon] <- x.scale[dati$icon] * start.controls$lbc.init
+            out[dati$icon] <- x.scale[dati$icon] * start.controls$scale.factor.init.lower
             out
           } else {
             NULL
@@ -1204,7 +1205,7 @@ npscoefbw.scbandwidth <-
                        bandwidth.compute = bandwidth.compute,
                        optim.method = optim.method,
                        total.time = total.time)
-    bws$scale.factor.lower.bound <- scale.factor.lower.bound
+    bws <- npSetScaleFactorSearchLower(bws, scale.factor.search.lower)
 
     bws
   }
@@ -1235,9 +1236,9 @@ npscoefbw.scbandwidth <-
   )
 
   out <- do.call(scbandwidth, sbw.args)
-  if (!is.null(reg.args$scale.factor.lower.bound))
-    out$scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      reg.args$scale.factor.lower.bound
+  if (!is.null(reg.args$scale.factor.search.lower))
+    out$scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      reg.args$scale.factor.search.lower
     )
   out
 }
@@ -1434,9 +1435,9 @@ npscoefbw.scbandwidth <-
   ndeg <- length(degree.search$start.degree)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(NCOL(eval.zdat)) else npValidateNmulti(opt.args$nmulti[1L])
 
-  cont_lower <- npResolveScaleFactorLowerBound(
-    template$scale.factor.lower.bound,
-    argname = "template$scale.factor.lower.bound"
+  cont_lower <- npGetScaleFactorSearchLower(
+    template,
+    argname = "template$scale.factor.search.lower"
   )
   bw_lower <- c(rep.int(cont_lower, ncon), rep.int(0, ncat))
   bw_upper <- c(rep.int(1e6, ncon), setup$cat_upper * setup$bandwidth.scale.categorical)
@@ -1750,13 +1751,13 @@ npscoefbw.default <-
            random.seed,
            regtype,
            ukertype,
-           lbc.init = 0.5,
-           hbc.init = 1.5,
-           cfac.init = 1.0,
+           scale.factor.init.lower = 0.5,
+           scale.factor.init.upper = 1.5,
+           scale.factor.init = 1.0,
            lbd.init = 0.5,
            hbd.init = 1.5,
            dfac.init = 1.0,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            ...){
 
     if (!missing(bwmethod) && identical(match.arg(bwmethod, c("cv.ls", "manual")), "manual") &&
@@ -1867,7 +1868,7 @@ npscoefbw.default <-
       ncon = sum(if (miss.z) untangle(xdat)$icon else untangle(zdat)$icon),
       degree.select = degree.select.value
     )
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
 
     ## first grab dummy args for scbandwidth() and perform 'bootstrap'
     ## bandwidth call
@@ -1875,7 +1876,7 @@ npscoefbw.default <-
     margs <- c("regtype", "basis", "degree", "bernstein.basis",
                "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
-               "scale.factor.lower.bound")
+               "scale.factor.search.lower")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
@@ -1901,15 +1902,15 @@ npscoefbw.default <-
     if (!is.null(degree.search))
       reg.args$bernstein.basis <- degree.search$bernstein.basis
     tbw <- do.call(scbandwidth, sbw.args)
-    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
+    tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
     ## next grab dummies for actual bandwidth selection and perform call
     margs <- c("zdat",
                "nmulti",
                "random.seed",
-               "lbc.init", "hbc.init", "cfac.init",
+               "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
                "lbd.init", "hbd.init", "dfac.init",
-               "scale.factor.lower.bound",
+               "scale.factor.search.lower",
                "cv.iterate",
                "cv.num.iterations",
                "backfit.iterate",
@@ -1927,8 +1928,8 @@ npscoefbw.default <-
       opt.args <- list()
     }
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
-    reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
-    opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    reg.args$scale.factor.search.lower <- scale.factor.search.lower
+    opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
     if (!is.null(degree.search)) {
       if (identical(degree.search$engine, "cell")) {
