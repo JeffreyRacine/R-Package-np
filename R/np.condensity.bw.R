@@ -232,11 +232,6 @@ npcdensbw.formula <-
   if (as.integer(yncon) >= 2L) points[[2L]] else points[[1L]]
 }
 
-.npcdensbw_effective_continuous_start_lower <- function(lbc.init,
-                                                        scale.factor.lower.bound) {
-  max(as.double(lbc.init), as.double(scale.factor.lower.bound))
-}
-
 .npcdensbw_apply_continuous_search_floor <- function(tbw,
                                                      xdat,
                                                      ydat,
@@ -471,6 +466,13 @@ npcdensbw.conbandwidth <-
     penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
 
     if (bandwidth.compute){
+      cont.start <- npContinuousSearchStartControls(
+        lbc.init,
+        hbc.init,
+        cfac.init,
+        tbw$scale.factor.lower.bound,
+        where = "npcdensbw"
+      )
       myopti = list(num_obs_train = nrow,
         iMultistart = IMULTI_TRUE,
         iNum_Multistart = nmulti,
@@ -527,8 +529,9 @@ npcdensbw.conbandwidth <-
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
         lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
-        lbc.init = .npcdensbw_effective_continuous_start_lower(lbc.init, tbw$scale.factor.lower.bound),
-        hbc.init = hbc.init, cfac.init = cfac.init, 
+        lbc.init = cont.start$lbc.init,
+        hbc.init = cont.start$hbc.init,
+        cfac.init = cont.start$cfac.init,
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac,
         scale.factor.lower.bound = tbw$scale.factor.lower.bound,

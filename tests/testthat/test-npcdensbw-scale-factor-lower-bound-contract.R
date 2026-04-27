@@ -92,6 +92,23 @@ test_that("explicit 0.1 floor keeps nomad and nomad+powell aligned on bad seed",
   hot <- do.call(npcdensbw, c(common_args, list(search.engine = "nomad+powell")))
 
   expect_equal(hot$degree, nomad$degree, tolerance = 0)
-  expect_gte(hot$ybw[1L], 0.1 * np:::EssDee(dat$y$y) * nrow(dat$y)^(-1 / 5))
+  expect_gte(hot$sfactor$y[1L], hot$scale.factor.lower.bound)
   expect_true(is.finite(hot$fval[1L]))
+})
+
+test_that("explicit high floor is enforced during conditional-density Powell search", {
+  set.seed(42)
+  n <- 100L
+  dat <- data.frame(x = rnorm(n), y = rnorm(n))
+
+  out <- npcdensbw(
+    y ~ x,
+    data = dat,
+    bwmethod = "cv.ls",
+    scale.factor.lower.bound = 1
+  )
+
+  expect_true(is.finite(out$fval[1L]))
+  expect_gte(out$sfactor$x[1L], out$scale.factor.lower.bound)
+  expect_gte(out$sfactor$y[1L], out$scale.factor.lower.bound)
 })

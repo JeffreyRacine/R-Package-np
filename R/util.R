@@ -338,6 +338,49 @@ npEffectiveContinuousStartLower <- function(lbc.init,
   max(as.double(lbc.init), as.double(scale.factor.lower.bound))
 }
 
+npEffectiveContinuousStartPoint <- function(cfac.init,
+                                            scale.factor.lower.bound) {
+  max(as.double(cfac.init), as.double(scale.factor.lower.bound))
+}
+
+npContinuousSearchStartControls <- function(lbc.init,
+                                            hbc.init,
+                                            cfac.init,
+                                            scale.factor.lower.bound,
+                                            where = "bandwidth search") {
+  lbc.raw <- npValidatePositiveFiniteNumeric(lbc.init, "lbc.init")
+  hbc.init <- npValidatePositiveFiniteNumeric(hbc.init, "hbc.init")
+  cfac.raw <- npValidatePositiveFiniteNumeric(cfac.init, "cfac.init")
+  scale.factor.lower.bound <- npValidateScaleFactorLowerBound(
+    scale.factor.lower.bound,
+    "scale.factor.lower.bound"
+  )
+
+  lbc.effective <- npEffectiveContinuousStartLower(
+    lbc.raw,
+    scale.factor.lower.bound
+  )
+  cfac.effective <- npEffectiveContinuousStartPoint(
+    cfac.raw,
+    scale.factor.lower.bound
+  )
+
+  if (hbc.init < lbc.effective) {
+    stop(sprintf(
+      "%s: 'hbc.init' must be greater than or equal to max('lbc.init', 'scale.factor.lower.bound') (effective lower %.15g; hbc.init %.15g)",
+      where,
+      lbc.effective,
+      hbc.init
+    ), call. = FALSE)
+  }
+
+  list(
+    lbc.init = lbc.effective,
+    hbc.init = hbc.init,
+    cfac.init = cfac.effective
+  )
+}
+
 npValidateLpBasis <- function(regtype, basis, argname = "basis") {
   if (!identical(regtype, "lp"))
     return("glp")
