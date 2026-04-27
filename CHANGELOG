@@ -1,5 +1,13 @@
 Changes in development after 0.70-1 [22-Mar-2026]
 
+* Addressed the CRAN-reported MPI unload race by no longer explicitly
+  calling `library.dynam.unload("npRmpi", ...)` from `.onUnload()` after
+  MPI finalization. Validation covered repeated subprocess load/unload,
+  tarball-first `R CMD check --no-manual --ignore-vignettes` with clean
+  package and namespace unload checks, sliced attach-route validation,
+  profile/manual-broadcast validation, and copied demo triplets for
+  `npreglcls`, `npcdensml`, and `npcdensls`.
+
 * Reduced the default multistart cap from `min(5, p)` to `min(2, p)`
   across the mirrored core bandwidth selectors, with the univariate
   boundary density helper now defaulting to `nmulti=1`.

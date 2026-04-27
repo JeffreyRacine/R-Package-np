@@ -158,14 +158,35 @@ run_mpiexec_route() {
   return "${rc}"
 }
 
+run_attach_route_slices() {
+  local route
+  local route_log
+  local token
+  local status_log="${ATTACH_LOG}"
+
+  : > "${status_log}"
+  for route in npreg npscoef npplreg npindex npcopula npconmode; do
+    route_log="${OUT_DIR}/attach_${route}.log"
+    token="$(printf 'ATTACH_%s_ROUTE_OK,ATTACH_ROUTE_OK' "$(echo "${route}" | tr '[:lower:]' '[:upper:]')")"
+    echo "[info] attach route slice=${route}" | tee -a "${status_log}"
+    if ! NP_RMPI_ATTACH_VALIDATE_ROUTE="${route}" \
+        run_mpiexec_route "attach-${route}" \
+          "${ROOT_DIR}/issue_notes/validate_route_attach.R" \
+          "${token}" \
+          "${route_log}" \
+          0; then
+      cat "${route_log}" >> "${status_log}" 2>/dev/null || true
+      return 1
+    fi
+    cat "${route_log}" >> "${status_log}" 2>/dev/null || true
+  done
+  echo "ATTACH_ROUTE_OK" >> "${status_log}"
+}
+
 echo "[info] installing npRmpi from ${ROOT_DIR}" | tee "${INSTALL_LOG}"
 R CMD INSTALL --preclean -l "${TMP_LIB}" "${ROOT_DIR}" >>"${INSTALL_LOG}" 2>&1
 
-run_mpiexec_route "attach" \
-  "${ROOT_DIR}/issue_notes/validate_route_attach.R" \
-  "ATTACH_ROUTE_OK,ATTACH_NPCOPULA_ROUTE_OK,ATTACH_NPCONMODE_ROUTE_OK" \
-  "${ATTACH_LOG}" \
-  0
+run_attach_route_slices
 run_mpiexec_route "profile" \
   "${ROOT_DIR}/issue_notes/validate_route_profile.R" \
   "PROFILE_ROUTE_OK,PROFILE_NPCOPULA_ROUTE_OK,PROFILE_NPCONMODE_ROUTE_OK" \
