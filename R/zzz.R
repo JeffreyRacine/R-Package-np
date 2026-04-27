@@ -130,7 +130,6 @@
   tryCatch(.Call("C_np_release_static_buffers", PACKAGE = "npRmpi"), error = function(e) NULL)
   if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
     tryCatch(mpi.finalize(), error = function(e) NULL)
-  library.dynam.unload("npRmpi", libpath=lpath) 
 }
 
 .onLoad <- function (lib, pkg) {

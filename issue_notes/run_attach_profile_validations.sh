@@ -9,12 +9,13 @@ MANUAL_LOG="${OUT_DIR}/manual_broadcast.log"
 ATTACH_LOG="${OUT_DIR}/attach.log"
 PROFILE_LOG="${OUT_DIR}/profile.log"
 PROFILE_PLOT_LOG="${OUT_DIR}/profile_plot.log"
-TMP_LIB="$(mktemp -d /tmp/nprmpi_route_validation_lib.XXXXXX)"
+TMP_LIB="${OUT_DIR}/Rlib"
 PRIMARY_IFACE="${NP_RMPI_IFACE_PRIMARY:-en0}"
 FALLBACK_IFACE="${NP_RMPI_IFACE_FALLBACK:-lo0}"
 ROUTE_TIMEOUT_SEC="${NP_RMPI_ROUTE_TIMEOUT_SEC:-120}"
 
 mkdir -p "${OUT_DIR}"
+mkdir -p "${TMP_LIB}"
 
 run_with_timeout() {
   local timeout_sec="$1"
@@ -60,15 +61,20 @@ kill_stray_mpi_slaves() {
 
 cleanup() {
   kill_stray_mpi_slaves || true
-  rm -rf "${TMP_LIB}"
 }
 trap cleanup EXIT
 
 run_manual_route() {
   echo "[info] manual-broadcast route smoke" | tee -a "${MANUAL_LOG}"
-  R_LIBS="${TMP_LIB}${R_LIBS:+:${R_LIBS}}" \
+  # This is a one-off subprocess route gate, not an interactive session.
+  # Disable spawned-slave reuse so the manual-broadcast smoke tears down cleanly
+  # before the subsequent attach/profile mpiexec route checks.
+  (
+    export R_LIBS="${TMP_LIB}${R_LIBS:+:${R_LIBS}}"
+    export NP_RMPI_NO_REUSE_SLAVES=1
     run_with_timeout "${ROUTE_TIMEOUT_SEC}" \
-    Rscript "${ROOT_DIR}/issue_notes/validate_route_manual_broadcast.R" >>"${MANUAL_LOG}" 2>&1
+      Rscript "${ROOT_DIR}/issue_notes/validate_route_manual_broadcast.R"
+  ) >>"${MANUAL_LOG}" 2>&1
   rg -n "MANUAL_BCAST_ROUTE_OK" "${MANUAL_LOG}" >/dev/null
 }
 
@@ -155,7 +161,6 @@ run_mpiexec_route() {
 echo "[info] installing npRmpi from ${ROOT_DIR}" | tee "${INSTALL_LOG}"
 R CMD INSTALL --preclean -l "${TMP_LIB}" "${ROOT_DIR}" >>"${INSTALL_LOG}" 2>&1
 
-run_manual_route
 run_mpiexec_route "attach" \
   "${ROOT_DIR}/issue_notes/validate_route_attach.R" \
   "ATTACH_ROUTE_OK,ATTACH_NPCOPULA_ROUTE_OK,ATTACH_NPCONMODE_ROUTE_OK" \
@@ -171,6 +176,7 @@ run_mpiexec_route "profile-plot" \
   "PROFILE_PLOT_ROUTE_OK" \
   "${PROFILE_PLOT_LOG}" \
   1
+run_manual_route
 
 echo "[ok] route smoke checks passed"
 echo "[ok] out dir: ${OUT_DIR}"

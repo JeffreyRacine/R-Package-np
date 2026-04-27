@@ -2,20 +2,21 @@
 
 suppressPackageStartupMessages(library(npRmpi))
 
-npRmpi.init(mode = "attach", quiet = TRUE)
+is.master <- isTRUE(npRmpi.init(mode = "attach", quiet = TRUE))
 
-if (mpi.comm.rank(1L) == 0L) {
+if (is.master) {
   suppressPackageStartupMessages(library(MASS))
   set.seed(42)
   n <- 80
   x <- runif(n)
   z <- runif(n)
   y <- sin(2 * pi * x) + 0.5 * z + rnorm(n, sd = 0.1)
+  d <- data.frame(x = x, y = y)
   d1 <- data.frame(x = x)
   d2 <- data.frame(x = x, z = z)
   dz <- data.frame(z = z)
-  bw <- npregbw(y ~ x, regtype = "lc", bwmethod = "cv.ls", nmulti = 1)
-  fit <- npreg(bws = bw, gradients = FALSE)
+  bw <- npregbw(y ~ x, data = d, regtype = "lc", bwmethod = "cv.ls", nmulti = 1)
+  fit <- npreg(bws = bw, data = d, gradients = FALSE)
   bw.sc <- npscoefbw(xdat = d1, ydat = y, zdat = dz, regtype = "lc", nmulti = 1)
   fit.sc <- npscoef(bws = bw.sc, gradients = FALSE)
   bw.pl <- npplregbw(xdat = d1, ydat = y, zdat = dz, regtype = "lc", nmulti = 1)
