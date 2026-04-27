@@ -193,33 +193,6 @@ static double np_blas_ddot_int(const int n, const double *x, const double *y){
   return F77_CALL(ddot)(&n, x, &inc, y, &inc);
 }
 
-static void np_blas_dgemv_trans_int(const int nrow,
-                                    const int ncol,
-                                    const double *a,
-                                    const double *x,
-                                    double *y){
-  const char trans = 'T';
-  const int inc = 1;
-  const double alpha = 1.0;
-  const double beta = 0.0;
-
-  if((nrow <= 0) || (ncol <= 0) || (a == NULL) || (x == NULL) || (y == NULL))
-    return;
-
-  F77_CALL(dgemv)(&trans,
-                  &nrow,
-                  &ncol,
-                  &alpha,
-                  a,
-                  &nrow,
-                  x,
-                  &inc,
-                  &beta,
-                  y,
-                  &inc
-                  FCONE);
-}
-
 static void np_blas_dgemm_tn_int(const int m,
                                  const int n,
                                  const int k,
