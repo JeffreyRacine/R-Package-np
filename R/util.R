@@ -806,6 +806,43 @@ npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
   )
 }
 
+npWithLocalLinearRawBasisSearchError <- function(expr,
+                                                 where,
+                                                 spec,
+                                                 bwmethod,
+                                                 ncon) {
+  expected <- switch(where,
+    npcdensbw = "C_np_density_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective",
+    npcdistbw = "C_np_distribution_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective",
+    NULL
+  )
+  tryCatch(
+    force(expr),
+    error = function(e) {
+      msg <- conditionMessage(e)
+      degree <- if (is.null(spec$degree.engine)) integer(0) else as.integer(spec$degree.engine)
+      ncon <- as.integer(ncon)
+      targeted <- !is.null(expected) &&
+        identical(msg, expected) &&
+        identical(spec$regtype, "ll") &&
+        identical(bwmethod, "cv.ls") &&
+        identical(spec$regtype.engine, "lp") &&
+        !isTRUE(spec$bernstein.basis.engine) &&
+        length(degree) == ncon &&
+        ncon > 0L &&
+        all(degree == 1L)
+
+      if (targeted) {
+        stop(sprintf(
+          "%s() local-linear cv.ls failed while using the canonical raw degree-1 basis. Try regtype = \"lp\", degree = 1, bernstein.basis = TRUE, or center/scale continuous regressors.",
+          where
+        ), call. = FALSE)
+      }
+      stop(e)
+    }
+  )
+}
+
 npResolveCanonicalConditionalRegSpec <- function(mc.names,
                                                  regtype = c("lc", "ll", "lp"),
                                                  basis = c("glp", "additive", "tensor"),

@@ -422,7 +422,12 @@ npcdistbw(\dots)
     \code{"lc"}, \code{"ll"}, and \code{"lp"}.
     For \code{npc*} methods, \code{"ll"} is implemented via the
     canonical local polynomial engine with \code{degree = 1} and
-    \code{basis = "glp"}.
+    \code{basis = "glp"}. If local-linear \code{cv.ls} search fails
+    while using this canonical raw basis, retrying explicitly with
+    \code{regtype="lp"}, \code{degree=1}, and
+    \code{bernstein.basis=TRUE}, or centering/scaling the continuous
+    regressors, can improve numerical conditioning without changing package
+    defaults or invoking an automatic fallback.
   }
 
   \item{basis}{
