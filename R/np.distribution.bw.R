@@ -172,7 +172,6 @@ npudistbw.dbandwidth <-
     scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
       if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
     )
-    lbc.init <- npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound)
     if (!missing(nmulti))
       nmulti <- npValidateNmulti(nmulti)
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
@@ -276,6 +275,13 @@ npudistbw.dbandwidth <-
     penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
 
     if (bandwidth.compute){
+      cont.start <- npContinuousSearchStartControls(
+        lbc.init,
+        hbc.init,
+        cfac.init,
+        scale.factor.lower.bound,
+        where = "npudistbw"
+      )
       myopti = list(num_obs_train = dim(dat)[1],
         num_obs_eval = nog,
         iMultistart = IMULTI_TRUE,
@@ -314,7 +320,7 @@ npudistbw.dbandwidth <-
       myoptd = list(ftol=ftol, tol=tol, small=small,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
         lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
-        lbc.init = lbc.init, hbc.init = hbc.init, cfac.init = cfac.init, 
+        lbc.init = cont.start$lbc.init, hbc.init = cont.start$hbc.init, cfac.init = cont.start$cfac.init,
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac, memfac = memfac,
         scale.factor.lower.bound = scale.factor.lower.bound)

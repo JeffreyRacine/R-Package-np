@@ -899,12 +899,125 @@ static void bwm_to_constrained(double *p, int n)
     p[i] = bwm_transform_buf[i];
 }
 
+static int np_bw_candidate_is_admissible_with_floor(
+  int n,
+  int use_transform,
+  int KERNEL,
+  int KERNEL_unordered_liracine,
+  int BANDWIDTH,
+  int BANDWIDTH_den_ml,
+  int REGRESSION_ML,
+  int num_obs,
+  int num_var_continuous,
+  int num_var_unordered,
+  int num_var_ordered,
+  int num_reg_continuous,
+  int num_reg_unordered,
+  int num_reg_ordered,
+  int *num_categories,
+  double *vector_scale_factor,
+  double floor_coeff);
+
+static int bwm_floor_context_active = 0;
+static int bwm_floor_context_n = 0;
+static int bwm_floor_context_use_transform = 0;
+static int bwm_floor_context_kernel = 0;
+static int bwm_floor_context_kernel_unordered = 0;
+static int bwm_floor_context_bandwidth = 0;
+static int bwm_floor_context_bandwidth_den_ml = 0;
+static int bwm_floor_context_regression_ml = 0;
+static int bwm_floor_context_num_obs = 0;
+static int bwm_floor_context_num_var_continuous = 0;
+static int bwm_floor_context_num_var_unordered = 0;
+static int bwm_floor_context_num_var_ordered = 0;
+static int bwm_floor_context_num_reg_continuous = 0;
+static int bwm_floor_context_num_reg_unordered = 0;
+static int bwm_floor_context_num_reg_ordered = 0;
+static int *bwm_floor_context_num_categories = NULL;
+static double bwm_floor_context_coeff = 0.1;
+
+static void bwm_clear_floor_context(void)
+{
+  bwm_floor_context_active = 0;
+  bwm_floor_context_num_categories = NULL;
+}
+
+static void bwm_set_floor_context(
+  int active,
+  int n,
+  int use_transform,
+  int KERNEL,
+  int KERNEL_unordered_liracine,
+  int BANDWIDTH,
+  int BANDWIDTH_den_ml,
+  int REGRESSION_ML,
+  int num_obs,
+  int num_var_continuous,
+  int num_var_unordered,
+  int num_var_ordered,
+  int num_reg_continuous,
+  int num_reg_unordered,
+  int num_reg_ordered,
+  int *num_categories,
+  double floor_coeff)
+{
+  bwm_floor_context_active = active;
+  bwm_floor_context_n = n;
+  bwm_floor_context_use_transform = use_transform;
+  bwm_floor_context_kernel = KERNEL;
+  bwm_floor_context_kernel_unordered = KERNEL_unordered_liracine;
+  bwm_floor_context_bandwidth = BANDWIDTH;
+  bwm_floor_context_bandwidth_den_ml = BANDWIDTH_den_ml;
+  bwm_floor_context_regression_ml = REGRESSION_ML;
+  bwm_floor_context_num_obs = num_obs;
+  bwm_floor_context_num_var_continuous = num_var_continuous;
+  bwm_floor_context_num_var_unordered = num_var_unordered;
+  bwm_floor_context_num_var_ordered = num_var_ordered;
+  bwm_floor_context_num_reg_continuous = num_reg_continuous;
+  bwm_floor_context_num_reg_unordered = num_reg_unordered;
+  bwm_floor_context_num_reg_ordered = num_reg_ordered;
+  bwm_floor_context_num_categories = num_categories;
+  bwm_floor_context_coeff = floor_coeff;
+}
+
+static int bwm_active_floor_candidate_ok(double *p)
+{
+  if (!bwm_floor_context_active)
+    return 1;
+
+  return np_bw_candidate_is_admissible_with_floor(
+    bwm_floor_context_n,
+    bwm_floor_context_use_transform,
+    bwm_floor_context_kernel,
+    bwm_floor_context_kernel_unordered,
+    bwm_floor_context_bandwidth,
+    bwm_floor_context_bandwidth_den_ml,
+    bwm_floor_context_regression_ml,
+    bwm_floor_context_num_obs,
+    bwm_floor_context_num_var_continuous,
+    bwm_floor_context_num_var_unordered,
+    bwm_floor_context_num_var_ordered,
+    bwm_floor_context_num_reg_continuous,
+    bwm_floor_context_num_reg_unordered,
+    bwm_floor_context_num_reg_ordered,
+    bwm_floor_context_num_categories,
+    p,
+    bwm_floor_context_coeff);
+}
+
 static double bwmfunc_wrapper(double *p)
 {
   double val;
   double *use_p = p;
 
   bwm_eval_count += 1.0;
+  if (!bwm_active_floor_candidate_ok(p)) {
+    bwm_invalid_count += 1.0;
+    if (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value))
+      return bwm_penalty_value;
+    return DBL_MAX;
+  }
+
   if (bwm_use_transform) {
     int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
     bwm_reserve_transform_buf(n + 1);
@@ -5015,6 +5128,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   num_reg_ordered_extern = myopti[BW_NORDI];
   num_reg_continuous_extern = myopti[BW_NCONI];
   np_reset_y_side_extern();
+  bwm_clear_floor_context();
 
   vector_ckerlb_extern = ckerlb;
   vector_ckerub_extern = ckerub;
@@ -5275,6 +5389,24 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   bwm_kernel_unordered_vec = NULL;
   bwm_kernel_unordered_len = 0;
   bwm_num_categories = num_categories_extern;
+  bwm_set_floor_context(
+    enforce_fixed_feasibility,
+    num_var,
+    bwm_use_transform,
+    KERNEL_den_extern,
+    KERNEL_den_unordered_extern,
+    BANDWIDTH_den_extern,
+    BANDWIDTH_den_extern,
+    0,
+    num_obs_train_extern,
+    0,
+    0,
+    0,
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    num_categories_extern,
+    bwm_scale_factor_lower_bound);
   bwm_reset_counters();
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
@@ -5630,6 +5762,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   }
 
   if (enforce_fixed_feasibility) {
+    double final_raw;
     if (!have_start_best) {
       bw_error_msg = "C_np_density_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
       goto cleanup_np_density_bw;
@@ -5654,6 +5787,12 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       bw_error_msg = "C_np_density_bw: optimizer returned an infeasible fixed-bandwidth candidate";
       goto cleanup_np_density_bw;
     }
+    final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
+    if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      bw_error_msg = "C_np_density_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      goto cleanup_np_density_bw;
+    }
+    fret = final_raw;
   }
 
   if (bwm_use_transform)
@@ -5677,6 +5816,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
 cleanup_np_density_bw:
   /* Free data objects */
+  bwm_clear_floor_context();
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
@@ -5762,6 +5902,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   num_reg_ordered_extern = myopti[DBW_NORDI];
   num_reg_continuous_extern = myopti[DBW_NCONI];
   np_reset_y_side_extern();
+  bwm_clear_floor_context();
 
   vector_ckerlb_extern = ckerlb;
   vector_ckerub_extern = ckerub;
@@ -6072,6 +6213,24 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   bwm_kernel_unordered_vec = NULL;
   bwm_kernel_unordered_len = 0;
   bwm_num_categories = num_categories_extern;
+  bwm_set_floor_context(
+    enforce_fixed_feasibility,
+    num_var,
+    bwm_use_transform,
+    KERNEL_den_extern,
+    KERNEL_den_unordered_extern,
+    BANDWIDTH_den_extern,
+    BANDWIDTH_den_extern,
+    0,
+    num_obs_train_extern,
+    0,
+    0,
+    0,
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    num_categories_extern,
+    bwm_scale_factor_lower_bound);
   bwm_reset_counters();
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
@@ -6416,6 +6575,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   }
 
   if (enforce_fixed_feasibility) {
+    double final_raw;
     if (!have_start_best) {
       bw_error_msg = "C_np_distribution_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
       goto cleanup_np_distribution_bw;
@@ -6440,6 +6600,12 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
       bw_error_msg = "C_np_distribution_bw: optimizer returned an infeasible fixed-bandwidth candidate";
       goto cleanup_np_distribution_bw;
     }
+    final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
+    if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      bw_error_msg = "C_np_distribution_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      goto cleanup_np_distribution_bw;
+    }
+    fret = final_raw;
   }
 
   if (bwm_use_transform)
@@ -6464,6 +6630,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
 cleanup_np_distribution_bw:
   /* Free data objects */
+  bwm_clear_floor_context();
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
@@ -6564,6 +6731,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   num_categories_extern_Y = NULL;
   matrix_categorical_vals_extern_Y = NULL;
   np_bounded_cvls_conditional_quad_context_clear_extern();
+  bwm_clear_floor_context();
 
   num_var_unordered_extern = myopti[CBW_CNUNOI];
   num_var_ordered_extern = myopti[CBW_CNORDI];
@@ -7152,6 +7320,24 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     bwm_kernel_unordered_vec = NULL;
   }
   bwm_num_categories = num_categories_extern;
+  bwm_set_floor_context(
+    enforce_fixed_feasibility,
+    num_all_var,
+    bwm_use_transform,
+    KERNEL_den_extern,
+    KERNEL_reg_unordered_extern,
+    BANDWIDTH_den_extern,
+    BANDWIDTH_den_extern,
+    0,
+    num_obs_train_extern,
+    num_var_continuous_extern,
+    num_var_unordered_extern,
+    num_var_ordered_extern,
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    num_categories_extern,
+    scale_factor_lower_bound);
   bwm_reset_counters();
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
@@ -7519,6 +7705,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   }
 
   if (enforce_fixed_feasibility) {
+    double final_raw;
     if (!have_start_best) {
       bw_error_msg = "C_np_density_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
       goto cleanup_np_density_conditional_bw;
@@ -7544,6 +7731,12 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       bw_error_msg = "C_np_density_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate";
       goto cleanup_np_density_conditional_bw;
     }
+    final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
+    if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      bw_error_msg = "C_np_density_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      goto cleanup_np_density_conditional_bw;
+    }
+    fret = final_raw;
   }
 
   if (bwm_use_transform)
@@ -7569,6 +7762,7 @@ cleanup_np_density_conditional_bw:
   /* Free data objects */
 
   np_bounded_cvls_conditional_quad_context_clear_extern();
+  bwm_clear_floor_context();
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
   free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
@@ -7727,6 +7921,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   num_reg_unordered_extern = myopti[CDBW_UNUNOI];
   num_reg_ordered_extern = myopti[CDBW_UNORDI];
   num_reg_continuous_extern = myopti[CDBW_UNCONI];
+  bwm_clear_floor_context();
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
   num_var_var = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
@@ -8264,6 +8459,24 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     bwm_kernel_unordered_vec = NULL;
   }
   bwm_num_categories = num_categories_extern;
+  bwm_set_floor_context(
+    enforce_fixed_feasibility,
+    num_all_var,
+    bwm_use_transform,
+    KERNEL_den_extern,
+    KERNEL_reg_unordered_extern,
+    BANDWIDTH_den_extern,
+    BANDWIDTH_den_extern,
+    0,
+    num_obs_train_extern,
+    num_var_continuous_extern,
+    num_var_unordered_extern,
+    num_var_ordered_extern,
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    num_categories_extern,
+    bwm_scale_factor_lower_bound);
   bwm_reset_counters();
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
@@ -8607,6 +8820,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   }
 
   if (enforce_fixed_feasibility) {
+    double final_raw;
     if (!have_start_best) {
       bw_error_msg = "C_np_distribution_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
       goto cleanup_np_distribution_conditional_bw;
@@ -8631,6 +8845,12 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       bw_error_msg = "C_np_distribution_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate";
       goto cleanup_np_distribution_conditional_bw;
     }
+    final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
+    if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      bw_error_msg = "C_np_distribution_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      goto cleanup_np_distribution_conditional_bw;
+    }
+    fret = final_raw;
   }
 
   if (bwm_use_transform)
@@ -8654,6 +8874,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
 cleanup_np_distribution_conditional_bw:
   /* Free data objects */
+  bwm_clear_floor_context();
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
   free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
@@ -9847,6 +10068,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   num_reg_unordered_extern = myopti[RBW_NUNOI];
   num_reg_ordered_extern = myopti[RBW_NORDI];
   np_reset_y_side_extern();
+  bwm_clear_floor_context();
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
@@ -10146,6 +10368,24 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   bwm_num_reg_ordered = num_reg_ordered_extern;
   bwm_kernel_unordered = KERNEL_reg_unordered_extern;
   bwm_num_categories = num_categories_extern;
+  bwm_set_floor_context(
+    enforce_fixed_feasibility,
+    num_var,
+    bwm_use_transform,
+    KERNEL_reg_extern,
+    KERNEL_reg_unordered_extern,
+    BANDWIDTH_reg_extern,
+    BANDWIDTH_reg_extern,
+    0,
+    num_obs_train_extern,
+    0,
+    0,
+    0,
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    num_categories_extern,
+    bwm_scale_factor_lower_bound);
   if (bwm_use_transform) {
     int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
     bwm_reserve_transform_buf(n + 1);
@@ -10467,6 +10707,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   }
 
   if (enforce_fixed_feasibility) {
+    double final_raw;
     if (!have_start_best) {
       bw_error_msg = "C_np_regression_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
       goto cleanup_np_regression_bw_mode;
@@ -10491,6 +10732,12 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
       bw_error_msg = "C_np_regression_bw: optimizer returned an infeasible fixed-bandwidth candidate";
       goto cleanup_np_regression_bw_mode;
     }
+    final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
+    if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      bw_error_msg = "C_np_regression_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      goto cleanup_np_regression_bw_mode;
+    }
+    fret = final_raw;
   }
 
   if (bwm_use_transform)
@@ -10513,6 +10760,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
 cleanup_np_regression_bw_mode:
   /* Free data objects */
+  bwm_clear_floor_context();
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);

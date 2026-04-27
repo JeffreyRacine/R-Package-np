@@ -169,20 +169,14 @@ npindexbw.NULL <-
 .npindexbw_h_start_controls <- function(lbc.init = 0.5,
                                         hbc.init = 1.5,
                                         cfac.init = 1.059224,
+                                        scale.factor.lower.bound = 0,
                                         where = "npindexbw") {
-  lbc.init <- npValidatePositiveFiniteNumeric(lbc.init, "lbc.init")
-  hbc.init <- npValidatePositiveFiniteNumeric(hbc.init, "hbc.init")
-  cfac.init <- npValidatePositiveFiniteNumeric(cfac.init, "cfac.init")
-
-  if (hbc.init < lbc.init) {
-    stop(sprintf("%s: 'hbc.init' must be greater than or equal to 'lbc.init'", where),
-         call. = FALSE)
-  }
-
-  list(
-    lbc.init = as.double(lbc.init),
-    hbc.init = as.double(hbc.init),
-    cfac.init = as.double(cfac.init)
+  npContinuousSearchStartControls(
+    lbc.init,
+    hbc.init,
+    cfac.init,
+    scale.factor.lower.bound,
+    where = where
   )
 }
 
@@ -933,12 +927,10 @@ npindexbw.NULL <-
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else npValidateNmulti(opt.args$nmulti[1L])
   scale.factor.lower.bound <- npResolveScaleFactorLowerBound(opt.args$scale.factor.lower.bound)
   h.start.controls <- .npindexbw_h_start_controls(
-    lbc.init = npEffectiveContinuousStartLower(
-      if (is.null(opt.args$lbc.init)) 0.5 else opt.args$lbc.init,
-      scale.factor.lower.bound
-    ),
+    lbc.init = if (is.null(opt.args$lbc.init)) 0.5 else opt.args$lbc.init,
     hbc.init = if (is.null(opt.args$hbc.init)) 1.5 else opt.args$hbc.init,
     cfac.init = if (is.null(opt.args$cfac.init)) 1.059224 else opt.args$cfac.init,
+    scale.factor.lower.bound = scale.factor.lower.bound,
     where = "npindexbw"
   )
   fixed.nomad <- identical(baseline.bws$type, "fixed")
@@ -1651,9 +1643,10 @@ npindexbw.sibandwidth <-
       if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
     )
     h.start.controls <- .npindexbw_h_start_controls(
-      lbc.init = npEffectiveContinuousStartLower(lbc.init, scale.factor.lower.bound),
+      lbc.init = lbc.init,
       hbc.init = hbc.init,
       cfac.init = cfac.init,
+      scale.factor.lower.bound = scale.factor.lower.bound,
       where = "npindexbw"
     )
     .npRmpi_require_active_slave_pool(where = "npindexbw()")

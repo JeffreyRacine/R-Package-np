@@ -236,20 +236,24 @@ npindexbw(\dots)
     lower bound for random fixed-bandwidth start factors for the index
     bandwidth \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults
     to \code{0.5}. Nearest-neighbor start laws are unchanged by this
-    control.
+    control. The effective lower endpoint is
+    \code{max(lbc.init, scale.factor.lower.bound)}.
   }
 
   \item{hbc.init}{
     upper bound for random fixed-bandwidth start factors for the index
     bandwidth \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults
-    to \code{1.5}. Must be greater than or equal to \code{lbc.init}.
+    to \code{1.5}. Must be greater than or equal to
+    \code{max(lbc.init, scale.factor.lower.bound)}.
   }
 
   \item{cfac.init}{
     deterministic fixed-bandwidth start factor for the index bandwidth
     \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{1.059224}. For automatic LP NOMAD search, this same fixed-bandwidth
-    start law seeds the internal initial \eqn{h} coordinate before the
+    \code{1.059224}. If \code{scale.factor.lower.bound} is larger, the
+    effective first search start is raised to that floor. For automatic
+    LP NOMAD search, this same fixed-bandwidth start law seeds the internal
+    initial \eqn{h} coordinate before the
     unchanged beta-start logic is applied.
   }
 

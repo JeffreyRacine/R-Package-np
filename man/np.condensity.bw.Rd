@@ -204,7 +204,7 @@ npcdensbw(\dots)
 
   \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{cfac.init}{non-random initial values for scale factors for \code{numeric} variables for Powell's algorithm. See Details}
+  \item{cfac.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.lower.bound} is larger, the effective first search start is raised to that floor. See Details}
 
   \item{cxkerbound}{
     character string controlling continuous-kernel support handling for
@@ -291,7 +291,7 @@ npcdensbw(\dots)
     (1.0e+01*sqrt(.Machine$double.eps)).
   }
 
-  \item{hbc.init}{upper bound for scale factors for \code{numeric} variables for Powell's algorithm. See Details}
+  \item{hbc.init}{upper endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. It must be no smaller than \code{max(lbc.init, scale.factor.lower.bound)}. See Details}
 
   \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
 
@@ -314,7 +314,7 @@ npcdensbw(\dots)
 
   \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{lbc.init}{lower bound for scale factors for \code{numeric} variables for Powell's algorithm. See Details}
+  \item{lbc.init}{lower endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. The effective lower endpoint is \code{max(lbc.init, scale.factor.lower.bound)}. See Details}
 
   \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
 
@@ -392,7 +392,8 @@ npcdensbw(\dots)
     stricter search floor. This argument affects
     search admissibility and search-start sanitization only; explicit
     bandwidths supplied for storage when \code{bandwidth.compute = FALSE}
-    are not rewritten. This differs from \code{lbc.init}, which controls
+    are not rewritten. Final fixed-bandwidth search candidates must also have
+    a finite valid raw objective value. This differs from \code{lbc.init}, which controls
     the lower bound for continuous starting scale factors in Powell-style
     search initialization.
   }
