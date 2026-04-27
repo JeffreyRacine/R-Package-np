@@ -1,6 +1,7 @@
 npregbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
+    npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npregbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat"),
                                      eval_env = parent.frame())
@@ -40,14 +41,14 @@ npregbw.formula <-
       attr(formula, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
       mf[["formula"]] <- formula
     }
-      
+
     mf[[1]] <- as.name("model.frame")
     mf.args <- as.list(mf[-1L])
     mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
 
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
-    
+
     dots <- list(...)
     tbw <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat), dots))
 
@@ -64,7 +65,7 @@ npregbw.formula <-
                            list(ynames =
                                 attr(mf, "names")[attr(tbw$terms, "response")]),
                            bws = tbw)
-    
+
     tbw
   }
 
@@ -111,7 +112,7 @@ npregbw.NULL <-
     xdat <- toFrame(xdat)
 
     bws = double(dim(xdat)[2])
-    
+
     tbw <- npregbw.default(xdat = xdat, ydat = ydat, bws = bws, ...)
 
     ## clean up (possible) inconsistencies due to recursion ...
@@ -121,22 +122,22 @@ npregbw.NULL <-
     tbw <- updateBwNameMetadata(nameList =
                                 list(ynames = deparse(substitute(ydat))),
                                 bws = tbw)
-    
+
     tbw
   }
 
-npregbw.rbandwidth <- 
+npregbw.rbandwidth <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            bws,
            bandwidth.compute = TRUE,
            cfac.dir = 2.5*(3.0-sqrt(5)),
-           cfac.init = 0.5,
+           scale.factor.init = 0.5,
            dfac.dir = 0.25*(3.0-sqrt(5)),
            dfac.init = 0.375,
            dfc.dir = 3,
            ftol = 1.490116e-07,
-           hbc.init = 2.0,
+           scale.factor.init.upper = 2.0,
            hbd.dir = 1,
            hbd.init = 0.9,
            initc.dir = 1.0,
@@ -144,14 +145,14 @@ npregbw.rbandwidth <-
            invalid.penalty = c("baseline","dbmax"),
            itmax = 10000,
            lbc.dir = 0.5,
-           lbc.init = 0.1,
+           scale.factor.init.lower = 0.1,
            lbd.dir = 0.1,
            lbd.init = 0.1,
            nmulti,
            penalty.multiplier = 10,
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
@@ -172,8 +173,8 @@ npregbw.rbandwidth <-
     tol <- npValidatePositiveFiniteNumeric(tol, "tol")
     small <- npValidatePositiveFiniteNumeric(small, "small")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
     )
     nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
@@ -217,7 +218,7 @@ npregbw.rbandwidth <-
 
     xdat <- xdat[keep.rows,,drop = FALSE]
     ydat <- ydat[keep.rows]
-    
+
     nrow = dim(xdat)[1]
     ncol = dim(xdat)[2]
 
@@ -269,13 +270,13 @@ npregbw.rbandwidth <-
 
     if (bandwidth.compute){
       cont.start <- npContinuousSearchStartControls(
-        lbc.init,
-        hbc.init,
-        cfac.init,
-        scale.factor.lower.bound,
+        scale.factor.init.lower,
+        scale.factor.init.upper,
+        scale.factor.init,
+        scale.factor.search.lower,
         where = "npregbw"
       )
-      myopti = list(num_obs_train = dim(xdat)[1], 
+      myopti = list(num_obs_train = dim(xdat)[1],
         iMultistart = IMULTI_TRUE,
         iNum_Multistart = nmulti,
         int_use_starting_values = (if (all(bws$bw==0)) USE_START_NO else USE_START_YES),
@@ -284,8 +285,8 @@ npregbw.rbandwidth <-
           fixed = BW_FIXED,
           generalized_nn = BW_GEN_NN,
           adaptive_nn = BW_ADAP_NN),
-        itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE), 
-        int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE, 
+        itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE),
+        int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
         bwmethod = switch(bws$method,
           cv.aic = BWM_CVAIC,
           cv.ls = BWM_CVLS),
@@ -309,14 +310,16 @@ npregbw.rbandwidth <-
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
-      
+
       myoptd = list(ftol=ftol, tol=tol, small=small,
-        lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
-        lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
-        lbc.init = cont.start$lbc.init, hbc.init = cont.start$hbc.init, cfac.init = cont.start$cfac.init,
-        lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
+        lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir,
+        lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir,
+        lbc.init = cont.start$scale.factor.init.lower,
+        hbc.init = cont.start$scale.factor.init.upper,
+        cfac.init = cont.start$scale.factor.init,
+        lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init,
         nconfac = nconfac, ncatfac = ncatfac,
-        scale.factor.lower.bound = scale.factor.lower.bound)
+        scale.factor.lower.bound = scale.factor.search.lower)
 
       cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
@@ -335,7 +338,7 @@ npregbw.rbandwidth <-
               as.double(cker.bounds.c$lb),
               as.double(cker.bounds.c$ub),
               PACKAGE = "npRmpi"))[1]
-      
+
 
       rorder = numeric(ncol)
       ord_idx <- seq_len(ncol)
@@ -359,13 +362,13 @@ npregbw.rbandwidth <-
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
 
     if (tbw$nuno > 0){
-      if(tbw$scaling){ 
+      if(tbw$scaling){
         tbw$bandwidth[tbw$xdati$iuno] <- tbw$bandwidth[tbw$xdati$iuno]*ncatfac
       } else {
         tbw$sfactor[tbw$xdati$iuno] <- tbw$sfactor[tbw$xdati$iuno]/ncatfac
       }
     }
-    
+
     if (tbw$nord > 0){
       if(tbw$scaling){
         tbw$bandwidth[tbw$xdati$iord] <- tbw$bandwidth[tbw$xdati$iord]*ncatfac
@@ -383,7 +386,7 @@ npregbw.rbandwidth <-
         tbw$sfactor[tbw$xdati$icon] <- tbw$sfactor[tbw$xdati$icon]/dfactor
       }
     }
-    
+
 
 
     tbw <- rbandwidth(bw = tbw$bw,
@@ -422,7 +425,7 @@ npregbw.rbandwidth <-
                       bandwidth.compute = bandwidth.compute,
                       timing = tbw$timing,
                       total.time = tbw$total.time)
-    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
+    tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
     tbw$initial.fval <- if (!is.null(initial.fval)) initial.fval else NA_real_
     tbw
   }
@@ -446,9 +449,9 @@ npregbw.rbandwidth <-
     reg.args
   )
   out <- do.call(rbandwidth, bw.args)
-  if (!is.null(reg.args$scale.factor.lower.bound)) {
-    out$scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      reg.args$scale.factor.lower.bound
+  if (!is.null(reg.args$scale.factor.search.lower)) {
+    out$scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      reg.args$scale.factor.search.lower
     )
   }
   out
@@ -472,32 +475,32 @@ npregbw.rbandwidth <-
                                             hbd.dir = 0,
                                             dfac.dir = 0,
                                             initd.dir = 0,
-                                            lbc.init = 0,
-                                            hbc.init = 0,
-                                            cfac.init = 0,
+                                            scale.factor.init.lower = 0,
+                                            scale.factor.init.upper = 0,
+                                            scale.factor.init = 0,
                                             lbd.init = 0,
                                             hbd.init = 0,
                                             dfac.init = 0,
                                             invalid.penalty = c("baseline", "dbmax"),
                                             penalty.multiplier = 10,
                                             transform.bounds = FALSE,
-                                            scale.factor.lower.bound = NULL,
+                                            scale.factor.search.lower = NULL,
                                             eval.only = FALSE) {
   invalid.penalty <- match.arg(invalid.penalty)
-  scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-    if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+  scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+    if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
   )
   if (!isTRUE(eval.only)) {
     cont.start <- npContinuousSearchStartControls(
-      lbc.init,
-      hbc.init,
-      cfac.init,
-      scale.factor.lower.bound,
+      scale.factor.init.lower,
+      scale.factor.init.upper,
+      scale.factor.init,
+      scale.factor.search.lower,
       where = "npregbw"
     )
-    lbc.init <- cont.start$lbc.init
-    hbc.init <- cont.start$hbc.init
-    cfac.init <- cont.start$cfac.init
+    scale.factor.init.lower <- cont.start$scale.factor.init.lower
+    scale.factor.init.upper <- cont.start$scale.factor.init.upper
+    scale.factor.init <- cont.start$scale.factor.init
   }
 
   xdat <- toFrame(xdat)
@@ -587,15 +590,15 @@ npregbw.rbandwidth <-
     hbd.dir = hbd.dir,
     dfac.dir = dfac.dir,
     initd.dir = initd.dir,
-    lbc.init = lbc.init,
-    hbc.init = hbc.init,
-    cfac.init = cfac.init,
+    lbc.init = scale.factor.init.lower,
+    hbc.init = scale.factor.init.upper,
+    cfac.init = scale.factor.init,
     lbd.init = lbd.init,
     hbd.init = hbd.init,
     dfac.init = dfac.init,
     nconfac = nconfac,
     ncatfac = ncatfac,
-    scale.factor.lower.bound = scale.factor.lower.bound
+    scale.factor.lower.bound = scale.factor.search.lower
   )
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
@@ -718,16 +721,16 @@ npregbw.rbandwidth <-
     hbd.dir = opt.value("hbd.dir", 1),
     dfac.dir = opt.value("dfac.dir", 0.25 * (3.0 - sqrt(5))),
     initd.dir = opt.value("initd.dir", 1.0),
-    lbc.init = opt.value("lbc.init", 0.1),
-    hbc.init = opt.value("hbc.init", 2.0),
-    cfac.init = opt.value("cfac.init", 0.5),
+    scale.factor.init.lower = opt.value("scale.factor.init.lower", 0.1),
+    scale.factor.init.upper = opt.value("scale.factor.init.upper", 2.0),
+    scale.factor.init = opt.value("scale.factor.init", 0.5),
     lbd.init = opt.value("lbd.init", 0.1),
     hbd.init = opt.value("hbd.init", 0.9),
     dfac.init = opt.value("dfac.init", 0.375),
     invalid.penalty = opt.value("invalid.penalty", "baseline"),
     penalty.multiplier = opt.value("penalty.multiplier", 10),
     transform.bounds = opt.value("transform.bounds", FALSE),
-    scale.factor.lower.bound = opt.value("scale.factor.lower.bound", NULL),
+    scale.factor.search.lower = opt.value("scale.factor.search.lower", NULL),
     eval.only = FALSE
   )
 
@@ -910,7 +913,7 @@ npRmpiNomadShadowPrepareRegression <- function(runo,
   if (length(myoptd) <= 18L) {
     rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
     if (isTRUE(rank == 0L))
-      stop("resident npreg NOMAD shadow options are missing scale.factor.lower.bound", call. = FALSE)
+      stop("resident npreg NOMAD shadow options are missing the scale-factor search lower bound", call. = FALSE)
     return(FALSE)
   }
 
@@ -1031,9 +1034,9 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   nrow <- dim(xmat)[1L]
   nconfac <- nrow^(-1.0 / (2.0 * bws$ckerorder + bws$ncon))
   ncatfac <- nrow^(-2.0 / (2.0 * bws$ckerorder + bws$ncon))
-  scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-    bws$scale.factor.lower.bound,
-    argname = "bws$scale.factor.lower.bound"
+  scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+    npGetScaleFactorSearchLower(bws),
+    argname = "bws$scale.factor.search.lower"
   )
 
   penalty_mode <- if (match.arg(invalid.penalty) == "baseline") 1L else 0L
@@ -1100,7 +1103,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     dfac.init = 0,
     nconfac = nconfac,
     ncatfac = ncatfac,
-    scale.factor.lower.bound = scale.factor.lower.bound
+    scale.factor.lower.bound = scale.factor.search.lower
   )
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
@@ -1562,8 +1565,8 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
   ncat <- length(setup$cat_idx)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
 
-  cont_lower <- npResolveScaleFactorLowerBound(template$scale.factor.lower.bound,
-                                               argname = "template$scale.factor.lower.bound")
+  cont_lower <- npGetScaleFactorSearchLower(template,
+                                            argname = "template$scale.factor.search.lower")
   bw_lower <- c(rep.int(cont_lower, ncon), rep.int(0, ncat))
   bw_upper <- c(rep.int(1e6, ncon), setup$cat_upper * setup$bandwidth.scale.categorical)
 
@@ -1956,7 +1959,7 @@ npregbw.default <-
            bwscaling,
            bwtype,
            cfac.dir,
-           cfac.init,
+           scale.factor.init,
            ckerbound,
            ckerlb,
            ckerorder,
@@ -1977,7 +1980,7 @@ npregbw.default <-
            dfac.init,
            dfc.dir,
            ftol,
-           hbc.init,
+           scale.factor.init.upper,
            hbd.dir,
            hbd.init,
            initc.dir,
@@ -1985,7 +1988,7 @@ npregbw.default <-
            invalid.penalty = c("baseline","dbmax"),
            itmax,
            lbc.dir,
-           lbc.init,
+           scale.factor.init.lower,
            lbd.dir,
            lbd.init,
            nmulti,
@@ -1994,7 +1997,7 @@ npregbw.default <-
            regtype,
            remin,
            scale.init.categorical.sample,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            small,
            tol,
            transform.bounds = FALSE,
@@ -2004,7 +2007,7 @@ npregbw.default <-
     lp.dot.args <- list(...)
     npRejectLegacyLpArgs(names(lp.dot.args), where = "npregbw")
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
 
     xdat <- toFrame(xdat)
     yname <- deparse(substitute(ydat))
@@ -2113,11 +2116,11 @@ npregbw.default <-
                "small",
                "lbc.dir", "dfc.dir", "cfac.dir","initc.dir",
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir",
-               "lbc.init", "hbc.init", "cfac.init",
+               "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
                "lbd.init", "hbd.init", "dfac.init",
                "scale.init.categorical.sample",
                "transform.bounds",
-               "scale.factor.lower.bound",
+               "scale.factor.search.lower",
                "invalid.penalty",
                "penalty.multiplier")
     m <- match(margs, mc.names, nomatch = 0)
@@ -2132,8 +2135,8 @@ npregbw.default <-
 
     reg.args <- bw.args[setdiff(names(bw.args), c("bw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
-    reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
-    opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    reg.args$scale.factor.search.lower <- scale.factor.search.lower
+    opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
     ncon <- sum(untangle(xdat)$icon)
     regtype.value <- if (!is.null(nomad.shortcut$values$regtype)) nomad.shortcut$values$regtype else "lc"
@@ -2245,5 +2248,5 @@ npregbw.default <-
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     return(tbw)
-    
+
   }

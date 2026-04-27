@@ -1,6 +1,7 @@
 npscoefbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
+    npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npscoefbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat", "zdat"),
                                      eval_env = parent.frame())
@@ -52,16 +53,16 @@ npscoefbw.formula <-
       ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
       attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
     }
-    
+
     mf.args <- as.list(mf[-1L])
     mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
-    
+
     ydat <- model.response(mf)
     xdat <- mf[, chromoly[[2]], drop = FALSE]
     miss.z <- !(length(chromoly) == 3)
     if (!miss.z)
       zdat <- mf[, chromoly[[3]], drop = FALSE]
-    
+
     bw.args <- list(xdat = xdat, ydat = ydat)
     if (!miss.z)
       bw.args$zdat <- zdat
@@ -81,7 +82,7 @@ npscoefbw.formula <-
                            list(ynames =
                                 attr(mf, "names")[attr(tbw$terms, "response")]),
                            bws = tbw)
-    
+
     tbw
   }
 
@@ -179,9 +180,9 @@ npscoefbw.NULL <-
   )
 
   out <- do.call(scbandwidth, sbw.args)
-  if (!is.null(reg.args$scale.factor.lower.bound))
-    out$scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      reg.args$scale.factor.lower.bound
+  if (!is.null(reg.args$scale.factor.search.lower))
+    out$scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      reg.args$scale.factor.search.lower
     )
   out
 }
@@ -1042,9 +1043,9 @@ npscoefbw.NULL <-
   ndeg <- length(degree.search$start.degree)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(NCOL(eval.zdat)) else npValidateNmulti(opt.args$nmulti[1L])
 
-  cont_lower <- npResolveScaleFactorLowerBound(
-    template$scale.factor.lower.bound,
-    argname = "template$scale.factor.lower.bound"
+  cont_lower <- npGetScaleFactorSearchLower(
+    template,
+    argname = "template$scale.factor.search.lower"
   )
   bw_lower <- c(rep.int(cont_lower, ncon), rep.int(0, ncat))
   bw_upper <- c(rep.int(1e6, ncon), setup$cat_upper * setup$bandwidth.scale.categorical)
@@ -1348,19 +1349,19 @@ npscoefbw.NULL <-
   }, numeric(1))
 }
 
-.npscoefbw_start_controls <- function(lbc.init = 0.5,
-                                     hbc.init = 1.5,
-                                     cfac.init = 1.0,
+.npscoefbw_start_controls <- function(scale.factor.init.lower = 0.5,
+                                     scale.factor.init.upper = 1.5,
+                                     scale.factor.init = 1.0,
                                      lbd.init = 0.5,
                                      hbd.init = 1.5,
                                      dfac.init = 1.0,
-                                     scale.factor.lower.bound = 0,
+                                     scale.factor.search.lower = 0,
                                      where = "npscoefbw") {
   cont.start <- npContinuousSearchStartControls(
-    lbc.init,
-    hbc.init,
-    cfac.init,
-    scale.factor.lower.bound,
+    scale.factor.init.lower,
+    scale.factor.init.upper,
+    scale.factor.init,
+    scale.factor.search.lower,
     where = where
   )
   lbd.init <- npValidatePositiveFiniteNumeric(lbd.init, "lbd.init")
@@ -1377,9 +1378,9 @@ npscoefbw.NULL <-
   }
 
   list(
-    lbc.init = cont.start$lbc.init,
-    hbc.init = cont.start$hbc.init,
-    cfac.init = cont.start$cfac.init,
+    scale.factor.init.lower = cont.start$scale.factor.init.lower,
+    scale.factor.init.upper = cont.start$scale.factor.init.upper,
+    scale.factor.init = cont.start$scale.factor.init,
     lbd.init = as.double(lbd.init),
     hbd.init = as.double(hbd.init),
     dfac.init = as.double(dfac.init)
@@ -1431,7 +1432,7 @@ npscoefbw.NULL <-
         icon = icon,
         iord = iord,
         iuno = iuno,
-        continuous.factor = start.controls$cfac.init,
+        continuous.factor = start.controls$scale.factor.init,
         categorical.factor = start.controls$dfac.init
       )
     ))
@@ -1455,7 +1456,7 @@ npscoefbw.NULL <-
       icon = icon,
       iord = iord,
       iuno = iuno,
-      continuous.factor = start.controls$lbc.init,
+      continuous.factor = start.controls$scale.factor.init.lower,
       categorical.factor = start.controls$lbd.init
     )
 
@@ -1464,7 +1465,7 @@ npscoefbw.NULL <-
           !isTRUE(as.logical(icon)[ii])) {
         draws[ii] <- runif(1L, min = start.controls$lbd.init, max = start.controls$hbd.init)
       } else {
-        draws[ii] <- runif(1L, min = start.controls$lbc.init, max = start.controls$hbc.init)
+        draws[ii] <- runif(1L, min = start.controls$scale.factor.init.lower, max = start.controls$scale.factor.init.upper)
       }
     }
 
@@ -1527,7 +1528,7 @@ npscoefbw.NULL <-
   as.double(candidate)
 }
 
-npscoefbw.scbandwidth <- 
+npscoefbw.scbandwidth <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            zdat = NULL,
@@ -1545,13 +1546,13 @@ npscoefbw.scbandwidth <-
            optim.method = c("Nelder-Mead", "BFGS", "CG"),
            optim.reltol = sqrt(.Machine$double.eps),
            random.seed = 42,
-           lbc.init = 0.5,
-           hbc.init = 1.5,
-           cfac.init = 1.0,
+           scale.factor.init.lower = 0.5,
+           scale.factor.init.upper = 1.5,
+           scale.factor.init = 1.0,
            lbd.init = 0.5,
            hbd.init = 1.5,
            dfac.init = 1.0,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            ...){
     ## Save seed prior to setting
 
@@ -1559,12 +1560,12 @@ npscoefbw.scbandwidth <-
 
 
     miss.z <- missing(zdat)
-    
+
     xdat <- toFrame(xdat)
 
     if (!miss.z)
       zdat <- toFrame(zdat)
-    
+
     if (missing(nmulti)){
       nmulti <- npDefaultNmulti(if (miss.z) NCOL(xdat) else NCOL(zdat))
     }
@@ -1580,17 +1581,17 @@ npscoefbw.scbandwidth <-
     optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
     optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
     )
     start.controls <- .npscoefbw_start_controls(
-      lbc.init = lbc.init,
-      hbc.init = hbc.init,
-      cfac.init = cfac.init,
+      scale.factor.init.lower = scale.factor.init.lower,
+      scale.factor.init.upper = scale.factor.init.upper,
+      scale.factor.init = scale.factor.init,
       lbd.init = lbd.init,
       hbd.init = hbd.init,
       dfac.init = dfac.init,
-      scale.factor.lower.bound = scale.factor.lower.bound,
+      scale.factor.search.lower = scale.factor.search.lower,
       where = "npscoefbw"
     )
     if (cv.iterate)
@@ -1615,7 +1616,7 @@ npscoefbw.scbandwidth <-
     } else {
       bwMatch(zdat, bws$zdati)
     }
-    
+
     if (dim(xdat)[1] != length(ydat))
       stop("number of regression data and response data do not match")
 
@@ -1626,7 +1627,7 @@ npscoefbw.scbandwidth <-
       stop("Only continuous 'x' regressors are supported in this version.")
 
     optim.method <- match.arg(optim.method)
-      
+
     ## catch and destroy NA's
     keep.rows <- rep_len(TRUE, nrow(xdat))
     train.df <- data.frame(xdat, ydat)
@@ -1644,7 +1645,7 @@ npscoefbw.scbandwidth <-
 
     if(!miss.z)
       zdat <- zdat[keep.rows,, drop = FALSE]
-    
+
     nrow = dim(xdat)[1]
     ncol = dim(xdat)[2]
 
@@ -1660,23 +1661,23 @@ npscoefbw.scbandwidth <-
 
     ## if (!miss.z)
     ##  zdat <- toMatrix(zdat)
-    
+
     ## bad data
     if (qr(xdat)$rank < ncol(xdat)){
-      stop("columns of the independent variable (xdat) are linearly dependent") 
+      stop("columns of the independent variable (xdat) are linearly dependent")
     }
 
     n <- nrow(xdat)
-    
+
     ## ... do bandwidth selection
-    
+
     ## construct 'W' matrix
     ## in the future one will be able to use a switch to npksum
     ## to emulate W
 
     W <- cbind(1.0, xdat)
     yW <- cbind(ydat, W)
-    
+
     if (miss.z){
       zdat <- xdat
       dati <- bws$xdati
@@ -2066,7 +2067,7 @@ npscoefbw.scbandwidth <-
           )
           if (!miss.z)
             scoef.loo.args$tzdat <- zdat
-          
+
           partial.cv.ls <- function(param, partial.index) {
             cv_state$objective_fast <- FALSE
             sbw <- apply_bw_to_scbw(bws, param)
@@ -2076,7 +2077,7 @@ npscoefbw.scbandwidth <-
                 ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
             cv_state$objective_fast <- npscoef_fast_eligible(sbw)
-            
+
             if (backfit.iterate){
               bws$bw.fitted[,partial.index] <- param
               scoef.loo <- do.call(npscoef, scoef.loo.args)
@@ -2100,13 +2101,13 @@ npscoefbw.scbandwidth <-
                 )
               }
             }
-            
+
 
             fv <- sum((partial.orig - partial.loo)^2)/n
 
             if (isTRUE(cv_state$objective_fast))
               cv_state$fast_total <- cv_state$fast_total + 1L
-            
+
             partial_progress_step(fv = fv)
             return((if (is.finite(fv)) fv else maxPenalty))
           }
@@ -2123,18 +2124,18 @@ npscoefbw.scbandwidth <-
             if (dati$icon[i]){
               return(1.059224*((if (bws$scaling) 1.0 else mysd[sum(dati$icon[seq_len(i)])]*nconfac)))
             }
-            
+
             if (dati$iord[i])
               return(0.5*oMaxL(dati$all.nlev[[i]], kertype = bws$okertype)*
                      (if (bws$scaling) ncatfac else 1.0))
-            
+
             if (dati$iuno[i])
               return(0.5*uMaxL(dati$all.nlev[[i]], kertype = bws$ukertype)*
-                     (if (bws$scaling) ncatfac else 1.0))       
+                     (if (bws$scaling) ncatfac else 1.0))
           })
           fixed.lower <- if (identical(bws$type, "fixed")) {
             out <- rep.int(0, length(x.scale))
-            out[dati$icon] <- x.scale[dati$icon] * start.controls$lbc.init
+            out[dati$icon] <- x.scale[dati$icon] * start.controls$scale.factor.init.lower
             out
           } else {
             NULL
@@ -2148,7 +2149,7 @@ npscoefbw.scbandwidth <-
 
             cv_state$multistart_index <- i
             cv_progress_begin()
-            
+
             if (i == 1) {
               tbw <- .npscoef_default_start_bandwidth(
                 param = x.scale,
@@ -2271,10 +2272,10 @@ npscoefbw.scbandwidth <-
             if (!miss.z)
               scoef.args$tzdat <- zdat
             scoef <- do.call(npscoef, scoef.args)
-            
+
             resid.full <- ydat - scoef$mean
 
-            
+
             for (i in seq_len(cv.num.iterations)) {
               backfit.progress <- .np_progress_step(
                 state = backfit.progress,
@@ -2286,7 +2287,7 @@ npscoefbw.scbandwidth <-
                 ## estimate partial residuals
                 partial.orig <- W[,j] * scoef$beta[,j] + resid.full
                 partial_progress_begin(iteration = i, partial.index = j)
-                
+
                 ## minimise
                 suppressWarnings(optim.return <-
                                  optim(tbw, fn = partial.cv.ls,
@@ -2295,7 +2296,7 @@ npscoefbw.scbandwidth <-
                 if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
                   num.feval.overall <- num.feval.overall + optim.return$counts[1]
                 partial_progress_finish(fv = optim.return$value)
-                
+
                 ## grab parameter
                 bws$bw.fitted[,j] <- optim.return$par
 
@@ -2333,10 +2334,10 @@ npscoefbw.scbandwidth <-
                       leave.one.out.eval = FALSE
                     )
                   }
-                  
+
                   bws$bw <- param.overall
                   bws <- apply_bw_to_scbw(bws, bws$bw)
-                  ## estimate new full residuals 
+                  ## estimate new full residuals
                   resid.full <- partial.orig - W[,j] * scoef$beta[,j]
                 }
               }
@@ -2361,7 +2362,7 @@ npscoefbw.scbandwidth <-
           bws$fval.vector = value.overall
         }
       })[["elapsed"]]
-    
+
     bws$sfactor <- bws$bandwidth <- bws$bw
     nfactor <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))
     dfactor <- EssDee(zdat[, dati$icon, drop = FALSE])*nrow^(-1.0/(2.0*bws$ckerorder+sum(dati$icon)))
@@ -2374,7 +2375,7 @@ npscoefbw.scbandwidth <-
 
       if(bws$nord > 0)
         bws$bandwidth[dati$iord] <- bws$bandwidth[dati$iord]*nfactor
-      
+
     } else {
       bws$sfactor[dati$icon] <- bws$sfactor[dati$icon]/dfactor
 
@@ -2388,7 +2389,7 @@ npscoefbw.scbandwidth <-
     ## Restore seed
 
     .np_seed_exit(seed.state)
-    
+
     bws <- scbandwidth(bw = bws$bw,
                        regtype = regtype,
                        basis = if (is.null(bws$basis)) "glp" else bws$basis,
@@ -2423,7 +2424,7 @@ npscoefbw.scbandwidth <-
                        bandwidth.compute = bandwidth.compute,
                        optim.method = optim.method,
                        total.time = total.time)
-    bws$scale.factor.lower.bound <- scale.factor.lower.bound
+    bws <- npSetScaleFactorSearchLower(bws, scale.factor.search.lower)
 
     bws
   }
@@ -2470,13 +2471,13 @@ npscoefbw.default <-
            random.seed,
            regtype,
            ukertype,
-           lbc.init = 0.5,
-           hbc.init = 1.5,
-           cfac.init = 1.0,
+           scale.factor.init.lower = 0.5,
+           scale.factor.init.upper = 1.5,
+           scale.factor.init = 1.0,
            lbd.init = 0.5,
            hbd.init = 1.5,
            dfac.init = 1.0,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            ...){
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")
     if (!missing(bwmethod) && identical(match.arg(bwmethod, c("cv.ls", "manual")), "manual") &&
@@ -2485,7 +2486,7 @@ npscoefbw.default <-
 
     miss.z <- missing(zdat)
     xdat <- toFrame(xdat)
-    
+
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
 
@@ -2588,7 +2589,7 @@ npscoefbw.default <-
       ncon = sum(if (miss.z) untangle(xdat)$icon else untangle(zdat)$icon),
       degree.select = degree.select.value
     )
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
     if (.npRmpi_autodispatch_active() && is.null(degree.search))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -2598,7 +2599,7 @@ npscoefbw.default <-
     margs <- c("regtype", "basis", "degree", "bernstein.basis",
                "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
-               "scale.factor.lower.bound")
+               "scale.factor.search.lower")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
@@ -2624,15 +2625,15 @@ npscoefbw.default <-
     if (!is.null(degree.search))
       reg.args$bernstein.basis <- degree.search$bernstein.basis
     tbw <- do.call(scbandwidth, sbw.args)
-    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
+    tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
     ## next grab dummies for actual bandwidth selection and perform call
     margs <- c("zdat",
                "nmulti",
                "random.seed",
-               "lbc.init", "hbc.init", "cfac.init",
+               "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
                "lbd.init", "hbd.init", "dfac.init",
-               "scale.factor.lower.bound",
+               "scale.factor.search.lower",
                "cv.iterate",
                "cv.num.iterations",
                "backfit.iterate",
@@ -2650,8 +2651,8 @@ npscoefbw.default <-
       opt.args <- list()
     }
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
-    reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
-    opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    reg.args$scale.factor.search.lower <- scale.factor.search.lower
+    opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
     if (!is.null(degree.search)) {
       if (identical(degree.search$engine, "cell")) {
@@ -2719,5 +2720,5 @@ npscoefbw.default <-
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     return(tbw)
-    
+
   }

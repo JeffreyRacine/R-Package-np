@@ -1,6 +1,7 @@
 npplregbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
+    npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npplregbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat", "zdat"),
                                      eval_env = parent.frame())
@@ -19,10 +20,10 @@ npplregbw.formula <-
       mf[[2]] <- formula.call
 
     mf.xf <- mf
-    
+
     mf[[1]] <- as.name("model.frame")
     mf.xf[[1]] <- as.name("model.frame")
-    
+
     ## mangle formula ...
     formula.obj <- .np_bw_resolve_formula(formula_obj = formula,
                                         formula_call = formula.call,
@@ -62,7 +63,7 @@ npplregbw.formula <-
 
     mf[["formula"]] <- terms(mf[["formula"]])
     mf.xf[["formula"]] <- terms(mf.xf[["formula"]])
-    
+
     if(all(orig.ts)){
       arguments <- (as.list(attr(formula.all, "variables"))[-1])
       attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mf,arguments)),drop = FALSE])
@@ -76,7 +77,7 @@ npplregbw.formula <-
       attr(mf[["formula"]], "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mf,arguments)),drop = FALSE])
       attr(mf.xf[["formula"]], "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mfx,arguments)),drop = FALSE])
     }
-    
+
     mf.args <- as.list(mf[-1L])
     mf.xf.args <- as.list(mf.xf[-1L])
     mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
@@ -202,7 +203,7 @@ npplregbw.plbandwidth =
     if (.npRmpi_autodispatch_active() &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-    
+
     xdat = toFrame(xdat)
     zdat = toFrame(zdat)
 
@@ -230,7 +231,7 @@ npplregbw.plbandwidth =
         .np_progress_bandwidth_set_coordinator_group(1L, "y~z")
         bws$bw$yzbw  <- npregbw(xdat = zdat, ydat = ydat,
                                 bws = bws$bw$yzbw, nmulti = nmulti, ...)
-        
+
         ## x on z
 
         for (i in seq_len(ncol(xdat))) {
@@ -840,9 +841,9 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
   child.point.length <- search.state$child.point.length
 
   child_cont_lower <- function(i) {
-    npResolveScaleFactorLowerBound(
-      child.templates[[i]]$scale.factor.lower.bound,
-      argname = "child scale.factor.lower.bound"
+    npGetScaleFactorSearchLower(
+      child.templates[[i]],
+      argname = "child scale.factor.search.lower"
     )
   }
 
@@ -1255,7 +1256,7 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
   bws
 }
 
-npplregbw.default = 
+npplregbw.default =
   function(xdat = stop("invoked without data `xdat'"),
            ydat = stop("invoked without data `ydat'"),
            zdat = stop("invoked without data `zdat'"),
@@ -1272,7 +1273,7 @@ npplregbw.default =
            degree.restarts = 0L,
            degree.max.cycles = 20L,
            degree.verify = FALSE,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            ftol, itmax, nmulti, remin, small, tol,
            ...){
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
@@ -1357,7 +1358,7 @@ npplregbw.default =
       ncon = sum(untangle(zdat)$icon),
       degree.select = degree.select.value
     )
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
 
     spec <- npResolveCanonicalConditionalRegSpec(
       mc.names = spec.mc.names,
@@ -1409,7 +1410,7 @@ npplregbw.default =
       degree = spec$degree.engine,
       bernstein.basis = spec$bernstein.basis.engine,
       bandwidth.compute = FALSE,
-      scale.factor.lower.bound = scale.factor.lower.bound
+      scale.factor.search.lower = scale.factor.search.lower
     )
     if (!is.null(degree.search))
       reg.args$bernstein.basis <- degree.search$bernstein.basis
@@ -1425,13 +1426,13 @@ npplregbw.default =
     outer.args$basis <- spec$basis
     outer.args$degree <- spec$degree
     outer.args$bernstein.basis <- spec$bernstein.basis
-    outer.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    outer.args$scale.factor.search.lower <- scale.factor.search.lower
 
     opt.args <- list()
     margs <- c("regtype", "basis", "degree", "bernstein.basis",
                "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
-               "scale.factor.lower.bound",
+               "scale.factor.search.lower",
                "ftol", "itmax", "nmulti", "remin", "small", "tol")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
@@ -1447,7 +1448,7 @@ npplregbw.default =
         nms <- mc.names[m]
         opt.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
       }
-      opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
+      opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
       if (!is.null(degree.search)) {
         if (identical(degree.search$engine, "cell")) {

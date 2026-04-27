@@ -2,6 +2,7 @@
 npindexbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
+    npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npindexbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat"),
                                      eval_env = parent.frame())
@@ -41,7 +42,7 @@ npindexbw.formula <-
       attr(formula, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
       mf[["formula"]] <- formula
     }
-    
+
     mf.args <- as.list(mf[-1L])
     mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
 
@@ -166,16 +167,16 @@ npindexbw.NULL <-
   list(ok = (k >= lower) && (k <= upper), value = as.double(k))
 }
 
-.npindexbw_h_start_controls <- function(lbc.init = 0.5,
-                                        hbc.init = 1.5,
-                                        cfac.init = 1.059224,
-                                        scale.factor.lower.bound = 0,
+.npindexbw_h_start_controls <- function(scale.factor.init.lower = 0.5,
+                                        scale.factor.init.upper = 1.5,
+                                        scale.factor.init = 1.059224,
+                                        scale.factor.search.lower = 0,
                                         where = "npindexbw") {
   npContinuousSearchStartControls(
-    lbc.init,
-    hbc.init,
-    cfac.init,
-    scale.factor.lower.bound,
+    scale.factor.init.lower,
+    scale.factor.init.upper,
+    scale.factor.init,
+    scale.factor.search.lower,
     where = where
   )
 }
@@ -189,7 +190,7 @@ npindexbw.NULL <-
                                              nobs,
                                              start.controls = .npindexbw_h_start_controls()) {
   if (identical(bwtype, "fixed")) {
-    return(start.controls$cfac.init * .npindex_start_bandwidth_scale(fit = fit, nobs = nobs))
+    return(start.controls$scale.factor.init * .npindex_start_bandwidth_scale(fit = fit, nobs = nobs))
   }
 
   lower <- 2L
@@ -201,7 +202,7 @@ npindexbw.NULL <-
                                             nobs,
                                             start.controls = .npindexbw_h_start_controls()) {
   if (identical(bwtype, "fixed")) {
-    return(runif(1, min = start.controls$lbc.init, max = start.controls$hbc.init) *
+    return(runif(1, min = start.controls$scale.factor.init.lower, max = start.controls$scale.factor.init.upper) *
              .npindex_start_bandwidth_scale(fit = fit, nobs = nobs))
   }
 
@@ -299,7 +300,7 @@ npindexbw.NULL <-
       start.controls = h.start.controls
     )
   } else {
-    h.lower.raw <- h.start.controls$lbc.init *
+    h.lower.raw <- h.start.controls$scale.factor.init.lower *
       .npindex_start_bandwidth_scale(fit = fit.proxy, nobs = nobs)
     h.start.raw <- tryCatch(
       .npindex_finalize_bandwidth(
@@ -746,9 +747,9 @@ npindexbw.NULL <-
       reg.args
     )
   )
-  if (!is.null(reg.args$scale.factor.lower.bound))
-    out$scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      reg.args$scale.factor.lower.bound
+  if (!is.null(reg.args$scale.factor.search.lower))
+    out$scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      reg.args$scale.factor.search.lower
     )
   out
 }
@@ -925,12 +926,12 @@ npindexbw.NULL <-
 
   p <- ncol(x.clean)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else npValidateNmulti(opt.args$nmulti[1L])
-  scale.factor.lower.bound <- npResolveScaleFactorLowerBound(opt.args$scale.factor.lower.bound)
+  scale.factor.search.lower <- npResolveScaleFactorLowerBound(opt.args$scale.factor.search.lower)
   h.start.controls <- .npindexbw_h_start_controls(
-    lbc.init = if (is.null(opt.args$lbc.init)) 0.5 else opt.args$lbc.init,
-    hbc.init = if (is.null(opt.args$hbc.init)) 1.5 else opt.args$hbc.init,
-    cfac.init = if (is.null(opt.args$cfac.init)) 1.059224 else opt.args$cfac.init,
-    scale.factor.lower.bound = scale.factor.lower.bound,
+    scale.factor.init.lower = if (is.null(opt.args$scale.factor.init.lower)) 0.5 else opt.args$scale.factor.init.lower,
+    scale.factor.init.upper = if (is.null(opt.args$scale.factor.init.upper)) 1.5 else opt.args$scale.factor.init.upper,
+    scale.factor.init = if (is.null(opt.args$scale.factor.init)) 1.059224 else opt.args$scale.factor.init,
+    scale.factor.search.lower = scale.factor.search.lower,
     where = "npindexbw"
   )
   fixed.nomad <- identical(baseline.bws$type, "fixed")
@@ -983,12 +984,12 @@ npindexbw.NULL <-
     max(2L, as.integer(nrow(x.clean)) - 1L)
   }
   h.lower <- if (fixed.nomad) {
-    h.start.controls$lbc.init
+    h.start.controls$scale.factor.init.lower
   } else {
     h.lower.raw
   }
   h.upper <- if (fixed.nomad) {
-    h.start.controls$hbc.init
+    h.start.controls$scale.factor.init.upper
   } else {
     h.upper.raw
   }
@@ -1034,7 +1035,7 @@ npindexbw.NULL <-
       h = h,
       bwtype = baseline.bws$type,
       nobs = nrow(x.clean),
-      lower = if (fixed.nomad) h.start.controls$lbc.init * fixed.setup$h.scale else NULL,
+      lower = if (fixed.nomad) h.start.controls$scale.factor.init.lower * fixed.setup$h.scale else NULL,
       where = "npindexbw"
     )
     c(beta.tail, h)
@@ -1341,10 +1342,10 @@ npindexbw.default <-
            optim.reltol,
            random.seed,
            regtype = c("lc", "ll", "lp"),
-           lbc.init = 0.5,
-           hbc.init = 1.5,
-           cfac.init = 1.059224,
-           scale.factor.lower.bound = NULL,
+           scale.factor.init.lower = 0.5,
+           scale.factor.init.upper = 1.5,
+           scale.factor.init = 1.059224,
+           scale.factor.search.lower = NULL,
            ...){
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
     search.mc.names <- names(match.call(expand.dots = FALSE))
@@ -1472,7 +1473,7 @@ npindexbw.default <-
       ncon = 1L,
       degree.select = degree.select.value
     )
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
     spec <- npResolveCanonicalConditionalRegSpec(
       mc.names = mc.names,
       regtype = if (!is.null(nomad.shortcut$values$regtype)) nomad.shortcut$values$regtype else regtype,
@@ -1499,15 +1500,15 @@ npindexbw.default <-
                        ynames = deparse(substitute(ydat)),
                        bandwidth = bws[p+1L],
                        bandwidth.compute = bandwidth.compute)
-    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
+    tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
     if (tbw$method == "kleinspady" && !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
     margs <- c("nmulti","random.seed", "optim.method", "optim.maxattempts",
                "optim.reltol", "optim.abstol", "optim.maxit", "only.optimize.beta",
-               "lbc.init", "hbc.init", "cfac.init",
-               "scale.factor.lower.bound")
+               "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
+               "scale.factor.search.lower")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
@@ -1527,13 +1528,13 @@ npindexbw.default <-
         basis.engine = spec$basis.engine,
         degree.engine = spec$degree.engine,
         bernstein.basis.engine = spec$bernstein.basis.engine,
-        scale.factor.lower.bound = scale.factor.lower.bound
+        scale.factor.search.lower = scale.factor.search.lower
       )
       opt.args <- c(
         list(bandwidth.compute = bandwidth.compute),
         bwsel.args[setdiff(names(bwsel.args), c("xdat", "ydat", "bws"))]
       )
-      opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
+      opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
       if (identical(degree.search$engine, "cell")) {
         eval_fun <- function(degree.vec) {
@@ -1616,10 +1617,10 @@ npindexbw.sibandwidth <-
            optim.method = c("Nelder-Mead", "BFGS", "CG"),
            optim.reltol = sqrt(.Machine$double.eps),
            random.seed = 42,
-           lbc.init = 0.5,
-           hbc.init = 1.5,
-           cfac.init = 1.059224,
-           scale.factor.lower.bound = NULL,
+           scale.factor.init.lower = 0.5,
+           scale.factor.init.upper = 1.5,
+           scale.factor.init = 1.059224,
+           scale.factor.search.lower = NULL,
            ...){
     ## Save seed prior to setting
 
@@ -1639,14 +1640,14 @@ npindexbw.sibandwidth <-
     optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
     optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
     )
     h.start.controls <- .npindexbw_h_start_controls(
-      lbc.init = lbc.init,
-      hbc.init = hbc.init,
-      cfac.init = cfac.init,
-      scale.factor.lower.bound = scale.factor.lower.bound,
+      scale.factor.init.lower = scale.factor.init.lower,
+      scale.factor.init.upper = scale.factor.init.upper,
+      scale.factor.init = scale.factor.init,
+      scale.factor.search.lower = scale.factor.search.lower,
       where = "npindexbw"
     )
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
@@ -1936,7 +1937,7 @@ npindexbw.sibandwidth <-
               ols.fit <- lm(ydat~xdat,x=TRUE)
               fit <- fitted(ols.fit)
               fixed.h.lower <- if (identical(bws$type, "fixed")) {
-                h.start.controls$lbc.init * .npindex_start_bandwidth_scale(fit = fit, nobs = nobs)
+                h.start.controls$scale.factor.init.lower * .npindex_start_bandwidth_scale(fit = fit, nobs = nobs)
               } else {
                 NULL
               }
@@ -2025,7 +2026,7 @@ npindexbw.sibandwidth <-
                 if(!is.null(optim.control$abstol))
                   optim.control$abstol <-  10.0*optim.control$abstol
               }
-              
+
               optim.parm <- if(only.optimize.beta) beta else c(beta,h)
               optim.base.args$par <- optim.parm
               optim.base.args$control <- optim.control
@@ -2111,7 +2112,7 @@ npindexbw.sibandwidth <-
                        optim.method = optim.method,
                        only.optimize.beta = only.optimize.beta,
                        total.time = total.time)
-    bws$scale.factor.lower.bound <- scale.factor.lower.bound
+    bws <- npSetScaleFactorSearchLower(bws, scale.factor.search.lower)
 
     bws
 

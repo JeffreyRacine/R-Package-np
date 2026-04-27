@@ -1,6 +1,7 @@
 npcdistbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
+    npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npcdistbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat", "gydat"),
                                      eval_env = parent.frame())
@@ -20,7 +21,7 @@ npcdistbw.formula <-
     }, error = function(e) FALSE)
 
     has.gval <- !is.null(gdata)
-    
+
     gmf <- mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
@@ -35,7 +36,7 @@ npcdistbw.formula <-
       mf[[2]] <- formula.call
       gmf[[2]] <- formula.call
     }
-                     
+
 
     mf[[1]] <- as.name("model.frame")
     gmf[[1]] <- as.name("model.frame")
@@ -44,7 +45,7 @@ npcdistbw.formula <-
                                         eval_env = parent.frame())
 
     variableNames <- if(m[2] > 0) explodeFormula(formula.obj, data = data) else explodeFormula(formula.obj)
-    
+
     ## make formula evaluable, then eval
     varsPlus <- lapply(variableNames, paste, collapse=" + ")
     mf[["formula"]] <- as.formula(paste(" ~ ", varsPlus[[1]]," + ",
@@ -64,10 +65,10 @@ npcdistbw.formula <-
       ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
       attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
     }
-    
+
     mf.args <- as.list(mf[-1L])
     mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
-    
+
     ydat <- mf[, variableNames[[1]], drop = FALSE]
     xdat <- mf[, variableNames[[2]], drop = FALSE]
 
@@ -77,7 +78,7 @@ npcdistbw.formula <-
       gmf <- do.call(stats::model.frame, gmf.args, envir = parent.frame())
       gydat <- gmf[, variableNames[[1]], drop = FALSE]
     }
-    
+
     dots <- list(...)
     seed.args <- c(list(xdat = xdat, ydat = ydat),
                    if (has.gval) list(gydat = gydat) else list(),
@@ -130,13 +131,13 @@ npcdistbw.condbandwidth <-
            bws,
            bandwidth.compute = TRUE,
            cfac.dir = 2.5*(3.0-sqrt(5)),
-           cfac.init = 0.5,
+           scale.factor.init = 0.5,
            dfac.dir = 0.25*(3.0-sqrt(5)),
            dfac.init = 0.375,
            dfc.dir = 3,
            do.full.integral = FALSE,
            ftol = 1.490116e-07,
-           hbc.init = 2.0,
+           scale.factor.init.upper = 2.0,
            hbd.dir = 1,
            hbd.init = 0.9,
            initc.dir = 1.0,
@@ -144,7 +145,7 @@ npcdistbw.condbandwidth <-
            invalid.penalty = c("baseline","dbmax"),
            itmax = 10000,
            lbc.dir = 0.5,
-           lbc.init = 0.1,
+           scale.factor.init.lower = 0.1,
            lbd.dir = 0.1,
            lbd.init = 0.1,
            memfac = 500.0,
@@ -153,7 +154,7 @@ npcdistbw.condbandwidth <-
            penalty.multiplier = 10,
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
@@ -178,8 +179,8 @@ npcdistbw.condbandwidth <-
     small <- npValidatePositiveFiniteNumeric(small, "small")
     memfac <- npValidatePositiveFiniteNumeric(memfac, "memfac")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
     )
     nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
@@ -250,7 +251,7 @@ npcdistbw.condbandwidth <-
     xdat = xdat[goodrows,,drop = FALSE]
     ydat = ydat[goodrows,,drop = FALSE]
 
-    
+
     nrow = nrow(ydat)
     yncol = ncol(ydat)
     xncol = ncol(xdat)
@@ -259,7 +260,7 @@ npcdistbw.condbandwidth <-
     ## numeric type.
 
     oydat <- ydat
-    
+
     ydat = toMatrix(ydat)
 
     yuno = ydat[, bws$iyuno, drop = FALSE]
@@ -349,10 +350,10 @@ npcdistbw.condbandwidth <-
 
     if (bandwidth.compute){
       cont.start <- npContinuousSearchStartControls(
-        lbc.init,
-        hbc.init,
-        cfac.init,
-        scale.factor.lower.bound,
+        scale.factor.init.lower,
+        scale.factor.init.upper,
+        scale.factor.init,
+        scale.factor.search.lower,
         where = "npcdistbw"
       )
       myopti = list(num_obs_train = nrow,
@@ -365,8 +366,8 @@ npcdistbw.condbandwidth <-
           fixed = BW_FIXED,
           generalized_nn = BW_GEN_NN,
           adaptive_nn = BW_ADAP_NN),
-        itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE), 
-        int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE, 
+        itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE),
+        int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
         bwmethod = switch(bws$method,
           cv.ls = CDBWM_CVLS),
         xkerneval = switch(bws$cxkertype,
@@ -404,14 +405,16 @@ npcdistbw.condbandwidth <-
         scale.init.categorical.sample=scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
-      
+
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
-        lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
-        lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
-        lbc.init = cont.start$lbc.init, hbc.init = cont.start$hbc.init, cfac.init = cont.start$cfac.init,
-        lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
+        lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir,
+        lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir,
+        lbc.init = cont.start$scale.factor.init.lower,
+        hbc.init = cont.start$scale.factor.init.upper,
+        cfac.init = cont.start$scale.factor.init,
+        lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init,
         nconfac = nconfac, ncatfac = ncatfac,
-        scale.factor.lower.bound = scale.factor.lower.bound)
+        scale.factor.lower.bound = scale.factor.search.lower)
 
       cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
       cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
@@ -490,14 +493,14 @@ npcdistbw.condbandwidth <-
 
       ## bandwidths are passed back from the C routine in an unusual order
       ## xc, y[cuo], x[uo]
-      
-      rxcon = xr[bws$ixcon]
-      rxuno = xr[bws$ixuno] 
-      rxord = xr[bws$ixord] 
 
-      rycon = yr[bws$iycon] 
-      ryuno = yr[bws$iyuno] 
-      ryord = yr[bws$iyord] 
+      rxcon = xr[bws$ixcon]
+      rxuno = xr[bws$ixuno]
+      rxord = xr[bws$ixord]
+
+      rycon = yr[bws$iycon]
+      ryuno = yr[bws$iyuno]
+      ryord = yr[bws$iyord]
 
 
       ## rorder[c(rxcon,rycon,ryuno,ryord,rxuno,rxord)]=1:(yncol+xncol)
@@ -517,7 +520,7 @@ npcdistbw.condbandwidth <-
       tbw$timing <- myout$timing
       tbw$total.time <- total.time
     }
-    
+
     ## bandwidth metadata
     tbw$sfactor <- tbw$bandwidth <- list(x = tbw$xbw, y = tbw$ybw)
 
@@ -533,7 +536,7 @@ npcdistbw.condbandwidth <-
         }
       }
     }
-    
+
     if ((tbw$xnuno+tbw$ynuno) > 0){
       dfactor <- ncatfac
       dfactor <- list(x = dfactor, y = dfactor)
@@ -552,7 +555,7 @@ npcdistbw.condbandwidth <-
       apply_bw_meta(tl = tl, dfactor = dfactor)
     }
 
-      
+
     if (tbw$ncon > 0){
       dfactor <- nconfac
       dfactor <- list(x = EssDee(xcon)*dfactor, y = EssDee(ycon)*dfactor)
@@ -561,7 +564,7 @@ npcdistbw.condbandwidth <-
 
       apply_bw_meta(tl = tl, dfactor = dfactor)
     }
-  
+
     initial.fval <- tbw$initial.fval
     tbw <- condbandwidth(xbw = tbw$xbw,
                          ybw = tbw$ybw,
@@ -591,7 +594,7 @@ npcdistbw.condbandwidth <-
                          invalid.history = tbw$invalid.history,
                          nobs = tbw$nobs,
                          xdati = tbw$xdati,
-                         ydati = tbw$ydati,      
+                         ydati = tbw$ydati,
                          xnames = tbw$xnames,
                          ynames = tbw$ynames,
                          sfactor = tbw$sfactor,
@@ -612,7 +615,7 @@ npcdistbw.condbandwidth <-
                          basis.engine = tbw$basis.engine,
                          degree.engine = tbw$degree.engine,
                          bernstein.basis.engine = tbw$bernstein.basis.engine)
-    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
+    tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
     tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
     tbw$initial.fval <- if (!is.null(initial.fval)) initial.fval else NA_real_
@@ -645,9 +648,9 @@ npcdistbw.condbandwidth <-
   )
 
   out <- do.call(condbandwidth, bw.args)
-  if (!is.null(reg.args$scale.factor.lower.bound))
-    out$scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      reg.args$scale.factor.lower.bound
+  if (!is.null(reg.args$scale.factor.search.lower))
+    out$scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      reg.args$scale.factor.search.lower
     )
   out
 }
@@ -874,8 +877,8 @@ npcdistbw.condbandwidth <-
     nconfac = nconfac,
     ncatfac = ncatfac,
     scale.factor.lower.bound = npResolveScaleFactorLowerBound(
-      bws$scale.factor.lower.bound,
-      argname = "bws$scale.factor.lower.bound"
+      npGetScaleFactorSearchLower(bws),
+      argname = "bws$scale.factor.search.lower"
     )
   )
 
@@ -1207,9 +1210,9 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   ndeg <- length(degree.search$start.degree)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
-  cont_lower <- npResolveScaleFactorLowerBound(
-    template$scale.factor.lower.bound,
-    argname = "template$scale.factor.lower.bound"
+  cont_lower <- npGetScaleFactorSearchLower(
+    template,
+    argname = "template$scale.factor.search.lower"
   )
   bw_lower <- c(rep.int(cont_lower, length(setup$cont_flat)), rep.int(0, length(setup$cat_flat)))
   bw_upper <- c(rep.int(1e6, length(setup$cont_flat)), setup$cat_upper * setup$bandwidth.scale.categorical)
@@ -1635,7 +1638,7 @@ npcdistbw.NULL <-
     ydat <- toFrame(ydat)
 
     ## do bandwidths
-    
+
     bws = double(ncol(ydat)+ncol(xdat))
 
     tbw <- npcdistbw.default(xdat = xdat, ydat = ydat, bws = bws, ...)
@@ -1652,13 +1655,13 @@ npcdistbw.default <-
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
            gydat,
-           bws, 
+           bws,
            bandwidth.compute = TRUE,
            bwmethod,
            bwscaling,
            bwtype,
            cfac.dir,
-           cfac.init,
+           scale.factor.init,
            cxkerbound,
            cxkerlb,
            cxkerorder,
@@ -1674,7 +1677,7 @@ npcdistbw.default <-
            dfc.dir,
            do.full.integral,
            ftol,
-           hbc.init,
+           scale.factor.init.upper,
            hbd.dir,
            hbd.init,
            initc.dir,
@@ -1682,7 +1685,7 @@ npcdistbw.default <-
            invalid.penalty,
            itmax,
            lbc.dir,
-           lbc.init,
+           scale.factor.init.lower,
            lbd.dir,
            lbd.init,
            memfac,
@@ -1693,7 +1696,7 @@ npcdistbw.default <-
            penalty.multiplier,
            remin,
            scale.init.categorical.sample,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            small,
            tol,
            transform.bounds,
@@ -1827,7 +1830,7 @@ npcdistbw.default <-
     lp.dot.args <- list(...)
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(scale.factor.lower.bound)
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
     degree.min.value <- nomad.shortcut$values$degree.min
     degree.max.value <- nomad.shortcut$values$degree.max
     degree.start.value <- if ("degree.start" %in% search.mc.names) degree.start else NULL
@@ -1918,17 +1921,17 @@ npcdistbw.default <-
         identical(tbw$type, "generalized_nn")))
     if (.npRmpi_autodispatch_active() && !keep_local_cvls_nn && is.null(degree.search))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-                        
+
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(mc)
     margs <- c("gydat", "nmulti", "remin", "itmax", "do.full.integral", "ngrid", "ftol",
                "tol", "small", "memfac",
-               "lbc.dir", "dfc.dir", "cfac.dir","initc.dir", 
-               "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
-               "lbc.init", "hbc.init", "cfac.init", 
-               "lbd.init", "hbd.init", "dfac.init", 
-               "scale.factor.lower.bound",
+               "lbc.dir", "dfc.dir", "cfac.dir","initc.dir",
+               "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir",
+               "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
+               "lbd.init", "hbd.init", "dfac.init",
+               "scale.factor.search.lower",
                "scale.init.categorical.sample",
                "transform.bounds",
                "invalid.penalty",
@@ -1943,8 +1946,8 @@ npcdistbw.default <-
       opt.args <- list()
     }
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
-    reg.args$scale.factor.lower.bound <- scale.factor.lower.bound
-    opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
+    reg.args$scale.factor.search.lower <- scale.factor.search.lower
+    opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
     if (!is.null(degree.search)) {
       if (identical(degree.search$engine, "cell")) {

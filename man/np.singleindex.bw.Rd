@@ -1,4 +1,4 @@
-% 
+%
 \name{npindexbw}
 \alias{npindexbw}
 \alias{npindexbw.default}
@@ -51,10 +51,10 @@ npindexbw(\dots)
           optim.reltol,
           random.seed,
           regtype = c("lc", "ll", "lp"),
-          lbc.init = 0.5,
-          hbc.init = 1.5,
-          cfac.init = 1.059224,
-          scale.factor.lower.bound = NULL,
+          scale.factor.init.lower = 0.5,
+          scale.factor.init.upper = 1.5,
+          scale.factor.init = 1.059224,
+          scale.factor.search.lower = NULL,
           \dots)
 
 \method{npindexbw}{sibandwidth}(xdat = stop("training data xdat missing"),
@@ -69,10 +69,10 @@ npindexbw(\dots)
           optim.method = c("Nelder-Mead", "BFGS", "CG"),
           optim.reltol = sqrt(.Machine$double.eps),
           random.seed = 42,
-          lbc.init = 0.5,
-          hbc.init = 1.5,
-          cfac.init = 1.059224,
-          scale.factor.lower.bound = NULL,
+          scale.factor.init.lower = 0.5,
+          scale.factor.init.upper = 1.5,
+          scale.factor.init = 1.059224,
+          scale.factor.search.lower = NULL,
           \dots)
 
 }
@@ -86,7 +86,7 @@ npindexbw(\dots)
   \item{ydat}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{xdat}. 
+    \code{xdat}.
   }
 
   \item{bws}{
@@ -232,37 +232,37 @@ npindexbw(\dots)
     points. Defaults to \code{min(2,ncol(xdat))}.
   }
 
-  \item{lbc.init}{
+  \item{scale.factor.init.lower}{
     lower bound for random fixed-bandwidth start factors for the index
     bandwidth \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults
     to \code{0.5}. Nearest-neighbor start laws are unchanged by this
     control. The effective lower endpoint is
-    \code{max(lbc.init, scale.factor.lower.bound)}.
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
 
-  \item{hbc.init}{
+  \item{scale.factor.init.upper}{
     upper bound for random fixed-bandwidth start factors for the index
     bandwidth \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults
     to \code{1.5}. Must be greater than or equal to
-    \code{max(lbc.init, scale.factor.lower.bound)}.
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
 
-  \item{cfac.init}{
+  \item{scale.factor.init}{
     deterministic fixed-bandwidth start factor for the index bandwidth
     \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{1.059224}. If \code{scale.factor.lower.bound} is larger, the
+    \code{1.059224}. If \code{scale.factor.search.lower} is larger, the
     effective first search start is raised to that floor. For automatic
     LP NOMAD search, this same fixed-bandwidth start law seeds the internal
     initial \eqn{h} coordinate before the
     unchanged beta-start logic is applied.
   }
 
-  \item{scale.factor.lower.bound}{
+  \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for the fixed-bandwidth index-bandwidth search coordinate. When
     omitted, the default coefficient \code{0.1} is used; the existing
-    \code{lbc.init=0.5} default is therefore unchanged unless the user
-    requests a larger value or a smaller \code{lbc.init}. This argument
+    \code{scale.factor.init.lower=0.5} default is therefore unchanged unless the user
+    requests a larger value or a smaller \code{scale.factor.init.lower}. This argument
     affects search admissibility and search-start sanitization only;
     explicit bandwidths supplied for storage when
     \code{bandwidth.compute = FALSE} are not rewritten.}
@@ -339,7 +339,7 @@ npindexbw(\dots)
   \item{data}{
     an optional data frame, list or environment (or object
     coercible to a data frame by \code{\link{as.data.frame}}) containing
-    the variables 
+    the variables
     in the model. If not found in data, the variables are taken from
     \code{environment(formula)}, typically the environment from which the
     function is called.
@@ -347,7 +347,7 @@ npindexbw(\dots)
 
   \item{subset}{
     an optional vector specifying a subset of observations to be used in
-    the fitting process. 
+    the fitting process.
   }
 
   \item{na.action}{
@@ -355,9 +355,9 @@ npindexbw(\dots)
     \code{NA}s. The default is set by the
     \code{\link{na.action}} setting of options, and is
     \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.  
+    \code{\link{na.omit}}.
   }
-  
+
   \item{call}{
     the original function call. This is passed internally by
     \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
@@ -379,11 +379,14 @@ npindexbw(\dots)
     types.
   }
 
-  
+
 
 }
 
 \details{
+
+The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
   For S3 plotting help, use \code{methods("plot")} and query
@@ -410,7 +413,7 @@ npindexbw(\dots)
   be performed \emph{or} through a simpler interface whereby data is
   passed directly to the function via the \code{xdat} and \code{ydat}
   parameters. Use of these two interfaces is \bold{mutually exclusive}.
-  
+
   Note that, unlike most other bandwidth methods in the \code{npRmpi}
   package, this implementation uses the R \code{\link{optim}} nonlinear
   minimization routines and \code{\link{npksum}}. We have implemented
@@ -461,7 +464,7 @@ npindexbw(\dots)
   Compatible explicit tuning arguments are respected. Incompatible
   explicit settings fail fast so the shortcut never silently changes
   user-selected semantics.
-  
+
 }
 
 \value{
@@ -512,7 +515,7 @@ npindexbw(\dots)
     estimators for discrete distributions,} Biometrika, 68, 301-309.
 }
 
-    
+
 
 \author{
   Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
@@ -607,6 +610,6 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{nonparametric}

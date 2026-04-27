@@ -1,4 +1,4 @@
-% 
+%
 \name{npscoefbw}
 \alias{npscoefbw}
 \alias{npscoefbw.default}
@@ -9,13 +9,13 @@
 \description{
   \code{npscoefbw} computes a bandwidth object for a smooth
   coefficient kernel regression estimate of a one (1) dimensional
-  dependent variable on 
+  dependent variable on
   \eqn{p+q}-variate explanatory data, using the model
   \eqn{Y_i = W_{i}^{\prime} \gamma (Z_i) + u_i}{Y_i = t(W_i) * gamma(Z_i) +
     u_i} where \eqn{W_i'=(1,X_i')}{t(W_i) = (1,t(X_i))}
   given training points (consisting of explanatory data and dependent
   data), and a bandwidth specification, which can be a \code{rbandwidth}
-  object, or a bandwidth vector, bandwidth type and kernel type. 
+  object, or a bandwidth vector, bandwidth type and kernel type.
 }
 
 \usage{
@@ -65,13 +65,13 @@ npscoefbw(\dots)
           random.seed,
           regtype,
           ukertype,
-          lbc.init = 0.5,
-          hbc.init = 1.5,
-          cfac.init = 1.0,
+          scale.factor.init.lower = 0.5,
+          scale.factor.init.upper = 1.5,
+          scale.factor.init = 1.0,
           lbd.init = 0.5,
           hbd.init = 1.5,
           dfac.init = 1.0,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           \dots)
 
 \method{npscoefbw}{scbandwidth}(xdat = stop("invoked without data 'xdat'"),
@@ -91,13 +91,13 @@ npscoefbw(\dots)
           optim.method = c("Nelder-Mead", "BFGS", "CG"),
           optim.reltol = sqrt(.Machine$double.eps),
           random.seed = 42,
-          lbc.init = 0.5,
-          hbc.init = 1.5,
-          cfac.init = 1.0,
+          scale.factor.init.lower = 0.5,
+          scale.factor.init.upper = 1.5,
+          scale.factor.init = 1.0,
           lbd.init = 0.5,
           hbd.init = 1.5,
           dfac.init = 1.0,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           \dots)
 }
 
@@ -105,15 +105,15 @@ npscoefbw(\dots)
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data (training data),
     which, by default, populates the columns \eqn{2} through \eqn{p+1}
-    of \eqn{W} in the model equation, and in the 
-    absence of \code{zdat}, will also correspond to 
+    of \eqn{W} in the model equation, and in the
+    absence of \code{zdat}, will also correspond to
     \eqn{Z} from the model equation.
   }
 
   \item{ydat}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{xdat}. 
+    \code{xdat}.
   }
 
   \item{zdat}{
@@ -135,7 +135,7 @@ npscoefbw(\dots)
     be left unset.
   }
 
-  
+
   \item{backfit.iterate}{
     boolean value specifying whether or not to iterate evaluations of
     the smooth coefficient estimator, for extra accuracy, during the
@@ -207,7 +207,7 @@ npscoefbw(\dots)
     \code{generalized_nn}: generalized nearest neighbors \cr
     \code{adaptive_nn}:  adaptive nearest neighbors
   }
-  
+
   \item{ckerbound}{
     character string controlling continuous-kernel support handling.
     Can be set as \code{none} (default kernel on full support),
@@ -360,34 +360,34 @@ npscoefbw(\dots)
     points. Defaults to \code{min(2,ncol(xdat))}.
   }
 
-  \item{lbc.init}{
+  \item{scale.factor.init.lower}{
     lower bound for random fixed-bandwidth start factors for continuous
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
     \code{0.5}. Nearest-neighbor start laws are unchanged by this
     control. The effective lower endpoint is
-    \code{max(lbc.init, scale.factor.lower.bound)}.
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
 
-  \item{hbc.init}{
+  \item{scale.factor.init.upper}{
     upper bound for random fixed-bandwidth start factors for continuous
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
     \code{1.5}. Must be greater than or equal to
-    \code{max(lbc.init, scale.factor.lower.bound)}.
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
 
-  \item{cfac.init}{
+  \item{scale.factor.init}{
     deterministic fixed-bandwidth start factor for continuous
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{1.0}. If \code{scale.factor.lower.bound} is larger, the
+    \code{1.0}. If \code{scale.factor.search.lower} is larger, the
     effective first search start is raised to that floor.
   }
 
-  \item{scale.factor.lower.bound}{
+  \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates. When omitted, the
     default coefficient \code{0.1} is used; the existing
-    \code{lbc.init=0.5} default is therefore unchanged unless the user
-    requests a larger value or a smaller \code{lbc.init}. This argument
+    \code{scale.factor.init.lower=0.5} default is therefore unchanged unless the user
+    requests a larger value or a smaller \code{scale.factor.init.lower}. This argument
     affects search admissibility and search-start sanitization only;
     explicit bandwidths supplied for storage when
     \code{bandwidth.compute = FALSE} are not rewritten.}
@@ -419,7 +419,7 @@ npscoefbw(\dots)
     Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}. Defaults to
     \code{liracine}.
   }
-  
+
   \item{optim.abstol}{
     the absolute convergence tolerance used by \code{\link{optim}}. Only useful
     for non-negative functions, as a tolerance for reaching
@@ -499,16 +499,16 @@ npscoefbw(\dots)
 
   \item{subset}{
     an optional vector specifying a subset of observations to be used in
-    the fitting process. 
+    the fitting process.
   }
 
   \item{na.action}{
     a function which indicates what should happen when the data contain
    \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
     \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.  
+    \code{\link{na.omit}}.
   }
-  
+
   \item{call}{
     the original function call. This is passed internally by
     \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
@@ -518,11 +518,14 @@ npscoefbw(\dots)
   \item{\dots}{
   additional arguments supplied to specify the regression type,
   bandwidth type, kernel types, selection methods, and so on, detailed
-  below. 
+  below.
   }
 }
 
 \details{
+
+The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
   For S3 plotting help, use \code{methods("plot")} and query
@@ -614,7 +617,7 @@ npscoefbw(\dots)
   supplied, the automatic search route defaults to
   \code{bernstein.basis=TRUE} for numerical stability.
 
-} 
+}
 
 \value{
 
@@ -628,7 +631,7 @@ npscoefbw(\dots)
  component name \code{bw.fitted}.
 
   The functions \code{\link{predict}}, \code{\link{summary}}, and
-  \code{\link{plot}} support 
+  \code{\link{plot}} support
   objects of this class.
 
 }
@@ -657,7 +660,7 @@ npscoefbw(\dots)
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
  Cambridge University Press.
- 
+
  Li, Q. and D. Ouyang and J.S. Racine (2013), \dQuote{Categorical
  semiparametric varying-coefficient models,} Journal of Applied
  Econometrics, 28, 551-589.
@@ -776,6 +779,6 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{nonparametric}

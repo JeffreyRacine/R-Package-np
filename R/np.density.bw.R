@@ -1,5 +1,6 @@
 npudensbw <- function(...){
   mc <- match.call(expand.dots = FALSE)
+  npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npudensbw")
   target <- .np_bw_dispatch_target(dots = mc$...,
                                    data_arg_names = "dat",
                                    eval_env = parent.frame())
@@ -16,7 +17,7 @@ npudensbw.formula <-
     else .np_terms_ts_mask(terms_obj = formula.terms,
                            data = data,
                            eval_env = environment(formula))
-   
+
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
@@ -37,16 +38,16 @@ npudensbw.formula <-
       attr(formula, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
       mf[["formula"]] <- formula
     }
-    
+
     mf[[1]] <- as.name("model.frame")
     mf.args <- as.list(mf[-1L])
     mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
 
     if (attr(attr(mf, "terms"), "response") != 0)
       stop("invalid density formula")
-    
+
     dat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
-    
+
     tbw <- npudensbw(dat = dat, ...)
     tbw$call <- match.call(expand.dots = FALSE)
     environment(tbw$call) <- parent.frame()
@@ -70,7 +71,7 @@ npudensbw.NULL <-
       t.names <- paste(deparse(substitute(dat)), collapse = "")
 
     dat = toFrame(dat)
-    
+
     if(!is.null(t.names))
       names(dat) <- t.names
 
@@ -117,17 +118,17 @@ npudensbw.NULL <-
   invisible(TRUE)
 }
 
-npudensbw.bandwidth <- 
+npudensbw.bandwidth <-
   function(dat = stop("invoked without input data 'dat'"),
            bws,
            bandwidth.compute = TRUE,
            cfac.dir = 2.5*(3.0-sqrt(5)),
-           cfac.init = 0.5,
+           scale.factor.init = 0.5,
            dfac.dir = 0.25*(3.0-sqrt(5)),
            dfac.init = 0.375,
            dfc.dir = 3,
            ftol = 1.490116e-07,
-           hbc.init = 2.0,
+           scale.factor.init.upper = 2.0,
            hbd.dir = 1,
            hbd.init = 0.9,
            initc.dir = 1.0,
@@ -135,14 +136,14 @@ npudensbw.bandwidth <-
            invalid.penalty = c("baseline","dbmax"),
            itmax = 10000,
            lbc.dir = 0.5,
-           lbc.init = 0.1,
+           scale.factor.init.lower = 0.1,
            lbd.dir = 0.1,
            lbd.init = 0.1,
            nmulti,
            penalty.multiplier = 10,
            remin = TRUE,
            scale.init.categorical.sample = FALSE,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
@@ -158,8 +159,8 @@ npudensbw.bandwidth <-
     tol <- npValidatePositiveFiniteNumeric(tol, "tol")
     small <- npValidatePositiveFiniteNumeric(small, "small")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
-    scale.factor.lower.bound <- npResolveScaleFactorLowerBound(
-      if (is.null(scale.factor.lower.bound)) bws$scale.factor.lower.bound else scale.factor.lower.bound
+    scale.factor.search.lower <- npResolveScaleFactorLowerBound(
+      if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
     )
     if (!missing(nmulti))
       nmulti <- npValidateNmulti(nmulti)
@@ -206,20 +207,20 @@ npudensbw.bandwidth <-
 
     mysd <- EssDee(dcon)
     nconfac <- nrow^(-1.0/(2.0*bws$ckerorder+bws$ncon))
-    ncatfac <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))                     
+    ncatfac <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))
 
     invalid.penalty <- match.arg(invalid.penalty)
     penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
 
     if (bandwidth.compute){
       cont.start <- npContinuousSearchStartControls(
-        lbc.init,
-        hbc.init,
-        cfac.init,
-        scale.factor.lower.bound,
+        scale.factor.init.lower,
+        scale.factor.init.upper,
+        scale.factor.init,
+        scale.factor.search.lower,
         where = "npudensbw"
       )
-      myopti = list(num_obs_train = dim(dat)[1], 
+      myopti = list(num_obs_train = dim(dat)[1],
         iMultistart = IMULTI_TRUE,
         iNum_Multistart = nmulti,
         int_use_starting_values = (if (all(bws$bw==0)) USE_START_NO else USE_START_YES),
@@ -228,8 +229,8 @@ npudensbw.bandwidth <-
           fixed = BW_FIXED,
           generalized_nn = BW_GEN_NN,
           adaptive_nn = BW_ADAP_NN),
-        itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE), 
-        int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE, 
+        itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE),
+        int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
         bwmethod = switch(bws$method,
           cv.ml = BWM_CVML,
           cv.ls = BWM_CVLS),
@@ -254,14 +255,16 @@ npudensbw.bandwidth <-
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
 
-      
+
       myoptd = list(ftol=ftol, tol=tol, small=small,
-        lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
-        lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
-        lbc.init = cont.start$lbc.init, hbc.init = cont.start$hbc.init, cfac.init = cont.start$cfac.init,
-        lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
+        lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir,
+        lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir,
+        lbc.init = cont.start$scale.factor.init.lower,
+        hbc.init = cont.start$scale.factor.init.upper,
+        cfac.init = cont.start$scale.factor.init,
+        lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init,
         nconfac = nconfac, ncatfac = ncatfac, memfac = 0,
-        scale.factor.lower.bound = scale.factor.lower.bound)
+        scale.factor.lower.bound = scale.factor.search.lower)
       cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
       .npudensbw_assert_bounded_cvls_supported(tbw, where = "npudensbw()")
@@ -308,17 +311,17 @@ npudensbw.bandwidth <-
       tbw$timing <- myout$timing
       tbw$total.time <- total.time
     }
-    
+
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
-    
+
     if (tbw$nuno > 0){
-      if(tbw$scaling){ 
+      if(tbw$scaling){
         tbw$bandwidth[tbw$xdati$iuno] <- tbw$bandwidth[tbw$xdati$iuno]*ncatfac
       } else {
         tbw$sfactor[tbw$xdati$iuno] <- tbw$sfactor[tbw$xdati$iuno]/ncatfac
       }
     }
-    
+
     if (tbw$nord > 0){
       if(tbw$scaling){
         tbw$bandwidth[tbw$xdati$iord] <- tbw$bandwidth[tbw$xdati$iord]*ncatfac
@@ -368,8 +371,8 @@ npudensbw.bandwidth <-
                      bandwidth.compute = bandwidth.compute,
                      timing = tbw$timing,
                      total.time = tbw$total.time)
-    tbw$scale.factor.lower.bound <- scale.factor.lower.bound
-    
+    tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
+
     tbw
   }
 
@@ -381,7 +384,7 @@ npudensbw.default <-
            bwscaling,
            bwtype,
            cfac.dir,
-           cfac.init,
+           scale.factor.init,
            ckerbound,
            ckerlb,
            ckerorder,
@@ -391,7 +394,7 @@ npudensbw.default <-
            dfac.init,
            dfc.dir,
            ftol,
-           hbc.init,
+           scale.factor.init.upper,
            hbd.dir,
            hbd.init,
            initc.dir,
@@ -399,7 +402,7 @@ npudensbw.default <-
            invalid.penalty,
            itmax,
            lbc.dir,
-           lbc.init,
+           scale.factor.init.lower,
            lbd.dir,
            lbd.init,
            nmulti,
@@ -407,7 +410,7 @@ npudensbw.default <-
            penalty.multiplier,
            remin,
            scale.init.categorical.sample,
-           scale.factor.lower.bound = NULL,
+           scale.factor.search.lower = NULL,
            small,
            tol,
            transform.bounds,
@@ -423,7 +426,7 @@ npudensbw.default <-
       t.names <- paste(deparse(substitute(dat)), collapse = "")
 
     dat <- toFrame(dat)
-    
+
     if(!is.null(t.names))
       names(dat) <- t.names
 
@@ -452,37 +455,28 @@ npudensbw.default <-
 
     ## next grab dummies for actual bandwidth selection and perform call
 
-    opt.args <- list(dat = dat, bws = tbw)
-    if (!missing(bandwidth.compute)) opt.args$bandwidth.compute <- bandwidth.compute
-    if (!missing(nmulti)) opt.args$nmulti <- nmulti
-    if (!missing(remin)) opt.args$remin <- remin
-    if (!missing(itmax)) opt.args$itmax <- itmax
-    if (!missing(ftol)) opt.args$ftol <- ftol
-    if (!missing(tol)) opt.args$tol <- tol
-    if (!missing(small)) opt.args$small <- small
-    if (!missing(lbc.dir)) opt.args$lbc.dir <- lbc.dir
-    if (!missing(dfc.dir)) opt.args$dfc.dir <- dfc.dir
-    if (!missing(cfac.dir)) opt.args$cfac.dir <- cfac.dir
-    if (!missing(initc.dir)) opt.args$initc.dir <- initc.dir
-    if (!missing(lbd.dir)) opt.args$lbd.dir <- lbd.dir
-    if (!missing(hbd.dir)) opt.args$hbd.dir <- hbd.dir
-    if (!missing(dfac.dir)) opt.args$dfac.dir <- dfac.dir
-    if (!missing(initd.dir)) opt.args$initd.dir <- initd.dir
-    if (!missing(lbc.init)) opt.args$lbc.init <- lbc.init
-    if (!missing(hbc.init)) opt.args$hbc.init <- hbc.init
-    if (!missing(cfac.init)) opt.args$cfac.init <- cfac.init
-    if (!missing(lbd.init)) opt.args$lbd.init <- lbd.init
-    if (!missing(hbd.init)) opt.args$hbd.init <- hbd.init
-    if (!missing(dfac.init)) opt.args$dfac.init <- dfac.init
-    if (!missing(scale.init.categorical.sample))
-      opt.args$scale.init.categorical.sample <- scale.init.categorical.sample
-    if (!missing(scale.factor.lower.bound))
-      opt.args$scale.factor.lower.bound <- scale.factor.lower.bound
-    if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
-    if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
+    mc.names <- names(match.call(expand.dots = FALSE))
+    margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
+               "small",
+               "lbc.dir","dfc.dir","cfac.dir", "initc.dir",
+               "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir",
+               "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
+               "lbd.init", "hbd.init", "dfac.init",
+               "scale.init.categorical.sample",
+               "scale.factor.search.lower",
+               "invalid.penalty",
+               "penalty.multiplier")
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
+
+    bwsel.args <- list(dat = dat, bws = tbw)
+    if (any.m) {
+      nms <- mc.names[m]
+      bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+    }
     tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting density bandwidth",
-      do.call(npudensbw.bandwidth, opt.args)
+      do.call(npudensbw.bandwidth, bwsel.args)
     )
 
     mc <- match.call(expand.dots = FALSE)

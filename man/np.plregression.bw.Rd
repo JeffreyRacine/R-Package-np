@@ -1,4 +1,4 @@
-% 
+%
 \name{npplregbw}
 \alias{npplregbw}
 \alias{npplregbw.default}
@@ -40,7 +40,7 @@ npplregbw(\dots)
           degree.restarts = 0L,
           degree.max.cycles = 20L,
           degree.verify = FALSE,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           ftol,
           itmax,
           nmulti,
@@ -67,7 +67,7 @@ npplregbw(\dots)
   \item{ydat}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
-  \code{xdat}. 
+  \code{xdat}.
   }
 
   \item{zdat}{
@@ -98,7 +98,7 @@ npplregbw(\dots)
     bandwidths using \code{\link{npregbw}} in the course of
     calculations. If specified, \code{npplregbw} will use the given
     bandwidths as the starting point for the numerical search for optimal
-    bandwidths, unless you specify bandwidth.compute = FALSE. 
+    bandwidths, unless you specify bandwidth.compute = FALSE.
   }
 
   \item{degree}{
@@ -207,9 +207,9 @@ npplregbw(\dots)
     \code{search.engine="cell"}.
   }
 
-  
+
   \item{ftol}{
-    tolerance on the value of the cross-validation function 
+    tolerance on the value of the cross-validation function
     evaluated at located minima. Defaults to \code{1.19e-07
       (FLT_EPSILON)}
   }
@@ -237,12 +237,12 @@ npplregbw(\dots)
   }
 
   \item{tol}{
-    tolerance on the position of located minima of the 
+    tolerance on the position of located minima of the
     cross-validation function. Defaults to \code{1.49e-08
       (sqrt(DBL_EPSILON))}
   }
 
-  \item{scale.factor.lower.bound}{
+  \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates in the
     nonparametric \code{zdat} bandwidth searches. When omitted, the
@@ -267,16 +267,16 @@ npplregbw(\dots)
 
   \item{subset}{
     an optional vector specifying a subset of observations to be used in
-    the fitting process. 
+    the fitting process.
   }
 
   \item{na.action}{
     a function which indicates what should happen when the data contain
    \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
     \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.  
+    \code{\link{na.omit}}.
   }
-  
+
   \item{call}{
     the original function call. This is passed internally by
     \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
@@ -286,7 +286,7 @@ npplregbw(\dots)
   \item{\dots}{
     additional arguments supplied to specify the regression type,
     bandwidth type, kernel types, selection methods, and so on. To do
-    this, you may specify any of \code{regtype}, 
+    this, you may specify any of \code{regtype},
     \code{bwmethod}, \code{bwscaling}, \code{bwtype} (one of
     \code{fixed}, \code{generalized_nn}, \code{adaptive_nn}), \code{ckertype},
     \code{ckerorder}, \code{ukertype}, \code{okertype},
@@ -296,6 +296,9 @@ npplregbw(\dots)
 }
 
 \details{
+
+The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
   For S3 plotting help, use \code{methods("plot")} and query
@@ -319,11 +322,11 @@ npplregbw(\dots)
  are constant over the support of \eqn{x}.
 
  \code{npplregbw} may be invoked \emph{either} with a formula-like
- symbolic 
+ symbolic
  description of variables on which bandwidth selection is to be
  performed \emph{or} through a simpler interface whereby data is passed
  directly to the function via the \code{xdat}, \code{ydat}, and
- \code{zdat} 
+ \code{zdat}
  parameters. Use of these two interfaces is \bold{mutually exclusive}.
 
  Data contained in the data frame \code{zdat} may be a mix of continuous
@@ -345,9 +348,9 @@ npplregbw(\dots)
  the separation character '+'. For example, \code{ y1 ~ x1 + x2 | z1 }
  specifies that the bandwidth object for the partially linear model with
  response \code{y1}, linear parametric regressors \code{x1} and
- \code{x2}, and 
+ \code{x2}, and
  nonparametric regressor \code{z1} is to be estimated. See below for
- further examples.  
+ further examples.
 
  A variety of kernels may be specified by the user. Kernels implemented
  for continuous data types include the second, fourth, sixth, and eighth
@@ -397,7 +400,7 @@ npplregbw(\dots)
   kernel bandwidths are returned for the discrete variables. Bandwidths
   are stored in a list under the component name \code{bw}. Each element
   is an \code{rbandwidth} object. The first
-  element of the list corresponds to the regression of \eqn{Y} on \eqn{Z}.  
+  element of the list corresponds to the regression of \eqn{Y} on \eqn{Z}.
   Each subsequent element is the bandwidth object corresponding to the
   regression of the \eqn{i}th column of \eqn{X} on \eqn{Z}. See examples
   for more information.
@@ -423,14 +426,14 @@ npplregbw(\dots)
 
  Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
  Cambridge University Press.
- 
+
  Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of regression
  functions with both categorical and continuous data,} Journal of
  Econometrics, 119, 99-130.
 
  Robinson, P.M. (1988), \dQuote{Root-n-consistent semiparametric regression,}
- Econometrica, 56, 931-954. 
- 
+ Econometrica, 56, 931-954.
+
  Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth estimators
  for discrete distributions,}  Biometrika, 68, 301-309.
 
@@ -537,6 +540,6 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{nonparametric}

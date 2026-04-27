@@ -1,4 +1,4 @@
-% 
+%
 \name{npregbw}
 \alias{npregbw}
 \alias{npregbw.default}
@@ -31,7 +31,7 @@ npregbw(\dots)
         bwscaling,
         bwtype,
         cfac.dir,
-        cfac.init,
+        scale.factor.init,
         ckerbound,
         ckerlb,
         ckerorder,
@@ -52,7 +52,7 @@ npregbw(\dots)
         dfac.init,
         dfc.dir,
         ftol,
-        hbc.init,
+        scale.factor.init.upper,
         hbd.dir,
         hbd.init,
         initc.dir,
@@ -60,7 +60,7 @@ npregbw(\dots)
         invalid.penalty = c("baseline","dbmax"),
         itmax,
         lbc.dir,
-        lbc.init,
+        scale.factor.init.lower,
         lbd.dir,
         lbd.init,
         nmulti,
@@ -69,7 +69,7 @@ npregbw(\dots)
         regtype,
         remin,
         scale.init.categorical.sample,
-        scale.factor.lower.bound = NULL,
+        scale.factor.search.lower = NULL,
         small,
         tol,
         transform.bounds = FALSE,
@@ -81,12 +81,12 @@ npregbw(\dots)
         bws,
         bandwidth.compute = TRUE,
         cfac.dir = 2.5*(3.0-sqrt(5)),
-        cfac.init = 0.5,
+        scale.factor.init = 0.5,
         dfac.dir = 0.25*(3.0-sqrt(5)),
         dfac.init = 0.375,
         dfc.dir = 3,
         ftol = 1.490116e-07,
-        hbc.init = 2.0,
+        scale.factor.init.upper = 2.0,
         hbd.dir = 1,
         hbd.init = 0.9,
         initc.dir = 1.0,
@@ -94,14 +94,14 @@ npregbw(\dots)
         invalid.penalty = c("baseline","dbmax"),
         itmax = 10000,
         lbc.dir = 0.5,
-        lbc.init = 0.1,
+        scale.factor.init.lower = 0.1,
         lbd.dir = 0.1,
         lbd.init = 0.1,
         nmulti,
         penalty.multiplier = 10,
         remin = TRUE,
         scale.init.categorical.sample = FALSE,
-        scale.factor.lower.bound = NULL,
+        scale.factor.search.lower = NULL,
         small = 1.490116e-05,
         tol = 1.490116e-04,
         transform.bounds = FALSE,
@@ -117,7 +117,7 @@ npregbw(\dots)
   \item{ydat}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{xdat}. 
+    \code{xdat}.
   }
 
   \item{bws}{
@@ -132,7 +132,7 @@ npregbw(\dots)
     be left unset.
   }
 
-  
+
   \item{bandwidth.compute}{
     a logical value which specifies whether to do a numerical search for
     bandwidths or not. If set to \code{FALSE}, a \code{rbandwidth} object
@@ -173,7 +173,7 @@ npregbw(\dots)
     number (\eqn{\kappa(B)}{kappa(B)}) triggers warning/error thresholds
     to avoid unstable optimization dominated by ridging.
   }
-  
+
   \item{bwmethod}{
     which method to use to select bandwidths. \code{cv.aic} specifies
     expected Kullback-Leibler cross-validation (Hurvich, Simonoff, and
@@ -207,12 +207,12 @@ npregbw(\dots)
     \code{fixed}: compute fixed bandwidths \cr
     \code{generalized_nn}: compute generalized nearest neighbors \cr
     \code{adaptive_nn}: compute adaptive nearest neighbors
-    
+
   }
 
   \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{cfac.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.lower.bound} is larger, the effective first search start is raised to that floor. See Details}
+  \item{scale.factor.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.search.lower} is larger, the effective first search start is raised to that floor. See Details}
 
   \item{ckerbound}{
     character string controlling continuous-kernel support handling.
@@ -377,7 +377,7 @@ npregbw(\dots)
     (1.0e+01*sqrt(.Machine$double.eps)).
   }
 
-  \item{hbc.init}{upper endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. It must be no smaller than \code{max(lbc.init, scale.factor.lower.bound)}. See Details}
+  \item{scale.factor.init.upper}{upper endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. It must be no smaller than \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
 
   \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
 
@@ -400,7 +400,7 @@ npregbw(\dots)
 
   \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{lbc.init}{lower endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. The effective lower endpoint is \code{max(lbc.init, scale.factor.lower.bound)}. See Details}
+  \item{scale.factor.init.lower}{lower endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. The effective lower endpoint is \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
 
   \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
 
@@ -445,7 +445,7 @@ npregbw(\dots)
     kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
     Details}
 
-  \item{scale.factor.lower.bound}{
+  \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates. When omitted, the
     default coefficient \code{0.1} is used. Larger values impose a
@@ -497,16 +497,16 @@ npregbw(\dots)
 
   \item{subset}{
     an optional vector specifying a subset of observations to be used in
-    the fitting process. 
+    the fitting process.
   }
 
   \item{na.action}{
     a function which indicates what should happen when the data contain
    \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
     \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.  
+    \code{\link{na.omit}}.
   }
-  
+
   \item{call}{
     the original function call. This is passed internally by
     \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
@@ -519,6 +519,9 @@ npregbw(\dots)
   }
 }
 \details{
+
+The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
   For S3 plotting help, use \code{methods("plot")} and query
@@ -551,7 +554,7 @@ npregbw(\dots)
   are constant over the support of \eqn{x}.
 
   \code{npregbw} may be invoked \emph{either} with a formula-like
-  symbolic 
+  symbolic
   description of variables on which bandwidth selection is to be
   performed \emph{or} through a simpler interface whereby data is passed
   directly to the function via the \code{xdat} and \code{ydat}
@@ -570,12 +573,12 @@ npregbw(\dots)
     ~ explanatory data},
   where \code{dependent data} is a univariate response, and
   \code{explanatory data} is a
-  series of variables specified by name, separated by 
+  series of variables specified by name, separated by
   the separation character '+'. For example, \code{ y1 ~ x1 + x2 }
   specifies that the bandwidths for the regression of response \code{y1}
-  and 
+  and
   nonparametric regressors \code{x1} and \code{x2} are to be estimated.
-  See below for further examples. 
+  See below for further examples.
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and eighth
@@ -717,11 +720,11 @@ npregbw(\dots)
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
-  
+
   Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of regression
     functions with both categorical and continuous data,} Journal of
   Econometrics, 119, 99-130.
-  
+
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth estimators
     for discrete distributions,}  Biometrika, 68, 301-309.
 }
@@ -811,6 +814,6 @@ npRmpi.quit()
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{nonparametric}

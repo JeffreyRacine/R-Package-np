@@ -81,7 +81,7 @@ compact_window_clone_bw <- function(bw, bound, lb = NULL, ub = NULL) {
     degree.engine = bw$degree.engine,
     bernstein.basis.engine = bw$bernstein.basis.engine
   )
-  out$scale.factor.lower.bound <- bw$scale.factor.lower.bound
+  out$scale.factor.search.lower <- bw$scale.factor.search.lower
   out$cvls.quadrature.grid <- bw$cvls.quadrature.grid
   out$cvls.quadrature.extend.factor <- bw$cvls.quadrature.extend.factor
   out$cvls.quadrature.points <- bw$cvls.quadrature.points

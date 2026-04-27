@@ -1,4 +1,4 @@
-% 
+%
 \name{npudensbw}
 \alias{npudensbw}
 \alias{npudensbw.formula}
@@ -27,12 +27,12 @@ npudensbw(\dots)
           bws,
           bandwidth.compute = TRUE,
           cfac.dir = 2.5*(3.0-sqrt(5)),
-          cfac.init = 0.5,
+          scale.factor.init = 0.5,
           dfac.dir = 0.25*(3.0-sqrt(5)),
           dfac.init = 0.375,
           dfc.dir = 3,
           ftol = 1.490116e-07,
-          hbc.init = 2.0,
+          scale.factor.init.upper = 2.0,
           hbd.dir = 1,
           hbd.init = 0.9,
           initc.dir = 1.0,
@@ -40,14 +40,14 @@ npudensbw(\dots)
           invalid.penalty = c("baseline","dbmax"),
           itmax = 10000,
           lbc.dir = 0.5,
-          lbc.init = 0.1,
+          scale.factor.init.lower = 0.1,
           lbd.dir = 0.1,
           lbd.init = 0.1,
           nmulti,
           penalty.multiplier = 10,
           remin = TRUE,
           scale.init.categorical.sample = FALSE,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           small = 1.490116e-05,
           tol = 1.490116e-04,
           transform.bounds = FALSE,
@@ -60,7 +60,7 @@ npudensbw(\dots)
           bwscaling,
           bwtype,
           cfac.dir,
-          cfac.init,
+          scale.factor.init,
           ckerbound,
           ckerlb,
           ckerorder,
@@ -70,7 +70,7 @@ npudensbw(\dots)
           dfac.init,
           dfc.dir,
           ftol,
-          hbc.init,
+          scale.factor.init.upper,
           hbd.dir,
           hbd.init,
           initc.dir,
@@ -78,7 +78,7 @@ npudensbw(\dots)
           invalid.penalty,
           itmax,
           lbc.dir,
-          lbc.init,
+          scale.factor.init.lower,
           lbd.dir,
           lbd.init,
           nmulti,
@@ -86,12 +86,12 @@ npudensbw(\dots)
           penalty.multiplier,
           remin,
           scale.init.categorical.sample,
-          scale.factor.lower.bound = NULL,
+          scale.factor.search.lower = NULL,
           small,
           tol,
           transform.bounds,
           ukertype,
-          \dots) 
+          \dots)
 
 }
 
@@ -113,14 +113,14 @@ npudensbw(\dots)
     kernel types, selection methods, and so on. This can be left unset.
   }
 
-  
+
   \item{bandwidth.compute}{
     a logical value which specifies whether to do a numerical search for
     bandwidths or not. If set to \code{FALSE}, a \code{bandwidth} object
     will be returned with bandwidths set to those specified
     in \code{bws}. Defaults to \code{TRUE}.
   }
-  
+
 
   \item{bwmethod}{ a character string specifying the bandwidth selection
     method. \code{cv.ml} specifies likelihood cross-validation,
@@ -162,12 +162,12 @@ npudensbw(\dots)
     \code{fixed}: compute fixed bandwidths \cr
     \code{generalized_nn}: compute generalized nearest neighbors \cr
     \code{adaptive_nn}: compute adaptive nearest neighbors
-    
+
   }
 
   \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{cfac.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.lower.bound} is larger, the effective first search start is raised to that floor. See Details}
+  \item{scale.factor.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.search.lower} is larger, the effective first search start is raised to that floor. See Details}
 
   \item{ckerbound}{
     character string controlling continuous-kernel support handling.
@@ -215,7 +215,7 @@ npudensbw(\dots)
     (1.0e+01*sqrt(.Machine$double.eps)).
   }
 
-  \item{hbc.init}{upper endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. It must be no smaller than \code{max(lbc.init, scale.factor.lower.bound)}. See Details}
+  \item{scale.factor.init.upper}{upper endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. It must be no smaller than \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
 
   \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
 
@@ -238,7 +238,7 @@ npudensbw(\dots)
 
   \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{lbc.init}{lower endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. The effective lower endpoint is \code{max(lbc.init, scale.factor.lower.bound)}. See Details}
+  \item{scale.factor.init.lower}{lower endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. The effective lower endpoint is \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
 
   \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
 
@@ -271,7 +271,7 @@ npudensbw(\dots)
     kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
     Details}
 
-  \item{scale.factor.lower.bound}{
+  \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates. When omitted, the
     default coefficient \code{0.1} is used. Larger values impose a
@@ -322,7 +322,7 @@ npudensbw(\dots)
 
   \item{subset}{
     an optional vector specifying a subset of observations to be used in
-    the fitting process. 
+    the fitting process.
   }
 
   \item{na.action}{
@@ -331,13 +331,13 @@ npudensbw(\dots)
    of options, and is \code{\link{na.fail}} if that is unset. The
    (recommended) default is \code{\link{na.omit}}.
   }
-  
+
   \item{call}{
     the original function call. This is passed internally by
     \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
     another function. It is not recommended that the user set this.
   }
-    
+
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
@@ -345,6 +345,9 @@ npudensbw(\dots)
 }
 
 \details{
+
+The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
   For S3 plotting help, use \code{methods("plot")} and query
@@ -356,9 +359,9 @@ npudensbw(\dots)
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)
   \preformatted{
-    
+
     Usage 1: compute a bandwidth object using the formula interface:
-    
+
     ## Start npRmpi for interactive execution. If slaves are already running and
     ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
     ## reuse the existing pool instead of respawning. To change the number of
@@ -366,7 +369,7 @@ npudensbw(\dots)
     npRmpi.init(nslaves=1)
     bw <- npudensbw(formula = ~y, data = mydat)
     npRmpi.quit()
-    
+
     Usage 2: compute a bandwidth object using the data frame interface
     and change the default kernel and order:
 
@@ -377,10 +380,10 @@ npudensbw(\dots)
     npRmpi.init(nslaves=1)
     fhat <- npudensbw(tdat = y, ckertype="epanechnikov", ckerorder=4)
     npRmpi.quit()
-    
+
   }
 
-  
+
   \code{npudensbw} implements a variety of methods for choosing
   bandwidths for multivariate (\eqn{p}-variate) distributions defined over
   a set of possibly continuous and/or discrete (unordered, ordered)
@@ -461,7 +464,7 @@ npudensbw(\dots)
   bandwidths, of class \code{bandwidth}
   (or scale factors if \code{bwscaling = TRUE}) is returned. If it is set to
   \code{generalized_nn} or \code{adaptive_nn}, then instead the
-  \eqn{k}th nearest 
+  \eqn{k}th nearest
   neighbors are returned for the continuous variables while the discrete
   kernel bandwidths are returned for the discrete variables. Bandwidths
   are stored under the component name \code{bw}, with each
@@ -533,7 +536,7 @@ npudensbw(\dots)
   \code{Rmpi} wrapper is under development that allows one to deploy
   this software in a clustered computing environment to facilitate
   computation involving large datasets.
- 
+
 }
 
 \seealso{
