@@ -245,7 +245,13 @@ npcdistbw.condbandwidth <-
       (use.local.compiled.adaptive.cvls ||
        (identical(spec$regtype.engine, "lp") &&
         identical(bws$type, "generalized_nn")))
-    if (.npRmpi_autodispatch_active() && !keep_local_cvls_nn)
+    keep_local_raw_degree1_cvls <- bandwidth.compute &&
+      identical(bws$method, "cv.ls") &&
+      identical(bws$type, "fixed") &&
+      npIsRawDegreeOneConditionalSpec(spec, bws$xncon)
+    if (.npRmpi_autodispatch_active() &&
+        !keep_local_cvls_nn &&
+        !keep_local_raw_degree1_cvls)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat = xdat[goodrows,,drop = FALSE]
@@ -421,7 +427,7 @@ npcdistbw.condbandwidth <-
 
       if (bws$method != "normal-reference"){
         myout <- npWithLocalLinearRawBasisSearchError(
-          if (keep_local_cvls_nn) {
+          if (keep_local_cvls_nn || keep_local_raw_degree1_cvls) {
             .npRmpi_with_local_cdist_eval(
               .Call("C_np_distribution_conditional_bw",
                     as.double(yuno), as.double(yord), as.double(ycon),
@@ -1925,7 +1931,14 @@ npcdistbw.default <-
       (use.local.compiled.adaptive.cvls ||
        (identical(tbw$regtype.engine, "lp") &&
         identical(tbw$type, "generalized_nn")))
-    if (.npRmpi_autodispatch_active() && !keep_local_cvls_nn && is.null(degree.search))
+    keep_local_raw_degree1_cvls <- bandwidth.compute &&
+      identical(tbw$method, "cv.ls") &&
+      identical(tbw$type, "fixed") &&
+      npIsRawDegreeOneConditionalSpec(spec, tbw$xncon)
+    if (.npRmpi_autodispatch_active() &&
+        !keep_local_cvls_nn &&
+        !keep_local_raw_degree1_cvls &&
+        is.null(degree.search))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ## next grab dummies for actual bandwidth selection and perform call

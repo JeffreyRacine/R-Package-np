@@ -420,7 +420,13 @@ npcdensbw.conbandwidth <-
       identical(spec$regtype.engine, "lp") &&
       identical(bws$method %in% c("cv.ml", "cv.ls"), TRUE) &&
       identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
-    if (.npRmpi_autodispatch_active() && !keep_local_shadow_nn)
+    keep_local_raw_degree1_cvls <- bandwidth.compute &&
+      identical(bws$method, "cv.ls") &&
+      identical(bws$type, "fixed") &&
+      npIsRawDegreeOneConditionalSpec(spec, bws$xncon)
+    if (.npRmpi_autodispatch_active() &&
+        !keep_local_shadow_nn &&
+        !keep_local_raw_degree1_cvls)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat = xdat[goodrows,,drop = FALSE]
@@ -562,7 +568,7 @@ npcdensbw.conbandwidth <-
 
       if (bws$method != "normal-reference"){
         myout <- npWithLocalLinearRawBasisSearchError(
-          if (keep_local_shadow_nn) {
+          if (keep_local_shadow_nn || keep_local_raw_degree1_cvls) {
             .npRmpi_with_local_regression(
               .Call("C_np_density_conditional_bw",
                     as.double(yuno), as.double(yord), as.double(ycon),
@@ -2524,7 +2530,14 @@ npcdensbw.default <-
       identical(tbw$regtype.engine, "lp") &&
       identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
       identical(tbw$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
-    if (.npRmpi_autodispatch_active() && !keep_local_shadow_nn && is.null(degree.search))
+    keep_local_raw_degree1_cvls <- bandwidth.compute &&
+      identical(tbw$method, "cv.ls") &&
+      identical(tbw$type, "fixed") &&
+      npIsRawDegreeOneConditionalSpec(spec, tbw$xncon)
+    if (.npRmpi_autodispatch_active() &&
+        !keep_local_shadow_nn &&
+        !keep_local_raw_degree1_cvls &&
+        is.null(degree.search))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
     ## next grab dummies for actual bandwidth selection and perform call
 

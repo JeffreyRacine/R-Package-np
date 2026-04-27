@@ -806,6 +806,32 @@ npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
   )
 }
 
+npIsRawDegreeOneConditionalSpec <- function(spec, ncon) {
+  degree <- if (is.null(spec$degree.engine)) integer(0) else as.integer(spec$degree.engine)
+  ncon <- as.integer(ncon)
+  identical(spec$regtype.engine, "lp") &&
+    !isTRUE(spec$bernstein.basis.engine) &&
+    length(degree) == ncon &&
+    ncon > 0L &&
+    all(degree == 1L)
+}
+
+npIsRawDegreeOneConditionalRequest <- function(regtype,
+                                               degree = NULL,
+                                               bernstein.basis = FALSE) {
+  regtype <- as.character(regtype)[1L]
+  if (identical(regtype, "ll"))
+    return(TRUE)
+  if (!identical(regtype, "lp"))
+    return(FALSE)
+  if (isTRUE(bernstein.basis) || is.null(degree))
+    return(FALSE)
+  degree <- suppressWarnings(as.numeric(degree))
+  length(degree) > 0L &&
+    all(is.finite(degree)) &&
+    all(degree == 1)
+}
+
 npWithLocalLinearRawBasisSearchError <- function(expr,
                                                  where,
                                                  spec,
@@ -820,17 +846,10 @@ npWithLocalLinearRawBasisSearchError <- function(expr,
     force(expr),
     error = function(e) {
       msg <- conditionMessage(e)
-      degree <- if (is.null(spec$degree.engine)) integer(0) else as.integer(spec$degree.engine)
-      ncon <- as.integer(ncon)
       targeted <- !is.null(expected) &&
         identical(msg, expected) &&
-        identical(spec$regtype, "ll") &&
         identical(bwmethod, "cv.ls") &&
-        identical(spec$regtype.engine, "lp") &&
-        !isTRUE(spec$bernstein.basis.engine) &&
-        length(degree) == ncon &&
-        ncon > 0L &&
-        all(degree == 1L)
+        npIsRawDegreeOneConditionalSpec(spec, ncon)
 
       if (targeted) {
         stop(sprintf(
