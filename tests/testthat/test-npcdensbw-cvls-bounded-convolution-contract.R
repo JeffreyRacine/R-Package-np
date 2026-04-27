@@ -29,7 +29,8 @@ test_that("bounded conditional cv.ls fixed-point objective matches direct delete
     regtype = "lc",
     bandwidth.compute = FALSE,
     cxkerbound = "range",
-    cykerbound = "range"
+    cykerbound = "range",
+    cvls.quadrature.grid = "uniform"
   )
 
   Kx <- outer(seq_len(n), seq_len(n), Vectorize(function(i, j) {

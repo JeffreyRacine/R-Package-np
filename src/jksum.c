@@ -3859,191 +3859,6 @@ void np_ckernelv(const int KERNEL,
 
 }
 
-static inline double np_bounded_convol_kernel_eval(const int KERNEL,
-                                                   const double t,
-                                                   const double x,
-                                                   const double hx,
-                                                   const double y,
-                                                   const double hy){
-  return kernel(KERNEL, (t - x)/hx)*
-    kernel(KERNEL, (t - y)/hy);
-}
-
-static inline double np_bounded_convol_gauss2(const double x,
-                                              const double y,
-                                              const double hx,
-                                              const double hy,
-                                              const double lb,
-                                              const double ub,
-                                              const double invnorm_x,
-                                              const double invnorm_y){
-  const double h2 = hx*hx + hy*hy;
-  const double hs = sqrt(h2);
-  const double s = hx*hy/hs;
-  const double mu = (x*hy*hy + y*hx*hx)/h2;
-  const double z2 = (x - y)*(x - y)/h2;
-  const double base =
-    ONE_OVER_SQRT_TWO_PI*hx*hy*exp(-0.5*z2)/hs;
-  const double zu = isfinite(ub) ? ((ub - mu)/s) : R_PosInf;
-  const double zl = isfinite(lb) ? ((lb - mu)/s) : R_NegInf;
-  const double mass = np_cdf_gauss2(zu) - np_cdf_gauss2(zl);
-
-  return base*invnorm_x*invnorm_y*mass;
-}
-
-static double np_bounded_convol_finite_gl16(const int KERNEL,
-                                            const double x,
-                                            const double y,
-                                            const double hx,
-                                            const double hy,
-                                            const double lb,
-                                            const double ub,
-                                            const double invnorm_x,
-                                            const double invnorm_y){
-  static const double nodes[] = {
-    0.09501250983763744, 0.2816035507792589,
-    0.4580167776572274, 0.6178762444026437,
-    0.7554044083550030, 0.8656312023878318,
-    0.9445750230732326, 0.9894009349916499
-  };
-  static const double weights[] = {
-    0.1894506104550685, 0.1826034150449236,
-    0.1691565193950025, 0.1495959888165767,
-    0.1246289712555339, 0.09515851168249279,
-    0.06225352393864789, 0.02715245941175409
-  };
-  const double mid = 0.5*(lb + ub);
-  const double half = 0.5*(ub - lb);
-  double sum = 0.0;
-  int i;
-
-  if(!(ub > lb))
-    return 0.0;
-
-  for(i = 0; i < (int)(sizeof(nodes)/sizeof(nodes[0])); i++){
-    const double dx = half*nodes[i];
-    sum += weights[i]*
-      (np_bounded_convol_kernel_eval(KERNEL, mid - dx, x, hx, y, hy) +
-       np_bounded_convol_kernel_eval(KERNEL, mid + dx, x, hx, y, hy));
-  }
-
-  return invnorm_x*invnorm_y*half*sum;
-}
-
-static double np_bounded_convol_upper_inf_gl16(const int KERNEL,
-                                               const double x,
-                                               const double y,
-                                               const double hx,
-                                               const double hy,
-                                               const double lb,
-                                               const double invnorm_x,
-                                               const double invnorm_y){
-  static const double nodes[] = {
-    0.09501250983763744, 0.2816035507792589,
-    0.4580167776572274, 0.6178762444026437,
-    0.7554044083550030, 0.8656312023878318,
-    0.9445750230732326, 0.9894009349916499
-  };
-  static const double weights[] = {
-    0.1894506104550685, 0.1826034150449236,
-    0.1691565193950025, 0.1495959888165767,
-    0.1246289712555339, 0.09515851168249279,
-    0.06225352393864789, 0.02715245941175409
-  };
-  double sum = 0.0;
-  int i, s;
-
-  for(i = 0; i < (int)(sizeof(nodes)/sizeof(nodes[0])); i++){
-    for(s = -1; s <= 1; s += 2){
-      const double xi = s*nodes[i];
-      const double u = 0.5*(xi + 1.0);
-      const double omu = 1.0 - u;
-      const double t = lb + u/omu;
-      const double jac = 0.5/(omu*omu);
-      sum += weights[i]*
-        np_bounded_convol_kernel_eval(KERNEL, t, x, hx, y, hy)*
-        jac;
-    }
-  }
-
-  return invnorm_x*invnorm_y*sum;
-}
-
-static double np_bounded_convol_lower_inf_gl16(const int KERNEL,
-                                               const double x,
-                                               const double y,
-                                               const double hx,
-                                               const double hy,
-                                               const double ub,
-                                               const double invnorm_x,
-                                               const double invnorm_y){
-  static const double nodes[] = {
-    0.09501250983763744, 0.2816035507792589,
-    0.4580167776572274, 0.6178762444026437,
-    0.7554044083550030, 0.8656312023878318,
-    0.9445750230732326, 0.9894009349916499
-  };
-  static const double weights[] = {
-    0.1894506104550685, 0.1826034150449236,
-    0.1691565193950025, 0.1495959888165767,
-    0.1246289712555339, 0.09515851168249279,
-    0.06225352393864789, 0.02715245941175409
-  };
-  double sum = 0.0;
-  int i, s;
-
-  for(i = 0; i < (int)(sizeof(nodes)/sizeof(nodes[0])); i++){
-    for(s = -1; s <= 1; s += 2){
-      const double xi = s*nodes[i];
-      const double u = 0.5*(xi + 1.0);
-      const double omu = 1.0 - u;
-      const double t = ub - u/omu;
-      const double jac = 0.5/(omu*omu);
-      sum += weights[i]*
-        np_bounded_convol_kernel_eval(KERNEL, t, x, hx, y, hy)*
-        jac;
-    }
-  }
-
-  return invnorm_x*invnorm_y*sum;
-}
-
-static double np_bounded_convol_ckernel(const int KERNEL,
-                                        const double x,
-                                        const double y,
-                                        const double hx,
-                                        const double hy,
-                                        const double lb,
-                                        const double ub){
-  const int k0 = KERNEL % 10;
-  const double invnorm_x = np_cker_invnorm(KERNEL, x, hx, lb, ub);
-  const double invnorm_y = np_cker_invnorm(KERNEL, y, hy, lb, ub);
-
-  if(!(hx > 0.0) || !(hy > 0.0) || !isfinite(hx) || !isfinite(hy))
-    return 0.0;
-
-  if(k0 == 0)
-    return np_bounded_convol_gauss2(x, y, hx, hy, lb, ub, invnorm_x, invnorm_y);
-
-  if((k0 >= 4) && (k0 <= 8)){
-    const double sl = cksup[k0][0];
-    const double su = cksup[k0][1];
-    const double lo = MAX(isfinite(lb) ? lb : R_NegInf, MAX(x + hx*sl, y + hy*sl));
-    const double hi = MIN(isfinite(ub) ? ub : R_PosInf, MIN(x + hx*su, y + hy*su));
-    if(isfinite(lo) && isfinite(hi) && !(hi > lo))
-      return 0.0;
-  }
-
-  if(isfinite(lb) && isfinite(ub))
-    return np_bounded_convol_finite_gl16(k0, x, y, hx, hy, lb, ub, invnorm_x, invnorm_y);
-  if(isfinite(lb))
-    return np_bounded_convol_upper_inf_gl16(k0, x, y, hx, hy, lb, invnorm_x, invnorm_y);
-  if(isfinite(ub))
-    return np_bounded_convol_lower_inf_gl16(k0, x, y, hx, hy, ub, invnorm_x, invnorm_y);
-
-  return 0.0;
-}
-
 void np_convol_ckernelv(const int KERNEL, 
                         const double * const xt, const int num_xt, 
                         const int do_xw,
@@ -4051,9 +3866,6 @@ void np_convol_ckernelv(const int KERNEL,
                         double * xt_h,
                         const int xt_h_is_scalar,
                         const double h, 
-                        const double lb,
-                        const double ub,
-                        const int use_bound_convol,
                         double * const result,
                         const int power){
 
@@ -4075,9 +3887,7 @@ void np_convol_ckernelv(const int KERNEL,
 
     if(xw[j] == 0.0) continue;
 
-    kval = use_bound_convol ?
-      np_bounded_convol_ckernel(KERNEL, x, xt[i], h, hy, lb, ub) :
-      k[KERNEL](x, xt[i], h, hy);
+    kval = k[KERNEL](x, xt[i], h, hy);
 
     result[i] = xw[j]*kval/ipow(hy, power);
   }
@@ -6160,24 +5970,16 @@ const int keep_kw_owner_local){
           }
         }
         else if(p_nvar == 0){
-          const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
           np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, tprod_has_vals, xc[i][j],
                              matrix_alt_bandwidth[i], (BANDWIDTH_reg == BW_FIXED),
                              m[i][jbw],
-                             use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
-                             use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
-                             use_bound_convol_i,
                              tprod, bpow[i]);
           tprod_has_vals = 1;
         } else
         {
-          const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
           np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j],
                              matrix_alt_bandwidth[i], (BANDWIDTH_reg == BW_FIXED),
                              m[i][jbw],
-                             use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
-                             use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
-                             use_bound_convol_i,
                              tprod, bpow[i]);
         }
         dband *= ipow(m[i][jbw], bpow[i]);
