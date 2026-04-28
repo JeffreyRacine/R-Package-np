@@ -30,6 +30,36 @@ Repo-specific note:
   - for suspected hangs, monitor worker split with `ps -p '<pid1,pid2>' -o 'pid,stat,etime,%cpu,command'`;
   - if one worker remains near idle while another remains busy, abort and clean stale `slavedaemon.R`/`Rslaves.sh` before retry.
 
+## Rd Documentation Campaign Policy (2026-04-28)
+
+During release hardening, `.Rd` documentation cleanup is a user-facing
+readability campaign, not an API or MPI-runtime refactor.
+
+1. Organize long `\arguments{}` sections by the user's decision model for the
+   function, not by historical/internal argument order.
+2. Use real `\subsection{Group Name}{...}` blocks inside `\arguments{}` for
+   long public pages. Do not fake headings with `\item{Group Name}{...}`.
+3. First-pass documentation cleanup is Rd-only:
+   - no R formal argument reordering,
+   - no `.Rd` `\usage{}` reordering unless fixing an existing mismatch,
+   - no defaults, aliases, signatures, S3 signatures, MPI lifecycle semantics,
+     autodispatch behavior, or runtime dispatch changes.
+4. Estimator pages that compute bandwidths implicitly must explain that
+   bandwidth-selection controls in `...` pass through to the corresponding
+   `*bw` function, and must point users to the `*bw` help page as the complete
+   bandwidth-control reference.
+5. Preserve `npRmpi`-specific lifecycle, attach/profile, autodispatch, and
+   slave-cleanup guidance when mirroring serial `np` documentation structure.
+6. For touched pages, verify argument descriptions, defaults, `...`
+   pass-throughs, examples, and `\seealso{}` links against current code.
+7. Gallery links should use canonical wording/URLs from existing package
+   materials; do not invent new Gallery destinations while editing `.Rd` pages.
+8. Validate documentation edits with `R CMD Rd2txt`, `tools::checkRd()`, package
+   checks from a tarball/private library, installed smoke calls, and relevant
+   MPI attach/profile or `nslaves` gates for touched routes.
+9. Any proposed R formal-order change is a separate post-inventory decision
+   requiring explicit sign-off because it can break downstream positional code.
+
 ## Canonical Implementation Directive (2026-03-05)
 
 This repository follows a strict canonical execution rule:
