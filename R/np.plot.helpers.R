@@ -6393,18 +6393,9 @@ plotFactor <- function(f, y, ...){
                                    exdat,
                                    tau = 0.5,
                                    gradients = FALSE,
-                                   ftol = 1.490116e-07,
                                    tol = 1.490116e-04,
                                    small = 1.490116e-05,
                                    itmax = 10000,
-                                   lbc.dir = 0.5,
-                                   dfc.dir = 3,
-                                   cfac.dir = 2.5 * (3.0 - sqrt(5)),
-                                   initc.dir = 1.0,
-                                   lbd.dir = 0.1,
-                                   hbd.dir = 1.0,
-                                   dfac.dir = 0.25 * (3.0 - sqrt(5)),
-                                   initd.dir = 1.0,
                                    ...) {
   .np_plot_activity_run(
     label = "Computing quantile-regression plot fit",
@@ -6415,9 +6406,6 @@ plotFactor <- function(f, y, ...){
       if (!is.numeric(itmax) || length(itmax) != 1L || is.na(itmax) ||
           !is.finite(itmax) || itmax < 1 || itmax != floor(itmax))
         stop("'itmax' must be a positive integer")
-      if (!is.numeric(ftol) || length(ftol) != 1L || is.na(ftol) ||
-          !is.finite(ftol) || ftol <= 0)
-        stop("'ftol' must be a positive finite numeric scalar")
       if (!is.numeric(tol) || length(tol) != 1L || is.na(tol) ||
           !is.finite(tol) || tol <= 0)
         stop("'tol' must be a positive finite numeric scalar")
@@ -6426,7 +6414,6 @@ plotFactor <- function(f, y, ...){
         stop("'small' must be a positive finite numeric scalar")
 
       itmax <- as.integer(itmax)
-      ftol <- as.double(ftol)
       tol <- as.double(tol)
       small <- as.double(small)
 
@@ -6563,20 +6550,14 @@ plotFactor <- function(f, y, ...){
         itmax = itmax,
         xmcv.numRow = attr(bws$xmcv, "num.row"),
         nmulti = itmax,
-        dfc.dir = dfc.dir
+        qreg.unused = 0L
       )
 
-      myoptd <- list(
-        ftol = ftol,
+      myoptd <- c(
+        qreg.unused = 0.0,
         tol = tol,
         small = small,
-        lbc.dir = lbc.dir,
-        cfac.dir = cfac.dir,
-        initc.dir = initc.dir,
-        lbd.dir = lbd.dir,
-        hbd.dir = hbd.dir,
-        dfac.dir = dfac.dir,
-        initd.dir = initd.dir
+        rep(0.0, 7L)
       )
 
       myout <- .Call(

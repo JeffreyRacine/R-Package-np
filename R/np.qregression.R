@@ -20,6 +20,29 @@ npqreg <-
     }
   }
 
+.npqreg.fit.control.names <- c("data", "newdata", "tau", "gradients", "tol", "small", "itmax")
+.npqreg.removed.solver.controls <- c("ftol",
+                                     "lbc.dir", "dfc.dir", "cfac.dir", "initc.dir",
+                                     "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir")
+
+.npqreg_fit_dots <- function(dots, allow.bandwidth.controls = FALSE) {
+  dot.names <- names(dots)
+  if (is.null(dot.names))
+    return(dots)
+
+  stale <- intersect(dot.names[nzchar(dot.names)], .npqreg.removed.solver.controls)
+  if (length(stale) && !allow.bandwidth.controls) {
+    stop(sprintf(
+      "'%s' %s no longer accepted by npqreg; the canonical one-dimensional quantile extractor is controlled by 'tol', 'small', and 'itmax'",
+      paste(stale, collapse = "', '"),
+      if (length(stale) == 1L) "is" else "are"
+    ))
+  }
+
+  keep <- (!nzchar(dot.names)) | (dot.names %in% .npqreg.fit.control.names)
+  dots[keep]
+}
+
 npqreg.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
@@ -48,7 +71,7 @@ npqreg.formula <-
     if (has.eval)
       q.args$exdat <- exdat
     q.args$bws <- bws
-    tbw <- do.call(npqreg, c(q.args, list(...)))
+    tbw <- do.call(npqreg, c(q.args, .npqreg_fit_dots(list(...))))
 
     tbw$omit <- attr(umf,"na.action")
     tbw$rows.omit <- as.vector(tbw$omit)
@@ -83,20 +106,18 @@ npqreg.condbandwidth <-
            exdat,
            tau = 0.5,
            gradients = FALSE,
-           ftol = 1.490116e-07, tol = 1.490116e-04,
+           tol = 1.490116e-04,
            small = 1.490116e-05, itmax = 10000,
-           lbc.dir = 0.5, dfc.dir = 3, cfac.dir = 2.5*(3.0-sqrt(5)),initc.dir = 1.0, 
-           lbd.dir = 0.1, hbd.dir = 1, dfac.dir = 0.25*(3.0-sqrt(5)), initd.dir = 1.0, 
            ...){
 
     fit.start <- proc.time()[3]
+    fit.dots <- .npqreg_fit_dots(list(...))
+    if (length(fit.dots))
+      stop(sprintf("unused npqreg fit argument '%s'", names(fit.dots)[1L]))
     gradients <- npValidateScalarLogical(gradients, "gradients")
     if (!is.numeric(itmax) || length(itmax) != 1L || is.na(itmax) ||
         !is.finite(itmax) || itmax < 1 || itmax != floor(itmax))
       stop("'itmax' must be a positive integer")
-    if (!is.numeric(ftol) || length(ftol) != 1L || is.na(ftol) ||
-        !is.finite(ftol) || ftol <= 0)
-      stop("'ftol' must be a positive finite numeric scalar")
     if (!is.numeric(tol) || length(tol) != 1L || is.na(tol) ||
         !is.finite(tol) || tol <= 0)
       stop("'tol' must be a positive finite numeric scalar")
@@ -104,7 +125,6 @@ npqreg.condbandwidth <-
         !is.finite(small) || small <= 0)
       stop("'small' must be a positive finite numeric scalar")
     itmax <- as.integer(itmax)
-    ftol <- as.double(ftol)
     tol <- as.double(tol)
     small <- as.double(small)
 
@@ -257,14 +277,13 @@ npqreg.condbandwidth <-
       itmax = itmax,
       xmcv.numRow = attr(bws$xmcv, "num.row"),
       nmulti = itmax,
-      dfc.dir = dfc.dir)
+      qreg.unused = 0L)
 
-    myoptd = list(
-      ftol = ftol,
+    myoptd = c(
+      qreg.unused = 0.0,
       tol = tol,
       small = small,
-      lbc.dir = lbc.dir, cfac.dir = cfac.dir,initc.dir = initc.dir, 
-      lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir)
+      rep(0.0, 7L))
     
     myout <-
       .Call("C_np_quantile_conditional",
@@ -437,5 +456,10 @@ npqreg.default <- function(bws, txdat, tydat, ...){
       call.args <- c(call.args, list(tydat))
     }
   }
-  do.call(npqreg, c(call.args, list(...)))
+  dots <- list(...)
+  if (has.explicit.bws)
+    fit.dots <- .npqreg_fit_dots(dots)
+  else
+    fit.dots <- .npqreg_fit_dots(dots, allow.bandwidth.controls = TRUE)
+  do.call(npqreg, c(call.args, fit.dots))
 }

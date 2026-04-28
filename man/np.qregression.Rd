@@ -28,18 +28,9 @@ npqreg(bws, \dots)
        exdat,
        tau = 0.5,
        gradients = FALSE,
-       ftol = 1.490116e-07,
        tol = 1.490116e-04,
        small = 1.490116e-05,
        itmax = 10000,
-       lbc.dir = 0.5,
-       dfc.dir = 3,
-       cfac.dir = 2.5*(3.0-sqrt(5)),
-       initc.dir = 1.0,
-       lbd.dir = 0.1,
-       hbd.dir = 1,
-       dfac.dir = 0.25*(3.0-sqrt(5)),
-       initd.dir = 1.0,
        \dots)
 
 \method{npqreg}{default}(bws, txdat, tydat, \dots)
@@ -108,53 +99,26 @@ These arguments select the target quantile and optional returned quantities.
     object. Defaults to \code{FALSE}.
   }
 
-\subsection{Powell Search Controls}{
-These arguments control tolerances, iteration limits, and direction-set search parameters.
+\subsection{Quantile Extraction Controls}{
+These arguments control the target quantile and the one-dimensional numerical refinement used to extract the conditional quantile from the estimated conditional distribution.
 }
 
-  \item{ftol}{
-    fractional tolerance on the value of the cross-validation function
-    evaluated at located minima (of order the machine precision or
-    perhaps slightly larger so as not to be diddled by
-    roundoff). Defaults to \code{1.490116e-07}
-    (1.0e+01*sqrt(.Machine$double.eps)).
-  }
-
   \item{tol}{
-    tolerance on the position of located minima of the cross-validation
-    function (tol should generally be no smaller than the square root of
-    your machine's floating point precision). Defaults to \code{
-      1.490116e-04 (1.0e+04*sqrt(.Machine$double.eps))}.
+    tolerance on the one-dimensional quantile location refinement.
+    Defaults to \code{1.490116e-04}
+    (approximately \code{10000*sqrt(.Machine$double.eps)}).
   }
 
   \item{small}{
-    a small number used to bracket a minimum (it is hopeless to ask for
-    a bracketing interval of width less than sqrt(epsilon) times its
-    central value, a fractional width of only about 10-04 (single
-    precision) or 3x10-8 (double precision)). Defaults to \code{small
-      = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
+    minimum interval width used by the one-dimensional quantile
+    refinement. Defaults to \code{1.490116e-05}
+    (approximately \code{1000*sqrt(.Machine$double.eps)}).
   }
 
   \item{itmax}{
-    integer number of iterations before failure in the numerical
-    optimization routine. Defaults to \code{10000}.
+    integer maximum number of iterations allowed in the one-dimensional
+    quantile refinement. Defaults to \code{10000}.
   }
-
-  \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
-
-  \item{dfc.dir}{chi-square degrees of freedom for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
-
-  \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
-
-  \item{initc.dir}{initial non-random values for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
-
-  \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
-
-  \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
-
-  \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
-
-  \item{initd.dir}{initial non-random values for direction set search for Powell's algorithm for categorical variables. See Details}
 
 \subsection{Additional Arguments}{
 These arguments are passed to \code{\link{npcdistbw}} for bandwidth type, kernel, and training-data controls.
@@ -176,23 +140,14 @@ These arguments are passed to \code{\link{npcdistbw}} for bandwidth type, kernel
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
 
-  The optimizer invoked for search is Powell's conjugate direction
-  method which requires the setting of (non-random) initial values and
-  search directions for bandwidths, and, when restarting, random values
-  for successive invocations. Bandwidths for \code{numeric} variables
-  are scaled by robust measures of spread, the sample size, and the
-  number of \code{numeric} variables where appropriate. Two sets of
-  parameters for bandwidths for \code{numeric} can be modified, those
-  for initial values for the parameters themselves, and those for the
-  directions taken (Powell's algorithm does not involve explicit
-  computation of the function's gradient). The default values are set by
-  considering search performance for a variety of difficult test cases
-  and simulated cases. We highly recommend restarting search a large
-  number of times to avoid the presence of local minima (achieved by
-  modifying \code{nmulti}). Further refinement for difficult cases can
-  be achieved by modifying these sets of parameters. However, these
-  parameters are intended more for the authors of the package to enable
-  \sQuote{tuning} for various methods rather than for the user themselves.
+  Given a conditional distribution bandwidth object, \code{npqreg}
+  estimates the conditional distribution at candidate response values
+  and extracts the requested conditional quantile by a one-dimensional
+  numerical refinement over the observed support of the dependent
+  variable. The refinement minimizes the squared residual between the
+  estimated conditional distribution and the requested probability
+  \code{tau}. The arguments \code{tol}, \code{small}, and \code{itmax}
+  control this one-dimensional refinement.
 
 }
 

@@ -121,22 +121,6 @@ static inline double np_lp_mhat(
   return mhat;
 }
 
-static int np_qreg_use_candidate_extractor(void)
-{
-  const char *mode = getenv("NP_QREG_EXTRACT_MODE");
-
-  if(mode == NULL)
-    return 1;
-
-  if((strcmp(mode, "legacy") == 0) ||
-     (strcmp(mode, "powell") == 0))
-    return 0;
-
-  return (strcmp(mode, "candidate") == 0) ||
-         (strcmp(mode, "grid_brent") == 0) ||
-         (strcmp(mode, "default") == 0);
-}
-
 static double np_qreg_quantile_objective_scalar(double y)
 {
   double quantile[2];
@@ -145,100 +129,6 @@ static double np_qreg_quantile_objective_scalar(double y)
   quantile[1] = y;
 
   return func_con_density_quantile(quantile);
-}
-
-static double np_qreg_extract_powell_1d(
-  int BANDWIDTH_den,
-  int num_obs_train,
-  double *vector_scale_factor,
-  double **matrix_y,
-  int *seed,
-  double ftol,
-  double tol,
-  double small,
-  int itmax,
-  int iMax_Num_Multistart,
-  double zero,
-  double lbc_dir,
-  int dfc_dir,
-  double c_dir,
-  double initc_dir,
-  double lbd_dir,
-  double hbd_dir,
-  double d_dir,
-  double initd_dir,
-  double **matrix_X_continuous_train,
-  double **matrix_Y_continuous_train,
-  double *quantile_best)
-{
-  double fret;
-  double fret_best;
-  double quantile[2];
-  double quantile_multistart[2];
-  int iMs_counter;
-  int iNum_Ms;
-  int iter;
-
-  quantile[1] = (y_max_extern-y_min_extern)/2.0;
-
-  initialize_nr_directions(BANDWIDTH_den,
-                           num_obs_train,
-                           1, 0, 0,
-                           0, 0, 0,
-                           vector_scale_factor,
-                           NULL,
-                           matrix_y,
-                           0, *seed,
-                           lbc_dir, c_dir, dfc_dir, initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir,
-                           matrix_X_continuous_train,
-                           matrix_Y_continuous_train);
-
-  powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
-
-  if(fret > zero)
-  {
-    fret_best = fret;
-    quantile_multistart[1] = quantile[1];
-
-    imstot = iMax_Num_Multistart;
-    for(iMs_counter = 1, iNum_Ms = 1; iMs_counter < iMax_Num_Multistart; iMs_counter++, iNum_Ms++)
-    {
-      quantile[1] = y_min_extern + ran3(seed)*(y_max_extern-y_min_extern);
-
-      initialize_nr_directions(BANDWIDTH_den,
-                               num_obs_train,
-                               1, 0, 0,
-                               0, 0, 0,
-                               vector_scale_factor,
-                               NULL,
-                               matrix_y,
-                               0, *seed,
-                               lbc_dir, c_dir, dfc_dir, initc_dir,
-                               lbd_dir, hbd_dir, d_dir, initd_dir,
-                               matrix_X_continuous_train,
-                               matrix_Y_continuous_train);
-
-      powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
-
-      if(fret < fret_best)
-      {
-        fret_best = fret;
-        quantile_multistart[1] = quantile[1];
-        if(fret <= zero)
-        {
-          iMs_counter = iMax_Num_Multistart;
-        }
-      }
-    }
-
-    fret = fret_best;
-    quantile[1] = quantile_multistart[1];
-  }
-
-  *quantile_best = quantile[1];
-
-  return fret;
 }
 
 static int np_qreg_build_grid_window(
@@ -394,27 +284,9 @@ static double np_qreg_refine_golden_1d(
 }
 
 static double np_qreg_extract_quantile_1d(
-  int BANDWIDTH_den,
-  int num_obs_train,
-  double *vector_scale_factor,
-  double **matrix_y,
-  int *seed,
-  double ftol,
   double tol,
   double small,
   int itmax,
-  int iMax_Num_Multistart,
-  double zero,
-  double lbc_dir,
-  int dfc_dir,
-  double c_dir,
-  double initc_dir,
-  double lbd_dir,
-  double hbd_dir,
-  double d_dir,
-  double initd_dir,
-  double **matrix_X_continuous_train,
-  double **matrix_Y_continuous_train,
   double *quantile_best)
 {
   double left;
@@ -425,58 +297,11 @@ static double np_qreg_extract_quantile_1d(
   double grid_best_f;
   int window_status;
 
-  if(!np_qreg_use_candidate_extractor())
-  {
-    return np_qreg_extract_powell_1d(BANDWIDTH_den,
-                                     num_obs_train,
-                                     vector_scale_factor,
-                                     matrix_y,
-                                     seed,
-                                     ftol,
-                                     tol,
-                                     small,
-                                     itmax,
-                                     iMax_Num_Multistart,
-                                     zero,
-                                     lbc_dir,
-                                     dfc_dir,
-                                     c_dir,
-                                     initc_dir,
-                                     lbd_dir,
-                                     hbd_dir,
-                                     d_dir,
-                                     initd_dir,
-                                     matrix_X_continuous_train,
-                                     matrix_Y_continuous_train,
-                                     quantile_best);
-  }
-
   window_status = np_qreg_build_grid_window(&left, &right, &grid_best_x, &grid_best_f);
 
   if(window_status == 0)
   {
-    return np_qreg_extract_powell_1d(BANDWIDTH_den,
-                                     num_obs_train,
-                                     vector_scale_factor,
-                                     matrix_y,
-                                     seed,
-                                     ftol,
-                                     tol,
-                                     small,
-                                     itmax,
-                                     iMax_Num_Multistart,
-                                     zero,
-                                     lbc_dir,
-                                     dfc_dir,
-                                     c_dir,
-                                     initc_dir,
-                                     lbd_dir,
-                                     hbd_dir,
-                                     d_dir,
-                                     initd_dir,
-                                     matrix_X_continuous_train,
-                                     matrix_Y_continuous_train,
-                                     quantile_best);
+    error("C_np_quantile_conditional: canonical one-dimensional quantile extraction failed to bracket a finite support window");
   }
 
   fret = np_qreg_refine_golden_1d(left, right, tol, small, itmax, &xmin);
@@ -486,28 +311,7 @@ static double np_qreg_extract_quantile_1d(
      (xmin < y_min_extern) ||
      (xmin > y_max_extern))
   {
-    return np_qreg_extract_powell_1d(BANDWIDTH_den,
-                                     num_obs_train,
-                                     vector_scale_factor,
-                                     matrix_y,
-                                     seed,
-                                     ftol,
-                                     tol,
-                                     small,
-                                     itmax,
-                                     iMax_Num_Multistart,
-                                     zero,
-                                     lbc_dir,
-                                     dfc_dir,
-                                     c_dir,
-                                     initc_dir,
-                                     lbd_dir,
-                                     hbd_dir,
-                                     d_dir,
-                                     initd_dir,
-                                     matrix_X_continuous_train,
-                                     matrix_Y_continuous_train,
-                                     quantile_best);
+    error("C_np_quantile_conditional: canonical one-dimensional quantile extraction failed to produce a finite in-support candidate");
   }
 
   if(grid_best_f < fret)
@@ -17921,28 +17725,10 @@ double  initd_dir)
 			matrix_X_continuous_quantile_extern[j][0] = matrix_X_continuous_eval[j][i];
 		}
 
-		(void) np_qreg_extract_quantile_1d(BANDWIDTH_den,
-                                     num_obs_train,
-                                     vector_scale_factor,
-                                     matrix_y,
-                                     &seed,
-                                     ftol,
-                                     tol,
-                                     small,
-                                     itmax,
-                                     iMax_Num_Multistart,
-                                     zero,
-                                     lbc_dir,
-                                     dfc_dir,
-                                     c_dir,
-                                     initc_dir,
-                                     lbd_dir,
-                                     hbd_dir,
-                                     d_dir,
-                                     initd_dir,
-                                     matrix_X_continuous_train,
-                                     matrix_Y_continuous_train,
-                                     &quantile[1]);
+			(void) np_qreg_extract_quantile_1d(tol,
+	                                     small,
+	                                     itmax,
+	                                     &quantile[1]);
 
 		quan[i] = quantile[1];
 		quan_stderr[i] = 0.0;
@@ -17964,28 +17750,10 @@ double  initd_dir)
 
 				matrix_X_continuous_quantile_extern[k][0] = matrix_X_continuous_eval[k][i]  - matrix_bandwidth_reg[k][i];
 
-				(void) np_qreg_extract_quantile_1d(BANDWIDTH_den,
-                                         num_obs_train,
-                                         vector_scale_factor,
-                                         matrix_y,
-                                         &seed,
-                                         ftol,
-                                         tol,
-                                         small,
-                                         itmax,
-                                         iMax_Num_Multistart,
-                                         zero,
-                                         lbc_dir,
-                                         dfc_dir,
-                                         c_dir,
-                                         initc_dir,
-                                         lbd_dir,
-                                         hbd_dir,
-                                         d_dir,
-                                         initd_dir,
-                                         matrix_X_continuous_train,
-                                         matrix_Y_continuous_train,
-                                         &quantile[1]);
+					(void) np_qreg_extract_quantile_1d(tol,
+	                                         small,
+	                                         itmax,
+	                                         &quantile[1]);
 
 				quantile_l = quantile[1];
 
@@ -17998,28 +17766,10 @@ double  initd_dir)
 
 				matrix_X_continuous_quantile_extern[k][0] = matrix_X_continuous_eval[k][i] + matrix_bandwidth_reg[k][i]/2.0;
 
-				(void) np_qreg_extract_quantile_1d(BANDWIDTH_den,
-                                         num_obs_train,
-                                         vector_scale_factor,
-                                         matrix_y,
-                                         &seed,
-                                         ftol,
-                                         tol,
-                                         small,
-                                         itmax,
-                                         iMax_Num_Multistart,
-                                         zero,
-                                         lbc_dir,
-                                         dfc_dir,
-                                         c_dir,
-                                         initc_dir,
-                                         lbd_dir,
-                                         hbd_dir,
-                                         d_dir,
-                                         initd_dir,
-                                         matrix_X_continuous_train,
-                                         matrix_Y_continuous_train,
-                                         &quantile[1]);
+					(void) np_qreg_extract_quantile_1d(tol,
+	                                         small,
+	                                         itmax,
+	                                         &quantile[1]);
 
 				quantile_u = quantile[1];
 
@@ -18079,28 +17829,10 @@ double  initd_dir)
 			matrix_X_continuous_quantile_extern[j][0] = matrix_X_continuous_eval[j][i];
 		}
 
-		(void) np_qreg_extract_quantile_1d(BANDWIDTH_den,
-                                     num_obs_train,
-                                     vector_scale_factor,
-                                     matrix_y,
-                                     &seed,
-                                     ftol,
-                                     tol,
-                                     small,
-                                     itmax,
-                                     iMax_Num_Multistart,
-                                     zero,
-                                     lbc_dir,
-                                     dfc_dir,
-                                     c_dir,
-                                     initc_dir,
-                                     lbd_dir,
-                                     hbd_dir,
-                                     d_dir,
-                                     initd_dir,
-                                     matrix_X_continuous_train,
-                                     matrix_Y_continuous_train,
-                                     &quantile[1]);
+			(void) np_qreg_extract_quantile_1d(tol,
+	                                     small,
+	                                     itmax,
+	                                     &quantile[1]);
 
 		quan[i-my_rank*stride] = quantile[1];
 		quan_stderr[i-my_rank*stride] = 0.0;
@@ -18120,28 +17852,10 @@ double  initd_dir)
 
 				matrix_X_continuous_quantile_extern[k][0] = matrix_X_continuous_eval[k][i]  - matrix_bandwidth_reg[k][i];
 
-				(void) np_qreg_extract_quantile_1d(BANDWIDTH_den,
-                                         num_obs_train,
-                                         vector_scale_factor,
-                                         matrix_y,
-                                         &seed,
-                                         ftol,
-                                         tol,
-                                         small,
-                                         itmax,
-                                         iMax_Num_Multistart,
-                                         zero,
-                                         lbc_dir,
-                                         dfc_dir,
-                                         c_dir,
-                                         initc_dir,
-                                         lbd_dir,
-                                         hbd_dir,
-                                         d_dir,
-                                         initd_dir,
-                                         matrix_X_continuous_train,
-                                         matrix_Y_continuous_train,
-                                         &quantile[1]);
+					(void) np_qreg_extract_quantile_1d(tol,
+	                                         small,
+	                                         itmax,
+	                                         &quantile[1]);
 
 				quantile_l = quantile[1];
 
@@ -18154,28 +17868,10 @@ double  initd_dir)
 
 				matrix_X_continuous_quantile_extern[k][0] = matrix_X_continuous_eval[k][i] + matrix_bandwidth_reg[k][i]/2.0;
 
-				(void) np_qreg_extract_quantile_1d(BANDWIDTH_den,
-                                         num_obs_train,
-                                         vector_scale_factor,
-                                         matrix_y,
-                                         &seed,
-                                         ftol,
-                                         tol,
-                                         small,
-                                         itmax,
-                                         iMax_Num_Multistart,
-                                         zero,
-                                         lbc_dir,
-                                         dfc_dir,
-                                         c_dir,
-                                         initc_dir,
-                                         lbd_dir,
-                                         hbd_dir,
-                                         d_dir,
-                                         initd_dir,
-                                         matrix_X_continuous_train,
-                                         matrix_Y_continuous_train,
-                                         &quantile[1]);
+					(void) np_qreg_extract_quantile_1d(tol,
+	                                         small,
+	                                         itmax,
+	                                         &quantile[1]);
 
 				quantile_u = quantile[1];
 
