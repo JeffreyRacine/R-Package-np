@@ -16,11 +16,13 @@ Use this skill for `.Rd` documentation updates in `npRmpi`.
    - local-polynomial/degree controls;
    - numerical controls;
    - returned object and follow-up methods.
-4. Organize long `\arguments{}` sections with real
-   `\subsection{Group Name}{...}` blocks. Keep subsection text short and
-   user-facing.
+4. For long `\arguments{}` sections, use `\subsection{Group Name}{}` as an
+   empty sibling before top-level `\item{arg}{...}` entries. Real arguments must
+   remain top-level `\item{arg}{...}` entries.
 5. Do not use `\item{Group Name}{...}` for headings; R will treat it as a
-   documented argument and may warn during checks.
+   documented argument and may warn during checks. Do not wrap `\item{}` entries
+   inside the second argument of `\subsection{...}{...}`; touched-page
+   validation showed that nested form makes `\item{}` parse incorrectly.
 6. Keep `\usage{}` synchronized with actual formals. Do not reorder `\usage{}`
    merely for visual tidiness.
 7. Do not reorder R function formals in this campaign unless separately
