@@ -11,6 +11,10 @@ nptgauss(b)
 }
 
 \arguments{
+\subsection{Kernel Truncation}{
+Truncation radius for the truncated Gaussian kernel helper.
+}
+
   \item{b}{
     Truncation radius of the kernel.
   }

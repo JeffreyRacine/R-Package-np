@@ -11,6 +11,10 @@ np.pairs(y_vars, y_dat, ...)
 np.pairs.plot(pair_list)
 }
 \arguments{
+\subsection{Pair Plot Inputs}{
+Variables, data, and saved pair-list objects used by the pair-plot helpers.
+}
+
   \item{y_vars}{
     character vector of column names in \code{y_dat}. If \code{y_vars}
     is named, the names are used as plot labels.
@@ -23,6 +27,11 @@ np.pairs.plot(pair_list)
   \item{pair_list}{
     list returned by \code{np.pairs}.
   }
+
+\subsection{Additional Arguments}{
+Further arguments passed to the density and regression routines used to
+construct pair panels.
+}
 
   \item{...}{
     additional arguments passed to \code{\link{npudens}} and

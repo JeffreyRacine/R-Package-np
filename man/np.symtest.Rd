@@ -16,6 +16,10 @@ npsymtest(data = NULL,
 }
 
 \arguments{
+\subsection{Data And Statistic Inputs}{
+Sample data and statistic form for the symmetry test.
+}
+
   \item{data}{
     a vector containing the variable.
   }
@@ -27,6 +31,11 @@ npsymtest(data = NULL,
     details). Defaults to \code{integration}.
   }
   
+\subsection{Bootstrap And Bandwidth Controls}{
+Bootstrap method, replication count, scalar bandwidth, and reproducibility
+controls.
+}
+
   \item{boot.num}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
@@ -45,6 +54,11 @@ npsymtest(data = NULL,
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
+
+\subsection{Additional Bandwidth Arguments}{
+Arguments used when the scalar bandwidth is interpreted with non-default
+kernel or bandwidth settings.
+}
 
   \item{\dots}{ additional arguments supplied to specify the bandwidth
     type, kernel types, and so on.  This is used since we specify bw as

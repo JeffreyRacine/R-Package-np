@@ -37,6 +37,10 @@ npuniden.boundary(X = NULL,
                   proper = FALSE)
 }
 \arguments{
+\subsection{Data And Support Inputs}{
+Training/evaluation data, optional bandwidth, and bounded support endpoints.
+}
+
   \item{X}{
 a required numeric vector of training data lying in \eqn{[a,b]}
 }
@@ -52,6 +56,12 @@ an optional lower bound (defaults to lower bound of empirical support \eqn{\min(
   \item{b}{
 an optional upper bound (defaults to upper bound of empirical support \eqn{\max(X)})
 }
+
+\subsection{Bandwidth Search Controls}{
+Cross-validation method, search route, starting grid, kernel type, and
+multistart controls.
+}
+
   \item{bwmethod}{
 whether to conduct bandwidth search via least squares cross-validation
 (\code{"cv.ls"}) or likelihood cross-validation (\code{"cv.ml"})
@@ -70,6 +80,11 @@ an optional kernel specification (defaults to "gaussian1")
 number of multi-starts used when \code{cv="numeric"} (defaults to 1 for
 the univariate boundary problem)
 }
+
+\subsection{Proper Density Control}{
+Control for proper density and distribution repair on the bounded support.
+}
+
   \item{proper}{
 an optional logical value indicating whether to enforce proper density
 and distribution function estimates over the range \eqn{[a,b]}

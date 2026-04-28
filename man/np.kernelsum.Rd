@@ -48,6 +48,11 @@ npksum(\dots)
 }
 
 \arguments{
+\subsection{Bandwidth And Data Inputs}{
+Core inputs defining the training data, optional weighted response, and
+evaluation points for the generalized product kernel sum.
+}
+
   \item{bws}{
     a bandwidth specification. This can be set as any suitable bandwidth
     object returned from a bandwidth-generating function, or a numeric vector.
@@ -73,6 +78,11 @@ npksum(\dots)
     applied to \code{tydat} in the sum. See details.
   }
   
+\subsection{Kernel-Sum Operators And Output}{
+Controls for bandwidth normalization, kernel powers, leave-one-out
+evaluation, operator variants, and returned kernel weights.
+}
+
   \item{bandwidth.divide}{
     a logical specifying whether or not to divide continuous kernel
     weights by their bandwidths. Use this with nearest-neighbor
@@ -128,6 +138,10 @@ npksum(\dots)
     details.
     }
 
+\subsection{Formula Interface}{
+Formula-method arguments for symbolic kernel-sum specifications.
+}
+
   \item{formula}{
     a symbolic description of variables on which the sum is
     to be performed. The details of constructing a formula are
@@ -159,6 +173,9 @@ npksum(\dots)
   }
 
 
+\subsection{Additional Arguments}{
+Further arguments passed to the default kernel-sum method.
+}
 
   \item{\dots}{
     additional arguments supplied to specify the parameters to the

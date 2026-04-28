@@ -45,6 +45,10 @@ FALSE, \dots)
 }
 
 \arguments{
+\subsection{Main Bandwidth And Data Inputs}{
+These arguments identify the bandwidth specification, training data, and evaluation data.
+}
+
   \item{bws}{
   a bandwidth specification. This can be set as a \code{scbandwidth}
   object returned from an invocation of \code{\link{npscoefbw}}, or
@@ -124,6 +128,10 @@ FALSE, \dots)
     in the model equation. Defaults to be the same as \code{txdat}.
   }
 
+\subsection{Fitted Quantities And Backfitting}{
+These arguments control returned coefficient estimates, errors, residuals, and iterative backfitting.
+}
+
   \item{betas}{
     a logical value indicating whether or not estimates of the
     components of \eqn{\gamma}{gamma} should be returned in the
@@ -165,6 +173,10 @@ FALSE, \dots)
     estimates. Defaults to \code{.Machine$double.eps}.
   }
 
+\subsection{Bandwidth Search Shortcut}{
+This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npscoefbw}} when bandwidths are computed inside \code{npscoef}.
+}
+
   \item{nomad}{
     logical shortcut passed through to \code{\link{npscoefbw}} when
     bandwidths are computed inside \code{npscoef}. When \code{TRUE},
@@ -181,6 +193,10 @@ FALSE, \dots)
     \code{fit$bws$nomad.shortcut} on the returned object \code{fit} to
     see the normalized shortcut metadata.
   }
+
+\subsection{Additional Arguments}{
+These arguments are passed to the bandwidth-selection counterpart when bandwidths are not supplied.
+}
   
   \item{\dots}{
     additional arguments supplied to specify the regression type,

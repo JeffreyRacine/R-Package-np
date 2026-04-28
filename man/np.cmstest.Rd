@@ -29,6 +29,10 @@ npcmstest(formula,
 }
 
 \arguments{
+\subsection{Formula And Data Inputs}{
+Model, formula, and data inputs for the conditional mean specification test.
+}
+
     \item{formula}{
     a symbolic description of variables on which the test is
     to be performed. The details of constructing a formula are
@@ -68,6 +72,11 @@ npcmstest(formula,
     (which rules out Logit, Probit, and Count models).
   }
 
+\subsection{Test Statistic And Bootstrap Controls}{
+Controls for the reference distribution, bootstrap route, statistic
+normalization, density weighting, and random seed.
+}
+
   \item{distribution}{
     a character string used to specify the method of estimating the
     distribution of the statistic to be calculated. \code{bootstrap}
@@ -103,6 +112,10 @@ npcmstest(formula,
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
+
+\subsection{Additional Bandwidth Arguments}{
+Arguments passed through to residual bandwidth selection.
+}
 
   
   \item{\dots}{

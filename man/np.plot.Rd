@@ -36,12 +36,21 @@
 }
 \arguments{
 
+\subsection{Plot Object}{
+Bandwidth object to be plotted.
+}
+
   \item{x}{
     a bandwidth specification. This should be a bandwidth object
     returned from an invocation of \code{\link{npudensbw}}, \link{npcdensbw},
     \code{\link{npregbw}}, \link{npplregbw}, \link{npindexbw}, or
     \code{\link{npscoefbw}}.
   }
+
+\subsection{Plot Controls Passed Through \dots}{
+Named plotting, evaluation, renderer, uncertainty, and graphical controls
+accepted through \code{\dots}.
+}
 
   \item{\dots}{
     additional arguments supplied to control plotting behavior or passed

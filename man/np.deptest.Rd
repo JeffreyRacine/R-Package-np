@@ -20,6 +20,10 @@ npdeptest(data.x = NULL,
 }
 
 \arguments{
+\subsection{Data And Statistic Inputs}{
+Variables and statistic form for the bivariate dependence test.
+}
+
   \item{data.x, data.y}{
     
     two univariate vectors containing two variables that are of type
@@ -36,6 +40,10 @@ npdeptest(data.x = NULL,
 
   }
   
+\subsection{Bootstrap Controls}{
+Bootstrap execution and reproducibility controls.
+}
+
   \item{bootstrap}{
     a logical value which specifies whether to conduct
     the bootstrap test or not. If set to \code{FALSE}, only the

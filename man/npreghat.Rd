@@ -38,6 +38,11 @@ npreghat(bws, ...)
   deriv = NULL, ...)
 }
 \arguments{
+\subsection{Bandwidth And Data Inputs}{
+Regression bandwidth object, formula data, training predictors, and
+evaluation predictors.
+}
+
   \item{bws}{An object of class \code{rbandwidth} or \code{npregression}.}
 
   \item{data}{A data frame used with the formula interface.}
@@ -48,9 +53,19 @@ npreghat(bws, ...)
 
   \item{exdat}{Optional evaluation predictors.}
 
+\subsection{Operator Output}{
+Right-hand-side input and output mode for matrix construction or direct
+operator application.
+}
+
   \item{y}{Optional response vector or matrix for apply mode.}
 
   \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
+
+\subsection{Local-Polynomial Controls}{
+Basis, degree, derivative, leave-one-out, and ridge controls for local
+polynomial operator construction.
+}
 
   \item{basis}{Local polynomial basis: \code{"glp"}, \code{"additive"}, or \code{"tensor"}.}
 
@@ -65,6 +80,10 @@ npreghat(bws, ...)
   \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves.}
 
   \item{s}{Derivative multi-index over continuous predictors.}
+
+\subsection{Methods And Additional Arguments}{
+S3 method input and additional arguments passed to methods.
+}
 
   \item{object}{An object returned by \code{npreghat}.}
 

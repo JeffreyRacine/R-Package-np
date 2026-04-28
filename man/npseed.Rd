@@ -7,6 +7,10 @@ npseed(seed)
 }
 
 \arguments{
+\subsection{Seed Input}{
+Seed value used to reset the package C backend random number generator.
+}
+
   \item{seed}{a single finite numeric value that is representable as a non-negative integer after applying \code{abs()}.}
 }
 \value{

@@ -15,11 +15,21 @@ npudenshat(bws,
   output = c("matrix", "apply"))
 }
 \arguments{
+\subsection{Bandwidth And Data Inputs}{
+Unconditional density bandwidth object and training/evaluation data used to
+construct the operator.
+}
+
   \item{bws}{A fitted unconditional density bandwidth object of class \code{"bandwidth"}.}
 
   \item{tdat}{Training data used to construct the operator.}
 
   \item{edat}{Optional evaluation data. If omitted, the operator is built on the training data.}
+
+\subsection{Operator Output}{
+Right-hand-side input and output mode for matrix construction or direct
+operator application.
+}
 
   \item{y}{Optional right-hand side vector or matrix with one row per training observation.}
 

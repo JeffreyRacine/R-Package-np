@@ -16,6 +16,10 @@ npcopula(bws,
 }
 
 \arguments{
+\subsection{Bandwidth And Data Inputs}{
+Bandwidth object and data used to construct the mixed-data copula estimate.
+}
+
   \item{bws}{
     an unconditional joint distribution (\code{npudistbw}) or joint
     density (\code{npudensbw}) bandwidth object (if \code{bws} is
@@ -26,6 +30,11 @@ npcopula(bws,
   \item{data}{
     a data frame containing variables used to construct \code{bws}
   }
+
+\subsection{Copula Evaluation Grid}{
+Controls for requested marginal probability values and quasi-inverse grids.
+}
+
   \item{u}{
     an optional matrix of real numbers lying in [0,1], each column of
     which corresponds to the vector of uth quantile values desired for

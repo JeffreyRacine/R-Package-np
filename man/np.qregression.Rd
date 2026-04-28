@@ -47,6 +47,10 @@ npqreg(bws, \dots)
 }
 
 \arguments{
+\subsection{Main Bandwidth And Data Inputs}{
+These arguments identify the conditional-distribution bandwidth specification, training data, and evaluation data used by quantile regression.
+}
+
   \item{bws}{
     a bandwidth specification. This can be set as a \code{condbandwidth}
     object returned from an invocation of \code{\link{npcdistbw}}, or
@@ -88,6 +92,10 @@ npqreg(bws, \dots)
     evaluation takes place on the data provided by \code{txdat}.
   }
 
+\subsection{Quantile And Returned Quantities}{
+These arguments select the target quantile and optional returned quantities.
+}
+
   \item{tau}{
     a numeric value specifying the \eqn{\tau}{tau}th quantile is
     desired. Defaults to \code{0.5}.
@@ -99,6 +107,10 @@ npqreg(bws, \dots)
     gradients computed and returned in the resulting \code{npregression}
     object. Defaults to \code{FALSE}.
   }
+
+\subsection{Powell Search Controls}{
+These arguments control tolerances, iteration limits, and direction-set search parameters.
+}
 
   \item{ftol}{
     fractional tolerance on the value of the cross-validation function
@@ -143,6 +155,10 @@ npqreg(bws, \dots)
   \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
 
   \item{initd.dir}{initial non-random values for direction set search for Powell's algorithm for categorical variables. See Details}
+
+\subsection{Additional Arguments}{
+These arguments are passed to \code{\link{npcdistbw}} for bandwidth type, kernel, and training-data controls.
+}
 
   \item{\dots}{
     additional arguments supplied to specify the regression type,
