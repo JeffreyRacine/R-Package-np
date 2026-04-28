@@ -132,9 +132,9 @@ npindexbw.NULL <-
   list(ok = (k >= lower) && (k <= upper), value = as.double(k))
 }
 
-.npindexbw_h_start_controls <- function(scale.factor.init.lower = 0.5,
-                                        scale.factor.init.upper = 1.5,
-                                        scale.factor.init = 1.059224,
+.npindexbw_h_start_controls <- function(scale.factor.init.lower = 0.1,
+                                        scale.factor.init.upper = 2.0,
+                                        scale.factor.init = 0.5,
                                         scale.factor.search.lower = 0,
                                         where = "npindexbw") {
   cont.start <- npContinuousSearchStartControls(
@@ -659,9 +659,9 @@ npindexbw.NULL <-
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else npValidateNmulti(opt.args$nmulti[1L])
   scale.factor.search.lower <- npResolveScaleFactorLowerBound(opt.args$scale.factor.search.lower)
   h.start.controls <- .npindexbw_h_start_controls(
-    scale.factor.init.lower = if (is.null(opt.args$scale.factor.init.lower)) 0.5 else opt.args$scale.factor.init.lower,
-    scale.factor.init.upper = if (is.null(opt.args$scale.factor.init.upper)) 1.5 else opt.args$scale.factor.init.upper,
-    scale.factor.init = if (is.null(opt.args$scale.factor.init)) 1.059224 else opt.args$scale.factor.init,
+    scale.factor.init.lower = if (is.null(opt.args$scale.factor.init.lower)) 0.1 else opt.args$scale.factor.init.lower,
+    scale.factor.init.upper = if (is.null(opt.args$scale.factor.init.upper)) 2.0 else opt.args$scale.factor.init.upper,
+    scale.factor.init = if (is.null(opt.args$scale.factor.init)) 0.5 else opt.args$scale.factor.init,
     scale.factor.search.lower = scale.factor.search.lower,
     where = "npindexbw"
   )
@@ -1072,9 +1072,9 @@ npindexbw.default <-
            optim.reltol,
            random.seed,
            regtype = c("lc", "ll", "lp"),
-           scale.factor.init.lower = 0.5,
-           scale.factor.init.upper = 1.5,
-           scale.factor.init = 1.059224,
+           scale.factor.init.lower = 0.1,
+           scale.factor.init.upper = 2.0,
+           scale.factor.init = 0.5,
            scale.factor.search.lower = NULL,
            ...){
 
@@ -1336,9 +1336,9 @@ npindexbw.sibandwidth <-
            optim.method = c("Nelder-Mead", "BFGS", "CG"),
            optim.reltol = sqrt(.Machine$double.eps),
            random.seed = 42,
-           scale.factor.init.lower = 0.5,
-           scale.factor.init.upper = 1.5,
-           scale.factor.init = 1.059224,
+           scale.factor.init.lower = 0.1,
+           scale.factor.init.upper = 2.0,
+           scale.factor.init = 0.5,
            scale.factor.search.lower = NULL,
            ...){
 

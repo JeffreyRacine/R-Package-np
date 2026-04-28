@@ -51,9 +51,9 @@ npindexbw(\dots)
           optim.reltol,
           random.seed,
           regtype = c("lc", "ll", "lp"),
-          scale.factor.init.lower = 0.5,
-          scale.factor.init.upper = 1.5,
-          scale.factor.init = 1.059224,
+          scale.factor.init.lower = 0.1,
+          scale.factor.init.upper = 2.0,
+          scale.factor.init = 0.5,
           scale.factor.search.lower = NULL,
           \dots)
 
@@ -69,9 +69,9 @@ npindexbw(\dots)
           optim.method = c("Nelder-Mead", "BFGS", "CG"),
           optim.reltol = sqrt(.Machine$double.eps),
           random.seed = 42,
-          scale.factor.init.lower = 0.5,
-          scale.factor.init.upper = 1.5,
-          scale.factor.init = 1.059224,
+          scale.factor.init.lower = 0.1,
+          scale.factor.init.upper = 2.0,
+          scale.factor.init = 0.5,
           scale.factor.search.lower = NULL,
           \dots)
 
@@ -235,7 +235,7 @@ npindexbw(\dots)
   \item{scale.factor.init.lower}{
     lower bound for random fixed-bandwidth start factors for the index
     bandwidth \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults
-    to \code{0.5}. Nearest-neighbor start laws are unchanged by this
+    to \code{0.1}. Nearest-neighbor start laws are unchanged by this
     control. The effective lower endpoint is
     \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
@@ -243,14 +243,14 @@ npindexbw(\dots)
   \item{scale.factor.init.upper}{
     upper bound for random fixed-bandwidth start factors for the index
     bandwidth \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults
-    to \code{1.5}. Must be greater than or equal to
+    to \code{2.0}. Must be greater than or equal to
     \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
 
   \item{scale.factor.init}{
     deterministic fixed-bandwidth start factor for the index bandwidth
     \eqn{h}. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{1.059224}. If \code{scale.factor.search.lower} is larger, the
+    \code{0.5}. If \code{scale.factor.search.lower} is larger, the
     effective first search start is raised to that floor. For automatic
     LP NOMAD search, this same fixed-bandwidth start law seeds the internal
     initial \eqn{h} coordinate before the unchanged beta-start logic is applied.
@@ -259,9 +259,9 @@ npindexbw(\dots)
   \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for the fixed-bandwidth index-bandwidth search coordinate. When
-    omitted, the default coefficient \code{0.1} is used; the existing
-    \code{scale.factor.init.lower=0.5} default is therefore unchanged unless the user
-    requests a larger value or a smaller \code{scale.factor.init.lower}. This argument
+    omitted, the default coefficient \code{0.1} is used; the
+    \code{scale.factor.init.lower=0.1} default is therefore unchanged unless the user
+    requests a larger value. This argument
     affects search admissibility and search-start sanitization only;
     explicit bandwidths supplied for storage when
     \code{bandwidth.compute = FALSE} are not rewritten.}
