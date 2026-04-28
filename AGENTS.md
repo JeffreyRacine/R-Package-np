@@ -37,10 +37,12 @@ readability campaign, not an API or MPI-runtime refactor.
 
 1. Organize long `\arguments{}` sections by the user's decision model for the
    function, not by historical/internal argument order.
-2. Use `\subsection{Group Name}{}` as an empty sibling before top-level
+2. Use real, non-empty sibling subheaders such as
+   `\subsection{Group Name}{Short orientation sentence.}` before top-level
    `\item{arg}{...}` entries when long `\arguments{}` sections need group
-   headings. Do not wrap `\item{}` entries inside `\subsection{...}{...}`, and
-   do not fake headings with `\item{Group Name}{...}`.
+   headings. Do not wrap `\item{}` entries inside `\subsection{...}{...}`, do
+   not leave subheaders empty, and do not fake headings with
+   `\item{Group Name}{...}`.
 3. First-pass documentation cleanup is Rd-only:
    - no R formal argument reordering,
    - no `.Rd` `\usage{}` reordering unless fixing an existing mismatch,
@@ -55,14 +57,18 @@ readability campaign, not an API or MPI-runtime refactor.
 6. For long public pages, add a concise argument-group guide in `\details{}`
    when the plain `\arguments{}` list is too long to reveal the user decision
    model by item order alone.
-7. For touched pages, verify argument descriptions, defaults, `...`
+7. Use the standard heading `Search Initialization, Kernels, And Support` for
+   the shared bandwidth-search group; all continuous and categorical kernel
+   arguments for that page belong in this group. Keep local-polynomial and
+   NOMAD controls in a separate group when those controls exist.
+8. For touched pages, verify argument descriptions, defaults, `...`
    pass-throughs, examples, and `\seealso{}` links against current code.
-8. Gallery links should use canonical wording/URLs from existing package
+9. Gallery links should use canonical wording/URLs from existing package
    materials; do not invent new Gallery destinations while editing `.Rd` pages.
-9. Validate documentation edits with `R CMD Rd2txt`, `tools::checkRd()`, package
+10. Validate documentation edits with `R CMD Rd2txt`, `tools::checkRd()`, package
    checks from a tarball/private library, installed smoke calls, and relevant
    MPI attach/profile or `nslaves` gates for touched routes.
-10. Any proposed R formal-order change is a separate post-inventory decision
+11. Any proposed R formal-order change is a separate post-inventory decision
    requiring explicit sign-off because it can break downstream positional code.
 
 ## Canonical Implementation Directive (2026-03-05)

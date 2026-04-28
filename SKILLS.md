@@ -16,11 +16,13 @@ Use this skill for `.Rd` documentation updates in `npRmpi`.
    - local-polynomial/degree controls;
    - numerical controls;
    - returned object and follow-up methods.
-4. For long `\arguments{}` sections, use `\subsection{Group Name}{}` as an
-   empty sibling before top-level `\item{arg}{...}` entries. Real arguments must
-   remain top-level `\item{arg}{...}` entries.
+4. For long `\arguments{}` sections, use real, non-empty sibling subheaders
+   such as `\subsection{Group Name}{Short orientation sentence.}` before
+   top-level `\item{arg}{...}` entries. Real arguments must remain top-level
+   `\item{arg}{...}` entries.
 5. Do not use `\item{Group Name}{...}` for headings; R will treat it as a
-   documented argument and may warn during checks. Do not wrap `\item{}` entries
+   documented argument and may warn during checks. Do not leave subheaders
+   empty; package checks warn on empty sections. Do not wrap `\item{}` entries
    inside the second argument of `\subsection{...}{...}`; touched-page
    validation showed that nested form makes `\item{}` parse incorrectly.
 6. Keep `\usage{}` synchronized with actual formals. Do not reorder `\usage{}`
@@ -33,9 +35,13 @@ Use this skill for `.Rd` documentation updates in `npRmpi`.
    bandwidth/search/kernel/support control surface.
 10. Preserve `npRmpi`-specific attach/profile/autodispatch wording when
     mirroring serial documentation structure.
-11. Add Gallery pointers only using canonical Gallery wording/URLs already
+11. Use the standard heading `Search Initialization, Kernels, And Support` for
+    the shared bandwidth-search group; all continuous and categorical kernel
+    arguments for that page belong in this group. Keep local-polynomial and
+    NOMAD controls in a separate group when those controls exist.
+12. Add Gallery pointers only using canonical Gallery wording/URLs already
     present in package materials.
-12. Validate each tranche with:
+13. Validate each tranche with:
     - `R CMD Rd2txt` for touched pages;
     - `tools::checkRd()` for touched pages;
     - package check from a built tarball/private library;
