@@ -29,6 +29,10 @@ npudist(bws, \dots)
 }
 
 \arguments{
+\subsection{Main Bandwidth And Estimation Inputs}{
+These arguments identify the bandwidth specification and training data.
+}
+
   \item{bws}{
     a \code{dbandwidth} specification. This can be set as a \code{dbandwidth}
     object returned from an invocation of \code{\link{npudistbw}}, or as a
@@ -54,6 +58,10 @@ npudist(bws, \dots)
     \code{\link{npudistbw}} was called.
   }
 
+\subsection{Evaluation Data}{
+These arguments control where the fitted cumulative distribution is evaluated.
+}
+
   \item{newdata}{
     An optional data frame in which to look for evaluation data. If
     omitted, the training data are used.  
@@ -64,19 +72,46 @@ npudist(bws, \dots)
     evaluation takes place on the data provided by \code{tdat}.
   }
 
+\subsection{Bandwidth Selection Pass-Through}{
+These arguments pass bandwidth-selection controls to \code{\link{npudistbw}} when bandwidths are computed internally.
+}
+
   \item{\dots}{
-    additional arguments supplied to specify the training data, the
-    bandwidth type, kernel types, and so on.  This is necessary if you
-    specify bws as a \eqn{p}-vector and not a \code{dbandwidth} object,
-    and you do not desire the default behaviours. To do this, you may
-    specify any of \code{bwscaling}, \code{bwtype}, \code{ckertype},
-    \code{ckerorder}, \code{okertype}, as described in
-    \code{\link{npudistbw}}.
+    additional arguments supplied to \code{\link{npudistbw}} when
+    \code{npudist} computes bandwidths internally, or arguments needed
+    to interpret a numeric \code{bws} vector. This is where bandwidth
+    selection controls such as \code{bwmethod}, \code{bwtype},
+    \code{bwscaling}, kernel/support controls such as \code{ckertype},
+    \code{ckerorder}, and \code{ckerbound}, categorical kernel controls
+    such as \code{okertype}, and search controls such as
+    \code{nmulti}, \code{ngrid}, and
+    \code{scale.factor.search.lower} are supplied. See
+    \code{\link{npudistbw}} for the complete bandwidth-selection
+    argument surface.
   }
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}}, \code{\link{plot.np}} for plotting options.
+  Documentation guide: see \code{\link{npudistbw}} for bandwidth
+  selection and search controls, \code{\link{np.kernels}} for kernels,
+  \code{\link{np.options}} for global options, and \code{\link{plot}},
+  \code{\link{plot.np}} for plotting options. Additional worked
+  examples are available from the package gallery at
+  \url{https://jeffreyracine.github.io/gallery/density_distribution_quantiles.html}
+  and \url{https://jeffreyracine.github.io/gallery/kernel_primer.html}.
+
+  When \code{bws} is omitted, the formula and default methods call
+  \code{\link{npudistbw}} first and pass bandwidth-selection arguments
+  from \code{\dots} to that call. When \code{bws} is already a
+  \code{dbandwidth} object, \code{npudist} estimates with the stored
+  bandwidth metadata in that object.
+
+  Argument groups for bandwidth selection are documented on
+  \code{\link{npudistbw}}. The most common workflow is to choose data
+  and bandwidth inputs first, then bandwidth criterion and
+  representation, then kernel/support controls, distribution-specific
+  integral/grid controls, and numerical search controls if defaults
+  need to be changed.
 
   For S3 plotting help, use \code{methods("plot")} and query
   class-specific help topics such as \code{?plot.npregression} and
