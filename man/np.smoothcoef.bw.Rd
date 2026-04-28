@@ -65,9 +65,9 @@ npscoefbw(\dots)
           random.seed,
           regtype,
           ukertype,
-          scale.factor.init.lower = 0.5,
-          scale.factor.init.upper = 1.5,
-          scale.factor.init = 1.0,
+          scale.factor.init.lower = 0.1,
+          scale.factor.init.upper = 2.0,
+          scale.factor.init = 0.5,
           lbd.init = 0.5,
           hbd.init = 1.5,
           dfac.init = 1.0,
@@ -91,9 +91,9 @@ npscoefbw(\dots)
           optim.method = c("Nelder-Mead", "BFGS", "CG"),
           optim.reltol = sqrt(.Machine$double.eps),
           random.seed = 42,
-          scale.factor.init.lower = 0.5,
-          scale.factor.init.upper = 1.5,
-          scale.factor.init = 1.0,
+          scale.factor.init.lower = 0.1,
+          scale.factor.init.upper = 2.0,
+          scale.factor.init = 0.5,
           lbd.init = 0.5,
           hbd.init = 1.5,
           dfac.init = 1.0,
@@ -363,7 +363,7 @@ npscoefbw(\dots)
   \item{scale.factor.init.lower}{
     lower bound for random fixed-bandwidth start factors for continuous
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{0.5}. Nearest-neighbor start laws are unchanged by this
+    \code{0.1}. Nearest-neighbor start laws are unchanged by this
     control. The effective lower endpoint is
     \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
@@ -371,23 +371,23 @@ npscoefbw(\dots)
   \item{scale.factor.init.upper}{
     upper bound for random fixed-bandwidth start factors for continuous
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{1.5}. Must be greater than or equal to
+    \code{2.0}. Must be greater than or equal to
     \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
   }
 
   \item{scale.factor.init}{
     deterministic fixed-bandwidth start factor for continuous
     coordinates. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{1.0}. If \code{scale.factor.search.lower} is larger, the
+    \code{0.5}. If \code{scale.factor.search.lower} is larger, the
     effective first search start is raised to that floor.
   }
 
   \item{scale.factor.search.lower}{
     an optional nonnegative scalar controlling the hard lower bound used
     for continuous fixed-bandwidth search candidates. When omitted, the
-    default coefficient \code{0.1} is used; the existing
-    \code{scale.factor.init.lower=0.5} default is therefore unchanged unless the user
-    requests a larger value or a smaller \code{scale.factor.init.lower}. This argument
+    default coefficient \code{0.1} is used; the
+    \code{scale.factor.init.lower=0.1} default is therefore unchanged unless the user
+    requests a larger value. This argument
     affects search admissibility and search-start sanitization only;
     explicit bandwidths supplied for storage when
     \code{bandwidth.compute = FALSE} are not rewritten.}
