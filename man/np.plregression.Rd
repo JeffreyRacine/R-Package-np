@@ -174,9 +174,6 @@ These arguments pass bandwidth-selection controls to \code{\link{npplregbw}} and
   nonparametric regression search controls, \code{\link{np.kernels}}
   for kernels, \code{\link{np.options}} for global options, and
   \code{\link{plot}}, \code{\link{plot.np}} for plotting options.
-  Additional worked examples are available from the package gallery at
-  \url{https://jeffreyracine.github.io/gallery/semiparametric_models.html}
-  and \url{https://jeffreyracine.github.io/gallery/kernel_primer.html}.
 
   When \code{bws} is omitted, the formula and default methods call
   \code{\link{npplregbw}} first and pass bandwidth-selection arguments

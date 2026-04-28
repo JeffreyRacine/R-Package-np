@@ -165,9 +165,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when 
   Documentation guide: see \code{\link{npregbw}} for bandwidth
   selection and search controls, \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and \code{\link{plot}},
-  \code{\link{plot.np}} for plotting options. Additional worked
-  examples are available from the package gallery at
-  \url{https://jeffreyracine.github.io/gallery/kernel_primer.html}.
+  \code{\link{plot.np}} for plotting options.
 
   When \code{bws} is omitted, the formula and default methods call
   \code{\link{npregbw}} first and pass bandwidth-selection arguments

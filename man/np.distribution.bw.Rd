@@ -403,10 +403,7 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
 
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and \code{\link{plot}}
-  for plotting options. Additional worked examples are available from
-  the package gallery at
-  \url{https://jeffreyracine.github.io/gallery/density_distribution_quantiles.html}
-  and \url{https://jeffreyracine.github.io/gallery/kernel_primer.html}.
+  for plotting options.
 
   The bandwidth-selection argument surface is easiest to read by
   decision group: data, grid, and existing bandwidth inputs; bandwidth

@@ -24,6 +24,7 @@ mknpkg.sh
 ^issue_notes
 ^benchmarks
 ^AGENTS\.md$
+^SKILLS\.md$
 ^MODERNIZATION_DOD\.md$
 ^AS_CRAN_WARNING_LEDGER\.md$
 ^archive$
