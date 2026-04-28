@@ -1,5 +1,11 @@
 Changes from Version 0.70-0 to 0.70-1 [28-Apr-2026]
 
+* Mirrored the `npqreg` canonical quantile-extraction cleanup from `np` by
+  removing the legacy Powell/environment-selected extraction path, retaining
+  the single one-dimensional conditional-CDF residual refinement route, and
+  updating the `npqreg` help page and fit interface to expose only the live
+  quantile-extraction controls.
+
 * Addressed the CRAN-reported MPI unload race by no longer explicitly
   calling `library.dynam.unload("npRmpi", ...)` from `.onUnload()` after
   MPI finalization. Validation covered repeated subprocess load/unload,
