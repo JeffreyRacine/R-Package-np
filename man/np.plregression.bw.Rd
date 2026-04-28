@@ -58,6 +58,10 @@ npplregbw(\dots)
 
 }
 \arguments{
+\subsection{Data And Bandwidth Inputs}{
+These arguments identify the linear and nonparametric data components and whether bandwidths are supplied or computed.
+}
+
   \item{xdat}{
   a \eqn{p}-variate data frame of explanatory data (training data),
   corresponding to \eqn{X} in the model equation, whose linear
@@ -100,6 +104,10 @@ npplregbw(\dots)
     bandwidths as the starting point for the numerical search for optimal
     bandwidths, unless you specify bandwidth.compute = FALSE.
   }
+
+\subsection{Local-Polynomial And NOMAD Controls}{
+These arguments control local-polynomial specification and optional automatic degree search for the nonparametric component.
+}
 
   \item{degree}{
     for local-polynomial partially linear fits, polynomial degree
@@ -207,6 +215,10 @@ npplregbw(\dots)
     \code{search.engine="cell"}.
   }
 
+\subsection{Search Initialization And Feasibility Controls}{
+These controls tune restarts, tolerances, and continuous search lower bounds for the component bandwidth searches.
+}
+
 
   \item{ftol}{
     tolerance on the value of the cross-validation function
@@ -251,6 +263,10 @@ npplregbw(\dots)
     and search-start sanitization only; explicit bandwidths supplied for
     storage when \code{bandwidth.compute = FALSE} are not rewritten.}
 
+\subsection{Formula Interface}{
+These arguments are used by the formula method and are normally supplied by the top-level call.
+}
+
   \item{formula}{
     a symbolic description of variables on which bandwidth selection is
     to be performed. The details of constructing a formula are
@@ -283,6 +299,10 @@ npplregbw(\dots)
     another function. It is not recommended that the user set this.
   }
 
+\subsection{Additional Arguments}{
+These arguments collect bandwidth, kernel, and support controls passed to component \code{\link{npregbw}} searches.
+}
+
   \item{\dots}{
     additional arguments supplied to specify the regression type,
     bandwidth type, kernel types, selection methods, and so on. To do
@@ -299,7 +319,25 @@ npplregbw(\dots)
 
 The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
 
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
+  Documentation guide: see \code{\link{npregbw}} for component
+  nonparametric regression bandwidth controls, \code{\link{np.kernels}}
+  for kernels, \code{\link{np.options}} for global options,
+  \code{\link{plot}} for plotting options, and
+  \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See
+  \code{\link{npRmpi.init}} details for performance tradeoffs (message
+  passing/startup mode) and the \code{inst/Rprofile} manual-broadcast
+  template. Additional MPI-oriented examples are available from the
+  package gallery at
+  \url{https://jeffreyracine.github.io/gallery/mpi_large_data.html}
+  and \url{https://jeffreyracine.github.io/gallery/np_npRmpi.html}.
+
+  The partially linear bandwidth-selection argument surface is easiest
+  to read by decision group: linear \code{xdat} inputs,
+  nonparametric \code{zdat} inputs, and existing bandwidth inputs;
+  local-polynomial/NOMAD controls for the nonparametric component;
+  numerical search and feasibility controls; formula-interface
+  controls; and additional bandwidth, kernel, and support controls that
+  are passed to the component \code{\link{npregbw}} searches.
 
   For S3 plotting help, use \code{methods("plot")} and query
   class-specific help topics such as \code{?plot.npregression} and

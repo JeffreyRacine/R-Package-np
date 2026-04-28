@@ -42,6 +42,10 @@ FALSE, \dots)
         \dots)
 }
 \arguments{
+\subsection{Main Bandwidth And Model Inputs}{
+These arguments identify the partially linear bandwidth specification and training data.
+}
+
   \item{bws}{
   a bandwidth specification. This can be set as a \code{plbandwidth}
   object returned from an invocation of \code{\link{npplregbw}}, or as
@@ -98,6 +102,10 @@ FALSE, \dots)
     compute the bandwidth object.
   }
 
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the partially linear regression is evaluated and which fitted quantities are returned.
+}
+
   \item{exdat}{
   a \eqn{p}-variate data frame of points on which the regression will be
   estimated (evaluation data).  By default,
@@ -139,19 +147,55 @@ FALSE, \dots)
     returned object \code{fit} to see the normalized shortcut metadata.
   }
 
+\subsection{Bandwidth Selection Pass-Through}{
+These arguments pass bandwidth-selection controls to \code{\link{npplregbw}} and its component \code{\link{npregbw}} searches.
+}
+
   \item{\dots}{
-    additional arguments supplied to specify the regression type,
-    bandwidth type, kernel types, selection methods, and so on. To do
-    this, you may specify any of \code{regtype}, 
-    \code{bwmethod}, \code{bwscaling}, \code{bwtype} (one of
-    \code{fixed}, \code{generalized_nn}, \code{adaptive_nn}), \code{ckertype},
-    \code{ckerorder}, \code{ukertype}, \code{okertype}, as described in
-    \code{\link{npregbw}}.
+    additional arguments supplied to \code{\link{npplregbw}} when
+    \code{npplreg} computes bandwidths internally, or arguments needed
+    to interpret a numeric or matrix \code{bws} specification. This is
+    where bandwidth selection controls such as \code{bwmethod},
+    \code{bwtype}, and \code{bwscaling}, kernel/support controls such
+    as \code{ckertype}, \code{ckerorder}, and \code{ckerbound},
+    categorical kernel controls such as \code{ukertype} and
+    \code{okertype}, search controls such as \code{nmulti} and
+    \code{scale.factor.search.lower}, and local-polynomial/NOMAD
+    controls such as \code{regtype}, \code{degree},
+    \code{bernstein.basis}, \code{degree.select}, and
+    \code{nomad.nmulti} are supplied. See \code{\link{npplregbw}} and
+    \code{\link{npregbw}} for the complete bandwidth-selection
+    argument surface.
   }
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}}, \code{\link{plot.np}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
+  Documentation guide: see \code{\link{npplregbw}} for partially linear
+  bandwidth selection, \code{\link{npregbw}} for the component
+  nonparametric regression search controls, \code{\link{np.kernels}}
+  for kernels, \code{\link{np.options}} for global options,
+  \code{\link{plot}}, \code{\link{plot.np}} for plotting options, and
+  \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See
+  \code{\link{npRmpi.init}} details for performance tradeoffs (message
+  passing/startup mode) and the \code{inst/Rprofile} manual-broadcast
+  template. Additional MPI-oriented examples are available from the
+  package gallery at
+  \url{https://jeffreyracine.github.io/gallery/mpi_large_data.html}
+  and \url{https://jeffreyracine.github.io/gallery/np_npRmpi.html}.
+
+  When \code{bws} is omitted, the formula and default methods call
+  \code{\link{npplregbw}} first and pass bandwidth-selection arguments
+  from \code{\dots} to that call. When \code{bws} is already a
+  \code{plbandwidth} object, \code{npplreg} estimates with the stored
+  bandwidth metadata in that object.
+
+  Argument groups for bandwidth selection are documented on
+  \code{\link{npplregbw}} and, for the component nonparametric
+  regressions, \code{\link{npregbw}}. The most common workflow is to
+  choose the linear \code{X} variables and nonparametric \code{Z}
+  variables first, then bandwidth/search controls for the
+  \code{Z}-side nonparametric regressions, and finally
+  local-polynomial/NOMAD controls when using polynomial-adaptive fits.
 
   For S3 plotting help, use \code{methods("plot")} and query
   class-specific help topics such as \code{?plot.npregression} and
