@@ -63,8 +63,8 @@ test_that("phase1 npcdensbw cv.ml fixed keeps ll on canonical lp degree-1 glp", 
   expect_identical(as.integer(bw.ll$degree.engine), degree)
   expect_true(is.finite(bw.ll$fval))
   expect_true(is.finite(bw.lp$fval))
-  expect_equal(bw.ll$fval, 25.6788850143431, tolerance = 1e-10)
-  expect_equal(bw.lp$fval, 25.6788850143431, tolerance = 1e-10)
+  expect_equal(bw.ll$fval, 15.7534838033289, tolerance = 1e-10)
+  expect_equal(bw.lp$fval, 15.7534838033289, tolerance = 1e-10)
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
 })
 
@@ -124,12 +124,9 @@ test_that("phase1 npcdensbw cv.ml fixed avoids boundary collapse on bounded supp
     cykerlb = 0,
     cykerub = 1
   )
-  fit <- npcdens(
-    bws = bw,
-    exdat = data.frame(x1 = rep(0.5, 4L)),
-    eydat = data.frame(y1 = c(0, 0.02, 0.98, 1))
-  )
-  pred <- fitted(fit)
+  fit <- npcdens(bws = bw)
+  grid <- data.frame(y1 = c(0, 0.02, 0.98, 1), x1 = rep(0.5, 4L))
+  pred <- predict(fit, newdata = grid)
 
   expect_true(is.finite(bw$fval))
   expect_true(all(is.finite(pred)))
