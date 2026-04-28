@@ -34,7 +34,7 @@ test_that("core estimator methods reject non-scalar logical control flags", {
   expect_error(
     npqreg.condbandwidth(structure(list(), class = "condbandwidth"),
                          txdat = tx, tydat = ty, ftol = 0),
-    "'ftol' must be a positive finite numeric scalar"
+    "'ftol' is no longer accepted by npqreg"
   )
   expect_error(
     npindex.sibandwidth(structure(list(), class = "sibandwidth"),
