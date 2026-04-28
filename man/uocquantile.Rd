@@ -5,6 +5,10 @@ uocquantile(x, prob)
 }
 \alias{uocquantile}
 \arguments{
+\subsection{Variable And Probability Inputs}{
+Variable and requested probability for mixed-type quantile extraction.
+}
+
   \item{x}{an ordered, unordered or continuous variable.}
   \item{prob}{quantile to compute.}
 }
@@ -40,4 +44,3 @@ uocquantile(x, 0.5)
 
 \keyword{univar}
 \keyword{nonparametric}
-

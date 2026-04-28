@@ -5,6 +5,10 @@
 }
 \alias{mpi.barrier}
 \arguments{
+\subsection{Communicator Input}{
+MPI communicator on which to synchronize ranks.
+}
+
   \item{comm}{a communicator number}
 }
 \description{

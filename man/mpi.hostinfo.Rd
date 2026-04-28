@@ -11,6 +11,10 @@ mpi.hostinfo(comm = 1)
 slave.hostinfo(comm = 1, short = TRUE)
 }
 \arguments{
+\subsection{Host-Information Controls}{
+Communicator and output-abbreviation controls for host/rank summaries.
+}
+
   \item{comm}{a communicator number.}
   \item{short}{a logical; if \code{TRUE}, abbreviate output when there are many slaves.}
 }

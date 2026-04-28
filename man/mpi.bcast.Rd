@@ -9,10 +9,19 @@
 mpi.bcast(x, type, rank = 0, comm = 1, buffunit=100)
 }
 \arguments{
+\subsection{Message Payload}{
+Object and low-level MPI datatype sent or received by the broadcast.
+}
+
   \item{x}{data to be sent or received. Must be the same 
   type among all members.}
   \item{type}{1 for integer, 2 for double, and 3 for 
   character. Others are not supported.}
+
+\subsection{Communication Controls}{
+Sender rank, communicator, and buffer-unit controls.
+}
+
   \item{rank}{the sender.}
   \item{comm}{a communicator number.}
   \item{buffunit}{a buffer unit number.}

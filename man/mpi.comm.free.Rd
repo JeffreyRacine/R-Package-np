@@ -5,6 +5,10 @@
 }
 \alias{mpi.comm.free}
 \arguments{
+\subsection{Communicator Input}{
+MPI communicator to deallocate.
+}
+
   \item{comm}{a communicator number}
 }
 \description{

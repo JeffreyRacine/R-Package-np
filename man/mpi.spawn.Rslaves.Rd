@@ -11,11 +11,20 @@ mpi.close.Rslaves(dellog = TRUE, comm = 1, force = FALSE)
 tailslave.log(nlines = 3, comm = 1)
 }
 \arguments{
+\subsection{Slave Shutdown Controls}{
+Communicator, log-deletion, and hard-shutdown controls for slave daemons.
+}
+
   \item{dellog}{a logical specifying if R slave log files are deleted.}
   \item{comm}{a communicator number.}
   \item{force}{a logical. If \code{TRUE}, force a hard shutdown of slave daemons.
   When \code{options(npRmpi.reuse.slaves=TRUE)} and \code{force=FALSE},
   \code{mpi.close.Rslaves()} performs a soft-close (keeps daemons alive for reuse).}
+
+\subsection{Slave Log Inspection}{
+Tail length used when inspecting slave log files.
+}
+
   \item{nlines}{number of lines shown from the tail of each slave log file.}
 }
 \value{

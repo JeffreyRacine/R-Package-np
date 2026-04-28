@@ -13,6 +13,10 @@ mpi.exit()
 mpi.quit(save = "no")
 }
 \arguments{
+\subsection{Exit Controls}{
+R-session save behavior used by \code{mpi.quit()}.
+}
+
 \item{save}{the same argument as \code{quit} but default to "no".}
 }
 \value{

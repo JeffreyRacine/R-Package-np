@@ -10,8 +10,17 @@ b.star(data,
        round = FALSE)
 }
 \arguments{
+\subsection{Data Input}{
+Time-series data used for automatic block-length selection.
+}
+
   \item{data}{data, an n x k matrix, each column being a data series.}
   
+\subsection{Block-Length Selection Controls}{
+Tuning constants from Politis and White (2004) and Patton, Politis, and
+White (2009).
+}
+
   \item{Kn}{ See footnote c, page 59, Politis and White (2004). Defaults
     to \code{ceiling(log10(n))}.}
 
@@ -23,6 +32,10 @@ b.star(data,
 
   \item{c}{See Politis and White (2004). Defaults to
   \code{qnorm(0.975)}.}
+
+\subsection{Output Rounding}{
+Control for rounding the selected block lengths.
+}
 
   \item{round}{whether to round the result or not. Defaults to FALSE.}
  

@@ -16,7 +16,15 @@ mpi.bcast.cmd(cmd=NULL,
               caller.execute = FALSE)
 }
 \arguments{
+\subsection{Command Payload}{
+Command sent from the master and optional arguments evaluated on workers.
+}
+
   \item{cmd}{a command to be sent from master.}
+
+\subsection{Communication Controls}{
+Sender rank, communicator, receiver polling, and caller-execution controls.
+}
 
   \item{rank}{the sender}
 
@@ -30,6 +38,10 @@ are, the more CPUs consume.}
 
   \item{caller.execute}{a logical value indicating whether the master
     node is additionally to execute the command}
+
+\subsection{Additional Command Arguments}{
+Arguments supplied to the transmitted function command.
+}
 
   \item{...}{used as arguments to cmd (function command) for passing their 
   (master) values to R slaves, i.e., if `myfun(x)' will be executed on R slaves 

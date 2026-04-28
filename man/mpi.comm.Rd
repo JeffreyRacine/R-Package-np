@@ -9,6 +9,10 @@
 \alias{mpi.comm.rank}
 \alias{mpi.comm.size}
 \arguments{
+\subsection{Communicator Inputs}{
+Existing communicator and optional target communicator for duplication.
+}
+
   \item{comm}{a communicator number}
   \item{newcomm}{a new communicator number}
 }

@@ -11,7 +11,16 @@ mpi.bcast.Robj(obj = NULL, rank = 0, comm = 1)
 mpi.bcast.Robj2slave(obj, comm = 1, all = FALSE)
 }
 \arguments{
+\subsection{Object Payload}{
+R object sent from the sender rank or master process.
+}
+
   \item{obj}{an R object to be transmitted from the sender}
+
+\subsection{Communication Controls}{
+Sender rank, communicator, and all-object broadcast control.
+}
+
   \item{rank}{the sender.}
   \item{comm}{a communicator number.}
   \item{all}{a logical. If TRUE, all R objects on master are transmitted to slaves.}

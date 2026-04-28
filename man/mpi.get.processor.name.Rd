@@ -5,6 +5,10 @@
 }
 \alias{mpi.get.processor.name}
 \arguments{
+\subsection{Hostname Format}{
+Control for abbreviated versus full processor names.
+}
+
  \item{short}{a logical.}
 }
 \description{
