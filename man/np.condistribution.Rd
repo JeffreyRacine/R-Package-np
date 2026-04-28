@@ -38,6 +38,10 @@ npcdist(bws, \dots)
 }
 
 \arguments{
+\subsection{Main Bandwidth And Estimation Inputs}{
+These arguments identify the bandwidth specification and training data.
+}
+
   \item{bws}{
     a bandwidth specification. This can be set as a \code{condbandwidth}
     object returned from a previous invocation of
@@ -71,6 +75,10 @@ npcdist(bws, \dots)
     which \code{\link{npcdistbw}} was called.
  }
 
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the fitted conditional distribution is evaluated and which estimates are returned.
+}
+
   \item{newdata}{
     An optional data frame in which to look for evaluation data. If
     omitted, the training data are used.  
@@ -94,6 +102,10 @@ npcdist(bws, \dots)
     a logical value specifying whether to return estimates of the
     gradients at the evaluation points. Defaults to \code{FALSE}.
   }
+
+\subsection{Bandwidth Selection Pass-Through And Fit Controls}{
+These arguments either pass bandwidth-selection controls to \code{\link{npcdistbw}} or control post-estimation fitting behavior.
+}
 
   \item{nomad}{
     logical shortcut passed through to \code{\link{npcdistbw}} when
@@ -130,18 +142,35 @@ npcdist(bws, \dots)
 
   
   \item{\dots}{
-    additional arguments supplied to specify the bandwidth type, kernel
-    types, and so on.  This is necessary if you specify bws as a
-    \eqn{p+q}-vector and not a \code{condbandwidth} object, and you do
-    not desire the default behaviours. To do this, you may specify any
-    of \code{bwmethod}, \code{bwscaling}, \code{bwtype},
-    \code{cxkertype}, \code{cxkerorder}, \code{cykertype},
-    \code{cykerorder}, \code{uxkertype}, \code{oxkertype},
-    \code{oykertype}, as described in \code{\link{npcdistbw}}.
+    additional arguments supplied to \code{\link{npcdistbw}} when
+    \code{npcdist} computes bandwidths internally, or arguments needed
+    to interpret a numeric \code{bws} vector. This is where bandwidth
+    selection controls such as \code{bwmethod}, \code{bwtype},
+    kernel/support controls such as \code{cxkertype},
+    \code{cykertype}, \code{cxkerbound}, and \code{cykerbound},
+    search controls such as \code{nmulti},
+    \code{scale.factor.search.lower}, and \code{nomad.nmulti}, and
+    local-polynomial controls such as \code{regtype}, \code{degree},
+    \code{basis}, and \code{bernstein.basis} are supplied. See
+    \code{\link{npcdistbw}} for the complete bandwidth-selection
+    argument surface.
   }
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}}, \code{\link{plot.np}} for plotting options.
+  Documentation guide: see \code{\link{npcdistbw}} for bandwidth selection and search controls, \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}}, \code{\link{plot.np}} for plotting options. Additional worked examples are available from the package gallery at \url{https://jeffreyracine.github.io/gallery/density_distribution_quantiles.html} and \url{https://jeffreyracine.github.io/gallery/kernel_primer.html}.
+
+  When \code{bws} is omitted, the formula and default methods call
+  \code{\link{npcdistbw}} first and pass bandwidth-selection arguments
+  from \code{\dots} to that call. When \code{bws} is already a
+  \code{condbandwidth} object, \code{npcdist} estimates with the stored
+  bandwidth metadata in that object.
+
+  Argument groups for bandwidth selection are documented on
+  \code{\link{npcdistbw}}. The most common workflow is to choose data
+  and bandwidth inputs first, then bandwidth criterion and
+  representation, then kernel/support controls, numerical search
+  controls, and finally local-polynomial/NOMAD controls for
+  polynomial-adaptive fits.
 
   For S3 plotting help, use \code{methods("plot")} and query
   class-specific help topics such as \code{?plot.npregression} and

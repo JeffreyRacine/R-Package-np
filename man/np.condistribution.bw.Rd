@@ -125,6 +125,10 @@ npcdistbw(\dots)
 }
 
 \arguments{
+\subsection{Data And Bandwidth Inputs}{
+These arguments identify the data, optional distribution grid, and whether bandwidths are supplied or computed.
+}
+
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data on which bandwidth selection will
     be performed. The data types may be continuous, discrete (unordered
@@ -165,6 +169,10 @@ npcdistbw(\dots)
     will be returned with bandwidths set to those specified
     in \code{bws}. Defaults to \code{TRUE}.
   }
+
+\subsection{Bandwidth Criterion And Representation}{
+These arguments choose the selection criterion and the way continuous bandwidths are represented.
+}
 
   \item{bwmethod}{ which method to use to select bandwidths.
     \code{cv.ls} specifies least-squares cross-validation (Li, Lin and
@@ -207,6 +215,10 @@ npcdistbw(\dots)
     \code{generalized_nn}: compute generalized nearest neighbors \cr
     \code{adaptive_nn}: compute adaptive nearest neighbors
   }
+
+\subsection{Search Initialization, Kernels, And Support}{
+These controls set numerical search starts, kernel choices, support bounds, and least-squares integral controls.
+}
 
   \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
@@ -416,6 +428,10 @@ npcdistbw(\dots)
     \code{liracine}. Defaults to \code{aitchisonaitken}.
   }
 
+\subsection{Local-Polynomial And NOMAD Controls}{
+These arguments control local-polynomial specification and optional automatic degree search.
+}
+
   \item{regtype}{
     character string specifying the conditional local method used for
     the \code{xdat} regression weight operator. Options are
@@ -552,6 +568,10 @@ npcdistbw(\dots)
     can be poorly conditioned at higher degrees.
   }
 
+\subsection{Formula Interface}{
+These arguments are used by the formula method.
+}
+
   \item{formula}{
     a symbolic description of variables on which bandwidth selection is
     to be performed. The details of constructing a formula are
@@ -590,6 +610,10 @@ npcdistbw(\dots)
     or a grid of quantiles).
   }
 
+\subsection{Additional Arguments}{
+These arguments are passed onward to lower-level methods as needed.
+}
+
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
@@ -600,7 +624,23 @@ npcdistbw(\dots)
 
 The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
 
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options. Additional worked examples are available from the package gallery at \url{https://jeffreyracine.github.io/gallery/density_distribution_quantiles.html} and \url{https://jeffreyracine.github.io/gallery/kernel_primer.html}.
+
+  The bandwidth-selection argument surface is easiest to read by
+  decision group. Start with the data and bandwidth inputs
+  (\code{xdat}, \code{ydat}, \code{gydat}, \code{bws}, and
+  \code{bandwidth.compute}), then choose the bandwidth criterion and
+  representation (\code{bwmethod}, \code{bwscaling}, and
+  \code{bwtype}). Next choose continuous kernel and support controls
+  (\code{cxker*} and \code{cyker*}), categorical kernel controls
+  (\code{uxkertype}, \code{oxkertype}, and \code{oykertype}), and
+  numerical search controls including \code{nmulti}, tolerances,
+  penalties, and the \code{scale.factor.*} search-start and
+  admissibility controls. Local-polynomial and NOMAD controls
+  (\code{regtype}, \code{basis}, \code{degree*},
+  \code{search.engine}, \code{nomad}, \code{nomad.nmulti}, and
+  \code{bernstein.basis}) are relevant when using the explicit
+  local-polynomial route.
 
   For S3 plotting help, use \code{methods("plot")} and query
   class-specific help topics such as \code{?plot.npregression} and
