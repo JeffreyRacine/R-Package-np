@@ -1,4 +1,4 @@
-Changes in development after 0.70-1 [22-Mar-2026]
+Changes from Version 0.70-0 to 0.70-1 [28-Apr-2026]
 
 * Reduced the default multistart cap from `min(5, p)` to `min(2, p)`
   across the core bandwidth selectors, with the univariate boundary
@@ -16,8 +16,6 @@ Changes in development after 0.70-1 [22-Mar-2026]
   in the estimator and bandwidth help pages and regression formula
   shorthand carrying that preset through internal bandwidth
   construction.
-
-Changes from Version 0.70-0 to 0.70-1 [06-Mar-2026]
 
 * Reactivated the public conditional LP/LL cross-validation routes for the
   affected source-of-truth families after the low-memory shadow-helper
