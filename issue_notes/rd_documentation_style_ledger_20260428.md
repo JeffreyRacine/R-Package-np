@@ -25,8 +25,9 @@ documentation campaign. It is a style contract, not a status tracker.
 - `Returned Values`
 - `Compatibility And Additional Arguments`
 
-Use these names in details-level argument guides or as planning labels. Do not
-put `\subsection{}` inside `\arguments{}`.
+Use these names as empty sibling `\subsection{Group Name}{}` headings inside
+`\arguments{}` or as planning labels. Real arguments must remain top-level
+`\item{arg}{...}` entries.
 
 ## Provisional Reader QA Rubric
 
@@ -70,9 +71,9 @@ vignettes. Do not invent a new URL or wording during `.Rd` edits.
 
 ## Do Not Use
 
-- Do not put `\subsection{}` blocks inside `\arguments{}`; touched-page
-  validation showed that this can make following `\item{}` entries parse
-  incorrectly.
+- Do not wrap real argument entries inside the second argument of
+  `\subsection{...}{...}`. Use only the empty sibling form
+  `\subsection{Group Name}{}` followed by top-level `\item{arg}{...}` entries.
 - Do not create fake group headings with `\item{Group Name}{...}` inside
   `\arguments{}`.
 - Do not reorder R function formals during the first-pass documentation

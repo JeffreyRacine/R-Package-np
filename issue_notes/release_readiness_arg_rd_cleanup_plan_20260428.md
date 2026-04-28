@@ -51,15 +51,14 @@ Result:
 - No warning, note, or error was introduced by `\subsection{}` inside
   `\arguments{}`.
 
-Pilot correction: the first touched-page validation invalidated this
-conclusion. When the subsection pattern was applied to the live `npcdens` pages,
-`parse_Rd()` warned that the following `\item{}` entries were unknown macros.
-The corrected campaign contract is to keep `\arguments{}` syntactically
-standard, with real arguments documented as top-level `\item{arg}{...}`
-entries. Do not place `\subsection{}` inside `\arguments{}` and do not fake
-headings with `\item{Group Name}{...}`. For long public pages, expose the user
-decision model through low-risk argument item ordering and a concise
-argument-group guide in `\details{}`.
+Pilot correction: the first touched-page validation showed that wrapping
+`\item{}` entries inside the second argument of `\subsection{...}{...}` is
+invalid; `parse_Rd()` warned that the nested `\item{}` entries were unknown
+macros. A follow-up minimal Rd check showed the valid form:
+`\subsection{Group Name}{}` as an empty sibling followed by ordinary top-level
+`\item{arg}{...}` entries. The corrected campaign contract is therefore to use
+only the empty sibling subsection form and never to fake headings with
+`\item{Group Name}{...}`.
 
 ## Initial Documentation Surface Observations
 
@@ -147,8 +146,8 @@ risk for a release candidate.
 The safer release-grade strategy is:
 
 1. Make `.Rd` argument presentation the primary cleanup surface, using real
-   top-level `\item{arg}{...}` entries and details-level argument-group guides
-   for long public pages.
+   `\subsection{Group Name}{}` empty sibling headings plus top-level
+   `\item{arg}{...}` entries for long public pages.
 2. Change `.Rd` `\usage{}` only when it must match existing function formals or
    when the function formal order has deliberately passed the formal-risk gate.
 3. Change R function formal order only when all of these are true:
@@ -206,10 +205,11 @@ Branching state for this campaign:
 
 ## Rd Argument Grouping Style Contract
 
-Keep `\arguments{}` syntactically standard. Real arguments should remain
-top-level `\item{arg}{...}` entries. Do not put `\subsection{}` inside
-`\arguments{}` and do not fake headings with `\item{Group Name}{...}` because
-that creates documented non-arguments and can confuse Rd parsing/checking.
+Keep real arguments as top-level `\item{arg}{...}` entries. Use
+`\subsection{Group Name}{}` as an empty sibling before a group of argument
+items. Do not wrap `\item{}` entries inside `\subsection{...}{...}` and do not
+fake headings with `\item{Group Name}{...}` because that creates documented
+non-arguments and can confuse Rd parsing/checking.
 
 For long public pages, add a short `\details{}` argument-group guide when the
 plain argument list is too long to reveal the user decision model. Group text

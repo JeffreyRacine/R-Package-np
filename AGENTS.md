@@ -17,10 +17,10 @@ readability campaign, not an API refactor.
 
 1. Organize long `\arguments{}` sections by the user's decision model for the
    function, not by historical/internal argument order.
-2. Keep `\arguments{}` syntactically standard: document real arguments as
-   top-level `\item{arg}{...}` entries. Do not put `\subsection{}` blocks
-   inside `\arguments{}` and do not fake headings with
-   `\item{Group Name}{...}`.
+2. Use `\subsection{Group Name}{}` as an empty sibling before top-level
+   `\item{arg}{...}` entries when long `\arguments{}` sections need group
+   headings. Do not wrap `\item{}` entries inside `\subsection{...}{...}`, and
+   do not fake headings with `\item{Group Name}{...}`.
 3. First-pass documentation cleanup is Rd-only:
    - no R formal argument reordering,
    - no `.Rd` `\usage{}` reordering unless fixing an existing mismatch,

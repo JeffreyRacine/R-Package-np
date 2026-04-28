@@ -125,6 +125,10 @@ npcdensbw(\dots)
 }
 
 \arguments{
+\subsection{Data And Bandwidth Inputs}{
+These arguments identify the data and whether bandwidths are supplied or computed.
+}
+
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data on which bandwidth selection will
     be performed. The data types may be continuous, discrete (unordered
@@ -159,6 +163,10 @@ npcdensbw(\dots)
     will be returned with bandwidths set to those specified
     in \code{bws}. Defaults to \code{TRUE}.
   }
+
+\subsection{Bandwidth Criterion And Representation}{
+These arguments choose the selection criterion and the way continuous bandwidths are represented.
+}
 
   \item{bwmethod}{ which method to use to select
     bandwidths. \code{cv.ml} specifies likelihood cross-validation,
@@ -201,6 +209,10 @@ npcdensbw(\dots)
     \code{generalized_nn}: compute generalized nearest neighbors \cr
     \code{adaptive_nn}: compute adaptive nearest neighbors
   }
+
+\subsection{Search Initialization, Kernels, And Support}{
+These controls set numerical search starts, kernel choices, and support bounds.
+}
 
   \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
@@ -398,6 +410,21 @@ npcdensbw(\dots)
     search initialization.
   }
 
+  \item{uxkertype}{
+    character string used to specify the unordered categorical
+    kernel type. Can be set as \code{aitchisonaitken} or
+    \code{liracine}. Defaults to \code{aitchisonaitken}.
+  }
+
+  \item{uykertype}{
+    character string used to specify the unordered categorical
+    kernel type. Can be set as \code{aitchisonaitken} or \code{liracine}.
+  }
+
+\subsection{Least-Squares Quadrature Controls}{
+These arguments control bounded-response quadrature used by the least-squares cross-validation route.
+}
+
   \item{cvls.quadrature.grid}{
     character string specifying the one-dimensional bounded \code{cv.ls}
     \eqn{I_1} quadrature grid. \code{"uniform"} uses only evenly spaced
@@ -438,16 +465,9 @@ npcdensbw(\dots)
   case, callers who want tighter agreement with the ordinary unbounded
   convolution route should set \code{cvls.quadrature.points} explicitly.
 
-  \item{uxkertype}{
-    character string used to specify the unordered categorical
-    kernel type. Can be set as \code{aitchisonaitken} or
-    \code{liracine}. Defaults to \code{aitchisonaitken}.
-  }
-
-  \item{uykertype}{
-    character string used to specify the unordered categorical
-    kernel type. Can be set as \code{aitchisonaitken} or \code{liracine}.
-  }
+\subsection{Local-Polynomial And NOMAD Controls}{
+These arguments control local-polynomial specification and optional automatic degree search.
+}
 
   \item{regtype}{
     character string specifying the conditional local method used for
@@ -585,6 +605,10 @@ npcdensbw(\dots)
     can be poorly conditioned at higher degrees.
   }
 
+\subsection{Formula Interface}{
+These arguments are used by the formula method.
+}
+
   \item{formula}{
     a symbolic description of variables on which bandwidth selection is
     to be performed. The details of constructing a formula are
@@ -616,6 +640,10 @@ npcdensbw(\dots)
     \code{\link{np}} when a bandwidth search has been implied by a call to
     another function. It is not recommended that the user set this.
   }
+
+\subsection{Additional Arguments}{
+These arguments are passed onward to lower-level methods as needed.
+}
 
 
   \item{\dots}{

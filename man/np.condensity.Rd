@@ -38,6 +38,10 @@ npcdens(bws, \dots)
 }
 
 \arguments{
+\subsection{Main Bandwidth And Estimation Inputs}{
+These arguments identify the bandwidth specification and training data.
+}
+
   \item{bws}{
     a bandwidth specification. This can be set as a \code{conbandwidth}
     object returned from a previous invocation of
@@ -71,6 +75,10 @@ npcdens(bws, \dots)
    \code{\link{npcdensbw}} was called.
   }
 
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the fitted conditional density is evaluated and which estimates are returned.
+}
+
   \item{newdata}{
     An optional data frame in which to look for evaluation data. If
     omitted, the training data are used.  
@@ -93,6 +101,10 @@ npcdens(bws, \dots)
     a logical value specifying whether to return estimates of the
     gradients at the evaluation points. Defaults to \code{FALSE}.
   }
+
+\subsection{Bandwidth Selection Pass-Through And Fit Controls}{
+These arguments either pass bandwidth-selection controls to \code{\link{npcdensbw}} or control post-estimation fitting behavior.
+}
 
   \item{nomad}{
     logical shortcut passed through to \code{\link{npcdensbw}} when

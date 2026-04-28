@@ -15,13 +15,13 @@ Use this skill for `.Rd` documentation updates in `np-master`.
    - local-polynomial/degree controls;
    - numerical controls;
    - returned object and follow-up methods.
-4. Keep `\arguments{}` syntactically standard: real arguments must remain
-   top-level `\item{arg}{...}` entries. Do not put `\subsection{}` blocks
-   inside `\arguments{}`.
+4. For long `\arguments{}` sections, use `\subsection{Group Name}{}` as an
+   empty sibling before top-level `\item{arg}{...}` entries. Real arguments must
+   remain top-level `\item{arg}{...}` entries.
 5. Do not use `\item{Group Name}{...}` for headings; R will treat it as a
-   documented argument and may warn during checks. For long pages, add a concise
-   argument-group guide in `\details{}` and, where safe, reorder only the
-   `\arguments{}` items by user decision model.
+   documented argument and may warn during checks. Do not wrap `\item{}` entries
+   inside the second argument of `\subsection{...}{...}`; touched-page
+   validation showed that nested form makes `\item{}` parse incorrectly.
 6. Keep `\usage{}` synchronized with actual formals. Do not reorder `\usage{}`
    merely for visual tidiness.
 7. Do not reorder R function formals in this campaign unless separately

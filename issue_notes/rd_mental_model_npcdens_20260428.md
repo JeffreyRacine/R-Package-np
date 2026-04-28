@@ -32,7 +32,9 @@ through `...` when bandwidths are omitted and computed internally.
 
 The `.Rd` pilot must not reorder R function formals, alter `\usage{}`
 signatures, change defaults, or change examples semantically. Any
-reorganization is limited to rendered documentation.
+reorganization is limited to rendered documentation. Argument group headings
+must use the Rd-valid empty sibling form `\subsection{Group Name}{}` followed by
+top-level `\item{arg}{...}` entries.
 
 ## Pilot Grouping
 
