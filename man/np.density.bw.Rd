@@ -96,6 +96,10 @@ npudensbw(\dots)
 }
 
 \arguments{
+\subsection{Data And Bandwidth Inputs}{
+These arguments identify the data and whether bandwidths are supplied or computed.
+}
+
   \item{dat}{
     a \eqn{p}-variate data frame on which bandwidth selection will
     be performed. The data types may be continuous, discrete (unordered
@@ -121,6 +125,10 @@ npudensbw(\dots)
     in \code{bws}. Defaults to \code{TRUE}.
   }
 
+
+\subsection{Bandwidth Criterion And Representation}{
+These arguments choose the selection criterion and the way continuous bandwidths are represented.
+}
 
   \item{bwmethod}{ a character string specifying the bandwidth selection
     method. \code{cv.ml} specifies likelihood cross-validation,
@@ -164,6 +172,10 @@ npudensbw(\dots)
     \code{adaptive_nn}: compute adaptive nearest neighbors
 
   }
+
+\subsection{Search Initialization, Kernels, And Support}{
+These controls set numerical search starts, kernel choices, and support bounds.
+}
 
   \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
@@ -306,6 +318,10 @@ npudensbw(\dots)
     Can be set as \code{aitchisonaitken} or \code{liracine}.
   }
 
+\subsection{Formula Interface}{
+These arguments are used by the formula method and are normally supplied by the top-level call.
+}
+
   \item{formula}{
     a symbolic description of variables on which bandwidth selection is
     to be performed. The details of constructing a formula are
@@ -338,6 +354,10 @@ npudensbw(\dots)
     another function. It is not recommended that the user set this.
   }
 
+\subsection{Additional Arguments}{
+These arguments collect remaining controls passed through S3 methods.
+}
+
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
@@ -348,7 +368,24 @@ npudensbw(\dots)
 
 The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
 
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
+  Documentation guide: see \code{\link{np.kernels}} for kernels,
+  \code{\link{np.options}} for global options, \code{\link{plot}} for
+  plotting options, and \code{\link{npRmpi.init}} for
+  interactive/cluster MPI startup. See \code{\link{npRmpi.init}}
+  details for performance tradeoffs (message passing/startup mode) and
+  the \code{inst/Rprofile} manual-broadcast template. Additional
+  MPI-oriented examples are available from the package gallery at
+  \url{https://jeffreyracine.github.io/gallery/mpi_large_data.html}
+  and \url{https://jeffreyracine.github.io/gallery/np_npRmpi.html}.
+
+  The bandwidth-selection argument surface is easiest to read by
+  decision group: data and existing bandwidth inputs; bandwidth
+  criterion and representation; continuous kernel and support controls
+  beginning with \code{cker*}; categorical kernel controls
+  \code{ukertype} and \code{okertype}; and numerical search
+  initialization, tolerances, and feasibility controls. Users who call
+  \code{\link{npudens}} without a bandwidth object can pass these same
+  bandwidth-selection controls through that function's \code{\dots}.
 
   For S3 plotting help, use \code{methods("plot")} and query
   class-specific help topics such as \code{?plot.npregression} and
