@@ -17,7 +17,7 @@ the current top section is `Changes from Version 0.70-0 to 0.70-1
 [28-Apr-2026]`. The detailed final release-note expansion remains deferred
 until the cleanup and release gates are complete.
 
-## Proof Of Concept: Rd Argument Subsections
+## Proof Of Concept: Rd Argument Grouping
 
 An end-to-end proof of concept was completed on 2026-04-28 in a scratch copy of
 `np-master`, not in the live package tree:
@@ -51,9 +51,15 @@ Result:
 - No warning, note, or error was introduced by `\subsection{}` inside
   `\arguments{}`.
 
-Conclusion: real `\subsection{}` headings inside `\arguments{}` are an accepted
-and useful mechanism for organizing long argument lists. They should be the
-preferred first-line documentation enhancement for large public help pages.
+Pilot correction: the first touched-page validation invalidated this
+conclusion. When the subsection pattern was applied to the live `npcdens` pages,
+`parse_Rd()` warned that the following `\item{}` entries were unknown macros.
+The corrected campaign contract is to keep `\arguments{}` syntactically
+standard, with real arguments documented as top-level `\item{arg}{...}`
+entries. Do not place `\subsection{}` inside `\arguments{}` and do not fake
+headings with `\item{Group Name}{...}`. For long public pages, expose the user
+decision model through low-risk argument item ordering and a concise
+argument-group guide in `\details{}`.
 
 ## Initial Documentation Surface Observations
 
@@ -62,7 +68,7 @@ A quick structural scan on 2026-04-28 found:
 - `np-master` has 57 `.Rd` files.
 - `np-npRmpi` has 72 `.Rd` files.
 - The longest public pages are argument-heavy and likely to benefit from
-  subsection organization:
+  argument-group guidance:
   - `np.condensity.bw.Rd` with 74 documented items;
   - `np.condistribution.bw.Rd` with 73;
   - `np.regression.bw.Rd` with 61;
@@ -141,7 +147,8 @@ risk for a release candidate.
 The safer release-grade strategy is:
 
 1. Make `.Rd` argument presentation the primary cleanup surface, using real
-   `\subsection{}` headings inside `\arguments{}` for long public pages.
+   top-level `\item{arg}{...}` entries and details-level argument-group guides
+   for long public pages.
 2. Change `.Rd` `\usage{}` only when it must match existing function formals or
    when the function formal order has deliberately passed the formal-risk gate.
 3. Change R function formal order only when all of these are true:
@@ -170,7 +177,7 @@ cleanup:
    needed to repair an existing documented/code mismatch.
 3. No default changes, no alias changes, no signature changes, no S3 method
    signature changes, and no changes to runtime dispatch.
-4. `.Rd` `\arguments{}` subsection organization, argument text, `\details{}`,
+4. `.Rd` `\arguments{}` item text/order, `\details{}` argument-group guides,
    `\seealso{}`, and lightweight examples are the allowed first-pass surfaces.
 5. Any proposed R formal-order change must be spun out into a separate
    post-inventory decision with explicit sign-off, because even cosmetic formal
@@ -197,15 +204,17 @@ Branching state for this campaign:
 - Keep the branches separate because the repos share a worktree-style topology
   and may not be able to use the same branch name simultaneously.
 
-## Rd Subsection Style Contract
+## Rd Argument Grouping Style Contract
 
-Use `\subsection{Group Name}{...}` inside `\arguments{}` for long public pages
-whose argument lists are hard to scan. Do not fake headings with
-`\item{Group Name}{...}` because that creates documented non-arguments and
-triggers `R CMD check` usage warnings.
+Keep `\arguments{}` syntactically standard. Real arguments should remain
+top-level `\item{arg}{...}` entries. Do not put `\subsection{}` inside
+`\arguments{}` and do not fake headings with `\item{Group Name}{...}` because
+that creates documented non-arguments and can confuse Rd parsing/checking.
 
-Subsection text should be short and user-facing. It should say what kind of
-decisions the group controls, not restate every argument.
+For long public pages, add a short `\details{}` argument-group guide when the
+plain argument list is too long to reveal the user decision model. Group text
+should be short and user-facing. It should say what kind of decisions the group
+controls, not restate every argument.
 
 Recommended group names should be stable across related pages when applicable:
 
@@ -229,9 +238,9 @@ selectors with kernel, search, support, and local-polynomial controls.
 
 Reader-experience rules:
 
-1. A subsection heading should answer "what decision am I making here?"
-2. A subsection should usually contain at least two real arguments; avoid
-   one-argument headings unless the argument is genuinely central and complex.
+1. A group label should answer "what decision am I making here?"
+2. A group should usually contain at least two real arguments; avoid one-argument
+   groups unless the argument is genuinely central and complex.
 3. Keep high-use arguments near where users expect them, even if a different
    taxonomy would be more internally elegant.
 4. Do not bury `formula`, `data`, `bws`, `xdat`, `ydat`, or `...`.
@@ -247,7 +256,7 @@ Before broad editing, create and maintain a campaign-local style ledger:
 The ledger should be short, reusable, and updated only when a wording or
 structure pattern is actually approved by a passing tranche. It should record:
 
-1. approved subsection names and their intended meaning;
+1. approved argument-group names and their intended meaning;
 2. approved estimator-to-`*bw` pass-through wording;
 3. approved `...` wording patterns by page type;
 4. approved `bws`/`bandwidth` wording patterns;
@@ -279,9 +288,8 @@ Required estimator-page pattern:
 2. In the `...` argument item, explicitly state that when bandwidths are
    omitted, bandwidth-selection controls supplied through `...` are passed to
    the corresponding `*bw` function.
-3. Add a short `\subsection{Bandwidth Selection Arguments}{...}` under
-   `\arguments{}` or in `\details{}` when the pass-through behavior is otherwise
-   easy to overlook.
+3. Add a short bandwidth-selection argument guide in `\details{}` when the
+   pass-through behavior is otherwise easy to overlook.
 4. Point users to the `*bw` help page for the full bandwidth, kernel, support,
    search, local-polynomial, quadrature, and scale-factor control surface.
 5. Ensure `\seealso{}` prominently links to the corresponding `*bw` page.
@@ -485,7 +493,7 @@ Acceptance:
    - current `.Rd` usage order;
    - current `.Rd` argument order;
    - alias list and family membership;
-   - argument count and subsection need;
+   - argument count and argument-group guide need;
    - whether `...` exists and how it is currently described;
    - whether a `bws`/`bandwidth` object exists and how it is described;
    - likely `*bw` counterpart, if any;
@@ -551,7 +559,8 @@ reordering unless repairing a pre-existing mismatch.
 Pilot tasks:
 
 1. Create the family mental-model note.
-2. Add mental-model `\subsection{}` organization to the `*bw` page.
+2. Add a mental-model argument-group guide to the `*bw` page and reorder
+   top-level `\arguments{}` items only where the move is plainly low risk.
 3. Add estimator-to-`*bw` pass-through wording to the estimator page.
 4. Reconcile touched argument/default text with current code.
 5. Add or improve `\seealso{}` links.
@@ -584,7 +593,7 @@ Pilot acceptance:
 - The pilot artifact summary states why the new help is easier for a user to
   navigate, not only that checks passed.
 
-## Tranche 3: Remaining High-Use np Pages, Rd-First With Subsections
+## Tranche 3: Remaining High-Use np Pages, Rd-First With Argument Guides
 
 After the pilot passes, continue in `np-master` one family or page cluster at a
 time:
@@ -603,8 +612,8 @@ For each page/function:
 
 1. Record pre-edit formal order and `.Rd` order.
 2. Decide the positional prefix.
-3. Reorder `.Rd` `\arguments{}` by user mental-model groups, using
-   `\subsection{}` headings when the page is long enough to benefit.
+3. Reorder `.Rd` `\arguments{}` by user mental-model groups where safe, and add
+   details-level argument-group guides when the page is long enough to benefit.
 4. For estimator pages, add the estimator-to-bandwidth documentation bridge:
    clear `bws`/`...` pass-through wording, a `*bw` cross-reference, and one
    compact example where useful.
@@ -630,8 +639,8 @@ Acceptance:
 - No changed S3 generic/method required signatures.
 - No new `R CMD check` warnings/errors.
 - Focused positional smoke tests pass for canonical calls.
-- `R CMD Rd2txt` confirms subsection headings render cleanly for at least one
-  page in each edited family.
+- `R CMD Rd2txt` confirms argument-group guidance renders cleanly for at least
+  one page in each edited family.
 - Help pages render and usage blocks remain consistent.
 - Estimator pages that compute bandwidths clearly identify the corresponding
   `*bw` page as the complete bandwidth-control reference.
@@ -729,8 +738,8 @@ Acceptance:
 - Documentation inventory ledger before/after each family tranche.
 - Family mental-model note exists before edits.
 - `tools::checkRd()` or package check Rd phase via `R CMD check`.
-- `R CMD Rd2txt` spot checks for representative subsectioned pages, especially
-  the largest bandwidth selector pages.
+- `R CMD Rd2txt` spot checks for representative argument-group guide pages,
+  especially the largest bandwidth selector pages.
 - Before/after rendered help artifacts for the pilot and any unusually large
   page.
 - Documentation bridge audit: each estimator page with implicit bandwidth

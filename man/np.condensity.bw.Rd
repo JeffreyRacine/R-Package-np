@@ -628,7 +628,25 @@ npcdensbw(\dots)
 
 The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
 
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options. Additional worked examples are available from the package gallery at \url{https://jeffreyracine.github.io/gallery/density_distribution_quantiles.html} and \url{https://jeffreyracine.github.io/gallery/kernel_primer.html}.
+
+  The bandwidth-selection argument surface is easiest to read by
+  decision group. Start with the data and bandwidth inputs
+  (\code{xdat}, \code{ydat}, \code{bws}, and
+  \code{bandwidth.compute}), then choose the bandwidth criterion and
+  representation (\code{bwmethod}, \code{bwscaling}, and
+  \code{bwtype}). Next choose continuous kernel and support controls
+  (\code{cxker*} and \code{cyker*}), categorical kernel controls
+  (\code{uxkertype}, \code{uykertype}, \code{oxkertype}, and
+  \code{oykertype}), and numerical search controls including
+  \code{nmulti}, tolerances, penalties, and the \code{scale.factor.*}
+  search-start and admissibility controls. Bounded continuous-response
+  \code{cv.ls} fits may also use the \code{cvls.quadrature.*}
+  controls. Local-polynomial and NOMAD controls
+  (\code{regtype}, \code{basis}, \code{degree*},
+  \code{search.engine}, \code{nomad}, \code{nomad.nmulti}, and
+  \code{bernstein.basis}) are relevant when using the explicit
+  local-polynomial route.
 
   For S3 plotting help, use \code{methods("plot")} and query
   class-specific help topics such as \code{?plot.npregression} and

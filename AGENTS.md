@@ -17,8 +17,10 @@ readability campaign, not an API refactor.
 
 1. Organize long `\arguments{}` sections by the user's decision model for the
    function, not by historical/internal argument order.
-2. Use real `\subsection{Group Name}{...}` blocks inside `\arguments{}` for
-   long public pages. Do not fake headings with `\item{Group Name}{...}`.
+2. Keep `\arguments{}` syntactically standard: document real arguments as
+   top-level `\item{arg}{...}` entries. Do not put `\subsection{}` blocks
+   inside `\arguments{}` and do not fake headings with
+   `\item{Group Name}{...}`.
 3. First-pass documentation cleanup is Rd-only:
    - no R formal argument reordering,
    - no `.Rd` `\usage{}` reordering unless fixing an existing mismatch,
@@ -27,14 +29,17 @@ readability campaign, not an API refactor.
    bandwidth-selection controls in `...` pass through to the corresponding
    `*bw` function, and must point users to the `*bw` help page as the complete
    bandwidth-control reference.
-5. For touched pages, verify argument descriptions, defaults, `...`
+5. For long public pages, add a concise argument-group guide in `\details{}`
+   when the plain `\arguments{}` list is too long to reveal the user decision
+   model by item order alone.
+6. For touched pages, verify argument descriptions, defaults, `...`
    pass-throughs, examples, and `\seealso{}` links against current code.
-6. Gallery links should use canonical wording/URLs from existing package
+7. Gallery links should use canonical wording/URLs from existing package
    materials; do not invent new Gallery destinations while editing `.Rd` pages.
-7. Validate documentation edits with `R CMD Rd2txt`, `tools::checkRd()`, package
+8. Validate documentation edits with `R CMD Rd2txt`, `tools::checkRd()`, package
    checks from a tarball/private library, and installed smoke calls for any
    estimator-to-`*bw` pass-through examples.
-8. Any proposed R formal-order change is a separate post-inventory decision
+9. Any proposed R formal-order change is a separate post-inventory decision
    requiring explicit sign-off because it can break downstream positional code.
 
 ## Canonical Implementation Directive (2026-03-05)

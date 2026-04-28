@@ -9,7 +9,7 @@ Status: provisional until the first live pilot family passes validation.
 This ledger records reusable `.Rd` documentation patterns for the release
 documentation campaign. It is a style contract, not a status tracker.
 
-## Provisional Subsection Names
+## Provisional Argument-Group Names
 
 - `Data And Bandwidth Inputs`
 - `Formula Interface`
@@ -24,6 +24,9 @@ documentation campaign. It is a style contract, not a status tracker.
 - `Plot And Interval Controls`
 - `Returned Values`
 - `Compatibility And Additional Arguments`
+
+Use these names in details-level argument guides or as planning labels. Do not
+put `\subsection{}` inside `\arguments{}`.
 
 ## Provisional Reader QA Rubric
 
@@ -67,6 +70,9 @@ vignettes. Do not invent a new URL or wording during `.Rd` edits.
 
 ## Do Not Use
 
+- Do not put `\subsection{}` blocks inside `\arguments{}`; touched-page
+  validation showed that this can make following `\item{}` entries parse
+  incorrectly.
 - Do not create fake group headings with `\item{Group Name}{...}` inside
   `\arguments{}`.
 - Do not reorder R function formals during the first-pass documentation
