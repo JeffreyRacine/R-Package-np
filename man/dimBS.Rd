@@ -16,6 +16,11 @@ dimBS(basis = "additive",
       categories = NULL)
 }
 \arguments{
+\subsection{Basis Specification}{
+Basis family, continuous-kernel counting mode, polynomial degree, and
+segment controls.
+}
+
   \item{basis}{
     basis family. One of \code{"additive"}, \code{"glp"}, or
     \code{"tensor"}.
@@ -32,6 +37,11 @@ dimBS(basis = "additive",
     positive integer vector giving the number of segments for each
     continuous predictor. Defaults to one segment per degree entry.
   }
+
+\subsection{Categorical Augmentation}{
+Optional categorical-component controls used when \code{kernel = FALSE}.
+}
+
   \item{include}{
     non-negative integer vector indicating which categorical
     components are included when \code{kernel = FALSE}.

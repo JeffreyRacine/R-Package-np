@@ -5,6 +5,10 @@
 se(x)
 }
 \arguments{
+\subsection{Object Input}{
+Object to interrogate for standard errors.
+}
+
   \item{x}{an object for which the extraction of standard errors is
     meaningful.}
 }
