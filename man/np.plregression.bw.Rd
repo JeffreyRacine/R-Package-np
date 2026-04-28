@@ -326,10 +326,7 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
   \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See
   \code{\link{npRmpi.init}} details for performance tradeoffs (message
   passing/startup mode) and the \code{inst/Rprofile} manual-broadcast
-  template. Additional MPI-oriented examples are available from the
-  package gallery at
-  \url{https://jeffreyracine.github.io/gallery/mpi_large_data.html}
-  and \url{https://jeffreyracine.github.io/gallery/np_npRmpi.html}.
+  template.
 
   The partially linear bandwidth-selection argument surface is easiest
   to read by decision group: linear \code{xdat} inputs,

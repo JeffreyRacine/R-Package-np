@@ -178,10 +178,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npplregbw}} and
   \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See
   \code{\link{npRmpi.init}} details for performance tradeoffs (message
   passing/startup mode) and the \code{inst/Rprofile} manual-broadcast
-  template. Additional MPI-oriented examples are available from the
-  package gallery at
-  \url{https://jeffreyracine.github.io/gallery/mpi_large_data.html}
-  and \url{https://jeffreyracine.github.io/gallery/np_npRmpi.html}.
+  template.
 
   When \code{bws} is omitted, the formula and default methods call
   \code{\link{npplregbw}} first and pass bandwidth-selection arguments

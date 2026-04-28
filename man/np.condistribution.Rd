@@ -157,7 +157,7 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdistb
   }
 }
 \details{
-  Documentation guide: see \code{\link{npcdistbw}} for bandwidth selection and search controls, \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}}, \code{\link{plot.np}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template. Additional MPI-oriented examples are available from the package gallery at \url{https://jeffreyracine.github.io/gallery/mpi_large_data.html} and \url{https://jeffreyracine.github.io/gallery/np_npRmpi.html}.
+  Documentation guide: see \code{\link{npcdistbw}} for bandwidth selection and search controls, \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}}, \code{\link{plot.np}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
   When \code{bws} is omitted, the formula and default methods call
   \code{\link{npcdistbw}} first and pass bandwidth-selection arguments
