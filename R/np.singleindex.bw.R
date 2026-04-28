@@ -137,13 +137,15 @@ npindexbw.NULL <-
                                         scale.factor.init = 1.059224,
                                         scale.factor.search.lower = 0,
                                         where = "npindexbw") {
-  npContinuousSearchStartControls(
+  cont.start <- npContinuousSearchStartControls(
     scale.factor.init.lower,
     scale.factor.init.upper,
     scale.factor.init,
     scale.factor.search.lower,
     where = where
   )
+  cont.start$scale.factor.search.lower <- as.double(scale.factor.search.lower)
+  cont.start
 }
 
 .npindex_start_bandwidth_scale <- function(fit, nobs) {
@@ -265,7 +267,7 @@ npindexbw.NULL <-
       start.controls = h.start.controls
     )
   } else {
-    h.lower.raw <- h.start.controls$scale.factor.init.lower *
+    h.lower.raw <- h.start.controls$scale.factor.search.lower *
       .npindex_start_bandwidth_scale(fit = fit.proxy, nobs = nobs)
     h.start.raw <- tryCatch(
       .npindex_finalize_bandwidth(
@@ -714,7 +716,7 @@ npindexbw.NULL <-
   }
   gamma.start <- if (fixed.nomad) fixed.setup$start_matrix.point[1L, fixed.setup$h.col] else NA_real_
   h.lower <- if (fixed.nomad) {
-    h.start.controls$scale.factor.init.lower
+    h.start.controls$scale.factor.search.lower
   } else {
     h.lower.raw
   }
@@ -765,7 +767,7 @@ npindexbw.NULL <-
       h = h,
       bwtype = baseline.bws$type,
       nobs = nrow(x.clean),
-      lower = if (fixed.nomad) h.start.controls$scale.factor.init.lower * fixed.setup$h.scale else NULL,
+      lower = if (fixed.nomad) h.start.controls$scale.factor.search.lower * fixed.setup$h.scale else NULL,
       where = "npindexbw"
     )
     c(beta.tail, h)
@@ -1665,7 +1667,7 @@ npindexbw.sibandwidth <-
               ols.fit <- lm(ydat~xdat,x=TRUE)
               fit <- fitted(ols.fit)
               fixed.h.lower <- if (identical(bws$type, "fixed")) {
-                h.start.controls$scale.factor.init.lower * .npindex_start_bandwidth_scale(fit = fit, nobs = nobs)
+                h.start.controls$scale.factor.search.lower * .npindex_start_bandwidth_scale(fit = fit, nobs = nobs)
               } else {
                 NULL
               }

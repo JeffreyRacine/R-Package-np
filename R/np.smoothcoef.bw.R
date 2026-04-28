@@ -164,6 +164,7 @@ npscoefbw.NULL <-
     scale.factor.init.lower = cont.start$scale.factor.init.lower,
     scale.factor.init.upper = cont.start$scale.factor.init.upper,
     scale.factor.init = cont.start$scale.factor.init,
+    scale.factor.search.lower = as.double(scale.factor.search.lower),
     lbd.init = as.double(lbd.init),
     hbd.init = as.double(hbd.init),
     dfac.init = as.double(dfac.init)
@@ -917,7 +918,7 @@ npscoefbw.scbandwidth <-
           })
           fixed.lower <- if (identical(bws$type, "fixed")) {
             out <- rep.int(0, length(x.scale))
-            out[dati$icon] <- x.scale[dati$icon] * start.controls$scale.factor.init.lower
+            out[dati$icon] <- x.scale[dati$icon] * start.controls$scale.factor.search.lower
             out
           } else {
             NULL
