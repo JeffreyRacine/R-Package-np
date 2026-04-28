@@ -38,6 +38,10 @@ FALSE, \dots)
 }
 
 \arguments{
+\subsection{Main Bandwidth And Estimation Inputs}{
+These arguments identify the bandwidth specification and training data.
+}
+
   \item{bws}{
     a bandwidth specification. This can be set as a \code{rbandwidth}
     object returned from an invocation of \code{\link{npregbw}}, or
@@ -67,6 +71,10 @@ FALSE, \dots)
     \code{environment(bws)}, typically the environment from which
     \code{\link{npregbw}} was called.
   }
+
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the regression is evaluated and which fitted quantities are returned.
+}
 
   \item{newdata}{
     An optional data frame in which to look for evaluation data. If
@@ -132,15 +140,46 @@ FALSE, \dots)
     returned object \code{fit} to see the normalized shortcut metadata.
   }
 
+\subsection{Bandwidth Selection Pass-Through}{
+These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when bandwidths are computed internally.
+}
+
   \item{\dots}{
-    additional arguments supplied to specify the regression type,
-    bandwidth type, kernel types, training data, and so on, detailed
-    below. 
+    additional arguments supplied to \code{\link{npregbw}} when
+    \code{npreg} computes bandwidths internally, or arguments needed to
+    interpret a numeric \code{bws} vector. This is where bandwidth
+    selection controls such as \code{bwmethod}, \code{bwtype},
+    \code{bwscaling}, kernel/support controls such as \code{ckertype},
+    \code{ckerorder}, and \code{ckerbound}, categorical kernel controls
+    such as \code{ukertype} and \code{okertype}, search controls such
+    as \code{nmulti} and \code{scale.factor.search.lower}, and
+    local-polynomial/NOMAD controls such as \code{regtype},
+    \code{degree}, \code{basis}, \code{bernstein.basis},
+    \code{degree.select}, and \code{nomad.nmulti} are supplied. See
+    \code{\link{npregbw}} for the complete bandwidth-selection argument
+    surface.
   }
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}}, \code{\link{plot.np}} for plotting options.
+  Documentation guide: see \code{\link{npregbw}} for bandwidth
+  selection and search controls, \code{\link{np.kernels}} for kernels,
+  \code{\link{np.options}} for global options, and \code{\link{plot}},
+  \code{\link{plot.np}} for plotting options. Additional worked
+  examples are available from the package gallery at
+  \url{https://jeffreyracine.github.io/gallery/kernel_primer.html}.
+
+  When \code{bws} is omitted, the formula and default methods call
+  \code{\link{npregbw}} first and pass bandwidth-selection arguments
+  from \code{\dots} to that call. When \code{bws} is already an
+  \code{rbandwidth} object, \code{npreg} estimates with the stored
+  bandwidth metadata in that object.
+
+  Argument groups for bandwidth selection are documented on
+  \code{\link{npregbw}}. The most common workflow is to choose data and
+  bandwidth inputs first, then bandwidth criterion and representation,
+  then kernel/support controls, and finally local-polynomial/NOMAD
+  controls when using polynomial-adaptive fits.
 
   For S3 plotting help, use \code{methods("plot")} and query
   class-specific help topics such as \code{?plot.npregression} and

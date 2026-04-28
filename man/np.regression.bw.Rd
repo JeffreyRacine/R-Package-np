@@ -108,6 +108,10 @@ npregbw(\dots)
         \dots)
 }
 \arguments{
+\subsection{Data And Bandwidth Inputs}{
+These arguments identify the data and whether bandwidths are supplied or computed.
+}
+
   \item{xdat}{
     a \eqn{p}-variate data frame of regressors on which bandwidth selection will
     be performed. The data types may be continuous, discrete (unordered
@@ -132,7 +136,7 @@ npregbw(\dots)
     be left unset.
   }
 
-  
+
   \item{bandwidth.compute}{
     a logical value which specifies whether to do a numerical search for
     bandwidths or not. If set to \code{FALSE}, a \code{rbandwidth} object
@@ -140,6 +144,19 @@ npregbw(\dots)
     in \code{bws}. Defaults to \code{TRUE}.
   }
 
+\subsection{Local-Polynomial And NOMAD Controls}{
+These arguments control regression type, local-polynomial specification, and optional automatic degree search.
+}
+
+  \item{regtype}{
+    a character string specifying which type of kernel regression
+    estimator to use. \code{lc} specifies a local-constant estimator
+    (Nadaraya-Watson) and \code{ll} specifies a local-linear
+    estimator. \code{lp} specifies a local polynomial
+    estimator with polynomial degree(s) given by \code{degree} for
+    continuous predictors, or selected automatically when
+    \code{degree.select != "manual"}. Defaults to \code{lc}.
+  }
 
   \item{basis}{
     basis selector relevant only when \code{regtype="lp"}.
@@ -172,78 +189,6 @@ npregbw(\dots)
     design: rank deficiency triggers an error, and large condition
     number (\eqn{\kappa(B)}{kappa(B)}) triggers warning/error thresholds
     to avoid unstable optimization dominated by ridging.
-  }
-  
-  \item{bwmethod}{
-    which method to use to select bandwidths. \code{cv.aic} specifies
-    expected Kullback-Leibler cross-validation (Hurvich, Simonoff, and
-    Tsai (1998)), and \code{cv.ls} specifies least-squares
-    cross-validation. Defaults to \code{cv.ls}.
-  }
-
-  \item{bwscaling}{ a logical value that when set to \code{TRUE} the
-    supplied bandwidths are interpreted as \sQuote{scale factors}
-    (\eqn{c_j}{c[j]}), otherwise when the value is \code{FALSE} they are
-    interpreted as \sQuote{raw bandwidths} (\eqn{h_j}{h[j]} for
-    continuous data types, \eqn{\lambda_j}{lambda[j]} for discrete data
-    types). For continuous data types, \eqn{c_j}{c[j]} and
-    \eqn{h_j}{h[j]} are related by the formula \eqn{h_j = c_j \sigma_j
-    n^{-1/(2P+l)}}{h[j] = c[j]*sigma[j]*n^(-1/(2*P+l))}, where
-    \eqn{\sigma_j}{sigma[j]} is an adaptive measure of spread of
-    continuous variable \eqn{j} defined as min(standard deviation, mean
-    absolute deviation/1.4826, interquartile range/1.349), \eqn{n} the
-    number of observations, \eqn{P}{P} the order of the kernel, and
-    \eqn{l}{l} the number of continuous variables. For discrete data
-    types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are related by the
-    formula \eqn{h_j = c_jn^{-2/(2P+l)}}{h[j] = c[j]*n^(-2/(2*P+l))},
-    where here \eqn{j}{[j]} denotes discrete variable \eqn{j}{j}.
-    Defaults to \code{FALSE}.  }
-
-  \item{bwtype}{
-    character string used for the continuous variable bandwidth type,
-    specifying the type of bandwidth to compute and return in the
-    \code{bandwidth} object. Defaults to \code{fixed}. Option
-    summary:\cr
-    \code{fixed}: compute fixed bandwidths \cr
-    \code{generalized_nn}: compute generalized nearest neighbors \cr
-    \code{adaptive_nn}: compute adaptive nearest neighbors
-    
-  }
-
-  \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
-
-  \item{scale.factor.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.search.lower} is larger, the effective first search start is raised to that floor. See Details}
-
-  \item{ckerbound}{
-    character string controlling continuous-kernel support handling.
-    Can be set as \code{none} (default kernel on full support),
-    \code{range} (use sample min/max), or \code{fixed} (use
-    \code{ckerlb}/\code{ckerub}). The bounded-kernel route reuses the selected continuous kernel and renormalizes it on the chosen support; see \code{\link{np.kernels}}.
-  }
-
-  \item{ckerlb}{
-    numeric scalar/vector of lower bounds for continuous variables used
-    when \code{ckerbound="fixed"}. Must satisfy lower-bound validity for
-    each continuous variable (e.g., \code{<= min(variable)}). Use \code{-Inf} for unbounded below. See \code{\link{np.kernels}} for bounded-kernel normalization details.
-  }
-
-  \item{ckerorder}{
-    numeric value specifying kernel order (one of
-    \code{(2,4,6,8)}). Kernel order specified along with a
-  \code{uniform} continuous kernel type will be ignored. Defaults to
-  \code{2}.
-  }
-
-  \item{ckertype}{
-    character string used to specify the continuous kernel type.
-    Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
-  }
-
-  \item{ckerub}{
-    numeric scalar/vector of upper bounds for continuous variables used
-    when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
-    each continuous variable (e.g., \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
   \item{degree}{
@@ -363,6 +308,86 @@ npregbw(\dots)
     \code{search.engine="cell"}.
   }
 
+\subsection{Bandwidth Criterion And Representation}{
+These arguments choose the selection criterion and the way continuous bandwidths are represented.
+}
+
+  \item{bwmethod}{
+    which method to use to select bandwidths. \code{cv.aic} specifies
+    expected Kullback-Leibler cross-validation (Hurvich, Simonoff, and
+    Tsai (1998)), and \code{cv.ls} specifies least-squares
+    cross-validation. Defaults to \code{cv.ls}.
+  }
+
+  \item{bwscaling}{ a logical value that when set to \code{TRUE} the
+    supplied bandwidths are interpreted as \sQuote{scale factors}
+    (\eqn{c_j}{c[j]}), otherwise when the value is \code{FALSE} they are
+    interpreted as \sQuote{raw bandwidths} (\eqn{h_j}{h[j]} for
+    continuous data types, \eqn{\lambda_j}{lambda[j]} for discrete data
+    types). For continuous data types, \eqn{c_j}{c[j]} and
+    \eqn{h_j}{h[j]} are related by the formula \eqn{h_j = c_j \sigma_j
+    n^{-1/(2P+l)}}{h[j] = c[j]*sigma[j]*n^(-1/(2*P+l))}, where
+    \eqn{\sigma_j}{sigma[j]} is an adaptive measure of spread of
+    continuous variable \eqn{j} defined as min(standard deviation, mean
+    absolute deviation/1.4826, interquartile range/1.349), \eqn{n} the
+    number of observations, \eqn{P}{P} the order of the kernel, and
+    \eqn{l}{l} the number of continuous variables. For discrete data
+    types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are related by the
+    formula \eqn{h_j = c_jn^{-2/(2P+l)}}{h[j] = c[j]*n^(-2/(2*P+l))},
+    where here \eqn{j}{[j]} denotes discrete variable \eqn{j}{j}.
+    Defaults to \code{FALSE}.  }
+
+  \item{bwtype}{
+    character string used for the continuous variable bandwidth type,
+    specifying the type of bandwidth to compute and return in the
+    \code{bandwidth} object. Defaults to \code{fixed}. Option
+    summary:\cr
+    \code{fixed}: compute fixed bandwidths \cr
+    \code{generalized_nn}: compute generalized nearest neighbors \cr
+    \code{adaptive_nn}: compute adaptive nearest neighbors
+
+  }
+
+\subsection{Search Initialization, Kernels, And Support}{
+These controls set numerical search starts, kernel choices, and support bounds.
+}
+
+  \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{scale.factor.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.search.lower} is larger, the effective first search start is raised to that floor. See Details}
+
+  \item{ckerbound}{
+    character string controlling continuous-kernel support handling.
+    Can be set as \code{none} (default kernel on full support),
+    \code{range} (use sample min/max), or \code{fixed} (use
+    \code{ckerlb}/\code{ckerub}). The bounded-kernel route reuses the selected continuous kernel and renormalizes it on the chosen support; see \code{\link{np.kernels}}.
+  }
+
+  \item{ckerlb}{
+    numeric scalar/vector of lower bounds for continuous variables used
+    when \code{ckerbound="fixed"}. Must satisfy lower-bound validity for
+    each continuous variable (e.g., \code{<= min(variable)}). Use \code{-Inf} for unbounded below. See \code{\link{np.kernels}} for bounded-kernel normalization details.
+  }
+
+  \item{ckerorder}{
+    numeric value specifying kernel order (one of
+    \code{(2,4,6,8)}). Kernel order specified along with a
+  \code{uniform} continuous kernel type will be ignored. Defaults to
+  \code{2}.
+  }
+
+  \item{ckertype}{
+    character string used to specify the continuous kernel type.
+    Can be set as \code{gaussian}, \code{epanechnikov}, or
+    \code{uniform}. Defaults to \code{gaussian}.
+  }
+
+  \item{ckerub}{
+    numeric scalar/vector of upper bounds for continuous variables used
+    when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
+    each continuous variable (e.g., \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
+  }
+
   \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
 
   \item{dfac.init}{non-random initial values for scale factors for categorical variables for Powell's algorithm. See Details}
@@ -422,16 +447,6 @@ npregbw(\dots)
     baseline penalty when \code{invalid.penalty="baseline"}.
     Defaults to \code{10}.}
 
-  \item{regtype}{
-    a character string specifying which type of kernel regression
-    estimator to use. \code{lc} specifies a local-constant estimator
-    (Nadaraya-Watson) and \code{ll} specifies a local-linear
-    estimator. \code{lp} specifies a local polynomial
-    estimator with polynomial degree(s) given by \code{degree} for
-    continuous predictors, or selected automatically when
-    \code{degree.select != "manual"}. Defaults to \code{lc}.
-  }
-
   \item{remin}{
     a logical value which when set as \code{TRUE} the search routine
     restarts from located minima for a minor gain in accuracy. Defaults
@@ -481,6 +496,10 @@ npregbw(\dots)
     \code{aitchisonaitken}.
   }
 
+\subsection{Formula Interface}{
+These arguments are used by the formula method and are normally supplied by the top-level call.
+}
+
   \item{formula}{
     a symbolic description of variables on which bandwidth selection is
     to be performed. The details of constructing a formula are
@@ -513,6 +532,10 @@ npregbw(\dots)
     another function. It is not recommended that the user set this.
   }
 
+\subsection{Additional Arguments}{
+These arguments collect remaining controls passed through S3 methods.
+}
+
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
@@ -522,7 +545,22 @@ npregbw(\dots)
 
 The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
 
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels,
+  \code{\link{np.options}} for global options, and \code{\link{plot}}
+  for plotting options. Additional worked examples are available from
+  the package gallery at
+  \url{https://jeffreyracine.github.io/gallery/kernel_primer.html}.
+
+  The bandwidth-selection argument surface is easiest to read by
+  decision group: data and existing bandwidth inputs;
+  local-polynomial/NOMAD controls when polynomial-adaptive regression
+  is requested; bandwidth criterion and representation; continuous
+  kernel and support controls beginning with \code{cker*};
+  categorical kernel controls \code{ukertype} and \code{okertype}; and
+  numerical search initialization, tolerances, and feasibility
+  controls. Users who call \code{\link{npreg}} without a bandwidth
+  object can pass these same bandwidth-selection controls through that
+  function's \code{\dots}.
 
   For S3 plotting help, use \code{methods("plot")} and query
   class-specific help topics such as \code{?plot.npregression} and
