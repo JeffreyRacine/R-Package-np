@@ -26,6 +26,10 @@ npRmpi.quit(force = FALSE, dellog = TRUE, comm = 1,
 npRmpi.session.info(comm = 1)
 }
 \arguments{
+\subsection{Session And Worker Controls}{
+MPI startup, shutdown, worker-count, and worker-status controls.
+}
+
   \item{nslaves}{Number of slaves to spawn for interactive execution (\code{mode="spawn"}); must be at least \code{1}. For serial workflows, use package \pkg{np}.}
   \item{comm}{Communicator used for the master+slaves pool (defaults to \code{1}).}
   \item{mode}{Startup/stop mode. \code{"spawn"} starts slaves from rank 0

@@ -18,6 +18,10 @@ npdeneqtest(x = NULL,
 }
 
 \arguments{
+\subsection{Sample And Bandwidth Inputs}{
+Two-sample data and optional bandwidth objects for the density equality test.
+}
+
   \item{x,y}{
     data frames for the two samples for which one wishes to
     test equality of densities. The variables in each data
@@ -28,6 +32,10 @@ npdeneqtest(x = NULL,
     optional bandwidth objects for \code{x,y}
   }
   
+\subsection{Bootstrap Controls}{
+Bootstrap replication and reproducibility controls.
+}
+
   \item{boot.num}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
@@ -37,6 +45,10 @@ npdeneqtest(x = NULL,
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
+
+\subsection{Additional Bandwidth Arguments}{
+Arguments used when bandwidth objects are not supplied.
+}
 
   \item{\dots}{ additional arguments supplied to specify the bandwidth
     type, kernel types, and so on.  This is used if you do not pass in

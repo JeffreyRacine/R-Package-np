@@ -19,6 +19,10 @@ npunitest(data.x = NULL,
 }
 
 \arguments{
+\subsection{Data And Statistic Inputs}{
+Common-support samples and statistic form.
+}
+
   \item{data.x, data.y}{
     common support univariate vectors containing the variables.
   }
@@ -31,6 +35,10 @@ npunitest(data.x = NULL,
     regarding the use of \code{summation} when \code{data.x} and
     \code{data.y} lack common support and/or are sparse.
   }
+
+\subsection{Bootstrap And Bandwidth Controls}{
+Bootstrap execution, scalar bandwidths, and reproducibility controls.
+}
 
   \item{bootstrap}{
     a logical value which specifies whether to conduct the bootstrap
@@ -51,6 +59,11 @@ npunitest(data.x = NULL,
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
+
+\subsection{Additional Bandwidth Arguments}{
+Arguments used when scalar bandwidths are interpreted with non-default
+kernel or bandwidth settings.
+}
 
   \item{\dots}{ additional arguments supplied to specify the bandwidth
     type, kernel types, and so on.  This is used since we specify bw as

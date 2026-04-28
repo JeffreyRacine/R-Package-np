@@ -35,6 +35,11 @@ npregivderiv(y,
              ...)
 }
 \arguments{
+\subsection{Main Data Inputs}{
+Dependent variable, endogenous regressors, instruments, exogenous regressors,
+and evaluation data for derivative estimation.
+}
+
   \item{y}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
@@ -72,6 +77,10 @@ npregivderiv(y,
     evaluation takes place on the data provided by \code{x}.
   }
 
+\subsection{Iteration Controls}{
+Landweber-Fridman iteration, starting-value, and stopping controls.
+}
+
 \item{constant}{
   the constant to use for Landweber-Fridman iteration.
 }
@@ -99,6 +108,10 @@ npregivderiv(y,
     replicability of the numerical search. Defaults to 42.
   }
 
+\subsection{Residual Smoothing And Starting Values}{
+Controls for residual smoothing and the initial derivative path.
+}
+
 \item{smooth.residuals}{
   a logical value (defaults to \code{TRUE}) indicating whether to
   optimize bandwidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
@@ -122,6 +135,11 @@ npregivderiv(y,
     course of one iteration (i.e. it may be above the iteration tolerance
     but increased).
   }
+
+\subsection{Additional Estimation Arguments}{
+Further arguments supplied to \code{\link{npreg}} and \code{\link{npksum}}.
+}
+
   \item{...}{ 
     additional arguments supplied to \code{\link{npreg}} and \code{\link{npksum}}.
   }

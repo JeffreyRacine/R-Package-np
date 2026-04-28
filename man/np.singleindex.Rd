@@ -47,6 +47,10 @@ npindex(bws, \dots)
 }
 
 \arguments{
+\subsection{Main Bandwidth And Data Inputs}{
+These arguments identify the bandwidth specification, training data, and evaluation data.
+}
+
   \item{bws}{
     a bandwidth specification. This can be set as a
     \code{sibandwidth}
@@ -100,6 +104,10 @@ npindex(bws, \dots)
     of the dependent variable. Optional, and used only to calculate the
     true errors. 
   }
+
+\subsection{Fitted Quantities And Inference}{
+These arguments control residuals, gradients, and bootstrap standard errors.
+}
   
   \item{boot.num}{
     an integer specifying the number of bootstrap replications to use
@@ -127,6 +135,10 @@ npindex(bws, \dots)
     \code{FALSE}.
   }
 
+\subsection{Bandwidth Search Shortcut}{
+This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npindexbw}} when bandwidths are computed inside \code{npindex}.
+}
+
   \item{nomad}{
     logical shortcut passed through to \code{\link{npindexbw}} when
     bandwidths are computed inside \code{npindex}. When \code{TRUE},
@@ -143,6 +155,9 @@ npindex(bws, \dots)
     returned object \code{fit} to see the normalized shortcut metadata.
   }
 
+\subsection{Additional Arguments}{
+These arguments are passed to the bandwidth-selection counterpart when bandwidths are not supplied.
+}
 
   \item{\dots}{
     additional arguments supplied to specify the parameters to the

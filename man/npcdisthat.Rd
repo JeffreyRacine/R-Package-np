@@ -17,6 +17,11 @@ npcdisthat(bws,
   output = c("matrix", "apply"))
 }
 \arguments{
+\subsection{Bandwidth And Data Inputs}{
+Conditional distribution bandwidth object and training/evaluation data used to
+construct the operator.
+}
+
   \item{bws}{A fitted conditional distribution bandwidth object of class \code{"condbandwidth"}.}
 
   \item{txdat}{Training conditioning data used to construct the operator.}
@@ -26,6 +31,11 @@ npcdisthat(bws,
   \item{exdat}{Optional evaluation conditioning data. If omitted, the operator is built on the training conditioning data.}
 
   \item{eydat}{Optional evaluation response data. If omitted, the operator is built on the training response data.}
+
+\subsection{Operator Output}{
+Right-hand-side input and output mode for matrix construction or direct
+operator application.
+}
 
   \item{y}{Optional right-hand side vector or matrix with one row per training observation.}
 

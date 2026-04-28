@@ -19,6 +19,10 @@ npsdeptest(data = NULL,
 }
 
 \arguments{
+\subsection{Data And Statistic Inputs}{
+Time-series data, lag horizon, and statistic form for the serial dependence test.
+}
+
   \item{data}{
     a vector containing the variable that can be of type
     \code{\link{numeric}} or \code{\link{ts}}.
@@ -36,6 +40,10 @@ npsdeptest(data = NULL,
     details). Defaults to \code{integration}.
   }
   
+\subsection{Bootstrap Controls}{
+Bootstrap execution and reproducibility controls.
+}
+
   \item{bootstrap}{
     a logical value which specifies whether to conduct
     the bootstrap test or not. If set to \code{FALSE}, only the

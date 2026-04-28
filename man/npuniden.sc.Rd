@@ -36,6 +36,10 @@ npuniden.sc(X = NULL,
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
+\subsection{Data And Support Inputs}{
+Training/evaluation data, bandwidth, and support endpoints.
+}
+
   \item{X}{
 a required numeric vector of training data lying in \eqn{[a,b]}
 }
@@ -51,6 +55,12 @@ an optional lower bound on the support of \code{X} or \code{Y} (defaults to 0)
   \item{b}{
 an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
 }
+
+\subsection{Density Bounds}{
+Optional lower and upper density bounds used with
+\code{constraint="density"}.
+}
+
 \item{lb}{
   a scalar lower bound (\eqn{\ge 0}) to be used in conjunction with
   \code{constraint="density"}
@@ -59,6 +69,11 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
   a scalar upper bound (\eqn{\ge 0} and \eqn{\ge} \code{lb}) to be used
   in conjunction with \code{constraint="density"}
 }
+
+\subsection{Grid And Distance Controls}{
+Additional grid construction, distance metric, and mass-preservation controls.
+}
+
 \item{extend.range}{
   number specifying the fraction by which the range of the training data
   should be extended for the additional grid points (passed to the
@@ -81,6 +96,11 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
   to have the same probability mass over the range \code{X}, \code{Y},
   and the additional grid points
 }
+
+\subsection{Shape Constraint}{
+Monotonicity, convexity, and log-shape constraint choice.
+}
+
 \item{constraint}{
   a character string indicating whether the estimate is to be
   constrained to be monotonically increasing

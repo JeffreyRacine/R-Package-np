@@ -38,6 +38,10 @@ npconmode(bws, \dots)
 }
 
 \arguments{
+\subsection{Bandwidth And Training Data Inputs}{
+Conditional density bandwidth and training data inputs used to compute modes.
+}
+
   \item{bws}{
     a bandwidth specification. This can be set as a \code{conbandwidth}
     object returned from an invocation of \code{\link{npcdensbw}}
@@ -64,6 +68,11 @@ npconmode(bws, \dots)
     \code{\link{npcdensbw}} was called.
   }
 
+\subsection{Evaluation Data}{
+Evaluation covariates and optional true outcomes used for mode prediction
+and classification summaries.
+}
+
   \item{newdata}{
     An optional data frame in which to look for evaluation data. If
     omitted, the training data are used.  
@@ -83,6 +92,10 @@ npconmode(bws, \dots)
   }
 
 
+\subsection{Additional Bandwidth Arguments}{
+Further arguments used when \code{bws} is supplied as a vector rather than
+a \code{conbandwidth} object.
+}
 
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,

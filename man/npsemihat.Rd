@@ -40,6 +40,11 @@ npscoefhat(bws,
   ...)
 }
 \arguments{
+\subsection{Bandwidth And Data Inputs}{
+Semiparametric bandwidth object, training/evaluation data, and optional
+right-hand-side input.
+}
+
   \item{bws}{A fitted bandwidth object. \code{npindexhat()} requires class \code{sibandwidth}, \code{npplreghat()} requires class \code{plbandwidth}, and \code{npscoefhat()} requires class \code{scbandwidth}.}
 
   \item{txdat}{Training \code{x} data.}
@@ -48,21 +53,38 @@ npscoefhat(bws,
 
   \item{y}{Optional response vector or matrix for apply mode.}
 
+\subsection{Operator Output And Derivatives}{
+Output mode and derivative controls used by semiparametric hat operators.
+}
+
   \item{output}{Either \code{"matrix"} or \code{"apply"}.}
 
   \item{s}{For \code{npindexhat}, \code{s=0} returns fit operator and \code{s=1} returns index-derivative operator.}
 
   \item{fd.step}{Compatibility argument for \code{npindexhat(..., s=1)}. If supplied it must be a positive finite scalar, but the current \code{s=1} route uses the canonical exact derivative operator rather than finite-differencing the fit operator.}
 
+\subsection{Partially Linear And Smooth-Coefficient Data}{
+Additional \code{z} data used by partially linear and smooth-coefficient
+operator routes.
+}
+
   \item{tzdat}{Training \code{z} data for partially linear and smooth-coefficient models.}
 
   \item{ezdat}{Evaluation \code{z} data.}
+
+\subsection{Smooth-Coefficient Controls}{
+Ridge, iteration, and leave-one-out controls for \code{npscoefhat()}.
+}
 
   \item{ridge}{Base ridge term for local linear solves in \code{npscoefhat}; must be a non-negative finite scalar. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves.}
 
   \item{iterate}{Logical; \code{npscoefhat()} currently supports \code{iterate = FALSE} only.}
 
   \item{leave.one.out}{Logical; leave-one-out kernel weights for \code{npscoefhat}. This currently requires evaluation \code{z} data to match training \code{z} data.}
+
+\subsection{Additional Arguments}{
+Reserved extension arguments.
+}
 
   \item{...}{Reserved for future extensions.}
 }

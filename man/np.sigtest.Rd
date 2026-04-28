@@ -40,6 +40,10 @@ npsigtest(bws, \dots)
 }
 
 \arguments{
+\subsection{Bandwidth And Data Inputs}{
+Regression bandwidth and training data inputs for the significance test.
+}
+
   \item{bws}{
     a bandwidth specification. This can be set as a \code{rbandwidth}
     object returned from a previous invocation, or as a vector of
@@ -70,6 +74,10 @@ npsigtest(bws, \dots)
     taken from \code{environment(bws)}, typically the environment from
     which \code{\link{npregbw}} was called.
   }
+
+\subsection{Bootstrap And Test Controls}{
+Controls for bootstrap type, null distribution, tested variables, and random seed.
+}
 
   \item{boot.num}{
     an integer value specifying the number of bootstrap replications to
@@ -123,6 +131,10 @@ npsigtest(bws, \dots)
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
+
+\subsection{Additional Bandwidth Arguments}{
+Further arguments for bandwidth selection when needed.
+}
 
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,

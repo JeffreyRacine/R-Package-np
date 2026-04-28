@@ -30,6 +30,10 @@ string(length)
 .typeindex(x)
 }
 \arguments{
+\subsection{MPI And Dispatch Inputs}{
+Internal communicator, dispatch, worker, and result-simplification inputs.
+}
+
   \item{comm}{a communicator number.}
   \item{length}{length of a string.}
   \item{fun}{a function or name of a function.}

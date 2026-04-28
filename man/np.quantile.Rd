@@ -20,6 +20,11 @@ npquantile(x = NULL,
 }
 
 \arguments{
+\subsection{Distribution And Quantile Inputs}{
+Sample data, requested probabilities, and optional distribution bandwidth
+object used for quantile inversion.
+}
+
   \item{x}{
     a univariate vector of type \code{\link{numeric}} containing sample
     realizations (training data) used to estimate the cumulative
@@ -42,10 +47,20 @@ npquantile(x = NULL,
     \code{\link{npudistbw}}. If not provided \code{\link{npudistbw}} is
     invoked with optional arguments passed via \code{\dots}.
   }
+
+\subsection{Evaluation Controls}{
+Grid and range controls for the quasi-inverse calculation.
+}
+
   \item{f}{
     an optional argument fed to \code{\link{extendrange}}. Defaults to
     \code{1}. See \code{?\link{extendrange}} for details.
   }
+
+\subsection{Additional Bandwidth Arguments}{
+Arguments passed to \code{\link{npudistbw}} when \code{bws} is not supplied.
+}
+
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type, kernel
     types, bandwidth selection methods, and so on. See

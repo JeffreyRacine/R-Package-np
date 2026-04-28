@@ -33,6 +33,10 @@ npqcmstest(formula,
 }
 
 \arguments{
+\subsection{Formula And Data Inputs}{
+Model, formula, quantile, and data inputs for the quantile specification test.
+}
+
     \item{formula}{
     a symbolic description of variables on which the test is
     to be performed. The details of constructing a formula are
@@ -71,6 +75,11 @@ npqcmstest(formula,
   \item{tau}{
     a numeric value specifying the \eqn{\tau}{tau}th quantile is desired
   }
+
+\subsection{Test Statistic And Bootstrap Controls}{
+Controls for the reference distribution, bootstrap route, statistic
+normalization, density weighting, and random seed.
+}
 
   \item{distribution}{
     a character string used to specify the method of estimating the
@@ -114,6 +123,10 @@ npqcmstest(formula,
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
+
+\subsection{Additional Bandwidth Arguments}{
+Arguments passed through to residual bandwidth selection.
+}
 
   \item{\dots}{
     additional arguments supplied to control bandwidth selection on the

@@ -102,6 +102,10 @@ npscoefbw(\dots)
 }
 
 \arguments{
+\subsection{Data And Bandwidth Inputs}{
+Primary smooth-coefficient data and bandwidth inputs.
+}
+
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data (training data),
     which, by default, populates the columns \eqn{2} through \eqn{p+1}
@@ -159,6 +163,11 @@ npscoefbw(\dots)
     will be returned with bandwidths set to those specified
     in \code{bws}. Defaults to \code{TRUE}.
   }
+
+\subsection{Local-Polynomial And NOMAD Controls}{
+Controls for the local-polynomial search route and the \code{nomad=TRUE}
+shortcut.
+}
 
   \item{basis}{
     for \code{regtype="lp"}, the polynomial basis family used for local
@@ -319,6 +328,10 @@ npscoefbw(\dots)
     controls inner NOMAD multistarts within each outer restart.
   }
 
+\subsection{Search Initialization, Kernels, And Support}{
+Controls for search starts, continuous support handling, and kernel choices.
+}
+
   \item{degree.min}{
     optional scalar or integer vector giving lower bounds for automatic
     degree search when \code{degree.select != "manual"}.
@@ -420,6 +433,16 @@ npscoefbw(\dots)
     \code{liracine}.
   }
 
+  \item{ukertype}{
+    character string used to specify the unordered categorical kernel type.
+    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults to
+    \code{aitchisonaitken}.
+  }
+
+\subsection{Optimization Controls}{
+General numerical optimization tolerances and restart controls.
+}
+
   \item{optim.abstol}{
     the absolute convergence tolerance used by \code{\link{optim}}. Only useful
     for non-negative functions, as a tolerance for reaching
@@ -471,17 +494,19 @@ npscoefbw(\dots)
     replicability of the numerical search. Defaults to 42.
   }
 
+\subsection{Regression Type}{
+Local smoothing type for the coefficient surface.
+}
+
   \item{regtype}{
     a character string specifying local smoothing type for the \code{z}
     surface. Options are \code{"lc"} (default), \code{"ll"}, and
     \code{"lp"}.
   }
 
-  \item{ukertype}{
-    character string used to specify the unordered categorical kernel type.
-    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults to
-    \code{aitchisonaitken}.
-  }
+\subsection{Formula Interface}{
+Formula-method arguments used when the data are supplied symbolically.
+}
 
   \item{formula}{
     a symbolic description of variables on which bandwidth selection is
@@ -514,6 +539,10 @@ npscoefbw(\dots)
     \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
     another function. It is not recommended that the user set this.
   }
+
+\subsection{Additional Arguments}{
+Further arguments passed through the bandwidth-selection interface.
+}
 
   \item{\dots}{
   additional arguments supplied to specify the regression type,

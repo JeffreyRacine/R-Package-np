@@ -7,6 +7,10 @@ npseed(seed)
 }
 
 \arguments{
+\subsection{Seed Input}{
+Seed value used to reset the package C backend random number generator.
+}
+
   \item{seed}{an integer seed for the random number generator.}
 }
 \value{

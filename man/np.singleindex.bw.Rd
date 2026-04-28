@@ -78,6 +78,10 @@ npindexbw(\dots)
 }
 
 \arguments{
+\subsection{Data And Bandwidth Inputs}{
+These arguments identify the data and whether bandwidths are supplied or computed.
+}
+
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data (training data) used to
     calculate the regression estimators.
@@ -107,6 +111,10 @@ npindexbw(\dots)
     will be returned with bandwidths set to those specified
     in \code{bws}. Defaults to \code{TRUE}.
   }
+
+\subsection{Local-Polynomial And NOMAD Controls}{
+These arguments control the index smoother, local-polynomial specification, and optional automatic degree search.
+}
 
   \item{basis}{
     local polynomial basis selector used when
@@ -226,6 +234,10 @@ npindexbw(\dots)
     \code{search.engine="cell"}.
   }
 
+\subsection{Search Initialization}{
+These arguments control multistarts and fixed-bandwidth scale-factor starts for the index bandwidth.
+}
+
   \item{nmulti}{
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
@@ -266,6 +278,10 @@ npindexbw(\dots)
     affects search admissibility and search-start sanitization only;
     explicit bandwidths supplied for storage when
     \code{bandwidth.compute = FALSE} are not rewritten.}
+
+\subsection{Optimization Controls}{
+These arguments control beta optimization and the underlying \code{\link{optim}} search.
+}
 
    \item{only.optimize.beta}{
      signals the routine to only minimize the objective function with
@@ -323,12 +339,20 @@ npindexbw(\dots)
     replicability of the numerical search. Defaults to 42.
   }
 
+\subsection{Regression Type}{
+This argument controls the downstream index-regression smoothing type.
+}
+
   \item{regtype}{
     a character string specifying local smoothing type for the
     nonparametric index regression fit used downstream in
     \code{npindex}. Supported values are \code{"lc"}, \code{"ll"}, and
     \code{"lp"}.
   }
+
+\subsection{Formula Interface}{
+These arguments support formula-style bandwidth selection and internal calls from related estimators.
+}
 
   \item{formula}{
     a symbolic description of variables on which bandwidth selection is
@@ -370,6 +394,10 @@ npindexbw(\dots)
     (1993)). Defaults to
     \code{ichimura}.
   }
+
+\subsection{Additional Arguments}{
+These arguments are passed through during the numerical search.
+}
 
   \item{\dots}{
     additional arguments supplied to specify the parameters to the

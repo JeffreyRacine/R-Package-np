@@ -24,6 +24,10 @@ npuniden.reflect(X = NULL,
                  ...)
 }
 \arguments{
+\subsection{Data And Support Inputs}{
+Training/evaluation data, optional bandwidth, and reflecting support endpoints.
+}
+
   \item{X}{
 a required numeric vector of training data lying in \eqn{[a,b]}
 }
@@ -39,6 +43,11 @@ an optional lower bound (defaults to 0)
   \item{b}{
 an optional upper bound (defaults to 1)
 }
+
+\subsection{Additional Estimation Arguments}{
+Further arguments passed to \code{\link{npudensbw}} and \code{\link{npudens}}.
+}
+
  \item{...}{
 optional arguments passed to \code{npudensbw} and \code{npudens}
 }

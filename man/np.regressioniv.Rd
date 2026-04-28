@@ -59,6 +59,11 @@ npregiv(y,
         \dots)
 }
 \arguments{
+\subsection{Main Data Inputs}{
+Dependent variable, endogenous regressors, instruments, exogenous regressors,
+and evaluation data.
+}
+
   \item{y}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
@@ -90,6 +95,12 @@ npregiv(y,
     regression will be estimated (evaluation data). By default,
     evaluation takes place on the data provided by \code{x}.
   }
+
+\subsection{Tikhonov Regularization Controls}{
+Direct, iterated, and searched regularization controls for the
+\code{"Tikhonov"} route.
+}
+
   \item{alpha}{
     a numeric scalar that, if supplied, is used rather than numerically
     solving for \code{alpha}, when using \code{method="Tikhonov"}.
@@ -119,6 +130,12 @@ npregiv(y,
     and/or numerical optimization which is particularly costly in this
     setting (see details below for an illustration of its use)
   }
+
+\subsection{Landweber-Fridman Iteration Controls}{
+Iteration, starting-value, penalty, and stopping controls for the
+\code{"Landweber-Fridman"} route and related iteration paths.
+}
+
   \item{constant}{
     the constant to use when using  \code{method="Landweber-Fridman"}.
   }
@@ -150,6 +167,12 @@ npregiv(y,
     the cross-validation function from different (random) initial
     points.
   }
+
+\subsection{Optimization Controls}{
+Numerical optimization tolerances, method, multistart, and reproducibility
+controls.
+}
+
   \item{optim.abstol}{
     the absolute convergence tolerance used by \code{\link{optim}}. Only useful
     for non-negative functions, as a tolerance for reaching
@@ -195,6 +218,12 @@ npregiv(y,
     the order of the local polynomial regression (defaults to
     \code{p=1}, i.e. local linear).
   }
+
+\subsection{Returned Weights And Smooth Residuals}{
+Controls for returned instrumental-regression weight matrices and residual
+smoothing during iteration.
+}
+
   \item{penalize.iteration}{ a logical value indicating whether to
     penalize the norm by the number of iterations or not (default
     \code{TRUE})
@@ -242,6 +271,11 @@ npregiv(y,
     course of one iteration (i.e. it may be above the iteration tolerance
     but increased)
   }
+
+\subsection{Additional Kernel-Sum Arguments}{
+Further arguments supplied to \code{\link{npksum}}.
+}
+
   \item{\dots}{
     additional arguments supplied to \code{\link{npksum}}.
   }
