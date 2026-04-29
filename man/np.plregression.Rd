@@ -1,4 +1,4 @@
-% 
+%
 \name{npplreg}
 \alias{npplreg}
 \alias{npplreg.default}
@@ -41,8 +41,8 @@ FALSE, \dots)
         \dots)
 }
 \arguments{
-\subsection{Main Bandwidth And Model Inputs}{
-These arguments identify the partially linear bandwidth specification and training data.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification, formula/data interface, and partially linear training data.
 }
 
   \item{bws}{
@@ -59,6 +59,7 @@ These arguments identify the partially linear bandwidth specification and traini
   }
 
 
+
   \item{data}{
     an optional data frame, list or environment (or object
     coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
@@ -67,24 +68,15 @@ These arguments identify the partially linear bandwidth specification and traini
    \code{\link{npplregbw}} was called.
   }
 
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
-  }
-
-  \item{y.eval}{
-    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
-    \code{\link{np}} will compute goodness of fit statistics on these
-    data and return them. Defaults to \code{FALSE}.
-  }
 
   \item{txdat}{
   a \eqn{p}-variate data frame of explanatory data (training data),
   corresponding to \eqn{X} in the model equation, whose linear
   relationship with the dependent data \eqn{Y} is posited. Defaults to
-  the training data used to 
+  the training data used to
     compute the bandwidth object.
   }
+
 
   \item{tydat}{
   a one (1) dimensional numeric or integer vector of dependent data, each
@@ -93,42 +85,19 @@ These arguments identify the partially linear bandwidth specification and traini
     compute the bandwidth object.
   }
 
+
   \item{tzdat}{
   a \eqn{q}-variate data frame of explanatory data (training data),
   corresponding to \eqn{Z} in the model equation, whose relationship
   to the dependent variable is unspecified (nonparametric). Defaults to
-  the training data used to 
+  the training data used to
     compute the bandwidth object.
   }
 
-\subsection{Evaluation Data And Returned Quantities}{
-These arguments control where the partially linear regression is evaluated and which fitted quantities are returned.
+
+\subsection{Bandwidth Search Shortcut}{
+This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npplregbw}} when bandwidths are computed inside \code{npplreg}.
 }
-
-  \item{exdat}{
-  a \eqn{p}-variate data frame of points on which the regression will be
-  estimated (evaluation data).  By default,
-    evaluation takes place on the data provided by \code{txdat}.
-  }
-
-  \item{eydat}{
-  a one (1) dimensional numeric or integer vector of the true values
-  of the dependent variable. Optional, and used only to calculate the
-  true errors.  By default,
-    evaluation takes place on the data provided by \code{tydat}.
-  }
-
-  \item{ezdat}{
-    a \eqn{q}-variate data frame of points on which the regression will
-    be estimated (evaluation data).  By default,
-    evaluation takes place on the data provided by \code{tzdat}.
-  }
-
-  \item{residuals}{
-    a logical value indicating that you want residuals computed and
-    returned in the resulting \code{plregression} object. Defaults to
-    \code{FALSE}.
-  }
 
   \item{nomad}{
     logical shortcut passed through to \code{\link{npplregbw}} when
@@ -146,8 +115,55 @@ These arguments control where the partially linear regression is evaluated and w
     returned object \code{fit} to see the normalized shortcut metadata.
   }
 
-\subsection{Bandwidth Selection Pass-Through}{
-These arguments pass bandwidth-selection controls to \code{\link{npplregbw}} and its component \code{\link{npregbw}} searches.
+
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the partially linear regression is evaluated and which fitted quantities are returned.
+}
+
+  \item{exdat}{
+  a \eqn{p}-variate data frame of points on which the regression will be
+  estimated (evaluation data).  By default,
+    evaluation takes place on the data provided by \code{txdat}.
+  }
+
+
+  \item{eydat}{
+  a one (1) dimensional numeric or integer vector of the true values
+  of the dependent variable. Optional, and used only to calculate the
+  true errors.  By default,
+    evaluation takes place on the data provided by \code{tydat}.
+  }
+
+
+  \item{ezdat}{
+    a \eqn{q}-variate data frame of points on which the regression will
+    be estimated (evaluation data).  By default,
+    evaluation takes place on the data provided by \code{tzdat}.
+  }
+
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.
+  }
+
+
+  \item{residuals}{
+    a logical value indicating that you want residuals computed and
+    returned in the resulting \code{plregression} object. Defaults to
+    \code{FALSE}.
+  }
+
+
+  \item{y.eval}{
+    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
+    \code{\link{np}} will compute goodness of fit statistics on these
+    data and return them. Defaults to \code{FALSE}.
+  }
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to \code{\link{npplregbw}} and its component \code{\link{npregbw}} searches when bandwidths are computed internally.
 }
 
   \item{\dots}{
@@ -167,7 +183,6 @@ These arguments pass bandwidth-selection controls to \code{\link{npplregbw}} and
     argument surface.
   }
 }
-
 \details{
   Documentation guide: see \code{\link{npplregbw}} for partially linear
   bandwidth selection, \code{\link{npregbw}} for the component
@@ -246,11 +261,11 @@ These arguments pass bandwidth-selection controls to \code{\link{npplregbw}} and
   the returned object. Furthermore, the functions \code{summary}
   and \code{plot} support objects of this type. The returned object
   has the following components:
-  
+
   \item{evalx}{ evaluation points }
   \item{evalz}{ evaluation points }
   \item{mean}{ estimation of the regression, or conditional mean, at the
-    evaluation points } 
+    evaluation points }
   \item{xcoef}{ coefficient(s) corresponding to the components
     \eqn{\beta_i}{B[i]} in the model }
   \item{xcoeferr}{ standard errors of the coefficients }
@@ -267,7 +282,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npplregbw}} and
   \item{CORR}{ absolute value of Pearson's correlation coefficient }
   \item{SIGN}{ fraction of observations where fitted and observed values
     agree in sign }
-  
+
 }
 
 \references{
@@ -288,17 +303,17 @@ These arguments pass bandwidth-selection controls to \code{\link{npplregbw}} and
 
  Li, Q. and J.S. Racine (2004), \dQuote{Cross-validated local linear
    nonparametric regression,} Statistica Sinica, 14, 485-512.
- 
+
  Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
  Cambridge University Press.
- 
+
  Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of regression
  functions with both categorical and continuous data,} Journal of
  Econometrics, 119, 99-130.
 
  Robinson, P.M. (1988), \dQuote{Root-n-consistent semiparametric regression,}
- Econometrica, 56, 931-954. 
- 
+ Econometrica, 56, 931-954.
+
  Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth estimators
  for discrete distributions,}  Biometrika, 68, 301-309.
 
@@ -389,7 +404,7 @@ if (interactive()) plot(bw)
 # of course do this in general)
 
 plot(bw,
-     plot.errors.boot.num=25, 
+     plot.errors.boot.num=25,
      plot.errors.method="bootstrap")
 
 
@@ -464,7 +479,7 @@ if (interactive()) plot(bw)
 # of course do this in general)
 
 plot(bw,
-     plot.errors.boot.num=25, 
+     plot.errors.boot.num=25,
      plot.errors.method="bootstrap")
 } % enddontrun
 }

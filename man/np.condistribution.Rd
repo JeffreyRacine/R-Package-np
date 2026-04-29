@@ -38,8 +38,8 @@ npcdist(bws, \dots)
 }
 
 \arguments{
-\subsection{Main Bandwidth And Estimation Inputs}{
-These arguments identify the bandwidth specification and training data.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
 
   \item{bws}{
@@ -55,17 +55,6 @@ These arguments identify the bandwidth specification and training data.
     data, and so on.
   }
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of sample realizations of explanatory
-    data (training data). Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a \eqn{q}-variate data frame of sample realizations of dependent
-    data (training data). Defaults to the training data used to
-    compute the bandwidth object.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object coercible to
@@ -75,36 +64,23 @@ These arguments identify the bandwidth specification and training data.
     which \code{\link{npcdistbw}} was called.
  }
 
-\subsection{Evaluation Data And Returned Quantities}{
-These arguments control where the fitted conditional distribution is evaluated and which estimates are returned.
-}
 
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
+  \item{txdat}{
+    a \eqn{p}-variate data frame of sample realizations of explanatory
+    data (training data). Defaults to the training data used to
+    compute the bandwidth object.
   }
 
 
-  \item{exdat}{
-    a \eqn{p}-variate data frame of explanatory data on
-    which cumulative conditional distributions will be evaluated. By
-    default, evaluation takes place on the data provided by
-    \code{txdat}.
+  \item{tydat}{
+    a \eqn{q}-variate data frame of sample realizations of dependent
+    data (training data). Defaults to the training data used to
+    compute the bandwidth object.
   }
 
-  \item{eydat}{
-    a \eqn{q}-variate data frame of dependent data on which
-    cumulative conditional distributions will be evaluated. By default,
-    evaluation takes place on the data provided by \code{tydat}.
-  }
 
-  \item{gradients}{
-    a logical value specifying whether to return estimates of the
-    gradients at the evaluation points. Defaults to \code{FALSE}.
-  }
-
-\subsection{Bandwidth Selection Pass-Through And Fit Controls}{
-These arguments either pass bandwidth-selection controls to \code{\link{npcdistbw}} or control post-estimation fitting behavior.
+\subsection{Bandwidth Search Shortcut}{
+This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npcdistbw}} when bandwidths are computed inside \code{npcdist}.
 }
 
   \item{nomad}{
@@ -123,16 +99,49 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdistb
     returned object \code{fit} to see the normalized shortcut metadata.
   }
 
+
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the fitted conditional distribution is evaluated and which estimates are returned.
+}
+
+  \item{exdat}{
+    a \eqn{p}-variate data frame of explanatory data on
+    which cumulative conditional distributions will be evaluated. By
+    default, evaluation takes place on the data provided by
+    \code{txdat}.
+  }
+
+
+  \item{eydat}{
+    a \eqn{q}-variate data frame of dependent data on which
+    cumulative conditional distributions will be evaluated. By default,
+    evaluation takes place on the data provided by \code{tydat}.
+  }
+
+
+  \item{gradients}{
+    a logical value specifying whether to return estimates of the
+    gradients at the evaluation points. Defaults to \code{FALSE}.
+  }
+
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.
+  }
+
+
+
+\subsection{Fit Properization Controls}{
+These arguments control optional post-estimation properization of the fitted conditional distribution.
+}
+
   \item{proper}{
     a logical value specifying whether to apply post-estimation
     properization to the conditional distribution estimate. Defaults to
     \code{FALSE}.
   }
 
-  \item{proper.method}{
-    a character string specifying the properization method. Currently
-    \code{"isotonic"} is supported.
-  }
 
   \item{proper.control}{
     a list of controls for properization. Supported entries are
@@ -140,7 +149,18 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdistb
     \code{fail.on.unsupported}.
   }
 
-  
+
+
+  \item{proper.method}{
+    a character string specifying the properization method. Currently
+    \code{"isotonic"} is supported.
+  }
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are computed internally, or used to interpret a numeric \code{bws} vector.
+}
+
   \item{\dots}{
     additional arguments supplied to \code{\link{npcdistbw}} when
     \code{npcdist} computes bandwidths internally, or arguments needed
@@ -155,6 +175,7 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdistb
     \code{\link{npcdistbw}} for the complete bandwidth-selection
     argument surface.
   }
+
 }
 \details{
   Documentation guide: see \code{\link{npcdistbw}} for bandwidth selection and search controls, \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}}, \code{\link{plot.np}} for plotting options.
@@ -258,13 +279,13 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdistb
   conditional CDF and quantile functions with mixed categorical and
   continuous data,} Journal of Business and Economic Statistics, 26,
   423-434.
-  
+
   Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal bandwidth
   selection for nonparametric conditional distribution and quantile
   functions}, Journal of Business and Economic Statistics, 31, 57-65.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
-  University Press. 
+  University Press.
 
   Scott, D.W. (1992), \emph{Multivariate Density Estimation. Theory,
   Practice and Visualization,} New York: Wiley.
@@ -278,7 +299,7 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdistb
 }
 \author{
   Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine
-  \email{racinej@mcmaster.ca}    
+  \email{racinej@mcmaster.ca}
 }
 
 \section{Usage Issues}{

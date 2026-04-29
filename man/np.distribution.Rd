@@ -29,8 +29,8 @@ npudist(bws, \dots)
 }
 
 \arguments{
-\subsection{Main Bandwidth And Estimation Inputs}{
-These arguments identify the bandwidth specification and training data.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
 
   \item{bws}{
@@ -44,11 +44,6 @@ These arguments identify the bandwidth specification and training data.
   }
 
 
-  \item{tdat}{
-    a \eqn{p}-variate data frame of sample realizations (training data)
-    used to estimate the cumulative distribution. Defaults to the training data used to
-    compute the bandwidth object.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object
@@ -58,22 +53,32 @@ These arguments identify the bandwidth specification and training data.
     \code{\link{npudistbw}} was called.
   }
 
+
+  \item{tdat}{
+    a \eqn{p}-variate data frame of sample realizations (training data)
+    used to estimate the cumulative distribution. Defaults to the training data used to
+    compute the bandwidth object.
+  }
+
+
 \subsection{Evaluation Data}{
 These arguments control where the fitted cumulative distribution is evaluated.
 }
 
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
-  }
-  
   \item{edat}{
     a \eqn{p}-variate data frame of cumulative distribution evaluation points. By default,
     evaluation takes place on the data provided by \code{tdat}.
   }
 
-\subsection{Bandwidth Selection Pass-Through}{
-These arguments pass bandwidth-selection controls to \code{\link{npudistbw}} when bandwidths are computed internally.
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.
+  }
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to \code{\link{npudistbw}} when bandwidths are computed internally, or used to interpret a numeric \code{bws} vector.
 }
 
   \item{\dots}{
@@ -90,7 +95,6 @@ These arguments pass bandwidth-selection controls to \code{\link{npudistbw}} whe
     argument surface.
   }
 }
-
 \details{
   Documentation guide: see \code{\link{npudistbw}} for bandwidth
   selection and search controls, \code{\link{np.kernels}} for kernels,
@@ -121,16 +125,16 @@ These arguments pass bandwidth-selection controls to \code{\link{npudistbw}} whe
   \preformatted{
     Usage 1: first compute the bandwidth object via npudistbw and then
     compute the cumulative distribution:
-    
+
     bw <- npudistbw(~y)
     Fhat <- npudist(bw)
-    
+
     Usage 2: alternatively, compute the bandwidth object indirectly:
-    
+
     Fhat <- npudist(~y)
-    
+
     Usage 3: modify the default kernel and order:
-    
+
     Fhat <- npudist(~y, ckertype="epanechnikov", ckerorder=4)
 
     Usage 4: use the data frame interface rather than the formula
@@ -169,7 +173,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npudistbw}} whe
 
 }
 \value{
-  
+
   \code{\link{npudist}} returns a \code{npdistribution} object. The
   generic accessor functions \code{\link{fitted}} and \code{\link{se}}
   extract estimated values and asymptotic standard errors on estimates,
@@ -181,7 +185,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npudistbw}} whe
   \item{eval}{ the evaluation points. }
   \item{dist}{ estimate of the cumulative distribution at the evaluation points }
   \item{derr}{ standard errors of the cumulative distribution estimates }
-  
+
 }
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{ Multivariate binary
@@ -204,7 +208,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npudistbw}} whe
     data,} Journal of Nonparametric Statistics, 18, 69-100.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
-  University Press. 
+  University Press.
 
   Scott, D.W. (1992), \emph{Multivariate Density Estimation. Theory,
   Practice and Visualization,} New York: Wiley.
@@ -286,12 +290,12 @@ persp(as.integer(levels(year.seq)), gdp.seq, F, col="lightblue",
 
 if (interactive()) Sys.sleep(5)
 
-contour(as.integer(levels(year.seq)), 
-        gdp.seq, 
-        F, 
-        xlab="Year", 
-        ylab="GDP", 
-        main = "Cumulative Distribution Contour Plot", 
+contour(as.integer(levels(year.seq)),
+        gdp.seq,
+        F,
+        xlab="Year",
+        ylab="GDP",
+        main = "Cumulative Distribution Contour Plot",
         col=topo.colors(100))
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -363,11 +367,11 @@ persp(as.integer(levels(year.seq)), gdp.seq, F, col="lightblue",
 if (interactive()) Sys.sleep(5)
 
 contour(as.integer(levels(year.seq)),
-        gdp.seq, 
-        F, 
-        xlab="Year", 
-        ylab="GDP", 
-        main = "Cumulative Distribution Contour Plot", 
+        gdp.seq,
+        F,
+        xlab="Year",
+        ylab="GDP",
+        main = "Cumulative Distribution Contour Plot",
         col=topo.colors(100))
 
 # Sleep for 5 seconds so that we can examine the output...

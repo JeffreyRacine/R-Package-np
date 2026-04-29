@@ -1,4 +1,4 @@
-% 
+%
 \name{npcdens}
 \alias{npcdens}
 \alias{npcdens.conbandwidth}
@@ -13,7 +13,7 @@
   \code{conbandwidth} object or a bandwidth vector, bandwidth type, and
   kernel type) using the method of Hall, Racine, and Li (2004).
   The data may be continuous, discrete (unordered and ordered
-  factors), or some combination thereof. 
+  factors), or some combination thereof.
 }
 
 \usage{
@@ -38,8 +38,8 @@ npcdens(bws, \dots)
 }
 
 \arguments{
-\subsection{Main Bandwidth And Estimation Inputs}{
-These arguments identify the bandwidth specification and training data.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
 
   \item{bws}{
@@ -55,17 +55,6 @@ These arguments identify the bandwidth specification and training data.
     data, and so on.
   }
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of sample realizations of explanatory
-    data (training data). Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a \eqn{q}-variate data frame of sample realizations of dependent
-    data (training data). Defaults to the training data used to
-    compute the bandwidth object.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object
@@ -75,35 +64,23 @@ These arguments identify the bandwidth specification and training data.
    \code{\link{npcdensbw}} was called.
   }
 
-\subsection{Evaluation Data And Returned Quantities}{
-These arguments control where the fitted conditional density is evaluated and which estimates are returned.
-}
 
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
+  \item{txdat}{
+    a \eqn{p}-variate data frame of sample realizations of explanatory
+    data (training data). Defaults to the training data used to
+    compute the bandwidth object.
   }
 
 
-  \item{exdat}{
-    a \eqn{p}-variate data frame of explanatory data on which
-    conditional densities will be evaluated. By default,
-    evaluation takes place on the data provided by \code{txdat}.
+  \item{tydat}{
+    a \eqn{q}-variate data frame of sample realizations of dependent
+    data (training data). Defaults to the training data used to
+    compute the bandwidth object.
   }
 
-  \item{eydat}{
-    a \eqn{q}-variate data frame of dependent data on which conditional
-    densities will be evaluated. By default,
-    evaluation takes place on the data provided by \code{tydat}.
-  }
 
-  \item{gradients}{
-    a logical value specifying whether to return estimates of the
-    gradients at the evaluation points. Defaults to \code{FALSE}.
-  }
-
-\subsection{Bandwidth Selection Pass-Through And Fit Controls}{
-These arguments either pass bandwidth-selection controls to \code{\link{npcdensbw}} or control post-estimation fitting behavior.
+\subsection{Bandwidth Search Shortcut}{
+This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npcdensbw}} when bandwidths are computed inside \code{npcdens}.
 }
 
   \item{nomad}{
@@ -122,16 +99,48 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdensb
     returned object \code{fit} to see the normalized shortcut metadata.
   }
 
+
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the fitted conditional density is evaluated and which estimates are returned.
+}
+
+  \item{exdat}{
+    a \eqn{p}-variate data frame of explanatory data on which
+    conditional densities will be evaluated. By default,
+    evaluation takes place on the data provided by \code{txdat}.
+  }
+
+
+  \item{eydat}{
+    a \eqn{q}-variate data frame of dependent data on which conditional
+    densities will be evaluated. By default,
+    evaluation takes place on the data provided by \code{tydat}.
+  }
+
+
+  \item{gradients}{
+    a logical value specifying whether to return estimates of the
+    gradients at the evaluation points. Defaults to \code{FALSE}.
+  }
+
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.
+  }
+
+
+
+\subsection{Fit Properization Controls}{
+These arguments control optional post-estimation properization of the fitted conditional density.
+}
+
   \item{proper}{
     a logical value specifying whether to apply post-estimation
     properization to the conditional density estimate. Defaults to
     \code{FALSE}.
   }
 
-  \item{proper.method}{
-    a character string specifying the properization method. Currently
-    \code{"project"} is supported.
-  }
 
   \item{proper.control}{
     a list of controls for properization. Supported entries are
@@ -139,7 +148,18 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdensb
     \code{fail.on.unsupported}.
   }
 
-  
+
+
+  \item{proper.method}{
+    a character string specifying the properization method. Currently
+    \code{"project"} is supported.
+  }
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are computed internally, or used to interpret a numeric \code{bws} vector.
+}
+
   \item{\dots}{
     additional arguments supplied to \code{\link{npcdensbw}} when
     \code{npcdens} computes bandwidths internally, or arguments needed
@@ -155,6 +175,7 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdensb
     argument surface.
 
   }
+
 }
 \details{
   Documentation guide: see \code{\link{npcdensbw}} for bandwidth selection and search controls, \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}}, \code{\link{plot.np}} for plotting options.
@@ -254,7 +275,7 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdensb
   and Practice,} Princeton University Press.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
-  University Press. 
+  University Press.
 
   Scott, D.W. (1992), \emph{Multivariate Density Estimation. Theory,
   Practice and Visualization,} New York: Wiley.
@@ -268,7 +289,7 @@ These arguments either pass bandwidth-selection controls to \code{\link{npcdensb
 }
 \author{
   Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine
-  \email{racinej@mcmaster.ca}    
+  \email{racinej@mcmaster.ca}
 }
 
 \section{Usage Issues}{
@@ -296,7 +317,7 @@ Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
 attach(Italy)
 
 # First, compute the bandwidths... note that this may take a minute or
-# two depending on the speed of your computer. 
+# two depending on the speed of your computer.
 
 bw <- npcdensbw(formula=gdp~ordered(year), nmulti=1)
 
@@ -328,7 +349,7 @@ Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
 attach(Italy)
 
 # First, compute the bandwidths... note that this may take a minute or
-# two depending on the speed of your computer. 
+# two depending on the speed of your computer.
 
 # Note - we cast `X' and `y' as data frames so that plot() can
 # automatically grab names (this looks like overkill, but in
@@ -401,7 +422,7 @@ bw <- npcdensbw(xdat=X, ydat=y, nmulti=1)
 
 summary(bw)
 
-# Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
+# Plot the density function (<ctrl>-C will interrupt on *NIX systems,
 # <esc> will interrupt on MS Windows systems)
 
 if (interactive()) plot(bw)
@@ -457,16 +478,16 @@ fit.mat <- matrix(fit, 30, 30)
 # Generate a perspective plot similar to Figure 2 b of Klein and Spady
 # (1993)
 
-persp(x1.seq, 
-      x2.seq, 
-      fit.mat, 
-      col="white", 
-      ticktype="detailed", 
-      expand=0.5, 
-      axes=FALSE, 
-      box=FALSE, 
-      main="Estimated Nonparametric Probability Perspective", 
-      theta=310, 
+persp(x1.seq,
+      x2.seq,
+      fit.mat,
+      col="white",
+      ticktype="detailed",
+      expand=0.5,
+      axes=FALSE,
+      box=FALSE,
+      main="Estimated Nonparametric Probability Perspective",
+      theta=310,
       phi=25)
 
 # EXAMPLE 3 (INTERFACE=DATA FRAME): Replicate the DGP of Klein & Spady
@@ -511,8 +532,8 @@ X.eval <- expand.grid(x1=x1.seq,x2=x2.seq)
 # Now evaluate the conditional probability for y=1 and for the
 # evaluation Xs
 
-fit <- fitted(npcdens(exdat=X.eval, 
-               eydat=factor(rep(1, nrow(X.eval))), 
+fit <- fitted(npcdens(exdat=X.eval,
+               eydat=factor(rep(1, nrow(X.eval))),
                bws=bw))
 
 # Finally, coerce the data into a matrix for plotting with persp()
@@ -522,16 +543,16 @@ fit.mat <- matrix(fit, 30, 30)
 # Generate a perspective plot similar to Figure 2 b of Klein and Spady
 # (1993)
 
-persp(x1.seq, 
-      x2.seq, 
-      fit.mat, 
-      col="white", 
-      ticktype="detailed", 
-      expand=0.5, 
-      axes=FALSE, 
-      box=FALSE, 
-      main="Estimated Nonparametric Probability Perspective", 
-      theta=310, 
+persp(x1.seq,
+      x2.seq,
+      fit.mat,
+      col="white",
+      ticktype="detailed",
+      expand=0.5,
+      axes=FALSE,
+      box=FALSE,
+      main="Estimated Nonparametric Probability Perspective",
+      theta=310,
       phi=25)
 
 # EXAMPLE 4: Variations on local polynomial conditional density

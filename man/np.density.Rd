@@ -1,4 +1,4 @@
-% 
+%
 \name{npudens}
 \alias{npudens}
 \alias{npudens.bandwidth}
@@ -30,8 +30,8 @@ npudens(bws, \dots)
 }
 
 \arguments{
-\subsection{Main Bandwidth And Estimation Inputs}{
-These arguments identify the bandwidth specification and training data.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
 
   \item{bws}{
@@ -45,11 +45,6 @@ These arguments identify the bandwidth specification and training data.
   }
 
 
-  \item{tdat}{
-    a \eqn{p}-variate data frame of sample realizations (training data)
-    used to estimate the density. Defaults to the training data used to
-    compute the bandwidth object.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object
@@ -59,22 +54,32 @@ These arguments identify the bandwidth specification and training data.
     \code{\link{npudensbw}} was called.
   }
 
+
+  \item{tdat}{
+    a \eqn{p}-variate data frame of sample realizations (training data)
+    used to estimate the density. Defaults to the training data used to
+    compute the bandwidth object.
+  }
+
+
 \subsection{Evaluation Data}{
 These arguments control where the fitted density is evaluated.
 }
 
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
-  }
-  
   \item{edat}{
     a \eqn{p}-variate data frame of density evaluation points. By default,
     evaluation takes place on the data provided by \code{tdat}.
   }
 
-\subsection{Bandwidth Selection Pass-Through}{
-These arguments pass bandwidth-selection controls to \code{\link{npudensbw}} when bandwidths are computed internally.
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.
+  }
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to \code{\link{npudensbw}} when bandwidths are computed internally, or used to interpret a numeric \code{bws} vector.
 }
 
   \item{\dots}{
@@ -90,7 +95,6 @@ These arguments pass bandwidth-selection controls to \code{\link{npudensbw}} whe
     bandwidth-selection argument surface.
   }
 }
-
 \details{
   Documentation guide: see \code{\link{npudensbw}} for bandwidth
   selection and search controls, \code{\link{np.kernels}} for kernels,
@@ -120,16 +124,16 @@ These arguments pass bandwidth-selection controls to \code{\link{npudensbw}} whe
   \preformatted{
     Usage 1: first compute the bandwidth object via npudensbw and then
     compute the density:
-    
+
     bw <- npudensbw(~y)
     fhat <- npudens(bw)
-    
+
     Usage 2: alternatively, compute the bandwidth object indirectly:
-    
+
     fhat <- npudens(~y)
-    
+
     Usage 3: modify the default kernel and order:
-    
+
     fhat <- npudens(~y, ckertype="epanechnikov", ckerorder=4)
 
     Usage 4: use the data frame interface rather than the formula
@@ -170,7 +174,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npudensbw}} whe
 
 }
 \value{
-  
+
   \code{npudens} returns a \code{npdensity} object. The generic accessor
   functions \code{\link{fitted}}, and \code{\link{se}}, extract
   estimated values and asymptotic standard errors on estimates,
@@ -183,7 +187,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npudensbw}} whe
   \item{dens}{ estimation of the density at the evaluation points }
   \item{derr}{ standard errors of the density estimates }
   \item{log_likelihood}{ log likelihood of the density estimates }
-  
+
 }
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{ Multivariate binary
@@ -201,7 +205,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npudensbw}} whe
     data,} Journal of Nonparametric Statistics, 18, 69-100.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
-  University Press. 
+  University Press.
 
   Scott, D.W. (1992), \emph{Multivariate Density Estimation: Theory,
   Practice and Visualization,} New York: Wiley.
@@ -250,7 +254,7 @@ bw <- npudensbw(formula=~ordered(year)+gdp)
 fhat <- npudens(bws=bw)
 
 # Note that simply typing the name of the object returns some useful
-# information. For more info, one can call summary: 
+# information. For more info, one can call summary:
 
 summary(fhat)
 
@@ -282,12 +286,12 @@ persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
 
 if (interactive()) Sys.sleep(5)
 
-contour(as.integer(levels(year.seq)), 
-        gdp.seq, 
-        f, 
-        xlab="Year", 
-        ylab="GDP", 
-        main = "Density Contour Plot", 
+contour(as.integer(levels(year.seq)),
+        gdp.seq,
+        f,
+        xlab="Year",
+        ylab="GDP",
+        main = "Density Contour Plot",
         col=topo.colors(100))
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -324,7 +328,7 @@ bw <- npudensbw(dat=data)
 fhat <- npudens(bws=bw)
 
 # Note that simply typing the name of the object returns some useful
-# information. For more info, one can call summary: 
+# information. For more info, one can call summary:
 
 summary(fhat)
 
@@ -357,11 +361,11 @@ persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
 if (interactive()) Sys.sleep(5)
 
 contour(as.integer(levels(year.seq)),
-        gdp.seq, 
-        f, 
-        xlab="Year", 
-        ylab="GDP", 
-        main = "Density Contour Plot", 
+        gdp.seq,
+        f,
+        xlab="Year",
+        ylab="GDP",
+        main = "Density Contour Plot",
         col=topo.colors(100))
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -391,7 +395,7 @@ bw <- npudensbw(formula=~eruptions+waiting)
 
 summary(bw)
 
-# Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
+# Plot the density function (<ctrl>-C will interrupt on *NIX systems,
 # <esc> will interrupt on MS Windows systems). Note that we use xtrim =
 # -0.2 to extend the plot outside the support of the data (i.e., extend
 # the tails of the estimate to meet the horizontal axis).
@@ -415,7 +419,7 @@ bw <- npudensbw(dat=faithful)
 
 summary(bw)
 
-# Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
+# Plot the density function (<ctrl>-C will interrupt on *NIX systems,
 # <esc> will interrupt on MS Windows systems). Note that we use xtrim =
 # -0.2 to extend the plot outside the support of the data (i.e., extend
 # the tails of the estimate to meet the horizontal axis).
