@@ -37,58 +37,68 @@ npuniden.boundary(X = NULL,
                   proper = FALSE)
 }
 \arguments{
-\subsection{Data And Support Inputs}{
-Training/evaluation data, optional bandwidth, and bounded support endpoints.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify evaluation points, observations, support bounds, and optional bandwidths.
+}
+
+  \item{a}{
+an optional lower bound (defaults to lower bound of empirical support \eqn{\min(X)})
+}
+
+  \item{b}{
+an optional upper bound (defaults to upper bound of empirical support \eqn{\max(X)})
+}
+
+
+  \item{h}{
+an optional bandwidth (>0)
 }
 
   \item{X}{
 a required numeric vector of training data lying in \eqn{[a,b]}
 }
+
   \item{Y}{
 an optional numeric vector of evaluation data lying in \eqn{[a,b]}
 }
-  \item{h}{
-an optional bandwidth (>0)
-}
-  \item{a}{
-an optional lower bound (defaults to lower bound of empirical support \eqn{\min(X)})
-}
-  \item{b}{
-an optional upper bound (defaults to upper bound of empirical support \eqn{\max(X)})
-}
 
 \subsection{Bandwidth Search Controls}{
-Cross-validation method, search route, starting grid, kernel type, and
-multistart controls.
+These arguments control the boundary-corrected bandwidth search.
 }
 
   \item{bwmethod}{
 whether to conduct bandwidth search via least squares cross-validation
 (\code{"cv.ls"}) or likelihood cross-validation (\code{"cv.ml"})
 }
+
   \item{cv}{
 an optional argument for search (default is likely more reliable in the
 presence of local maxima)
 }
+
   \item{grid}{
 an optional grid used for the initial grid search when \code{cv="grid-hybrid"}
 }
+
   \item{kertype}{
 an optional kernel specification (defaults to "gaussian1")
 }
+
   \item{nmulti}{
 number of multi-starts used when \code{cv="numeric"} (defaults to 1 for
 the univariate boundary problem)
 }
 
+
 \subsection{Proper Density Control}{
-Control for proper density and distribution repair on the bounded support.
+This argument controls optional proper-density repair.
 }
 
   \item{proper}{
 an optional logical value indicating whether to enforce proper density
 and distribution function estimates over the range \eqn{[a,b]}
 }
+
 }
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.

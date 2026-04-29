@@ -36,42 +36,48 @@ npuniden.sc(X = NULL,
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
-\subsection{Data And Support Inputs}{
-Training/evaluation data, bandwidth, and support endpoints.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify evaluation points, observations, support bounds, and optional bandwidths.
+}
+
+  \item{a}{
+an optional lower bound on the support of \code{X} or \code{Y} (defaults to 0)
+}
+
+  \item{b}{
+an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
+}
+
+
+  \item{h}{
+a bandwidth (\eqn{>0})
 }
 
   \item{X}{
 a required numeric vector of training data lying in \eqn{[a,b]}
 }
+
   \item{Y}{
 an optional numeric vector of evaluation data lying in \eqn{[a,b]}
 }
-  \item{h}{
-a bandwidth (\eqn{>0})
-}
-  \item{a}{
-an optional lower bound on the support of \code{X} or \code{Y} (defaults to 0)
-}
-  \item{b}{
-an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
-}
 
 \subsection{Density Bounds}{
-Optional lower and upper density bounds used with
-\code{constraint="density"}.
+These arguments set optional lower and upper density bounds used with \code{constraint = \"density\"}.
 }
 
 \item{lb}{
   a scalar lower bound (\eqn{\ge 0}) to be used in conjunction with
   \code{constraint="density"}
 }
+
 \item{ub}{
   a scalar upper bound (\eqn{\ge 0} and \eqn{\ge} \code{lb}) to be used
   in conjunction with \code{constraint="density"}
 }
 
+
 \subsection{Grid And Distance Controls}{
-Additional grid construction, distance metric, and mass-preservation controls.
+These arguments control grid construction, distance metric, and mass preservation.
 }
 
 \item{extend.range}{
@@ -79,6 +85,20 @@ Additional grid construction, distance metric, and mass-preservation controls.
   should be extended for the additional grid points (passed to the
   function \code{extendrange})
 }
+
+\item{function.distance}{
+  a logical value that, if \code{TRUE}, minimizes the squared deviation between
+  the constrained and unconstrained estimates, otherwise, minimizes the
+  squared deviation between the constrained and unconstrained weights
+}
+
+\item{integral.equal}{
+  a logical value, that, if \code{TRUE}, adjusts the constrained estimate
+  to have the same probability mass over the range \code{X}, \code{Y},
+  and the additional grid points
+}
+
+
 \item{num.grid}{
   number of additional grid points (in addition to \code{X} and
   \code{Y}) placed on an equi-spaced grid spanning
@@ -86,19 +106,9 @@ Additional grid construction, distance metric, and mass-preservation controls.
   additional grid points will be used regardless of the value of
   \code{extend.range})
 }
-\item{function.distance}{
-  a logical value that, if \code{TRUE}, minimizes the squared deviation between
-  the constrained and unconstrained estimates, otherwise, minimizes the
-  squared deviation between the constrained and unconstrained weights
-}
-\item{integral.equal}{
-  a logical value, that, if \code{TRUE}, adjusts the constrained estimate
-  to have the same probability mass over the range \code{X}, \code{Y},
-  and the additional grid points
-}
 
 \subsection{Shape Constraint}{
-Monotonicity, convexity, and log-shape constraint choice.
+This argument chooses the monotonicity, convexity, or log-shape constraint.
 }
 
 \item{constraint}{
@@ -110,8 +120,8 @@ Monotonicity, convexity, and log-shape constraint choice.
   (\code{constraint="log-convex"}), or log-concave
   (\code{constraint="log-concave"})
 }
-}
 
+}
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
 

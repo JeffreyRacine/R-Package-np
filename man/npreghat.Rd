@@ -38,56 +38,73 @@ npreghat(bws, ...)
   deriv = NULL, ...)
 }
 \arguments{
-\subsection{Bandwidth And Data Inputs}{
-Regression bandwidth object, formula data, training predictors, and
-evaluation predictors.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the fitted bandwidth object, formula/data interface, training data, and evaluation data.
 }
 
   \item{bws}{An object of class \code{rbandwidth} or \code{npregression}.}
 
+
   \item{data}{A data frame used with the formula interface.}
 
-  \item{newdata}{Optional evaluation data for formula and predict methods.}
-
-  \item{txdat}{Training predictors.}
 
   \item{exdat}{Optional evaluation predictors.}
 
-\subsection{Operator Output}{
-Right-hand-side input and output mode for matrix construction or direct
-operator application.
-}
 
-  \item{y}{Optional response vector or matrix for apply mode.}
+  \item{newdata}{Optional evaluation data for formula and predict methods.}
 
-  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
+
+  \item{txdat}{Training predictors.}
+
 
 \subsection{Local-Polynomial Controls}{
-Basis, degree, derivative, leave-one-out, and ridge controls for local
-polynomial operator construction.
+These arguments control local-polynomial basis, degree, derivatives, leave-one-out behavior, and ridge stabilization.
 }
 
   \item{basis}{Local polynomial basis: \code{"glp"}, \code{"additive"}, or \code{"tensor"}.}
 
+
   \item{bernstein.basis}{Logical; use Bernstein basis for LP terms.}
+
 
   \item{degree}{Optional local polynomial degree vector override (LP path).}
 
+
   \item{deriv}{Convenience alias for \code{s}.}
+
 
   \item{leave.one.out}{Logical; if \code{TRUE}, compute in-sample leave-one-out hat weights. This cannot be combined with explicit \code{exdat}/\code{newdata}.}
 
+
   \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves.}
+
 
   \item{s}{Derivative multi-index over continuous predictors.}
 
-\subsection{Methods And Additional Arguments}{
-S3 method input and additional arguments passed to methods.
+
+\subsection{Method Objects}{
+This argument identifies a fitted hat-operator object supplied to an S3 method.
 }
 
   \item{object}{An object returned by \code{npreghat}.}
 
+
+\subsection{Operator Output}{
+These arguments control whether the operator is returned as a matrix or applied directly.
+}
+
+  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
+
+
+  \item{y}{Optional response vector or matrix for apply mode.}
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to methods.
+}
+
   \item{...}{Additional arguments passed to methods.}
+
 }
 \details{
 For \code{output = "matrix"}, the return value is a matrix with class

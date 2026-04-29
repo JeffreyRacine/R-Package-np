@@ -35,10 +35,34 @@ npregivderiv(y,
              ...)
 }
 \arguments{
-\subsection{Main Data Inputs}{
-Dependent variable, endogenous regressors, instruments, exogenous regressors,
-and evaluation data for derivative estimation.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the response, endogenous variables, instruments, exogenous covariates, and evaluation data.
 }
+
+  \item{w}{
+    a \eqn{q}-variate data frame of instruments. The data types may be
+    continuous, discrete (unordered and ordered factors), or some
+    combination thereof.
+  }
+
+  \item{weval}{
+    a \eqn{q}-variate data frame of instruments on which the regression
+    will be estimated (evaluation data). By default, evaluation
+    takes place on the data provided by \code{w}.
+  }
+
+  \item{x}{
+    an \eqn{r}-variate data frame of exogenous regressors. The data
+    types may be continuous, discrete (unordered and ordered factors),
+    or some combination thereof.
+  }
+
+  \item{xeval}{
+    an \eqn{r}-variate data frame of exogenous regressors on which the
+    regression will be estimated (evaluation data). By default,
+    evaluation takes place on the data provided by \code{x}.
+  }
+
 
   \item{y}{
     a one (1) dimensional numeric or integer vector of dependent data, each
@@ -46,44 +70,27 @@ and evaluation data for derivative estimation.
     \code{z}.
   }
 
+
   \item{z}{
     a \eqn{p}-variate data frame of endogenous regressors. The data
     types may be continuous, discrete (unordered and ordered factors),
     or some combination thereof.
   }
-  \item{w}{
-    a \eqn{q}-variate data frame of instruments. The data types may be
-    continuous, discrete (unordered and ordered factors), or some
-    combination thereof.
-  }
-  \item{x}{
-    an \eqn{r}-variate data frame of exogenous regressors. The data
-    types may be continuous, discrete (unordered and ordered factors),
-    or some combination thereof.
-  }
+
   \item{zeval}{
     a \eqn{p}-variate data frame of endogenous regressors on which the
     regression will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{z}.
   }
-  \item{weval}{
-    a \eqn{q}-variate data frame of instruments on which the regression
-    will be estimated (evaluation data). By default, evaluation
-    takes place on the data provided by \code{w}.
-  }
-  \item{xeval}{
-    an \eqn{r}-variate data frame of exogenous regressors on which the
-    regression will be estimated (evaluation data). By default,
-    evaluation takes place on the data provided by \code{x}.
-  }
 
 \subsection{Iteration Controls}{
-Landweber-Fridman iteration, starting-value, and stopping controls.
+These arguments control derivative iteration and reproducibility settings.
 }
 
 \item{constant}{
   the constant to use for Landweber-Fridman iteration.
 }
+
 
   \item{iterate.break}{
     a logical value indicating whether to compute all objects up to
@@ -92,10 +99,12 @@ Landweber-Fridman iteration, starting-value, and stopping controls.
     \code{iterate.max})
   }
 
+
   \item{iterate.max}{
     an integer indicating the maximum number of iterations permitted
     before termination occurs for Landweber-Fridman iteration.
   }
+
 
   \item{nmulti}{
     integer number of times to restart the process of finding extrema of
@@ -103,13 +112,15 @@ Landweber-Fridman iteration, starting-value, and stopping controls.
     points.
   }
 
+
   \item{random.seed}{
     an integer used to seed R's random number generator. This ensures
     replicability of the numerical search. Defaults to 42.
   }
 
+
 \subsection{Residual Smoothing And Starting Values}{
-Controls for residual smoothing and the initial derivative path.
+These arguments control residual smoothing and the initial derivative path.
 }
 
 \item{smooth.residuals}{
@@ -119,16 +130,19 @@ Controls for residual smoothing and the initial derivative path.
   \eqn{w} during Landweber-Fridman iteration.
  }
 
+
 \item{start.from}{ a character string indicating whether to start from
   \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|z)|z)} (this can
   be overridden by providing \code{starting.values} below)
 }  
+
 \item{starting.values}{ a value indicating whether to commence
   Landweber-Fridman assuming
   \eqn{\varphi'_{-1}=starting.values}{phi'[-1]=starting.values} (proper
   Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
   \code{NULL}, see details below)
 }
+
   \item{stop.on.increase}{
     a logical value (defaults to \code{TRUE}) indicating whether to halt
     iteration if the stopping criterion (see below) increases over the
@@ -136,15 +150,16 @@ Controls for residual smoothing and the initial derivative path.
     but increased).
   }
 
-\subsection{Additional Estimation Arguments}{
-Further arguments supplied to \code{\link{npreg}} and \code{\link{npksum}}.
+
+\subsection{Additional Arguments}{
+Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
 }
 
   \item{...}{ 
     additional arguments supplied to \code{\link{npreg}} and \code{\link{npksum}}.
   }
-}
 
+}
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
