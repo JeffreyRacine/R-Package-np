@@ -125,26 +125,15 @@ npcdistbw(\dots)
 }
 
 \arguments{
-\subsection{Data And Bandwidth Inputs}{
-These arguments identify the data, optional distribution grid, and whether bandwidths are supplied or computed.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the data, formula interface, optional distribution grid, and whether bandwidths are supplied or computed.
 }
 
-  \item{xdat}{
-    a \eqn{p}-variate data frame of explanatory data on which bandwidth selection will
-    be performed. The data types may be continuous, discrete (unordered
-    and ordered factors), or some combination thereof.
-  }
-
-  \item{ydat}{
-    a \eqn{q}-variate data frame of dependent data on which bandwidth
-    selection will be performed. The data types may be continuous,
-    discrete (ordered factors), or some combination thereof.
-  }
-
-  \item{gydat}{
-    a grid of data on which the indicator function for
-    least-squares cross-validation is to be computed (can be the sample
-    or a grid of quantiles for \code{ydat}).
+  \item{bandwidth.compute}{
+    a logical value which specifies whether to do a numerical search for
+    bandwidths or not. If set to \code{FALSE}, a \code{condbandwidth} object
+    will be returned with bandwidths set to those specified
+    in \code{bws}. Defaults to \code{TRUE}.
   }
 
   \item{bws}{
@@ -163,12 +152,116 @@ These arguments identify the data, optional distribution grid, and whether bandw
 
 
     
-  \item{bandwidth.compute}{
-    a logical value which specifies whether to do a numerical search for
-    bandwidths or not. If set to \code{FALSE}, a \code{condbandwidth} object
-    will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
+  \item{call}{
+    the original function call. This is passed internally by
+    \code{\link{np}} when a bandwidth search has been implied by a call to
+    another function. It is not recommended that the user set this.
   }
+
+  \item{data}{
+    an optional data frame, list or environment (or object
+    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
+    in the model. If not found in data, the variables are taken from
+    \code{environment(formula)}, typically the environment from which the
+    function is called.
+  }
+
+  \item{formula}{
+    a symbolic description of variables on which bandwidth selection is
+    to be performed. The details of constructing a formula are
+    described below.
+  }
+
+  \item{gdata}{
+    a grid of data on which the indicator function for
+    least-squares cross-validation is to be computed (can be the sample
+    or a grid of quantiles).
+  }
+
+  \item{gydat}{
+    a grid of data on which the indicator function for
+    least-squares cross-validation is to be computed (can be the sample
+    or a grid of quantiles for \code{ydat}).
+  }
+
+  \item{na.action}{
+    a function which indicates what should happen when the data contain
+   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
+    \code{\link{na.fail}} if that is unset. The (recommended) default is
+    \code{\link{na.omit}}.  
+  }
+  
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used in
+    the fitting process. 
+  }
+
+  \item{xdat}{
+    a \eqn{p}-variate data frame of explanatory data on which bandwidth selection will
+    be performed. The data types may be continuous, discrete (unordered
+    and ordered factors), or some combination thereof.
+  }
+
+  \item{ydat}{
+    a \eqn{q}-variate data frame of dependent data on which bandwidth
+    selection will be performed. The data types may be continuous,
+    discrete (ordered factors), or some combination thereof.
+  }
+
+
+\subsection{Automatic Degree Search Controls}{
+These arguments control automatic local-polynomial degree search when \code{regtype="lp"}.
+}
+
+  \item{degree.max}{
+    optional scalar or integer vector giving upper bounds for automatic
+    degree search over continuous \code{xdat} predictors when
+    \code{degree.select != "manual"}.
+  }
+
+  \item{degree.max.cycles}{
+    positive integer giving the maximum number of coordinate-search
+    sweeps over the degree vector. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
+  }
+
+  \item{degree.min}{
+    optional scalar or integer vector giving lower bounds for automatic
+    degree search over continuous \code{xdat} predictors when
+    \code{degree.select != "manual"}.
+  }
+
+  \item{degree.restarts}{
+    non-negative integer giving the number of additional deterministic
+    coordinate-search restarts. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
+  }
+
+  \item{degree.select}{
+    character string controlling local-polynomial degree handling when
+    \code{regtype="lp"}. \code{"manual"} (default) treats
+    \code{degree} as fixed. \code{"coordinate"} performs cached
+    coordinate-wise search over admissible degree vectors for the
+    continuous \code{xdat} predictors. \code{"exhaustive"} evaluates
+    the full admissible degree grid when \code{search.engine="cell"}.
+    For NOMAD-based search engines, any non-\code{"manual"} value
+    requests direct joint search over degree and bandwidth
+    coordinates.
+  }
+
+  \item{degree.start}{
+    optional starting degree vector for automatic coordinate search. If
+    omitted, the search starts from the degree-zero local-constant
+    baseline on the continuous \code{xdat} predictors.
+  }
+
+  \item{degree.verify}{
+    logical value indicating whether a coordinate-search solution should
+    be exhaustively verified over the admissible degree grid after the
+    heuristic phase completes. Available only for
+    \code{search.engine="cell"}.
+  }
+
 
 \subsection{Bandwidth Criterion And Representation}{
 These arguments choose the selection criterion and the way continuous bandwidths are represented.
@@ -216,13 +309,49 @@ These arguments choose the selection criterion and the way continuous bandwidths
     \code{adaptive_nn}: compute adaptive nearest neighbors
   }
 
-\subsection{Search Initialization, Kernels, And Support}{
-These controls set numerical search starts, kernel choices, support bounds, and least-squares integral controls.
+
+\subsection{Categorical Search Initialization}{
+These controls set categorical search starts and categorical direction-set initialization.
+}
+
+  \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{dfac.init}{non-random initial values for scale factors for categorical variables for Powell's algorithm. See Details}
+
+  \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{hbd.init}{upper bound for scale factors for categorical variables for Powell's algorithm. See Details}
+
+  \item{initd.dir}{initial non-random values for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{lbd.init}{lower bound for scale factors for categorical variables for Powell's algorithm. See Details}
+
+  \item{scale.init.categorical.sample}{ a logical value that when set
+    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
+    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
+    \eqn{n} the number of observations, \eqn{P}{P} the order of the
+    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
+    Details}
+
+
+\subsection{Continuous Direction-Set Search Controls}{
+These controls set Powell direction-set initialization for continuous variables.
 }
 
   \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{scale.factor.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.search.lower} is larger, the effective first search start is raised to that floor. See Details}
+  \item{dfc.dir}{chi-square degrees of freedom for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{initc.dir}{initial non-random values for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+
+\subsection{Continuous Kernel Support Controls}{
+These controls choose and parameterize bounded support for continuous kernels.
+}
 
   \item{cxkerbound}{
     character string controlling continuous-kernel support handling for
@@ -236,20 +365,6 @@ These controls set numerical search starts, kernel choices, support bounds, and 
     variables used when \code{cxkerbound="fixed"}. Must satisfy
     lower-bound validity for each variable (e.g.,
     \code{<= min(variable)}). Use \code{-Inf} for unbounded below. See \code{\link{np.kernels}} for bounded-kernel normalization details.
-  }
-
-  \item{cxkerorder}{
-    numeric value specifying kernel order for
-    \code{xdat} (one of
-    \code{(2,4,6,8)}). Kernel order specified along with a
-  \code{uniform} continuous kernel type will be ignored. Defaults to
-  \code{2}.
-  }
-
-  \item{cxkertype}{
-    character string used to specify the continuous kernel type for
-    \code{xdat}.  Can be set as \code{gaussian},
-    \code{epanechnikov}, or \code{uniform}. Defaults to \code{gaussian}.
   }
 
   \item{cxkerub}{
@@ -273,21 +388,6 @@ These controls set numerical search starts, kernel choices, support bounds, and 
     \code{<= min(variable)}). Use \code{-Inf} for unbounded below. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
-  \item{cykerorder}{
-    numeric value specifying kernel order for
-    \code{ydat} (one of
-    \code{(2,4,6,8)}). Kernel order specified along with a
-  \code{uniform} continuous kernel type will be ignored. Defaults to
-  \code{2}.
-  }
-
-  \item{cykertype}{
-    character string used to specify the continuous kernel type for
-    \code{ydat}.
-    Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
-  }
-
   \item{cykerub}{
     numeric scalar/vector of upper bounds for continuous \code{ydat}
     variables used when \code{cykerbound="fixed"}. Must satisfy
@@ -295,53 +395,53 @@ These controls set numerical search starts, kernel choices, support bounds, and 
     \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
-  \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
 
-  \item{dfac.init}{non-random initial values for scale factors for categorical variables for Powell's algorithm. See Details}
+\subsection{Continuous Scale-Factor Search Initialization}{
+These controls define deterministic and random continuous scale-factor starts and the lower admissibility floor for fixed-bandwidth search.
+}
 
-  \item{dfc.dir}{chi-square degrees of freedom for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+  \item{scale.factor.init}{
+    deterministic initial scale factor for continuous fixed-bandwidth
+    search. Defaults to \code{0.5}. The value supplied by the user is
+    not rewritten, but the effective first start passed to the optimizer
+    is \code{max(scale.factor.init, scale.factor.search.lower)}. See
+    Details.
+  }
+  \item{scale.factor.init.lower}{
+    lower endpoint for random continuous scale-factor starts. Defaults
+    to \code{0.1}. The value supplied by the user is not rewritten, but
+    the effective random-start lower endpoint is
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See
+    Details.
+  }
+  \item{scale.factor.init.upper}{
+    upper endpoint for random continuous scale-factor starts. Defaults
+    to \code{2.0}. It must be greater than or equal to the effective
+    lower endpoint,
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)};
+    otherwise bandwidth search errors rather than silently expanding the
+    interval. See Details.
+  }
+  \item{scale.factor.search.lower}{
+    optional nonnegative scalar giving the hard lower admissibility
+    bound for continuous fixed-bandwidth search candidates. Defaults to
+    \code{NULL}. If \code{NULL}, an existing bandwidth object's stored
+    value is inherited when available; otherwise the package default
+    \code{0.1} is used. This floor applies to computed/search bandwidth
+    candidates and to effective search starts only. It does not rewrite
+    explicit bandwidths supplied for storage with
+    \code{bandwidth.compute = FALSE}. Final fixed-bandwidth search
+    candidates must also have a finite valid raw objective value.
+  }
+
+\subsection{Distribution Integral And Grid Controls}{
+These controls tune the conditional distribution-function integral and grid calculations.
+}
 
   \item{do.full.integral}{
     a logical value which when set as \code{TRUE} evaluates the
     moment-based integral on the entire sample.
   }
-
- \item{ftol}{
-    fractional tolerance on the value of the cross-validation function
-    evaluated at located minima (of order the machine precision or
-    perhaps slightly larger so as not to be diddled by
-    roundoff). Defaults to \code{1.490116e-07}
-    (1.0e+01*sqrt(.Machine$double.eps)).
-  }
-
-  \item{scale.factor.init.upper}{upper endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. It must be no smaller than \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
-
-  \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
-
-  \item{hbd.init}{upper bound for scale factors for categorical variables for Powell's algorithm. See Details}
-
-  \item{initc.dir}{initial non-random values for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
-
-  \item{initd.dir}{initial non-random values for direction set search for Powell's algorithm for categorical variables. See Details}
-
-  \item{invalid.penalty}{ a character string specifying the penalty
-    used when the optimizer encounters invalid bandwidths.
-    \code{"baseline"} returns a finite penalty based on a baseline
-    objective; \code{"dbmax"} returns \code{DBL\_MAX}. Defaults to
-    \code{"baseline"}.}
-
-  \item{itmax}{
-    integer number of iterations before failure in the numerical
-    optimization routine. Defaults to \code{10000}.
-  }
-
-  \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
-
-  \item{scale.factor.init.lower}{lower endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. The effective lower endpoint is \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
-
-  \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
-
-  \item{lbd.init}{lower bound for scale factors for categorical variables for Powell's algorithm. See Details}
 
   \item{memfac}{
     The algorithm to compute the least-squares objective function uses
@@ -360,77 +460,83 @@ These controls set numerical search starts, kernel choices, support bounds, and 
     integral. Defaults to \code{100}.
   }
 
-  \item{nmulti}{
-    integer number of times to restart the process of finding extrema of
-    the cross-validation function from different (random) initial points
+
+\subsection{Kernel Type Controls}{
+These controls choose continuous, unordered, and ordered kernels for \code{xdat} and \code{ydat}.
+}
+
+  \item{cxkerorder}{
+    numeric value specifying kernel order for
+    \code{xdat} (one of
+    \code{(2,4,6,8)}). Kernel order specified along with a
+  \code{uniform} continuous kernel type will be ignored. Defaults to
+  \code{2}.
+  }
+
+  \item{cxkertype}{
+    character string used to specify the continuous kernel type for
+    \code{xdat}.  Can be set as \code{gaussian},
+    \code{epanechnikov}, or \code{uniform}. Defaults to \code{gaussian}.
+  }
+
+  \item{cykerorder}{
+    numeric value specifying kernel order for
+    \code{ydat} (one of
+    \code{(2,4,6,8)}). Kernel order specified along with a
+  \code{uniform} continuous kernel type will be ignored. Defaults to
+  \code{2}.
+  }
+
+  \item{cykertype}{
+    character string used to specify the continuous kernel type for
+    \code{ydat}.
+    Can be set as \code{gaussian}, \code{epanechnikov}, or
+    \code{uniform}. Defaults to \code{gaussian}.
   }
 
   \item{oxkertype}{
-    character string used to specify the ordered categorical
-    kernel type. Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}. Defaults to \code{liracine}.
+    character string used to specify the ordered categorical kernel
+    type for \code{xdat}. Can be set as \code{wangvanryzin},
+    \code{liracine}, or \code{racineliyan}. Defaults to
+    \code{liracine}.
   }
-
   \item{oykertype}{
-    character string used to specify the ordered categorical
-    kernel type. Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}.
+    character string used to specify the ordered categorical kernel
+    type for \code{ydat}. Can be set as \code{wangvanryzin},
+    \code{liracine}, or \code{racineliyan}. Defaults to
+    \code{liracine}.
   }
-
-  \item{penalty.multiplier}{ a numeric multiplier applied to the
-    baseline penalty when \code{invalid.penalty="baseline"}.
-    Defaults to \code{10}.}
-
-  \item{remin}{
-    a logical value which when set as \code{TRUE} the search routine
-    restarts from located minima for a minor gain in accuracy. Defaults
-    to \code{TRUE}.
-  }
-
-  \item{scale.init.categorical.sample}{ a logical value that when set
-    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
-    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
-    \eqn{n} the number of observations, \eqn{P}{P} the order of the
-    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
-    Details}
-
-  \item{scale.factor.search.lower}{
-    an optional nonnegative scalar controlling the hard lower bound used
-    for continuous fixed-bandwidth search candidates. When omitted, the
-    default coefficient \code{0.1} is used. Larger values impose a
-    stricter search floor. This argument affects search admissibility
-    and search-start sanitization only; explicit bandwidths supplied for
-    storage when \code{bandwidth.compute = FALSE} are not rewritten.
-    Final fixed-bandwidth search candidates must also have a finite valid raw
-    objective value.}
-
-  \item{small}{
-    a small number used to bracket a minimum (it is hopeless to ask for
-    a bracketing interval of width less than sqrt(epsilon) times its
-    central value, a fractional width of only about 10-04 (single
-    precision) or 3x10-8 (double precision)). Defaults to \code{small
-      = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
-  }
-
-  \item{tol}{
-    tolerance on the position of located minima of the cross-validation
-    function (tol should generally be no smaller than the square root of
-    your machine's floating point precision). Defaults to \code{
-      1.490116e-04 (1.0e+04*sqrt(.Machine$double.eps))}.
-  }
-
-  \item{transform.bounds}{ a logical value that when set to \code{TRUE}
-    applies an internal transformation that maps the unconstrained
-    search to the feasible bandwidth domain. Defaults to
-    \code{FALSE}.}
-
   \item{uxkertype}{
-    character string used to specify the unordered categorical
-    kernel type. Can be set as \code{aitchisonaitken} or
+    character string used to specify the unordered categorical kernel
+    type for \code{xdat}. Can be set as \code{aitchisonaitken} or
     \code{liracine}. Defaults to \code{aitchisonaitken}.
   }
 
-\subsection{Local-Polynomial And NOMAD Controls}{
-These arguments control local-polynomial specification and optional automatic degree search.
+\subsection{Local-Polynomial Model Specification}{
+These arguments control the local-polynomial estimator, basis, and fixed degree specification.
 }
+
+  \item{basis}{
+    character string specifying the polynomial basis used when
+    \code{regtype="lp"}. Options are \code{"glp"},
+    \code{"additive"}, and \code{"tensor"}.
+  }
+
+  \item{bernstein.basis}{
+    logical value controlling Bernstein basis evaluation for
+    \code{regtype="lp"}. When automatic degree search is requested and
+    \code{bernstein.basis} is not explicitly supplied, the search route
+    defaults to \code{TRUE} for numerical stability. Explicit
+    \code{bernstein.basis=FALSE} is honored, but raw-polynomial search
+    can be poorly conditioned at higher degrees.
+  }
+
+  \item{degree}{
+    integer scalar or integer vector of polynomial degrees for
+    continuous \code{xdat} variables when \code{regtype="lp"}.
+    If scalar, the value is recycled to all continuous \code{xdat}
+    variables.
+  }
 
   \item{regtype}{
     character string specifying the conditional local method used for
@@ -446,45 +552,10 @@ These arguments control local-polynomial specification and optional automatic de
     defaults or invoking an automatic fallback.
   }
 
-  \item{basis}{
-    character string specifying the polynomial basis used when
-    \code{regtype="lp"}. Options are \code{"glp"},
-    \code{"additive"}, and \code{"tensor"}.
-  }
 
-  \item{degree}{
-    integer scalar or integer vector of polynomial degrees for
-    continuous \code{xdat} variables when \code{regtype="lp"}.
-    If scalar, the value is recycled to all continuous \code{xdat}
-    variables.
-  }
-
-  \item{degree.select}{
-    character string controlling local-polynomial degree handling when
-    \code{regtype="lp"}. \code{"manual"} (default) treats
-    \code{degree} as fixed. \code{"coordinate"} performs cached
-    coordinate-wise search over admissible degree vectors for the
-    continuous \code{xdat} predictors. \code{"exhaustive"} evaluates
-    the full admissible degree grid when \code{search.engine="cell"}.
-    For NOMAD-based search engines, any non-\code{"manual"} value
-    requests direct joint search over degree and bandwidth
-    coordinates.
-  }
-
-  \item{search.engine}{
-    character string controlling the automatic local-polynomial search
-    backend when \code{regtype="lp"} and
-    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
-    performs direct joint search over the \code{xdat}-side continuous
-    bandwidth coordinates and degree vector using
-    \code{crs::snomadr()}, then applies one Powell hot start from the
-    NOMAD solution. \code{"nomad"} omits the Powell refinement.
-    \code{"cell"} profiles the criterion over the admissible degree
-    grid using repeated fixed-degree bandwidth solves. NOMAD-based
-    search currently requires \code{bwtype="fixed"},
-    \code{degree.verify=FALSE}, and the suggested package \pkg{crs} to
-    be installed.
-  }
+\subsection{NOMAD Search Controls}{
+These arguments control the optional NOMAD direct-search route for local-polynomial degree and bandwidth search.
+}
 
   \item{nomad}{
     logical shortcut for the recommended automatic local-polynomial
@@ -522,107 +593,122 @@ These arguments control local-polynomial specification and optional automatic de
     controls inner NOMAD multistarts within each outer restart.
   }
 
-  \item{degree.min}{
-    optional scalar or integer vector giving lower bounds for automatic
-    degree search over continuous \code{xdat} predictors when
-    \code{degree.select != "manual"}.
+  \item{search.engine}{
+    character string controlling the automatic local-polynomial search
+    backend when \code{regtype="lp"} and
+    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
+    performs direct joint search over the \code{xdat}-side continuous
+    bandwidth coordinates and degree vector using
+    \code{crs::snomadr()}, then applies one Powell hot start from the
+    NOMAD solution. \code{"nomad"} omits the Powell refinement.
+    \code{"cell"} profiles the criterion over the admissible degree
+    grid using repeated fixed-degree bandwidth solves. NOMAD-based
+    search currently requires \code{bwtype="fixed"},
+    \code{degree.verify=FALSE}, and the suggested package \pkg{crs} to
+    be installed.
   }
 
-  \item{degree.max}{
-    optional scalar or integer vector giving upper bounds for automatic
-    degree search over continuous \code{xdat} predictors when
-    \code{degree.select != "manual"}.
-  }
 
-  \item{degree.start}{
-    optional starting degree vector for automatic coordinate search. If
-    omitted, the search starts from the degree-zero local-constant
-    baseline on the continuous \code{xdat} predictors.
-  }
-
-  \item{degree.restarts}{
-    non-negative integer giving the number of additional deterministic
-    coordinate-search restarts. Ignored for \code{"manual"} and
-    \code{"exhaustive"} degree selection.
-  }
-
-  \item{degree.max.cycles}{
-    positive integer giving the maximum number of coordinate-search
-    sweeps over the degree vector. Ignored for \code{"manual"} and
-    \code{"exhaustive"} degree selection.
-  }
-
-  \item{degree.verify}{
-    logical value indicating whether a coordinate-search solution should
-    be exhaustively verified over the admissible degree grid after the
-    heuristic phase completes. Available only for
-    \code{search.engine="cell"}.
-  }
-
-  \item{bernstein.basis}{
-    logical value controlling Bernstein basis evaluation for
-    \code{regtype="lp"}. When automatic degree search is requested and
-    \code{bernstein.basis} is not explicitly supplied, the search route
-    defaults to \code{TRUE} for numerical stability. Explicit
-    \code{bernstein.basis=FALSE} is honored, but raw-polynomial search
-    can be poorly conditioned at higher degrees.
-  }
-
-\subsection{Formula Interface}{
-These arguments are used by the formula method.
+\subsection{Numerical Search And Tolerance Controls}{
+These controls set optimizer tolerances, restart behavior, invalid-candidate penalties, memory blocking, and bounded search transformations.
 }
 
-  \item{formula}{
-    a symbolic description of variables on which bandwidth selection is
-    to be performed. The details of constructing a formula are
-    described below.
+ \item{ftol}{
+    fractional tolerance on the value of the cross-validation function
+    evaluated at located minima (of order the machine precision or
+    perhaps slightly larger so as not to be diddled by
+    roundoff). Defaults to \code{1.490116e-07}
+    (1.0e+01*sqrt(.Machine$double.eps)).
   }
 
-  \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(formula)}, typically the environment from which the
-    function is called.
+  \item{invalid.penalty}{ a character string specifying the penalty
+    used when the optimizer encounters invalid bandwidths.
+    \code{"baseline"} returns a finite penalty based on a baseline
+    objective; \code{"dbmax"} returns \code{DBL\_MAX}. Defaults to
+    \code{"baseline"}.}
+
+  \item{itmax}{
+    integer number of iterations before failure in the numerical
+    optimization routine. Defaults to \code{10000}.
   }
 
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used in
-    the fitting process. 
+  \item{nmulti}{
+    integer number of times to restart the process of finding extrema of
+    the cross-validation function from different (random) initial points
   }
 
-  \item{na.action}{
-    a function which indicates what should happen when the data contain
-   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
-    \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.  
-  }
-  
-  \item{call}{
-    the original function call. This is passed internally by
-    \code{\link{np}} when a bandwidth search has been implied by a call to
-    another function. It is not recommended that the user set this.
+  \item{penalty.multiplier}{ a numeric multiplier applied to the
+    baseline penalty when \code{invalid.penalty="baseline"}.
+    Defaults to \code{10}.}
+
+  \item{remin}{
+    a logical value which when set as \code{TRUE} the search routine
+    restarts from located minima for a minor gain in accuracy. Defaults
+    to \code{TRUE}.
   }
 
-  \item{gdata}{
-    a grid of data on which the indicator function for
-    least-squares cross-validation is to be computed (can be the sample
-    or a grid of quantiles).
+  \item{small}{
+    a small number used to bracket a minimum (it is hopeless to ask for
+    a bracketing interval of width less than sqrt(epsilon) times its
+    central value, a fractional width of only about 10-04 (single
+    precision) or 3x10-8 (double precision)). Defaults to \code{small
+      = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
+
+  \item{tol}{
+    tolerance on the position of located minima of the cross-validation
+    function (tol should generally be no smaller than the square root of
+    your machine's floating point precision). Defaults to \code{
+      1.490116e-04 (1.0e+04*sqrt(.Machine$double.eps))}.
+  }
+
+  \item{transform.bounds}{ a logical value that when set to \code{TRUE}
+    applies an internal transformation that maps the unconstrained
+    search to the feasible bandwidth domain. Defaults to
+    \code{FALSE}.}
+
 
 \subsection{Additional Arguments}{
-These arguments are passed onward to lower-level methods as needed.
+These arguments collect remaining controls passed through S3 methods.
 }
 
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
   }
+
 }
 
 \details{
 
-The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+The \code{scale.factor.*} controls are dimensionless search
+controls. The package converts scale factors to bandwidths using the
+estimator-specific scaling encoded in the bandwidth object, including
+kernel order and the number of continuous variables relevant for the
+estimator. Users should not pre-multiply these controls by sample-size
+or standard-deviation factors.
+
+  \code{scale.factor.init} controls the deterministic first search
+  start. \code{scale.factor.init.lower} and
+  \code{scale.factor.init.upper} define the random multistart interval.
+  \code{scale.factor.search.lower} is the lower admissibility bound for
+  continuous fixed-bandwidth search candidates. The effective first
+  start is \code{max(scale.factor.init, scale.factor.search.lower)},
+  and the effective random-start lower endpoint is
+  \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
+  \code{scale.factor.init.upper} must be at least that effective lower
+  endpoint; the package errors rather than silently expanding the user's
+  interval.
+
+  When \code{scale.factor.search.lower} is \code{NULL}, an existing
+  bandwidth object's stored floor is inherited when available;
+  otherwise the package default \code{0.1} is used. Explicit bandwidths
+  supplied for storage with \code{bandwidth.compute = FALSE} are not
+  rewritten by the search floor.
+
+  Categorical search-start controls such as \code{dfac.init},
+  \code{lbd.init}, and \code{hbd.init} have separate semantics and are
+  not affected by \code{scale.factor.search.lower}.
 
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
