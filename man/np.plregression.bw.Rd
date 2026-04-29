@@ -58,27 +58,9 @@ npplregbw(\dots)
 
 }
 \arguments{
-\subsection{Data And Bandwidth Inputs}{
-These arguments identify the linear and nonparametric data components and whether bandwidths are supplied or computed.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the linear, nonparametric, formula, and bandwidth inputs.
 }
-
-  \item{xdat}{
-  a \eqn{p}-variate data frame of explanatory data (training data),
-  corresponding to \eqn{X} in the model equation, whose linear
-  relationship with the dependent data \eqn{Y} is posited.
-  }
-
-  \item{ydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-  \code{xdat}.
-  }
-
-  \item{zdat}{
-    a \eqn{q}-variate data frame of explanatory data (training data),
-    corresponding to \eqn{Z} in the model equation, whose relationship
-    to the dependent variable is unspecified (nonparametric)
-  }
 
   \item{bandwidth.compute}{
     a logical value which specifies whether to do a numerical search for
@@ -105,15 +87,83 @@ These arguments identify the linear and nonparametric data components and whethe
     bandwidths, unless you specify bandwidth.compute = FALSE.
   }
 
-\subsection{Local-Polynomial And NOMAD Controls}{
-These arguments control local-polynomial specification and optional automatic degree search for the nonparametric component.
+  \item{call}{
+    the original function call. This is passed internally by
+    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
+    another function. It is not recommended that the user set this.
+  }
+
+  \item{data}{
+    an optional data frame, list or environment (or object
+    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
+    in the model. If not found in data, the variables are taken from
+    \code{environment(formula)}, typically the environment from which the
+    function is called.
+  }
+
+  \item{formula}{
+    a symbolic description of variables on which bandwidth selection is
+    to be performed. The details of constructing a formula are
+    described below.
+  }
+
+  \item{na.action}{
+    a function which indicates what should happen when the data contain
+   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
+    \code{\link{na.fail}} if that is unset. The (recommended) default is
+    \code{\link{na.omit}}.
+  }
+
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used in
+    the fitting process.
+  }
+
+  \item{xdat}{
+  a \eqn{p}-variate data frame of explanatory data (training data),
+  corresponding to \eqn{X} in the model equation, whose linear
+  relationship with the dependent data \eqn{Y} is posited.
+  }
+
+  \item{ydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+  \code{xdat}.
+  }
+
+  \item{zdat}{
+    a \eqn{q}-variate data frame of explanatory data (training data),
+    corresponding to \eqn{Z} in the model equation, whose relationship
+    to the dependent variable is unspecified (nonparametric)
+  }
+
+
+\subsection{Automatic Degree Search Controls}{
+These arguments control automatic local-polynomial degree search.
 }
 
-  \item{degree}{
-    for local-polynomial partially linear fits, polynomial degree
-    specification for each continuous nonparametric regressor in
-    \code{zdat}. When supplied with \code{degree.select="manual"},
-    bandwidth optimization treats this vector as fixed input.
+  \item{degree.max}{
+    optional scalar or integer vector giving upper bounds for automatic
+    degree search over continuous \code{zdat} predictors when
+    \code{degree.select != "manual"}.
+  }
+
+  \item{degree.max.cycles}{
+    positive integer giving the maximum number of coordinate-search
+    sweeps over the degree vector. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
+  }
+
+  \item{degree.min}{
+    optional scalar or integer vector giving lower bounds for automatic
+    degree search over continuous \code{zdat} predictors when
+    \code{degree.select != "manual"}.
+  }
+
+  \item{degree.restarts}{
+    non-negative integer giving the number of additional deterministic
+    coordinate-search restarts. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
   }
 
   \item{degree.select}{
@@ -127,19 +177,51 @@ These arguments control local-polynomial specification and optional automatic de
     and bandwidth coordinates for the nonparametric component.
   }
 
-  \item{search.engine}{
-    character string controlling the automatic local-polynomial search
-    backend for the nonparametric \code{zdat} component when
-    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
-    performs direct joint search over fixed bandwidths and the degree
-    vector using \code{crs::snomadr()}, then applies one Powell hot
-    start from the NOMAD solution. \code{"nomad"} omits the Powell
-    refinement. \code{"cell"} profiles the criterion over the
-    admissible degree grid using repeated fixed-degree bandwidth solves.
-    NOMAD-based search currently requires fixed-bandwidth child
-    templates, \code{degree.verify=FALSE}, and the suggested package
-    \pkg{crs} to be installed.
+  \item{degree.start}{
+    optional starting degree vector for automatic coordinate search. If
+    omitted, the search starts from the degree-zero local-constant
+    baseline on the continuous \code{zdat} predictors.
   }
+
+  \item{degree.verify}{
+    logical value indicating whether a coordinate-search solution should
+    be exhaustively verified over the admissible degree grid after the
+    heuristic phase completes. Available only for
+    \code{search.engine="cell"}.
+  }
+
+
+\subsection{Continuous Scale-Factor Search Controls}{
+These controls define lower admissibility bounds for continuous fixed-bandwidth search.
+}
+
+  \item{scale.factor.search.lower}{
+    optional nonnegative scalar giving the hard lower admissibility
+    bound for continuous fixed-bandwidth search candidates. Defaults to
+    \code{NULL}. If \code{NULL}, an existing bandwidth object's stored
+    value is inherited when available; otherwise the package default
+    \code{0.1} is used. This floor applies to computed/search bandwidth
+    candidates and to effective search starts only. It does not rewrite
+    explicit bandwidths supplied for storage with
+    \code{bandwidth.compute = FALSE}. Final fixed-bandwidth search
+    candidates must also have a finite valid raw objective value.
+  }
+
+\subsection{Local-Polynomial Model Specification}{
+These arguments control fixed local-polynomial specification for the nonparametric component.
+}
+
+  \item{degree}{
+    for local-polynomial partially linear fits, polynomial degree
+    specification for each continuous nonparametric regressor in
+    \code{zdat}. When supplied with \code{degree.select="manual"},
+    bandwidth optimization treats this vector as fixed input.
+  }
+
+
+\subsection{NOMAD Search Controls}{
+These arguments control the optional NOMAD direct-search route for local-polynomial degree and bandwidth search.
+}
 
   \item{nomad}{
     logical shortcut for the recommended automatic local-polynomial
@@ -178,47 +260,24 @@ These arguments control local-polynomial specification and optional automatic de
     controls inner NOMAD multistarts within each outer restart.
   }
 
-  \item{degree.min}{
-    optional scalar or integer vector giving lower bounds for automatic
-    degree search over continuous \code{zdat} predictors when
-    \code{degree.select != "manual"}.
+  \item{search.engine}{
+    character string controlling the automatic local-polynomial search
+    backend for the nonparametric \code{zdat} component when
+    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
+    performs direct joint search over fixed bandwidths and the degree
+    vector using \code{crs::snomadr()}, then applies one Powell hot
+    start from the NOMAD solution. \code{"nomad"} omits the Powell
+    refinement. \code{"cell"} profiles the criterion over the
+    admissible degree grid using repeated fixed-degree bandwidth solves.
+    NOMAD-based search currently requires fixed-bandwidth child
+    templates, \code{degree.verify=FALSE}, and the suggested package
+    \pkg{crs} to be installed.
   }
 
-  \item{degree.max}{
-    optional scalar or integer vector giving upper bounds for automatic
-    degree search over continuous \code{zdat} predictors when
-    \code{degree.select != "manual"}.
-  }
 
-  \item{degree.start}{
-    optional starting degree vector for automatic coordinate search. If
-    omitted, the search starts from the degree-zero local-constant
-    baseline on the continuous \code{zdat} predictors.
-  }
-
-  \item{degree.restarts}{
-    non-negative integer giving the number of additional deterministic
-    coordinate-search restarts. Ignored for \code{"manual"} and
-    \code{"exhaustive"} degree selection.
-  }
-
-  \item{degree.max.cycles}{
-    positive integer giving the maximum number of coordinate-search
-    sweeps over the degree vector. Ignored for \code{"manual"} and
-    \code{"exhaustive"} degree selection.
-  }
-
-  \item{degree.verify}{
-    logical value indicating whether a coordinate-search solution should
-    be exhaustively verified over the admissible degree grid after the
-    heuristic phase completes. Available only for
-    \code{search.engine="cell"}.
-  }
-
-\subsection{Search Initialization And Feasibility Controls}{
-These controls tune restarts, tolerances, and continuous search lower bounds for the component bandwidth searches.
+\subsection{Numerical Search And Tolerance Controls}{
+These controls set optimizer tolerances and restart behavior.
 }
-
 
   \item{ftol}{
     tolerance on the value of the cross-validation function
@@ -254,53 +313,9 @@ These controls tune restarts, tolerances, and continuous search lower bounds for
       (sqrt(DBL_EPSILON))}
   }
 
-  \item{scale.factor.search.lower}{
-    an optional nonnegative scalar controlling the hard lower bound used
-    for continuous fixed-bandwidth search candidates in the
-    nonparametric \code{zdat} bandwidth searches. When omitted, the
-    default coefficient \code{0.1} is used. Larger values impose a
-    stricter search floor. This argument affects search admissibility
-    and search-start sanitization only; explicit bandwidths supplied for
-    storage when \code{bandwidth.compute = FALSE} are not rewritten.}
-
-\subsection{Formula Interface}{
-These arguments are used by the formula method and are normally supplied by the top-level call.
-}
-
-  \item{formula}{
-    a symbolic description of variables on which bandwidth selection is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
-
-  \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(formula)}, typically the environment from which the
-    function is called.
-  }
-
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used in
-    the fitting process.
-  }
-
-  \item{na.action}{
-    a function which indicates what should happen when the data contain
-   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
-    \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.
-  }
-
-  \item{call}{
-    the original function call. This is passed internally by
-    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
-    another function. It is not recommended that the user set this.
-  }
 
 \subsection{Additional Arguments}{
-These arguments collect bandwidth, kernel, and support controls passed to component \code{\link{npregbw}} searches.
+These arguments collect remaining controls passed through S3 methods.
 }
 
   \item{\dots}{
@@ -313,11 +328,40 @@ These arguments collect bandwidth, kernel, and support controls passed to compon
     \code{bernstein.basis}, and \code{basis}, as described in
     \code{\link{npregbw}}.
   }
+
 }
 
 \details{
 
-The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+The \code{scale.factor.*} controls are dimensionless search
+controls. The package converts scale factors to bandwidths using the
+estimator-specific scaling encoded in the bandwidth object, including
+kernel order and the number of continuous variables relevant for the
+estimator. Users should not pre-multiply these controls by sample-size
+or standard-deviation factors.
+
+  \code{scale.factor.init} controls the deterministic first search
+  start when that control is exposed. \code{scale.factor.init.lower}
+  and \code{scale.factor.init.upper} define the random multistart
+  interval when exposed. \code{scale.factor.search.lower} is the lower
+  admissibility bound for continuous fixed-bandwidth search candidates.
+  The effective first start is \code{max(scale.factor.init,
+  scale.factor.search.lower)} when both controls are present, and the
+  effective random-start lower endpoint is
+  \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
+  \code{scale.factor.init.upper} must be at least that effective lower
+  endpoint; the package errors rather than silently expanding the user's
+  interval.
+
+  When \code{scale.factor.search.lower} is \code{NULL}, an existing
+  bandwidth object's stored floor is inherited when available;
+  otherwise the package default \code{0.1} is used. Explicit bandwidths
+  supplied for storage with \code{bandwidth.compute = FALSE} are not
+  rewritten by the search floor.
+
+  Categorical search-start controls such as \code{dfac.init},
+  \code{lbd.init}, and \code{hbd.init} have separate semantics and are
+  not affected by \code{scale.factor.search.lower}.
 
   Documentation guide: see \code{\link{npregbw}} for component
   nonparametric regression bandwidth controls, \code{\link{np.kernels}}

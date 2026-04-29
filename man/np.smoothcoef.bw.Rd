@@ -102,9 +102,61 @@ npscoefbw(\dots)
 }
 
 \arguments{
-\subsection{Data And Bandwidth Inputs}{
-Primary smooth-coefficient data and bandwidth inputs.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the smooth-coefficient data, formula interface, and whether bandwidths are supplied or computed.
 }
+
+  \item{bandwidth.compute}{
+    a logical value which specifies whether to do a numerical search for
+    bandwidths or not. If set to \code{FALSE}, a \code{scbandwidth} object
+    will be returned with bandwidths set to those specified
+    in \code{bws}. Defaults to \code{TRUE}.
+  }
+
+  \item{bws}{
+    a bandwidth specification. This can be set as a \code{scbandwidth}
+    object returned from a previous invocation, or as a vector of
+    bandwidths, with each element \eqn{i} corresponding to the bandwidth
+    for column \eqn{i} in \code{xdat}. In either case, the bandwidth
+    supplied will serve as a starting point in the numerical search for
+    optimal bandwidths. If specified as a vector, then additional
+    arguments will need to be supplied as necessary to specify the
+    bandwidth type, kernel types, selection methods, and so on. This can
+    be left unset.
+  }
+
+
+  \item{call}{
+    the original function call. This is passed internally by
+    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
+    another function. It is not recommended that the user set this.
+  }
+
+  \item{data}{
+    an optional data frame, list or environment (or object
+    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
+    in the model. If not found in data, the variables are taken from
+    \code{environment(formula)}, typically the environment from which the
+    function is called.
+  }
+
+  \item{formula}{
+    a symbolic description of variables on which bandwidth selection is
+    to be performed. The details of constructing a formula are
+    described below.
+  }
+
+  \item{na.action}{
+    a function which indicates what should happen when the data contain
+   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
+    \code{\link{na.fail}} if that is unset. The (recommended) default is
+    \code{\link{na.omit}}.
+  }
+
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used in
+    the fitting process.
+  }
 
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data (training data),
@@ -127,18 +179,62 @@ Primary smooth-coefficient data and bandwidth inputs.
   }
 
 
-  \item{bws}{
-    a bandwidth specification. This can be set as a \code{scbandwidth}
-    object returned from a previous invocation, or as a vector of
-    bandwidths, with each element \eqn{i} corresponding to the bandwidth
-    for column \eqn{i} in \code{xdat}. In either case, the bandwidth
-    supplied will serve as a starting point in the numerical search for
-    optimal bandwidths. If specified as a vector, then additional
-    arguments will need to be supplied as necessary to specify the
-    bandwidth type, kernel types, selection methods, and so on. This can
-    be left unset.
+
+\subsection{Automatic Degree Search Controls}{
+These arguments control automatic local-polynomial degree search.
+}
+
+  \item{degree.max}{
+    optional scalar or integer vector giving upper bounds for automatic
+    degree search when \code{degree.select != "manual"}.
   }
 
+  \item{degree.max.cycles}{
+    positive integer giving the maximum number of coordinate-search
+    sweeps over the degree vector. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
+  }
+
+  \item{degree.min}{
+    optional scalar or integer vector giving lower bounds for automatic
+    degree search when \code{degree.select != "manual"}.
+  }
+
+  \item{degree.restarts}{
+    non-negative integer giving the number of additional deterministic
+    coordinate-search restarts. Ignored for \code{"manual"} and
+    \code{"exhaustive"} degree selection.
+  }
+
+  \item{degree.select}{
+    character string controlling local-polynomial degree handling when
+    \code{regtype="lp"}. \code{"manual"} (default) treats
+    \code{degree} as fixed. \code{"coordinate"} performs cached
+    coordinate-wise search over admissible degree vectors for the
+    continuous \code{z} variables. \code{"exhaustive"} evaluates the
+    full admissible degree grid when \code{search.engine="cell"}.
+    For NOMAD-based search engines, any non-\code{"manual"} value
+    requests direct joint search over degree and bandwidth
+    coordinates.
+  }
+
+  \item{degree.start}{
+    optional starting degree vector for automatic coordinate search. If
+    omitted, the search starts from the degree-zero local-constant
+    baseline on the continuous \code{z} variables.
+  }
+
+  \item{degree.verify}{
+    logical value indicating whether a coordinate-search solution should
+    be exhaustively verified over the admissible degree grid after the
+    heuristic phase completes. Available only for
+    \code{search.engine="cell"}.
+  }
+
+
+\subsection{Backfitting Controls}{
+These controls tune the optional smooth-coefficient backfitting iterations.
+}
 
   \item{backfit.iterate}{
     boolean value specifying whether or not to iterate evaluations of
@@ -157,32 +253,10 @@ Primary smooth-coefficient data and bandwidth inputs.
     smooth coefficient estimator. Defaults to \code{.Machine$double.eps}.
   }
 
-  \item{bandwidth.compute}{
-    a logical value which specifies whether to do a numerical search for
-    bandwidths or not. If set to \code{FALSE}, a \code{scbandwidth} object
-    will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
-  }
 
-\subsection{Local-Polynomial And NOMAD Controls}{
-Controls for the local-polynomial search route and the \code{nomad=TRUE}
-shortcut.
+\subsection{Bandwidth Criterion And Representation}{
+These arguments choose the selection criterion and the way continuous bandwidths are represented.
 }
-
-  \item{basis}{
-    for \code{regtype="lp"}, the polynomial basis family used for local
-    polynomial fitting. Options are \code{"glp"} (default),
-    \code{"additive"}, and \code{"tensor"}.
-  }
-
-  \item{bernstein.basis}{
-    for \code{regtype="lp"}, logical flag selecting Bernstein-basis
-    representation where supported. When automatic degree search is
-    requested and \code{bernstein.basis} is not explicitly supplied,
-    the search route defaults to \code{TRUE} for numerical stability.
-    Explicit \code{bernstein.basis=FALSE} is honored, but raw-polynomial
-    search can be poorly conditioned at higher degrees.
-  }
 
   \item{bwmethod}{
     which method was used to select bandwidths. \code{cv.ls}
@@ -217,6 +291,38 @@ shortcut.
     \code{adaptive_nn}:  adaptive nearest neighbors
   }
 
+
+\subsection{Categorical Search Initialization}{
+These controls set categorical search starts.
+}
+
+  \item{dfac.init}{
+    deterministic fixed-bandwidth start factor for ordered and
+    unordered categorical coordinates. Used only when
+    \code{bwtype="fixed"}. Defaults to \code{1.0}. Values must not
+    exceed \code{2}.
+  }
+
+  \item{hbd.init}{
+    upper bound for random fixed-bandwidth start factors for ordered
+    and unordered categorical coordinates. Used only when
+    \code{bwtype="fixed"}. Defaults to \code{1.5}. Must be greater than
+    or equal to \code{lbd.init} and must not exceed \code{2}.
+  }
+
+  \item{lbd.init}{
+    lower bound for random fixed-bandwidth start factors for ordered
+    and unordered categorical coordinates. Used only when
+    \code{bwtype="fixed"}. Defaults to \code{0.5}. Values must not
+    exceed \code{2} so that categorical fixed starts remain within
+    lawful bandwidth bounds.
+  }
+
+
+\subsection{Continuous Kernel Support Controls}{
+These controls choose and parameterize bounded support for continuous kernels.
+}
+
   \item{ckerbound}{
     character string controlling continuous-kernel support handling.
     Can be set as \code{none} (default kernel on full support),
@@ -229,6 +335,71 @@ shortcut.
     when \code{ckerbound="fixed"}. Must satisfy lower-bound validity for
     each continuous variable (e.g., \code{<= min(variable)}). Use \code{-Inf} for unbounded below. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
+
+  \item{ckerub}{
+    numeric scalar/vector of upper bounds for continuous variables used
+    when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
+    each continuous variable (e.g., \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
+  }
+
+
+\subsection{Continuous Scale-Factor Search Initialization}{
+These controls define deterministic and random continuous scale-factor starts and the lower admissibility floor for fixed-bandwidth search.
+}
+
+  \item{scale.factor.init}{
+    deterministic initial scale factor for continuous fixed-bandwidth
+    search. Defaults to \code{0.5}. The value supplied by the user is
+    not rewritten, but the effective first start passed to the optimizer
+    is \code{max(scale.factor.init, scale.factor.search.lower)}. See
+    Details.
+  }
+  \item{scale.factor.init.lower}{
+    lower endpoint for random continuous scale-factor starts. Defaults
+    to \code{0.1}. The value supplied by the user is not rewritten, but
+    the effective random-start lower endpoint is
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See
+    Details.
+  }
+  \item{scale.factor.init.upper}{
+    upper endpoint for random continuous scale-factor starts. Defaults
+    to \code{2.0}. It must be greater than or equal to the effective
+    lower endpoint,
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)};
+    otherwise bandwidth search errors rather than silently expanding the
+    interval. See Details.
+  }
+  \item{scale.factor.search.lower}{
+    optional nonnegative scalar giving the hard lower admissibility
+    bound for continuous fixed-bandwidth search candidates. Defaults to
+    \code{NULL}. If \code{NULL}, an existing bandwidth object's stored
+    value is inherited when available; otherwise the package default
+    \code{0.1} is used. This floor applies to computed/search bandwidth
+    candidates and to effective search starts only. It does not rewrite
+    explicit bandwidths supplied for storage with
+    \code{bandwidth.compute = FALSE}. Final fixed-bandwidth search
+    candidates must also have a finite valid raw objective value.
+  }
+
+\subsection{Cross-Validation Iteration Controls}{
+These controls tune iterative cross-validation behavior.
+}
+
+  \item{cv.iterate}{
+    boolean value specifying whether or not to perform iterative,
+    cross-validated backfitting on the data. See details for limitations
+    of the backfitting procedure. Defaults to \code{FALSE}.
+  }
+
+  \item{cv.num.iterations}{
+    integer specifying the number of times to iterate the backfitting
+    process over all covariates. Defaults to \code{1}.
+  }
+
+
+\subsection{Kernel Type Controls}{
+These controls choose continuous, unordered, and ordered kernels.
+}
 
   \item{ckerorder}{
     numeric value specifying kernel order (one of
@@ -243,21 +414,34 @@ shortcut.
     \code{uniform}. Defaults to \code{gaussian}.
   }
 
-  \item{ckerub}{
-    numeric scalar/vector of upper bounds for continuous variables used
-    when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
-    each continuous variable (e.g., \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
+  \item{okertype}{
+    character string used to specify the ordered categorical kernel type.
+    Can be set as \code{wangvanryzin}, \code{liracine}, or
+    \code{racineliyan}. Defaults to \code{liracine}.
+  }
+  \item{ukertype}{
+    character string used to specify the unordered categorical kernel type.
+    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults
+    to \code{aitchisonaitken}.
   }
 
-  \item{cv.iterate}{
-    boolean value specifying whether or not to perform iterative,
-    cross-validated backfitting on the data. See details for limitations
-    of the backfitting procedure. Defaults to \code{FALSE}.
+\subsection{Local-Polynomial Model Specification}{
+These arguments control the local-polynomial estimator, basis, and fixed degree specification.
+}
+
+  \item{basis}{
+    for \code{regtype="lp"}, the polynomial basis family used for local
+    polynomial fitting. Options are \code{"glp"} (default),
+    \code{"additive"}, and \code{"tensor"}.
   }
 
-  \item{cv.num.iterations}{
-    integer specifying the number of times to iterate the backfitting
-    process over all covariates. Defaults to \code{1}.
+  \item{bernstein.basis}{
+    for \code{regtype="lp"}, logical flag selecting Bernstein-basis
+    representation where supported. When automatic degree search is
+    requested and \code{bernstein.basis} is not explicitly supplied,
+    the search route defaults to \code{TRUE} for numerical stability.
+    Explicit \code{bernstein.basis=FALSE} is honored, but raw-polynomial
+    search can be poorly conditioned at higher degrees.
   }
 
   \item{degree}{
@@ -265,32 +449,16 @@ shortcut.
     continuous \code{z} variable.
   }
 
-  \item{degree.select}{
-    character string controlling local-polynomial degree handling when
-    \code{regtype="lp"}. \code{"manual"} (default) treats
-    \code{degree} as fixed. \code{"coordinate"} performs cached
-    coordinate-wise search over admissible degree vectors for the
-    continuous \code{z} variables. \code{"exhaustive"} evaluates the
-    full admissible degree grid when \code{search.engine="cell"}.
-    For NOMAD-based search engines, any non-\code{"manual"} value
-    requests direct joint search over degree and bandwidth
-    coordinates.
+  \item{regtype}{
+    a character string specifying local smoothing type for the \code{z}
+    surface. Options are \code{"lc"} (default), \code{"ll"}, and
+    \code{"lp"}.
   }
 
-  \item{search.engine}{
-    character string controlling the automatic local-polynomial search
-    backend when \code{regtype="lp"} and
-    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
-    performs direct joint search over the \code{zdat}-side continuous
-    bandwidth coordinates and degree vector using
-    \code{crs::snomadr()}, then applies one Powell hot start from the
-    NOMAD solution. \code{"nomad"} omits the Powell refinement.
-    \code{"cell"} profiles the criterion over the admissible degree
-    grid using repeated fixed-degree bandwidth solves. NOMAD-based
-    search currently requires \code{bwtype="fixed"},
-    \code{degree.verify=FALSE}, and the suggested package \pkg{crs} to
-    be installed.
-  }
+
+\subsection{NOMAD Search Controls}{
+These arguments control the optional NOMAD direct-search route for local-polynomial degree and bandwidth search.
+}
 
   \item{nomad}{
     logical shortcut for the recommended automatic local-polynomial
@@ -328,44 +496,25 @@ shortcut.
     controls inner NOMAD multistarts within each outer restart.
   }
 
-\subsection{Search Initialization, Kernels, And Support}{
-Controls for search starts, continuous support handling, and kernel choices.
+  \item{search.engine}{
+    character string controlling the automatic local-polynomial search
+    backend when \code{regtype="lp"} and
+    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
+    performs direct joint search over the \code{zdat}-side continuous
+    bandwidth coordinates and degree vector using
+    \code{crs::snomadr()}, then applies one Powell hot start from the
+    NOMAD solution. \code{"nomad"} omits the Powell refinement.
+    \code{"cell"} profiles the criterion over the admissible degree
+    grid using repeated fixed-degree bandwidth solves. NOMAD-based
+    search currently requires \code{bwtype="fixed"},
+    \code{degree.verify=FALSE}, and the suggested package \pkg{crs} to
+    be installed.
+  }
+
+
+\subsection{Numerical Search Controls}{
+These controls set search restart behavior.
 }
-
-  \item{degree.min}{
-    optional scalar or integer vector giving lower bounds for automatic
-    degree search when \code{degree.select != "manual"}.
-  }
-
-  \item{degree.max}{
-    optional scalar or integer vector giving upper bounds for automatic
-    degree search when \code{degree.select != "manual"}.
-  }
-
-  \item{degree.start}{
-    optional starting degree vector for automatic coordinate search. If
-    omitted, the search starts from the degree-zero local-constant
-    baseline on the continuous \code{z} variables.
-  }
-
-  \item{degree.restarts}{
-    non-negative integer giving the number of additional deterministic
-    coordinate-search restarts. Ignored for \code{"manual"} and
-    \code{"exhaustive"} degree selection.
-  }
-
-  \item{degree.max.cycles}{
-    positive integer giving the maximum number of coordinate-search
-    sweeps over the degree vector. Ignored for \code{"manual"} and
-    \code{"exhaustive"} degree selection.
-  }
-
-  \item{degree.verify}{
-    logical value indicating whether a coordinate-search solution should
-    be exhaustively verified over the admissible degree grid after the
-    heuristic phase completes. Available only for
-    \code{search.engine="cell"}.
-  }
 
   \item{nmulti}{
     integer number of times to restart the process of finding extrema of
@@ -373,74 +522,9 @@ Controls for search starts, continuous support handling, and kernel choices.
     points. Defaults to \code{min(2,ncol(xdat))}.
   }
 
-  \item{scale.factor.init.lower}{
-    lower bound for random fixed-bandwidth start factors for continuous
-    coordinates. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{0.1}. Nearest-neighbor start laws are unchanged by this
-    control. The effective lower endpoint is
-    \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
-  }
-
-  \item{scale.factor.init.upper}{
-    upper bound for random fixed-bandwidth start factors for continuous
-    coordinates. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{2.0}. Must be greater than or equal to
-    \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
-  }
-
-  \item{scale.factor.init}{
-    deterministic fixed-bandwidth start factor for continuous
-    coordinates. Used only when \code{bwtype="fixed"}. Defaults to
-    \code{0.5}. If \code{scale.factor.search.lower} is larger, the
-    effective first search start is raised to that floor.
-  }
-
-  \item{scale.factor.search.lower}{
-    an optional nonnegative scalar controlling the hard lower bound used
-    for continuous fixed-bandwidth search candidates. When omitted, the
-    default coefficient \code{0.1} is used; the
-    \code{scale.factor.init.lower=0.1} default is therefore unchanged unless the user
-    requests a larger value. This argument
-    affects search admissibility and search-start sanitization only;
-    explicit bandwidths supplied for storage when
-    \code{bandwidth.compute = FALSE} are not rewritten.}
-
-  \item{lbd.init}{
-    lower bound for random fixed-bandwidth start factors for ordered
-    and unordered categorical coordinates. Used only when
-    \code{bwtype="fixed"}. Defaults to \code{0.5}. Values must not
-    exceed \code{2} so that categorical fixed starts remain within
-    lawful bandwidth bounds.
-  }
-
-  \item{hbd.init}{
-    upper bound for random fixed-bandwidth start factors for ordered
-    and unordered categorical coordinates. Used only when
-    \code{bwtype="fixed"}. Defaults to \code{1.5}. Must be greater than
-    or equal to \code{lbd.init} and must not exceed \code{2}.
-  }
-
-  \item{dfac.init}{
-    deterministic fixed-bandwidth start factor for ordered and
-    unordered categorical coordinates. Used only when
-    \code{bwtype="fixed"}. Defaults to \code{1.0}. Values must not
-    exceed \code{2}.
-  }
-
-  \item{okertype}{
-    character string used to specify the ordered categorical kernel type.
-    Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}. Defaults to
-    \code{liracine}.
-  }
-
-  \item{ukertype}{
-    character string used to specify the unordered categorical kernel type.
-    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults to
-    \code{aitchisonaitken}.
-  }
 
 \subsection{Optimization Controls}{
-General numerical optimization tolerances and restart controls.
+These arguments control outer optimization behavior for the semiparametric search.
 }
 
   \item{optim.abstol}{
@@ -494,54 +578,9 @@ General numerical optimization tolerances and restart controls.
     replicability of the numerical search. Defaults to 42.
   }
 
-\subsection{Regression Type}{
-Local smoothing type for the coefficient surface.
-}
-
-  \item{regtype}{
-    a character string specifying local smoothing type for the \code{z}
-    surface. Options are \code{"lc"} (default), \code{"ll"}, and
-    \code{"lp"}.
-  }
-
-\subsection{Formula Interface}{
-Formula-method arguments used when the data are supplied symbolically.
-}
-
-  \item{formula}{
-    a symbolic description of variables on which bandwidth selection is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
-
-  \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(formula)}, typically the environment from which the
-    function is called.
-  }
-
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used in
-    the fitting process.
-  }
-
-  \item{na.action}{
-    a function which indicates what should happen when the data contain
-   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
-    \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.
-  }
-
-  \item{call}{
-    the original function call. This is passed internally by
-    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
-    another function. It is not recommended that the user set this.
-  }
 
 \subsection{Additional Arguments}{
-Further arguments passed through the bandwidth-selection interface.
+These arguments collect remaining controls passed through S3 methods.
 }
 
   \item{\dots}{
@@ -549,11 +588,40 @@ Further arguments passed through the bandwidth-selection interface.
   bandwidth type, kernel types, selection methods, and so on, detailed
   below.
   }
+
 }
 
 \details{
 
-The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+The \code{scale.factor.*} controls are dimensionless search
+controls. The package converts scale factors to bandwidths using the
+estimator-specific scaling encoded in the bandwidth object, including
+kernel order and the number of continuous variables relevant for the
+estimator. Users should not pre-multiply these controls by sample-size
+or standard-deviation factors.
+
+  \code{scale.factor.init} controls the deterministic first search
+  start when that control is exposed. \code{scale.factor.init.lower}
+  and \code{scale.factor.init.upper} define the random multistart
+  interval when exposed. \code{scale.factor.search.lower} is the lower
+  admissibility bound for continuous fixed-bandwidth search candidates.
+  The effective first start is \code{max(scale.factor.init,
+  scale.factor.search.lower)} when both controls are present, and the
+  effective random-start lower endpoint is
+  \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
+  \code{scale.factor.init.upper} must be at least that effective lower
+  endpoint; the package errors rather than silently expanding the user's
+  interval.
+
+  When \code{scale.factor.search.lower} is \code{NULL}, an existing
+  bandwidth object's stored floor is inherited when available;
+  otherwise the package default \code{0.1} is used. Explicit bandwidths
+  supplied for storage with \code{bandwidth.compute = FALSE} are not
+  rewritten by the search floor.
+
+  Categorical search-start controls such as \code{dfac.init},
+  \code{lbd.init}, and \code{hbd.init} have separate semantics and are
+  not affected by \code{scale.factor.search.lower}.
 
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
