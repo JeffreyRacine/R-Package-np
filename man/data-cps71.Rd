@@ -44,14 +44,10 @@ in.check <- !force.run && (
 if (!in.check) {
 npRmpi.init(nslaves=1)
 
-data("cps71")
+data("cps71", package = "npRmpi")
 mpi.bcast.Robj2slave(cps71)
 
-attach(cps71)
-
-if (interactive()) plot(age, logwage, xlab="Age", ylab="log(wage)")
-
-detach(cps71)
+if (interactive()) with(cps71, plot(age, logwage, xlab="Age", ylab="log(wage)"))
 
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.
