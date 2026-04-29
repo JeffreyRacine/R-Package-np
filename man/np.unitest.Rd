@@ -19,13 +19,19 @@ npunitest(data.x = NULL,
 }
 
 \arguments{
-\subsection{Data And Statistic Inputs}{
-Common-support samples and statistic form.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the two samples, statistic variant, and any supplied bandwidths.
 }
+
+  \item{bw.x, bw.y}{
+    numeric (scalar) bandwidths. Defaults to plug-in (see details below).
+  }
+
 
   \item{data.x, data.y}{
     common support univariate vectors containing the variables.
   }
+
 
   \item{method}{
     a character string used to specify whether to compute
@@ -36,9 +42,16 @@ Common-support samples and statistic form.
     \code{data.y} lack common support and/or are sparse.
   }
 
-\subsection{Bootstrap And Bandwidth Controls}{
-Bootstrap execution, scalar bandwidths, and reproducibility controls.
+
+\subsection{Bootstrap Controls}{
+These arguments control bootstrap execution and reproducibility settings.
 }
+
+  \item{boot.num}{
+    an integer value specifying the number of bootstrap
+    replications to use. Defaults to \code{399}.
+  }
+
 
   \item{bootstrap}{
     a logical value which specifies whether to conduct the bootstrap
@@ -46,23 +59,15 @@ Bootstrap execution, scalar bandwidths, and reproducibility controls.
     computed. Defaults to \code{TRUE}.
   }
 
-  \item{boot.num}{
-    an integer value specifying the number of bootstrap
-    replications to use. Defaults to \code{399}.
-  }
-
-  \item{bw.x, bw.y}{
-    numeric (scalar) bandwidths. Defaults to plug-in (see details below).
-  }
 
   \item{random.seed}{
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
 
-\subsection{Additional Bandwidth Arguments}{
-Arguments used when scalar bandwidths are interpreted with non-default
-kernel or bandwidth settings.
+
+\subsection{Additional Arguments}{
+Further arguments are passed to the bandwidth-selection routines used by the test.
 }
 
   \item{\dots}{ additional arguments supplied to specify the bandwidth
@@ -73,8 +78,8 @@ kernel or bandwidth settings.
     \code{ckertype}, \code{ckerorder}, \code{ukertype},
     \code{okertype}.}
 
-}
 
+}
 \value{
   \code{npunitest} returns an object of type \code{unitest} with the
   following components
@@ -206,7 +211,7 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{ univar }
 \keyword{ nonparametric }

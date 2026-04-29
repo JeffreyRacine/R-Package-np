@@ -1,4 +1,4 @@
-% 
+%
 \name{npcmstest}
 \alias{npcmstest}
 \title{ Kernel Consistent Model Specification Test with Mixed Data Types }
@@ -30,15 +30,9 @@ npcmstest(formula,
 }
 
 \arguments{
-\subsection{Formula And Data Inputs}{
-Model, formula, and data inputs for the conditional mean specification test.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the model formula/data interface and explicit data inputs.
 }
-
-    \item{formula}{
-    a symbolic description of variables on which the test is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object
@@ -48,42 +42,45 @@ Model, formula, and data inputs for the conditional mean specification test.
     function is called.
   }
 
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used. 
+  \item{formula}{
+    a symbolic description of variables on which the test is
+    to be performed. The details of constructing a formula are
+    described below.
   }
+
+
+  \item{model}{
+    a model object obtained from a call to \code{\link{lm}} (or
+    \code{\link{glm}}). Important: the
+    call to either \code{\link{glm}} or \code{\link{lm}} must have the arguments
+    \code{x=TRUE} and
+    \code{y=TRUE} or \code{npcmstest} will not work. Also, the test is
+    based on residual bootstrapping hence the outcome must be continuous
+    (which rules out Logit, Probit, and Count models).
+  }
+
+
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used.
+  }
+
 
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data (training data) used to
     calculate the regression estimators.
   }
 
+
   \item{ydat}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{xdat}. 
+    \code{xdat}.
   }
 
-  \item{model}{
-    a model object obtained from a call to \code{\link{lm}} (or
-    \code{\link{glm}}). Important: the 
-    call to either \code{\link{glm}} or \code{\link{lm}} must have the arguments
-    \code{x=TRUE} and 
-    \code{y=TRUE} or \code{npcmstest} will not work. Also, the test is
-    based on residual bootstrapping hence the outcome must be continuous
-    (which rules out Logit, Probit, and Count models).
-  }
 
-\subsection{Test Statistic And Bootstrap Controls}{
-Controls for the reference distribution, bootstrap route, statistic
-normalization, density weighting, and random seed.
+\subsection{Bootstrap And Test Controls}{
+These arguments control the test statistic, bootstrap procedure, and reproducibility settings.
 }
-
-  \item{distribution}{
-    a character string used to specify the method of estimating the
-    distribution of the statistic to be calculated. \code{bootstrap}
-    will conduct bootstrapping. \code{asymptotic} will use the normal
-    distribution. Defaults to \code{bootstrap}.
-  }
 
   \item{boot.method}{
     a character string used to specify the bootstrap method.
@@ -93,10 +90,26 @@ normalization, density weighting, and random seed.
     \code{iid}.
   }
 
+
   \item{boot.num}{
     an integer value specifying the number of bootstrap replications to
     use. Defaults to \code{399}.
   }
+
+
+  \item{density.weighted}{
+    a logical value specifying whether the statistic should be
+    weighted by the density of \code{xdat}. Defaults to \code{TRUE}.
+  }
+
+
+  \item{distribution}{
+    a character string used to specify the method of estimating the
+    distribution of the statistic to be calculated. \code{bootstrap}
+    will conduct bootstrapping. \code{asymptotic} will use the normal
+    distribution. Defaults to \code{bootstrap}.
+  }
+
 
   \item{pivot}{
     a logical value specifying whether the statistic should be
@@ -104,21 +117,17 @@ normalization, density weighting, and random seed.
     distribution. Defaults to \code{TRUE}.
   }
 
-  \item{density.weighted}{
-    a logical value specifying whether the statistic should be
-    weighted by the density of \code{xdat}. Defaults to \code{TRUE}.
-  }
 
   \item{random.seed}{
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
 
-\subsection{Additional Bandwidth Arguments}{
-Arguments passed through to residual bandwidth selection.
+
+\subsection{Additional Arguments}{
+Further arguments are passed to the bandwidth-selection routines used by the test.
 }
 
-  
   \item{\dots}{
     additional arguments supplied to control bandwidth selection on the
     residuals. One can specify the bandwidth type,
@@ -129,8 +138,8 @@ Arguments passed through to residual bandwidth selection.
     a \code{bandwidth} object, and you do not desire the default behaviours.
   }
 
-}
 
+}
 \value{
   \code{npcmstest} returns an object of type \code{cmstest} with the
   following components, components will contain information
@@ -140,7 +149,7 @@ Arguments passed through to residual bandwidth selection.
   \item{In}{ the statistic \code{In} }
   \item{Omega.hat}{ as described in Hsiao, C. and Q. Li and J.S. Racine. }
   \item{q.*}{ the various quantiles of the statistic \code{Jn} (or
-    \code{In} if 
+    \code{In} if
     \code{pivot=FALSE})  are in
     components \code{q.90},
     \code{q.95}, \code{q.99} (one-sided 1\%, 5\%, 10\% critical values) }
@@ -149,7 +158,7 @@ Arguments passed through to residual bandwidth selection.
     replications of \code{Jn} }
   \item{In.bootstrap}{ if \code{pivot=FALSE} contains the bootstrap
     replications of \code{In} }
-  
+
   \code{\link{summary}} supports object of type \code{cmstest}.
 }
 \references{
@@ -188,7 +197,7 @@ Arguments passed through to residual bandwidth selection.
   \code{\link{lm}} and uses features specific to objects of type
   \code{\link{lm}} hence if you attempt to pass objects of a different
   type the function cannot be expected to work.
-  
+
   If you are using data of mixed types, then it is advisable to use the
   \code{\link{data.frame}} function to construct your input data and not
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
@@ -196,7 +205,7 @@ Arguments passed through to residual bandwidth selection.
   type.
 }
 
-\seealso{\code{\link{npRmpi.init}}. 
+\seealso{\code{\link{npRmpi.init}}.
   \code{\link{np.kernels}}, \code{\link{np.options}},
   \code{\link{plot}}, \code{\link{npregbw}}.
 }

@@ -1,4 +1,4 @@
-% 
+%
 \name{npsdeptest}
 \alias{npsdeptest}
 \title{ Kernel Consistent Serial Dependence Test for Univariate Nonlinear Processes }
@@ -19,19 +19,21 @@ npsdeptest(data = NULL,
 }
 
 \arguments{
-\subsection{Data And Statistic Inputs}{
-Time-series data, lag horizon, and statistic form for the serial dependence test.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the data series, lag count, and statistic variant.
 }
 
   \item{data}{
     a vector containing the variable that can be of type
     \code{\link{numeric}} or \code{\link{ts}}.
   }
-  
+
+
   \item{lag.num}{
     an integer value specifying the maximum number of lags to
     use. Defaults to \code{1}.
   }
+
 
   \item{method}{
     a character string used to specify whether to compute the integral
@@ -39,41 +41,44 @@ Time-series data, lag horizon, and statistic form for the serial dependence test
     \code{integration} or \code{summation} (see below for
     details). Defaults to \code{integration}.
   }
-  
+
+
 \subsection{Bootstrap Controls}{
-Bootstrap execution and reproducibility controls.
+These arguments control bootstrap execution and reproducibility settings.
 }
+
+  \item{boot.num}{
+    an integer value specifying the number of bootstrap
+    replications to use. Defaults to \code{399}.
+  }
+
 
   \item{bootstrap}{
     a logical value which specifies whether to conduct
     the bootstrap test or not. If set to \code{FALSE}, only the
     statistic will be computed. Defaults to \code{TRUE}.
   }
-  
-  \item{boot.num}{
-    an integer value specifying the number of bootstrap
-    replications to use. Defaults to \code{399}.
-  }
-  
+
+
   \item{random.seed}{
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
 
+
 }
-            
 \value{
   \code{npsdeptest} returns an object of type \code{deptest} with the
   following components
-  
+
   \item{Srho}{ the statistic vector \code{Srho} }
-  \item{Srho.cumulant}{ the cumulant statistic vector \code{Srho.cumulant} }            
+  \item{Srho.cumulant}{ the cumulant statistic vector \code{Srho.cumulant} }
   \item{Srho.bootstrap.mat}{ contains the bootstrap replications of
     \code{Srho} }
   \item{Srho.cumulant.bootstrap.mat}{ contains the bootstrap
     replications of \code{Srho.cumulant} }
   \item{P}{ the P-value vector of the Srho statistic vector }
-  \item{P.cumulant}{ the P-value vector of the cumulant Srho statistic vector }  
+  \item{P.cumulant}{ the P-value vector of the cumulant Srho statistic vector }
   \item{bootstrap}{ a logical value indicating whether bootstrapping was
   performed }
   \item{boot.num}{ number of bootstrap replications }
@@ -81,14 +86,14 @@ Bootstrap execution and reproducibility controls.
   \item{bw.y}{ the numeric vector of bandwidths for \code{data}
   marginal density at lag \code{num.lag}}
   \item{bw.y.lag}{ the numeric vector of bandwidths for lagged
-    \code{data} marginal density  at lag \code{num.lag}}  
+    \code{data} marginal density  at lag \code{num.lag}}
   \item{bw.joint}{ the numeric matrix of bandwidths for \code{data}
-  and lagged \code{data} joint density  at lag \code{num.lag}}      
+  and lagged \code{data} joint density  at lag \code{num.lag}}
 
 \code{\link{summary}} supports object of type \code{deptest}.
 }
 \references{
-  
+
   Granger, C.W. and E. Maasoumi and J.S. Racine (2004), \dQuote{A
   dependence metric for possibly nonlinear processes}, Journal of Time
   Series Analysis, 25, 649-669.
@@ -102,7 +107,7 @@ Bootstrap execution and reproducibility controls.
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
-  
+
   \code{npsdeptest} computes the nonparametric metric entropy
    (normalized Hellinger of Granger, Maasoumi and Racine (2004)) for
    testing for nonlinear serial dependence, \eqn{D[f(y_t, \hat y_{t-k}),
@@ -118,18 +123,18 @@ Bootstrap execution and reproducibility controls.
   densities while the integration version involves differences). Warning
   messages are produced should this occur (\sQuote{integration recommended})
   and should be heeded.
- 
+
 }
 
 \section{Usage Issues}{
-  
+
   The \code{integration} version of the statistic uses multidimensional
   numerical methods from the \pkg{cubature} package. See
   \pkg{adaptIntegrate} for details. The \code{integration}
   version of the statistic will be substantially slower than the
   \code{summation} version, however, it will likely be both more
   accurate and powerful.
-  
+
 }
 
 \seealso{
@@ -206,7 +211,7 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{ univar }
 \keyword{ nonparametric }

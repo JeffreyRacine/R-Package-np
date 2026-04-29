@@ -11,32 +11,35 @@ np.pairs(y_vars, y_dat, ...)
 np.pairs.plot(pair_list)
 }
 \arguments{
-\subsection{Pair Plot Inputs}{
-Variables, data, and saved pair-list objects used by the pair-plot helpers.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the variables, data, and pair specifications to plot.
 }
+
+  \item{pair_list}{
+    list returned by \code{np.pairs}.
+  }
+
+
+  \item{y_dat}{
+    data frame containing the variables listed in \code{y_vars}.
+  }
+
 
   \item{y_vars}{
     character vector of column names in \code{y_dat}. If \code{y_vars}
     is named, the names are used as plot labels.
   }
 
-  \item{y_dat}{
-    data frame containing the variables listed in \code{y_vars}.
-  }
-
-  \item{pair_list}{
-    list returned by \code{np.pairs}.
-  }
 
 \subsection{Additional Arguments}{
-Further arguments passed to the density and regression routines used to
-construct pair panels.
+Further graphical arguments are passed through to plotting methods.
 }
 
   \item{...}{
     additional arguments passed to \code{\link{npudens}} and
     \code{\link{npreg}}.
   }
+
 }
 \value{
   \code{np.pairs} returns a list with components
@@ -83,7 +86,7 @@ y_vars <- c("Murder", "UrbanPop")
 names(y_vars) <- c("Murder Arrests per 100K", "Pop. Percent Urban")
 
 pair_list <- np.pairs(y_vars = y_vars, y_dat = USArrests,
-                      ckertype = "epanechnikov", 
+                      ckertype = "epanechnikov",
                       bwscaling = TRUE)
 
 np.pairs.plot(pair_list)

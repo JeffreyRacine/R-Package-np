@@ -1,4 +1,4 @@
-% 
+%
 
 \name{npsigtest}
 \alias{npsigtest}
@@ -40,8 +40,8 @@ npsigtest(bws, \dots)
 }
 
 \arguments{
-\subsection{Bandwidth And Data Inputs}{
-Regression bandwidth and training data inputs for the significance test.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth object, formula/data interface, and explicit data inputs.
 }
 
   \item{bws}{
@@ -56,16 +56,6 @@ Regression bandwidth and training data inputs for the significance test.
     methods, and so on.
   }
 
-  \item{xdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data)
-    used to calculate the regression estimators.
-  }
-
-  \item{ydat}{
-    a one (1) dimensional numeric or integer vector of dependent data,
-    each element \eqn{i} corresponding to each observation (row) \eqn{i}
-    of \code{xdat}.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object coercible to
@@ -75,14 +65,23 @@ Regression bandwidth and training data inputs for the significance test.
     which \code{\link{npregbw}} was called.
   }
 
-\subsection{Bootstrap And Test Controls}{
-Controls for bootstrap type, null distribution, tested variables, and random seed.
-}
 
-  \item{boot.num}{
-    an integer value specifying the number of bootstrap replications to
-    use. Defaults to \code{399}.
+  \item{xdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data)
+    used to calculate the regression estimators.
   }
+
+
+  \item{ydat}{
+    a one (1) dimensional numeric or integer vector of dependent data,
+    each element \eqn{i} corresponding to each observation (row) \eqn{i}
+    of \code{xdat}.
+  }
+
+
+\subsection{Bootstrap And Test Controls}{
+These arguments control bootstrap execution, tested effects, and reproducibility settings.
+}
 
   \item{boot.method}{
     a character string used to specify the bootstrap method for
@@ -94,6 +93,13 @@ Controls for bootstrap type, null distribution, tested variables, and random see
     Rademacher variables. Defaults to \code{iid}.
   }
 
+
+  \item{boot.num}{
+    an integer value specifying the number of bootstrap replications to
+    use. Defaults to \code{399}.
+  }
+
+
   \item{boot.type}{
     a character string specifying whether to use a \sQuote{Bootstrap I} or
     \sQuote{Bootstrap II} method (see Racine, Hart, and Li (2006) for
@@ -103,12 +109,14 @@ Controls for bootstrap type, null distribution, tested variables, and random see
     remaining variables. Defaults to \code{boot.type="I"}.
   }
 
-  \item{pivot}{
-    a logical value which specifies whether to bootstrap a pivotal
-    statistic or not (pivoting is achieved by dividing gradient
-    estimates by their asymptotic standard errors). Defaults to
-    \code{TRUE}.
+
+  \item{index}{
+    a vector of indices for the columns of \code{xdat} for which the
+    test of significance is to be conducted. Defaults to
+    (1,2,\dots,\eqn{p}) where \eqn{p} is the number of columns in
+    \code{xdat}.
   }
+
 
   \item{joint}{
     a logical value which specifies whether to conduct a joint test or
@@ -120,26 +128,30 @@ Controls for bootstrap type, null distribution, tested variables, and random see
     \code{npreg}/\code{npregbw}. Defaults to \code{FALSE}.
   }
 
-  \item{index}{
-    a vector of indices for the columns of \code{xdat} for which the
-    test of significance is to be conducted. Defaults to
-    (1,2,\dots,\eqn{p}) where \eqn{p} is the number of columns in
-    \code{xdat}.
+
+  \item{pivot}{
+    a logical value which specifies whether to bootstrap a pivotal
+    statistic or not (pivoting is achieved by dividing gradient
+    estimates by their asymptotic standard errors). Defaults to
+    \code{TRUE}.
   }
+
 
   \item{random.seed}{
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
 
-\subsection{Additional Bandwidth Arguments}{
-Further arguments for bandwidth selection when needed.
+
+\subsection{Additional Arguments}{
+Further arguments are passed to the bandwidth-selection routines used by the test.
 }
 
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
   }
+
 
 }
 \details{
@@ -174,8 +186,8 @@ Further arguments for bandwidth selection when needed.
   autodispatch is enabled (default via \code{npRmpi.init()}). In that mode,
   users can call \code{npregbw}, \code{npreg}, and \code{npsigtest}
   directly without wrapping calls in \code{mpi.bcast.cmd(...)}.
-  
-}  
+
+}
 
 \value{
   \code{npsigtest} returns an object of type
@@ -303,6 +315,6 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{ nonparametric }

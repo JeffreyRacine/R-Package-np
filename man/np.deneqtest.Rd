@@ -1,4 +1,4 @@
-% 
+%
 \name{npdeneqtest}
 \alias{npdeneqtest}
 \title{ Kernel Consistent Density Equality Test with Mixed Data Types }
@@ -18,36 +18,40 @@ npdeneqtest(x = NULL,
 }
 
 \arguments{
-\subsection{Sample And Bandwidth Inputs}{
-Two-sample data and optional bandwidth objects for the density equality test.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the two samples and any supplied bandwidths.
 }
+
+  \item{bw.x,bw.y}{
+    optional bandwidth objects for \code{x,y}
+  }
+
 
   \item{x,y}{
     data frames for the two samples for which one wishes to
     test equality of densities. The variables in each data
     frame must be the same (i.e. have identical names).
   }
-  
-  \item{bw.x,bw.y}{
-    optional bandwidth objects for \code{x,y}
-  }
-  
+
+
 \subsection{Bootstrap Controls}{
-Bootstrap replication and reproducibility controls.
+These arguments control bootstrap replication and reproducibility settings.
 }
 
   \item{boot.num}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
-  
+
+
   \item{random.seed}{
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
 
-\subsection{Additional Bandwidth Arguments}{
-Arguments used when bandwidth objects are not supplied.
+
+\subsection{Additional Arguments}{
+Further arguments are passed to the bandwidth-selection routines used by the test.
 }
 
   \item{\dots}{ additional arguments supplied to specify the bandwidth
@@ -56,13 +60,13 @@ Arguments used when bandwidth objects are not supplied.
     do this, you may specify any of \code{bwscaling}, \code{bwtype},
     \code{ckertype}, \code{ckerorder}, \code{ukertype},
     \code{okertype}.}
-  
-}
 
+
+}
 \value{
   \code{npdeneqtest} returns an object of type \code{deneqtest} with the
   following components
-  
+
   \item{Tn}{ the (standardized) statistic \code{Tn} }
   \item{In}{ the (unstandardized) statistic \code{In} }
   \item{Tn.bootstrap}{ contains the bootstrap replications of \code{Tn} }
@@ -70,7 +74,7 @@ Arguments used when bandwidth objects are not supplied.
   \item{Tn.P}{ the P-value of the \code{Tn} statistic }
   \item{In.P}{ the P-value of the \code{In} statistic }
   \item{boot.num}{ number of bootstrap replications }
-    
+
   \code{\link{summary}} supports object of type \code{deneqtest}.
 }
 \references{
@@ -86,16 +90,16 @@ Arguments used when bandwidth objects are not supplied.
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
-  
+
   \code{npdeneqtest} computes the integrated squared density difference
   between the estimated densities/probabilities of two samples having
   identical variables/datatypes. See Li, Maasoumi, and Racine (2009) for
   details.
- 
+
 }
 
 \section{Usage Issues}{
-  
+
   If you are using data of mixed types, then it is advisable to use the
   \code{\link{data.frame}} function to construct your input data and not
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
@@ -168,7 +172,7 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 
 \keyword{ nonparametric }

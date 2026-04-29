@@ -33,15 +33,9 @@ npqcmstest(formula,
 }
 
 \arguments{
-\subsection{Formula And Data Inputs}{
-Model, formula, quantile, and data inputs for the quantile specification test.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the model formula/data interface and explicit data inputs.
 }
-
-    \item{formula}{
-    a symbolic description of variables on which the test is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object
@@ -51,20 +45,12 @@ Model, formula, quantile, and data inputs for the quantile specification test.
     function is called.
   }
 
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used. 
+  \item{formula}{
+    a symbolic description of variables on which the test is
+    to be performed. The details of constructing a formula are
+    described below.
   }
 
-  \item{xdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the quantile regression estimators.
-  }
-
-  \item{ydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{xdat}. 
-  }
 
   \item{model}{
     a model object obtained from a call to \code{\link[quantreg]{rq}}. Important: the
@@ -72,28 +58,28 @@ Model, formula, quantile, and data inputs for the quantile specification test.
     \code{npqcmstest} will not work.
   }
 
-  \item{tau}{
-    a numeric value specifying the \eqn{\tau}{tau}th quantile is desired
+
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used.
   }
 
-\subsection{Test Statistic And Bootstrap Controls}{
-Controls for the reference distribution, bootstrap route, statistic
-normalization, density weighting, and random seed.
+
+  \item{xdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data) used to
+    calculate the quantile regression estimators.
+  }
+
+
+  \item{ydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+    \code{xdat}.
+  }
+
+
+\subsection{Bootstrap And Test Controls}{
+These arguments control the quantile level, test statistic, bootstrap procedure, and reproducibility settings.
 }
-
-  \item{distribution}{
-    a character string used to specify the method of estimating the
-    distribution of the statistic to be calculated. \code{bootstrap}
-    will conduct bootstrapping. \code{asymptotic} will use the normal
-    distribution. Defaults to \code{bootstrap}.
-  }
-
-  \item{bwydat}{
-    a character string used to specify the left hand side variable used
-    in bandwidth selection. \code{"varepsilon"} uses
-    \eqn{1-\tau,-\tau}{1-tau,-tau} for \code{ydat} while \code{"y"} will
-    use \eqn{y}. Defaults to \code{"y"}.
-  }
 
   \item{boot.method}{
     a character string used to specify the bootstrap method.
@@ -103,10 +89,34 @@ normalization, density weighting, and random seed.
     \code{iid}.
   }
 
+
   \item{boot.num}{
     an integer value specifying the number of bootstrap replications to
     use. Defaults to \code{399}.
   }
+
+
+  \item{bwydat}{
+    a character string used to specify the left hand side variable used
+    in bandwidth selection. \code{"varepsilon"} uses
+    \eqn{1-\tau,-\tau}{1-tau,-tau} for \code{ydat} while \code{"y"} will
+    use \eqn{y}. Defaults to \code{"y"}.
+  }
+
+
+  \item{density.weighted}{
+    a logical value specifying whether the statistic should be
+    weighted by the density of \code{xdat}. Defaults to \code{TRUE}.
+  }
+
+
+  \item{distribution}{
+    a character string used to specify the method of estimating the
+    distribution of the statistic to be calculated. \code{bootstrap}
+    will conduct bootstrapping. \code{asymptotic} will use the normal
+    distribution. Defaults to \code{bootstrap}.
+  }
+
 
   \item{pivot}{
     a logical value specifying whether the statistic should be
@@ -114,18 +124,20 @@ normalization, density weighting, and random seed.
     distribution. Defaults to \code{TRUE}.
   }
 
-  \item{density.weighted}{
-    a logical value specifying whether the statistic should be
-    weighted by the density of \code{xdat}. Defaults to \code{TRUE}.
-  }
 
   \item{random.seed}{
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
 
-\subsection{Additional Bandwidth Arguments}{
-Arguments passed through to residual bandwidth selection.
+
+  \item{tau}{
+    a numeric value specifying the \eqn{\tau}{tau}th quantile is desired
+  }
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to the bandwidth-selection routines used by the test.
 }
 
   \item{\dots}{
@@ -137,8 +149,8 @@ Arguments passed through to residual bandwidth selection.
     This is necessary if you specify \code{bws} as a \eqn{p}-vector and not
     a \code{bandwidth} object, and you do not desire the default behaviours.
   }
-}
 
+}
 \value{
   \code{npqcmstest} returns an object of type \code{cmstest} with the
   following components. Components will contain information
@@ -148,7 +160,7 @@ Arguments passed through to residual bandwidth selection.
   \item{In}{ the statistic \code{In} }
   \item{Omega.hat}{ as described in Racine, J.S. (2006). }
   \item{q.*}{ the various quantiles of the statistic \code{Jn} (or
-    \code{In} if 
+    \code{In} if
     \code{pivot=FALSE})  are in
     components \code{q.90},
     \code{q.95}, \code{q.99} (one-sided 1\%, 5\%, 10\% critical values) }
@@ -157,7 +169,7 @@ Arguments passed through to residual bandwidth selection.
     replications of \code{Jn} }
   \item{In.bootstrap}{ if \code{pivot=FALSE} contains the bootstrap
     replications of \code{In} }
-  
+
   \code{\link{summary}} supports object of type \code{cmstest}.
 }
 \references{
@@ -201,7 +213,7 @@ Arguments passed through to residual bandwidth selection.
   type.
 }
 
-\seealso{\code{\link{npRmpi.init}}. 
+\seealso{\code{\link{npRmpi.init}}.
   \code{\link{np.kernels}}, \code{\link{np.options}},
   \code{\link{plot}}, \code{\link{npregbw}}.
 }
@@ -269,6 +281,6 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{ nonparametric }
