@@ -1563,6 +1563,46 @@ static void np_shadow_reset_state_internal(void)
   np_shadow_state_active = 0;
 }
 
+static void np_clear_estimator_extern_aliases(void)
+{
+  matrix_Y_unordered_train_extern = NULL;
+  matrix_Y_ordered_train_extern = NULL;
+  matrix_Y_continuous_train_extern = NULL;
+  matrix_Y_unordered_eval_extern = NULL;
+  matrix_Y_ordered_eval_extern = NULL;
+  matrix_Y_continuous_eval_extern = NULL;
+  matrix_X_unordered_train_extern = NULL;
+  matrix_X_ordered_train_extern = NULL;
+  matrix_X_continuous_train_extern = NULL;
+  matrix_X_unordered_eval_extern = NULL;
+  matrix_X_ordered_eval_extern = NULL;
+  matrix_X_continuous_eval_extern = NULL;
+  matrix_XY_unordered_train_extern = NULL;
+  matrix_XY_ordered_train_extern = NULL;
+  matrix_XY_continuous_train_extern = NULL;
+  matrix_XY_unordered_eval_extern = NULL;
+  matrix_XY_ordered_eval_extern = NULL;
+  matrix_XY_continuous_eval_extern = NULL;
+  matrix_categorical_vals_extern = NULL;
+  matrix_categorical_vals_extern_X = NULL;
+  matrix_categorical_vals_extern_Y = NULL;
+  matrix_categorical_vals_extern_XY = NULL;
+  num_categories_extern = NULL;
+  num_categories_extern_X = NULL;
+  num_categories_extern_Y = NULL;
+  num_categories_extern_XY = NULL;
+  vector_continuous_stddev_extern = NULL;
+  ipt_extern_X = NULL;
+  ipt_extern_Y = NULL;
+  ipt_extern_XY = NULL;
+  ipt_lookup_extern_X = NULL;
+  ipt_lookup_extern_Y = NULL;
+  ipt_lookup_extern_XY = NULL;
+  kdt_extern_X = NULL;
+  kdt_extern_Y = NULL;
+  kdt_extern_XY = NULL;
+}
+
 SEXP C_np_shadow_reset_state(void)
 {
   np_shadow_reset_state_internal();
@@ -5273,6 +5313,7 @@ cleanup_np_density_bw:
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   np_reset_y_side_extern();
+  np_clear_estimator_extern_aliases();
 
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
@@ -6097,6 +6138,7 @@ cleanup_np_distribution_bw:
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   np_reset_y_side_extern();
+  np_clear_estimator_extern_aliases();
 
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
@@ -7283,6 +7325,7 @@ cleanup_np_density_conditional_bw:
   vector_glp_degree_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
+  np_clear_estimator_extern_aliases();
   np_glp_cv_clear_extern();
 
   if (bw_error_msg != NULL) {
@@ -8394,6 +8437,7 @@ cleanup_np_distribution_conditional_bw:
   vector_glp_degree_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
+  np_clear_estimator_extern_aliases();
   np_glp_cv_clear_extern();
 
   if (bw_error_msg != NULL)
@@ -10232,6 +10276,7 @@ cleanup_np_regression_bw_mode:
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
+  np_clear_estimator_extern_aliases();
   int_nn_k_min_extern = 1;
 
   if (bw_error_msg != NULL)
@@ -11616,6 +11661,7 @@ void np_quantile_conditional(double * tc_con,
 
   safe_free(eq);
   safe_free(eqerr);
+  np_clear_estimator_extern_aliases();
 
   return ;
 }
