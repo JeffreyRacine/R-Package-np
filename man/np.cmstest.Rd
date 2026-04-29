@@ -41,6 +41,12 @@ These arguments identify the model formula/data interface and explicit data inpu
     function is called.
   }
 
+  \item{formula}{
+    a symbolic description of the model to be tested. If \code{xdat}
+    and \code{ydat} are omitted, the data are extracted from this
+    formula and \code{data}.
+  }
+
 
   \item{model}{
     a model object obtained from a call to \code{\link{lm}} (or
