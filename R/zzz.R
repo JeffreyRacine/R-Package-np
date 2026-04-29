@@ -1,7 +1,12 @@
 .onAttach <- function (lib, pkg) {
 	packageStartupMessage(
     sprintf(
-      'np %s: examples and guides at https://jeffreyracine.github.io/gallery/; vignette("np_getting_started", package = "np")',
+      paste(
+        "np %s",
+        "Examples and guides at https://jeffreyracine.github.io/gallery/",
+        'See also vignette("np_getting_started", package = "np")',
+        sep = "\n"
+      ),
       utils::packageDescription(pkg, fields = "Version")
     ),
     domain = NULL,
