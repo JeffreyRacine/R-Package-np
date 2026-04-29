@@ -1,4 +1,37 @@
-Changes from Version 0.70-0 to 0.70-1 [28-Apr-2026]
+Changes from Version 0.70-0 to 0.70-1 [29-Apr-2026]
+
+* Updated the package startup message to point first to the online gallery
+  of MPI examples and guides, while retaining the compact installed
+  `nprmpi_getting_started` vignette as the offline/package-side entry point.
+
+* Reorganized and expanded `.Rd` argument documentation across the package
+  into user-oriented sections with clearer defaults and cross-references,
+  mirroring the serial package where appropriate without changing the public
+  API.
+
+* Added `.Rbuildignore` coverage for local agent/skill guidance files so
+  release tarballs remain clean.
+
+* Mirrored the native bandwidth-selector alias-cleanup hardening from `np`,
+  clearing stale estimator alias pointers after production C routes release
+  borrowed state.
+
+* Made the extended `NP_CHECK_FULL=1` test lane fail honestly when `testthat`
+  reports failures, then reconciled stale installed-check, progress-output,
+  and scale-factor expectation tests so the full lane is green again.
+
+* Removed recently added extinct bounded-kernel convolution scaffolding for
+  the bounded continuous kernel, preserving the live quadrature-based bounded
+  `cv.ls` route and existing bounded-kernel functionality.
+
+* Standardized continuous bandwidth-search control naming around
+  `scale.factor.*` arguments and documented how initialization bounds,
+  deterministic starts, and the hard search lower bound work together.
+
+* Added local-polynomial instability guidance for conditional-density and
+  conditional-distribution search failures, pointing users from canonical
+  raw-basis `regtype="ll"` failures toward the numerically safer
+  Bernstein-basis local-polynomial route.
 
 * Mirrored the `npqreg` canonical quantile-extraction cleanup from `np` by
   removing the legacy Powell/environment-selected extraction path, retaining
