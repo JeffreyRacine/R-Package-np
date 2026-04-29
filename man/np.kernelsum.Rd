@@ -48,14 +48,49 @@ npksum(\dots)
 }
 
 \arguments{
-\subsection{Bandwidth And Data Inputs}{
-Core inputs defining the training data, optional weighted response, and
-evaluation points for the generalized product kernel sum.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+Core inputs defining the symbolic interface, training data, optional weighted
+response, and evaluation points for the generalized product kernel sum.
 }
 
   \item{bws}{
     a bandwidth specification. This can be set as any suitable bandwidth
     object returned from a bandwidth-generating function, or a numeric vector.
+  }
+
+  \item{data}{
+    an optional data frame, list or environment (or object
+    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
+    in the model. If not found in data, the variables are taken from
+    \code{environment(formula)}, typically the environment from which the
+    function is called.
+  }
+
+  \item{exdat}{
+    a \eqn{p}-variate data frame of sum evaluation points (if omitted,
+    defaults to the training data itself).
+  }
+
+  \item{formula}{
+    a symbolic description of variables on which the sum is
+    to be performed. The details of constructing a formula are
+    described below.
+  }
+
+  \item{na.action}{
+    a function which indicates what should happen when the data contain
+   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
+    \code{\link{na.fail}} if that is unset. The (recommended) default is
+    \code{\link{na.omit}}.
+  }
+
+  \item{newdata}{
+    an optional data frame in which to look for evaluation data. If
+    omitted, \code{data} is used.
+  }
+
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used.
   }
   
   \item{txdat}{
@@ -66,11 +101,6 @@ evaluation points for the generalized product kernel sum.
   \item{tydat}{
     a numeric vector of data to be weighted. The \eqn{i}th kernel weight
     is applied to the \eqn{i}th element. Defaults to  \code{1}.
-  }
-  
-  \item{exdat}{
-    a \eqn{p}-variate data frame of sum evaluation points (if omitted,
-    defaults to the training data itself).
   }
   
   \item{weights}{
@@ -136,40 +166,6 @@ evaluation, operator variants, and returned kernel weights.
     a logical specifying whether or not to return the matrix of
     generalized product kernel weights. Defaults to \code{FALSE}. See
     details.
-    }
-
-\subsection{Formula Interface}{
-Formula-method arguments for symbolic kernel-sum specifications.
-}
-
-  \item{formula}{
-    a symbolic description of variables on which the sum is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
-
-  \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(formula)}, typically the environment from which the
-    function is called.
-  }
-
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, \code{data} is used.
-  }
-
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used. 
-  }
-
-  \item{na.action}{
-    a function which indicates what should happen when the data contain
-   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
-    \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.  
   }
 
 
