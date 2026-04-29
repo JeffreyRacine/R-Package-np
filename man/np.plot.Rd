@@ -603,12 +603,12 @@ plot(bw,
 # Take the cps71 data by way of example. In this case, there is only one
 # object returned by default, `r1', since xdat is univariate.
 
-data("cps71")
-attach(cps71)
+data("cps71", package = "np")
 
 # Compute bandwidths for local linear regression using cv.aic...
 
-bw <- npregbw(xdat=age,ydat=logwage,regtype="ll",bwmethod="cv.aic")
+bw <- npregbw(xdat=cps71$age, ydat=cps71$logwage,
+              regtype="ll", bwmethod="cv.aic")
 
 # Generate the plot and return plotting data, and store output in
 # `plot.out' (NOTE: the call to `plot.behavior' is necessary).
@@ -637,7 +637,7 @@ age.eval <- plot.out$r1$eval[,1]
 # Now we could plot this if we wished, or direct it to whatever end use
 # we envisioned. We plot the results using R's plot() routines...
 
-plot(age,logwage,cex=0.2,xlab="Age",ylab="log(Wage)")
+with(cps71, plot(age, logwage, cex=0.2, xlab="Age", ylab="log(Wage)"))
 lines(age.eval,logwage.eval)
 lines(age.eval,logwage.lower.ci,lty=3)
 lines(age.eval,logwage.upper.ci,lty=3)
@@ -675,8 +675,6 @@ plot(age.eval,grad.eval,cex=0.2,
      xlab="Age",ylab="d log(Wage)/d Age",type="l")
 lines(age.eval,grad.lower.ci,lty=3)
 lines(age.eval,grad.upper.ci,lty=3)
-
-detach(cps71)
 
 # EXAMPLE 4: Variations on local polynomial conditional density
 # estimation with proper = TRUE.

@@ -17,12 +17,9 @@
 }
 \source{ Aman Ullah }
 \examples{
-data("cps71")
-attach(cps71)
+data("cps71", package = "np")
 
-if (interactive()) plot(age, logwage, xlab="Age", ylab="log(wage)")
-
-detach(cps71)
+if (interactive()) with(cps71, plot(age, logwage, xlab="Age", ylab="log(wage)"))
 }
 \references{
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}

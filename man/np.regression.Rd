@@ -472,15 +472,14 @@ if (interactive()) Sys.sleep(5)
 # linear fit using the AIC_c bandwidth selection criterion. We then plot
 # the estimator and its gradient using asymptotic standard errors.
 
-data("cps71")
-attach(cps71)
+data("cps71", package = "np")
 
-bw <- npregbw(logwage~age, regtype="ll", bwmethod="cv.aic")
+bw <- npregbw(logwage~age, regtype="ll", bwmethod="cv.aic", data = cps71)
 
 # Next, plot the regression function...
 
 if (interactive()) plot(bw, plot.errors.method="asymptotic")
-points(age, logwage, cex=.2, col="red")
+with(cps71, points(age, logwage, cex=.2, col="red"))
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -489,8 +488,6 @@ if (interactive()) Sys.sleep(5)
 # Next, plot the derivative...
 
 if (interactive()) plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
-
-detach(cps71)
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -500,15 +497,14 @@ if (interactive()) Sys.sleep(5)
 # linear fit using the AIC_c bandwidth selection criterion. We then plot
 # the estimator and its gradient using asymptotic standard errors.
 
-data("cps71")
-attach(cps71)
+data("cps71", package = "np")
 
-bw <- npregbw(xdat=age, ydat=logwage, regtype="ll", bwmethod="cv.aic")
+bw <- npregbw(xdat=cps71$age, ydat=cps71$logwage, regtype="ll", bwmethod="cv.aic")
 
 # Next, plot the regression function...
 
 if (interactive()) plot(bw, plot.errors.method="asymptotic")
-points(age, logwage, cex=.2, col="red")
+with(cps71, points(age, logwage, cex=.2, col="red"))
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -517,8 +513,6 @@ if (interactive()) Sys.sleep(5)
 # Next, plot the derivative...
 
 if (interactive()) plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
-
-detach(cps71)
 
 # Sleep for 5 seconds so that we can examine the output...
 
