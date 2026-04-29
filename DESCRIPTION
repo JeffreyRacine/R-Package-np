@@ -1,6 +1,6 @@
 Package: np
 Version: 0.70-1
-Date: 2026-04-28
+Date: 2026-04-29
 Depends: R (>= 3.5.0)
 Imports: boot, cubature, methods, quadprog, quantreg, stats
 Suggests: MASS, logspline, ks, testthat, crs (>= 0.15-41), knitr, rmarkdown, rgl
