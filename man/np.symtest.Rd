@@ -16,48 +16,52 @@ npsymtest(data = NULL,
 }
 
 \arguments{
-\subsection{Data And Statistic Inputs}{
-Sample data and statistic form for the symmetry test.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the data, statistic variant, and any supplied bandwidth.
 }
+
+  \item{bw}{
+    a numeric (scalar) bandwidth. Defaults to plug-in (see details below).
+  }
+
 
   \item{data}{
     a vector containing the variable.
   }
-  
+
+
   \item{method}{
     a character string used to specify whether to compute the integral
     version or the summation version of the statistic. Can be set as
     \code{integration} or \code{summation} (see below for
     details). Defaults to \code{integration}.
   }
-  
-\subsection{Bootstrap And Bandwidth Controls}{
-Bootstrap method, replication count, scalar bandwidth, and reproducibility
-controls.
+
+
+\subsection{Bootstrap Controls}{
+These arguments control bootstrap execution and reproducibility settings.
 }
+
+  \item{boot.method}{ a character string used to specify the
+    bootstrap method. Can be set as \code{iid} or \code{geom} (see below
+    for details). Defaults to \code{iid}.
+  }
+
 
   \item{boot.num}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
-  
-  \item{bw}{
-    a numeric (scalar) bandwidth. Defaults to plug-in (see details below).
-  }
-  
-  \item{boot.method}{ a character string used to specify the
-    bootstrap method. Can be set as \code{iid} or \code{geom} (see below
-    for details). Defaults to \code{iid}.
-  }
-  
+
+
   \item{random.seed}{
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
 
-\subsection{Additional Bandwidth Arguments}{
-Arguments used when the scalar bandwidth is interpreted with non-default
-kernel or bandwidth settings.
+
+\subsection{Additional Arguments}{
+Further arguments are passed to the bandwidth-selection routines used by the test.
 }
 
   \item{\dots}{ additional arguments supplied to specify the bandwidth
@@ -67,20 +71,20 @@ kernel or bandwidth settings.
     defaults, you may specify any of \code{bwscaling}, \code{bwtype},
     \code{ckertype}, \code{ckerorder}, \code{ukertype},
     \code{okertype}.}
-  
-}
 
+
+}
 \value{
   \code{npsymtest} returns an object of type \code{symtest} with the
   following components
-  
+
   \item{Srho}{ the statistic \code{Srho} }
   \item{Srho.bootstrap}{ contains the bootstrap replications of \code{Srho} }
   \item{P}{ the P-value of the statistic }
   \item{boot.num}{ number of bootstrap replications }
   \item{data.rotate}{ the rotated data series }
   \item{bw}{ the numeric (scalar) bandwidth }
-    
+
   \code{\link{summary}} supports object of type \code{symtest}.
 }
 \references{
@@ -114,7 +118,7 @@ kernel or bandwidth settings.
    Maasoumi and Racine (2009) for details. Default bandwidths are of the
    plug-in variety (\code{\link{bw.SJ}} for continuous variables and
    direct plug-in for discrete variables).
- 
+
   For bootstrapping the null distribution of the statistic, \code{iid}
   conducts simple random resampling, while \code{geom} conducts Politis
   and Romano's (1994) stationary bootstrap using automatic block length
@@ -127,18 +131,18 @@ kernel or bandwidth settings.
   densities while the integration version involves differences). Warning
   messages are produced should this occur (\sQuote{integration recommended})
   and should be heeded.
- 
+
 }
 
 \section{Usage Issues}{
-  
+
   When using data of type \code{\link{factor}} it is crucial that the
   variable not be an alphabetic character string (i.e. the factor must
   be integer-valued). The rotation is conducted about the median after
   conversion to type \code{\link{numeric}} which is then converted back
   to type \code{\link{factor}}. Failure to do so will have unpredictable
   results. See the example below for proper usage.
-  
+
 }
 
 \seealso{

@@ -1,4 +1,4 @@
-% 
+%
 \name{plot.np}
 \alias{plot.np}
 
@@ -35,9 +35,8 @@
 
 }
 \arguments{
-
 \subsection{Plot Object}{
-Bandwidth object to be plotted.
+This argument identifies the object to plot.
 }
 
   \item{x}{
@@ -47,9 +46,9 @@ Bandwidth object to be plotted.
     \code{\link{npscoefbw}}.
   }
 
-\subsection{Plot Controls Passed Through \dots}{
-Named plotting, evaluation, renderer, uncertainty, and graphical controls
-accepted through \code{\dots}.
+
+\subsection{Additional Arguments}{
+Further graphical controls are passed through \code{\dots} to the relevant plot method.
 }
 
   \item{\dots}{
@@ -261,8 +260,8 @@ accepted through \code{\dots}.
     }
   }
 
-}
 
+}
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels and
   \code{\link{np.options}} for global options.
@@ -286,7 +285,7 @@ accepted through \code{\dots}.
   data. For a slice along dimension \eqn{i}, all other variables at
   indices \eqn{j \ne i}{j != i} are held constant at the quantiles
   specified in the \eqn{j}th element of \code{xq}. The default is the
-  median. 
+  median.
 
   The slice itself is evaluated on a uniformly spaced sequence of
   \eqn{neval} points. The interval of evaluation is determined by the
@@ -467,7 +466,7 @@ accepted through \code{\dots}.
   and Practice,} Princeton University Press.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
-  University Press. 
+  University Press.
 
   Politis, D.N. and J.P. Romano (1994), \dQuote{The stationary
     bootstrap,} Journal of the American Statistical Association, 89,
@@ -590,7 +589,7 @@ plot(bw, gradients=TRUE)
 # completed prior to results being displayed...
 
 plot(bw,
-     plot.errors.method="bootstrap", 
+     plot.errors.method="bootstrap",
      plot.errors.center="bias-corrected",
      plot.errors.type="simultaneous")
 
@@ -599,7 +598,7 @@ plot(bw,
 # `plot.behavior="plot-data"' (or "data"), it returns plotting objects
 # named r1, r2, and so on (rg1, rg2, and so on when `gradients=TRUE' is
 # set).  Each plotting object's index (1,2,...) corresponds to the index
-# of the explanatory data data frame xdat (and zdat if appropriate). 
+# of the explanatory data data frame xdat (and zdat if appropriate).
 
 # Take the cps71 data by way of example. In this case, there is only one
 # object returned by default, `r1', since xdat is univariate.

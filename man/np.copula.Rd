@@ -16,8 +16,8 @@ npcopula(bws,
 }
 
 \arguments{
-\subsection{Bandwidth And Data Inputs}{
-Bandwidth object and data used to construct the mixed-data copula estimate.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification and source data.
 }
 
   \item{bws}{
@@ -27,13 +27,27 @@ Bandwidth object and data used to construct the mixed-data copula estimate.
     while if \code{bws} is delivered via \code{npudensbw} the copula
     density is estimated)
   }
+
   \item{data}{
     a data frame containing variables used to construct \code{bws}
   }
 
+
 \subsection{Copula Evaluation Grid}{
-Controls for requested marginal probability values and quasi-inverse grids.
+These arguments control the marginal probability grid and numerical inversion used for copula evaluation.
 }
+
+  \item{er.quasi.inv}{
+    number passed to \code{\link{extendrange}} when \code{u} is provided
+    specifying the fraction by which the data range should be extended when
+    constructing the grid used to compute the quasi-inverse (see details)
+  }
+
+  \item{n.quasi.inv}{
+    number of grid points generated when \code{u} is provided in order to
+    compute the quasi-inverse of each marginal distribution (see
+    details)
+  }
 
   \item{u}{
     an optional matrix of real numbers lying in [0,1], each column of
@@ -41,18 +55,8 @@ Controls for requested marginal probability values and quasi-inverse grids.
     each variable in the copula (otherwise the u values returned are
     those corresponding to the sample realizations)
   }
-  \item{n.quasi.inv}{
-    number of grid points generated when \code{u} is provided in order to
-    compute the quasi-inverse of each marginal distribution (see
-    details)
-  }
-  \item{er.quasi.inv}{
-    number passed to \code{\link{extendrange}} when \code{u} is provided
-    specifying the fraction by which the data range should be extended when
-    constructing the grid used to compute the quasi-inverse (see details)
-  }
-}
 
+}
 \value{
 
   \code{npcopula} returns an object of type \code{\link{data.frame}}

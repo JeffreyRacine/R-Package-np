@@ -1,4 +1,4 @@
-% 
+%
 \name{npconmode}
 \alias{npconmode}
 \alias{npconmode.default}
@@ -37,8 +37,8 @@ npconmode(bws, \dots)
 }
 
 \arguments{
-\subsection{Bandwidth And Training Data Inputs}{
-Conditional density bandwidth and training data inputs used to compute modes.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
 
   \item{bws}{
@@ -47,17 +47,6 @@ Conditional density bandwidth and training data inputs used to compute modes.
   }
 
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of explanatory data (conditioning data) used to
-    calculate the regression estimators. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a one (1) dimensional vector of unordered or ordered factors,
-    containing the dependent data. Defaults to the training data used to
-    compute the bandwidth object.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object
@@ -67,22 +56,31 @@ Conditional density bandwidth and training data inputs used to compute modes.
     \code{\link{npcdensbw}} was called.
   }
 
-\subsection{Evaluation Data}{
-Evaluation covariates and optional true outcomes used for mode prediction
-and classification summaries.
-}
 
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
+  \item{txdat}{
+    a \eqn{p}-variate data frame of explanatory data (conditioning data) used to
+    calculate the regression estimators. Defaults to the training data used to
+    compute the bandwidth object.
   }
-  
+
+
+  \item{tydat}{
+    a one (1) dimensional vector of unordered or ordered factors,
+    containing the dependent data. Defaults to the training data used to
+    compute the bandwidth object.
+  }
+
+
+\subsection{Evaluation Data}{
+These arguments control where the conditional mode is evaluated.
+}
 
   \item{exdat}{
     a \eqn{p}-variate data frame of points on which the regression will be
     estimated (evaluation data). By default,
     evaluation takes place on the data provided by \code{txdat}.
   }
+
 
   \item{eydat}{
     a one (1) dimensional numeric or integer vector of the true values
@@ -91,9 +89,16 @@ and classification summaries.
   }
 
 
-\subsection{Additional Bandwidth Arguments}{
-Further arguments used when \code{bws} is supplied as a vector rather than
-a \code{conbandwidth} object.
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.
+  }
+
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to the bandwidth-selection counterpart when bandwidths are computed internally.
 }
 
   \item{\dots}{
@@ -102,8 +107,8 @@ a \code{conbandwidth} object.
     This is necessary if you specify bws as a \eqn{p+q}-vector and not
     a \code{conbandwidth} object, and you do not desire the default behaviours.
   }
-}
 
+}
 \value{
   \code{npconmode} returns a \code{conmode} object with the following
   components:
@@ -149,7 +154,7 @@ a \code{conbandwidth} object.
   McFadden, D. and C. Puig and D. Kerschner (1977), \dQuote{Determinants
     of the long-run demand for electricity,} Proceedings of the
   American Statistical Association (Business and Economics Section),
-  109-117. 
+  109-117.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
@@ -212,7 +217,7 @@ model.logit <- glm(low~factor(smoke)+
                    factor(ui)+
                    ordered(ftv)+
                    age+
-                   lwt, 
+                   lwt,
                    family=binomial(link=logit))
 
 # Generate the confusion matrix and correct classification ratio
@@ -221,7 +226,7 @@ cm <- table(low, ifelse(fitted(model.logit)>0.5, 1, 0))
 ccr <- sum(diag(cm))/sum(cm)
 
 # Now do the same with a nonparametric model.  Note - this may take a
-# few minutes depending on the speed of your computer... 
+# few minutes depending on the speed of your computer...
 
 bw <- npcdensbw(formula=factor(low)~factor(smoke)+
                 factor(race)+
@@ -274,7 +279,7 @@ model.logit <- glm(low~factor(smoke)+
                    factor(ui)+
                    ordered(ftv)+
                    age+
-                   lwt, 
+                   lwt,
                    family=binomial(link=logit))
 
 # Generate the confusion matrix and correct classification ratio
@@ -284,18 +289,18 @@ ccr <- sum(diag(cm))/sum(cm)
 
 # Now do the same with a nonparametric model...
 
-X <- data.frame(factor(smoke), 
-                factor(race), 
-                factor(ht), 
-                factor(ui), 
-                ordered(ftv), 
-                age, 
+X <- data.frame(factor(smoke),
+                factor(race),
+                factor(ht),
+                factor(ui),
+                ordered(ftv),
+                age,
                 lwt)
 
 y <- factor(low)
 
 # Note - this may take a few minutes depending on the speed of your
-# computer... 
+# computer...
 
 bw <- npcdensbw(xdat=X, ydat=y)
 
