@@ -96,16 +96,17 @@ npudensbw(\dots)
 }
 
 \arguments{
-\subsection{Data And Bandwidth Inputs}{
-These arguments identify the data and whether bandwidths are supplied or computed.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the data, formula interface, and whether bandwidths are supplied or computed.
 }
 
-  \item{dat}{
-    a \eqn{p}-variate data frame on which bandwidth selection will
-    be performed. The data types may be continuous, discrete (unordered
-    and ordered factors), or some combination thereof.
+  \item{bandwidth.compute}{
+    a logical value which specifies whether to do a numerical search for
+    bandwidths or not. If set to \code{FALSE}, a \code{bandwidth} object
+    will be returned with bandwidths set to those specified
+    in \code{bws}. Defaults to \code{TRUE}.
   }
-
+  
   \item{bws}{
     a bandwidth specification. This can be set as a bandwidth object
     returned from a previous invocation, or as a vector of bandwidths,
@@ -118,17 +119,48 @@ These arguments identify the data and whether bandwidths are supplied or compute
   }
 
   
-  \item{bandwidth.compute}{
-    a logical value which specifies whether to do a numerical search for
-    bandwidths or not. If set to \code{FALSE}, a \code{bandwidth} object
-    will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
+  \item{call}{
+    the original function call. This is passed internally by
+    \code{\link{np}} when a bandwidth search has been implied by a call to
+    another function. It is not recommended that the user set this.
+  }
+    
+  \item{dat}{
+    a \eqn{p}-variate data frame on which bandwidth selection will
+    be performed. The data types may be continuous, discrete (unordered
+    and ordered factors), or some combination thereof.
+  }
+
+  \item{data}{
+    an optional data frame, list or environment (or object
+    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
+    in the model. If not found in data, the variables are taken from
+    \code{environment(formula)}, typically the environment from which the
+    function is called.
+  }
+
+  \item{formula}{
+    a symbolic description of variables on which bandwidth selection is
+    to be performed. The details of constructing a formula are
+    described below.
+  }
+
+  \item{na.action}{
+    a function which indicates what should happen when the data contain
+   \code{NA}s. The default is set by the \code{\link{na.action}} setting
+   of options, and is \code{\link{na.fail}} if that is unset. The
+   (recommended) default is \code{\link{na.omit}}.
   }
   
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used in
+    the fitting process. 
+  }
+
+
 \subsection{Bandwidth Criterion And Representation}{
 These arguments choose the selection criterion and the way continuous bandwidths are represented.
 }
-
 
   \item{bwmethod}{ a character string specifying the bandwidth selection
     method. \code{cv.ml} specifies likelihood cross-validation,
@@ -173,13 +205,49 @@ These arguments choose the selection criterion and the way continuous bandwidths
     
   }
 
-\subsection{Search Initialization, Kernels, And Support}{
-These controls set numerical search starts, kernel choices, and support bounds.
+
+\subsection{Categorical Search Initialization}{
+These controls set categorical search starts and categorical direction-set initialization.
+}
+
+  \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{dfac.init}{non-random initial values for scale factors for categorical variables for Powell's algorithm. See Details}
+
+  \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{hbd.init}{upper bound for scale factors for categorical variables for Powell's algorithm. See Details}
+
+  \item{initd.dir}{initial non-random values for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{lbd.init}{lower bound for scale factors for categorical variables for Powell's algorithm. See Details}
+
+  \item{scale.init.categorical.sample}{ a logical value that when set
+    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
+    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
+    \eqn{n} the number of observations, \eqn{P}{P} the order of the
+    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
+    Details}
+
+
+\subsection{Continuous Direction-Set Search Controls}{
+These controls set Powell direction-set initialization for continuous variables.
 }
 
   \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{scale.factor.init}{non-random initial scale factor for \code{numeric} variables for Powell's algorithm. If \code{scale.factor.search.lower} is larger, the effective first search start is raised to that floor. See Details}
+  \item{dfc.dir}{chi-square degrees of freedom for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{initc.dir}{initial non-random values for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+
+\subsection{Continuous Kernel Support Controls}{
+These controls choose and parameterize bounded support for continuous kernels.
+}
 
   \item{ckerbound}{
     character string controlling continuous-kernel support handling.
@@ -194,6 +262,55 @@ These controls set numerical search starts, kernel choices, and support bounds.
     each continuous variable (e.g., \code{<= min(variable)}). Use \code{-Inf} for unbounded below. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
+  \item{ckerub}{
+    numeric scalar/vector of upper bounds for continuous variables used
+    when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
+    each continuous variable (e.g., \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
+  }
+
+
+\subsection{Continuous Scale-Factor Search Initialization}{
+These controls define deterministic and random continuous scale-factor starts and the lower admissibility floor for fixed-bandwidth search.
+}
+
+  \item{scale.factor.init}{
+    deterministic initial scale factor for continuous fixed-bandwidth
+    search. Defaults to \code{0.5}. The value supplied by the user is
+    not rewritten, but the effective first start passed to the optimizer
+    is \code{max(scale.factor.init, scale.factor.search.lower)}. See
+    Details.
+  }
+  \item{scale.factor.init.lower}{
+    lower endpoint for random continuous scale-factor starts. Defaults
+    to \code{0.1}. The value supplied by the user is not rewritten, but
+    the effective random-start lower endpoint is
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See
+    Details.
+  }
+  \item{scale.factor.init.upper}{
+    upper endpoint for random continuous scale-factor starts. Defaults
+    to \code{2.0}. It must be greater than or equal to the effective
+    lower endpoint,
+    \code{max(scale.factor.init.lower, scale.factor.search.lower)};
+    otherwise bandwidth search errors rather than silently expanding the
+    interval. See Details.
+  }
+  \item{scale.factor.search.lower}{
+    optional nonnegative scalar giving the hard lower admissibility
+    bound for continuous fixed-bandwidth search candidates. Defaults to
+    \code{NULL}. If \code{NULL}, an existing bandwidth object's stored
+    value is inherited when available; otherwise the package default
+    \code{0.1} is used. This floor applies to computed/search bandwidth
+    candidates and to effective search starts only. It does not rewrite
+    explicit bandwidths supplied for storage with
+    \code{bandwidth.compute = FALSE}. Final fixed-bandwidth search
+    candidates must also have a finite valid raw objective value.
+  }
+
+\subsection{Kernel Type Controls}{
+These controls choose continuous, unordered, and ordered kernels.
+}
+
   \item{ckerorder}{
     numeric value specifying kernel order (one of
     \code{(2,4,6,8)}). Kernel order specified along with a
@@ -207,17 +324,20 @@ These controls set numerical search starts, kernel choices, and support bounds.
     \code{uniform}. Defaults to \code{gaussian}.
   }
 
-  \item{ckerub}{
-    numeric scalar/vector of upper bounds for continuous variables used
-    when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
-    each continuous variable (e.g., \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
+  \item{okertype}{
+    character string used to specify the ordered categorical kernel type.
+    Can be set as \code{wangvanryzin}, \code{liracine}, or
+    \code{racineliyan}. Defaults to \code{liracine}.
+  }
+  \item{ukertype}{
+    character string used to specify the unordered categorical kernel type.
+    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults
+    to \code{aitchisonaitken}.
   }
 
-  \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
-
-  \item{dfac.init}{non-random initial values for scale factors for categorical variables for Powell's algorithm. See Details}
-
-  \item{dfc.dir}{chi-square degrees of freedom for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+\subsection{Numerical Search And Tolerance Controls}{
+These controls set optimizer tolerances, restart behavior, invalid-candidate penalties, and bounded search transformations.
+}
 
   \item{ftol}{
     fractional tolerance on the value of the cross-validation function
@@ -226,16 +346,6 @@ These controls set numerical search starts, kernel choices, and support bounds.
     roundoff). Defaults to \code{1.490116e-07}
     (1.0e+01*sqrt(.Machine$double.eps)).
   }
-
-  \item{scale.factor.init.upper}{upper endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. It must be no smaller than \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
-
-  \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
-
-  \item{hbd.init}{upper bound for scale factors for categorical variables for Powell's algorithm. See Details}
-
-  \item{initc.dir}{initial non-random values for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
-
-  \item{initd.dir}{initial non-random values for direction set search for Powell's algorithm for categorical variables. See Details}
 
   \item{invalid.penalty}{ a character string specifying the penalty
     used when the optimizer encounters invalid bandwidths.
@@ -248,22 +358,9 @@ These controls set numerical search starts, kernel choices, and support bounds.
     optimization routine. Defaults to \code{10000}.
   }
 
-  \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
-
-  \item{scale.factor.init.lower}{lower endpoint for random scale-factor starts for \code{numeric} variables for Powell's algorithm. The effective lower endpoint is \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See Details}
-
-  \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
-
-  \item{lbd.init}{lower bound for scale factors for categorical variables for Powell's algorithm. See Details}
-
   \item{nmulti}{
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial points.
-  }
-
-  \item{okertype}{
-    character string used to specify the ordered categorical kernel type.
-    Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}.
   }
 
   \item{penalty.multiplier}{ a numeric multiplier applied to the
@@ -275,23 +372,6 @@ These controls set numerical search starts, kernel choices, and support bounds.
     restarts from located minima for a minor gain in accuracy. Defaults
     to \code{TRUE}.
   }
-
-  \item{scale.init.categorical.sample}{ a logical value that when set
-    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
-    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
-    \eqn{n} the number of observations, \eqn{P}{P} the order of the
-    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
-    Details}
-
-  \item{scale.factor.search.lower}{
-    an optional nonnegative scalar controlling the hard lower bound used
-    for continuous fixed-bandwidth search candidates. When omitted, the
-    default coefficient \code{0.1} is used. Larger values impose a
-    stricter search floor. This argument affects search admissibility
-    and search-start sanitization only; explicit bandwidths supplied for
-    storage when \code{bandwidth.compute = FALSE} are not rewritten.
-    Final fixed-bandwidth search candidates must also have a finite valid raw
-    objective value.}
 
   \item{small}{
     a small number used to bracket a minimum (it is hopeless to ask for
@@ -313,47 +393,7 @@ These controls set numerical search starts, kernel choices, and support bounds.
     search to the feasible bandwidth domain. Defaults to
     \code{FALSE}.}
 
-  \item{ukertype}{
-    character string used to specify the unordered categorical kernel type.
-    Can be set as \code{aitchisonaitken} or \code{liracine}.
-  }
 
-\subsection{Formula Interface}{
-These arguments are used by the formula method and are normally supplied by the top-level call.
-}
-
-  \item{formula}{
-    a symbolic description of variables on which bandwidth selection is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
-
-  \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(formula)}, typically the environment from which the
-    function is called.
-  }
-
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used in
-    the fitting process. 
-  }
-
-  \item{na.action}{
-    a function which indicates what should happen when the data contain
-   \code{NA}s. The default is set by the \code{\link{na.action}} setting
-   of options, and is \code{\link{na.fail}} if that is unset. The
-   (recommended) default is \code{\link{na.omit}}.
-  }
-  
-  \item{call}{
-    the original function call. This is passed internally by
-    \code{\link{np}} when a bandwidth search has been implied by a call to
-    another function. It is not recommended that the user set this.
-  }
-    
 \subsection{Additional Arguments}{
 These arguments collect remaining controls passed through S3 methods.
 }
@@ -362,11 +402,39 @@ These arguments collect remaining controls passed through S3 methods.
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
   }
+
 }
 
 \details{
 
-The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
+The \code{scale.factor.*} controls are dimensionless search
+controls. The package converts scale factors to bandwidths using the
+estimator-specific scaling encoded in the bandwidth object, including
+kernel order and the number of continuous variables relevant for the
+estimator. Users should not pre-multiply these controls by sample-size
+or standard-deviation factors.
+
+  \code{scale.factor.init} controls the deterministic first search
+  start. \code{scale.factor.init.lower} and
+  \code{scale.factor.init.upper} define the random multistart interval.
+  \code{scale.factor.search.lower} is the lower admissibility bound for
+  continuous fixed-bandwidth search candidates. The effective first
+  start is \code{max(scale.factor.init, scale.factor.search.lower)},
+  and the effective random-start lower endpoint is
+  \code{max(scale.factor.init.lower, scale.factor.search.lower)}.
+  \code{scale.factor.init.upper} must be at least that effective lower
+  endpoint; the package errors rather than silently expanding the user's
+  interval.
+
+  When \code{scale.factor.search.lower} is \code{NULL}, an existing
+  bandwidth object's stored floor is inherited when available;
+  otherwise the package default \code{0.1} is used. Explicit bandwidths
+  supplied for storage with \code{bandwidth.compute = FALSE} are not
+  rewritten by the search floor.
+
+  Categorical search-start controls such as \code{dfac.init},
+  \code{lbd.init}, and \code{hbd.init} have separate semantics and are
+  not affected by \code{scale.factor.search.lower}.
 
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and \code{\link{plot}}
