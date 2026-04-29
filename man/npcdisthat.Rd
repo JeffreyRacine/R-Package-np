@@ -9,12 +9,12 @@ fitted conditional distribution function.
 }
 \usage{
 npcdisthat(bws,
-  txdat = stop("training data 'txdat' missing"),
-  tydat = stop("training data 'tydat' missing"),
-  exdat,
-  eydat,
-  y = NULL,
-  output = c("matrix", "apply"))
+           txdat = stop("training data 'txdat' missing"),
+           tydat = stop("training data 'tydat' missing"),
+           exdat,
+           eydat,
+           y = NULL,
+           output = c("matrix", "apply"))
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{

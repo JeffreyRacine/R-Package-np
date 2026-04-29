@@ -12,16 +12,22 @@ for routine interactive use and for \code{mpiexec}-launched scripts that
 attach to an already-running MPI world.
 }
 \usage{
-npRmpi.init(..., nslaves = 1, comm = 1,
+npRmpi.init(..., 
+            nslaves = 1, 
+            comm = 1,
             mode = c("auto", "spawn", "attach"),
             autodispatch = TRUE,
             autodispatch.verify.options = FALSE,
             autodispatch.option.sync = c("onchange", "always", "never"),
             np.messages = NULL,
-            nonblock = TRUE, sleep = 0.1, quiet = FALSE)
+            nonblock = TRUE, 
+            sleep = 0.1, 
+            quiet = FALSE)
 
-npRmpi.quit(force = FALSE, dellog = TRUE, comm = 1,
-           mode = c("auto", "spawn", "attach"))
+npRmpi.quit(force = FALSE, 
+            dellog = TRUE, 
+            comm = 1,
+            mode = c("auto", "spawn", "attach"))
 
 npRmpi.session.info(comm = 1)
 }

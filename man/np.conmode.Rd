@@ -23,10 +23,15 @@
 \usage{
 npconmode(bws, \dots)
 
-\method{npconmode}{formula}(bws, data = NULL, newdata = NULL, \dots)
+\method{npconmode}{formula}(bws, 
+          data = NULL, 
+          newdata = NULL, 
+          \dots)
 
-
-\method{npconmode}{default}(bws, txdat, tydat, \dots)
+\method{npconmode}{default}(bws, 
+          txdat, 
+          tydat, 
+          \dots)
 
 \method{npconmode}{conbandwidth}(bws,
           txdat = stop("invoked without training data 'txdat'"),

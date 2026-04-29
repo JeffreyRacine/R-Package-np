@@ -17,15 +17,19 @@
 \usage{
 npudist(bws, \dots)
 
-\method{npudist}{formula}(bws, data = NULL, newdata = NULL, \dots)
+\method{npudist}{formula}(bws, 
+        data = NULL, 
+        newdata = NULL, 
+        \dots)
 
 \method{npudist}{dbandwidth}(bws,
         tdat = stop("invoked without training data 'tdat'"),
         edat,
         \dots)
 
-
-\method{npudist}{default}(bws, tdat, \dots)
+\method{npudist}{default}(bws, 
+        tdat, 
+        \dots)
 }
 
 \arguments{

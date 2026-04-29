@@ -21,8 +21,12 @@
 \usage{
 npscoefbw(\dots)
 
-\method{npscoefbw}{formula}(formula, data, subset, na.action, call, \dots)
-
+\method{npscoefbw}{formula}(formula, 
+          data, 
+          subset, 
+          na.action, 
+          call, 
+          \dots)
 
 \method{npscoefbw}{default}(xdat = stop("invoked without data 'xdat'"),
           ydat = stop("invoked without data 'ydat'"),

@@ -22,8 +22,12 @@
 \usage{
 npindexbw(\dots)
 
-\method{npindexbw}{formula}(formula, data, subset, na.action, call, \dots)
-
+\method{npindexbw}{formula}(formula, 
+          data, 
+          subset, 
+          na.action, 
+          call, 
+          \dots)
 
 \method{npindexbw}{default}(xdat = stop("training data xdat missing"),
           ydat = stop("training data ydat missing"),

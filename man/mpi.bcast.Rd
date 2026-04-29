@@ -6,7 +6,11 @@
   broadcasts a message from the specified rank to all members. 
 }
 \usage{
-mpi.bcast(x, type, rank = 0, comm = 1, buffunit=100)
+mpi.bcast(x, 
+          type, 
+          rank = 0, 
+          comm = 1, 
+          buffunit=100)
 }
 \arguments{
 \subsection{Message Payload}{

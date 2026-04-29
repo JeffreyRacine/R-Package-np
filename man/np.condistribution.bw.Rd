@@ -20,7 +20,13 @@ Data Types}
 \usage{
 npcdistbw(\dots)
 
-\method{npcdistbw}{formula}(formula, data, subset, na.action, call, gdata = NULL,\dots)
+\method{npcdistbw}{formula}(formula, 
+          data, 
+          subset, 
+          na.action, 
+          call, 
+          gdata = NULL,
+          \dots)
 
 
 \method{npcdistbw}{condbandwidth}(xdat = stop("data 'xdat' missing"),

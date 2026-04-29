@@ -19,8 +19,10 @@
 \usage{
 npqreg(bws, \dots)
 
-\method{npqreg}{formula}(bws, data = NULL, newdata = NULL, \dots)
-
+\method{npqreg}{formula}(bws, 
+       data = NULL, 
+       newdata = NULL, 
+       \dots)
 
 \method{npqreg}{condbandwidth}(bws,
        txdat = stop("training data 'txdat' missing"),
@@ -33,7 +35,10 @@ npqreg(bws, \dots)
        itmax = 10000,
        \dots)
 
-\method{npqreg}{default}(bws, txdat, tydat, \dots)
+\method{npqreg}{default}(bws, 
+       txdat, 
+       tydat, 
+       \dots)
 
 }
 

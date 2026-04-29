@@ -18,7 +18,10 @@
 \usage{
 npudens(bws, \dots)
 
-\method{npudens}{formula}(bws, data = NULL, newdata = NULL, \dots)
+\method{npudens}{formula}(bws, 
+        data = NULL, 
+        newdata = NULL, 
+        \dots)
 
 \method{npudens}{bandwidth}(bws,
         tdat = stop("invoked without training data 'tdat'"),

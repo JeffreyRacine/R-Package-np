@@ -18,8 +18,12 @@
 \usage{
 npregbw(\dots)
 
-\method{npregbw}{formula}(formula, data, subset, na.action, call, \dots)
-
+\method{npregbw}{formula}(formula, 
+        data, 
+        subset, 
+        na.action, 
+        call, 
+        \dots)
 
 \method{npregbw}{default}(xdat = stop("invoked without data 'xdat'"),
         ydat = stop("invoked without data 'ydat'"),

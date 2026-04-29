@@ -18,8 +18,9 @@
 \usage{
 npsigtest(bws, \dots)
 
-\method{npsigtest}{formula}(bws, data = NULL, \dots)
-
+\method{npsigtest}{formula}(bws, 
+          data = NULL, 
+          \dots)
 
 \method{npsigtest}{npregression}(bws, \dots)
 

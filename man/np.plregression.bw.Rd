@@ -21,8 +21,12 @@
 \usage{
 npplregbw(\dots)
 
-\method{npplregbw}{formula}(formula, data, subset, na.action, call, \dots)
-
+\method{npplregbw}{formula}(formula, 
+          data, 
+          subset, 
+          na.action, 
+          call, 
+          \dots)
 
 \method{npplregbw}{default}(xdat = stop("invoked without data `xdat'"),
           ydat = stop("invoked without data `ydat'"),

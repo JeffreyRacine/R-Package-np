@@ -17,8 +17,12 @@
 
 npudistbw(\dots)
 
-\method{npudistbw}{formula}(formula, data, subset, na.action, call, gdata = NULL,\dots)
-
+\method{npudistbw}{formula}(formula, 
+          data, subset, 
+          na.action, 
+          call, 
+          gdata = NULL,
+          \dots)
 
 \method{npudistbw}{dbandwidth}(dat = stop("invoked without input data 'dat'"),
           bws,

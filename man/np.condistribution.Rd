@@ -19,7 +19,10 @@
 \usage{
 npcdist(bws, \dots)
 
-\method{npcdist}{formula}(bws, data = NULL, newdata = NULL, \dots)
+\method{npcdist}{formula}(bws, 
+        data = NULL, 
+        newdata = NULL, 
+        \dots)
 
 
 \method{npcdist}{condbandwidth}(bws,
