@@ -106,7 +106,12 @@
 .onAttach <- function (lib, pkg) {
 		packageStartupMessage(
       sprintf(
-        'npRmpi %s: MPI examples and guides at https://jeffreyracine.github.io/gallery/; vignette("nprmpi_getting_started", package = "npRmpi")',
+        paste(
+          "npRmpi %s",
+          "Examples and guides at https://jeffreyracine.github.io/gallery/",
+          'See also vignette("npRmpi_getting_started", package = "npRmpi")',
+          sep = "\n"
+        ),
         utils::packageDescription(pkg, fields = "Version")
       ),
       domain = NULL,

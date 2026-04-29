@@ -815,7 +815,7 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
 ## directory (npRmpi/demos) and study them carefully. Also kindly see
 ## the more extensive examples in the np package itself. See the npRmpi
 ## vignette for further details on running parallel np programs via
-## vignette("nprmpi_getting_started", package = "npRmpi").
+## vignette("npRmpi_getting_started", package = "npRmpi").
 
 
 force.run <- nzchar(Sys.getenv("NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK"))
