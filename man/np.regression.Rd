@@ -1,4 +1,4 @@
-% 
+%
 \name{npreg}
 \alias{npreg}
 \alias{npreg.default}
@@ -38,8 +38,8 @@ FALSE, \dots)
 }
 
 \arguments{
-\subsection{Main Bandwidth And Estimation Inputs}{
-These arguments identify the bandwidth specification and training data.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
 
   \item{bws}{
@@ -51,18 +51,6 @@ These arguments identify the bandwidth specification and training data.
     necessary to specify the bandwidth type, kernel types, and so on.
   }
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the regression estimators. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{txdat}. Defaults to the training data used to
-    compute the bandwidth object.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object
@@ -72,57 +60,25 @@ These arguments identify the bandwidth specification and training data.
     \code{\link{npregbw}} was called.
   }
 
-\subsection{Evaluation Data And Returned Quantities}{
-These arguments control where the regression is evaluated and which fitted quantities are returned.
+
+  \item{txdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data) used to
+    calculate the regression estimators. Defaults to the training data used to
+    compute the bandwidth object.
+  }
+
+
+  \item{tydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+    \code{txdat}. Defaults to the training data used to
+    compute the bandwidth object.
+  }
+
+
+\subsection{Bandwidth Search Shortcut}{
+This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npregbw}} when bandwidths are computed inside \code{npreg}.
 }
-
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
-  }
-
-  \item{y.eval}{
-    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
-    \code{\link{npRmpi}} will compute goodness of fit statistics on these
-    data and return them. Defaults to \code{FALSE}.
-  }
-  
-  \item{exdat}{
-    a \eqn{p}-variate data frame of points on which the regression will be
-    estimated (evaluation data). By default,
-    evaluation takes place on the data provided by \code{txdat}.
-  }
-
-  \item{eydat}{
-    a one (1) dimensional numeric or integer vector of the true values
-    of the dependent variable. Optional, and used only to calculate the
-    true errors. 
-  }
-
-  \item{gradient.order}{
-    for \code{regtype="lp"} with \code{gradients=TRUE}, a positive
-    integer (or integer vector with one entry per continuous predictor)
-    specifying derivative order(s). Defaults to \code{1L}. Orders
-    exceeding \code{degree} for a variable are returned as
-    \code{NA}; orders greater than one are currently reserved for
-    future extension and return \code{NA}.
-  }
-
-  \item{gradients}{
-    a logical value indicating that you want gradients computed and
-    returned in the resulting \code{npregression} object. Defaults to
-    \code{FALSE}. For \code{regtype="lp"}, derivative components that
-    are not defined (requested order exceeds the variable-specific
-    polynomial degree) are returned as \code{NA}. Higher-order GLP
-    derivatives (order \eqn{>1}) are reserved for future C-level
-    extraction and currently return \code{NA}.
-  }
-
-  \item{residuals}{
-    a logical value indicating that you want residuals computed and
-    returned in the resulting \code{npregression} object. Defaults to
-    \code{FALSE}.
-  }
 
   \item{nomad}{
     logical shortcut passed through to \code{\link{npregbw}} when
@@ -140,8 +96,68 @@ These arguments control where the regression is evaluated and which fitted quant
     returned object \code{fit} to see the normalized shortcut metadata.
   }
 
-\subsection{Bandwidth Selection Pass-Through}{
-These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when bandwidths are computed internally.
+
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the regression is evaluated and which fitted quantities are returned.
+}
+
+  \item{exdat}{
+    a \eqn{p}-variate data frame of points on which the regression will be
+    estimated (evaluation data). By default,
+    evaluation takes place on the data provided by \code{txdat}.
+  }
+
+
+  \item{eydat}{
+    a one (1) dimensional numeric or integer vector of the true values
+    of the dependent variable. Optional, and used only to calculate the
+    true errors.
+  }
+
+
+  \item{gradient.order}{
+    for \code{regtype="lp"} with \code{gradients=TRUE}, a positive
+    integer (or integer vector with one entry per continuous predictor)
+    specifying derivative order(s). Defaults to \code{1L}. Orders
+    exceeding \code{degree} for a variable are returned as
+    \code{NA}; orders greater than one are currently reserved for
+    future extension and return \code{NA}.
+  }
+
+
+  \item{gradients}{
+    a logical value indicating that you want gradients computed and
+    returned in the resulting \code{npregression} object. Defaults to
+    \code{FALSE}. For \code{regtype="lp"}, derivative components that
+    are not defined (requested order exceeds the variable-specific
+    polynomial degree) are returned as \code{NA}. Higher-order GLP
+    derivatives (order \eqn{>1}) are reserved for future C-level
+    extraction and currently return \code{NA}.
+  }
+
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.
+  }
+
+
+  \item{residuals}{
+    a logical value indicating that you want residuals computed and
+    returned in the resulting \code{npregression} object. Defaults to
+    \code{FALSE}.
+  }
+
+
+  \item{y.eval}{
+    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
+    \code{\link{npRmpi}} will compute goodness of fit statistics on these
+    data and return them. Defaults to \code{FALSE}.
+  }
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to \code{\link{npregbw}} when bandwidths are computed internally, or used to interpret a numeric \code{bws} vector.
 }
 
   \item{\dots}{
@@ -160,7 +176,6 @@ These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when 
     surface.
   }
 }
-
 \details{
   Documentation guide: see \code{\link{npregbw}} for bandwidth
   selection and search controls, \code{\link{np.kernels}} for kernels,
@@ -194,16 +209,16 @@ These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when 
   \preformatted{
     Usage 1: first compute the bandwidth object via npregbw and then
     compute the conditional mean:
-    
+
     bw <- npregbw(y~x)
     ghat <- npreg(bw)
-    
+
     Usage 2: alternatively, compute the bandwidth object indirectly:
-    
+
     ghat <- npreg(y~x)
-    
+
     Usage 3: modify the default kernel and order:
-    
+
     ghat <- npreg(y~x, ckertype="epanechnikov", ckerorder=4)
 
     Usage 4: use the data frame interface rather than the formula
@@ -213,7 +228,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when 
   }
 
 
-  
+
   \code{npreg} implements a variety of methods for regression on
   multivariate (\eqn{p}-variate) data, the types of which are possibly
   continuous and/or discrete (unordered, ordered). The approach is
@@ -310,8 +325,8 @@ These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when 
 
   \item{eval}{ evaluation points }
   \item{mean}{ estimates of the regression function (conditional mean) at the
-  evaluation points } 
-  \item{merr}{ standard errors of the regression function estimates } 
+  evaluation points }
+  \item{merr}{ standard errors of the regression function estimates }
   \item{grad}{ estimates of the gradients at each evaluation point }
   \item{gerr}{ standard errors of the gradient estimates }
   \item{resid}{ if \code{residuals = TRUE}, in-sample or out-of-sample
@@ -323,7 +338,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when 
   \item{CORR}{ absolute value of Pearson's correlation coefficient }
   \item{SIGN}{ fraction of observations where fitted and observed values
   agree in sign }
-  
+
 }
 
 \references{
@@ -340,7 +355,7 @@ These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when 
 
   Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric estimation of
   global functionals and a measure of the explanatory power of
-  covariates in regression,} The Annals of Statistics, 23 1443-1473.  
+  covariates in regression,} The Annals of Statistics, 23 1443-1473.
 
   Hall, P. and Q. Li and J.S. Racine (2007), \dQuote{Nonparametric
   estimation of regression functions in the presence of irrelevant
@@ -357,11 +372,11 @@ These arguments pass bandwidth-selection controls to \code{\link{npregbw}} when 
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
-  
+
   Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of
     regression functions with both categorical and continuous data,}
   Journal of Econometrics, 119, 99-130.
-  
+
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
     estimators for discrete distributions,} Biometrika, 68, 301-309.
 
@@ -436,6 +451,6 @@ if (!in.check) {
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{nonparametric}

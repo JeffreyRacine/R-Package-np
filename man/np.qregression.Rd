@@ -1,4 +1,4 @@
-% 
+%
 \name{npqreg}
 \alias{npqreg}
 \alias{npqreg.condbandwidth}
@@ -38,8 +38,8 @@ npqreg(bws, \dots)
 }
 
 \arguments{
-\subsection{Main Bandwidth And Data Inputs}{
-These arguments identify the conditional-distribution bandwidth specification, training data, and evaluation data used by quantile regression.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
 
   \item{bws}{
@@ -51,18 +51,6 @@ These arguments identify the conditional-distribution bandwidth specification, t
     necessary to specify the bandwidth type, kernel types, and so on.
   }
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the regression estimators. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{txdat}. Defaults to the training data used to
-    compute the bandwidth object.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object
@@ -72,24 +60,30 @@ These arguments identify the conditional-distribution bandwidth specification, t
     \code{\link{npcdistbw}} was called.
   }
 
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
+
+  \item{txdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data) used to
+    calculate the regression estimators. Defaults to the training data used to
+    compute the bandwidth object.
   }
+
+
+  \item{tydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+    \code{txdat}. Defaults to the training data used to
+    compute the bandwidth object.
+  }
+
+
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the quantile regression is evaluated and which fitted quantities are returned.
+}
 
   \item{exdat}{
     a \eqn{p}-variate data frame of points on which the regression will be
     estimated (evaluation data). By default,
     evaluation takes place on the data provided by \code{txdat}.
-  }
-
-\subsection{Quantile And Returned Quantities}{
-These arguments select the target quantile and optional returned quantities.
-}
-
-  \item{tau}{
-    a numeric value specifying the \eqn{\tau}{tau}th quantile is
-    desired. Defaults to \code{0.5}.
   }
 
 
@@ -99,15 +93,29 @@ These arguments select the target quantile and optional returned quantities.
     object. Defaults to \code{FALSE}.
   }
 
-\subsection{Quantile Extraction Controls}{
-These arguments control the target quantile and the one-dimensional numerical refinement used to extract the conditional quantile from the estimated conditional distribution.
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.
+  }
+
+
+  \item{tau}{
+    a numeric value specifying the \eqn{\tau}{tau}th quantile is
+    desired. Defaults to \code{0.5}.
+  }
+
+
+
+\subsection{Quantile Solver Controls}{
+These arguments control the one-dimensional numerical quantile extraction step.
 }
 
-  \item{tol}{
-    tolerance on the one-dimensional quantile location refinement.
-    Defaults to \code{1.490116e-04}
-    (approximately \code{10000*sqrt(.Machine$double.eps)}).
+  \item{itmax}{
+    integer maximum number of iterations allowed in the one-dimensional
+    quantile refinement. Defaults to \code{10000}.
   }
+
 
   \item{small}{
     minimum interval width used by the one-dimensional quantile
@@ -115,13 +123,16 @@ These arguments control the target quantile and the one-dimensional numerical re
     (approximately \code{1000*sqrt(.Machine$double.eps)}).
   }
 
-  \item{itmax}{
-    integer maximum number of iterations allowed in the one-dimensional
-    quantile refinement. Defaults to \code{10000}.
+
+  \item{tol}{
+    tolerance on the one-dimensional quantile location refinement.
+    Defaults to \code{1.490116e-04}
+    (approximately \code{10000*sqrt(.Machine$double.eps)}).
   }
 
+
 \subsection{Additional Arguments}{
-These arguments are passed to \code{\link{npcdistbw}} for bandwidth type, kernel, and training-data controls.
+Further arguments are passed to the regression estimator or bandwidth interpretation path as needed.
 }
 
   \item{\dots}{
@@ -132,10 +143,9 @@ These arguments are passed to \code{\link{npcdistbw}} for bandwidth type, kernel
     \code{bwtype}, \code{cxkertype}, \code{cxkerorder},
     \code{cykertype}, \code{cykerorder}, \code{uxkertype},
     \code{uykertype}, \code{oxkertype}, \code{oykertype}, as described
-    in \code{\link{npcdistbw}}. 
+    in \code{\link{npcdistbw}}.
   }
 }
-
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
@@ -173,7 +183,7 @@ These arguments are passed to \code{\link{npcdistbw}} for bandwidth type, kernel
   \item{quantgrad}{ gradients at each evaluation point }
   \item{tau}{ the \eqn{\tau}{tau}th quantile computed }
 
-  
+
 }
 
 \references{
@@ -198,7 +208,7 @@ These arguments are passed to \code{\link{npcdistbw}} for bandwidth type, kernel
   conditional CDF and quantile functions with mixed categorical and
   continuous data,} Journal of Business and Economic Statistics, 26,
   423-434.
-  
+
   Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
   Selection for Nonparametric Conditional Distribution and Quantile
   Functions}, Journal of Business and Economic Statistics, 31, 57-65.
@@ -280,6 +290,6 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{nonparametric}

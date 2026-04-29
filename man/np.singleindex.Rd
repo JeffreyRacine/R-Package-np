@@ -1,4 +1,4 @@
-% 
+%
 \name{npindex}
 \alias{npindex}
 \alias{npindex.default}
@@ -47,8 +47,8 @@ npindex(bws, \dots)
 }
 
 \arguments{
-\subsection{Main Bandwidth And Data Inputs}{
-These arguments identify the bandwidth specification, training data, and evaluation data.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
 
   \item{bws}{
@@ -58,21 +58,9 @@ These arguments identify the bandwidth specification, training data, and evaluat
     as a vector of parameters (beta) with each element \eqn{i}
     corresponding to the coefficient for column \eqn{i} in \code{txdat}
     where the first element is normalized to 1, and a scalar bandwidth
-    (h). 
+    (h).
   }
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the regression estimators. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{txdat}. Defaults to the training data used to
-    compute the bandwidth object.
-  }
 
   \item{data}{
     an optional data frame, list or environment (or object
@@ -82,58 +70,21 @@ These arguments identify the bandwidth specification, training data, and evaluat
     \code{\link{npindexbw}} was called.
   }
 
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
+
+  \item{txdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data) used to
+    calculate the regression estimators. Defaults to the training data used to
+    compute the bandwidth object.
   }
 
-  \item{y.eval}{
-    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
-    \code{\link{npRmpi}} will compute goodness of fit statistics on these
-    data and return them. Defaults to \code{FALSE}.
+
+  \item{tydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+    \code{txdat}. Defaults to the training data used to
+    compute the bandwidth object.
   }
 
-  \item{exdat}{
-    a \eqn{p}-variate data frame of points on which the regression will be
-    estimated (evaluation data). By default,
-    evaluation takes place on the data provided by \code{txdat}.
-  }
-
-  \item{eydat}{
-    a one (1) dimensional numeric or integer vector of the true values
-    of the dependent variable. Optional, and used only to calculate the
-    true errors. 
-  }
-
-\subsection{Fitted Quantities And Inference}{
-These arguments control residuals, gradients, and bootstrap standard errors.
-}
-  
-  \item{boot.num}{
-    an integer specifying the number of bootstrap replications to use
-    when performing standard error calculations. Defaults to
-    \code{399}. 
-  }
-
-  \item{errors}{
-    a logical value indicating that you want (bootstrapped)
-    standard errors for the conditional mean, gradients (when
-    \code{gradients=TRUE} is set), and average gradients (when
-    \code{gradients=TRUE} is set), computed and returned in the
-    resulting \code{singleindex} object. Defaults to \code{FALSE}.
-  }
-
-  \item{gradients}{
-    a logical value indicating that you want gradients and the
-    asymptotic covariance matrix for beta computed and returned in the
-    resulting \code{singleindex} object. Defaults to \code{FALSE}.
-  }
-
-  \item{residuals}{
-    a logical value indicating that you want residuals computed and
-    returned in the resulting \code{singleindex} object. Defaults to
-    \code{FALSE}.
-  }
 
 \subsection{Bandwidth Search Shortcut}{
 This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npindexbw}} when bandwidths are computed inside \code{npindex}.
@@ -155,16 +106,81 @@ This argument passes the recommended automatic local-polynomial NOMAD preset to 
     returned object \code{fit} to see the normalized shortcut metadata.
   }
 
+
+\subsection{Evaluation Data And Returned Quantities}{
+These arguments control where the single-index fit is evaluated and which evaluation quantities are returned.
+}
+
+  \item{exdat}{
+    a \eqn{p}-variate data frame of points on which the regression will be
+    estimated (evaluation data). By default,
+    evaluation takes place on the data provided by \code{txdat}.
+  }
+
+
+  \item{eydat}{
+    a one (1) dimensional numeric or integer vector of the true values
+    of the dependent variable. Optional, and used only to calculate the
+    true errors.
+  }
+
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.
+  }
+
+
+  \item{y.eval}{
+    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
+    \code{\link{npRmpi}} will compute goodness of fit statistics on these
+    data and return them. Defaults to \code{FALSE}.
+  }
+
+
+\subsection{Fitted Quantities And Inference}{
+These arguments control residuals, gradients, and bootstrap standard errors.
+}
+
+  \item{boot.num}{
+    an integer specifying the number of bootstrap replications to use
+    when performing standard error calculations. Defaults to
+    \code{399}.
+  }
+
+
+  \item{errors}{
+    a logical value indicating that you want (bootstrapped)
+    standard errors for the conditional mean, gradients (when
+    \code{gradients=TRUE} is set), and average gradients (when
+    \code{gradients=TRUE} is set), computed and returned in the
+    resulting \code{singleindex} object. Defaults to \code{FALSE}.
+  }
+
+
+  \item{gradients}{
+    a logical value indicating that you want gradients and the
+    asymptotic covariance matrix for beta computed and returned in the
+    resulting \code{singleindex} object. Defaults to \code{FALSE}.
+  }
+
+
+  \item{residuals}{
+    a logical value indicating that you want residuals computed and
+    returned in the resulting \code{singleindex} object. Defaults to
+    \code{FALSE}.
+  }
+
+
 \subsection{Additional Arguments}{
-These arguments are passed to the bandwidth-selection counterpart when bandwidths are not supplied.
+Further arguments are passed to the bandwidth-selection counterpart when bandwidths are not supplied.
 }
 
   \item{\dots}{
     additional arguments supplied to specify the parameters to the
-    \code{sibandwidth} S3 method, which is called during estimation. 
+    \code{sibandwidth} S3 method, which is called during estimation.
   }
 }
-
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}}, \code{\link{plot.np}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
@@ -200,10 +216,10 @@ These arguments are passed to the bandwidth-selection counterpart when bandwidth
 
   \item{eval}{ evaluation points }
   \item{mean}{ estimates of the regression function (conditional mean) at the
-  evaluation points } 
+  evaluation points }
   \item{beta}{ the model coefficients }
   \item{betavcov}{ the asymptotic covariance matrix for the model coefficients}
-  \item{merr}{ standard errors of the regression function estimates } 
+  \item{merr}{ standard errors of the regression function estimates }
   \item{grad}{ estimates of the gradients at each evaluation point }
   \item{gerr}{ standard errors of the gradient estimates }
   \item{mean.grad}{ mean (average) gradient over the evaluation points}
@@ -251,13 +267,13 @@ These arguments are passed to the bandwidth-selection counterpart when bandwidth
   McFadden, D. and C. Puig and D. Kerschner (1977), \dQuote{Determinants
     of the long-run demand for electricity,} Proceedings of the
   American Statistical Association (Business and Economics Section),
-  109-117. 
+  109-117.
 
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
     estimators for discrete distributions,} Biometrika, 68, 301-309.
 }
 
-    
+
 
 \author{
   Tristen Hayfield  \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
@@ -342,6 +358,6 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
-} % enddontrun     
+} % enddontrun
 }
 \keyword{nonparametric}
