@@ -18,12 +18,17 @@
 \usage{
 npsigtest(bws, \dots)
 
-\method{npsigtest}{formula}(bws, data = NULL, \dots)
+\method{npsigtest}{formula}(bws, 
+          data = NULL, 
+          \dots)
 
 
 \method{npsigtest}{npregression}(bws, \dots)
 
-\method{npsigtest}{default}(bws, xdat, ydat, \dots)
+\method{npsigtest}{default}(bws, 
+          xdat, 
+          ydat, 
+          \dots)
 
 \method{npsigtest}{rbandwidth}(bws,
           xdat = stop("data xdat missing"),

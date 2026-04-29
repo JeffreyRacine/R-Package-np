@@ -20,11 +20,17 @@
 \usage{
 npreg(bws, \dots)
 
-\method{npreg}{formula}(bws, data = NULL, newdata = NULL, y.eval =
-FALSE, \dots)
+\method{npreg}{formula}(bws, 
+      data = NULL, 
+      newdata = NULL, 
+      y.eval = FALSE, 
+      \dots)
 
-
-\method{npreg}{default}(bws, txdat, tydat, nomad = FALSE, \dots)
+\method{npreg}{default}(bws, 
+      txdat, 
+      tydat, 
+      nomad = FALSE, 
+      \dots)
 
 \method{npreg}{rbandwidth}(bws,
       txdat = stop("training data 'txdat' missing"),

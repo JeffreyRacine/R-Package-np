@@ -9,10 +9,10 @@ fitted unconditional density.
 }
 \usage{
 npudenshat(bws,
-  tdat = stop("training data 'tdat' missing"),
-  edat,
-  y = NULL,
-  output = c("matrix", "apply"))
+           tdat = stop("training data 'tdat' missing"),
+           edat,
+           y = NULL,
+           output = c("matrix", "apply"))
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{

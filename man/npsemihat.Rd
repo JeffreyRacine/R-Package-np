@@ -10,34 +10,34 @@ These interfaces are currently experimental.
 }
 \usage{
 npindexhat(bws,
-  txdat = stop("training data 'txdat' missing"),
-  exdat = txdat,
-  y = NULL,
-  output = c("matrix", "apply"),
-  s = 0L,
-  fd.step = NULL,
-  ...)
+           txdat = stop("training data 'txdat' missing"),
+           exdat = txdat,
+           y = NULL,
+           output = c("matrix", "apply"),
+           s = 0L,
+           fd.step = NULL,
+           ...)
 
 npplreghat(bws,
-  txdat = stop("training data 'txdat' missing"),
-  tzdat = stop("training data 'tzdat' missing"),
-  exdat = txdat,
-  ezdat = tzdat,
-  y = NULL,
-  output = c("apply", "matrix"),
-  ...)
+           txdat = stop("training data 'txdat' missing"),
+           tzdat = stop("training data 'tzdat' missing"),
+           exdat = txdat,
+           ezdat = tzdat,
+           y = NULL,
+           output = c("apply", "matrix"),
+           ...)
 
 npscoefhat(bws,
-  txdat = stop("training data 'txdat' missing"),
-  tzdat = NULL,
-  exdat = txdat,
-  ezdat = tzdat,
-  y = NULL,
-  output = c("matrix", "apply"),
-  ridge = 0,
-  iterate = FALSE,
-  leave.one.out = FALSE,
-  ...)
+           txdat = stop("training data 'txdat' missing"),
+           tzdat = NULL,
+           exdat = txdat,
+           ezdat = tzdat,
+           y = NULL,
+           output = c("matrix", "apply"),
+           ridge = 0,
+           iterate = FALSE,
+           leave.one.out = FALSE,
+           ...)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{

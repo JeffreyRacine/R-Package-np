@@ -21,11 +21,18 @@
 \usage{
 npscoef(bws, \dots)
 
-\method{npscoef}{formula}(bws, data = NULL, newdata = NULL, y.eval =
-FALSE, \dots)
+\method{npscoef}{formula}(bws, 
+        data = NULL, 
+        newdata = NULL, 
+        y.eval = FALSE, 
+        \dots)
 
-
-\method{npscoef}{default}(bws, txdat, tydat, tzdat, nomad = FALSE, \dots)
+\method{npscoef}{default}(bws, 
+        txdat, 
+        tydat, 
+        tzdat, 
+        nomad = FALSE, 
+        \dots)
 
 \method{npscoef}{scbandwidth}(bws,
         txdat = stop("training data 'txdat' missing"),

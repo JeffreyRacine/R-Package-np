@@ -14,28 +14,36 @@ values or derivative estimates via \eqn{H^{(s)} y}.
 \usage{
 npreghat(bws, ...)
 
-\method{npreghat}{formula}(bws, data = NULL, newdata = NULL, ...)
-
+\method{npreghat}{formula}(bws, 
+         data = NULL, 
+         newdata = NULL, 
+         ...)
 
 \method{npreghat}{rbandwidth}(bws,
-  txdat = stop("training data 'txdat' missing"),
-  exdat, y = NULL,
-  output = c("matrix", "apply"),
-  basis = NULL,
-  bernstein.basis = NULL,
-  degree = NULL,
-  deriv = NULL,
-  leave.one.out = FALSE,
-  ridge = 0,
-  s = NULL, ...)
+         txdat = stop("training data 'txdat' missing"),
+         exdat, y = NULL,
+         output = c("matrix", "apply"),
+         basis = NULL,
+         bernstein.basis = NULL,
+         degree = NULL,
+         deriv = NULL,
+         leave.one.out = FALSE,
+         ridge = 0,
+         s = NULL, 
+         ...)
 
-\method{npreghat}{npregression}(bws, txdat, y, ...)
+\method{npreghat}{npregression}(bws, 
+         txdat, 
+         y, 
+         ...)
 
-\method{predict}{npreghat}(object, newdata = NULL, y = NULL,
-  output = c("matrix", "apply"),
-  s = attr(object, "s"),
-  leave.one.out = attr(object, "leave.one.out"),
-  deriv = NULL, ...)
+\method{predict}{npreghat}(object, 
+        newdata = NULL, y = NULL,
+        output = c("matrix", "apply"),
+        s = attr(object, "s"),
+        leave.one.out = attr(object, "leave.one.out"),
+        deriv = NULL, 
+        ...)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
