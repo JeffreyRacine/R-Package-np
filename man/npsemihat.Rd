@@ -10,7 +10,7 @@ These interfaces are currently experimental.
 }
 \usage{
 npindexhat(bws,
-           xdat = stop("training data 'txdat' missing"),
+           txdat = stop("training data 'txdat' missing"),
            exdat = txdat,
            y = NULL,
            output = c("matrix", "apply"),
