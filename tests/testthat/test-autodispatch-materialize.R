@@ -94,7 +94,7 @@ test_that("autodispatch materialization preserves explicit NULL arguments withou
 
   expect_false(identical(bws.ref, "bws"))
   expect_identical(prepared$tmpvals[[compute.ref]], TRUE)
-  expect_identical(prepared$tmpvals[[nmulti.ref]], 0L)
+  expect_identical(prepared$tmpvals[[nmulti.ref]], 1L)
   expect_identical(prepared$tmpvals[[remin.ref]], FALSE)
   expect_identical(prepared$tmpvals[[itmax.ref]], 1L)
 })

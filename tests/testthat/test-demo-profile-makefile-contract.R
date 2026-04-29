@@ -1,5 +1,6 @@
 test_that("profile demo launcher captures the R CMD BATCH transcript explicitly", {
   makefile <- testthat::test_path("..", "..", "demo", "makefile")
+  skip_if_not(file.exists(makefile), "demo makefile unavailable in installed test context")
   lines <- readLines(makefile, warn = FALSE)
   text <- paste(lines, collapse = "\n")
 

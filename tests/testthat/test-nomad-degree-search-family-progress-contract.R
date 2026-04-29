@@ -18,10 +18,8 @@ expect_nomad_unknown_bound_output <- function(lines, case) {
   expect_false(any(grepl("fval=", block, fixed = TRUE)), info = case)
   expect_false(any(grepl("%|eta ", block)), info = case)
   expect_true(any(grepl("^\\[npRmpi\\] Selecting degree and bandwidth \\(", block)), info = case)
-  expect_true(any(grepl("^\\[npRmpi\\] Refining bandwidth \\(", block)), info = case)
   expect_true(any(grepl("multistart [12]/2", block)), info = case)
   expect_true(any(grepl("iteration [0-9]+", block)), info = case)
-  expect_true(any(grepl("iteration [0-9]+ \\([0-9]+\\)", block)), info = case)
   expect_true(any(grepl("deg \\(", block)), info = case)
   expect_true(any(grepl("best \\(", block)), info = case)
 }

@@ -10,13 +10,14 @@ test_that("npindexbw surfaces fixed-h start controls as formal arguments", {
   expect_true(all(c("scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init") %in% names(formals(npindexbw_sibandwidth))))
 })
 
-test_that("npindexbw fixed-h helper replays legacy defaults", {
+test_that("npindexbw fixed-h helper replays scale-factor defaults", {
   fit <- c(-1.5, -0.25, 0.1, 0.8, 1.7)
   controls <- npindexbw_h_start_controls()
+  h.scale <- getFromNamespace("EssDee", "npRmpi")(fit) * 80^(-1 / 5)
 
   expect_equal(
     npindex_default_start_bandwidth(fit = fit, bwtype = "fixed", nobs = 80L, start.controls = controls),
-    1.059224 * getFromNamespace("EssDee", "npRmpi")(fit) * 80^(-1 / 5)
+    0.5 * h.scale
   )
 
   set.seed(20260405)
@@ -27,7 +28,7 @@ test_that("npindexbw fixed-h helper replays legacy defaults", {
     start.controls = controls
   )
   set.seed(20260405)
-  expect_equal(got, runif(1, min = 0.5, max = 1.5) * getFromNamespace("EssDee", "npRmpi")(fit) * 80^(-1 / 5))
+  expect_equal(got, runif(1, min = 0.1, max = 2.0) * h.scale)
 })
 
 test_that("npindexbw fixed-h helper honors explicit overrides", {

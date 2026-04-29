@@ -1,5 +1,7 @@
 test_that("native registration disables dynamic lookup and registers MPI entry points", {
-  lines <- readLines(test_path("..", "..", "src", "np_init.c"), warn = FALSE)
+  src <- test_path("..", "..", "src", "np_init.c")
+  skip_if_not(file.exists(src), "source C files unavailable in installed test context")
+  lines <- readLines(src, warn = FALSE)
   text <- paste(lines, collapse = "\n")
 
   expect_match(text, "R_useDynamicSymbols\\(dll, FALSE\\);")
@@ -10,6 +12,8 @@ test_that("native registration disables dynamic lookup and registers MPI entry p
 })
 
 test_that("package metadata declares the MPI system dependency", {
-  lines <- readLines(test_path("..", "..", "DESCRIPTION"), warn = FALSE)
+  desc <- test_path("..", "..", "DESCRIPTION")
+  skip_if_not(file.exists(desc), "DESCRIPTION unavailable in installed test context")
+  lines <- readLines(desc, warn = FALSE)
   expect_true(any(grepl("^SystemRequirements:\\s*MPI\\s*$", lines)))
 })

@@ -4,6 +4,7 @@ test_that("compute sources no longer own MPI finalization", {
     testthat::test_path("..", "..", "src", "kernele.c"),
     testthat::test_path("..", "..", "src", "statmods.c")
   )
+  skip_if_not(all(file.exists(files)), "source C files unavailable in installed test context")
 
   for (path in files) {
     text <- paste(readLines(path, warn = FALSE), collapse = "\n")
