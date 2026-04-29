@@ -15,25 +15,28 @@ npudisthat(bws,
   output = c("matrix", "apply"))
 }
 \arguments{
-\subsection{Bandwidth And Data Inputs}{
-Unconditional distribution bandwidth object and training/evaluation data used to
-construct the operator.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the fitted bandwidth object, training data, and evaluation data.
 }
 
   \item{bws}{A fitted unconditional distribution bandwidth object of class \code{"dbandwidth"}.}
 
-  \item{tdat}{Training data used to construct the operator.}
 
   \item{edat}{Optional evaluation data. If omitted, the operator is built on the training data.}
 
+
+  \item{tdat}{Training data used to construct the operator.}
+
+
 \subsection{Operator Output}{
-Right-hand-side input and output mode for matrix construction or direct
-operator application.
+These arguments control whether the operator is returned as a matrix or applied directly.
 }
+
+  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
 
   \item{y}{Optional right-hand side vector or matrix with one row per training observation.}
 
-  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
+
 }
 \details{
 For \code{output = "matrix"}, the return value is a matrix with class

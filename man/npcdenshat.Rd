@@ -17,29 +17,34 @@ npcdenshat(bws,
   output = c("matrix", "apply"))
 }
 \arguments{
-\subsection{Bandwidth And Data Inputs}{
-Conditional density bandwidth object and training/evaluation data used to
-construct the operator.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the fitted bandwidth object, training data, and evaluation data.
 }
 
   \item{bws}{A fitted conditional density bandwidth object of class \code{"conbandwidth"}.}
 
-  \item{txdat}{Training conditioning data used to construct the operator.}
-
-  \item{tydat}{Training response data used to construct the operator.}
 
   \item{exdat}{Optional evaluation conditioning data. If omitted, the operator is built on the training conditioning data.}
 
+
   \item{eydat}{Optional evaluation response data. If omitted, the operator is built on the training response data.}
 
+
+  \item{txdat}{Training conditioning data used to construct the operator.}
+
+
+  \item{tydat}{Training response data used to construct the operator.}
+
+
 \subsection{Operator Output}{
-Right-hand-side input and output mode for matrix construction or direct
-operator application.
+These arguments control whether the operator is returned as a matrix or applied directly.
 }
+
+  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
 
   \item{y}{Optional right-hand side vector or matrix with one row per training observation.}
 
-  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
+
 }
 \details{
 For \code{output = "matrix"}, the return value is a matrix with class

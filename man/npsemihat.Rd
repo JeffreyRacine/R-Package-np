@@ -40,53 +40,64 @@ npscoefhat(bws,
   ...)
 }
 \arguments{
-\subsection{Bandwidth And Data Inputs}{
-Semiparametric bandwidth object, training/evaluation data, and optional
-right-hand-side input.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the fitted bandwidth object, training data, and evaluation data.
 }
 
   \item{bws}{A fitted bandwidth object. \code{npindexhat()} requires class \code{sibandwidth}, \code{npplreghat()} requires class \code{plbandwidth}, and \code{npscoefhat()} requires class \code{scbandwidth}.}
 
-  \item{txdat}{Training \code{x} data.}
 
   \item{exdat}{Evaluation \code{x} data.}
 
-  \item{y}{Optional response vector or matrix for apply mode.}
+
+  \item{txdat}{Training \code{x} data.}
+
 
 \subsection{Operator Output And Derivatives}{
-Output mode and derivative controls used by semiparametric hat operators.
+These arguments control operator output, derivative selection, finite-difference compatibility, and apply-mode right-hand sides.
 }
-
-  \item{output}{Either \code{"matrix"} or \code{"apply"}.}
-
-  \item{s}{For \code{npindexhat}, \code{s=0} returns fit operator and \code{s=1} returns index-derivative operator.}
 
   \item{fd.step}{Compatibility argument for \code{npindexhat(..., s=1)}. If supplied it must be a positive finite scalar, but the current \code{s=1} route uses the canonical exact derivative operator rather than finite-differencing the fit operator.}
 
-\subsection{Partially Linear And Smooth-Coefficient Data}{
-Additional \code{z} data used by partially linear and smooth-coefficient
-operator routes.
-}
 
-  \item{tzdat}{Training \code{z} data for partially linear and smooth-coefficient models.}
+  \item{output}{Either \code{"matrix"} or \code{"apply"}.}
+
+
+  \item{s}{For \code{npindexhat}, \code{s=0} returns fit operator and \code{s=1} returns index-derivative operator.}
+
+
+  \item{y}{Optional response vector or matrix for apply mode.}
+
+
+\subsection{Partially Linear And Smooth-Coefficient Data}{
+These arguments supply the additional \code{z} data used by partially linear and smooth-coefficient models.
+}
 
   \item{ezdat}{Evaluation \code{z} data.}
 
-\subsection{Smooth-Coefficient Controls}{
-Ridge, iteration, and leave-one-out controls for \code{npscoefhat()}.
-}
 
-  \item{ridge}{Base ridge term for local linear solves in \code{npscoefhat}; must be a non-negative finite scalar. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves.}
+  \item{tzdat}{Training \code{z} data for partially linear and smooth-coefficient models.}
+
+
+\subsection{Smooth-Coefficient Controls}{
+These arguments control smooth-coefficient iteration, leave-one-out behavior, and ridge stabilization.
+}
 
   \item{iterate}{Logical; \code{npscoefhat()} currently supports \code{iterate = FALSE} only.}
 
+
   \item{leave.one.out}{Logical; leave-one-out kernel weights for \code{npscoefhat}. This currently requires evaluation \code{z} data to match training \code{z} data.}
 
+
+  \item{ridge}{Base ridge term for local linear solves in \code{npscoefhat}; must be a non-negative finite scalar. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves.}
+
+
 \subsection{Additional Arguments}{
-Reserved extension arguments.
+Reserved for future extensions.
 }
 
   \item{...}{Reserved for future extensions.}
+
 }
 \value{
 If \code{output = "matrix"}, returns a hat matrix \eqn{H}. If

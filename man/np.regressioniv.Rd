@@ -59,10 +59,31 @@ npregiv(y,
         \dots)
 }
 \arguments{
-\subsection{Main Data Inputs}{
-Dependent variable, endogenous regressors, instruments, exogenous regressors,
-and evaluation data.
+\subsection{Data, Bandwidth Inputs And Formula Interface}{
+These arguments identify the response, endogenous variables, instruments, exogenous covariates, and evaluation data.
 }
+
+  \item{w}{
+    a \eqn{q}-variate data frame of instruments. The data types may be
+    continuous, discrete (unordered and ordered factors), or some
+    combination thereof.
+  }
+
+
+  \item{x}{
+    an \eqn{r}-variate data frame of exogenous regressors. The data
+    types may be continuous, discrete (unordered and ordered factors),
+    or some combination thereof.
+  }
+
+
+  \item{xeval}{
+    an \eqn{r}-variate data frame of exogenous regressors on which the
+    regression will be estimated (evaluation data). By default,
+    evaluation takes place on the data provided by \code{x}.
+  }
+
+
 
   \item{y}{
     a one (1) dimensional numeric or integer vector of dependent data, each
@@ -70,107 +91,74 @@ and evaluation data.
     \code{z}.
   }
 
+
+
   \item{z}{
     a \eqn{p}-variate data frame of endogenous regressors. The data
     types may be continuous, discrete (unordered and ordered factors),
     or some combination thereof.
   }
-  \item{w}{
-    a \eqn{q}-variate data frame of instruments. The data types may be
-    continuous, discrete (unordered and ordered factors), or some
-    combination thereof.
-  }
-  \item{x}{
-    an \eqn{r}-variate data frame of exogenous regressors. The data
-    types may be continuous, discrete (unordered and ordered factors),
-    or some combination thereof.
-  }
+
+
   \item{zeval}{
     a \eqn{p}-variate data frame of endogenous regressors on which the
     regression will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{z}.
   }
-  \item{xeval}{
-    an \eqn{r}-variate data frame of exogenous regressors on which the
-    regression will be estimated (evaluation data). By default,
-    evaluation takes place on the data provided by \code{x}.
-  }
 
-\subsection{Tikhonov Regularization Controls}{
-Direct, iterated, and searched regularization controls for the
-\code{"Tikhonov"} route.
-}
-
-  \item{alpha}{
-    a numeric scalar that, if supplied, is used rather than numerically
-    solving for \code{alpha}, when using \code{method="Tikhonov"}.
-    }
-  \item{alpha.iter}{
-    a numeric scalar that, if supplied, is used for iterated Tikhonov
-    rather than numerically solving for \code{alpha}, when using
-    \code{method="Tikhonov"}.
-  }
-  \item{alpha.max}{
-    maximum of search range for \eqn{\alpha}{alpha}, the Tikhonov
-    regularization parameter, when using  \code{method="Tikhonov"}.
-  }
-  \item{alpha.min}{
-    minimum of search range for \eqn{\alpha}{alpha}, the Tikhonov
-    regularization parameter, when using \code{method="Tikhonov"}.
-  }
-  \item{alpha.tol}{
-    the search tolerance for \code{optimize} when solving for
-    \eqn{\alpha}{alpha}, the Tikhonov regularization parameter,
-    when using \code{method="Tikhonov"}.
-  }
-  \item{bw}{
-    an object which, if provided, contains bandwidths and parameters
-    (obtained from a previous invocation of \code{npregiv}) required to
-    re-compute the estimator without having to re-run cross-validation
-    and/or numerical optimization which is particularly costly in this
-    setting (see details below for an illustration of its use)
-  }
 
 \subsection{Landweber-Fridman Iteration Controls}{
-Iteration, starting-value, penalty, and stopping controls for the
-\code{"Landweber-Fridman"} route and related iteration paths.
+These arguments control the Landweber-Fridman iteration path.
 }
 
   \item{constant}{
     the constant to use when using  \code{method="Landweber-Fridman"}.
   }
+
+
   \item{iterate.diff.tol}{
     the search tolerance for the difference in the stopping rule from
     iteration to iteration when using \code{method="Landweber-Fridman"}
     (disable by setting to zero).
   }
+
+
   \item{iterate.max}{
     an integer indicating the maximum number of iterations permitted
     before termination occurs when using \code{method="Landweber-Fridman"}.
   }
+
+
   \item{iterate.Tikhonov}{
     a logical value indicating whether to use iterated Tikhonov (one
     iteration) or not when using \code{method="Tikhonov"}.
   }
+
+
   \item{iterate.Tikhonov.num}{
     an integer indicating the number of iterations to conduct when using
     \code{method="Tikhonov"}.
   }
+
+
   \item{method}{
     the regularization method employed (defaults to
     \code{"Landweber-Fridman"}, see Horowitz (2011); see Darolles,
     Fan, Florens and Renault (2011) for details for
     \code{"Tikhonov"}).
   }
+
+
   \item{nmulti}{
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
     points.
   }
 
+
+
 \subsection{Optimization Controls}{
-Numerical optimization tolerances, method, multistart, and reproducibility
-controls.
+These arguments control numerical optimization for the inverse problem.
 }
 
   \item{optim.abstol}{
@@ -178,14 +166,20 @@ controls.
     for non-negative functions, as a tolerance for reaching
     zero. Defaults to \code{.Machine$double.eps}.
   }
+
+
   \item{optim.maxattempts}{
     maximum number of attempts taken trying to achieve successful
     convergence in \code{\link{optim}}. Defaults to \code{100}.
   }
+
+
   \item{optim.maxit}{
     maximum number of iterations used by \code{\link{optim}}. Defaults
      to \code{500}.
    }
+
+
   \item{optim.method}{ method used by \code{\link{optim}} for minimization of
     the objective function. See \code{?optim} for references. Defaults
     to \code{"Nelder-Mead"}.
@@ -208,63 +202,84 @@ controls.
     they do not store a matrix they may be successful in much larger
     optimization problems.
   }
+
+
   \item{optim.reltol}{
     relative convergence tolerance used by \code{\link{optim}}.  The algorithm
     stops if it is unable to reduce the value by a factor of 'reltol *
     (abs(val) + reltol)' at a step.  Defaults to
     \code{sqrt(.Machine$double.eps)}, typically about \code{1e-8}.
   }
+
+
   \item{p}{
     the order of the local polynomial regression (defaults to
     \code{p=1}, i.e. local linear).
   }
 
+
+
 \subsection{Returned Weights And Smooth Residuals}{
-Controls for returned instrumental-regression weight matrices and residual
-smoothing during iteration.
+These arguments control returned kernel weights, starting values, residual smoothing, and iteration stopping behavior.
 }
 
   \item{penalize.iteration}{ a logical value indicating whether to
     penalize the norm by the number of iterations or not (default
     \code{TRUE})
   }    
+
+
   \item{random.seed}{
     an integer used to seed R's random number generator. This ensures
     replicability of the numerical search. Defaults to 42.
   }
+
+
   \item{return.weights.phi}{
     a logical value (defaults to \code{FALSE}) indicating whether to
     return the weight matrix which when postmultiplied by the response
     \eqn{y} delivers the instrumental regression
   }
+
+
   \item{return.weights.phi.deriv.1}{
     a logical value (defaults to \code{FALSE}) indicating whether to
     return the weight matrix which when postmultiplied by the response
     \eqn{y} delivers the first partial derivative of the instrumental
     regression with respect to \eqn{z}
   }
+
+
   \item{return.weights.phi.deriv.2}{
     a logical value (defaults to \code{FALSE}) indicating whether to
     return the weight matrix which when postmultiplied by the response
     \eqn{y} delivers the second partial derivative of the instrumental
     regression with respect to \eqn{z}
   }
+
+
   \item{smooth.residuals}{ a logical value indicating whether to
     optimize bandwidths for the regression of
     \eqn{(y-\varphi(z))}{(y-phi(z))} on \eqn{w} (defaults to
     \code{TRUE}) or for the regression of \eqn{\varphi(z)}{phi(z)} on
     \eqn{w} during iteration
   }
+
+
   \item{start.from}{ a character string indicating whether to start from
     \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|z)|z)} (this can
     be overridden by providing \code{starting.values} below)
   }  
+
+
   \item{starting.values}{ a value indicating whether to commence
     Landweber-Fridman assuming
     \eqn{\varphi_{-1}=starting.values}{phi[-1]=starting.values} (proper
     Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
     \code{NULL}, see details below)
   }
+
+
   \item{stop.on.increase}{
     a logical value (defaults to \code{TRUE}) indicating whether to halt
     iteration if the stopping criterion (see below) increases over the
@@ -272,13 +287,63 @@ smoothing during iteration.
     but increased)
   }
 
-\subsection{Additional Kernel-Sum Arguments}{
-Further arguments supplied to \code{\link{npksum}}.
+
+
+\subsection{Tikhonov Regularization Controls}{
+These arguments control Tikhonov regularization and its bandwidth.
+}
+
+  \item{alpha}{
+    a numeric scalar that, if supplied, is used rather than numerically
+    solving for \code{alpha}, when using \code{method="Tikhonov"}.
+    }
+
+
+  \item{alpha.iter}{
+    a numeric scalar that, if supplied, is used for iterated Tikhonov
+    rather than numerically solving for \code{alpha}, when using
+    \code{method="Tikhonov"}.
+  }
+
+
+  \item{alpha.max}{
+    maximum of search range for \eqn{\alpha}{alpha}, the Tikhonov
+    regularization parameter, when using  \code{method="Tikhonov"}.
+  }
+
+
+  \item{alpha.min}{
+    minimum of search range for \eqn{\alpha}{alpha}, the Tikhonov
+    regularization parameter, when using \code{method="Tikhonov"}.
+  }
+
+
+  \item{alpha.tol}{
+    the search tolerance for \code{optimize} when solving for
+    \eqn{\alpha}{alpha}, the Tikhonov regularization parameter,
+    when using \code{method="Tikhonov"}.
+  }
+
+
+  \item{bw}{
+    an object which, if provided, contains bandwidths and parameters
+    (obtained from a previous invocation of \code{npregiv}) required to
+    re-compute the estimator without having to re-run cross-validation
+    and/or numerical optimization which is particularly costly in this
+    setting (see details below for an illustration of its use)
+  }
+
+
+
+\subsection{Additional Arguments}{
+Further arguments are passed to lower-level kernel-sum and estimation routines.
 }
 
   \item{\dots}{
     additional arguments supplied to \code{\link{npksum}}.
   }
+
+
 }
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
