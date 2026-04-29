@@ -31,21 +31,19 @@
   can work with the bandwidth object directly without
   having to do the subsequent companion function evaluation.
 
-  As of \code{np} version 0.20-0, we allow the user to combine these
-  steps. When using \code{np} versions 0.20-0 and higher, if the first
-  step (bandwidth selection) is not performed explicitly then the second
-  step will automatically call the omitted first step bandwidth selector
-  using defaults unless otherwise specified, and the bandwidth object
-  could then be retrieved retroactively if so desired via
-  \code{objectname$bws}. Furthermore, options for bandwidth selection
-  will be passed directly to the bandwidth selector function. Note that
-  the combined approach would not be a wise choice for certain
-  applications such as when bootstrapping (as it would involve
-  unnecessary computation since the bandwidths would properly be those
-  for the original sample and not the bootstrap resamples) or when
-  conducting quantile regression (as it would involve unnecessary
-  computation when different quantiles are computed from the same
-  conditional cumulative distribution estimate).
+  The user may also combine these steps. If the first step (bandwidth
+  selection) is not performed explicitly then the second step will
+  automatically call the omitted first-step bandwidth selector using
+  defaults unless otherwise specified, and the bandwidth object can be
+  retrieved retroactively if so desired via \code{objectname$bws}.
+  Furthermore, options for bandwidth selection will be passed directly
+  to the bandwidth selector function. Note that the combined approach
+  would not be a wise choice for certain applications such as when
+  bootstrapping (as it would involve unnecessary computation since the
+  bandwidths would properly be those for the original sample and not the
+  bootstrap resamples) or when conducting quantile regression (as it
+  would involve unnecessary computation when different quantiles are
+  computed from the same conditional cumulative distribution estimate).
   
   There are two ways in which you can interact with functions in
   \code{np}, either i) using data frames, or ii) using a formula
@@ -118,10 +116,10 @@
 	The underlying functions are written in C for computational
 	efficiency. Despite this, due to their nature, data-driven bandwidth
 	selection methods involving multivariate numerical search can be
-	time-consuming, particularly for large datasets. A version of this
-	package using the \code{Rmpi} wrapper is under development that allows
-	one to deploy this software in a clustered computing environment to
-	facilitate computation involving large datasets.
+	time-consuming, particularly for large datasets. For MPI-oriented
+	workflows on larger jobs, see the companion package \pkg{npRmpi},
+	which extends the same mixed-data kernel methodology to clustered
+	computing environments.
 
   To cite the \code{np} package, type \code{citation("np")} from within
   \code{R} for details.
