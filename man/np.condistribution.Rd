@@ -38,7 +38,7 @@ npcdist(bws,
         \dots)
 
 \method{npcdist}{default}(bws, 
-        xdat, 
+        txdat, 
         tydat, 
         nomad = FALSE, 
         \dots)
