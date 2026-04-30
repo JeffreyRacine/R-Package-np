@@ -14,7 +14,12 @@
 \usage{
 npksum(\dots)
 
-\method{npksum}{formula}(formula, data, newdata, subset, na.action, \dots)
+\method{npksum}{formula}(formula, 
+       data, 
+       newdata, 
+       subset, 
+       na.action, 
+       \dots)
 
 \method{npksum}{default}(bws,
        txdat = stop("training data 'txdat' missing"),

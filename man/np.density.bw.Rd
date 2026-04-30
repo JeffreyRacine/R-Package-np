@@ -20,8 +20,12 @@
 
 npudensbw(\dots)
 
-\method{npudensbw}{formula}(formula, data, subset, na.action, call, \dots)
-
+\method{npudensbw}{formula}(formula, 
+          data, 
+          subset, 
+          na.action, 
+          call, 
+          \dots)
 
 \method{npudensbw}{bandwidth}(dat = stop("invoked without input data 'dat'"),
           bws,

@@ -18,10 +18,14 @@
 }
 
 \usage{
-npplreg(bws, \dots)
+npplreg(bws, 
+        \dots)
 
-\method{npplreg}{formula}(bws, data = NULL, newdata = NULL, y.eval =
-FALSE, \dots)
+\method{npplreg}{formula}(bws, 
+       data = NULL, 
+       newdata = NULL, 
+       y.eval = FALSE, 
+       \dots)
 
 \method{npplreg}{default}(bws,
         txdat,
