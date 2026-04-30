@@ -17,8 +17,12 @@
 \usage{
 npcdensbw(\dots)
 
-\method{npcdensbw}{formula}(formula, data, subset, na.action, call, \dots)
-
+\method{npcdensbw}{formula}(formula, 
+          data, 
+          subset, 
+          na.action, 
+          call, 
+          \dots)
 
 \method{npcdensbw}{conbandwidth}(xdat = stop("data 'xdat' missing"),
           ydat = stop("data 'ydat' missing"),

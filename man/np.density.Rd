@@ -16,7 +16,8 @@
 
 }
 \usage{
-npudens(bws, \dots)
+npudens(bws, 
+        \dots)
 
 \method{npudens}{formula}(bws, 
         data = NULL, 
@@ -28,8 +29,9 @@ npudens(bws, \dots)
         edat,
         \dots)
 
-
-\method{npudens}{default}(bws, tdat, \dots)
+\method{npudens}{default}(bws, 
+        tdat, 
+        \dots)
 }
 
 \arguments{

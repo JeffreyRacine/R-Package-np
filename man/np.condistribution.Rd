@@ -17,7 +17,8 @@
 }
 
 \usage{
-npcdist(bws, \dots)
+npcdist(bws, 
+        \dots)
 
 \method{npcdist}{formula}(bws, 
         data = NULL, 
@@ -36,7 +37,11 @@ npcdist(bws, \dots)
         proper.control = list(),
         \dots)
 
-\method{npcdist}{default}(bws, txdat, tydat, nomad = FALSE, \dots)
+\method{npcdist}{default}(bws, 
+        xdat, 
+        tydat, 
+        nomad = FALSE, 
+        \dots)
 
 }
 
