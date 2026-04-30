@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# Windows builds use src/Makevars.win to link against Microsoft MPI.
+# No additional configure-time action is required on Windows.
+exit 0
