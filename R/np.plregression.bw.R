@@ -87,7 +87,8 @@ npplregbw.formula <-
     xdat <- mf.xf
     zdat <- mf[, chromoly[[3]], drop = FALSE]
 
-    tbw <- npplregbw(xdat = xdat, ydat = ydat, zdat = zdat, ...)
+    tbw <- do.call(npplregbw,
+                   c(list(xdat = xdat, ydat = ydat, zdat = zdat), list(...)))
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- match.call(expand.dots = FALSE)

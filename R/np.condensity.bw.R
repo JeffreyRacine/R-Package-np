@@ -59,7 +59,7 @@ npcdensbw.formula <-
     ydat <- mf[, variableNames[[1]], drop = FALSE]
     xdat <- mf[, variableNames[[2]], drop = FALSE]
     
-    tbw = npcdensbw(xdat = xdat, ydat = ydat, ...)
+    tbw <- do.call(npcdensbw, c(list(xdat = xdat, ydat = ydat), list(...)))
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- match.call(expand.dots = FALSE)

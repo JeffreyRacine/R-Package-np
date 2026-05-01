@@ -49,7 +49,7 @@ npregbw.formula <-
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
     
-    tbw <- npregbw(xdat = xdat, ydat = ydat, ...)
+    tbw <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat), list(...)))
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- match.call(expand.dots = FALSE)

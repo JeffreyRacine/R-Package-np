@@ -11,7 +11,29 @@
   }
 
   if (!is.null(sym) && is.environment(eval_env)) {
+    get_dot_value <- function(env) {
+      dots <- tryCatch(
+        eval(substitute(list(...)), envir = env),
+        error = function(e) not_found
+      )
+      if (identical(dots, not_found) || !is.list(dots))
+        return(not_found)
+      dot_names <- names(dots)
+      if (is.null(dot_names) || !(sym %in% dot_names))
+        return(not_found)
+      dots[[which(dot_names == sym)[1L]]]
+    }
+    eval_symbol <- function(env) {
+      tryCatch(eval(expr, envir = env), error = function(e) not_found)
+    }
+
     sym_val <- get0(sym, envir = eval_env, inherits = TRUE, ifnotfound = not_found)
+    if (!identical(sym_val, not_found))
+      return(list(ok = TRUE, value = sym_val, error = NULL))
+    sym_val <- get_dot_value(eval_env)
+    if (!identical(sym_val, not_found))
+      return(list(ok = TRUE, value = sym_val, error = NULL))
+    sym_val <- eval_symbol(eval_env)
     if (!identical(sym_val, not_found))
       return(list(ok = TRUE, value = sym_val, error = NULL))
 
@@ -26,6 +48,12 @@
         next
       if (is.environment(env_i)) {
         sym_val <- get0(sym, envir = env_i, inherits = TRUE, ifnotfound = not_found)
+        if (!identical(sym_val, not_found))
+          return(list(ok = TRUE, value = sym_val, error = NULL))
+        sym_val <- get_dot_value(env_i)
+        if (!identical(sym_val, not_found))
+          return(list(ok = TRUE, value = sym_val, error = NULL))
+        sym_val <- eval_symbol(env_i)
         if (!identical(sym_val, not_found))
           return(list(ok = TRUE, value = sym_val, error = NULL))
       }
@@ -156,9 +184,6 @@
 
   dot.names <- names(dots)
   has.named.bws <- !is.null(dot.names) && any(dot.names == "bws")
-  has.named.data <- length(data_arg_names) > 0L &&
-    !is.null(dot.names) &&
-    any(dot.names %in% data_arg_names)
 
   if (!is.null(dot.names) && any(dot.names == "formula")) {
     fval <- .np_try_eval_in_frames(dots[[which(dot.names == "formula")[1L]]], eval_env = eval_env)
@@ -166,15 +191,15 @@
       return(fval$value)
   }
 
-  if (has.named.data && !has.named.bws)
-    return(NULL)
-
   first.eval <- .np_try_eval_in_frames(dots[[1L]], eval_env = eval_env)
   if (!isTRUE(first.eval$ok))
     return(NULL)
   first.val <- first.eval$value
   if (inherits(first.val, "formula"))
     return(first.val)
+
+  if (!has.named.bws)
+    return(NULL)
 
   if (has.named.bws) {
     bval <- .np_try_eval_in_frames(dots[[which(dot.names == "bws")[1L]]], eval_env = eval_env)
