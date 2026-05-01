@@ -195,6 +195,24 @@ test_that(".np_bw_dispatch_target distinguishes formula, named-data, and bws ent
   expect_s3_class(bw.out, "rbandwidth")
 })
 
+test_that(".np_bw_dispatch_target resolves bws forwarded through dots", {
+  bw <- structure(list(), class = "conbandwidth")
+
+  forwarder <- function(...) {
+    .np_bw_dispatch_target(
+      dots = list(xdat = quote(xdat), ydat = quote(ydat), bws = quote(bws)),
+      data_arg_names = c("xdat", "ydat"),
+      eval_env = environment()
+    )
+  }
+
+  xdat <- data.frame(x = 1:3)
+  ydat <- data.frame(y = 4:6)
+  out <- forwarder(xdat = xdat, ydat = ydat, bws = bw)
+
+  expect_s3_class(out, "conbandwidth")
+})
+
 test_that(".np_bw_formula_from_call extracts the formula argument call when present", {
   out <- .np_bw_formula_from_call(quote(npregbw(y ~ x1 + x2, nmulti = 2)))
   expect_true(is.call(out))

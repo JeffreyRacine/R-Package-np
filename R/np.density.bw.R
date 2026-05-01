@@ -48,7 +48,7 @@ npudensbw.formula <-
 
     dat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
 
-    tbw <- npudensbw(dat = dat, ...)
+    tbw <- do.call(npudensbw, c(list(dat = dat), list(...)))
     tbw$call <- match.call(expand.dots = FALSE)
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula

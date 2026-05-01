@@ -16,6 +16,24 @@ test_that("bw generics route named data args without bws to NULL methods", {
   expect_s3_class(bw_dist, "dbandwidth")
 })
 
+test_that("bw generics route unnamed data args without bws to NULL methods", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260501)
+  x <- rnorm(30)
+  y <- x + rnorm(30)
+  dat <- data.frame(x = x, y = y)
+
+  bw_reg <- npregbw(x, y, regtype = "lc", bwmethod = "cv.aic", nmulti = 1)
+  bw_dens <- npudensbw(dat, bwmethod = "normal-reference")
+  bw_dist <- npudistbw(dat, bwmethod = "normal-reference")
+
+  expect_s3_class(bw_reg, "rbandwidth")
+  expect_s3_class(bw_dens, "bandwidth")
+  expect_s3_class(bw_dist, "dbandwidth")
+})
+
 test_that("bw object dispatch remains intact", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
@@ -36,6 +54,30 @@ test_that("bw object dispatch remains intact", {
   bw_dist0 <- npudistbw(dat = dat, bws = c(0.4, 0.6), bandwidth.compute = FALSE)
   bw_dist1 <- npudistbw(bws = bw_dist0, dat = dat, bandwidth.compute = FALSE)
   expect_equal(as.numeric(bw_dist1$bw), as.numeric(bw_dist0$bw))
+})
+
+test_that("formula bandwidth reuse preserves explicit bws objects", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260501)
+  n <- 30L
+  x <- rnorm(n)
+  y <- x + rnorm(n)
+  dat <- data.frame(y = y, x = x, g = factor(sample(0:1, n, TRUE)))
+
+  bw_dens0 <- npudensbw(~ x, data = dat, bwmethod = "normal-reference")
+  bw_dens1 <- npudensbw(~ x, data = dat, bws = bw_dens0,
+                        bandwidth.compute = FALSE)
+  expect_s3_class(bw_dens1, "bandwidth")
+  expect_equal(as.numeric(bw_dens1$bw), as.numeric(bw_dens0$bw))
+
+  bw_cdens0 <- npcdensbw(y ~ g, data = dat, bwtype = "fixed", nmulti = 1)
+  bw_cdens1 <- npcdensbw(y ~ g, data = dat, bws = bw_cdens0,
+                         bandwidth.compute = FALSE)
+  expect_s3_class(bw_cdens1, "conbandwidth")
+  expect_equal(as.numeric(bw_cdens1$xbw), as.numeric(bw_cdens0$xbw))
+  expect_equal(as.numeric(bw_cdens1$ybw), as.numeric(bw_cdens0$ybw))
 })
 
 test_that("formula estimator fronts tolerate omitted legacy regtype defaults", {
