@@ -21,6 +21,32 @@ cd /Users/jracine/Development
 This builds `npRmpi`, runs the shared package/gallery sync audit, and then runs
 the final tarball-first `R CMD check --as-cran`.
 
+## LAPACK/BLAS Linkage
+
+Unix MPI builds must keep MPI discovery host-specific while linking
+LAPACK/BLAS through R's portable make variables:
+
+```make
+PKG_LIBS = @PKG_LIBS@ $(ARCHLIB) $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
+```
+
+On Apple Silicon framework R 4.6 hosts, verify the local R configuration before
+release builds:
+
+```bash
+/Library/Frameworks/R.framework/Resources/bin/R CMD config FLIBS
+```
+
+For the current framework setup, `FLIBS` should resolve to:
+
+```text
+/Library/Frameworks/R.framework/Resources/lib/libgfortran.5.dylib /Library/Frameworks/R.framework/Resources/lib/libquadmath.0.dylib
+```
+
+If it instead points at stale `/opt/gfortran/...` paths, refresh the host
+`Makeconf`/user `Makevars` as described in
+`/Users/jracine/Development/SKILLS.md` before running release preflight.
+
 ## Build Tarball
 
 ```bash
