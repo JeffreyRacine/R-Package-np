@@ -10,6 +10,19 @@ cd /Users/jracine/Development
 This builds `np`, runs the shared package/gallery sync audit, and then runs the
 final tarball-first `R CMD check --as-cran`.
 
+For CRAN-ready release claims, use the hardened revdep-aware release gate
+instead of relying on `release_preflight.sh` alone:
+
+```bash
+cd /Users/jracine/Development
+./release_protocol/run_np_release_gate.sh
+```
+
+This gate builds from source, installs into a private library, runs installed
+smokes, runs tarball-first `R CMD check --as-cran`, inventories CRAN reverse
+dependencies, and can run the focused revdep checks required after the
+2026-05-01 bandwidth-dispatch compatibility regression.
+
 ## LAPACK/BLAS Linkage
 
 Unix builds must link through R's portable make variables, not host-specific
@@ -81,6 +94,11 @@ cd /Users/jracine/Development
 VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-master/DESCRIPTION)
 R CMD check --as-cran "np_${VERSION}.tar.gz"
 ```
+
+If a change touches formula interfaces, `...` forwarding, bandwidth
+constructors, compatibility dispatch helpers, exported defaults, warning/error
+contracts, estimator semantics, or object structure, run the revdep-aware
+release gate and focused revdep lane before submission.
 
 ## Release-Surface Audit
 

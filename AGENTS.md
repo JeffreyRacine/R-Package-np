@@ -9,6 +9,13 @@ Repo-specific note:
 - For regression bandwidth summary work, keep `num.feval` and `num.feval.fast` semantics aligned with `np-npRmpi`.
 - Keep kernel discoverability docs aligned via `man/np.kernels.Rd` and cross-links in method `.Rd` pages.
 - `npRmpi` parity ports from `np-master` must preserve `npRmpi` runtime independence: no runtime `np::` bridge calls and no silent serial fallback in MPI-selected plot/bootstrap/helper paths.
+- Release-hardening reminder: the 2026-05-01 CRAN pretest caught a real
+  `np` reverse-dependency regression in bandwidth-dispatch compatibility after
+  local checks passed. Any change to formula wrappers, `...` forwarding,
+  bandwidth-constructor dispatch, call materialization, or compatibility
+  helpers must be validated through the revdep-aware release gate in
+  `/Users/jracine/Development/release_protocol`, including the current
+  CRAN-flagged focused revdep set until retired by a later gate note.
 
 ## Rd Documentation Campaign Policy (2026-04-28)
 
