@@ -21,7 +21,9 @@ cd /Users/jracine/Development
 This gate builds from source, installs into a private library, runs installed
 smokes, runs tarball-first `R CMD check --as-cran`, inventories CRAN reverse
 dependencies, and can run the focused revdep checks required after the
-2026-05-01 bandwidth-dispatch compatibility regression.
+2026-05-01 bandwidth-dispatch compatibility regression. It also runs the
+containerized `rchk` native-code protection check when feasible
+(`RUN_RCHK=auto` by default).
 
 ## LAPACK/BLAS Linkage
 
@@ -99,6 +101,18 @@ If a change touches formula interfaces, `...` forwarding, bandwidth
 constructors, compatibility dispatch helpers, exported defaults, warning/error
 contracts, estimator semantics, or object structure, run the revdep-aware
 release gate and focused revdep lane before submission.
+
+If a change touches `src/`, registered native interfaces, or code that changes
+the shape/lifetime of objects passed to `.C`, `.Call`, or `.Fortran`, require
+local `rchk` proof when infrastructure is available:
+
+```bash
+cd /Users/jracine/Development
+RUN_RCHK=1 ./release_protocol/run_np_release_gate.sh
+```
+
+Use `RUN_RCHK=auto` for ordinary full release rehearsal; it records a precise
+`SKIP` when Docker/rchk infrastructure is unavailable.
 
 ## Release-Surface Audit
 

@@ -16,6 +16,11 @@ Repo-specific note:
   helpers must be validated through the revdep-aware release gate in
   `/Users/jracine/Development/release_protocol`, including the current
   CRAN-flagged focused revdep set until retired by a later gate note.
+- Native-code release-hardening reminder: for changes touching `src/`,
+  registered native interfaces, or `.C`/`.Call`/`.Fortran` payload lifetimes,
+  run the release gate with `RUN_RCHK=1` when container infrastructure is
+  available. `RUN_RCHK=auto` is acceptable for ordinary rehearsal only if the
+  resulting summary records either PASS or a precise SKIP reason.
 
 ## Rd Documentation Campaign Policy (2026-04-28)
 
