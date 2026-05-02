@@ -33,7 +33,9 @@ This gate builds from source, installs into a private library, verifies startup
 and vignette discovery, runs installed namespace and MPI smokes, runs
 tarball-first `R CMD check --as-cran`, and records the CRAN reverse-dependency
 inventory. It is the `npRmpi` counterpart to the protocol hardened after the
-2026-05-01 `np` bandwidth-dispatch compatibility regression.
+2026-05-01 `np` bandwidth-dispatch compatibility regression. It also runs the
+containerized `rchk` native-code protection check when feasible
+(`RUN_RCHK=auto` by default).
 
 ## LAPACK/BLAS Linkage
 
@@ -112,6 +114,21 @@ constructors, compatibility dispatch helpers, MPI materialization of those
 surfaces, exported defaults, warning/error contracts, estimator semantics, or
 object structure, run the revdep-aware release gate and relevant MPI smoke
 lanes before submission.
+
+If a change touches `src/`, registered native interfaces, MPI/native bridge
+payloads, or code that changes the shape/lifetime of objects passed to `.C`,
+`.Call`, or `.Fortran`, require local `rchk` proof when infrastructure is
+available:
+
+```bash
+cd /Users/jracine/Development
+RUN_RCHK=1 ./release_protocol/run_npRmpi_release_gate.sh
+```
+
+Use `RUN_RCHK=auto` for ordinary full release rehearsal; it records a precise
+`SKIP` when Docker/rchk infrastructure is unavailable. If the generic rchk
+container lacks MPI headers or MPI build tooling, classify that as an
+infrastructure SKIP under `auto`, not as package-code proof.
 
 ## Release-Surface Audit
 

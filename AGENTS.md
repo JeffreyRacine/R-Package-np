@@ -25,6 +25,13 @@ Repo-specific note:
   or MPI materialization of those surfaces must be validated through the
   revdep-aware release gate in `/Users/jracine/Development/release_protocol`
   plus the relevant `npRmpi` installed/MPI smoke gates.
+- Native-code release-hardening reminder: for changes touching `src/`,
+  registered native interfaces, MPI/native bridge payloads, or
+  `.C`/`.Call`/`.Fortran` payload lifetimes, run the release gate with
+  `RUN_RCHK=1` when container/MPI infrastructure is available. `RUN_RCHK=auto`
+  is acceptable for ordinary rehearsal only if the resulting summary records
+  either PASS or a precise SKIP reason, including missing MPI tooling in the
+  rchk container when applicable.
 - Demo execution contract (`np-npRmpi/demo`):
   - treat `demo/makefile` as launcher source of truth for attach/profile;
   - run from `demo` subdirectories (`serial`, `n_*_attach`, `n_*_profile`) using `make -f ../makefile ...`;
