@@ -21,6 +21,20 @@ cd /Users/jracine/Development
 This builds `npRmpi`, runs the shared package/gallery sync audit, and then runs
 the final tarball-first `R CMD check --as-cran`.
 
+For CRAN-ready release claims, use the hardened revdep-aware release gate
+instead of relying on `release_preflight.sh` alone:
+
+```bash
+cd /Users/jracine/Development
+./release_protocol/run_npRmpi_release_gate.sh
+```
+
+This gate builds from source, installs into a private library, verifies startup
+and vignette discovery, runs installed namespace and MPI smokes, runs
+tarball-first `R CMD check --as-cran`, and records the CRAN reverse-dependency
+inventory. It is the `npRmpi` counterpart to the protocol hardened after the
+2026-05-01 `np` bandwidth-dispatch compatibility regression.
+
 ## LAPACK/BLAS Linkage
 
 Unix MPI builds must keep MPI discovery host-specific while linking
@@ -92,6 +106,12 @@ cd /Users/jracine/Development
 VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-npRmpi/DESCRIPTION)
 R CMD check --as-cran "npRmpi_${VERSION}.tar.gz"
 ```
+
+If a change touches formula interfaces, `...` forwarding, bandwidth
+constructors, compatibility dispatch helpers, MPI materialization of those
+surfaces, exported defaults, warning/error contracts, estimator semantics, or
+object structure, run the revdep-aware release gate and relevant MPI smoke
+lanes before submission.
 
 ## Release-Surface Audit
 

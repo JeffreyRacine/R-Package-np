@@ -17,6 +17,14 @@ Repo-specific note:
 - Keep shared regression summary telemetry in sync with `np-master`: `num.feval`, `num.feval.fast`.
 - Keep `man/np.kernels.Rd` and kernel/options/plot cross-links aligned, while preserving package-specific `npRmpi` docs text.
 - Runtime contract: `npRmpi` must never call serial `np` estimator/plot/bootstrap/helper code paths and must not silently fall back to serial execution when MPI mode is selected.
+- Release-hardening reminder: the 2026-05-01 CRAN pretest caught a real
+  `np` reverse-dependency regression in bandwidth-dispatch compatibility after
+  local checks passed. Matching compatibility repairs were mirrored to
+  `npRmpi`. Any change to formula wrappers, `...` forwarding,
+  bandwidth-constructor dispatch, call materialization, compatibility helpers,
+  or MPI materialization of those surfaces must be validated through the
+  revdep-aware release gate in `/Users/jracine/Development/release_protocol`
+  plus the relevant `npRmpi` installed/MPI smoke gates.
 - Demo execution contract (`np-npRmpi/demo`):
   - treat `demo/makefile` as launcher source of truth for attach/profile;
   - run from `demo` subdirectories (`serial`, `n_*_attach`, `n_*_profile`) using `make -f ../makefile ...`;
