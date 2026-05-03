@@ -267,6 +267,35 @@ int np_mpi_local_regression_active(void)
 {
   return np_mpi_local_regression_mode;
 }
+
+#ifdef MPI2
+static void np_mpi_local_regression_enter_internal(void)
+{
+  if (np_mpi_local_regression_mode)
+    return;
+
+  np_mpi_local_regression_saved_rank = my_rank;
+  np_mpi_local_regression_saved_nproc = iNum_Processors;
+  np_mpi_local_regression_saved_comm1 = comm[1];
+  comm[1] = MPI_COMM_SELF;
+  my_rank = 0;
+  iNum_Processors = 1;
+  np_mpi_local_regression_mode = 1;
+}
+
+static void np_mpi_local_regression_leave_internal(void)
+{
+  if (!np_mpi_local_regression_mode)
+    return;
+
+  if (np_mpi_local_regression_saved_comm1 != MPI_COMM_NULL)
+    comm[1] = np_mpi_local_regression_saved_comm1;
+  my_rank = np_mpi_local_regression_saved_rank;
+  iNum_Processors = np_mpi_local_regression_saved_nproc;
+  np_mpi_local_regression_saved_comm1 = MPI_COMM_NULL;
+  np_mpi_local_regression_mode = 0;
+}
+#endif
 int int_cxker_bound_extern=0;
 int int_cyker_bound_extern=0;
 int int_cxyker_bound_extern=0;
@@ -1472,22 +1501,10 @@ SEXP C_np_set_local_regression_mode(SEXP active)
     error("C_np_set_local_regression_mode: 'active' must be TRUE or FALSE");
 
 #ifdef MPI2
-  if (requested && !np_mpi_local_regression_mode) {
-    np_mpi_local_regression_saved_rank = my_rank;
-    np_mpi_local_regression_saved_nproc = iNum_Processors;
-    np_mpi_local_regression_saved_comm1 = comm[1];
-    comm[1] = MPI_COMM_SELF;
-    my_rank = 0;
-    iNum_Processors = 1;
-    np_mpi_local_regression_mode = 1;
-  } else if (!requested && np_mpi_local_regression_mode) {
-    if (np_mpi_local_regression_saved_comm1 != MPI_COMM_NULL)
-      comm[1] = np_mpi_local_regression_saved_comm1;
-    my_rank = np_mpi_local_regression_saved_rank;
-    iNum_Processors = np_mpi_local_regression_saved_nproc;
-    np_mpi_local_regression_saved_comm1 = MPI_COMM_NULL;
-    np_mpi_local_regression_mode = 0;
-  }
+  if (requested)
+    np_mpi_local_regression_enter_internal();
+  else
+    np_mpi_local_regression_leave_internal();
 #else
   np_mpi_local_regression_mode = requested ? 1 : 0;
 #endif
@@ -9558,13 +9575,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
 #ifdef MPI2
     if(lp_owner_blocks){
-      np_mpi_local_regression_saved_rank = my_rank;
-      np_mpi_local_regression_saved_nproc = iNum_Processors;
-      np_mpi_local_regression_saved_comm1 = comm[1];
-      comm[1] = MPI_COMM_SELF;
-      my_rank = 0;
-      iNum_Processors = 1;
-      np_mpi_local_regression_mode = 1;
+      np_mpi_local_regression_enter_internal();
     }
 #endif
 
@@ -9714,12 +9725,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     if(lp_owner_blocks){
       int lp_local_fail = (status != 0);
       int lp_any_fail = 0;
-      if(np_mpi_local_regression_saved_comm1 != MPI_COMM_NULL)
-        comm[1] = np_mpi_local_regression_saved_comm1;
-      my_rank = np_mpi_local_regression_saved_rank;
-      iNum_Processors = np_mpi_local_regression_saved_nproc;
-      np_mpi_local_regression_saved_comm1 = MPI_COMM_NULL;
-      np_mpi_local_regression_mode = 0;
+      np_mpi_local_regression_leave_internal();
 
       MPI_Allreduce(&lp_local_fail, &lp_any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
       if(lp_any_fail){
