@@ -20007,6 +20007,7 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
   const int num_eval = num_obs_eval_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(), MAX(1, num_train));
   double **xblock = NULL, **yintblock = NULL;
+  double *fit_cross = NULL;
   int i0, j0, ii, jj;
   int status = 1;
 
@@ -20022,9 +20023,10 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
      (int_TREE_Y == NP_TREE_TRUE))
     return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
 
-  xblock = alloc_matd(num_train, block_size);
-  yintblock = alloc_matd(num_train, block_size);
-  if((xblock == NULL) || (yintblock == NULL))
+  xblock = alloc_tmatd(num_train, block_size);
+  yintblock = alloc_tmatd(num_train, block_size);
+  fit_cross = alloc_vecd(block_size*block_size);
+  if((xblock == NULL) || (yintblock == NULL) || (fit_cross == NULL))
     goto cleanup_cdist_lp_block;
 
   *cv = 0.0;
@@ -20049,9 +20051,9 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
                                                     yintblock) != 0)
         goto cleanup_cdist_lp_block;
 
+      np_blas_dgemm_tn_int(ib, jb, num_train, xblock[0], yintblock[0], fit_cross);
       for(ii = 0; ii < ib; ii++){
         const int train_i = i0 + ii;
-        double * const ai = xblock[ii];
 
         for(jj = 0; jj < jb; jj++){
           const int eval_j = j0 + jj;
@@ -20061,7 +20063,7 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
           if(cdfontrain_extern && (train_i == eval_j))
             continue;
 
-          fit = np_blas_ddot_int(num_train, ai, yintblock[jj]);
+          fit = fit_cross[ii + jj*ib];
           indy = np_conditional_indicator_row_core(train_i,
                                                    eval_j,
                                                    cdfontrain_extern,
@@ -20086,8 +20088,9 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
   status = 0;
 
 cleanup_cdist_lp_block:
-  if(xblock != NULL) free_mat(xblock, block_size);
-  if(yintblock != NULL) free_mat(yintblock, block_size);
+  if(xblock != NULL) free_tmat(xblock);
+  if(yintblock != NULL) free_tmat(yintblock);
+  if(fit_cross != NULL) free(fit_cross);
   np_glp_cv_clear_extern();
   return status;
 }
