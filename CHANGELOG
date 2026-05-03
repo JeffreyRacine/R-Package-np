@@ -1,5 +1,17 @@
 Changes from Version 0.70-1 to 0.70-2 [03-May-2026]
 
+* Restored MPI-aware fixed-bandwidth `npcdens` and `npcdist` fitting,
+  evaluation, and prediction in profile/manual-broadcast mode for conditional
+  LC and LP routes, including standard errors, gradients, and gradient
+  standard errors where requested; fitted/evaluation fields remain numerically
+  identical to the prior implementation, with only harmless density
+  log-likelihood summation-order differences.
+
+* Allowed `npscoef` internal moment sums to use the MPI-aware `npksum()` route
+  instead of forcing local execution, preserving adaptive-nearest-neighbor
+  localization while removing avoidable duplicate work in fit/eval/predict
+  paths.
+
 * Collapsed the `npreg` `regtype="ll"` execution engine onto the canonical
   `regtype="lp", degree=1` local-polynomial path while preserving public `ll`
   metadata and fitted/evaluation output parity, aligning `npreg` with the
