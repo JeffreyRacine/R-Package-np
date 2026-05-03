@@ -23579,6 +23579,195 @@ double * log_likelihood
   free_mat(matrix_bandwidth_X, num_X_continuous);
 }
 
+static double **np_conditional_subset_eval_matrix(double **src,
+                                                  const int nvar,
+                                                  const int start,
+                                                  const int nloc){
+  double **out = NULL;
+  int i, l;
+
+  if(nvar <= 0)
+    return NULL;
+  out = alloc_matd(MAX(1, nloc), nvar);
+  if(out == NULL)
+    return NULL;
+  for(l = 0; l < nvar; l++)
+    for(i = 0; i < nloc; i++)
+      out[l][i] = src[l][start + i];
+  return out;
+}
+
+int np_kernel_estimate_con_dens_dist_categorical_owner_blocks(
+int KERNEL_Y,
+int KERNEL_unordered_Y,
+int KERNEL_ordered_Y,
+int KERNEL_X,
+int KERNEL_unordered_X,
+int KERNEL_ordered_X,
+int BANDWIDTH_den,
+int yop,
+int num_obs_train,
+int num_obs_eval,
+int num_Y_unordered,
+int num_Y_ordered,
+int num_Y_continuous,
+int num_X_unordered,
+int num_X_ordered,
+int num_X_continuous,
+double **matrix_XY_unordered_train,
+double **matrix_XY_ordered_train,
+double **matrix_XY_continuous_train,
+double **matrix_XY_unordered_eval,
+double **matrix_XY_ordered_eval,
+double **matrix_XY_continuous_eval,
+double *vector_scale_factor,
+int *num_categories,
+int *num_categories_XY,
+double ** matrix_categorical_vals,
+double ** matrix_categorical_vals_XY,
+double * kdf,
+double * kdf_stderr,
+double ** kdf_deriv,
+double ** kdf_deriv_stderr,
+double * log_likelihood
+){
+#ifdef MPI2
+  int *counts = NULL, *displs = NULL;
+  double **eval_uno = NULL, **eval_ord = NULL, **eval_con = NULL;
+  double *kdf_local = NULL, *stderr_local = NULL;
+  double local_log_likelihood = 0.0;
+  int start, stop, nloc, r, status = 1;
+
+  if((kdf_deriv != NULL) || (kdf_deriv_stderr != NULL))
+    return 1;
+  if((BANDWIDTH_den != BW_FIXED) || (num_obs_eval <= 0) || (iNum_Processors <= 1) ||
+     np_mpi_local_regression_active())
+    return 1;
+
+  counts = (int *)malloc((size_t)iNum_Processors*sizeof(int));
+  displs = (int *)malloc((size_t)iNum_Processors*sizeof(int));
+  if((counts == NULL) || (displs == NULL))
+    goto cleanup_owner_blocks;
+
+  for(r = 0; r < iNum_Processors; r++){
+    const int r_start = (int)(((int64_t)num_obs_eval * (int64_t)r) / (int64_t)iNum_Processors);
+    const int r_stop = (int)(((int64_t)num_obs_eval * (int64_t)(r + 1)) / (int64_t)iNum_Processors);
+    displs[r] = r_start;
+    counts[r] = r_stop - r_start;
+  }
+
+  start = displs[my_rank];
+  nloc = counts[my_rank];
+  stop = start + nloc;
+  (void)stop;
+
+  kdf_local = (double *)calloc((size_t)MAX(1, nloc), sizeof(double));
+  stderr_local = (double *)calloc((size_t)MAX(1, nloc), sizeof(double));
+  if((kdf_local == NULL) || (stderr_local == NULL))
+    goto cleanup_owner_blocks;
+
+  eval_uno = np_conditional_subset_eval_matrix(matrix_XY_unordered_eval,
+                                               num_X_unordered + num_Y_unordered,
+                                               start,
+                                               nloc);
+  eval_ord = np_conditional_subset_eval_matrix(matrix_XY_ordered_eval,
+                                               num_X_ordered + num_Y_ordered,
+                                               start,
+                                               nloc);
+  eval_con = np_conditional_subset_eval_matrix(matrix_XY_continuous_eval,
+                                               num_X_continuous + num_Y_continuous,
+                                               start,
+                                               nloc);
+  if(((num_X_unordered + num_Y_unordered) > 0 && eval_uno == NULL) ||
+     ((num_X_ordered + num_Y_ordered) > 0 && eval_ord == NULL) ||
+     ((num_X_continuous + num_Y_continuous) > 0 && eval_con == NULL))
+    goto cleanup_owner_blocks;
+
+  if(nloc > 0){
+    np_kernel_estimate_con_dens_dist_categorical(KERNEL_Y,
+                                                 KERNEL_unordered_Y,
+                                                 KERNEL_ordered_Y,
+                                                 KERNEL_X,
+                                                 KERNEL_unordered_X,
+                                                 KERNEL_ordered_X,
+                                                 BANDWIDTH_den,
+                                                 yop,
+                                                 num_obs_train,
+                                                 nloc,
+                                                 num_Y_unordered,
+                                                 num_Y_ordered,
+                                                 num_Y_continuous,
+                                                 num_X_unordered,
+                                                 num_X_ordered,
+                                                 num_X_continuous,
+                                                 matrix_XY_unordered_train,
+                                                 matrix_XY_ordered_train,
+                                                 matrix_XY_continuous_train,
+                                                 eval_uno,
+                                                 eval_ord,
+                                                 eval_con,
+                                                 vector_scale_factor,
+                                                 num_categories,
+                                                 num_categories_XY,
+                                                 matrix_categorical_vals,
+                                                 matrix_categorical_vals_XY,
+                                                 kdf_local,
+                                                 stderr_local,
+                                                 NULL,
+                                                 NULL,
+                                                 &local_log_likelihood);
+  }
+
+  MPI_Allgatherv(kdf_local,
+                 nloc,
+                 MPI_DOUBLE,
+                 kdf,
+                 counts,
+                 displs,
+                 MPI_DOUBLE,
+                 comm[1]);
+  MPI_Allgatherv(stderr_local,
+                 nloc,
+                 MPI_DOUBLE,
+                 kdf_stderr,
+                 counts,
+                 displs,
+                 MPI_DOUBLE,
+                 comm[1]);
+  MPI_Allreduce(&local_log_likelihood,
+                log_likelihood,
+                1,
+                MPI_DOUBLE,
+                MPI_SUM,
+                comm[1]);
+  status = 0;
+
+cleanup_owner_blocks:
+  if(eval_uno != NULL) free_mat(eval_uno, num_X_unordered + num_Y_unordered);
+  if(eval_ord != NULL) free_mat(eval_ord, num_X_ordered + num_Y_ordered);
+  if(eval_con != NULL) free_mat(eval_con, num_X_continuous + num_Y_continuous);
+  if(kdf_local != NULL) free(kdf_local);
+  if(stderr_local != NULL) free(stderr_local);
+  if(counts != NULL) free(counts);
+  if(displs != NULL) free(displs);
+  return status;
+#else
+  (void)KERNEL_Y; (void)KERNEL_unordered_Y; (void)KERNEL_ordered_Y;
+  (void)KERNEL_X; (void)KERNEL_unordered_X; (void)KERNEL_ordered_X;
+  (void)BANDWIDTH_den; (void)yop; (void)num_obs_train; (void)num_obs_eval;
+  (void)num_Y_unordered; (void)num_Y_ordered; (void)num_Y_continuous;
+  (void)num_X_unordered; (void)num_X_ordered; (void)num_X_continuous;
+  (void)matrix_XY_unordered_train; (void)matrix_XY_ordered_train;
+  (void)matrix_XY_continuous_train; (void)matrix_XY_unordered_eval;
+  (void)matrix_XY_ordered_eval; (void)matrix_XY_continuous_eval;
+  (void)vector_scale_factor; (void)num_categories; (void)num_categories_XY;
+  (void)matrix_categorical_vals; (void)matrix_categorical_vals_XY;
+  (void)kdf; (void)kdf_stderr; (void)kdf_deriv; (void)kdf_deriv_stderr;
+  (void)log_likelihood;
+  return 1;
+#endif
+}
+
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered,
                            const int num_var_ordered,
                            const int num_var_continuous,
