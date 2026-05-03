@@ -3699,6 +3699,8 @@ SEXP C_np_regression(SEXP tuno,
   PROTECT(out_g = allocVector(REALSXP, gsize));
   PROTECT(out_gerr = allocVector(REALSXP, gsize));
   PROTECT(out_xtra = allocVector(REALSXP, 6));
+  for(R_xlen_t ii = 0; ii < gsize; ii++)
+    REAL(out_gerr)[ii] = 0.0;
 
   np_regression(REAL(tuno_r), REAL(tord_r), REAL(tcon_r), REAL(ty_r),
                 REAL(euno_r), REAL(eord_r), REAL(econ_r), REAL(ey_r),

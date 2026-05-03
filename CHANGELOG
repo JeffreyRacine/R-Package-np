@@ -1,5 +1,10 @@
 Changes from Version 0.70-1 to 0.70-2 [03-May-2026]
 
+* Collapsed the `npreg` `regtype="ll"` execution engine onto the canonical
+  `regtype="lp", degree=1` local-polynomial path while preserving public `ll`
+  metadata and fitted/evaluation output parity, aligning `npreg` with the
+  other conditional estimator families.
+
 * Restored MPI-aware fixed-bandwidth `npreg` fitting and evaluation for the
   continuous `lc`, `ll`, and `lp` routes, including gradients and standard
   errors where defined, so the fit stage again distributes owner rows across

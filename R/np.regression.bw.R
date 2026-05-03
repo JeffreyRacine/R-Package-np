@@ -244,6 +244,14 @@ npregbw.rbandwidth <-
                                           ncon = tbw$ncon)
     tbw$bernstein.basis <- npValidateGlpBernstein(regtype = tbw$regtype,
                                                 bernstein.basis = tbw$bernstein.basis)
+    reg.spec <- npCanonicalConditionalRegSpec(
+      regtype = tbw$regtype,
+      basis = tbw$basis,
+      degree = tbw$degree,
+      bernstein.basis = tbw$bernstein.basis,
+      ncon = tbw$ncon,
+      where = "npregbw"
+    )
 
     mysd <- EssDee(rcon)
     nconfac <- nrow^(-1.0/(2.0*bws$ckerorder+bws$ncon))
@@ -252,15 +260,15 @@ npregbw.rbandwidth <-
     invalid.penalty <- match.arg(invalid.penalty)
     penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
 
-    reg.c <- npRegtypeToC(regtype = tbw$regtype,
-                          degree = tbw$degree,
+    reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
+                          degree = reg.spec$degree.engine,
                           ncon = tbw$ncon,
                           context = "npregbw")
     npCheckRegressionDesignCondition(reg.code = reg.c$code,
                                      xcon = rcon,
-                                     basis = tbw$basis,
-                                     degree = tbw$degree,
-                                     bernstein.basis = tbw$bernstein.basis,
+                                     basis = reg.spec$basis.engine,
+                                     degree = reg.spec$degree.engine,
+                                     bernstein.basis = reg.spec$bernstein.basis.engine,
                                      where = "npregbw")
     degree.c <- if (tbw$ncon > 0) {
       as.integer(if (is.null(reg.c$degree)) rep.int(0L, tbw$ncon) else reg.c$degree)
@@ -333,8 +341,8 @@ npregbw.rbandwidth <-
               as.integer(penalty_mode),
               as.double(penalty.multiplier),
               as.integer(degree.c),
-              as.integer(isTRUE(tbw$bernstein.basis)),
-              as.integer(npLpBasisCode(tbw$basis)),
+              as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+              as.integer(npLpBasisCode(reg.spec$basis.engine)),
               as.double(cker.bounds.c$lb),
               as.double(cker.bounds.c$ub),
               PACKAGE = "npRmpi"))[1]
@@ -534,11 +542,19 @@ npregbw.rbandwidth <-
   ncatfac <- nrow^(-2.0 / (2.0 * bws$ckerorder + bws$ncon))
 
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
-  reg.c <- npRegtypeToC(regtype = bws$regtype,
-                        degree = bws$degree,
+  reg.spec <- npCanonicalConditionalRegSpec(
+    regtype = bws$regtype,
+    basis = bws$basis,
+    degree = bws$degree,
+    bernstein.basis = bws$bernstein.basis,
+    ncon = bws$ncon,
+    where = "npregbw"
+  )
+  reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
+                        degree = reg.spec$degree.engine,
                         ncon = bws$ncon,
                         context = "npregbw")
-  degree.c <- if (bws$ncon > 0) as.integer(bws$degree) else integer(1L)
+  degree.c <- if (bws$ncon > 0) as.integer(reg.spec$degree.engine) else integer(1L)
   nmulti <- as.integer(nmulti[1L])
 
   myopti <- list(
@@ -618,8 +634,8 @@ npregbw.rbandwidth <-
       as.integer(penalty_mode),
       as.double(penalty.multiplier),
       as.integer(degree.c),
-      as.integer(isTRUE(bws$bernstein.basis)),
-      as.integer(npLpBasisCode(bws$basis)),
+      as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+      as.integer(npLpBasisCode(reg.spec$basis.engine)),
       as.double(cker.bounds.c$lb),
       as.double(cker.bounds.c$ub),
       PACKAGE = "npRmpi"
@@ -639,8 +655,8 @@ npregbw.rbandwidth <-
       as.integer(penalty_mode),
       as.double(penalty.multiplier),
       as.integer(degree.c),
-      as.integer(isTRUE(bws$bernstein.basis)),
-      as.integer(npLpBasisCode(bws$basis)),
+      as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+      as.integer(npLpBasisCode(reg.spec$basis.engine)),
       as.double(cker.bounds.c$lb),
       as.double(cker.bounds.c$ub),
       PACKAGE = "npRmpi"
@@ -1040,11 +1056,19 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   )
 
   penalty_mode <- if (match.arg(invalid.penalty) == "baseline") 1L else 0L
-  reg.c <- npRegtypeToC(regtype = bws$regtype,
-                        degree = bws$degree,
+  reg.spec <- npCanonicalConditionalRegSpec(
+    regtype = bws$regtype,
+    basis = bws$basis,
+    degree = bws$degree,
+    bernstein.basis = bws$bernstein.basis,
+    ncon = bws$ncon,
+    where = "npregbw"
+  )
+  reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
+                        degree = reg.spec$degree.engine,
                         ncon = bws$ncon,
                         context = "npregbw")
-  degree.c <- if (bws$ncon > 0) as.integer(bws$degree) else integer(0L)
+  degree.c <- if (bws$ncon > 0) as.integer(reg.spec$degree.engine) else integer(0L)
 
   myopti <- list(
     num_obs_train = nrow,
@@ -1125,8 +1149,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     penalty_mode = as.integer(penalty_mode),
     penalty_multiplier = as.double(penalty.multiplier),
     degree = as.integer(degree.c),
-    bernstein = as.integer(isTRUE(bws$bernstein.basis)),
-    basis = as.integer(npLpBasisCode(bws$basis)),
+    bernstein = as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+    basis = as.integer(npLpBasisCode(reg.spec$basis.engine)),
     ckerlb = as.double(cker.bounds.c$lb),
     ckerub = as.double(cker.bounds.c$ub)
   )
