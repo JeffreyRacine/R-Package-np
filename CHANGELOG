@@ -1,4 +1,10 @@
-Changes from Version 0.70-1 to 0.70-2 [02-May-2026]
+Changes from Version 0.70-1 to 0.70-2 [03-May-2026]
+
+* Reblocked conditional density and conditional distribution local-polynomial
+  `cv.ls` block products to use BLAS matrix multiplication in the fixed
+  bandwidth block routes, materially reducing repeated long inner-product
+  work while preserving numerical results up to floating-point summation
+  order.
 
 * Opened the next development cycle after the 0.70-1 CRAN submission, with
   release-hardening follow-up tracked separately.
