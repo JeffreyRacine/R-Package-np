@@ -605,11 +605,11 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       }
     }
 
-    local_npksum <- function(args) {
-      .npRmpi_with_local_regression(do.call(npksum, args))
+    moment_npksum <- function(args) {
+      do.call(npksum, args)
     }
-    lp1_local_npksum <- function(...) {
-      local_npksum(list(...))
+    lp1_moment_npksum <- function(...) {
+      moment_npksum(list(...))
     }
 
     lc_moments <- function(z.eval, leave.one.out.eval, u2 = NULL) {
@@ -624,7 +624,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       )
       if (!leave.one.out.eval && !is.null(z.eval))
         ksum.args$exdat <- z.eval
-      main.ks <- local_npksum(ksum.args)$ksum
+      main.ks <- moment_npksum(ksum.args)$ksum
       tyw.out <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw.out)) == 3L)
         dim(tyw.out) <- c(dim(tyw.out)[1L], dim(tyw.out)[3L])
@@ -643,7 +643,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         )
         if (!leave.one.out.eval && !is.null(z.eval))
           cov.args$exdat <- z.eval
-        s.out <- local_npksum(cov.args)$ksum
+        s.out <- moment_npksum(cov.args)$ksum
       }
 
       list(tyw = tyw.out, tww = tww.out, s = s.out)
@@ -687,7 +687,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         bws = bws,
         bandwidth.divide = TRUE
       )
-      main.ks <- local_npksum(ksum.args)$ksum
+      main.ks <- moment_npksum(ksum.args)$ksum
       out <- list(
         tyw = as.double(main.ks[-1L, 1L, 1L]),
         tww = main.ks[-1L, -1L, 1L, drop = TRUE]
@@ -703,7 +703,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
           bandwidth.divide = TRUE,
           kernel.pow = 2
         )
-        out$s <- local_npksum(cov.args)$ksum[, , 1L, drop = TRUE]
+        out$s <- moment_npksum(cov.args)$ksum[, , 1L, drop = TRUE]
       } else {
         out$s <- NULL
       }
@@ -724,7 +724,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       )
       if (!state$leave.one.out)
         ksum.args$exdat <- state$z.eval
-      main.ks <- local_npksum(ksum.args)$ksum
+      main.ks <- moment_npksum(ksum.args)$ksum
       tyw.out <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw.out)) == 3L)
         dim(tyw.out) <- c(dim(tyw.out)[1L], dim(tyw.out)[3L])
@@ -743,7 +743,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         )
         if (!state$leave.one.out)
           cov.args$exdat <- state$z.eval
-        s.out <- local_npksum(cov.args)$ksum
+        s.out <- moment_npksum(cov.args)$ksum
       }
 
       list(tyw = tyw.out, tww = tww.out, s = s.out)
@@ -774,7 +774,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         leave.one.out = leave.one.out,
         where = "npscoef",
         solver = solve_single_moment_system,
-        ksum_fun = lp1_local_npksum
+        ksum_fun = lp1_moment_npksum
       )
       if (!is.null(fit.progress.step))
         fit.progress.step("solving global coefficients")
@@ -823,13 +823,13 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
         for (j in seq_len(n.part)) {
           partial <- W[,j] * coef.mat[j,] + resid
 
-          twww <- .npRmpi_with_local_regression(npksum(
+          twww <- npksum(
             txdat=tzdat,
             tydat=cbind(partial * W[,j],W[,j]^2),
             weights=cbind(partial * W[,j],1),
             bws=bws,
             leave.one.out=leave.one.out
-          ))$ksum
+          )$ksum
 
           coef.mat[j,] <- twww[1,2,]/NZD(twww[2,2,])
           resid <- partial - W[,j] * coef.mat[j,]
@@ -905,7 +905,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
               leave.one.out = leave.one.out,
               where = "npscoef",
               solver = solve_single_moment_system,
-              ksum_fun = lp1_local_npksum
+              ksum_fun = lp1_moment_npksum
             )
             mean.fit <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop = FALSE] %*% train.fast$coef[,i] })
           }
@@ -921,7 +921,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
             leave.one.out = leave.one.out,
             where = "npscoef",
             solver = solve_single_moment_system,
-            ksum_fun = lp1_local_npksum
+            ksum_fun = lp1_moment_npksum
           )$s
           if (!is.null(fit.progress.step))
             fit.progress.step("estimating standard errors")
