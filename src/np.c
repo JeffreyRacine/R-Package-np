@@ -9449,12 +9449,34 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     double **yuno_eval_one = NULL, **yord_eval_one = NULL, **ycon_eval_one = NULL;
     double **grad_one = NULL, **graderr_one = NULL;
     int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL, *operator_y = NULL;
+    const char *lp_error = NULL;
     double RS = 0.0, MSE = 0.0, MAE = 0.0, MAPE = 0.0, CORR = 0.0, SIGN = 0.0;
     int num_y_vars = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
     int num_x_vars = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+    int lp_loop_start = 0;
+    int lp_loop_stop = num_obs_eval_extern;
+#ifdef MPI2
+    int lp_owner_blocks = 0;
+#endif
 
 #ifdef MPI2
     lp_eval_alloc = MAX((int)ceil(1.0 / (double)iNum_Processors), 1) * iNum_Processors;
+    lp_owner_blocks = (iNum_Processors > 1) && !np_mpi_local_regression_active();
+    if(lp_owner_blocks){
+      const int lp_stride = MAX((int)ceil((double)num_obs_eval_extern / (double)iNum_Processors), 1);
+      lp_loop_start = MIN(num_obs_eval_extern, my_rank * lp_stride);
+      lp_loop_stop = MIN(num_obs_eval_extern, lp_loop_start + lp_stride);
+      for(i = 0; i < num_obs_eval_extern; i++){
+        pdf[i] = 0.0;
+        pdf_stderr[i] = 0.0;
+      }
+      if(do_grad){
+        for(i = 0; i < num_x_vars; i++){
+          memset(pdf_deriv[i], 0, (size_t)num_obs_eval_extern * sizeof(double));
+          memset(pdf_deriv_stderr[i], 0, (size_t)num_obs_eval_extern * sizeof(double));
+        }
+      }
+    }
 #endif
 
     if((int_ll_eff == LL_LP) &&
@@ -9534,7 +9556,20 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     saved_ckerub = vector_ckerub_extern;
     log_likelihood = 0.0;
 
-    for(j = 0; j < num_obs_eval_extern; j++){
+#ifdef MPI2
+    if(lp_owner_blocks){
+      np_mpi_local_regression_saved_rank = my_rank;
+      np_mpi_local_regression_saved_nproc = iNum_Processors;
+      np_mpi_local_regression_saved_comm1 = comm[1];
+      comm[1] = MPI_COMM_SELF;
+      my_rank = 0;
+      iNum_Processors = 1;
+      np_mpi_local_regression_mode = 1;
+    }
+#endif
+
+    status = 0;
+    for(j = lp_loop_start; j < lp_loop_stop; j++){
       for(i = 0; i < num_reg_unordered_extern; i++)
         xuno_eval_one[i][0] = matrix_XY_unordered_eval_extern[i][j];
       for(i = 0; i < num_reg_ordered_extern; i++)
@@ -9552,6 +9587,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       int_cker_bound_extern = int_cyker_bound_extern;
       vector_ckerlb_extern = vector_cykerlb_extern;
       vector_ckerub_extern = vector_cykerub_extern;
+
+      lp_error = NULL;
 
       status = kernel_weighted_sum_np(kernel_cy,
                                       kernel_uy,
@@ -9606,8 +9643,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                       NULL,
                                       ykw,
                                       NULL);
-      if(status != 0)
-        error("np_density_conditional: y-kernel response construction failed in LP path");
+      if(status != 0){
+        lp_error = "np_density_conditional: y-kernel response construction failed in LP path";
+      }
 
       y_eval_one[0] = ykw[0];
 
@@ -9615,40 +9653,44 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       vector_ckerlb_extern = vector_cxkerlb_extern;
       vector_ckerub_extern = vector_cxkerub_extern;
 
-      status = kernel_estimate_regression_categorical_tree_np(int_ll_eff,
-                                                               KERNEL_reg_extern,
-                                                               KERNEL_reg_unordered_extern,
-                                                               KERNEL_reg_ordered_extern,
-                                                               BANDWIDTH_den_extern,
-                                                               num_obs_train_extern,
-                                                               1,
-                                                               num_reg_unordered_extern,
-                                                               num_reg_ordered_extern,
-                                                               num_reg_continuous_extern,
-                                                               matrix_XY_unordered_train_extern,
-                                                               matrix_XY_ordered_train_extern,
-                                                               matrix_XY_continuous_train_extern,
-                                                               xuno_eval_one,
-                                                               xord_eval_one,
-                                                               xcon_eval_one,
-                                                               ykw,
-                                                               y_eval_one,
-                                                               vsf_x,
-                                                               num_categories_extern + xcat_offset,
-                                                               matrix_categorical_vals_extern + xcat_offset,
-                                                               mean_one,
-                                                               grad_one,
-                                                               stderr_one,
-                                                               graderr_one,
-                                                               &RS,
-                                                               &MSE,
-                                                               &MAE,
-                                                               &MAPE,
-                                                               &CORR,
-                                                               &SIGN);
+      if(status == 0){
+        status = kernel_estimate_regression_categorical_tree_np(int_ll_eff,
+                                                                 KERNEL_reg_extern,
+                                                                 KERNEL_reg_unordered_extern,
+                                                                 KERNEL_reg_ordered_extern,
+                                                                 BANDWIDTH_den_extern,
+                                                                 num_obs_train_extern,
+                                                                 1,
+                                                                 num_reg_unordered_extern,
+                                                                 num_reg_ordered_extern,
+                                                                 num_reg_continuous_extern,
+                                                                 matrix_XY_unordered_train_extern,
+                                                                 matrix_XY_ordered_train_extern,
+                                                                 matrix_XY_continuous_train_extern,
+                                                                 xuno_eval_one,
+                                                                 xord_eval_one,
+                                                                 xcon_eval_one,
+                                                                 ykw,
+                                                                 y_eval_one,
+                                                                 vsf_x,
+                                                                 num_categories_extern + xcat_offset,
+                                                                 matrix_categorical_vals_extern + xcat_offset,
+                                                                 mean_one,
+                                                                 grad_one,
+                                                                 stderr_one,
+                                                                 graderr_one,
+                                                                 &RS,
+                                                                 &MSE,
+                                                                 &MAE,
+                                                                 &MAPE,
+                                                                 &CORR,
+                                                                 &SIGN);
+        if(status != 0)
+          lp_error = "np_density_conditional: regression LP solve failed in conditional LP path";
+      }
 
       if(status != 0)
-        error("np_density_conditional: regression LP solve failed in conditional LP path");
+        break;
 
       pdf[j] = mean_one[0];
       pdf_stderr[j] = stderr_one[0];
@@ -9667,6 +9709,45 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
       np_progress_fit_step(j + 1);
     }
+
+#ifdef MPI2
+    if(lp_owner_blocks){
+      int lp_local_fail = (status != 0);
+      int lp_any_fail = 0;
+      if(np_mpi_local_regression_saved_comm1 != MPI_COMM_NULL)
+        comm[1] = np_mpi_local_regression_saved_comm1;
+      my_rank = np_mpi_local_regression_saved_rank;
+      iNum_Processors = np_mpi_local_regression_saved_nproc;
+      np_mpi_local_regression_saved_comm1 = MPI_COMM_NULL;
+      np_mpi_local_regression_mode = 0;
+
+      MPI_Allreduce(&lp_local_fail, &lp_any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+      if(lp_any_fail){
+        if(lp_local_fail)
+          error("%s", (lp_error != NULL) ? lp_error : "np_density_conditional: conditional LP owner-block path failed");
+        else
+          error("np_density_conditional: another rank failed in conditional LP owner-block path");
+      } else {
+        MPI_Allreduce(MPI_IN_PLACE, pdf, num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
+        MPI_Allreduce(MPI_IN_PLACE, pdf_stderr, num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
+        if(do_grad){
+          for(i = 0; i < num_x_vars; i++){
+            MPI_Allreduce(MPI_IN_PLACE, pdf_deriv[i], num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
+            MPI_Allreduce(MPI_IN_PLACE, pdf_deriv_stderr[i], num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
+          }
+        }
+        MPI_Allreduce(MPI_IN_PLACE, &log_likelihood, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
+      }
+    }
+#endif
+
+#ifdef MPI2
+    if((!lp_owner_blocks) && (status != 0))
+      error("%s", (lp_error != NULL) ? lp_error : "np_density_conditional: conditional LP path failed");
+#else
+    if(status != 0)
+      error("%s", (lp_error != NULL) ? lp_error : "np_density_conditional: conditional LP path failed");
+#endif
 
     int_cker_bound_extern = saved_cker_bound;
     vector_ckerlb_extern = saved_ckerlb;
