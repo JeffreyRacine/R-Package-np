@@ -23634,11 +23634,15 @@ double * log_likelihood
 #ifdef MPI2
   int *counts = NULL, *displs = NULL;
   double **eval_uno = NULL, **eval_ord = NULL, **eval_con = NULL;
+  double **deriv_local = NULL, **gerr_local = NULL;
   double *kdf_local = NULL, *stderr_local = NULL;
   double local_log_likelihood = 0.0;
-  int start, stop, nloc, r, status = 1;
+  const int num_X = num_X_continuous + num_X_unordered + num_X_ordered;
+  const int do_deriv = (kdf_deriv != NULL);
+  const int do_gerr = (kdf_deriv_stderr != NULL);
+  int start, stop, nloc, r, l, status = 1;
 
-  if((kdf_deriv != NULL) || (kdf_deriv_stderr != NULL))
+  if(do_gerr && !do_deriv)
     return 1;
   if((BANDWIDTH_den != BW_FIXED) || (num_obs_eval <= 0) || (iNum_Processors <= 1) ||
      np_mpi_local_regression_active())
@@ -23665,6 +23669,16 @@ double * log_likelihood
   stderr_local = (double *)calloc((size_t)MAX(1, nloc), sizeof(double));
   if((kdf_local == NULL) || (stderr_local == NULL))
     goto cleanup_owner_blocks;
+  if(do_deriv){
+    deriv_local = alloc_matd(MAX(1, nloc), num_X);
+    if(deriv_local == NULL)
+      goto cleanup_owner_blocks;
+  }
+  if(do_gerr){
+    gerr_local = alloc_matd(MAX(1, nloc), num_X);
+    if(gerr_local == NULL)
+      goto cleanup_owner_blocks;
+  }
 
   eval_uno = np_conditional_subset_eval_matrix(matrix_XY_unordered_eval,
                                                num_X_unordered + num_Y_unordered,
@@ -23713,8 +23727,8 @@ double * log_likelihood
                                                  matrix_categorical_vals_XY,
                                                  kdf_local,
                                                  stderr_local,
-                                                 NULL,
-                                                 NULL,
+                                                 deriv_local,
+                                                 gerr_local,
                                                  &local_log_likelihood);
   }
 
@@ -23740,12 +23754,36 @@ double * log_likelihood
                 MPI_DOUBLE,
                 MPI_SUM,
                 comm[1]);
+  if(do_deriv){
+    for(l = 0; l < num_X; l++)
+      MPI_Allgatherv(deriv_local[l],
+                     nloc,
+                     MPI_DOUBLE,
+                     kdf_deriv[l],
+                     counts,
+                     displs,
+                     MPI_DOUBLE,
+                     comm[1]);
+  }
+  if(do_gerr){
+    for(l = 0; l < num_X; l++)
+      MPI_Allgatherv(gerr_local[l],
+                     nloc,
+                     MPI_DOUBLE,
+                     kdf_deriv_stderr[l],
+                     counts,
+                     displs,
+                     MPI_DOUBLE,
+                     comm[1]);
+  }
   status = 0;
 
 cleanup_owner_blocks:
   if(eval_uno != NULL) free_mat(eval_uno, num_X_unordered + num_Y_unordered);
   if(eval_ord != NULL) free_mat(eval_ord, num_X_ordered + num_Y_ordered);
   if(eval_con != NULL) free_mat(eval_con, num_X_continuous + num_Y_continuous);
+  if(deriv_local != NULL) free_mat(deriv_local, num_X);
+  if(gerr_local != NULL) free_mat(gerr_local, num_X);
   if(kdf_local != NULL) free(kdf_local);
   if(stderr_local != NULL) free(stderr_local);
   if(counts != NULL) free(counts);

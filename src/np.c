@@ -9369,8 +9369,6 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 #ifdef MPI2
     if((int_ll_eff == LL_LC) &&
        (BANDWIDTH_den_extern == BW_FIXED) &&
-       (pdf_deriv == NULL) &&
-       (pdf_deriv_stderr == NULL) &&
        (iNum_Processors > 1) &&
        !np_mpi_local_regression_active()){
       if(np_kernel_estimate_con_dens_dist_categorical_owner_blocks(KERNEL_den_extern,
@@ -9402,8 +9400,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                    matrix_categorical_vals_extern_XY,
                                                                    pdf,
                                                                    pdf_stderr,
-                                                                   NULL,
-                                                                   NULL,
+                                                                   pdf_deriv,
+                                                                   pdf_deriv_stderr,
                                                                    &log_likelihood) != 0)
         error("np_density_conditional: conditional LC owner-block helper failed");
       lc_owner_done = 1;
