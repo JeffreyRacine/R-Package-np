@@ -38,7 +38,7 @@ if [ -z "${DEMOS:-}" ]; then
       DEMOS="npcdensls npcdensml npcdistls"
       ;;
     core-scaling)
-      DEMOS="npcdensls npcdensml npcdistls"
+      DEMOS="npreglcls npregllls npcdensls npcdensml npcdistls"
       ;;
     nomad)
       echo "DEMO_SET=nomad is reserved until explicit NOMAD demo scripts are added" >&2

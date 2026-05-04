@@ -1,9 +1,4 @@
-## This is the serial version of npreglcls_npRmpi.R for comparison
-## purposes (bandwidth ought to be identical, timing may
-## differ). Study the differences between this file and its MPI
-## counterpart for insight about your own problems.
-
-library(np)
+library(npRmpi)
 options(np.messages=FALSE)
 
 .np_demo_src <- Sys.getenv("NP_DEMO_SRC", "")
@@ -11,9 +6,16 @@ options(np.messages=FALSE)
                     if (nzchar(.np_demo_src)) file.path(.np_demo_src, "demo_utils.R"),
                     "demo_utils", "demo_utils.R", "../demo_utils", "../demo_utils.R",
                     file.path("demo", "demo_utils"), file.path("demo", "demo_utils.R"),
-                    system.file("demo_utils.R", package = "npRmpi"))
+                    system.file("demo_utils.R", package = "npRmpi"),
+                    system.file("demo", "demo_utils", package = "npRmpi"),
+                    system.file("demo", "demo_utils.R", package = "npRmpi"))
 .np_demo_utils <- .np_demo_utils[nzchar(.np_demo_utils) & file.exists(.np_demo_utils)]
 source(.np_demo_utils[[1L]])
+
+nslaves <- np_demo_n(default = 1L, floor = 1L,
+                     exact_env = "NP_DEMO_NSLAVES",
+                     frac_env = "NP_DEMO_NSLAVES_FRAC")
+npRmpi.init(nslaves = nslaves)
 
 set.seed(42)
 
@@ -26,11 +28,10 @@ y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
 z1 <- factor(z1)
 z2 <- factor(z2)
 mydat <- data.frame(y,x,z1,z2)
-
-## A regression example (local constant, least-squares cross-validation)
+rm(x,y,z1,z2)
 
 t <- system.time(bw <- npregbw(y~x+z1+z2,
-                               regtype="lc",
+                               regtype="ll",
                                bwmethod="cv.ls",
                                data=mydat))
 
@@ -42,5 +43,7 @@ t <- t + system.time(model <- npreg(bws=bw,
 summary(model)
 
 cat("Elapsed time =", t[3], "\n")
-np_demo_result("npreglcls", "serial", n, default_n, t[3],
-               bwmethod = "cv.ls", regtype = "lc")
+np_demo_result("npregllls", "session", n, default_n, t[3],
+               bwmethod = "cv.ls", regtype = "ll", slaves = nslaves)
+
+## The demo harness cleans spawned slave daemons from the launcher layer.

@@ -4,9 +4,9 @@ Changes from Version 0.70-1 to 0.70-2 [04-May-2026]
   checks by adding exact/fractional demo sample-size helpers, machine-readable
   `DEMO_RESULT` transcript lines, a parser that reads both new and legacy demo
   layouts, explicit session/attach/profile result directories, and a
-  four-route conditional density/distribution pilot covering `npcdensls`,
-  `npcdensml`, and `npcdistls` under serial, session, attach, and
-  profile/manual-broadcast execution.
+  four-route core pilot covering regression `npreglcls`/`npregllls` plus
+  conditional density/distribution `npcdensls`, `npcdensml`, and `npcdistls`
+  under serial, session, attach, and profile/manual-broadcast execution.
 
 * Routed the post-NOMAD Powell hot-start refinement in `npcdensbw()` through
   the same MPI-aware collective fixed-degree pattern used by adjacent
