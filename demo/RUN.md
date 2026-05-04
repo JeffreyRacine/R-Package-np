@@ -132,7 +132,8 @@ Demo sets:
 - `DEMO_SET=pilot`: narrow `npcdensls` four-route pilot
 - `DEMO_SET=conditional-density`: `npcdensls` and `npcdensml`
 - `DEMO_SET=conditional-core`: `npcdensls`, `npcdensml`, and `npcdistls`
-- `DEMO_SET=core-scaling`: initial workhorse subset using existing scripts
+- `DEMO_SET=core-scaling`: currently the converted conditional-core subset;
+  this will expand only as additional families gain four-route coverage
 - `DEMO_SET=nomad`: reserved until explicit NOMAD demo scripts are added
 
 You can always override the set with `DEMOS="npcdensls npreglcls"`.
