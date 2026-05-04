@@ -136,10 +136,10 @@ Demo sets:
 - `DEMO_SET=all`: makefile default demo list
 - `DEMO_SET=pilot`: narrow matrix-driven `npcdens` four-route pilot
 - `DEMO_SET=conditional-density`: matrix-driven `npcdens`
-- `DEMO_SET=conditional-core`: matrix-driven `npcdens` and `npcdistls`
+- `DEMO_SET=conditional-core`: matrix-driven `npcdens` and `npcdist`
 - `DEMO_SET=core-scaling`: converted core subset currently covering
-  matrix-driven `npreg`, matrix-driven `npcdens`, and `npcdistls`
-- `DEMO_SET=nomad`: matrix-driven `npreg` and `npcdens` NOMAD smoke rows
+  matrix-driven `npreg`, matrix-driven `npcdens`, and matrix-driven `npcdist`
+- `DEMO_SET=nomad`: matrix-driven `npreg`, `npcdens`, and `npcdist` NOMAD smoke rows
 
 You can always override the set with `DEMOS="npcdens npreg"`.
 
@@ -158,6 +158,11 @@ maximum-likelihood, `ll` least-squares, explicit `lp` degree 1, and NOMAD
 local-polynomial degree search. The sentinel matrix preserves the previous
 `npcdensls`/`npcdensml` calibrated defaults while adding the newer `ll`, `lp`,
 and NOMAD surfaces.
+
+The `npcdist` smoke matrix currently covers `lc` least-squares, `ll`
+least-squares, explicit `lp` degree 1, and NOMAD local-polynomial degree
+search. The sentinel matrix preserves the previous `npcdistls` calibrated
+default while adding the newer `ll`, `lp`, and NOMAD surfaces.
 
 Cross-version archive run:
 

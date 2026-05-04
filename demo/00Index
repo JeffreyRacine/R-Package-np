@@ -2,10 +2,10 @@ npcdens_npRmpi_attach	matrix-driven npcdens demo for npRmpi attach mode
 npcdens_npRmpi_profile	matrix-driven npcdens demo for npRmpi profile/manual mode
 npcdens_npRmpi_session	matrix-driven npcdens demo for npRmpi session/spawn mode
 npcdens_serial	matrix-driven npcdens demo for np serial comparison
-npcdistls_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npcdistls_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npcdistls_npRmpi_session	sample program for npRmpi session/spawn mode (_npRmpi_session)
-npcdistls_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
+npcdist_npRmpi_attach	matrix-driven npcdist demo for npRmpi attach mode
+npcdist_npRmpi_profile	matrix-driven npcdist demo for npRmpi profile/manual mode
+npcdist_npRmpi_session	matrix-driven npcdist demo for npRmpi session/spawn mode
+npcdist_serial	matrix-driven npcdist demo for np serial comparison
 npcmstest_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
 npcmstest_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
 npcmstest_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)

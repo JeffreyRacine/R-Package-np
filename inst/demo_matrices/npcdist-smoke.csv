@@ -1,0 +1,5 @@
+family,case,tier,enabled,default_n,floor_n,regtype,bwmethod,nomad,degree,degree.max,bwtype,why
+npcdist,npcdist_lc_ls,smoke,TRUE,40,20,lc,cv.ls,FALSE,,,fixed,default_local_constant_least_squares_route
+npcdist,npcdist_ll_ls,smoke,TRUE,40,20,ll,cv.ls,FALSE,,,fixed,local_linear_route_and_lp1_parity_sentinel
+npcdist,npcdist_lp1_ls,smoke,TRUE,40,20,lp,cv.ls,FALSE,1,,fixed,explicit_local_polynomial_degree_1_route
+npcdist,npcdist_lp_nomad,smoke,TRUE,30,20,lp,cv.ls,TRUE,,1,fixed,nomad_powell_handoff_route_with_degree_search
