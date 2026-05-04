@@ -42,3 +42,12 @@ test_that("npcdensbw NOMAD shadow search keeps collective routing in manual-broa
   expect_true(grepl("caller.execute = TRUE)", body_text, fixed = TRUE))
   expect_false(grepl("!isTRUE(.npRmpi_autodispatch_called_from_bcast())", body_text, fixed = TRUE))
 })
+
+test_that("npcdensbw NOMAD plus Powell hot-start uses collective fixed-degree refinement", {
+  body_text <- paste(
+    deparse(body(get(".npcdensbw_nomad_search", envir = asNamespace("npRmpi"), inherits = FALSE))),
+    collapse = "\n"
+  )
+
+  expect_true(grepl(".npcdensbw_run_fixed_degree_collective(", body_text, fixed = TRUE))
+})

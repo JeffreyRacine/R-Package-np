@@ -824,6 +824,64 @@ npcdensbw.conbandwidth <-
   do.call(npcdensbw.conbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
 }
 
+.npcdensbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, bws, reg.args, opt.args) {
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  old.messages <- getOption("np.messages")
+  rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+
+  options(npRmpi.autodispatch.disable = TRUE)
+  if (!isTRUE(rank == 0L))
+    options(np.messages = FALSE)
+
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+  on.exit(options(np.messages = old.messages), add = TRUE)
+
+  .npcdensbw_run_fixed_degree(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws,
+    reg.args = reg.args,
+    opt.args = opt.args
+  )
+}
+
+.npcdensbw_run_fixed_degree_collective <- function(xdat,
+                                                   ydat,
+                                                   bws,
+                                                   reg.args,
+                                                   opt.args,
+                                                   comm = 1L) {
+  if (.npRmpi_has_active_slave_pool(comm = comm) &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    mc <- substitute(
+      get(".npcdensbw_run_fixed_degree_bcast_payload", envir = asNamespace("npRmpi"), inherits = FALSE)(
+        XDAT,
+        YDAT,
+        BWS,
+        REGARGS,
+        OPTARGS
+      ),
+      list(
+        XDAT = xdat,
+        YDAT = ydat,
+        BWS = bws,
+        REGARGS = reg.args,
+        OPTARGS = opt.args
+      )
+    )
+    return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
+  }
+
+  .npcdensbw_run_fixed_degree(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws,
+    reg.args = reg.args,
+    opt.args = opt.args
+  )
+}
+
 .npcdensbw_is_explicit_fixed_all_infinite <- function(kerlb, kerub, kerbound) {
   if (is.null(kerbound) || !identical(as.character(kerbound)[1L], "fixed"))
     return(FALSE)
@@ -1855,7 +1913,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       powell.start <- proc.time()[3L]
       hot.payload <- .npcdensbw_with_powell_refinement_progress(
         degree,
-        .npcdensbw_run_fixed_degree(
+        .npcdensbw_run_fixed_degree_collective(
           xdat = xdat,
           ydat = ydat,
           bws = bw_vec,
