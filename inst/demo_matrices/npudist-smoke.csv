@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,bwmethod,bwtype,do.full.integral,why
+npudist,npudist_cvcdf,smoke,TRUE,60,20,cv.cdf,fixed,TRUE,unconditional_distribution_cdf_cv_route

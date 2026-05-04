@@ -45,6 +45,10 @@ NOMAD degree-search rows.
 matrix-driven unconditional density demo covering both least-squares and
 likelihood cross-validation rows.
 
+`npudist` replaces the older `npudistcdf` scripts with one matrix-driven
+unconditional distribution demo covering CDF cross-validation and fitted CDF
+construction.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable

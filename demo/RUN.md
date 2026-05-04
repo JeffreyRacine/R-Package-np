@@ -139,10 +139,10 @@ Demo sets:
 - `DEMO_SET=conditional-core`: matrix-driven `npcdens` and `npcdist`
 - `DEMO_SET=core-scaling`: converted core subset currently covering
   matrix-driven `npreg`, matrix-driven `npcdens`, matrix-driven `npcdist`,
-  and matrix-driven `npudens`
+  matrix-driven `npudens`, and matrix-driven `npudist`
 - `DEMO_SET=nomad`: matrix-driven `npreg`, `npcdens`, `npcdist`, `npindex`, `npscoef`, and `npplreg` NOMAD smoke rows
 - `DEMO_SET=semiparametric`: matrix-driven `npindex`, `npscoef`, and `npplreg`
-- `DEMO_SET=unconditional`: matrix-driven `npudens`
+- `DEMO_SET=unconditional`: matrix-driven `npudens` and `npudist`
 
 You can always override the set with `DEMOS="npcdens npreg"`.
 
@@ -188,6 +188,11 @@ The `npudens` smoke matrix replaces the older `npudensls`/`npudensml` split
 with one unconditional density demo covering both least-squares and likelihood
 cross-validation. Each row now runs both bandwidth selection and `npudens()`,
 recording objective, bandwidth, fitted length, and the first density estimate.
+
+The `npudist` smoke matrix replaces `npudistcdf` with one unconditional
+distribution demo covering CDF cross-validation. It runs both `npudistbw()` and
+`npudist()`, recording objective, bandwidth, fitted length, and the first CDF
+estimate.
 
 Cross-version archive run:
 

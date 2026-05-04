@@ -56,9 +56,10 @@ npudens_npRmpi_attach	matrix-driven npudens demo for npRmpi attach mode
 npudens_npRmpi_profile	matrix-driven npudens demo for npRmpi profile/manual mode
 npudens_npRmpi_session	matrix-driven npudens demo for npRmpi session/spawn mode
 npudens_serial	matrix-driven npudens demo for np serial comparison
-npudistcdf_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npudistcdf_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npudistcdf_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
+npudist_npRmpi_attach	matrix-driven npudist demo for npRmpi attach mode
+npudist_npRmpi_profile	matrix-driven npudist demo for npRmpi profile/manual mode
+npudist_npRmpi_session	matrix-driven npudist demo for npRmpi session/spawn mode
+npudist_serial	matrix-driven npudist demo for np serial comparison
 npunitest_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
 npunitest_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
 npunitest_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
