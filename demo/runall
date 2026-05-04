@@ -31,6 +31,9 @@ if [ -z "${DEMOS:-}" ]; then
     pilot)
       DEMOS="npcdensls"
       ;;
+    conditional-density)
+      DEMOS="npcdensls npcdensml"
+      ;;
     core-scaling)
       DEMOS="npreglcls npregllls npcdensls npcdistls npscoef npindexich"
       ;;

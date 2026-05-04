@@ -4,6 +4,7 @@ npcdensls_npRmpi_session	sample program for npRmpi session/spawn mode (_npRmpi_s
 npcdensls_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
 npcdensml_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
 npcdensml_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
+npcdensml_npRmpi_session	sample program for npRmpi session/spawn mode (_npRmpi_session)
 npcdensml_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
 npcdistls_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
 npcdistls_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
