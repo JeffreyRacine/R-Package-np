@@ -1,5 +1,17 @@
 Changes from Version 0.70-1 to 0.70-2 [04-May-2026]
 
+* Restored session-mode MPI participation for automatic `npindex(...,
+  nomad=TRUE)` / `npindexbw(..., nomad=TRUE)` degree-search routes when
+  multiple workers are active, so the bandwidth-search stage no longer runs
+  master-only while preserving selected objectives, bandwidths, coefficients,
+  degrees, evaluation counts, and fitted output in installed validation.
+
+* Improved profile/manual-broadcast `npplregbw(..., nomad=TRUE)` scaling for
+  larger local-polynomial degree-search problems by routing child regression
+  objectives through the MPI-aware fixed-regression evaluator when profile
+  ranks otherwise outnumber child objectives, while leaving session/attach
+  autodispatch on the existing child-split route.
+
 * Restored MPI-aware NOMAD objective evaluation for semiparametric
   `npscoefbw()` and `npindexbw()` profile/manual-broadcast routes by allowing
   their internal fixed-objective regression work to use active MPI ranks while
