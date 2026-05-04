@@ -1,0 +1,53 @@
+#!/bin/bash
+set -euo pipefail
+
+TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEMO_ROOT="$(cd "${TOOLS_DIR}/.." && pwd)"
+cd "${DEMO_ROOT}"
+
+cleanup_slaves() {
+  local pids
+  pids="$(pgrep -f 'slavedaemon\.R|Rslaves\.sh' || true)"
+  if [ -n "${pids}" ]; then
+    printf '%s\n' "${pids}" | xargs kill >/dev/null 2>&1 || true
+  fi
+}
+
+cleanup_run_dirs() {
+  shopt -s nullglob
+  rm -rf -- serial session session_* mpi_launch results n_*_attach n_*_profile
+  shopt -u nullglob
+}
+
+cleanup_local_transients() {
+  rm -f -- ./*.tmp ./*.Rout ./.RData ./.Rhistory ./Rplots.pdf
+}
+
+restore_tracked_timing_outputs() {
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local files=(
+    timing_all.dat
+  )
+  local tracked=()
+  local f
+
+  for f in "${files[@]}"; do
+    if git ls-files --error-unmatch -- "${f}" >/dev/null 2>&1; then
+      tracked+=("${f}")
+    fi
+  done
+
+  if [ "${#tracked[@]}" -gt 0 ]; then
+    git restore --worktree -- "${tracked[@]}"
+  fi
+}
+
+cleanup_slaves
+cleanup_run_dirs
+cleanup_local_transients
+restore_tracked_timing_outputs
+
+echo "demo cleanup complete"

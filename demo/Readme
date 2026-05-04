@@ -1,8 +1,9 @@
 February 7 2026
 
 Timing results updated using an Apple M2 Mac Studio (12 cores) running
-macOS 15.2 and MPICH 4.3.2. Consolidated results for np=1, 2, 3, 4
-can be found in timing.pdf.
+macOS 15.2 and MPICH 4.3.2. Historical LaTeX/PDF timing artifacts have been
+retired; current runs write CSV/dat summaries and an optional Quarto report
+under `results/<run-id>/timing/`.
 
 May 4 2026
 
@@ -12,6 +13,10 @@ profile/manual-broadcast routes. New `runall` output is written under
 `session/slaves_01` and `mpi_launch/ranks_02/attach`, while the timing parser
 continues to read legacy folders such as `serial`, `n_2_attach`, and
 `n_2_profile`.
+
+The demo source layout now keeps package-visible demo entry scripts at the
+top level and places run/report tooling under `tools/`. Top-level `runall`,
+`timing`, `cleanup`, and `makefile` shims are retained for familiar commands.
 
 `NP_DEMO_N` remains the exact sample-size override. `NP_DEMO_N_FRAC` now runs
 supported demos at a fraction of their calibrated default sample size.

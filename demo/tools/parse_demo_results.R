@@ -248,6 +248,44 @@ results <- results[order(results$family, results$demo, results$case,
 
 write.csv(results, file.path(out_dir, "demo_results.csv"), row.names = FALSE)
 
+compute_label <- function(row) {
+  mode <- row[["mode"]]
+  if (is.na(mode) || !nzchar(mode)) mode <- "unknown"
+  if (identical(mode, "serial")) return("serial")
+  if (identical(mode, "session")) {
+    slaves <- row[["slaves"]]
+    return(sprintf("session_s%02d", ifelse(is.na(slaves), 0L, slaves)))
+  }
+  ranks <- row[["ranks"]]
+  if (is.na(ranks)) ranks <- row[["slaves"]] + 1L
+  if (is.na(ranks)) return(mode)
+  sprintf("%s_r%02d", mode, ranks)
+}
+
+write_wide <- function(results, path) {
+  if (!nrow(results)) {
+    write.csv(results, path, row.names = FALSE)
+    return(invisible(TRUE))
+  }
+
+  wide <- results
+  wide$compute <- vapply(seq_len(nrow(wide)), function(i) compute_label(wide[i, ]),
+                         character(1L))
+  id_cols <- c("run_id", "family", "case", "tier", "regtype", "bwmethod",
+               "nomad", "degree", "degree.max", "selected.degree", "bwtype",
+               "n", "default_n")
+  id_cols <- id_cols[id_cols %in% names(wide)]
+  wide <- wide[, c(id_cols, "compute", "elapsed"), drop = FALSE]
+  names(wide)[names(wide) == "elapsed"] <- "seconds"
+  out <- reshape(wide, idvar = id_cols, timevar = "compute",
+                 direction = "wide")
+  names(out) <- sub("^seconds\\.", "seconds_", names(out))
+  write.csv(out, path, row.names = FALSE)
+  invisible(TRUE)
+}
+
+write_wide(results, file.path(out_dir, "demo_results_wide.csv"))
+
 line_for <- function(row) {
   compute <- if (!is.na(row[["slaves"]])) paste0("slaves=", row[["slaves"]]) else
     if (!is.na(row[["ranks"]])) paste0("ranks=", row[["ranks"]]) else
@@ -261,24 +299,80 @@ line_for <- function(row) {
 dat <- if (nrow(results)) vapply(seq_len(nrow(results)), function(i) line_for(results[i, ]), character(1L)) else character()
 writeLines(dat, file.path(out_dir, "timing_all.dat"))
 
-tex_escape <- function(x) gsub("_", "\\\\_", x, fixed = TRUE)
-tex <- c(
-  "\\begin{tabular}{llrrrr}",
-  "Demo & Mode & Ranks & Slaves & $n$ & Seconds\\\\",
-  "\\hline"
+qmd <- c(
+  "---",
+  "title: \"npRmpi Demo Timing Summary\"",
+  "format:",
+  "  html:",
+  "    toc: true",
+  "    code-fold: true",
+  "execute:",
+  "  echo: false",
+  "  warning: false",
+  "  message: false",
+  "---",
+  "",
+  "```{r}",
+  "results <- read.csv('demo_results.csv', stringsAsFactors = FALSE)",
+  "wide <- read.csv('demo_results_wide.csv', stringsAsFactors = FALSE)",
+  "metadata_path <- file.path('..', 'RUN_METADATA.txt')",
+  "metadata <- if (file.exists(metadata_path)) readLines(metadata_path, warn = FALSE) else character()",
+  "num <- function(x) suppressWarnings(as.numeric(x))",
+  "results$elapsed <- num(results$elapsed)",
+  "results$slaves <- num(results$slaves)",
+  "results$ranks <- num(results$ranks)",
+  "results$n <- num(results$n)",
+  "results$family[!nzchar(results$family)] <- results$demo[!nzchar(results$family)]",
+  "```",
+  "",
+  "## Run Metadata",
+  "",
+  "```{r}",
+  "if (length(metadata)) {",
+  "  cat(paste(metadata, collapse = '\\n'))",
+  "} else {",
+  "  cat('No RUN_METADATA.txt found.')",
+  "}",
+  "```",
+  "",
+  "## Coverage",
+  "",
+  "```{r}",
+  "coverage <- aggregate(elapsed ~ family + mode, results, length)",
+  "names(coverage)[names(coverage) == 'elapsed'] <- 'rows'",
+  "coverage <- coverage[order(coverage$family, coverage$mode), ]",
+  "knitr::kable(coverage, row.names = FALSE)",
+  "```",
+  "",
+  "## Elapsed Time",
+  "",
+  "```{r}",
+  "elapsed <- results[, c('family', 'case', 'mode', 'ranks', 'slaves', 'n', 'elapsed')]",
+  "elapsed <- elapsed[order(elapsed$family, elapsed$case, elapsed$mode, elapsed$ranks, elapsed$slaves), ]",
+  "knitr::kable(elapsed, row.names = FALSE, digits = 3)",
+  "```",
+  "",
+  "## Wide Elapsed Table",
+  "",
+  "```{r}",
+  "knitr::kable(wide, row.names = FALSE, digits = 3)",
+  "```",
+  "",
+  "## Option Drift Sentinels",
+  "",
+  "```{r}",
+  "sentinel_cols <- c('family', 'case', 'mode', 'regtype', 'bwmethod', 'nomad', 'degree',",
+  "                   'degree.max', 'selected.degree', 'bwtype', 'objective', 'bandwidth',",
+  "                   'bandwidth.second', 'beta.second', 'coef.first', 'coef.second',",
+  "                   'density.first', 'distribution.first', 'statistic.first',",
+  "                   'statistic.second', 'p.value', 'estimate.first', 'estimate.second',",
+  "                   'num.feval', 'num.feval.fast', 'fitted.length')",
+  "sentinel_cols <- sentinel_cols[sentinel_cols %in% names(results)]",
+  "sentinels <- results[, sentinel_cols, drop = FALSE]",
+  "sentinels <- sentinels[order(sentinels$family, sentinels$case, sentinels$mode), ]",
+  "knitr::kable(sentinels, row.names = FALSE, digits = 6)",
+  "```"
 )
-if (nrow(results)) {
-  for (i in seq_len(nrow(results))) {
-    row <- results[i, ]
-    tex <- c(tex, sprintf("%s & %s & %s & %s & %s & %.3f\\\\",
-                          tex_escape(row$demo), tex_escape(row$mode),
-                          ifelse(is.na(row$ranks), "--", row$ranks),
-                          ifelse(is.na(row$slaves), "--", row$slaves),
-                          ifelse(is.na(row$n), "--", row$n),
-                          row$elapsed))
-  }
-}
-tex <- c(tex, "\\hline", "\\end{tabular}")
-writeLines(tex, file.path(out_dir, "timing_all.tex"))
+writeLines(qmd, file.path(out_dir, "demo_summary.qmd"))
 
 cat("Parsed", nrow(results), "demo result rows from", length(files), "transcripts\n")

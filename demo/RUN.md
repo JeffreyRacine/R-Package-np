@@ -18,7 +18,9 @@ against archived CRAN/candidate demo output.
 3. for each value in `MPI_RANKS`:
    - `attach`
    - `profile`
-4. parse transcripts into `timing/demo_results.csv` and text/TeX summaries
+4. parse transcripts into `timing/demo_results.csv`, `demo_results_wide.csv`,
+   `timing_all.dat`, and `demo_summary.qmd`
+5. render `demo_summary.html` when Quarto is available
 
 Default compute tiers:
 
@@ -32,20 +34,24 @@ to `SESSION_SLAVES=3`.
 
 1. Install `np` and `npRmpi` first (matching versions for your run).
 2. MPI launcher available (`mpiexec`/`mpirun`).
-3. Keep the expected folder layout (`demo/serial`, `demo/n_2_attach`, `demo/n_2_profile`, etc.).
+3. Keep the expected folder layout when running copied demo folders; the
+   canonical in-repo runner writes under `demo/results/<run-id>/`.
 
 ## Core Files
 
-- `runall`: orchestrates full matrix
-- `makefile`: mode-specific launcher logic
+- `runall`: top-level compatibility shim for `tools/runall`
+- `makefile`: top-level compatibility include for `tools/makefile`
+- `tools/runall`: orchestrates full matrix
+- `tools/makefile`: mode-specific launcher logic
+- `tools/timing`: parser/report wrapper
+- `tools/parse_demo_results.R`: transcript parser and Quarto report generator
 - `../inst/demo_utils.R`: sample-size and machine-readable result helpers
 - `../inst/demo_matrices/*.csv`: family/case matrices for modern demos
 - `../inst/demo_family_*.R`: shared family runners used by thin mode scripts
-- `parse_demo_results.R`: transcript parser used by `timing`
 - `*.R`: demo scripts
 - `../inst/Rprofile`: canonical profile startup (also available as `system.file("Rprofile", package="npRmpi")`)
 
-The `makefile` is the source of truth for launch semantics:
+The `tools/makefile` is the source of truth for launch semantics:
 - `attach`: timeout + cleared profile envs (`R_PROFILE_USER`, `R_PROFILE`) + optional `FI_*` env overrides
 - `profile`: timeout + explicit `R_PROFILE_USER` + cleared `R_PROFILE` + optional `FI_*` env overrides + `NP_RMPI_PROFILE_RECV_TIMEOUT_SEC`
 - all mode loops (`serial`, `attach`, `profile`) are fail-fast per demo; any failed demo exits non-zero immediately (no masked failures).
@@ -84,7 +90,7 @@ NP_DEMO_N=100 make -f ../makefile MODE=serial
 ```bash
 mkdir -p /Users/jracine/Development/np-npRmpi/demo/session_direct
 cd /Users/jracine/Development/np-npRmpi/demo/session_direct
-NP_DEMO_N=100 make -f ../makefile MODE=session NSLAVES=1 DEMOS=npcdensls
+NP_DEMO_N=100 make -f ../makefile MODE=session NSLAVES=1 DEMOS=npcdens
 ```
 
 ### Attach
@@ -241,7 +247,13 @@ cd /Users/jracine/Development/np-npRmpi/demo
 - Attach outputs: `results/<run-id>/mpi_launch/ranks_02/attach/*.Rout`, etc.
 - Profile outputs: `results/<run-id>/mpi_launch/ranks_02/profile/*.Rout`, etc.
 - Parsed output: `results/<run-id>/timing/demo_results.csv`
-- Cleanup helper: `./cleanup` removes run-generated folders/files and restores tracked timing outputs when run inside the repo
+- Wide parsed output: `results/<run-id>/timing/demo_results_wide.csv`
+- Human-readable terminal summary: `results/<run-id>/timing/timing_all.dat`
+- Quarto report source: `results/<run-id>/timing/demo_summary.qmd`
+- Optional rendered report, when Quarto is installed:
+  `results/<run-id>/timing/demo_summary.html`
+- Cleanup helper: `./cleanup` removes run-generated folders/files when run
+  inside the repo
 
 The parser also tolerates legacy direct folders such as `serial/`,
 `n_2_attach/`, and `n_2_profile/`.
@@ -265,7 +277,7 @@ cd /Users/jracine/Development/np-npRmpi/demo
 ### B) Running from a copied demo folder outside the repo
 
 You must preserve relative layout:
-- copied root contains `makefile`, `runall`, and `*.R`
+- copied root contains `makefile`, `runall`, `tools/`, and `*.R`
 - run from subdirs (`serial`, `n_2_attach`, `n_2_profile`) with `make -f ../makefile ...`
 
 For profile mode, set `RPROFILE` explicitly (do not rely on accidental relative matches):
@@ -296,7 +308,7 @@ This indicates profile startup was not applied to ranks.
 
 ```bash
 cd /path/to/demo/n_2_profile
-make -f ../makefile MODE=profile NP=2 NP_DEMO_N=100 DEMOS='npcdensls' -n run-profile
+make -f ../makefile MODE=profile NP=2 NP_DEMO_N=100 DEMOS='npcdens' -n run-profile
 ```
 
 2. Verify the printed command contains `-env R_PROFILE_USER <expected path>`.
