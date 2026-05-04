@@ -50,6 +50,9 @@ The `makefile` is the source of truth for launch semantics:
 - session scripts run under `setsid` when available so MPI spawn/finalize
   signals do not terminate the launcher shell; the launcher cleans up spawned
   slave daemons after each session demo.
+- session mode skips demos that do not yet have an explicit
+  `*_npRmpi_session.R` script, so broad legacy demo sets remain runnable while
+  session coverage is expanded family by family.
 - attach demo scripts execute estimator bodies on master rank only (`mpi.comm.rank(0L) == 0L`) and finalize with `npRmpi.quit(mode="attach", ...)`.
 - profile demo scripts do not call `npRmpi.init()`; startup comes from `inst/Rprofile`, then scripts use `np.mpi.initialize()` plus explicit `mpi.bcast.*` calls.
 

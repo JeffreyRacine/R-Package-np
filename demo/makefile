@@ -81,6 +81,10 @@ run-session:
 		echo "[session][nslaves=$(NSLAVES)] $$d"; \
 		out_file=$${d}_npRmpi_session.Rout; \
 		tmp_file=$${out_file}.tmp; \
+		if ! test -f $(DEMO_SRC)/$${d}_npRmpi_session.R; then \
+			echo "[session][nslaves=$(NSLAVES)] $$d SKIPPED (no session demo script)"; \
+			continue; \
+		fi; \
 		if $(SESSION_LAUNCH) env NP_DEMO_SRC=$(DEMO_SRC) NP_DEMO_N=$(NP_DEMO_N) NP_DEMO_N_FRAC=$(NP_DEMO_N_FRAC) NP_DEMO_NSLAVES=$(NSLAVES) $(RSCRIPT_BIN) --vanilla $(DEMO_SRC)/$${d}_npRmpi_session.R > "$$tmp_file" 2>&1; then \
 			{ $(PROVENANCE_CMD); cat "$$tmp_file"; } > "$$out_file"; \
 			rm -f "$$tmp_file"; \
