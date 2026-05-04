@@ -131,6 +131,7 @@ Demo sets:
 - `DEMO_SET=all`: makefile default demo list
 - `DEMO_SET=pilot`: narrow `npcdensls` four-route pilot
 - `DEMO_SET=conditional-density`: `npcdensls` and `npcdensml`
+- `DEMO_SET=conditional-core`: `npcdensls`, `npcdensml`, and `npcdistls`
 - `DEMO_SET=core-scaling`: initial workhorse subset using existing scripts
 - `DEMO_SET=nomad`: reserved until explicit NOMAD demo scripts are added
 

@@ -34,6 +34,9 @@ if [ -z "${DEMOS:-}" ]; then
     conditional-density)
       DEMOS="npcdensls npcdensml"
       ;;
+    conditional-core)
+      DEMOS="npcdensls npcdensml npcdistls"
+      ;;
     core-scaling)
       DEMOS="npreglcls npregllls npcdensls npcdistls npscoef npindexich"
       ;;
