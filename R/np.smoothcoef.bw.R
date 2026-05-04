@@ -1097,13 +1097,25 @@ npscoefbw.NULL <-
       bw = bw_vec
     )
 
-    out <- .npscoefbw_eval_pool(
-      ctx = ctx,
-      bws = tbw,
-      pool = pool,
-      invalid.penalty = "baseline",
-      penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
-    )
+    penalty.multiplier <- if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
+    out <- if (isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+               .npRmpi_safe_int(mpi.comm.size(1L)) > 1L) {
+      .npscoefbw_nomad_lp_eval_direct(
+        ctx = ctx,
+        bws = tbw,
+        invalid.penalty = "baseline",
+        penalty.multiplier = penalty.multiplier,
+        localize = FALSE
+      )
+    } else {
+      .npscoefbw_eval_pool(
+        ctx = ctx,
+        bws = tbw,
+        pool = pool,
+        invalid.penalty = "baseline",
+        penalty.multiplier = penalty.multiplier
+      )
+    }
     nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
 

@@ -1,4 +1,10 @@
-Changes from Version 0.70-1 to 0.70-2 [03-May-2026]
+Changes from Version 0.70-1 to 0.70-2 [04-May-2026]
+
+* Restored MPI-aware NOMAD objective evaluation for semiparametric
+  `npscoefbw()` and `npindexbw()` profile/manual-broadcast routes by allowing
+  their internal fixed-objective regression work to use active MPI ranks while
+  preserving selected objectives, bandwidths, degrees, coefficients, and
+  evaluation counts in paired validation runs.
 
 * Reblocked conditional density and conditional distribution local-polynomial
   `cv.ls` block products to use BLAS matrix multiplication in the fixed

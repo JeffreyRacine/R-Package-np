@@ -493,7 +493,8 @@ npregbw.rbandwidth <-
                                             penalty.multiplier = 10,
                                             transform.bounds = FALSE,
                                             scale.factor.search.lower = NULL,
-                                            eval.only = FALSE) {
+                                            eval.only = FALSE,
+                                            localize = TRUE) {
   invalid.penalty <- match.arg(invalid.penalty)
   scale.factor.search.lower <- npResolveScaleFactorLowerBound(
     if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
@@ -620,26 +621,29 @@ npregbw.rbandwidth <-
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
   if (isTRUE(eval.only)) {
-    out <- .npRmpi_with_local_regression(.Call(
-      C_np_regression_bw_eval,
-      as.double(runo),
-      as.double(rord),
-      as.double(rcon),
-      as.double(ydat),
-      as.double(mysd),
-      as.integer(myopti),
-      as.double(myoptd),
-      as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-      as.integer(1L),
-      as.integer(penalty_mode),
-      as.double(penalty.multiplier),
-      as.integer(degree.c),
-      as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
-      as.integer(npLpBasisCode(reg.spec$basis.engine)),
-      as.double(cker.bounds.c$lb),
-      as.double(cker.bounds.c$ub),
-      PACKAGE = "npRmpi"
-    ))
+    eval_core <- function() {
+      .Call(
+        C_np_regression_bw_eval,
+        as.double(runo),
+        as.double(rord),
+        as.double(rcon),
+        as.double(ydat),
+        as.double(mysd),
+        as.integer(myopti),
+        as.double(myoptd),
+        as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+        as.integer(1L),
+        as.integer(penalty_mode),
+        as.double(penalty.multiplier),
+        as.integer(degree.c),
+        as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+        as.integer(npLpBasisCode(reg.spec$basis.engine)),
+        as.double(cker.bounds.c$lb),
+        as.double(cker.bounds.c$ub),
+        PACKAGE = "npRmpi"
+      )
+    }
+    out <- if (isTRUE(localize)) .npRmpi_with_local_regression(eval_core()) else eval_core()
   } else {
     out <- .npRmpi_with_local_regression(.Call(
       C_np_regression_bw,
@@ -894,14 +898,16 @@ npregbw.rbandwidth <-
                                ydat,
                                bws,
                                invalid.penalty = c("baseline", "dbmax"),
-                               penalty.multiplier = 10) {
+                               penalty.multiplier = 10,
+                               localize = TRUE) {
   out <- .npregbw_call_fixed_degree_core(
     xdat = xdat,
     ydat = ydat,
     bws = bws,
     invalid.penalty = invalid.penalty,
     penalty.multiplier = penalty.multiplier,
-    eval.only = TRUE
+    eval.only = TRUE,
+    localize = localize
   )
 
   list(

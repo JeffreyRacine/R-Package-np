@@ -478,13 +478,17 @@ npindexbw.NULL <-
     spec = spec
   )
 
+  localize <- !(isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+                .npRmpi_safe_int(mpi.comm.size(1L)) > 1L)
+
   out <- tryCatch(
     .npregbw_eval_only(
       xdat = leaf$xdat,
       ydat = ydat,
       bws = leaf$bws,
       invalid.penalty = "baseline",
-      penalty.multiplier = 10
+      penalty.multiplier = 10,
+      localize = localize
     ),
     error = function(e) NULL
   )
