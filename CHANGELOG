@@ -36,6 +36,12 @@ Changes from Version 0.70-1 to 0.70-2 [04-May-2026]
   degree 1, and NOMAD local-polynomial degree-search smoke/sentinel rows across
   serial, session, attach, and profile/manual-broadcast routes.
 
+* Converted the `npplreg` partially linear demo to the matrix-driven harness,
+  preserving the original data generator while adding `ll`, explicit `lp`
+  degree 1, and NOMAD local-polynomial degree-search smoke/sentinel rows plus
+  flattened bandwidth/coefficient sentinels across serial, session, attach,
+  and profile/manual-broadcast routes.
+
 * Routed the post-NOMAD Powell hot-start refinement in `npcdensbw()` through
   the same MPI-aware collective fixed-degree pattern used by adjacent
   conditional distribution routes, preserving objectives, degrees, and

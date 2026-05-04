@@ -139,8 +139,8 @@ Demo sets:
 - `DEMO_SET=conditional-core`: matrix-driven `npcdens` and `npcdist`
 - `DEMO_SET=core-scaling`: converted core subset currently covering
   matrix-driven `npreg`, matrix-driven `npcdens`, and matrix-driven `npcdist`
-- `DEMO_SET=nomad`: matrix-driven `npreg`, `npcdens`, `npcdist`, `npindex`, and `npscoef` NOMAD smoke rows
-- `DEMO_SET=semiparametric`: matrix-driven `npindex` and `npscoef`
+- `DEMO_SET=nomad`: matrix-driven `npreg`, `npcdens`, `npcdist`, `npindex`, `npscoef`, and `npplreg` NOMAD smoke rows
+- `DEMO_SET=semiparametric`: matrix-driven `npindex`, `npscoef`, and `npplreg`
 
 You can always override the set with `DEMOS="npcdens npreg"`.
 
@@ -175,6 +175,12 @@ generator while adding `ll`, explicit `lp` degree 1, and LP NOMAD degree-search
 rows. It records objective, bandwidth, fitted-length, and evaluation-count
 fields so the semiparametric route can be compared across serial, session,
 attach, and profile/manual-broadcast modes.
+
+The `npplreg` smoke matrix keeps the original partially linear data generator
+and adds local-linear, explicit degree-1 local-polynomial, and LP NOMAD
+degree-search rows. Because `npplreg` stores multiple child bandwidths, the
+timing parser records the first two flattened bandwidth and coefficient
+sentinels for regression-litmus comparisons.
 
 Cross-version archive run:
 

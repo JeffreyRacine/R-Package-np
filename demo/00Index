@@ -25,9 +25,10 @@ npindex_npRmpi_attach	matrix-driven npindex demo for npRmpi attach mode
 npindex_npRmpi_profile	matrix-driven npindex demo for npRmpi profile/manual mode
 npindex_npRmpi_session	matrix-driven npindex demo for npRmpi session/spawn mode
 npindex_serial	matrix-driven npindex demo for np serial comparison
-npplreg_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npplreg_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npplreg_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
+npplreg_npRmpi_attach	matrix-driven npplreg demo for npRmpi attach mode
+npplreg_npRmpi_profile	matrix-driven npplreg demo for npRmpi profile/manual mode
+npplreg_npRmpi_session	matrix-driven npplreg demo for npRmpi session/spawn mode
+npplreg_serial	matrix-driven npplreg demo for np serial comparison
 npqreg_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
 npqreg_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
 npqreg_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)

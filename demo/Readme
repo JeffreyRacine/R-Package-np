@@ -37,6 +37,10 @@ degree-search coverage.
 coefficient data generator while adding local-linear, explicit degree-1 local
 polynomial, and NOMAD degree-search rows.
 
+`npplreg` is matrix-driven too, retaining the original partially linear data
+generator while adding local-linear, explicit degree-1 local-polynomial, and
+NOMAD degree-search rows.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable

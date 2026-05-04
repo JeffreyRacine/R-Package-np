@@ -124,7 +124,10 @@ fallback_record <- function(path, text) {
     bwtype = NA_character_,
     objective = NA_real_,
     bandwidth = NA_real_,
+    bandwidth.second = NA_real_,
     beta.second = NA_real_,
+    coef.first = NA_real_,
+    coef.second = NA_real_,
     num.feval = NA_real_,
     num.feval.fast = NA_real_,
     nomad.time = NA_real_,
@@ -172,7 +175,10 @@ for (path in files) {
         bwtype = if (!is.null(kv$bwtype)) kv$bwtype else NA_character_,
         objective = num_or_na(kv$objective),
         bandwidth = num_or_na(kv$bandwidth),
+        bandwidth.second = num_or_na(kv$bandwidth.second),
         beta.second = num_or_na(kv$beta.second),
+        coef.first = num_or_na(kv$coef.first),
+        coef.second = num_or_na(kv$coef.second),
         num.feval = num_or_na(kv$num.feval),
         num.feval.fast = num_or_na(kv$num.feval.fast),
         nomad.time = num_or_na(kv$nomad.time),
@@ -198,7 +204,8 @@ results <- if (length(records)) do.call(rbind, records) else {
              degree = character(), degree.max = character(),
              selected.degree = numeric(),
              bwtype = character(), objective = numeric(), bandwidth = numeric(),
-             beta.second = numeric(), num.feval = numeric(),
+             bandwidth.second = numeric(), beta.second = numeric(),
+             coef.first = numeric(), coef.second = numeric(), num.feval = numeric(),
              num.feval.fast = numeric(), nomad.time = numeric(),
              powell.time = numeric(), fitted.length = integer(),
              source_file = character(),
@@ -207,7 +214,8 @@ results <- if (length(records)) do.call(rbind, records) else {
 
 for (name in c("method", "family", "case", "tier", "regtype", "nomad", "degree",
                "degree.max", "selected.degree", "bwtype", "objective", "num.feval",
-               "bandwidth", "beta.second", "num.feval.fast", "nomad.time", "powell.time",
+               "bandwidth", "bandwidth.second", "beta.second", "coef.first", "coef.second",
+               "num.feval.fast", "nomad.time", "powell.time",
                "fitted.length")) {
   if (!name %in% names(results)) results[[name]] <- NA
 }

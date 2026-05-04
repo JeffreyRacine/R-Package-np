@@ -1,0 +1,5 @@
+family,case,tier,enabled,default_n,floor_n,regtype,bwmethod,nomad,degree,degree.max,bwtype,why
+npplreg,npplreg_lc_ls,smoke,TRUE,35,20,lc,cv.ls,FALSE,,,fixed,default_partially_linear_local_constant_route
+npplreg,npplreg_ll_ls,smoke,TRUE,35,20,ll,cv.ls,FALSE,,,fixed,partially_linear_local_linear_route
+npplreg,npplreg_lp1_ls,smoke,TRUE,35,20,lp,cv.ls,FALSE,1,,fixed,partially_linear_explicit_local_polynomial_degree_1_route
+npplreg,npplreg_lp_nomad,smoke,TRUE,25,20,lp,cv.ls,TRUE,,1,fixed,partially_linear_nomad_powell_degree_search_route
