@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,why
+npcopula,npcopula_gaussian_copula_grid,smoke,TRUE,80,25,gaussian_copula_grid_smoke

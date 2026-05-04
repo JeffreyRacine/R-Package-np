@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,why
+npcopula,npcopula_gaussian_copula_grid,sentinel,TRUE,5000,500,gaussian_copula_grid_sentinel

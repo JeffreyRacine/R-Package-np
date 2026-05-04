@@ -146,6 +146,8 @@ Demo sets:
 - `DEMO_SET=tests`: matrix-driven statistical test demos:
   `npdeneqtest`, `npdeptest`, `npsdeptest`, `npsigtest`, `npsymtest`,
   and `npunitest`
+- `DEMO_SET=auxiliary`: matrix-driven auxiliary demos:
+  `npcmstest`, `npconmode`, `npcopula`, `npqreg`, and `npregiv`
 
 You can always override the set with `DEMOS="npcdens npreg"`.
 
@@ -202,6 +204,11 @@ sample-size and bootstrap-count rows. Smoke matrices use the minimum supported
 bootstrap count, while sentinel matrices preserve the older heavier defaults.
 The parser records representative numeric test statistics and p-values when
 available.
+
+The auxiliary demos now share a matrix-driven runner with deterministic
+simulated data. This removes fixed-size real-data dependencies from the scaling
+surface for `npcmstest`, `npconmode`, and `npqreg`, while preserving the public
+workflow each demo is meant to exercise.
 
 Cross-version archive run:
 

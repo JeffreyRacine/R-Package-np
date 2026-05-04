@@ -53,16 +53,14 @@ if [ -z "${DEMOS:-}" ]; then
     tests)
       DEMOS="npdeneqtest npdeptest npsdeptest npsigtest npsymtest npunitest"
       ;;
+    auxiliary)
+      DEMOS="npcmstest npconmode npcopula npqreg npregiv"
+      ;;
     *)
       echo "unknown DEMO_SET=${DEMO_SET}" >&2
       exit 2
       ;;
   esac
-fi
-
-DEMOS_OPT=()
-if [ -n "${DEMOS:-}" ]; then
-  DEMOS_OPT=("DEMOS=${DEMOS}")
 fi
 
 write_metadata() {
@@ -95,11 +93,19 @@ run_make() {
   mkdir -p "${work_dir}"
   (
     cd "${work_dir}"
-    make -f "${SCRIPT_DIR}/makefile" DEMO_SRC="${SCRIPT_DIR}" \
-      NP_DEMO_TIER="${NP_DEMO_TIER}" \
-      NP_DEMO_CASES="${NP_DEMO_CASES:-}" \
-      NP_DEMO_MATRIX="${NP_DEMO_MATRIX:-}" \
-      "${DEMOS_OPT[@]}" "$@"
+    if [ -n "${DEMOS:-}" ]; then
+      make -f "${SCRIPT_DIR}/makefile" DEMO_SRC="${SCRIPT_DIR}" \
+        NP_DEMO_TIER="${NP_DEMO_TIER}" \
+        NP_DEMO_CASES="${NP_DEMO_CASES:-}" \
+        NP_DEMO_MATRIX="${NP_DEMO_MATRIX:-}" \
+        "DEMOS=${DEMOS}" "$@"
+    else
+      make -f "${SCRIPT_DIR}/makefile" DEMO_SRC="${SCRIPT_DIR}" \
+        NP_DEMO_TIER="${NP_DEMO_TIER}" \
+        NP_DEMO_CASES="${NP_DEMO_CASES:-}" \
+        NP_DEMO_MATRIX="${NP_DEMO_MATRIX:-}" \
+        "$@"
+    fi
   )
 }
 

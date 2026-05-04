@@ -6,15 +6,18 @@ npcdist_npRmpi_attach	matrix-driven npcdist demo for npRmpi attach mode
 npcdist_npRmpi_profile	matrix-driven npcdist demo for npRmpi profile/manual mode
 npcdist_npRmpi_session	matrix-driven npcdist demo for npRmpi session/spawn mode
 npcdist_serial	matrix-driven npcdist demo for np serial comparison
-npcmstest_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npcmstest_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npcmstest_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
-npconmode_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npconmode_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npconmode_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
-npcopula_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npcopula_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npcopula_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
+npcmstest_npRmpi_attach	matrix-driven npcmstest demo for npRmpi attach mode
+npcmstest_npRmpi_profile	matrix-driven npcmstest demo for npRmpi profile/manual mode
+npcmstest_npRmpi_session	matrix-driven npcmstest demo for npRmpi session/spawn mode
+npcmstest_serial	matrix-driven npcmstest demo for np serial comparison
+npconmode_npRmpi_attach	matrix-driven npconmode demo for npRmpi attach mode
+npconmode_npRmpi_profile	matrix-driven npconmode demo for npRmpi profile/manual mode
+npconmode_npRmpi_session	matrix-driven npconmode demo for npRmpi session/spawn mode
+npconmode_serial	matrix-driven npconmode demo for np serial comparison
+npcopula_npRmpi_attach	matrix-driven npcopula demo for npRmpi attach mode
+npcopula_npRmpi_profile	matrix-driven npcopula demo for npRmpi profile/manual mode
+npcopula_npRmpi_session	matrix-driven npcopula demo for npRmpi session/spawn mode
+npcopula_serial	matrix-driven npcopula demo for np serial comparison
 npdeneqtest_npRmpi_attach	matrix-driven npdeneqtest demo for npRmpi attach mode
 npdeneqtest_npRmpi_profile	matrix-driven npdeneqtest demo for npRmpi profile/manual mode
 npdeneqtest_npRmpi_session	matrix-driven npdeneqtest demo for npRmpi session/spawn mode
@@ -31,12 +34,14 @@ npplreg_npRmpi_attach	matrix-driven npplreg demo for npRmpi attach mode
 npplreg_npRmpi_profile	matrix-driven npplreg demo for npRmpi profile/manual mode
 npplreg_npRmpi_session	matrix-driven npplreg demo for npRmpi session/spawn mode
 npplreg_serial	matrix-driven npplreg demo for np serial comparison
-npqreg_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npqreg_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npqreg_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
-npregiv_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npregiv_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npregiv_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
+npqreg_npRmpi_attach	matrix-driven npqreg demo for npRmpi attach mode
+npqreg_npRmpi_profile	matrix-driven npqreg demo for npRmpi profile/manual mode
+npqreg_npRmpi_session	matrix-driven npqreg demo for npRmpi session/spawn mode
+npqreg_serial	matrix-driven npqreg demo for np serial comparison
+npregiv_npRmpi_attach	matrix-driven npregiv demo for npRmpi attach mode
+npregiv_npRmpi_profile	matrix-driven npregiv demo for npRmpi profile/manual mode
+npregiv_npRmpi_session	matrix-driven npregiv demo for npRmpi session/spawn mode
+npregiv_serial	matrix-driven npregiv demo for np serial comparison
 npreg_npRmpi_attach	matrix-driven npreg demo for npRmpi attach mode
 npreg_npRmpi_profile	matrix-driven npreg demo for npRmpi profile/manual mode
 npreg_npRmpi_session	matrix-driven npreg demo for npRmpi session/spawn mode

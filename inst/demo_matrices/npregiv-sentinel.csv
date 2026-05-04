@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,why
+npregiv,npregiv_darolles_style_quadratic,sentinel,TRUE,2500,500,nonparametric_iv_quadratic_sentinel

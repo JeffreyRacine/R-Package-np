@@ -1,83 +1,14 @@
-## Profile/manual-broadcast demo (mpiexec + .Rprofile + mpi.bcast.*).
-## Run with two ranks (master + one worker), e.g.
-##   mpiexec -env R_PROFILE_USER ../.Rprofile -env R_PROFILE "" \\
-##           -n 2 R CMD BATCH --no-save <script>.R
-## Do not use R CMD BATCH --vanilla for profile mode.
-##
-## Initialize master and slaves.
+mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)
+mpi.bcast.cmd(options(np.messages = FALSE), caller.execute = TRUE)
 
-mpi.bcast.cmd(np.mpi.initialize(),
-              caller.execute=TRUE)
+.np_demo_src <- Sys.getenv("NP_DEMO_SRC", "")
+.np_demo_family <- c(if (nzchar(.np_demo_src)) file.path(.np_demo_src, "..", "inst", "demo_family_npaux.R"),
+                     system.file("demo_family_npaux.R", package = "npRmpi"))
+.np_demo_family <- .np_demo_family[nzchar(.np_demo_family) & file.exists(.np_demo_family)]
+source(.np_demo_family[[1L]])
+mpi.bcast.Robj2slave(.np_demo_family)
+mpi.bcast.cmd(source(.np_demo_family[[1L]]), caller.execute = FALSE)
+npaux_demo_source_utils()
+npaux_demo_run_matrix("npregiv", "profile")
 
-## Turn off progress i/o as this clutters the output file (if you want
-## to see search progress you can comment out this command)
-
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
-
-## Generate some data and broadcast it to all slaves (it will be known
-## to the master node)
-
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
-
-## Generate some data
-
-n <- as.integer(Sys.getenv("NP_DEMO_N", "2500"))
-## The DGP is as follows:
-
-## 1) y = phi(z) + u
-
-## 2) E(u|z) != 0 (endogeneity present)
-
-## 3) Suppose there exists an instrument w such that z = f(w) + v and
-## E(u|w) = 0
-
-## 4) We generate v, w, and generate u such that u and z are
-## correlated. To achieve this we express u as a function of v (i.e. u =
-## gamma v + eps)
-
-v <- rnorm(n,mean=0,sd=0.27)
-eps <- rnorm(n,mean=0,sd=0.05)
-u <- -0.5*v + eps
-w <- rnorm(n,mean=0,sd=1)
-
-## In Darolles et al (2011) there exist two DGPs. The first is
-## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
-## discontinuous and has a kink at zero).
-
-fun1 <- function(z) { z^2 }
-fun2 <- function(z) { exp(-abs(z)) }
-
-z <- 0.2*w + v
-
-## Generate two y vectors for each function.
-
-y1 <- fun1(z) + u
-y2 <- fun2(z) + u
-
-## You set y to be either y1 or y2 (ditto for phi) depending on which
-## DGP you are considering:
-
-y <- y1
-phi <- fun1
-
-## Sort on z (for plotting)
-
-ivdata <- data.frame(y,z,w)
-ivdata <- ivdata[order(ivdata$z),]
-rm(y,z,w)
-mpi.bcast.Robj2slave(ivdata)
-
-if (mpi.comm.rank(1L) == 0L) {
-  ## npregiv is a composite/orchestrator route: in profile mode keep the
-  ## orchestration on master and let leaf calls use the existing MPI path.
-  t <- system.time(model.iv <- with(ivdata, npregiv(y=y,z=z,w=w)))
-
-  cat("Elapsed time =", t[3], "\n")
-}
-
-## Clean up properly then quit()
-
-mpi.bcast.cmd(mpi.quit(),
-              caller.execute=TRUE)
+mpi.bcast.cmd(mpi.quit(), caller.execute = TRUE)

@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,boot.num,why
+npcmstest,npcmstest_simulated_lm,smoke,TRUE,60,25,9,consistent_model_specification_simulated_smoke

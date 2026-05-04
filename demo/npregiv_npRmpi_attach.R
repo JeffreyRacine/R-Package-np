@@ -1,83 +1,15 @@
 library(npRmpi)
+options(np.messages = FALSE)
 
-## Attach mode demo (session routing under mpiexec).
-## Run with two ranks (master + one worker), e.g.
-##   mpiexec -n 2 Rscript --no-save <script>.R
-## or
-##   mpiexec -n 2 R CMD BATCH --no-save <script>.R
-##
-## If running under mpiexec, keep profile env vars cleared for attach mode:
-##   -env R_PROFILE_USER "" -env R_PROFILE ""
-##
-## Initialize master and slaves.
-npRmpi.init(mode="attach", comm=1, autodispatch=TRUE)
-options(np.messages=FALSE)
+npRmpi.init(mode = "attach", comm = 1, autodispatch = TRUE)
 
 if (mpi.comm.rank(0L) == 0L) {
-
-## Turn off progress i/o as this clutters the output file (if you want
-## to see search progress you can comment out this command)
-## Generate some data and broadcast it to all slaves (it will be known
-## to the master node)
-
-set.seed(42)
-
-## Generate some data
-
-n <- as.integer(Sys.getenv("NP_DEMO_N", "2500"))
-## The DGP is as follows:
-
-## 1) y = phi(z) + u
-
-## 2) E(u|z) != 0 (endogeneity present)
-
-## 3) Suppose there exists an instrument w such that z = f(w) + v and
-## E(u|w) = 0
-
-## 4) We generate v, w, and generate u such that u and z are
-## correlated. To achieve this we express u as a function of v (i.e. u =
-## gamma v + eps)
-
-v <- rnorm(n,mean=0,sd=0.27)
-eps <- rnorm(n,mean=0,sd=0.05)
-u <- -0.5*v + eps
-w <- rnorm(n,mean=0,sd=1)
-
-## In Darolles et al (2011) there exist two DGPs. The first is
-## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
-## discontinuous and has a kink at zero).
-
-fun1 <- function(z) { z^2 }
-fun2 <- function(z) { exp(-abs(z)) }
-
-z <- 0.2*w + v
-
-## Generate two y vectors for each function.
-
-y1 <- fun1(z) + u
-y2 <- fun2(z) + u
-
-## You set y to be either y1 or y2 (ditto for phi) depending on which
-## DGP you are considering:
-
-y <- y1
-phi <- fun1
-
-## Sort on z (for plotting)
-
-ivdata <- data.frame(y,z,w)
-ivdata <- ivdata[order(ivdata$z),]
-rm(y,z,w)
-attach(ivdata)
-
-t <- system.time(model.iv <- npregiv(y=y,z=z,w=w))
-
-cat("Elapsed time =", t[3], "\n")
-
-## Clean up properly then quit()
-
-npRmpi.quit(mode="attach", comm=1)
+  .np_demo_src <- Sys.getenv("NP_DEMO_SRC", "")
+  .np_demo_family <- c(if (nzchar(.np_demo_src)) file.path(.np_demo_src, "..", "inst", "demo_family_npaux.R"),
+                       system.file("demo_family_npaux.R", package = "npRmpi"))
+  .np_demo_family <- .np_demo_family[nzchar(.np_demo_family) & file.exists(.np_demo_family)]
+  source(.np_demo_family[[1L]])
+  npaux_demo_source_utils()
+  npaux_demo_run_matrix("npregiv", "attach")
+  npRmpi.quit(mode = "attach", comm = 1)
 }
-## Batch/cluster attach-mode shutdown (for mpiexec workflows):
-##   npRmpi.quit(mode="attach", comm=1)
-## (no force=TRUE required for attach mode)

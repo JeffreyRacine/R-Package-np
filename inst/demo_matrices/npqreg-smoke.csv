@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,why
+npqreg,npqreg_simulated_three_tau,smoke,TRUE,60,25,quantile_regression_three_tau_simulated_smoke

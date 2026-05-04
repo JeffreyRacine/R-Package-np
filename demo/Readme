@@ -53,6 +53,10 @@ The statistical test demos (`npdeneqtest`, `npdeptest`, `npsdeptest`,
 `npsigtest`, `npsymtest`, and `npunitest`) share a matrix-driven runner with
 smoke/sentinel sample sizes and bootstrap counts.
 
+The auxiliary demos (`npcmstest`, `npconmode`, `npcopula`, `npqreg`, and
+`npregiv`) share a matrix-driven runner with deterministic simulated data and
+serial/session/attach/profile coverage.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable

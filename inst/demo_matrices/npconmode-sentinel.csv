@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,why
+npconmode,npconmode_simulated_binary,sentinel,TRUE,1000,100,conditional_mode_simulated_binary_sentinel

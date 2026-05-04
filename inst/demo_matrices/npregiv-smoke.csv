@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,why
+npregiv,npregiv_darolles_style_quadratic,smoke,TRUE,30,20,nonparametric_iv_quadratic_smoke

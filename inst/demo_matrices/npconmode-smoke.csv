@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,why
+npconmode,npconmode_simulated_binary,smoke,TRUE,60,25,conditional_mode_simulated_binary_smoke
