@@ -41,6 +41,10 @@ polynomial, and NOMAD degree-search rows.
 generator while adding local-linear, explicit degree-1 local-polynomial, and
 NOMAD degree-search rows.
 
+`npudens` replaces the older `npudensls`/`npudensml` split scripts with one
+matrix-driven unconditional density demo covering both least-squares and
+likelihood cross-validation rows.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable

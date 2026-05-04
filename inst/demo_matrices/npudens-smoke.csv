@@ -1,0 +1,3 @@
+family,case,tier,enabled,default_n,floor_n,bwmethod,bwtype,why
+npudens,npudens_cvls,smoke,TRUE,60,20,cv.ls,fixed,unconditional_density_least_squares_cv_route
+npudens,npudens_cvml,smoke,TRUE,60,20,cv.ml,fixed,unconditional_density_likelihood_cv_route

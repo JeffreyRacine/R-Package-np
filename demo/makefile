@@ -1,4 +1,4 @@
-DEMOS ?= npcdens npcdist npcmstest npconmode npcopula npdeneqtest npdeptest npindex npplreg npqreg npreg npregiv npscoef npsdeptest npsigtest npsymtest npudensls npudensml npudistcdf npunitest
+DEMOS ?= npcdens npcdist npcmstest npconmode npcopula npdeneqtest npdeptest npindex npplreg npqreg npreg npregiv npscoef npsdeptest npsigtest npsymtest npudens npudistcdf npunitest
 
 MODE ?= attach
 NP ?= 2
