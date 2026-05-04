@@ -510,7 +510,8 @@ npplregbw.plbandwidth =
                                                  degree,
                                                  penalty.multiplier = 10,
                                                  child.indices = seq_along(child.templates),
-                                                 include_payloads = TRUE) {
+                                                 include_payloads = TRUE,
+                                                 localize = TRUE) {
   total.objective <- 0
   total.feval <- 0
   total.feval.fast <- 0
@@ -536,7 +537,8 @@ npplregbw.plbandwidth =
       ydat = resp$values,
       bws = tbw,
       invalid.penalty = "baseline",
-      penalty.multiplier = penalty.multiplier
+      penalty.multiplier = penalty.multiplier,
+      localize = localize
     )
     total.objective <- total.objective + out$objective
     total.feval <- total.feval + out$num.feval
@@ -626,6 +628,69 @@ npplregbw.plbandwidth =
       penalty.multiplier = penalty.multiplier,
       child.indices = seq_along(child.templates),
       include_payloads = FALSE
+    ))
+  }
+
+  allrank.min.n <- suppressWarnings(as.integer(
+    getOption("npRmpi.npplreg.nomad.allrank.min.n", 3000L)
+  ))
+  if (!is.finite(allrank.min.n) || allrank.min.n < 1L)
+    allrank.min.n <- 3000L
+  profile.manual <- isTRUE(getOption("npRmpi.profile.active", FALSE)) &&
+    isTRUE(.npRmpi_manual_bcast_in_context())
+  use.allrank <- isTRUE(profile.manual) &&
+    size > length(child.templates) &&
+    length(child.templates) > 0L &&
+    NROW(zdat) >= allrank.min.n
+
+  if (isTRUE(use.allrank)) {
+    all.indices <- seq_along(child.templates)
+
+    .npRmpi_transport_trace(
+      role = "npplreg.nomad",
+      event = "collective.eval.start",
+      fields = list(
+        eval_id = eval_id,
+        rank = rank,
+        strategy = "regression_allrank",
+        degree = paste(as.integer(degree), collapse = ","),
+        child_indices = paste(as.integer(all.indices), collapse = ",")
+      )
+    )
+
+    out <- .npplregbw_eval_child_payload_subset(
+      zdat = zdat,
+      reg.args = reg.args,
+      degree.search = degree.search,
+      child.responses = child.responses,
+      child.templates = child.templates,
+      child.setup = child.setup,
+      bw.matrix = bw.matrix,
+      degree = degree,
+      penalty.multiplier = penalty.multiplier,
+      child.indices = all.indices,
+      include_payloads = FALSE,
+      localize = FALSE
+    )
+
+    .npRmpi_transport_trace(
+      role = "npplreg.nomad",
+      event = "collective.eval.done",
+      fields = list(
+        eval_id = eval_id,
+        rank = rank,
+        strategy = "regression_allrank",
+        total_objective = out$objective,
+        total_num_feval = out$num.feval,
+        total_num_feval_fast = out$num.feval.fast
+      )
+    )
+
+    return(list(
+      objective = out$objective,
+      num.feval = out$num.feval,
+      num.feval.fast = out$num.feval.fast,
+      child.payloads = NULL
     ))
   }
 
