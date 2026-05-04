@@ -106,7 +106,8 @@ npindexbw.NULL <-
       automatic.degree.search = automatic.degree.search,
       search.engine = search.engine.value
     )
-    if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
+    if (.npRmpi_autodispatch_active() &&
+        (!isTRUE(automatic.degree.search) || .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
       return(.npRmpi_autodispatch_call(mc, parent.frame()))
 
     xdat <- toFrame(xdat)
@@ -1363,7 +1364,8 @@ npindexbw.default <-
       "manual"
     }
     automatic.degree.search <- !identical(match.arg(degree.select.value, c("manual", "coordinate", "exhaustive")), "manual")
-    if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
+    if (.npRmpi_autodispatch_active() &&
+        (!isTRUE(automatic.degree.search) || .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat <- toFrame(xdat)
