@@ -22,6 +22,10 @@ for each regression type/bandwidth method. Use `NP_DEMO_TIER=smoke` or
 as `npreg_lc_ls`, `npreg_ll_ls`, `npreg_lp1_ls`, `npreg_lc_aic`, and
 `npreg_lp_nomad`.
 
+`npcdens` is also matrix-driven. Its smoke/sentinel rows replace the older
+`npcdensls` and `npcdensml` script pairs while adding `ll`, explicit
+`lp` degree 1, and `lp` NOMAD degree-search coverage.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable

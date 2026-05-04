@@ -118,6 +118,7 @@ fallback_record <- function(path, text) {
     regtype = NA_character_,
     nomad = NA_character_,
     degree = NA_character_,
+    degree.max = NA_character_,
     selected.degree = NA_real_,
     bwtype = NA_character_,
     objective = NA_real_,
@@ -162,6 +163,7 @@ for (path in files) {
         regtype = if (!is.null(kv$regtype)) kv$regtype else NA_character_,
         nomad = if (!is.null(kv$nomad)) kv$nomad else NA_character_,
         degree = if (!is.null(kv$degree)) kv$degree else NA_character_,
+        degree.max = if (!is.null(kv$degree.max)) kv$degree.max else NA_character_,
         selected.degree = num_or_na(kv$selected.degree),
         bwtype = if (!is.null(kv$bwtype)) kv$bwtype else NA_character_,
         objective = num_or_na(kv$objective),
@@ -186,7 +188,8 @@ results <- if (length(records)) do.call(rbind, records) else {
              n = integer(), default_n = integer(), elapsed = numeric(),
              bwmethod = character(), family = character(), case = character(),
              tier = character(), regtype = character(), nomad = character(),
-             degree = character(), selected.degree = numeric(),
+             degree = character(), degree.max = character(),
+             selected.degree = numeric(),
              bwtype = character(), objective = numeric(), num.feval = numeric(),
              num.feval.fast = numeric(), nomad.time = numeric(),
              powell.time = numeric(), fitted.length = integer(),
@@ -195,7 +198,7 @@ results <- if (length(records)) do.call(rbind, records) else {
 }
 
 for (name in c("family", "case", "tier", "regtype", "nomad", "degree",
-               "selected.degree", "bwtype", "objective", "num.feval",
+               "degree.max", "selected.degree", "bwtype", "objective", "num.feval",
                "num.feval.fast", "nomad.time", "powell.time",
                "fitted.length")) {
   if (!name %in% names(results)) results[[name]] <- NA

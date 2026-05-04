@@ -134,14 +134,14 @@ DEMO_SET=pilot NP_DEMO_N=100 SESSION_SLAVES=1 MPI_RANKS=2 ./runall
 Demo sets:
 
 - `DEMO_SET=all`: makefile default demo list
-- `DEMO_SET=pilot`: narrow `npcdensls` four-route pilot
-- `DEMO_SET=conditional-density`: `npcdensls` and `npcdensml`
-- `DEMO_SET=conditional-core`: `npcdensls`, `npcdensml`, and `npcdistls`
+- `DEMO_SET=pilot`: narrow matrix-driven `npcdens` four-route pilot
+- `DEMO_SET=conditional-density`: matrix-driven `npcdens`
+- `DEMO_SET=conditional-core`: matrix-driven `npcdens` and `npcdistls`
 - `DEMO_SET=core-scaling`: converted core subset currently covering
-  matrix-driven `npreg`, `npcdensls`, `npcdensml`, and `npcdistls`
-- `DEMO_SET=nomad`: matrix-driven `npreg` NOMAD smoke rows
+  matrix-driven `npreg`, matrix-driven `npcdens`, and `npcdistls`
+- `DEMO_SET=nomad`: matrix-driven `npreg` and `npcdens` NOMAD smoke rows
 
-You can always override the set with `DEMOS="npcdensls npreg"`.
+You can always override the set with `DEMOS="npcdens npreg"`.
 
 Matrix-driven family demos, beginning with `npreg`, accept:
 
@@ -152,6 +152,12 @@ Matrix-driven family demos, beginning with `npreg`, accept:
 The `npreg` smoke matrix currently covers `lc`, `ll`, explicit `lp` degree 1,
 `cv.aic`, and NOMAD local-polynomial degree search. The heavier sentinel
 matrix uses larger calibrated defaults for cross-version regression checks.
+
+The `npcdens` smoke matrix currently covers `lc` least-squares, `lc`
+maximum-likelihood, `ll` least-squares, explicit `lp` degree 1, and NOMAD
+local-polynomial degree search. The sentinel matrix preserves the previous
+`npcdensls`/`npcdensml` calibrated defaults while adding the newer `ll`, `lp`,
+and NOMAD surfaces.
 
 Cross-version archive run:
 

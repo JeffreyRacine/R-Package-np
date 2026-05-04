@@ -30,19 +30,19 @@ if [ -z "${DEMOS:-}" ]; then
     all)
       ;;
     pilot)
-      DEMOS="npcdensls"
+      DEMOS="npcdens"
       ;;
     conditional-density)
-      DEMOS="npcdensls npcdensml"
+      DEMOS="npcdens"
       ;;
     conditional-core)
-      DEMOS="npcdensls npcdensml npcdistls"
+      DEMOS="npcdens npcdistls"
       ;;
     core-scaling)
-      DEMOS="npreg npcdensls npcdensml npcdistls"
+      DEMOS="npreg npcdens npcdistls"
       ;;
     nomad)
-      DEMOS="npreg"
+      DEMOS="npreg npcdens"
       ;;
     *)
       echo "unknown DEMO_SET=${DEMO_SET}" >&2
