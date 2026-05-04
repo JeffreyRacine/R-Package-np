@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,boot.num,method,why
+npsymtest,npsymtest_symmetry,smoke,TRUE,60,20,9,summation,symmetry_bootstrap_smoke

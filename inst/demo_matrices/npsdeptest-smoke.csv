@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,boot.num,method,why
+npsdeptest,npsdeptest_serial_dependence,smoke,TRUE,60,20,9,summation,serial_dependence_bootstrap_smoke

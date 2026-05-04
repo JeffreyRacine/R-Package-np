@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,boot.num,method,why
+npsymtest,npsymtest_symmetry,sentinel,TRUE,2500,500,399,summation,symmetry_bootstrap_sentinel

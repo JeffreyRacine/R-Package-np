@@ -143,6 +143,9 @@ Demo sets:
 - `DEMO_SET=nomad`: matrix-driven `npreg`, `npcdens`, `npcdist`, `npindex`, `npscoef`, and `npplreg` NOMAD smoke rows
 - `DEMO_SET=semiparametric`: matrix-driven `npindex`, `npscoef`, and `npplreg`
 - `DEMO_SET=unconditional`: matrix-driven `npudens` and `npudist`
+- `DEMO_SET=tests`: matrix-driven statistical test demos:
+  `npdeneqtest`, `npdeptest`, `npsdeptest`, `npsigtest`, `npsymtest`,
+  and `npunitest`
 
 You can always override the set with `DEMOS="npcdens npreg"`.
 
@@ -193,6 +196,12 @@ The `npudist` smoke matrix replaces `npudistcdf` with one unconditional
 distribution demo covering CDF cross-validation. It runs both `npudistbw()` and
 `npudist()`, recording objective, bandwidth, fitted length, and the first CDF
 estimate.
+
+The statistical test demos now share a matrix-driven runner with calibrated
+sample-size and bootstrap-count rows. Smoke matrices use the minimum supported
+bootstrap count, while sentinel matrices preserve the older heavier defaults.
+The parser records representative numeric test statistics and p-values when
+available.
 
 Cross-version archive run:
 

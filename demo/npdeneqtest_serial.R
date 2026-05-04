@@ -1,23 +1,10 @@
-## This is the serial version of npdeneqtest_npRmpi.R for comparison
-## purposes (bandwidth ought to be identical, timing may
-## differ). Study the differences between this file and its MPI
-## counterpart for insight about your own problems.
-
 library(np)
-options(np.messages=FALSE)
+options(np.messages = FALSE)
 
-## Generate some data
-
-set.seed(42)
-
-n <- as.integer(Sys.getenv("NP_DEMO_N", "2500"))
-sample.A <- data.frame(x=rnorm(n))
-sample.B <- data.frame(x=rnorm(n))
-
-## A consistent density equality test example
-
-t <- system.time(output <- npdeneqtest(sample.A,sample.B,boot.num=99))
-
-output
-
-cat("Elapsed time =", t[3], "\n")
+.np_demo_src <- Sys.getenv("NP_DEMO_SRC", "")
+.np_demo_family <- c(if (nzchar(.np_demo_src)) file.path(.np_demo_src, "..", "inst", "demo_family_nptests.R"),
+                     system.file("demo_family_nptests.R", package = "npRmpi"))
+.np_demo_family <- .np_demo_family[nzchar(.np_demo_family) & file.exists(.np_demo_family)]
+source(.np_demo_family[[1L]])
+nptest_demo_source_utils()
+nptest_demo_run_matrix("npdeneqtest", "serial")

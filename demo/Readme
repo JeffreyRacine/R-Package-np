@@ -49,6 +49,10 @@ likelihood cross-validation rows.
 unconditional distribution demo covering CDF cross-validation and fitted CDF
 construction.
 
+The statistical test demos (`npdeneqtest`, `npdeptest`, `npsdeptest`,
+`npsigtest`, `npsymtest`, and `npunitest`) share a matrix-driven runner with
+smoke/sentinel sample sizes and bootstrap counts.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable

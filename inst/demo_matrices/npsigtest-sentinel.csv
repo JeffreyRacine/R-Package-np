@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,boot.num,method,why
+npsigtest,npsigtest_regression_significance,sentinel,TRUE,1000,200,399,summation,regression_significance_bootstrap_sentinel

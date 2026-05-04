@@ -1,0 +1,2 @@
+family,case,tier,enabled,default_n,floor_n,boot.num,method,why
+npdeneqtest,npdeneqtest_density_equality,sentinel,TRUE,2500,500,99,summation,density_equality_bootstrap_sentinel

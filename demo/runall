@@ -50,6 +50,9 @@ if [ -z "${DEMOS:-}" ]; then
     unconditional)
       DEMOS="npudens npudist"
       ;;
+    tests)
+      DEMOS="npdeneqtest npdeptest npsdeptest npsigtest npsymtest npunitest"
+      ;;
     *)
       echo "unknown DEMO_SET=${DEMO_SET}" >&2
       exit 2

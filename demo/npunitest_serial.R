@@ -1,26 +1,10 @@
-## This is the serial version of npunitest_npRmpi.R for comparison
-## purposes (bandwidth ought to be identical, timing may
-## differ). Study the differences between this file and its MPI
-## counterpart for insight about your own problems.
-
 library(np)
-options(np.messages=FALSE)
+options(np.messages = FALSE)
 
-## Generate some data
-
-set.seed(42)
-
-n <- as.integer(Sys.getenv("NP_DEMO_N", "5000"))
-x <- rnorm(n)
-y <- rnorm(n)
-
-## A simple example of the test for equality of univariate densities
-
-t <- system.time(output <- npunitest(x,y,
-                                     method="summation",
-                                     bootstrap=TRUE))
-
-output
-
-cat("Elapsed time =", t[3], "\n")
-
+.np_demo_src <- Sys.getenv("NP_DEMO_SRC", "")
+.np_demo_family <- c(if (nzchar(.np_demo_src)) file.path(.np_demo_src, "..", "inst", "demo_family_nptests.R"),
+                     system.file("demo_family_nptests.R", package = "npRmpi"))
+.np_demo_family <- .np_demo_family[nzchar(.np_demo_family) & file.exists(.np_demo_family)]
+source(.np_demo_family[[1L]])
+nptest_demo_source_utils()
+nptest_demo_run_matrix("npunitest", "serial")
