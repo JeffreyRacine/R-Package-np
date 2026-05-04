@@ -30,7 +30,9 @@
 ^demo/runall_npRmpi
 ^demo/runall_serial
 ^demo/serial/.*$
+^demo/results/
 ^demo/timing
+^demo/parse_demo_results\.R$
 ^issue_notes
 ^archive$
 ^archive/

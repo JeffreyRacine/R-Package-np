@@ -14,7 +14,7 @@ cleanup_slaves() {
 
 cleanup_run_dirs() {
   shopt -s nullglob
-  rm -rf -- serial n_*_attach n_*_profile
+  rm -rf -- serial session session_* mpi_launch results n_*_attach n_*_profile
   shopt -u nullglob
 }
 

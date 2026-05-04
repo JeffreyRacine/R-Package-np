@@ -1,25 +1,5 @@
 library(npRmpi)
-
-## Attach mode demo (session routing under mpiexec).
-## Run with two ranks (master + one worker), e.g.
-##   mpiexec -n 2 Rscript --no-save <script>.R
-## or
-##   mpiexec -n 2 R CMD BATCH --no-save <script>.R
-##
-## If running under mpiexec, keep profile env vars cleared for attach mode:
-##   -env R_PROFILE_USER "" -env R_PROFILE ""
-##
-## Initialize master and slaves.
-npRmpi.init(mode="attach", comm=1, autodispatch=TRUE)
 options(np.messages=FALSE)
-
-if (mpi.comm.rank(0L) == 0L) {
-
-## Turn off progress i/o as this clutters the output file (if you want
-## to see search progress you can comment out this command)
-## Load your data and broadcast it to all slave nodes
-
-library(MASS)
 
 .np_demo_src <- Sys.getenv("NP_DEMO_SRC", "")
 .np_demo_utils <- c(if (nzchar(.np_demo_src)) file.path(.np_demo_src, "..", "inst", "demo_utils.R"),
@@ -32,6 +12,13 @@ library(MASS)
 .np_demo_utils <- .np_demo_utils[nzchar(.np_demo_utils) & file.exists(.np_demo_utils)]
 source(.np_demo_utils[[1L]])
 
+library(MASS)
+
+nslaves <- np_demo_n(default = 1L, floor = 1L,
+                     exact_env = "NP_DEMO_NSLAVES",
+                     frac_env = "NP_DEMO_NSLAVES_FRAC")
+npRmpi.init(nslaves = nslaves)
+
 set.seed(42)
 
 default_n <- 1000L
@@ -41,11 +28,10 @@ mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
 data <- mvrnorm(n=n, mu, Sigma)
 mydat <- data.frame(x=data[,2],y=data[,1])
-## A conditional density estimation example. 
 
 t <- system.time(bw <- npcdensbw(y~x,
-                                               bwmethod="cv.ls",
-                                               data=mydat))
+                                 bwmethod="cv.ls",
+                                 data=mydat))
 
 summary(bw)
 
@@ -54,12 +40,7 @@ t <- t + system.time(model <- npcdens(bws=bw))
 summary(model)
 
 cat("Elapsed time =", t[3], "\n")
-np_demo_result("npcdensls", "attach", n, default_n, t[3], bwmethod = "cv.ls")
+np_demo_result("npcdensls", "session", n, default_n, t[3],
+               bwmethod = "cv.ls", slaves = nslaves)
 
-## Clean up properly then quit()
-
-npRmpi.quit(mode="attach", comm=1)
-}
-## Batch/cluster attach-mode shutdown (for mpiexec workflows):
-##   npRmpi.quit(mode="attach", comm=1)
-## (no force=TRUE required for attach mode)
+## The demo harness cleans spawned slave daemons from the launcher layer.

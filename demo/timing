@@ -1,36 +1,15 @@
 #!/bin/bash
+set -euo pipefail
 
-# Collect base info and serial times
-grep "n <- " serial/*serial.Rout | awk '{print $4}' > sample_serial.tmp
-grep "time = " serial/*serial.Rout | awk -F/ '{print $2}' | awk -F_ '{print $1}' > names.tmp
-grep "time = " serial/*serial.Rout | awk -F= '{print $2}' > serial.tmp
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${1:-.}"
+OUT_DIR="${2:-.}"
 
-# Collect MPI times for n=2, 3, 4
-for n in 2 3 4; do
-    if [ -d "n_$n" ]; then
-        grep "time = " n_$n/*npRmpi.Rout | awk -F= '{print $2}' > n_$n.tmp
-    else
-        # If directory doesn't exist yet, fill with 0 or NA
-        awk '{print "0"}' serial.tmp > n_$n.tmp
-    fi
-done
+Rscript --vanilla "${SCRIPT_DIR}/parse_demo_results.R" "${ROOT}" "${OUT_DIR}"
 
-# Consolidated .dat file
-paste names.tmp sample_serial.tmp serial.tmp n_2.tmp n_3.tmp n_4.tmp | \
-awk '{printf("%s (n=%d): np=1: %.1f, np=2: %.1f, np=3: %.1f, np=4: %.1f, ratios: %.2f, %.2f, %.2f\n", \
-$1, $2, $3, $4, $5, $6, $4/$3, $5/$3, $6/$3)}' > timing_all.dat
-
-# Consolidated .tex file
-echo '\begin{tabular}{llrrrrrrr}' > timing_all.tex
-echo 'Function & $n$ & Secs(1) & Secs(2) & Secs(3) & Secs(4) & Ratio(2) & Ratio(3) & Ratio(4)\cr' >> timing_all.tex
-echo '\hline' >> timing_all.tex
-paste names.tmp sample_serial.tmp serial.tmp n_2.tmp n_3.tmp n_4.tmp | \
-awk '{printf("%s & %d & %.1f & %.1f & %.1f & %.1f & %.2f & %.2f & %.2f\\cr\n", \
-$1, $2, $3, $4, $5, $6, $4/$3, $5/$3, $6/$3)}' >> timing_all.tex
-echo '\hline' >> timing_all.tex
-echo '\end{tabular}' >> timing_all.tex
-
-cat timing_all.dat
-
-rm *.tmp
-latexmk -pdf timing
+if [ -f "${OUT_DIR}/timing.tex" ] && command -v latexmk >/dev/null 2>&1; then
+  (
+    cd "${OUT_DIR}"
+    latexmk -pdf timing
+  )
+fi

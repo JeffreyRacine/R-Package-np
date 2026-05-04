@@ -4,6 +4,18 @@ Timing results updated using an Apple M2 Mac Studio (12 cores) running
 macOS 15.2 and MPICH 4.3.2. Consolidated results for np=1, 2, 3, 4
 can be found in timing.pdf.
 
+May 4 2026
+
+The demo harness now distinguishes serial, session, attach, and
+profile/manual-broadcast routes. New `runall` output is written under
+`results/<run-id>/` using explicit directories such as
+`session/slaves_01` and `mpi_launch/ranks_02/attach`, while the timing parser
+continues to read legacy folders such as `serial`, `n_2_attach`, and
+`n_2_profile`.
+
+`NP_DEMO_N` remains the exact sample-size override. `NP_DEMO_N_FRAC` now runs
+supported demos at a fraction of their calibrated default sample size.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable
