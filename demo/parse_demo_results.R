@@ -112,6 +112,20 @@ fallback_record <- function(path, text) {
     default_n = NA_integer_,
     elapsed = num_or_na(elapsed),
     bwmethod = NA_character_,
+    family = NA_character_,
+    case = NA_character_,
+    tier = NA_character_,
+    regtype = NA_character_,
+    nomad = NA_character_,
+    degree = NA_character_,
+    selected.degree = NA_real_,
+    bwtype = NA_character_,
+    objective = NA_real_,
+    num.feval = NA_real_,
+    num.feval.fast = NA_real_,
+    nomad.time = NA_real_,
+    powell.time = NA_real_,
+    fitted.length = NA_integer_,
     source_file = normalizePath(path, mustWork = TRUE),
     stringsAsFactors = FALSE
   )
@@ -142,6 +156,20 @@ for (path in files) {
         default_n = int_or_na(kv$default_n),
         elapsed = num_or_na(kv$elapsed),
         bwmethod = if (!is.null(kv$bwmethod)) kv$bwmethod else NA_character_,
+        family = if (!is.null(kv$family)) kv$family else NA_character_,
+        case = if (!is.null(kv$case)) kv$case else NA_character_,
+        tier = if (!is.null(kv$tier)) kv$tier else NA_character_,
+        regtype = if (!is.null(kv$regtype)) kv$regtype else NA_character_,
+        nomad = if (!is.null(kv$nomad)) kv$nomad else NA_character_,
+        degree = if (!is.null(kv$degree)) kv$degree else NA_character_,
+        selected.degree = num_or_na(kv$selected.degree),
+        bwtype = if (!is.null(kv$bwtype)) kv$bwtype else NA_character_,
+        objective = num_or_na(kv$objective),
+        num.feval = num_or_na(kv$num.feval),
+        num.feval.fast = num_or_na(kv$num.feval.fast),
+        nomad.time = num_or_na(kv$nomad.time),
+        powell.time = num_or_na(kv$powell.time),
+        fitted.length = int_or_na(kv$fitted.length),
         source_file = normalizePath(path, mustWork = TRUE),
         stringsAsFactors = FALSE
       )
@@ -156,11 +184,25 @@ results <- if (length(records)) do.call(rbind, records) else {
   data.frame(run_id = character(), demo = character(), mode = character(),
              engine = character(), ranks = integer(), slaves = integer(),
              n = integer(), default_n = integer(), elapsed = numeric(),
-             bwmethod = character(), source_file = character(),
+             bwmethod = character(), family = character(), case = character(),
+             tier = character(), regtype = character(), nomad = character(),
+             degree = character(), selected.degree = numeric(),
+             bwtype = character(), objective = numeric(), num.feval = numeric(),
+             num.feval.fast = numeric(), nomad.time = numeric(),
+             powell.time = numeric(), fitted.length = integer(),
+             source_file = character(),
              stringsAsFactors = FALSE)
 }
 
-results <- results[order(results$demo, results$mode, results$ranks, results$slaves,
+for (name in c("family", "case", "tier", "regtype", "nomad", "degree",
+               "selected.degree", "bwtype", "objective", "num.feval",
+               "num.feval.fast", "nomad.time", "powell.time",
+               "fitted.length")) {
+  if (!name %in% names(results)) results[[name]] <- NA
+}
+
+results <- results[order(results$family, results$demo, results$case,
+                         results$mode, results$ranks, results$slaves,
                          results$source_file), ]
 
 write.csv(results, file.path(out_dir, "demo_results.csv"), row.names = FALSE)

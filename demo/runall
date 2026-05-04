@@ -23,6 +23,7 @@ RUN_DIR="${RESULTS_ROOT}/${RUN_ID}"
 SESSION_SLAVES="${SESSION_SLAVES:-1 2 3}"
 MPI_RANKS="${MPI_RANKS:-2 3 4}"
 DEMO_SET="${DEMO_SET:-all}"
+NP_DEMO_TIER="${NP_DEMO_TIER:-smoke}"
 
 if [ -z "${DEMOS:-}" ]; then
   case "${DEMO_SET}" in
@@ -38,11 +39,10 @@ if [ -z "${DEMOS:-}" ]; then
       DEMOS="npcdensls npcdensml npcdistls"
       ;;
     core-scaling)
-      DEMOS="npreglcls npregllls npcdensls npcdensml npcdistls"
+      DEMOS="npreg npcdensls npcdensml npcdistls"
       ;;
     nomad)
-      echo "DEMO_SET=nomad is reserved until explicit NOMAD demo scripts are added" >&2
-      exit 2
+      DEMOS="npreg"
       ;;
     *)
       echo "unknown DEMO_SET=${DEMO_SET}" >&2
@@ -66,6 +66,9 @@ write_metadata() {
     echo "results_root=${RESULTS_ROOT}"
     echo "np_demo_n=${NP_DEMO_N:-}"
     echo "np_demo_n_frac=${NP_DEMO_N_FRAC:-}"
+    echo "np_demo_tier=${NP_DEMO_TIER}"
+    echo "np_demo_cases=${NP_DEMO_CASES:-}"
+    echo "np_demo_matrix=${NP_DEMO_MATRIX:-}"
     echo "session_slaves=${SESSION_SLAVES}"
     echo "mpi_ranks=${MPI_RANKS}"
     echo "demo_set=${DEMO_SET}"
@@ -83,7 +86,11 @@ run_make() {
   mkdir -p "${work_dir}"
   (
     cd "${work_dir}"
-    make -f "${SCRIPT_DIR}/makefile" DEMO_SRC="${SCRIPT_DIR}" "${DEMOS_OPT[@]}" "$@"
+    make -f "${SCRIPT_DIR}/makefile" DEMO_SRC="${SCRIPT_DIR}" \
+      NP_DEMO_TIER="${NP_DEMO_TIER}" \
+      NP_DEMO_CASES="${NP_DEMO_CASES:-}" \
+      NP_DEMO_MATRIX="${NP_DEMO_MATRIX:-}" \
+      "${DEMOS_OPT[@]}" "$@"
   )
 }
 

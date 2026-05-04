@@ -16,6 +16,12 @@ continues to read legacy folders such as `serial`, `n_2_attach`, and
 `NP_DEMO_N` remains the exact sample-size override. `NP_DEMO_N_FRAC` now runs
 supported demos at a fraction of their calibrated default sample size.
 
+`npreg` is now a matrix-driven family demo rather than separate script names
+for each regression type/bandwidth method. Use `NP_DEMO_TIER=smoke` or
+`NP_DEMO_TIER=sentinel`, and optionally `NP_DEMO_CASES`, to select rows such
+as `npreg_lc_ls`, `npreg_ll_ls`, `npreg_lp1_ls`, `npreg_lc_aic`, and
+`npreg_lp_nomad`.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable

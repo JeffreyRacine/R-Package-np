@@ -39,6 +39,8 @@ to `SESSION_SLAVES=3`.
 - `runall`: orchestrates full matrix
 - `makefile`: mode-specific launcher logic
 - `../inst/demo_utils.R`: sample-size and machine-readable result helpers
+- `../inst/demo_matrices/*.csv`: family/case matrices for modern demos
+- `../inst/demo_family_*.R`: shared family runners used by thin mode scripts
 - `parse_demo_results.R`: transcript parser used by `timing`
 - `*.R`: demo scripts
 - `../inst/Rprofile`: canonical profile startup (also available as `system.file("Rprofile", package="npRmpi")`)
@@ -136,10 +138,20 @@ Demo sets:
 - `DEMO_SET=conditional-density`: `npcdensls` and `npcdensml`
 - `DEMO_SET=conditional-core`: `npcdensls`, `npcdensml`, and `npcdistls`
 - `DEMO_SET=core-scaling`: converted core subset currently covering
-  `npreglcls`, `npregllls`, `npcdensls`, `npcdensml`, and `npcdistls`
-- `DEMO_SET=nomad`: reserved until explicit NOMAD demo scripts are added
+  matrix-driven `npreg`, `npcdensls`, `npcdensml`, and `npcdistls`
+- `DEMO_SET=nomad`: matrix-driven `npreg` NOMAD smoke rows
 
-You can always override the set with `DEMOS="npcdensls npreglcls"`.
+You can always override the set with `DEMOS="npcdensls npreg"`.
+
+Matrix-driven family demos, beginning with `npreg`, accept:
+
+- `NP_DEMO_TIER=smoke` or `NP_DEMO_TIER=sentinel`
+- `NP_DEMO_CASES="npreg_lc_ls npreg_lp_nomad"` for selected rows
+- `NP_DEMO_MATRIX=/absolute/path/to/custom.csv` for a custom matrix
+
+The `npreg` smoke matrix currently covers `lc`, `ll`, explicit `lp` degree 1,
+`cv.aic`, and NOMAD local-polynomial degree search. The heavier sentinel
+matrix uses larger calibrated defaults for cross-version regression checks.
 
 Cross-version archive run:
 

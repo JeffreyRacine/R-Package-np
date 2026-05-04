@@ -1,0 +1,6 @@
+family,case,tier,enabled,default_n,floor_n,regtype,bwmethod,nomad,degree,bwtype,why
+npreg,npreg_lc_ls,smoke,TRUE,40,20,lc,cv.ls,FALSE,,fixed,default_local_constant_ls_route
+npreg,npreg_ll_ls,smoke,TRUE,40,20,ll,cv.ls,FALSE,,fixed,legacy_local_linear_ls_route
+npreg,npreg_lp1_ls,smoke,TRUE,40,20,lp,cv.ls,FALSE,1,fixed,explicit_local_polynomial_degree_1_route
+npreg,npreg_lc_aic,smoke,TRUE,40,20,lc,cv.aic,FALSE,,fixed,aic_route_without_regtype_change
+npreg,npreg_lp_nomad,smoke,TRUE,30,20,lp,cv.ls,TRUE,,fixed,nomad_powell_handoff_route_with_degree_search
