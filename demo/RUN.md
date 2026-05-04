@@ -139,7 +139,8 @@ Demo sets:
 - `DEMO_SET=conditional-core`: matrix-driven `npcdens` and `npcdist`
 - `DEMO_SET=core-scaling`: converted core subset currently covering
   matrix-driven `npreg`, matrix-driven `npcdens`, and matrix-driven `npcdist`
-- `DEMO_SET=nomad`: matrix-driven `npreg`, `npcdens`, `npcdist`, and `npindex` NOMAD smoke rows
+- `DEMO_SET=nomad`: matrix-driven `npreg`, `npcdens`, `npcdist`, `npindex`, and `npscoef` NOMAD smoke rows
+- `DEMO_SET=semiparametric`: matrix-driven `npindex` and `npscoef`
 
 You can always override the set with `DEMOS="npcdens npreg"`.
 
@@ -168,6 +169,12 @@ The `npindex` smoke matrix replaces the older Ichimura/Klein-Spady split
 scripts with rows for Ichimura `lc`, `ll`, explicit `lp` degree 1, Ichimura
 LP NOMAD degree search, and the Klein-Spady binary route. It records beta and
 bandwidth fields as regression-litmus sentinels.
+
+The `npscoef` smoke matrix preserves the original smooth-coefficient data
+generator while adding `ll`, explicit `lp` degree 1, and LP NOMAD degree-search
+rows. It records objective, bandwidth, fitted-length, and evaluation-count
+fields so the semiparametric route can be compared across serial, session,
+attach, and profile/manual-broadcast modes.
 
 Cross-version archive run:
 

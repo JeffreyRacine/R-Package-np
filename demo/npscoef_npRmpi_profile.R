@@ -1,50 +1,12 @@
-## Profile/manual-broadcast demo (mpiexec + .Rprofile + mpi.bcast.*).
-## Run with two ranks (master + one worker), e.g.
-##   mpiexec -env R_PROFILE_USER ../.Rprofile -env R_PROFILE "" \\
-##           -n 2 R CMD BATCH --no-save <script>.R
-## Do not use R CMD BATCH --vanilla for profile mode.
-##
-## Initialize master and slaves.
+mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)
+mpi.bcast.cmd(options(np.messages = FALSE), caller.execute = TRUE)
 
-mpi.bcast.cmd(np.mpi.initialize(),
-              caller.execute=TRUE)
+.np_demo_src <- Sys.getenv("NP_DEMO_SRC", "")
+.np_demo_family <- c(if (nzchar(.np_demo_src)) file.path(.np_demo_src, "..", "inst", "demo_family_npscoef.R"),
+                     system.file("demo_family_npscoef.R", package = "npRmpi"))
+.np_demo_family <- .np_demo_family[nzchar(.np_demo_family) & file.exists(.np_demo_family)]
+source(.np_demo_family[[1L]])
+npscoef_demo_source_utils()
+npscoef_demo_run_matrix("profile")
 
-## Turn off progress i/o as this clutters the output file (if you want
-## to see search progress you can comment out this command)
-
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
-
-## Generate some data and broadcast it to all slaves (it will be known
-## to the master node so no need to broadcast it)
-
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
-
-n <- as.integer(Sys.getenv("NP_DEMO_N", "10000"))
-x <- runif(n)
-z <- runif(n, min=-2, max=2)
-y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
-mydat <- data.frame(x,y,z)
-rm(x,y,z)
-
-mpi.bcast.Robj2slave(mydat)
-
-## A smooth coefficient model example
-
-t <- system.time(mpi.bcast.cmd(bw <- npscoefbw(y~x|z,data=mydat),
-                               caller.execute=TRUE))
-
-summary(bw)
-
-t <- t + system.time(mpi.bcast.cmd(model <- npscoef(bws=bw, gradients=TRUE),
-                                   caller.execute=TRUE))
-
-summary(model)
-
-cat("Elapsed time =", t[3], "\n")
-
-## Clean up properly then quit()
-
-mpi.bcast.cmd(mpi.quit(),
-              caller.execute=TRUE)
+mpi.bcast.cmd(mpi.quit(), caller.execute = TRUE)

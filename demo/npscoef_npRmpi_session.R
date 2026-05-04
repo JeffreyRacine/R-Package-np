@@ -1,4 +1,4 @@
-library(np)
+library(npRmpi)
 options(np.messages = FALSE)
 
 .np_demo_src <- Sys.getenv("NP_DEMO_SRC", "")
@@ -7,4 +7,10 @@ options(np.messages = FALSE)
 .np_demo_family <- .np_demo_family[nzchar(.np_demo_family) & file.exists(.np_demo_family)]
 source(.np_demo_family[[1L]])
 npscoef_demo_source_utils()
-npscoef_demo_run_matrix("serial")
+
+nslaves <- np_demo_n(default = 1L, floor = 1L,
+                     exact_env = "NP_DEMO_NSLAVES",
+                     frac_env = "NP_DEMO_NSLAVES_FRAC")
+npRmpi.init(nslaves = nslaves)
+
+npscoef_demo_run_matrix("session")

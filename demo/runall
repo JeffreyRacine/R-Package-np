@@ -42,7 +42,10 @@ if [ -z "${DEMOS:-}" ]; then
       DEMOS="npreg npcdens npcdist"
       ;;
     nomad)
-      DEMOS="npreg npcdens npcdist npindex"
+      DEMOS="npreg npcdens npcdist npindex npscoef"
+      ;;
+    semiparametric)
+      DEMOS="npindex npscoef"
       ;;
     *)
       echo "unknown DEMO_SET=${DEMO_SET}" >&2

@@ -33,6 +33,10 @@ as `npreg_lc_ls`, `npreg_ll_ls`, `npreg_lp1_ls`, `npreg_lc_aic`, and
 split scripts while adding `ll`, explicit `lp` degree 1, and `lp` NOMAD
 degree-search coverage.
 
+`npscoef` now follows the same matrix structure, keeping the original smooth
+coefficient data generator while adding local-linear, explicit degree-1 local
+polynomial, and NOMAD degree-search rows.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable
