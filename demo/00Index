@@ -21,12 +21,10 @@ npdeneqtest_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_att
 npdeptest_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
 npdeptest_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
 npdeptest_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
-npindexich_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npindexich_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npindexich_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
-npindexks_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
-npindexks_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
-npindexks_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)
+npindex_npRmpi_attach	matrix-driven npindex demo for npRmpi attach mode
+npindex_npRmpi_profile	matrix-driven npindex demo for npRmpi profile/manual mode
+npindex_npRmpi_session	matrix-driven npindex demo for npRmpi session/spawn mode
+npindex_serial	matrix-driven npindex demo for np serial comparison
 npplreg_npRmpi_attach	sample program for np (_serial) and npRmpi attach mode (_npRmpi_attach)
 npplreg_npRmpi_profile	sample program for np (_serial) and npRmpi profile/manual mode (_npRmpi_profile)
 npplreg_serial	sample program for np (_serial) and npRmpi modes (_npRmpi_attach/_npRmpi_profile)

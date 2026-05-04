@@ -1,0 +1,6 @@
+family,case,tier,enabled,default_n,floor_n,method,regtype,nomad,degree,degree.max,bwtype,gradients,why
+npindex,npindex_ich_lc,smoke,TRUE,40,20,ichimura,lc,FALSE,,,fixed,TRUE,ichimura_default_local_constant_route
+npindex,npindex_ich_ll,smoke,TRUE,40,20,ichimura,ll,FALSE,,,fixed,TRUE,ichimura_local_linear_route
+npindex,npindex_ich_lp1,smoke,TRUE,40,20,ichimura,lp,FALSE,1,,fixed,TRUE,ichimura_explicit_local_polynomial_degree_1_route
+npindex,npindex_ich_lp_nomad,smoke,TRUE,30,20,ichimura,lp,TRUE,,1,fixed,FALSE,ichimura_nomad_powell_degree_search_route
+npindex,npindex_ks_lc,smoke,TRUE,40,20,kleinspady,lc,FALSE,,,fixed,TRUE,klein_spady_binary_route

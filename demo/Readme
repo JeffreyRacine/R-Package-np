@@ -29,6 +29,10 @@ as `npreg_lc_ls`, `npreg_ll_ls`, `npreg_lp1_ls`, `npreg_lc_aic`, and
 `npcdist` follows the same pattern, replacing `npcdistls` with matrix rows for
 `lc`, `ll`, explicit `lp` degree 1, and `lp` NOMAD degree search.
 
+`npindex` is matrix-driven as well, replacing the older Ichimura/Klein-Spady
+split scripts while adding `ll`, explicit `lp` degree 1, and `lp` NOMAD
+degree-search coverage.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable

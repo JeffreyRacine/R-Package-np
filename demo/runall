@@ -42,7 +42,7 @@ if [ -z "${DEMOS:-}" ]; then
       DEMOS="npreg npcdens npcdist"
       ;;
     nomad)
-      DEMOS="npreg npcdens npcdist"
+      DEMOS="npreg npcdens npcdist npindex"
       ;;
     *)
       echo "unknown DEMO_SET=${DEMO_SET}" >&2

@@ -139,7 +139,7 @@ Demo sets:
 - `DEMO_SET=conditional-core`: matrix-driven `npcdens` and `npcdist`
 - `DEMO_SET=core-scaling`: converted core subset currently covering
   matrix-driven `npreg`, matrix-driven `npcdens`, and matrix-driven `npcdist`
-- `DEMO_SET=nomad`: matrix-driven `npreg`, `npcdens`, and `npcdist` NOMAD smoke rows
+- `DEMO_SET=nomad`: matrix-driven `npreg`, `npcdens`, `npcdist`, and `npindex` NOMAD smoke rows
 
 You can always override the set with `DEMOS="npcdens npreg"`.
 
@@ -163,6 +163,11 @@ The `npcdist` smoke matrix currently covers `lc` least-squares, `ll`
 least-squares, explicit `lp` degree 1, and NOMAD local-polynomial degree
 search. The sentinel matrix preserves the previous `npcdistls` calibrated
 default while adding the newer `ll`, `lp`, and NOMAD surfaces.
+
+The `npindex` smoke matrix replaces the older Ichimura/Klein-Spady split
+scripts with rows for Ichimura `lc`, `ll`, explicit `lp` degree 1, Ichimura
+LP NOMAD degree search, and the Klein-Spady binary route. It records beta and
+bandwidth fields as regression-litmus sentinels.
 
 Cross-version archive run:
 
