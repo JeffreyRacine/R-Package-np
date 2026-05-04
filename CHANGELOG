@@ -1,5 +1,11 @@
 Changes from Version 0.70-1 to 0.70-2 [04-May-2026]
 
+* Reused the lean MPI-aware regression objective for Ichimura
+  `npindexbw()` local-linear/local-polynomial fixed-degree searches, including
+  the post-NOMAD Powell cleanup, preserving selected objectives, bandwidths,
+  coefficients, degrees, and evaluation counts while restoring scaling in
+  session, attach, and profile/manual-broadcast launches.
+
 * Restored session-mode MPI participation for automatic `npindex(...,
   nomad=TRUE)` / `npindexbw(..., nomad=TRUE)` degree-search routes when
   multiple workers are active, so the bandwidth-search stage no longer runs

@@ -1769,27 +1769,17 @@ npindexbw.sibandwidth <-
                 )$ksum
                 tww[1,2,]/NZD(tww[2,2,])
               } else {
-                ok.design <- tryCatch({
-                  npCheckRegressionDesignCondition(
-                    reg.code = REGTYPE_LP,
-                    xcon = data.frame(index = index),
-                    basis = spec$basis.engine,
-                    degree = spec$degree.engine,
-                    bernstein.basis = spec$bernstein.basis.engine,
-                    where = "npindexbw"
-                  )
-                  TRUE
-                }, error = function(e) FALSE)
-                if (!ok.design)
-                  return(ichimuraMaxPenalty)
-
-                .npindex_lp_loo_fit(
+                objective <- .npindexbw_eval_ichimura_lp_via_npreg(
                   index = index,
                   ydat = ydat,
                   h = h,
                   bws = bws,
-                  spec = spec
+                  spec = spec,
+                  invalid.penalty = ichimuraMaxPenalty
                 )
+                num.feval.fast.overall <<- num.feval.fast.overall +
+                  as.numeric(objective$num.feval.fast[1L])
+                return(as.numeric(objective$objective[1L]))
               }
 
               t.ret <- mean((ydat-fit.loo)^2)
