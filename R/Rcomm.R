@@ -31,6 +31,12 @@ mpi.comm.dup <- function(comm, newcomm){
     PACKAGE = "npRmpi")
 }
 
+mpi.comm.split <- function(comm = 1, color = 0, key = mpi.comm.rank(comm), newcomm = 2){
+        .Call("mpi_comm_split", as.integer(comm), as.integer(color),
+              as.integer(key), as.integer(newcomm),
+    PACKAGE = "npRmpi")
+}
+
 mpi.comm.remote.size <- function(comm=2){
     .Call("mpi_comm_remote_size", as.integer(comm),PACKAGE = "npRmpi")
 }

@@ -880,6 +880,451 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
   search.result
 }
 
+npRmpiNomadSessionServicePlreg <- function(zdat,
+                                           child.responses,
+                                           child.templates,
+                                           child.setup,
+                                           reg.args,
+                                           degree.search,
+                                           x0,
+                                           bbin,
+                                           lb,
+                                           ub,
+                                           nomad.nmulti = 1L,
+                                           nomad.inner.nmulti = 0L,
+                                           random.seed = 42L) {
+  with.active.comm <- function(comm, expr) {
+    .Call("C_np_set_active_comm", TRUE, as.integer(comm), PACKAGE = "npRmpi")
+    on.exit(.Call("C_np_set_active_comm", FALSE, as.integer(1L), PACKAGE = "npRmpi"), add = TRUE)
+    force(expr)
+  }
+
+  receive_final <- function() {
+    final <- mpi.bcast.Robj(rank = 0L, comm = 1L)
+    if (is.list(final) && identical(final$kind, "error"))
+      stop(final$message, call. = FALSE)
+    if (is.list(final) && identical(final$kind, "result"))
+      return(final$value)
+    final
+  }
+
+  rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+  size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) 1L)
+  if (!is.finite(rank)) rank <- 0L
+  if (!is.finite(size) || size < 1L) size <- 1L
+
+  nchild <- length(child.templates)
+  if (size < 2L || nchild < 1L) {
+    return(npRmpiNomadShadowSearchPlreg(
+      zdat = zdat,
+      child.responses = child.responses,
+      child.templates = child.templates,
+      child.setup = child.setup,
+      reg.args = reg.args,
+      degree.search = degree.search,
+      x0 = x0,
+      bbin = bbin,
+      lb = lb,
+      ub = ub,
+      nomad.nmulti = nomad.nmulti,
+      nomad.inner.nmulti = nomad.inner.nmulti,
+      random.seed = random.seed
+    ))
+  }
+
+  task.tag <- 57101L
+  result.tag <- 57102L
+  team.comm <- 3L
+  use.team <- size > nchild
+  strategy.label <- if (isTRUE(use.team)) "team_child" else "split_child"
+
+  active.count <- min(size, nchild)
+  assignments <- .splitIndices(nchild, active.count)
+  rank_indices <- function(rk) {
+    if (rk >= active.count || !length(assignments))
+      integer(0L)
+    else
+      assignments[[rk + 1L]]
+  }
+
+  old.messages <- getOption("np.messages")
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  if (!isTRUE(rank == 0L))
+    options(np.messages = FALSE)
+  options(npRmpi.autodispatch.disable = TRUE)
+  on.exit(options(np.messages = old.messages), add = TRUE)
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+
+  child.point.length <- vapply(seq_along(child.templates), function(i) {
+    length(.npregbw_nomad_bw_to_point(child.templates[[i]]$bw, template = child.templates[[i]], setup = child.setup[[i]]))
+  }, integer(1L))
+  bwdim <- sum(child.point.length)
+  ndeg <- length(degree.search$start.degree)
+  worker.ranks <- if (size > 1L) seq_len(size - 1L) else integer(0L)
+  service.worker.ranks <- worker.ranks[worker.ranks < active.count]
+  team.child <- NA_integer_
+  team.rank <- NA_integer_
+  team.root.ranks <- integer(0L)
+
+  if (isTRUE(use.team)) {
+    team.sizes <- rep.int(1L, nchild)
+    extra <- size - nchild
+    if (extra > 0L) {
+      extra.order <- c(1L, seq_len(nchild))
+      for (k in seq_len(extra)) {
+        target <- extra.order[((k - 1L) %% length(extra.order)) + 1L]
+        team.sizes[target] <- team.sizes[target] + 1L
+      }
+    }
+    team.child.by.rank <- rep(seq_len(nchild), times = team.sizes)
+    team.child <- as.integer(team.child.by.rank[rank + 1L])
+    team.color <- as.integer(team.child - 1L)
+    mpi.comm.split(comm = 1L, color = team.color, key = rank, newcomm = team.comm)
+    on.exit(try(mpi.comm.free(team.comm), silent = TRUE), add = TRUE)
+    team.rank <- tryCatch(as.integer(mpi.comm.rank(team.comm)), error = function(e) NA_integer_)
+    team.root.ranks <- match(seq_len(nchild), team.child.by.rank) - 1L
+    service.worker.ranks <- worker.ranks
+  }
+
+  if (rank != 0L) {
+    if (isTRUE(use.team)) {
+      repeat {
+        task <- mpi.bcast.Robj(rank = 0L, comm = 1L)
+        if (is.list(task) && identical(task$kind, "stop"))
+          break
+        if (!is.list(task) || !identical(task$kind, "eval")) {
+          out <- list(ok = FALSE, error = "malformed npplreg session team-service task")
+        } else {
+          out <- tryCatch({
+            .npRmpi_transport_trace(
+              role = "npplreg.nomad.session_service",
+              event = "eval.start",
+              fields = list(
+                eval_id = task$eval_id,
+                rank = rank,
+                strategy = strategy.label,
+                team_child = team.child,
+                team_rank = team.rank,
+                child_indices = as.integer(team.child)
+              )
+            )
+            eval.child <- function() .npplregbw_eval_child_payload_subset(
+                zdat = zdat,
+                reg.args = reg.args,
+                degree.search = degree.search,
+                child.responses = child.responses,
+                child.templates = child.templates,
+                child.setup = child.setup,
+                bw.matrix = task$bw.matrix,
+                degree = task$degree,
+                penalty.multiplier = 10,
+                child.indices = team.child,
+                include_payloads = FALSE,
+                localize = FALSE
+              )
+            local.out <- with.active.comm(team.comm, eval.child())
+            .npRmpi_transport_trace(
+              role = "npplreg.nomad.session_service",
+              event = "eval.done",
+              fields = list(
+                eval_id = task$eval_id,
+                rank = rank,
+                strategy = strategy.label,
+                team_child = team.child,
+                team_rank = team.rank,
+                objective = as.numeric(local.out$objective[1L]),
+                num_feval = as.numeric(local.out$num.feval[1L]),
+                num_feval_fast = as.numeric(local.out$num.feval.fast[1L])
+              )
+            )
+            list(
+              ok = TRUE,
+              eval_id = task$eval_id,
+              objective = as.numeric(local.out$objective[1L]),
+              num.feval = as.numeric(local.out$num.feval[1L]),
+              num.feval.fast = as.numeric(local.out$num.feval.fast[1L])
+            )
+          }, error = function(e) {
+            list(ok = FALSE, eval_id = task$eval_id, error = conditionMessage(e))
+          })
+        }
+        if (identical(as.integer(team.rank), 0L))
+          mpi.send.Robj(out, dest = 0L, tag = result.tag, comm = 1L)
+      }
+      return(receive_final())
+    }
+
+    repeat {
+      task <- mpi.recv.Robj(source = 0L, tag = task.tag, comm = 1L)
+      if (is.list(task) && identical(task$kind, "stop"))
+        break
+      if (!is.list(task) || !identical(task$kind, "eval")) {
+        out <- list(ok = FALSE, error = "malformed npplreg session service task")
+      } else {
+        out <- tryCatch({
+          child.indices <- task$child.indices
+          .npRmpi_transport_trace(
+            role = "npplreg.nomad.session_service",
+            event = "eval.start",
+            fields = list(
+              eval_id = task$eval_id,
+              rank = rank,
+              strategy = "split_child",
+              child_indices = paste(as.integer(child.indices), collapse = ",")
+            )
+          )
+          local.out <- .npplregbw_eval_child_payload_subset(
+            zdat = zdat,
+            reg.args = reg.args,
+            degree.search = degree.search,
+            child.responses = child.responses,
+            child.templates = child.templates,
+            child.setup = child.setup,
+            bw.matrix = task$bw.matrix,
+            degree = task$degree,
+            penalty.multiplier = 10,
+            child.indices = child.indices,
+            include_payloads = FALSE,
+            localize = TRUE
+          )
+          .npRmpi_transport_trace(
+            role = "npplreg.nomad.session_service",
+            event = "eval.done",
+            fields = list(
+              eval_id = task$eval_id,
+              rank = rank,
+              strategy = "split_child",
+              objective = as.numeric(local.out$objective[1L]),
+              num_feval = as.numeric(local.out$num.feval[1L]),
+              num_feval_fast = as.numeric(local.out$num.feval.fast[1L])
+            )
+          )
+          list(
+            ok = TRUE,
+            eval_id = task$eval_id,
+            objective = as.numeric(local.out$objective[1L]),
+            num.feval = as.numeric(local.out$num.feval[1L]),
+            num.feval.fast = as.numeric(local.out$num.feval.fast[1L])
+          )
+        }, error = function(e) {
+          list(ok = FALSE, eval_id = task$eval_id, error = conditionMessage(e))
+        })
+      }
+      mpi.send.Robj(out, dest = 0L, tag = result.tag, comm = 1L)
+    }
+    return(receive_final())
+  }
+
+  set.seed(as.integer(random.seed))
+  .np_nomad_baseline_note(degree.search$start.degree)
+
+  nomad.num.feval.total <- 0
+  nomad.num.feval.fast.total <- 0
+  eval.counter <- 0L
+  workers.stopped <- FALSE
+
+  stop_workers <- function() {
+    if (isTRUE(workers.stopped))
+      return(invisible(TRUE))
+    if (!length(worker.ranks))
+      return(invisible(TRUE))
+    if (isTRUE(use.team)) {
+      try(mpi.bcast.Robj(list(kind = "stop"), rank = 0L, comm = 1L), silent = TRUE)
+    } else {
+      for (rk in worker.ranks) {
+        try(mpi.send.Robj(list(kind = "stop"), dest = rk, tag = task.tag, comm = 1L),
+            silent = TRUE)
+      }
+    }
+    workers.stopped <<- TRUE
+    invisible(TRUE)
+  }
+  on.exit(stop_workers(), add = TRUE)
+
+  eval_fun <- function(point) {
+    point <- as.numeric(point)
+    degree <- as.integer(round(point[bwdim + seq_len(ndeg)]))
+    degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
+    bw.matrix <- .npplregbw_nomad_point_to_matrix(
+      point = point[seq_len(bwdim)],
+      child.templates = child.templates,
+      child.setup = child.setup,
+      child.point.length = child.point.length
+    )
+    eval.counter <<- eval.counter + 1L
+
+    if (isTRUE(use.team)) {
+      mpi.bcast.Robj(
+        list(
+          kind = "eval",
+          eval_id = eval.counter,
+          bw.matrix = bw.matrix,
+          degree = degree
+        ),
+        rank = 0L,
+        comm = 1L
+      )
+      local.child.indices <- team.child
+    } else {
+      for (rk in service.worker.ranks) {
+        mpi.send.Robj(
+          list(
+            kind = "eval",
+            eval_id = eval.counter,
+            child.indices = rank_indices(rk),
+            bw.matrix = bw.matrix,
+            degree = degree
+          ),
+          dest = rk,
+          tag = task.tag,
+          comm = 1L
+        )
+      }
+      local.child.indices <- rank_indices(0L)
+    }
+
+    .npRmpi_transport_trace(
+      role = "npplreg.nomad.session_service",
+      event = "eval.start",
+      fields = list(
+        eval_id = eval.counter,
+        rank = rank,
+        strategy = strategy.label,
+        team_child = if (isTRUE(use.team)) team.child else NA_integer_,
+        team_rank = if (isTRUE(use.team)) team.rank else NA_integer_,
+        child_indices = paste(as.integer(local.child.indices), collapse = ",")
+      )
+    )
+
+    eval.local <- function() .npplregbw_eval_child_payload_subset(
+      zdat = zdat,
+      reg.args = reg.args,
+      degree.search = degree.search,
+      child.responses = child.responses,
+      child.templates = child.templates,
+      child.setup = child.setup,
+      bw.matrix = bw.matrix,
+      degree = degree,
+      penalty.multiplier = 10,
+      child.indices = local.child.indices,
+      include_payloads = FALSE,
+      localize = !isTRUE(use.team)
+    )
+    local.out <- if (isTRUE(use.team)) with.active.comm(team.comm, eval.local()) else eval.local()
+
+    .npRmpi_transport_trace(
+      role = "npplreg.nomad.session_service",
+      event = "eval.done",
+      fields = list(
+        eval_id = eval.counter,
+        rank = rank,
+        strategy = strategy.label,
+        team_child = if (isTRUE(use.team)) team.child else NA_integer_,
+        team_rank = if (isTRUE(use.team)) team.rank else NA_integer_,
+        objective = as.numeric(local.out$objective[1L]),
+        num_feval = as.numeric(local.out$num.feval[1L]),
+        num_feval_fast = as.numeric(local.out$num.feval.fast[1L])
+      )
+    )
+
+    total.objective <- as.numeric(local.out$objective[1L])
+    total.feval <- as.numeric(local.out$num.feval[1L])
+    total.feval.fast <- as.numeric(local.out$num.feval.fast[1L])
+
+    result.ranks <- if (isTRUE(use.team)) {
+      setdiff(team.root.ranks, 0L)
+    } else {
+      service.worker.ranks
+    }
+    for (rk in result.ranks) {
+      msg <- mpi.recv.Robj(source = rk, tag = result.tag, comm = 1L)
+      if (!is.list(msg) || !isTRUE(msg$ok)) {
+        err <- if (is.list(msg) && !is.null(msg$error)) msg$error else "unknown worker error"
+        stop(sprintf("npplreg session worker rank %d failed: %s", rk, err), call. = FALSE)
+      }
+      total.objective <- total.objective + as.numeric(msg$objective[1L])
+      total.feval <- total.feval + as.numeric(msg$num.feval[1L])
+      total.feval.fast <- total.feval.fast + as.numeric(msg$num.feval.fast[1L])
+    }
+
+    nomad.num.feval.total <<- nomad.num.feval.total + total.feval
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + total.feval.fast
+
+    list(
+      objective = total.objective,
+      degree = degree,
+      num.feval = total.feval,
+      num.feval.fast = total.feval.fast
+    )
+  }
+
+  root.error <- NULL
+  search.result <- tryCatch({
+    search.engine.used <- if (identical(degree.search$engine, "nomad+powell")) {
+      "nomad"
+    } else {
+      degree.search$engine
+    }
+
+    out <- .np_nomad_search(
+      engine = search.engine.used,
+      baseline_record = NULL,
+      start_degree = degree.search$start.degree,
+      x0 = x0,
+      bbin = bbin,
+      lb = lb,
+      ub = ub,
+      eval_fun = eval_fun,
+      build_payload = function(point, best_record, solution, interrupted) {
+        list(
+          payload = NULL,
+          objective = as.numeric(best_record$objective),
+          powell.time = NA_real_
+        )
+      },
+      direction = "min",
+      objective_name = "fval",
+      nmulti = nomad.nmulti,
+      nomad.inner.nmulti = nomad.inner.nmulti,
+      random.seed = random.seed,
+      nomad.opts = list(
+        DIRECTION_TYPE = "ORTHO 2N",
+        QUAD_MODEL_SEARCH = "no",
+        NM_SEARCH = "no",
+        SPECULATIVE_SEARCH = "no",
+        EVAL_OPPORTUNISTIC = "no"
+      ),
+      degree_spec = list(
+        initial = degree.search$start.degree,
+        lower = degree.search$lower,
+        upper = degree.search$upper,
+        basis = degree.search$basis,
+        nobs = degree.search$nobs,
+        user_supplied = degree.search$start.user
+      )
+    )
+    if (!identical(search.engine.used, degree.search$engine))
+      out$method <- degree.search$engine
+    out$best_payload <- NULL
+    out$powell.time <- NA_real_
+    out$num.feval.total <- as.numeric(nomad.num.feval.total)
+    out$num.feval.fast.total <- as.numeric(nomad.num.feval.fast.total)
+    out
+  }, error = function(e) {
+    root.error <<- conditionMessage(e)
+    NULL
+  })
+
+  stop_workers()
+  if (!is.null(root.error)) {
+    mpi.bcast.Robj(list(kind = "error", message = root.error), rank = 0L, comm = 1L)
+    stop(root.error, call. = FALSE)
+  }
+
+  mpi.bcast.Robj(list(kind = "result", value = search.result), rank = 0L, comm = 1L)
+  search.result
+}
+
 .npplregbw_nomad_search <- function(xdat,
                                     ydat,
                                     zdat,
@@ -1139,7 +1584,19 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
       )
     )
 
-    if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
+    session.service <- !isTRUE(getOption("npRmpi.profile.active", FALSE)) &&
+      !identical(as.character(getOption("npRmpi.attach.close.state", "closed"))[1L], "open")
+
+    if (isTRUE(session.service) && isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
+      session.mc <- mc
+      session.mc[[1L]] <- quote(get("npRmpiNomadSessionServicePlreg", envir = asNamespace("npRmpi"), inherits = FALSE))
+      search.result <- eval(session.mc, envir = environment())
+    } else if (isTRUE(session.service)) {
+      session.mc <- mc
+      session.mc[[1L]] <- quote(get("npRmpiNomadSessionServicePlreg", envir = asNamespace("npRmpi"), inherits = FALSE))
+      .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = TRUE)
+      search.result <- .npRmpi_bcast_cmd_expr(session.mc, comm = 1L, caller.execute = TRUE)
+    } else if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
       search.result <- eval(mc, envir = environment())
     } else {
       .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = TRUE)

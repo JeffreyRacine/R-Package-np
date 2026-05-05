@@ -1019,6 +1019,16 @@ SEXP mpi_comm_dup(SEXP sexp_comm, SEXP sexp_newcomm){
                 &comm[newcommn]))));
 }
 
+SEXP mpi_comm_split(SEXP sexp_comm, SEXP sexp_color, SEXP sexp_key, SEXP sexp_newcomm){
+    int commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
+    int newcommn=rmpi_require_index(sexp_newcomm, COMM_MAXSIZE, "new communicator");
+    int color=INTEGER(sexp_color)[0];
+    int key=INTEGER(sexp_key)[0];
+    MPI_Comm base = (commn==0) ? MPI_COMM_WORLD : comm[commn];
+    return AsInt(erreturn(mpi_errhandler(MPI_Comm_split(base, color, key,
+            &comm[newcommn]))));
+}
+
 SEXP mpi_comm_c2f(SEXP sexp_comm){
   int c = rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
   return AsInt(MPI_Comm_c2f(comm[c]));

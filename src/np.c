@@ -70,6 +70,10 @@ static int np_mpi_local_regression_mode = 0;
 static int np_mpi_local_regression_saved_rank = 0;
 static int np_mpi_local_regression_saved_nproc = 1;
 static MPI_Comm np_mpi_local_regression_saved_comm1 = MPI_COMM_NULL;
+static int np_mpi_active_comm_mode = 0;
+static int np_mpi_active_comm_saved_rank = 0;
+static int np_mpi_active_comm_saved_nproc = 1;
+static MPI_Comm np_mpi_active_comm_saved_comm1 = MPI_COMM_NULL;
 #endif
 static int fit_progress_active = 0;
 static int fit_progress_total = 0;
@@ -1507,6 +1511,49 @@ SEXP C_np_set_local_regression_mode(SEXP active)
     np_mpi_local_regression_leave_internal();
 #else
   np_mpi_local_regression_mode = requested ? 1 : 0;
+#endif
+
+  return ScalarLogical(previous);
+}
+
+SEXP C_np_set_active_comm(SEXP active, SEXP sexp_comm)
+{
+  const int requested = asLogical(active);
+  const int commn = asInteger(sexp_comm);
+  const int previous = np_mpi_active_comm_mode;
+
+  if (requested == NA_LOGICAL)
+    error("C_np_set_active_comm: 'active' must be TRUE or FALSE");
+
+#ifdef MPI2
+  if (requested) {
+    if (np_mpi_active_comm_mode)
+      error("C_np_set_active_comm: active communicator override already in effect");
+    if (np_mpi_local_regression_active())
+      error("C_np_set_active_comm: local regression mode is already active");
+    if (commn < 0)
+      error("C_np_set_active_comm: invalid communicator index");
+    if (comm[commn] == MPI_COMM_NULL)
+      error("C_np_set_active_comm: communicator is NULL");
+    np_mpi_active_comm_saved_rank = my_rank;
+    np_mpi_active_comm_saved_nproc = iNum_Processors;
+    np_mpi_active_comm_saved_comm1 = comm[1];
+    comm[1] = comm[commn];
+    MPI_Comm_rank(comm[1], &my_rank);
+    MPI_Comm_size(comm[1], &iNum_Processors);
+    np_mpi_active_comm_mode = 1;
+  } else {
+    if (np_mpi_active_comm_mode) {
+      if (np_mpi_active_comm_saved_comm1 != MPI_COMM_NULL)
+        comm[1] = np_mpi_active_comm_saved_comm1;
+      my_rank = np_mpi_active_comm_saved_rank;
+      iNum_Processors = np_mpi_active_comm_saved_nproc;
+      np_mpi_active_comm_saved_comm1 = MPI_COMM_NULL;
+      np_mpi_active_comm_mode = 0;
+    }
+  }
+#else
+  (void)commn;
 #endif
 
   return ScalarLogical(previous);

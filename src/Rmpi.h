@@ -80,6 +80,7 @@ SEXP mpi_comm_is_null(SEXP sexp_comm);
 SEXP mpi_comm_size(SEXP sexp_comm);
 SEXP mpi_comm_rank(SEXP sexp_comm);
 SEXP mpi_comm_dup(SEXP sexp_comm, SEXP sexp_newcomm);
+SEXP mpi_comm_split(SEXP sexp_comm, SEXP sexp_color, SEXP sexp_key, SEXP sexp_newcomm);
 SEXP mpi_comm_c2f(SEXP sexp_comm);
 SEXP mpi_comm_free(SEXP sexp_comm);
 SEXP mpi_abort(SEXP sexp_comm);
@@ -97,6 +98,7 @@ SEXP mpi_sendrecv(SEXP sexp_senddata, SEXP sexp_sendtype, SEXP sexp_dest, SEXP s
         SEXP sexp_status);
 SEXP mpi_sendrecv_replace(SEXP sexp_data, SEXP sexp_type, SEXP sexp_dest, SEXP sexp_sendtag,
         SEXP sexp_source, SEXP sexp_recvtag, SEXP sexp_comm, SEXP sexp_status);
+SEXP C_np_set_active_comm(SEXP sexp_active, SEXP sexp_comm);
 SEXP mpi_cart_create(SEXP sexp_comm_old,  SEXP sexp_dims, SEXP sexp_periods, SEXP sexp_reorder,
            SEXP sexp_comm_cart);
 SEXP mpi_dims_create(SEXP sexp_nnodes, SEXP sexp_ndims, SEXP sexp_dims);
