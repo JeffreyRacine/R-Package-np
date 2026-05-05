@@ -1,13 +1,13 @@
 Changes from Version 0.70-1 to 0.70-2 [05-May-2026]
 
-* Added a resident spawned-session NOMAD objective service for `npplregbw()`
-  local-polynomial degree searches. Session mode now avoids repeated
-  worker-side optimizer shadowing, uses rank teams/subcommunicators when there
-  are more ranks than child regressions, and preserves the existing
-  profile/attach collective objective route. Installed validation preserved
-  objective values, selected degree, bandwidths, and evaluation counts across
-  session, attach, and profile while improving the representative session
-  `npplreg` NOMAD sentinel.
+* Reworked `npplregbw()` local-polynomial degree-search orchestration so each
+  component regression uses the full active MPI communicator in sequence,
+  matching the serial `np` algorithmic decomposition while avoiding the earlier
+  rank-team scheduler. Installed validation preserved objective values,
+  selected degree, coefficients, fitted lengths, and evaluation counts across
+  session, attach, and profile routes for LC, LL, explicit LP degree 1, and
+  NOMAD+Powell sentinels; large, practically flat bandwidth directions may
+  show harmless optimizer drift when the objective and fitted quantities agree.
 
 * Hardened attach-mode teardown by registering a master-side process-exit
   finalizer that performs the normal worker close handshake when an attach

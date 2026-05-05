@@ -356,16 +356,14 @@ npplregbw.plbandwidth =
 
   on.exit(options(np.messages = old.messages), add = TRUE)
 
-  .npRmpi_with_local_regression(
-    .npplregbw_run_fixed_degree(
-      xdat = xdat,
-      ydat = ydat,
-      zdat = zdat,
-      bws = bws,
-      reg.args = reg.args,
-      outer.args = outer.args,
-      opt.args = opt.args
-    )
+  .npplregbw_run_fixed_degree(
+    xdat = xdat,
+    ydat = ydat,
+    zdat = zdat,
+    bws = bws,
+    reg.args = reg.args,
+    outer.args = outer.args,
+    opt.args = opt.args
   )
 }
 
@@ -631,20 +629,13 @@ npplregbw.plbandwidth =
     ))
   }
 
-  allrank.min.n <- suppressWarnings(as.integer(
-    getOption("npRmpi.npplreg.nomad.allrank.min.n", 3000L)
-  ))
-  if (!is.finite(allrank.min.n) || allrank.min.n < 1L)
-    allrank.min.n <- 3000L
   profile.manual <- isTRUE(getOption("npRmpi.profile.active", FALSE)) &&
     isTRUE(.npRmpi_manual_bcast_in_context())
   attach.state <- as.character(getOption("npRmpi.attach.close.state", "closed"))[1L]
   attach.world <- identical(attach.state, "open") && !isTRUE(profile.manual)
   allrank.mode <- isTRUE(profile.manual) || isTRUE(attach.world)
   use.allrank <- isTRUE(allrank.mode) &&
-    size > length(child.templates) &&
-    length(child.templates) > 0L &&
-    NROW(zdat) >= allrank.min.n
+    length(child.templates) > 0L
 
   if (isTRUE(use.allrank)) {
     all.indices <- seq_along(child.templates)
@@ -935,8 +926,9 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
   task.tag <- 57101L
   result.tag <- 57102L
   team.comm <- 3L
-  use.team <- size > nchild
-  strategy.label <- if (isTRUE(use.team)) "team_child" else "split_child"
+  use.fullcomm <- TRUE
+  use.team <- FALSE
+  strategy.label <- "full_communicator"
 
   active.count <- min(size, nchild)
   assignments <- .splitIndices(nchild, active.count)
@@ -987,6 +979,62 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
   }
 
   if (rank != 0L) {
+    if (isTRUE(use.fullcomm)) {
+      repeat {
+        task <- mpi.bcast.Robj(rank = 0L, comm = 1L)
+        if (is.list(task) && identical(task$kind, "stop"))
+          break
+        if (!is.list(task) || !identical(task$kind, "eval")) {
+          out <- list(ok = FALSE, error = "malformed npplreg session full-communicator task")
+        } else {
+          out <- tryCatch({
+            .npRmpi_transport_trace(
+              role = "npplreg.nomad.session_service",
+              event = "eval.start",
+              fields = list(
+                eval_id = task$eval_id,
+                rank = rank,
+                strategy = strategy.label,
+                child_indices = paste(as.integer(seq_along(child.templates)), collapse = ",")
+              )
+            )
+            local.out <- .npplregbw_eval_child_payload_subset(
+              zdat = zdat,
+              reg.args = reg.args,
+              degree.search = degree.search,
+              child.responses = child.responses,
+              child.templates = child.templates,
+              child.setup = child.setup,
+              bw.matrix = task$bw.matrix,
+              degree = task$degree,
+              penalty.multiplier = 10,
+              child.indices = seq_along(child.templates),
+              include_payloads = FALSE,
+              localize = FALSE
+            )
+            .npRmpi_transport_trace(
+              role = "npplreg.nomad.session_service",
+              event = "eval.done",
+              fields = list(
+                eval_id = task$eval_id,
+                rank = rank,
+                strategy = strategy.label,
+                objective = as.numeric(local.out$objective[1L]),
+                num_feval = as.numeric(local.out$num.feval[1L]),
+                num_feval_fast = as.numeric(local.out$num.feval.fast[1L])
+              )
+            )
+            list(ok = TRUE)
+          }, error = function(e) {
+            list(ok = FALSE, eval_id = task$eval_id, error = conditionMessage(e))
+          })
+        }
+        if (is.list(out) && !isTRUE(out$ok))
+          stop(out$error, call. = FALSE)
+      }
+      return(receive_final())
+    }
+
     if (isTRUE(use.team)) {
       repeat {
         task <- mpi.bcast.Robj(rank = 0L, comm = 1L)
@@ -1128,7 +1176,9 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
       return(invisible(TRUE))
     if (!length(worker.ranks))
       return(invisible(TRUE))
-    if (isTRUE(use.team)) {
+    if (isTRUE(use.fullcomm)) {
+      try(mpi.bcast.Robj(list(kind = "stop"), rank = 0L, comm = 1L), silent = TRUE)
+    } else if (isTRUE(use.team)) {
       try(mpi.bcast.Robj(list(kind = "stop"), rank = 0L, comm = 1L), silent = TRUE)
     } else {
       for (rk in worker.ranks) {
@@ -1153,7 +1203,19 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
     )
     eval.counter <<- eval.counter + 1L
 
-    if (isTRUE(use.team)) {
+    if (isTRUE(use.fullcomm)) {
+      mpi.bcast.Robj(
+        list(
+          kind = "eval",
+          eval_id = eval.counter,
+          bw.matrix = bw.matrix,
+          degree = degree
+        ),
+        rank = 0L,
+        comm = 1L
+      )
+      local.child.indices <- seq_along(child.templates)
+    } else if (isTRUE(use.team)) {
       mpi.bcast.Robj(
         list(
           kind = "eval",
@@ -1208,7 +1270,7 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
       penalty.multiplier = 10,
       child.indices = local.child.indices,
       include_payloads = FALSE,
-      localize = !isTRUE(use.team)
+      localize = !isTRUE(use.team) && !isTRUE(use.fullcomm)
     )
     local.out <- if (isTRUE(use.team)) with.active.comm(team.comm, eval.local()) else eval.local()
 
@@ -1231,7 +1293,9 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
     total.feval <- as.numeric(local.out$num.feval[1L])
     total.feval.fast <- as.numeric(local.out$num.feval.fast[1L])
 
-    result.ranks <- if (isTRUE(use.team)) {
+    result.ranks <- if (isTRUE(use.fullcomm)) {
+      integer(0L)
+    } else if (isTRUE(use.team)) {
       setdiff(team.root.ranks, 0L)
     } else {
       service.worker.ranks
