@@ -3,7 +3,8 @@ DEMOS ?= npcdens npcdist npcmstest npconmode npcopula npdeneqtest npdeptest npin
 MODE ?= attach
 NP ?= 2
 NSLAVES ?= 1
-TIMEOUT_SEC ?= 180
+TIMEOUT_SEC ?= 600
+CONTINUE_ON_ERROR ?= false
 DEMO_SRC ?= ..
 NP_DEMO_TIER ?= smoke
 NP_DEMO_CASES ?=
@@ -38,9 +39,11 @@ run-serial:
 			rm -f "$$tmp_file"; \
 			: ; \
 		else \
+			status=$$?; \
+			{ $(PROVENANCE_CMD); test -s "$$tmp_file" && cat "$$tmp_file"; echo "DEMO_STATUS demo=$$d mode=serial status=failed exit_code=$$status timeout_sec=NA"; } > "$$out_file"; \
 			rm -f "$$tmp_file"; \
 			echo "[serial] $$d FAILED"; \
-			exit 1; \
+			if test "$(CONTINUE_ON_ERROR)" = "true"; then continue; else exit 1; fi; \
 		fi; \
 	done
 
@@ -54,9 +57,11 @@ run-attach:
 			rm -f "$$tmp_file"; \
 			: ; \
 		else \
+			status=$$?; \
+			{ $(PROVENANCE_CMD); test -s "$$tmp_file" && cat "$$tmp_file"; echo "DEMO_STATUS demo=$$d mode=attach np=$(NP) status=failed exit_code=$$status timeout_sec=$(TIMEOUT_SEC)"; } > "$$out_file"; \
 			rm -f "$$tmp_file"; \
 			echo "[attach][np=$(NP)] $$d FAILED"; \
-			exit 1; \
+			if test "$(CONTINUE_ON_ERROR)" = "true"; then continue; else exit 1; fi; \
 		fi; \
 	done
 
@@ -68,17 +73,20 @@ run-profile:
 		tmp_file=$${out_file}.tmp; \
 		if /opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env R_PROFILE_USER $(RPROFILE) -env R_PROFILE '' -env NP_RMPI_PROFILE_RECV_TIMEOUT_SEC $(TIMEOUT_SEC) $(MPI_ENV_FI) $(MPI_ENV_NP_DEMO_SRC) $(MPI_ENV_NP_DEMO_TIER) $(MPI_ENV_NP_DEMO_CASES) $(MPI_ENV_NP_DEMO_MATRIX) $(MPI_ENV_NP_DEMO_N) $(MPI_ENV_NP_DEMO_N_FRAC) -n $(NP) R CMD BATCH --no-save $(DEMO_SRC)/$${d}_npRmpi_profile.R "$$batch_file" > "$$tmp_file" 2>&1; then \
 			if test ! -s "$$batch_file"; then \
+				{ $(PROVENANCE_CMD); test -s "$$tmp_file" && cat "$$tmp_file"; echo "DEMO_STATUS demo=$$d mode=profile np=$(NP) status=failed exit_code=empty_batch timeout_sec=$(TIMEOUT_SEC)"; } > "$$out_file"; \
 				rm -f "$$tmp_file" "$$batch_file"; \
 				echo "[profile][np=$(NP)] $$d FAILED (empty batch transcript)"; \
-				exit 1; \
+				if test "$(CONTINUE_ON_ERROR)" = "true"; then continue; else exit 1; fi; \
 			fi; \
 			{ $(PROVENANCE_CMD); cat "$$batch_file"; if test -s "$$tmp_file"; then cat "$$tmp_file"; fi; } > "$$out_file"; \
 			rm -f "$$tmp_file" "$$batch_file"; \
 			: ; \
 		else \
+			status=$$?; \
+			{ $(PROVENANCE_CMD); test -s "$$batch_file" && cat "$$batch_file"; test -s "$$tmp_file" && cat "$$tmp_file"; echo "DEMO_STATUS demo=$$d mode=profile np=$(NP) status=failed exit_code=$$status timeout_sec=$(TIMEOUT_SEC)"; } > "$$out_file"; \
 			rm -f "$$tmp_file" "$$batch_file"; \
 			echo "[profile][np=$(NP)] $$d FAILED"; \
-			exit 1; \
+			if test "$(CONTINUE_ON_ERROR)" = "true"; then continue; else exit 1; fi; \
 		fi; \
 	done
 
@@ -97,9 +105,11 @@ run-session:
 			pgrep -f 'slavedaemon\.R|Rslaves\.sh' | xargs kill >/dev/null 2>&1 || true; \
 			: ; \
 		else \
+			status=$$?; \
+			{ $(PROVENANCE_CMD); test -s "$$tmp_file" && cat "$$tmp_file"; echo "DEMO_STATUS demo=$$d mode=session nslaves=$(NSLAVES) status=failed exit_code=$$status timeout_sec=NA"; } > "$$out_file"; \
 			rm -f "$$tmp_file"; \
 			pgrep -f 'slavedaemon\.R|Rslaves\.sh' | xargs kill >/dev/null 2>&1 || true; \
 			echo "[session][nslaves=$(NSLAVES)] $$d FAILED"; \
-			exit 1; \
+			if test "$(CONTINUE_ON_ERROR)" = "true"; then continue; else exit 1; fi; \
 		fi; \
 	done

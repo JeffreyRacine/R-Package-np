@@ -43,6 +43,8 @@ to `SESSION_SLAVES=3`.
 - `makefile`: top-level compatibility include for `tools/makefile`
 - `tools/runall`: orchestrates full matrix
 - `tools/makefile`: mode-specific launcher logic
+- `tools/monitor_demo_cpu.sh`: optional process-level CPU sidecar for MPI runs
+- `tools/summarize_cpu_monitor.R`: summarizes the CPU sidecar and flags low-utilization stages
 - `tools/timing`: parser/report wrapper
 - `tools/parse_demo_results.R`: transcript parser and Quarto report generator
 - `../inst/demo_utils.R`: sample-size and machine-readable result helpers
@@ -54,7 +56,9 @@ to `SESSION_SLAVES=3`.
 The `tools/makefile` is the source of truth for launch semantics:
 - `attach`: timeout + cleared profile envs (`R_PROFILE_USER`, `R_PROFILE`) + optional `FI_*` env overrides
 - `profile`: timeout + explicit `R_PROFILE_USER` + cleared `R_PROFILE` + optional `FI_*` env overrides + `NP_RMPI_PROFILE_RECV_TIMEOUT_SEC`
-- all mode loops (`serial`, `attach`, `profile`) are fail-fast per demo; any failed demo exits non-zero immediately (no masked failures).
+- all mode loops are fail-fast per demo by default; set
+  `CONTINUE_ON_ERROR=true` for archive/sentinel comparison runs where known
+  failures should be recorded and the remaining demos should continue.
 - session scripts run under `setsid` when available so MPI spawn/finalize
   signals do not terminate the launcher shell; the launcher cleans up spawned
   slave daemons after each session demo.
@@ -72,6 +76,13 @@ Profile startup contract (required):
 - `R CMD BATCH --no-save` is supported for profile mode when this contract is respected.
 - package-level guard (`inst/Rprofile`) now hard-fails on dual-source profile startup with a remediation message.
 - launchers export `NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=$(TIMEOUT_SEC)` so blocked profile receives fail-fast.
+- MPI launch timeout defaults to `TIMEOUT_SEC=600` seconds. Increase this
+  explicitly for deliberately long diagnostics; do not use multi-hour timeouts
+  for routine sentinel runs.
+- set `CPU_MONITOR=true` to write `cpu_monitor.csv` and
+  `cpu_monitor_summary.csv` under the run directory. Stages with rank median
+  CPU below roughly `80-90%` should be treated as suspicious enough to inspect
+  when the corresponding timing row is long enough to be meaningful.
 
 ## Tiny Fast Smoke
 
@@ -114,6 +125,13 @@ NP_DEMO_N=100 make -f ../makefile MODE=profile NP=2
 ```bash
 cd /Users/jracine/Development/np-npRmpi/demo
 ./runall
+```
+
+Full matrix intended for archive comparison:
+
+```bash
+cd /Users/jracine/Development/np-npRmpi/demo
+NP_DEMO_TIER=sentinel CONTINUE_ON_ERROR=true CPU_MONITOR=true TIMEOUT_SEC=600 ./runall
 ```
 
 Optional smaller smoke:
@@ -166,6 +184,10 @@ Matrix-driven family demos, beginning with `npreg`, accept:
 The `npreg` smoke matrix currently covers `lc`, `ll`, explicit `lp` degree 1,
 `cv.aic`, and NOMAD local-polynomial degree search. The heavier sentinel
 matrix uses larger calibrated defaults for cross-version regression checks.
+Sentinel `default_n` values are calibrated from current timings: rows that
+already track roughly `serial / mpi_size` are left alone even when short, while
+functioning but underpowered rows are increased. Suspicious flat or failing
+rows are not hidden by increasing `n`; keep them visible for debugging.
 
 The `npcdens` smoke matrix currently covers `lc` least-squares, `lc`
 maximum-likelihood, `ll` least-squares, explicit `lp` degree 1, and NOMAD
