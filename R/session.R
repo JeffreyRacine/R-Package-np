@@ -98,6 +98,32 @@
   invisible(TRUE)
 }
 
+.npRmpi_attach_exit_finalizer <- function(e) {
+  tryCatch({
+    state <- as.character(getOption("npRmpi.attach.close.state", "closed"))[1L]
+    if (!identical(state, "open"))
+      return(invisible(FALSE))
+    world <- .npRmpi_safe_int(mpi.comm.size(0L))
+    comm <- .npRmpi_safe_int(mpi.comm.size(1L))
+    rank <- .npRmpi_safe_int(mpi.comm.rank(1L))
+    if (!is.na(world) && world > 1L &&
+        !is.na(comm) && comm > 1L &&
+        !is.na(rank) && rank == 0L) {
+      npRmpi.quit(mode = "attach", comm = 1L)
+    }
+  }, error = function(err) NULL)
+  invisible(TRUE)
+}
+
+.npRmpi_attach_register_exit_finalizer <- function() {
+  if (!is.null(getOption("npRmpi.attach.exit.finalizer", NULL)))
+    return(invisible(FALSE))
+  env <- new.env(parent = emptyenv())
+  reg.finalizer(env, .npRmpi_attach_exit_finalizer, onexit = TRUE)
+  options(npRmpi.attach.exit.finalizer = env)
+  invisible(TRUE)
+}
+
 .npRmpi_attach_next_session_id <- function() {
   sid <- suppressWarnings(as.integer(getOption("npRmpi.attach.session.counter", 0L)))
   if (!is.finite(sid) || sid < 0L)
@@ -520,6 +546,7 @@ npRmpi.init <- function(...,
   options(npRmpi.attach.close.state = "open")
 
   if (rank == 0L) {
+    .npRmpi_attach_register_exit_finalizer()
     if (!quiet) slave.hostinfo(comm)
     return(invisible(TRUE))
   }

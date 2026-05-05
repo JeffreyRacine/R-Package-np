@@ -47,6 +47,21 @@ test_that("attach quit path contains idempotent state guard and ACK collection",
   expect_match(txt, "\\.npRmpi_attach_state_reset\\(")
 })
 
+test_that("attach init registers a master-side process-exit close finalizer", {
+  init_fn <- getFromNamespace("npRmpi.init", "npRmpi")
+  init_txt <- paste(deparse(body(init_fn), width.cutoff = 500L), collapse = " ")
+  finalizer <- getFromNamespace(".npRmpi_attach_exit_finalizer", "npRmpi")
+  register <- getFromNamespace(".npRmpi_attach_register_exit_finalizer", "npRmpi")
+  register_txt <- paste(deparse(body(register), width.cutoff = 500L), collapse = " ")
+  finalizer_txt <- paste(deparse(body(finalizer), width.cutoff = 500L), collapse = " ")
+
+  expect_match(init_txt, "\\.npRmpi_attach_register_exit_finalizer\\(")
+  expect_match(register_txt, "reg\\.finalizer\\(")
+  expect_match(register_txt, "onexit = TRUE")
+  expect_match(finalizer_txt, "npRmpi\\.attach\\.close\\.state")
+  expect_match(finalizer_txt, "npRmpi\\.quit\\(mode = \"attach\"")
+})
+
 test_that("attach ACK collector marks complete ACK sets as OK", {
   collect <- getFromNamespace(".npRmpi_attach_collect_close_acks", "npRmpi")
 

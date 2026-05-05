@@ -1,5 +1,11 @@
 Changes from Version 0.70-1 to 0.70-2 [05-May-2026]
 
+* Hardened attach-mode teardown by registering a master-side process-exit
+  finalizer that performs the normal worker close handshake when an attach
+  script reaches process exit with an open worker pool; explicit
+  `npRmpi.quit(mode = "attach")` remains the preferred close path, and the
+  existing no-op and broadcast close protocols are unchanged.
+
 * Restored spawned-session MPI participation for fixed-bandwidth `npcdens`
   and `npcdist` fitting/evaluation by detecting the active worker pool on the
   session communicator instead of treating singleton world communicator state
