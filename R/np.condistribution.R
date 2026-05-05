@@ -105,7 +105,7 @@ npcdist.condbandwidth <-
        identical(bws$type, "generalized_nn"))
     if (.npRmpi_autodispatch_active() &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
-        identical(.npRmpi_safe_int(mpi.comm.size(0)), 1L)) {
+        !.npRmpi_session_has_active_pool(comm = 1L)) {
       return(.npRmpi_with_local_cdist_eval(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     }
     if (.npRmpi_autodispatch_active() && !keep_local_cvls_nn) {
@@ -518,7 +518,7 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       .npRmpi_autodispatch_active() &&
       !isTRUE(nomad) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
-      identical(.npRmpi_safe_int(mpi.comm.size(0)), 1L)) {
+      !.npRmpi_session_has_active_pool(comm = 1L)) {
     return(.npRmpi_with_local_cdist_eval(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   }
   keep_local_raw_degree1_cvls <- !has.explicit.bws &&

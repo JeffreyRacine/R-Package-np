@@ -102,7 +102,7 @@ npcdens.conbandwidth <- function(bws,
     identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
   if (.npRmpi_autodispatch_active() &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
-      identical(.npRmpi_safe_int(mpi.comm.size(0)), 1L)) {
+      !.npRmpi_session_has_active_pool(comm = 1L)) {
     return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   }
   if (.npRmpi_autodispatch_active() && !keep_local_shadow_nn) {
@@ -507,7 +507,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       .npRmpi_autodispatch_active() &&
       !isTRUE(nomad) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
-      identical(.npRmpi_safe_int(mpi.comm.size(0)), 1L)) {
+      !.npRmpi_session_has_active_pool(comm = 1L)) {
     return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   }
   keep_local_shadow_nn <- (identical(regtype.request[1L], "lp") ||
