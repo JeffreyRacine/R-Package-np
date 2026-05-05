@@ -1069,6 +1069,13 @@ npscoefbw.NULL <-
   on.exit(.npscoefbw_nomad_context_cleanup(ctx, comm = 1L), add = TRUE)
   pool <- .npscoefbw_nomad_pool_start(ctx, comm = 1L)
   on.exit(.npscoefbw_nomad_pool_stop(pool), add = TRUE)
+  stop_pool_before_collective <- function() {
+    if (!is.null(pool)) {
+      .npscoefbw_nomad_pool_stop(pool)
+      pool <<- NULL
+    }
+    invisible(NULL)
+  }
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -1176,6 +1183,7 @@ npscoefbw.NULL <-
       hot.reg.args$bernstein.basis <- degree.search$bernstein.basis
       hot.opt.args <- opt.args
       hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("single_iteration")
+      stop_pool_before_collective()
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
         degree,
