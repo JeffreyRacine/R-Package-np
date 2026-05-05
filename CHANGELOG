@@ -9,6 +9,11 @@ Changes from Version 0.70-1 to 0.70-2 [05-May-2026]
   NOMAD+Powell sentinels; large, practically flat bandwidth directions may
   show harmless optimizer drift when the objective and fitted quantities agree.
 
+* Suppressed the spurious nested auto-dispatch warning that could appear during
+  expected `npplreg` broadcast payloads in session and attach runs by making
+  manual broadcast contexts explicitly disable recursive auto-dispatch while
+  preserving the existing local MPI-aware component computations.
+
 * Hardened attach-mode teardown by registering a master-side process-exit
   finalizer that performs the normal worker close handshake when an attach
   script reaches process exit with an open worker pool; explicit
