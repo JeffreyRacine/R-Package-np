@@ -638,7 +638,10 @@ npplregbw.plbandwidth =
     allrank.min.n <- 3000L
   profile.manual <- isTRUE(getOption("npRmpi.profile.active", FALSE)) &&
     isTRUE(.npRmpi_manual_bcast_in_context())
-  use.allrank <- isTRUE(profile.manual) &&
+  attach.state <- as.character(getOption("npRmpi.attach.close.state", "closed"))[1L]
+  attach.world <- identical(attach.state, "open") && !isTRUE(profile.manual)
+  allrank.mode <- isTRUE(profile.manual) || isTRUE(attach.world)
+  use.allrank <- isTRUE(allrank.mode) &&
     size > length(child.templates) &&
     length(child.templates) > 0L &&
     NROW(zdat) >= allrank.min.n
