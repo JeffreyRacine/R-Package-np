@@ -5,27 +5,35 @@ test_that("npreg cv objective and bandwidths match for ll and lp(degree=1)", {
   tx <- data.frame(x = x)
 
   for (m in c("cv.ls", "cv.aic")) {
-    set.seed(90210)
-    bw.ll <- npregbw(
-      xdat = tx,
-      ydat = y,
-      regtype = "ll",
-      bwmethod = m,
-      nmulti = 1L
-    )
-    set.seed(90210)
-    bw.lp <- npregbw(
-      xdat = tx,
-      ydat = y,
-      regtype = "lp",
-      basis = "glp",
-      degree = 1L,
-      bwmethod = m,
-      nmulti = 1L
-    )
+    for (bt in c("fixed", "generalized_nn")) {
+      set.seed(90210)
+      bw.ll <- npregbw(
+        xdat = tx,
+        ydat = y,
+        regtype = "ll",
+        bwmethod = m,
+        bwtype = bt,
+        nmulti = 1L
+      )
+      set.seed(90210)
+      bw.lp <- npregbw(
+        xdat = tx,
+        ydat = y,
+        regtype = "lp",
+        basis = "glp",
+        degree = 1L,
+        bwmethod = m,
+        bwtype = bt,
+        nmulti = 1L
+      )
 
-    expect_equal(as.numeric(bw.ll$fval), as.numeric(bw.lp$fval), tolerance = 1e-10)
-    expect_equal(as.numeric(bw.ll$bw), as.numeric(bw.lp$bw), tolerance = 1e-9)
+      expect_identical(bw.ll$regtype, "ll")
+      expect_identical(bw.ll$pregtype, "Local-Linear")
+      expect_identical(bw.ll$regtype.engine, "lp")
+      expect_identical(as.integer(bw.ll$degree.engine), rep.int(1L, bw.ll$ncon))
+      expect_equal(as.numeric(bw.ll$fval), as.numeric(bw.lp$fval), tolerance = 1e-10)
+      expect_equal(as.numeric(bw.ll$bw), as.numeric(bw.lp$bw), tolerance = 1e-9)
+    }
   }
 })
 
