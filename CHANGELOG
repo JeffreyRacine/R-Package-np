@@ -9,6 +9,12 @@ Changes from Version 0.70-1 to 0.70-2 [06-May-2026]
   and non-MPI local helper behavior; installed candidate traces now show worker
   dispatch where the previous route reported `comm_calls = 0`.
 
+* Extended that `npcdens()`/`npcdist()` plot-bootstrap fanout to the
+  `proper = TRUE` projection pass, so the bounded-density and monotone-CDF
+  repair matrices are partitioned across workers after the bootstrap
+  generation step. Fixed-count projection sentinels are bit-identical to the
+  local projection helpers, including the master-only/vector route.
+
 * Restored MPI fanout for the final partially linear plot-bootstrap composition
   step in `npplreg()` objects. The component bootstrap regressions are left on
   their existing kernels, while the per-replication residual recomposition and

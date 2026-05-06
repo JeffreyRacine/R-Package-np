@@ -7223,6 +7223,90 @@
   num / pmax(den, .Machine$double.eps)
 }
 
+.npRmpi_project_conditional_proper_values <- function(values,
+                                                      plan,
+                                                      cdf,
+                                                      progress.label = NULL,
+                                                      what = NULL) {
+  is.vector.input <- is.null(dim(values))
+  if (isTRUE(is.vector.input)) {
+    if (isTRUE(cdf))
+      return(.np_condist_project_values_with_plan(values, plan))
+    return(.np_condens_project_values_with_plan(values, plan))
+  }
+
+  values.mat <- data.matrix(values)
+  nrow.values <- nrow(values.mat)
+  ncol.values <- ncol(values.mat)
+  if (nrow.values < 2L ||
+      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+      !isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))) {
+    if (isTRUE(cdf)) {
+      return(.np_condist_project_values_with_plan(
+        values.mat,
+        plan,
+        progress.label = progress.label
+      ))
+    }
+    return(.np_condens_project_values_with_plan(
+      values.mat,
+      plan,
+      progress.label = progress.label
+    ))
+  }
+
+  what <- if (is.null(what)) {
+    if (isTRUE(cdf)) "proper-condist-project" else "proper-condens-project"
+  } else {
+    as.character(what)[1L]
+  }
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = nrow.values,
+    chunk.size = .np_inid_chunk_size(n = ncol.values, B = nrow.values),
+    comm = 1L,
+    include.master = TRUE
+  )
+  .npRmpi_bootstrap_fanout_enabled(
+    comm = 1L,
+    n = ncol.values,
+    B = nrow.values,
+    chunk.size = chunk.size,
+    what = what
+  )
+  tasks <- .npRmpi_bootstrap_chunk_tasks(B = nrow.values, chunk.size = chunk.size)
+  worker <- function(task) {
+    start <- as.integer(task$start)
+    stopi <- start + as.integer(task$bsz) - 1L
+    chunk <- values.mat[start:stopi, , drop = FALSE]
+    if (isTRUE(cdf)) {
+      .np_condist_project_values_with_plan(chunk, plan)
+    } else {
+      .np_condens_project_values_with_plan(chunk, plan)
+    }
+  }
+
+  .npRmpi_bootstrap_run_fanout(
+    tasks = tasks,
+    worker = worker,
+    ncol.out = ncol.values,
+    what = what,
+    progress.label = progress.label,
+    profile.where = paste0("mpi.applyLB:", what),
+    comm = 1L,
+    master_local_chunk = TRUE,
+    required.bindings = list(
+      values.mat = values.mat,
+      plan = plan,
+      cdf = cdf,
+      .np_condens_project_values_with_plan = .np_condens_project_values_with_plan,
+      .np_condens_project_weighted_simplex = .np_condens_project_weighted_simplex,
+      .np_condist_project_values_with_plan = .np_condist_project_values_with_plan,
+      .np_condist_project_bounded_isotonic = .np_condist_project_bounded_isotonic,
+      .np_condist_weighted_pava = .np_condist_weighted_pava
+    )
+  )
+}
+
 .np_inid_boot_from_ksum_conditional <- function(xdat,
                                                 ydat,
                                                 exdat,
@@ -11642,10 +11726,15 @@ compute.bootstrap.errors.conbandwidth =
             where = "plot()"
           ), call. = FALSE)
         }
-        boot.out$t0 <- .np_condist_project_values_with_plan(boot.out$t0, proper.plan)
-        boot.out$t <- .np_condist_project_values_with_plan(
+        boot.out$t0 <- .npRmpi_project_conditional_proper_values(
+          boot.out$t0,
+          proper.plan,
+          cdf = TRUE
+        )
+        boot.out$t <- .npRmpi_project_conditional_proper_values(
           boot.out$t,
           proper.plan,
+          cdf = TRUE,
           progress.label = proper.progress.label
         )
       } else {
@@ -11659,10 +11748,15 @@ compute.bootstrap.errors.conbandwidth =
             where = "plot()"
           ), call. = FALSE)
         }
-        boot.out$t0 <- .np_condens_project_values_with_plan(boot.out$t0, proper.plan)
-        boot.out$t <- .np_condens_project_values_with_plan(
+        boot.out$t0 <- .npRmpi_project_conditional_proper_values(
+          boot.out$t0,
+          proper.plan,
+          cdf = FALSE
+        )
+        boot.out$t <- .npRmpi_project_conditional_proper_values(
           boot.out$t,
           proper.plan,
+          cdf = FALSE,
           progress.label = proper.progress.label
         )
       }
