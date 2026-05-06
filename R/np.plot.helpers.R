@@ -4044,6 +4044,43 @@
   stop("plreg weighted solve failed")
 }
 
+.np_inid_boot_from_plreg_finish_chunk <- function(rows,
+                                                  x.train.num,
+                                                  x.eval.num,
+                                                  y.num,
+                                                  y.train.t,
+                                                  y.eval.t,
+                                                  x.train.t.list,
+                                                  x.eval.t.list,
+                                                  counts.mat,
+                                                  ridge = 1.0e-12) {
+  rows <- as.integer(rows)
+  p <- ncol(x.train.num)
+  n <- nrow(x.train.num)
+  neval <- nrow(x.eval.num)
+  out <- matrix(NA_real_, nrow = length(rows), ncol = neval)
+  xres.train.b <- matrix(0.0, nrow = n, ncol = p)
+  xres.eval.b <- matrix(0.0, nrow = neval, ncol = p)
+
+  for (ii in seq_along(rows)) {
+    b <- rows[ii]
+    for (j in seq_len(p)) {
+      xres.train.b[, j] <- x.train.num[, j] - x.train.t.list[[j]][b, ]
+      xres.eval.b[, j] <- x.eval.num[, j] - x.eval.t.list[[j]][b, ]
+    }
+    yres.b <- y.num - y.train.t[b, ]
+    beta.b <- .np_plreg_weighted_coef(
+      X = xres.train.b,
+      y = yres.b,
+      w = counts.mat[, b],
+      ridge = ridge
+    )
+    out[ii, ] <- y.eval.t[b, ] + as.vector(xres.eval.b %*% beta.b)
+  }
+
+  out
+}
+
 .np_inid_boot_from_plreg_exact <- function(txdat,
                                            ydat,
                                            tzdat,
@@ -4158,33 +4195,108 @@
   )
   t0 <- as.double(y.eval$t0) + as.vector(xres.eval0 %*% beta0)
 
-  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-  xres.train.b <- matrix(0.0, nrow = n, ncol = p)
-  xres.eval.b <- matrix(0.0, nrow = neval, ncol = p)
   progress.label <- if (is.null(progress.label)) {
     if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
   } else {
     progress.label
   }
-  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
-  on.exit({
-    .np_plot_progress_end(progress)
-  }, add = TRUE)
 
-  for (b in seq_len(B)) {
-    for (j in seq_len(p)) {
-      xres.train.b[, j] <- x.train.num[, j] - x.train[[j]]$t[b, ]
-      xres.eval.b[, j] <- x.eval.num[, j] - x.eval[[j]]$t[b, ]
-    }
-    yres.b <- y.num - y.train$t[b, ]
-    beta.b <- .np_plreg_weighted_coef(
-      X = xres.train.b,
-      y = yres.b,
-      w = counts.mat[, b],
-      ridge = ridge
+  y.train.t <- as.matrix(y.train$t)
+  y.eval.t <- as.matrix(y.eval$t)
+  x.train.t.list <- lapply(x.train, function(obj) as.matrix(obj$t))
+  x.eval.t.list <- lapply(x.eval, function(obj) as.matrix(obj$t))
+  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+    isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
+
+  if (isTRUE(use.mpi)) {
+    chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+      B = B,
+      chunk.size = .np_inid_chunk_size(n = n, B = B),
+      comm = 1L,
+      include.master = TRUE
     )
-    tmat[b, ] <- y.eval$t[b, ] + as.vector(xres.eval.b %*% beta.b)
-    progress <- .np_plot_progress_tick(state = progress, done = b)
+    .npRmpi_bootstrap_fanout_enabled(
+      comm = 1L,
+      n = n,
+      B = B,
+      chunk.size = chunk.size,
+      what = "inid-plreg-compose"
+    )
+    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    worker <- function(task) {
+      start <- as.integer(task$start)
+      stopi <- start + as.integer(task$bsz) - 1L
+      .np_inid_boot_from_plreg_finish_chunk(
+        rows = seq.int(start, stopi),
+        x.train.num = x.train.num,
+        x.eval.num = x.eval.num,
+        y.num = y.num,
+        y.train.t = y.train.t,
+        y.eval.t = y.eval.t,
+        x.train.t.list = x.train.t.list,
+        x.eval.t.list = x.eval.t.list,
+        counts.mat = counts.mat,
+        ridge = ridge
+      )
+    }
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = "inid-plreg-compose",
+      progress.label = progress.label,
+      profile.where = "mpi.applyLB:inid-plreg-compose",
+      comm = 1L,
+      prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = TRUE,
+      required.bindings = list(
+        x.train.num = x.train.num,
+        x.eval.num = x.eval.num,
+        y.num = y.num,
+        y.train.t = y.train.t,
+        y.eval.t = y.eval.t,
+        x.train.t.list = x.train.t.list,
+        x.eval.t.list = x.eval.t.list,
+        counts.mat = counts.mat,
+        ridge = ridge,
+        .np_plreg_weighted_coef = .np_plreg_weighted_coef,
+        .np_inid_boot_from_plreg_finish_chunk = .np_inid_boot_from_plreg_finish_chunk
+      )
+    )
+  } else {
+    tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+    progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+    on.exit({
+      .np_plot_progress_end(progress)
+    }, add = TRUE)
+    chunk.controller <- .np_plot_progress_chunk_controller(
+      chunk.size = .np_inid_chunk_size(n = n, B = B),
+      progress = progress
+    )
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+      chunk.started <- .np_progress_now()
+      tmat[start:stopi, ] <- .np_inid_boot_from_plreg_finish_chunk(
+        rows = seq.int(start, stopi),
+        x.train.num = x.train.num,
+        x.eval.num = x.eval.num,
+        y.num = y.num,
+        y.train.t = y.train.t,
+        y.eval.t = y.eval.t,
+        x.train.t.list = x.train.t.list,
+        x.eval.t.list = x.eval.t.list,
+        counts.mat = counts.mat,
+        ridge = ridge
+      )
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = stopi - start + 1L,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
+      start <- stopi + 1L
+    }
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
@@ -4297,33 +4409,109 @@
   )
   t0 <- as.double(y.eval$t0) + as.vector(xres.eval0 %*% beta0)
 
-  tmat <- matrix(NA_real_, nrow = B, ncol = nrow(exdat))
-  xres.train.b <- matrix(0.0, nrow = n, ncol = p)
-  xres.eval.b <- matrix(0.0, nrow = nrow(exdat), ncol = p)
+  neval <- nrow(exdat)
   progress.label <- if (is.null(progress.label)) {
     if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
   } else {
     progress.label
   }
-  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
-  on.exit({
-    .np_plot_progress_end(progress)
-  }, add = TRUE)
 
-  for (b in seq_len(B)) {
-    for (j in seq_len(p)) {
-      xres.train.b[, j] <- x.train.num[, j] - x.train[[j]]$t[b, ]
-      xres.eval.b[, j] <- x.eval.num[, j] - x.eval[[j]]$t[b, ]
-    }
-    yres.b <- y.num - y.train$t[b, ]
-    beta.b <- .np_plreg_weighted_coef(
-      X = xres.train.b,
-      y = yres.b,
-      w = counts.mat[, b],
-      ridge = ridge
+  y.train.t <- as.matrix(y.train$t)
+  y.eval.t <- as.matrix(y.eval$t)
+  x.train.t.list <- lapply(x.train, function(obj) as.matrix(obj$t))
+  x.eval.t.list <- lapply(x.eval, function(obj) as.matrix(obj$t))
+  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+    isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
+
+  if (isTRUE(use.mpi)) {
+    chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+      B = B,
+      chunk.size = .np_inid_chunk_size(n = n, B = B),
+      comm = 1L,
+      include.master = TRUE
     )
-    tmat[b, ] <- y.eval$t[b, ] + as.vector(xres.eval.b %*% beta.b)
-    progress <- .np_plot_progress_tick(state = progress, done = b)
+    .npRmpi_bootstrap_fanout_enabled(
+      comm = 1L,
+      n = n,
+      B = B,
+      chunk.size = chunk.size,
+      what = "inid-plreg-frozen-compose"
+    )
+    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    worker <- function(task) {
+      start <- as.integer(task$start)
+      stopi <- start + as.integer(task$bsz) - 1L
+      .np_inid_boot_from_plreg_finish_chunk(
+        rows = seq.int(start, stopi),
+        x.train.num = x.train.num,
+        x.eval.num = x.eval.num,
+        y.num = y.num,
+        y.train.t = y.train.t,
+        y.eval.t = y.eval.t,
+        x.train.t.list = x.train.t.list,
+        x.eval.t.list = x.eval.t.list,
+        counts.mat = counts.mat,
+        ridge = ridge
+      )
+    }
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = "inid-plreg-frozen-compose",
+      progress.label = progress.label,
+      profile.where = "mpi.applyLB:inid-plreg-frozen-compose",
+      comm = 1L,
+      prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = TRUE,
+      required.bindings = list(
+        x.train.num = x.train.num,
+        x.eval.num = x.eval.num,
+        y.num = y.num,
+        y.train.t = y.train.t,
+        y.eval.t = y.eval.t,
+        x.train.t.list = x.train.t.list,
+        x.eval.t.list = x.eval.t.list,
+        counts.mat = counts.mat,
+        ridge = ridge,
+        .np_plreg_weighted_coef = .np_plreg_weighted_coef,
+        .np_inid_boot_from_plreg_finish_chunk = .np_inid_boot_from_plreg_finish_chunk
+      )
+    )
+  } else {
+    tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+    progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+    on.exit({
+      .np_plot_progress_end(progress)
+    }, add = TRUE)
+    chunk.controller <- .np_plot_progress_chunk_controller(
+      chunk.size = .np_inid_chunk_size(n = n, B = B),
+      progress = progress
+    )
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+      chunk.started <- .np_progress_now()
+      tmat[start:stopi, ] <- .np_inid_boot_from_plreg_finish_chunk(
+        rows = seq.int(start, stopi),
+        x.train.num = x.train.num,
+        x.eval.num = x.eval.num,
+        y.num = y.num,
+        y.train.t = y.train.t,
+        y.eval.t = y.eval.t,
+        x.train.t.list = x.train.t.list,
+        x.eval.t.list = x.eval.t.list,
+        counts.mat = counts.mat,
+        ridge = ridge
+      )
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = stopi - start + 1L,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
+      start <- stopi + 1L
+    }
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
