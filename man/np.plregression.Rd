@@ -266,6 +266,12 @@ Further arguments are passed to \code{\link{npplregbw}} and its component \code{
   and \code{plot} support objects of this type. The returned object
   has the following components:
 
+  For \code{plregression} objects, \code{predict(object, se.fit = TRUE)}
+  returns a list with components \code{fit} and \code{se.fit}. The
+  \code{se.fit} component contains asymptotic prediction standard errors
+  computed from the partially linear fitted-value linear operator and
+  the squared residuals from the training fit.
+
   \item{evalx}{ evaluation points }
   \item{evalz}{ evaluation points }
   \item{mean}{ estimation of the regression, or conditional mean, at the

@@ -122,10 +122,101 @@ residuals.plregression <- function(object, ...) {
                   residuals = TRUE)$resid)
  }
 }
-predict.plregression <- function(object, se.fit = FALSE, ...) {
-  if (isTRUE(se.fit))
-    stop("se.fit = TRUE is not implemented for 'plregression' objects", call. = FALSE)
 
+.np_plreg_predict_se_block_size <- function(ntrain) {
+  ntrain <- max(1L, as.integer(ntrain)[1L])
+  max(1L, min(512L, floor(5.0e7 / ntrain)))
+}
+
+.np_plreg_predict_train_data <- function(bws) {
+  if (!is.null(bws$formula)) {
+    tt <- terms(bws)
+    tt.xf <- bws$xterms
+
+    m <- match(c("formula", "data", "subset", "na.action"),
+               names(bws$call), nomatch = 0)
+    tmf <- bws$call[c(1, m)]
+    tmf.xf <- bws$call[c(1, m)]
+
+    tmf[[1L]] <- as.name("model.frame")
+    tmf.xf[[1L]] <- as.name("model.frame")
+    tmf[["formula"]] <- tt
+    tmf.xf[["formula"]] <- tt.xf
+
+    mf.args <- as.list(tmf)[-1L]
+    mf.xf.args <- as.list(tmf.xf)[-1L]
+    train.mf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    train.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt.xf))
+
+    list(
+      txdat = train.xf,
+      tydat = model.response(train.mf),
+      tzdat = train.mf[, bws$chromoly[[3L]], drop = FALSE]
+    )
+  } else {
+    list(
+      txdat = toFrame(.np_eval_bws_call_arg(bws, "xdat")),
+      tydat = .np_eval_bws_call_arg(bws, "ydat"),
+      tzdat = toFrame(.np_eval_bws_call_arg(bws, "zdat"))
+    )
+  }
+}
+
+.np_plreg_predict_se_data <- function(bws, fit) {
+  train <- .np_plreg_predict_train_data(bws)
+  txdat <- toFrame(train$txdat)
+  tydat <- train$tydat
+  tzdat <- toFrame(train$tzdat)
+
+  keep.rows <- rep_len(TRUE, nrow(txdat))
+  rows.omit <- attr(na.omit(data.frame(txdat, tydat, tzdat)), "na.action")
+  if (length(rows.omit) > 0L)
+    keep.rows[as.integer(rows.omit)] <- FALSE
+
+  if (!any(keep.rows))
+    stop("Training data has no rows without NAs")
+
+  txdat <- txdat[keep.rows, , drop = FALSE]
+  tydat <- tydat[keep.rows]
+  tzdat <- tzdat[keep.rows, , drop = FALSE]
+
+  exdat <- toFrame(fit$evalx)
+  ezdat <- toFrame(fit$evalz)
+
+  list(txdat = txdat, tydat = tydat, tzdat = tzdat, exdat = exdat, ezdat = ezdat)
+}
+
+.np_plreg_predict_se <- function(bws, fit) {
+  dat <- .np_plreg_predict_se_data(bws = bws, fit = fit)
+  train.fit <- npplreg(bws = bws, residuals = TRUE)
+  u <- as.numeric(residuals(train.fit))
+  if (length(u) != nrow(dat$txdat))
+    stop("internal error: residual length does not match training rows")
+
+  u2 <- u^2
+  neval <- nrow(dat$exdat)
+  block.size <- .np_plreg_predict_se_block_size(nrow(dat$txdat))
+  se.fit <- numeric(neval)
+  starts <- seq.int(1L, neval, by = block.size)
+
+  for (st in starts) {
+    en <- min(neval, st + block.size - 1L)
+    ii <- st:en
+    H <- npplreghat(
+      bws = bws,
+      txdat = dat$txdat,
+      tzdat = dat$tzdat,
+      exdat = dat$exdat[ii, , drop = FALSE],
+      ezdat = dat$ezdat[ii, , drop = FALSE],
+      output = "matrix"
+    )
+    se.fit[ii] <- sqrt(pmax(drop((H^2) %*% u2), 0.0))
+  }
+
+  se.fit
+}
+
+predict.plregression <- function(object, se.fit = FALSE, ...) {
   obj.bws <- .np_plreg_bws(object, where = "predict.plregression")
   dots <- list(...)
   has.formula.route <- !is.null(obj.bws$formula)
@@ -141,7 +232,14 @@ predict.plregression <- function(object, se.fit = FALSE, ...) {
   }
 
   tr <- do.call(npplreg, c(list(bws = obj.bws), dots))
-  return(fitted(tr))
+  fit <- fitted(tr)
+
+  if (isTRUE(se.fit)) {
+    se.out <- .np_plreg_predict_se(bws = obj.bws, fit = tr)
+    return(list(fit = fit, se.fit = se.out))
+  }
+
+  fit
 }
 summary.plregression <- function(object, ...){
   obj.bws <- .np_plreg_bws(object, where = "summary.plregression")
