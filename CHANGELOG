@@ -5,6 +5,12 @@ Changes from Version 0.70-1 to 0.70-2 [06-May-2026]
   return asymptotic prediction standard errors for training and evaluation
   data, with numerical parity to `np` on the shared fixed-bandwidth sentinel.
 
+* Reduced attach/session auto-dispatch payload overhead for formula calls that
+  omit `data=` by routing large internally constructed model data through the
+  existing prepublish broadcast path instead of embedding it inside every
+  command payload; the small-data inline path and estimator semantics are
+  unchanged.
+
 * Reworked `npplregbw()` local-polynomial degree-search orchestration so each
   component regression uses the full active MPI communicator in sequence,
   matching the serial `np` algorithmic decomposition while avoiding the earlier

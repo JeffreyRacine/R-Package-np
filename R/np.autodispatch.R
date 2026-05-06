@@ -163,6 +163,20 @@
   as.integer(rthr)
 }
 
+.npRmpi_autodispatch_store_tmp <- function(name,
+                                           value,
+                                           tmpvals,
+                                           prepublish,
+                                           threshold,
+                                           force.inline = FALSE) {
+  if (isTRUE(force.inline) || as.numeric(object.size(value)) < threshold) {
+    tmpvals[[name]] <- value
+  } else {
+    prepublish[[name]] <- value
+  }
+  list(tmpvals = tmpvals, prepublish = prepublish)
+}
+
 .npRmpi_autodispatch_as_generic_call <- function(generic, mc) {
   mc <- .npRmpi_autodispatch_expand_dots_call(mc)
   args <- as.list(mc)[-1L]
@@ -431,6 +445,7 @@
   opt.verify <- isTRUE(payload$opt.verify)
   tmpvals <- payload$tmpvals
   tmpnames <- payload$tmpnames
+  prepublish.names <- payload$prepublish.names
   remote.name <- payload$remote.name
 
   if (!is.null(opt.keys) && length(opt.keys)) {
@@ -460,8 +475,16 @@
     on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(tmpnames, envir = .GlobalEnv), add = TRUE)
 
   res <- .npRmpi_eval_scmd(call.obj, envir = .GlobalEnv)
-  if (!is.null(tmpvals) && length(tmpvals))
-    res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpvals)
+  tmpreplace <- tmpvals
+  if (!is.null(prepublish.names) && length(prepublish.names)) {
+    prepublish.names <- unique(as.character(prepublish.names))
+    for (nm in prepublish.names) {
+      if (nzchar(nm) && exists(nm, envir = .GlobalEnv, inherits = FALSE))
+        tmpreplace[[nm]] <- get(nm, envir = .GlobalEnv, inherits = FALSE)
+    }
+  }
+  if (!is.null(tmpreplace) && length(tmpreplace))
+    res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpreplace)
   if (is.character(remote.name) && length(remote.name) == 1L && nzchar(remote.name))
     .GlobalEnv[[remote.name]] <- res
   res
@@ -1479,7 +1502,15 @@
       tmp <- sprintf(".__npRmpi_autod_data_%d", idx)
       out[["data"]] <- as.name(tmp)
       tmpnames <- c(tmpnames, tmp)
-      tmpvals[[tmp]] <- as.data.frame(dlist, stringsAsFactors = FALSE)
+      stored <- .npRmpi_autodispatch_store_tmp(
+        name = tmp,
+        value = as.data.frame(dlist, stringsAsFactors = FALSE),
+        tmpvals = tmpvals,
+        prepublish = prepublish,
+        threshold = large.arg.threshold
+      )
+      tmpvals <- stored$tmpvals
+      prepublish <- stored$prepublish
     }
   }
 
@@ -1538,11 +1569,16 @@
     # npsigtest formulas store master-only symbols in bws$call; forcing the
     # bws object through inline payload avoids worker-side prepublish divergence.
     force.inline <- identical(call.base, "npsigtest") && identical(nm, "bws")
-    if (!force.inline && as.numeric(object.size(val)) >= large.arg.threshold) {
-      prepublish[[tmp]] <- val
-    } else {
-      tmpvals[[tmp]] <- val
-    }
+    stored <- .npRmpi_autodispatch_store_tmp(
+      name = tmp,
+      value = val,
+      tmpvals = tmpvals,
+      prepublish = prepublish,
+      threshold = large.arg.threshold,
+      force.inline = force.inline
+    )
+    tmpvals <- stored$tmpvals
+    prepublish <- stored$prepublish
   }
 
   list(call = out, tmpnames = unique(tmpnames), tmpvals = tmpvals, prepublish = prepublish)
@@ -1856,6 +1892,7 @@
     call = prepared$call,
     tmpvals = prepared$tmpvals,
     tmpnames = prepared$tmpnames,
+    prepublish.names = names(prepared$prepublish),
     opt.keys = opt.keys,
     opt.vals = opt.vals,
     opt.verify = opt.verify,
