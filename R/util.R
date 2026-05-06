@@ -2160,6 +2160,10 @@ npFormatRegressionType <- function(x){
   }
   basis.family <- npLpBasisFamilyLabel(basis)
 
+  if (!is.null(x$child.degree.common) && !isTRUE(x$child.degree.common))
+    return(sprintf("Local-Polynomial (%s basis; child-specific degree)",
+                   basis.family))
+
   sprintf("Local-Polynomial (%s basis; degree = %s)",
           basis.family, paste(degree, collapse = ","))
 }

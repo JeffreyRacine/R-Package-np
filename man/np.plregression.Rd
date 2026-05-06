@@ -110,6 +110,9 @@ This argument passes the recommended automatic local-polynomial NOMAD preset to 
     \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
     \code{degree.verify}, and \code{bwtype} with the recommended
     automatic LP NOMAD preset documented in \code{\link{npplregbw}}.
+    The preset selects local-polynomial degrees and bandwidths
+    separately for the nuisance regressions \eqn{E[Y \mid Z]} and
+    \eqn{E[X_j \mid Z]} before the final partially linear solve.
     Additional NOMAD tuning arguments such as \code{nomad.nmulti} may
     also be supplied through \code{\dots}; \code{nmulti} remains the
     outer restart count while \code{nomad.nmulti} controls inner
@@ -183,7 +186,9 @@ Further arguments are passed to \code{\link{npplregbw}} and its component \code{
     \code{bernstein.basis}, \code{degree.select}, and
     \code{nomad.nmulti} are supplied. See \code{\link{npplregbw}} and
     \code{\link{npregbw}} for the complete bandwidth-selection
-    argument surface.
+    argument surface, including the child-indexed matrix/list
+    \code{degree} form for fixed local-polynomial partially linear
+    fits.
   }
 }
 \details{

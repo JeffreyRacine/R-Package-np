@@ -178,7 +178,7 @@ npplregbw.NULL =
     tbw$call <- mc
 
     tbw <-
-      updateBwNameMetadata(nameList = list(ynames = deparse(substitute(ydat))),
+      updateBwNameMetadata(nameList = list(ynames = .npplregbw_sanitize_yname(deparse(substitute(ydat)))),
                            bws = tbw)
 
     tbw
@@ -228,14 +228,14 @@ npplregbw.plbandwidth =
     )
     total.time <-
       system.time({
-        .np_progress_bandwidth_set_coordinator_group(1L, "y~z")
+        .np_progress_bandwidth_set_coordinator_group(1L, "E[y | z]")
         bws$bw$yzbw  <- npregbw(xdat = zdat, ydat = ydat,
                                 bws = bws$bw$yzbw, nmulti = nmulti, ...)
 
         ## x on z
 
         for (i in seq_len(ncol(xdat))) {
-          .np_progress_bandwidth_set_coordinator_group(i + 1L, sprintf("x%s~z", i))
+          .np_progress_bandwidth_set_coordinator_group(i + 1L, sprintf("E[%s | z]", names(xdat)[[i]]))
           bws$bw[[i+1]] <- npregbw(xdat=zdat, ydat=xdat[,i],
                   bws = bws$bw[[i+1]], nmulti = nmulti, ...)
         }
@@ -277,8 +277,17 @@ npplregbw.plbandwidth =
                        num.feval.fast = num.feval.fast,
                        rows.omit = rows.omit,
                        total.time = total.time)
+    bws$degree.policy <- if (isTRUE(bws$child.degree.common)) "common-child-degree" else "child-specific"
+    bws
 
   }
+
+.npplregbw_sanitize_yname <- function(yname) {
+  yname <- paste(yname, collapse = " ")
+  if (!nzchar(yname) || nchar(yname) > 80L || grepl("^c\\(", yname))
+    return("y")
+  yname
+}
 
 .npplregbw_build_plbandwidth <- function(xdat,
                                          ydat,
@@ -286,19 +295,26 @@ npplregbw.plbandwidth =
                                          bws,
                                          bandwidth.compute,
                                          reg.args,
-                                         outer.args) {
-  yname <- deparse(substitute(ydat))
+                                         outer.args,
+                                         child.degree = NULL) {
+  yname <- .npplregbw_sanitize_yname(deparse(substitute(ydat)))
 
   plband <- list()
+  child.reg.args <- reg.args
+  if (!is.null(child.degree))
+    child.reg.args$degree <- child.degree[[1L]]
   plband$yzbw <- do.call(
     npregbw,
-    c(list(xdat = zdat, ydat = ydat, bws = bws[1, ]), reg.args)
+    c(list(xdat = zdat, ydat = ydat, bws = bws[1, ]), child.reg.args)
   )
 
   for (i in seq_len(dim(xdat)[2])) {
+    child.reg.args <- reg.args
+    if (!is.null(child.degree))
+      child.reg.args$degree <- child.degree[[i + 1L]]
     plband[[i + 1L]] <- do.call(
       npregbw,
-      c(list(xdat = zdat, ydat = xdat[, i], bws = bws[i + 1L, ]), reg.args)
+      c(list(xdat = zdat, ydat = xdat[, i], bws = bws[i + 1L, ]), child.reg.args)
     )
   }
 
@@ -327,10 +343,22 @@ npplregbw.plbandwidth =
     outer.args
   )
 
-  do.call(plbandwidth, plbw.args)
+  tbw <- do.call(plbandwidth, plbw.args)
+  if (!is.null(child.degree)) {
+    degree.keys <- vapply(child.degree, paste, collapse = ",", character(1L))
+    tbw$degree.policy <- if (length(unique(degree.keys)) <= 1L) "common-child-degree" else "child-specific"
+  }
+  tbw
 }
 
-.npplregbw_run_fixed_degree <- function(xdat, ydat, zdat, bws, reg.args, outer.args, opt.args) {
+.npplregbw_run_fixed_degree <- function(xdat,
+                                        ydat,
+                                        zdat,
+                                        bws,
+                                        reg.args,
+                                        outer.args,
+                                        opt.args,
+                                        child.degree = NULL) {
   tbw <- .npplregbw_build_plbandwidth(
     xdat = xdat,
     ydat = ydat,
@@ -338,7 +366,8 @@ npplregbw.plbandwidth =
     bws = bws,
     bandwidth.compute = TRUE,
     reg.args = reg.args,
-    outer.args = outer.args
+    outer.args = outer.args,
+    child.degree = child.degree
   )
 
   do.call(
@@ -347,7 +376,7 @@ npplregbw.plbandwidth =
   )
 }
 
-.npplregbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, zdat, bws, reg.args, outer.args, opt.args) {
+.npplregbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, zdat, bws, reg.args, outer.args, opt.args, child.degree = NULL) {
   old.messages <- getOption("np.messages")
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
 
@@ -363,7 +392,8 @@ npplregbw.plbandwidth =
     bws = bws,
     reg.args = reg.args,
     outer.args = outer.args,
-    opt.args = opt.args
+    opt.args = opt.args,
+    child.degree = child.degree
   )
 }
 
@@ -374,6 +404,7 @@ npplregbw.plbandwidth =
                                                    reg.args,
                                                    outer.args,
                                                    opt.args,
+                                                   child.degree = NULL,
                                                    comm = 1L) {
   if (.npRmpi_has_active_slave_pool(comm = comm) &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
@@ -386,7 +417,8 @@ npplregbw.plbandwidth =
         BWS,
         REGARGS,
         OUTERARGS,
-        OPTARGS
+        OPTARGS,
+        CHILDDEGREE
       ),
       list(
         XDAT = xdat,
@@ -395,7 +427,8 @@ npplregbw.plbandwidth =
         BWS = bws,
         REGARGS = reg.args,
         OUTERARGS = outer.args,
-        OPTARGS = opt.args
+        OPTARGS = opt.args,
+        CHILDDEGREE = child.degree
       )
     )
     return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
@@ -408,11 +441,221 @@ npplregbw.plbandwidth =
     bws = bws,
     reg.args = reg.args,
     outer.args = outer.args,
-    opt.args = opt.args
+    opt.args = opt.args,
+    child.degree = child.degree
+  )
+}
+
+.npplregbw_child_nomad_call_args <- function(zdat,
+                                             response,
+                                             bw.start,
+                                             reg.args,
+                                             opt.args,
+                                             degree.search,
+                                             nomad.inner.nmulti,
+                                             random.seed) {
+  kernel.arg.names <- c(
+    "basis", "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
+    "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
+    "scale.factor.search.lower"
+  )
+  optimizer.arg.names <- c(
+    "ftol", "itmax", "nmulti", "remin", "small", "tol",
+    "scale.factor.search.lower"
+  )
+  child.args <- c(
+    list(
+      xdat = zdat,
+      ydat = response,
+      bws = bw.start,
+      bandwidth.compute = TRUE,
+      regtype = "lp",
+      nomad = TRUE,
+      search.engine = degree.search$engine,
+      degree.select = degree.search$degree.select,
+      bernstein.basis = degree.search$bernstein.basis,
+      degree.min = degree.search$lower,
+      degree.max = degree.search$upper,
+      degree.start = degree.search$start.degree,
+      degree.restarts = degree.search$restarts,
+      degree.max.cycles = degree.search$max.cycles,
+      degree.verify = degree.search$verify,
+      nomad.nmulti = nomad.inner.nmulti,
+      random.seed = random.seed
+    ),
+    reg.args[intersect(names(reg.args), kernel.arg.names)],
+    opt.args[intersect(names(opt.args), optimizer.arg.names)]
+  )
+  child.args[c("degree", "degree.engine")] <- NULL
+  child.args <- child.args[!duplicated(names(child.args), fromLast = TRUE)]
+  child.args
+}
+
+.npplregbw_child_specific_nomad_search <- function(xdat,
+                                                   ydat,
+                                                   zdat,
+                                                   bws,
+                                                   reg.args,
+                                                   outer.args,
+                                                   opt.args,
+                                                   degree.search,
+                                                   nomad.inner.nmulti = 0L,
+                                                   random.seed = 42L,
+                                                   yname = deparse(substitute(ydat))) {
+  if (isTRUE(degree.search$verify))
+    stop("npplreg child-specific NOMAD does not support degree.verify")
+
+  if (is.null(degree.search$degree.select) ||
+      identical(degree.search$degree.select, "manual"))
+    stop("npplreg child-specific NOMAD requires automatic child degree search")
+
+  xdat <- toFrame(xdat)
+  zdat <- toFrame(zdat)
+  child.responses <- .npplregbw_child_responses(xdat = xdat, ydat = ydat, yname = yname)
+  child.names <- c("yzbw", names(xdat))
+  child.labels <- c("E[y | z]", sprintf("E[%s | z]", names(xdat)))
+  child.list <- vector("list", length(child.responses))
+  names(child.list) <- child.names
+
+  total.start <- proc.time()[3L]
+  .np_progress_bandwidth_set_coordinator(
+    total_groups = length(child.responses),
+    local_total = 1L
+  )
+
+  for (i in seq_along(child.responses)) {
+    child.context <- sprintf("%s (%d/%d)", child.labels[[i]], i, length(child.responses))
+    .np_progress_bandwidth_set_coordinator_group(i, child.context)
+    old.context <- .np_progress_runtime$bandwidth_context_label
+    .np_progress_bandwidth_set_context(child.context)
+    child.list[[i]] <- tryCatch({
+      child.args <- .npplregbw_child_nomad_call_args(
+        zdat = zdat,
+        response = child.responses[[i]]$values,
+        bw.start = bws[i, ],
+        reg.args = reg.args,
+        opt.args = opt.args,
+        degree.search = degree.search,
+        nomad.inner.nmulti = nomad.inner.nmulti,
+        random.seed = random.seed
+      )
+      do.call(npregbw, child.args)
+    }, finally = {
+      .np_progress_bandwidth_set_context(old.context)
+    })
+    child.list[[i]]$ynames <- child.responses[[i]]$name
+  }
+
+  total.time <- proc.time()[3L] - total.start
+  child.fval <- vapply(child.list, function(bwi) {
+    if (is.null(bwi$fval) || !length(bwi$fval)) NA_real_ else as.numeric(bwi$fval[1L])
+  }, numeric(1L))
+  child.feval <- vapply(child.list, function(bwi) {
+    if (is.null(bwi$num.feval) || identical(bwi$num.feval, NA)) 0 else as.numeric(bwi$num.feval[1L])
+  }, numeric(1L))
+  child.feval.fast <- vapply(child.list, function(bwi) {
+    if (is.null(bwi$num.feval.fast) || identical(bwi$num.feval.fast, NA)) 0 else as.numeric(bwi$num.feval.fast[1L])
+  }, numeric(1L))
+  child.nomad.time <- vapply(child.list, function(bwi) {
+    if (is.null(bwi$nomad.time) || !length(bwi$nomad.time)) NA_real_ else as.numeric(bwi$nomad.time[1L])
+  }, numeric(1L))
+  child.powell.time <- vapply(child.list, function(bwi) {
+    if (is.null(bwi$powell.time) || !length(bwi$powell.time)) NA_real_ else as.numeric(bwi$powell.time[1L])
+  }, numeric(1L))
+
+  common.degree <- {
+    degree.keys <- vapply(child.list, function(bwi) paste(as.integer(bwi$degree), collapse = ","), character(1L))
+    length(unique(degree.keys)) <= 1L
+  }
+  object.degree <- if (isTRUE(common.degree)) {
+    as.integer(child.list[[1L]]$degree)
+  } else {
+    as.integer(child.list[[1L]]$degree)
+  }
+
+  plbw.args <- c(
+    list(
+      bws = child.list,
+      nobs = dim(xdat)[1],
+      fval = if (all(!is.finite(child.fval))) NA_real_ else sum(child.fval[is.finite(child.fval)]),
+      num.feval = sum(child.feval),
+      num.feval.fast = sum(child.feval.fast),
+      xdati = untangle(xdat),
+      ydati = untangle(data.frame(ydat)),
+      zdati = untangle(zdat),
+      xnames = names(xdat),
+      ynames = child.responses[[1L]]$name,
+      znames = names(zdat),
+      bandwidth.compute = TRUE,
+      total.time = total.time
+    ),
+    utils::modifyList(
+      outer.args,
+      list(
+        regtype = "lp",
+        degree = object.degree,
+        bernstein.basis = degree.search$bernstein.basis
+      )
+    )
+  )
+  tbw <- do.call(plbandwidth, plbw.args)
+  tbw$degree.policy <- if (isTRUE(common.degree)) "common-child-degree" else "child-specific"
+  tbw$nomad.time <- if (all(!is.finite(child.nomad.time))) NA_real_ else sum(child.nomad.time[is.finite(child.nomad.time)])
+  tbw$powell.time <- if (all(!is.finite(child.powell.time))) NA_real_ else sum(child.powell.time[is.finite(child.powell.time)])
+  tbw$child.fval <- child.fval
+  tbw$child.num.feval <- child.feval
+  tbw$child.num.feval.fast <- child.feval.fast
+  tbw$child.nomad.time <- child.nomad.time
+  tbw$child.powell.time <- child.powell.time
+
+  selected.degrees <- lapply(child.list, function(bwi) as.integer(bwi$degree))
+  names(selected.degrees) <- child.names
+  baseline.degrees <- lapply(child.list, function(bwi) {
+    if (!is.null(bwi$degree.search$baseline.degree)) as.integer(bwi$degree.search$baseline.degree) else integer(0L)
+  })
+  names(baseline.degrees) <- child.names
+
+  list(
+    method = degree.search$engine,
+    direction = "min",
+    verify = FALSE,
+    completed = TRUE,
+    certified = TRUE,
+    interrupted = FALSE,
+    baseline = list(degree = baseline.degrees, objective = NA_real_),
+    best = list(
+      degree = selected.degrees,
+      objective = as.numeric(tbw$fval[1L]),
+      child.fval = child.fval
+    ),
+    best_payload = tbw,
+    nomad.time = tbw$nomad.time,
+    powell.time = tbw$powell.time,
+    optim.time = total.time,
+    n.unique = NA_integer_,
+    n.visits = NA_integer_,
+    n.cached = NA_integer_,
+    grid.size = NA_integer_,
+    best.restart = NA_integer_,
+    restart.starts = NULL,
+    restart.degree.starts = NULL,
+    restart.bandwidth.starts = NULL,
+    restart.start.info = NULL,
+    restart.results = NULL,
+    trace = data.frame(
+      child = child.names,
+      label = child.labels,
+      degree = vapply(selected.degrees, paste, collapse = ",", character(1L)),
+      objective = child.fval,
+      num.feval = child.feval,
+      num.feval.fast = child.feval.fast,
+      stringsAsFactors = FALSE
+    )
   )
 }
 
 .npplregbw_child_responses <- function(xdat, ydat, yname = deparse(substitute(ydat))) {
+  yname <- .npplregbw_sanitize_yname(yname)
   xdat <- toFrame(xdat)
   yvec <- as.double(ydat)
   out <- vector("list", ncol(xdat) + 1L)
@@ -422,6 +665,89 @@ npplregbw.plbandwidth =
       out[[i + 1L]] <- list(values = xdat[[i]], name = names(xdat)[i])
     }
   }
+  out
+}
+
+.npplregbw_child_degree_names <- function(xdat) {
+  c("yzbw", names(toFrame(xdat)))
+}
+
+.npplregbw_validate_child_degree_entry <- function(value, ncon, child_name) {
+  npValidateGlpDegree(
+    regtype = "lp",
+    degree = value,
+    ncon = ncon,
+    argname = sprintf("degree for npplreg child '%s'", child_name)
+  )
+}
+
+.npplregbw_normalize_child_degree <- function(degree,
+                                              regtype,
+                                              ncon,
+                                              child.names,
+                                              degree.select) {
+  out <- list(
+    degree.for.spec = degree,
+    child.degree = NULL,
+    child.degree.common = TRUE
+  )
+
+  if (!identical(regtype, "lp") || is.null(degree))
+    return(out)
+
+  degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
+  nchild <- length(child.names)
+
+  if (is.list(degree) && !is.data.frame(degree)) {
+    if (!identical(degree.select, "manual"))
+      stop("child-specific npplreg degree lists are fixed-degree controls; use degree.select='manual'")
+    if (length(degree) != nchild)
+      stop(sprintf("npplreg degree list must have one entry per child regression (%d expected, got %d)",
+                   nchild, length(degree)))
+    if (!is.null(names(degree)) && all(nzchar(names(degree)))) {
+      missing.names <- setdiff(child.names, names(degree))
+      if (length(missing.names))
+        stop(sprintf("npplreg degree list is missing child %s",
+                     paste(sQuote(missing.names), collapse = ", ")))
+      degree <- degree[child.names]
+    }
+    child.degree <- Map(
+      function(value, child_name) .npplregbw_validate_child_degree_entry(value, ncon, child_name),
+      degree,
+      child.names
+    )
+  } else if (is.matrix(degree) || is.data.frame(degree)) {
+    if (!identical(degree.select, "manual"))
+      stop("child-specific npplreg degree matrices are fixed-degree controls; use degree.select='manual'")
+    degree.matrix <- as.matrix(degree)
+    if (nrow(degree.matrix) != nchild || ncol(degree.matrix) != ncon) {
+      stop(sprintf(
+        "npplreg degree matrix must have %d rows (yzbw plus x children) and %d columns (continuous z predictors)",
+        nchild,
+        ncon
+      ))
+    }
+    if (!is.null(rownames(degree.matrix)) && all(nzchar(rownames(degree.matrix)))) {
+      missing.names <- setdiff(child.names, rownames(degree.matrix))
+      if (length(missing.names))
+        stop(sprintf("npplreg degree matrix is missing child row %s",
+                     paste(sQuote(missing.names), collapse = ", ")))
+      degree.matrix <- degree.matrix[child.names, , drop = FALSE]
+    }
+    child.degree <- lapply(seq_len(nchild), function(i) {
+      .npplregbw_validate_child_degree_entry(degree.matrix[i, ], ncon, child.names[[i]])
+    })
+    names(child.degree) <- child.names
+  } else {
+    common.degree <- .npplregbw_validate_child_degree_entry(degree, ncon, "all")
+    child.degree <- replicate(nchild, common.degree, simplify = FALSE)
+    names(child.degree) <- child.names
+  }
+
+  degree.keys <- vapply(child.degree, paste, collapse = ",", character(1L))
+  out$degree.for.spec <- child.degree[[1L]]
+  out$child.degree <- child.degree
+  out$child.degree.common <- length(unique(degree.keys)) <= 1L
   out
 }
 
@@ -1791,6 +2117,7 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
   list(
     method = if (identical(search.engine, "cell")) degree.select else search.engine,
     engine = search.engine,
+    degree.select = degree.select,
     candidates = bounds$candidates,
     lower = bounds$lower,
     upper = bounds$upper,
@@ -1935,6 +2262,15 @@ npplregbw.default =
     basis.arg <- if ("basis" %in% dot.names) dots$basis else "glp"
     degree.arg <- if (!missing(degree)) degree else NULL
     bernstein.arg <- if (!is.null(nomad.shortcut$values$bernstein.basis)) nomad.shortcut$values$bernstein.basis else FALSE
+    ncon.z <- sum(untangle(zdat)$icon)
+    child.degree.setup <- .npplregbw_normalize_child_degree(
+      degree = degree.arg,
+      regtype = regtype.arg,
+      ncon = ncon.z,
+      child.names = .npplregbw_child_degree_names(xdat),
+      degree.select = if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else "manual"
+    )
+    degree.for.spec <- child.degree.setup$degree.for.spec
 
     spec.mc.names <- dot.names
     if (!missing(degree))
@@ -1944,8 +2280,8 @@ npplregbw.default =
     degree.select.value <- if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else "manual"
     degree.setup <- npSetupGlpDegree(
       regtype = regtype.arg,
-      degree = degree.arg,
-      ncon = sum(untangle(zdat)$icon),
+      degree = degree.for.spec,
+      ncon = ncon.z,
       degree.select = degree.select.value
     )
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
@@ -1956,7 +2292,7 @@ npplregbw.default =
       basis = basis.arg,
       degree = degree.setup,
       bernstein.basis = bernstein.arg,
-      ncon = sum(untangle(zdat)$icon),
+      ncon = ncon.z,
       where = "npplregbw"
     )
 
@@ -1965,7 +2301,7 @@ npplregbw.default =
       regtype = regtype.arg,
       regtype.named = isTRUE(nomad.shortcut$enabled) || ("regtype" %in% dot.names),
       bandwidth.compute = bandwidth.compute,
-      ncon = sum(untangle(zdat)$icon),
+      ncon = ncon.z,
       nobs = NROW(zdat),
       basis = spec$basis.engine,
       degree.select = degree.select.value,
@@ -2081,7 +2417,7 @@ npplregbw.default =
             objective_name = "fval"
           )
         } else {
-          search.result <- .npplregbw_nomad_search(
+          search.result <- .npplregbw_child_specific_nomad_search(
             xdat = xdat,
             ydat = ydat,
             zdat = zdat,
@@ -2091,7 +2427,8 @@ npplregbw.default =
             opt.args = opt.args,
             degree.search = degree.search,
             nomad.inner.nmulti = nomad.inner.nmulti,
-            random.seed = random.seed.value
+            random.seed = random.seed.value,
+            yname = deparse(substitute(ydat))
           )
       }
         tbw <- .npplregbw_attach_degree_search(
@@ -2113,7 +2450,8 @@ npplregbw.default =
       bws = bws,
       bandwidth.compute = bandwidth.compute,
       reg.args = reg.args,
-      outer.args = outer.args
+      outer.args = outer.args,
+      child.degree = child.degree.setup$child.degree
     )
 
     if (bandwidth.compute) {
