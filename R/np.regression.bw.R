@@ -645,26 +645,29 @@ npregbw.rbandwidth <-
     }
     out <- if (isTRUE(localize)) .npRmpi_with_local_regression(eval_core()) else eval_core()
   } else {
-    out <- .npRmpi_with_local_regression(.Call(
-      C_np_regression_bw,
-      as.double(runo),
-      as.double(rord),
-      as.double(rcon),
-      as.double(ydat),
-      as.double(mysd),
-      as.integer(myopti),
-      as.double(myoptd),
-      as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-      as.integer(max(1L, nmulti)),
-      as.integer(penalty_mode),
-      as.double(penalty.multiplier),
-      as.integer(degree.c),
-      as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
-      as.integer(npLpBasisCode(reg.spec$basis.engine)),
-      as.double(cker.bounds.c$lb),
-      as.double(cker.bounds.c$ub),
-      PACKAGE = "npRmpi"
-    ))
+    search_core <- function() {
+      .Call(
+        C_np_regression_bw,
+        as.double(runo),
+        as.double(rord),
+        as.double(rcon),
+        as.double(ydat),
+        as.double(mysd),
+        as.integer(myopti),
+        as.double(myoptd),
+        as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+        as.integer(max(1L, nmulti)),
+        as.integer(penalty_mode),
+        as.double(penalty.multiplier),
+        as.integer(degree.c),
+        as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+        as.integer(npLpBasisCode(reg.spec$basis.engine)),
+        as.double(cker.bounds.c$lb),
+        as.double(cker.bounds.c$ub),
+        PACKAGE = "npRmpi"
+      )
+    }
+    out <- if (isTRUE(localize)) .npRmpi_with_local_regression(search_core()) else search_core()
   }
 
   rorder <- numeric(length(bws$bw))
@@ -716,7 +719,8 @@ npregbw.rbandwidth <-
 .npregbw_run_fixed_degree_source_of_truth <- function(xdat,
                                                       ydat,
                                                       bws,
-                                                      opt.args) {
+                                                      opt.args,
+                                                      localize = TRUE) {
   opt.value <- function(name, default) {
     if (is.null(opt.args[[name]])) default else opt.args[[name]]
   }
@@ -751,7 +755,8 @@ npregbw.rbandwidth <-
     penalty.multiplier = opt.value("penalty.multiplier", 10),
     transform.bounds = opt.value("transform.bounds", FALSE),
     scale.factor.search.lower = opt.value("scale.factor.search.lower", NULL),
-    eval.only = FALSE
+    eval.only = FALSE,
+    localize = localize
   )
 
   .npregbw_finalize_fixed_degree_payload(
@@ -779,7 +784,8 @@ npregbw.rbandwidth <-
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    opt.args = opt.args
+    opt.args = opt.args,
+    localize = FALSE
   )
 }
 
