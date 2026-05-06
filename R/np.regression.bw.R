@@ -982,6 +982,10 @@ npRmpiNomadShadowClearRegression <- function() {
   .Call("C_np_regression_nomad_shadow_clear", PACKAGE = "npRmpi")
 }
 
+.npregbw_nomad_shadow_template <- function(template) {
+  template[c("bw", "icon", "iuno", "iord", "scaling")]
+}
+
 npRmpiNomadEvalOnlyRegression <- function(runo,
                                           rord,
                                           rcon,
@@ -1422,12 +1426,9 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   value
 }
 
-npRmpiNomadShadowSearchRegression <- function(xdat,
-                                              ydat,
-                                              template,
+npRmpiNomadShadowSearchRegression <- function(template,
                                               setup,
                                               prep,
-                                              reg.args,
                                               degree.search,
                                               x0,
                                               bbin,
@@ -1435,7 +1436,6 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
                                               ub,
                                               nomad.nmulti = 1L,
                                               nomad.inner.nmulti = 0L,
-                                              penalty.multiplier = 10,
                                               random.seed = 42L) {
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   old.messages <- getOption("np.messages")
@@ -1699,14 +1699,12 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     )
 
+    shadow.template <- .npregbw_nomad_shadow_template(template)
     mc <- substitute(
       get("npRmpiNomadShadowSearchRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
-        XDAT,
-        YDAT,
         TEMPLATE,
         SETUP,
         PREP,
-        REGARGS,
         DEGREESEARCH,
         X0,
         BBIN,
@@ -1714,16 +1712,12 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
         UB,
         NOMADNMULTI,
         INNERNMULTI,
-        PENMULT,
         RSEED
       ),
       list(
-        XDAT = xdat,
-        YDAT = ydat,
-        TEMPLATE = template,
+        TEMPLATE = shadow.template,
         SETUP = setup,
         PREP = prep,
-        REGARGS = reg.args,
         DEGREESEARCH = degree.search,
         X0 = x0,
         BBIN = bbin,
@@ -1731,7 +1725,6 @@ npRmpiNomadShadowSearchRegression <- function(xdat,
         UB = ub,
         NOMADNMULTI = nomad.nmulti,
         INNERNMULTI = nomad.inner.nmulti,
-        PENMULT = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier,
         RSEED = random.seed
       )
     )
