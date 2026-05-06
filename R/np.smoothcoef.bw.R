@@ -766,13 +766,43 @@ npscoefbw.NULL <-
   if (is.null(pool) || !is.list(pool) || is.null(pool$nslaves) || pool$nslaves < 1L)
     return(invisible(NULL))
 
+  ack.tag <- function(rank) {
+    as.integer(pool$res.base + 1000L + as.integer(rank))
+  }
+
+  sent <- integer(0)
   for (rk in seq_len(pool$nslaves)) {
-    mpi.send.Robj(
-      obj = list(type = "stop"),
-      dest = rk,
-      tag = pool$req.base + rk,
-      comm = pool$comm
+    ok <- try(
+      mpi.send.Robj(
+        obj = list(type = "stop"),
+        dest = rk,
+        tag = pool$req.base + rk,
+        comm = pool$comm
+      ),
+      silent = TRUE
     )
+    if (!inherits(ok, "try-error"))
+      sent <- c(sent, rk)
+  }
+
+  if (!length(sent))
+    return(invisible(NULL))
+
+  deadline <- as.numeric(Sys.time()) + .npRmpi_attach_close_ack_timeout()
+  pending <- as.integer(sent)
+  while (length(pending) && as.numeric(Sys.time()) < deadline) {
+    for (rk in pending) {
+      tag <- ack.tag(rk)
+      if (!isTRUE(.npRmpi_safe(mpi.iprobe(source = rk, tag = tag, comm = pool$comm),
+                               fallback = FALSE)))
+        next
+      msg <- .npRmpi_safe(mpi.recv.Robj(source = rk, tag = tag, comm = pool$comm),
+                          fallback = NULL)
+      if (is.list(msg) && identical(as.character(msg$type)[1L], "stopped"))
+        pending <- pending[pending != rk]
+    }
+    if (length(pending))
+      Sys.sleep(0.01)
   }
 
   invisible(NULL)
@@ -794,8 +824,18 @@ npscoefbw.NULL <-
 
   repeat {
     msg <- mpi.recv.Robj(source = 0L, tag = REQ_BASE + rank, comm = COMM)
-    if (is.list(msg) && identical(msg$type, "stop"))
+    if (is.list(msg) && identical(msg$type, "stop")) {
+      try(
+        mpi.send.Robj(
+          obj = list(type = "stopped", rank = rank),
+          dest = 0L,
+          tag = RES_BASE + 1000L + rank,
+          comm = COMM
+        ),
+        silent = TRUE
+      )
       break
+    }
 
     out <- tryCatch(
       .npscoefbw_nomad_lp_eval_subset(
