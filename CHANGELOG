@@ -1,5 +1,14 @@
 Changes from Version 0.70-1 to 0.70-2 [06-May-2026]
 
+* Restored MPI fanout for fixed local-constant and fixed local-polynomial
+  conditional density/distribution plot bootstraps in `npcdens()` and
+  `npcdist()` objects.
+  The repaired `plot(..., plot.errors.method = "bootstrap")` path now
+  partitions `inid`, `fixed`, and `geom` bootstrap chunks across the active
+  worker pool while preserving the existing bootstrap kernels, output ordering,
+  and non-MPI local helper behavior; installed candidate traces now show worker
+  dispatch where the previous route reported `comm_calls = 0`.
+
 * Restored pure-discrete/all-categorical `npregbw()` least-squares
   cross-validation for fixed bandwidths by allowing the optimized regression
   CV cache to represent legitimate zero-continuous bandwidth storage. This
