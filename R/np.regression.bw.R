@@ -819,7 +819,8 @@ npregbw.rbandwidth <-
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    opt.args = opt.args
+    opt.args = opt.args,
+    localize = !isTRUE(.npRmpi_autodispatch_called_from_bcast())
   )
 }
 
