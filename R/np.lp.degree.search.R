@@ -1334,11 +1334,18 @@
 
 .np_nomad_powell_progress_detail <- function(current_degree,
                                              best_record,
+                                             iteration = NULL,
                                              elapsed = NULL) {
   fields <- character()
 
   if (is.finite(elapsed) && !is.na(elapsed) && elapsed >= 0)
     fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
+
+  if (!is.null(iteration)) {
+    iteration <- suppressWarnings(as.integer(iteration)[1L])
+    if (!is.na(iteration) && iteration >= 1L)
+      fields <- c(fields, sprintf("iter %s", format(iteration)))
+  }
 
   if (!is.null(current_degree))
     fields <- c(fields, sprintf("deg %s", .np_degree_format_degree(current_degree)))
@@ -1355,6 +1362,7 @@
   .np_nomad_powell_progress_detail(
     current_degree = state$nomad_current_degree,
     best_record = state$nomad_best_record,
+    iteration = done,
     elapsed = max(0, now - state$started)
   )
 }
@@ -1377,10 +1385,51 @@
   )
 }
 
-.np_nomad_with_powell_progress <- function(degree, expr) {
+.np_nomad_with_powell_progress <- function(degree, expr, best_record = NULL) {
+  old.context <- .np_progress_runtime$bandwidth_context_label
+  old.state <- .np_progress_runtime$bandwidth_state
+  local.state <- NULL
+  progress.enabled <- isTRUE(.np_progress_enabled(domain = "general"))
+
   .np_progress_bandwidth_set_context(.np_nomad_powell_context_label(degree))
-  on.exit(.np_progress_bandwidth_set_context(NULL), add = TRUE)
-  force(expr)
+  on.exit({
+    if (!is.null(local.state) && !is.null(.np_progress_runtime$bandwidth_state)) {
+      .np_progress_end(.np_progress_runtime$bandwidth_state)
+    }
+    if (!is.null(local.state)) {
+      .np_progress_runtime$bandwidth_state <- old.state
+    }
+    .np_progress_bandwidth_set_context(old.context)
+  }, add = TRUE)
+
+  if (is.null(old.state) && isTRUE(progress.enabled)) {
+    local.state <- .np_progress_begin(
+      label = .np_nomad_powell_progress_label(),
+      domain = "general",
+      surface = "bandwidth"
+    )
+    local.state$unknown_total_fields <- .np_nomad_powell_progress_fields
+    local.state$nomad_current_degree <- as.integer(degree)
+    local.state$nomad_best_record <- best_record
+    local.state <- .np_progress_show_now(local.state)
+    .np_progress_runtime$bandwidth_state <- local.state
+  }
+
+  value <- force(expr)
+
+  if (!is.null(local.state) && is.list(value) && !is.null(value$num.feval)) {
+    done <- suppressWarnings(as.integer(value$num.feval[1L]))
+    if (!is.na(done) && done >= 1L && !is.null(.np_progress_runtime$bandwidth_state)) {
+      .np_progress_runtime$bandwidth_state <- .np_progress_step_at(
+        state = .np_progress_runtime$bandwidth_state,
+        now = .np_progress_now(),
+        done = done,
+        force = TRUE
+      )
+    }
+  }
+
+  value
 }
 
 .np_nomad_search <- function(engine = c("nomad", "nomad+powell"),

@@ -1542,16 +1542,20 @@ npscoefbw.scbandwidth <-
       hot.opt.args <- opt.args
       hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("single_iteration")
       powell.start <- proc.time()[3L]
-      hot.payload <- .np_nomad_with_powell_progress(degree, local({
-        .npscoefbw_run_fixed_degree(
-          xdat = xdat,
-          ydat = ydat,
-          zdat = zdat,
-          bws = bw_vec,
-          reg.args = hot.reg.args,
-          opt.args = hot.opt.args
-        )
-      }))
+      hot.payload <- .np_nomad_with_powell_progress(
+        degree = degree,
+        best_record = best_record,
+        expr = local({
+          .npscoefbw_run_fixed_degree(
+            xdat = xdat,
+            ydat = ydat,
+            zdat = zdat,
+            bws = bw_vec,
+            reg.args = hot.reg.args,
+            opt.args = hot.opt.args
+          )
+        })
+      )
       powell.elapsed <- proc.time()[3L] - powell.start
       direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
       direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])

@@ -1042,8 +1042,9 @@ npcdistbw.condbandwidth <-
       hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("disable_multistart")
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
-        degree,
-        .npcdistbw_run_fixed_degree(
+        degree = degree,
+        best_record = best_record,
+        expr = .npcdistbw_run_fixed_degree(
           xdat = xdat,
           ydat = ydat,
           bws = bw_vec,
