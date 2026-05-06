@@ -146,8 +146,24 @@
   restart_total * (1L + max_cycles * per_cycle)
 }
 
+.np_degree_progress_context <- function() {
+  label <- .np_progress_runtime$bandwidth_context_label
+  if (is.null(label))
+    return(NULL)
+
+  label <- as.character(label)[1L]
+  if (is.na(label) || !nzchar(label))
+    return(NULL)
+
+  label
+}
+
 .np_degree_progress_label <- function() {
-  "Selecting degree and bandwidth"
+  context <- .np_degree_progress_context()
+  label <- "Selecting degree/bandwidth"
+  if (!is.null(context))
+    label <- paste(context, label, sep = ": ")
+  label
 }
 
 .np_degree_progress_best_detail <- function(best_record,
@@ -1343,7 +1359,11 @@
 }
 
 .np_nomad_powell_progress_label <- function() {
-  "Refining bandwidth"
+  context <- .np_degree_progress_context()
+  label <- "Refining bandwidth"
+  if (!is.null(context))
+    label <- paste(context, label, sep = ": ")
+  label
 }
 
 .np_nomad_powell_hotstart_nmulti <- function(strategy = c("disable_multistart",
@@ -1429,9 +1449,7 @@
       !is.na(attach.rank) && attach.rank != 0L
   }
 
-  powell.context <- .np_nomad_powell_context_label(degree)
-  if (!is.null(old.context) && nzchar(old.context))
-    powell.context <- paste(old.context, powell.context, sep = " - ")
+  powell.context <- if (!is.null(old.context) && nzchar(old.context)) old.context else NULL
   .np_progress_bandwidth_set_context(powell.context)
   on.exit({
     if (!is.null(local.state) && !is.null(.np_progress_runtime$bandwidth_state)) {
