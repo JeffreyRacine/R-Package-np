@@ -1186,8 +1186,9 @@ npscoefbw.NULL <-
       stop_pool_before_collective()
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
-        degree,
-        .npscoefbw_run_fixed_degree_collective(
+        degree = degree,
+        best_record = best_record,
+        expr = .npscoefbw_run_fixed_degree_collective(
           xdat = xdat,
           ydat = ydat,
           zdat = zdat,
