@@ -1,5 +1,13 @@
 Changes from Version 0.70-1 to 0.70-2 [06-May-2026]
 
+* Reworked `npplregbw(..., nomad = TRUE)` so local-polynomial automatic degree
+  search follows the natural partially linear decomposition: separate nuisance
+  regressions for `E[y | z]` and each `E[x_j | z]`, each with its own selected
+  degree and bandwidths, followed by the final partially linear solve. Fixed
+  `regtype = "lp"` now also accepts child-indexed degree matrices/lists in the
+  same order as the `plbandwidth` rows (`yzbw`, then the `x` children), while a
+  vector remains the common-degree shorthand.
+
 * Added `predict.plregression(..., se.fit = TRUE)` support using the
   partially linear fitted-value linear operator and training-fit residuals to
   return asymptotic prediction standard errors for training and evaluation

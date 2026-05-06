@@ -129,7 +129,7 @@ npplreg.call <-
   }
 
 .np_plreg_fit_progress_targets <- function(xnames) {
-  c("y~z", sprintf("%s~z", xnames))
+  c("E[y | z]", sprintf("E[%s | z]", xnames), "final partially linear solve")
 }
 
 .np_plreg_fit_progress_begin <- function(xnames, handoff = FALSE) {
@@ -418,6 +418,12 @@ npplreg.plbandwidth <-
         detail = fit.progress.targets[i + 1L]
       )
     }
+
+    fit.progress <- .np_progress_step(
+      fit.progress,
+      done = ncol + 2L,
+      detail = fit.progress.targets[ncol + 2L]
+    )
 
     B = coef((model = lm(resy ~ resx - 1)))
 

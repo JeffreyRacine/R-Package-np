@@ -1,3 +1,31 @@
+.np_plbandwidth_child_degree <- function(bw, engine = FALSE) {
+  field <- if (isTRUE(engine)) "degree.engine" else "degree"
+  deg <- bw[[field]]
+  if ((is.null(deg) || !length(deg)) && !is.null(bw$regtype)) {
+    ncon <- if (is.null(bw$ncon) || !length(bw$ncon)) 0L else as.integer(bw$ncon[1L])
+    if (identical(bw$regtype, "lc") && ncon > 0L)
+      return(rep.int(0L, ncon))
+    if (identical(bw$regtype, "ll") && ncon > 0L)
+      return(rep.int(1L, ncon))
+  }
+  if (is.null(deg) || !length(deg))
+    return(integer(0L))
+  as.integer(deg)
+}
+
+.np_plbandwidth_format_degree <- function(degree) {
+  degree <- as.integer(degree)
+  if (!length(degree))
+    return("none")
+  paste(degree, collapse = ", ")
+}
+
+.np_plbandwidth_child_degree_block <- function(bw) {
+  paste0("\nDegree: ", .np_plbandwidth_format_degree(
+    .np_plbandwidth_child_degree(bw)
+  ))
+}
+
 plbandwidth <-
   function(bws = stop("plbandwidth: bws missing"),
            regtype = c("lc","ll","lp"),
@@ -83,6 +111,10 @@ plbandwidth <-
     sfactor <- lapply(seq_along(bws), function(i) { unlist(bws[[i]]$sfactor) })
     bandwidth <- lapply(seq_along(bws), function(i) { unlist(bws[[i]]$bandwidth) })
     sumNum <- lapply(seq_along(bws), function(i) { unlist(bws[[i]]$sumNum) })
+    child.degree <- lapply(bws, .np_plbandwidth_child_degree)
+    child.degree.engine <- lapply(bws, .np_plbandwidth_child_degree, engine = TRUE)
+    degree.keys <- vapply(child.degree, paste, collapse = ",", character(1L))
+    child.degree.common <- length(unique(degree.keys)) <= 1L
 
     names(sfactor) <- names(bandwidth) <- names(sumNum) <- rep("z", length(bws))
 
@@ -98,6 +130,9 @@ plbandwidth <-
         lp = "Local-Polynomial"),
       basis = basis,
       degree = degree,
+      child.degree = child.degree,
+      child.degree.engine = child.degree.engine,
+      child.degree.common = child.degree.common,
       bernstein.basis = bernstein.basis,
       regtype.engine = spec$regtype.engine,
       basis.engine = spec$basis.engine,
@@ -179,6 +214,11 @@ print.plbandwidth <- function(x, digits=NULL, ...){
   
   for (i in seq_along(x$bw))
     bwmat[i,] = x$bw[[i]]$bw
+
+  child.labels <- c(x$ynames, x$xnames)
+  child.degrees <- vapply(x$bw, function(bwi) {
+    .np_plbandwidth_format_degree(.np_plbandwidth_child_degree(bwi))
+  }, character(1L))
   
   ## perhaps add a column for objective function value?
   print(matrix(bwmat[1,], ncol=x$zndim,
@@ -188,6 +228,10 @@ print.plbandwidth <- function(x, digits=NULL, ...){
   print(matrix(bwmat[2:(1+x$xndim),], ncol=x$zndim,
                dimnames=list(c(paste(x$pscaling,":",sep=""), replicate(x$xndim-1,"")),
                  c("x(z)", replicate(x$zndim-1,"")))))
+  cat("\n")
+  print(matrix(child.degrees,
+               ncol = 1L,
+               dimnames = list(child.labels, "Degree")))
 
   cat(genBwSelStr(x))
   cat(genBwKerStrs(x))
@@ -214,6 +258,7 @@ summary.plbandwidth <- function(object, ...){
     seq_along(object$bw),
     function(i) {
       paste0("\n\n", child.labels[[i]], " on z:",
+             .np_plbandwidth_child_degree_block(object$bw[[i]]),
              paste(genBwScaleStrs(object$bw[[i]]), collapse = ""))
     },
     character(1L)

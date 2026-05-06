@@ -168,13 +168,14 @@ These arguments control automatic local-polynomial degree search.
 
   \item{degree.select}{
     character string controlling local-polynomial degree handling for
-    the nonparametric \code{zdat} component. \code{"manual"} (default)
-    treats \code{degree} as fixed. \code{"coordinate"} performs cached
-    coordinate-wise search over admissible degree vectors.
+    the nuisance regressions of \eqn{Y} on \eqn{Z} and each column of
+    \eqn{X} on \eqn{Z}. \code{"manual"} (default) treats \code{degree}
+    as fixed. \code{"coordinate"} performs cached coordinate-wise
+    search over admissible degree vectors.
     \code{"exhaustive"} evaluates the full admissible degree grid when
     \code{search.engine="cell"}. For NOMAD-based search engines, any
-    non-\code{"manual"} value requests direct joint search over degree
-    and bandwidth coordinates for the nonparametric component.
+    non-\code{"manual"} value requests a separate degree and bandwidth
+    search for each nuisance regression.
   }
 
   \item{degree.start}{
@@ -215,7 +216,15 @@ These arguments control fixed local-polynomial specification for the nonparametr
     for local-polynomial partially linear fits, polynomial degree
     specification for each continuous nonparametric regressor in
     \code{zdat}. When supplied with \code{degree.select="manual"},
-    bandwidth optimization treats this vector as fixed input.
+    bandwidth optimization treats this input as fixed. A numeric vector
+    is used as a common degree vector for every nuisance regression.
+    To specify child-specific fixed degrees, supply either a matrix with
+    \eqn{p+1} rows and one column per continuous \code{zdat} predictor,
+    or a list with \eqn{p+1} entries. The child order matches the
+    bandwidth matrix/object order: first the regression of \eqn{Y} on
+    \eqn{Z} (row or entry \code{yzbw}), followed by the regressions of
+    the columns of \eqn{X} on \eqn{Z}. Named matrix rows or list entries
+    are accepted and reordered to this canonical order.
   }
 
 
@@ -225,7 +234,7 @@ These arguments control the optional NOMAD direct-search route for local-polynom
 
   \item{nomad}{
     logical shortcut for the recommended automatic local-polynomial
-    NOMAD route for the nonparametric \code{zdat} component. When
+    NOMAD route for the partially linear nuisance regressions. When
     \code{TRUE}, any missing values among \code{regtype},
     \code{search.engine}, \code{degree.select},
     \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
@@ -246,7 +255,8 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     Returned bandwidth objects retain this normalized preset metadata in
     \code{bw$nomad.shortcut} for a returned object \code{bw}; when
     available, \code{nomad.time} and \code{powell.time} record the
-    direct-search and Powell-polish timing components.
+    direct-search and Powell-polish timing components. Each nuisance
+    regression selects its own admissible degree and bandwidths.
   }
 
   \item{nomad.nmulti}{
@@ -262,13 +272,14 @@ These arguments control the optional NOMAD direct-search route for local-polynom
 
   \item{search.engine}{
     character string controlling the automatic local-polynomial search
-    backend for the nonparametric \code{zdat} component when
+    backend for each nuisance regression when
     \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
-    performs direct joint search over fixed bandwidths and the degree
-    vector using \code{crs::snomadr()}, then applies one Powell hot
-    start from the NOMAD solution. \code{"nomad"} omits the Powell
-    refinement. \code{"cell"} profiles the criterion over the
-    admissible degree grid using repeated fixed-degree bandwidth solves.
+    performs direct search over fixed bandwidths and the degree vector
+    using \code{crs::snomadr()}, then applies one Powell hot start from
+    the NOMAD solution, separately for each nuisance regression.
+    \code{"nomad"} omits the Powell refinement. \code{"cell"} profiles
+    the criterion over the admissible degree grid using repeated
+    fixed-degree bandwidth solves.
     NOMAD-based search currently requires fixed-bandwidth child
     templates, \code{degree.verify=FALSE}, and the suggested package
     \pkg{crs} to be installed.
@@ -435,16 +446,18 @@ or standard-deviation factors.
 
  When the nonparametric component is estimated with
  \code{regtype="lp"} and \code{degree.select != "manual"},
- \code{npplregbw} can jointly determine the \code{zdat}-side degree
- vector and the associated bandwidth coordinates. With
+ \code{npplregbw} determines the \code{zdat}-side degree vector and
+ associated bandwidth coordinates separately for the nuisance
+ regressions \eqn{E[Y \mid Z]} and \eqn{E[X_j \mid Z]}. With
  \code{search.engine="cell"}, the criterion is profiled over the degree
  grid using cached coordinate-wise or exhaustive search together with
  repeated fixed-degree bandwidth solves. With
- \code{search.engine="nomad"} or \code{"nomad+powell"}, the criterion
- is optimized directly over the joint degree/bandwidth space using
- \code{crs::snomadr()}; \code{"nomad+powell"} then performs one Powell
- hot start and keeps the better of the direct NOMAD and polished
- solutions. For the nonparametric regression component, this
+ \code{search.engine="nomad"} or \code{"nomad+powell"}, each nuisance
+ criterion is optimized directly over that child's degree/bandwidth
+ space using \code{crs::snomadr()}; \code{"nomad+powell"} then performs
+ one Powell hot start for that child and keeps the better of the direct
+ NOMAD and polished solutions. For the nonparametric regression
+ components, this
  polynomial-adaptive joint-search route follows Hall and Racine (2015).
 
  Setting \code{nomad=TRUE} is a convenience preset for this automatic

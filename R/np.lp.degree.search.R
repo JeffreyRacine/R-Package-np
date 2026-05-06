@@ -1391,7 +1391,10 @@
   local.state <- NULL
   progress.enabled <- isTRUE(.np_progress_enabled(domain = "general"))
 
-  .np_progress_bandwidth_set_context(.np_nomad_powell_context_label(degree))
+  powell.context <- .np_nomad_powell_context_label(degree)
+  if (!is.null(old.context) && nzchar(old.context))
+    powell.context <- paste(old.context, powell.context, sep = " - ")
+  .np_progress_bandwidth_set_context(powell.context)
   on.exit({
     if (!is.null(local.state) && !is.null(.np_progress_runtime$bandwidth_state)) {
       .np_progress_end(.np_progress_runtime$bandwidth_state)
