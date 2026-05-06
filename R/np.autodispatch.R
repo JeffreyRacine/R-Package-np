@@ -115,10 +115,17 @@
   if (is.null(.npRmpi_autodispatch_remote_ref(val)))
     return(FALSE)
 
-  if (!call.base %in% c("npreg", "npplreg"))
+  allowed <- list(
+    npreg = "rbandwidth",
+    npplreg = "plbandwidth",
+    npindex = "sibandwidth",
+    npscoef = "scbandwidth"
+  )
+  cls <- allowed[[call.base]]
+  if (is.null(cls))
     return(FALSE)
 
-  if (!(inherits(val, "rbandwidth") || inherits(val, "plbandwidth")))
+  if (!inherits(val, cls))
     return(FALSE)
 
   if (!is.null(val$call) && .npRmpi_autodispatch_has_tmp_symbols(val$call))

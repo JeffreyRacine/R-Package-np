@@ -11,6 +11,11 @@ Changes from Version 0.70-1 to 0.70-2 [06-May-2026]
   command payload; the small-data inline path and estimator semantics are
   unchanged.
 
+* Reduced attach/session auto-dispatch payload overhead for follow-on
+  `npindex(bws=...)` and `npscoef(bws=...)` calls by reusing worker-resident
+  `sibandwidth` and `scbandwidth` remote references when their stored calls are
+  self-contained, avoiding an unnecessary rebroadcast of the bandwidth object.
+
 * Reworked `npplregbw()` local-polynomial degree-search orchestration so each
   component regression uses the full active MPI communicator in sequence,
   matching the serial `np` algorithmic decomposition while avoiding the earlier
