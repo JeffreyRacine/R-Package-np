@@ -1,5 +1,13 @@
 Changes from Version 0.70-1 to 0.70-2 [06-May-2026]
 
+* Restored pure-discrete/all-categorical `npregbw()` least-squares
+  cross-validation for fixed bandwidths by allowing the optimized regression
+  CV cache to represent legitimate zero-continuous bandwidth storage. This
+  repairs a regression from legacy behavior where all-categorical regression
+  bandwidth selection could fail with an invalid raw objective, while adjacent
+  mixed continuous/categorical routes were regression-checked for unchanged
+  numerical output.
+
 * Reworked `npplregbw(..., nomad = TRUE)` so local-polynomial automatic degree
   search follows the natural partially linear decomposition: separate nuisance
   regressions for `E[y | z]` and each `E[x_j | z]`, each with its own selected

@@ -32,3 +32,30 @@ test_that("npreg works with formula and mixed data", {
   expect_s3_class(model, "npregression")
   expect_output(summary(model))
 })
+
+test_that("npregbw cv.ls handles all-categorical fixed bandwidths", {
+  old_rng <- RNGkind()
+  on.exit(do.call(RNGkind, as.list(old_rng)), add = TRUE)
+  RNGkind("Mersenne-Twister", "Inversion", "Rejection")
+  set.seed(5000001L)
+
+  n <- 200L
+  xbar <- factor(rbinom(n, 1L, 0.5), levels = 0:1)
+  xtilde <- factor(rbinom(n, 1L, 0.5), levels = 0:1)
+  y <- ifelse(as.integer(as.character(xbar)) == 1L, 1, 0) + rnorm(n)
+
+  bw <- npregbw(
+    xdat = data.frame(xbar = xbar, xtilde = xtilde),
+    ydat = y,
+    bwmethod = "cv.ls",
+    bwscaling = FALSE,
+    bwtype = "fixed",
+    ukertype = "aitchisonaitken"
+  )
+
+  expect_equal(unname(bw$bw),
+               c(0.016073908490923, 0.499999933944028),
+               tolerance = 1e-10)
+  expect_equal(unname(bw$fval), 1.0135341078806, tolerance = 1e-10)
+  expect_equal(unname(bw$num.feval), 306)
+})

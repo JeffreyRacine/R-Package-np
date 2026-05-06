@@ -7415,7 +7415,7 @@ static int np_reg_cv_core_cache_prepare(const int KERNEL_reg,
        np_reg_cv_core_cache.kernel_u == NULL ||
        np_reg_cv_core_cache.kernel_o == NULL ||
        np_reg_cv_core_cache.lambda == NULL ||
-       np_reg_cv_core_cache.matrix_bandwidth == NULL){
+       (num_reg_continuous > 0 && np_reg_cv_core_cache.matrix_bandwidth == NULL)){
       np_reg_cv_core_cache_clear();
       return 0;
     }
