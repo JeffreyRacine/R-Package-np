@@ -512,6 +512,7 @@
   if (!grepl("Selecting polynomial degree and bandwidth", line, fixed = TRUE) &&
       !grepl("Selecting polynomial degree and bw", line, fixed = TRUE) &&
       !grepl("Selecting degree and bandwidth", line, fixed = TRUE) &&
+      !grepl("Selecting degree/bandwidth", line, fixed = TRUE) &&
       !grepl("Refining bandwidth", line, fixed = TRUE)) {
     return(line)
   }
@@ -521,6 +522,7 @@
     out <- sub("Selecting polynomial degree and bandwidth", "Degree/bw search", out, fixed = TRUE)
     out <- sub("Selecting polynomial degree and bw", "Degree/bw search", out, fixed = TRUE)
     out <- sub("Selecting degree and bandwidth", "Degree/bw search", out, fixed = TRUE)
+    out <- sub("Selecting degree/bandwidth", "Degree/bw search", out, fixed = TRUE)
     out <- sub("Refining bandwidth", "Refining bw", out, fixed = TRUE)
     out <- gsub("elapsed ", "elap ", out, fixed = TRUE)
     out <- gsub("restart ", "r ", out, fixed = TRUE)

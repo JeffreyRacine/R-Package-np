@@ -129,7 +129,7 @@ npplreg.call <-
   }
 
 .np_plreg_fit_progress_targets <- function(xnames) {
-  c("E[y | z]", sprintf("E[%s | z]", xnames), "final partially linear solve")
+  c("E[y|z]", sprintf("E[%s|z]", xnames), "final partially linear solve")
 }
 
 .np_plreg_fit_progress_begin <- function(xnames, handoff = FALSE) {

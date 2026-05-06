@@ -182,14 +182,14 @@ npplregbw.plbandwidth =
     )
     total.time <-
       system.time({
-        .np_progress_bandwidth_set_coordinator_group(1L, "E[y | z]")
+        .np_progress_bandwidth_set_coordinator_group(1L, "E[y|z]")
         bws$bw$yzbw  <- npregbw(xdat = zdat, ydat = ydat,
                                 bws = bws$bw$yzbw, nmulti = nmulti, ...)
         
         ## x on z
 
         for (i in seq_len(ncol(xdat))) {
-          .np_progress_bandwidth_set_coordinator_group(i + 1L, sprintf("E[%s | z]", names(xdat)[[i]]))
+          .np_progress_bandwidth_set_coordinator_group(i + 1L, sprintf("E[%s|z]", names(xdat)[[i]]))
           bws$bw[[i+1]] <- npregbw(xdat=zdat, ydat=xdat[,i],
                   bws = bws$bw[[i+1]], nmulti = nmulti, ...)
         }
@@ -602,7 +602,7 @@ npplregbw.plbandwidth =
   zdat <- toFrame(zdat)
   child.responses <- .npplregbw_child_responses(xdat = xdat, ydat = ydat, yname = yname)
   child.names <- c("yzbw", names(xdat))
-  child.labels <- c("E[y | z]", sprintf("E[%s | z]", names(xdat)))
+  child.labels <- c("E[y|z]", sprintf("E[%s|z]", names(xdat)))
   child.list <- vector("list", length(child.responses))
   names(child.list) <- child.names
 
