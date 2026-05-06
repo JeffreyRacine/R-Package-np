@@ -9470,6 +9470,298 @@ plotFactor <- function(f, y, ...){
   list(t = tmat, t0 = t0)
 }
 
+.npRmpi_inid_boot_from_conditional_gradient <- function(xdat,
+                                                        ydat,
+                                                        exdat,
+                                                        eydat,
+                                                        bws,
+                                                        B,
+                                                        cdf,
+                                                        gradient.index,
+                                                        counts = NULL,
+                                                        counts.drawer = NULL,
+                                                        progress.label = NULL) {
+  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+    isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
+  if (!isTRUE(use.mpi)) {
+    return(.np_inid_boot_from_conditional_gradient_local(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      B = B,
+      cdf = cdf,
+      gradient.index = gradient.index,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
+
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (nrow(ydat) != n || nrow(exdat) != nrow(eydat))
+    stop("conditional gradient bootstrap helper requires aligned x/y training and evaluation rows")
+  if (n < 1L || B < 1L)
+    stop("invalid conditional gradient bootstrap dimensions")
+
+  t0 <- .npRmpi_with_local_bootstrap(
+    .np_inid_boot_from_conditional_gradient_local(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      B = 1L,
+      cdf = cdf,
+      gradient.index = gradient.index,
+      counts = matrix(1, nrow = n, ncol = 1L),
+      progress.label = NULL
+    )$t0
+  )
+  neval <- length(t0)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
+    comm = 1L,
+    include.master = TRUE
+  )
+  .npRmpi_bootstrap_fanout_enabled(
+    comm = 1L,
+    n = n,
+    B = B,
+    chunk.size = chunk.size,
+    what = "conditional-gradient"
+  )
+  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  counts.mat <- if (!is.null(counts)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  } else {
+    NULL
+  }
+  counts.mode <- if (!is.null(counts.mat)) {
+    "fixed"
+  } else if (!is.null(counts.drawer)) {
+    "drawer"
+  } else {
+    "random"
+  }
+
+  worker <- function(task) {
+    start <- as.integer(task$start)
+    stopi <- start + as.integer(task$bsz) - 1L
+    counts.chunk <- if (identical(counts.mode, "fixed")) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (identical(counts.mode, "drawer")) {
+      .np_inid_counts_matrix(
+        n = n,
+        B = as.integer(task$bsz),
+        counts = counts.drawer(start, stopi)
+      )
+    } else {
+      set.seed(as.integer(task$seed))
+      stats::rmultinom(n = as.integer(task$bsz), size = n, prob = rep.int(1 / n, n))
+    }
+
+    .npRmpi_with_local_bootstrap(
+      .np_inid_boot_from_conditional_gradient_local(
+        xdat = xdat,
+        ydat = ydat,
+        exdat = exdat,
+        eydat = eydat,
+        bws = bws,
+        B = as.integer(task$bsz),
+        cdf = cdf,
+        gradient.index = gradient.index,
+        counts = counts.chunk,
+        progress.label = NULL
+      )$t
+    )
+  }
+
+  list(
+    t = .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = "conditional-gradient",
+      progress.label = progress.label,
+      profile.where = "mpi.applyLB:conditional-gradient",
+      comm = 1L,
+      master_local_chunk = TRUE,
+      required.bindings = c(
+        list(
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          eydat = eydat,
+          bws = bws,
+          cdf = cdf,
+          gradient.index = gradient.index,
+          n = n,
+          counts.mode = counts.mode,
+          .np_inid_boot_from_conditional_gradient_local =
+            .np_inid_boot_from_conditional_gradient_local,
+          .np_inid_counts_matrix = .np_inid_counts_matrix,
+          .npRmpi_with_local_bootstrap = .npRmpi_with_local_bootstrap
+        ),
+        if (!is.null(counts.mat)) list(counts.mat = counts.mat) else list(),
+        if (!is.null(counts.drawer)) list(counts.drawer = counts.drawer) else list()
+      )
+    ),
+    t0 = t0
+  )
+}
+
+.npRmpi_inid_boot_from_quantile_gradient <- function(xdat,
+                                                     ydat,
+                                                     exdat,
+                                                     bws,
+                                                     B,
+                                                     tau,
+                                                     gradient.index,
+                                                     counts = NULL,
+                                                     counts.drawer = NULL,
+                                                     progress.label = NULL) {
+  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+    isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
+  if (!isTRUE(use.mpi)) {
+    return(.np_inid_boot_from_quantile_gradient_local(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      bws = bws,
+      B = B,
+      tau = tau,
+      gradient.index = gradient.index,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
+
+  xdat <- toFrame(xdat)
+  ydat <- as.double(ydat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("quantile gradient bootstrap helper requires aligned x/y training rows")
+  if (n < 1L || B < 1L)
+    stop("invalid quantile gradient bootstrap dimensions")
+
+  t0 <- .npRmpi_with_local_bootstrap(
+    .np_inid_boot_from_quantile_gradient_local(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      bws = bws,
+      B = 1L,
+      tau = tau,
+      gradient.index = gradient.index,
+      counts = matrix(1, nrow = n, ncol = 1L),
+      progress.label = NULL
+    )$t0
+  )
+  neval <- length(t0)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
+    comm = 1L,
+    include.master = TRUE
+  )
+  .npRmpi_bootstrap_fanout_enabled(
+    comm = 1L,
+    n = n,
+    B = B,
+    chunk.size = chunk.size,
+    what = "quantile-gradient"
+  )
+  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  counts.mat <- if (!is.null(counts)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  } else {
+    NULL
+  }
+  counts.mode <- if (!is.null(counts.mat)) {
+    "fixed"
+  } else if (!is.null(counts.drawer)) {
+    "drawer"
+  } else {
+    "random"
+  }
+
+  worker <- function(task) {
+    start <- as.integer(task$start)
+    stopi <- start + as.integer(task$bsz) - 1L
+    counts.chunk <- if (identical(counts.mode, "fixed")) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (identical(counts.mode, "drawer")) {
+      .np_inid_counts_matrix(
+        n = n,
+        B = as.integer(task$bsz),
+        counts = counts.drawer(start, stopi)
+      )
+    } else {
+      set.seed(as.integer(task$seed))
+      stats::rmultinom(n = as.integer(task$bsz), size = n, prob = rep.int(1 / n, n))
+    }
+
+    .npRmpi_with_local_bootstrap(
+      .np_inid_boot_from_quantile_gradient_local(
+        xdat = xdat,
+        ydat = ydat,
+        exdat = exdat,
+        bws = bws,
+        B = as.integer(task$bsz),
+        tau = tau,
+        gradient.index = gradient.index,
+        counts = counts.chunk,
+        progress.label = NULL
+      )$t
+    )
+  }
+
+  list(
+    t = .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = "quantile-gradient",
+      progress.label = progress.label,
+      profile.where = "mpi.applyLB:quantile-gradient",
+      comm = 1L,
+      master_local_chunk = TRUE,
+      required.bindings = c(
+        list(
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          bws = bws,
+          tau = tau,
+          gradient.index = gradient.index,
+          n = n,
+          counts.mode = counts.mode,
+          .np_inid_boot_from_quantile_gradient_local =
+            .np_inid_boot_from_quantile_gradient_local,
+          .np_inid_counts_matrix = .np_inid_counts_matrix,
+          .npRmpi_with_local_bootstrap = .npRmpi_with_local_bootstrap
+        ),
+        if (!is.null(counts.mat)) list(counts.mat = counts.mat) else list(),
+        if (!is.null(counts.drawer)) list(counts.drawer = counts.drawer) else list()
+      )
+    ),
+    t0 = t0
+  )
+}
+
 .np_plot_quantile_eval <- function(bws,
                                    txdat,
                                    tydat,
@@ -11640,7 +11932,7 @@ compute.bootstrap.errors.conbandwidth =
       }
       boot.out <- .npRmpi_with_local_bootstrap({
         tryCatch(
-          .np_inid_boot_from_conditional_gradient_local(
+          .npRmpi_inid_boot_from_conditional_gradient(
             xdat = xdat,
             ydat = ydat,
             exdat = exdat,
@@ -11675,7 +11967,7 @@ compute.bootstrap.errors.conbandwidth =
       }
       boot.out <- .npRmpi_with_local_bootstrap({
         tryCatch(
-          .np_inid_boot_from_quantile_gradient_local(
+          .npRmpi_inid_boot_from_quantile_gradient(
             xdat = xdat,
             ydat = ydat[[1L]],
             exdat = exdat,

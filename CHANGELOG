@@ -15,6 +15,13 @@ Changes from Version 0.70-1 to 0.70-2 [06-May-2026]
   generation step. Fixed-count projection sentinels are bit-identical to the
   local projection helpers, including the master-only/vector route.
 
+* Restored MPI fanout for conditional-gradient plot bootstraps by partitioning
+  bootstrap replications across workers while preserving the existing local
+  gradient helper for each chunk. Fixed-count sentinels are numerically
+  identical to the local helper for conditional-gradient routes, and the same
+  fanout wrapper is in place for the quantile-gradient helper where that route
+  is exercised.
+
 * Restored MPI fanout for the final partially linear plot-bootstrap composition
   step in `npplreg()` objects. The component bootstrap regressions are left on
   their existing kernels, while the per-replication residual recomposition and
