@@ -372,11 +372,11 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
     suppressWarnings(
       plot(
         ubw,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "wild",
-        plot.errors.boot.num = 9
+        errors = "bootstrap",
+        bootstrap = "wild",
+        B = 9
       )
     ),
     "not supported for unconditional density/distribution estimators"
@@ -392,11 +392,11 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
     suppressWarnings(
       plot(
         cbw,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "wild",
-        plot.errors.boot.num = 9
+        errors = "bootstrap",
+        bootstrap = "wild",
+        B = 9
       )
     ),
     "not supported for conditional density/distribution estimators"

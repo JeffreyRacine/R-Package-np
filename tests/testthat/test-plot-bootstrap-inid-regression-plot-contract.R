@@ -11,12 +11,12 @@ test_that("rbandwidth plot bootstrap supports gradients across methods", {
     suppressWarnings(
       plot(
         bw,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
         gradients = TRUE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = method,
-        plot.errors.boot.num = 9
+        errors = "bootstrap",
+        bootstrap = method,
+        B = 9
       )
     )
   }
@@ -44,11 +44,11 @@ test_that("plot bootstrap accepts wild selector", {
       bw,
       xdat = data.frame(x = x),
       ydat = y,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 9
+      errors = "bootstrap",
+      bootstrap = "wild",
+      B = 9
     )
   )
 
@@ -87,10 +87,10 @@ test_that("scbandwidth bootstrap non-coef path avoids npscoef refits", {
       zdat = zdat,
       coef = FALSE,
       perspective = FALSE,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 7
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = "inid",
+      B = 7
     )
   )
 
@@ -204,11 +204,11 @@ test_that("npreg plot bootstrap inid supports lp basis variants", {
         bw,
         xdat = tx,
         ydat = y,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 7
+        errors = "bootstrap",
+        bootstrap = "inid",
+        B = 7
       )
     )
     expect_type(out, "list")

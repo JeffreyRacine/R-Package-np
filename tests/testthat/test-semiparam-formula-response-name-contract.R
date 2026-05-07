@@ -55,9 +55,9 @@ test_that("semiparametric formula fits preserve response-name metadata for plott
 
 test_that("semiparametric formula-fit plots do not regress on response labels", {
   fits <- make_semiparam_formula_fits(seed = 456)
-  out.pl <- expect_no_error(plot(fits$pl, plot.behavior = "data", perspective = FALSE))
-  out.sc <- expect_no_error(plot(fits$sc, plot.behavior = "data", perspective = FALSE))
-  out.si <- expect_no_error(plot(fits$si, plot.behavior = "data", perspective = FALSE))
+  out.pl <- expect_no_error(plot(fits$pl, behavior = "data", perspective = FALSE))
+  out.sc <- expect_no_error(plot(fits$sc, behavior = "data", perspective = FALSE))
+  out.si <- expect_no_error(plot(fits$si, behavior = "data", perspective = FALSE))
 
   expect_type(out.pl, "list")
   expect_type(out.sc, "list")

@@ -24,8 +24,8 @@ test_that("npqreg fixed no-error slice prototype matches current fitted-object r
     fit,
     xdat = x,
     ydat = y,
-    plot.behavior = "data",
-    plot.errors.method = "none",
+    behavior = "data",
+    errors = "none",
     neval = 7L,
     perspective = FALSE
   ))
@@ -130,9 +130,9 @@ test_that("npqreg fixed asymptotic slice prototype matches current fitted-object
       fit,
       xdat = x,
       ydat = y,
-      plot.behavior = "data",
-      plot.errors.method = "asymptotic",
-      plot.errors.type = band,
+      behavior = "data",
+      errors = "asymptotic",
+      band = band,
       neval = 6L,
       perspective = FALSE
     ))
@@ -141,14 +141,14 @@ test_that("npqreg fixed asymptotic slice prototype matches current fitted-object
       xdat = x,
       ydat = y,
       neval = 6L,
-      plot.errors.type = band
+      band = band
     )
     stages <- proto(
       fit,
       xdat = x,
       ydat = y,
       neval = 6L,
-      plot.errors.type = band,
+      band = band,
       return.stages = TRUE
     )
 
@@ -201,19 +201,19 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
     method <- cases$method[ii]
     center <- cases$center[ii]
     boot.seed <- 8200L + ii
-    extra <- if (identical(method, "inid")) list() else list(plot.errors.boot.blocklen = 3L)
+    extra <- if (identical(method, "inid")) list() else list(boot_control = np_boot_control(blocklen = 3L))
     set.seed(boot.seed)
     old <- suppressWarnings(do.call(plot, c(
       list(
         x = fit,
         xdat = x,
         ydat = y,
-        plot.behavior = "data",
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = method,
-        plot.errors.boot.num = 11L,
-        plot.errors.center = center,
-        plot.errors.type = "pmzsd",
+        behavior = "data",
+        errors = "bootstrap",
+        bootstrap = method,
+        B = 11L,
+        center = center,
+        band = "pmzsd",
         neval = 5L,
         perspective = FALSE,
         random.seed = boot.seed
@@ -227,10 +227,10 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
         xdat = x,
         ydat = y,
         neval = 5L,
-        plot.errors.boot.method = method,
-        plot.errors.boot.num = 11L,
-        plot.errors.center = center,
-        plot.errors.type = "pmzsd"
+        bootstrap = method,
+        B = 11L,
+        center = center,
+        band = "pmzsd"
       ),
       extra
     )))
@@ -241,10 +241,10 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
         xdat = x,
         ydat = y,
         neval = 5L,
-        plot.errors.boot.method = method,
-        plot.errors.boot.num = 11L,
-        plot.errors.center = center,
-        plot.errors.type = "pmzsd",
+        bootstrap = method,
+        B = 11L,
+        center = center,
+        band = "pmzsd",
         return.stages = TRUE
       ),
       extra
@@ -290,8 +290,8 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
     fit,
     xdat = x,
     ydat = y,
-    plot.behavior = "data",
-    plot.errors.method = "none",
+    behavior = "data",
+    errors = "none",
     gradients = TRUE,
     neval = 5L,
     perspective = FALSE
@@ -335,7 +335,7 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
 
   for (method in c("inid", "fixed")) {
     boot.seed <- if (identical(method, "inid")) 8301L else 902L
-    extra <- if (identical(method, "fixed")) list(plot.errors.boot.blocklen = 2L) else list()
+    extra <- if (identical(method, "fixed")) list(boot_control = np_boot_control(blocklen = 2L)) else list()
     boot.num <- if (identical(method, "fixed")) 5L else 7L
     set.seed(boot.seed)
     old.boot <- suppressWarnings(do.call(plot, c(
@@ -343,12 +343,12 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
         x = fit,
         xdat = x,
         ydat = y,
-        plot.behavior = "data",
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = method,
-        plot.errors.boot.num = boot.num,
-        plot.errors.center = "estimate",
-        plot.errors.type = "pmzsd",
+        behavior = "data",
+        errors = "bootstrap",
+        bootstrap = method,
+        B = boot.num,
+        center = "estimate",
+        band = "pmzsd",
         gradients = TRUE,
         neval = 5L,
         perspective = FALSE,
@@ -363,10 +363,10 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
         xdat = x,
         ydat = y,
         neval = 5L,
-        plot.errors.boot.method = method,
-        plot.errors.boot.num = boot.num,
-        plot.errors.center = "estimate",
-        plot.errors.type = "pmzsd",
+        bootstrap = method,
+        B = boot.num,
+        center = "estimate",
+        band = "pmzsd",
         gradients = TRUE
       ),
       extra
@@ -378,10 +378,10 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
         xdat = x,
         ydat = y,
         neval = 5L,
-        plot.errors.boot.method = method,
-        plot.errors.boot.num = boot.num,
-        plot.errors.center = "estimate",
-        plot.errors.type = "pmzsd",
+        bootstrap = method,
+        B = boot.num,
+        center = "estimate",
+        band = "pmzsd",
         gradients = TRUE,
         return.stages = TRUE
       ),

@@ -22,8 +22,8 @@ test_that("npudens and npudist fixed no-error plot-data prototypes match current
   old.dens <- suppressWarnings(plot(
     dens.bw,
     xdat = x,
-    plot.behavior = "data",
-    plot.errors.method = "none",
+    behavior = "data",
+    errors = "none",
     view = "fixed",
     neval = 7L,
     perspective = TRUE
@@ -56,8 +56,8 @@ test_that("npudens and npudist fixed no-error plot-data prototypes match current
   old.dist <- suppressWarnings(plot(
     dist.bw,
     xdat = x,
-    plot.behavior = "data",
-    plot.errors.method = "none",
+    behavior = "data",
+    errors = "none",
     view = "fixed",
     neval = 7L,
     perspective = TRUE
@@ -118,9 +118,9 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
       old <- suppressWarnings(plot(
         bws,
         xdat = x,
-        plot.behavior = "data",
-        plot.errors.method = "asymptotic",
-        plot.errors.type = band,
+        behavior = "data",
+        errors = "asymptotic",
+        band = band,
         view = "fixed",
         neval = 6L,
         perspective = TRUE
@@ -129,8 +129,8 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
         bws,
         xdat = x,
         neval = 6L,
-        plot.errors.method = "asymptotic",
-        plot.errors.type = band,
+        errors = "asymptotic",
+        band = band,
         cdf = cdf
       )
       expect_equal(candidate$d1[[value.name]], old$d1[[value.name]], info = paste(case, band))
@@ -142,12 +142,12 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
     old <- suppressWarnings(plot(
       bws,
       xdat = x,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 13L,
-      plot.errors.center = "bias-corrected",
-      plot.errors.type = "pointwise",
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = "inid",
+      B = 13L,
+      center = "bias-corrected",
+      band = "pointwise",
       view = "fixed",
       neval = 5L,
       perspective = TRUE,
@@ -158,11 +158,11 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
       bws,
       xdat = x,
       neval = 5L,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 13L,
-      plot.errors.center = "bias-corrected",
-      plot.errors.type = "pointwise",
+      errors = "bootstrap",
+      bootstrap = "inid",
+      B = 13L,
+      center = "bias-corrected",
+      band = "pointwise",
       cdf = cdf
     ))
     set.seed(boot.seed)
@@ -170,11 +170,11 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
       bws,
       xdat = x,
       neval = 5L,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 13L,
-      plot.errors.center = "bias-corrected",
-      plot.errors.type = "pointwise",
+      errors = "bootstrap",
+      bootstrap = "inid",
+      B = 13L,
+      center = "bias-corrected",
+      band = "pointwise",
       cdf = cdf,
       return.stages = TRUE
     ))

@@ -36,11 +36,11 @@ test_that("npplreg generalized-nn cv.aic bootstrap plot contract holds across re
         xdat = tx,
         ydat = y,
         zdat = tz,
-        plot.behavior = "data",
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = boot_method,
-        plot.errors.boot.num = 7L,
-        plot.errors.alpha = 0.1,
+        behavior = "data",
+        errors = "bootstrap",
+        bootstrap = boot_method,
+        B = 7L,
+        alpha = 0.1,
         perspective = FALSE
       )
 

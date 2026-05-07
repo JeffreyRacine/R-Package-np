@@ -43,12 +43,12 @@ run_exact_frozen_plot_pair <- function(fit, ..., seed = 9001L) {
 
   set.seed(seed)
   suppressWarnings(capture.output(
-    exact <- do.call(plot, c(list(fit), extra, list(plot.errors.boot.nonfixed = "exact")))
+    exact <- do.call(plot, c(list(fit), extra, list(boot_control = np_boot_control(nonfixed = "exact"))))
   ))
 
   set.seed(seed)
   suppressWarnings(capture.output(
-    frozen <- do.call(plot, c(list(fit), extra, list(plot.errors.boot.nonfixed = "frozen")))
+    frozen <- do.call(plot, c(list(fit), extra, list(boot_control = np_boot_control(nonfixed = "frozen"))))
   ))
 
   list(exact = exact, frozen = frozen)
@@ -114,11 +114,11 @@ test_that("exact and frozen plot payloads stay comparable for regression and sem
     reg.fit,
     view = "fixed",
     gradients = TRUE,
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 41L,
-    plot.errors.type = "pointwise",
+    behavior = "data",
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 41L,
+    band = "pointwise",
     neval = 8L
   )
   expect_plot_payload_comparable(reg.pair, "npreg", min.merr.corr = 0.90, max.merr.rel = 0.75)
@@ -134,11 +134,11 @@ test_that("exact and frozen plot payloads stay comparable for regression and sem
   idx.pair <- run_exact_frozen_plot_pair(
     idx.fit,
     view = "fixed",
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 41L,
-    plot.errors.type = "pointwise",
+    behavior = "data",
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 41L,
+    band = "pointwise",
     neval = 8L
   )
   expect_plot_payload_comparable(idx.pair, "npindex", min.merr.corr = 0.90, max.merr.rel = 0.80)
@@ -151,11 +151,11 @@ test_that("exact and frozen plot payloads stay comparable for regression and sem
   pl.pair <- run_exact_frozen_plot_pair(
     pl.fit,
     view = "fixed",
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "geom",
-    plot.errors.boot.num = 41L,
-    plot.errors.type = "pointwise",
+    behavior = "data",
+    errors = "bootstrap",
+    bootstrap = "geom",
+    B = 41L,
+    band = "pointwise",
     neval = 8L
   )
   expect_plot_payload_comparable(pl.pair, "npplreg", min.merr.corr = 0.70, max.merr.rel = 0.55)
@@ -172,11 +172,11 @@ test_that("exact and frozen plot payloads stay comparable for regression and sem
     sc.fit,
     view = "fixed",
     coef = FALSE,
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 41L,
-    plot.errors.type = "pointwise",
+    behavior = "data",
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 41L,
+    band = "pointwise",
     neval = 8L
   )
   expect_plot_payload_comparable(sc.pair, "npscoef", min.merr.corr = 0.95, max.merr.rel = 0.35)
@@ -190,11 +190,11 @@ test_that("exact and frozen plot payloads stay comparable for density and distri
   ud.fit <- npudens(~ y.u, nmulti = 1, bwtype = "adaptive_nn")
   ud.pair <- run_exact_frozen_plot_pair(
     ud.fit,
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 41L,
-    plot.errors.type = "pointwise",
+    behavior = "data",
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 41L,
+    band = "pointwise",
     neval = 8L
   )
   expect_plot_payload_comparable(ud.pair, "npudens", min.merr.corr = 0.95, max.merr.rel = 0.75)
@@ -202,11 +202,11 @@ test_that("exact and frozen plot payloads stay comparable for density and distri
   uf.fit <- npudist(~ y.u, nmulti = 1, bwtype = "adaptive_nn")
   uf.pair <- run_exact_frozen_plot_pair(
     uf.fit,
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 41L,
-    plot.errors.type = "pointwise",
+    behavior = "data",
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 41L,
+    band = "pointwise",
     neval = 8L
   )
   expect_plot_payload_comparable(uf.pair, "npudist", min.merr.corr = 0.95, max.merr.rel = 0.45)
@@ -219,11 +219,11 @@ test_that("exact and frozen plot payloads stay comparable for density and distri
   cd.pair <- run_exact_frozen_plot_pair(
     cd.fit,
     view = "fixed",
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 41L,
-    plot.errors.type = "pointwise",
+    behavior = "data",
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 41L,
+    band = "pointwise",
     neval = 8L
   )
   expect_plot_payload_comparable(cd.pair, "npcdens", min.merr.corr = 0.55, max.merr.rel = 1.20)
@@ -232,11 +232,11 @@ test_that("exact and frozen plot payloads stay comparable for density and distri
   cf.pair <- run_exact_frozen_plot_pair(
     cf.fit,
     view = "fixed",
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 41L,
-    plot.errors.type = "pointwise",
+    behavior = "data",
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 41L,
+    band = "pointwise",
     neval = 8L
   )
   expect_plot_payload_comparable(cf.pair, "npcdist", min.merr.corr = 0.90, max.merr.rel = 0.75)

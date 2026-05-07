@@ -12,15 +12,15 @@ test_that("npcdens plot-data centers stay on predict and bootstrap offsets remai
 
     out <- suppressWarnings(plot(
       fit,
-      plot.behavior = "data",
+      behavior = "data",
       view = "fixed",
       perspective = FALSE,
       neval = 40L,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 39L,
-      plot.errors.type = "pointwise",
-      plot.errors.boot.nonfixed = nonfixed_mode
+      errors = "bootstrap",
+      bootstrap = "inid",
+      B = 39L,
+      band = "pointwise",
+      boot_control = np_boot_control(nonfixed = nonfixed_mode)
     ))
 
     expect_true(length(out) > 0L)

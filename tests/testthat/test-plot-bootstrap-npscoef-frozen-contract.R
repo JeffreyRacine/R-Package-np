@@ -117,12 +117,12 @@ test_that("npscoef frozen surface plot mode is forwarded", {
     zdat = zdat,
     neval = 6L,
     coef = FALSE,
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.nonfixed = "frozen",
-    plot.errors.boot.num = 41L,
-    plot.errors.type = "pointwise"
+    behavior = "data",
+    errors = "bootstrap",
+    bootstrap = "inid",
+    boot_control = np_boot_control(nonfixed = "frozen"),
+    B = 41L,
+    band = "pointwise"
   )))
 
   expect_gte(length(modes), 1L)

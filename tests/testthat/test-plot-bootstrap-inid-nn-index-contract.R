@@ -13,11 +13,11 @@ test_that("npindex plot bootstrap inid supports nearest-neighbor bwtypes", {
       bw,
       xdat = tx,
       ydat = y,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 5
+      errors = "bootstrap",
+      bootstrap = "inid",
+      B = 5
     ))
   }
 

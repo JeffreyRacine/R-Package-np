@@ -8,17 +8,17 @@ expect_plot_modes_match_unconditional <- function(bw,
                                                   xdat,
                                                   method_label,
                                                   yfield,
-                                                  plot.errors.method,
-                                                  plot.errors.type) {
+                                                  errors,
+                                                  band) {
   data.out <- suppressWarnings(
     plot(
       bw,
       xdat = xdat,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = plot.errors.method,
-      plot.errors.type = plot.errors.type,
-      plot.errors.boot.num = 5,
+      errors = errors,
+      band = band,
+      B = 5,
       view = "fixed"
     )
   )
@@ -27,11 +27,11 @@ expect_plot_modes_match_unconditional <- function(bw,
     plot(
       bw,
       xdat = xdat,
-      plot.behavior = "plot-data",
+      behavior = "plot-data",
       perspective = FALSE,
-      plot.errors.method = plot.errors.method,
-      plot.errors.type = plot.errors.type,
-      plot.errors.boot.num = 5,
+      errors = errors,
+      band = band,
+      B = 5,
       view = "fixed"
     )
   )
@@ -85,10 +85,10 @@ test_that("unconditional interval payload helper preserves bootstrap and asympto
   boot.out <- payload(
     estimate = c(1, 2),
     se = c(0.1, 0.2),
-    plot.errors.method = "bootstrap",
-    plot.errors.alpha = 0.05,
-    plot.errors.type = "all",
-    plot.errors.center = "bias-corrected",
+    errors = "bootstrap",
+    alpha = 0.05,
+    band = "all",
+    center = "bias-corrected",
     bootstrap_raw = boot.raw
   )
 
@@ -100,10 +100,10 @@ test_that("unconditional interval payload helper preserves bootstrap and asympto
   asym.out <- payload(
     estimate = c(1, 2),
     se = c(0.1, 0.2),
-    plot.errors.method = "asymptotic",
-    plot.errors.alpha = 0.05,
-    plot.errors.type = "pointwise",
-    plot.errors.center = "estimate",
+    errors = "asymptotic",
+    alpha = 0.05,
+    band = "pointwise",
+    center = "estimate",
     bootstrap_raw = NULL
   )
 
@@ -135,31 +135,31 @@ test_that("bandwidth and dbandwidth engines preserve data vs plot-data payloads"
     xdat = xdat,
     method_label = "npudensbw bootstrap",
     yfield = "dens",
-    plot.errors.method = "bootstrap",
-    plot.errors.type = "all"
+    errors = "bootstrap",
+    band = "all"
   )
   expect_plot_modes_match_unconditional(
     bw = dist.bw,
     xdat = xdat,
     method_label = "npudistbw bootstrap",
     yfield = "dist",
-    plot.errors.method = "bootstrap",
-    plot.errors.type = "all"
+    errors = "bootstrap",
+    band = "all"
   )
   expect_plot_modes_match_unconditional(
     bw = dens.bw,
     xdat = xdat,
     method_label = "npudensbw asymptotic",
     yfield = "dens",
-    plot.errors.method = "asymptotic",
-    plot.errors.type = "pointwise"
+    errors = "asymptotic",
+    band = "pointwise"
   )
   expect_plot_modes_match_unconditional(
     bw = dist.bw,
     xdat = xdat,
     method_label = "npudistbw asymptotic",
     yfield = "dist",
-    plot.errors.method = "asymptotic",
-    plot.errors.type = "pointwise"
+    errors = "asymptotic",
+    band = "pointwise"
   )
 })

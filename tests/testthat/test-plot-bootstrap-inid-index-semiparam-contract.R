@@ -136,11 +136,11 @@ test_that("npindex plot bootstrap inid supports ll/lp basis variants", {
         bw,
         xdat = tx,
         ydat = y,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 7
+        errors = "bootstrap",
+        bootstrap = "inid",
+        B = 7
       )
     )
     expect_type(out, "list")
@@ -173,12 +173,12 @@ test_that("npindex plot bootstrap inid fails fast for unsupported nonfixed gradi
           bw,
           xdat = tx,
           ydat = y,
-          plot.behavior = "data",
+          behavior = "data",
           perspective = FALSE,
           gradients = TRUE,
-          plot.errors.method = "bootstrap",
-          plot.errors.boot.method = "inid",
-          plot.errors.boot.num = 7
+          errors = "bootstrap",
+          bootstrap = "inid",
+          B = 7
         )
       ),
       "gradients=FALSE",
@@ -213,12 +213,12 @@ test_that("npindex bounded bootstrap plot-data supports bw and fit objects", {
         obj,
         xdat = tx,
         ydat = y,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = boot.method,
-        plot.errors.boot.num = 5L,
-        plot.errors.type = "pointwise"
+        errors = "bootstrap",
+        bootstrap = boot.method,
+        B = 5L,
+        band = "pointwise"
       )
     )
   }

@@ -10,11 +10,11 @@ test_that("nearest-neighbor plot helpers run for regression and density/distribu
   run_plot <- function(bw, ...) {
     suppressWarnings(plot(
       bw,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 5,
+      errors = "bootstrap",
+      bootstrap = "inid",
+      B = 5,
       ...
     ))
   }
@@ -50,11 +50,11 @@ test_that("nearest-neighbor frozen bootstrap plots run across regression and uns
   run_plot <- function(bw, ...) {
     suppressWarnings(plot(
       bw,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.nonfixed = "frozen",
-      plot.errors.boot.num = 5,
+      errors = "bootstrap",
+      boot_control = np_boot_control(nonfixed = "frozen"),
+      B = 5,
       ...
     ))
   }
@@ -64,25 +64,25 @@ test_that("nearest-neighbor frozen bootstrap plots run across regression and uns
 
     for (boot.method in c("inid", "fixed", "geom")) {
       expect_type(
-        run_plot(rbw, xdat = x, ydat = y, plot.errors.boot.method = boot.method),
+        run_plot(rbw, xdat = x, ydat = y, bootstrap = boot.method),
         "list"
       )
 
       ubw <- npudensbw(dat = x, nmulti = 1, bwtype = bt)
-      expect_type(run_plot(ubw, plot.errors.boot.method = boot.method), "list")
+      expect_type(run_plot(ubw, bootstrap = boot.method), "list")
 
       dbw <- npudistbw(dat = x, nmulti = 1, bwtype = bt)
-      expect_type(run_plot(dbw, plot.errors.boot.method = boot.method), "list")
+      expect_type(run_plot(dbw, bootstrap = boot.method), "list")
 
       cbw <- npcdensbw(xdat = x, ydat = yframe, nmulti = 1, bwtype = bt)
       expect_type(
-        run_plot(cbw, xdat = x, ydat = yframe, view = "fixed", plot.errors.boot.method = boot.method),
+        run_plot(cbw, xdat = x, ydat = yframe, view = "fixed", bootstrap = boot.method),
         "list"
       )
 
       cdbw <- npcdistbw(xdat = x, ydat = yframe, nmulti = 1, bwtype = bt)
       expect_type(
-        run_plot(cdbw, xdat = x, ydat = yframe, view = "fixed", plot.errors.boot.method = boot.method),
+        run_plot(cdbw, xdat = x, ydat = yframe, view = "fixed", bootstrap = boot.method),
         "list"
       )
     }

@@ -36,13 +36,13 @@ test_that("npreg adaptive-nn wild gradient plot-data stays available in serial",
     fit,
     xdat = xdat,
     ydat = y,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
     neval = 40L,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "wild",
-    plot.errors.boot.num = 39L,
-    plot.errors.type = "all",
+    errors = "bootstrap",
+    bootstrap = "wild",
+    B = 39L,
+    band = "all",
     gradients = TRUE
   )))
 

@@ -23,7 +23,7 @@ test_that("plot condensity 2D data payload applies proper repair on supported gr
 
   out <- plot(
     fit,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = TRUE,
     view = "fixed"
   )
@@ -59,7 +59,7 @@ test_that("plot condensity 1D data payload repairs only y-varying panels", {
 
   out <- suppressWarnings(plot(
     fit,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE
   ))
 
@@ -95,20 +95,20 @@ test_that("plot condensity supports asymptotic and bootstrap errors on proper gr
 
   asym <- suppressWarnings(plot(
     fit,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = TRUE,
     view = "fixed",
-    plot.errors.method = "asymptotic"
+    errors = "asymptotic"
   ))
   boot <- suppressWarnings(plot(
     fit,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = TRUE,
     view = "fixed",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 19,
-    plot.errors.type = "pointwise"
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 19,
+    band = "pointwise"
   ))
 
   expect_true(isTRUE(asym$cd1$proper.applied))
@@ -137,13 +137,13 @@ test_that("plot condensity bootstrap supports mixed-bound fixed helper path", {
   fit <- npcdens(y ~ x, cykerbound = "range")
   out <- suppressWarnings(plot(
     fit,
-    plot.behavior = "data",
+    behavior = "data",
     view = "fixed",
     plot.data.overlay = FALSE,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 5L,
-    plot.errors.type = "pointwise"
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 5L,
+    band = "pointwise"
   ))
 
   expect_s3_class(out$cd1, "condensity")

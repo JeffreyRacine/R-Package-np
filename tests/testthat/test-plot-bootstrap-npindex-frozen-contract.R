@@ -82,13 +82,13 @@ test_that("npindex public frozen plot-data mean stays on the exact scale", {
   get_obj <- function(mode) {
     suppressWarnings(plot(
       fit,
-      plot.behavior = "data",
+      behavior = "data",
       neval = 40L,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.nonfixed = mode,
-      plot.errors.boot.num = 39L,
-      plot.errors.type = "pointwise"
+      errors = "bootstrap",
+      bootstrap = "inid",
+      boot_control = np_boot_control(nonfixed = mode),
+      B = 39L,
+      band = "pointwise"
     ))[[1L]]
   }
 
@@ -128,11 +128,11 @@ test_that("npindex nonfixed frozen bootstrap still supports gradient slices", {
     capture.output(plot(
       fit,
       neval = 20L,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.nonfixed = "frozen",
-      plot.errors.boot.num = 41L,
-      plot.errors.type = "pointwise",
+      errors = "bootstrap",
+      bootstrap = "inid",
+      boot_control = np_boot_control(nonfixed = "frozen"),
+      B = 41L,
+      band = "pointwise",
       gradients = TRUE
     ))
   )

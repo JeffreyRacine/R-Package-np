@@ -23,6 +23,6 @@ test_that("npreg formula fits preserve the response name for plotting metadata",
   }, add = TRUE)
 
   expect_no_error(
-    plot(fit, plot.errors.method = "asymptotic", view = "fixed")
+    plot(fit, errors = "asymptotic", view = "fixed")
   )
 })

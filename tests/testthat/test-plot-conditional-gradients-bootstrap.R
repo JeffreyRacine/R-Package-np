@@ -21,12 +21,12 @@ test_that("conditional density/distribution gradient bootstrap inid works for ba
         obj,
         xdat = xdat,
         ydat = ydat,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
         gradients = TRUE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 5L
+        errors = "bootstrap",
+        bootstrap = "inid",
+        B = 5L
       )
     )
     expect_type(out, "list")
@@ -57,12 +57,12 @@ test_that("conditional density/distribution gradient bootstrap inid works for fi
     out <- suppressWarnings(
       plot(
         obj,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
         gradients = TRUE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 5L
+        errors = "bootstrap",
+        bootstrap = "inid",
+        B = 5L
       )
     )
     expect_type(out, "list")

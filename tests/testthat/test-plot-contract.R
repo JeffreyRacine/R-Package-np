@@ -11,11 +11,11 @@ test_that("plot contract: regression and conditional estimators return data payl
   rout <- suppressWarnings(
     plot(
       rbw,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.num = 9,
-      plot.errors.type = "all",
+      errors = "bootstrap",
+      B = 9,
+      band = "all",
       view = "fixed"
     )
   )
@@ -39,11 +39,11 @@ test_that("plot contract: npcdens/npcdist support bootstrap all in data mode", {
   cout <- suppressWarnings(
     plot(
       cbw,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.num = 9,
-      plot.errors.type = "all",
+      errors = "bootstrap",
+      B = 9,
+      band = "all",
       view = "fixed"
     )
   )
@@ -58,11 +58,11 @@ test_that("plot contract: npcdens/npcdist support bootstrap all in data mode", {
   dout <- suppressWarnings(
     plot(
       dbw,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.num = 9,
-      plot.errors.type = "all",
+      errors = "bootstrap",
+      B = 9,
+      band = "all",
       view = "fixed"
     )
   )
@@ -99,9 +99,9 @@ test_that("plot contract: 3D plot-data matches data mode for regression and cond
     txdat = data.frame(x = x, z = z),
     tydat = y
   )
-  rdata <- plot(rfit, plot.behavior = "data", view = "fixed")
-  expect_warning(plot(rfit, plot.behavior = "data", view = "fixed"), NA)
-  rplotdata <- with_plot_device(plot(rfit, plot.behavior = "plot-data", view = "fixed"))
+  rdata <- plot(rfit, behavior = "data", view = "fixed")
+  expect_warning(plot(rfit, behavior = "data", view = "fixed"), NA)
+  rplotdata <- with_plot_device(plot(rfit, behavior = "plot-data", view = "fixed"))
 
   expect_type(rplotdata, "list")
   expect_named(rplotdata, names(rdata))
@@ -123,9 +123,9 @@ test_that("plot contract: 3D plot-data matches data mode for regression and cond
     tydat = data.frame(y = y),
     proper = TRUE
   )
-  cdata <- plot(cfit, plot.behavior = "data", view = "fixed")
-  expect_warning(plot(cfit, plot.behavior = "data", view = "fixed"), NA)
-  cplotdata <- with_plot_device(plot(cfit, plot.behavior = "plot-data", view = "fixed"))
+  cdata <- plot(cfit, behavior = "data", view = "fixed")
+  expect_warning(plot(cfit, behavior = "data", view = "fixed"), NA)
+  cplotdata <- with_plot_device(plot(cfit, behavior = "plot-data", view = "fixed"))
 
   expect_type(cplotdata, "list")
   expect_named(cplotdata, names(cdata))
@@ -149,8 +149,8 @@ test_that("plot contract: 3D plot-data matches data mode for regression and cond
     tydat = data.frame(y = y),
     proper = TRUE
   )
-  ddata <- suppressWarnings(plot(dfit, plot.behavior = "data", view = "fixed"))
-  dplotdata <- with_plot_device(plot(dfit, plot.behavior = "plot-data", view = "fixed"))
+  ddata <- suppressWarnings(plot(dfit, behavior = "data", view = "fixed"))
+  dplotdata <- with_plot_device(plot(dfit, behavior = "plot-data", view = "fixed"))
 
   expect_type(dplotdata, "list")
   expect_named(dplotdata, names(ddata))
@@ -171,8 +171,8 @@ test_that("plot contract: remaining public plot families return plot-data payloa
   }
 
   expect_plot_modes_match <- function(object, fields, ...) {
-    data.out <- suppressWarnings(plot(object, plot.behavior = "data", ...))
-    plot.out <- with_plot_device(plot(object, plot.behavior = "plot-data", ...))
+    data.out <- suppressWarnings(plot(object, behavior = "data", ...))
+    plot.out <- with_plot_device(plot(object, behavior = "plot-data", ...))
 
     expect_type(plot.out, "list")
     expect_named(plot.out, names(data.out))
@@ -271,7 +271,7 @@ test_that("plot contract: remaining public plot families return plot-data payloa
     bw.cf,
     xdat = data.frame(x = x),
     ydat = data.frame(y = y),
-    plot.behavior = "data",
+    behavior = "data",
     perspective = TRUE,
     view = "fixed",
     quantreg = TRUE,
@@ -279,7 +279,7 @@ test_that("plot contract: remaining public plot families return plot-data payloa
   )
   fit.qr.alt.fixed <- plot(
     fit.qr.alt,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = TRUE,
     view = "fixed"
   )
@@ -287,14 +287,14 @@ test_that("plot contract: remaining public plot families return plot-data payloa
     bw.cf,
     xdat = data.frame(x = x),
     ydat = data.frame(y = y),
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
     quantreg = TRUE,
     tau = 0.4
   )
   fit.qr.alt.slice <- plot(
     fit.qr.alt,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE
   )
 
@@ -376,7 +376,7 @@ test_that("plot contract: rgl plot-data returns the usual data payload", {
 
   rdata <- suppressWarnings(plot(
     rfit,
-    plot.behavior = "data",
+    behavior = "data",
     renderer = "rgl",
     view = "fixed",
     plot.data.overlay = FALSE
@@ -384,7 +384,7 @@ test_that("plot contract: rgl plot-data returns the usual data payload", {
 
   rplotdata <- suppressWarnings(plot(
     rfit,
-    plot.behavior = "plot-data",
+    behavior = "plot-data",
     renderer = "rgl",
     view = "fixed",
     plot.data.overlay = FALSE
@@ -413,14 +413,14 @@ test_that("plot contract: rgl plot-data returns the usual data payload", {
 
   cdata <- suppressWarnings(plot(
     cfit,
-    plot.behavior = "data",
+    behavior = "data",
     renderer = "rgl",
     view = "fixed"
   ))
 
   cplotdata <- suppressWarnings(plot(
     cfit,
-    plot.behavior = "plot-data",
+    behavior = "plot-data",
     renderer = "rgl",
     view = "fixed"
   ))
@@ -433,7 +433,7 @@ test_that("plot contract: rgl plot-data returns the usual data payload", {
   expect_equal(cplotdata$cd1$yeval, cdata$cd1$yeval)
 })
 
-test_that("plot contract: plot.errors.alpha is enforced in (0,0.5)", {
+test_that("plot contract: alpha is enforced in (0,0.5)", {
   skip_if_not_installed("np")
 
   set.seed(103)
@@ -446,10 +446,10 @@ test_that("plot contract: plot.errors.alpha is enforced in (0,0.5)", {
     suppressWarnings(
       plot(
         bw,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
-        plot.errors.method = "bootstrap",
-        plot.errors.alpha = 0.5
+        errors = "bootstrap",
+        alpha = 0.5
       )
     ),
     "must lie in \\(0,0\\.5\\)"
@@ -459,10 +459,10 @@ test_that("plot contract: plot.errors.alpha is enforced in (0,0.5)", {
     suppressWarnings(
       plot(
         bw,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
-        plot.errors.method = "bootstrap",
-        plot.errors.alpha = 0
+        errors = "bootstrap",
+        alpha = 0
       )
     ),
     "must lie in \\(0,0\\.5\\)"
@@ -502,8 +502,8 @@ test_that("plot contract: npscoef supports coef=TRUE plot path", {
       coef.index = 1,
       perspective = FALSE,
       neval = 20,
-      plot.behavior = "plot-data",
-      plot.errors.method = "none"
+      behavior = "plot-data",
+      errors = "none"
     )
   )
 
@@ -532,8 +532,8 @@ test_that("plot contract: npplreg supports coef=TRUE plot-data payload", {
       ydat = y,
       zdat = zdat,
       coef = TRUE,
-      plot.behavior = "plot-data",
-      plot.errors.method = "none"
+      behavior = "plot-data",
+      errors = "none"
     )
   )
 
@@ -587,11 +587,11 @@ test_that("plot contract: scbandwidth perspective bootstrap uses z evaluation co
       zdat = zdat,
       perspective = TRUE,
       view = "fixed",
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 9,
-      plot.errors.type = "pointwise",
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = "inid",
+      B = 9,
+      band = "pointwise",
       neval = neval
     )
   )
@@ -637,9 +637,9 @@ test_that("plot contract: npscoef fitted perspective path preserves semantic z e
     fit,
     view = "fixed",
     renderer = "base",
-    plot.behavior = "data",
+    behavior = "data",
     plot.data.overlay = FALSE,
-    plot.errors.method = "none"
+    errors = "none"
   ))
 
   expect_type(out, "list")
@@ -665,13 +665,13 @@ test_that("plot contract: bootstrap defaults are wild for regression-class and i
 
   for (nm in reg.engines) {
     fn <- getFromNamespace(nm, "np")
-    defaults <- eval(formals(fn)$plot.errors.boot.method)
+    defaults <- eval(formals(fn)$bootstrap)
     expect_identical(defaults[1L], "wild")
   }
 
   for (nm in unsup.engines) {
     fn <- getFromNamespace(nm, "np")
-    defaults <- eval(formals(fn)$plot.errors.boot.method)
+    defaults <- eval(formals(fn)$bootstrap)
     expect_identical(defaults[1L], "inid")
   }
 

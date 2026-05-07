@@ -42,7 +42,7 @@ test_that("conditional categorical gradient bootstrap helper matches explicit lo
       ydat = ydat,
       gradients = TRUE,
       perspective = FALSE,
-      plot.behavior = "data"
+      behavior = "data"
     ))[[1L]]
 
     boot <- helper(
@@ -109,11 +109,11 @@ test_that("conditional density/distribution categorical bootstrap gradients work
         list(
           case$obj,
           perspective = FALSE,
-          plot.behavior = "data",
+          behavior = "data",
           gradients = TRUE,
-          plot.errors.method = "bootstrap",
-          plot.errors.boot.method = boot.method,
-          plot.errors.boot.num = 7L
+          errors = "bootstrap",
+          bootstrap = boot.method,
+          B = 7L
         ),
         case$args
       )

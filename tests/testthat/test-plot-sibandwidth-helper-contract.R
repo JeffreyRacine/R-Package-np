@@ -25,7 +25,7 @@ run_singleindex_bootstrap_plot <- function(bw,
                                            ydat,
                                            boot_method,
                                            gradients = FALSE,
-                                           plot.behavior = "data",
+                                           behavior = "data",
                                            boot_num = 9L,
                                            neval = 50L) {
   suppressWarnings(plot(
@@ -33,12 +33,12 @@ run_singleindex_bootstrap_plot <- function(bw,
     xdat = xdat,
     ydat = ydat,
     neval = neval,
-    plot.behavior = plot.behavior,
+    behavior = behavior,
     perspective = FALSE,
     gradients = gradients,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = boot_method,
-    plot.errors.boot.num = boot_num
+    errors = "bootstrap",
+    bootstrap = boot_method,
+    B = boot_num
   ))[[1]]
 }
 
@@ -246,7 +246,7 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         xdat = tx,
         ydat = y,
         neval = neval,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
         gradients = FALSE
       ))[[1]]
@@ -255,7 +255,7 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         xdat = tx,
         ydat = y,
         neval = neval,
-        plot.behavior = "plot-data",
+        behavior = "plot-data",
         perspective = FALSE,
         gradients = FALSE
       ))[[1]]
@@ -294,7 +294,7 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         xdat = tx,
         ydat = y,
         neval = neval,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
         gradients = TRUE
       ))[[1]]
@@ -303,7 +303,7 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         xdat = tx,
         ydat = y,
         neval = neval,
-        plot.behavior = "plot-data",
+        behavior = "plot-data",
         perspective = FALSE,
         gradients = TRUE
       ))[[1]]
@@ -379,7 +379,7 @@ test_that("sibandwidth bootstrap helper routes work across bwtype, regtype, and 
           ydat = y,
           boot_method = boot_method,
           gradients = FALSE,
-          plot.behavior = "data",
+          behavior = "data",
           neval = neval
         )
         out.plot <- with_plot_device(run_singleindex_bootstrap_plot(
@@ -388,7 +388,7 @@ test_that("sibandwidth bootstrap helper routes work across bwtype, regtype, and 
           ydat = y,
           boot_method = boot_method,
           gradients = FALSE,
-          plot.behavior = "plot-data",
+          behavior = "plot-data",
           neval = neval
         ))
 

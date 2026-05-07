@@ -30,7 +30,7 @@ capture_rbandwidth_panel_ylabs <- function(object, xdat, ydat, ...) {
     xdat = xdat,
     ydat = ydat,
     perspective = FALSE,
-    plot.errors.method = "none",
+    errors = "none",
     plot.data.overlay = FALSE,
     plot.rug = FALSE,
     ...
@@ -133,8 +133,8 @@ test_that("rbandwidth mixed gradient plot still returns data payloads", {
     gradients = TRUE,
     perspective = FALSE,
     common.scale = FALSE,
-    plot.behavior = "data",
-    plot.errors.method = "none",
+    behavior = "data",
+    errors = "none",
     plot.data.overlay = FALSE
   )))
 

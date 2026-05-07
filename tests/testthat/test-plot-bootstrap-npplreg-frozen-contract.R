@@ -101,14 +101,14 @@ test_that("npplreg bootstrap plot payload stays finite across frozen nonfixed bw
     for (mode in c("exact", "frozen")) {
       out <- quiet_eval(plot(
         fit,
-        plot.errors.method = "bootstrap",
+        errors = "bootstrap",
         view = "fixed",
-        plot.errors.boot.method = "geom",
+        bootstrap = "geom",
         neval = 12,
-        plot.errors.boot.num = 61,
-        plot.errors.type = "pointwise",
-        plot.errors.boot.nonfixed = mode,
-        plot.behavior = "data"
+        B = 61,
+        band = "pointwise",
+        boot_control = np_boot_control(nonfixed = mode),
+        behavior = "data"
       ))
 
       expect_true(all(is.finite(out$r1$merr)), info = paste(bwtype, mode))

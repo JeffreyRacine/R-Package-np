@@ -37,10 +37,10 @@ test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {
         ydat = y,
         zdat = tz,
         perspective = FALSE,
-        plot.behavior = "data",
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 7
+        behavior = "data",
+        errors = "bootstrap",
+        bootstrap = "inid",
+        B = 7
       )
     )
     expect_type(out, "list")

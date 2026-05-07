@@ -25,8 +25,8 @@ test_that("object-fed regression plots avoid public npreg re-entry", {
   fit <- npreg(txdat = xdat, tydat = ydat, bws = bw)
 
   calls <- with_public_trace_counter("np", "npreg", {
-    out.bw <- plot(bw, xdat = xdat, ydat = ydat, plot.behavior = "data")
-    out.fit <- plot(fit, plot.behavior = "data")
+    out.bw <- plot(bw, xdat = xdat, ydat = ydat, behavior = "data")
+    out.fit <- plot(fit, behavior = "data")
     expect_type(out.bw, "list")
     expect_type(out.fit, "list")
   })
@@ -45,15 +45,15 @@ test_that("object-fed unconditional density/distribution plots avoid public re-e
   dist.fit <- npudist(tdat = dat, bws = dist.bw)
 
   dens.calls <- with_public_trace_counter("np", "npudens", {
-    out.bw <- plot(dens.bw, xdat = dat, plot.behavior = "data")
-    out.fit <- plot(dens.fit, plot.behavior = "data")
+    out.bw <- plot(dens.bw, xdat = dat, behavior = "data")
+    out.fit <- plot(dens.fit, behavior = "data")
     expect_type(out.bw, "list")
     expect_type(out.fit, "list")
   })
 
   dist.calls <- with_public_trace_counter("np", "npudist", {
-    out.bw <- plot(dist.bw, xdat = dat, plot.behavior = "data")
-    out.fit <- plot(dist.fit, plot.behavior = "data")
+    out.bw <- plot(dist.bw, xdat = dat, behavior = "data")
+    out.fit <- plot(dist.fit, behavior = "data")
     expect_type(out.bw, "list")
     expect_type(out.fit, "list")
   })
@@ -73,8 +73,8 @@ test_that("object-fed partially linear plots avoid public npplreg re-entry", {
   fit <- npplreg(txdat = xdat, tydat = ydat, tzdat = zdat, bws = bw)
 
   calls <- with_public_trace_counter("np", "npplreg", {
-    out.bw <- plot(bw, xdat = xdat, ydat = ydat, zdat = zdat, plot.behavior = "data")
-    out.fit <- plot(fit, plot.behavior = "data")
+    out.bw <- plot(bw, xdat = xdat, ydat = ydat, zdat = zdat, behavior = "data")
+    out.fit <- plot(fit, behavior = "data")
     expect_type(out.bw, "list")
     expect_type(out.fit, "list")
   })
@@ -94,10 +94,10 @@ test_that("object-fed conditional density/distribution plots avoid public re-ent
   dist.fit <- npcdist(txdat = xdat, tydat = ydat, bws = dist.bw)
 
   dens.calls <- with_public_trace_counter("np", "npcdens", {
-    out.grid.bw <- plot(dens.bw, xdat = xdat, ydat = ydat, plot.behavior = "data", view = "fixed")
-    out.grid.fit <- plot(dens.fit, plot.behavior = "data", view = "fixed")
-    out.slice.bw <- plot(dens.bw, xdat = xdat, ydat = ydat, plot.behavior = "data", perspective = FALSE, plot.errors.method = "asymptotic")
-    out.slice.fit <- plot(dens.fit, plot.behavior = "data", perspective = FALSE, plot.errors.method = "asymptotic")
+    out.grid.bw <- plot(dens.bw, xdat = xdat, ydat = ydat, behavior = "data", view = "fixed")
+    out.grid.fit <- plot(dens.fit, behavior = "data", view = "fixed")
+    out.slice.bw <- plot(dens.bw, xdat = xdat, ydat = ydat, behavior = "data", perspective = FALSE, errors = "asymptotic")
+    out.slice.fit <- plot(dens.fit, behavior = "data", perspective = FALSE, errors = "asymptotic")
     expect_type(out.grid.bw, "list")
     expect_type(out.grid.fit, "list")
     expect_type(out.slice.bw, "list")
@@ -105,10 +105,10 @@ test_that("object-fed conditional density/distribution plots avoid public re-ent
   })
 
   dist.calls <- with_public_trace_counter("np", "npcdist", {
-    out.grid.bw <- plot(dist.bw, xdat = xdat, ydat = ydat, plot.behavior = "data", view = "fixed")
-    out.grid.fit <- plot(dist.fit, plot.behavior = "data", view = "fixed")
-    out.slice.bw <- plot(dist.bw, xdat = xdat, ydat = ydat, plot.behavior = "data", perspective = FALSE, plot.errors.method = "asymptotic")
-    out.slice.fit <- plot(dist.fit, plot.behavior = "data", perspective = FALSE, plot.errors.method = "asymptotic")
+    out.grid.bw <- plot(dist.bw, xdat = xdat, ydat = ydat, behavior = "data", view = "fixed")
+    out.grid.fit <- plot(dist.fit, behavior = "data", view = "fixed")
+    out.slice.bw <- plot(dist.bw, xdat = xdat, ydat = ydat, behavior = "data", perspective = FALSE, errors = "asymptotic")
+    out.slice.fit <- plot(dist.fit, behavior = "data", perspective = FALSE, errors = "asymptotic")
     expect_type(out.grid.bw, "list")
     expect_type(out.grid.fit, "list")
     expect_type(out.slice.bw, "list")
@@ -129,10 +129,10 @@ test_that("object-fed quantile plots avoid public npqreg re-entry", {
   fit <- npqreg(txdat = xdat, tydat = ydat, bws = bw, tau = 0.4)
 
   calls <- with_public_trace_counter("np", "npqreg", {
-    out.grid.bw <- plot(bw, xdat = xdat, ydat = ydat, plot.behavior = "data", view = "fixed", quantreg = TRUE, tau = 0.4)
-    out.grid.fit <- plot(fit, plot.behavior = "data", view = "fixed")
-    out.slice.bw <- plot(bw, xdat = xdat, ydat = ydat, plot.behavior = "data", perspective = FALSE, quantreg = TRUE, tau = 0.4)
-    out.slice.fit <- plot(fit, plot.behavior = "data", perspective = FALSE)
+    out.grid.bw <- plot(bw, xdat = xdat, ydat = ydat, behavior = "data", view = "fixed", quantreg = TRUE, tau = 0.4)
+    out.grid.fit <- plot(fit, behavior = "data", view = "fixed")
+    out.slice.bw <- plot(bw, xdat = xdat, ydat = ydat, behavior = "data", perspective = FALSE, quantreg = TRUE, tau = 0.4)
+    out.slice.fit <- plot(fit, behavior = "data", perspective = FALSE)
     expect_type(out.grid.bw, "list")
     expect_type(out.grid.fit, "list")
     expect_type(out.slice.bw, "list")
@@ -161,8 +161,8 @@ test_that("smooth coefficient coef/asymptotic plots avoid public npscoef re-entr
         zdat = zdat,
         coef = TRUE,
         perspective = FALSE,
-        plot.behavior = "data",
-        plot.errors.method = "none"
+        behavior = "data",
+        errors = "none"
       )
     )
     out.fit.coef <- suppressWarnings(
@@ -173,8 +173,8 @@ test_that("smooth coefficient coef/asymptotic plots avoid public npscoef re-entr
         zdat = zdat,
         coef = TRUE,
         perspective = FALSE,
-        plot.behavior = "data",
-        plot.errors.method = "none"
+        behavior = "data",
+        errors = "none"
       )
     )
     out.bw.asym <- suppressWarnings(
@@ -185,8 +185,8 @@ test_that("smooth coefficient coef/asymptotic plots avoid public npscoef re-entr
         zdat = zdat,
         coef = FALSE,
         perspective = FALSE,
-        plot.behavior = "data",
-        plot.errors.method = "asymptotic"
+        behavior = "data",
+        errors = "asymptotic"
       )
     )
     out.fit.asym <- suppressWarnings(
@@ -197,8 +197,8 @@ test_that("smooth coefficient coef/asymptotic plots avoid public npscoef re-entr
         zdat = zdat,
         coef = FALSE,
         perspective = FALSE,
-        plot.behavior = "data",
-        plot.errors.method = "asymptotic"
+        behavior = "data",
+        errors = "asymptotic"
       )
     )
     expect_type(out.bw.coef, "list")

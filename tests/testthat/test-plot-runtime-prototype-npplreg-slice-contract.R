@@ -33,8 +33,8 @@ test_that("npplreg fixed no-error plot-data prototype matches current route", {
       xdat = x,
       zdat = z,
       ydat = y,
-      plot.behavior = "data",
-      plot.errors.method = "none",
+      behavior = "data",
+      errors = "none",
       neval = 7L,
       perspective = TRUE
     ))
@@ -129,9 +129,9 @@ test_that("npplreg fixed asymptotic plot-data prototype matches current route", 
       xdat = x,
       zdat = z,
       ydat = y,
-      plot.behavior = "data",
-      plot.errors.method = "asymptotic",
-      plot.errors.type = band,
+      behavior = "data",
+      errors = "asymptotic",
+      band = band,
       neval = 6L,
       perspective = TRUE
     ))
@@ -141,7 +141,7 @@ test_that("npplreg fixed asymptotic plot-data prototype matches current route", 
       zdat = z,
       ydat = y,
       neval = 6L,
-      plot.errors.type = band
+      band = band
     )
     stages <- proto(
       bw,
@@ -149,7 +149,7 @@ test_that("npplreg fixed asymptotic plot-data prototype matches current route", 
       zdat = z,
       ydat = y,
       neval = 6L,
-      plot.errors.type = band,
+      band = band,
       return.stages = TRUE
     )
 
@@ -199,12 +199,12 @@ test_that("npplreg fixed bootstrap plot-data prototype matches current route", {
       xdat = x,
       zdat = z,
       ydat = y,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = method,
-      plot.errors.boot.num = 11L,
-      plot.errors.center = center,
-      plot.errors.type = "pointwise",
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = method,
+      B = 11L,
+      center = center,
+      band = "pointwise",
       neval = 5L,
       perspective = TRUE,
       random.seed = boot.seed
@@ -216,10 +216,10 @@ test_that("npplreg fixed bootstrap plot-data prototype matches current route", {
       zdat = z,
       ydat = y,
       neval = 5L,
-      plot.errors.boot.method = method,
-      plot.errors.boot.num = 11L,
-      plot.errors.center = center,
-      plot.errors.type = "pointwise"
+      bootstrap = method,
+      B = 11L,
+      center = center,
+      band = "pointwise"
     ))
     set.seed(boot.seed)
     stages <- suppressWarnings(proto(
@@ -228,10 +228,10 @@ test_that("npplreg fixed bootstrap plot-data prototype matches current route", {
       zdat = z,
       ydat = y,
       neval = 5L,
-      plot.errors.boot.method = method,
-      plot.errors.boot.num = 11L,
-      plot.errors.center = center,
-      plot.errors.type = "pointwise",
+      bootstrap = method,
+      B = 11L,
+      center = center,
+      band = "pointwise",
       return.stages = TRUE
     ))
 

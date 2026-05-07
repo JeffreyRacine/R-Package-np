@@ -1112,10 +1112,10 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       ydat = y,
       zdat = data.frame(z = z),
       perspective = FALSE,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 19
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = "wild",
+      B = 19
     )
   )
   expect_type(sc.out, "list")
@@ -1128,12 +1128,12 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       ydat = y,
       zdat = data.frame(z = z),
       perspective = FALSE,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.wild = "rademacher",
-      plot.errors.type = "pointwise",
-      plot.errors.boot.num = 19
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = "wild",
+      boot_control = np_boot_control(wild = "rademacher"),
+      band = "pointwise",
+      B = 19
     )
   )
   expect_type(sc.out.rad, "list")
@@ -1172,10 +1172,10 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
         ydat = y,
         zdat = data.frame(z = z),
         perspective = FALSE,
-        plot.behavior = "data",
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "wild",
-        plot.errors.boot.num = 11
+        behavior = "data",
+        errors = "bootstrap",
+        bootstrap = "wild",
+        B = 11
       )
     )
     expect_type(sc.out.cfg, "list")
@@ -1210,10 +1210,10 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
         ydat = y,
         zdat = data.frame(z = z),
         perspective = FALSE,
-        plot.behavior = "data",
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "wild",
-        plot.errors.boot.num = 9
+        behavior = "data",
+        errors = "bootstrap",
+        bootstrap = "wild",
+        B = 9
       )
     )
     expect_true(is.list(pl.out), info = cfg$label)
@@ -1231,10 +1231,10 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       sibw,
       xdat = data.frame(x1 = x, x2 = z),
       ydat = y,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 19
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = "wild",
+      B = 19
     )
   )
   expect_type(si.out, "list")

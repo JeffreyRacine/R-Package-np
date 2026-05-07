@@ -23,7 +23,7 @@ test_that("quantile categorical gradient bootstrap helper matches explicit local
     tau = tau,
     gradients = TRUE,
     perspective = FALSE,
-    plot.behavior = "data"
+    behavior = "data"
   ))[[1L]]
 
   counts <- cbind(
@@ -93,10 +93,10 @@ test_that("quantile categorical bootstrap gradients work again", {
           tau = 0.5,
           gradients = TRUE,
           perspective = FALSE,
-          plot.behavior = "data",
-          plot.errors.method = "bootstrap",
-          plot.errors.boot.method = boot.method,
-          plot.errors.boot.num = 5L
+          behavior = "data",
+          errors = "bootstrap",
+          bootstrap = boot.method,
+          B = 5L
         ),
         case$args
       )
