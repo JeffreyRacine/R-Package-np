@@ -586,3 +586,36 @@ test_that("npcdens generalized/adaptive NN inid bootstrap plot-data prototype ma
                  info = bwtype)
   }
 })
+
+test_that("npcdens staged plot-data object renders through base renderer smoke", {
+  proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_none_data", "np")
+  render <- getFromNamespace(".np_plot_proto_npcdens_surface_base_render", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(133)
+
+  n <- 65L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    nmulti = 1L,
+    regtype = "lp",
+    degree = 1L,
+    bwtype = "fixed"
+  )
+  candidate <- proto(bw, xdat = x, ydat = y, neval = 7L)
+
+  out.file <- tempfile(fileext = ".pdf")
+  grDevices::pdf(out.file)
+  on.exit({
+    if (grDevices::dev.cur() > 1L)
+      grDevices::dev.off()
+  }, add = TRUE)
+  expect_identical(render(candidate, perspective = FALSE), candidate)
+  expect_identical(render(candidate, perspective = TRUE), candidate)
+  grDevices::dev.off()
+
+  expect_true(file.exists(out.file))
+  expect_gt(file.info(out.file)$size, 0)
+})

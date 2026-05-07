@@ -461,3 +461,61 @@
     return.stages = return.stages
   )
 }
+
+.np_plot_proto_npcdens_surface_base_render <- function(plot.data,
+                                                       perspective = TRUE,
+                                                       main = NULL,
+                                                       xlab = NULL,
+                                                       ylab = NULL,
+                                                       zlab = NULL,
+                                                       col = "lightblue",
+                                                       theta = 0.0,
+                                                       phi = 20.0,
+                                                       ...) {
+  ## Contract: renderer smoke for staged npcdens surface data. It consumes a
+  ## plot-data object and must not re-enter public estimators, bandwidth
+  ## constructors, bootstrap helpers, or target builders.
+  if (!is.list(plot.data) || is.null(plot.data$cd1) || !inherits(plot.data$cd1, "condensity"))
+    stop("renderer prototype requires plot-data with a condensity 'cd1' element", call. = FALSE)
+  cd <- plot.data$cd1
+  x <- unique(as.numeric(cd$xeval))
+  y <- unique(as.numeric(cd$yeval))
+  z <- matrix(as.numeric(cd$condens), nrow = length(x), ncol = length(y), byrow = FALSE)
+  if (length(x) * length(y) != length(cd$condens) ||
+      any(!is.finite(x)) || any(!is.finite(y)) || any(!is.finite(z))) {
+    stop("renderer prototype requires a finite rectangular conditional-density surface", call. = FALSE)
+  }
+
+  xlab <- if (is.null(xlab)) cd$xnames[1L] else xlab
+  ylab <- if (is.null(ylab)) cd$ynames[1L] else ylab
+  zlab <- if (is.null(zlab)) "Conditional density" else zlab
+  main <- if (is.null(main)) "Conditional Density" else main
+
+  if (isTRUE(perspective)) {
+    graphics::persp(
+      x = x,
+      y = y,
+      z = z,
+      theta = theta,
+      phi = phi,
+      xlab = xlab,
+      ylab = ylab,
+      zlab = zlab,
+      main = main,
+      col = col,
+      ...
+    )
+  } else {
+    graphics::image(
+      x = x,
+      y = y,
+      z = z,
+      xlab = xlab,
+      ylab = ylab,
+      main = main,
+      col = grDevices::hcl.colors(64L, "YlOrRd", rev = TRUE),
+      ...
+    )
+  }
+  invisible(plot.data)
+}
