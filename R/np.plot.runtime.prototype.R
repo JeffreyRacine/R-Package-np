@@ -93,7 +93,8 @@
                                                       ydat,
                                                       neval = 50,
                                                       xtrim = 0.0,
-                                                      ytrim = 0.0) {
+                                                      ytrim = 0.0,
+                                                      return.stages = FALSE) {
   ## Contract: first plot-runtime vertical slice. It reproduces the current
   ## npcdens LC/fixed/no-error plot.behavior='data' surface object while keeping
   ## state cleanup, target construction, evaluator, and plot-data assembly
@@ -146,5 +147,22 @@
   )
   cd1$bias <- NA
 
-  list(cd1 = cd1)
+  plot.data <- list(cd1 = cd1)
+  if (!isTRUE(return.stages))
+    return(plot.data)
+
+  list(
+    state = list(
+      bws = bws,
+      xdat = xdat,
+      ydat = ydat,
+      ntrain = nrow(xdat),
+      family = "npcdens",
+      cdf = FALSE,
+      gradients = FALSE
+    ),
+    target_grid = grid,
+    evaluator = fit,
+    plot_data = plot.data
+  )
 }

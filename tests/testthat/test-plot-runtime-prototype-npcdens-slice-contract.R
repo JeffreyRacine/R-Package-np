@@ -25,6 +25,7 @@ test_that("npcdens LC fixed no-error plot-data prototype matches current route",
     perspective = TRUE
   )
   candidate <- proto(bw, xdat = x, ydat = y, neval = 9L)
+  stages <- proto(bw, xdat = x, ydat = y, neval = 9L, return.stages = TRUE)
 
   expect_named(candidate, names(old))
   expect_s3_class(candidate$cd1, "condensity")
@@ -36,6 +37,9 @@ test_that("npcdens LC fixed no-error plot-data prototype matches current route",
   expect_equal(candidate$cd1$bias, old$cd1$bias)
   expect_identical(candidate$cd1$proper.requested, old$cd1$proper.requested)
   expect_identical(candidate$cd1$proper.applied, old$cd1$proper.applied)
+  expect_named(stages, c("state", "target_grid", "evaluator", "plot_data"))
+  expect_equal(stages$plot_data, candidate)
+  expect_equal(stages$evaluator$condens, old$cd1$condens)
 })
 
 test_that("npcdens plot prototype fails early outside its vertical slice", {
