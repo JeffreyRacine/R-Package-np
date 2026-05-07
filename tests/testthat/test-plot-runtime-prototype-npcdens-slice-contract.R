@@ -310,3 +310,71 @@ test_that("npcdens LC fixed proper plot-data prototype matches current route", {
   expect_equal(stages_boot$bootstrap$boot.err[, 1:2, drop = FALSE],
                cand_boot$cd1$conderr)
 })
+
+test_that("npcdens LC fixed block bootstrap plot-data prototype matches current route", {
+  proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_bootstrap_block_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(128)
+
+  n <- 70L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    nmulti = 1L,
+    regtype = "lc",
+    bwtype = "fixed"
+  )
+
+  for (method in c("fixed", "geom")) {
+    boot.seed <- if (identical(method, "fixed")) 9101L else 9102L
+    set.seed(boot.seed)
+    old <- suppressWarnings(plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      plot.behavior = "data",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = method,
+      plot.errors.boot.blocklen = 5L,
+      plot.errors.boot.num = 19L,
+      plot.errors.type = "pmzsd",
+      view = "fixed",
+      neval = 7L,
+      perspective = TRUE,
+      random.seed = boot.seed
+    ))
+    set.seed(boot.seed)
+    candidate <- suppressWarnings(proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 7L,
+      plot.errors.boot.method = method,
+      plot.errors.boot.blocklen = 5L,
+      plot.errors.boot.num = 19L,
+      plot.errors.type = "pmzsd"
+    ))
+    set.seed(boot.seed)
+    stages <- suppressWarnings(proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 7L,
+      plot.errors.boot.method = method,
+      plot.errors.boot.blocklen = 5L,
+      plot.errors.boot.num = 19L,
+      plot.errors.type = "pmzsd",
+      return.stages = TRUE
+    ))
+
+    expect_equal(candidate$cd1$condens, old$cd1$condens, info = method)
+    expect_equal(candidate$cd1$conderr, old$cd1$conderr, info = method)
+    expect_identical(stages$bootstrap$method, method)
+    expect_identical(stages$bootstrap$blocklen, 5L)
+    expect_equal(stages$bootstrap$boot.err[, 1:2, drop = FALSE],
+                 candidate$cd1$conderr,
+                 info = method)
+  }
+})
