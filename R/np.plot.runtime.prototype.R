@@ -909,3 +909,207 @@
     return.stages = return.stages
   )
 }
+
+.np_plot_proto_check_unconditional_fixed_surface <- function(bws,
+                                                            xdat,
+                                                            neval,
+                                                            xtrim,
+                                                            cdf = FALSE) {
+  expected.class <- if (isTRUE(cdf)) "dbandwidth" else "bandwidth"
+  expected.label <- if (isTRUE(cdf)) "unconditional distribution" else "unconditional density"
+  if (!inherits(bws, expected.class))
+    stop(sprintf("prototype route requires an %s bandwidth object", expected.label), call. = FALSE)
+  if (!identical(as.character(bws$type), "fixed"))
+    stop("prototype route currently supports fixed bandwidths only", call. = FALSE)
+  if (bws$ndim != 2L)
+    stop(sprintf("prototype route currently supports two-dimensional %s surfaces", expected.label), call. = FALSE)
+  if (bws$nuno != 0L)
+    stop("prototype route currently supports continuous/ordered surface variables only", call. = FALSE)
+  if (bws$ncon + bws$nord != 2L)
+    stop(sprintf("prototype route requires a two-dimensional %s surface", expected.label), call. = FALSE)
+  if (!is.numeric(neval) || length(neval) != 1L || is.na(neval) || neval < 2L)
+    stop("prototype route requires scalar neval >= 2", call. = FALSE)
+  invisible(TRUE)
+}
+
+.np_plot_proto_clean_unconditional_data <- function(xdat) {
+  xdat <- toFrame(xdat)
+  keep.rows <- rep_len(TRUE, nrow(xdat))
+  rows.omit <- attr(na.omit(xdat), "na.action")
+  if (length(rows.omit) > 0L)
+    keep.rows[as.integer(rows.omit)] <- FALSE
+  if (!any(keep.rows))
+    stop("Data has no rows without NAs")
+  list(xdat = xdat[keep.rows, , drop = FALSE])
+}
+
+.np_plot_proto_unconditional_fixed_data <- function(bws,
+                                                   xdat,
+                                                   neval = 50,
+                                                   xtrim = 0.0,
+                                                   plot.errors.method = c("none", "asymptotic", "bootstrap"),
+                                                   plot.errors.boot.method = c("inid", "fixed", "geom"),
+                                                   plot.errors.boot.nonfixed = c("exact", "frozen"),
+                                                   plot.errors.boot.blocklen = NULL,
+                                                   plot.errors.boot.num = 1999,
+                                                   plot.errors.center = c("estimate", "bias-corrected"),
+                                                   plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
+                                                                        "simultaneous", "all"),
+                                                   plot.errors.alpha = 0.05,
+                                                   return.stages = FALSE,
+                                                   cdf = FALSE) {
+  if (missing(xdat))
+    stop("prototype route requires explicit xdat", call. = FALSE)
+  plot.errors.method <- match.arg(plot.errors.method)
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method)
+  plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
+  plot.errors.center <- match.arg(plot.errors.center)
+  plot.errors.type <- match.arg(plot.errors.type)
+
+  dat <- .np_plot_proto_clean_unconditional_data(xdat = xdat)
+  xdat <- dat$xdat
+  .np_plot_proto_check_unconditional_fixed_surface(
+    bws = bws,
+    xdat = xdat,
+    neval = neval,
+    xtrim = xtrim,
+    cdf = cdf
+  )
+  grid <- .np_plot_proto_regression_surface_grid(
+    bws = bws,
+    xdat = xdat,
+    neval = neval,
+    xtrim = xtrim
+  )
+  fit <- .np_plot_unconditional_eval(
+    xdat = xdat,
+    exdat = grid$x.eval,
+    bws = bws,
+    cdf = isTRUE(cdf),
+    need.asymptotic = identical(plot.errors.method, "asymptotic")
+  )
+
+  estimate <- if (isTRUE(cdf)) fit$dist else fit$dens
+  se <- if (isTRUE(cdf)) fit$derr else fit$derr
+  terr <- matrix(data = se, nrow = length(estimate), ncol = 3L)
+  terr[, 3L] <- NA_real_
+  interval <- NULL
+  bootstrap <- NULL
+  if (identical(plot.errors.method, "bootstrap")) {
+    bootstrap.args <- list(
+      xdat = xdat,
+      exdat = grid$x.eval,
+      slice.index = 0L,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.boot.num = plot.errors.boot.num,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      bws = bws
+    )
+    if (!isTRUE(cdf))
+      bootstrap.args$cdf <- FALSE
+    bootstrap <- do.call(compute.bootstrap.errors, bootstrap.args)
+    terr <- bootstrap$boot.err
+    interval <- list(
+      err = bootstrap$boot.err[, 1:2, drop = FALSE],
+      all.err = bootstrap$boot.all.err
+    )
+  } else if (identical(plot.errors.method, "asymptotic")) {
+    interval <- .np_plot_asymptotic_error_from_se(
+      se = se,
+      alpha = plot.errors.alpha,
+      band.type = plot.errors.type,
+      m = nrow(grid$x.eval)
+    )
+    terr[, 1:2] <- interval$err
+  }
+
+  d1 <- if (isTRUE(cdf)) {
+    npdistribution(
+      bws = bws,
+      eval = grid$x.eval,
+      dist = estimate,
+      derr = terr[, 1:2, drop = FALSE],
+      ntrain = nrow(xdat)
+    )
+  } else {
+    npdensity(
+      bws = bws,
+      eval = grid$x.eval,
+      dens = estimate,
+      derr = terr[, 1:2, drop = FALSE],
+      ntrain = nrow(xdat)
+    )
+  }
+  d1$bias <- NA
+  if (identical(plot.errors.center, "bias-corrected"))
+    d1$bias <- terr[, 3L] - estimate
+
+  plot.data <- list(d1 = d1)
+  if (!isTRUE(return.stages))
+    return(plot.data)
+
+  list(
+    state = list(
+      bws = bws,
+      xdat = xdat,
+      ntrain = nrow(xdat),
+      family = if (isTRUE(cdf)) "npudist" else "npudens",
+      cdf = isTRUE(cdf)
+    ),
+    target_grid = grid,
+    evaluator = fit,
+    intervals = if (is.null(interval)) NULL else list(
+      method = plot.errors.method,
+      type = plot.errors.type,
+      alpha = plot.errors.alpha,
+      err = interval$err,
+      all.err = interval$all.err
+    ),
+    bootstrap = if (is.null(bootstrap)) NULL else list(
+      method = plot.errors.boot.method,
+      nonfixed = plot.errors.boot.nonfixed,
+      blocklen = plot.errors.boot.blocklen,
+      B = plot.errors.boot.num,
+      center = plot.errors.center,
+      boot.err = bootstrap$boot.err,
+      boot.all.err = bootstrap$boot.all.err,
+      bxp = bootstrap$bxp
+    ),
+    plot_data = plot.data
+  )
+}
+
+.np_plot_proto_npudens_fixed_none_data <- function(bws,
+                                                   xdat,
+                                                   neval = 50,
+                                                   xtrim = 0.0,
+                                                   return.stages = FALSE) {
+  .np_plot_proto_unconditional_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    neval = neval,
+    xtrim = xtrim,
+    plot.errors.method = "none",
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npudist_fixed_none_data <- function(bws,
+                                                   xdat,
+                                                   neval = 50,
+                                                   xtrim = 0.0,
+                                                   return.stages = FALSE) {
+  .np_plot_proto_unconditional_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    neval = neval,
+    xtrim = xtrim,
+    plot.errors.method = "none",
+    return.stages = return.stages,
+    cdf = TRUE
+  )
+}
