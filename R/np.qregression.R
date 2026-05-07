@@ -67,7 +67,7 @@ npqreg <-
     stop("quantile delta helper requires a single response")
 
   eydat <- stats::setNames(data.frame(quantile), names(ydat)[1L])
-  cdf.obj <- .np_plot_conditional_eval(
+  cdf.obj <- .np_conditional_eval_selected(
     bws = bws,
     xdat = xdat,
     ydat = ydat,
@@ -76,7 +76,7 @@ npqreg <-
     cdf = TRUE,
     gradients = gradients
   )
-  dens.obj <- .np_plot_conditional_eval(
+  dens.obj <- .np_conditional_eval_selected(
     bws = bws,
     xdat = xdat,
     ydat = ydat,
@@ -116,6 +116,111 @@ npqreg <-
     cdf = cdf.obj,
     dens = dens.obj
   )
+}
+
+.npqreg_selected_cdf_values <- function(bws,
+                                        xdat,
+                                        ydat,
+                                        exdat,
+                                        ycand) {
+  ydat <- toFrame(ydat)
+  yname <- names(ydat)[1L]
+  eydat <- stats::setNames(data.frame(as.double(ycand)), yname)
+  as.double(.np_conditional_eval_selected(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    cdf = TRUE,
+    gradients = FALSE
+  )$condist)
+}
+
+.npqreg_assert_selected_cdf_metadata <- function(bws) {
+  reg.engine <- if (is.null(bws$regtype.engine)) {
+    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  } else {
+    as.character(bws$regtype.engine)
+  }
+  if (!identical(reg.engine, "lp"))
+    return(invisible(TRUE))
+
+  if (is.null(bws$degree.engine) && is.null(bws$degree))
+    stop("selected LP conditional distribution metadata missing from bandwidth object: degree")
+  invisible(TRUE)
+}
+
+.npqreg_invert_selected_cdf <- function(bws,
+                                        xdat,
+                                        ydat,
+                                        exdat,
+                                        tau,
+                                        tol,
+                                        small,
+                                        itmax) {
+  .npqreg_assert_selected_cdf_metadata(bws)
+
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  y <- as.double(ydat[[1L]])
+  y <- y[is.finite(y)]
+  if (!length(y))
+    stop("npqreg selected-CDF inversion requires finite response support")
+
+  n.eval <- nrow(exdat)
+  y.min <- min(y)
+  y.max <- max(y)
+  if (!is.finite(y.min) || !is.finite(y.max))
+    stop("npqreg selected-CDF inversion found non-finite response support")
+  if (identical(y.min, y.max))
+    return(rep.int(y.min, n.eval))
+
+  lo <- rep.int(y.min, n.eval)
+  hi <- rep.int(y.max, n.eval)
+
+  flo <- .npqreg_selected_cdf_values(bws, xdat, ydat, exdat, lo)
+  fhi <- .npqreg_selected_cdf_values(bws, xdat, ydat, exdat, hi)
+  if (any(!is.finite(flo)) || any(!is.finite(fhi)))
+    stop("npqreg selected-CDF inversion encountered non-finite bracket values")
+
+  done.low <- flo >= tau
+  done.high <- fhi < tau
+  active <- !(done.low | done.high)
+
+  maxiter <- min(as.integer(itmax), 1000L)
+  iter <- 0L
+  while (any(active) && iter < maxiter) {
+    iter <- iter + 1L
+    mid <- (lo[active] + hi[active]) / 2.0
+    fmid <- .npqreg_selected_cdf_values(
+      bws = bws,
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat[active, , drop = FALSE],
+      ycand = mid
+    )
+    if (any(!is.finite(fmid)))
+      stop("npqreg selected-CDF inversion encountered non-finite refinement values")
+
+    active.idx <- which(active)
+    upper <- fmid >= tau
+    hi[active.idx[upper]] <- mid[upper]
+    lo[active.idx[!upper]] <- mid[!upper]
+
+    width <- hi[active.idx] - lo[active.idx]
+    scale <- pmax(abs(hi[active.idx]), abs(lo[active.idx]), 1.0)
+    active[active.idx] <- width > (tol * scale + small)
+  }
+
+  if (any(active))
+    stop("npqreg selected-CDF inversion failed to converge within 'itmax'")
+
+  out <- hi
+  out[done.low] <- y.min
+  out[done.high] <- y.max
+  out
 }
 
 npqreg.formula <-
@@ -283,98 +388,20 @@ npqreg.condbandwidth <-
     if (!no.ex)
       exdat.df <- exdat
 
-    ## at this stage, data to be sent to the c routines must be converted to
-    ## numeric type.
-    
-    tydat = toMatrix(tydat)
-
-    txdat = toMatrix(txdat)
-
-    txuno = txdat[, bws$ixuno, drop = FALSE]
-    txcon = txdat[, bws$ixcon, drop = FALSE]
-    txord = txdat[, bws$ixord, drop = FALSE]
-
-    if (!no.ex){
-      exdat = toMatrix(exdat)
-
-      exuno = exdat[, bws$ixuno, drop = FALSE]
-      excon = exdat[, bws$ixcon, drop = FALSE]
-      exord = exdat[, bws$ixord, drop = FALSE]
-    } else {
-      exuno = data.frame()
-      excon = data.frame()
-      exord = data.frame()
-    }
-
-    myopti = list(
-      num_obs_train = tnrow,
-      num_obs_eval = enrow,
-      int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
-      BANDWIDTH_den_extern = switch(bws$type,
-        fixed = BW_FIXED,
-        generalized_nn = BW_GEN_NN,
-        adaptive_nn = BW_ADAP_NN),
-      int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
-      xkerneval = switch(bws$cxkertype,
-        gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
-        epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
-        uniform = CKER_UNI,
-        "truncated gaussian" = CKER_TGAUSS),
-      ykerneval = switch(bws$cykertype,
-        gaussian = CKER_GAUSS + bws$cykerorder/2 - 1,
-        epanechnikov = CKER_EPAN + bws$cykerorder/2 - 1,
-        uniform = CKER_UNI,
-        "truncated gaussian" = CKER_TGAUSS),
-      uxkerneval = switch(bws$uxkertype,
-        aitchisonaitken = UKER_AIT,
-        liracine = UKER_LR),
-      uykerneval = switch(bws$uykertype,
-        aitchisonaitken = UKER_AIT,
-        liracine = UKER_LR),
-      oxkerneval = switch(bws$oxkertype,
-        wangvanryzin = OKER_WANG,
-        liracine = OKER_LR,
-        "racineliyan" = OKER_RLY),
-      oykerneval = switch(bws$oykertype,
-        wangvanryzin = OKER_WANG,
-        liracine = OKER_NLR,
-        "racineliyan" = OKER_RLY),
-      num_yuno = bws$ynuno,
-      num_yord = bws$ynord,
-      num_ycon = bws$yncon,
-      num_xuno = bws$xnuno,
-      num_xord = bws$xnord,
-      num_xcon = bws$xncon,
-      no.ex = no.ex,
-      gradients = FALSE,
-      itmax = itmax,
-      xmcv.numRow = attr(bws$xmcv, "num.row"),
-      nmulti = itmax,
-      qreg.unused = 0L)
-
-    myoptd = c(
-      qreg.unused = 0.0,
-      tol = tol,
-      small = small,
-      rep(0.0, 7L))
-    
-    myout <-
-      .Call("C_np_quantile_conditional",
-            as.double(tydat),
-            as.double(txuno), as.double(txord), as.double(txcon),
-            as.double(exuno), as.double(exord), as.double(excon),
-            as.double(tau),
-            as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                        bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                        bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-            as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-            as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
-            as.integer(myopti),
-            as.double(myoptd),
-            as.integer(enrow),
-            as.integer(bws$xndim),
-            as.logical(FALSE),
-            PACKAGE="np")[c("yq", "yqerr", "yqgrad")]
+    myout <- list(
+      yq = .npqreg_invert_selected_cdf(
+        bws = bws,
+        xdat = txdat.df,
+        ydat = tydat.df,
+        exdat = txeval,
+        tau = tau,
+        tol = tol,
+        small = small,
+        itmax = itmax
+      ),
+      yqerr = NA,
+      yqgrad = NA
+    )
 
     qdelta <- .npqreg_quantile_delta_from_conditional(
         bws = bws,

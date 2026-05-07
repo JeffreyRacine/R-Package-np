@@ -163,11 +163,15 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
   \eqn{F} on the range of \eqn{F}, while outside that range the
   generalized inverse is defined by the lower endpoint at which
   \eqn{F} reaches or exceeds the requested probability. Numerically,
-  \code{npqreg} searches over the observed support of the dependent
-  variable and refines the one-dimensional solution by minimizing the
-  squared residual between the estimated conditional distribution and
-  \code{tau}. The arguments \code{tol}, \code{small}, and \code{itmax}
-  control this one-dimensional refinement.
+  \code{npqreg} inverts the selected conditional distribution estimator
+  represented by \code{bws}. This includes the selected bandwidth type,
+  kernels, local-polynomial regression type, selected polynomial degree,
+  basis, and Bernstein-basis setting inherited from \code{\link{npcdistbw}}.
+  The one-dimensional inversion is carried out over the observed support
+  of the dependent variable using the same selected conditional CDF
+  estimator that is later used for quantile standard errors and gradients.
+  The arguments \code{tol}, \code{small}, and \code{itmax} control this
+  one-dimensional refinement.
 
   Let \eqn{f(y|x) = \partial F(y|x)/\partial y} denote the conditional
   density. The asymptotic standard error of the conditional quantile is
@@ -178,9 +182,9 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
     \frac{se\{\hat F(\hat q_\tau(x)|x)\}}
          {\hat f(\hat q_\tau(x)|x)} ,
   }
-  using the conditional distribution standard-error machinery and the
-  estimated conditional density evaluated at the fitted quantile. This
-  corresponds to the quantile variance expression in Li, Lin and
+  using the selected conditional distribution standard-error machinery
+  and the selected conditional density evaluated at the fitted quantile.
+  This corresponds to the quantile variance expression in Li, Lin and
   Racine (2013).
 
   If \code{gradients=TRUE}, \code{npqreg} also computes gradients of
@@ -192,9 +196,13 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
       =
     -\frac{F_x(q_\tau(x)|x)}{f(q_\tau(x)|x)},
   }
-  where \eqn{F_x(y|x)} is the derivative of the conditional
-  distribution with respect to \eqn{x}. The corresponding first-order
-  gradient standard errors are computed componentwise as
+  where \eqn{F_x(y|x)} is the derivative of the same selected conditional
+  distribution estimator with respect to \eqn{x}. For \code{regtype="lc"},
+  this uses the local-constant conditional-gradient machinery; for
+  \code{regtype="ll"} it uses the canonical local-polynomial degree-one
+  route; and for \code{regtype="lp"} it uses the selected or supplied
+  degree vector. The corresponding first-order gradient standard errors
+  are computed componentwise as
   \deqn{
     se\{\nabla_x \hat q_\tau(x)\}
       =

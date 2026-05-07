@@ -6560,105 +6560,20 @@ plotFactor <- function(f, y, ...){
       if (!no.ex)
         exdat.df <- exdat
 
-      ydat <- toMatrix(ydat)
-      xdat <- toMatrix(xdat)
-
-      xuno <- xdat[, bws$ixuno, drop = FALSE]
-      xcon <- xdat[, bws$ixcon, drop = FALSE]
-      xord <- xdat[, bws$ixord, drop = FALSE]
-
-      if (!no.ex) {
-        exdat <- toMatrix(exdat)
-        exuno <- exdat[, bws$ixuno, drop = FALSE]
-        excon <- exdat[, bws$ixcon, drop = FALSE]
-        exord <- exdat[, bws$ixord, drop = FALSE]
-      } else {
-        exuno <- data.frame()
-        excon <- data.frame()
-        exord <- data.frame()
-      }
-
-      myopti <- list(
-        num_obs_train = tnrow,
-        num_obs_eval = enrow,
-        int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
-        BANDWIDTH_den_extern = switch(bws$type,
-          fixed = BW_FIXED,
-          generalized_nn = BW_GEN_NN,
-          adaptive_nn = BW_ADAP_NN
+      myout <- list(
+        yq = .npqreg_invert_selected_cdf(
+          bws = bws,
+          xdat = xdat.df,
+          ydat = ydat.df,
+          exdat = txeval,
+          tau = tau,
+          tol = tol,
+          small = small,
+          itmax = itmax
         ),
-        int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
-        xkerneval = switch(bws$cxkertype,
-          gaussian = CKER_GAUSS + bws$cxkerorder / 2 - 1,
-          epanechnikov = CKER_EPAN + bws$cxkerorder / 2 - 1,
-          uniform = CKER_UNI,
-          "truncated gaussian" = CKER_TGAUSS
-        ),
-        ykerneval = switch(bws$cykertype,
-          gaussian = CKER_GAUSS + bws$cykerorder / 2 - 1,
-          epanechnikov = CKER_EPAN + bws$cykerorder / 2 - 1,
-          uniform = CKER_UNI,
-          "truncated gaussian" = CKER_TGAUSS
-        ),
-        uxkerneval = switch(bws$uxkertype,
-          aitchisonaitken = UKER_AIT,
-          liracine = UKER_LR
-        ),
-        uykerneval = switch(bws$uykertype,
-          aitchisonaitken = UKER_AIT,
-          liracine = UKER_LR
-        ),
-        oxkerneval = switch(bws$oxkertype,
-          wangvanryzin = OKER_WANG,
-          liracine = OKER_LR,
-          racineliyan = OKER_RLY
-        ),
-        oykerneval = switch(bws$oykertype,
-          wangvanryzin = OKER_WANG,
-          liracine = OKER_NLR,
-          racineliyan = OKER_RLY
-        ),
-        num_yuno = bws$ynuno,
-        num_yord = bws$ynord,
-        num_ycon = bws$yncon,
-        num_xuno = bws$xnuno,
-        num_xord = bws$xnord,
-        num_xcon = bws$xncon,
-        no.ex = no.ex,
-        gradients = FALSE,
-        itmax = itmax,
-        xmcv.numRow = attr(bws$xmcv, "num.row"),
-        nmulti = itmax,
-        qreg.unused = 0L
+        yqerr = NA,
+        yqgrad = NA
       )
-
-      myoptd <- c(
-        qreg.unused = 0.0,
-        tol = tol,
-        small = small,
-        rep(0.0, 7L)
-      )
-
-      myout <- .Call(
-        "C_np_quantile_conditional",
-        as.double(ydat),
-        as.double(xuno), as.double(xord), as.double(xcon),
-        as.double(exuno), as.double(exord), as.double(excon),
-        as.double(tau),
-        as.double(c(
-          bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-          bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-          bws$xbw[bws$ixuno], bws$xbw[bws$ixord]
-        )),
-        as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-        as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
-        as.integer(myopti),
-        as.double(myoptd),
-        as.integer(enrow),
-        as.integer(bws$xndim),
-        as.logical(FALSE),
-        PACKAGE = "np"
-      )[c("yq", "yqerr", "yqgrad")]
 
       qdelta <- .npqreg_quantile_delta_from_conditional(
         bws = bws,
@@ -6719,6 +6634,30 @@ plotFactor <- function(f, y, ...){
     }
   )
   on.exit(.np_plot_activity_end(activity), add = TRUE)
+  .np_conditional_eval_selected(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    cdf = cdf,
+    gradients = gradients,
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control
+  )
+}
+
+.np_conditional_eval_selected <- function(bws,
+                                          xdat,
+                                          ydat,
+                                          exdat,
+                                          eydat,
+                                          cdf = FALSE,
+                                          gradients = FALSE,
+                                          proper = FALSE,
+                                          proper.method = NULL,
+                                          proper.control = list()) {
   fit.start <- proc.time()[3]
   proper <- npValidateScalarLogical(proper, "proper")
 
@@ -6728,9 +6667,9 @@ plotFactor <- function(f, y, ...){
   eydat <- toFrame(eydat)
 
   if (nrow(xdat) != nrow(ydat))
-    stop("conditional plot helper requires aligned training rows")
+    stop("conditional evaluation helper requires aligned training rows")
   if (nrow(exdat) != nrow(eydat))
-    stop("conditional plot helper requires aligned evaluation rows")
+    stop("conditional evaluation helper requires aligned evaluation rows")
   if (!xdat %~% exdat)
     stop("'xdat' and 'exdat' are not similar data frames!")
   if (!ydat %~% eydat)
