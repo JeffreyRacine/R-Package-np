@@ -28,7 +28,7 @@ npqreg <-
 .npqreg_fit_dots <- function(dots, allow.bandwidth.controls = FALSE) {
   dot.names <- names(dots)
   if (is.null(dot.names))
-    return(dots)
+    dot.names <- rep("", length(dots))
 
   stale <- intersect(dot.names[nzchar(dot.names)], .npqreg.removed.solver.controls)
   if (length(stale) && !allow.bandwidth.controls) {
@@ -37,6 +37,12 @@ npqreg <-
       paste(stale, collapse = "', '"),
       if (length(stale) == 1L) "is" else "are"
     ))
+  }
+
+  if (!allow.bandwidth.controls) {
+    bad <- dot.names == "" | !(dot.names %in% .npqreg.fit.control.names)
+    if (any(bad))
+      .np_reject_unused_dots(dots[bad], "npqreg")
   }
 
   keep <- (!nzchar(dot.names)) | (dot.names %in% .npqreg.fit.control.names)

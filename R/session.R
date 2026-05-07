@@ -441,6 +441,7 @@ npRmpi.init <- function(...,
                          nonblock = TRUE,
                          sleep = 0.1,
                          quiet = FALSE) {
+  .np_reject_unused_dots(list(...), "npRmpi.init")
   .npRmpi_abort_if_rmpi_attached(where = "npRmpi.init()")
 
   nslaves <- npValidateNonNegativeInteger(nslaves, "nslaves")

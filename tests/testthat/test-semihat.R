@@ -1143,6 +1143,21 @@ test_that("semihat validates class and scalar controls", {
   expect_error(npindexhat(bws = rbw, txdat = data.frame(x = x)), "sibandwidth")
   expect_error(npplreghat(bws = rbw, txdat = data.frame(x = x), tzdat = data.frame(z = z)), "plbandwidth")
   expect_error(npscoefhat(bws = rbw, txdat = data.frame(x = x), tzdat = data.frame(z = z)), "scbandwidth")
+  expect_error(
+    npindexhat(bws = structure(list(), class = "sibandwidth"),
+               txdat = data.frame(x = x), foo = TRUE),
+    "unused argument in npindexhat: 'foo'"
+  )
+  expect_error(
+    npplreghat(bws = structure(list(), class = "plbandwidth"),
+               txdat = data.frame(x = x), tzdat = data.frame(z = z), foo = TRUE),
+    "unused argument in npplreghat: 'foo'"
+  )
+  expect_error(
+    npscoefhat(bws = structure(list(), class = "scbandwidth"),
+               txdat = data.frame(x = x), tzdat = data.frame(z = z), foo = TRUE),
+    "unused argument in npscoefhat: 'foo'"
+  )
 
   sibw <- npindexbw(
     xdat = data.frame(x = x, x2 = x^2),

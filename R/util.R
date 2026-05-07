@@ -2560,6 +2560,23 @@ gradients <- function(x, ...){
   UseMethod("gradients",x)
 }
 
+.np_reject_unused_dots <- function(dots, where) {
+  if (length(dots) == 0L)
+    return(invisible(TRUE))
+
+  dot.names <- names(dots)
+  if (is.null(dot.names))
+    dot.names <- rep("", length(dots))
+
+  labels <- ifelse(nzchar(dot.names), dot.names, "<unnamed>")
+  labels <- paste(sprintf("'%s'", labels), collapse = ", ")
+  stop(sprintf("unused argument%s in %s: %s",
+               if (length(dots) == 1L) "" else "s",
+               where,
+               labels),
+       call. = FALSE)
+}
+
 ## From crs to avoid crs:::W.glp
 
 mypoly <- function(x,

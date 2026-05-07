@@ -1,4 +1,5 @@
 test_that("npRmpi.init validates scalar control arguments before MPI calls", {
+  expect_error(npRmpi.init(nslave = 1, mode = "spawn"), "unused argument in npRmpi.init: 'nslave'")
   expect_error(npRmpi.init(nslaves = -1, mode = "spawn"), "'nslaves' must be a non-negative integer")
   expect_error(npRmpi.init(nslaves = 0, mode = "spawn"), "'nslaves' must be >= 1 for npRmpi; use package 'np' for serial workflows")
   expect_error(npRmpi.init(comm = 0, mode = "spawn"), "'comm' must be a positive integer")
