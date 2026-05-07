@@ -32,6 +32,16 @@ Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
   and Nelsen-style quasi-inverse construction used by the conditional
   quantile solver.
 
+* Repaired `npqreg()` conditional-quantile inversion so quantile levels,
+  standard errors, gradients, and gradient standard errors are all derived
+  from the same selected `npcdistbw()` conditional distribution estimator,
+  including selected local-polynomial degree and basis metadata. This removes
+  an inconsistency where the newly degree-aware quantile-gradient path could
+  use a higher-order conditional distribution fit while the quantile level was
+  still extracted by the legacy degree-unaware inversion path; the repaired
+  route is used by the MPI-aware session/attach/profile paths without
+  cross-package fallback.
+
 * Restored/validated MPI fanout coverage for touched plot-bootstrap routes,
   including conditional adaptive exact helpers, conditional gradients,
   proper conditional projection, partially linear recomposition, and public
