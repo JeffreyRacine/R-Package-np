@@ -3,9 +3,12 @@
                                                        ydat,
                                                        neval,
                                                        xtrim,
-                                                       ytrim) {
-  if (!inherits(bws, "conbandwidth"))
-    stop("prototype route requires a conditional density bandwidth object", call. = FALSE)
+                                                       ytrim,
+                                                       cdf = FALSE) {
+  expected.class <- if (isTRUE(cdf)) "condbandwidth" else "conbandwidth"
+  expected.label <- if (isTRUE(cdf)) "conditional distribution" else "conditional density"
+  if (!inherits(bws, expected.class))
+    stop(sprintf("prototype route requires a %s bandwidth object", expected.label), call. = FALSE)
   regtype.engine <- if (is.null(bws$regtype.engine)) {
     if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
   } else {
@@ -20,7 +23,7 @@
   if (bws$xnuno + bws$ynuno != 0L)
     stop("prototype route currently supports continuous/ordered surface variables only", call. = FALSE)
   if (bws$xncon + bws$xnord + bws$yncon + bws$ynord != 2L)
-    stop("prototype route requires a two-dimensional conditional density surface", call. = FALSE)
+    stop(sprintf("prototype route requires a two-dimensional %s surface", expected.label), call. = FALSE)
   if (!is.numeric(neval) || length(neval) != 1L || is.na(neval) || neval < 2L)
     stop("prototype route requires scalar neval >= 2", call. = FALSE)
   invisible(TRUE)
@@ -113,10 +116,12 @@
                                               proper = FALSE,
                                               proper.method = c("project"),
                                               proper.control = list(),
-                                              return.stages = FALSE) {
-  ## Contract: private npcdens fixed-bandwidth/data-only prototype. This owns explicit
-  ## data cleanup, target construction, evaluator invocation, optional
-  ## asymptotic interval construction, and old-compatible plot-data assembly.
+                                              return.stages = FALSE,
+                                              cdf = FALSE) {
+  ## Contract: private conditional density/distribution data-only prototype.
+  ## This owns explicit data cleanup, target construction, evaluator invocation,
+  ## optional asymptotic/bootstrap interval construction, and old-compatible
+  ## plot-data assembly.
   ## It must not draw graphics, bootstrap, change RNG state, or recover formula
   ## data until those stages receive their own slice.
   if (missing(xdat) || missing(ydat))
@@ -126,11 +131,21 @@
   plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
   plot.errors.center <- match.arg(plot.errors.center)
   plot.errors.type <- match.arg(plot.errors.type)
-  proper.args <- .np_condens_validate_proper_args(
-    proper = proper,
-    proper.method = proper.method,
-    proper.control = proper.control
-  )
+  if (missing(proper.method))
+    proper.method <- if (isTRUE(cdf)) "isotonic" else "project"
+  proper.args <- if (isTRUE(cdf)) {
+    .np_condist_validate_proper_args(
+      proper = proper,
+      proper.method = proper.method,
+      proper.control = proper.control
+    )
+  } else {
+    .np_condens_validate_proper_args(
+      proper = proper,
+      proper.method = proper.method,
+      proper.control = proper.control
+    )
+  }
   dat <- .np_plot_proto_clean_conditional_data(xdat = xdat, ydat = ydat)
   xdat <- dat$xdat
   ydat <- dat$ydat
@@ -140,7 +155,8 @@
     ydat = ydat,
     neval = neval,
     xtrim = xtrim,
-    ytrim = ytrim
+    ytrim = ytrim,
+    cdf = cdf
   )
 
   grid <- .np_plot_proto_conditional_surface_grid(
@@ -157,14 +173,15 @@
     ydat = ydat,
     exdat = grid$x.eval[, 1L, drop = FALSE],
     eydat = grid$x.eval[, 2L, drop = FALSE],
-    cdf = FALSE,
+    cdf = isTRUE(cdf),
     gradients = FALSE,
     proper = isTRUE(proper.args$proper.requested),
     proper.method = proper.args$proper.method,
     proper.control = proper.args$proper.control
   )
 
-  terr <- matrix(fit$conderr, nrow = length(fit$condens), ncol = 3L)
+  tcomp <- if (isTRUE(cdf)) fit$condist else fit$condens
+  terr <- matrix(fit$conderr, nrow = length(tcomp), ncol = 3L)
   terr[, 3L] <- NA_real_
   interval <- NULL
   bootstrap <- NULL
@@ -182,7 +199,7 @@
       ydat = ydat,
       exdat = grid$x.eval[, 1L],
       eydat = grid$x.eval[, 2L],
-      cdf = FALSE,
+      cdf = isTRUE(cdf),
       quantreg = FALSE,
       tau = 0.5,
       gradients = FALSE,
@@ -208,19 +225,26 @@
     )
   }
 
-  cd1 <- condensity(
+  cd.args <- list(
     bws = bws,
     xeval = grid$x.eval[, 1L],
     yeval = grid$x.eval[, 2L],
     ntrain = nrow(xdat),
-    condens = fit$condens,
     conderr = terr[, 1:2, drop = FALSE],
     proper.requested = fit$proper.requested,
     proper.applied = fit$proper.applied,
     proper.method = fit$proper.method,
-    condens.raw = fit$condens.raw,
     proper.info = fit$proper.info
   )
+  if (isTRUE(cdf)) {
+    cd.args$condist <- fit$condist
+    cd.args$condist.raw <- fit$condist.raw
+    cd1 <- do.call(condistribution, cd.args)
+  } else {
+    cd.args$condens <- fit$condens
+    cd.args$condens.raw <- fit$condens.raw
+    cd1 <- do.call(condensity, cd.args)
+  }
   cd1$bias <- NA
 
   plot.data <- list(cd1 = cd1)
@@ -233,8 +257,8 @@
       xdat = xdat,
       ydat = ydat,
       ntrain = nrow(xdat),
-      family = "npcdens",
-      cdf = FALSE,
+      family = if (isTRUE(cdf)) "npcdist" else "npcdens",
+      cdf = isTRUE(cdf),
       gradients = FALSE,
       proper = proper.args
     ),
@@ -316,6 +340,69 @@
     proper.method = proper.method,
     proper.control = proper.control,
     return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npcdist_fixed_none_data <- function(bws,
+                                                   xdat,
+                                                   ydat,
+                                                   neval = 50,
+                                                   xtrim = 0.0,
+                                                   ytrim = 0.0,
+                                                   proper = FALSE,
+                                                   proper.method = c("isotonic"),
+                                                   proper.control = list(),
+                                                   return.stages = FALSE) {
+  .np_plot_proto_npcdens_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    ytrim = ytrim,
+    plot.errors.method = "none",
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control,
+    return.stages = return.stages,
+    cdf = TRUE
+  )
+}
+
+.np_plot_proto_npcdist_fixed_bootstrap_inid_data <- function(bws,
+                                                            xdat,
+                                                            ydat,
+                                                            neval = 50,
+                                                            xtrim = 0.0,
+                                                            ytrim = 0.0,
+                                                            plot.errors.boot.num = 1999,
+                                                            plot.errors.center = c("estimate", "bias-corrected"),
+                                                            plot.errors.type = c("pmzsd", "pointwise",
+                                                                                 "bonferroni", "simultaneous",
+                                                                                 "all"),
+                                                            plot.errors.alpha = 0.05,
+                                                            proper = FALSE,
+                                                            proper.method = c("isotonic"),
+                                                            proper.control = list(),
+                                                            return.stages = FALSE) {
+  .np_plot_proto_npcdens_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    ytrim = ytrim,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = plot.errors.boot.num,
+    plot.errors.center = plot.errors.center,
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control,
+    return.stages = return.stages,
+    cdf = TRUE
   )
 }
 

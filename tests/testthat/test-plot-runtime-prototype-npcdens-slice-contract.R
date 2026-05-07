@@ -587,6 +587,116 @@ test_that("npcdens generalized/adaptive NN inid bootstrap plot-data prototype ma
   }
 })
 
+test_that("npcdist fixed no-error plot-data prototype matches current route", {
+  proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_none_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(134)
+
+  n <- 75L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+  cases <- list(
+    lc = list(regtype = "lc"),
+    ll = list(regtype = "ll"),
+    lp1 = list(regtype = "lp", degree = 1L),
+    lp2 = list(regtype = "lp", degree = 2L)
+  )
+
+  for (nm in names(cases)) {
+    bw <- do.call(
+      npcdistbw,
+      c(list(xdat = x, ydat = y, nmulti = 1L, bwtype = "fixed"), cases[[nm]])
+    )
+    old <- plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      plot.behavior = "data",
+      plot.errors.method = "none",
+      view = "fixed",
+      neval = 7L,
+      perspective = TRUE
+    )
+    candidate <- proto(bw, xdat = x, ydat = y, neval = 7L)
+    stages <- proto(bw, xdat = x, ydat = y, neval = 7L, return.stages = TRUE)
+
+    expect_s3_class(candidate$cd1, "condistribution")
+    expect_equal(candidate$cd1$xeval, old$cd1$xeval, info = nm)
+    expect_equal(candidate$cd1$yeval, old$cd1$yeval, info = nm)
+    expect_equal(candidate$cd1$condist, old$cd1$condist, info = nm)
+    expect_equal(candidate$cd1$conderr, old$cd1$conderr, info = nm)
+    expect_identical(stages$state$family, "npcdist")
+    expect_true(stages$state$cdf)
+    expect_equal(stages$plot_data, candidate, info = nm)
+  }
+})
+
+test_that("npcdist fixed inid bootstrap plot-data prototype matches current route", {
+  proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_bootstrap_inid_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(135)
+
+  n <- 65L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+  cases <- list(
+    lc = list(regtype = "lc"),
+    ll = list(regtype = "ll"),
+    lp1 = list(regtype = "lp", degree = 1L),
+    lp2 = list(regtype = "lp", degree = 2L)
+  )
+
+  for (ii in seq_along(cases)) {
+    nm <- names(cases)[ii]
+    bw <- do.call(
+      npcdistbw,
+      c(list(xdat = x, ydat = y, nmulti = 1L, bwtype = "fixed"), cases[[ii]])
+    )
+    boot.seed <- 9400L + ii
+    set.seed(boot.seed)
+    old <- suppressWarnings(plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      plot.behavior = "data",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = "inid",
+      plot.errors.boot.num = 13L,
+      plot.errors.type = "pmzsd",
+      view = "fixed",
+      neval = 6L,
+      perspective = TRUE,
+      random.seed = boot.seed
+    ))
+    set.seed(boot.seed)
+    candidate <- suppressWarnings(proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 6L,
+      plot.errors.boot.num = 13L,
+      plot.errors.type = "pmzsd"
+    ))
+    set.seed(boot.seed)
+    stages <- suppressWarnings(proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 6L,
+      plot.errors.boot.num = 13L,
+      plot.errors.type = "pmzsd",
+      return.stages = TRUE
+    ))
+
+    expect_equal(candidate$cd1$condist, old$cd1$condist, info = nm)
+    expect_equal(candidate$cd1$conderr, old$cd1$conderr, info = nm)
+    expect_identical(stages$bootstrap$method, "inid")
+    expect_equal(stages$bootstrap$boot.err[, 1:2, drop = FALSE],
+                 candidate$cd1$conderr,
+                 info = nm)
+  }
+})
+
 test_that("npcdens staged plot-data object renders through base renderer smoke", {
   proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_none_data", "np")
   render <- getFromNamespace(".np_plot_proto_npcdens_surface_base_render", "np")
