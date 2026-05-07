@@ -1,5 +1,5 @@
 qregression <- 
-    function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
+    function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, quantgerr = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
              timing = NA, total.time = NA, optim.time = NA, fit.time = NA){
 
         if (missing(bws) || missing(xeval) || missing(tau) || missing(quantile) || missing(ntrain))
@@ -33,6 +33,7 @@ qregression <-
             quantile = quantile,
             quanterr = quanterr,
             quantgrad = quantgrad,
+            quantgerr = quantgerr,
             ntrain = ntrain,
             trainiseval = trainiseval,
             gradients = gradients,
@@ -78,11 +79,12 @@ predict.qregression <- function(object, se.fit = FALSE, ...) {
 
 se.qregression <- function(x) { x$quanterr }
 gradients.qregression <- function(x, errors = FALSE, ...) {
-  if (errors)
-    stop("gradient standard errors are not available for qregression")
-  gout <- x$quantgrad
+  gout <- if (!errors) x$quantgrad else x$quantgerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop("gradients are not available: fit the model with gradients=TRUE")
+    stop(if (!errors)
+      "gradients are not available: fit the model with gradients=TRUE"
+    else
+      "gradient standard errors are not available: fit the model with gradients=TRUE")
   gout
 }
 

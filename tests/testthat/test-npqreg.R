@@ -15,6 +15,8 @@ test_that("npqreg basic functionality works", {
   expect_type(predict(model), "double")
   expect_equal(length(predict(model)), 50)
   expect_equal(model$tau, 0.5)
+  expect_error(gradients(model), "fit the model with gradients=TRUE", fixed = TRUE)
+  expect_error(gradients(model, errors = TRUE), "fit the model with gradients=TRUE", fixed = TRUE)
   
   expect_output(summary(model))
 })
@@ -69,9 +71,26 @@ test_that("npqreg gradients populate qregression objects", {
   expect_s3_class(fit, "qregression")
   expect_true(fit$gradients)
   expect_equal(dim(fit$quantgrad), c(nrow(exdat), ncol(xdat)))
+  expect_equal(dim(fit$quantgerr), c(nrow(exdat), ncol(xdat)))
   expect_true(all(is.finite(fit$quantgrad)))
+  expect_true(all(is.finite(fit$quantgerr)))
+  expect_true(all(is.finite(se(fit))))
+  expect_true(all(se(fit) > 0))
   expect_equal(fit$quantgrad, ref$quantgrad, tolerance = 0)
   expect_equal(gradients(fit), fit$quantgrad, tolerance = 0)
+  expect_equal(gradients(fit, errors = TRUE), fit$quantgerr, tolerance = 0)
+
+  qdelta <- getFromNamespace(".npqreg_quantile_delta_from_conditional", "npRmpi")(
+    bws = bw,
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    quantile = fitted(fit),
+    gradients = TRUE
+  )
+  expect_equal(se(fit), qdelta$quanterr, tolerance = 0)
+  expect_equal(fit$quantgrad, qdelta$quantgrad, tolerance = 0)
+  expect_equal(fit$quantgerr, qdelta$quantgerr, tolerance = 0)
 
   eps <- 1e-2
   for (j in seq_along(exdat)) {

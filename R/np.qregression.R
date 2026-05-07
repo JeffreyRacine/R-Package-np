@@ -43,20 +43,22 @@ npqreg <-
   dots[keep]
 }
 
-.npqreg_quantile_gradient_from_conditional <- function(bws,
-                                                       xdat,
-                                                       ydat,
-                                                       exdat,
-                                                       quantile) {
+.npqreg_quantile_delta_from_conditional <- function(bws,
+                                                    xdat,
+                                                    ydat,
+                                                    exdat,
+                                                    quantile,
+                                                    gradients = FALSE) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
   quantile <- as.double(quantile)
+  gradients <- npValidateScalarLogical(gradients, "gradients")
 
   if (length(quantile) != nrow(exdat))
-    stop("quantile gradient helper requires one quantile per evaluation row")
+    stop("quantile delta helper requires one quantile per evaluation row")
   if (ncol(ydat) != 1L)
-    stop("quantile gradient helper requires a single response")
+    stop("quantile delta helper requires a single response")
 
   eydat <- stats::setNames(data.frame(quantile), names(ydat)[1L])
   cdf.obj <- .np_plot_conditional_eval(
@@ -66,7 +68,7 @@ npqreg <-
     exdat = exdat,
     eydat = eydat,
     cdf = TRUE,
-    gradients = TRUE
+    gradients = gradients
   )
   dens.obj <- .np_plot_conditional_eval(
     bws = bws,
@@ -79,11 +81,35 @@ npqreg <-
   )
 
   dens <- as.double(dens.obj$condens)
-  grad <- -cdf.obj$congrad / matrix(NZD(dens),
-                                    nrow = nrow(cdf.obj$congrad),
-                                    ncol = ncol(cdf.obj$congrad))
+  quanterr <- as.double(cdf.obj$conderr) / NZD(dens)
+  quanterr[!is.finite(quanterr) | quanterr < 0.0] <- NA_real_
+
+  if (!gradients) {
+    return(list(
+      quanterr = quanterr,
+      quantgrad = NA,
+      quantgerr = NA,
+      cdf = cdf.obj,
+      dens = dens.obj
+    ))
+  }
+
+  dens.mat <- matrix(NZD(dens),
+                     nrow = nrow(cdf.obj$congrad),
+                     ncol = ncol(cdf.obj$congrad))
+  grad <- -cdf.obj$congrad / dens.mat
   grad[!is.finite(grad)] <- NA_real_
-  grad
+
+  gerr <- cdf.obj$congerr / dens.mat
+  gerr[!is.finite(gerr) | gerr < 0.0] <- NA_real_
+
+  list(
+    quanterr = quanterr,
+    quantgrad = grad,
+    quantgerr = gerr,
+    cdf = cdf.obj,
+    dens = dens.obj
+  )
 }
 
 npqreg.formula <-
@@ -125,6 +151,7 @@ npqreg.formula <-
 
     if(tbw$gradients){
         tbw$quantgrad <- napredict(tbw$omit, tbw$quantgrad)
+        tbw$quantgerr <- napredict(tbw$omit, tbw$quantgerr)
     }
 
     return(tbw)
@@ -353,67 +380,21 @@ npqreg.condbandwidth <-
             as.logical(FALSE),
             PACKAGE="npRmpi")[c("yq", "yqerr", "yqgrad")]
 
-    if (all(!is.finite(myout$yqerr) | myout$yqerr <= 0.0)) {
-      dens.bw <- tryCatch(
-        conbandwidth(
-          xbw = bws$xbw,
-          ybw = bws$ybw,
-          bwmethod = "manual",
-          bwscaling = bws$scaling,
-          bwtype = bws$type,
-          cxkertype = bws$cxkertype,
-          cxkerorder = bws$cxkerorder,
-          cxkerbound = bws$cxkerbound,
-          cxkerlb = bws$cxkerlb,
-          cxkerub = bws$cxkerub,
-          uxkertype = bws$uxkertype,
-          oxkertype = bws$oxkertype,
-          cykertype = bws$cykertype,
-          cykerorder = bws$cykerorder,
-          cykerbound = bws$cykerbound,
-          cykerlb = bws$cykerlb,
-          cykerub = bws$cykerub,
-          uykertype = bws$uykertype,
-          oykertype = bws$oykertype,
-          nobs = nrow(txdat.df),
-          xdati = bws$xdati,
-          ydati = bws$ydati,
-          xnames = bws$xnames,
-          ynames = bws$ynames,
-          sfactor = bws$sfactor,
-          bandwidth = bws$bw,
-          bandwidth.compute = FALSE
-        ),
-        error = function(e) NULL
-      )
-      dens.obj <- tryCatch(
-        npcdens(
-          txdat = txdat.df,
-          tydat = tydat.df,
-          exdat = if (no.ex) txdat.df else exdat.df,
-          eydat = data.frame(y = as.double(myout$yq)),
-          bws = dens.bw
-        ),
-        error = function(e) NULL
-      )
-      if (!is.null(dens.obj)) {
-        dens.q <- as.double(dens.obj$condens)
-        qvar <- tau * (1.0 - tau) / (tnrow * NZD(dens.q)^2)
-        myout$yqerr <- sqrt(pmax(qvar, 0.0))
-        myout$yqerr[!is.finite(myout$yqerr)] <- NA_real_
-      }
-    }
-
-    if(gradients){
-      myout$yqgrad <- .npqreg_quantile_gradient_from_conditional(
+    qdelta <- .npqreg_quantile_delta_from_conditional(
         bws = bws,
         xdat = txdat.df,
         ydat = tydat.df,
         exdat = txeval,
-        quantile = myout$yq
+        quantile = myout$yq,
+        gradients = gradients
       )
+    myout$yqerr <- qdelta$quanterr
+    if(gradients){
+      myout$yqgrad <- qdelta$quantgrad
+      myout$yqgerr <- qdelta$quantgerr
     } else {
       myout$yqgrad = NA
+      myout$yqgerr = NA
     }
 
 
@@ -427,6 +408,7 @@ npqreg.condbandwidth <-
                 quantile = myout$yq,
                 quanterr = myout$yqerr,
                 quantgrad = myout$yqgrad,
+                quantgerr = myout$yqgerr,
                 ntrain = tnrow,
                 trainiseval = no.ex,
                 gradients = gradients,

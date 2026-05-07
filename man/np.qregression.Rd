@@ -183,9 +183,12 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
   \item{quantile}{ estimation of the quantile regression function
     (conditional quantile) at the  evaluation points }
   \item{quanterr}{ asymptotic standard errors of the quantile
-    regression estimates, based on the estimated conditional density at
-    the fitted quantile }
+    regression estimates, obtained from the conditional distribution
+    standard error and the estimated conditional density at the fitted
+    quantile }
   \item{quantgrad}{ gradients at each evaluation point }
+  \item{quantgerr}{ asymptotic standard errors for gradients, when
+    \code{gradients=TRUE} }
   \item{tau}{ the \eqn{\tau}{tau}th quantile computed }
 
 
