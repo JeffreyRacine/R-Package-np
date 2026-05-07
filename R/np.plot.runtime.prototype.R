@@ -910,6 +910,273 @@
   )
 }
 
+.np_plot_proto_check_npindex_fixed_curve <- function(bws,
+                                                    xdat,
+                                                    ydat,
+                                                    neval) {
+  if (!inherits(bws, "sibandwidth"))
+    stop("prototype route requires a single-index bandwidth object", call. = FALSE)
+  regtype.engine <- if (is.null(bws$regtype.engine)) {
+    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  } else {
+    as.character(bws$regtype.engine)
+  }
+  if (!is.element(regtype.engine, c("lc", "lp")))
+    stop("prototype route currently supports regtype='lc', 'll', or 'lp' only", call. = FALSE)
+  if (!identical(as.character(bws$type), "fixed"))
+    stop("prototype route currently supports fixed bandwidths only", call. = FALSE)
+  if (bws$nuno != 0L)
+    stop("prototype route currently supports continuous/ordered index variables only", call. = FALSE)
+  if (bws$ncon + bws$nord < 1L)
+    stop("prototype route requires at least one continuous/ordered index variable", call. = FALSE)
+  if (!is.numeric(neval) || length(neval) != 1L || is.na(neval) || neval < 2L)
+    stop("prototype route requires scalar neval >= 2", call. = FALSE)
+  invisible(TRUE)
+}
+
+.np_plot_proto_npindex_payload <- function(bws,
+                                           index,
+                                           mean,
+                                           ntrain,
+                                           trainiseval = FALSE,
+                                           merr = NA,
+                                           bias = NULL) {
+  payload <- singleindex(
+    bws = bws,
+    index = index,
+    mean = mean,
+    merr = merr,
+    ntrain = ntrain,
+    trainiseval = trainiseval,
+    gradients = FALSE
+  )
+  if (!is.null(bias))
+    payload$bias <- bias
+  payload
+}
+
+.np_plot_proto_npindex_fixed_data <- function(bws,
+                                             xdat,
+                                             ydat,
+                                             neval = 50,
+                                             plot.errors.method = c("none", "asymptotic", "bootstrap"),
+                                             plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
+                                             plot.errors.boot.nonfixed = c("exact", "frozen"),
+                                             plot.errors.boot.wild = c("rademacher", "mammen"),
+                                             plot.errors.boot.blocklen = NULL,
+                                             plot.errors.boot.num = 399L,
+                                             plot.errors.center = c("estimate", "bias-corrected"),
+                                             plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
+                                                                  "simultaneous", "all"),
+                                             plot.errors.alpha = 0.05,
+                                             return.stages = FALSE) {
+  if (missing(xdat) || missing(ydat))
+    stop("prototype route requires explicit xdat and ydat", call. = FALSE)
+  plot.errors.method <- match.arg(plot.errors.method)
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method)
+  plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
+  plot.errors.boot.wild <- match.arg(plot.errors.boot.wild)
+  plot.errors.center <- match.arg(plot.errors.center)
+  plot.errors.type <- match.arg(plot.errors.type)
+
+  dat <- .np_plot_proto_clean_regression_data(xdat = xdat, ydat = ydat)
+  xdat <- dat$xdat
+  ydat <- dat$ydat
+  .np_plot_proto_check_npindex_fixed_curve(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval
+  )
+  eval.info <- .np_plot_singleindex_eval_grid(
+    bws = bws,
+    xdat = xdat,
+    neval = neval,
+    trim = 0.0,
+    where = "plot.sibandwidth"
+  )
+  maxneval <- nrow(eval.info$idx.eval)
+  fit <- if (identical(plot.errors.method, "asymptotic")) {
+    .np_plot_singleindex_asymptotic_eval(
+      bws = bws,
+      txdat = xdat,
+      tydat = ydat,
+      gradients = FALSE,
+      index.eval = eval.info$index.eval
+    )
+  } else {
+    .np_plot_singleindex_local_eval(
+      bws = bws,
+      idx.train = eval.info$idx.train,
+      idx.eval = eval.info$idx.eval,
+      ydat = ydat,
+      gradients = FALSE
+    )
+  }
+
+  temp.err <- matrix(data = NA_real_, nrow = maxneval, ncol = 3L)
+  temp.mean <- as.vector(fit$mean)
+  temp.all.err <- NULL
+  interval <- NULL
+  bootstrap <- NULL
+  if (identical(plot.errors.method, "bootstrap")) {
+    bootstrap <- compute.bootstrap.errors(
+      xdat = xdat,
+      ydat = ydat,
+      gradients = FALSE,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+      plot.errors.boot.wild = plot.errors.boot.wild,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.boot.num = plot.errors.boot.num,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      idx.eval = eval.info$idx.eval,
+      bws = bws
+    )
+    temp.err[,] <- bootstrap$boot.err
+    temp.all.err <- bootstrap$boot.all.err
+    interval <- list(
+      err = bootstrap$boot.err[, 1:2, drop = FALSE],
+      all.err = bootstrap$boot.all.err
+    )
+  } else if (identical(plot.errors.method, "asymptotic")) {
+    interval <- .np_plot_asymptotic_error_from_se(
+      se = fit$merr,
+      alpha = plot.errors.alpha,
+      band.type = plot.errors.type,
+      m = maxneval
+    )
+    temp.err[, 1:2] <- interval$err
+    temp.all.err <- interval$all.err
+  }
+
+  merr <- NA
+  bias <- NULL
+  if (!identical(plot.errors.method, "none")) {
+    merr <- cbind(-temp.err[, 1L], temp.err[, 2L])
+    if (identical(plot.errors.center, "bias-corrected"))
+      bias <- temp.err[, 3L] - temp.mean
+  }
+  plot.data <- list(si1 = .np_plot_proto_npindex_payload(
+    bws = bws,
+    index = fit$index,
+    mean = fit$mean,
+    ntrain = nrow(xdat),
+    trainiseval = eval.info$trainiseval,
+    merr = merr,
+    bias = bias
+  ))
+  if (!isTRUE(return.stages))
+    return(plot.data)
+
+  list(
+    state = list(
+      bws = bws,
+      xdat = xdat,
+      ydat = ydat,
+      ntrain = nrow(xdat),
+      family = "npindex",
+      gradients = FALSE
+    ),
+    target_grid = eval.info,
+    evaluator = fit,
+    intervals = if (is.null(interval)) NULL else list(
+      method = plot.errors.method,
+      type = plot.errors.type,
+      alpha = plot.errors.alpha,
+      err = interval$err,
+      all.err = temp.all.err
+    ),
+    bootstrap = if (is.null(bootstrap)) NULL else list(
+      method = plot.errors.boot.method,
+      nonfixed = plot.errors.boot.nonfixed,
+      wild = plot.errors.boot.wild,
+      blocklen = plot.errors.boot.blocklen,
+      B = plot.errors.boot.num,
+      center = plot.errors.center,
+      boot.err = bootstrap$boot.err,
+      boot.all.err = bootstrap$boot.all.err,
+      bxp = bootstrap$bxp
+    ),
+    plot_data = plot.data
+  )
+}
+
+.np_plot_proto_npindex_fixed_none_data <- function(bws,
+                                                  xdat,
+                                                  ydat,
+                                                  neval = 50,
+                                                  return.stages = FALSE) {
+  .np_plot_proto_npindex_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    plot.errors.method = "none",
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npindex_fixed_asymptotic_data <- function(bws,
+                                                        xdat,
+                                                        ydat,
+                                                        neval = 50,
+                                                        plot.errors.type = c("pmzsd", "pointwise",
+                                                                             "bonferroni", "simultaneous",
+                                                                             "all"),
+                                                        plot.errors.alpha = 0.05,
+                                                        return.stages = FALSE) {
+  .np_plot_proto_npindex_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    plot.errors.method = "asymptotic",
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npindex_fixed_bootstrap_data <- function(bws,
+                                                       xdat,
+                                                       ydat,
+                                                       neval = 50,
+                                                       plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
+                                                       plot.errors.boot.nonfixed = c("exact", "frozen"),
+                                                       plot.errors.boot.wild = c("rademacher", "mammen"),
+                                                       plot.errors.boot.blocklen = NULL,
+                                                       plot.errors.boot.num = 399L,
+                                                       plot.errors.center = c("estimate", "bias-corrected"),
+                                                       plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
+                                                                            "simultaneous", "all"),
+                                                       plot.errors.alpha = 0.05,
+                                                       return.stages = FALSE) {
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method)
+  plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
+  plot.errors.boot.wild <- match.arg(plot.errors.boot.wild)
+  plot.errors.center <- match.arg(plot.errors.center)
+  plot.errors.type <- match.arg(plot.errors.type)
+  .np_plot_proto_npindex_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = plot.errors.boot.method,
+    plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+    plot.errors.boot.wild = plot.errors.boot.wild,
+    plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+    plot.errors.boot.num = plot.errors.boot.num,
+    plot.errors.center = plot.errors.center,
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    return.stages = return.stages
+  )
+}
+
 .np_plot_proto_check_unconditional_fixed_surface <- function(bws,
                                                             xdat,
                                                             neval,
