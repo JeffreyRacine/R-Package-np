@@ -418,7 +418,7 @@ np_render_control <- function(style = c("band", "bar"),
     if (identical(req.method, "bootstrap")) {
       stop(
         sprintf(
-          "%s cannot run plot.errors.method='bootstrap' inside mpi.bcast.cmd(...); call plot(...) from master context with npRmpi.autodispatch=TRUE",
+          "%s cannot run errors=\"bootstrap\" inside mpi.bcast.cmd(...); call plot(...) from master context with npRmpi.autodispatch=TRUE",
           where
         ),
         call. = FALSE

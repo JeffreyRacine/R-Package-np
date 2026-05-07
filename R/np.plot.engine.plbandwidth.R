@@ -162,7 +162,7 @@
             !missing(plot.errors.boot.nonfixed),
             !missing(plot.errors.boot.blocklen))){
       stop(
-        "plot.errors.method must be set to 'bootstrap' when bootstrap error arguments are supplied",
+        "errors must be set to \"bootstrap\" when bootstrap controls are supplied",
         call. = FALSE
       )
     }

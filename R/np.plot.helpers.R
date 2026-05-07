@@ -634,7 +634,7 @@
   if (length(fit.mean) != n)
     stop("length mismatch between fitted means and residuals for wild bootstrap")
   if (B < 1L)
-    stop("argument 'plot.errors.boot.num' must be a positive integer")
+    stop("B must be a positive integer")
   .npRmpi_bootstrap_transport_trace(
     what = "wild",
     event = "wild.entry",
@@ -679,7 +679,7 @@
 
 .np_plot_reject_wild_unsupervised <- function(method, where) {
   if (.np_plot_is_wild_method(method)) {
-    stop(sprintf("plot.errors.boot.method='wild' is not supported for %s; use one of 'inid', 'fixed', or 'geom'", where))
+    stop(sprintf("bootstrap=\"wild\" is not supported for %s; use one of \"inid\", \"fixed\", or \"geom\"", where))
   }
   invisible(NULL)
 }
@@ -1605,7 +1605,7 @@
   B <- as.integer(B)
   n <- length(ydat)
   if (B < 1L)
-    stop("argument 'plot.errors.boot.num' must be a positive integer")
+    stop("B must be a positive integer")
   if (ncol(H) != n)
     stop("hat matrix columns must match length of ydat")
 
@@ -3171,7 +3171,7 @@
 
   if (isTRUE(xi.factor)) {
     stop(
-      "plot.errors.boot.nonfixed='frozen' currently supports nonfixed regression means and continuous gradients only; use 'exact' for categorical slices",
+      "boot_control = np_boot_control(nonfixed = \"frozen\") currently supports nonfixed regression means and continuous gradients only; use nonfixed = \"exact\" for categorical slices",
       call. = FALSE
     )
   }
@@ -3179,7 +3179,7 @@
   if (identical(regtype, "lc")) {
     if (isTRUE(gradients)) {
       stop(
-        "plot.errors.boot.nonfixed='frozen' currently supports nonfixed local-constant regression means only; use 'exact' for local-constant gradients",
+        "boot_control = np_boot_control(nonfixed = \"frozen\") currently supports nonfixed local-constant regression means only; use nonfixed = \"exact\" for local-constant gradients",
         call. = FALSE
       )
     }
@@ -8856,7 +8856,7 @@ plotFactor <- function(f, y, ...){
 
   if (!identical(as.character(plot.errors.method)[1L], "none")) {
     if (!isTRUE(allow.plot.errors)) {
-      stop("renderer='rgl' does not yet support plot.errors.method != 'none'. Use renderer='base'.",
+      stop("renderer=\"rgl\" does not yet support errors != \"none\". Use renderer=\"base\".",
            call. = FALSE)
     }
   }
@@ -8869,7 +8869,7 @@ plotFactor <- function(f, y, ...){
   }
 
   if (!(plot.behavior %in% c("plot", "plot-data"))) {
-    stop("renderer='rgl' currently supports plot.behavior %in% c('plot', 'plot-data', 'data') only in this rollout tranche.",
+    stop("renderer=\"rgl\" currently supports behavior %in% c(\"plot\", \"plot-data\", \"data\") only in this rollout tranche.",
          call. = FALSE)
   }
 
@@ -10689,7 +10689,7 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
       sprintf("m=n.eval=%d (Bonferroni-conservative tails)", neval)
     }
     .np_warning(sprintf(
-      paste0("plot.errors.boot.num=%d is too small for plot.errors.type='%s' ",
+      paste0("B=%d is too small for band=\"%s\" ",
              "(alpha=%g). Minimum recommended is %d using ",
              "B >= ceiling(2*m/alpha - 1), with %s. ",
              "For 2D perspective plots on a full neval x neval grid, m=neval^2."),
@@ -10945,13 +10945,13 @@ compute.default.error.range <- function(center, err) {
   if (identical(plot.errors.method, "bootstrap") &&
       isTRUE(.npRmpi_autodispatch_called_from_bcast()))
     stop(
-      "cannot run bootstrap plot paths inside mpi.bcast.cmd context; invoke plot(...) from master context with npRmpi.autodispatch=TRUE",
+      "cannot run errors=\"bootstrap\" inside mpi.bcast.cmd context; invoke plot(...) from master context with npRmpi.autodispatch=TRUE",
       call. = FALSE
     )
 
   if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
       is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
-    stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
+    stop("alpha must lie in (0, 0.5)")
 
   plot.errors.style <- match.arg(
     scalar_choice(plot.errors.style, "band"),
@@ -10965,7 +10965,7 @@ compute.default.error.range <- function(center, err) {
   common.scale <- common.scale | (!is.null(ylim))
 
   if (plot.errors.method == "none" && plot.errors.type == "all") {
-    .np_warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+    .np_warning("band=\"all\" requires bootstrap errors; setting errors=\"bootstrap\"")
     plot.errors.method <- "bootstrap"
   }
 
@@ -11062,7 +11062,7 @@ compute.bootstrap.errors.rbandwidth =
     xi.factor <- isTRUE(slice.index > 0L) &&
       (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
     if (is.wild.hat && gradients && !xi.factor && is.na(match(slice.index, cont.idx))) {
-      stop("plot.errors.boot.method='wild' supports gradients only for continuous or categorical slices in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("bootstrap=\"wild\" supports gradients only for continuous or categorical slices in npRmpi; no serial fallback is permitted", call. = FALSE)
     }
 
     inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled())

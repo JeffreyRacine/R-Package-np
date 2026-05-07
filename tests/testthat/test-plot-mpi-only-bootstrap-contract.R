@@ -60,7 +60,7 @@ test_that("plot option normalization fails fast for bootstrap inside mpi.bcast.c
       common.scale = FALSE,
       ylim = NULL
     ),
-    "cannot run bootstrap plot paths inside mpi\\.bcast\\.cmd context",
+    "cannot run errors=\"bootstrap\" inside mpi\\.bcast\\.cmd context",
     fixed = FALSE
   )
 })
@@ -113,7 +113,7 @@ test_that("plot method entrypoint fails fast for bootstrap inside mpi.bcast.cmd 
       plot.errors.method = "bootstrap",
       where = "plot.rbandwidth()"
     ),
-    "cannot run plot.errors.method='bootstrap' inside mpi\\.bcast\\.cmd",
+    "cannot run errors=\"bootstrap\" inside mpi\\.bcast\\.cmd",
     fixed = FALSE
   )
 })
