@@ -147,7 +147,7 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
   }
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}}, \code{\link{plot.np}} for plotting options.
 
 
   Given a conditional distribution bandwidth object, \code{npqreg}
@@ -289,7 +289,7 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}} \pkg{quantreg} }
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}}, \pkg{quantreg} }
 
 \examples{
 \dontrun{

@@ -193,10 +193,8 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   controls, bounded \code{cv.ls} quadrature controls if relevant, and
   finally local-polynomial/NOMAD controls for polynomial-adaptive fits.
 
-  For S3 plotting help, use \code{methods("plot")} and query
-  class-specific help topics such as \code{?plot.npregression} and
-  \code{?plot.rbandwidth}. You can inspect implementations with
-  \code{getS3method("plot","npregression")}.
+  For S3 plotting help, see \code{\link{plot.np}}. You can list
+  available plot methods with \code{methods("plot")}.
 
   \code{npcdens} implements a variety of methods for estimating
   multivariate conditional distributions (\eqn{p+q}-variate) defined

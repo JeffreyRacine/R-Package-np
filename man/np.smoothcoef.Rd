@@ -323,13 +323,16 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   expand missing settings to the same documented preset. Explicit
   incompatible settings fail fast rather than being silently rewritten.
 
+  For plotting options for fitted smooth-coefficient objects and their
+  bandwidth objects, see \code{\link{plot.np}}.
+
   Support for backfitted bandwidths is experimental and is limited in
   functionality. The code does not support asymptotic standard errors
   or out of sample estimates with backfitting.
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}},
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}}, \code{\link{hist}},
   \code{\link{npudens}}, \code{\link{npudist}},
   \code{\link{npudensbw}}, \code{\link{npscoefbw}} }
