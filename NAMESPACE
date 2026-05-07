@@ -46,6 +46,9 @@ export(b.star
        ,npindexbw
        ,npqcmstest       
        ,npseed
+       ,np_boot_control
+       ,np_grid_control
+       ,np_render_control
        ,np.pairs
        ,np.pairs.plot
        ,npscoef
