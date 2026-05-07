@@ -562,21 +562,24 @@
   ## Contract: renderer smoke for staged npcdens surface data. It consumes a
   ## plot-data object and must not re-enter public estimators, bandwidth
   ## constructors, bootstrap helpers, or target builders.
-  if (!is.list(plot.data) || is.null(plot.data$cd1) || !inherits(plot.data$cd1, "condensity"))
-    stop("renderer prototype requires plot-data with a condensity 'cd1' element", call. = FALSE)
+  if (!is.list(plot.data) || is.null(plot.data$cd1) ||
+      !(inherits(plot.data$cd1, "condensity") || inherits(plot.data$cd1, "condistribution")))
+    stop("renderer prototype requires plot-data with a conditional density/distribution 'cd1' element", call. = FALSE)
   cd <- plot.data$cd1
+  value.name <- if (inherits(cd, "condistribution")) "condist" else "condens"
+  value.label <- if (identical(value.name, "condist")) "Conditional distribution" else "Conditional density"
   x <- unique(as.numeric(cd$xeval))
   y <- unique(as.numeric(cd$yeval))
-  z <- matrix(as.numeric(cd$condens), nrow = length(x), ncol = length(y), byrow = FALSE)
-  if (length(x) * length(y) != length(cd$condens) ||
+  z <- matrix(as.numeric(cd[[value.name]]), nrow = length(x), ncol = length(y), byrow = FALSE)
+  if (length(x) * length(y) != length(cd[[value.name]]) ||
       any(!is.finite(x)) || any(!is.finite(y)) || any(!is.finite(z))) {
-    stop("renderer prototype requires a finite rectangular conditional-density surface", call. = FALSE)
+    stop("renderer prototype requires a finite rectangular conditional surface", call. = FALSE)
   }
 
   xlab <- if (is.null(xlab)) cd$xnames[1L] else xlab
   ylab <- if (is.null(ylab)) cd$ynames[1L] else ylab
-  zlab <- if (is.null(zlab)) "Conditional density" else zlab
-  main <- if (is.null(main)) "Conditional Density" else main
+  zlab <- if (is.null(zlab)) value.label else zlab
+  main <- if (is.null(main)) value.label else main
 
   if (isTRUE(perspective)) {
     graphics::persp(

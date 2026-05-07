@@ -697,6 +697,121 @@ test_that("npcdist fixed inid bootstrap plot-data prototype matches current rout
   }
 })
 
+test_that("npcdist generalized/adaptive NN plot-data prototype matches current route", {
+  none_proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_none_data", "np")
+  boot_proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_bootstrap_inid_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(136)
+
+  n <- 60L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+
+  for (ii in seq_along(c("generalized_nn", "adaptive_nn"))) {
+    bwtype <- c("generalized_nn", "adaptive_nn")[ii]
+    bw <- npcdistbw(
+      xdat = x,
+      ydat = y,
+      nmulti = 1L,
+      regtype = "lc",
+      bwtype = bwtype
+    )
+    old <- plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      plot.behavior = "data",
+      plot.errors.method = "none",
+      view = "fixed",
+      neval = 6L,
+      perspective = TRUE
+    )
+    candidate <- none_proto(bw, xdat = x, ydat = y, neval = 6L)
+    expect_equal(candidate$cd1$xeval, old$cd1$xeval, info = bwtype)
+    expect_equal(candidate$cd1$yeval, old$cd1$yeval, info = bwtype)
+    expect_equal(candidate$cd1$condist, old$cd1$condist, info = bwtype)
+    expect_equal(candidate$cd1$conderr, old$cd1$conderr, info = bwtype)
+
+    boot.seed <- 9500L + ii
+    set.seed(boot.seed)
+    old.boot <- suppressWarnings(plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      plot.behavior = "data",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = "inid",
+      plot.errors.boot.num = 11L,
+      plot.errors.type = "pmzsd",
+      view = "fixed",
+      neval = 5L,
+      perspective = TRUE,
+      random.seed = boot.seed
+    ))
+    set.seed(boot.seed)
+    candidate.boot <- suppressWarnings(boot_proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 5L,
+      plot.errors.boot.num = 11L,
+      plot.errors.type = "pmzsd"
+    ))
+    expect_equal(candidate.boot$cd1$condist, old.boot$cd1$condist, info = bwtype)
+    expect_equal(candidate.boot$cd1$conderr, old.boot$cd1$conderr, info = bwtype)
+  }
+})
+
+test_that("npcdist proper projection plot-data prototype matches current route", {
+  proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_none_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(137)
+
+  n <- 70L
+  x <- data.frame(x = runif(n, -1, 1))
+  y <- data.frame(y = sin(2 * pi * x$x) + rnorm(n, sd = 0.2))
+  bw <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.28, 0.22),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 2L
+  )
+  old <- suppressWarnings(plot(
+    bw,
+    xdat = x,
+    ydat = y,
+    plot.behavior = "data",
+    plot.errors.method = "none",
+    view = "fixed",
+    neval = 8L,
+    perspective = TRUE,
+    proper = TRUE
+  ))
+  candidate <- suppressWarnings(proto(
+    bw,
+    xdat = x,
+    ydat = y,
+    neval = 8L,
+    proper = TRUE
+  ))
+  stages <- suppressWarnings(proto(
+    bw,
+    xdat = x,
+    ydat = y,
+    neval = 8L,
+    proper = TRUE,
+    return.stages = TRUE
+  ))
+
+  expect_true(isTRUE(candidate$cd1$proper.requested))
+  expect_equal(candidate$cd1$proper.applied, old$cd1$proper.applied)
+  expect_equal(candidate$cd1$condist, old$cd1$condist)
+  expect_equal(candidate$cd1$conderr, old$cd1$conderr)
+  expect_named(stages$proper_projection, c("requested", "applied", "method", "info"))
+})
+
 test_that("npcdens staged plot-data object renders through base renderer smoke", {
   proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_none_data", "np")
   render <- getFromNamespace(".np_plot_proto_npcdens_surface_base_render", "np")
@@ -707,6 +822,39 @@ test_that("npcdens staged plot-data object renders through base renderer smoke",
   x <- data.frame(x = runif(n))
   y <- data.frame(y = rnorm(n))
   bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    nmulti = 1L,
+    regtype = "lp",
+    degree = 1L,
+    bwtype = "fixed"
+  )
+  candidate <- proto(bw, xdat = x, ydat = y, neval = 7L)
+
+  out.file <- tempfile(fileext = ".pdf")
+  grDevices::pdf(out.file)
+  on.exit({
+    if (grDevices::dev.cur() > 1L)
+      grDevices::dev.off()
+  }, add = TRUE)
+  expect_identical(render(candidate, perspective = FALSE), candidate)
+  expect_identical(render(candidate, perspective = TRUE), candidate)
+  grDevices::dev.off()
+
+  expect_true(file.exists(out.file))
+  expect_gt(file.info(out.file)$size, 0)
+})
+
+test_that("npcdist staged plot-data object renders through base renderer smoke", {
+  proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_none_data", "np")
+  render <- getFromNamespace(".np_plot_proto_npcdens_surface_base_render", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(138)
+
+  n <- 65L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+  bw <- npcdistbw(
     xdat = x,
     ydat = y,
     nmulti = 1L,
