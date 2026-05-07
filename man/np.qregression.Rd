@@ -88,9 +88,9 @@ These arguments control where the quantile regression is evaluated and which fit
 
 
   \item{gradients}{
-    [currently not supported] a logical value indicating that you want
-    gradients computed and returned in the resulting \code{npregression}
-    object. Defaults to \code{FALSE}.
+    a logical value indicating that you want gradients of the conditional
+    quantile with respect to the conditioning variables computed and returned
+    in the resulting \code{qregression} object. Defaults to \code{FALSE}.
   }
 
 
