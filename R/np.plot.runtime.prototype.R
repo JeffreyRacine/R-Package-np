@@ -1,4 +1,4 @@
-.np_plot_proto_check_npcdens_lc_fixed_none <- function(bws,
+.np_plot_proto_check_npcdens_fixed_surface <- function(bws,
                                                        xdat,
                                                        ydat,
                                                        neval,
@@ -6,8 +6,13 @@
                                                        ytrim) {
   if (!inherits(bws, "conbandwidth"))
     stop("prototype route requires a conditional density bandwidth object", call. = FALSE)
-  if (!identical(if (is.null(bws$regtype)) "lc" else as.character(bws$regtype), "lc"))
-    stop("prototype route currently supports regtype='lc' only", call. = FALSE)
+  regtype.engine <- if (is.null(bws$regtype.engine)) {
+    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  } else {
+    as.character(bws$regtype.engine)
+  }
+  if (!is.element(regtype.engine, c("lc", "lp")))
+    stop("prototype route currently supports regtype='lc', 'll', or 'lp' only", call. = FALSE)
   if (!identical(as.character(bws$type), "fixed"))
     stop("prototype route currently supports bwtype='fixed' only", call. = FALSE)
   if (bws$xndim != 1L || bws$yndim != 1L)
@@ -20,6 +25,8 @@
     stop("prototype route requires scalar neval >= 2", call. = FALSE)
   invisible(TRUE)
 }
+
+.np_plot_proto_check_npcdens_lc_fixed_none <- .np_plot_proto_check_npcdens_fixed_surface
 
 .np_plot_proto_clean_conditional_data <- function(xdat, ydat) {
   ## Contract: align explicit training data for the first prototype route. This
@@ -88,26 +95,26 @@
   )
 }
 
-.np_plot_proto_npcdens_lc_fixed_data <- function(bws,
-                                                 xdat,
-                                                 ydat,
-                                                 neval = 50,
-                                                 xtrim = 0.0,
-                                                 ytrim = 0.0,
-                                                 plot.errors.method = c("none", "asymptotic", "bootstrap"),
-                                                 plot.errors.boot.method = c("inid", "fixed", "geom"),
-                                                 plot.errors.boot.nonfixed = c("exact", "frozen"),
-                                                 plot.errors.boot.blocklen = NULL,
-                                                 plot.errors.boot.num = 1999,
-                                                 plot.errors.center = c("estimate", "bias-corrected"),
-                                                 plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
-                                                                      "simultaneous", "all"),
-                                                 plot.errors.alpha = 0.05,
-                                                 proper = FALSE,
-                                                 proper.method = c("project"),
-                                                 proper.control = list(),
-                                                 return.stages = FALSE) {
-  ## Contract: private npcdens LC/fixed/data-only prototype. This owns explicit
+.np_plot_proto_npcdens_fixed_data <- function(bws,
+                                              xdat,
+                                              ydat,
+                                              neval = 50,
+                                              xtrim = 0.0,
+                                              ytrim = 0.0,
+                                              plot.errors.method = c("none", "asymptotic", "bootstrap"),
+                                              plot.errors.boot.method = c("inid", "fixed", "geom"),
+                                              plot.errors.boot.nonfixed = c("exact", "frozen"),
+                                              plot.errors.boot.blocklen = NULL,
+                                              plot.errors.boot.num = 1999,
+                                              plot.errors.center = c("estimate", "bias-corrected"),
+                                              plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
+                                                                   "simultaneous", "all"),
+                                              plot.errors.alpha = 0.05,
+                                              proper = FALSE,
+                                              proper.method = c("project"),
+                                              proper.control = list(),
+                                              return.stages = FALSE) {
+  ## Contract: private npcdens fixed-bandwidth/data-only prototype. This owns explicit
   ## data cleanup, target construction, evaluator invocation, optional
   ## asymptotic interval construction, and old-compatible plot-data assembly.
   ## It must not draw graphics, bootstrap, change RNG state, or recover formula
@@ -127,7 +134,7 @@
   dat <- .np_plot_proto_clean_conditional_data(xdat = xdat, ydat = ydat)
   xdat <- dat$xdat
   ydat <- dat$ydat
-  .np_plot_proto_check_npcdens_lc_fixed_none(
+.np_plot_proto_check_npcdens_fixed_surface(
     bws = bws,
     xdat = xdat,
     ydat = ydat,
@@ -260,6 +267,8 @@
   )
 }
 
+.np_plot_proto_npcdens_lc_fixed_data <- .np_plot_proto_npcdens_fixed_data
+
 .np_plot_proto_npcdens_lc_fixed_none_data <- function(bws,
                                                       xdat,
                                                       ydat,
@@ -271,6 +280,31 @@
                                                       proper.control = list(),
                                                       return.stages = FALSE) {
   .np_plot_proto_npcdens_lc_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    ytrim = ytrim,
+    plot.errors.method = "none",
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control,
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npcdens_fixed_none_data <- function(bws,
+                                                   xdat,
+                                                   ydat,
+                                                   neval = 50,
+                                                   xtrim = 0.0,
+                                                   ytrim = 0.0,
+                                                   proper = FALSE,
+                                                   proper.method = c("project"),
+                                                   proper.control = list(),
+                                                   return.stages = FALSE) {
+  .np_plot_proto_npcdens_fixed_data(
     bws = bws,
     xdat = xdat,
     ydat = ydat,
@@ -307,6 +341,42 @@
     xtrim = xtrim,
     ytrim = ytrim,
     plot.errors.method = "asymptotic",
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control,
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npcdens_fixed_bootstrap_inid_data <- function(bws,
+                                                            xdat,
+                                                            ydat,
+                                                            neval = 50,
+                                                            xtrim = 0.0,
+                                                            ytrim = 0.0,
+                                                            plot.errors.boot.num = 1999,
+                                                            plot.errors.center = c("estimate", "bias-corrected"),
+                                                            plot.errors.type = c("pmzsd", "pointwise",
+                                                                                 "bonferroni", "simultaneous",
+                                                                                 "all"),
+                                                            plot.errors.alpha = 0.05,
+                                                            proper = FALSE,
+                                                            proper.method = c("project"),
+                                                            proper.control = list(),
+                                                            return.stages = FALSE) {
+  .np_plot_proto_npcdens_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    ytrim = ytrim,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = plot.errors.boot.num,
+    plot.errors.center = plot.errors.center,
     plot.errors.type = plot.errors.type,
     plot.errors.alpha = plot.errors.alpha,
     proper = proper,
