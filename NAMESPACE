@@ -81,6 +81,9 @@ export(b.star
        ,npuniden.sc
        ,np.pairs
        ,np.pairs.plot
+       ,np_boot_control
+       ,np_grid_control
+       ,np_render_control
        ,npscoef
        ,npscoefbw
        ,npsigtest
