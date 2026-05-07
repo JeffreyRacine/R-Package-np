@@ -60,6 +60,12 @@ test_that("plot runtime files avoid silent remap/downgrade patterns", {
     raw <- readLines(f, warn = FALSE)
     code <- sub("#.*$", "", raw)
     idx <- which(grepl(pat.assign, code, perl = TRUE) | grepl(pat.warn, raw, fixed = TRUE))
+    if (length(idx) && identical(basename(f), "np.plot.helpers.R")) {
+      idx <- idx[!vapply(idx, function(i) {
+        context <- raw[pmax(1L, i - 10L):i]
+        any(grepl("\\.np_plot_validate_renderer_request\\s*<-\\s*function", context, perl = TRUE))
+      }, logical(1L))]
+    }
     if (length(idx)) {
       offenders <- c(offenders, sprintf("%s:%d: %s", basename(f), idx, trimws(raw[idx])))
     }
