@@ -427,9 +427,9 @@ summary(model)
 # computer due to bootstrapping being conducted (<ctrl>-C will
 # interrupt). Note - nothing will appear in the graphics window until
 # all computations are completed (if you use
-# plot.errors.method="asymptotic" the figure will instantly appear).
+# errors="asymptotic" the figure will instantly appear).
 
-if (interactive()) plot(bw, plot.errors.method="bootstrap")
+if (interactive()) plot(bw, errors="bootstrap")
 points(ordered(year), gdp, cex=.2, col="red")
 
 detach(Italy)
@@ -463,9 +463,9 @@ summary(model)
 # computer due to bootstrapping being conducted (<ctrl>-C will
 # interrupt). Note - nothing will appear in the graphics window until
 # all computations are completed (if you use
-# plot.errors.method="asymptotic" the figure will instantly appear).
+# errors="asymptotic" the figure will instantly appear).
 
-if (interactive()) plot(bw, plot.errors.method="bootstrap")
+if (interactive()) plot(bw, errors="bootstrap")
 points(ordered(year), gdp, cex=.2, col="red")
 
 detach(Italy)
@@ -484,7 +484,7 @@ bw <- npregbw(logwage~age, regtype="ll", bwmethod="cv.aic", data = cps71)
 
 # Next, plot the regression function...
 
-if (interactive()) plot(bw, plot.errors.method="asymptotic")
+if (interactive()) plot(bw, errors="asymptotic")
 with(cps71, points(age, logwage, cex=.2, col="red"))
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -493,7 +493,7 @@ if (interactive()) Sys.sleep(5)
 
 # Next, plot the derivative...
 
-if (interactive()) plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
+if (interactive()) plot(bw, errors="asymptotic", gradient=TRUE)
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -509,7 +509,7 @@ bw <- npregbw(xdat=cps71$age, ydat=cps71$logwage, regtype="ll", bwmethod="cv.aic
 
 # Next, plot the regression function...
 
-if (interactive()) plot(bw, plot.errors.method="asymptotic")
+if (interactive()) plot(bw, errors="asymptotic")
 with(cps71, points(age, logwage, cex=.2, col="red"))
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -518,7 +518,7 @@ if (interactive()) Sys.sleep(5)
 
 # Next, plot the derivative...
 
-if (interactive()) plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
+if (interactive()) plot(bw, errors="asymptotic", gradient=TRUE)
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -541,7 +541,7 @@ bw <- npregbw(formula=growth~
               inv+
               humancap)
 
-if (interactive()) plot(bw, plot.errors.method="asymptotic")
+if (interactive()) plot(bw, errors="asymptotic")
 
 detach(oecdpanel)
 
@@ -559,7 +559,7 @@ X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 
 bw <- npregbw(xdat=X, ydat=y)
 
-if (interactive()) plot(bw, plot.errors.method="asymptotic")
+if (interactive()) plot(bw, errors="asymptotic")
 
 detach(oecdpanel)
 
@@ -596,7 +596,7 @@ bw <- npregbw(formula=len~factor(supp)+ordered(dose))
 # Now plot the partial regression surfaces with bootstrapped
 # nonparametric confidence bounds
 
-if (interactive()) plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
+if (interactive()) plot(bw, errors="bootstrap", band="simultaneous")
 
 detach(ToothGrowth)
 
@@ -635,7 +635,7 @@ bw <- npregbw(X, y)
 # Now plot the partial regression surfaces with bootstrapped
 # nonparametric confidence bounds
 
-if (interactive()) plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
+if (interactive()) plot(bw, errors="bootstrap", band="simultaneous")
 
 detach(ToothGrowth)
 

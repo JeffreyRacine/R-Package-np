@@ -419,8 +419,8 @@ if (interactive()) plot(bw)
 # of course do this in general)
 
 plot(bw,
-     plot.errors.boot.num=25,
-     plot.errors.method="bootstrap")
+     B=25,
+     errors="bootstrap")
 
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we simulate an
@@ -494,8 +494,8 @@ if (interactive()) plot(bw)
 # of course do this in general)
 
 plot(bw,
-     plot.errors.boot.num=25,
-     plot.errors.method="bootstrap")
+     B=25,
+     errors="bootstrap")
 } % enddontrun
 }
 \keyword{nonparametric}
