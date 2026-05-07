@@ -37,7 +37,8 @@ test_that("npcdens LC fixed no-error plot-data prototype matches current route",
   expect_equal(candidate$cd1$bias, old$cd1$bias)
   expect_identical(candidate$cd1$proper.requested, old$cd1$proper.requested)
   expect_identical(candidate$cd1$proper.applied, old$cd1$proper.applied)
-  expect_named(stages, c("state", "target_grid", "evaluator", "plot_data"))
+  expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "plot_data"))
+  expect_null(stages$intervals)
   expect_equal(stages$plot_data, candidate)
   expect_equal(stages$evaluator$condens, old$cd1$condens)
 })
@@ -69,4 +70,59 @@ test_that("npcdens plot prototype fails early outside its vertical slice", {
     "explicit xdat and ydat",
     fixed = TRUE
   )
+})
+
+test_that("npcdens LC fixed asymptotic plot-data prototype matches current route", {
+  proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_asymptotic_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(125)
+
+  n <- 80L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    nmulti = 1L,
+    regtype = "lc",
+    bwtype = "fixed"
+  )
+
+  for (band in c("pmzsd", "pointwise", "bonferroni", "simultaneous", "all")) {
+    old <- suppressWarnings(plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      plot.behavior = "data",
+      plot.errors.method = "asymptotic",
+      plot.errors.type = band,
+      view = "fixed",
+      neval = 9L,
+      perspective = TRUE
+    ))
+    candidate <- proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 9L,
+      plot.errors.type = band
+    )
+    stages <- proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 9L,
+      plot.errors.type = band,
+      return.stages = TRUE
+    )
+
+    expect_equal(candidate$cd1$xeval, old$cd1$xeval, info = band)
+    expect_equal(candidate$cd1$yeval, old$cd1$yeval, info = band)
+    expect_equal(candidate$cd1$condens, old$cd1$condens, info = band)
+    expect_equal(candidate$cd1$conderr, old$cd1$conderr, info = band)
+    expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "plot_data"))
+    expect_equal(stages$plot_data, candidate, info = band)
+    expect_identical(stages$intervals$method, "asymptotic")
+    expect_identical(stages$intervals$type, band)
+  }
 })

@@ -88,19 +88,26 @@
   )
 }
 
-.np_plot_proto_npcdens_lc_fixed_none_data <- function(bws,
-                                                      xdat,
-                                                      ydat,
-                                                      neval = 50,
-                                                      xtrim = 0.0,
-                                                      ytrim = 0.0,
-                                                      return.stages = FALSE) {
-  ## Contract: first plot-runtime vertical slice. It reproduces the current
-  ## npcdens LC/fixed/no-error plot.behavior='data' surface object while keeping
-  ## state cleanup, target construction, evaluator, and plot-data assembly
-  ## inspectable as separate stages.
+.np_plot_proto_npcdens_lc_fixed_data <- function(bws,
+                                                 xdat,
+                                                 ydat,
+                                                 neval = 50,
+                                                 xtrim = 0.0,
+                                                 ytrim = 0.0,
+                                                 plot.errors.method = c("none", "asymptotic"),
+                                                 plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
+                                                                      "simultaneous", "all"),
+                                                 plot.errors.alpha = 0.05,
+                                                 return.stages = FALSE) {
+  ## Contract: private npcdens LC/fixed/data-only prototype. This owns explicit
+  ## data cleanup, target construction, evaluator invocation, optional
+  ## asymptotic interval construction, and old-compatible plot-data assembly.
+  ## It must not draw graphics, bootstrap, change RNG state, or recover formula
+  ## data until those stages receive their own slice.
   if (missing(xdat) || missing(ydat))
     stop("prototype route requires explicit xdat and ydat", call. = FALSE)
+  plot.errors.method <- match.arg(plot.errors.method)
+  plot.errors.type <- match.arg(plot.errors.type)
   dat <- .np_plot_proto_clean_conditional_data(xdat = xdat, ydat = ydat)
   xdat <- dat$xdat
   ydat <- dat$ydat
@@ -132,13 +139,26 @@
     proper = FALSE
   )
 
+  terr <- matrix(fit$conderr, nrow = length(fit$condens), ncol = 3L)
+  terr[, 3L] <- NA_real_
+  interval <- NULL
+  if (identical(plot.errors.method, "asymptotic")) {
+    interval <- .np_plot_asymptotic_error_from_se(
+      se = fit$conderr,
+      alpha = plot.errors.alpha,
+      band.type = plot.errors.type,
+      m = nrow(grid$x.eval[, 1L])
+    )
+    terr[, 1:2] <- interval$err
+  }
+
   cd1 <- condensity(
     bws = bws,
     xeval = grid$x.eval[, 1L],
     yeval = grid$x.eval[, 2L],
     ntrain = nrow(xdat),
     condens = fit$condens,
-    conderr = matrix(fit$conderr, nrow = length(fit$condens), ncol = 3L)[, 1:2, drop = FALSE],
+    conderr = terr[, 1:2, drop = FALSE],
     proper.requested = fit$proper.requested,
     proper.applied = fit$proper.applied,
     proper.method = fit$proper.method,
@@ -163,6 +183,57 @@
     ),
     target_grid = grid,
     evaluator = fit,
+    intervals = if (is.null(interval)) NULL else list(
+      method = plot.errors.method,
+      type = plot.errors.type,
+      alpha = plot.errors.alpha,
+      err = interval$err,
+      all.err = interval$all.err
+    ),
     plot_data = plot.data
+  )
+}
+
+.np_plot_proto_npcdens_lc_fixed_none_data <- function(bws,
+                                                      xdat,
+                                                      ydat,
+                                                      neval = 50,
+                                                      xtrim = 0.0,
+                                                      ytrim = 0.0,
+                                                      return.stages = FALSE) {
+  .np_plot_proto_npcdens_lc_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    ytrim = ytrim,
+    plot.errors.method = "none",
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npcdens_lc_fixed_asymptotic_data <- function(bws,
+                                                           xdat,
+                                                           ydat,
+                                                           neval = 50,
+                                                           xtrim = 0.0,
+                                                           ytrim = 0.0,
+                                                           plot.errors.type = c("pmzsd", "pointwise",
+                                                                                "bonferroni", "simultaneous",
+                                                                                "all"),
+                                                           plot.errors.alpha = 0.05,
+                                                           return.stages = FALSE) {
+  .np_plot_proto_npcdens_lc_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    ytrim = ytrim,
+    plot.errors.method = "asymptotic",
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    return.stages = return.stages
   )
 }
