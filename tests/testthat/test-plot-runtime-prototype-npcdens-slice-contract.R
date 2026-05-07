@@ -37,8 +37,9 @@ test_that("npcdens LC fixed no-error plot-data prototype matches current route",
   expect_equal(candidate$cd1$bias, old$cd1$bias)
   expect_identical(candidate$cd1$proper.requested, old$cd1$proper.requested)
   expect_identical(candidate$cd1$proper.applied, old$cd1$proper.applied)
-  expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "plot_data"))
+  expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "bootstrap", "plot_data"))
   expect_null(stages$intervals)
+  expect_null(stages$bootstrap)
   expect_equal(stages$plot_data, candidate)
   expect_equal(stages$evaluator$condens, old$cd1$condens)
 })
@@ -120,9 +121,89 @@ test_that("npcdens LC fixed asymptotic plot-data prototype matches current route
     expect_equal(candidate$cd1$yeval, old$cd1$yeval, info = band)
     expect_equal(candidate$cd1$condens, old$cd1$condens, info = band)
     expect_equal(candidate$cd1$conderr, old$cd1$conderr, info = band)
-    expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "plot_data"))
+    expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "bootstrap", "plot_data"))
     expect_equal(stages$plot_data, candidate, info = band)
     expect_identical(stages$intervals$method, "asymptotic")
     expect_identical(stages$intervals$type, band)
+    expect_null(stages$bootstrap)
+  }
+})
+
+test_that("npcdens LC fixed inid bootstrap plot-data prototype matches current route", {
+  proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_bootstrap_inid_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(126)
+
+  n <- 70L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    nmulti = 1L,
+    regtype = "lc",
+    bwtype = "fixed"
+  )
+
+  cases <- expand.grid(
+    band = c("pmzsd", "pointwise", "bonferroni"),
+    center = c("estimate", "bias-corrected"),
+    stringsAsFactors = FALSE
+  )
+  for (ii in seq_len(nrow(cases))) {
+    band <- cases$band[ii]
+    center <- cases$center[ii]
+    boot.seed <- 1000 + ii
+    set.seed(boot.seed)
+    old <- suppressWarnings(plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      plot.behavior = "data",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = "inid",
+      plot.errors.boot.num = 19L,
+      plot.errors.center = center,
+      plot.errors.type = band,
+      view = "fixed",
+      neval = 7L,
+      perspective = TRUE,
+      random.seed = boot.seed
+    ))
+    set.seed(boot.seed)
+    candidate <- suppressWarnings(proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 7L,
+      plot.errors.boot.num = 19L,
+      plot.errors.center = center,
+      plot.errors.type = band
+    ))
+    set.seed(boot.seed)
+    stages <- suppressWarnings(proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 7L,
+      plot.errors.boot.num = 19L,
+      plot.errors.center = center,
+      plot.errors.type = band,
+      return.stages = TRUE
+    ))
+
+    expect_equal(candidate$cd1$xeval, old$cd1$xeval, info = paste(band, center))
+    expect_equal(candidate$cd1$yeval, old$cd1$yeval, info = paste(band, center))
+    expect_equal(candidate$cd1$condens, old$cd1$condens, info = paste(band, center))
+    expect_equal(candidate$cd1$conderr, old$cd1$conderr, info = paste(band, center))
+    expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "bootstrap", "plot_data"))
+    expect_equal(stages$plot_data, candidate, info = paste(band, center))
+    expect_identical(stages$intervals$method, "bootstrap")
+    expect_identical(stages$intervals$type, band)
+    expect_identical(stages$bootstrap$method, "inid")
+    expect_identical(stages$bootstrap$B, 19L)
+    expect_equal(stages$bootstrap$boot.err[, 1:2, drop = FALSE],
+                 candidate$cd1$conderr,
+                 info = paste(band, center))
   }
 })

@@ -94,7 +94,12 @@
                                                  neval = 50,
                                                  xtrim = 0.0,
                                                  ytrim = 0.0,
-                                                 plot.errors.method = c("none", "asymptotic"),
+                                                 plot.errors.method = c("none", "asymptotic", "bootstrap"),
+                                                 plot.errors.boot.method = c("inid"),
+                                                 plot.errors.boot.nonfixed = c("exact", "frozen"),
+                                                 plot.errors.boot.blocklen = NULL,
+                                                 plot.errors.boot.num = 1999,
+                                                 plot.errors.center = c("estimate", "bias-corrected"),
                                                  plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
                                                                       "simultaneous", "all"),
                                                  plot.errors.alpha = 0.05,
@@ -107,6 +112,9 @@
   if (missing(xdat) || missing(ydat))
     stop("prototype route requires explicit xdat and ydat", call. = FALSE)
   plot.errors.method <- match.arg(plot.errors.method)
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method)
+  plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
+  plot.errors.center <- match.arg(plot.errors.center)
   plot.errors.type <- match.arg(plot.errors.type)
   dat <- .np_plot_proto_clean_conditional_data(xdat = xdat, ydat = ydat)
   xdat <- dat$xdat
@@ -142,6 +150,7 @@
   terr <- matrix(fit$conderr, nrow = length(fit$condens), ncol = 3L)
   terr[, 3L] <- NA_real_
   interval <- NULL
+  bootstrap <- NULL
   if (identical(plot.errors.method, "asymptotic")) {
     interval <- .np_plot_asymptotic_error_from_se(
       se = fit$conderr,
@@ -150,6 +159,34 @@
       m = nrow(grid$x.eval[, 1L])
     )
     terr[, 1:2] <- interval$err
+  } else if (identical(plot.errors.method, "bootstrap")) {
+    bootstrap <- compute.bootstrap.errors(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = grid$x.eval[, 1L],
+      eydat = grid$x.eval[, 2L],
+      cdf = FALSE,
+      quantreg = FALSE,
+      tau = 0.5,
+      gradients = FALSE,
+      gradient.index = 0L,
+      slice.index = 0L,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.boot.num = plot.errors.boot.num,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      progress.target = NULL,
+      proper = FALSE,
+      bws = bws
+    )
+    terr <- bootstrap$boot.err
+    interval <- list(
+      err = bootstrap$boot.err[, 1:2, drop = FALSE],
+      all.err = bootstrap$boot.all.err
+    )
   }
 
   cd1 <- condensity(
@@ -189,6 +226,16 @@
       alpha = plot.errors.alpha,
       err = interval$err,
       all.err = interval$all.err
+    ),
+    bootstrap = if (is.null(bootstrap)) NULL else list(
+      method = plot.errors.boot.method,
+      nonfixed = plot.errors.boot.nonfixed,
+      blocklen = plot.errors.boot.blocklen,
+      B = plot.errors.boot.num,
+      center = plot.errors.center,
+      boot.err = bootstrap$boot.err,
+      boot.all.err = bootstrap$boot.all.err,
+      bxp = bootstrap$bxp
     ),
     plot_data = plot.data
   )
@@ -232,6 +279,36 @@
     xtrim = xtrim,
     ytrim = ytrim,
     plot.errors.method = "asymptotic",
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npcdens_lc_fixed_bootstrap_inid_data <- function(bws,
+                                                               xdat,
+                                                               ydat,
+                                                               neval = 50,
+                                                               xtrim = 0.0,
+                                                               ytrim = 0.0,
+                                                               plot.errors.boot.num = 1999,
+                                                               plot.errors.center = c("estimate", "bias-corrected"),
+                                                               plot.errors.type = c("pmzsd", "pointwise",
+                                                                                    "bonferroni", "simultaneous",
+                                                                                    "all"),
+                                                               plot.errors.alpha = 0.05,
+                                                               return.stages = FALSE) {
+  .np_plot_proto_npcdens_lc_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    ytrim = ytrim,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = plot.errors.boot.num,
+    plot.errors.center = plot.errors.center,
     plot.errors.type = plot.errors.type,
     plot.errors.alpha = plot.errors.alpha,
     return.stages = return.stages
