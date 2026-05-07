@@ -170,7 +170,7 @@ test_that("npqreg fixed asymptotic slice prototype matches current fitted-object
   }
 })
 
-test_that("npqreg fixed bootstrap slice prototype preserves current fail-fast boundary", {
+test_that("npqreg fixed quantile-level bootstrap slice prototype matches current fitted-object route", {
   proto <- getFromNamespace(".np_plot_proto_npqreg_fixed_bootstrap_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2804)
@@ -192,42 +192,73 @@ test_that("npqreg fixed bootstrap slice prototype preserves current fail-fast bo
     tau = 0.45
   )
 
-  for (center in c("estimate", "bias-corrected")) {
-    boot.seed <- if (identical(center, "estimate")) 8201L else 8202L
+  cases <- expand.grid(
+    method = c("inid", "fixed", "geom"),
+    center = c("estimate", "bias-corrected"),
+    stringsAsFactors = FALSE
+  )
+  for (ii in seq_len(nrow(cases))) {
+    method <- cases$method[ii]
+    center <- cases$center[ii]
+    boot.seed <- 8200L + ii
+    extra <- if (identical(method, "inid")) list() else list(plot.errors.boot.blocklen = 3L)
     set.seed(boot.seed)
-    expect_error(
-      suppressWarnings(plot(
-        fit,
+    old <- suppressWarnings(do.call(plot, c(
+      list(
+        x = fit,
         xdat = x,
         ydat = y,
         plot.behavior = "data",
         plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
+        plot.errors.boot.method = method,
         plot.errors.boot.num = 11L,
         plot.errors.center = center,
         plot.errors.type = "pmzsd",
         neval = 5L,
         perspective = FALSE,
         random.seed = boot.seed
-      )),
-      "inid conditional helper unavailable",
-      fixed = TRUE
-    )
+      ),
+      extra
+    )))
     set.seed(boot.seed)
-    expect_error(
-      suppressWarnings(proto(
-        fit,
+    candidate <- suppressWarnings(do.call(proto, c(
+      list(
+        object = fit,
         xdat = x,
         ydat = y,
         neval = 5L,
-        plot.errors.boot.method = "inid",
+        plot.errors.boot.method = method,
         plot.errors.boot.num = 11L,
         plot.errors.center = center,
-        plot.errors.type = "pointwise"
-      )),
-      "inid conditional helper unavailable",
-      fixed = TRUE
-    )
+        plot.errors.type = "pmzsd"
+      ),
+      extra
+    )))
+    set.seed(boot.seed)
+    stages <- suppressWarnings(do.call(proto, c(
+      list(
+        object = fit,
+        xdat = x,
+        ydat = y,
+        neval = 5L,
+        plot.errors.boot.method = method,
+        plot.errors.boot.num = 11L,
+        plot.errors.center = center,
+        plot.errors.type = "pmzsd",
+        return.stages = TRUE
+      ),
+      extra
+    )))
+
+    for (nm in names(old)) {
+      expect_equal(candidate[[nm]]$xeval, old[[nm]]$xeval, info = paste(nm, method, center))
+      expect_equal(candidate[[nm]]$quantile, old[[nm]]$quantile, info = paste(nm, method, center))
+      expect_equal(candidate[[nm]]$quanterr, old[[nm]]$quanterr, info = paste(nm, method, center))
+      expect_equal(candidate[[nm]]$bias, old[[nm]]$bias, info = paste(nm, method, center))
+      expect_equal(candidate[[nm]]$bxp, old[[nm]]$bxp, info = paste(nm, method, center))
+    }
+    expect_true(all(vapply(stages$bootstrap, function(x) is.list(x) && !is.null(x$boot.err), logical(1))),
+                info = paste(method, center))
   }
 })
 
