@@ -205,7 +205,7 @@ test_that("npqreg fixed bootstrap slice prototype preserves current fail-fast bo
         plot.errors.boot.method = "inid",
         plot.errors.boot.num = 11L,
         plot.errors.center = center,
-        plot.errors.type = "pointwise",
+        plot.errors.type = "pmzsd",
         neval = 5L,
         perspective = FALSE,
         random.seed = boot.seed
@@ -228,5 +228,145 @@ test_that("npqreg fixed bootstrap slice prototype preserves current fail-fast bo
       "inid conditional helper unavailable",
       fixed = TRUE
     )
+  }
+})
+
+test_that("npqreg fixed gradient slice prototype matches current fitted-object route", {
+  proto.none <- getFromNamespace(".np_plot_proto_npqreg_fixed_none_data", "np")
+  proto.boot <- getFromNamespace(".np_plot_proto_npqreg_fixed_bootstrap_data", "np")
+  proto.asym <- getFromNamespace(".np_plot_proto_npqreg_fixed_asymptotic_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(2805)
+
+  n <- 45L
+  x <- data.frame(x1 = runif(n, -1, 1), x2 = runif(n, -1, 1))
+  y <- data.frame(y = x$x1^2 - x$x2 + rnorm(n, sd = 0.15))
+  bw <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.50, 0.55, 0.60),
+    bandwidth.compute = FALSE,
+    bwtype = "fixed"
+  )
+  fit <- npqreg(
+    bws = bw,
+    txdat = x,
+    tydat = y,
+    tau = 0.45
+  )
+
+  old.none <- suppressWarnings(plot(
+    fit,
+    xdat = x,
+    ydat = y,
+    plot.behavior = "data",
+    plot.errors.method = "none",
+    gradients = TRUE,
+    neval = 5L,
+    perspective = FALSE
+  ))
+  candidate.none <- proto.none(
+    fit,
+    xdat = x,
+    ydat = y,
+    neval = 5L,
+    gradients = TRUE
+  )
+  stages.none <- proto.none(
+    fit,
+    xdat = x,
+    ydat = y,
+    neval = 5L,
+    gradients = TRUE,
+    return.stages = TRUE
+  )
+
+  expect_named(candidate.none, names(old.none))
+  expect_true(isTRUE(stages.none$state$gradients))
+  for (nm in names(old.none)) {
+    expect_equal(candidate.none[[nm]]$xeval, old.none[[nm]]$xeval, info = nm)
+    expect_equal(candidate.none[[nm]]$quantile, old.none[[nm]]$quantile, info = nm)
+    expect_equal(candidate.none[[nm]]$quantgrad, old.none[[nm]]$quantgrad, info = nm)
+    expect_equal(candidate.none[[nm]]$quanterr, old.none[[nm]]$quanterr, info = nm)
+  }
+
+  expect_error(
+    proto.asym(
+      fit,
+      xdat = x,
+      ydat = y,
+      neval = 5L,
+      gradients = TRUE
+    ),
+    "asymptotic errors are unsupported for quantile regression gradients; use bootstrap errors",
+    fixed = TRUE
+  )
+
+  for (method in c("inid", "fixed")) {
+    boot.seed <- if (identical(method, "inid")) 8301L else 902L
+    extra <- if (identical(method, "fixed")) list(plot.errors.boot.blocklen = 2L) else list()
+    boot.num <- if (identical(method, "fixed")) 5L else 7L
+    set.seed(boot.seed)
+    old.boot <- suppressWarnings(do.call(plot, c(
+      list(
+        x = fit,
+        xdat = x,
+        ydat = y,
+        plot.behavior = "data",
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = method,
+        plot.errors.boot.num = boot.num,
+        plot.errors.center = "estimate",
+        plot.errors.type = "pmzsd",
+        gradients = TRUE,
+        neval = 5L,
+        perspective = FALSE,
+        random.seed = boot.seed
+      ),
+      extra
+    )))
+    set.seed(boot.seed)
+    candidate.boot <- suppressWarnings(do.call(proto.boot, c(
+      list(
+        object = fit,
+        xdat = x,
+        ydat = y,
+        neval = 5L,
+        plot.errors.boot.method = method,
+        plot.errors.boot.num = boot.num,
+        plot.errors.center = "estimate",
+        plot.errors.type = "pmzsd",
+        gradients = TRUE
+      ),
+      extra
+    )))
+    set.seed(boot.seed)
+    stages.boot <- suppressWarnings(do.call(proto.boot, c(
+      list(
+        object = fit,
+        xdat = x,
+        ydat = y,
+        neval = 5L,
+        plot.errors.boot.method = method,
+        plot.errors.boot.num = boot.num,
+        plot.errors.center = "estimate",
+        plot.errors.type = "pmzsd",
+        gradients = TRUE,
+        return.stages = TRUE
+      ),
+      extra
+    )))
+
+    for (nm in names(old.boot)) {
+      expect_equal(candidate.boot[[nm]]$xeval, old.boot[[nm]]$xeval, info = paste(nm, method))
+      expect_equal(candidate.boot[[nm]]$quantile, old.boot[[nm]]$quantile, info = paste(nm, method))
+      expect_equal(candidate.boot[[nm]]$quantgrad, old.boot[[nm]]$quantgrad, info = paste(nm, method))
+      expect_equal(candidate.boot[[nm]]$gc1err, old.boot[[nm]]$gc1err, info = paste(nm, method))
+      expect_equal(candidate.boot[[nm]]$gc1bias, old.boot[[nm]]$gc1bias, info = paste(nm, method))
+      expect_equal(candidate.boot[[nm]]$gc2err, old.boot[[nm]]$gc2err, info = paste(nm, method))
+      expect_equal(candidate.boot[[nm]]$gc2bias, old.boot[[nm]]$gc2bias, info = paste(nm, method))
+      expect_equal(candidate.boot[[nm]]$bxp, old.boot[[nm]]$bxp, info = paste(nm, method))
+    }
+    expect_true(all(vapply(stages.boot$bootstrap, is.list, logical(1))))
   }
 })

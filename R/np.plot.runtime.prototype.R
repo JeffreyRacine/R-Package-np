@@ -1884,6 +1884,7 @@
                                                    plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
                                                                         "simultaneous", "all"),
                                                    plot.errors.alpha = 0.05,
+                                                   gradients = FALSE,
                                                    return.stages = FALSE) {
   if (missing(xdat) || missing(ydat))
     stop("prototype route requires explicit xdat and ydat", call. = FALSE)
@@ -1892,6 +1893,13 @@
   plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
   plot.errors.center <- match.arg(plot.errors.center)
   plot.errors.type <- match.arg(plot.errors.type)
+  gradients <- npValidateScalarLogical(gradients, "gradients")
+  if (isTRUE(gradients) && identical(plot.errors.method, "asymptotic")) {
+    stop(
+      "asymptotic errors are unsupported for quantile regression gradients; use bootstrap errors",
+      call. = FALSE
+    )
+  }
 
   bws <- object$bws
   dat <- .np_plot_proto_clean_conditional_data(xdat = xdat, ydat = ydat)
@@ -1925,6 +1933,7 @@
       tydat = ydat,
       exdat = target$exdat,
       tau = object$tau,
+      gradients = gradients,
       bws = bws
     )
     temp.err <- matrix(data = NA, nrow = targets$maxneval, ncol = 3L)
@@ -1933,7 +1942,7 @@
     interval <- NULL
     bootstrap <- NULL
 
-    if (identical(plot.errors.method, "bootstrap")) {
+    if (identical(plot.errors.method, "bootstrap") && !isTRUE(gradients)) {
       bootstrap <- compute.bootstrap.errors(
         xdat = xdat,
         ydat = ydat,
@@ -1965,6 +1974,44 @@
         err = bootstrap$boot.err[, 1:2, drop = FALSE],
         all.err = bootstrap$boot.all.err
       )
+    } else if (identical(plot.errors.method, "bootstrap") && isTRUE(gradients)) {
+      bootstrap <- vector("list", bws$xndim)
+      interval <- vector("list", bws$xndim)
+      for (jj in seq_len(bws$xndim)) {
+        temp.err.j <- matrix(data = NA, nrow = targets$maxneval, ncol = 3L)
+        bootstrap.j <- compute.bootstrap.errors(
+          xdat = xdat,
+          ydat = ydat,
+          exdat = target$exdat,
+          eydat = target$eydat,
+          cdf = TRUE,
+          quantreg = TRUE,
+          tau = object$tau,
+          gradients = TRUE,
+          gradient.index = jj,
+          slice.index = target$index,
+          plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+          plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+          plot.errors.boot.num = plot.errors.boot.num,
+          plot.errors.center = plot.errors.center,
+          plot.errors.type = plot.errors.type,
+          plot.errors.alpha = plot.errors.alpha,
+          progress.target = .np_plot_conditional_bootstrap_target_label(
+            bws = bws,
+            slice.index = target$index,
+            gradients = TRUE,
+            gradient.index = jj
+          ),
+          bws = bws
+        )
+        temp.err.j[seq_len(target$neval), ] <- bootstrap.j$boot.err
+        bootstrap[[jj]] <- bootstrap.j
+        interval[[jj]] <- list(
+          err = bootstrap.j$boot.err[, 1:2, drop = FALSE],
+          all.err = bootstrap.j$boot.all.err
+        )
+      }
     } else if (identical(plot.errors.method, "asymptotic")) {
       asym <- .np_plot_asymptotic_error_from_se(
         se = fit$quanterr,
@@ -1977,7 +2024,7 @@
     }
 
     payload <- fit
-    if (!identical(plot.errors.method, "none")) {
+    if (!identical(plot.errors.method, "none") && !isTRUE(gradients)) {
       payload$quanterr <- na.omit(cbind(
         -temp.err[seq_len(target$neval), 1L],
         temp.err[seq_len(target$neval), 2L]
@@ -1986,6 +2033,21 @@
         temp.quant[seq_len(target$neval)] - temp.err[seq_len(target$neval), 3L]
       )
       payload$bxp <- if (is.null(bootstrap)) list() else bootstrap$bxp
+    } else if (identical(plot.errors.method, "bootstrap") && isTRUE(gradients)) {
+      for (jj in seq_len(bws$xndim)) {
+        temp.err.j <- matrix(data = NA, nrow = targets$maxneval, ncol = 3L)
+        temp.err.j[seq_len(target$neval), ] <- bootstrap[[jj]]$boot.err
+        temp.grad.j <- rep(NA_real_, targets$maxneval)
+        temp.grad.j[seq_len(target$neval)] <- fit$quantgrad[, jj]
+        payload[[paste0("gc", jj, "err")]] <- na.omit(cbind(
+          -temp.err.j[, 1L],
+          temp.err.j[, 2L]
+        ))
+        payload[[paste0("gc", jj, "bias")]] <- na.omit(
+          temp.grad.j - temp.err.j[, 3L]
+        )
+        payload$bxp <- bootstrap[[jj]]$bxp
+      }
     }
 
     plot.data[[ii]] <- payload
@@ -2006,7 +2068,7 @@
       ntrain = nrow(xdat),
       family = "npqreg",
       tau = object$tau,
-      gradients = FALSE
+      gradients = gradients
     ),
     target_grid = targets,
     evaluator = evaluators,
@@ -2023,6 +2085,7 @@
                                                  xq = 0.5,
                                                  yq = 0.5,
                                                  xtrim = 0.0,
+                                                 gradients = FALSE,
                                                  return.stages = FALSE) {
   .np_plot_proto_npqreg_fixed_slices_data(
     object = object,
@@ -2033,6 +2096,7 @@
     yq = yq,
     xtrim = xtrim,
     plot.errors.method = "none",
+    gradients = gradients,
     return.stages = return.stages
   )
 }
@@ -2048,6 +2112,7 @@
                                                                             "bonferroni", "simultaneous",
                                                                             "all"),
                                                        plot.errors.alpha = 0.05,
+                                                       gradients = FALSE,
                                                        return.stages = FALSE) {
   .np_plot_proto_npqreg_fixed_slices_data(
     object = object,
@@ -2060,6 +2125,7 @@
     plot.errors.method = "asymptotic",
     plot.errors.type = plot.errors.type,
     plot.errors.alpha = plot.errors.alpha,
+    gradients = gradients,
     return.stages = return.stages
   )
 }
@@ -2079,6 +2145,7 @@
                                                       plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
                                                                            "simultaneous", "all"),
                                                       plot.errors.alpha = 0.05,
+                                                      gradients = FALSE,
                                                       return.stages = FALSE) {
   plot.errors.boot.method <- match.arg(plot.errors.boot.method)
   plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
@@ -2100,6 +2167,7 @@
     plot.errors.center = plot.errors.center,
     plot.errors.type = plot.errors.type,
     plot.errors.alpha = plot.errors.alpha,
+    gradients = gradients,
     return.stages = return.stages
   )
 }
