@@ -1,5 +1,17 @@
 Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
 
+* Added the redesigned public plot-control interface with direct scalar
+  controls such as `errors`, `band`, `alpha`, `bootstrap`, `B`, `behavior`,
+  `renderer`, and `perspective`, plus validated `np_boot_control()`,
+  `np_grid_control()`, and `np_render_control()` helpers for detailed
+  bootstrap, grid, and rendering options. Historical `plot.errors.*` inputs
+  remain accepted as compatibility arguments.
+
+* Hardened S3 plot argument handling so unsupported or misspelled named
+  arguments in `...` fail fast on the master before expensive plot computation
+  or MPI fanout begins, while preserving ordinary base-graphics pass-through
+  arguments such as labels, limits, colors, and line widths.
+
 * Added MPI-aware object-fed plot runtime support across the main S3 plot
   families, extending the redesigned plot-data payload paths to regression,
   unconditional density/distribution, conditional density/distribution,
