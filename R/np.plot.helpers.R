@@ -6738,6 +6738,155 @@
   )
 }
 
+.np_inid_boot_from_ksum_conditional_adaptive_exact_mpi <- function(xdat,
+                                                                  ydat,
+                                                                  exdat,
+                                                                  eydat,
+                                                                  bws,
+                                                                  B,
+                                                                  cdf,
+                                                                  counts = NULL,
+                                                                  counts.drawer = NULL,
+                                                                  progress.label = NULL,
+                                                                  fit_one_local) {
+  ## Contract: partition adaptive-NN exact conditional bootstrap replications
+  ## across MPI workers. Worker payloads reconstruct active bootstrap samples
+  ## and call the supplied local evaluator; they must not call public
+  ## estimators, bandwidth constructors, or nested MPI wrappers.
+  n <- nrow(xdat)
+  t0 <- fit_one_local(x.train = xdat, y.train = ydat)
+  nout <- length(t0)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
+    comm = 1L,
+    include.master = TRUE
+  )
+  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+
+  eval_counts_chunk <- function(counts.chunk) {
+    counts.chunk <- as.matrix(counts.chunk)
+    bsz <- ncol(counts.chunk)
+    out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+    for (jj in seq_len(bsz)) {
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      out[jj, ] <- fit_one_local(
+        x.train = xdat[idx, , drop = FALSE],
+        y.train = ydat[idx, , drop = FALSE]
+      )
+    }
+    out
+  }
+
+  common.bindings <- list(
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    bws = bws,
+    cdf = cdf,
+    nout = nout,
+    fit_one_local = fit_one_local,
+    eval_counts_chunk = eval_counts_chunk,
+    .np_counts_to_indices = .np_counts_to_indices,
+    .np_con_make_kbandwidth_x = .np_con_make_kbandwidth_x,
+    .np_con_make_kbandwidth_xy = .np_con_make_kbandwidth_xy,
+    .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
+    .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
+  )
+
+  run_adaptive_fanout <- function(what, worker, required.bindings) {
+    if (!.npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = what
+        )) {
+      return(NULL)
+    }
+
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = nout,
+      what = what,
+      progress.label = progress.label,
+      profile.where = paste0("mpi.applyLB:", what),
+      comm = 1L,
+      required.bindings = required.bindings
+    )
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = paste(what, "fan-out returned incomplete results"),
+        what = what
+      )
+    list(t = tmat, t0 = t0)
+  }
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    worker <- function(task) {
+      start <- as.integer(task$start)
+      stopi <- start + as.integer(task$bsz) - 1L
+      eval_counts_chunk(counts.mat[, start:stopi, drop = FALSE])
+    }
+    out <- run_adaptive_fanout(
+      what = "inid-ksum-conditional-adaptive-exact-counts",
+      worker = worker,
+      required.bindings = c(common.bindings, list(counts.mat = counts.mat))
+    )
+    if (!is.null(out))
+      return(out)
+  } else if (!is.null(counts.drawer)) {
+    worker <- function(task) {
+      start <- as.integer(task$start)
+      stopi <- start + as.integer(task$bsz) - 1L
+      eval_counts_chunk(
+        .np_inid_counts_matrix(
+          n = n,
+          B = as.integer(task$bsz),
+          counts = counts.drawer(start, stopi)
+        )
+      )
+    }
+    out <- run_adaptive_fanout(
+      what = "inid-ksum-conditional-adaptive-exact-block",
+      worker = worker,
+      required.bindings = c(
+        common.bindings,
+        list(
+          n = n,
+          counts.drawer = counts.drawer,
+          .np_inid_counts_matrix = .np_inid_counts_matrix
+        )
+      )
+    )
+    if (!is.null(out))
+      return(out)
+  } else {
+    prob <- rep.int(1 / n, n)
+    worker <- function(task) {
+      set.seed(as.integer(task$seed))
+      eval_counts_chunk(
+        stats::rmultinom(n = as.integer(task$bsz), size = n, prob = prob)
+      )
+    }
+    out <- run_adaptive_fanout(
+      what = "inid-ksum-conditional-adaptive-exact",
+      worker = worker,
+      required.bindings = c(common.bindings, list(n = n, prob = prob))
+    )
+    if (!is.null(out))
+      return(out)
+  }
+
+  .npRmpi_bootstrap_fail_or_fallback(
+    msg = "adaptive exact conditional bootstrap fan-out did not dispatch",
+    what = "inid-ksum-conditional-adaptive-exact"
+  )
+}
+
 .np_inid_boot_from_ksum_conditional_exact <- function(xdat,
                                                       ydat,
                                                       exdat,
@@ -6855,137 +7004,19 @@
   }
 
   if (identical(bws$type, "adaptive_nn")) {
-    t0 <- fit_one_local(x.train = xdat, y.train = ydat)
-    nout <- length(t0)
-    chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
-      B = B,
-      chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
-      comm = 1L,
-      include.master = TRUE
-    )
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-
-    eval_counts_chunk <- function(counts.chunk) {
-      counts.chunk <- as.matrix(counts.chunk)
-      bsz <- ncol(counts.chunk)
-      out <- matrix(NA_real_, nrow = bsz, ncol = nout)
-      for (jj in seq_len(bsz)) {
-        idx <- .np_counts_to_indices(counts.chunk[, jj])
-        out[jj, ] <- fit_one_local(
-          x.train = xdat[idx, , drop = FALSE],
-          y.train = ydat[idx, , drop = FALSE]
-        )
-      }
-      out
-    }
-
-    common.bindings <- list(
+    return(.np_inid_boot_from_ksum_conditional_adaptive_exact_mpi(
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
       eydat = eydat,
       bws = bws,
+      B = B,
       cdf = cdf,
-      nout = nout,
-      fit_one_local = fit_one_local,
-      eval_counts_chunk = eval_counts_chunk,
-      .np_counts_to_indices = .np_counts_to_indices,
-      .np_con_make_kbandwidth_x = .np_con_make_kbandwidth_x,
-      .np_con_make_kbandwidth_xy = .np_con_make_kbandwidth_xy,
-      .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
-      .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
-    )
-
-    run_adaptive_fanout <- function(what, worker, required.bindings) {
-      if (!.npRmpi_bootstrap_fanout_enabled(
-            comm = 1L,
-            n = n,
-            B = B,
-            chunk.size = chunk.size,
-            what = what
-          )) {
-        return(NULL)
-      }
-
-      tmat <- .npRmpi_bootstrap_run_fanout(
-        tasks = tasks,
-        worker = worker,
-        ncol.out = nout,
-        what = what,
-        progress.label = progress.label,
-        profile.where = paste0("mpi.applyLB:", what),
-        comm = 1L,
-        required.bindings = required.bindings
-      )
-      if (anyNA(tmat))
-        .npRmpi_bootstrap_fail_or_fallback(
-          msg = paste(what, "fan-out returned incomplete results"),
-          what = what
-        )
-      list(t = tmat, t0 = t0)
-    }
-
-    if (!is.null(counts)) {
-      counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-      worker <- function(task) {
-        start <- as.integer(task$start)
-        stopi <- start + as.integer(task$bsz) - 1L
-        eval_counts_chunk(counts.mat[, start:stopi, drop = FALSE])
-      }
-      out <- run_adaptive_fanout(
-        what = "inid-ksum-conditional-adaptive-exact-counts",
-        worker = worker,
-        required.bindings = c(common.bindings, list(counts.mat = counts.mat))
-      )
-      if (!is.null(out))
-        return(out)
-    } else if (!is.null(counts.drawer)) {
-      worker <- function(task) {
-        start <- as.integer(task$start)
-        stopi <- start + as.integer(task$bsz) - 1L
-        eval_counts_chunk(
-          .np_inid_counts_matrix(
-            n = n,
-            B = as.integer(task$bsz),
-            counts = counts.drawer(start, stopi)
-          )
-        )
-      }
-      out <- run_adaptive_fanout(
-        what = "inid-ksum-conditional-adaptive-exact-block",
-        worker = worker,
-        required.bindings = c(
-          common.bindings,
-          list(
-            n = n,
-            counts.drawer = counts.drawer,
-            .np_inid_counts_matrix = .np_inid_counts_matrix
-          )
-        )
-      )
-      if (!is.null(out))
-        return(out)
-    } else {
-      prob <- rep.int(1 / n, n)
-      worker <- function(task) {
-        set.seed(as.integer(task$seed))
-        eval_counts_chunk(
-          stats::rmultinom(n = as.integer(task$bsz), size = n, prob = prob)
-        )
-      }
-      out <- run_adaptive_fanout(
-        what = "inid-ksum-conditional-adaptive-exact",
-        worker = worker,
-        required.bindings = c(common.bindings, list(n = n, prob = prob))
-      )
-      if (!is.null(out))
-        return(out)
-    }
-
-    .npRmpi_bootstrap_fail_or_fallback(
-      msg = "adaptive exact conditional bootstrap fan-out did not dispatch",
-      what = "inid-ksum-conditional-adaptive-exact"
-    )
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label,
+      fit_one_local = fit_one_local
+    ))
   }
 
   kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = xdat),
