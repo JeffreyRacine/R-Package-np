@@ -1,4 +1,26 @@
-Changes from Version 0.70-1 to 0.70-2 [06-May-2026]
+Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
+
+* Added MPI-aware object-fed plot runtime support across the main S3 plot
+  families, extending the redesigned plot-data payload paths to regression,
+  unconditional density/distribution, conditional density/distribution,
+  single-index, partially linear, smooth-coefficient, and quantile-regression
+  plots while preserving standalone `npRmpi` runtime behavior.
+
+* Added `npqreg()` gradient support using the conditional-quantile
+  delta-method relationship between the conditional distribution derivative
+  and conditional density, with plot-data support for quantile gradients.
+
+* Added asymptotic standard errors for `npqreg()` conditional quantiles and
+  quantile gradients, and documented the implemented delta-method formulas
+  and Nelsen-style quasi-inverse construction used by the conditional
+  quantile solver.
+
+* Restored/validated MPI fanout coverage for touched plot-bootstrap routes,
+  including conditional adaptive exact helpers, conditional gradients,
+  proper conditional projection, partially linear recomposition, and public
+  single-index fixed-gradient bootstrap plots; paired baseline/candidate plot
+  performance smokes showed no material slowdown in the exercised public
+  routes.
 
 * Restored MPI fanout for fixed local-constant and fixed local-polynomial
   conditional density/distribution plot bootstraps in `npcdens()` and
