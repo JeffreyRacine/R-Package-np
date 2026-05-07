@@ -103,6 +103,9 @@
                                                  plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
                                                                       "simultaneous", "all"),
                                                  plot.errors.alpha = 0.05,
+                                                 proper = FALSE,
+                                                 proper.method = c("project"),
+                                                 proper.control = list(),
                                                  return.stages = FALSE) {
   ## Contract: private npcdens LC/fixed/data-only prototype. This owns explicit
   ## data cleanup, target construction, evaluator invocation, optional
@@ -116,6 +119,11 @@
   plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
   plot.errors.center <- match.arg(plot.errors.center)
   plot.errors.type <- match.arg(plot.errors.type)
+  proper.args <- .np_condens_validate_proper_args(
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control
+  )
   dat <- .np_plot_proto_clean_conditional_data(xdat = xdat, ydat = ydat)
   xdat <- dat$xdat
   ydat <- dat$ydat
@@ -144,7 +152,9 @@
     eydat = grid$x.eval[, 2L, drop = FALSE],
     cdf = FALSE,
     gradients = FALSE,
-    proper = FALSE
+    proper = isTRUE(proper.args$proper.requested),
+    proper.method = proper.args$proper.method,
+    proper.control = proper.args$proper.control
   )
 
   terr <- matrix(fit$conderr, nrow = length(fit$condens), ncol = 3L)
@@ -179,7 +189,9 @@
       plot.errors.type = plot.errors.type,
       plot.errors.alpha = plot.errors.alpha,
       progress.target = NULL,
-      proper = FALSE,
+      proper = isTRUE(proper.args$proper.requested),
+      proper.method = proper.args$proper.method,
+      proper.control = proper.args$proper.control,
       bws = bws
     )
     terr <- bootstrap$boot.err
@@ -216,7 +228,8 @@
       ntrain = nrow(xdat),
       family = "npcdens",
       cdf = FALSE,
-      gradients = FALSE
+      gradients = FALSE,
+      proper = proper.args
     ),
     target_grid = grid,
     evaluator = fit,
@@ -237,6 +250,12 @@
       boot.all.err = bootstrap$boot.all.err,
       bxp = bootstrap$bxp
     ),
+    proper_projection = if (!isTRUE(proper.args$proper.requested)) NULL else list(
+      requested = fit$proper.requested,
+      applied = fit$proper.applied,
+      method = fit$proper.method,
+      info = fit$proper.info
+    ),
     plot_data = plot.data
   )
 }
@@ -247,6 +266,9 @@
                                                       neval = 50,
                                                       xtrim = 0.0,
                                                       ytrim = 0.0,
+                                                      proper = FALSE,
+                                                      proper.method = c("project"),
+                                                      proper.control = list(),
                                                       return.stages = FALSE) {
   .np_plot_proto_npcdens_lc_fixed_data(
     bws = bws,
@@ -256,6 +278,9 @@
     xtrim = xtrim,
     ytrim = ytrim,
     plot.errors.method = "none",
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control,
     return.stages = return.stages
   )
 }
@@ -270,6 +295,9 @@
                                                                                 "bonferroni", "simultaneous",
                                                                                 "all"),
                                                            plot.errors.alpha = 0.05,
+                                                           proper = FALSE,
+                                                           proper.method = c("project"),
+                                                           proper.control = list(),
                                                            return.stages = FALSE) {
   .np_plot_proto_npcdens_lc_fixed_data(
     bws = bws,
@@ -281,6 +309,9 @@
     plot.errors.method = "asymptotic",
     plot.errors.type = plot.errors.type,
     plot.errors.alpha = plot.errors.alpha,
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control,
     return.stages = return.stages
   )
 }
@@ -297,6 +328,9 @@
                                                                                     "bonferroni", "simultaneous",
                                                                                     "all"),
                                                                plot.errors.alpha = 0.05,
+                                                               proper = FALSE,
+                                                               proper.method = c("project"),
+                                                               proper.control = list(),
                                                                return.stages = FALSE) {
   .np_plot_proto_npcdens_lc_fixed_data(
     bws = bws,
@@ -311,6 +345,9 @@
     plot.errors.center = plot.errors.center,
     plot.errors.type = plot.errors.type,
     plot.errors.alpha = plot.errors.alpha,
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control,
     return.stages = return.stages
   )
 }
