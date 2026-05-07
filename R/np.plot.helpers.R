@@ -10302,7 +10302,7 @@ plotFactor <- function(f, y, ...){
     num_xord = bws$xnord,
     num_xcon = bws$xncon,
     no.ex = no.ex,
-    gradients = gradients,
+    gradients = FALSE,
     itmax = itmax,
     xmcv.numRow = attr(bws$xmcv, "num.row"),
     nmulti = itmax,
@@ -10333,7 +10333,7 @@ plotFactor <- function(f, y, ...){
     as.double(myoptd),
     as.integer(enrow),
     as.integer(bws$xndim),
-    as.logical(gradients),
+    as.logical(FALSE),
     PACKAGE = "npRmpi"
   ))[c("yq", "yqerr", "yqgrad")]
 
@@ -10359,11 +10359,13 @@ plotFactor <- function(f, y, ...){
       }
 
       if (gradients) {
-        myout$yqgrad <- matrix(data = myout$yqgrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
-        rorder <- numeric(bws$xndim)
-        xidx <- seq_len(bws$xndim)
-        rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
-        myout$yqgrad <- myout$yqgrad[, rorder, drop = FALSE]
+        myout$yqgrad <- .npqreg_quantile_gradient_from_conditional(
+          bws = bws,
+          xdat = xdat.df,
+          ydat = ydat.df,
+          exdat = txeval,
+          quantile = myout$yq
+        )
       } else {
         myout$yqgrad <- NA
       }

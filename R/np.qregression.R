@@ -43,6 +43,49 @@ npqreg <-
   dots[keep]
 }
 
+.npqreg_quantile_gradient_from_conditional <- function(bws,
+                                                       xdat,
+                                                       ydat,
+                                                       exdat,
+                                                       quantile) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  quantile <- as.double(quantile)
+
+  if (length(quantile) != nrow(exdat))
+    stop("quantile gradient helper requires one quantile per evaluation row")
+  if (ncol(ydat) != 1L)
+    stop("quantile gradient helper requires a single response")
+
+  eydat <- stats::setNames(data.frame(quantile), names(ydat)[1L])
+  cdf.obj <- .np_plot_conditional_eval(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    cdf = TRUE,
+    gradients = TRUE
+  )
+  dens.obj <- .np_plot_conditional_eval(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    cdf = FALSE,
+    gradients = FALSE
+  )
+
+  dens <- as.double(dens.obj$condens)
+  grad <- -cdf.obj$congrad / matrix(NZD(dens),
+                                    nrow = nrow(cdf.obj$congrad),
+                                    ncol = ncol(cdf.obj$congrad))
+  grad[!is.finite(grad)] <- NA_real_
+  grad
+}
+
 npqreg.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
@@ -156,9 +199,6 @@ npqreg.condbandwidth <-
         stop("'txdat' and 'exdat' are not similar data frames!")
     }
 
-    if(gradients)
-      stop("gradients not currently supported for this object")
-    
     if (length(bws$xbw) != length(txdat))
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
@@ -283,7 +323,7 @@ npqreg.condbandwidth <-
       num_xord = bws$xnord,
       num_xcon = bws$xncon,
       no.ex = no.ex,
-      gradients = gradients,
+      gradients = FALSE,
       itmax = itmax,
       xmcv.numRow = attr(bws$xmcv, "num.row"),
       nmulti = itmax,
@@ -310,7 +350,7 @@ npqreg.condbandwidth <-
             as.double(myoptd),
             as.integer(enrow),
             as.integer(bws$xndim),
-            as.logical(gradients),
+            as.logical(FALSE),
             PACKAGE="npRmpi")[c("yq", "yqerr", "yqgrad")]
 
     if (all(!is.finite(myout$yqerr) | myout$yqerr <= 0.0)) {
@@ -364,15 +404,14 @@ npqreg.condbandwidth <-
       }
     }
 
-    ##need to untangle yqgrad
-
     if(gradients){
-      myout$yqgrad = matrix(data=myout$yqgrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE) 
-      rorder = numeric(bws$xndim)
-      xidx <- seq_len(bws$xndim)
-      rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
-      myout$yqgrad = myout$yqgrad[, rorder, drop = FALSE]
-
+      myout$yqgrad <- .npqreg_quantile_gradient_from_conditional(
+        bws = bws,
+        xdat = txdat.df,
+        ydat = tydat.df,
+        exdat = txeval,
+        quantile = myout$yq
+      )
     } else {
       myout$yqgrad = NA
     }
