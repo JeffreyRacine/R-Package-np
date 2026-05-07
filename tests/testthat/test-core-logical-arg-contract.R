@@ -45,6 +45,11 @@ test_that("core estimator methods reject non-scalar logical control flags", {
     "'ftol' is no longer accepted by npqreg"
   )
   expect_error(
+    npqreg_condbandwidth(structure(list(), class = "condbandwidth"),
+                         txdat = tx, tydat = ty, foo = TRUE),
+    "unused argument in npqreg: 'foo'"
+  )
+  expect_error(
     npindex_sibandwidth(structure(list(), class = "sibandwidth"),
                         txdat = tx, tydat = ty, gradients = c(TRUE, FALSE)),
     "'gradients' must be TRUE or FALSE"

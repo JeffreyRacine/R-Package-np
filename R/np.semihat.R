@@ -941,6 +941,7 @@ npindexhat <-
            fd.step = NULL,
            ...){
 
+    .np_reject_unused_dots(list(...), "npindexhat")
     output <- match.arg(output)
     .np_semihat_require_class(bws, "sibandwidth", "npindexhat")
     s <- as.integer(s)
@@ -1087,6 +1088,7 @@ npplreghat <-
            output = c("apply", "matrix"),
            ...){
 
+    .np_reject_unused_dots(list(...), "npplreghat")
     output <- match.arg(output)
     .np_semihat_require_class(bws, "plbandwidth", "npplreghat")
     txdat <- toFrame(txdat)
@@ -1239,6 +1241,7 @@ npscoefhat <-
            leave.one.out = FALSE,
            ...){
 
+    .np_reject_unused_dots(list(...), "npscoefhat")
     output <- match.arg(output)
     .np_semihat_require_class(bws, "scbandwidth", "npscoefhat")
     iterate <- npValidateScalarLogical(iterate, "iterate")
