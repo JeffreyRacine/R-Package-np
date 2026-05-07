@@ -1359,7 +1359,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
                                             done = NULL,
                                             detail = NULL,
                                             now = .np_progress_now()) {
-  fields <- character()
+  fields <- .np_degree_progress_context_fields()
   elapsed <- max(0, now - state$started)
 
   fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
@@ -1409,6 +1409,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       surface = "bandwidth"
     )
     active.state$unknown_total_fields <- .npregbw_powell_progress_fields
+    active.state$nomad_nmulti <- 1L
     active.state$nomad_current_degree <- as.integer(degree)
     active.state <- .np_progress_show_now(active.state)
     .np_progress_runtime$bandwidth_state <- active.state
