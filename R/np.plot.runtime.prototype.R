@@ -1792,6 +1792,318 @@
   )
 }
 
+.np_plot_proto_check_npqreg_fixed_slices <- function(object,
+                                                     xdat,
+                                                     ydat,
+                                                     neval,
+                                                     xtrim) {
+  if (!inherits(object, "qregression"))
+    stop("prototype route requires a quantile regression object", call. = FALSE)
+  bws <- object$bws
+  if (!(inherits(bws, "condbandwidth") || inherits(bws, "conbandwidth")))
+    stop("prototype route requires a conditional distribution bandwidth object", call. = FALSE)
+  if (!identical(as.character(bws$type), "fixed"))
+    stop("prototype route currently supports fixed bandwidths only", call. = FALSE)
+  if (bws$xnuno != 0L)
+    stop("prototype route currently supports continuous/ordered slice variables only", call. = FALSE)
+  if (bws$xndim < 1L || bws$yndim != 1L)
+    stop("prototype route requires at least one x variable and one y variable", call. = FALSE)
+  if (!is.numeric(neval) || length(neval) != 1L || is.na(neval) || neval < 2L)
+    stop("prototype route requires scalar neval >= 2", call. = FALSE)
+  invisible(TRUE)
+}
+
+.np_plot_proto_npqreg_slice_targets <- function(bws,
+                                                xdat,
+                                                ydat,
+                                                neval,
+                                                xq,
+                                                yq,
+                                                xtrim) {
+  xq <- double(bws$xndim) + xq
+  xtrim <- double(bws$xndim) + xtrim
+  x.ev <- xdat[1L, , drop = FALSE]
+  y.ev <- ydat[1L, , drop = FALSE]
+  for (i in seq_len(bws$xndim))
+    x.ev[1L, i] <- uocquantile(xdat[, i], prob = xq[i])
+  for (i in seq_len(bws$yndim))
+    y.ev[1L, i] <- uocquantile(ydat[, i], prob = yq)
+
+  maxneval <- max(c(sapply(xdat, nlevels), neval))
+  exdat.base <- xdat[rep(1L, maxneval), , drop = FALSE]
+  eydat.base <- as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$yndim))
+  colnames(eydat.base) <- colnames(ydat)
+  for (i in seq_len(bws$xndim))
+    exdat.base[, i] <- x.ev[1L, i]
+  for (i in seq_len(bws$yndim))
+    eydat.base[, i] <- y.ev[1L, i]
+
+  slices <- vector("list", bws$xndim)
+  for (i in seq_len(bws$xndim)) {
+    if (is.factor(xdat[, i])) {
+      ei <- levels(xdat[, i])
+      ei <- factor(ei, levels = ei)
+      xi.neval <- length(ei)
+    } else {
+      xi.neval <- as.integer(neval)
+      qi <- trim.quantiles(xdat[, i], xtrim[i])
+      ei <- seq(qi[1L], qi[2L], length.out = neval)
+    }
+    exdat.i <- subcol(exdat.base, ei, i)[seq_len(xi.neval), , drop = FALSE]
+    eydat.i <- eydat.base[seq_len(xi.neval), , drop = FALSE]
+    slices[[i]] <- list(
+      index = i,
+      eval = ei,
+      neval = xi.neval,
+      exdat = exdat.i,
+      eydat = eydat.i
+    )
+  }
+
+  list(
+    base_x = x.ev,
+    base_y = y.ev,
+    maxneval = maxneval,
+    slices = slices
+  )
+}
+
+.np_plot_proto_npqreg_fixed_slices_data <- function(object,
+                                                   xdat,
+                                                   ydat,
+                                                   neval = 50,
+                                                   xq = 0.5,
+                                                   yq = 0.5,
+                                                   xtrim = 0.0,
+                                                   plot.errors.method = c("none", "asymptotic", "bootstrap"),
+                                                   plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
+                                                   plot.errors.boot.nonfixed = c("exact", "frozen"),
+                                                   plot.errors.boot.blocklen = NULL,
+                                                   plot.errors.boot.num = 399L,
+                                                   plot.errors.center = c("estimate", "bias-corrected"),
+                                                   plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
+                                                                        "simultaneous", "all"),
+                                                   plot.errors.alpha = 0.05,
+                                                   return.stages = FALSE) {
+  if (missing(xdat) || missing(ydat))
+    stop("prototype route requires explicit xdat and ydat", call. = FALSE)
+  plot.errors.method <- match.arg(plot.errors.method)
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method)
+  plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
+  plot.errors.center <- match.arg(plot.errors.center)
+  plot.errors.type <- match.arg(plot.errors.type)
+
+  bws <- object$bws
+  dat <- .np_plot_proto_clean_conditional_data(xdat = xdat, ydat = ydat)
+  xdat <- dat$xdat
+  ydat <- dat$ydat
+  .np_plot_proto_check_npqreg_fixed_slices(
+    object = object,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim
+  )
+  targets <- .np_plot_proto_npqreg_slice_targets(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xq = xq,
+    yq = yq,
+    xtrim = xtrim
+  )
+
+  plot.data <- vector("list", length(targets$slices))
+  evaluators <- vector("list", length(targets$slices))
+  intervals <- vector("list", length(targets$slices))
+  bootstraps <- vector("list", length(targets$slices))
+  for (ii in seq_along(targets$slices)) {
+    target <- targets$slices[[ii]]
+    fit <- .np_plot_quantile_eval(
+      txdat = xdat,
+      tydat = ydat,
+      exdat = target$exdat,
+      tau = object$tau,
+      bws = bws
+    )
+    temp.err <- matrix(data = NA, nrow = targets$maxneval, ncol = 3L)
+    temp.quant <- rep(NA_real_, targets$maxneval)
+    temp.quant[seq_len(target$neval)] <- fit$quantile
+    interval <- NULL
+    bootstrap <- NULL
+
+    if (identical(plot.errors.method, "bootstrap")) {
+      bootstrap <- compute.bootstrap.errors(
+        xdat = xdat,
+        ydat = ydat,
+        exdat = target$exdat,
+        eydat = target$eydat,
+        cdf = TRUE,
+        quantreg = TRUE,
+        tau = object$tau,
+        gradients = FALSE,
+        gradient.index = 0L,
+        slice.index = target$index,
+        plot.errors.boot.method = plot.errors.boot.method,
+        plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+        plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+        plot.errors.boot.num = plot.errors.boot.num,
+        plot.errors.center = plot.errors.center,
+        plot.errors.type = plot.errors.type,
+        plot.errors.alpha = plot.errors.alpha,
+        progress.target = .np_plot_conditional_bootstrap_target_label(
+          bws = bws,
+          slice.index = target$index,
+          gradients = FALSE,
+          gradient.index = 0L
+        ),
+        bws = bws
+      )
+      temp.err[seq_len(target$neval), ] <- bootstrap$boot.err
+      interval <- list(
+        err = bootstrap$boot.err[, 1:2, drop = FALSE],
+        all.err = bootstrap$boot.all.err
+      )
+    } else if (identical(plot.errors.method, "asymptotic")) {
+      asym <- .np_plot_asymptotic_error_from_se(
+        se = fit$quanterr,
+        alpha = plot.errors.alpha,
+        band.type = plot.errors.type,
+        m = target$neval
+      )
+      temp.err[seq_len(target$neval), 1:2] <- asym$err
+      interval <- list(err = asym$err, all.err = asym$all.err)
+    }
+
+    payload <- fit
+    if (!identical(plot.errors.method, "none")) {
+      payload$quanterr <- na.omit(cbind(
+        -temp.err[seq_len(target$neval), 1L],
+        temp.err[seq_len(target$neval), 2L]
+      ))
+      payload$bias <- na.omit(
+        temp.quant[seq_len(target$neval)] - temp.err[seq_len(target$neval), 3L]
+      )
+      payload$bxp <- if (is.null(bootstrap)) list() else bootstrap$bxp
+    }
+
+    plot.data[[ii]] <- payload
+    evaluators[[ii]] <- fit
+    intervals[[ii]] <- interval
+    bootstraps[[ii]] <- bootstrap
+  }
+  names(plot.data) <- paste0("cd", seq_along(plot.data))
+
+  if (!isTRUE(return.stages))
+    return(plot.data)
+
+  list(
+    state = list(
+      bws = bws,
+      xdat = xdat,
+      ydat = ydat,
+      ntrain = nrow(xdat),
+      family = "npqreg",
+      tau = object$tau,
+      gradients = FALSE
+    ),
+    target_grid = targets,
+    evaluator = evaluators,
+    intervals = intervals,
+    bootstrap = bootstraps,
+    plot_data = plot.data
+  )
+}
+
+.np_plot_proto_npqreg_fixed_none_data <- function(object,
+                                                 xdat,
+                                                 ydat,
+                                                 neval = 50,
+                                                 xq = 0.5,
+                                                 yq = 0.5,
+                                                 xtrim = 0.0,
+                                                 return.stages = FALSE) {
+  .np_plot_proto_npqreg_fixed_slices_data(
+    object = object,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xq = xq,
+    yq = yq,
+    xtrim = xtrim,
+    plot.errors.method = "none",
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npqreg_fixed_asymptotic_data <- function(object,
+                                                       xdat,
+                                                       ydat,
+                                                       neval = 50,
+                                                       xq = 0.5,
+                                                       yq = 0.5,
+                                                       xtrim = 0.0,
+                                                       plot.errors.type = c("pmzsd", "pointwise",
+                                                                            "bonferroni", "simultaneous",
+                                                                            "all"),
+                                                       plot.errors.alpha = 0.05,
+                                                       return.stages = FALSE) {
+  .np_plot_proto_npqreg_fixed_slices_data(
+    object = object,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xq = xq,
+    yq = yq,
+    xtrim = xtrim,
+    plot.errors.method = "asymptotic",
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npqreg_fixed_bootstrap_data <- function(object,
+                                                      xdat,
+                                                      ydat,
+                                                      neval = 50,
+                                                      xq = 0.5,
+                                                      yq = 0.5,
+                                                      xtrim = 0.0,
+                                                      plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
+                                                      plot.errors.boot.nonfixed = c("exact", "frozen"),
+                                                      plot.errors.boot.blocklen = NULL,
+                                                      plot.errors.boot.num = 399L,
+                                                      plot.errors.center = c("estimate", "bias-corrected"),
+                                                      plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
+                                                                           "simultaneous", "all"),
+                                                      plot.errors.alpha = 0.05,
+                                                      return.stages = FALSE) {
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method)
+  plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
+  plot.errors.center <- match.arg(plot.errors.center)
+  plot.errors.type <- match.arg(plot.errors.type)
+  .np_plot_proto_npqreg_fixed_slices_data(
+    object = object,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xq = xq,
+    yq = yq,
+    xtrim = xtrim,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = plot.errors.boot.method,
+    plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+    plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+    plot.errors.boot.num = plot.errors.boot.num,
+    plot.errors.center = plot.errors.center,
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    return.stages = return.stages
+  )
+}
+
 .np_plot_proto_check_unconditional_fixed_surface <- function(bws,
                                                             xdat,
                                                             neval,
