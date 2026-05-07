@@ -107,10 +107,57 @@ np_render_control <- function(style = c("band", "bar"),
   ))
 }
 
-.np_plot_validate_qregression_dots <- function(dots_call) {
+.np_plot_canonical_arg_names <- function() {
+  c("errors", "band", "alpha", "bootstrap", "B", "center",
+    "behavior", "renderer", "neval", "perspective",
+    "boot_control", "grid_control", "render_control")
+}
+
+.np_plot_legacy_arg_names <- function() {
+  c("plot.errors.method", "plot.errors.type", "plot.errors.alpha",
+    "plot.errors.boot.method", "plot.errors.boot.num",
+    "plot.errors.boot.nonfixed", "plot.errors.boot.wild",
+    "plot.errors.boot.blocklen", "plot.errors.center",
+    "plot.errors.style", "plot.errors.bar", "plot.errors.bar.num",
+    "plot.behavior", "gradient", "persp", "plot.par.mfrow")
+}
+
+.np_plot_engine_for_bws <- function(bws) {
+  cls <- class(bws)
+  if ("rbandwidth" %in% cls)
+    return(.np_plot_rbandwidth_engine)
+  if ("conbandwidth" %in% cls)
+    return(.np_plot_conbandwidth_engine)
+  if ("condbandwidth" %in% cls)
+    return(.np_plot_condbandwidth_engine)
+  if ("plbandwidth" %in% cls)
+    return(.np_plot_plbandwidth_engine)
+  if ("sibandwidth" %in% cls)
+    return(.np_plot_sibandwidth_engine)
+  if ("scbandwidth" %in% cls)
+    return(.np_plot_scbandwidth_engine)
+  if ("dbandwidth" %in% cls)
+    return(.np_plot_dbandwidth_engine)
+  if ("bandwidth" %in% cls)
+    return(.np_plot_bandwidth_engine)
+  NULL
+}
+
+.np_plot_allowed_engine_args <- function(method = NULL, bws = NULL) {
+  if (!is.null(method) && identical(method, .np_plot_compat_dispatch))
+    method <- .np_plot_engine_for_bws(bws)
+  if (is.null(method))
+    return(character())
+  setdiff(names(formals(method)), c("bws", "..."))
+}
+
+.np_plot_validate_public_dots <- function(dots_call,
+                                          method = NULL,
+                                          bws = NULL,
+                                          context = "plot") {
   dot.names <- .np_plot_dot_names(dots_call)
   if (any(!nzchar(dot.names)))
-    stop("unnamed plot arguments are not supported for plot.qregression",
+    stop(sprintf("unnamed plot arguments are not supported for %s", context),
          call. = FALSE)
   if ("intervals" %in% dot.names)
     stop("unused plot argument: intervals; did you mean errors?",
@@ -121,18 +168,12 @@ np_render_control <- function(style = c("band", "bar"),
   if ("bands" %in% dot.names)
     stop("unused plot argument: bands; did you mean band?",
          call. = FALSE)
-  canonical <- c("errors", "band", "alpha", "bootstrap", "B", "center",
-                 "behavior", "renderer", "neval", "perspective",
-                 "boot_control", "grid_control", "render_control")
-  legacy <- c("plot.errors.method", "plot.errors.type", "plot.errors.alpha",
-              "plot.errors.boot.method", "plot.errors.boot.num",
-              "plot.errors.boot.nonfixed", "plot.errors.boot.wild",
-              "plot.errors.boot.blocklen", "plot.errors.center",
-              "plot.errors.style", "plot.errors.bar",
-              "plot.errors.bar.num", "plot.behavior", "gradient", "persp",
-              "plot.par.mfrow")
-  engine <- setdiff(names(formals(.np_plot_condbandwidth_engine)), "...")
-  allowed <- unique(c(canonical, legacy, engine, .np_plot_graphics_arg_names()))
+  canonical <- .np_plot_canonical_arg_names()
+  legacy <- .np_plot_legacy_arg_names()
+  engine <- .np_plot_allowed_engine_args(method = method, bws = bws)
+  dispatcher <- "random.seed"
+  allowed <- unique(c(canonical, legacy, dispatcher, engine,
+                      .np_plot_graphics_arg_names()))
   bad <- setdiff(dot.names[nzchar(dot.names)], allowed)
   .np_plot_stop_unused_args(bad, allowed)
   invisible(NULL)
@@ -149,7 +190,7 @@ np_render_control <- function(style = c("band", "bar"),
   dots
 }
 
-.np_plot_normalize_qregression_dots <- function(dots) {
+.np_plot_normalize_public_dots <- function(dots, context = "plot") {
   supplied <- names(dots)
   has <- function(x) x %in% supplied
 
@@ -255,7 +296,7 @@ np_render_control <- function(style = c("band", "bar"),
       dots <- .np_plot_set_normalized_arg(dots, "grid_control$xq",
                                           "xq", ctrl$xq)
     if (!is.null(ctrl$slices))
-      stop("grid_control$slices is not yet supported for plot.qregression",
+      stop(sprintf("grid_control$slices is not yet supported for %s", context),
            call. = FALSE)
   }
   if (has("render_control")) {
@@ -274,10 +315,10 @@ np_render_control <- function(style = c("band", "bar"),
       dots <- .np_plot_set_normalized_arg(dots, "render_control$rug",
                                           "plot.rug", TRUE)
     if (isTRUE(ctrl$overlay))
-      stop("render_control$overlay is not yet supported for plot.qregression",
+      stop(sprintf("render_control$overlay is not yet supported for %s", context),
            call. = FALSE)
     if (isTRUE(ctrl$rotate))
-      stop("render_control$rotate is not yet supported for plot.qregression",
+      stop(sprintf("render_control$rotate is not yet supported for %s", context),
            call. = FALSE)
   }
 
@@ -305,8 +346,16 @@ np_render_control <- function(style = c("band", "bar"),
   dots
 }
 
-.np_plot_call_method <- function(method, bws, ...) {
+.np_plot_call_method <- function(method, bws, ..., .plot_dots_call = NULL,
+                                 .plot_context = "plot") {
+  .np_plot_validate_public_dots(
+    .plot_dots_call,
+    method = method,
+    bws = bws,
+    context = .plot_context
+  )
   dots <- list(...)
+  dots <- .np_plot_normalize_public_dots(dots, context = .plot_context)
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 
@@ -401,11 +450,15 @@ np_render_control <- function(style = c("band", "bar"),
   stop("unsupported bandwidth class for plotting")
 }
 
-.np_plot_from_slot <- function(object, slot = "bws", ...) {
+.np_plot_from_slot <- function(object, slot = "bws", ...,
+                               .plot_dots_call = NULL,
+                               .plot_context = "plot") {
   bws <- object[[slot]]
   if (is.null(bws))
     stop("plot object does not contain expected bandwidth slot")
-  .np_plot_call_method(.np_plot_compat_dispatch, bws = bws, ...)
+  .np_plot_call_method(.np_plot_compat_dispatch, bws = bws, ...,
+                       .plot_dots_call = .plot_dots_call,
+                       .plot_context = .plot_context)
 }
 
 .np_plot_restore_bandwidth_from_call <- function(object, bws, caller_env = parent.frame()) {
@@ -465,8 +518,15 @@ np_render_control <- function(style = c("band", "bar"),
   out
 }
 
-.np_plot_npregression <- function(object, ...) {
+.np_plot_npregression <- function(object, ..., .plot_dots_call = NULL) {
+  .np_plot_validate_public_dots(
+    .plot_dots_call,
+    method = .np_plot_compat_dispatch,
+    bws = object$bws,
+    context = "plot.npregression"
+  )
   dots <- list(...)
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npregression")
   if (is.null(dots$xdat) && is.null(dots$ydat) &&
       is.null(object$bws$formula) &&
       !is.null(object$call)) {
@@ -489,8 +549,15 @@ np_render_control <- function(style = c("band", "bar"),
 
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
-.np_plot_npdensity <- function(object, ...) {
+.np_plot_npdensity <- function(object, ..., .plot_dots_call = NULL) {
+  .np_plot_validate_public_dots(
+    .plot_dots_call,
+    method = .np_plot_compat_dispatch,
+    bws = object$bws,
+    context = "plot.npdensity"
+  )
   dots <- list(...)
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity")
   plot.rug <- FALSE
   if (!is.null(dots$plot.rug)) {
     plot.rug <- .np_plot_match_flag(dots$plot.rug, "plot.rug")
@@ -537,39 +604,71 @@ np_render_control <- function(style = c("band", "bar"),
     }
   }
 
-  .np_plot_from_slot(object, "bws", ...)
+  do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
-.np_plot_condensity <- function(object, ...) {
+.np_plot_condensity <- function(object, ..., .plot_dots_call = NULL) {
+  .np_plot_validate_public_dots(
+    .plot_dots_call,
+    method = .np_plot_compat_dispatch,
+    bws = object$bws,
+    context = "plot.condensity"
+  )
   dots <- list(...)
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.condensity")
   if (is.null(dots$proper) && isTRUE(object$proper.requested))
     dots$proper <- TRUE
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
-.np_plot_condistribution <- function(object, ...) {
+.np_plot_condistribution <- function(object, ..., .plot_dots_call = NULL) {
+  .np_plot_validate_public_dots(
+    .plot_dots_call,
+    method = .np_plot_compat_dispatch,
+    bws = object$bws,
+    context = "plot.condistribution"
+  )
   dots <- list(...)
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.condistribution")
   if (is.null(dots$proper) && isTRUE(object$proper.requested))
     dots$proper <- TRUE
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
-.np_plot_npdistribution <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
+.np_plot_npdistribution <- function(object, ..., .plot_dots_call = NULL)
+  .np_plot_from_slot(object, "bws", ...,
+                     .plot_dots_call = .plot_dots_call,
+                     .plot_context = "plot.npdistribution")
 .np_plot_qregression <- function(object, ..., .plot_dots_call = NULL) {
-  .np_plot_validate_qregression_dots(.plot_dots_call)
+  .np_plot_validate_public_dots(
+    .plot_dots_call,
+    method = .np_plot_compat_dispatch,
+    bws = object$bws,
+    context = "plot.qregression"
+  )
   dots <- list(...)
-  dots <- .np_plot_normalize_qregression_dots(dots)
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.qregression")
   if (is.null(dots$quantreg))
     dots$quantreg <- TRUE
   if (is.null(dots$tau) && !is.null(object$tau))
     dots$tau <- object$tau
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
-.np_plot_singleindex <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
-.np_plot_smoothcoefficient <- function(object, ...) {
-  dots <- list(...)
+.np_plot_singleindex <- function(object, ..., .plot_dots_call = NULL)
+  .np_plot_from_slot(object, "bws", ...,
+                     .plot_dots_call = .plot_dots_call,
+                     .plot_context = "plot.singleindex")
+.np_plot_smoothcoefficient <- function(object, ..., .plot_dots_call = NULL) {
   obj.bws <- .np_plot_restore_bandwidth_from_call(
     object = object,
     bws = object$bws,
     caller_env = parent.frame(2L)
   )
+  .np_plot_validate_public_dots(
+    .plot_dots_call,
+    method = .np_plot_compat_dispatch,
+    bws = obj.bws,
+    context = "plot.smoothcoefficient"
+  )
+  dots <- list(...)
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.smoothcoefficient")
 
   if (is.null(dots$xdat) && is.null(dots$ydat) && is.null(dots$zdat) &&
       isTRUE(object$trainiseval) &&
@@ -592,13 +691,20 @@ np_render_control <- function(style = c("band", "bar"),
   do.call(.np_plot_call_method,
           c(list(method = .np_plot_compat_dispatch, bws = obj.bws), dots))
 }
-.np_plot_plregression <- function(object, ...) {
-  dots <- list(...)
+.np_plot_plregression <- function(object, ..., .plot_dots_call = NULL) {
   obj.bws <- .np_plot_restore_bandwidth_from_call(
     object = object,
     bws = .np_plreg_bws(object, where = "plot.plregression"),
     caller_env = parent.frame(2L)
   )
+  .np_plot_validate_public_dots(
+    .plot_dots_call,
+    method = .np_plot_compat_dispatch,
+    bws = obj.bws,
+    context = "plot.plregression"
+  )
+  dots <- list(...)
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.plregression")
 
   if (is.null(dots$xdat) && is.null(dots$ydat) && is.null(dots$zdat) &&
       isTRUE(object$trainiseval) &&
@@ -631,23 +737,63 @@ np_render_control <- function(style = c("band", "bar"),
           c(list(method = .np_plot_compat_dispatch, bws = obj.bws), dots))
 }
 
-plot.bandwidth <- function(x, ...) .np_plot_call_method(.np_plot_bandwidth_engine, bws = x, ...)
-plot.rbandwidth <- function(x, ...) .np_plot_call_method(.np_plot_rbandwidth_engine, bws = x, ...)
-plot.dbandwidth <- function(x, ...) .np_plot_call_method(.np_plot_dbandwidth_engine, bws = x, ...)
-plot.conbandwidth <- function(x, ...) .np_plot_call_method(.np_plot_conbandwidth_engine, bws = x, ...)
-plot.condbandwidth <- function(x, ...) .np_plot_call_method(.np_plot_condbandwidth_engine, bws = x, ...)
-plot.plbandwidth <- function(x, ...) .np_plot_call_method(.np_plot_plbandwidth_engine, bws = x, ...)
-plot.sibandwidth <- function(x, ...) .np_plot_call_method(.np_plot_sibandwidth_engine, bws = x, ...)
-plot.scbandwidth <- function(x, ...) .np_plot_call_method(.np_plot_scbandwidth_engine, bws = x, ...)
+plot.bandwidth <- function(x, ...)
+  .np_plot_call_method(.np_plot_bandwidth_engine, bws = x, ...,
+                       .plot_dots_call = match.call(expand.dots = FALSE)$...,
+                       .plot_context = "plot.bandwidth")
+plot.rbandwidth <- function(x, ...)
+  .np_plot_call_method(.np_plot_rbandwidth_engine, bws = x, ...,
+                       .plot_dots_call = match.call(expand.dots = FALSE)$...,
+                       .plot_context = "plot.rbandwidth")
+plot.dbandwidth <- function(x, ...)
+  .np_plot_call_method(.np_plot_dbandwidth_engine, bws = x, ...,
+                       .plot_dots_call = match.call(expand.dots = FALSE)$...,
+                       .plot_context = "plot.dbandwidth")
+plot.conbandwidth <- function(x, ...)
+  .np_plot_call_method(.np_plot_conbandwidth_engine, bws = x, ...,
+                       .plot_dots_call = match.call(expand.dots = FALSE)$...,
+                       .plot_context = "plot.conbandwidth")
+plot.condbandwidth <- function(x, ...)
+  .np_plot_call_method(.np_plot_condbandwidth_engine, bws = x, ...,
+                       .plot_dots_call = match.call(expand.dots = FALSE)$...,
+                       .plot_context = "plot.condbandwidth")
+plot.plbandwidth <- function(x, ...)
+  .np_plot_call_method(.np_plot_plbandwidth_engine, bws = x, ...,
+                       .plot_dots_call = match.call(expand.dots = FALSE)$...,
+                       .plot_context = "plot.plbandwidth")
+plot.sibandwidth <- function(x, ...)
+  .np_plot_call_method(.np_plot_sibandwidth_engine, bws = x, ...,
+                       .plot_dots_call = match.call(expand.dots = FALSE)$...,
+                       .plot_context = "plot.sibandwidth")
+plot.scbandwidth <- function(x, ...)
+  .np_plot_call_method(.np_plot_scbandwidth_engine, bws = x, ...,
+                       .plot_dots_call = match.call(expand.dots = FALSE)$...,
+                       .plot_context = "plot.scbandwidth")
 
-plot.npregression <- function(x, ...) .np_plot_npregression(x, ...)
-plot.npdensity <- function(x, ...) .np_plot_npdensity(x, ...)
-plot.condensity <- function(x, ...) .np_plot_condensity(x, ...)
-plot.condistribution <- function(x, ...) .np_plot_condistribution(x, ...)
-plot.npdistribution <- function(x, ...) .np_plot_npdistribution(x, ...)
+plot.npregression <- function(x, ...)
+  .np_plot_npregression(x, ...,
+                        .plot_dots_call = match.call(expand.dots = FALSE)$...)
+plot.npdensity <- function(x, ...)
+  .np_plot_npdensity(x, ...,
+                     .plot_dots_call = match.call(expand.dots = FALSE)$...)
+plot.condensity <- function(x, ...)
+  .np_plot_condensity(x, ...,
+                      .plot_dots_call = match.call(expand.dots = FALSE)$...)
+plot.condistribution <- function(x, ...)
+  .np_plot_condistribution(x, ...,
+                           .plot_dots_call = match.call(expand.dots = FALSE)$...)
+plot.npdistribution <- function(x, ...)
+  .np_plot_npdistribution(x, ...,
+                          .plot_dots_call = match.call(expand.dots = FALSE)$...)
 plot.qregression <- function(x, ...)
   .np_plot_qregression(x, ...,
                        .plot_dots_call = match.call(expand.dots = FALSE)$...)
-plot.singleindex <- function(x, ...) .np_plot_singleindex(x, ...)
-plot.smoothcoefficient <- function(x, ...) .np_plot_smoothcoefficient(x, ...)
-plot.plregression <- function(x, ...) .np_plot_plregression(x, ...)
+plot.singleindex <- function(x, ...)
+  .np_plot_singleindex(x, ...,
+                       .plot_dots_call = match.call(expand.dots = FALSE)$...)
+plot.smoothcoefficient <- function(x, ...)
+  .np_plot_smoothcoefficient(x, ...,
+                             .plot_dots_call = match.call(expand.dots = FALSE)$...)
+plot.plregression <- function(x, ...)
+  .np_plot_plregression(x, ...,
+                        .plot_dots_call = match.call(expand.dots = FALSE)$...)
