@@ -2477,17 +2477,38 @@ summary.npregiv <- function(object, ...) {
   cat("\n\n")
 }
 
+.np_plot_validate_npregiv_call <- function(call,
+                                           method_args,
+                                           context) {
+  call.args <- as.list(call)[-1L]
+  arg.names <- names(call.args)
+  if (is.null(arg.names))
+    arg.names <- rep.int("", length(call.args))
+  if (sum(!nzchar(arg.names)) > 1L)
+    stop(sprintf("unnamed plot arguments are not supported for %s", context),
+         call. = FALSE)
+  allowed <- unique(c("x", method_args, .np_plot_graphics_arg_names()))
+  bad <- setdiff(arg.names[nzchar(arg.names)], allowed)
+  .np_plot_stop_unused_args(bad, allowed)
+  invisible(NULL)
+}
+
 plot.npregiv <- function(x,
                          plot.data = FALSE,
                          deriv = FALSE,
                          ...) {
 
   object <- x
+  .np_plot_validate_npregiv_call(
+    sys.call(),
+    method_args = c("plot.data", "deriv"),
+    context = "plot.npregiv"
+  )
   dots <- list(...)
   take_arg <- function(name, default = NULL) {
     if (!is.null(dots[[name]])) {
       val <- dots[[name]]
-      dots[[name]] <- NULL
+      dots[[name]] <<- NULL
       return(val)
     }
     default

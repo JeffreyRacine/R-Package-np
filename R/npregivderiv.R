@@ -503,11 +503,16 @@ plot.npregivderiv <- function(x,
                               ...) {
 
   object <- x
+  .np_plot_validate_npregiv_call(
+    sys.call(),
+    method_args = c("plot.data", "phi"),
+    context = "plot.npregivderiv"
+  )
   dots <- list(...)
   take_arg <- function(name, default = NULL) {
     if (!is.null(dots[[name]])) {
       val <- dots[[name]]
-      dots[[name]] <- NULL
+      dots[[name]] <<- NULL
       return(val)
     }
     default
