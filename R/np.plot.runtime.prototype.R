@@ -609,3 +609,303 @@
   }
   invisible(plot.data)
 }
+
+.np_plot_proto_check_npreg_fixed_surface <- function(bws,
+                                                     xdat,
+                                                     ydat,
+                                                     neval,
+                                                     xtrim) {
+  if (!inherits(bws, "rbandwidth"))
+    stop("prototype route requires a regression bandwidth object", call. = FALSE)
+  regtype.engine <- if (is.null(bws$regtype.engine)) {
+    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  } else {
+    as.character(bws$regtype.engine)
+  }
+  if (!is.element(regtype.engine, c("lc", "lp")))
+    stop("prototype route currently supports regtype='lc', 'll', or 'lp' only", call. = FALSE)
+  if (!identical(as.character(bws$type), "fixed"))
+    stop("prototype route currently supports fixed bandwidths only", call. = FALSE)
+  if (bws$ndim != 2L)
+    stop("prototype route currently supports two-dimensional regression surfaces only", call. = FALSE)
+  if (bws$nuno != 0L)
+    stop("prototype route currently supports continuous/ordered surface variables only", call. = FALSE)
+  if (bws$ncon + bws$nord != 2L)
+    stop("prototype route requires a two-dimensional regression surface", call. = FALSE)
+  if (!is.numeric(neval) || length(neval) != 1L || is.na(neval) || neval < 2L)
+    stop("prototype route requires scalar neval >= 2", call. = FALSE)
+  invisible(TRUE)
+}
+
+.np_plot_proto_clean_regression_data <- function(xdat, ydat) {
+  xdat <- toFrame(xdat)
+  ydat <- as.vector(ydat)
+  keep.rows <- rep_len(TRUE, nrow(xdat))
+  rows.omit <- attr(na.omit(data.frame(xdat, ydat)), "na.action")
+  if (length(rows.omit) > 0L)
+    keep.rows[as.integer(rows.omit)] <- FALSE
+  if (!any(keep.rows))
+    stop("Data has no rows without NAs")
+  list(
+    xdat = xdat[keep.rows, , drop = FALSE],
+    ydat = ydat[keep.rows]
+  )
+}
+
+.np_plot_proto_regression_surface_grid <- function(bws,
+                                                   xdat,
+                                                   neval,
+                                                   xtrim) {
+  xtrim <- double(bws$ndim) + xtrim
+
+  if (is.ordered(xdat[, 1L])) {
+    x1.eval <- bws$xdati$all.ulev[[1L]]
+    x1.neval <- length(x1.eval)
+  } else {
+    x1.neval <- as.integer(neval)
+    qi <- trim.quantiles(xdat[, 1L], xtrim[1L])
+    x1.eval <- seq(qi[1L], qi[2L], length.out = x1.neval)
+  }
+
+  if (is.ordered(xdat[, 2L])) {
+    x2.eval <- bws$xdati$all.ulev[[2L]]
+    x2.neval <- length(x2.eval)
+  } else {
+    x2.neval <- as.integer(neval)
+    qi <- trim.quantiles(xdat[, 2L], xtrim[2L])
+    x2.eval <- seq(qi[1L], qi[2L], length.out = x2.neval)
+  }
+
+  x.eval <- expand.grid(x1.eval, x2.eval)
+  if (is.ordered(xdat[, 1L]))
+    x1.eval <- bws$xdati$all.dlev[[1L]][as.integer(x1.eval)]
+  if (is.ordered(xdat[, 2L]))
+    x2.eval <- bws$xdati$all.dlev[[2L]][as.integer(x2.eval)]
+
+  list(
+    x.eval = x.eval,
+    x1.eval = x1.eval,
+    x2.eval = x2.eval,
+    x1.neval = x1.neval,
+    x2.neval = x2.neval
+  )
+}
+
+.np_plot_proto_npreg_fixed_data <- function(bws,
+                                            xdat,
+                                            ydat,
+                                            neval = 50,
+                                            xtrim = 0.0,
+                                            plot.errors.method = c("none", "asymptotic", "bootstrap"),
+                                            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
+                                            plot.errors.boot.nonfixed = c("exact", "frozen"),
+                                            plot.errors.boot.wild = c("rademacher", "mammen"),
+                                            plot.errors.boot.blocklen = NULL,
+                                            plot.errors.boot.num = 399L,
+                                            plot.errors.center = c("estimate", "bias-corrected"),
+                                            plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
+                                                                 "simultaneous", "all"),
+                                            plot.errors.alpha = 0.05,
+                                            return.stages = FALSE) {
+  if (missing(xdat) || missing(ydat))
+    stop("prototype route requires explicit xdat and ydat", call. = FALSE)
+  plot.errors.method <- match.arg(plot.errors.method)
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method)
+  plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
+  plot.errors.boot.wild <- match.arg(plot.errors.boot.wild)
+  plot.errors.center <- match.arg(plot.errors.center)
+  plot.errors.type <- match.arg(plot.errors.type)
+
+  dat <- .np_plot_proto_clean_regression_data(xdat = xdat, ydat = ydat)
+  xdat <- dat$xdat
+  ydat <- dat$ydat
+  .np_plot_proto_check_npreg_fixed_surface(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim
+  )
+  grid <- .np_plot_proto_regression_surface_grid(
+    bws = bws,
+    xdat = xdat,
+    neval = neval,
+    xtrim = xtrim
+  )
+  fit <- .np_plot_regression_eval(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    exdat = grid$x.eval,
+    gradients = FALSE,
+    need.asymptotic = identical(plot.errors.method, "asymptotic")
+  )
+
+  terr <- matrix(data = fit$merr, nrow = nrow(grid$x.eval), ncol = 3L)
+  terr[, 3L] <- NA_real_
+  interval <- NULL
+  bootstrap <- NULL
+  treg <- matrix(data = fit$mean,
+                 nrow = grid$x1.neval,
+                 ncol = grid$x2.neval,
+                 byrow = FALSE)
+  if (identical(plot.errors.method, "bootstrap")) {
+    bootstrap <- compute.bootstrap.errors(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = grid$x.eval,
+      gradients = FALSE,
+      gradient.order = 1L,
+      slice.index = 0L,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+      plot.errors.boot.wild = plot.errors.boot.wild,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.boot.num = plot.errors.boot.num,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      progress.target = NULL,
+      bws = bws
+    )
+    terr <- bootstrap$boot.err
+    interval <- list(
+      err = bootstrap$boot.err[, 1:2, drop = FALSE],
+      all.err = bootstrap$boot.all.err
+    )
+  } else if (identical(plot.errors.method, "asymptotic")) {
+    interval <- .np_plot_asymptotic_error_from_se(
+      se = fit$merr,
+      alpha = plot.errors.alpha,
+      band.type = plot.errors.type,
+      m = nrow(grid$x.eval)
+    )
+    terr[, 1:2] <- interval$err
+  }
+
+  r1 <- npregression(
+    bws = bws,
+    eval = grid$x.eval,
+    mean = as.double(treg),
+    merr = terr[, 1:2, drop = FALSE],
+    ntrain = nrow(xdat)
+  )
+  r1$bias <- NA
+  if (identical(plot.errors.center, "bias-corrected"))
+    r1$bias <- terr[, 3L] - treg
+
+  plot.data <- list(r1 = r1)
+  if (!isTRUE(return.stages))
+    return(plot.data)
+
+  list(
+    state = list(
+      bws = bws,
+      xdat = xdat,
+      ydat = ydat,
+      ntrain = nrow(xdat),
+      family = "npreg",
+      gradients = FALSE
+    ),
+    target_grid = grid,
+    evaluator = fit,
+    intervals = if (is.null(interval)) NULL else list(
+      method = plot.errors.method,
+      type = plot.errors.type,
+      alpha = plot.errors.alpha,
+      err = interval$err,
+      all.err = interval$all.err
+    ),
+    bootstrap = if (is.null(bootstrap)) NULL else list(
+      method = plot.errors.boot.method,
+      nonfixed = plot.errors.boot.nonfixed,
+      wild = plot.errors.boot.wild,
+      blocklen = plot.errors.boot.blocklen,
+      B = plot.errors.boot.num,
+      center = plot.errors.center,
+      boot.err = bootstrap$boot.err,
+      boot.all.err = bootstrap$boot.all.err,
+      bxp = bootstrap$bxp
+    ),
+    plot_data = plot.data
+  )
+}
+
+.np_plot_proto_npreg_fixed_none_data <- function(bws,
+                                                 xdat,
+                                                 ydat,
+                                                 neval = 50,
+                                                 xtrim = 0.0,
+                                                 return.stages = FALSE) {
+  .np_plot_proto_npreg_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    plot.errors.method = "none",
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npreg_fixed_asymptotic_data <- function(bws,
+                                                       xdat,
+                                                       ydat,
+                                                       neval = 50,
+                                                       xtrim = 0.0,
+                                                       plot.errors.type = c("pmzsd", "pointwise",
+                                                                            "bonferroni", "simultaneous",
+                                                                            "all"),
+                                                       plot.errors.alpha = 0.05,
+                                                       return.stages = FALSE) {
+  .np_plot_proto_npreg_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    plot.errors.method = "asymptotic",
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    return.stages = return.stages
+  )
+}
+
+.np_plot_proto_npreg_fixed_bootstrap_data <- function(bws,
+                                                     xdat,
+                                                     ydat,
+                                                     neval = 50,
+                                                     xtrim = 0.0,
+                                                     plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
+                                                     plot.errors.boot.nonfixed = c("exact", "frozen"),
+                                                     plot.errors.boot.wild = c("rademacher", "mammen"),
+                                                     plot.errors.boot.blocklen = NULL,
+                                                     plot.errors.boot.num = 399L,
+                                                     plot.errors.center = c("estimate", "bias-corrected"),
+                                                     plot.errors.type = c("pmzsd", "pointwise", "bonferroni",
+                                                                          "simultaneous", "all"),
+                                                     plot.errors.alpha = 0.05,
+                                                     return.stages = FALSE) {
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method)
+  plot.errors.boot.nonfixed <- match.arg(plot.errors.boot.nonfixed)
+  plot.errors.boot.wild <- match.arg(plot.errors.boot.wild)
+  plot.errors.center <- match.arg(plot.errors.center)
+  plot.errors.type <- match.arg(plot.errors.type)
+  .np_plot_proto_npreg_fixed_data(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    neval = neval,
+    xtrim = xtrim,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = plot.errors.boot.method,
+    plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+    plot.errors.boot.wild = plot.errors.boot.wild,
+    plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+    plot.errors.boot.num = plot.errors.boot.num,
+    plot.errors.center = plot.errors.center,
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    return.stages = return.stages
+  )
+}
