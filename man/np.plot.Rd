@@ -100,7 +100,7 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
         \code{npcdens}/\code{npcdensbw}, and
         \code{npcdist}/\code{npcdistbw}. In this tranche,
         \code{renderer="rgl"} requires \code{perspective=TRUE},
-        \code{view="fixed"} and \code{plot.behavior="plot"};
+        \code{view="fixed"} and \code{behavior="plot"};
         unsupported combinations still error rather than falling back
         silently. The suggested package
         \code{rgl} must be installed when \code{renderer="rgl"} is
@@ -118,8 +118,8 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
         \code{npscoef} surface routes, \code{plot.data.overlay=TRUE}
         adds observed data as an interactive point cloud. For all
         currently supported \code{rgl} surface routes,
-        \code{plot.errors.method != "none"} adds interval surfaces;
-        \code{plot.errors.type="all"} draws pointwise,
+        \code{errors != "none"} adds interval surfaces;
+        \code{band="all"} draws pointwise,
         simultaneous, and bonferroni band families with distinct,
         colorblind-safer colors when those bands are available for
         the route.
@@ -141,7 +141,7 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
         the new overlay layers,
         \code{rgl.points3d.<arg>} customizes observed-point overlays
         and \code{rgl.surface3d.<arg>} customizes interval surfaces.
-        When \code{plot.errors.type="all"} is used on supported
+        When \code{band="all"} is used on supported
         \code{rgl} routes, a matching interactive legend is drawn, and
         \code{rgl.legend3d.<arg>} may be used to customize it, for
         example \code{rgl.legend3d.bty="o"} to restore a legend box.
@@ -163,7 +163,7 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
       \item{\code{view}, \code{theta}, \code{phi}}{
         view controls for bivariate continuous surface plots.
       }
-      \item{\code{plot.behavior}}{
+      \item{\code{behavior}}{
         one of \code{"plot"}, \code{"plot-data"}, or \code{"data"}.
       }
       \item{\code{plot.data.overlay}}{
@@ -196,42 +196,44 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
         plots. On supported regression surfaces, both options may be
         used together. Default is \code{FALSE}.
       }
-      \item{\code{plot.errors.method}}{
+      \item{\code{errors}}{
         one of \code{"none"}, \code{"bootstrap"}, or
         \code{"asymptotic"}.
       }
-      \item{\code{plot.errors.boot.method}}{
+      \item{\code{bootstrap}}{
         the bootstrap resampling scheme. Regression-family plots support
         \code{"wild"}, \code{"inid"}, \code{"fixed"}, and
         \code{"geom"}; density/distribution-family plots support
         \code{"inid"}, \code{"fixed"}, and \code{"geom"}.
       }
-      \item{\code{plot.errors.boot.nonfixed}}{
-        for non-fixed density/distribution bootstrap routes, one of
-        \code{"exact"} or \code{"frozen"}.
+      \item{\code{B}}{
+        the bootstrap replication count.
       }
-      \item{\code{plot.errors.boot.wild}}{
-        the wild-bootstrap multiplier distribution, one of
-        \code{"rademacher"} or \code{"mammen"}, when relevant.
-      }
-      \item{\code{plot.errors.boot.blocklen}, \code{plot.errors.boot.num}}{
-        the dependent-bootstrap block length and the bootstrap
-        replication count.
-      }
-      \item{\code{plot.errors.center}}{
+      \item{\code{center}}{
         one of \code{"estimate"} or \code{"bias-corrected"}.
       }
-      \item{\code{plot.errors.type}}{
+      \item{\code{band}}{
         one of \code{"pmzsd"}, \code{"pointwise"},
         \code{"bonferroni"}, \code{"simultaneous"}, or \code{"all"}.
       }
-      \item{\code{plot.errors.alpha}}{
+      \item{\code{alpha}}{
         the nominal significance level used for interval/band
         construction.
       }
-      \item{\code{plot.errors.style}, \code{plot.errors.bar},
-      \code{plot.errors.bar.num}}{
-        controls for band- versus bar-style uncertainty displays.
+      \item{\code{boot_control}}{
+        optional detailed bootstrap controls created by
+        \code{\link{np_boot_control}}. This controls non-fixed bootstrap
+        behavior, wild-bootstrap multipliers, and dependent-bootstrap
+        block length.
+      }
+      \item{\code{grid_control}}{
+        optional detailed grid controls created by
+        \code{\link{np_grid_control}}.
+      }
+      \item{\code{render_control}}{
+        optional detailed rendering controls created by
+        \code{\link{np_render_control}}, including band-versus-bar
+        uncertainty display controls.
       }
       \item{\code{plot.bxp}, \code{plot.bxp.out}}{
         boxplot-style bootstrap summary controls for factor/categorical
@@ -328,7 +330,7 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
   \eqn{\alpha/m} in place of \eqn{\alpha}. For the kernel estimators in
   this package, asymptotic simultaneous bands are not generally
   available, so \code{"simultaneous"} with
-  \code{plot.errors.method="asymptotic"} returns \code{NA} bands.
+  \code{errors="asymptotic"} returns \code{NA} bands.
   Asymptotic standard errors are taken from fitted-object components such as
   \code{merr}, \code{gerr}, \code{derr}, \code{conderr}, and
   \code{congerr} where implemented.
@@ -349,7 +351,8 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
   }
   For non-fixed density/distribution bootstrap, an explicit experimental
   approximation is available via
-  \code{plot.errors.boot.nonfixed=c("exact","frozen")}. The default
+  \code{boot_control = np_boot_control(nonfixed = "exact")} or
+  \code{boot_control = np_boot_control(nonfixed = "frozen")}. The default
   \code{"exact"} route recomputes the non-fixed geometry for each resample.
   The experimental \code{"frozen"} route reuses the original-sample
   non-fixed geometry throughout the bootstrap run. This option is currently
@@ -387,7 +390,7 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
   to one using trapezoidal quadrature weights from the evaluation
   \eqn{y}-grid, while each conditional distribution slice is projected to
   be monotone and bounded in \eqn{[0,1]}. When
-  \code{plot.errors.method="bootstrap"}, the bootstrap resample surfaces
+  \code{errors="bootstrap"}, the bootstrap resample surfaces
   are computed first on that same fixed grid and then properized
   resample-by-resample using the same grid geometry before
   \code{"pointwise"}, \code{"bonferroni"}, \code{"simultaneous"}, and
@@ -411,7 +414,7 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
   is minimized.
 
   The default bootstrap replication count is
-  \code{plot.errors.boot.num=1999}. For pointwise tails, ensure
+  \code{B=1999}. For pointwise tails, ensure
   \eqn{B \ge \lceil 2/\alpha - 1 \rceil}{B >= ceiling(2/alpha - 1)} so
   \eqn{\alpha(B+1)} is feasible on the bootstrap rank grid. For interval
   types \code{"bonferroni"}, \code{"simultaneous"}, and \code{"all"},
@@ -425,20 +428,27 @@ Further graphical controls are passed through \code{\dots} to the relevant plot 
   Typical plotting calls:
   \preformatted{
   ## Asymptotic pointwise/bonferroni intervals
-  plot(bw, plot.errors.method="asymptotic", plot.errors.type="pointwise")
-  plot(bw, plot.errors.method="asymptotic", plot.errors.type="bonferroni")
+  plot(bw, errors="asymptotic", band="pointwise")
+  plot(bw, errors="asymptotic", band="bonferroni")
 
   ## Regression-family bootstrap (wild available)
-  plot(bw, plot.errors.method="bootstrap", plot.errors.boot.method="wild")
+  plot(bw, errors="bootstrap", bootstrap="wild")
 
   ## Density/distribution-family bootstrap (use inid/fixed/geom)
-  plot(bw, plot.errors.method="bootstrap", plot.errors.boot.method="inid")
+  plot(bw, errors="bootstrap", bootstrap="inid")
   }
+
+  Historical \code{plot.errors.*} and \code{plot.behavior} names remain
+  accepted as compatibility inputs in this release, but new code should use
+  \code{errors}, \code{bootstrap}, \code{B}, \code{band}, \code{alpha},
+  \code{center}, \code{behavior}, and the control constructors documented in
+  \code{\link{np_boot_control}}, \code{\link{np_grid_control}}, and
+  \code{\link{np_render_control}}.
 
 }
 
 \value{
-  Setting \code{plot.behavior} will instruct \code{plot} what data
+  Setting \code{behavior} will instruct \code{plot} what data
   to return. Option summary:\cr
   \code{plot}: instruct \code{plot} to just plot the data and
   return \code{NULL} \cr
@@ -572,7 +582,7 @@ plot(bw)
 # will interrupt on *NIX systems, <esc> will interrupt on MS Windows
 # systems)
 
-plot(bw, plot.errors.method = "asymptotic")
+plot(bw, errors = "asymptotic")
 
 # EXAMPLE 2: For this example, we simulate multivariate data, and plot the
 # partial regression surfaces for a locally linear estimator and its
@@ -609,13 +619,13 @@ plot(bw, gradients=TRUE)
 # completed prior to results being displayed...
 
 plot(bw,
-     plot.errors.method="bootstrap",
-     plot.errors.center="bias-corrected",
-     plot.errors.type="simultaneous")
+     errors="bootstrap",
+     center="bias-corrected",
+     band="simultaneous")
 
 # EXAMPLE 3: This example demonstrates how to retrieve plotting data from
 # plot(). When plot() is called with the arguments
-# `plot.behavior="plot-data"' (or "data"), it returns plotting objects
+# `behavior="plot-data"' (or "data"), it returns plotting objects
 # named r1, r2, and so on (rg1, rg2, and so on when `gradients=TRUE' is
 # set).  Each plotting object's index (1,2,...) corresponds to the index
 # of the explanatory data data frame xdat (and zdat if appropriate).
@@ -631,13 +641,13 @@ bw <- npregbw(xdat=cps71$age, ydat=cps71$logwage,
               regtype="ll", bwmethod="cv.aic")
 
 # Generate the plot and return plotting data, and store output in
-# `plot.out' (NOTE: the call to `plot.behavior' is necessary).
+# `plot.out' (NOTE: the call to `behavior' is necessary).
 
 plot.out <- plot(bw,
                  perspective=FALSE,
-                 plot.errors.method="bootstrap",
-                 plot.errors.boot.num=25,
-                 plot.behavior="plot-data")
+                 errors="bootstrap",
+                 B=25,
+                 behavior="plot-data")
 
 # Now grab the r1 object that plot plotted on the screen, and take
 # what you need. First, take the output, lower error bound and upper
@@ -668,9 +678,9 @@ lines(age.eval,logwage.upper.ci,lty=3)
 
 plot.out <- plot(bw,
                  perspective=FALSE,
-                 plot.errors.method="bootstrap",
-                 plot.errors.boot.num=25,
-                 plot.behavior="plot-data",
+                 errors="bootstrap",
+                 B=25,
+                 behavior="plot-data",
                  gradients=TRUE)
 
 # Now grab object that plot() plotted on the screen. First, take the
