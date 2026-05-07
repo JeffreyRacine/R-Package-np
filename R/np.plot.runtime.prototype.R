@@ -1113,3 +1113,80 @@
     cdf = TRUE
   )
 }
+
+.np_plot_proto_rectangular_surface_base_render <- function(plot.data,
+                                                          perspective = TRUE,
+                                                          main = NULL,
+                                                          xlab = NULL,
+                                                          ylab = NULL,
+                                                          zlab = NULL,
+                                                          col = "lightblue",
+                                                          theta = 0.0,
+                                                          phi = 20.0,
+                                                          ...) {
+  if (!is.list(plot.data))
+    stop("renderer prototype requires a plot-data list", call. = FALSE)
+
+  obj <- NULL
+  value.name <- NULL
+  value.label <- NULL
+  if (!is.null(plot.data$r1) && inherits(plot.data$r1, "npregression")) {
+    obj <- plot.data$r1
+    value.name <- "mean"
+    value.label <- "Conditional mean"
+  } else if (!is.null(plot.data$d1) && inherits(plot.data$d1, "npdensity")) {
+    obj <- plot.data$d1
+    value.name <- "dens"
+    value.label <- "Density"
+  } else if (!is.null(plot.data$d1) && inherits(plot.data$d1, "npdistribution")) {
+    obj <- plot.data$d1
+    value.name <- "dist"
+    value.label <- "Distribution"
+  }
+  if (is.null(obj))
+    stop("renderer prototype requires npregression, npdensity, or npdistribution plot data", call. = FALSE)
+
+  xeval <- obj$eval
+  if (!is.data.frame(xeval) || ncol(xeval) != 2L)
+    stop("renderer prototype requires a two-column rectangular evaluation grid", call. = FALSE)
+  x <- unique(as.numeric(xeval[, 1L]))
+  y <- unique(as.numeric(xeval[, 2L]))
+  z <- matrix(as.numeric(obj[[value.name]]), nrow = length(x), ncol = length(y), byrow = FALSE)
+  if (length(x) * length(y) != length(obj[[value.name]]) ||
+      any(!is.finite(x)) || any(!is.finite(y)) || any(!is.finite(z))) {
+    stop("renderer prototype requires a finite rectangular surface", call. = FALSE)
+  }
+
+  xlab <- if (is.null(xlab)) names(xeval)[1L] else xlab
+  ylab <- if (is.null(ylab)) names(xeval)[2L] else ylab
+  zlab <- if (is.null(zlab)) value.label else zlab
+  main <- if (is.null(main)) value.label else main
+
+  if (isTRUE(perspective)) {
+    graphics::persp(
+      x = x,
+      y = y,
+      z = z,
+      theta = theta,
+      phi = phi,
+      xlab = xlab,
+      ylab = ylab,
+      zlab = zlab,
+      main = main,
+      col = col,
+      ...
+    )
+  } else {
+    graphics::image(
+      x = x,
+      y = y,
+      z = z,
+      xlab = xlab,
+      ylab = ylab,
+      main = main,
+      col = grDevices::hcl.colors(64L, "YlOrRd", rev = TRUE),
+      ...
+    )
+  }
+  invisible(plot.data)
+}

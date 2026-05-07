@@ -188,3 +188,39 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
     expect_equal(stages$plot_data, candidate, info = case)
   }
 })
+
+test_that("npudens and npudist staged plot data can be rendered without estimator re-entry", {
+  dens.proto <- getFromNamespace(".np_plot_proto_npudens_fixed_none_data", "np")
+  dist.proto <- getFromNamespace(".np_plot_proto_npudist_fixed_none_data", "np")
+  render <- getFromNamespace(".np_plot_proto_rectangular_surface_base_render", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(2403)
+
+  n <- 55L
+  x <- data.frame(x1 = rnorm(n), x2 = runif(n, -1, 1))
+  dens.bw <- npudensbw(
+    dat = x,
+    bws = c(0.55, 0.60),
+    bandwidth.compute = FALSE,
+    bwtype = "fixed"
+  )
+  dist.bw <- npudistbw(
+    dat = x,
+    bws = c(0.55, 0.60),
+    bandwidth.compute = FALSE,
+    bwtype = "fixed"
+  )
+  dens.data <- dens.proto(dens.bw, xdat = x, neval = 5L)
+  dist.data <- dist.proto(dist.bw, xdat = x, neval = 5L)
+  pdf.file <- tempfile(fileext = ".pdf")
+  grDevices::pdf(pdf.file)
+  on.exit(if (grDevices::dev.cur() > 1L) grDevices::dev.off(), add = TRUE)
+
+  expect_identical(render(dens.data, perspective = FALSE), dens.data)
+  expect_identical(render(dens.data, perspective = TRUE), dens.data)
+  expect_identical(render(dist.data, perspective = FALSE), dist.data)
+  expect_identical(render(dist.data, perspective = TRUE), dist.data)
+  grDevices::dev.off()
+  expect_true(file.exists(pdf.file))
+  expect_gt(file.info(pdf.file)$size, 0)
+})

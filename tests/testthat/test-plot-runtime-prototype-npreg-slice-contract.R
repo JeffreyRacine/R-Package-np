@@ -231,3 +231,36 @@ test_that("npreg fixed bootstrap plot-data prototype matches current route", {
     expect_equal(stages$plot_data, candidate, info = label)
   }
 })
+
+test_that("npreg staged plot data can be rendered without estimator re-entry", {
+  proto <- getFromNamespace(".np_plot_proto_npreg_fixed_none_data", "np")
+  render <- getFromNamespace(".np_plot_proto_rectangular_surface_base_render", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(2205)
+
+  n <- 55L
+  x <- data.frame(x1 = runif(n, -1, 1), x2 = runif(n, -1, 1))
+  y <- x$x1 + x$x2^2 + rnorm(n, sd = 0.1)
+  bw <- npregbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.55, 0.55),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = c(1L, 1L),
+    bwtype = "fixed"
+  )
+  plot.data <- proto(bw, xdat = x, ydat = y, neval = 5L)
+  pdf.file <- tempfile(fileext = ".pdf")
+  grDevices::pdf(pdf.file)
+  on.exit(if (grDevices::dev.cur() > 1L) grDevices::dev.off(), add = TRUE)
+
+  out.image <- render(plot.data, perspective = FALSE)
+  out.persp <- render(plot.data, perspective = TRUE)
+
+  expect_identical(out.image, plot.data)
+  expect_identical(out.persp, plot.data)
+  grDevices::dev.off()
+  expect_true(file.exists(pdf.file))
+  expect_gt(file.info(pdf.file)$size, 0)
+})
