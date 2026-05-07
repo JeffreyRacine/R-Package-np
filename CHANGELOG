@@ -1,5 +1,10 @@
 Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
 
+* Hardened OpenMPI runtime initialization on Debian-compatible systems by
+  probing the current `libmpi.so.40` runtime SONAME before the generic
+  `libmpi.so` fallback, while preserving existing older OpenMPI probes and
+  failure behavior.
+
 * Added the redesigned public plot-control interface with direct scalar
   controls such as `errors`, `band`, `alpha`, `bootstrap`, `B`, `behavior`,
   `renderer`, and `perspective`, plus validated `np_boot_control()`,

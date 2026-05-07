@@ -143,6 +143,7 @@ if (flag)
 #ifdef OPENMPI
     if (!dlopen("libmpi.so.1", RTLD_GLOBAL | RTLD_LAZY) 
 	&& !dlopen("libmpi.so.0", RTLD_GLOBAL | RTLD_LAZY)
+	&& !dlopen("libmpi.so.40", RTLD_GLOBAL | RTLD_LAZY)
 	&& !dlopen("libmpi.so", RTLD_GLOBAL | RTLD_LAZY)) {
         Rprintf("%s\n",dlerror());
         return AsInt(0);
