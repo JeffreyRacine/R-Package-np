@@ -106,8 +106,8 @@ These arguments control where the quantile regression is evaluated and which fit
 
 
   \item{tau}{
-    a numeric value specifying the \eqn{\tau}{tau}th quantile is
-    desired. Defaults to \code{0.5}.
+    a numeric value specifying the quantile probability
+    \eqn{\tau}{tau}. Defaults to \code{0.5}.
   }
 
 
@@ -156,13 +156,56 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
 
 
   Given a conditional distribution bandwidth object, \code{npqreg}
-  estimates the conditional distribution at candidate response values
-  and extracts the requested conditional quantile by a one-dimensional
-  numerical refinement over the observed support of the dependent
-  variable. The refinement minimizes the squared residual between the
-  estimated conditional distribution and the requested probability
+  estimates the conditional distribution function
+  \eqn{F(y|x)} and extracts the requested conditional quantile. For
+  \eqn{0 < \tau < 1}, the conditional quantile at probability
+  \eqn{\tau}{tau} is
+  \deqn{
+    q_\tau(x) = \inf\{y : F(y|x) \ge \tau\}.
+  }
+  Equivalently, \eqn{q_\tau(x)} is a quasi-inverse of the conditional
+  distribution in the sense of Nelsen (2006): an inverse agrees with
+  \eqn{F} on the range of \eqn{F}, while outside that range the
+  generalized inverse is defined by the lower endpoint at which
+  \eqn{F} reaches or exceeds the requested probability. Numerically,
+  \code{npqreg} searches over the observed support of the dependent
+  variable and refines the one-dimensional solution by minimizing the
+  squared residual between the estimated conditional distribution and
   \code{tau}. The arguments \code{tol}, \code{small}, and \code{itmax}
   control this one-dimensional refinement.
+
+  Let \eqn{f(y|x) = \partial F(y|x)/\partial y} denote the conditional
+  density. The asymptotic standard error of the conditional quantile is
+  computed by the first-order delta method,
+  \deqn{
+    se\{\hat q_\tau(x)\}
+      =
+    \frac{se\{\hat F(\hat q_\tau(x)|x)\}}
+         {\hat f(\hat q_\tau(x)|x)} ,
+  }
+  using the conditional distribution standard-error machinery and the
+  estimated conditional density evaluated at the fitted quantile. This
+  corresponds to the quantile variance expression in Li, Lin and
+  Racine (2013).
+
+  If \code{gradients=TRUE}, \code{npqreg} also computes gradients of
+  the conditional quantile with respect to the conditioning variables
+  for which gradients are defined. Differentiating
+  \eqn{F(q_\tau(x)|x) = \tau} gives
+  \deqn{
+    \nabla_x q_\tau(x)
+      =
+    -\frac{F_x(q_\tau(x)|x)}{f(q_\tau(x)|x)},
+  }
+  where \eqn{F_x(y|x)} is the derivative of the conditional
+  distribution with respect to \eqn{x}. The corresponding first-order
+  gradient standard errors are computed componentwise as
+  \deqn{
+    se\{\nabla_x \hat q_\tau(x)\}
+      =
+    \frac{se\{\hat F_x(\hat q_\tau(x)|x)\}}
+         {\hat f(\hat q_\tau(x)|x)} .
+  }
 
 }
 
@@ -186,10 +229,12 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
     regression estimates, obtained from the conditional distribution
     standard error and the estimated conditional density at the fitted
     quantile }
-  \item{quantgrad}{ gradients at each evaluation point }
+  \item{quantgrad}{ gradients of the conditional quantile with respect
+    to the conditioning variables at each evaluation point, when
+    \code{gradients=TRUE} }
   \item{quantgerr}{ asymptotic standard errors for gradients, when
     \code{gradients=TRUE} }
-  \item{tau}{ the \eqn{\tau}{tau}th quantile computed }
+  \item{tau}{ the quantile probability computed }
 
 
 }
@@ -220,6 +265,9 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
   Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
   Selection for Nonparametric Conditional Distribution and Quantile
   Functions}, Journal of Business and Economic Statistics, 31, 57-65.
+
+  Nelsen, R.B. (2006), \emph{An Introduction to Copulas}, Second
+  Edition, Springer.
 
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
     estimators for discrete distributions,} Biometrika, 68, 301-309.
