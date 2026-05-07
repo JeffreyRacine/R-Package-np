@@ -51,19 +51,19 @@ test_that("npcdens plot prototype fails early outside its vertical slice", {
   set.seed(124)
 
   n <- 60L
-  x <- data.frame(x = runif(n))
+  x <- data.frame(x = factor(rbinom(n, 1L, 0.5)))
   y <- data.frame(y = rnorm(n))
   bw <- npcdensbw(
     xdat = x,
     ydat = y,
     nmulti = 1L,
     regtype = "lc",
-    bwtype = "generalized_nn"
+    bwtype = "fixed"
   )
 
   expect_error(
     proto(bw, xdat = x, ydat = y, neval = 9L),
-    "bwtype='fixed'",
+    "continuous/ordered surface variables",
     fixed = TRUE
   )
 
@@ -481,5 +481,108 @@ test_that("npcdens fixed LL/LP inid bootstrap plot-data prototype matches curren
     expect_equal(stages$bootstrap$boot.err[, 1:2, drop = FALSE],
                  candidate$cd1$conderr,
                  info = nm)
+  }
+})
+
+test_that("npcdens generalized/adaptive NN no-error plot-data prototype matches current route", {
+  proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_none_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(131)
+
+  n <- 70L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+  cases <- c("generalized_nn", "adaptive_nn")
+
+  for (bwtype in cases) {
+    bw <- npcdensbw(
+      xdat = x,
+      ydat = y,
+      nmulti = 1L,
+      regtype = "lc",
+      bwtype = bwtype
+    )
+    old <- plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      plot.behavior = "data",
+      plot.errors.method = "none",
+      view = "fixed",
+      neval = 7L,
+      perspective = TRUE
+    )
+    candidate <- proto(bw, xdat = x, ydat = y, neval = 7L)
+    stages <- proto(bw, xdat = x, ydat = y, neval = 7L, return.stages = TRUE)
+
+    expect_equal(candidate$cd1$xeval, old$cd1$xeval, info = bwtype)
+    expect_equal(candidate$cd1$yeval, old$cd1$yeval, info = bwtype)
+    expect_equal(candidate$cd1$condens, old$cd1$condens, info = bwtype)
+    expect_equal(candidate$cd1$conderr, old$cd1$conderr, info = bwtype)
+    expect_equal(stages$plot_data, candidate, info = bwtype)
+  }
+})
+
+test_that("npcdens generalized/adaptive NN inid bootstrap plot-data prototype matches current route", {
+  proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_bootstrap_inid_data", "np")
+  withr::local_options(np.messages = FALSE)
+  set.seed(132)
+
+  n <- 55L
+  x <- data.frame(x = runif(n))
+  y <- data.frame(y = rnorm(n))
+  cases <- c("generalized_nn", "adaptive_nn")
+
+  for (ii in seq_along(cases)) {
+    bwtype <- cases[ii]
+    bw <- npcdensbw(
+      xdat = x,
+      ydat = y,
+      nmulti = 1L,
+      regtype = "lc",
+      bwtype = bwtype
+    )
+    boot.seed <- 9300L + ii
+    set.seed(boot.seed)
+    old <- suppressWarnings(plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      plot.behavior = "data",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = "inid",
+      plot.errors.boot.num = 11L,
+      plot.errors.type = "pmzsd",
+      view = "fixed",
+      neval = 5L,
+      perspective = TRUE,
+      random.seed = boot.seed
+    ))
+    set.seed(boot.seed)
+    candidate <- suppressWarnings(proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 5L,
+      plot.errors.boot.num = 11L,
+      plot.errors.type = "pmzsd"
+    ))
+    set.seed(boot.seed)
+    stages <- suppressWarnings(proto(
+      bw,
+      xdat = x,
+      ydat = y,
+      neval = 5L,
+      plot.errors.boot.num = 11L,
+      plot.errors.type = "pmzsd",
+      return.stages = TRUE
+    ))
+
+    expect_equal(candidate$cd1$condens, old$cd1$condens, info = bwtype)
+    expect_equal(candidate$cd1$conderr, old$cd1$conderr, info = bwtype)
+    expect_identical(stages$bootstrap$method, "inid")
+    expect_equal(stages$bootstrap$boot.err[, 1:2, drop = FALSE],
+                 candidate$cd1$conderr,
+                 info = bwtype)
   }
 })

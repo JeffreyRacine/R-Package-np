@@ -13,8 +13,8 @@
   }
   if (!is.element(regtype.engine, c("lc", "lp")))
     stop("prototype route currently supports regtype='lc', 'll', or 'lp' only", call. = FALSE)
-  if (!identical(as.character(bws$type), "fixed"))
-    stop("prototype route currently supports bwtype='fixed' only", call. = FALSE)
+  if (!is.element(as.character(bws$type), c("fixed", "generalized_nn", "adaptive_nn")))
+    stop("prototype route currently supports fixed, generalized-NN, or adaptive-NN bandwidths only", call. = FALSE)
   if (bws$xndim != 1L || bws$yndim != 1L)
     stop("prototype route currently supports one x variable and one y variable", call. = FALSE)
   if (bws$xnuno + bws$ynuno != 0L)
