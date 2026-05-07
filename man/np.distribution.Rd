@@ -122,10 +122,8 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   integral/grid controls, and numerical search controls if defaults
   need to be changed.
 
-  For S3 plotting help, use \code{methods("plot")} and query
-  class-specific help topics such as \code{?plot.npregression} and
-  \code{?plot.rbandwidth}. You can inspect implementations with
-  \code{getS3method("plot","npregression")}.
+  For S3 plotting help, see \code{\link{plot.np}}. You can list
+  available plot methods with \code{methods("plot")}.
 
 
   Typical usages are (see below for a complete list of options and also

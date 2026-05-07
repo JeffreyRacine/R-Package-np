@@ -201,10 +201,8 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   search controls, and finally local-polynomial/NOMAD controls for
   polynomial-adaptive fits.
 
-  For S3 plotting help, use \code{methods("plot")} and query
-  class-specific help topics such as \code{?plot.npregression} and
-  \code{?plot.rbandwidth}. You can inspect implementations with
-  \code{getS3method("plot","npregression")}.
+  For S3 plotting help, see \code{\link{plot.np}}. You can list
+  available plot methods with \code{methods("plot")}.
 
   \code{npcdist} implements a variety of methods for estimating
   multivariate conditional cumulative distributions (\eqn{p+q}-variate)

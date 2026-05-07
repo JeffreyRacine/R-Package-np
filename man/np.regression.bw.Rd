@@ -550,8 +550,8 @@ These arguments collect remaining controls passed through S3 methods.
 The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
 
   Documentation guide: see \code{\link{np.kernels}} for kernels,
-  \code{\link{np.options}} for global options, \code{\link{plot}} for
-  plotting options, and \code{\link{npRmpi.init}} for
+  \code{\link{np.options}} for global options, \code{\link{plot}},
+  \code{\link{plot.np}} for plotting options, and \code{\link{npRmpi.init}} for
   interactive/cluster MPI startup. See \code{\link{npRmpi.init}}
   details for performance tradeoffs (message passing/startup mode) and
   the \code{inst/Rprofile} manual-broadcast template.
@@ -567,10 +567,8 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
   object can pass these same bandwidth-selection controls through that
   function's \code{\dots}.
 
-  For S3 plotting help, use \code{methods("plot")} and query
-  class-specific help topics such as \code{?plot.npregression} and
-  \code{?plot.rbandwidth}. You can inspect implementations with
-  \code{getS3method("plot","npregression")}.
+  For S3 plotting help, see \code{\link{plot.np}}. You can list
+  available plot methods with \code{methods("plot")}.
 
   \code{npregbw} implements a variety of methods for choosing
   bandwidths for multivariate (\eqn{p}-variate) regression data defined
@@ -807,7 +805,7 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}}
   \code{\link{npreg}}
 }
 \examples{

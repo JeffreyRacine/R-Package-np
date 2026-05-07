@@ -479,8 +479,8 @@ or standard-deviation factors.
   not affected by \code{scale.factor.search.lower}.
 
   Documentation guide: see \code{\link{np.kernels}} for kernels,
-  \code{\link{np.options}} for global options, \code{\link{plot}} for
-  plotting options, and \code{\link{npRmpi.init}} for
+  \code{\link{np.options}} for global options, \code{\link{plot}},
+  \code{\link{plot.np}} for plotting options, and \code{\link{npRmpi.init}} for
   interactive/cluster MPI startup. See \code{\link{npRmpi.init}}
   details for performance tradeoffs (message passing/startup mode) and
   the \code{inst/Rprofile} manual-broadcast template.
@@ -496,10 +496,8 @@ or standard-deviation factors.
   bandwidth object can pass these same bandwidth-selection controls
   through that function's \code{\dots}.
 
-  For S3 plotting help, use \code{methods("plot")} and query
-  class-specific help topics such as \code{?plot.npregression} and
-  \code{?plot.rbandwidth}. You can inspect implementations with
-  \code{getS3method("plot","npregression")}.
+  For S3 plotting help, see \code{\link{plot.np}}. You can list
+  available plot methods with \code{methods("plot")}.
 
 
   Typical usages are (see below for a complete list of options and also
@@ -693,7 +691,7 @@ or standard-deviation factors.
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}}
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}},  \code{\link{hist}},
   \code{\link{npudist}}, \code{\link{npudist}} }
 \examples{
