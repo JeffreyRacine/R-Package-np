@@ -19,8 +19,8 @@ npindex_frozen_plot_case <- function(label, boot.method) {
     "tf <- tempfile(fileext='.pdf')",
     "grDevices::pdf(tf)",
     "on.exit({ try(grDevices::dev.off(), silent=TRUE); unlink(tf) }, add=TRUE)",
-    sprintf("args <- list(x=fit, neval=20L, plot.errors.method='bootstrap', plot.errors.boot.method='%s', plot.errors.boot.nonfixed='frozen', plot.errors.boot.num=41L, plot.errors.type='pointwise', gradients=TRUE)", boot.method),
-    "if (identical(args$plot.errors.boot.method, 'geom')) args$plot.errors.boot.blocklen <- 4L",
+    sprintf("args <- list(x=fit, neval=20L, errors='bootstrap', bootstrap='%s', boot_control=np_boot_control(nonfixed='frozen'), B=41L, band='pointwise', gradients=TRUE)", boot.method),
+    "if (identical(args$bootstrap, 'geom')) args$boot_control <- np_boot_control(nonfixed='frozen', blocklen=4L)",
     "capture.output(do.call(plot, args))",
     sprintf("cat('%s\\n')", ok_tag)
   )
@@ -54,7 +54,7 @@ test_that("npRmpi npindex frozen inid stays on the exact public scale", {
       "z <- rnorm(n)",
       "y <- x^2 + rnorm(n, sd = 0.25 * stats::sd(x))",
       "fit <- suppressWarnings(npindex(y ~ x + z, bwtype='adaptive_nn', nmulti=1L))",
-      "get_obj <- function(mode) suppressWarnings(plot(fit, plot.behavior='data', neval=40L, plot.errors.method='bootstrap', plot.errors.boot.method='inid', plot.errors.boot.nonfixed=mode, plot.errors.boot.num=39L, plot.errors.type='pointwise'))[[1L]]",
+      "get_obj <- function(mode) suppressWarnings(plot(fit, behavior='data', neval=40L, errors='bootstrap', bootstrap='inid', boot_control=np_boot_control(nonfixed=mode), B=39L, band='pointwise'))[[1L]]",
       "frozen <- get_obj('frozen')",
       "exact <- get_obj('exact')",
       "ratio <- stats::median(abs(exact$merr[, 1L]) / pmax(abs(frozen$merr[, 1L]), 1e-12), na.rm = TRUE)",

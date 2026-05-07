@@ -25,11 +25,11 @@ run_bootstrap_plot <- function(bw,
                                boot_method = "inid") {
   args <- list(
     bw,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = boot_method,
-    plot.errors.boot.num = boot_num
+    errors = "bootstrap",
+    bootstrap = boot_method,
+    B = boot_num
   )
   if (!is.null(xdat))
     args$xdat <- xdat

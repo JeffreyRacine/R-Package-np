@@ -328,11 +328,11 @@ test_that("npplreg generalized-nn inid plot helper completes in session mode", {
     xdat = tx,
     ydat = y,
     zdat = tz,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 5
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 5
   )
 
   expect_true(is.list(out))
@@ -374,9 +374,9 @@ test_that("npplreg generalized-nn wild plot helper preserves means in session mo
     xdat = tx,
     ydat = y,
     zdat = tz,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
-    plot.errors.method = "none"
+    errors = "none"
   )
 
   set.seed(20260308)
@@ -385,11 +385,11 @@ test_that("npplreg generalized-nn wild plot helper preserves means in session mo
     xdat = tx,
     ydat = y,
     zdat = tz,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "wild",
-    plot.errors.boot.num = 5
+    errors = "bootstrap",
+    bootstrap = "wild",
+    B = 5
   )
 
   expect_equal(as.vector(wild.out[[1L]]$mean), as.vector(none.out[[1L]]$mean), tolerance = 1e-10)
@@ -429,9 +429,9 @@ test_that("npplreg adaptive-nn wild plot helper preserves means in session mode"
     xdat = tx,
     ydat = y,
     zdat = tz,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
-    plot.errors.method = "none"
+    errors = "none"
   )
 
   set.seed(20260311)
@@ -440,11 +440,11 @@ test_that("npplreg adaptive-nn wild plot helper preserves means in session mode"
     xdat = tx,
     ydat = y,
     zdat = tz,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "wild",
-    plot.errors.boot.num = 5
+    errors = "bootstrap",
+    bootstrap = "wild",
+    B = 5
   )
 
   expect_equal(as.vector(wild.out[[1L]]$mean), as.vector(none.out[[1L]]$mean), tolerance = 1e-10)
@@ -484,9 +484,9 @@ test_that("npplreg generalized-nn plot means match public estimator in session m
     xdat = tx,
     ydat = y,
     zdat = tz,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
-    plot.errors.method = "none"
+    errors = "none"
   )
 
   ex.x <- out[[1L]]$evalx
@@ -1219,10 +1219,10 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       ydat = y,
       zdat = data.frame(z = z),
       perspective = FALSE,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 19
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = "wild",
+      B = 19
     )
   )
   expect_type(sc.out, "list")
@@ -1235,12 +1235,12 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       ydat = y,
       zdat = data.frame(z = z),
       perspective = FALSE,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.wild = "rademacher",
-      plot.errors.type = "pointwise",
-      plot.errors.boot.num = 19
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = "wild",
+      boot_control = np_boot_control(wild = "rademacher"),
+      band = "pointwise",
+      B = 19
     )
   )
   expect_type(sc.out.rad, "list")
@@ -1280,10 +1280,10 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
         ydat = y,
         zdat = data.frame(z = z),
         perspective = FALSE,
-        plot.behavior = "data",
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "wild",
-        plot.errors.boot.num = 9
+        behavior = "data",
+        errors = "bootstrap",
+        bootstrap = "wild",
+        B = 9
       )
     )
     expect_true(is.list(pl.out), info = cfg$label)
@@ -1301,10 +1301,10 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       sibw,
       xdat = data.frame(x1 = x, x2 = z),
       ydat = y,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 19
+      behavior = "data",
+      errors = "bootstrap",
+      bootstrap = "wild",
+      B = 19
     )
   )
   expect_type(si.out, "list")

@@ -85,8 +85,8 @@ test_that("session adaptive conditional plot-data smoke completes in subprocess"
       "fit.cf <- npcdist(y~x, data=d, regtype='lp', degree=1L, bwtype='adaptive_nn')",
       "png(tempfile(fileext='.png'))",
       "on.exit(dev.off(), add=TRUE)",
-      "out.cd <- suppressWarnings(plot(fit.cd, plot.behavior='data'))",
-      "out.cf <- suppressWarnings(plot(fit.cf, plot.behavior='data'))",
+      "out.cd <- suppressWarnings(plot(fit.cd, behavior='data'))",
+      "out.cf <- suppressWarnings(plot(fit.cf, behavior='data'))",
       "stopifnot(is.list(out.cd), length(out.cd) > 0L)",
       "stopifnot(is.list(out.cf), length(out.cf) > 0L)",
       "cat('SESSION_ADAPTIVE_CONDITIONAL_PLOT_OK\\n')"

@@ -19,8 +19,8 @@ test_that("plot coef option: npscoef supports coef=TRUE in data mode", {
       coef.index = 1,
       perspective = FALSE,
       neval = 20,
-      plot.behavior = "plot-data",
-      plot.errors.method = "none"
+      behavior = "plot-data",
+      errors = "none"
     )
   )
 
@@ -52,8 +52,8 @@ test_that("plot coef option: npplreg supports coef=TRUE plot-data payload", {
       ydat = y,
       zdat = zdat,
       coef = TRUE,
-      plot.behavior = "plot-data",
-      plot.errors.method = "none"
+      behavior = "plot-data",
+      errors = "none"
     )
   )
 

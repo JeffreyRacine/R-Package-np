@@ -37,7 +37,7 @@ npplreg_semiparam_frozen_contract_case <- function() {
     "  }, ns = 'npRmpi')",
     "  on.exit(assignInNamespace('.np_inid_boot_from_plreg', orig, ns = 'npRmpi'), add = TRUE)",
     "  bootstrap.plot <- NULL",
-    "  invisible(capture.output(bootstrap.plot <- plot(bw, xdat = txdat, ydat = y, zdat = tzdat, neval = 3L, plot.behavior = 'data', plot.errors.method = 'bootstrap', plot.errors.boot.method = 'inid', plot.errors.boot.nonfixed = 'frozen', plot.errors.boot.num = 41L, plot.errors.type = 'pointwise')))",
+    "  invisible(capture.output(bootstrap.plot <- plot(bw, xdat = txdat, ydat = y, zdat = tzdat, neval = 3L, behavior = 'data', errors = 'bootstrap', bootstrap = 'inid', boot_control = np_boot_control(nonfixed = 'frozen'), B = 41L, band = 'pointwise')))",
     "  stopifnot(length(modes) >= 1L)",
     "  stopifnot(all(modes == 'frozen'))",
     "  expected.slice <- local.fit(bws = bw, xdat = txdat, ydat = y, zdat = tzdat, exdat = seen.ex[[1L]], ezdat = seen.ez[[1L]])",

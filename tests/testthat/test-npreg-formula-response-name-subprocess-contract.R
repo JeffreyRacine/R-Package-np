@@ -82,7 +82,7 @@ test_that("npreg formula fits preserve the response name for plotting metadata i
       "fit <- npreg(y ~ x, data = dat, nmulti = 1, regtype = 'lp', degree = 1, bwtype = 'adaptive_nn')",
       "stopifnot(identical(fit$bws$ynames, 'y'))",
       "png(tempfile(fileext = '.png'), width = 800, height = 600)",
-      "plot(fit, plot.errors.method = 'asymptotic', view = 'fixed')",
+      "plot(fit, errors = 'asymptotic', view = 'fixed')",
       "dev.off()",
       "cat('NPREG_FORMULA_YNAME_OK\\n')"
     ),

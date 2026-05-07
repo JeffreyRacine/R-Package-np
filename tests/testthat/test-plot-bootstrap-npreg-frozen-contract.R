@@ -18,8 +18,8 @@ npreg_frozen_plot_case <- function(label, bwtype, boot.method) {
     "tf <- tempfile(fileext='.pdf')",
     "grDevices::pdf(tf)",
     "on.exit({ try(grDevices::dev.off(), silent=TRUE); unlink(tf) }, add=TRUE)",
-    sprintf("args <- list(x=fit, neval=20L, plot.errors.method='bootstrap', plot.errors.boot.method='%s', plot.errors.boot.nonfixed='frozen', plot.errors.boot.num=41L, plot.errors.type='pointwise', gradients=TRUE)", boot.method),
-    "if (identical(args$plot.errors.boot.method, 'geom')) args$plot.errors.boot.blocklen <- 4L",
+    sprintf("args <- list(x=fit, neval=20L, errors='bootstrap', bootstrap='%s', boot_control=np_boot_control(nonfixed='frozen'), B=41L, band='pointwise', gradients=TRUE)", boot.method),
+    "if (identical(args$bootstrap, 'geom')) args$boot_control <- np_boot_control(nonfixed='frozen', blocklen=4L)",
     "capture.output(do.call(plot, args))",
     sprintf("cat('%s\\n')", ok_tag)
   )

@@ -176,12 +176,12 @@ test_that("sibandwidth fixed gradient bootstrap now works for helper methods", {
       bw,
       xdat = tx,
       ydat = y,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
       gradients = TRUE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = boot.method,
-      plot.errors.boot.num = 9L
+      errors = "bootstrap",
+      bootstrap = boot.method,
+      B = 9L
     ))[[1]]
 
     expect_true(all(is.finite(out$grad)))
@@ -215,12 +215,12 @@ test_that("single-index nonfixed gradient helper methods still fail fast", {
           bw,
           xdat = tx,
           ydat = y,
-          plot.behavior = "data",
+          behavior = "data",
           perspective = FALSE,
           gradients = TRUE,
-          plot.errors.method = "bootstrap",
-          plot.errors.boot.method = boot.method,
-          plot.errors.boot.num = 9L
+          errors = "bootstrap",
+          bootstrap = boot.method,
+          B = 9L
         )),
         "single-index helper unavailable|requires helper mode with gradients=FALSE",
         info = paste(bt, boot.method, "gradient helper guard")

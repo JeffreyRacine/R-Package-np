@@ -76,8 +76,8 @@ test_that("npRmpi fixed conditional plot bootstrap covers fixed and geom in subp
       "bw.dist <- npcdistbw(xdat=data.frame(x=x), ydat=data.frame(y=y), regtype='lp', degree=2, bwtype='fixed', bandwidth.compute=FALSE, bws=c(0.45, 0.45), basis='glp', bernstein.basis=FALSE)",
       "fit.dist <- npcdist(bws=bw.dist)",
       "for (boot.method in c('fixed', 'geom')) {",
-      "  out.dens <- plot(fit.dens, plot.errors.method='bootstrap', plot.errors.boot.method=boot.method, plot.errors.boot.num=9L, plot.errors.boot.blocklength=3L, plot.behavior='data')",
-      "  out.dist <- plot(fit.dist, plot.errors.method='bootstrap', plot.errors.boot.method=boot.method, plot.errors.boot.num=9L, plot.errors.boot.blocklength=3L, plot.behavior='data')",
+      "  out.dens <- plot(fit.dens, errors='bootstrap', bootstrap=boot.method, B=9L, boot_control=np_boot_control(blocklen=3L), behavior='data')",
+      "  out.dist <- plot(fit.dist, errors='bootstrap', bootstrap=boot.method, B=9L, boot_control=np_boot_control(blocklen=3L), behavior='data')",
       "  stopifnot(is.list(out.dens), length(out.dens) > 0L, is.list(out.dist), length(out.dist) > 0L)",
       "  cat('PLOT_BOOT_OK', boot.method, '\\n')",
       "}"

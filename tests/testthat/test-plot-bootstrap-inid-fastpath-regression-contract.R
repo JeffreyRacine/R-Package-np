@@ -226,12 +226,12 @@ test_that("npindex bounded bootstrap plot-data supports bw and fit objects", {
         obj,
         xdat = tx,
         ydat = y,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = boot.method,
-        plot.errors.boot.num = 3L,
-        plot.errors.type = "pointwise"
+        errors = "bootstrap",
+        bootstrap = boot.method,
+        B = 3L,
+        band = "pointwise"
       )
     )
   }
@@ -392,12 +392,12 @@ test_that("rbandwidth plot bootstrap supports gradients across methods", {
     out <- suppressWarnings(
       plot(
         bw,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
         gradients = TRUE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = m,
-        plot.errors.boot.num = 9
+        errors = "bootstrap",
+        bootstrap = m,
+        B = 9
       )
     )
     expect_type(out, "list")

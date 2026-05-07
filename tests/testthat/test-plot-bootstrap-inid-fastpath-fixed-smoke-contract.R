@@ -41,10 +41,10 @@ test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {
         ydat = y,
         zdat = tz,
         perspective = FALSE,
-        plot.behavior = "data",
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
-        plot.errors.boot.num = 7
+        behavior = "data",
+        errors = "bootstrap",
+        bootstrap = "inid",
+        B = 7
       )
     )
     expect_type(out, "list")
@@ -68,11 +68,11 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
   expect_error(
     suppressWarnings(plot(
       ubw,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 9
+      errors = "bootstrap",
+      bootstrap = "wild",
+      B = 9
     )),
     "not supported for unconditional density/distribution estimators"
   )
@@ -86,11 +86,11 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
   expect_error(
     suppressWarnings(plot(
       cbw,
-      plot.behavior = "data",
+      behavior = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 9
+      errors = "bootstrap",
+      bootstrap = "wild",
+      B = 9
     )),
     "not supported for conditional density/distribution estimators"
   )

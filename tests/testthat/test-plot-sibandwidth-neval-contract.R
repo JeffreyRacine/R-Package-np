@@ -20,7 +20,7 @@ test_that("sibandwidth plot respects bounded neval in session mode", {
     xdat = tx,
     ydat = y,
     neval = 13L,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
     gradients = FALSE
   ))[[1]]
@@ -34,7 +34,7 @@ test_that("sibandwidth plot respects bounded neval in session mode", {
     xdat = tx,
     ydat = y,
     neval = 13L,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
     gradients = TRUE
   ))[[1]]
@@ -73,12 +73,12 @@ test_that("sibandwidth bootstrap helpers honor bounded neval in session mode", {
         xdat = tx,
         ydat = y,
         neval = 11L,
-        plot.behavior = "data",
+        behavior = "data",
         perspective = FALSE,
         gradients = FALSE,
-        plot.errors.method = "bootstrap",
-        plot.errors.boot.method = boot.method,
-        plot.errors.boot.num = 9L
+        errors = "bootstrap",
+        bootstrap = boot.method,
+        B = 9L
       ))[[1]]
 
       expect_equal(length(out$mean), 11L, info = paste(bt, boot.method, "mean length"))

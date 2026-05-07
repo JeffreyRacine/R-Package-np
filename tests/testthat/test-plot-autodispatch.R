@@ -13,8 +13,8 @@ test_that("plot works with autodispatch for non-bootstrap paths", {
   out <- suppressWarnings(plot(bw,
                                persp = FALSE,
                                view = "fixed",
-                               plot.behavior = "data",
-                               plot.errors.method = "none"))
+                               behavior = "data",
+                               errors = "none"))
 
   expect_type(out, "list")
   expect_true(length(out) > 0)
@@ -37,9 +37,9 @@ test_that("plot bootstrap path works under autodispatch", {
     plot(bw,
          persp = FALSE,
          view = "fixed",
-         plot.behavior = "data",
-         plot.errors.method = "bootstrap",
-         plot.errors.boot.num = 9)
+         behavior = "data",
+         errors = "bootstrap",
+         B = 9)
   )
 
   expect_type(out, "list")
@@ -63,7 +63,7 @@ test_that("autodispatch keeps formula bws usable for condensity plot()", {
 
   pdf(file = tempfile(fileext = ".pdf"))
   on.exit(dev.off(), add = TRUE)
-  expect_error(plot(fit, perspective = FALSE, plot.errors.method = "none"), NA)
+  expect_error(plot(fit, perspective = FALSE, errors = "none"), NA)
   expect_false(grepl("\\.__npRmpi_autod_", paste(deparse(fit$bws$call), collapse = " ")))
 })
 
@@ -160,13 +160,13 @@ test_that("plot engine defaults: regression-class uses wild, unsupervised uses i
 
   for (nm in reg.engines) {
     fn <- getFromNamespace(nm, "npRmpi")
-    defaults <- eval(formals(fn)$plot.errors.boot.method)
+    defaults <- eval(formals(fn)$bootstrap)
     expect_identical(defaults[1L], "wild")
   }
 
   for (nm in unsup.engines) {
     fn <- getFromNamespace(nm, "npRmpi")
-    defaults <- eval(formals(fn)$plot.errors.boot.method)
+    defaults <- eval(formals(fn)$bootstrap)
     expect_identical(defaults[1L], "inid")
   }
 })

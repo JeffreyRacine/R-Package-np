@@ -30,8 +30,8 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     txdat = data.frame(x = x, z = z),
     tydat = y
   )
-  rdata <- plot(rfit, plot.behavior = "data", view = "fixed")
-  rplotdata <- with_plot_device(plot(rfit, plot.behavior = "plot-data", view = "fixed"))
+  rdata <- plot(rfit, behavior = "data", view = "fixed")
+  rplotdata <- with_plot_device(plot(rfit, behavior = "plot-data", view = "fixed"))
 
   expect_type(rplotdata, "list")
   expect_named(rplotdata, names(rdata))
@@ -53,8 +53,8 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     tydat = data.frame(y = y),
     proper = TRUE
   )
-  cdata <- plot(cfit, plot.behavior = "data", view = "fixed")
-  cplotdata <- with_plot_device(plot(cfit, plot.behavior = "plot-data", view = "fixed"))
+  cdata <- plot(cfit, behavior = "data", view = "fixed")
+  cplotdata <- with_plot_device(plot(cfit, behavior = "plot-data", view = "fixed"))
 
   expect_type(cplotdata, "list")
   expect_named(cplotdata, names(cdata))
@@ -78,8 +78,8 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     tydat = data.frame(y = y),
     proper = TRUE
   )
-  ddata <- suppressWarnings(plot(dfit, plot.behavior = "data", view = "fixed"))
-  dplotdata <- with_plot_device(plot(dfit, plot.behavior = "plot-data", view = "fixed"))
+  ddata <- suppressWarnings(plot(dfit, behavior = "data", view = "fixed"))
+  dplotdata <- with_plot_device(plot(dfit, behavior = "plot-data", view = "fixed"))
 
   expect_type(dplotdata, "list")
   expect_named(dplotdata, names(ddata))
@@ -106,13 +106,13 @@ test_that("plot return contract: bounded conditional bootstrap data stays availa
   cfit <- npcdens(y ~ x, cykerbound = "range")
   cout <- suppressWarnings(plot(
     cfit,
-    plot.behavior = "data",
+    behavior = "data",
     view = "fixed",
     plot.data.overlay = FALSE,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 5L,
-    plot.errors.type = "pointwise"
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 5L,
+    band = "pointwise"
   ))
 
   expect_s3_class(cout$cd1, "condensity")
@@ -122,13 +122,13 @@ test_that("plot return contract: bounded conditional bootstrap data stays availa
   dfit <- npcdist(y ~ x, cykerbound = "range")
   dout <- suppressWarnings(plot(
     dfit,
-    plot.behavior = "data",
+    behavior = "data",
     view = "fixed",
     plot.data.overlay = FALSE,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 5L,
-    plot.errors.type = "pointwise"
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 5L,
+    band = "pointwise"
   ))
 
   expect_s3_class(dout$cd1, "condistribution")
@@ -151,8 +151,8 @@ test_that("plot return contract: remaining public plot families return plot-data
   }
 
   expect_plot_modes_match <- function(object, fields, ...) {
-    data.out <- suppressWarnings(plot(object, plot.behavior = "data", ...))
-    plot.out <- with_plot_device(plot(object, plot.behavior = "plot-data", ...))
+    data.out <- suppressWarnings(plot(object, behavior = "data", ...))
+    plot.out <- with_plot_device(plot(object, behavior = "plot-data", ...))
 
     expect_type(plot.out, "list")
     expect_named(plot.out, names(data.out))
@@ -214,7 +214,7 @@ test_that("plot return contract: remaining public plot families return plot-data
       fit.reg.nn,
       fields = c("eval", "mean", "merr"),
       perspective = FALSE,
-      plot.errors.method = "none"
+      errors = "none"
     )
   }
   bw.cd <- npcdensbw(
@@ -342,9 +342,9 @@ test_that("plot return contract: npRmpi npscoef fitted perspective path preserve
     fit,
     view = "fixed",
     renderer = "base",
-    plot.behavior = "data",
+    behavior = "data",
     plot.data.overlay = FALSE,
-    plot.errors.method = "none"
+    errors = "none"
   ))
 
   expect_type(out, "list")
@@ -383,7 +383,7 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
 
   rdata <- suppressWarnings(plot(
     rfit,
-    plot.behavior = "data",
+    behavior = "data",
     renderer = "rgl",
     view = "fixed",
     plot.data.overlay = FALSE
@@ -391,7 +391,7 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
 
   rplotdata <- suppressWarnings(plot(
     rfit,
-    plot.behavior = "plot-data",
+    behavior = "plot-data",
     renderer = "rgl",
     view = "fixed",
     plot.data.overlay = FALSE
@@ -420,14 +420,14 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
 
   cdata <- suppressWarnings(plot(
     cfit,
-    plot.behavior = "data",
+    behavior = "data",
     renderer = "rgl",
     view = "fixed"
   ))
 
   cplotdata <- suppressWarnings(plot(
     cfit,
-    plot.behavior = "plot-data",
+    behavior = "plot-data",
     renderer = "rgl",
     view = "fixed"
   ))

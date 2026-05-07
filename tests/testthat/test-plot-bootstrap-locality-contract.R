@@ -25,9 +25,9 @@ test_that("session-route regression bootstrap plot stays off local bootstrap wra
     fit,
     xdat = xdat,
     ydat = ydat,
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.num = 5
+    behavior = "data",
+    errors = "bootstrap",
+    B = 5
   )
 
   expect_type(out, "list")

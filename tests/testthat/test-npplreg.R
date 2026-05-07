@@ -179,19 +179,19 @@ test_that("npplreg plot-data asymptotic and bootstrap intervals are comparable",
 
   asym <- plot(
     fit,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
-    plot.errors.method = "asymptotic",
-    plot.errors.type = "pointwise",
+    errors = "asymptotic",
+    band = "pointwise",
     neval = 8L
   )
   boot <- plot(
     fit,
-    plot.behavior = "data",
+    behavior = "data",
     perspective = FALSE,
-    plot.errors.method = "bootstrap",
-    plot.errors.type = "pointwise",
-    plot.errors.boot.num = 39L,
+    errors = "bootstrap",
+    band = "pointwise",
+    B = 39L,
     random.seed = 202605062,
     neval = 8L
   )

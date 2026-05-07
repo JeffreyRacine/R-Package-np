@@ -41,11 +41,11 @@ test_that("smooth-coefficient wild bootstrap returns finite plot-data errors", {
           xdat = xdat,
           ydat = ydat,
           zdat = zdat,
-          plot.behavior = "data",
+          behavior = "data",
           perspective = FALSE,
-          plot.errors.method = "bootstrap",
-          plot.errors.boot.method = "wild",
-          plot.errors.boot.num = 9L
+          errors = "bootstrap",
+          bootstrap = "wild",
+          B = 9L
         )
       )
     )
