@@ -57,7 +57,9 @@ Further method-specific arguments.
 }
 \details{
   This function provides a generic interface for extraction of gradients
-  from objects.
+  from objects. For \code{qregression} objects, \code{errors=TRUE} returns
+  asymptotic standard errors for the quantile gradients when the object was
+  fitted with \code{gradients=TRUE}.
 }
 \seealso{
   \code{\link{fitted}}, \code{\link{residuals}}, \code{\link{coef}},

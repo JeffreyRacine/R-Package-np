@@ -6660,37 +6660,21 @@ plotFactor <- function(f, y, ...){
         PACKAGE = "np"
       )[c("yq", "yqerr", "yqgrad")]
 
-      if (all(!is.finite(myout$yqerr) | myout$yqerr <= 0.0)) {
-        dens.obj <- tryCatch(
-          .np_plot_conditional_eval(
-            bws = bws,
-            xdat = xdat.df,
-            ydat = ydat.df,
-            exdat = if (no.ex) xdat.df else exdat.df,
-            eydat = setNames(data.frame(as.double(myout$yq)), names(ydat.df)),
-            cdf = FALSE,
-            gradients = FALSE
-          ),
-          error = function(e) NULL
-        )
-        if (!is.null(dens.obj)) {
-          dens.q <- as.double(dens.obj$condens)
-          qvar <- tau * (1.0 - tau) / (tnrow * NZD(dens.q)^2)
-          myout$yqerr <- sqrt(pmax(qvar, 0.0))
-          myout$yqerr[!is.finite(myout$yqerr)] <- NA_real_
-        }
-      }
-
+      qdelta <- .npqreg_quantile_delta_from_conditional(
+        bws = bws,
+        xdat = xdat.df,
+        ydat = ydat.df,
+        exdat = txeval,
+        quantile = myout$yq,
+        gradients = gradients
+      )
+      myout$yqerr <- qdelta$quanterr
       if (gradients) {
-        myout$yqgrad <- .npqreg_quantile_gradient_from_conditional(
-          bws = bws,
-          xdat = xdat.df,
-          ydat = ydat.df,
-          exdat = txeval,
-          quantile = myout$yq
-        )
+        myout$yqgrad <- qdelta$quantgrad
+        myout$yqgerr <- qdelta$quantgerr
       } else {
         myout$yqgrad <- NA
+        myout$yqgerr <- NA
       }
 
       fit.elapsed <- proc.time()[3] - fit.start
@@ -6704,6 +6688,7 @@ plotFactor <- function(f, y, ...){
         quantile = myout$yq,
         quanterr = myout$yqerr,
         quantgrad = myout$yqgrad,
+        quantgerr = myout$yqgerr,
         ntrain = tnrow,
         trainiseval = no.ex,
         gradients = gradients,
