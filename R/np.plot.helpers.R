@@ -9554,6 +9554,85 @@ plotFactor <- function(f, y, ...){
   list(t = tmat, t0 = t0)
 }
 
+.np_inid_boot_from_quantile_level_local <- function(xdat,
+                                                    ydat,
+                                                    exdat,
+                                                    bws,
+                                                    B,
+                                                    tau,
+                                                    counts = NULL,
+                                                    counts.drawer = NULL,
+                                                    progress.label = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- as.double(ydat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("quantile level bootstrap helper requires aligned x/y training rows")
+  if (n < 1L || B < 1L)
+    stop("invalid quantile level bootstrap dimensions")
+
+  fit.fun <- function(x.train, y.train) {
+    as.vector(.np_plot_quantile_eval(
+      bws = bws,
+      txdat = x.train,
+      tydat = y.train,
+      exdat = exdat,
+      tau = tau,
+      gradients = FALSE
+    )$quantile)
+  }
+
+  t0 <- fit.fun(x.train = xdat, y.train = ydat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+  counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  start <- 1L
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    counts.chunk <- if (!is.null(counts.mat)) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+    }
+
+    for (jj in seq_len(bsz)) {
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      tmat[start + jj - 1L, ] <- fit.fun(
+        x.train = xdat[idx, , drop = FALSE],
+        y.train = ydat[idx]
+      )
+    }
+
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_inid_boot_from_quantile_gradient_local <- function(xdat,
                                                        ydat,
                                                        exdat,
@@ -9772,6 +9851,144 @@ plotFactor <- function(f, y, ...){
           counts.mode = counts.mode,
           .np_inid_boot_from_conditional_gradient_local =
             .np_inid_boot_from_conditional_gradient_local,
+          .np_inid_counts_matrix = .np_inid_counts_matrix,
+          .npRmpi_with_local_bootstrap = .npRmpi_with_local_bootstrap
+        ),
+        if (!is.null(counts.mat)) list(counts.mat = counts.mat) else list(),
+        if (!is.null(counts.drawer)) list(counts.drawer = counts.drawer) else list()
+      )
+    ),
+    t0 = t0
+  )
+}
+
+.npRmpi_inid_boot_from_quantile_level <- function(xdat,
+                                                  ydat,
+                                                  exdat,
+                                                  bws,
+                                                  B,
+                                                  tau,
+                                                  counts = NULL,
+                                                  counts.drawer = NULL,
+                                                  progress.label = NULL) {
+  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+    isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
+  if (!isTRUE(use.mpi)) {
+    return(.np_inid_boot_from_quantile_level_local(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      bws = bws,
+      B = B,
+      tau = tau,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
+
+  xdat <- toFrame(xdat)
+  ydat <- as.double(ydat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+
+  if (length(ydat) != n)
+    stop("quantile level bootstrap helper requires aligned x/y training rows")
+  if (n < 1L || B < 1L)
+    stop("invalid quantile level bootstrap dimensions")
+
+  t0 <- .npRmpi_with_local_bootstrap(
+    .np_inid_boot_from_quantile_level_local(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      bws = bws,
+      B = 1L,
+      tau = tau,
+      counts = matrix(1, nrow = n, ncol = 1L),
+      progress.label = NULL
+    )$t0
+  )
+  neval <- length(t0)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
+    comm = 1L,
+    include.master = TRUE
+  )
+  .npRmpi_bootstrap_fanout_enabled(
+    comm = 1L,
+    n = n,
+    B = B,
+    chunk.size = chunk.size,
+    what = "quantile-level"
+  )
+  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  counts.mat <- if (!is.null(counts)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  } else {
+    NULL
+  }
+  counts.mode <- if (!is.null(counts.mat)) {
+    "fixed"
+  } else if (!is.null(counts.drawer)) {
+    "drawer"
+  } else {
+    "random"
+  }
+
+  worker <- function(task) {
+    start <- as.integer(task$start)
+    stopi <- start + as.integer(task$bsz) - 1L
+    counts.chunk <- if (identical(counts.mode, "fixed")) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (identical(counts.mode, "drawer")) {
+      .np_inid_counts_matrix(
+        n = n,
+        B = as.integer(task$bsz),
+        counts = counts.drawer(start, stopi)
+      )
+    } else {
+      set.seed(as.integer(task$seed))
+      stats::rmultinom(n = as.integer(task$bsz), size = n, prob = rep.int(1 / n, n))
+    }
+
+    .npRmpi_with_local_bootstrap(
+      .np_inid_boot_from_quantile_level_local(
+        xdat = xdat,
+        ydat = ydat,
+        exdat = exdat,
+        bws = bws,
+        B = as.integer(task$bsz),
+        tau = tau,
+        counts = counts.chunk,
+        progress.label = NULL
+      )$t
+    )
+  }
+
+  list(
+    t = .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = "quantile-level",
+      progress.label = progress.label,
+      profile.where = "mpi.applyLB:quantile-level",
+      comm = 1L,
+      master_local_chunk = TRUE,
+      required.bindings = c(
+        list(
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          bws = bws,
+          tau = tau,
+          n = n,
+          counts.mode = counts.mode,
+          .np_inid_boot_from_quantile_level_local =
+            .np_inid_boot_from_quantile_level_local,
           .np_inid_counts_matrix = .np_inid_counts_matrix,
           .npRmpi_with_local_bootstrap = .npRmpi_with_local_bootstrap
         ),
@@ -12027,11 +12244,12 @@ compute.bootstrap.errors.conbandwidth =
       isTRUE(!gradients) &&
       isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
     gradient.local.ok <- isTRUE(!quantreg) && isTRUE(gradients)
+    quantile.level.local.ok <- isTRUE(quantreg) && isTRUE(!gradients)
     quantile.gradient.local.ok <- isTRUE(quantreg) && isTRUE(gradients)
 
-    if (is.inid && !isTRUE(fast.inid) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.gradient.local.ok))
+    if (is.inid && !isTRUE(fast.inid) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.level.local.ok) && !isTRUE(quantile.gradient.local.ok))
       stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
-    if (is.block && !isTRUE(fast.block) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.gradient.local.ok))
+    if (is.block && !isTRUE(fast.block) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.level.local.ok) && !isTRUE(quantile.gradient.local.ok))
       stop("fixed/geom conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     boot.out <- NULL
@@ -12110,6 +12328,39 @@ compute.bootstrap.errors.conbandwidth =
           ),
           error = function(e) {
             stop(sprintf("%s conditional gradient bootstrap helper failed in compute.bootstrap.errors.conbandwidth (%s)",
+                         if (is.block) plot.errors.boot.method else "inid",
+                         conditionMessage(e)),
+                 call. = FALSE)
+          }
+        )
+      })
+    }
+
+    if (is.null(boot.out) && isTRUE(quantile.level.local.ok) && (isTRUE(is.inid) || isTRUE(is.block))) {
+      counts.drawer <- if (is.block) {
+        .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+      } else {
+        NULL
+      }
+      boot.out <- .npRmpi_with_local_bootstrap({
+        tryCatch(
+          .npRmpi_inid_boot_from_quantile_level(
+            xdat = xdat,
+            ydat = ydat[[1L]],
+            exdat = exdat,
+            bws = bws,
+            B = plot.errors.boot.num,
+            tau = tau,
+            counts.drawer = counts.drawer,
+            progress.label = progress.label
+          ),
+          error = function(e) {
+            stop(sprintf("%s quantile level bootstrap helper failed in compute.bootstrap.errors.conbandwidth (%s)",
                          if (is.block) plot.errors.boot.method else "inid",
                          conditionMessage(e)),
                  call. = FALSE)
