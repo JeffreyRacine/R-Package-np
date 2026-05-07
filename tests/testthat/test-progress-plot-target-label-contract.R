@@ -153,7 +153,7 @@ test_that("conditional helper labels carry target context for block bootstrap ph
         list(label = label)
       },
       .np_plot_activity_end = function(state) invisible(NULL),
-      .np_inid_boot_from_conditional_gradient_local = function(..., progress.label = NULL) {
+      .npRmpi_inid_boot_from_conditional_gradient = function(..., progress.label = NULL) {
         captured$progress <- c(captured$progress, progress.label)
         list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
       },

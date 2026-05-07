@@ -6,7 +6,7 @@ quiet_capture <- function(expr) {
   out
 }
 
-test_that("smooth-coefficient wild bootstrap fails fast with explicit diagnostics", {
+test_that("smooth-coefficient wild bootstrap returns finite plot-data errors", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
@@ -33,7 +33,7 @@ test_that("smooth-coefficient wild bootstrap fails fast with explicit diagnostic
     ckertype = "gaussian"
   )
 
-  expect_error(
+  out <- expect_no_error(
     quiet_capture(
       suppressWarnings(
         plot(
@@ -48,8 +48,9 @@ test_that("smooth-coefficient wild bootstrap fails fast with explicit diagnostic
           plot.errors.boot.num = 9L
         )
       )
-    ),
-    "unsupported for smooth coefficient bootstrap in npRmpi canonical SPMD mode",
-    fixed = TRUE
+    )
   )
+  expect_type(out, "list")
+  expect_true(all(is.finite(out$mean)))
+  expect_true(all(is.finite(out$merr[, 1:2, drop = FALSE])))
 })

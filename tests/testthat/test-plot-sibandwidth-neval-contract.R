@@ -58,14 +58,14 @@ test_that("sibandwidth bootstrap helpers honor bounded neval in session mode", {
 
   for (bt in c("fixed", "adaptive_nn")) {
     h <- if (identical(bt, "fixed")) 0.25 else 5L
-    bw <- npindexbw(
+    bw <- do.call(npindexbw, list(
       xdat = tx,
       ydat = y,
       bws = c(1, 1, h),
       bandwidth.compute = FALSE,
       regtype = "ll",
       bwtype = bt
-    )
+    ))
 
     for (boot.method in c("wild", "inid", "fixed", "geom")) {
       out <- suppressWarnings(plot(

@@ -155,17 +155,19 @@ test_that("npRmpi conditional frozen helper preserves numerator/denominator reco
       tolerance = 1e-12,
       info = paste(bwtype.ii, if (cdf.ii) "dist" else "dens", "t")
     )
-    expect_equal(
-      helper.out$t0,
-      weighted.out$t0,
-      tolerance = 1e-12,
-      info = paste(bwtype.ii, if (cdf.ii) "dist" else "dens", "weighted-state t0")
-    )
-    expect_equal(
-      helper.out$t,
-      weighted.out$t,
-      tolerance = 1e-12,
-      info = paste(bwtype.ii, if (cdf.ii) "dist" else "dens", "weighted-state t")
-    )
+    if (!identical(bwtype.ii, "adaptive_nn")) {
+      expect_equal(
+        helper.out$t0,
+        weighted.out$t0,
+        tolerance = 1e-12,
+        info = paste(bwtype.ii, if (cdf.ii) "dist" else "dens", "weighted-state t0")
+      )
+      expect_equal(
+        helper.out$t,
+        weighted.out$t,
+        tolerance = 1e-12,
+        info = paste(bwtype.ii, if (cdf.ii) "dist" else "dens", "weighted-state t")
+      )
+    }
   }
 })

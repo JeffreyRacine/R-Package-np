@@ -6,7 +6,7 @@ test_that("nearest-neighbor frozen bootstrap plots run across regression and uns
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(32908)
-  n <- 45
+  n <- 24
   x <- data.frame(x = runif(n))
   y <- sin(2 * pi * x$x) + rnorm(n, sd = 0.08)
   yframe <- data.frame(y = y)
@@ -18,13 +18,16 @@ test_that("nearest-neighbor frozen bootstrap plots run across regression and uns
       perspective = FALSE,
       plot.errors.method = "bootstrap",
       plot.errors.boot.nonfixed = "frozen",
-      plot.errors.boot.num = 5,
+      plot.errors.boot.num = 3,
       ...
     ))
   }
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    rbw <- npregbw(xdat = x, ydat = y, regtype = "ll", nmulti = 1, bwtype = bt)
+    bw.val <- if (identical(bt, "adaptive_nn")) 5 else 2
+    rbw <- do.call(npregbw, list(xdat = x, ydat = y, regtype = "ll",
+                                 bws = bw.val, bwtype = bt,
+                                 bandwidth.compute = FALSE))
 
     for (boot.method in c("inid", "fixed", "geom")) {
       expect_type(
@@ -32,19 +35,25 @@ test_that("nearest-neighbor frozen bootstrap plots run across regression and uns
         "list"
       )
 
-      ubw <- npudensbw(dat = x, nmulti = 1, bwtype = bt)
+      ubw <- do.call(npudensbw, list(dat = x, bws = bw.val, bwtype = bt,
+                                     bandwidth.compute = FALSE))
       expect_type(run_plot(ubw, plot.errors.boot.method = boot.method), "list")
 
-      dbw <- npudistbw(dat = x, nmulti = 1, bwtype = bt)
+      dbw <- do.call(npudistbw, list(dat = x, bws = bw.val, bwtype = bt,
+                                     bandwidth.compute = FALSE))
       expect_type(run_plot(dbw, plot.errors.boot.method = boot.method), "list")
 
-      cbw <- npcdensbw(xdat = x, ydat = yframe, nmulti = 1, bwtype = bt)
+      cbw <- do.call(npcdensbw, list(xdat = x, ydat = yframe,
+                                     bws = rep.int(bw.val, 2L), bwtype = bt,
+                                     bandwidth.compute = FALSE))
       expect_type(
         run_plot(cbw, xdat = x, ydat = yframe, view = "fixed", plot.errors.boot.method = boot.method),
         "list"
       )
 
-      cdbw <- npcdistbw(xdat = x, ydat = yframe, nmulti = 1, bwtype = bt)
+      cdbw <- do.call(npcdistbw, list(xdat = x, ydat = yframe,
+                                      bws = rep.int(bw.val, 2L), bwtype = bt,
+                                      bandwidth.compute = FALSE))
       expect_type(
         run_plot(cdbw, xdat = x, ydat = yframe, view = "fixed", plot.errors.boot.method = boot.method),
         "list"

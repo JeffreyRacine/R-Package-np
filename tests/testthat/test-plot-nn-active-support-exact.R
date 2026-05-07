@@ -14,12 +14,12 @@ test_that("nonfixed unconditional exact bootstrap matches duplicate-row oracle",
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
     bw.val <- if (identical(bt, "adaptive_nn")) 2 else 1
-    bw <- npudensbw(
+    bw <- do.call(npudensbw, list(
       dat = xdat,
       bwtype = bt,
       bws = bw.val,
       bandwidth.compute = FALSE
-    )
+    ))
 
     helper <- npRmpi:::.np_inid_boot_from_ksum_unconditional_exact(
       xdat = xdat,
@@ -89,12 +89,12 @@ test_that("nonfixed unconditional exact helper matches direct kbandwidth precomp
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
     bw.val <- if (identical(bt, "adaptive_nn")) 2 else 1
-    bw <- npudensbw(
+    bw <- do.call(npudensbw, list(
       dat = xdat,
       bwtype = bt,
       bws = bw.val,
       bandwidth.compute = FALSE
-    )
+    ))
 
     kb <- npRmpi:::.np_make_kbandwidth_unconditional(bws = bw, xdat = xdat)
     weighted.active <- matrix(as.double(counts[active]), ncol = 1L)
@@ -139,13 +139,13 @@ test_that("nonfixed conditional exact bootstrap matches duplicate-row oracle", {
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
     bw.val <- if (identical(bt, "adaptive_nn")) c(2, 2) else c(1, 1)
-    bw <- npcdensbw(
+    bw <- do.call(npcdensbw, list(
       xdat = xdat,
       ydat = ydat,
       bwtype = bt,
       bws = bw.val,
       bandwidth.compute = FALSE
-    )
+    ))
 
     helper <- npRmpi:::.np_inid_boot_from_ksum_conditional_exact(
       xdat = xdat,

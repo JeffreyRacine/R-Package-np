@@ -202,13 +202,13 @@ test_that("plot return contract: remaining public plot families return plot-data
   )
   expect_plot_modes_match(bw.reg, fields = c("eval", "mean", "merr"), perspective = FALSE)
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.reg.nn <- npregbw(
+    bw.reg.nn <- do.call(npregbw, list(
       xdat = data.frame(x = x),
       ydat = y,
       bws = 7,
       bwtype = bt,
       bandwidth.compute = FALSE
-    )
+    ))
     fit.reg.nn <- npreg(bws = bw.reg.nn, txdat = data.frame(x = x), tydat = y)
     expect_plot_modes_match(
       fit.reg.nn,

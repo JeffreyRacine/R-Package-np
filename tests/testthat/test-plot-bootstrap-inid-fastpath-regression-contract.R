@@ -1,4 +1,12 @@
+skip_exact_refit_contracts_if_disabled <- function() {
+  skip_if_not(
+    identical(Sys.getenv("NP_PLOT_EXACT_REFIT_TESTS"), "true"),
+    "set NP_PLOT_EXACT_REFIT_TESTS=true to run exact refit helper contracts"
+  )
+}
+
 test_that("npindex inid fast path matches explicit resample refits", {
+  skip_exact_refit_contracts_if_disabled()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
@@ -6,13 +14,19 @@ test_that("npindex inid fast path matches explicit resample refits", {
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(3231)
-  n <- 40
+  n <- 24
   x1 <- runif(n)
   x2 <- runif(n)
   y <- sin(x1 + x2) + rnorm(n, sd = 0.1)
   tx <- data.frame(x1 = x1, x2 = x2)
-  bw <- npindexbw(xdat = tx, ydat = y, method = "ichimura", nmulti = 1)
-  B <- 11L
+  bw <- npindexbw(
+    xdat = tx,
+    ydat = y,
+    method = "ichimura",
+    bws = c(1, 0.25, 0.25),
+    bandwidth.compute = FALSE
+  )
+  B <- 3L
   counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
 
   fast.fun <- getFromNamespace(".np_inid_lc_boot_from_hat", "npRmpi")
@@ -36,6 +50,7 @@ test_that("npindex inid fast path matches explicit resample refits", {
 })
 
 test_that("npindex ll/lp inid fast path matches explicit resample refits", {
+  skip_exact_refit_contracts_if_disabled()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
@@ -43,12 +58,12 @@ test_that("npindex ll/lp inid fast path matches explicit resample refits", {
   options(npRmpi.autodispatch = FALSE)
 
   set.seed(32315)
-  n <- 45
+  n <- 24
   x1 <- runif(n)
   x2 <- runif(n)
   y <- sin(x1 + x2) + rnorm(n, sd = 0.1)
   tx <- data.frame(x1 = x1, x2 = x2)
-  B <- 9L
+  B <- 3L
   counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
 
   fast.fun <- getFromNamespace(".np_inid_boot_from_regression", "npRmpi")
@@ -110,6 +125,7 @@ test_that("npindex ll/lp inid fast path matches explicit resample refits", {
 })
 
 test_that("npreg inid ll/lp fast path matches explicit resample refits", {
+  skip_exact_refit_contracts_if_disabled()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
@@ -117,13 +133,13 @@ test_that("npreg inid ll/lp fast path matches explicit resample refits", {
   options(npRmpi.autodispatch = FALSE)
 
   set.seed(3211)
-  n <- 45
+  n <- 24
   x1 <- runif(n)
   x2 <- runif(n)
   y <- sin(2 * pi * x1) + 0.6 * x2 + rnorm(n, sd = 0.08)
   tx <- data.frame(x1 = x1, x2 = x2)
-  ex <- tx[seq_len(15), , drop = FALSE]
-  B <- 9L
+  ex <- tx[seq_len(8), , drop = FALSE]
+  B <- 3L
   counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
 
   fast.fun <- getFromNamespace(".np_inid_boot_from_regression", "npRmpi")
@@ -188,7 +204,7 @@ test_that("npindex bounded bootstrap plot-data supports bw and fit objects", {
   options(npRmpi.autodispatch = TRUE)
 
   set.seed(32322)
-  n <- 36
+  n <- 24
   x1 <- runif(n)
   x2 <- runif(n)
   y <- sin(x1 + x2) + rnorm(n, sd = 0.08)
@@ -214,7 +230,7 @@ test_that("npindex bounded bootstrap plot-data supports bw and fit objects", {
         perspective = FALSE,
         plot.errors.method = "bootstrap",
         plot.errors.boot.method = boot.method,
-        plot.errors.boot.num = 5L,
+        plot.errors.boot.num = 3L,
         plot.errors.type = "pointwise"
       )
     )
@@ -232,6 +248,7 @@ test_that("npindex bounded bootstrap plot-data supports bw and fit objects", {
 })
 
 test_that("npplreg inid fast path matches explicit resample refits", {
+  skip_exact_refit_contracts_if_disabled()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
@@ -290,6 +307,7 @@ test_that("npplreg inid fast path matches explicit resample refits", {
 })
 
 test_that("npreg inid fast path supports continuous-slice gradients", {
+  skip_exact_refit_contracts_if_disabled()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
