@@ -119,7 +119,8 @@ np_render_control <- function(style = c("band", "bar"),
     "plot.errors.boot.nonfixed", "plot.errors.boot.wild",
     "plot.errors.boot.blocklen", "plot.errors.center",
     "plot.errors.style", "plot.errors.bar", "plot.errors.bar.num",
-    "plot.behavior", "gradient", "persp", "plot.par.mfrow")
+    "plot.behavior", "gradient", "persp", "plot.par.mfrow",
+    "plot.data.overlay")
 }
 
 .np_plot_engine_for_bws <- function(bws) {
@@ -455,6 +456,17 @@ np_render_control <- function(style = c("band", "bar"),
       stop("plot.rug=TRUE is not yet implemented for this plot route.",
            call. = FALSE)
     }
+  }
+
+  if (!is.null(dots$plot.data.overlay) &&
+      !any(c("rbandwidth", "plbandwidth", "scbandwidth") %in% cls)) {
+    dots$plot.data.overlay <- .np_plot_match_flag(dots$plot.data.overlay,
+                                                  "plot.data.overlay")
+    if (isTRUE(dots$plot.data.overlay)) {
+      stop("plot.data.overlay=TRUE is available only for regression, partially linear, and smooth coefficient plot surfaces.",
+           call. = FALSE)
+    }
+    dots$plot.data.overlay <- NULL
   }
 
   if ("rbandwidth" %in% cls)

@@ -17,6 +17,11 @@ Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
   or MPI fanout begins, while preserving ordinary base-graphics pass-through
   arguments such as labels, limits, colors, and line widths.
 
+* Preserved documented `plot.data.overlay` compatibility under the redesigned
+  plot argument validator: `plot.data.overlay = FALSE` remains an accepted
+  harmless no-op on routes without observed-response overlays, while
+  `plot.data.overlay = TRUE` still fails fast on unsupported plot families.
+
 * Added MPI-aware object-fed plot runtime support across the main S3 plot
   families, extending the redesigned plot-data payload paths to regression,
   unconditional density/distribution, conditional density/distribution,
