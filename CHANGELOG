@@ -84,6 +84,15 @@ Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
   regression bootstrap work; fixed-count parity sentinels match the local
   helper exactly.
 
+* Extended plot-bootstrap master-assist dispatch across the common bootstrap
+  fanout helper and repaired smooth-coefficient local-polynomial bootstrap
+  loops to use the same worker partitioning. Installed traces with three
+  slaves now show active dispatch to every slave plus a rank-0 master chunk
+  for regression, unconditional density/distribution, conditional
+  density/distribution, partially linear, single-index, smooth-coefficient,
+  and quantile-regression plot bootstraps when there are enough bootstrap
+  chunks to keep all ranks busy.
+
 * Repaired active single-worker plot-bootstrap dispatch so fixed-bandwidth
   bootstrap routes no longer collapse to master-local execution when an
   `npRmpi.init(nslaves = 1)` worker pool is present. This restores worker
