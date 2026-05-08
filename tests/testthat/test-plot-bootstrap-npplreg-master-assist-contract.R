@@ -8,11 +8,12 @@ test_that("npplreg inid plot bootstrap component regressions use master-assist f
   ))
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess contract")
 
+  nslaves <- 3L
   ok_tag <- "NPPLREG_PLOT_MASTER_ASSIST_OK"
   lines <- c(
     "suppressPackageStartupMessages(library(npRmpi))",
     "run_case <- function() {",
-    "  npRmpi.init(nslaves = 1, quiet = TRUE)",
+    sprintf("  npRmpi.init(nslaves = %d, quiet = TRUE)", nslaves),
     "  on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
     "  options(npRmpi.autodispatch = TRUE, np.messages = FALSE)",
     "  set.seed(7301)",
@@ -50,6 +51,14 @@ test_that("npplreg inid plot bootstrap component regressions use master-assist f
   expect_true(length(starts) > 0L, info = paste(trace, collapse = "\n"))
   expect_true(all(grepl("master_local_chunk=TRUE", starts, fixed = TRUE)),
               info = paste(starts, collapse = "\n"))
+  expect_true(all(grepl(sprintf("workers=%d", nslaves), starts, fixed = TRUE)),
+              info = paste(starts, collapse = "\n"))
+  for (dest in seq_len(nslaves)) {
+    expect_true(any(grepl("what=inid-regression-counts", trace, fixed = TRUE) &
+                      grepl("event=fanout.send.initial", trace, fixed = TRUE) &
+                      grepl(sprintf("dest=%d", dest), trace, fixed = TRUE)),
+                info = paste(trace, collapse = "\n"))
+  }
   expect_true(any(grepl("what=inid-regression-counts", trace, fixed = TRUE) &
                     grepl("event=fanout.master_local_chunk.done", trace, fixed = TRUE)),
               info = paste(trace, collapse = "\n"))
