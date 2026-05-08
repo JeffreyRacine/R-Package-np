@@ -45,19 +45,15 @@ np_grid_control <- function(xtrim = NULL, xq = NULL, slices = NULL) {
 
 np_render_control <- function(style = c("band", "bar"),
                               bar = c("|", "I"),
-                              bar.num = NULL,
-                              rug = FALSE,
-                              overlay = FALSE,
-                              rotate = FALSE) {
+                              bar_num = NULL) {
   style <- match.arg(style)
   bar <- match.arg(bar)
-  if (!is.null(bar.num) &&
-      (!is.numeric(bar.num) || length(bar.num) != 1L ||
-       is.na(bar.num) || bar.num < 1))
-    stop("bar.num must be a positive numeric scalar", call. = FALSE)
+  if (!is.null(bar_num) &&
+      (!is.numeric(bar_num) || length(bar_num) != 1L ||
+       is.na(bar_num) || bar_num < 1))
+    stop("bar_num must be a positive numeric scalar", call. = FALSE)
   structure(
-    list(style = style, bar = bar, bar.num = bar.num,
-         rug = isTRUE(rug), overlay = isTRUE(overlay), rotate = isTRUE(rotate)),
+    list(style = style, bar = bar, bar_num = bar_num),
     class = "np_render_control"
   )
 }
@@ -109,7 +105,10 @@ np_render_control <- function(style = c("band", "bar"),
 
 .np_plot_canonical_arg_names <- function() {
   c("errors", "band", "alpha", "bootstrap", "B", "center",
-    "behavior", "renderer", "neval", "perspective",
+    "output", "data_overlay", "data_rug", "layout",
+    "factor_boxplot", "boxplot_outliers", "coef_index",
+    "gradient_order", "common_scale", "proper_method", "proper_control",
+    "renderer", "neval", "perspective",
     "boot_control", "grid_control", "render_control")
 }
 
@@ -120,7 +119,8 @@ np_render_control <- function(style = c("band", "bar"),
     "plot.errors.boot.blocklen", "plot.errors.center",
     "plot.errors.style", "plot.errors.bar", "plot.errors.bar.num",
     "plot.behavior", "gradient", "persp", "plot.par.mfrow",
-    "plot.data.overlay")
+    "plot.data.overlay", "plot.rug", "plot.bxp", "plot.bxp.out",
+    "behavior")
 }
 
 .np_plot_engine_for_bws <- function(bws) {
@@ -191,6 +191,17 @@ np_render_control <- function(style = c("band", "bar"),
   dots
 }
 
+.np_plot_match_layout <- function(value) {
+  if (is.logical(value)) {
+    if (length(value) != 1L || is.na(value))
+      stop("layout must be TRUE/FALSE or one of \"auto\", \"current\"",
+           call. = FALSE)
+    return(isTRUE(value))
+  }
+  layout <- .np_plot_scalar_match(value, c("auto", "current"), "layout")
+  identical(layout, "auto")
+}
+
 .np_plot_normalize_public_dots <- function(dots, context = "plot") {
   supplied <- names(dots)
   has <- function(x) x %in% supplied
@@ -255,6 +266,16 @@ np_render_control <- function(style = c("band", "bar"),
     dots <- .np_plot_set_normalized_arg(dots, "center",
                                         "plot.errors.center", center)
   }
+  if (has("output")) {
+    output <- .np_plot_scalar_match(dots$output,
+                                    c("plot", "data", "both", "plot-data"),
+                                    "output")
+    if (identical(output, "both"))
+      output <- "plot-data"
+    dots$output <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "output",
+                                        "plot.behavior", output)
+  }
   if (has("behavior")) {
     behavior <- .np_plot_scalar_match(dots$behavior,
                                       c("plot", "plot-data", "data"),
@@ -262,6 +283,81 @@ np_render_control <- function(style = c("band", "bar"),
     dots$behavior <- NULL
     dots <- .np_plot_set_normalized_arg(dots, "behavior",
                                         "plot.behavior", behavior)
+  }
+  if (has("data_overlay")) {
+    data_overlay <- .np_plot_match_flag(dots$data_overlay, "data_overlay")
+    dots$data_overlay <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "data_overlay",
+                                        "plot.data.overlay", data_overlay)
+  }
+  if (has("data_rug")) {
+    data_rug <- .np_plot_match_flag(dots$data_rug, "data_rug")
+    dots$data_rug <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "data_rug",
+                                        "plot.rug", data_rug)
+  }
+  if (has("layout")) {
+    layout <- .np_plot_match_layout(dots$layout)
+    dots$layout <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "layout",
+                                        "plot.par.mfrow", layout)
+  }
+  if (has("factor_boxplot")) {
+    factor_boxplot <- .np_plot_match_flag(dots$factor_boxplot,
+                                          "factor_boxplot")
+    dots$factor_boxplot <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "factor_boxplot",
+                                        "plot.bxp", factor_boxplot)
+  }
+  if (has("boxplot_outliers")) {
+    boxplot_outliers <- .np_plot_match_flag(dots$boxplot_outliers,
+                                            "boxplot_outliers")
+    dots$boxplot_outliers <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "boxplot_outliers",
+                                        "plot.bxp.out", boxplot_outliers)
+  }
+  if (has("coef_index")) {
+    coef_index <- dots$coef_index
+    if (!is.numeric(coef_index) || length(coef_index) != 1L ||
+        is.na(coef_index) || coef_index < 1L)
+      stop("coef_index must be a positive numeric scalar", call. = FALSE)
+    dots$coef_index <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "coef_index",
+                                        "coef.index", as.integer(coef_index))
+  }
+  if (has("gradient_order")) {
+    gradient_order <- dots$gradient_order
+    if (!is.numeric(gradient_order) || any(is.na(gradient_order)) ||
+        any(gradient_order < 1L))
+      stop("gradient_order must contain positive numeric values",
+           call. = FALSE)
+    dots$gradient_order <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "gradient_order",
+                                        "gradient.order",
+                                        as.integer(gradient_order))
+  }
+  if (has("common_scale")) {
+    common_scale <- .np_plot_match_flag(dots$common_scale, "common_scale")
+    dots$common_scale <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "common_scale",
+                                        "common.scale", common_scale)
+  }
+  if (has("proper_method")) {
+    proper_method <- dots$proper_method
+    if (!is.character(proper_method) || length(proper_method) != 1L ||
+        is.na(proper_method))
+      stop("proper_method must be a character scalar", call. = FALSE)
+    dots$proper_method <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "proper_method",
+                                        "proper.method", proper_method)
+  }
+  if (has("proper_control")) {
+    proper_control <- dots$proper_control
+    if (!is.list(proper_control))
+      stop("proper_control must be a list", call. = FALSE)
+    dots$proper_control <- NULL
+    dots <- .np_plot_set_normalized_arg(dots, "proper_control",
+                                        "proper.control", proper_control)
   }
   if (has("perspective")) {
     perspective <- isTRUE(dots$perspective)
@@ -309,18 +405,9 @@ np_render_control <- function(style = c("band", "bar"),
                                         "plot.errors.style", ctrl$style)
     dots <- .np_plot_set_normalized_arg(dots, "render_control$bar",
                                         "plot.errors.bar", ctrl$bar)
-    if (!is.null(ctrl$bar.num))
-      dots <- .np_plot_set_normalized_arg(dots, "render_control$bar.num",
-                                          "plot.errors.bar.num", ctrl$bar.num)
-    if (isTRUE(ctrl$rug))
-      dots <- .np_plot_set_normalized_arg(dots, "render_control$rug",
-                                          "plot.rug", TRUE)
-    if (isTRUE(ctrl$overlay))
-      stop(sprintf("render_control$overlay is not yet supported for %s", context),
-           call. = FALSE)
-    if (isTRUE(ctrl$rotate))
-      stop(sprintf("render_control$rotate is not yet supported for %s", context),
-           call. = FALSE)
+    if (!is.null(ctrl$bar_num))
+      dots <- .np_plot_set_normalized_arg(dots, "render_control$bar_num",
+                                          "plot.errors.bar.num", ctrl$bar_num)
   }
 
   method <- if (!is.null(dots$plot.errors.method))

@@ -88,27 +88,30 @@ Named options passed via \code{\dots} include:
 
     \strong{Plot content controls}
     \describe{
-      \item{\code{behavior}}{
-        one of \code{"plot"}, \code{"plot-data"}, or \code{"data"}.
-      }
-      \item{\code{coef}, \code{coef.index}}{
-        coefficient-function plotting controls for semiparametric
-        families where supported.
-      }
-      \item{\code{common.scale}}{
+      \item{\code{common_scale}}{
         a logical value specifying whether multiple panels should share a
         common plotting scale when feasible.
       }
-      \item{\code{gradients}, \code{gradient.order}}{
+      \item{\code{coef}, \code{coef_index}}{
+        coefficient-function plotting controls for semiparametric
+        families where supported.
+      }
+      \item{\code{gradient_order}, \code{gradients}}{
         derivative plotting controls for families that support
         gradients/derivatives.
       }
-      \item{\code{plot.par.mfrow}}{
-        a logical value specifying whether
-        \code{par(mfrow=...)} should be managed automatically for
-        multi-panel layouts.
+      \item{\code{layout}}{
+        \code{"auto"} or \code{TRUE} requests automatic
+        \code{par(mfrow=...)} management for multi-panel plots.
+        \code{"current"} or \code{FALSE} preserves the user's current
+        graphics layout.
       }
-      \item{\code{proper}, \code{proper.method}, \code{proper.control}}{
+      \item{\code{output}}{
+        one of \code{"plot"}, \code{"data"}, or \code{"both"}.
+        \code{"both"} is the public spelling for the historical
+        \code{"plot-data"} behavior.
+      }
+      \item{\code{proper}, \code{proper_method}, \code{proper_control}}{
         controls for proper conditional density/distribution handling
         where implemented.
       }
@@ -150,7 +153,7 @@ Named options passed via \code{\dots} include:
         one of \code{"none"}, \code{"bootstrap"}, or
         \code{"asymptotic"}.
       }
-      \item{\code{plot.bxp}, \code{plot.bxp.out}}{
+      \item{\code{boxplot_outliers}, \code{factor_boxplot}}{
         boxplot-style bootstrap summary controls for factor/categorical
         displays when available.
       }
@@ -165,7 +168,7 @@ Named options passed via \code{\dots} include:
       \item{\code{phi}, \code{theta}, \code{view}}{
         view controls for bivariate continuous surface plots.
       }
-      \item{\code{plot.data.overlay}}{
+      \item{\code{data_overlay}}{
         logical; when \code{TRUE}, overlay raw data points on regression
         surface plots (currently \code{npreg}, \code{npscoef}, and
         \code{npplreg}) and expand plot limits to include the data. The
@@ -175,22 +178,22 @@ Named options passed via \code{\dots} include:
         \code{...} (for example \code{pch}, \code{cex}, \code{col}, and
         \code{bg}). Default is \code{TRUE}.
       }
-      \item{\code{plot.rug}}{
+      \item{\code{data_rug}}{
         logical; when \code{TRUE}, draw a rug-style support cue for the
         plotted coordinates. For ordinary 1D base plots this behaves
         like a standard rug. For eligible 2D surface plots, the base
         renderer draws short floor-rug ticks and
         \code{renderer="rgl"} draws the analogous 3D floor-rug ticks
         on supported surface routes. In this rollout tranche,
-        \code{plot.rug=TRUE} is implemented across the current base
+        \code{data_rug=TRUE} is implemented across the current base
         plot families and across supported \code{rgl} surface routes;
         unsupported renderer/geometry combinations still fail clearly
         rather than being ignored silently. On mixed base plot layouts,
         rug marks are drawn for continuous panels and omitted for
         categorical panels.
-        This option is distinct from \code{plot.data.overlay}:
-        \code{plot.rug} shows where observations lie in the plotted
-        covariate support, while \code{plot.data.overlay} is the
+        This option is distinct from \code{data_overlay}:
+        \code{data_rug} shows where observations lie in the plotted
+        covariate support, while \code{data_overlay} is the
         regression-only 3D response overlay used on supported surface
         plots. On supported regression surfaces, both options may be
         used together. Default is \code{FALSE}.
@@ -213,7 +216,7 @@ Named options passed via \code{\dots} include:
         \code{npcdens}/\code{npcdensbw}, and
         \code{npcdist}/\code{npcdistbw}. In this tranche,
         \code{renderer="rgl"} requires \code{perspective=TRUE},
-        \code{view="fixed"} and \code{behavior="plot"};
+        \code{view="fixed"} and \code{output="plot"};
         unsupported combinations still error rather than falling back
         silently. The suggested package
         \code{rgl} must be installed when \code{renderer="rgl"} is
@@ -228,7 +231,7 @@ Named options passed via \code{\dots} include:
         camera to a more informative oblique view for this rollout
         tranche. For the currently supported \code{npreg},
         \code{npplreg}, and plain mean-surface
-        \code{npscoef} surface routes, \code{plot.data.overlay=TRUE}
+        \code{npscoef} surface routes, \code{data_overlay=TRUE}
         adds observed data as an interactive point cloud. For all
         currently supported \code{rgl} surface routes,
         \code{errors != "none"} adds interval surfaces;
@@ -467,21 +470,21 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   plot(fit, errors="bootstrap", bootstrap="inid")
   }
 
-  Historical \code{plot.errors.*} and \code{plot.behavior} names remain
-  accepted as compatibility inputs in this release, but new code should use
-  \code{errors}, \code{bootstrap}, \code{B}, \code{band}, \code{alpha},
-  \code{center}, \code{behavior}, and the control constructors documented in
-  \code{\link{np_boot_control}}, \code{\link{np_grid_control}}, and
-  \code{\link{np_render_control}}.
+  New public plot controls use \code{snake_case}. Dotted names are reserved for
+  S3 methods and internal plot-engine plumbing. Use \code{errors},
+  \code{bootstrap}, \code{B}, \code{band}, \code{alpha}, \code{center},
+  \code{output}, \code{data_overlay}, \code{data_rug}, \code{layout}, and the
+  control constructors documented in \code{\link{np_boot_control}},
+  \code{\link{np_grid_control}}, and \code{\link{np_render_control}}.
 
 }
 
 \value{
-  Setting \code{behavior} will instruct \code{plot} what data
+  Setting \code{output} will instruct \code{plot} what data
   to return. Option summary:\cr
   \code{plot}: instruct \code{plot} to just plot the data and
   return \code{NULL} \cr
-  \code{plot-data}: instruct \code{plot} to plot the data and return
+  \code{both}: instruct \code{plot} to plot the data and return
   the data used to generate the plots. The data will be a \code{list} of
   objects of the appropriate type, with one object per plot. For
   example, invoking \code{plot} on 3D density data will have it
@@ -656,7 +659,7 @@ plot(fit,
 
 # EXAMPLE 3: This example demonstrates how to retrieve plotting data from
 # plot(). When plot() is called with the arguments
-# `behavior="plot-data"' (or "data"), it returns plotting objects
+# `output="both"' (or "data"), it returns plotting objects
 # named r1, r2, and so on (rg1, rg2, and so on when `gradients=TRUE' is
 # set).  Each plotting object's index (1,2,...) corresponds to the index
 # of the explanatory data data frame xdat (and zdat if appropriate).
@@ -673,13 +676,13 @@ bw <- npregbw(xdat=cps71$age, ydat=cps71$logwage,
 fit <- npreg(bws=bw)
 
 # Generate the plot and return plotting data, and store output in
-# `plot.out' (NOTE: the call to `behavior' is necessary).
+# `plot.out' (NOTE: the call to `output' is necessary).
 
 plot.out <- plot(fit,
                  perspective=FALSE,
                  errors="bootstrap",
                  B=25,
-                 behavior="plot-data")
+                 output="both")
 
 # Now grab the r1 object that plot plotted on the screen, and take
 # what you need. First, take the output, lower error bound and upper
@@ -712,7 +715,7 @@ plot.out <- plot(fit,
                  perspective=FALSE,
                  errors="bootstrap",
                  B=25,
-                 behavior="plot-data",
+                 output="both",
                  gradients=TRUE)
 
 # Now grab object that plot() plotted on the screen. First, take the
