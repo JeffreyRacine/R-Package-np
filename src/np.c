@@ -9427,8 +9427,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   if((int_ll_eff == LL_LP) && (num_reg_continuous_extern == 0))
     int_ll_eff = LL_LC;
 
-  if((int_ll_eff == LL_LC) ||
-     ((int_ll_eff == LL_LP) && (BANDWIDTH_den_extern == BW_ADAP_NN))){
+  if(int_ll_eff == LL_LC){
     int lc_owner_done = 0;
 #ifdef MPI2
     if((int_ll_eff == LL_LC) &&

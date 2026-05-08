@@ -47,6 +47,14 @@ Changes from Version 0.70-1 to 0.70-2 [08-May-2026]
   route is used by the MPI-aware session/attach/profile paths without
   cross-package fallback.
 
+* Repaired adaptive nearest-neighbor conditional density/distribution
+  evaluation for local-polynomial fits so `npcdens()`, `npcdist()`, and
+  downstream `npqreg()` quantiles, standard errors, gradients, and gradient
+  standard errors honor the selected LP degree/basis metadata. The regression
+  guard verifies that `regtype = "ll"` remains identical to `regtype = "lp",
+  degree = 1` while higher-degree adaptive-NN LP fits are degree-sensitive,
+  with `npRmpi` matching `np` numerically on the installed parity sentinel.
+
 * Restored/validated MPI fanout coverage for touched plot-bootstrap routes,
   including conditional adaptive exact helpers, conditional gradients,
   proper conditional projection, partially linear recomposition, and public
