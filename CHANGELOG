@@ -1,4 +1,4 @@
-Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
+Changes from Version 0.70-1 to 0.70-2 [08-May-2026]
 
 * Added the redesigned public plot-control interface with direct scalar
   controls such as `errors`, `band`, `alpha`, `bootstrap`, `B`, `behavior`,
@@ -39,6 +39,13 @@ Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
   an inconsistency where the newly degree-aware quantile-gradient path could
   use a higher-order conditional distribution fit while the quantile level was
   still extracted by the legacy degree-unaware inversion path.
+
+* Restored live progress updates for local-polynomial plot-bootstrap helpers
+  when bootstrap resampling counts are precomputed and shared by a higher-level
+  route, such as the component regressions inside partially linear
+  `plot(..., errors = "bootstrap")`. The helper now processes the existing
+  count matrix in progress-sized chunks without changing the resamples or
+  bootstrap output order.
 
 * Restored pure-discrete/all-categorical `npregbw()` least-squares
   cross-validation for fixed bandwidths by allowing the optimized regression

@@ -1559,8 +1559,29 @@
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
-    progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
+    chunk.size <- min(.np_inid_chunk_size(n = n, B = B), .np_plot_progress_chunk_cap(B))
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+      chunk.started <- .np_progress_now()
+      fill_chunk(
+        counts.chunk = counts.mat[, start:stopi, drop = FALSE],
+        start = start,
+        stopi = stopi
+      )
+      progress <- .np_plot_progress_tick(
+        state = progress,
+        done = stopi,
+        force = identical(stopi, B)
+      )
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = stopi - start + 1L,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
+      start <- stopi + 1L
+    }
   } else {
     chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
     chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)

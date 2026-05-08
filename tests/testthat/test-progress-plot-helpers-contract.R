@@ -261,6 +261,58 @@ test_that("plot helper activity no longer waits for grace before first render", 
   )
 })
 
+test_that("local-polynomial regression bootstrap advances when counts are precomputed", {
+  boot_lp <- getFromNamespace(".np_inid_boot_from_regression", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.plot.progress = TRUE,
+    np.plot.progress.interval.sec = 0,
+    np.plot.progress.start.grace.sec = 0,
+    np.plot.progress.max.intermediate = 3
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260508)
+  n <- 8L
+  B <- 12L
+  x <- data.frame(z = seq(-1, 1, length.out = n))
+  y <- sin(x$z)
+  bw <- get("npregbw", envir = asNamespace("np"), inherits = FALSE)(
+    xdat = x,
+    ydat = y,
+    bws = 0.75,
+    regtype = "lp",
+    degree = 1L,
+    bwtype = "fixed",
+    bandwidth.compute = FALSE
+  )
+  counts <- matrix(0L, nrow = n, ncol = B)
+  for (b in seq_len(B))
+    counts[((seq_len(n) + b - 2L) %% n) + 1L, b] <- 1L
+
+  actual <- capture_progress_shadow_trace(
+    {
+      boot_lp(
+        xdat = x,
+        exdat = x,
+        bws = bw,
+        ydat = y,
+        B = B,
+        counts = counts,
+        progress.label = "Plot bootstrap lp-counts"
+      )
+    },
+    now = progress_time_counter()
+  )
+
+  lines <- vapply(actual$trace, `[[`, character(1L), "line")
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap lp-counts 3/12 ", lines)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap lp-counts 6/12 ", lines)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap lp-counts 9/12 ", lines)))
+  expect_true(any(grepl("^\\[np\\] Plot bootstrap lp-counts 12/12 ", lines)))
+})
+
 test_that("first-render helper emits exactly one render activity line", {
   init <- getFromNamespace(".np_plot_first_render_state", "np")
   begin <- getFromNamespace(".np_plot_first_render_begin", "np")
