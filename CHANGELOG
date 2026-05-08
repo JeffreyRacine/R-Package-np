@@ -153,6 +153,12 @@ Changes from Version 0.70-1 to 0.70-2 [08-May-2026]
   command payload; the small-data inline path and estimator semantics are
   unchanged.
 
+* Hardened attach/session auto-dispatch argument materialization so
+  bandwidth-type and kernel-control arguments are evaluated on the master and
+  carried explicitly to worker ranks. This repairs session routes where
+  caller-local variables such as looped `bwtype` values could be left as
+  unevaluated symbols in the worker payload.
+
 * Reduced attach/session auto-dispatch payload overhead for follow-on
   `npindex(bws=...)` and `npscoef(bws=...)` calls by reusing worker-resident
   `sibandwidth` and `scbandwidth` remote references when their stored calls are

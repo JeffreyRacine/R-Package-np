@@ -1396,6 +1396,8 @@
      "weights", "bandwidth.divide", "compute.ocg", "compute.score", "kernel.pow",
      "leave.one.out", "operator", "permutation.operator", "return.kernel.weights",
      "regtype", "basis", "degree", "bernstein.basis",
+     "bwmethod", "bwtype", "bwscaling",
+     "ckertype", "ckerorder", "ukertype", "okertype",
      "nmulti", "bandwidth.compute", "remin", "itmax", "ftol", "tol", "small",
      "gradients", "residuals", "errors", "gradient.order",
      "proper", "proper.method", "proper.control",
