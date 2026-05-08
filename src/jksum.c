@@ -368,6 +368,15 @@ static void *np_jksum_malloc_array3_or_die(size_t a, size_t b, size_t c, const c
   return np_jksum_malloc_bytes_or_die(np_jksum_size_mul3_or_die(a, b, c, what), what);
 }
 
+#ifdef MPI2
+static int np_jksum_mpi_count_or_die(size_t count, const char *what)
+{
+  if (count > (size_t)INT_MAX)
+    error("%s: MPI count exceeds INT_MAX", what);
+  return (int)count;
+}
+#endif
+
 int kernel_convolution_weighted_sum(
 int KERNEL_reg,
 int KERNEL_unordered_reg,
@@ -6371,23 +6380,49 @@ const int keep_kw_owner_local){
 #ifdef MPI2
     if(!nws){
       if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
-        MPI_Allgather(MPI_IN_PLACE, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);
+        const int weighted_count =
+          np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)stride,
+                                                             (size_t)sum_element_length,
+                                                             "weighted_sum MPI_Allgather"),
+                                    "weighted_sum MPI_Allgather");
+        MPI_Allgather(MPI_IN_PLACE, weighted_count, MPI_DOUBLE, weighted_sum, weighted_count, MPI_DOUBLE, comm[1]);
       } else if(BANDWIDTH_reg == BW_ADAP_NN){
-        MPI_Allreduce(MPI_IN_PLACE, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
+        const int weighted_count =
+          np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)num_obs_eval,
+                                                             (size_t)sum_element_length,
+                                                             "weighted_sum MPI_Allreduce"),
+                                    "weighted_sum MPI_Allreduce");
+        MPI_Allreduce(MPI_IN_PLACE, weighted_sum, weighted_count, MPI_DOUBLE, MPI_SUM, comm[1]);
       }
     }
 
     if((kw_work != NULL) && (!keep_kw_owner_local)){
-      MPI_Allgather(MPI_IN_PLACE, stride * num_xt, MPI_DOUBLE, kw_work, stride * num_xt, MPI_DOUBLE, comm[1]);
+      const int kw_count =
+        np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)stride,
+                                                           (size_t)num_xt,
+                                                           "kw_work MPI_Allgather"),
+                                  "kw_work MPI_Allgather");
+      MPI_Allgather(MPI_IN_PLACE, kw_count, MPI_DOUBLE, kw_work, kw_count, MPI_DOUBLE, comm[1]);
     }
 
     if(p_nvar > 0){
       if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
         for(ii = 0; ii < p_nvar; ii++){
-          MPI_Allgatherv(MPI_IN_PLACE, igatherv[my_rank], MPI_DOUBLE, weighted_permutation_sum + ii*num_obs_eval*sum_element_length, igatherv, idisplsv, MPI_DOUBLE, comm[1]);
+          const size_t perm_offset =
+            np_jksum_size_mul3_or_die((size_t)ii,
+                                      (size_t)num_obs_eval,
+                                      (size_t)sum_element_length,
+                                      "weighted_permutation_sum offset");
+          MPI_Allgatherv(MPI_IN_PLACE, igatherv[my_rank], MPI_DOUBLE, weighted_permutation_sum + perm_offset, igatherv, idisplsv, MPI_DOUBLE, comm[1]);
         }
       } else if(BANDWIDTH_reg == BW_ADAP_NN){
-        MPI_Allreduce(MPI_IN_PLACE, weighted_permutation_sum, p_nvar*num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
+        const int perm_count =
+          np_jksum_mpi_count_or_die(np_jksum_size_mul3_or_die((size_t)p_nvar,
+                                                              (size_t)num_obs_eval,
+                                                              (size_t)sum_element_length,
+                                                              "weighted_permutation_sum MPI_Allreduce"),
+                                    "weighted_permutation_sum MPI_Allreduce");
+        MPI_Allreduce(MPI_IN_PLACE, weighted_permutation_sum, perm_count, MPI_DOUBLE, MPI_SUM, comm[1]);
       }
     }
 #endif
