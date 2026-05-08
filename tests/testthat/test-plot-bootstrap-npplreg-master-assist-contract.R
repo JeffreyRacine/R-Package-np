@@ -1,4 +1,4 @@
-test_that("npplreg inid plot bootstrap component regressions use master-assist fanout", {
+test_that("npplreg LL/LP inid plot bootstrap uses fused master-assist fanout", {
   skip_on_cran()
 
   trace.file <- tempfile("npplreg-plot-master-assist-", fileext = ".tsv")
@@ -45,7 +45,7 @@ test_that("npplreg inid plot bootstrap component regressions use master-assist f
 
   trace <- readLines(trace.file, warn = FALSE)
   starts <- trace[
-    grepl("what=inid-regression-counts", trace, fixed = TRUE) &
+    grepl("what=inid-plreg-fixed-fused", trace, fixed = TRUE) &
       grepl("event=fanout.start", trace, fixed = TRUE)
   ]
   expect_true(length(starts) > 0L, info = paste(trace, collapse = "\n"))
@@ -54,19 +54,19 @@ test_that("npplreg inid plot bootstrap component regressions use master-assist f
   expect_true(all(grepl(sprintf("workers=%d", nslaves), starts, fixed = TRUE)),
               info = paste(starts, collapse = "\n"))
   assists <- trace[
-    grepl("what=inid-regression-counts", trace, fixed = TRUE) &
+    grepl("what=inid-plreg-fixed-fused", trace, fixed = TRUE) &
       grepl("event=fanout.master_assist.start", trace, fixed = TRUE)
   ]
   expect_true(length(assists) > 0L, info = paste(trace, collapse = "\n"))
   expect_true(all(grepl("scheduler=static_bundle", assists, fixed = TRUE)),
               info = paste(assists, collapse = "\n"))
   for (dest in seq_len(nslaves)) {
-    expect_true(any(grepl("what=inid-regression-counts", trace, fixed = TRUE) &
+    expect_true(any(grepl("what=inid-plreg-fixed-fused", trace, fixed = TRUE) &
                       grepl("event=fanout.send.initial", trace, fixed = TRUE) &
                       grepl(sprintf("dest=%d", dest), trace, fixed = TRUE)),
                 info = paste(trace, collapse = "\n"))
   }
-  expect_true(any(grepl("what=inid-regression-counts", trace, fixed = TRUE) &
+  expect_true(any(grepl("what=inid-plreg-fixed-fused", trace, fixed = TRUE) &
                     grepl("event=fanout.master_local_chunk.done", trace, fixed = TRUE)),
               info = paste(trace, collapse = "\n"))
 })
