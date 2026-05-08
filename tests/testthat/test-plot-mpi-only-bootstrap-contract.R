@@ -235,7 +235,7 @@ test_that("active single-worker fanout does not collapse to master-local", {
   expect_true(any(grepl("single_worker_local=FALSE", start.lines, fixed = TRUE)))
 })
 
-test_that("wild fanout master-assist is remote-only when workers are active", {
+test_that("wild fanout master-assist uses master chunk when workers are active", {
   run_fanout <- getFromNamespace(".npRmpi_bootstrap_run_fanout", "npRmpi")
   tf <- tempfile("npRmpi-boot-transport-", fileext = ".tsv")
   old.trace <- getOption("npRmpi.bootstrap.transport.trace.file")
@@ -289,10 +289,13 @@ test_that("wild fanout master-assist is remote-only when workers are active", {
 
   out <- run_fanout(
     tasks = tasks,
-    worker = function(task) stop("master-local execution must not run"),
+    worker = function(task) {
+      matrix(rep.int(as.integer(task$start), as.integer(task$bsz)),
+             nrow = as.integer(task$bsz), ncol = 1L)
+    },
     ncol.out = 1L,
     what = "wild",
-    profile.where = "unit.test:remote-only"
+    profile.where = "unit.test:master-assist"
   )
 
   expect_true(is.matrix(out))
@@ -302,7 +305,8 @@ test_that("wild fanout master-assist is remote-only when workers are active", {
   lines <- readLines(tf, warn = FALSE)
   done.lines <- lines[grepl("event=fanout.master_assist.done", lines, fixed = TRUE)]
   expect_true(length(done.lines) >= 1L)
-  expect_true(any(grepl("local_done=0", done.lines, fixed = TRUE)))
+  expect_true(any(grepl("local_done=1", done.lines, fixed = TRUE)))
+  expect_true(any(grepl("event=fanout.master_local_chunk.done", lines, fixed = TRUE)))
 })
 
 test_that("wild fanout fails fast on dispatch timeout when worker replies stall", {

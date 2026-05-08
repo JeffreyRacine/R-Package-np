@@ -161,6 +161,129 @@
   list(bws = bws, scale = bw.scale, operator = operator)
 }
 
+.npRmpi_hat_operator_row_tasks <- function(neval, workers) {
+  neval <- as.integer(neval)
+  workers <- as.integer(workers)
+  if (is.na(neval) || neval < 1L || is.na(workers) || workers < 1L)
+    return(NULL)
+
+  n.tasks <- min(neval, workers + 1L)
+  if (n.tasks < 2L)
+    return(NULL)
+
+  base <- neval %/% n.tasks
+  extra <- neval %% n.tasks
+  sizes <- rep.int(base, n.tasks)
+  if (extra > 0L)
+    sizes[seq_len(extra)] <- sizes[seq_len(extra)] + 1L
+
+  starts <- cumsum(c(1L, sizes[-length(sizes)]))
+  lapply(seq_along(sizes), function(i) {
+    rows <- seq.int(starts[[i]], length.out = sizes[[i]])
+    list(rows = as.integer(rows), bsz = as.integer(length(rows)))
+  })
+}
+
+.npRmpi_hat_operator_row_fanout <- function(fun.name,
+                                            bws,
+                                            tdat,
+                                            edat,
+                                            y = NULL,
+                                            output = c("matrix", "apply"),
+                                            target.dist = NULL,
+                                            what = fun.name,
+                                            comm = 1L) {
+  output <- match.arg(output)
+
+  if (!identical(fun.name, "npudisthat") || !identical(output, "apply"))
+    return(NULL)
+
+  if (!isTRUE(getOption("npRmpi.hat.operator.fanout", TRUE)) ||
+      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+      isTRUE(getOption("npRmpi.autodispatch.context", FALSE)) ||
+      isTRUE(getOption("npRmpi.autodispatch.disable", FALSE)) ||
+      isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+    return(NULL)
+
+  rank <- tryCatch(as.integer(mpi.comm.rank(comm = comm)), error = function(e) NA_integer_)
+  if (is.na(rank) || rank != 0L)
+    return(NULL)
+
+  workers <- tryCatch(.npRmpi_bootstrap_worker_count(comm = comm), error = function(e) 0L)
+  if (is.na(workers) || workers < 1L)
+    return(NULL)
+
+  neval <- nrow(edat)
+  if (is.null(target.dist) || length(target.dist) != neval)
+    return(NULL)
+
+  work.size <- as.double(nrow(tdat)) * as.double(neval) *
+    if (is.null(y)) 1.0 else as.double(ncol(as.matrix(y)))
+  min.work <- suppressWarnings(as.numeric(getOption("npRmpi.hat.operator.fanout.min.work", 6e6))[1L])
+  if (!is.finite(min.work) || is.na(min.work) || min.work < 0)
+    min.work <- 6e6
+  if (work.size < min.work)
+    return(NULL)
+
+  tasks <- .npRmpi_hat_operator_row_tasks(neval = neval, workers = workers)
+  if (!length(tasks) || length(tasks) < 2L)
+    return(NULL)
+
+  ncol.out <- if (identical(output, "apply")) {
+    if (is.null(y))
+      return(NULL)
+    ncol(as.matrix(y))
+  } else {
+    nrow(tdat)
+  }
+
+  worker <- function(task) {
+    old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+    old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+    options(npRmpi.autodispatch.disable = TRUE)
+    options(npRmpi.autodispatch.context = TRUE)
+    on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+    on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+
+    rows <- as.integer(task$rows)
+    out <- .np_udisthat_local_chunk(
+      bws = bws,
+      tdat = tdat,
+      edat = edat[rows, , drop = FALSE],
+      y = y,
+      output = output,
+      target.dist = target.dist[rows],
+      n.train = nrow(tdat)
+    )
+    out <- as.matrix(out)
+    if (!identical(dim(out), c(length(rows), as.integer(ncol.out))))
+      out <- matrix(as.numeric(out), nrow = length(rows), ncol = as.integer(ncol.out))
+    out
+  }
+
+  .npRmpi_bootstrap_run_fanout(
+    tasks = tasks,
+    worker = worker,
+    ncol.out = ncol.out,
+    what = what,
+    progress.label = sprintf("%s evaluation rows", what),
+    profile.where = what,
+    comm = comm,
+    prefer.local.single_worker = FALSE,
+    master_local_chunk = TRUE,
+    required.bindings = list(
+      fun.name = fun.name,
+      bws = bws,
+      tdat = tdat,
+      edat = edat,
+      y = y,
+      output = output,
+      target.dist = if (is.null(target.dist)) NA_real_ else target.dist,
+      ncol.out = ncol.out
+    )
+  )
+}
+
 .np_direct_operator_matrix <- function(kbw, txdat, exdat, operator, where) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
