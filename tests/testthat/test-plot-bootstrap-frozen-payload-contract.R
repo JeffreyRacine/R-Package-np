@@ -114,7 +114,7 @@ test_that("exact and frozen plot payloads stay comparable for regression and sem
     reg.fit,
     view = "fixed",
     gradients = TRUE,
-    behavior = "data",
+    output = "data",
     errors = "bootstrap",
     bootstrap = "inid",
     B = 41L,
@@ -134,7 +134,7 @@ test_that("exact and frozen plot payloads stay comparable for regression and sem
   idx.pair <- run_exact_frozen_plot_pair(
     idx.fit,
     view = "fixed",
-    behavior = "data",
+    output = "data",
     errors = "bootstrap",
     bootstrap = "inid",
     B = 41L,
@@ -151,7 +151,7 @@ test_that("exact and frozen plot payloads stay comparable for regression and sem
   pl.pair <- run_exact_frozen_plot_pair(
     pl.fit,
     view = "fixed",
-    behavior = "data",
+    output = "data",
     errors = "bootstrap",
     bootstrap = "geom",
     B = 41L,
@@ -172,7 +172,7 @@ test_that("exact and frozen plot payloads stay comparable for regression and sem
     sc.fit,
     view = "fixed",
     coef = FALSE,
-    behavior = "data",
+    output = "data",
     errors = "bootstrap",
     bootstrap = "inid",
     B = 41L,
@@ -190,7 +190,7 @@ test_that("exact and frozen plot payloads stay comparable for density and distri
   ud.fit <- npudens(~ y.u, nmulti = 1, bwtype = "adaptive_nn")
   ud.pair <- run_exact_frozen_plot_pair(
     ud.fit,
-    behavior = "data",
+    output = "data",
     errors = "bootstrap",
     bootstrap = "inid",
     B = 41L,
@@ -202,7 +202,7 @@ test_that("exact and frozen plot payloads stay comparable for density and distri
   uf.fit <- npudist(~ y.u, nmulti = 1, bwtype = "adaptive_nn")
   uf.pair <- run_exact_frozen_plot_pair(
     uf.fit,
-    behavior = "data",
+    output = "data",
     errors = "bootstrap",
     bootstrap = "inid",
     B = 41L,
@@ -219,7 +219,7 @@ test_that("exact and frozen plot payloads stay comparable for density and distri
   cd.pair <- run_exact_frozen_plot_pair(
     cd.fit,
     view = "fixed",
-    behavior = "data",
+    output = "data",
     errors = "bootstrap",
     bootstrap = "inid",
     B = 41L,
@@ -232,7 +232,7 @@ test_that("exact and frozen plot payloads stay comparable for density and distri
   cf.pair <- run_exact_frozen_plot_pair(
     cf.fit,
     view = "fixed",
-    behavior = "data",
+    output = "data",
     errors = "bootstrap",
     bootstrap = "inid",
     B = 41L,

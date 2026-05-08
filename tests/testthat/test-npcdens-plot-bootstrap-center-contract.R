@@ -12,7 +12,7 @@ test_that("npcdens plot-data centers stay on predict and bootstrap offsets remai
 
     out <- suppressWarnings(plot(
       fit,
-      behavior = "data",
+      output = "data",
       view = "fixed",
       perspective = FALSE,
       neval = 40L,

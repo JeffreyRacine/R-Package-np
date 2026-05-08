@@ -22,7 +22,7 @@ test_that("npudens and npudist fixed no-error plot-data prototypes match current
   old.dens <- suppressWarnings(plot(
     dens.bw,
     xdat = x,
-    behavior = "data",
+    output = "data",
     errors = "none",
     view = "fixed",
     neval = 7L,
@@ -56,7 +56,7 @@ test_that("npudens and npudist fixed no-error plot-data prototypes match current
   old.dist <- suppressWarnings(plot(
     dist.bw,
     xdat = x,
-    behavior = "data",
+    output = "data",
     errors = "none",
     view = "fixed",
     neval = 7L,
@@ -118,7 +118,7 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
       old <- suppressWarnings(plot(
         bws,
         xdat = x,
-        behavior = "data",
+        output = "data",
         errors = "asymptotic",
         band = band,
         view = "fixed",
@@ -142,7 +142,7 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
     old <- suppressWarnings(plot(
       bws,
       xdat = x,
-      behavior = "data",
+      output = "data",
       errors = "bootstrap",
       bootstrap = "inid",
       B = 13L,

@@ -23,7 +23,7 @@ test_that("plot condistribution 2D data payload applies proper repair on support
 
   out <- suppressWarnings(plot(
     fit,
-    behavior = "data",
+    output = "data",
     perspective = TRUE,
     view = "fixed"
   ))
@@ -64,7 +64,7 @@ test_that("plot condistribution 1D data payload repairs only y-varying panels", 
 
   out <- suppressWarnings(plot(
     fit,
-    behavior = "data",
+    output = "data",
     perspective = FALSE
   ))
 
@@ -102,14 +102,14 @@ test_that("plot condistribution supports asymptotic and bootstrap errors on prop
 
   asym <- suppressWarnings(plot(
     fit,
-    behavior = "data",
+    output = "data",
     perspective = TRUE,
     view = "fixed",
     errors = "asymptotic"
   ))
   boot <- suppressWarnings(plot(
     fit,
-    behavior = "data",
+    output = "data",
     perspective = TRUE,
     view = "fixed",
     errors = "bootstrap",
@@ -143,9 +143,9 @@ test_that("plot condistribution bootstrap supports mixed-bound fixed helper path
   fit <- npcdist(y ~ x, cykerbound = "range")
   out <- suppressWarnings(plot(
     fit,
-    behavior = "data",
+    output = "data",
     view = "fixed",
-    plot.data.overlay = FALSE,
+    data_overlay = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
     B = 5L,

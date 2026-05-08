@@ -26,7 +26,7 @@ test_that("wild categorical regression gradient helper matches explicit refits",
     xdat = xdat,
     ydat = y,
     gradients = TRUE,
-    behavior = "data",
+    output = "data",
     perspective = FALSE
   )[[1L]]$eval
   H <- npreghat(
@@ -111,7 +111,7 @@ test_that("categorical regression gradient bootstrap works for default, inid, an
   for (boot.method in c("default", "inid", "wild")) {
     args <- list(
       fit,
-      behavior = "data",
+      output = "data",
       perspective = FALSE,
       gradients = TRUE,
       errors = "bootstrap",

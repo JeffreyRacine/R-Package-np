@@ -1112,7 +1112,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       ydat = y,
       zdat = data.frame(z = z),
       perspective = FALSE,
-      behavior = "data",
+      output = "data",
       errors = "bootstrap",
       bootstrap = "wild",
       B = 19
@@ -1128,7 +1128,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       ydat = y,
       zdat = data.frame(z = z),
       perspective = FALSE,
-      behavior = "data",
+      output = "data",
       errors = "bootstrap",
       bootstrap = "wild",
       boot_control = np_boot_control(wild = "rademacher"),
@@ -1172,7 +1172,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
         ydat = y,
         zdat = data.frame(z = z),
         perspective = FALSE,
-        behavior = "data",
+        output = "data",
         errors = "bootstrap",
         bootstrap = "wild",
         B = 11
@@ -1210,7 +1210,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
         ydat = y,
         zdat = data.frame(z = z),
         perspective = FALSE,
-        behavior = "data",
+        output = "data",
         errors = "bootstrap",
         bootstrap = "wild",
         B = 9
@@ -1231,7 +1231,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       sibw,
       xdat = data.frame(x1 = x, x2 = z),
       ydat = y,
-      behavior = "data",
+      output = "data",
       errors = "bootstrap",
       bootstrap = "wild",
       B = 19

@@ -11,7 +11,7 @@ test_that("rbandwidth plot bootstrap supports gradients across methods", {
     suppressWarnings(
       plot(
         bw,
-        behavior = "data",
+        output = "data",
         perspective = FALSE,
         gradients = TRUE,
         errors = "bootstrap",
@@ -44,7 +44,7 @@ test_that("plot bootstrap accepts wild selector", {
       bw,
       xdat = data.frame(x = x),
       ydat = y,
-      behavior = "data",
+      output = "data",
       perspective = FALSE,
       errors = "bootstrap",
       bootstrap = "wild",
@@ -87,7 +87,7 @@ test_that("scbandwidth bootstrap non-coef path avoids npscoef refits", {
       zdat = zdat,
       coef = FALSE,
       perspective = FALSE,
-      behavior = "data",
+      output = "data",
       errors = "bootstrap",
       bootstrap = "inid",
       B = 7
@@ -204,7 +204,7 @@ test_that("npreg plot bootstrap inid supports lp basis variants", {
         bw,
         xdat = tx,
         ydat = y,
-        behavior = "data",
+        output = "data",
         perspective = FALSE,
         errors = "bootstrap",
         bootstrap = "inid",

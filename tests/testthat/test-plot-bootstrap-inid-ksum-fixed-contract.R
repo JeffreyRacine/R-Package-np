@@ -372,7 +372,7 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
     suppressWarnings(
       plot(
         ubw,
-        behavior = "data",
+        output = "data",
         perspective = FALSE,
         errors = "bootstrap",
         bootstrap = "wild",
@@ -392,7 +392,7 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
     suppressWarnings(
       plot(
         cbw,
-        behavior = "data",
+        output = "data",
         perspective = FALSE,
         errors = "bootstrap",
         bootstrap = "wild",

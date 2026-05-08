@@ -37,7 +37,7 @@ test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {
         ydat = y,
         zdat = tz,
         perspective = FALSE,
-        behavior = "data",
+        output = "data",
         errors = "bootstrap",
         bootstrap = "inid",
         B = 7

@@ -636,7 +636,7 @@ test_that("fixed-bwtype unsupervised plot bootstrap covers inid fixed and geom",
   run_unsup_plot <- function(bw, ..., boot.method) {
     suppressWarnings(plot(
       bw,
-      behavior = "data",
+      output = "data",
       perspective = FALSE,
       errors = "bootstrap",
       bootstrap = boot.method,

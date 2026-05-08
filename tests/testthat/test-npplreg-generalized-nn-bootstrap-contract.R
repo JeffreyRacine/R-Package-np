@@ -36,7 +36,7 @@ test_that("npplreg generalized-nn cv.aic bootstrap plot contract holds across re
         xdat = tx,
         ydat = y,
         zdat = tz,
-        behavior = "data",
+        output = "data",
         errors = "bootstrap",
         bootstrap = boot_method,
         B = 7L,

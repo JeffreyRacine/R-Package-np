@@ -82,7 +82,7 @@ test_that("npindex public frozen plot-data mean stays on the exact scale", {
   get_obj <- function(mode) {
     suppressWarnings(plot(
       fit,
-      behavior = "data",
+      output = "data",
       neval = 40L,
       errors = "bootstrap",
       bootstrap = "inid",

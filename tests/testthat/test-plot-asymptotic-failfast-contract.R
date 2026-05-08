@@ -41,7 +41,7 @@ test_that("plot contract: single-index asymptotic consumer payloads are supporte
           xdat = xdat,
           ydat = y.use,
           neval = neval,
-          behavior = "data",
+          output = "data",
           errors = "asymptotic",
           band = "pointwise",
           perspective = FALSE
@@ -97,7 +97,7 @@ test_that("plot contract: partially linear asymptotic consumer payloads are supp
           xdat = data.frame(x = x),
           ydat = y,
           zdat = data.frame(z = z),
-          behavior = "data",
+          output = "data",
           errors = "asymptotic",
           band = "pointwise",
           perspective = FALSE
