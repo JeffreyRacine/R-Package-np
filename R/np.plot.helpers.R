@@ -2190,41 +2190,159 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
-  on.exit({
-    .np_plot_progress_end(progress)
-  }, add = TRUE)
 
-  start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
-  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
-  while (start <= B) {
-    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
-    bsz <- stopi - start + 1L
-    chunk.started <- .np_progress_now()
-    counts.chunk <- if (!is.null(counts.mat)) {
-      counts.mat[, start:stopi, drop = FALSE]
-    } else if (!is.null(counts.drawer)) {
-      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
-    } else {
-      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
-    }
-
+  compute_chunk <- function(counts.chunk) {
+    counts.chunk <- as.matrix(counts.chunk)
+    bsz <- ncol(counts.chunk)
+    out <- matrix(NA_real_, nrow = bsz, ncol = length(t0))
     for (jj in seq_len(bsz)) {
       idx <- .np_counts_to_indices(counts.chunk[, jj])
-      tmat[start + jj - 1L, ] <- fit_hat(
+      out[jj, ] <- fit_hat(
         x.train = xdat[idx, , drop = FALSE],
         y.train = ydat[idx]
       )
     }
+    out
+  }
 
-    progress <- .np_plot_progress_tick(state = progress, done = stopi)
-    chunk.controller <- .np_plot_progress_chunk_observe(
-      controller = chunk.controller,
-      bsz = bsz,
-      elapsed.sec = .np_progress_now() - chunk.started
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+    isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
+  if (isTRUE(use.mpi)) {
+    chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+      B = B,
+      chunk.size = chunk.size,
+      comm = 1L,
+      include.master = TRUE
     )
-    start <- stopi + 1L
+    if (!is.null(counts.mat)) {
+      .npRmpi_bootstrap_fanout_enabled(
+        comm = 1L,
+        n = n,
+        B = B,
+        chunk.size = chunk.size,
+        what = "inid-index-exact-counts"
+      )
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        compute_chunk(counts.mat[, start:stopi, drop = FALSE])
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = length(t0),
+        what = "inid-index-exact-counts",
+        progress.label = progress.label,
+        profile.where = "mpi.applyLB:inid-index-exact-counts",
+        comm = 1L,
+        required.bindings = list(
+          counts.mat = counts.mat,
+          compute_chunk = compute_chunk
+        )
+      )
+    } else {
+      if (!is.null(counts.drawer)) {
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-index-exact-block"
+        )
+        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        worker <- function(task) {
+          start <- as.integer(task$start)
+          stopi <- start + as.integer(task$bsz) - 1L
+          compute_chunk(.np_inid_counts_matrix(
+            n = n,
+            B = as.integer(task$bsz),
+            counts = counts.drawer(start, stopi)
+          ))
+        }
+        tmat <- .npRmpi_bootstrap_run_fanout(
+          tasks = tasks,
+          worker = worker,
+          ncol.out = length(t0),
+          what = "inid-index-exact-block",
+          progress.label = progress.label,
+          profile.where = "mpi.applyLB:inid-index-exact-block",
+          comm = 1L,
+          required.bindings = list(
+            n = n,
+            counts.drawer = counts.drawer,
+            compute_chunk = compute_chunk,
+            .np_inid_counts_matrix = .np_inid_counts_matrix
+          )
+        )
+      } else {
+        prob <- rep.int(1 / n, n)
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-index-exact"
+        )
+        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        worker <- function(task) {
+          set.seed(as.integer(task$seed))
+          compute_chunk(stats::rmultinom(
+            n = as.integer(task$bsz),
+            size = n,
+            prob = prob
+          ))
+        }
+        tmat <- .npRmpi_bootstrap_run_fanout(
+          tasks = tasks,
+          worker = worker,
+          ncol.out = length(t0),
+          what = "inid-index-exact",
+          progress.label = progress.label,
+          profile.where = "mpi.applyLB:inid-index-exact",
+          comm = 1L,
+          required.bindings = list(
+            n = n,
+            prob = prob,
+            compute_chunk = compute_chunk
+          )
+        )
+      }
+    }
+
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-index-exact fan-out returned incomplete results",
+        what = "inid-index-exact"
+      )
+  } else {
+    progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+    on.exit({
+      .np_plot_progress_end(progress)
+    }, add = TRUE)
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      chunk.started <- .np_progress_now()
+      counts.chunk <- if (!is.null(counts.mat)) {
+        counts.mat[, start:stopi, drop = FALSE]
+      } else if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+      } else {
+        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+      }
+      tmat[start:stopi, ] <- compute_chunk(counts.chunk)
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = bsz,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
+      start <- stopi + 1L
+    }
   }
 
   list(t = tmat, t0 = t0)
@@ -5155,58 +5273,56 @@
     )
   }
 
-  t0.local <- fit_one_local(x.train = xdat)
-  tmat.local <- matrix(NA_real_, nrow = B, ncol = length(t0.local))
-  counts.mat.local <- if (!is.null(counts)) {
-    .np_inid_counts_matrix(n = n, B = B, counts = counts)
-  } else {
-    NULL
-  }
-  progress.local <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
-  on.exit({
-    .np_plot_progress_end(progress.local)
-  }, add = TRUE)
-
-  start.local <- 1L
-  chunk.size.local <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
-  chunk.controller.local <- .np_plot_progress_chunk_controller(
-    chunk.size = chunk.size.local,
-    progress = progress.local
-  )
-  while (start.local <= B) {
-    stopi.local <- min(B, start.local + chunk.controller.local$chunk.size - 1L)
-    bsz.local <- stopi.local - start.local + 1L
-    chunk.started.local <- .np_progress_now()
-    counts.chunk.local <- if (!is.null(counts.mat.local)) {
-      counts.mat.local[, start.local:stopi.local, drop = FALSE]
-    } else if (!is.null(counts.drawer)) {
-      .np_inid_counts_matrix(n = n, B = bsz.local, counts = counts.drawer(start.local, stopi.local))
+  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+    isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
+  if (!isTRUE(use.mpi)) {
+    t0.local <- fit_one_local(x.train = xdat)
+    tmat.local <- matrix(NA_real_, nrow = B, ncol = length(t0.local))
+    counts.mat.local <- if (!is.null(counts)) {
+      .np_inid_counts_matrix(n = n, B = B, counts = counts)
     } else {
-      stats::rmultinom(n = bsz.local, size = n, prob = rep.int(1 / n, n))
+      NULL
     }
+    progress.local <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+    on.exit({
+      .np_plot_progress_end(progress.local)
+    }, add = TRUE)
 
-    for (jj.local in seq_len(bsz.local)) {
-      idx.local <- .np_counts_to_indices(counts.chunk.local[, jj.local])
-      tmat.local[start.local + jj.local - 1L, ] <- fit_one_local(
-        x.train = xdat[idx.local, , drop = FALSE]
-      )
-    }
-
-    progress.local <- .np_plot_progress_tick(state = progress.local, done = stopi.local)
-    chunk.controller.local <- .np_plot_progress_chunk_observe(
-      controller = chunk.controller.local,
-      bsz = bsz.local,
-      elapsed.sec = .np_progress_now() - chunk.started.local
+    start.local <- 1L
+    chunk.size.local <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+    chunk.controller.local <- .np_plot_progress_chunk_controller(
+      chunk.size = chunk.size.local,
+      progress = progress.local
     )
-    start.local <- stopi.local + 1L
-  }
+    while (start.local <= B) {
+      stopi.local <- min(B, start.local + chunk.controller.local$chunk.size - 1L)
+      bsz.local <- stopi.local - start.local + 1L
+      chunk.started.local <- .np_progress_now()
+      counts.chunk.local <- if (!is.null(counts.mat.local)) {
+        counts.mat.local[, start.local:stopi.local, drop = FALSE]
+      } else if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz.local, counts = counts.drawer(start.local, stopi.local))
+      } else {
+        stats::rmultinom(n = bsz.local, size = n, prob = rep.int(1 / n, n))
+      }
 
-  return(list(t = tmat.local, t0 = t0.local))
+      for (jj.local in seq_len(bsz.local)) {
+        idx.local <- .np_counts_to_indices(counts.chunk.local[, jj.local])
+        tmat.local[start.local + jj.local - 1L, ] <- fit_one_local(
+          x.train = xdat[idx.local, , drop = FALSE]
+        )
+      }
 
-  progress.label <- if (is.null(progress.label)) {
-    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
-  } else {
-    progress.label
+      progress.local <- .np_plot_progress_tick(state = progress.local, done = stopi.local)
+      chunk.controller.local <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller.local,
+        bsz = bsz.local,
+        elapsed.sec = .np_progress_now() - chunk.started.local
+      )
+      start.local <- stopi.local + 1L
+    }
+
+    return(list(t = tmat.local, t0 = t0.local))
   }
 
   kb <- tryCatch(.np_make_kbandwidth_unconditional(bws = bws, xdat = xdat),
@@ -5969,13 +6085,6 @@
   num.op <- (Kx * Ky) / n
   t0 <- rowSums(num.op) / pmax(rowSums(den.op), .Machine$double.eps)
 
-  if (!is.null(counts)) {
-    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    den <- t(den.op %*% counts.mat)
-    num <- t(num.op %*% counts.mat)
-    return(list(t = num / pmax(den, .Machine$double.eps), t0 = t0))
-  }
-
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   progress.label <- if (is.null(progress.label)) {
@@ -5983,33 +6092,153 @@
   } else {
     progress.label
   }
-  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
-  on.exit({
-    .np_plot_progress_end(progress)
-  }, add = TRUE)
-  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
 
-  start <- 1L
-  while (start <= B) {
-    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
-    bsz <- stopi - start + 1L
-    chunk.started <- .np_progress_now()
-    counts.chunk <- if (!is.null(counts.drawer)) {
-      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
-    } else {
-      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
-    }
-
+  compute_chunk <- function(counts.chunk) {
+    counts.chunk <- as.matrix(counts.chunk)
     den <- t(den.op %*% counts.chunk)
     num <- t(num.op %*% counts.chunk)
-    tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
-    progress <- .np_plot_progress_tick(state = progress, done = stopi)
-    chunk.controller <- .np_plot_progress_chunk_observe(
-      controller = chunk.controller,
-      bsz = bsz,
-      elapsed.sec = .np_progress_now() - chunk.started
+    num / pmax(den, .Machine$double.eps)
+  }
+
+  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+    isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
+  if (isTRUE(use.mpi)) {
+    chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+      B = B,
+      chunk.size = chunk.size,
+      comm = 1L,
+      include.master = TRUE
     )
-    start <- stopi + 1L
+    if (!is.null(counts)) {
+      counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+      .npRmpi_bootstrap_fanout_enabled(
+        comm = 1L,
+        n = n,
+        B = B,
+        chunk.size = chunk.size,
+        what = "inid-hat-frozen-conditional-counts"
+      )
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        compute_chunk(counts.mat[, start:stopi, drop = FALSE])
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = "inid-hat-frozen-conditional-counts",
+        progress.label = progress.label,
+        profile.where = "mpi.applyLB:inid-hat-frozen-conditional-counts",
+        comm = 1L,
+        required.bindings = list(
+          counts.mat = counts.mat,
+          compute_chunk = compute_chunk
+        )
+      )
+    } else {
+      if (!is.null(counts.drawer)) {
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-hat-frozen-conditional-block"
+        )
+        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        worker <- function(task) {
+          start <- as.integer(task$start)
+          stopi <- start + as.integer(task$bsz) - 1L
+          compute_chunk(.np_inid_counts_matrix(
+            n = n,
+            B = as.integer(task$bsz),
+            counts = counts.drawer(start, stopi)
+          ))
+        }
+        tmat <- .npRmpi_bootstrap_run_fanout(
+          tasks = tasks,
+          worker = worker,
+          ncol.out = neval,
+          what = "inid-hat-frozen-conditional-block",
+          progress.label = progress.label,
+          profile.where = "mpi.applyLB:inid-hat-frozen-conditional-block",
+          comm = 1L,
+          required.bindings = list(
+            n = n,
+            counts.drawer = counts.drawer,
+            compute_chunk = compute_chunk,
+            .np_inid_counts_matrix = .np_inid_counts_matrix
+          )
+        )
+      } else {
+        prob <- rep.int(1 / n, n)
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-hat-frozen-conditional"
+        )
+        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        worker <- function(task) {
+          set.seed(as.integer(task$seed))
+          compute_chunk(stats::rmultinom(
+            n = as.integer(task$bsz),
+            size = n,
+            prob = prob
+          ))
+        }
+        tmat <- .npRmpi_bootstrap_run_fanout(
+          tasks = tasks,
+          worker = worker,
+          ncol.out = neval,
+          what = "inid-hat-frozen-conditional",
+          progress.label = progress.label,
+          profile.where = "mpi.applyLB:inid-hat-frozen-conditional",
+          comm = 1L,
+          required.bindings = list(
+            n = n,
+            prob = prob,
+            compute_chunk = compute_chunk
+          )
+        )
+      }
+    }
+
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-hat-frozen-conditional fan-out returned incomplete results",
+        what = "inid-hat-frozen-conditional"
+      )
+  } else if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    tmat <- compute_chunk(counts.mat)
+  } else {
+    progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+    on.exit({
+      .np_plot_progress_end(progress)
+    }, add = TRUE)
+    chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      chunk.started <- .np_progress_now()
+      counts.chunk <- if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+      } else {
+        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+      }
+      tmat[start:stopi, ] <- compute_chunk(counts.chunk)
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      chunk.controller <- .np_plot_progress_chunk_observe(
+        controller = chunk.controller,
+        bsz = bsz,
+        elapsed.sec = .np_progress_now() - chunk.started
+      )
+      start <- stopi + 1L
+    }
   }
 
   list(t = tmat, t0 = t0)

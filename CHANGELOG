@@ -93,6 +93,13 @@ Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
   and quantile-regression plot bootstraps when there are enough bootstrap
   chunks to keep all ranks busy.
 
+* Repaired additional nonfixed plot-bootstrap routes that could still execute
+  master-side bootstrap loops: exact generalized-nearest-neighbor
+  unconditional density/distribution, exact single-index bootstrap, and frozen
+  nonfixed conditional density/distribution bootstrap helpers. Installed
+  targeted traces with two slaves now show every repaired route dispatching to
+  all workers plus a rank-0 master-assist chunk.
+
 * Repaired active single-worker plot-bootstrap dispatch so fixed-bandwidth
   bootstrap routes no longer collapse to master-local execution when an
   `npRmpi.init(nslaves = 1)` worker pool is present. This restores worker
