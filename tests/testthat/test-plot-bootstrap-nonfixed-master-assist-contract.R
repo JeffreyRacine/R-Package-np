@@ -31,6 +31,12 @@ test_that("nonfixed exact and frozen plot bootstraps use all slaves plus master 
     "  plot(bw, xdat = data.frame(x = x), neval = 8L, behavior = 'data',",
     "       errors = 'bootstrap', bootstrap = 'inid', B = 31L, band = 'pointwise')",
     "})",
+    "run_case('npudist_exact', {",
+    "  bw <- npudistbw(dat = data.frame(x = x), bws = 5L,",
+    "                  bwtype = 'generalized_nn', bandwidth.compute = FALSE)",
+    "  plot(bw, xdat = data.frame(x = x), neval = 8L, behavior = 'data',",
+    "       errors = 'bootstrap', bootstrap = 'inid', B = 31L, band = 'pointwise')",
+    "})",
     "run_case('npindex_exact', {",
     "  bw <- npindexbw(xdat = data.frame(x = x, z = z), ydat = y,",
     "                  bws = c(1, 0.5, 5L), bwtype = 'generalized_nn',",
@@ -41,6 +47,15 @@ test_that("nonfixed exact and frozen plot bootstraps use all slaves plus master 
     "})",
     "run_case('npcdens_frozen', {",
     "  bw <- npcdensbw(xdat = data.frame(x = x), ydat = data.frame(y = y),",
+    "                  bws = c(5L, 5L), bwtype = 'generalized_nn',",
+    "                  bandwidth.compute = FALSE, regtype = 'lc')",
+    "  plot(bw, xdat = data.frame(x = x), ydat = data.frame(y = y),",
+    "       neval = 8L, behavior = 'data', errors = 'bootstrap',",
+    "       bootstrap = 'inid', boot_control = np_boot_control(nonfixed = 'frozen'),",
+    "       B = 31L, band = 'pointwise')",
+    "})",
+    "run_case('npcdist_frozen', {",
+    "  bw <- npcdistbw(xdat = data.frame(x = x), ydat = data.frame(y = y),",
     "                  bws = c(5L, 5L), bwtype = 'generalized_nn',",
     "                  bandwidth.compute = FALSE, regtype = 'lc')",
     "  plot(bw, xdat = data.frame(x = x), ydat = data.frame(y = y),",
@@ -59,8 +74,10 @@ test_that("nonfixed exact and frozen plot bootstraps use all slaves plus master 
 
   expected <- c(
     npudens_exact = "inid-ksum-unconditional-exact",
+    npudist_exact = "inid-ksum-unconditional-exact",
     npindex_exact = "inid-index-exact",
-    npcdens_frozen = "inid-hat-frozen-conditional"
+    npcdens_frozen = "inid-hat-frozen-conditional",
+    npcdist_frozen = "inid-hat-frozen-conditional"
   )
   for (case in names(expected)) {
     trace.file <- file.path(trace.dir, paste0(case, ".tsv"))
