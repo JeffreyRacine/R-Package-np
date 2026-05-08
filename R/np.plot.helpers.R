@@ -4501,6 +4501,173 @@
   }, logical(1L)))
 }
 
+.np_plreg_fixed_supported_components <- function(bws, p) {
+  if (!identical(bws$type, "fixed"))
+    return(FALSE)
+  component.bws <- c(list(bws$bw$yzbw), bws$bw[seq.int(2L, p + 1L)])
+  all(vapply(component.bws, function(bw) {
+    regtype <- if (is.null(bw$regtype)) "lc" else as.character(bw$regtype)[1L]
+    regtype %in% c("lc", "ll", "lp")
+  }, logical(1L)))
+}
+
+.np_regression_localpoly_fixed_counts_precompute <- function(xdat,
+                                                             exdat,
+                                                             bws,
+                                                             ydat,
+                                                             ridge = 1.0e-12) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows")
+  if (n < 1L || neval < 1L)
+    stop("invalid local-polynomial regression state dimensions")
+  if (!identical(bws$type, "fixed"))
+    stop("local-polynomial state helper requires fixed bandwidths")
+
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)[1L]
+  if (identical(regtype, "lc"))
+    stop("local-polynomial state helper requires regtype='ll' or 'lp'")
+
+  ncon <- bws$ncon
+  degree <- if (identical(regtype, "ll")) {
+    rep.int(1L, ncon)
+  } else {
+    npValidateGlpDegree(
+      regtype = "lp",
+      degree = bws$degree,
+      ncon = ncon
+    )
+  }
+  basis <- npValidateLpBasis(
+    regtype = "lp",
+    basis = if (is.null(bws$basis)) "glp" else bws$basis
+  )
+  bernstein.basis <- npValidateGlpBernstein(
+    regtype = "lp",
+    bernstein.basis = isTRUE(bws$bernstein.basis)
+  )
+
+  kw <- .np_plot_kernel_weights_direct(
+    bws = bws,
+    txdat = xdat,
+    exdat = exdat,
+    operator = "normal",
+    bandwidth.divide = identical(bws$type, "adaptive_nn"),
+    where = "direct regression kernel weights"
+  )
+  if (nrow(kw) != n || ncol(kw) != neval)
+    stop("kernel-weight matrix shape mismatch")
+
+  W <- as.matrix(W.lp(
+    xdat = xdat,
+    degree = degree,
+    basis = basis,
+    bernstein.basis = bernstein.basis
+  ))
+  W.eval <- as.matrix(W.lp(
+    xdat = xdat,
+    exdat = exdat,
+    degree = degree,
+    basis = basis,
+    bernstein.basis = bernstein.basis
+  ))
+  if (nrow(W) != n || nrow(W.eval) != neval || ncol(W.eval) != ncol(W))
+    stop("regression moment design matrix shape mismatch")
+
+  p <- ncol(W)
+  mcols <- p * (p + 1L) / 2L
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = ridge, cap = 1.0)
+  ones <- matrix(1.0, nrow = n, ncol = 1L)
+
+  Mfeat <- vector("list", neval)
+  Zfeat <- vector("list", neval)
+  t0 <- numeric(neval)
+
+  for (i in seq_len(neval)) {
+    k <- as.double(kw[, i])
+    WK <- W * k
+    zfeat <- WK * ydat
+    mfeat <- matrix(0.0, nrow = n, ncol = mcols)
+    idx <- 1L
+    for (a in seq_len(p)) {
+      for (bb in a:p) {
+        mfeat[, idx] <- WK[, a] * W[, bb]
+        idx <- idx + 1L
+      }
+    }
+
+    M0 <- crossprod(ones, mfeat)
+    Z0 <- crossprod(ones, zfeat)
+    Mfeat[[i]] <- mfeat
+    Zfeat[[i]] <- zfeat
+
+    if (p > 3L) {
+      t0[i] <- .np_inid_lp_predict_chunk_general(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = W.eval[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    } else {
+      t0[i] <- .np_inid_lp_predict_chunk(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = W.eval[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    }
+  }
+
+  list(
+    n = n,
+    neval = neval,
+    p = p,
+    W.eval = W.eval,
+    Mfeat = Mfeat,
+    Zfeat = Zfeat,
+    ridge.grid = ridge.grid,
+    t0 = t0
+  )
+}
+
+.np_regression_localpoly_fixed_counts_from_state <- function(state,
+                                                            counts.chunk) {
+  counts.chunk <- as.matrix(counts.chunk)
+  if (nrow(counts.chunk) != state$n)
+    stop("local-polynomial regression counts do not align with precomputed state")
+  bsz <- ncol(counts.chunk)
+  if (bsz < 1L)
+    stop("invalid local-polynomial regression counts dimensions")
+
+  out <- matrix(NA_real_, nrow = bsz, ncol = state$neval)
+  for (i in seq_len(state$neval)) {
+    Mvals <- crossprod(counts.chunk, state$Mfeat[[i]])
+    Zvals <- crossprod(counts.chunk, state$Zfeat[[i]])
+    if (state$p > 3L) {
+      out[, i] <- .np_inid_lp_predict_chunk_general(
+        Mvals = Mvals,
+        Zvals = Zvals,
+        rhs = state$W.eval[i, ],
+        ridge.grid = state$ridge.grid
+      )
+    } else {
+      out[, i] <- .np_inid_lp_predict_chunk(
+        Mvals = Mvals,
+        Zvals = Zvals,
+        rhs = state$W.eval[i, ],
+        ridge.grid = state$ridge.grid
+      )
+    }
+  }
+
+  out
+}
+
 .np_plreg_lc_predict_counts <- function(xdat, exdat, bws, ydat, counts.chunk) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
@@ -4560,6 +4727,71 @@
   as.vector(H %*% ydat)
 }
 
+.np_plreg_component_state <- function(xdat,
+                                      exdat,
+                                      bws,
+                                      ydat,
+                                      ridge = 1.0e-12) {
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)[1L]
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+
+  if (identical(regtype, "lc")) {
+    H <- .npRmpi_with_local_bootstrap(suppressWarnings(
+      tryCatch(
+        npreghat.rbandwidth(
+          bws = bws,
+          txdat = xdat,
+          exdat = exdat,
+          s = 0L,
+          output = "matrix"
+        ),
+        error = function(e) NULL
+      )
+    ))
+    if (is.null(H))
+      stop("failed to construct LC plreg component hat matrix", call. = FALSE)
+    if (!is.matrix(H))
+      H <- matrix(as.double(H), nrow = nrow(exdat), ncol = nrow(xdat))
+    if (nrow(H) != nrow(exdat) || ncol(H) != nrow(xdat))
+      stop("LC plreg component hat matrix shape mismatch", call. = FALSE)
+
+    return(list(
+      type = "lc",
+      n = nrow(xdat),
+      neval = nrow(exdat),
+      W = t(H),
+      ydat = ydat,
+      t0 = as.vector(H %*% ydat)
+    ))
+  }
+
+  state <- .np_regression_localpoly_fixed_counts_precompute(
+    xdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    ydat = ydat,
+    ridge = ridge
+  )
+  state$type <- "lp"
+  state
+}
+
+.np_plreg_component_state_counts <- function(state, counts.chunk) {
+  counts.chunk <- as.matrix(counts.chunk)
+  if (identical(state$type, "lc")) {
+    den <- crossprod(counts.chunk, state$W)
+    num <- crossprod(counts.chunk, state$W * state$ydat)
+    return(num / pmax(den, .Machine$double.eps))
+  }
+
+  .np_regression_localpoly_fixed_counts_from_state(
+    state = state,
+    counts.chunk = counts.chunk
+  )
+}
+
 .np_inid_boot_from_plreg_finish_chunk <- function(rows,
                                                   x.train.num,
                                                   x.eval.num,
@@ -4595,6 +4827,55 @@
   }
 
   out
+}
+
+.np_inid_boot_from_plreg_state_chunk <- function(counts.chunk,
+                                                 y.train.state,
+                                                 y.eval.state,
+                                                 x.train.states,
+                                                 x.eval.states,
+                                                 x.train.num,
+                                                 x.eval.num,
+                                                 y.num,
+                                                 ridge = 1.0e-12) {
+  counts.chunk <- as.matrix(counts.chunk)
+  p <- ncol(x.train.num)
+  bsz <- ncol(counts.chunk)
+
+  y.train.t <- .np_plreg_component_state_counts(
+    state = y.train.state,
+    counts.chunk = counts.chunk
+  )
+  y.eval.t <- .np_plreg_component_state_counts(
+    state = y.eval.state,
+    counts.chunk = counts.chunk
+  )
+
+  x.train.t.list <- vector("list", p)
+  x.eval.t.list <- vector("list", p)
+  for (j in seq_len(p)) {
+    x.train.t.list[[j]] <- .np_plreg_component_state_counts(
+      state = x.train.states[[j]],
+      counts.chunk = counts.chunk
+    )
+    x.eval.t.list[[j]] <- .np_plreg_component_state_counts(
+      state = x.eval.states[[j]],
+      counts.chunk = counts.chunk
+    )
+  }
+
+  .np_inid_boot_from_plreg_finish_chunk(
+    rows = seq_len(bsz),
+    x.train.num = x.train.num,
+    x.eval.num = x.eval.num,
+    y.num = y.num,
+    y.train.t = y.train.t,
+    y.eval.t = y.eval.t,
+    x.train.t.list = x.train.t.list,
+    x.eval.t.list = x.eval.t.list,
+    counts.mat = counts.chunk,
+    ridge = ridge
+  )
 }
 
 .np_inid_boot_from_plreg_lc_fixed_chunk <- function(counts.chunk,
@@ -4658,6 +4939,180 @@
     counts.mat = counts.chunk,
     ridge = ridge
   )
+}
+
+.np_inid_boot_from_plreg_fixed_fused <- function(txdat,
+                                                 ydat,
+                                                 tzdat,
+                                                 exdat,
+                                                 ezdat,
+                                                 bws,
+                                                 B,
+                                                 counts.mat = NULL,
+                                                 counts.drawer = NULL,
+                                                 x.train.num,
+                                                 x.eval.num,
+                                                 y.num,
+                                                 ridge = 1.0e-12,
+                                                 prefer.local.single_worker = FALSE,
+                                                 progress.label = NULL) {
+  n <- nrow(txdat)
+  neval <- nrow(exdat)
+  p <- ncol(x.train.num)
+  B <- as.integer(B)
+  if (!is.null(counts.mat) && (nrow(counts.mat) != n || ncol(counts.mat) != B))
+    stop("fused plreg counts do not match bootstrap dimensions")
+
+  y.train.state <- .np_plreg_component_state(
+    xdat = tzdat,
+    exdat = tzdat,
+    bws = bws$bw$yzbw,
+    ydat = y.num,
+    ridge = ridge
+  )
+  y.eval.state <- .np_plreg_component_state(
+    xdat = tzdat,
+    exdat = ezdat,
+    bws = bws$bw$yzbw,
+    ydat = y.num,
+    ridge = ridge
+  )
+  x.train.states <- vector("list", p)
+  x.eval.states <- vector("list", p)
+  for (j in seq_len(p)) {
+    x.train.states[[j]] <- .np_plreg_component_state(
+      xdat = tzdat,
+      exdat = tzdat,
+      bws = bws$bw[[j + 1L]],
+      ydat = x.train.num[, j],
+      ridge = ridge
+    )
+    x.eval.states[[j]] <- .np_plreg_component_state(
+      xdat = tzdat,
+      exdat = ezdat,
+      bws = bws$bw[[j + 1L]],
+      ydat = x.train.num[, j],
+      ridge = ridge
+    )
+  }
+
+  xres.train0 <- matrix(0.0, nrow = n, ncol = p)
+  xres.eval0 <- matrix(0.0, nrow = neval, ncol = p)
+  for (j in seq_len(p)) {
+    xres.train0[, j] <- x.train.num[, j] - as.double(x.train.states[[j]]$t0)
+    xres.eval0[, j] <- x.eval.num[, j] - as.double(x.eval.states[[j]]$t0)
+  }
+  beta0 <- .np_plreg_weighted_coef(
+    X = xres.train0,
+    y = y.num - as.double(y.train.state$t0),
+    w = rep.int(1.0, n),
+    ridge = ridge
+  )
+  t0 <- as.double(y.eval.state$t0) + as.vector(xres.eval0 %*% beta0)
+
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
+  .npRmpi_bootstrap_fanout_enabled(
+    comm = 1L,
+    n = n,
+    B = B,
+    chunk.size = chunk.size,
+    what = "inid-plreg-fixed-fused"
+  )
+  workers <- .npRmpi_bootstrap_worker_count(comm = 1L)
+  nslots <- max(1L, workers + 1L)
+  chunk.size <- max(1L, as.integer(ceiling(B / nslots)))
+  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  prob.local <- rep.int(1 / n, n)
+  has.counts.mat.local <- !is.null(counts.mat)
+  counts.mat.local <- if (is.null(counts.mat)) {
+    matrix(0L, nrow = 0L, ncol = 0L)
+  } else {
+    counts.mat
+  }
+  has.counts.drawer.local <- !is.null(counts.drawer)
+  counts.drawer.local <- if (is.null(counts.drawer)) {
+    function(start, stop) stop("counts.drawer is not available")
+  } else {
+    counts.drawer
+  }
+
+  worker <- function(task) {
+    start <- as.integer(task$start)
+    stopi <- start + as.integer(task$bsz) - 1L
+    bsz <- as.integer(task$bsz)
+    counts.chunk <- if (isTRUE(has.counts.mat.local)) {
+      counts.mat.local[, start:stopi, drop = FALSE]
+    } else if (isTRUE(has.counts.drawer.local)) {
+      .np_inid_counts_matrix(
+        n = n,
+        B = bsz,
+        counts = counts.drawer.local(start, stopi)
+      )
+    } else {
+      set.seed(as.integer(task$seed))
+      stats::rmultinom(n = bsz, size = n, prob = prob.local)
+    }
+    .np_inid_boot_from_plreg_state_chunk(
+      counts.chunk = counts.chunk,
+      y.train.state = y.train.state,
+      y.eval.state = y.eval.state,
+      x.train.states = x.train.states,
+      x.eval.states = x.eval.states,
+      x.train.num = x.train.num,
+      x.eval.num = x.eval.num,
+      y.num = y.num,
+      ridge = ridge
+    )
+  }
+
+  tmat <- .npRmpi_bootstrap_run_fanout(
+    tasks = tasks,
+    worker = worker,
+    ncol.out = neval,
+    what = "inid-plreg-fixed-fused",
+    progress.label = progress.label,
+    profile.where = "mpi.applyLB:inid-plreg-fixed-fused",
+    comm = 1L,
+    prefer.local.single_worker = prefer.local.single_worker,
+    master_local_chunk = TRUE,
+    required.bindings = list(
+      x.train.num = x.train.num,
+      x.eval.num = x.eval.num,
+      y.num = y.num,
+      ridge = ridge,
+      y.train.state = y.train.state,
+      y.eval.state = y.eval.state,
+      x.train.states = x.train.states,
+      x.eval.states = x.eval.states,
+      .np_inid_boot_from_plreg_state_chunk =
+        .np_inid_boot_from_plreg_state_chunk,
+      .np_plreg_component_state_counts = .np_plreg_component_state_counts,
+      .np_regression_localpoly_fixed_counts_from_state =
+        .np_regression_localpoly_fixed_counts_from_state,
+      .np_plreg_weighted_coef = .np_plreg_weighted_coef,
+      .np_inid_boot_from_plreg_finish_chunk =
+        .np_inid_boot_from_plreg_finish_chunk,
+      .np_inid_counts_matrix = .np_inid_counts_matrix,
+      .np_inid_lp_predict_chunk = .np_inid_lp_predict_chunk,
+      .np_inid_lp_predict_chunk_general = .np_inid_lp_predict_chunk_general,
+      n = n,
+      prob.local = prob.local,
+      counts.mat.local = counts.mat.local,
+      has.counts.mat.local = has.counts.mat.local,
+      counts.drawer.local = counts.drawer.local,
+      has.counts.drawer.local = has.counts.drawer.local
+    )
+  )
+
+  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
+    stop("fused plreg helper path produced non-finite values")
+
+  list(t = tmat, t0 = t0)
 }
 
 .np_inid_boot_from_plreg_lc_fixed_fused <- function(txdat,
@@ -4742,14 +5197,27 @@
   nslots <- max(1L, workers + 1L)
   chunk.size <- max(1L, as.integer(ceiling(B / nslots)))
   tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  prob.local <- rep.int(1 / n, n)
+  has.counts.mat.local <- !is.null(counts.mat)
+  counts.mat.local <- if (is.null(counts.mat)) {
+    matrix(0L, nrow = 0L, ncol = 0L)
+  } else {
+    counts.mat
+  }
+  has.counts.drawer.local <- !is.null(counts.drawer)
+  counts.drawer.local <- if (is.null(counts.drawer)) {
+    function(start, stop) stop("counts.drawer is not available")
+  } else {
+    counts.drawer
+  }
 
   worker <- function(task) {
     start <- as.integer(task$start)
     stopi <- start + as.integer(task$bsz) - 1L
     bsz <- as.integer(task$bsz)
-    counts.chunk <- if (isTRUE(has.counts.mat)) {
-      counts.mat[, start:stopi, drop = FALSE]
-    } else if (isTRUE(has.counts.drawer)) {
+    counts.chunk <- if (isTRUE(has.counts.mat.local)) {
+      counts.mat.local[, start:stopi, drop = FALSE]
+    } else if (isTRUE(has.counts.drawer.local)) {
       .np_inid_counts_matrix(
         n = n,
         B = bsz,
@@ -4757,7 +5225,7 @@
       )
     } else {
       set.seed(as.integer(task$seed))
-      stats::rmultinom(n = bsz, size = n, prob = prob)
+      stats::rmultinom(n = bsz, size = n, prob = prob.local)
     }
     .np_inid_boot_from_plreg_lc_fixed_chunk(
       counts.chunk = counts.chunk,
@@ -4801,16 +5269,13 @@
       .np_plreg_weighted_coef = .np_plreg_weighted_coef,
       .np_inid_boot_from_plreg_finish_chunk =
         .np_inid_boot_from_plreg_finish_chunk,
+      .np_inid_counts_matrix = .np_inid_counts_matrix,
       n = n,
-      prob = rep.int(1 / n, n),
-      counts.mat = if (is.null(counts.mat)) matrix(0L, nrow = 0L, ncol = 0L) else counts.mat,
-      has.counts.mat = !is.null(counts.mat),
-      counts.drawer.local = if (is.null(counts.drawer)) {
-        function(start, stop) stop("counts.drawer is not available")
-      } else {
-        counts.drawer
-      },
-      has.counts.drawer = !is.null(counts.drawer)
+      prob.local = prob.local,
+      counts.mat.local = counts.mat.local,
+      has.counts.mat.local = has.counts.mat.local,
+      counts.drawer.local = counts.drawer.local,
+      has.counts.drawer.local = has.counts.drawer.local
     )
   )
 
@@ -4871,6 +5336,26 @@
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (isTRUE(use.mpi) && isTRUE(.np_plreg_fixed_lc_components(bws = bws, p = p))) {
     return(.np_inid_boot_from_plreg_lc_fixed_fused(
+      txdat = txdat,
+      ydat = ydat,
+      tzdat = tzdat,
+      exdat = exdat,
+      ezdat = ezdat,
+      bws = bws,
+      B = B,
+      counts.mat = counts.mat,
+      counts.drawer = counts.drawer,
+      x.train.num = x.train.num,
+      x.eval.num = x.eval.num,
+      y.num = y.num,
+      ridge = ridge,
+      prefer.local.single_worker = prefer.local.single_worker,
+      progress.label = progress.label
+    ))
+  }
+
+  if (isTRUE(use.mpi) && isTRUE(.np_plreg_fixed_supported_components(bws = bws, p = p))) {
+    return(.np_inid_boot_from_plreg_fixed_fused(
       txdat = txdat,
       ydat = ydat,
       tzdat = tzdat,
