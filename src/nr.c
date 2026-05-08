@@ -164,9 +164,9 @@ double *fret, double (*func)(double *))
             {
                 REprintf("\n**Maximum number of iterations reached in routine POWELL\n");
             }
-            pt=vector(1,n);
-            ptt=vector(1,n);
-            xit=vector(1,n);
+            free_vector(xit,1);
+            free_vector(ptt,1);
+            free_vector(pt,1);
             return;
         }
 /* End checking and continue... */
@@ -607,4 +607,3 @@ double chidev(int *idum, int df)
     return chisq;
 
 }
-
