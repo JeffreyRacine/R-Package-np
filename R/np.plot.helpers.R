@@ -1120,6 +1120,7 @@
   }
   task.indices <- tmpmsg$task_indices
   bundle.tasks <- tmpmsg$tasks
+  stream.results <- isTRUE(tmpfunarg$stream.results)
   if (!is.integer(task.indices) || !is.list(bundle.tasks) ||
       length(task.indices) != length(bundle.tasks)) {
     out <- structure(
@@ -1131,18 +1132,63 @@
   }
   out.parts <- vector("list", length(bundle.tasks))
   for (ii in seq_along(bundle.tasks)) {
-    out.parts[[ii]] <- tryCatch(
+    out.part <- tryCatch(
       do.call(.tmpfun, c(list(bundle.tasks[[ii]]), dotarg)),
       error = function(e) structure(conditionMessage(e), class = "try-error", condition = e)
     )
+    if (isTRUE(stream.results)) {
+      mpi.send.Robj(
+        list(
+          bundle_done = FALSE,
+          task_indices = as.integer(task.indices[[ii]]),
+          parts = list(out.part)
+        ),
+        0,
+        tag,
+        .comm
+      )
+    } else {
+      out.parts[[ii]] <- out.part
+    }
   }
-  mpi.send.Robj(list(task_indices = task.indices, parts = out.parts), 0, tag, .comm)
+  if (isTRUE(stream.results)) {
+    mpi.send.Robj(
+      list(bundle_done = TRUE, task_indices = integer(0), parts = list()),
+      0,
+      tag,
+      .comm
+    )
+  } else {
+    mpi.send.Robj(list(task_indices = task.indices, parts = out.parts), 0, tag, .comm)
+  }
   .npRmpi_bootstrap_transport_trace(
     what = "bundle",
     event = "fanout.worker_bundle.done",
-    fields = list(tag = tag, tasks = length(bundle.tasks))
+    fields = list(tag = tag, tasks = length(bundle.tasks), stream_results = stream.results)
   )
   invisible(NULL)
+}
+
+.npRmpi_bootstrap_stream_bundle_results <- function(worker.idx,
+                                                    tasks,
+                                                    ncol.out) {
+  threshold <- suppressWarnings(as.numeric(
+    getOption("npRmpi.bootstrap.bundle.result.stream.threshold.bytes",
+              128 * 1024 * 1024)
+  )[1L])
+  if (!is.finite(threshold) || is.na(threshold) || threshold <= 0)
+    return(FALSE)
+
+  if (!length(worker.idx))
+    return(FALSE)
+  max.boot <- max(vapply(worker.idx, function(idx) {
+    if (!length(idx))
+      return(0)
+    sum(vapply(tasks[idx], function(tt) as.integer(tt$bsz), integer(1L)))
+  }, integer(1L)))
+  estimated.bytes <- as.numeric(max.boot) * as.numeric(ncol.out) * 8
+  is.finite(estimated.bytes) && !is.na(estimated.bytes) &&
+    estimated.bytes > threshold
 }
 
 .npRmpi_bootstrap_run_fanout <- function(tasks,
@@ -1251,6 +1297,11 @@
         worker.idx <- lapply(seq_len(workers), function(ii) which(rank.slot == ii))
         active.workers <- which(lengths(worker.idx) > 0L)
         n.remote <- length(active.workers)
+        stream.bundle.results <- .npRmpi_bootstrap_stream_bundle_results(
+          worker.idx = worker.idx,
+          tasks = tasks,
+          ncol.out = ncol.out
+        )
         slave.num <- workers
         mpi.anysource <- mpi.any.source()
         mpi.anytag <- mpi.any.tag()
@@ -1260,7 +1311,15 @@
         local.done <- 0L
 
         mpi.bcast.cmd(.npRmpi_bootstrap_worker_bundle, n = slave.num, comm = comm)
-        mpi.bcast.Robj(list(FUN = worker.exec, dot.arg = list(...)), rank = 0, comm = comm)
+        mpi.bcast.Robj(
+          list(
+            FUN = worker.exec,
+            dot.arg = list(...),
+            stream.results = stream.bundle.results
+          ),
+          rank = 0,
+          comm = comm
+        )
         .npRmpi_bootstrap_transport_trace(
           what = what,
           event = "fanout.master_assist.start",
@@ -1268,7 +1327,8 @@
             n_remote = n.remote,
             slave_num = slave.num,
             local_n = length(local.idx),
-            scheduler = "static_bundle"
+            scheduler = "static_bundle",
+            stream_results = stream.bundle.results
           )
         )
 
@@ -1339,11 +1399,16 @@
                 class = "try-error"
               )
             } else {
-              for (jj in seq_along(res$task_indices)) {
-                task.idx <- as.integer(res$task_indices[[jj]])
-                parts.out[[task.idx]] <- res$parts[[jj]]
+              if (isTRUE(stream.bundle.results) && !isTRUE(res$bundle_done)) {
+                done <- done - 1L
               }
-              done.boot <- done.boot + sum(vapply(tasks[res$task_indices], function(tt) as.integer(tt$bsz), integer(1L)))
+              if (!isTRUE(res$bundle_done)) {
+                for (jj in seq_along(res$task_indices)) {
+                  task.idx <- as.integer(res$task_indices[[jj]])
+                  parts.out[[task.idx]] <- res$parts[[jj]]
+                }
+                done.boot <- done.boot + sum(vapply(tasks[res$task_indices], function(tt) as.integer(tt$bsz), integer(1L)))
+              }
             }
             progress <- .np_plot_progress_tick(state = progress, done = done.boot)
           } else {
@@ -3757,231 +3822,28 @@
   if (length(ydat) != nrow(txdat))
     stop("length of ydat must match training rows in smooth coefficient inid helper")
 
-  txdat <- adjustLevels(txdat, bws$xdati)
-  exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
-  if (!miss.z) {
-    tzdat <- adjustLevels(tzdat, bws$zdati)
-    ezdat <- adjustLevels(ezdat, bws$zdati, allowNewCells = TRUE)
-  }
-
-  y.num <- .np_inid_scoef_numeric_y(ydat = ydat, bws = bws)
-  X.train <- toMatrix(txdat)
-  X.eval <- toMatrix(exdat)
-  W.train <- as.matrix(data.frame(1, X.train))
-  W.eval <- as.matrix(data.frame(1, X.eval))
-
-  kw <- .np_plot_kernel_weights_direct(
+  hat.args <- list(
     bws = bws,
-    txdat = tzdat,
-    exdat = ezdat,
-    operator = "normal",
-    where = "direct smooth-coefficient kernel weights"
+    txdat = txdat,
+    exdat = exdat,
+    output = "matrix",
+    iterate = FALSE,
+    leave.one.out = leave.one.out
   )
-
-  n <- nrow(W.train)
-  neval <- nrow(W.eval)
-  if (nrow(kw) != n || ncol(kw) != neval)
-    stop("smooth coefficient inid helper kernel-weight matrix shape mismatch")
-
-  p <- ncol(W.train)
-  mcols <- p * (p + 1L) / 2L
-  ones <- matrix(1.0, nrow = n, ncol = 1L)
-  ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
-
-  Mfeat <- vector("list", neval)
-  Zfeat <- vector("list", neval)
-  t0 <- numeric(neval)
-
-  for (i in seq_len(neval)) {
-    k <- as.double(kw[, i])
-    WK <- W.train * k
-    zf <- WK * y.num
-
-    mf <- matrix(0.0, nrow = n, ncol = mcols)
-    idx <- 1L
-    for (a in seq_len(p)) {
-      for (b in a:p) {
-        mf[, idx] <- WK[, a] * W.train[, b]
-        idx <- idx + 1L
-      }
-    }
-
-    Mfeat[[i]] <- mf
-    Zfeat[[i]] <- zf
-
-    M0 <- crossprod(ones, mf)
-    Z0 <- crossprod(ones, zf)
-    t0i <- .np_inid_scoef_predict_chunk(Mvals = M0, Zvals = Z0, rhs = W.eval[i, ])[1L]
-    if (!is.finite(t0i)) {
-      t0i <- .np_inid_scoef_predict_row(
-        mrow = M0[1L, ],
-        zrow = Z0[1L, ],
-        rhs = W.eval[i, ],
-        ridge.grid = ridge.grid
-      )
-    }
-    t0[i] <- t0i
+  if (!miss.z) {
+    hat.args$tzdat <- tzdat
+    hat.args$ezdat <- ezdat
   }
 
-  compute_chunk <- function(counts.chunk) {
-    counts.chunk <- as.matrix(counts.chunk)
-    bsz <- ncol(counts.chunk)
-    out.chunk <- matrix(NA_real_, nrow = bsz, ncol = neval)
-    for (i in seq_len(neval)) {
-      Mvals <- crossprod(counts.chunk, Mfeat[[i]])
-      Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      if (bsz == 1L) {
-        Mvals <- matrix(Mvals, nrow = 1L)
-        Zvals <- matrix(Zvals, nrow = 1L)
-      }
-      out <- .np_inid_scoef_predict_chunk(Mvals = Mvals, Zvals = Zvals, rhs = W.eval[i, ])
-      bad <- which(!is.finite(out))
-      if (length(bad)) {
-        for (bb in bad) {
-          out[bb] <- .np_inid_scoef_predict_row(
-            mrow = Mvals[bb, ],
-            zrow = Zvals[bb, ],
-            rhs = W.eval[i, ],
-            ridge.grid = ridge.grid
-          )
-        }
-      }
-      out.chunk[, i] <- out
-    }
-    out.chunk
-  }
-
-  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+  H <- do.call(npscoefhat, hat.args)
+  .np_inid_lc_boot_from_hat(
+    H = H,
+    ydat = .np_inid_scoef_numeric_y(ydat = ydat, bws = bws),
     B = B,
-    chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
-    comm = 1L,
-    include.master = TRUE
+    counts = counts,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
   )
-  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-
-  if (!is.null(counts)) {
-    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-
-    if (.npRmpi_bootstrap_fanout_enabled(
-          comm = 1L,
-          n = n,
-          B = B,
-          chunk.size = chunk.size,
-          what = "inid-scoef-counts"
-        )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-      worker <- function(task) {
-        start <- as.integer(task$start)
-        stopi <- start + as.integer(task$bsz) - 1L
-        compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
-      }
-      tmat <- .npRmpi_bootstrap_run_fanout(
-        tasks = tasks,
-        worker = worker,
-        ncol.out = neval,
-        what = "inid-scoef-counts",
-        progress.label = progress.label,
-        profile.where = "mpi.applyLB:inid-scoef-counts",
-        comm = 1L,
-        required.bindings = list(
-          counts.mat = counts.mat,
-          compute_chunk = compute_chunk
-        )
-      )
-    }
-
-    if (anyNA(tmat)) {
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = "inid-scoef-counts fan-out returned incomplete results",
-        what = "inid-scoef-counts"
-      )
-    }
-  } else {
-    if (!is.null(counts.drawer) &&
-        .npRmpi_bootstrap_fanout_enabled(
-          comm = 1L,
-          n = n,
-          B = B,
-          chunk.size = chunk.size,
-          what = "inid-scoef-block"
-        )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-      worker <- function(task) {
-        start <- as.integer(task$start)
-        stopi <- start + as.integer(task$bsz) - 1L
-        counts.chunk <- .np_inid_counts_matrix(
-          n = n,
-          B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
-        )
-        compute_chunk(counts.chunk = counts.chunk)
-      }
-      tmat <- .npRmpi_bootstrap_run_fanout(
-        tasks = tasks,
-        worker = worker,
-        ncol.out = neval,
-        what = "inid-scoef-block",
-        progress.label = progress.label,
-        profile.where = "mpi.applyLB:inid-scoef-block",
-        comm = 1L,
-        required.bindings = list(
-          n = n,
-          counts.drawer = counts.drawer,
-          compute_chunk = compute_chunk
-        )
-      )
-    }
-
-    if (!is.null(counts.drawer) && anyNA(tmat))
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = "inid-scoef-block fan-out returned incomplete results",
-        what = "inid-scoef-block"
-      )
-
-    prob <- rep.int(1 / n, n)
-
-    if (anyNA(tmat) &&
-        .npRmpi_bootstrap_fanout_enabled(
-          comm = 1L,
-          n = n,
-          B = B,
-          chunk.size = chunk.size,
-          what = "inid-scoef"
-        )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-      worker <- function(task) {
-        set.seed(as.integer(task$seed))
-        bsz <- as.integer(task$bsz)
-        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-        compute_chunk(counts.chunk = counts.chunk)
-      }
-      tmat <- .npRmpi_bootstrap_run_fanout(
-        tasks = tasks,
-        worker = worker,
-        ncol.out = neval,
-        what = "inid-scoef",
-        progress.label = progress.label,
-        profile.where = "mpi.applyLB:inid-scoef",
-        comm = 1L,
-        required.bindings = list(
-          n = n,
-          prob = prob,
-          compute_chunk = compute_chunk
-        )
-      )
-    }
-
-    if (anyNA(tmat))
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = "inid-scoef fan-out returned incomplete results",
-        what = "inid-scoef"
-      )
-  }
-
-  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
-    stop("inid smooth coefficient helper produced non-finite values")
-
-  list(t = tmat, t0 = t0)
 }
 
 .np_inid_boot_from_scoef_localpoly_fixed <- function(txdat,

@@ -115,6 +115,14 @@ Changes from Version 0.70-1 to 0.70-2 [08-May-2026]
   three MPI launch modes while dispatching work to every initialized worker
   plus a rank-0 master chunk.
 
+* Streamlined fixed local-constant `npscoef()` plot bootstraps by routing the
+  smooth-coefficient bootstrap through the reusable hat-matrix count
+  resampling helper instead of the heavier moment-feature reconstruction path.
+  Large bootstrap result bundles are now streamed back from worker ranks in
+  task-sized pieces when their estimated serialized size is large, avoiding
+  long-vector transport failures while preserving the existing static
+  master-assist scheduler and numerical bootstrap semantics.
+
 * Restored pure-discrete/all-categorical `npregbw()` least-squares
   cross-validation for fixed bandwidths by allowing the optimized regression
   CV cache to represent legitimate zero-continuous bandwidth storage. This
