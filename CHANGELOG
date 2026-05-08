@@ -76,11 +76,13 @@ Changes from Version 0.70-1 to 0.70-2 [07-May-2026]
   fanout wrapper is in place for the quantile-gradient helper where that route
   is exercised.
 
-* Restored MPI fanout for the final partially linear plot-bootstrap composition
-  step in `npplreg()` objects. The component bootstrap regressions are left on
-  their existing kernels, while the per-replication residual recomposition and
-  weighted coefficient solves are now partitioned across the active worker
-  pool; fixed-count parity sentinels match the local helper exactly.
+* Restored MPI fanout for partially linear plot bootstraps in `npplreg()`
+  objects. The per-replication residual recomposition and weighted coefficient
+  solves are partitioned across the active worker pool, and the component
+  bootstrap regressions now also use rank-0 master-assist chunks instead of
+  leaving the master as a coordinator while workers perform the heavy
+  regression bootstrap work; fixed-count parity sentinels match the local
+  helper exactly.
 
 * Repaired active single-worker plot-bootstrap dispatch so fixed-bandwidth
   bootstrap routes no longer collapse to master-local execution when an

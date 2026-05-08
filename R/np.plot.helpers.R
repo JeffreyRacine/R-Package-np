@@ -2478,6 +2478,7 @@
                                                 gradient.order = 1L,
                                                 slice.index = 1L,
                                                 prefer.local.single_worker = FALSE,
+                                                master_local_chunk = FALSE,
                                                 progress.label = NULL) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
@@ -2561,6 +2562,7 @@
         profile.where = "mpi.applyLB:inid-regression-exact-counts",
         comm = 1L,
         prefer.local.single_worker = prefer.local.single_worker,
+        master_local_chunk = master_local_chunk,
         required.bindings = list(
           counts.mat = counts.mat,
           compute_chunk = compute_chunk,
@@ -2602,6 +2604,7 @@
         profile.where = "mpi.applyLB:inid-regression-exact-block",
         comm = 1L,
         prefer.local.single_worker = prefer.local.single_worker,
+        master_local_chunk = master_local_chunk,
         required.bindings = list(
           n = n,
           counts.drawer = counts.drawer,
@@ -2642,6 +2645,7 @@
         profile.where = "mpi.applyLB:inid-regression-exact",
         comm = 1L,
         prefer.local.single_worker = prefer.local.single_worker,
+        master_local_chunk = master_local_chunk,
         required.bindings = list(
           n = n,
           prob = prob,
@@ -2676,6 +2680,7 @@
                                                            gradient.order = 1L,
                                                            slice.index = 1L,
                                                            prefer.local.single_worker = FALSE,
+                                                           master_local_chunk = FALSE,
                                                            prep.label = NULL,
                                                            progress.label = NULL) {
   xdat <- toFrame(xdat)
@@ -2874,6 +2879,7 @@
         profile.where = paste0("mpi.applyLB:", what.base, "-counts"),
         comm = 1L,
         prefer.local.single_worker = prefer.local.single_worker,
+        master_local_chunk = master_local_chunk,
         required.bindings = list(
           counts.mat = counts.mat,
           compute_chunk = compute_chunk
@@ -2915,6 +2921,7 @@
         profile.where = paste0("mpi.applyLB:", what.base, "-block"),
         comm = 1L,
         prefer.local.single_worker = prefer.local.single_worker,
+        master_local_chunk = master_local_chunk,
         required.bindings = list(
           n = n,
           counts.drawer = counts.drawer,
@@ -2954,6 +2961,7 @@
         profile.where = paste0("mpi.applyLB:", what.base),
         comm = 1L,
         prefer.local.single_worker = prefer.local.single_worker,
+        master_local_chunk = master_local_chunk,
         required.bindings = list(
           n = n,
           prob = prob,
@@ -2987,6 +2995,7 @@
                                                           gradient.order = 1L,
                                                           slice.index = 1L,
                                                           prefer.local.single_worker = FALSE,
+                                                          master_local_chunk = FALSE,
                                                           prep.label = NULL,
                                                           progress.label = NULL) {
   if (!identical(bws$type, "fixed"))
@@ -3005,6 +3014,7 @@
     gradient.order = gradient.order,
     slice.index = slice.index,
     prefer.local.single_worker = prefer.local.single_worker,
+    master_local_chunk = master_local_chunk,
     prep.label = prep.label,
     progress.label = progress.label
   )
@@ -3022,6 +3032,7 @@
                                           gradient.order = 1L,
                                           slice.index = 1L,
                                           prefer.local.single_worker = FALSE,
+                                          master_local_chunk = FALSE,
                                           prep.label = NULL,
                                           progress.label = NULL) {
   xdat <- toFrame(xdat)
@@ -3050,6 +3061,7 @@
       gradient.order = gradient.order,
       slice.index = slice.index,
       prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = master_local_chunk,
       progress.label = progress.label
     ))
   }
@@ -3069,6 +3081,7 @@
         gradient.order = gradient.order,
         slice.index = slice.index,
         prefer.local.single_worker = prefer.local.single_worker,
+        master_local_chunk = master_local_chunk,
         prep.label = prep.label,
         progress.label = progress.label
       ))
@@ -3086,6 +3099,7 @@
       gradient.order = gradient.order,
       slice.index = slice.index,
       prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = master_local_chunk,
       progress.label = progress.label
     ))
   }
@@ -3129,6 +3143,7 @@
     counts.drawer = counts.drawer,
     ridge = ridge,
     prefer.local.single_worker = prefer.local.single_worker,
+    master_local_chunk = master_local_chunk,
     prep.label = prep.label,
     progress.label = progress.label
   )
@@ -3145,6 +3160,7 @@
                                                  gradient.order = 1L,
                                                  slice.index = 1L,
                                                  prefer.local.single_worker = FALSE,
+                                                 master_local_chunk = FALSE,
                                                  prep.label = NULL,
                                                  progress.label = NULL) {
   xdat <- toFrame(xdat)
@@ -3222,6 +3238,7 @@
     gradient.order = gradient.order,
     slice.index = slice.index,
     prefer.local.single_worker = prefer.local.single_worker,
+    master_local_chunk = master_local_chunk,
     prep.label = prep.label,
     progress.label = progress.label
   )
@@ -4136,6 +4153,7 @@
     counts = counts.mat,
     ridge = ridge,
     prefer.local.single_worker = prefer.local.single_worker,
+    master_local_chunk = TRUE,
     progress.label = progress.label
   )
   y.eval <- .np_inid_boot_from_regression(
@@ -4147,6 +4165,7 @@
     counts = counts.mat,
     ridge = ridge,
     prefer.local.single_worker = prefer.local.single_worker,
+    master_local_chunk = TRUE,
     progress.label = progress.label
   )
 
@@ -4162,6 +4181,7 @@
       counts = counts.mat,
       ridge = ridge,
       prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = TRUE,
       progress.label = progress.label
     )
     x.eval[[j]] <- .np_inid_boot_from_regression(
@@ -4173,6 +4193,7 @@
       counts = counts.mat,
       ridge = ridge,
       prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = TRUE,
       progress.label = progress.label
     )
   }
@@ -4355,7 +4376,8 @@
     ydat = y.num,
     B = B,
     counts = counts.mat,
-    prefer.local.single_worker = prefer.local.single_worker
+    prefer.local.single_worker = prefer.local.single_worker,
+    master_local_chunk = TRUE
   )
   y.eval <- .np_inid_boot_from_regression_frozen(
     xdat = tzdat,
@@ -4364,7 +4386,8 @@
     ydat = y.num,
     B = B,
     counts = counts.mat,
-    prefer.local.single_worker = prefer.local.single_worker
+    prefer.local.single_worker = prefer.local.single_worker,
+    master_local_chunk = TRUE
   )
 
   p <- ncol(txdat)
@@ -4378,7 +4401,8 @@
       ydat = x.train.num[, j],
       B = B,
       counts = counts.mat,
-      prefer.local.single_worker = prefer.local.single_worker
+      prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = TRUE
     )
     x.eval[[j]] <- .np_inid_boot_from_regression_frozen(
       xdat = tzdat,
@@ -4387,7 +4411,8 @@
       ydat = x.train.num[, j],
       B = B,
       counts = counts.mat,
-      prefer.local.single_worker = prefer.local.single_worker
+      prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = TRUE
     )
   }
 
