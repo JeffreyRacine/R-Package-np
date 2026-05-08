@@ -193,6 +193,48 @@ test_that("wild fanout does not switch to master-local when workers are active",
   expect_true(any(grepl("master_local=FALSE", start.lines, fixed = TRUE)))
 })
 
+test_that("active single-worker fanout does not collapse to master-local", {
+  run_fanout <- getFromNamespace(".npRmpi_bootstrap_run_fanout", "npRmpi")
+  tf <- tempfile("npRmpi-boot-transport-", fileext = ".tsv")
+  old.trace <- getOption("npRmpi.bootstrap.transport.trace.file")
+  options(npRmpi.bootstrap.transport.trace.file = tf)
+  on.exit(options(npRmpi.bootstrap.transport.trace.file = old.trace), add = TRUE)
+
+  local_mocked_bindings(
+    .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
+    .npRmpi_master_only_mode = function(comm = 1L) FALSE,
+    .npRmpi_bootstrap_worker_count = function(comm = 1L) 1L,
+    mpi.applyLB = function(X, FUN, ..., comm = 1L) {
+      lapply(X, function(task) do.call(FUN, c(list(task), list(...))))
+    },
+    .package = "npRmpi"
+  )
+
+  tasks <- list(list(start = 1L, bsz = 2L, seed = 123L))
+  worker <- function(task) {
+    matrix(rep.int(as.integer(task$start), as.integer(task$bsz)),
+           nrow = as.integer(task$bsz), ncol = 1L)
+  }
+
+  out <- run_fanout(
+    tasks = tasks,
+    worker = worker,
+    ncol.out = 1L,
+    what = "single-worker",
+    profile.where = "unit.test:single-worker",
+    prefer.local.single_worker = TRUE
+  )
+  expect_true(is.matrix(out))
+  expect_identical(dim(out), c(2L, 1L))
+
+  lines <- readLines(tf, warn = FALSE)
+  start.lines <- lines[grepl("event=fanout.start", lines, fixed = TRUE)]
+  expect_true(length(start.lines) >= 1L)
+  expect_true(any(grepl("workers=1", start.lines, fixed = TRUE)))
+  expect_true(any(grepl("master_local=FALSE", start.lines, fixed = TRUE)))
+  expect_true(any(grepl("single_worker_local=FALSE", start.lines, fixed = TRUE)))
+})
+
 test_that("wild fanout master-assist is remote-only when workers are active", {
   run_fanout <- getFromNamespace(".npRmpi_bootstrap_run_fanout", "npRmpi")
   tf <- tempfile("npRmpi-boot-transport-", fileext = ".tsv")

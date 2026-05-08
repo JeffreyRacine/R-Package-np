@@ -1144,11 +1144,6 @@
   workers <- .npRmpi_bootstrap_worker_count(comm = comm)
   use.master.local <- !isTRUE(.npRmpi_has_active_slave_pool(comm = comm)) &&
     isTRUE(.npRmpi_master_only_mode(comm = comm))
-  if (!isTRUE(use.master.local) &&
-      isTRUE(prefer.local.single_worker) &&
-      workers <= 1L) {
-    use.master.local <- TRUE
-  }
   master_local_chunk <- isTRUE(master_local_chunk) &&
     !isTRUE(use.master.local) &&
     workers >= 1L &&
@@ -1161,7 +1156,9 @@
       tasks = length(tasks),
       master_local = isTRUE(use.master.local),
       master_local_chunk = master_local_chunk,
-      single_worker_local = isTRUE(prefer.local.single_worker) && workers <= 1L,
+      single_worker_local = isTRUE(use.master.local) &&
+        isTRUE(prefer.local.single_worker) &&
+        workers <= 1L,
       comm = comm
     )
   )
