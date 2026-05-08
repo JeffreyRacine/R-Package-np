@@ -88,13 +88,13 @@ Named options passed via \code{\dots} include:
 
     \strong{Plot content controls}
     \describe{
-      \item{\code{common_scale}}{
-        a logical value specifying whether multiple panels should share a
-        common plotting scale when feasible.
-      }
       \item{\code{coef}, \code{coef_index}}{
         coefficient-function plotting controls for semiparametric
         families where supported.
+      }
+      \item{\code{common_scale}}{
+        a logical value specifying whether multiple panels should share a
+        common plotting scale when feasible.
       }
       \item{\code{gradient_order}, \code{gradients}}{
         derivative plotting controls for families that support
@@ -111,7 +111,7 @@ Named options passed via \code{\dots} include:
         \code{"both"} is the public spelling for the historical
         \code{"plot-data"} behavior.
       }
-      \item{\code{proper}, \code{proper_method}, \code{proper_control}}{
+      \item{\code{proper}, \code{proper_control}, \code{proper_method}}{
         controls for proper conditional density/distribution handling
         where implemented.
       }
@@ -146,6 +146,10 @@ Named options passed via \code{\dots} include:
         \code{"geom"}; density/distribution-family plots support
         \code{"inid"}, \code{"fixed"}, and \code{"geom"}.
       }
+      \item{\code{boxplot_outliers}, \code{factor_boxplot}}{
+        boxplot-style bootstrap summary controls for factor/categorical
+        displays when available.
+      }
       \item{\code{center}}{
         one of \code{"estimate"} or \code{"bias-corrected"}.
       }
@@ -153,21 +157,10 @@ Named options passed via \code{\dots} include:
         one of \code{"none"}, \code{"bootstrap"}, or
         \code{"asymptotic"}.
       }
-      \item{\code{boxplot_outliers}, \code{factor_boxplot}}{
-        boxplot-style bootstrap summary controls for factor/categorical
-        displays when available.
-      }
     }
 
     \strong{Rendering and view controls}
     \describe{
-      \item{\code{perspective}}{
-        a logical value specifying whether bivariate continuous surfaces
-        are displayed with \code{\link{persp}}-style plots when relevant.
-      }
-      \item{\code{phi}, \code{theta}, \code{view}}{
-        view controls for bivariate continuous surface plots.
-      }
       \item{\code{data_overlay}}{
         logical; when \code{TRUE}, overlay raw data points on regression
         surface plots (currently \code{npreg}, \code{npscoef}, and
@@ -197,6 +190,13 @@ Named options passed via \code{\dots} include:
         regression-only 3D response overlay used on supported surface
         plots. On supported regression surfaces, both options may be
         used together. Default is \code{FALSE}.
+      }
+      \item{\code{perspective}}{
+        a logical value specifying whether bivariate continuous surfaces
+        are displayed with \code{\link{persp}}-style plots when relevant.
+      }
+      \item{\code{phi}, \code{theta}, \code{view}}{
+        view controls for bivariate continuous surface plots.
       }
       \item{\code{render_control}}{
         optional detailed rendering controls created by
