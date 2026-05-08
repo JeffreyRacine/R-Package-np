@@ -44,6 +44,65 @@ test_that("unknown-bound NOMAD restart detail drops synthetic percent and eta", 
   expect_false(grepl("%|eta ", line))
 })
 
+test_that("NOMAD progress fuses component context with dynamic fields", {
+  nomad_detail <- getFromNamespace(".np_nomad_progress_detail", "np")
+  powell_detail <- getFromNamespace(".np_nomad_powell_progress_detail", "np")
+  npreg_powell_fields <- getFromNamespace(".npregbw_powell_progress_fields", "np")
+  fit_line <- getFromNamespace(".np_progress_fit_single_line", "np")
+  set_context <- getFromNamespace(".np_progress_bandwidth_set_context", "np")
+
+  set_context("E[y|z] (1/3)")
+  on.exit(set_context(NULL), add = TRUE)
+
+  line <- nomad_detail(
+    current_degree = 5L,
+    best_record = list(degree = 1L),
+    iteration = 77L,
+    cumulative_iteration = 1234L,
+    restart_index = 2L,
+    nmulti = 2L,
+    restart_durations = c(18.8),
+    elapsed = 18.8
+  )
+
+  expect_identical(
+    line,
+    "E[y|z] (1/3), multistart 2/2, iteration 77 (1234), elapsed 18.8s, deg (5), best (1)"
+  )
+
+  compact <- fit_line(
+    sprintf("[np] Selecting degree/bandwidth (%s)", line),
+    max_width = 80L
+  )
+
+  expect_true(startsWith(compact, "[np] Degree/bw search (E[y|z] (1/3),"))
+  expect_true(grepl("iter 77", compact, fixed = TRUE))
+  expect_true(grepl("elap 18.8s", compact, fixed = TRUE))
+  expect_true(grepl("deg (5)", compact, fixed = TRUE))
+  expect_false(identical(compact, "[np] E[y|z] (1/3)"))
+
+  powell <- powell_detail(
+    current_degree = 5L,
+    best_record = list(degree = 1L),
+    iteration = 9L,
+    elapsed = 2.5
+  )
+
+  expect_identical(
+    powell,
+    "E[y|z] (1/3), elapsed 2.5s, iter 9, deg (5), best (1)"
+  )
+
+  expect_identical(
+    npreg_powell_fields(
+      state = list(started = 0, nomad_current_degree = 5L),
+      done = 9L,
+      now = 2.5
+    ),
+    c("E[y|z] (1/3)", "elapsed 2.5s", "degree (5)", "iter 9")
+  )
+})
+
 test_that("dark-launched bandwidth engine preserves nmulti=1 iteration heartbeats", {
   select_bw <- getFromNamespace(".np_progress_select_bandwidth", "np")
   activity_bw <- getFromNamespace(".np_progress_bandwidth_activity_step", "np")

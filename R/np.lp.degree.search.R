@@ -159,11 +159,12 @@
 }
 
 .np_degree_progress_label <- function() {
+  "Selecting degree and bandwidth"
+}
+
+.np_degree_progress_context_fields <- function() {
   context <- .np_degree_progress_context()
-  label <- "Selecting degree/bandwidth"
-  if (!is.null(context))
-    label <- paste(context, label, sep = ": ")
-  label
+  if (is.null(context)) character(0L) else context
 }
 
 .np_degree_progress_best_detail <- function(best_record,
@@ -205,7 +206,7 @@
     verify = "verify",
     as.character(phase)[1L]
   )
-  fields <- c(phase)
+  fields <- c(.np_degree_progress_context_fields(), phase)
 
   if (!is.null(step) && !is.na(step) && step >= 1L) {
     if (!is.null(step_max) && !is.na(step_max) && step_max >= step) {
@@ -1223,7 +1224,7 @@
                                       nmulti = 1L,
                                       restart_durations = numeric(),
                                       elapsed = NULL) {
-  fields <- character()
+  fields <- .np_degree_progress_context_fields()
   nmulti <- suppressWarnings(as.integer(nmulti)[1L])
   restart_index <- suppressWarnings(as.integer(restart_index)[1L])
   if (!is.na(nmulti) && nmulti > 1L) {
@@ -1330,11 +1331,7 @@
 }
 
 .np_nomad_powell_progress_label <- function() {
-  context <- .np_degree_progress_context()
-  label <- "Refining bandwidth"
-  if (!is.null(context))
-    label <- paste(context, label, sep = ": ")
-  label
+  "Refining bandwidth"
 }
 
 .np_nomad_powell_hotstart_nmulti <- function(strategy = c("disable_multistart",
@@ -1356,7 +1353,7 @@
                                              best_record,
                                              iteration = NULL,
                                              elapsed = NULL) {
-  fields <- character()
+  fields <- .np_degree_progress_context_fields()
 
   if (is.finite(elapsed) && !is.na(elapsed) && elapsed >= 0)
     fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))

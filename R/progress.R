@@ -532,10 +532,61 @@
     out
   }
 
-  candidates <- list(
+  compact_fields <- function(text) {
+    out <- compact(text)
+    out <- gsub("multistart ", "ms ", out, fixed = TRUE)
+    out <- gsub("iteration ", "iter ", out, fixed = TRUE)
+    out
+  }
+
+  field_drop_candidates <- function(text) {
+    if (!endsWith(text, ")")) {
+      return(character(0L))
+    }
+
+    open <- regexpr(" (", text, fixed = TRUE)[1L]
+    if (open <= 0L) {
+      return(character(0L))
+    }
+
+    prefix <- substr(text, 1L, open - 1L)
+    fields <- substr(text, open + 2L, nchar(text, type = "chars") - 1L)
+    parts <- strsplit(fields, ", ", fixed = TRUE)[[1L]]
+    if (!length(parts)) {
+      return(character(0L))
+    }
+
+    render <- function(values) {
+      sprintf("%s (%s)", prefix, paste(values, collapse = ", "))
+    }
+
+    out <- character(0L)
+    drop_sets <- list(
+      grep("^ms ", parts),
+      grep("^best ", parts),
+      grep("^deg ", parts)
+    )
+    keep <- seq_along(parts)
+    for (drop in drop_sets) {
+      if (length(drop)) {
+        keep <- setdiff(keep, drop)
+        if (length(keep)) {
+          out <- c(out, render(parts[keep]))
+        }
+      }
+    }
+
+    out
+  }
+
+  compacted <- compact(line)
+  compacted_fields <- compact_fields(line)
+  candidates <- unlist(list(
     line,
-    compact(line)
-  )
+    compacted,
+    compacted_fields,
+    field_drop_candidates(compacted_fields)
+  ), use.names = FALSE)
 
   for (candidate in candidates) {
     if (nchar(candidate, type = "width") <= max_width) {
