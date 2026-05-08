@@ -1121,6 +1121,10 @@
   task.indices <- tmpmsg$task_indices
   bundle.tasks <- tmpmsg$tasks
   stream.results <- isTRUE(tmpfunarg$stream.results)
+  progress.enabled <- isTRUE(tmpfunarg$progress.enabled) && !isTRUE(stream.results)
+  progress.stride <- suppressWarnings(as.integer(tmpfunarg$progress.stride)[1L])
+  if (is.na(progress.stride) || progress.stride < 1L)
+    progress.stride <- 1L
   if (!is.integer(task.indices) || !is.list(bundle.tasks) ||
       length(task.indices) != length(bundle.tasks)) {
     out <- structure(
@@ -1131,6 +1135,7 @@
     return(invisible(NULL))
   }
   out.parts <- vector("list", length(bundle.tasks))
+  progress.boot <- 0L
   for (ii in seq_along(bundle.tasks)) {
     out.part <- tryCatch(
       do.call(.tmpfun, c(list(bundle.tasks[[ii]]), dotarg)),
@@ -1149,6 +1154,18 @@
       )
     } else {
       out.parts[[ii]] <- out.part
+      if (isTRUE(progress.enabled)) {
+        progress.boot <- progress.boot + as.integer(bundle.tasks[[ii]]$bsz)
+        if ((ii %% progress.stride) == 0L || ii == length(bundle.tasks)) {
+          mpi.send.Robj(
+            list(progress_only = TRUE, boot = as.integer(progress.boot)),
+            0,
+            tag,
+            .comm
+          )
+          progress.boot <- 0L
+        }
+      }
     }
   }
   if (isTRUE(stream.results)) {
@@ -1189,6 +1206,25 @@
   estimated.bytes <- as.numeric(max.boot) * as.numeric(ncol.out) * 8
   is.finite(estimated.bytes) && !is.na(estimated.bytes) &&
     estimated.bytes > threshold
+}
+
+.npRmpi_bootstrap_bundle_progress_stride <- function(worker.idx) {
+  max.tasks <- if (!length(worker.idx)) {
+    0L
+  } else {
+    max(lengths(worker.idx))
+  }
+  max.tasks <- as.integer(max.tasks)
+  if (is.na(max.tasks) || max.tasks < 1L)
+    return(0L)
+
+  target <- suppressWarnings(as.integer(
+    getOption("npRmpi.bootstrap.bundle.progress.messages", 24L)
+  )[1L])
+  if (is.na(target) || target < 1L)
+    target <- 24L
+
+  max(1L, as.integer(ceiling(max.tasks / target)))
 }
 
 .npRmpi_bootstrap_run_fanout <- function(tasks,
@@ -1302,6 +1338,12 @@
           tasks = tasks,
           ncol.out = ncol.out
         )
+        progress.bundle.enabled <- !isTRUE(stream.bundle.results) && !is.null(progress)
+        progress.bundle.stride <- if (isTRUE(progress.bundle.enabled)) {
+          .npRmpi_bootstrap_bundle_progress_stride(worker.idx)
+        } else {
+          0L
+        }
         slave.num <- workers
         mpi.anysource <- mpi.any.source()
         mpi.anytag <- mpi.any.tag()
@@ -1309,13 +1351,58 @@
         dispatch.started <- unname(as.double(proc.time()[["elapsed"]]))
         done.boot <- 0L
         local.done <- 0L
+        done <- 0L
+
+        receive.remote.result <- function() {
+          srctag <- mpi.get.sourcetag()
+          src <- srctag[1L]
+          tag <- srctag[2L]
+          res <- mpi.recv.Robj(source = src, tag = tag, comm = comm)
+          if (is.list(res) && isTRUE(res$progress_only)) {
+            boot <- suppressWarnings(as.integer(res$boot)[1L])
+            if (!is.na(boot) && boot > 0L) {
+              done.boot <<- done.boot + boot
+              progress <<- .np_plot_progress_tick(state = progress, done = done.boot)
+            }
+            return(invisible(TRUE))
+          }
+          .npRmpi_bootstrap_transport_trace(
+            what = what,
+            event = "fanout.recv",
+            fields = list(src = src, tag = tag, done_next = done + 1L, n_remote = n.remote)
+          )
+          done <<- done + 1L
+          if (!is.list(res) || is.null(res$task_indices) || is.null(res$parts)) {
+            parts.out[[worker.idx[[src]][[1L]]]] <<- structure(
+              "bootstrap bundle worker returned malformed result",
+              class = "try-error"
+            )
+          } else {
+            if (isTRUE(stream.bundle.results) && !isTRUE(res$bundle_done)) {
+              done <<- done - 1L
+            }
+            if (!isTRUE(res$bundle_done)) {
+              for (jj in seq_along(res$task_indices)) {
+                task.idx <- as.integer(res$task_indices[[jj]])
+                parts.out[[task.idx]] <<- res$parts[[jj]]
+              }
+              if (!isTRUE(progress.bundle.enabled)) {
+                done.boot <<- done.boot + sum(vapply(tasks[res$task_indices], function(tt) as.integer(tt$bsz), integer(1L)))
+              }
+            }
+          }
+          progress <<- .np_plot_progress_tick(state = progress, done = done.boot)
+          invisible(TRUE)
+        }
 
         mpi.bcast.cmd(.npRmpi_bootstrap_worker_bundle, n = slave.num, comm = comm)
         mpi.bcast.Robj(
           list(
             FUN = worker.exec,
             dot.arg = list(...),
-            stream.results = stream.bundle.results
+            stream.results = stream.bundle.results,
+            progress.enabled = progress.bundle.enabled,
+            progress.stride = progress.bundle.stride
           ),
           rank = 0,
           comm = comm
@@ -1328,7 +1415,9 @@
             slave_num = slave.num,
             local_n = length(local.idx),
             scheduler = "static_bundle",
-            stream_results = stream.bundle.results
+            stream_results = stream.bundle.results,
+            progress_beacons = progress.bundle.enabled,
+            progress_stride = progress.bundle.stride
           )
         )
 
@@ -1378,39 +1467,14 @@
             event = "fanout.master_local_chunk.done",
             fields = list(task_idx = task.local.idx, bsz = as.integer(tasks[[task.local.idx]]$bsz))
           )
+          while (done < n.remote && isTRUE(mpi.iprobe(mpi.anysource, mpi.anytag, comm))) {
+            receive.remote.result()
+          }
         }
 
-        done <- 0L
         while (done < n.remote) {
           if (isTRUE(mpi.iprobe(mpi.anysource, mpi.anytag, comm))) {
-            srctag <- mpi.get.sourcetag()
-            src <- srctag[1L]
-            tag <- srctag[2L]
-            res <- mpi.recv.Robj(source = src, tag = tag, comm = comm)
-            .npRmpi_bootstrap_transport_trace(
-              what = what,
-              event = "fanout.recv",
-              fields = list(src = src, tag = tag, done_next = done + 1L, n_remote = n.remote)
-            )
-            done <- done + 1L
-            if (!is.list(res) || is.null(res$task_indices) || is.null(res$parts)) {
-              parts.out[[worker.idx[[src]][[1L]]]] <- structure(
-                "bootstrap bundle worker returned malformed result",
-                class = "try-error"
-              )
-            } else {
-              if (isTRUE(stream.bundle.results) && !isTRUE(res$bundle_done)) {
-                done <- done - 1L
-              }
-              if (!isTRUE(res$bundle_done)) {
-                for (jj in seq_along(res$task_indices)) {
-                  task.idx <- as.integer(res$task_indices[[jj]])
-                  parts.out[[task.idx]] <- res$parts[[jj]]
-                }
-                done.boot <- done.boot + sum(vapply(tasks[res$task_indices], function(tt) as.integer(tt$bsz), integer(1L)))
-              }
-            }
-            progress <- .np_plot_progress_tick(state = progress, done = done.boot)
+            receive.remote.result()
           } else {
             if (dispatch.timeout > 0) {
               elapsed.wait <- unname(as.double(proc.time()[["elapsed"]])) - dispatch.started

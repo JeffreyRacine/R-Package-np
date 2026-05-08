@@ -244,11 +244,18 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
 
   qenv <- new.env(parent = emptyenv())
   qenv$queue <- list()
+  qenv$progress <- integer()
 
   local_mocked_bindings(
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
     .npRmpi_master_only_mode = function(comm = 1L) FALSE,
     .npRmpi_bootstrap_worker_count = function(comm = 1L) 1L,
+    .np_plot_bootstrap_progress_begin = function(total, label) list(total = as.integer(total)),
+    .np_plot_progress_tick = function(state, done, force = FALSE) {
+      qenv$progress <- c(qenv$progress, as.integer(done))
+      state
+    },
+    .np_plot_progress_end = function(state) invisible(NULL),
     mpi.any.source = function() 0L,
     mpi.any.tag = function() 0L,
     mpi.bcast.cmd = function(...) invisible(NULL),
@@ -262,6 +269,14 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
             ncol = 1L
           )
         })
+        qenv$queue[[length(qenv$queue) + 1L]] <<- list(
+          src = as.integer(dest),
+          tag = as.integer(tag),
+          payload = list(
+            progress_only = TRUE,
+            boot = sum(vapply(obj$tasks, function(task) as.integer(task$bsz), integer(1L)))
+          )
+        )
         qenv$queue[[length(qenv$queue) + 1L]] <<- list(
           src = as.integer(dest),
           tag = as.integer(tag),
@@ -286,7 +301,9 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
 
   tasks <- list(
     list(start = 1L, bsz = 2L, seed = 101L),
-    list(start = 3L, bsz = 2L, seed = 202L)
+    list(start = 3L, bsz = 2L, seed = 202L),
+    list(start = 5L, bsz = 2L, seed = 303L),
+    list(start = 7L, bsz = 2L, seed = 404L)
   )
 
   out <- run_fanout(
@@ -301,15 +318,16 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
   )
 
   expect_true(is.matrix(out))
-  expect_identical(dim(out), c(4L, 1L))
-  expect_equal(out[, 1L], c(1, 1, 3, 3))
+  expect_identical(dim(out), c(8L, 1L))
+  expect_equal(out[, 1L], c(1, 1, 3, 3, 5, 5, 7, 7))
+  expect_true(any(qenv$progress == 6L))
 
   lines <- readLines(tf, warn = FALSE)
   done.lines <- lines[grepl("event=fanout.master_assist.done", lines, fixed = TRUE)]
   assist.lines <- lines[grepl("event=fanout.master_assist.start", lines, fixed = TRUE)]
   expect_true(any(grepl("scheduler=static_bundle", assist.lines, fixed = TRUE)))
   expect_true(length(done.lines) >= 1L)
-  expect_true(any(grepl("local_done=1", done.lines, fixed = TRUE)))
+  expect_true(any(grepl("local_done=2", done.lines, fixed = TRUE)))
   expect_true(any(grepl("event=fanout.master_local_chunk.done", lines, fixed = TRUE)))
 })
 
