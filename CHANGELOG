@@ -40,6 +40,13 @@ Changes from Version 0.70-1 to 0.70-2 [08-May-2026]
   use a higher-order conditional distribution fit while the quantile level was
   still extracted by the legacy degree-unaware inversion path.
 
+* Repaired adaptive nearest-neighbor conditional density/distribution
+  evaluation for local-polynomial fits so `npcdens()`, `npcdist()`, and
+  downstream `npqreg()` quantiles, standard errors, gradients, and gradient
+  standard errors honor the selected LP degree/basis metadata. The regression
+  guard verifies that `regtype = "ll"` remains identical to `regtype = "lp",
+  degree = 1` while higher-degree adaptive-NN LP fits are degree-sensitive.
+
 * Restored live progress updates for local-polynomial plot-bootstrap helpers
   when bootstrap resampling counts are precomputed and shared by a higher-level
   route, such as the component regressions inside partially linear
