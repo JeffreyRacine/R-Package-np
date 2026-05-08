@@ -30,8 +30,8 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     txdat = data.frame(x = x, z = z),
     tydat = y
   )
-  rdata <- plot(rfit, behavior = "data", view = "fixed")
-  rplotdata <- with_plot_device(plot(rfit, behavior = "plot-data", view = "fixed"))
+  rdata <- plot(rfit, output = "data", view = "fixed")
+  rplotdata <- with_plot_device(plot(rfit, output = "plot-data", view = "fixed"))
 
   expect_type(rplotdata, "list")
   expect_named(rplotdata, names(rdata))
@@ -53,8 +53,8 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     tydat = data.frame(y = y),
     proper = TRUE
   )
-  cdata <- plot(cfit, behavior = "data", view = "fixed")
-  cplotdata <- with_plot_device(plot(cfit, behavior = "plot-data", view = "fixed"))
+  cdata <- plot(cfit, output = "data", view = "fixed")
+  cplotdata <- with_plot_device(plot(cfit, output = "plot-data", view = "fixed"))
 
   expect_type(cplotdata, "list")
   expect_named(cplotdata, names(cdata))
@@ -78,8 +78,8 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     tydat = data.frame(y = y),
     proper = TRUE
   )
-  ddata <- suppressWarnings(plot(dfit, behavior = "data", view = "fixed"))
-  dplotdata <- with_plot_device(plot(dfit, behavior = "plot-data", view = "fixed"))
+  ddata <- suppressWarnings(plot(dfit, output = "data", view = "fixed"))
+  dplotdata <- with_plot_device(plot(dfit, output = "plot-data", view = "fixed"))
 
   expect_type(dplotdata, "list")
   expect_named(dplotdata, names(ddata))
@@ -106,9 +106,9 @@ test_that("plot return contract: bounded conditional bootstrap data stays availa
   cfit <- npcdens(y ~ x, cykerbound = "range")
   cout <- suppressWarnings(plot(
     cfit,
-    behavior = "data",
+    output = "data",
     view = "fixed",
-    plot.data.overlay = FALSE,
+    data_overlay = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
     B = 5L,
@@ -122,9 +122,9 @@ test_that("plot return contract: bounded conditional bootstrap data stays availa
   dfit <- npcdist(y ~ x, cykerbound = "range")
   dout <- suppressWarnings(plot(
     dfit,
-    behavior = "data",
+    output = "data",
     view = "fixed",
-    plot.data.overlay = FALSE,
+    data_overlay = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
     B = 5L,
@@ -151,8 +151,8 @@ test_that("plot return contract: remaining public plot families return plot-data
   }
 
   expect_plot_modes_match <- function(object, fields, ...) {
-    data.out <- suppressWarnings(plot(object, behavior = "data", ...))
-    plot.out <- with_plot_device(plot(object, behavior = "plot-data", ...))
+    data.out <- suppressWarnings(plot(object, output = "data", ...))
+    plot.out <- with_plot_device(plot(object, output = "plot-data", ...))
 
     expect_type(plot.out, "list")
     expect_named(plot.out, names(data.out))
@@ -342,8 +342,8 @@ test_that("plot return contract: npRmpi npscoef fitted perspective path preserve
     fit,
     view = "fixed",
     renderer = "base",
-    behavior = "data",
-    plot.data.overlay = FALSE,
+    output = "data",
+    data_overlay = FALSE,
     errors = "none"
   ))
 
@@ -383,18 +383,18 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
 
   rdata <- suppressWarnings(plot(
     rfit,
-    behavior = "data",
+    output = "data",
     renderer = "rgl",
     view = "fixed",
-    plot.data.overlay = FALSE
+    data_overlay = FALSE
   ))
 
   rplotdata <- suppressWarnings(plot(
     rfit,
-    behavior = "plot-data",
+    output = "plot-data",
     renderer = "rgl",
     view = "fixed",
-    plot.data.overlay = FALSE
+    data_overlay = FALSE
   ))
 
   expect_type(rplotdata, "list")
@@ -420,14 +420,14 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
 
   cdata <- suppressWarnings(plot(
     cfit,
-    behavior = "data",
+    output = "data",
     renderer = "rgl",
     view = "fixed"
   ))
 
   cplotdata <- suppressWarnings(plot(
     cfit,
-    behavior = "plot-data",
+    output = "plot-data",
     renderer = "rgl",
     view = "fixed"
   ))

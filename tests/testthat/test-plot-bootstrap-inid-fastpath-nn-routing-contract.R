@@ -14,7 +14,7 @@ test_that("nearest-neighbor frozen bootstrap plots run across regression and uns
   run_plot <- function(bw, ...) {
     suppressWarnings(plot(
       bw,
-      behavior = "data",
+      output = "data",
       perspective = FALSE,
       errors = "bootstrap",
       boot_control = np_boot_control(nonfixed = "frozen"),

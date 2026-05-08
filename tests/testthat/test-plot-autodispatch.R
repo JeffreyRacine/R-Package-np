@@ -11,9 +11,9 @@ test_that("plot works with autodispatch for non-bootstrap paths", {
 
   bw <- npregbw(y ~ x, data = d, regtype = "lc", bwmethod = "cv.ls", nmulti = 1)
   out <- suppressWarnings(plot(bw,
-                               persp = FALSE,
+                               perspective = FALSE,
                                view = "fixed",
-                               behavior = "data",
+                               output = "data",
                                errors = "none"))
 
   expect_type(out, "list")
@@ -35,9 +35,9 @@ test_that("plot bootstrap path works under autodispatch", {
 
   out <- suppressWarnings(
     plot(bw,
-         persp = FALSE,
+         perspective = FALSE,
          view = "fixed",
-         behavior = "data",
+         output = "data",
          errors = "bootstrap",
          B = 9)
   )
@@ -160,13 +160,13 @@ test_that("plot engine defaults: regression-class uses wild, unsupervised uses i
 
   for (nm in reg.engines) {
     fn <- getFromNamespace(nm, "npRmpi")
-    defaults <- eval(formals(fn)$bootstrap)
+    defaults <- eval(formals(fn)$plot.errors.boot.method)
     expect_identical(defaults[1L], "wild")
   }
 
   for (nm in unsup.engines) {
     fn <- getFromNamespace(nm, "npRmpi")
-    defaults <- eval(formals(fn)$bootstrap)
+    defaults <- eval(formals(fn)$plot.errors.boot.method)
     expect_identical(defaults[1L], "inid")
   }
 })

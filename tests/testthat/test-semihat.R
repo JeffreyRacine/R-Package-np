@@ -328,7 +328,7 @@ test_that("npplreg generalized-nn inid plot helper completes in session mode", {
     xdat = tx,
     ydat = y,
     zdat = tz,
-    behavior = "data",
+    output = "data",
     perspective = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
@@ -374,7 +374,7 @@ test_that("npplreg generalized-nn wild plot helper preserves means in session mo
     xdat = tx,
     ydat = y,
     zdat = tz,
-    behavior = "data",
+    output = "data",
     perspective = FALSE,
     errors = "none"
   )
@@ -385,7 +385,7 @@ test_that("npplreg generalized-nn wild plot helper preserves means in session mo
     xdat = tx,
     ydat = y,
     zdat = tz,
-    behavior = "data",
+    output = "data",
     perspective = FALSE,
     errors = "bootstrap",
     bootstrap = "wild",
@@ -429,7 +429,7 @@ test_that("npplreg adaptive-nn wild plot helper preserves means in session mode"
     xdat = tx,
     ydat = y,
     zdat = tz,
-    behavior = "data",
+    output = "data",
     perspective = FALSE,
     errors = "none"
   )
@@ -440,7 +440,7 @@ test_that("npplreg adaptive-nn wild plot helper preserves means in session mode"
     xdat = tx,
     ydat = y,
     zdat = tz,
-    behavior = "data",
+    output = "data",
     perspective = FALSE,
     errors = "bootstrap",
     bootstrap = "wild",
@@ -484,7 +484,7 @@ test_that("npplreg generalized-nn plot means match public estimator in session m
     xdat = tx,
     ydat = y,
     zdat = tz,
-    behavior = "data",
+    output = "data",
     perspective = FALSE,
     errors = "none"
   )
@@ -1219,7 +1219,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       ydat = y,
       zdat = data.frame(z = z),
       perspective = FALSE,
-      behavior = "data",
+      output = "data",
       errors = "bootstrap",
       bootstrap = "wild",
       B = 19
@@ -1235,7 +1235,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       ydat = y,
       zdat = data.frame(z = z),
       perspective = FALSE,
-      behavior = "data",
+      output = "data",
       errors = "bootstrap",
       bootstrap = "wild",
       boot_control = np_boot_control(wild = "rademacher"),
@@ -1280,7 +1280,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
         ydat = y,
         zdat = data.frame(z = z),
         perspective = FALSE,
-        behavior = "data",
+        output = "data",
         errors = "bootstrap",
         bootstrap = "wild",
         B = 9
@@ -1301,7 +1301,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       sibw,
       xdat = data.frame(x1 = x, x2 = z),
       ydat = y,
-      behavior = "data",
+      output = "data",
       errors = "bootstrap",
       bootstrap = "wild",
       B = 19

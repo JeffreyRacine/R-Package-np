@@ -148,7 +148,7 @@ test_that("fixed-bwtype plot bootstrap covers supervised wild and unsupervised i
   run_plot <- function(bw, ..., boot.method) {
     suppressWarnings(plot(
       bw,
-      behavior = "data",
+      output = "data",
       perspective = FALSE,
       errors = "bootstrap",
       bootstrap = boot.method,

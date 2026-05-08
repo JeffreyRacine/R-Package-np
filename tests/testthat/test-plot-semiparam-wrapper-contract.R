@@ -108,7 +108,7 @@ test_that("plot.plregression recovers training data for direct formula fits", {
   out <- suppressWarnings(plot(
     fit,
     perspective = FALSE,
-    behavior = "plot-data",
+    output = "plot-data",
     errors = "none",
     pch = 4,
     cex = 0.7

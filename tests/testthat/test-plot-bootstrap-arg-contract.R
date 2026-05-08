@@ -5,7 +5,7 @@ test_that("plot contract: bootstrap args require explicit bootstrap mode across 
   on.exit(close_mpi_slaves(), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
-  msg <- "errors must be set to 'bootstrap' when bootstrap error arguments are supplied"
+  msg <- "bootstrap controls require errors = \"bootstrap\""
 
   set.seed(812)
   n <- 50
@@ -46,27 +46,27 @@ test_that("plot contract: bootstrap args require explicit bootstrap mode across 
   )
 
   expect_error(
-    suppressWarnings(plot(rbw, behavior = "data", perspective = FALSE, B = 5)),
+    suppressWarnings(plot(rbw, output = "data", perspective = FALSE, B = 5)),
     msg,
     fixed = TRUE
   )
   expect_error(
-    suppressWarnings(plot(ubw, behavior = "data", perspective = FALSE, B = 5)),
+    suppressWarnings(plot(ubw, output = "data", perspective = FALSE, B = 5)),
     msg,
     fixed = TRUE
   )
   expect_error(
-    suppressWarnings(plot(dbw, behavior = "data", perspective = FALSE, B = 5)),
+    suppressWarnings(plot(dbw, output = "data", perspective = FALSE, B = 5)),
     msg,
     fixed = TRUE
   )
   expect_error(
-    suppressWarnings(plot(cbw, behavior = "data", perspective = FALSE, B = 5)),
+    suppressWarnings(plot(cbw, output = "data", perspective = FALSE, B = 5)),
     msg,
     fixed = TRUE
   )
   expect_error(
-    suppressWarnings(plot(cdbw, behavior = "data", perspective = FALSE, B = 5)),
+    suppressWarnings(plot(cdbw, output = "data", perspective = FALSE, B = 5)),
     msg,
     fixed = TRUE
   )
@@ -77,7 +77,7 @@ test_that("plot contract: bootstrap args require explicit bootstrap mode across 
         xdat = data.frame(x = z),
         ydat = y,
         zdat = data.frame(z = x),
-        behavior = "data",
+        output = "data",
         perspective = FALSE,
         B = 5
       )
@@ -91,7 +91,7 @@ test_that("plot contract: bootstrap args require explicit bootstrap mode across 
         sbw,
         xdat = data.frame(x = x, x2 = x2),
         ydat = y,
-        behavior = "data",
+        output = "data",
         perspective = FALSE,
         B = 5
       )
@@ -106,7 +106,7 @@ test_that("plot contract: bootstrap args require explicit bootstrap mode across 
         xdat = data.frame(x = x),
         ydat = y,
         zdat = data.frame(z = z),
-        behavior = "data",
+        output = "data",
         perspective = FALSE,
         B = 5
       )

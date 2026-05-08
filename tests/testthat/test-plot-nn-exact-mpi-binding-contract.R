@@ -24,7 +24,7 @@ test_that("adaptive conditional exact bootstrap plot binds only required worker 
       "  bootstrap='inid',",
       "  B=5,",
       "  boot_control=np_boot_control(nonfixed='exact'),",
-      "  behavior='data'",
+      "  output = 'data'",
       ")",
       "stopifnot(is.list(out), length(out) > 0)",
       "cat('ADAPTIVE_COND_EXACT_SESSION_OK\\n')"

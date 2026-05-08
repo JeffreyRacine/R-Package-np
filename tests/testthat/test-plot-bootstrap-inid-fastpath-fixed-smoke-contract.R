@@ -41,7 +41,7 @@ test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {
         ydat = y,
         zdat = tz,
         perspective = FALSE,
-        behavior = "data",
+        output = "data",
         errors = "bootstrap",
         bootstrap = "inid",
         B = 7
@@ -68,7 +68,7 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
   expect_error(
     suppressWarnings(plot(
       ubw,
-      behavior = "data",
+      output = "data",
       perspective = FALSE,
       errors = "bootstrap",
       bootstrap = "wild",
@@ -86,7 +86,7 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
   expect_error(
     suppressWarnings(plot(
       cbw,
-      behavior = "data",
+      output = "data",
       perspective = FALSE,
       errors = "bootstrap",
       bootstrap = "wild",

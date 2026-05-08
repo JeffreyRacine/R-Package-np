@@ -12,7 +12,7 @@ test_that("autodispatch plot workflow stays consistent", {
   bw <- npregbw(y ~ x, data = d, regtype = "lc", bwmethod = "cv.ls", nmulti = 1)
   fit <- npreg(bws = bw, data = d)
 
-  out <- plot(fit, persp = FALSE, view = "fixed", behavior = "data")
+  out <- plot(fit, perspective = FALSE, view = "fixed", output = "data")
   expect_true(is.list(out))
 })
 

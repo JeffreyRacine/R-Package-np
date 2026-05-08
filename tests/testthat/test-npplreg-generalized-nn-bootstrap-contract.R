@@ -41,7 +41,7 @@ test_that("npplreg generalized-nn cv.aic bootstrap representative session contra
       xdat = tx,
       ydat = y,
       zdat = tz,
-      behavior = "data",
+      output = "data",
       errors = "bootstrap",
       bootstrap = case$boot_method,
       B = 3L,

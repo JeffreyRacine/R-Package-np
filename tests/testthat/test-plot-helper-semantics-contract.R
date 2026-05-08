@@ -25,7 +25,7 @@ run_bootstrap_plot <- function(bw,
                                boot_method = "inid") {
   args <- list(
     bw,
-    behavior = "data",
+    output = "data",
     perspective = FALSE,
     errors = "bootstrap",
     bootstrap = boot_method,

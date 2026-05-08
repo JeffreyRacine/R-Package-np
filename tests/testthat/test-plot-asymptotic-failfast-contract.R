@@ -46,7 +46,7 @@ test_that("plot contract: asymptotic consumer payloads are supported in npRmpi s
     sbw,
     xdat = data.frame(x1 = x1, x2 = x2),
     ydat = y.cont,
-    behavior = "data",
+    output = "data",
     errors = "asymptotic",
     band = "pointwise",
     perspective = FALSE
@@ -55,7 +55,7 @@ test_that("plot contract: asymptotic consumer payloads are supported in npRmpi s
     sbw.bin,
     xdat = data.frame(x1 = x1, x2 = x2),
     ydat = y.bin,
-    behavior = "data",
+    output = "data",
     errors = "asymptotic",
     band = "pointwise",
     perspective = FALSE
@@ -65,7 +65,7 @@ test_that("plot contract: asymptotic consumer payloads are supported in npRmpi s
     xdat = data.frame(x = x1),
     ydat = y.cont,
     zdat = data.frame(z = z),
-    behavior = "data",
+    output = "data",
     errors = "asymptotic",
     band = "pointwise",
     perspective = FALSE
