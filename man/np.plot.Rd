@@ -52,14 +52,9 @@ This argument identifies the object to plot.
   }
 
 
-\subsection{Additional Arguments}{
-Further plotting controls are passed through \code{\dots} to the relevant plot method.
+\subsection{Plot Options Passed Through \code{\dots}}{
+Named options passed via \code{\dots} include:
 }
-
-  \item{\dots}{
-    additional arguments supplied to control plotting behavior or passed
-    through to underlying plotting helpers where supported. Named options
-    passed via \code{\dots} include:
 
     \strong{Data and evaluation controls}
     \describe{
@@ -285,8 +280,17 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
         reproducible.
       }
     }
-  }
 
+\subsection{Additional Arguments}{
+Further plotting controls are passed through \code{\dots} to the relevant plot method.
+}
+
+  \item{\dots}{
+    additional arguments supplied to control plotting behavior or passed
+    through to underlying plotting helpers where supported. Supported named
+    plotting controls are summarized above; standard graphical parameters
+    are forwarded where relevant.
+  }
 
 }
 \details{
