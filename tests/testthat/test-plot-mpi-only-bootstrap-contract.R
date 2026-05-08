@@ -254,16 +254,18 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
     mpi.bcast.cmd = function(...) invisible(NULL),
     mpi.bcast.Robj = function(...) invisible(NULL),
     mpi.send.Robj = function(obj, dest, tag, comm = 1L) {
-      if (is.list(obj) && !is.null(obj$data.arg) && length(obj$data.arg) == 1L) {
-        task <- obj$data.arg[[1L]]
-        qenv$queue[[length(qenv$queue) + 1L]] <<- list(
-          src = as.integer(dest),
-          tag = as.integer(tag),
-          payload = matrix(
+      if (is.list(obj) && !is.null(obj$task_indices) && !is.null(obj$tasks)) {
+        task.parts <- lapply(obj$tasks, function(task) {
+          matrix(
             rep.int(as.integer(task$start), as.integer(task$bsz)),
             nrow = as.integer(task$bsz),
             ncol = 1L
           )
+        })
+        qenv$queue[[length(qenv$queue) + 1L]] <<- list(
+          src = as.integer(dest),
+          tag = as.integer(tag),
+          payload = list(task_indices = obj$task_indices, parts = task.parts)
         )
       }
       invisible(NULL)
@@ -304,6 +306,8 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
 
   lines <- readLines(tf, warn = FALSE)
   done.lines <- lines[grepl("event=fanout.master_assist.done", lines, fixed = TRUE)]
+  assist.lines <- lines[grepl("event=fanout.master_assist.start", lines, fixed = TRUE)]
+  expect_true(any(grepl("scheduler=static_bundle", assist.lines, fixed = TRUE)))
   expect_true(length(done.lines) >= 1L)
   expect_true(any(grepl("local_done=1", done.lines, fixed = TRUE)))
   expect_true(any(grepl("event=fanout.master_local_chunk.done", lines, fixed = TRUE)))

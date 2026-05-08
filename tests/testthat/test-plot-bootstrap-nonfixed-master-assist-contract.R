@@ -93,6 +93,13 @@ test_that("nonfixed exact and frozen plot bootstraps use all slaves plus master 
                 info = paste(starts, collapse = "\n"))
     expect_true(all(grepl("master_local_chunk=TRUE", starts, fixed = TRUE)),
                 info = paste(starts, collapse = "\n"))
+    assists <- trace[
+      grepl(paste0("what=", expected[[case]]), trace, fixed = TRUE) &
+        grepl("event=fanout.master_assist.start", trace, fixed = TRUE)
+    ]
+    expect_true(length(assists) > 0L, info = paste(trace, collapse = "\n"))
+    expect_true(all(grepl("scheduler=static_bundle", assists, fixed = TRUE)),
+                info = paste(assists, collapse = "\n"))
     for (dest in seq_len(nslaves)) {
       expect_true(any(grepl(paste0("what=", expected[[case]]), trace, fixed = TRUE) &
                         grepl("event=fanout.send.initial", trace, fixed = TRUE) &

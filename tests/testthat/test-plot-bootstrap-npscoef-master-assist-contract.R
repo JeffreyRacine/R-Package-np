@@ -53,6 +53,13 @@ test_that("npscoef inid plot bootstrap uses all slaves plus master assist", {
               info = paste(starts, collapse = "\n"))
   expect_true(all(grepl("master_local_chunk=TRUE", starts, fixed = TRUE)),
               info = paste(starts, collapse = "\n"))
+  assists <- trace[
+    grepl("what=inid-scoef-localpoly", trace, fixed = TRUE) &
+      grepl("event=fanout.master_assist.start", trace, fixed = TRUE)
+  ]
+  expect_true(length(assists) > 0L, info = paste(trace, collapse = "\n"))
+  expect_true(all(grepl("scheduler=static_bundle", assists, fixed = TRUE)),
+              info = paste(assists, collapse = "\n"))
   for (dest in seq_len(nslaves)) {
     expect_true(any(grepl("what=inid-scoef-localpoly", trace, fixed = TRUE) &
                       grepl("event=fanout.send.initial", trace, fixed = TRUE) &
