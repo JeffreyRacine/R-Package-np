@@ -1065,6 +1065,133 @@ npindexhat <-
     (out.plus - out.minus) / (2.0 * step)
   }
 
+.npRmpi_npplreghat_apply_fanout <- function(bws,
+                                            txdat,
+                                            tzdat,
+                                            exdat,
+                                            ezdat,
+                                            y,
+                                            x.train.num,
+                                            x.eval.num,
+                                            comm = 1L) {
+  if (!isTRUE(getOption("npRmpi.hat.operator.fanout", TRUE)) ||
+      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+      isTRUE(getOption("npRmpi.autodispatch.context", FALSE)) ||
+      isTRUE(getOption("npRmpi.autodispatch.disable", FALSE)) ||
+      isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+    return(NULL)
+
+  rank <- tryCatch(as.integer(mpi.comm.rank(comm = comm)), error = function(e) NA_integer_)
+  if (is.na(rank) || rank != 0L)
+    return(NULL)
+
+  workers <- tryCatch(.npRmpi_bootstrap_worker_count(comm = comm), error = function(e) 0L)
+  if (is.na(workers) || workers < 1L)
+    return(NULL)
+
+  n <- nrow(txdat)
+  m <- nrow(exdat)
+  p <- ncol(txdat)
+  yy <- as.matrix(y)
+  work.size <- as.double(n) * as.double(m) * as.double(p + ncol(yy))
+  min.work <- suppressWarnings(as.numeric(getOption("npRmpi.hat.operator.fanout.min.work", 2e7))[1L])
+  if (!is.finite(min.work) || is.na(min.work) || min.work < 0)
+    min.work <- 2e7
+  if (work.size < min.work)
+    return(NULL)
+
+  tasks <- .npRmpi_hat_operator_row_tasks(neval = m, workers = workers)
+  if (!length(tasks) || length(tasks) < 2L)
+    return(NULL)
+
+  pre <- .npRmpi_with_local_hat_helper({
+    resx.train <- matrix(0.0, nrow = n, ncol = p)
+    for (j in seq_len(p)) {
+      xhat.train <- npreghat(
+        bws = bws$bw[[j + 1L]],
+        txdat = tzdat,
+        y = x.train.num[, j],
+        output = "apply"
+      )
+      resx.train[, j] <- x.train.num[, j] - as.vector(xhat.train)
+    }
+
+    qrR <- qr(resx.train, tol = .Machine$double.eps)
+
+    Hy.train <- npreghat(
+      bws = bws$bw$yzbw,
+      txdat = tzdat,
+      y = yy,
+      output = "apply"
+    )
+    if (!is.matrix(Hy.train))
+      Hy.train <- matrix(Hy.train, ncol = ncol(yy))
+
+    B <- qr.coef(qrR, yy - Hy.train)
+    B[is.na(B)] <- 0.0
+    B
+  })
+
+  worker <- function(task) {
+    old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+    old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+    options(npRmpi.autodispatch.disable = TRUE)
+    options(npRmpi.autodispatch.context = TRUE)
+    on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+    on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+
+    rows <- as.integer(task$rows)
+    resx.eval <- matrix(0.0, nrow = length(rows), ncol = p)
+    for (j in seq_len(p)) {
+      xhat.eval <- npreghat(
+        bws = bws$bw[[j + 1L]],
+        txdat = tzdat,
+        exdat = ezdat[rows, , drop = FALSE],
+        y = x.train.num[, j],
+        output = "apply"
+      )
+      resx.eval[, j] <- x.eval.num[rows, j] - as.vector(xhat.eval)
+    }
+
+    Hy.eval <- npreghat(
+      bws = bws$bw$yzbw,
+      txdat = tzdat,
+      exdat = ezdat[rows, , drop = FALSE],
+      y = yy,
+      output = "apply"
+    )
+    if (!is.matrix(Hy.eval))
+      Hy.eval <- matrix(Hy.eval, ncol = ncol(yy))
+
+    out <- Hy.eval + resx.eval %*% pre
+    if (!is.matrix(out))
+      out <- matrix(out, nrow = length(rows), ncol = ncol(yy))
+    out
+  }
+
+  .npRmpi_bootstrap_run_fanout(
+    tasks = tasks,
+    worker = worker,
+    ncol.out = ncol(yy),
+    what = "npplreghat",
+    progress.label = "npplreghat evaluation rows",
+    profile.where = "npplreghat",
+    comm = comm,
+    prefer.local.single_worker = FALSE,
+    master_local_chunk = TRUE,
+    required.bindings = list(
+      bws = bws,
+      tzdat = tzdat,
+      ezdat = ezdat,
+      yy = yy,
+      x.train.num = x.train.num,
+      x.eval.num = x.eval.num,
+      p = p,
+      pre = pre
+    )
+  )
+}
+
 npplreghat <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
@@ -1168,6 +1295,22 @@ npplreghat <-
     yy <- as.matrix(y)
     if (nrow(yy) != n)
       stop("number of rows in 'y' must equal number of training rows")
+
+    fanout <- .npRmpi_npplreghat_apply_fanout(
+      bws = bws,
+      txdat = txdat,
+      tzdat = tzdat,
+      exdat = exdat,
+      ezdat = ezdat,
+      y = yy,
+      x.train.num = x.train.num,
+      x.eval.num = x.eval.num
+    )
+    if (!is.null(fanout)) {
+      if (ncol(fanout) == 1L)
+        return(as.vector(fanout))
+      return(fanout)
+    }
 
     out <- .npRmpi_with_local_hat_helper({
       for (j in seq_len(p)) {

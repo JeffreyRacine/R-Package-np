@@ -219,9 +219,9 @@
 
   work.size <- as.double(nrow(tdat)) * as.double(neval) *
     if (is.null(y)) 1.0 else as.double(ncol(as.matrix(y)))
-  min.work <- suppressWarnings(as.numeric(getOption("npRmpi.hat.operator.fanout.min.work", 6e6))[1L])
+  min.work <- suppressWarnings(as.numeric(getOption("npRmpi.hat.operator.fanout.min.work", 2e7))[1L])
   if (!is.finite(min.work) || is.na(min.work) || min.work < 0)
-    min.work <- 6e6
+    min.work <- 2e7
   if (work.size < min.work)
     return(NULL)
 
