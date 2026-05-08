@@ -5190,7 +5190,11 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       ps_okernel = KERNEL_ordered_reg;
     }
 
-    tprod_mp = (double *)malloc(((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train)*p_nvar*sizeof(double));
+    {
+      const size_t tprod_rows = (size_t)((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train);
+      const size_t tprod_count = np_jksum_size_mul_or_die(tprod_rows, (size_t)p_nvar, "tprod_mp");
+      tprod_mp = (double *)malloc(np_jksum_size_mul_or_die(tprod_count, sizeof(double), "tprod_mp"));
+    }
     if(tprod_mp == NULL){
       status = KWSNP_ERR_BADINVOC;
       goto cleanup;
