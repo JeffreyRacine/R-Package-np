@@ -11,7 +11,7 @@ test_that("bounded adaptive_nn is available for unconditional distribution", {
     ckerorder = 2,
     ckerbound = "range",
     nmulti = 1,
-    remin = FALSE,
+    powell.remin = FALSE,
     itmax = 50,
     tol = 0.1
   )
@@ -23,7 +23,7 @@ test_that("bounded adaptive_nn is available for unconditional distribution", {
     ckerorder = 2,
     ckerbound = "range",
     nmulti = 1,
-    remin = FALSE,
+    powell.remin = FALSE,
     itmax = 50,
     tol = 0.1
   )
@@ -35,7 +35,7 @@ test_that("bounded adaptive_nn is available for unconditional distribution", {
     ckerorder = 2,
     ckerbound = "range",
     nmulti = 1,
-    remin = FALSE,
+    powell.remin = FALSE,
     itmax = 50,
     tol = 0.1
   )

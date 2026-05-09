@@ -49,7 +49,7 @@ npudensbw(\dots)
           lbd.init = 0.1,
           nmulti,
           penalty.multiplier = 10,
-          remin = TRUE,
+          powell.remin = TRUE,
           scale.init.categorical.sample = FALSE,
           scale.factor.search.lower = NULL,
           small = 1.490116e-05,
@@ -88,7 +88,7 @@ npudensbw(\dots)
           nmulti,
           okertype,
           penalty.multiplier,
-          remin,
+          powell.remin,
           scale.init.categorical.sample,
           scale.factor.search.lower = NULL,
           small,
@@ -371,10 +371,10 @@ These controls set optimizer tolerances, restart behavior, invalid-candidate pen
     baseline penalty when \code{invalid.penalty="baseline"}.
     Defaults to \code{10}.}
 
-  \item{remin}{
-    a logical value which when set as \code{TRUE} the search routine
-    restarts from located minima for a minor gain in accuracy. Defaults
-    to \code{TRUE}.
+  \item{powell.remin}{
+    logical flag controlling Powell restart-from-minimum behavior. When
+    \code{TRUE}, the Powell-style search restarts from the located minimum
+    for a minor gain in accuracy. Defaults to \code{TRUE}.
   }
 
   \item{small}{

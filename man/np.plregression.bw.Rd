@@ -34,7 +34,7 @@ npplregbw(\dots)
           search.engine = c("nomad+powell", "cell", "nomad"),
           nomad = FALSE,
           nomad.nmulti = 0L,
-          degree.min = NULL,
+            degree.min = NULL,
           degree.max = NULL,
           degree.start = NULL,
           degree.restarts = 0L,
@@ -44,7 +44,8 @@ npplregbw(\dots)
           ftol,
           itmax,
           nmulti,
-          remin,
+          nomad.remin,
+          powell.remin,
           small,
           tol,
           \dots)
@@ -270,6 +271,15 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     controls inner NOMAD multistarts within each outer restart.
   }
 
+  \item{nomad.remin}{
+    logical flag controlling the optional second NOMAD hot start. When
+    \code{TRUE}, NOMAD is restarted once from the best full candidate found,
+    including both bandwidth and degree coordinates. Defaults to \code{FALSE};
+    current simulation evidence favors the one-pass NOMAD default for routine
+    use, while leaving this switch available for sensitivity checks.
+  }
+
+
   \item{search.engine}{
     character string controlling the automatic local-polynomial search
     backend for each nuisance regression when
@@ -307,16 +317,13 @@ These controls set optimizer tolerances and restart behavior.
     points. Defaults to \code{min(2,ncol(zdat))}.
   }
 
-  \item{remin}{
-    logical flag controlling restart-from-minimum behavior. For ordinary
-    Powell-style search, \code{TRUE} restarts the local search from the
-    located minimum. For NOMAD local-polynomial degree search,
-    \code{TRUE} restarts NOMAD once from the best full candidate found,
-    including both bandwidth and degree coordinates. For
-    \code{search.engine="nomad+powell"}, \code{TRUE} applies this
-    NOMAD restart before the Powell refinement and also permits the
-    Powell refinement to restart from its located minimum. Defaults to
-    \code{TRUE}.
+  \item{powell.remin}{
+    logical flag controlling Powell restart-from-minimum behavior. For
+    ordinary fixed-degree Powell-style search, \code{TRUE} restarts the
+    local search from the located minimum. For \code{search.engine="nomad+powell"},
+    this controls only the final Powell bandwidth-polish step. The default
+    is \code{TRUE} for ordinary Powell routes and \code{FALSE} for the
+    Powell polish after NOMAD unless explicitly supplied.
   }
 
   \item{small}{ a small number, at about the precision of the data type

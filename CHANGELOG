@@ -1,16 +1,18 @@
-Changes from Version 0.70-1 to 0.70-2 [08-May-2026]
+Changes from Version 0.70-1 to 0.70-2 [09-May-2026]
 
-* Extended `remin` restart-from-minimum behavior to local-polynomial NOMAD
-  degree searches. With `search.engine = "nomad"`, `remin = TRUE` now runs a
-  second NOMAD pass from the best full bandwidth/degree candidate found by the
-  first pass. With `search.engine = "nomad+powell"`, `remin = TRUE` runs the
-  NOMAD hot restart and then allows the fixed-degree Powell polish to perform
-  its own restart-from-minimum pass. `remin = FALSE` disables those restart
-  passes, and ordinary non-NOMAD Powell searches retain their established
-  public `remin` behavior.
+* Split restart-from-minimum controls into `powell.remin` and
+  `nomad.remin`. Ordinary fixed-degree Powell-style searches retain
+  `powell.remin = TRUE` by default, following the established Numerical
+  Recipes restart convention. Local-polynomial NOMAD degree searches now
+  expose `nomad.remin`, which optionally performs a second NOMAD pass from the
+  best full bandwidth/degree candidate; simulation evidence supports
+  `nomad.remin = FALSE` for routine defaults. For
+  `search.engine = "nomad+powell"`, the Powell polish now uses
+  `powell.remin = FALSE` by default unless explicitly supplied, avoiding an
+  unhelpful hot start of the hot-start polish.
 
-* Exposed the same `remin` control on single-index and smooth-coefficient
-  bandwidth searches so `npindexbw(..., nomad = TRUE)` and
+* Exposed the same `powell.remin` and `nomad.remin` controls on single-index
+  and smooth-coefficient bandwidth searches so `npindexbw(..., nomad = TRUE)` and
   `npscoefbw(..., nomad = TRUE)` have the same documented NOMAD restart
   contract as the other LP-capable bandwidth selectors.
 

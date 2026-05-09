@@ -288,7 +288,7 @@ npcdensbw.conbandwidth <-
            memfac = 500.0,
            nmulti,
            penalty.multiplier = 10,
-           remin = TRUE,
+           powell.remin = TRUE,
            scale.init.categorical.sample = FALSE,
            scale.factor.search.lower = NULL,
            cvls.quadrature.grid = NULL,
@@ -326,7 +326,7 @@ npcdensbw.conbandwidth <-
       nmulti <- npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2])
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
-    remin <- npValidateScalarLogical(remin, "remin")
+    remin <- npValidateScalarLogical(powell.remin, "powell.remin")
     scale.init.categorical.sample <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
     scale.factor.search.lower <- .npcdensbw_resolve_scale_factor_lower_bound(
@@ -1411,7 +1411,7 @@ npcdensbw.conbandwidth <-
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
         strategy = "disable_multistart",
-        remin = isTRUE(opt.args$remin)
+        remin = isTRUE(opt.args$powell.remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .npcdensbw_with_powell_refinement_progress(
@@ -1463,7 +1463,7 @@ npcdensbw.conbandwidth <-
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
-    remin = isTRUE(opt.args$remin),
+    remin = isTRUE(opt.args$nomad.remin),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
@@ -1653,7 +1653,8 @@ npcdensbw.default <-
            oxkertype,
            oykertype,
            penalty.multiplier,
-           remin,
+           nomad.remin = FALSE,
+           powell.remin,
            scale.init.categorical.sample,
            scale.factor.search.lower = NULL,
            cvls.quadrature.grid = c("hybrid", "uniform", "sample"),
@@ -1938,7 +1939,7 @@ npcdensbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(mc)
-    margs <- c("nmulti", "remin", "itmax", "ftol",
+    margs <- c("nmulti", "nomad.remin", "powell.remin", "itmax", "ftol",
                "tol", "small", "memfac",
                "lbc.dir", "dfc.dir", "cfac.dir","initc.dir", 
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 

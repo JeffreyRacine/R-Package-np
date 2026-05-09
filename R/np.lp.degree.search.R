@@ -1348,7 +1348,7 @@
                                                remin = FALSE) {
   out <- opt.args
   out$nmulti <- .np_nomad_powell_hotstart_nmulti(strategy)
-  out$remin <- isTRUE(remin)
+  out$powell.remin <- isTRUE(remin)
   out
 }
 

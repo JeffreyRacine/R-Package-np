@@ -138,7 +138,7 @@ npudensbw.bandwidth <-
            lbd.init = 0.1,
            nmulti,
            penalty.multiplier = 10,
-           remin = TRUE,
+           powell.remin = TRUE,
            scale.init.categorical.sample = FALSE,
            scale.factor.search.lower = NULL,
            small = 1.490116e-05,
@@ -150,7 +150,7 @@ npudensbw.bandwidth <-
 
     dat = toFrame(dat)
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
-    remin <- npValidateScalarLogical(remin, "remin")
+    remin <- npValidateScalarLogical(powell.remin, "powell.remin")
     scale.init.categorical.sample <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
@@ -399,7 +399,7 @@ npudensbw.default <-
            nmulti,
            okertype,
            penalty.multiplier,
-           remin,
+           powell.remin,
            scale.init.categorical.sample,
            scale.factor.search.lower = NULL,
            small,
@@ -446,7 +446,7 @@ npudensbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
+    margs <- c("bandwidth.compute", "nmulti", "powell.remin", "itmax", "ftol", "tol",
                "small",
                "lbc.dir","dfc.dir","cfac.dir", "initc.dir", 
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
