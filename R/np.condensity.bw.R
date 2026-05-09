@@ -1452,7 +1452,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
                                                       nomad.nmulti = 1L,
                                                       nomad.inner.nmulti = 0L,
                                                       random.seed = 42L,
-                                                      use.runtime.bandwidth.progress = FALSE) {
+                                                      use.runtime.bandwidth.progress = FALSE,
+                                                      remin = FALSE) {
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   old.messages <- getOption("np.messages")
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -1570,6 +1571,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     manage_progress_lifecycle = is.null(external.progress),
     bind_bandwidth_runtime = !is.null(external.progress),
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
+    remin = isTRUE(remin),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
@@ -1910,7 +1912,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       hot.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
-        strategy = "disable_multistart"
+        strategy = "disable_multistart",
+        remin = isTRUE(opt.args$remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .npcdensbw_with_powell_refinement_progress(
@@ -1994,7 +1997,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
         NOMADNMULTI,
         INNERNMULTI,
         RSEED,
-        RPROGRESS
+        RPROGRESS,
+        REMIN
       ),
       list(
         TEMPLATE = search.template,
@@ -2008,7 +2012,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
         NOMADNMULTI = nomad.nmulti,
         INNERNMULTI = nomad.inner.nmulti,
         RSEED = random.seed,
-        RPROGRESS = TRUE
+        RPROGRESS = TRUE,
+        REMIN = isTRUE(opt.args$remin)
       )
     )
 
@@ -2115,6 +2120,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
+    remin = isTRUE(opt.args$remin),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,

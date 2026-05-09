@@ -1373,10 +1373,11 @@
 
 .np_nomad_powell_hotstart_opt_args <- function(opt.args,
                                                strategy = c("disable_multistart",
-                                                            "single_iteration")) {
+                                                            "single_iteration"),
+                                               remin = FALSE) {
   out <- opt.args
   out$nmulti <- .np_nomad_powell_hotstart_nmulti(strategy)
-  out$remin <- FALSE
+  out$remin <- isTRUE(remin)
   out
 }
 
@@ -1518,6 +1519,7 @@
                              manage_progress_lifecycle = is.null(progress_state),
                              bind_bandwidth_runtime = FALSE,
                              handoff_before_build = FALSE,
+                             remin = FALSE,
                              degree_spec = NULL,
                              nomad.opts = list()) {
   engine <- match.arg(engine)
@@ -1540,6 +1542,9 @@
   state$powell.time <- NA_real_
   state$restart_starts <- NULL
   state$restart_results <- NULL
+  state$nomad.remin <- isTRUE(remin)
+  state$nomad.remin.index <- NA_integer_
+  state$nomad.remin.roundtrip <- NULL
   state$current_restart <- NA_integer_
   state$best_restart_index <- NA_integer_
   state$restart_durations <- numeric()
@@ -1850,6 +1855,133 @@
       best_solution <- solution_i
     }
   }
+
+  if (isTRUE(state$nomad.remin) && !isTRUE(state$interrupted) &&
+      !is.null(state$best_point) && length(state$best_point) == length(x0)) {
+    remin.index <- length(restart_results) + 1L
+    remin.start <- as.numeric(state$best_point)
+    remin.degree <- if (!is.null(state$best_record$degree)) {
+      as.integer(state$best_record$degree)
+    } else {
+      integer(0)
+    }
+    state$nomad.remin.roundtrip <- list(
+      objective = as.numeric(state$best_record$objective[1L]),
+      degree = remin.degree,
+      note = "accepted best point reused; generic eval_fun is not side-effect-free"
+    )
+    state$current_restart <- as.integer(remin.index)
+    state$restart_eval_id <- 0L
+    state$nomad.remin.index <- as.integer(remin.index)
+    state$restart_starts[[remin.index]] <- remin.start
+    if (!is.null(state$restart_degree_starts))
+      state$restart_degree_starts[[remin.index]] <- remin.degree
+    if (!is.null(state$restart_bandwidth_starts)) {
+      q <- length(remin.degree)
+      state$restart_bandwidth_starts[[remin.index]] <- if (q > 0L) {
+        as.numeric(remin.start[seq_len(length(remin.start) - q)])
+      } else {
+        as.numeric(remin.start)
+      }
+    }
+    if (!is.null(state$progress_state)) {
+      state$progress_state$nomad_current_degree <- remin.degree
+      state$progress_state$nomad_best_record <- state$best_record
+      state$progress_state$nomad_restart_index <- remin.index
+      state$progress_state$nomad_restart_durations <- state$restart_durations
+      set_progress_state(.np_degree_progress_step(
+        state = state$progress_state,
+        done = NULL,
+        detail = NULL,
+        force = TRUE
+      ))
+    }
+    pre_restart_best <- state$best_record$objective
+    nomad.start <- proc.time()[3L]
+    solution_i <- tryCatch(
+      {
+        solver.opts <- utils::modifyList(
+          list(
+            SEED = as.integer(random.seed),
+            RNG_ALT_SEEDING = TRUE
+          ),
+          nomad.opts
+        )
+        crs::snomadr(
+          eval.f = wrapped_eval,
+          n = length(x0),
+          bbin = as.integer(bbin),
+          bbout = 0L,
+          x0 = remin.start,
+          lb = as.double(lb),
+          ub = as.double(ub),
+          nmulti = nomad.inner.nmulti,
+          random.seed = as.integer(random.seed),
+          opts = solver.opts,
+          display.nomad.progress = display.nomad.progress,
+          snomadr.environment = environment(wrapped_eval)
+        )
+      },
+      interrupt = function(e) {
+        state$interrupted <- TRUE
+        NULL
+      },
+      error = function(e) {
+        state$error <- conditionMessage(e)
+        NULL
+      }
+    )
+    restart.elapsed <- proc.time()[3L] - nomad.start
+    nomad.elapsed <- nomad.elapsed + restart.elapsed
+    state$restart_durations <- c(state$restart_durations, restart.elapsed)
+    if (!is.null(state$progress_state))
+      state$progress_state$nomad_restart_durations <- state$restart_durations
+    restart_results[[remin.index]] <- list(
+      restart = remin.index,
+      remin = TRUE,
+      start = remin.start,
+      degree.start = remin.degree,
+      elapsed = restart.elapsed,
+      status = if (is.null(solution_i)) {
+        if (isTRUE(state$interrupted)) "interrupt" else "error"
+      } else if (!is.null(solution_i$status)) {
+        as.character(solution_i$status)
+      } else {
+        "ok"
+      },
+      message = if (is.null(solution_i)) state$error else solution_i$message,
+      objective = if (!is.null(solution_i) && !is.null(solution_i$objective)) {
+        raw.objective <- as.numeric(solution_i$objective[1L])
+        if (identical(direction, "min")) raw.objective else -raw.objective
+      } else {
+        NA_real_
+      },
+      bbe = if (!is.null(solution_i) && !is.null(solution_i$bbe)) {
+        as.numeric(solution_i$bbe[1L])
+      } else {
+        NA_real_
+      },
+      iterations = if (!is.null(solution_i) && !is.null(solution_i$iterations)) {
+        as.numeric(solution_i$iterations[1L])
+      } else {
+        NA_real_
+      },
+      solution = if (!is.null(solution_i) && !is.null(solution_i$solution)) {
+        as.numeric(solution_i$solution)
+      } else {
+        NULL
+      }
+    )
+    post_restart_best <- if (is.null(state$best_record) || is.null(state$best_record$objective)) {
+      if (identical(direction, "min")) Inf else -Inf
+    } else {
+      state$best_record$objective
+    }
+    if (!is.null(solution_i) &&
+        .np_degree_better(post_restart_best, pre_restart_best, direction = direction)) {
+      best_solution <- solution_i
+    }
+  }
   state$nomad.time <- nomad.elapsed
   state$restart_results <- restart_results
 
@@ -1943,6 +2075,9 @@
     optim.time = sum(c(state$nomad.time, state$powell.time), na.rm = TRUE),
     grid.size = NA_integer_,
     best.restart = state$best_restart_index,
+    nomad.remin = state$nomad.remin,
+    nomad.remin.index = state$nomad.remin.index,
+    nomad.remin.roundtrip = state$nomad.remin.roundtrip,
     restart.starts = state$restart_starts,
     restart.degree.starts = state$restart_degree_starts,
     restart.bandwidth.starts = state$restart_bandwidth_starts,

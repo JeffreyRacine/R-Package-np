@@ -312,9 +312,15 @@ These controls set optimizer tolerances and restart behavior.
   }
 
   \item{remin}{
-    a logical value which when set as \code{TRUE} the search routine
-    restarts from located minima for a minor gain in accuracy. Defaults
-    to \code{TRUE}
+    logical flag controlling restart-from-minimum behavior. For ordinary
+    Powell-style search, \code{TRUE} restarts the local search from the
+    located minimum. For NOMAD local-polynomial degree search,
+    \code{TRUE} restarts NOMAD once from the best full candidate found,
+    including both bandwidth and degree coordinates. For
+    \code{search.engine="nomad+powell"}, \code{TRUE} applies this
+    NOMAD restart before the Powell refinement and also permits the
+    Powell refinement to restart from its located minimum. Defaults to
+    \code{TRUE}.
   }
 
   \item{small}{ a small number, at about the precision of the data type

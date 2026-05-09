@@ -64,6 +64,7 @@ test_that("npindexbw retains Powell evaluation counts when Powell does not impro
                                   nmulti,
                                   nomad.inner.nmulti,
                                   random.seed,
+                                  remin = FALSE,
                                   degree_spec,
                                   progress_label) {
         eval_fun(x0)
@@ -74,7 +75,7 @@ test_that("npindexbw retains Powell evaluation counts when Powell does not impro
           interrupted = FALSE
         )
       },
-      .np_nomad_with_powell_progress = function(degree, expr) expr,
+      .np_nomad_with_powell_progress = function(degree, expr, best_record = NULL) expr,
       .npindexbw_run_fixed_degree = function(xdat, ydat, bws, template, reg.args, opt.args) {
         list(
           method = "ichimura",

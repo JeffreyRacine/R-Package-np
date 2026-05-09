@@ -1444,7 +1444,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
                                               ub,
                                               nomad.nmulti = 1L,
                                               nomad.inner.nmulti = 0L,
-                                              random.seed = 42L) {
+                                              random.seed = 42L,
+                                              remin = FALSE) {
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   old.messages <- getOption("np.messages")
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -1543,6 +1544,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
+    remin = isTRUE(remin),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",
@@ -1671,7 +1673,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
     if (identical(degree.search$engine, "nomad+powell")) {
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
-        strategy = "disable_multistart"
+        strategy = "disable_multistart",
+        remin = isTRUE(opt.args$remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .npregbw_with_powell_refinement_progress(degree, local({
@@ -1722,7 +1725,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
         UB,
         NOMADNMULTI,
         INNERNMULTI,
-        RSEED
+        RSEED,
+        REMIN
       ),
       list(
         TEMPLATE = shadow.template,
@@ -1735,7 +1739,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
         UB = ub,
         NOMADNMULTI = nomad.nmulti,
         INNERNMULTI = nomad.inner.nmulti,
-        RSEED = random.seed
+        RSEED = random.seed,
+        REMIN = isTRUE(opt.args$remin)
       )
     )
 
@@ -1847,6 +1852,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
+    remin = isTRUE(opt.args$remin),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",

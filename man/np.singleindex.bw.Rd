@@ -47,6 +47,7 @@ npindexbw(\dots)
           degree.max.cycles = 20L,
           degree.verify = FALSE,
           nmulti,
+          remin = TRUE,
           only.optimize.beta,
           optim.abstol,
           optim.maxattempts,
@@ -344,6 +345,18 @@ These arguments control outer restart behavior for bandwidth and index-parameter
     integer number of times to restart the process of finding extrema
     of the cross-validation function from different (random) initial
     points. Defaults to \code{min(2,ncol(xdat))}.
+  }
+
+  \item{remin}{
+    logical flag controlling restart-from-minimum behavior. For ordinary
+    Powell-style search, \code{TRUE} restarts the local search from the
+    located minimum. For NOMAD local-polynomial degree search,
+    \code{TRUE} restarts NOMAD once from the best full candidate found,
+    including both bandwidth and degree coordinates. For
+    \code{search.engine="nomad+powell"}, \code{TRUE} applies this
+    NOMAD restart before the Powell refinement and also permits the
+    Powell refinement to restart from its located minimum. Defaults to
+    \code{TRUE}.
   }
 
 

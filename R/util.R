@@ -2035,6 +2035,9 @@ genTimingStr <- function(x){
   bws$nomad.restart.starts <- search_result$restart.starts
   bws$nomad.restart.degree.starts <- search_result$restart.degree.starts
   bws$nomad.restart.bandwidth.starts <- search_result$restart.bandwidth.starts
+  bws$nomad.remin <- isTRUE(search_result$nomad.remin)
+  bws$nomad.remin.index <- search_result$nomad.remin.index
+  bws$nomad.remin.roundtrip <- search_result$nomad.remin.roundtrip
   bws
 }
 

@@ -1162,6 +1162,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     manage_progress_lifecycle = is.null(external.progress),
     bind_bandwidth_runtime = !is.null(external.progress),
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
+    remin = isTRUE(opt.args$remin),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",
@@ -1352,7 +1353,8 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
       hot.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
-        strategy = "disable_multistart"
+        strategy = "disable_multistart",
+        remin = isTRUE(opt.args$remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
@@ -1507,6 +1509,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     nmulti = nomad.nmulti,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
+    remin = isTRUE(opt.args$remin),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",

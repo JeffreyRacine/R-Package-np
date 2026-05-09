@@ -121,7 +121,7 @@ test_that("NOMAD Powell hot-start helpers never emit zero public multistarts", {
   expect_identical(hot_nmulti("single_iteration"), 1L)
 })
 
-test_that("NOMAD Powell hot-start option helper disables internal remin only", {
+test_that("NOMAD Powell hot-start option helper controls internal remin explicitly", {
   hot_opt_args <- getFromNamespace(".np_nomad_powell_hotstart_opt_args", "npRmpi")
 
   opt.args <- list(
@@ -143,6 +143,39 @@ test_that("NOMAD Powell hot-start option helper disables internal remin only", {
   out2 <- hot_opt_args(opt.args, strategy = "single_iteration")
   expect_identical(out2$nmulti, 1L)
   expect_false(out2$remin)
+
+  out3 <- hot_opt_args(opt.args, strategy = "single_iteration", remin = TRUE)
+  expect_identical(out3$nmulti, 1L)
+  expect_true(out3$remin)
+})
+
+test_that("NOMAD restart summary records remin metadata", {
+  attach_summary <- getFromNamespace(".np_attach_nomad_restart_summary", "npRmpi")
+
+  bws <- list(fval = 1)
+  search_result <- list(
+    direction = "min",
+    best = list(objective = 0.5),
+    best.restart = 2L,
+    restart.results = list(
+      list(objective = 1.0),
+      list(objective = 0.5, remin = TRUE)
+    ),
+    restart.starts = list(10, 20),
+    restart.degree.starts = list(1L, 2L),
+    restart.bandwidth.starts = list(0.1, 0.2),
+    nomad.remin = TRUE,
+    nomad.remin.index = 2L,
+    nomad.remin.roundtrip = list(objective = 1.0, degree = 1L)
+  )
+
+  out <- attach_summary(bws, search_result)
+
+  expect_true(out$nomad.remin)
+  expect_identical(out$nomad.remin.index, 2L)
+  expect_identical(out$nomad.remin.roundtrip$degree, 1L)
+  expect_identical(out$nomad.best.restart, 2L)
+  expect_equal(out$nomad.restart.fval, c(1.0, 0.5))
 })
 
 test_that("coordinate search skips incumbent cell revisits within a sweep", {
