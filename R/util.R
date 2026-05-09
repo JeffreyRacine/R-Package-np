@@ -923,6 +923,9 @@ npRejectLegacyLpArgs <- function(dotnames, where = "npreg") {
   if (length(bad))
     stop(sprintf("%s: legacy arguments %s are no longer supported; use basis, degree and bernstein.basis",
                  where, paste(sprintf("'%s'", bad), collapse = ", ")))
+  if ("remin" %in% dotnames)
+    stop(sprintf("%s: argument 'remin' has been replaced by 'powell.remin' and 'nomad.remin'",
+                 where))
   invisible(NULL)
 }
 

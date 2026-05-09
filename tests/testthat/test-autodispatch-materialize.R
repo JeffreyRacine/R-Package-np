@@ -76,7 +76,7 @@ test_that("autodispatch materialization preserves explicit NULL arguments withou
     bws = bws,
     bandwidth.compute = TRUE,
     nmulti = 1L,
-    remin = FALSE,
+    powell.remin = FALSE,
     itmax = 1L
   ))
 
@@ -89,7 +89,7 @@ test_that("autodispatch materialization preserves explicit NULL arguments withou
   bws.ref <- as.character(prepared$call$bws)
   compute.ref <- as.character(prepared$call$bandwidth.compute)
   nmulti.ref <- as.character(prepared$call$nmulti)
-  remin.ref <- as.character(prepared$call$remin)
+  remin.ref <- as.character(prepared$call$powell.remin)
   itmax.ref <- as.character(prepared$call$itmax)
 
   expect_false(identical(bws.ref, "bws"))

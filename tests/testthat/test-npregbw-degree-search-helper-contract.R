@@ -126,7 +126,7 @@ test_that("NOMAD Powell hot-start option helper controls internal remin explicit
 
   opt.args <- list(
     nmulti = 7L,
-    remin = TRUE,
+    powell.remin = TRUE,
     ftol = 1e-6,
     tol = 1e-5,
     custom = "preserve-me"
@@ -135,18 +135,18 @@ test_that("NOMAD Powell hot-start option helper controls internal remin explicit
   out <- hot_opt_args(opt.args, strategy = "disable_multistart")
 
   expect_identical(out$nmulti, 1L)
-  expect_false(out$remin)
+  expect_false(out$powell.remin)
   expect_identical(out$ftol, opt.args$ftol)
   expect_identical(out$tol, opt.args$tol)
   expect_identical(out$custom, opt.args$custom)
 
   out2 <- hot_opt_args(opt.args, strategy = "single_iteration")
   expect_identical(out2$nmulti, 1L)
-  expect_false(out2$remin)
+  expect_false(out2$powell.remin)
 
   out3 <- hot_opt_args(opt.args, strategy = "single_iteration", remin = TRUE)
   expect_identical(out3$nmulti, 1L)
-  expect_true(out3$remin)
+  expect_true(out3$powell.remin)
 })
 
 test_that("NOMAD restart summary records remin metadata", {

@@ -460,7 +460,7 @@ npplregbw.plbandwidth =
     "scale.factor.search.lower"
   )
   optimizer.arg.names <- c(
-    "ftol", "itmax", "nmulti", "remin", "small", "tol",
+    "ftol", "itmax", "nmulti", "nomad.remin", "powell.remin", "small", "tol",
     "scale.factor.search.lower"
   )
   child.args <- c(
@@ -1914,7 +1914,7 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
         strategy = "disable_multistart",
-        remin = isTRUE(opt.args$remin)
+        remin = isTRUE(opt.args$powell.remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
@@ -1990,7 +1990,7 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
         NOMADNMULTI = nomad.nmulti,
         INNERNMULTI = nomad.inner.nmulti,
         RSEED = random.seed,
-        REMIN = isTRUE(opt.args$remin)
+        REMIN = isTRUE(opt.args$nomad.remin)
       )
     )
 
@@ -2060,7 +2060,7 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
     nmulti = nomad.nmulti,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
-    remin = isTRUE(opt.args$remin),
+    remin = isTRUE(opt.args$nomad.remin),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",
@@ -2211,7 +2211,7 @@ npplregbw.default =
            degree.max.cycles = 20L,
            degree.verify = FALSE,
            scale.factor.search.lower = NULL,
-           ftol, itmax, nmulti, remin, small, tol,
+           ftol, itmax, nmulti, nomad.remin, powell.remin, small, tol,
            ...){
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
@@ -2379,13 +2379,14 @@ npplregbw.default =
                "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
                "scale.factor.search.lower",
-               "ftol", "itmax", "nmulti", "remin", "small", "tol")
+               "ftol", "itmax", "nmulti", "nomad.remin", "powell.remin", "small", "tol")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
     if (bandwidth.compute) {
       if (!missing(nmulti)) nmulti <- npValidateNmulti(nmulti)
-      if (!missing(remin)) remin <- npValidateScalarLogical(remin, "remin")
+      if (!missing(powell.remin)) powell.remin <- npValidateScalarLogical(powell.remin, "powell.remin")
+      if (!missing(nomad.remin)) nomad.remin <- npValidateScalarLogical(nomad.remin, "nomad.remin")
       if (!missing(itmax)) itmax <- npValidatePositiveInteger(itmax, "itmax")
       if (!missing(ftol)) ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
       if (!missing(tol)) tol <- npValidatePositiveFiniteNumeric(tol, "tol")

@@ -152,7 +152,7 @@ npcdistbw.condbandwidth <-
            ngrid = 100,
            nmulti,
            penalty.multiplier = 10,
-           remin = TRUE,
+           powell.remin = TRUE,
            scale.init.categorical.sample = FALSE,
            scale.factor.search.lower = NULL,
            small = 1.490116e-05,
@@ -167,7 +167,7 @@ npcdistbw.condbandwidth <-
       nmulti <- npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2])
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
-    remin <- npValidateScalarLogical(remin, "remin")
+    remin <- npValidateScalarLogical(powell.remin, "powell.remin")
     do.full.integral <- npValidateScalarLogical(do.full.integral, "do.full.integral")
     scale.init.categorical.sample <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
@@ -1162,7 +1162,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     manage_progress_lifecycle = is.null(external.progress),
     bind_bandwidth_runtime = !is.null(external.progress),
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
-    remin = isTRUE(opt.args$remin),
+    remin = isTRUE(opt.args$nomad.remin),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",
@@ -1354,7 +1354,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
         strategy = "disable_multistart",
-        remin = isTRUE(opt.args$remin)
+        remin = isTRUE(opt.args$powell.remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
@@ -1509,7 +1509,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     nmulti = nomad.nmulti,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
-    remin = isTRUE(opt.args$remin),
+    remin = isTRUE(opt.args$nomad.remin),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",
@@ -1712,7 +1712,8 @@ npcdistbw.default <-
            oxkertype,
            oykertype,
            penalty.multiplier,
-           remin,
+           nomad.remin = FALSE,
+           powell.remin,
            scale.init.categorical.sample,
            scale.factor.search.lower = NULL,
            small,
@@ -1950,7 +1951,7 @@ npcdistbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(mc)
-    margs <- c("gydat", "nmulti", "remin", "itmax", "do.full.integral", "ngrid", "ftol",
+    margs <- c("gydat", "nmulti", "nomad.remin", "powell.remin", "itmax", "do.full.integral", "ngrid", "ftol",
                "tol", "small", "memfac",
                "lbc.dir", "dfc.dir", "cfac.dir","initc.dir",
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir",

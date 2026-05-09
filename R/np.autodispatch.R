@@ -1398,7 +1398,7 @@
      "regtype", "basis", "degree", "bernstein.basis",
      "bwmethod", "bwtype", "bwscaling",
      "ckertype", "ckerorder", "ukertype", "okertype",
-     "nmulti", "bandwidth.compute", "remin", "itmax", "ftol", "tol", "small",
+     "nmulti", "bandwidth.compute", "nomad.remin", "powell.remin", "itmax", "ftol", "tol", "small",
      "gradients", "residuals", "errors", "gradient.order",
      "proper", "proper.method", "proper.control",
      "alpha", "alpha.iter", "alpha.max", "alpha.min", "alpha.tol",

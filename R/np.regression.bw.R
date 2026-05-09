@@ -150,7 +150,7 @@ npregbw.rbandwidth <-
            lbd.init = 0.1,
            nmulti,
            penalty.multiplier = 10,
-           remin = TRUE,
+           powell.remin = TRUE,
            scale.init.categorical.sample = FALSE,
            scale.factor.search.lower = NULL,
            small = 1.490116e-05,
@@ -164,7 +164,7 @@ npregbw.rbandwidth <-
       nmulti <- npDefaultNmulti(dim(xdat)[2])
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
-    remin <- npValidateScalarLogical(remin, "remin")
+    remin <- npValidateScalarLogical(powell.remin, "powell.remin")
     scale.init.categorical.sample <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
     transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
@@ -732,7 +732,7 @@ npregbw.rbandwidth <-
     bws = bws,
     nmulti = opt.value("nmulti", npDefaultNmulti(dim(toFrame(xdat))[2L])),
     itmax = opt.value("itmax", 10000L),
-    remin = opt.value("remin", TRUE),
+    remin = opt.value("powell.remin", TRUE),
     scale.init.categorical.sample = opt.value("scale.init.categorical.sample", FALSE),
     ftol = opt.value("ftol", 1.490116e-07),
     tol = opt.value("tol", 1.490116e-04),
@@ -1674,7 +1674,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
         strategy = "disable_multistart",
-        remin = isTRUE(opt.args$remin)
+        remin = isTRUE(opt.args$powell.remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .npregbw_with_powell_refinement_progress(degree, local({
@@ -1740,7 +1740,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
         NOMADNMULTI = nomad.nmulti,
         INNERNMULTI = nomad.inner.nmulti,
         RSEED = random.seed,
-        REMIN = isTRUE(opt.args$remin)
+        REMIN = isTRUE(opt.args$nomad.remin)
       )
     )
 
@@ -1852,7 +1852,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
-    remin = isTRUE(opt.args$remin),
+    remin = isTRUE(opt.args$nomad.remin),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",
@@ -2034,7 +2034,8 @@ npregbw.default <-
            okertype,
            penalty.multiplier = 10,
            regtype,
-           remin,
+           nomad.remin = FALSE,
+           powell.remin,
            scale.init.categorical.sample,
            scale.factor.search.lower = NULL,
            small,
@@ -2151,7 +2152,7 @@ npregbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
 
-    margs <- c("nmulti", "remin", "itmax", "ftol", "tol",
+    margs <- c("nmulti", "nomad.remin", "powell.remin", "itmax", "ftol", "tol",
                "small",
                "lbc.dir", "dfc.dir", "cfac.dir","initc.dir",
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir",

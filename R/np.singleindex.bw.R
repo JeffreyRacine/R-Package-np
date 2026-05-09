@@ -1135,7 +1135,7 @@ npindexbw.NULL <-
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
         strategy = "single_iteration",
-        remin = isTRUE(opt.args$remin)
+        remin = isTRUE(opt.args$powell.remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
@@ -1182,7 +1182,7 @@ npindexbw.NULL <-
     nmulti = nomad.nmulti,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
-    remin = isTRUE(opt.args$remin),
+    remin = isTRUE(opt.args$nomad.remin),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
@@ -1346,7 +1346,8 @@ npindexbw.default <-
            degree.max.cycles = 20L,
            degree.verify = FALSE,
            nmulti,
-           remin = TRUE,
+           nomad.remin = FALSE,
+           powell.remin = TRUE,
            only.optimize.beta,
            optim.abstol,
            optim.maxattempts,
@@ -1519,7 +1520,7 @@ npindexbw.default <-
     if (tbw$method == "kleinspady" && !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
-    margs <- c("nmulti", "remin", "random.seed", "optim.method", "optim.maxattempts",
+    margs <- c("nmulti", "nomad.remin", "powell.remin", "random.seed", "optim.method", "optim.maxattempts",
                "optim.reltol", "optim.abstol", "optim.maxit", "only.optimize.beta",
                "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
                "scale.factor.search.lower")

@@ -71,7 +71,8 @@ npregbw(\dots)
         okertype,
         penalty.multiplier = 10,
         regtype,
-        remin,
+        nomad.remin = FALSE,
+        powell.remin,
         scale.init.categorical.sample,
         scale.factor.search.lower = NULL,
         small,
@@ -103,7 +104,7 @@ npregbw(\dots)
         lbd.init = 0.1,
         nmulti,
         penalty.multiplier = 10,
-        remin = TRUE,
+        powell.remin = TRUE,
         scale.init.categorical.sample = FALSE,
         scale.factor.search.lower = NULL,
         small = 1.490116e-05,
@@ -266,6 +267,15 @@ These arguments control regression type, local-polynomial specification, and opt
     \code{nmulti} controls outer restarts, while \code{nomad.nmulti}
     controls inner NOMAD multistarts within each outer restart.
   }
+
+  \item{nomad.remin}{
+    logical flag controlling the optional second NOMAD hot start. When
+    \code{TRUE}, NOMAD is restarted once from the best full candidate found,
+    including both bandwidth and degree coordinates. Defaults to \code{FALSE};
+    current simulation evidence favors the one-pass NOMAD default for routine
+    use, while leaving this switch available for sensitivity checks.
+  }
+
 
   \item{degree.min}{
     optional scalar or integer vector giving lower bounds for automatic
@@ -451,16 +461,13 @@ These controls set numerical search starts, kernel choices, and support bounds.
     baseline penalty when \code{invalid.penalty="baseline"}.
     Defaults to \code{10}.}
 
-  \item{remin}{
-    logical flag controlling restart-from-minimum behavior. For ordinary
-    Powell-style search, \code{TRUE} restarts the local search from the
-    located minimum. For NOMAD local-polynomial degree search,
-    \code{TRUE} restarts NOMAD once from the best full candidate found,
-    including both bandwidth and degree coordinates. For
-    \code{search.engine="nomad+powell"}, \code{TRUE} applies this
-    NOMAD restart before the Powell refinement and also permits the
-    Powell refinement to restart from its located minimum. Defaults to
-    \code{TRUE}.
+  \item{powell.remin}{
+    logical flag controlling Powell restart-from-minimum behavior. For
+    ordinary fixed-degree Powell-style search, \code{TRUE} restarts the
+    local search from the located minimum. For \code{search.engine="nomad+powell"},
+    this controls only the final Powell bandwidth-polish step. The default
+    is \code{TRUE} for ordinary Powell routes and \code{FALSE} for the
+    Powell polish after NOMAD unless explicitly supplied.
   }
 
   \item{scale.init.categorical.sample}{ a logical value that when set
