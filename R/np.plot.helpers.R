@@ -4269,7 +4269,9 @@
       fit.args$tzdat <- tz.train
       fit.args$ezdat <- ezdat
     }
-    as.vector(do.call(.np_scoef_fit_internal, fit.args)$mean)
+    as.vector(.np_plot_with_local_compiled_eval(
+      do.call(.np_scoef_fit_internal, fit.args)
+    )$mean)
   }
 
   t0 <- fit.fun(tx.train = txdat, y.train = ydat, tz.train = tzdat)

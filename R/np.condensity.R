@@ -98,14 +98,12 @@ npcdens.conbandwidth <- function(bws,
   )
   .npRmpi_require_active_slave_pool(where = "npcdens()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
-  keep_local_shadow_nn <- identical(bws$regtype.engine, "lp") &&
-    identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
   if (.npRmpi_autodispatch_active() &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
       !.npRmpi_session_has_active_pool(comm = 1L)) {
     return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   }
-  if (.npRmpi_autodispatch_active() && !keep_local_shadow_nn) {
+  if (.npRmpi_autodispatch_active()) {
     out <- .npRmpi_autodispatch_call(match.call(), parent.frame())
     out <- .npRmpi_restore_nomad_fit_bws_metadata(out, bws)
     if (inherits(out, "condensity") &&
@@ -357,57 +355,29 @@ npcdens.conbandwidth <- function(bws,
     total = .np_condensdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
     handoff = fit.progress.handoff,
     handoff.detail = if (fit.progress.handoff) "starting" else NULL,
-    if (keep_local_shadow_nn) {
-      .npRmpi_with_local_regression(
-        .Call("C_np_density_conditional",
-              as.double(tyuno), as.double(tyord), as.double(tycon),
-              as.double(txuno), as.double(txord), as.double(txcon),
-              as.double(eyuno), as.double(eyord), as.double(eycon),
-              as.double(exuno), as.double(exord), as.double(excon),
-              as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                          bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                          bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-              as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
-              as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-              as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
-              as.integer(myopti),
-              as.integer(enrow),
-              as.integer(bws$xndim),
-              as.double(cxker.bounds.c$lb),
-              as.double(cxker.bounds.c$ub),
-              as.double(cyker.bounds.c$lb),
-              as.double(cyker.bounds.c$ub),
-              as.integer(reg.c$code),
-              as.integer(degree.c),
-              as.integer(bernstein.engine),
-              basis.code,
-              PACKAGE = "npRmpi")
-      )
-    } else {
-      .Call("C_np_density_conditional",
-            as.double(tyuno), as.double(tyord), as.double(tycon),
-            as.double(txuno), as.double(txord), as.double(txcon),
-            as.double(eyuno), as.double(eyord), as.double(eycon),
-            as.double(exuno), as.double(exord), as.double(excon),
-            as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                        bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                        bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-            as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
-            as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-            as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
-            as.integer(myopti),
-            as.integer(enrow),
-            as.integer(bws$xndim),
-            as.double(cxker.bounds.c$lb),
-            as.double(cxker.bounds.c$ub),
-            as.double(cyker.bounds.c$lb),
-            as.double(cyker.bounds.c$ub),
-            as.integer(reg.c$code),
-            as.integer(degree.c),
-            as.integer(bernstein.engine),
-            basis.code,
-            PACKAGE = "npRmpi")
-    }
+    .Call("C_np_density_conditional",
+          as.double(tyuno), as.double(tyord), as.double(tycon),
+          as.double(txuno), as.double(txord), as.double(txcon),
+          as.double(eyuno), as.double(eyord), as.double(eycon),
+          as.double(exuno), as.double(exord), as.double(excon),
+          as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                      bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                      bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+          as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
+          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+          as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
+          as.integer(myopti),
+          as.integer(enrow),
+          as.integer(bws$xndim),
+          as.double(cxker.bounds.c$lb),
+          as.double(cxker.bounds.c$ub),
+          as.double(cyker.bounds.c$lb),
+          as.double(cyker.bounds.c$ub),
+          as.integer(reg.c$code),
+          as.integer(degree.c),
+          as.integer(bernstein.engine),
+          basis.code,
+          PACKAGE = "npRmpi")
   )
 
   if(gradients){
