@@ -123,6 +123,26 @@ static const double *np_reg_mpi_owner_chunk_recv_ptr(const NPRegMpiOwnerChunk * 
   return chunk->recvbuf + (size_t)(chunk->displs[rank] + pos*chunk->row_width);
 }
 
+static int np_reg_mpi_owner_chunk_rows(const int num_obs_eval,
+                                       const int row_width){
+  const int target_local_rows = 512;
+  const int min_chunk_rows = 4096;
+  const int max_recv_doubles = 4000000;
+  int chunk_rows = MAX(min_chunk_rows, target_local_rows*iNum_Processors);
+  int cap_rows;
+
+  if(num_obs_eval <= 0)
+    return 0;
+  if(row_width <= 0)
+    return MIN(num_obs_eval, chunk_rows);
+
+  cap_rows = MAX(iNum_Processors, max_recv_doubles / row_width);
+  chunk_rows = MIN(chunk_rows, cap_rows);
+  chunk_rows = MAX(iNum_Processors, chunk_rows);
+
+  return MIN(num_obs_eval, chunk_rows);
+}
+
 static void np_reg_mpi_owner_chunk_free(NPRegMpiOwnerChunk * const chunk){
   if(chunk == NULL)
     return;
@@ -14465,11 +14485,10 @@ double *SIGN){
 	    const int use_mpi_owner_reduce_lp =
 	      (iNum_Processors > 1) &&
 	      (!np_mpi_local_regression_active()) &&
-	      (BANDWIDTH_reg == BW_FIXED) &&
-	      (num_reg_unordered == 0) &&
-	      (num_reg_ordered == 0);
+	      (BANDWIDTH_reg == BW_FIXED);
 	    const int owner_chunk_rows_lp =
-	      MAX(iNum_Processors, 64*iNum_Processors);
+	      np_reg_mpi_owner_chunk_rows(num_obs_eval,
+	                                  2 + (do_grad ? num_reg_continuous*(1 + (do_gerr ? 1 : 0)) : 0));
 #endif
 
 	    for(j = 0; j < num_obs_eval; j++){
@@ -15190,10 +15209,12 @@ double *SIGN){
     const int use_mpi_owner_reduce_ll =
       (iNum_Processors > 1) &&
       (!np_mpi_local_regression_active()) &&
-      (BANDWIDTH_reg == BW_FIXED) &&
-      (!do_ocg);
+      (BANDWIDTH_reg == BW_FIXED);
     const int owner_chunk_rows_ll =
-      MAX(iNum_Processors, 64*iNum_Processors);
+      np_reg_mpi_owner_chunk_rows(num_obs_eval,
+                                  2 + (do_grad ?
+                                       (num_reg_continuous + num_reg_unordered + num_reg_ordered)*
+                                       (1 + (do_gerr ? 1 : 0)) : 0));
 #endif
     for(j = 0; j < num_obs_eval; j++){ // main loop
       nepsilon = 0.0;
@@ -15208,7 +15229,9 @@ double *SIGN){
       if(use_mpi_owner_reduce_ll && ((j % owner_chunk_rows_ll) == 0)){
         const int chunk_start = j;
         const int chunk_end = MIN(num_obs_eval, chunk_start + owner_chunk_rows_ll);
-        const int owner_row_width_ll = 2 + (do_grad ? num_reg_continuous*(1 + (do_gerr ? 1 : 0)) : 0);
+        const int owner_row_width_ll = 2 + (do_grad ?
+          (num_reg_continuous + num_reg_unordered + num_reg_ordered)*
+          (1 + (do_gerr ? 1 : 0)) : 0);
         NPRegMpiOwnerChunk owner_chunk;
         double *kwm2_owner = NULL;
         double *kw_owner = NULL;
@@ -15300,7 +15323,7 @@ double *SIGN){
                                  matrix_categorical_vals,
                                  moo,
                                  kwm+(size_t)jj*(size_t)nrcc33,
-                                 NULL,
+                                 do_ocg ? (permy+(size_t)jj*(size_t)nrcc33*(size_t)p_nvar) : NULL,
                                  kw_owner,
                                  est_gate_ctx_ptr);
           for(l = 0; l < (nrc1); l++){
@@ -15406,6 +15429,74 @@ double *SIGN){
                   out[opos++] = grad_se_owner;
                 }
               }
+              for(int ii = 0; ii < num_reg_unordered; ii++){
+                const int ojp = ((size_t)jj*(size_t)nrcc33*(size_t)p_nvar) +
+                  ((size_t)ii*(size_t)nrcc33);
+
+                for(int kk = 0; kk < nrc1; kk++){
+                  KWM[kk] = &permy[ojp + (size_t)(kk+2)*(size_t)nrc3 + 2];
+                  XTKY[kk] = &permy[ojp + kk + nrc3 + 2];
+                }
+
+                nepsilon_owner = 0.0;
+                while(mat_solve(KWM, XTKY, DELTA) == NULL){
+                  for(int kk = 0; kk < nrc1; kk++)
+                    KWM[kk][kk] += epsilon;
+                  nepsilon_owner += epsilon;
+                }
+
+                XTKY[0][0] += nepsilon_owner*XTKY[0][0]/NZD_POS(KWM[0][0]);
+                if(nepsilon_owner > 0.0){
+                  if(mat_solve(KWM, XTKY, DELTA) == NULL)
+                    error("mat_solve failed after unordered gradient ridge adjustment");
+                }
+
+                out[opos++] = out[0] - DELTA[0][0];
+
+                if(do_gerr){
+                  const double * const prow = permy + ojp;
+                  const double skg = copysign(DBL_MIN, prow[2*nrc3+2]) + prow[2*nrc3+2];
+                  const double eyg = prow[nrc3+2]/skg;
+                  const double ey2g = prow[nrc3+1]/skg;
+                  const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / (skg*hprod);
+                  out[opos++] = sqrt(mean_se_owner*mean_se_owner + se2);
+                }
+              }
+              for(int ii = 0; ii < num_reg_ordered; ii++){
+                const int dl = num_reg_unordered + ii;
+                const int ojp = ((size_t)jj*(size_t)nrcc33*(size_t)p_nvar) +
+                  ((size_t)dl*(size_t)nrcc33);
+
+                for(int kk = 0; kk < nrc1; kk++){
+                  KWM[kk] = &permy[ojp + (size_t)(kk+2)*(size_t)nrc3 + 2];
+                  XTKY[kk] = &permy[ojp + kk + nrc3 + 2];
+                }
+
+                nepsilon_owner = 0.0;
+                while(mat_solve(KWM, XTKY, DELTA) == NULL){
+                  for(int kk = 0; kk < nrc1; kk++)
+                    KWM[kk][kk] += epsilon;
+                  nepsilon_owner += epsilon;
+                }
+
+                XTKY[0][0] += nepsilon_owner*XTKY[0][0]/NZD_POS(KWM[0][0]);
+                if(nepsilon_owner > 0.0){
+                  if(mat_solve(KWM, XTKY, DELTA) == NULL)
+                    error("mat_solve failed after ordered gradient ridge adjustment");
+                }
+
+                out[opos++] = (out[0] - DELTA[0][0])*
+                  ((matrix_ordered_indices[ii][jj] != 0) ? 1.0 : -1.0);
+
+                if(do_gerr){
+                  const double * const prow = permy + ojp;
+                  const double skg = copysign(DBL_MIN, prow[2*nrc3+2]) + prow[2*nrc3+2];
+                  const double eyg = prow[nrc3+2]/skg;
+                  const double ey2g = prow[nrc3+1]/skg;
+                  const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / (skg*hprod);
+                  out[opos++] = sqrt(mean_se_owner*mean_se_owner + se2);
+                }
+              }
             }
           }
           local_pos++;
@@ -15423,6 +15514,13 @@ double *SIGN){
             mean_stderr[jj] = in[ipos++];
             if(do_grad){
               for(l = 0; l < num_reg_continuous; l++){
+                gradient[l][jj] = in[ipos++];
+                if(do_gerr)
+                  gradient_stderr[l][jj] = in[ipos++];
+              }
+              for(l = num_reg_continuous;
+                  l < (num_reg_continuous + num_reg_unordered + num_reg_ordered);
+                  l++){
                 gradient[l][jj] = in[ipos++];
                 if(do_gerr)
                   gradient_stderr[l][jj] = in[ipos++];
