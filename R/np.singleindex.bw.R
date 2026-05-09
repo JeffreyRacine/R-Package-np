@@ -479,17 +479,17 @@ npindexbw.NULL <-
     spec = spec
   )
 
-  localize <- !(isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
-                .npRmpi_safe_int(mpi.comm.size(1L)) > 1L)
-
   out <- tryCatch(
+    ## This objective is evaluated inside each rank's optimizer loop under
+    ## autodispatch. Keep the inner regression evaluator local so independent
+    ## optimizer paths cannot enter nested MPI collectives in different orders.
     .npregbw_eval_only(
       xdat = leaf$xdat,
       ydat = ydat,
       bws = leaf$bws,
       invalid.penalty = "baseline",
       penalty.multiplier = 10,
-      localize = localize
+      localize = TRUE
     ),
     error = function(e) NULL
   )

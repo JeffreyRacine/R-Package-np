@@ -738,6 +738,38 @@ test_that("session npreghat smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npindex ichimura lp search avoids nested-MPI optimizer divergence", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "options(np.messages=FALSE, np.tree=FALSE)",
+      "set.seed(20260509)",
+      "n <- 240L",
+      "x1 <- runif(n, -1, 1)",
+      "x2 <- rnorm(n)",
+      "xdat <- data.frame(x1=x1, x2=x2)",
+      "y <- sin(2*pi*x1) + 0.5*x2 + rnorm(n, sd=0.35)",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "bw.mpi <- npindexbw(xdat=xdat, ydat=y, method='ichimura', regtype='lp', degree=2L, bernstein.basis=TRUE, nmulti=1L)",
+      "fit <- npindex(bws=bw.mpi, gradients=FALSE)",
+      "stopifnot(is.finite(bw.mpi$fval))",
+      "stopifnot(all(is.finite(as.numeric(bw.mpi$bw))))",
+      "stopifnot(inherits(fit, 'singleindex'))",
+      "cat('SESSION_NPINDEX_ICHIMURA_LP_OK\\n')"
+    ),
+    timeout = 45L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEX_ICHIMURA_LP_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session adaptive-nn npreghat matrix owner stays exact in subprocess", {
   skip_on_cran()
   env <- subprocess_env()

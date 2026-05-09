@@ -497,6 +497,13 @@ npindex.sibandwidth <-
       args
     }
 
+    run_npreg_fit <- function(args) {
+      if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+        .npRmpi_with_local_regression(do.call(npreg, args))
+      else
+        do.call(npreg, args)
+    }
+
     fast.largeh <- FALSE
     fast.largeh.eval.mean <- NULL
     fast.largeh.train.mean <- NULL
@@ -600,14 +607,14 @@ npindex.sibandwidth <-
 
         }
       } else {
-        model <- do.call(npreg, next_npreg_fit_args(
+        model <- run_npreg_fit(next_npreg_fit_args(
           exdat = index.eval.df,
           gradients = FALSE
         ))
         index.mean <- model$mean
 
         if (!no.ex && (no.ey || residuals)) {
-          model <- do.call(npreg, next_npreg_fit_args(
+          model <- run_npreg_fit(next_npreg_fit_args(
             gradients = FALSE
           ))
           index.tmean <- model$mean
@@ -626,7 +633,7 @@ npindex.sibandwidth <-
           gradient.order = 1L
         )
       } else {
-        model <- do.call(npreg, next_npreg_fit_args(
+        model <- run_npreg_fit(next_npreg_fit_args(
           exdat = index.eval.df,
           gradients = TRUE
         ))
@@ -656,7 +663,7 @@ npindex.sibandwidth <-
             gradient.order = 1L
           )
         } else {
-          do.call(npreg, next_npreg_fit_args(
+          run_npreg_fit(next_npreg_fit_args(
             gradients = TRUE
           ))
         }
@@ -802,7 +809,7 @@ npindex.sibandwidth <-
           boot.args$degree <- spec$degree.engine
           boot.args$bernstein.basis <- spec$bernstein.basis.engine
         }
-        model <- do.call(npreg, boot.args)[c('mean','grad')]
+        model <- run_npreg_fit(boot.args)[c('mean','grad')]
         
         c(model$mean, model$grad, mean(model$grad))
       }
@@ -838,7 +845,7 @@ npindex.sibandwidth <-
             boot.args$degree <- spec$degree.engine
             boot.args$bernstein.basis <- spec$bernstein.basis.engine
           }
-          do.call(npreg, boot.args)$mean
+          run_npreg_fit(boot.args)$mean
         }
         
       }
