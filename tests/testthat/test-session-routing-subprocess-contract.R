@@ -1161,6 +1161,38 @@ test_that("session npindex inid consumer plot preserves bwtype variants in subpr
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npindex fitted NOMAD object plot recovers formula data in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE)",
+      "set.seed(12345)",
+      "n <- 70",
+      "x1 <- runif(n, min=-1, max=1)",
+      "x2 <- runif(n, min=-1, max=1)",
+      "y <- x1 - x2 + rnorm(n)",
+      "fit <- npindex(y ~ x1 + x2, nomad=TRUE)",
+      "stopifnot(inherits(fit, 'singleindex'))",
+      "stopifnot(!is.null(fit$bws$formula), !is.null(fit$bws$call))",
+      "out <- suppressWarnings(plot(fit, output='data'))",
+      "stopifnot(is.list(out), length(out) > 0L)",
+      "stopifnot(inherits(out[[1]], 'singleindex'))",
+      "cat('SESSION_NPINDEX_NOMAD_FIT_PLOT_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPINDEX_NOMAD_FIT_PLOT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npindex fixed-block consumer plot preserves bwtype variants in subprocess", {
   skip_on_cran()
   env <- subprocess_env()

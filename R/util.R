@@ -347,8 +347,14 @@ npValidateScalarLogical <- function(value, argname) {
   bws <- .npRmpi_reconcile_nomad_bws_timing(bws)
   result$bws <- .npRmpi_reconcile_nomad_bws_timing(result$bws)
 
-  # Fit objects should preserve the selected bandwidth object's telemetry and labels.
+  # Fit objects should preserve reconstruction metadata, telemetry, and labels
+  # from the selected bandwidth object.
   bandwidth.metadata.fields <- c(
+    "call",
+    "formula",
+    "terms",
+    "rows.omit",
+    "nobs.omit",
     "method",
     "pmethod",
     "fval",
