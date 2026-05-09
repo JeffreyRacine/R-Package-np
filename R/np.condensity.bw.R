@@ -1408,8 +1408,10 @@ npcdensbw.conbandwidth <-
       hot.reg.args$regtype.engine <- "lp"
       hot.reg.args$degree.engine <- degree
       hot.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
-      hot.opt.args <- opt.args
-      hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("disable_multistart")
+      hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
+        opt.args,
+        strategy = "disable_multistart"
+      )
       powell.start <- proc.time()[3L]
       hot.payload <- .npcdensbw_with_powell_refinement_progress(
         degree,

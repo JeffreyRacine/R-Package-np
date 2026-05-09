@@ -1,5 +1,10 @@
 Changes from Version 0.70-1 to 0.70-2 [08-May-2026]
 
+* Streamlined internal `nomad+powell` bandwidth searches so the post-NOMAD
+  Powell hot start performs a single local polish from the NOMAD-selected
+  candidate rather than inheriting the ordinary Powell `remin` restart pass.
+  Ordinary non-NOMAD Powell searches retain their public `remin` behavior.
+
 * Added the redesigned public plot-control interface with direct scalar
   controls such as `errors`, `band`, `alpha`, `bootstrap`, `B`, `behavior`,
   `renderer`, and `perspective`, plus validated `np_boot_control()`,

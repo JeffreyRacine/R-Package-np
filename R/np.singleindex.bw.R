@@ -857,8 +857,10 @@ npindexbw.NULL <-
       hot.reg.args$regtype.engine <- "lp"
       hot.reg.args$degree.engine <- degree
       hot.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
-      hot.opt.args <- opt.args
-      hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("single_iteration")
+      hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
+        opt.args,
+        strategy = "single_iteration"
+      )
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
         degree = degree,

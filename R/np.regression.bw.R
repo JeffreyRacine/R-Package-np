@@ -1017,8 +1017,10 @@ npregbw.rbandwidth <-
     direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
-      hot.opt.args <- opt.args
-      hot.opt.args$nmulti <- .np_nomad_powell_hotstart_nmulti("disable_multistart")
+      hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
+        opt.args,
+        strategy = "disable_multistart"
+      )
 
       powell.start <- proc.time()[3L]
       hot.payload <- .npregbw_with_powell_refinement_progress(degree, local({
