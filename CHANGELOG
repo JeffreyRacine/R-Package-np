@@ -1,5 +1,11 @@
 Changes from Version 0.70-1 to 0.70-2 [08-May-2026]
 
+* Streamlined internal `nomad+powell` bandwidth searches so the post-NOMAD
+  Powell hot start performs a single local polish from the NOMAD-selected
+  candidate rather than inheriting the ordinary Powell `remin` restart pass.
+  Ordinary non-NOMAD Powell searches retain their public `remin` behavior,
+  including in MPI-aware session/attach/profile routes.
+
 * Hardened OpenMPI runtime initialization on Debian-compatible systems by
   probing the current `libmpi.so.40` runtime SONAME before the generic
   `libmpi.so` fallback, while preserving existing older OpenMPI probes and

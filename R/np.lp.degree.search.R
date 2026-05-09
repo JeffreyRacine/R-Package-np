@@ -1371,6 +1371,15 @@
          single_iteration = 1L)
 }
 
+.np_nomad_powell_hotstart_opt_args <- function(opt.args,
+                                               strategy = c("disable_multistart",
+                                                            "single_iteration")) {
+  out <- opt.args
+  out$nmulti <- .np_nomad_powell_hotstart_nmulti(strategy)
+  out$remin <- FALSE
+  out
+}
+
 .np_nomad_powell_context_label <- function(degree) {
   sprintf(
     "Refining NOMAD solution with one Powell hot start at degree %s",
