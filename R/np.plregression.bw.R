@@ -639,6 +639,10 @@ npplregbw.plbandwidth =
   child.fval <- vapply(child.list, function(bwi) {
     if (is.null(bwi$fval) || !length(bwi$fval)) NA_real_ else as.numeric(bwi$fval[1L])
   }, numeric(1L))
+  child.baseline.fval <- vapply(child.list, function(bwi) {
+    if (is.null(bwi$degree.search$baseline.fval) ||
+        !length(bwi$degree.search$baseline.fval)) NA_real_ else as.numeric(bwi$degree.search$baseline.fval[1L])
+  }, numeric(1L))
   child.feval <- vapply(child.list, function(bwi) {
     if (is.null(bwi$num.feval) || identical(bwi$num.feval, NA)) 0 else as.numeric(bwi$num.feval[1L])
   }, numeric(1L))
@@ -687,7 +691,9 @@ npplregbw.plbandwidth =
   tbw$degree.policy <- if (isTRUE(common.degree)) "common-child-degree" else "child-specific"
   tbw$nomad.time <- if (all(!is.finite(child.nomad.time))) NA_real_ else sum(child.nomad.time[is.finite(child.nomad.time)])
   tbw$powell.time <- if (all(!is.finite(child.powell.time))) NA_real_ else sum(child.powell.time[is.finite(child.powell.time)])
+  tbw$total.time <- sum(c(tbw$nomad.time, tbw$powell.time), na.rm = TRUE)
   tbw$child.fval <- child.fval
+  tbw$child.baseline.fval <- child.baseline.fval
   tbw$child.num.feval <- child.feval
   tbw$child.num.feval.fast <- child.feval.fast
   tbw$child.nomad.time <- child.nomad.time
@@ -707,7 +713,10 @@ npplregbw.plbandwidth =
     completed = TRUE,
     certified = TRUE,
     interrupted = FALSE,
-    baseline = list(degree = baseline.degrees, objective = NA_real_),
+    baseline = list(
+      degree = baseline.degrees,
+      objective = if (all(!is.finite(child.baseline.fval))) NA_real_ else sum(child.baseline.fval[is.finite(child.baseline.fval)])
+    ),
     best = list(
       degree = selected.degrees,
       objective = as.numeric(tbw$fval[1L]),
@@ -716,7 +725,7 @@ npplregbw.plbandwidth =
     best_payload = tbw,
     nomad.time = tbw$nomad.time,
     powell.time = tbw$powell.time,
-    optim.time = total.time,
+    optim.time = tbw$total.time,
     n.unique = NA_integer_,
     n.visits = NA_integer_,
     n.cached = NA_integer_,
@@ -976,7 +985,8 @@ npplregbw.plbandwidth =
       hot.outer.args$bernstein.basis <- degree.search$bernstein.basis
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
-        strategy = "disable_multistart"
+        strategy = "disable_multistart",
+        remin = isTRUE(opt.args$remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
@@ -1022,6 +1032,7 @@ npplregbw.plbandwidth =
     nmulti = nomad.nmulti,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
+    remin = isTRUE(opt.args$remin),
     nomad.opts = list(
       DIRECTION_TYPE = "ORTHO 2N",
       QUAD_MODEL_SEARCH = "no",

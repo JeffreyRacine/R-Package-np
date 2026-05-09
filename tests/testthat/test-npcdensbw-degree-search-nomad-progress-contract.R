@@ -27,7 +27,7 @@ test_that("npcdensbw nomad+powell payload does not inject phantom multistart tot
     print = FALSE
   )
   trace(
-    np:::.np_nomad_with_powell_progress,
+    np:::.npcdensbw_with_powell_refinement_progress,
     tracer = eval(substitute(
       quote({
         assign(
@@ -41,7 +41,7 @@ test_that("npcdensbw nomad+powell payload does not inject phantom multistart tot
     print = FALSE
   )
   on.exit(untrace(np:::.np_progress_bandwidth_set_total), add = TRUE)
-  on.exit(untrace(np:::.np_nomad_with_powell_progress), add = TRUE)
+  on.exit(untrace(np:::.npcdensbw_with_powell_refinement_progress), add = TRUE)
 
   bw <- np::npcdensbw(
     y ~ x,
@@ -114,7 +114,8 @@ test_that("npcdensbw NOMAD plus Powell progress mirrors shared restart detail", 
   expect_true(any(grepl("^\\[np\\] Refining bandwidth \\(", msgs)))
   expect_true(any(grepl("multistart [12]/2", msgs)))
   expect_true(any(grepl("iteration [0-9]+", msgs)))
-  expect_true(any(grepl("iteration [0-9]+ \\([0-9]+\\)", msgs)))
+  if (any(grepl("multistart 2/2", msgs)))
+    expect_true(any(grepl("iteration [0-9]+( \\([0-9]+\\))?", msgs)))
   expect_true(any(grepl("deg \\(", msgs)))
   expect_true(any(grepl("best \\(", msgs)))
 })

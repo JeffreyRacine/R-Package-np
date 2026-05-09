@@ -1019,7 +1019,8 @@ npregbw.rbandwidth <-
     if (identical(degree.search$engine, "nomad+powell")) {
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
-        strategy = "disable_multistart"
+        strategy = "disable_multistart",
+        remin = isTRUE(opt.args$remin)
       )
 
       powell.start <- proc.time()[3L]
@@ -1072,6 +1073,7 @@ npregbw.rbandwidth <-
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
+    remin = isTRUE(opt.args$remin),
     nomad.opts = nomad.opts,
     degree_spec = list(
       initial = degree.search$start.degree,

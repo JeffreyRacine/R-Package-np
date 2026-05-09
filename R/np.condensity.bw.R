@@ -1410,7 +1410,8 @@ npcdensbw.conbandwidth <-
       hot.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
-        strategy = "disable_multistart"
+        strategy = "disable_multistart",
+        remin = isTRUE(opt.args$remin)
       )
       powell.start <- proc.time()[3L]
       hot.payload <- .npcdensbw_with_powell_refinement_progress(
@@ -1462,6 +1463,7 @@ npcdensbw.conbandwidth <-
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
+    remin = isTRUE(opt.args$remin),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
