@@ -453,6 +453,8 @@ These arguments control the local-polynomial estimator, basis, and fixed degree 
     relevant only when \code{regtype="lp"}. When
     \code{degree.select="manual"}, this must be supplied explicitly.
     Entries must be non-negative integers in \code{[0,12]}.
+    With no continuous predictors, \code{regtype="lp"} is only
+    admissible when \code{degree=0}, the local-constant equivalent.
     Bandwidth optimization treats this vector as fixed input and
     optimizes only bandwidths.
   }
@@ -464,7 +466,10 @@ These arguments control the local-polynomial estimator, basis, and fixed degree 
     estimator. \code{lp} specifies a local polynomial
     estimator with polynomial degree(s) given by \code{degree} for
     continuous predictors, or selected automatically when
-    \code{degree.select != "manual"}. Defaults to \code{lc}.
+    \code{degree.select != "manual"}. \code{ll} and positive-degree
+    \code{lp} require at least one continuous predictor; for
+    categorical-only predictors use \code{lc} or \code{lp} with
+    \code{degree=0}. Defaults to \code{lc}.
   }
 
 \subsection{NOMAD Search Controls}{
@@ -485,7 +490,8 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     immediately; in particular, \code{nomad=TRUE} currently requires
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
     search, \code{bernstein.basis=TRUE}, no explicit \code{degree},
-    and \code{search.engine \%in\% c("nomad", "nomad+powell")}.
+    at least one continuous predictor, and
+    \code{search.engine \%in\% c("nomad", "nomad+powell")}.
     This shortcut does not change the meaning of \code{nmulti} or
     \code{nomad.nmulti}: \code{nmulti} remains the outer restart count,
     while \code{nomad.nmulti} controls inner
