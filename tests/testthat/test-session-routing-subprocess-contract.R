@@ -2613,3 +2613,71 @@ test_that("session npindex nearest-neighbor exact route selects integer support 
   expect_true(any(grepl("SESSION_NPINDEX_NN_EXACT_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
+
+test_that("session conditional density fixed ll cv.ls uses MPI autodispatch route", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE, npRmpi.profile.level='detailed')",
+      "set.seed(20260509)",
+      "n <- 90L",
+      "x <- data.frame(x1=runif(n), x2=rnorm(n))",
+      "y <- data.frame(y1=sin(2*pi*x$x1) + 0.5*x$x2 + rnorm(n, sd=0.25))",
+      "bw <- npcdensbw(xdat=x, ydat=y, regtype='ll', bwmethod='cv.ls', nmulti=1, itmax=1)",
+      "stopifnot(inherits(bw, 'conbandwidth'))",
+      "stopifnot(identical(bw$regtype.engine, 'lp'))",
+      "stopifnot(all(as.integer(bw$degree.engine) == 1L))",
+      "stopifnot(is.finite(bw$fval))",
+      "stopifnot(!is.null(attr(bw, 'npRmpi.autodispatch.remote', exact=TRUE)))",
+      "stopifnot(is.list(bw$timing.profile))",
+      "stopifnot(identical(bw$timing.profile$where, 'npcdensbw'))",
+      "stopifnot(any(grepl('mpi.bcast.cmd.execute', bw$timing.profile$comm_notes, fixed=TRUE)))",
+      "cat('SESSION_NPCDENS_LL_CVLS_AUTODISPATCH_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPCDENS_LL_CVLS_AUTODISPATCH_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("session conditional distribution fixed ll cv.ls uses MPI autodispatch route", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE, npRmpi.profile.level='detailed')",
+      "set.seed(20260510)",
+      "n <- 90L",
+      "x <- data.frame(x1=runif(n), x2=rnorm(n))",
+      "y <- data.frame(y1=sin(2*pi*x$x1) + 0.5*x$x2 + rnorm(n, sd=0.25))",
+      "bw <- npcdistbw(xdat=x, ydat=y, regtype='ll', bwmethod='cv.ls', nmulti=1, itmax=1)",
+      "stopifnot(inherits(bw, 'condbandwidth'))",
+      "stopifnot(identical(bw$regtype.engine, 'lp'))",
+      "stopifnot(all(as.integer(bw$degree.engine) == 1L))",
+      "stopifnot(is.finite(bw$fval))",
+      "stopifnot(!is.null(attr(bw, 'npRmpi.autodispatch.remote', exact=TRUE)))",
+      "stopifnot(is.list(bw$timing.profile))",
+      "stopifnot(identical(bw$timing.profile$where, 'npcdistbw'))",
+      "stopifnot(any(grepl('mpi.bcast.cmd.execute', bw$timing.profile$comm_notes, fixed=TRUE)))",
+      "cat('SESSION_NPCDIST_LL_CVLS_AUTODISPATCH_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPCDIST_LL_CVLS_AUTODISPATCH_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
