@@ -790,7 +790,7 @@ npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
       basis = basis,
       degree = degree,
       bernstein.basis = FALSE,
-      regtype.engine = "lp",
+      regtype.engine = if (ncon > 0L) "lp" else "lc",
       basis.engine = basis,
       degree.engine = degree,
       bernstein.basis.engine = FALSE
@@ -805,7 +805,7 @@ npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
     basis = basis,
     degree = degree,
     bernstein.basis = bernstein.basis,
-    regtype.engine = "lp",
+    regtype.engine = if (ncon > 0L) "lp" else "lc",
     basis.engine = basis,
     degree.engine = degree,
     bernstein.basis.engine = bernstein.basis
@@ -2745,9 +2745,9 @@ W.lp <- function(xdat = NULL,
     ## Local constant OR no continuous variables
 
     if(is.null(exdat)) {
-      return(matrix(1,nrow=nrow(xdat.numeric),ncol=1))
+      return(matrix(1,nrow=nrow(as.data.frame(xdat)),ncol=1))
     } else {
-      return(matrix(1,nrow=nrow(exdat.numeric),ncol=1))
+      return(matrix(1,nrow=nrow(as.data.frame(exdat)),ncol=1))
     }
 
   } else {

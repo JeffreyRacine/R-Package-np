@@ -67,6 +67,38 @@ test_that("npreg multivariate cv.aic matches for ll and lp(all degree=1)", {
   expect_equal(as.numeric(bw.ll$bw), as.numeric(bw.lp$bw), tolerance = 1e-9)
 })
 
+test_that("npreg categorical-only ll/lp use lc-equivalent engine", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260509)
+  n <- 120
+  tx <- data.frame(
+    f = factor(rbinom(n, 1L, 0.45)),
+    g = ordered(sample(letters[1:3], n, replace = TRUE))
+  )
+  y <- 0.5 * as.integer(tx$f) + 0.2 * as.integer(tx$g) + rnorm(n, sd = 0.35)
+
+  set.seed(90210)
+  bw.lc <- npregbw(xdat = tx, ydat = y, regtype = "lc",
+                   bwmethod = "cv.aic", nmulti = 1L)
+  set.seed(90210)
+  bw.ll <- npregbw(xdat = tx, ydat = y, regtype = "ll",
+                   bwmethod = "cv.aic", nmulti = 1L)
+  set.seed(90210)
+  bw.lp <- npregbw(xdat = tx, ydat = y, regtype = "lp", degree = integer(0L),
+                   bwmethod = "cv.aic", nmulti = 1L)
+
+  expect_identical(bw.ll$regtype, "ll")
+  expect_identical(bw.ll$regtype.engine, "lc")
+  expect_identical(bw.lp$regtype, "lp")
+  expect_identical(bw.lp$regtype.engine, "lc")
+  expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.ll$fval), tolerance = 1e-12)
+  expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.lp$fval), tolerance = 1e-12)
+  expect_equal(as.numeric(bw.lc$bw), as.numeric(bw.ll$bw), tolerance = 1e-12)
+  expect_equal(as.numeric(bw.lc$bw), as.numeric(bw.lp$bw), tolerance = 1e-12)
+})
+
 test_that("npreg and npreghat match for ll and lp(degree=1) in 1D", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
