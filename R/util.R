@@ -163,14 +163,27 @@ npValidateGlpDegree <- function(regtype, degree, ncon, argname = "degree") {
   if (!identical(regtype, "lp"))
     return(NULL)
 
-  if (is.null(degree)) {
-    if (ncon == 0L)
+  if (ncon == 0L) {
+    if (is.null(degree))
+      stop(sprintf("%s must be 0 when regtype='lp' has no continuous predictors",
+                   argname),
+           call. = FALSE)
+    if (!length(degree))
       return(integer(0))
-    stop(sprintf("%s must be supplied explicitly when regtype='lp'", argname))
+    if (!is.numeric(degree) ||
+        length(degree) != 1L ||
+        anyNA(degree) ||
+        any(!is.finite(degree)) ||
+        degree != 0L)
+      stop(sprintf("%s must be 0 when regtype='lp' has no continuous predictors",
+                   argname),
+           call. = FALSE)
+    return(integer(0))
   }
 
-  if (!length(degree) && ncon == 0L)
-    return(integer(0))
+  if (is.null(degree)) {
+    stop(sprintf("%s must be supplied explicitly when regtype='lp'", argname))
+  }
 
   if (length(degree) != ncon)
     stop(sprintf("%s must have one entry per continuous predictor (%d expected, got %d)",
@@ -777,6 +790,11 @@ npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
   }
 
   if (identical(regtype, "ll")) {
+    if (ncon == 0L)
+      stop(sprintf("%s: regtype='ll' requires at least one continuous predictor; use regtype='lc' for categorical-only predictors",
+                   where),
+           call. = FALSE)
+
     if (ncon > 0L) {
       degree <- rep.int(1L, ncon)
       basis <- "glp"
@@ -800,6 +818,8 @@ npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
   degree <- npValidateGlpDegree(regtype = "lp",
                                 degree = degree,
                                 ncon = ncon)
+  if (ncon == 0L && length(degree) == 0L)
+    bernstein.basis <- FALSE
   list(
     regtype = "lp",
     basis = basis,

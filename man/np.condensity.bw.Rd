@@ -551,7 +551,9 @@ These arguments control the local-polynomial estimator, basis, and fixed degree 
     integer scalar or integer vector of polynomial degrees for
     continuous \code{xdat} variables when \code{regtype="lp"}.
     If scalar, the value is recycled to all continuous \code{xdat}
-    variables.
+    variables. With no continuous \code{xdat} predictors,
+    \code{regtype="lp"} is only admissible when \code{degree=0}, the
+    local-constant equivalent.
   }
 
   \item{regtype}{
@@ -560,7 +562,10 @@ These arguments control the local-polynomial estimator, basis, and fixed degree 
     \code{"lc"}, \code{"ll"}, and \code{"lp"}.
     For \code{npc*} methods, \code{"ll"} is implemented via the
     canonical local polynomial engine with \code{degree = 1} and
-    \code{basis = "glp"}. If local-linear \code{cv.ls} search fails
+    \code{basis = "glp"}. \code{"ll"} and positive-degree
+    \code{"lp"} require at least one continuous \code{xdat} predictor;
+    for categorical-only \code{xdat}, use \code{"lc"} or
+    \code{"lp"} with \code{degree=0}. If local-linear \code{cv.ls} search fails
     while using this canonical raw basis, retrying explicitly with
     \code{regtype="lp"}, \code{degree=1}, and
     \code{bernstein.basis=TRUE}, or centering/scaling the continuous
@@ -587,7 +592,8 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     immediately; in particular, \code{nomad=TRUE} currently requires
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
     search, \code{bernstein.basis=TRUE}, no explicit \code{degree},
-    and \code{search.engine \%in\% c("nomad", "nomad+powell")}.
+    at least one continuous \code{xdat} predictor, and
+    \code{search.engine \%in\% c("nomad", "nomad+powell")}.
     This shortcut does not change the meaning of \code{nmulti} or
     \code{nomad.nmulti}: \code{nmulti} remains the outer restart count,
     while \code{nomad.nmulti} controls inner

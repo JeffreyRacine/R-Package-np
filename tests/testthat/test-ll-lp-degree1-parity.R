@@ -67,7 +67,7 @@ test_that("npreg multivariate cv.aic matches for ll and lp(all degree=1)", {
   expect_equal(as.numeric(bw.ll$bw), as.numeric(bw.lp$bw), tolerance = 1e-9)
 })
 
-test_that("npreg categorical-only ll/lp use lc-equivalent engine", {
+test_that("npreg categorical-only predictors reject impossible degree structure", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -82,21 +82,39 @@ test_that("npreg categorical-only ll/lp use lc-equivalent engine", {
   set.seed(90210)
   bw.lc <- npregbw(xdat = tx, ydat = y, regtype = "lc",
                    bwmethod = "cv.aic", nmulti = 1L)
+  expect_error(
+    npregbw(xdat = tx, ydat = y, regtype = "ll",
+            bwmethod = "cv.aic", nmulti = 1L),
+    "requires at least one continuous predictor"
+  )
+  expect_error(
+    npregbw(xdat = tx, ydat = y, regtype = "lp", degree = 1L,
+            bwmethod = "cv.aic", nmulti = 1L),
+    "degree must be 0"
+  )
+  expect_error(
+    npregbw(xdat = tx, ydat = y, regtype = "lp",
+            bwmethod = "cv.aic", nmulti = 1L),
+    "degree must be 0"
+  )
+  expect_error(
+    npregbw(xdat = tx, ydat = y, regtype = "lp",
+            degree.select = "coordinate", search.engine = "cell",
+            bwmethod = "cv.aic", nmulti = 1L),
+    "automatic degree search requires at least one continuous"
+  )
   set.seed(90210)
-  bw.ll <- npregbw(xdat = tx, ydat = y, regtype = "ll",
-                   bwmethod = "cv.aic", nmulti = 1L)
-  set.seed(90210)
-  bw.lp <- npregbw(xdat = tx, ydat = y, regtype = "lp", degree = integer(0L),
+  bw.lp <- npregbw(xdat = tx, ydat = y, regtype = "lp", degree = 0L,
                    bwmethod = "cv.aic", nmulti = 1L)
 
-  expect_identical(bw.ll$regtype, "ll")
-  expect_identical(bw.ll$regtype.engine, "lc")
   expect_identical(bw.lp$regtype, "lp")
   expect_identical(bw.lp$regtype.engine, "lc")
-  expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.ll$fval), tolerance = 1e-12)
   expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.lp$fval), tolerance = 1e-12)
-  expect_equal(as.numeric(bw.lc$bw), as.numeric(bw.ll$bw), tolerance = 1e-12)
   expect_equal(as.numeric(bw.lc$bw), as.numeric(bw.lp$bw), tolerance = 1e-12)
+  expect_error(
+    npregbw(xdat = tx, ydat = y, nomad = TRUE),
+    "nomad=TRUE requires at least one continuous predictor"
+  )
 })
 
 test_that("npreg and npreghat match for ll and lp(degree=1) in 1D", {

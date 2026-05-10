@@ -2420,6 +2420,9 @@ npcdensbw.default <-
     )
 
     if (isTRUE(nomad.shortcut$enabled)) {
+      if (sum(x.info$icon) == 0L)
+        stop("nomad=TRUE requires at least one continuous predictor for degree search",
+             call. = FALSE)
       if ("degree" %in% mc.names)
         stop("nomad=TRUE does not support an explicit degree; remove degree or set nomad=FALSE")
       if ("regtype" %in% mc.names &&

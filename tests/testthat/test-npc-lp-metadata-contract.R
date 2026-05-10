@@ -190,7 +190,7 @@ test_that("npcdist ll matches lp(degree=1, basis='glp')", {
   expect_equal(fit.ll$congrad, fit.lp$congrad, tolerance = 1e-10)
 })
 
-test_that("npcdens categorical-only ll/lp use lc-equivalent engine", {
+test_that("npcdens categorical-only predictors reject impossible degree structure", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -204,35 +204,48 @@ test_that("npcdens categorical-only ll/lp use lc-equivalent engine", {
     bwmethod = "cv.ls",
     nmulti = 1L
   )
-  set.seed(90210)
-  bw.ll <- npcdensbw(
-    xdat = d$x,
-    ydat = d$y,
-    regtype = "ll",
-    bwmethod = "cv.ls",
-    nmulti = 1L
+  expect_error(
+    npcdensbw(xdat = d$x, ydat = d$y, regtype = "ll",
+              bwmethod = "cv.ls", nmulti = 1L),
+    "requires at least one continuous predictor"
+  )
+  expect_error(
+    npcdensbw(xdat = d$x, ydat = d$y, regtype = "lp", degree = 1L,
+              bwmethod = "cv.ls", nmulti = 1L),
+    "degree must be 0"
+  )
+  expect_error(
+    npcdensbw(xdat = d$x, ydat = d$y, regtype = "lp",
+              bwmethod = "cv.ls", nmulti = 1L),
+    "degree must be 0"
+  )
+  expect_error(
+    npcdensbw(xdat = d$x, ydat = d$y, regtype = "lp",
+              degree.select = "coordinate", search.engine = "cell",
+              bwmethod = "cv.ls", nmulti = 1L),
+    "automatic degree search requires at least one continuous"
   )
   set.seed(90210)
   bw.lp <- npcdensbw(
     xdat = d$x,
     ydat = d$y,
     regtype = "lp",
-    degree = integer(0L),
+    degree = 0L,
     bwmethod = "cv.ls",
     nmulti = 1L
   )
 
-  expect_identical(bw.ll$regtype, "ll")
-  expect_identical(bw.ll$regtype.engine, "lc")
   expect_identical(bw.lp$regtype, "lp")
   expect_identical(bw.lp$regtype.engine, "lc")
-  expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.ll$fval), tolerance = 1e-12)
   expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.lp$fval), tolerance = 1e-12)
-  expect_equal(bw_num(bw.lc), bw_num(bw.ll), tolerance = 1e-12)
   expect_equal(bw_num(bw.lc), bw_num(bw.lp), tolerance = 1e-12)
+  expect_error(
+    npcdensbw(xdat = d$x, ydat = d$y, nomad = TRUE),
+    "nomad=TRUE requires at least one continuous predictor"
+  )
 })
 
-test_that("npcdist categorical-only ll/lp use lc-equivalent engine", {
+test_that("npcdist categorical-only predictors reject impossible degree structure", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -246,30 +259,43 @@ test_that("npcdist categorical-only ll/lp use lc-equivalent engine", {
     bwmethod = "cv.ls",
     nmulti = 1L
   )
-  set.seed(90210)
-  bw.ll <- npcdistbw(
-    xdat = d$x,
-    ydat = d$y,
-    regtype = "ll",
-    bwmethod = "cv.ls",
-    nmulti = 1L
+  expect_error(
+    npcdistbw(xdat = d$x, ydat = d$y, regtype = "ll",
+              bwmethod = "cv.ls", nmulti = 1L),
+    "requires at least one continuous predictor"
+  )
+  expect_error(
+    npcdistbw(xdat = d$x, ydat = d$y, regtype = "lp", degree = 1L,
+              bwmethod = "cv.ls", nmulti = 1L),
+    "degree must be 0"
+  )
+  expect_error(
+    npcdistbw(xdat = d$x, ydat = d$y, regtype = "lp",
+              bwmethod = "cv.ls", nmulti = 1L),
+    "degree must be 0"
+  )
+  expect_error(
+    npcdistbw(xdat = d$x, ydat = d$y, regtype = "lp",
+              degree.select = "coordinate", search.engine = "cell",
+              bwmethod = "cv.ls", nmulti = 1L),
+    "automatic degree search requires at least one continuous"
   )
   set.seed(90210)
   bw.lp <- npcdistbw(
     xdat = d$x,
     ydat = d$y,
     regtype = "lp",
-    degree = integer(0L),
+    degree = 0L,
     bwmethod = "cv.ls",
     nmulti = 1L
   )
 
-  expect_identical(bw.ll$regtype, "ll")
-  expect_identical(bw.ll$regtype.engine, "lc")
   expect_identical(bw.lp$regtype, "lp")
   expect_identical(bw.lp$regtype.engine, "lc")
-  expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.ll$fval), tolerance = 1e-12)
   expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.lp$fval), tolerance = 1e-12)
-  expect_equal(bw_num(bw.lc), bw_num(bw.ll), tolerance = 1e-12)
   expect_equal(bw_num(bw.lc), bw_num(bw.lp), tolerance = 1e-12)
+  expect_error(
+    npcdistbw(xdat = d$x, ydat = d$y, nomad = TRUE),
+    "nomad=TRUE requires at least one continuous predictor"
+  )
 })
