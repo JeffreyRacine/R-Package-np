@@ -8538,7 +8538,23 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    num_reg_unordered,
                                    num_reg_ordered))
     return DBL_MAX;
+  /* Canonical CVAIC parity: LP(degree=1) should follow the LL-equivalent
+     objective branch for bandwidth search. */
   int int_ll_cv = int_ll;
+  if((int_ll == LL_LP) &&
+     (bwm == RBWM_CVAIC) &&
+     (vector_glp_degree_extern != NULL) &&
+     (num_reg_continuous > 0)){
+    int all_deg_one = 1;
+    for(i = 0; i < num_reg_continuous; i++){
+      if(vector_glp_degree_extern[i] != 1){
+        all_deg_one = 0;
+        break;
+      }
+    }
+    if(all_deg_one)
+      int_ll_cv = LL_LL;
+  }
 
   operator = np_reg_cv_core_cache.operator;
   kernel_c = np_reg_cv_core_cache.kernel_c;

@@ -32,6 +32,41 @@ test_that("npreg cv objective and bandwidths match for ll and lp(degree=1)", {
   }
 })
 
+test_that("npreg multivariate cv.aic matches for ll and lp(all degree=1)", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260509)
+  n <- 90
+  tx <- data.frame(
+    x1 = runif(n, -1, 1),
+    x2 = rnorm(n)
+  )
+  y <- sin(2 * pi * tx$x1) + 0.5 * tx$x2 + rnorm(n, sd = 0.15)
+
+  set.seed(90210)
+  bw.ll <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "ll",
+    bwmethod = "cv.aic",
+    nmulti = 1L
+  )
+  set.seed(90210)
+  bw.lp <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = rep.int(1L, ncol(tx)),
+    bwmethod = "cv.aic",
+    nmulti = 1L
+  )
+
+  expect_equal(as.numeric(bw.ll$fval), as.numeric(bw.lp$fval), tolerance = 1e-10)
+  expect_equal(as.numeric(bw.ll$bw), as.numeric(bw.lp$bw), tolerance = 1e-9)
+})
+
 test_that("npreg and npreghat match for ll and lp(degree=1) in 1D", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
