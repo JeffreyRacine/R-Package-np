@@ -8,6 +8,20 @@ make_xy <- function(n = 24L) {
   list(x = x, y = y)
 }
 
+make_cat_xy <- function(n = 80L) {
+  x <- data.frame(
+    f = factor(stats::rbinom(n, 1L, 0.45)),
+    g = ordered(sample(letters[1:3], n, replace = TRUE))
+  )
+  y <- data.frame(
+    y = 0.4 * as.integer(x$f) + 0.2 * as.integer(x$g) +
+      stats::rnorm(n, sd = 0.3)
+  )
+  list(x = x, y = y)
+}
+
+bw_num <- function(bw) as.numeric(unlist(bw$bw, use.names = FALSE))
+
 test_that("npcdensbw stores canonical ll/lp metadata", {
   d <- make_xy()
 
@@ -159,4 +173,82 @@ test_that("npcdist ll matches lp(degree=1, basis='glp')", {
 
   expect_equal(fitted(fit.ll), fitted(fit.lp), tolerance = 1e-10)
   expect_equal(fit.ll$congrad, fit.lp$congrad, tolerance = 1e-10)
+})
+
+test_that("npcdens categorical-only ll/lp use lc-equivalent engine", {
+  d <- make_cat_xy()
+
+  set.seed(90210)
+  bw.lc <- npcdensbw(
+    xdat = d$x,
+    ydat = d$y,
+    regtype = "lc",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+  set.seed(90210)
+  bw.ll <- npcdensbw(
+    xdat = d$x,
+    ydat = d$y,
+    regtype = "ll",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+  set.seed(90210)
+  bw.lp <- npcdensbw(
+    xdat = d$x,
+    ydat = d$y,
+    regtype = "lp",
+    degree = integer(0L),
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+
+  expect_identical(bw.ll$regtype, "ll")
+  expect_identical(bw.ll$regtype.engine, "lc")
+  expect_identical(bw.lp$regtype, "lp")
+  expect_identical(bw.lp$regtype.engine, "lc")
+  expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.ll$fval), tolerance = 1e-12)
+  expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.lp$fval), tolerance = 1e-12)
+  expect_equal(bw_num(bw.lc), bw_num(bw.ll), tolerance = 1e-12)
+  expect_equal(bw_num(bw.lc), bw_num(bw.lp), tolerance = 1e-12)
+})
+
+test_that("npcdist categorical-only ll/lp use lc-equivalent engine", {
+  d <- make_cat_xy()
+
+  set.seed(90210)
+  bw.lc <- npcdistbw(
+    xdat = d$x,
+    ydat = d$y,
+    regtype = "lc",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+  set.seed(90210)
+  bw.ll <- npcdistbw(
+    xdat = d$x,
+    ydat = d$y,
+    regtype = "ll",
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+  set.seed(90210)
+  bw.lp <- npcdistbw(
+    xdat = d$x,
+    ydat = d$y,
+    regtype = "lp",
+    degree = integer(0L),
+    bwmethod = "cv.ls",
+    nmulti = 1L
+  )
+
+  expect_identical(bw.ll$regtype, "ll")
+  expect_identical(bw.ll$regtype.engine, "lc")
+  expect_identical(bw.lp$regtype, "lp")
+  expect_identical(bw.lp$regtype.engine, "lc")
+  expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.ll$fval), tolerance = 1e-12)
+  expect_equal(as.numeric(bw.lc$fval), as.numeric(bw.lp$fval), tolerance = 1e-12)
+  expect_equal(bw_num(bw.lc), bw_num(bw.ll), tolerance = 1e-12)
+  expect_equal(bw_num(bw.lc), bw_num(bw.lp), tolerance = 1e-12)
 })
