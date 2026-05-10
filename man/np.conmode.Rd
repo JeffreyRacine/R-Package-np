@@ -25,6 +25,16 @@
   type, local-polynomial degree, and NOMAD/search metadata are also mirrored on
   the returned \code{conmode} object for convenient inspection and summary
   reporting; the bandwidth object remains the canonical source.
+
+  For non-local-constant conditional-mode fits, \code{npconmode} constructs
+  the full set of fitted probabilities over the discrete response support and
+  projects them onto the probability simplex before selecting and reporting
+  the modal outcome. Thus the probabilities used for modal selection are
+  non-negative and sum to one over the discrete support. For binary outcomes
+  this is the complement contract
+  \eqn{\Pr(Y=\ell_2\mid X=x)=1-\Pr(Y=\ell_1\mid X=x)}. Local-constant fits
+  are already proper by construction, so omitted \code{proper} resolves to
+  \code{FALSE} for \code{regtype="lc"} and to \code{TRUE} otherwise.
 }
 
 \usage{
@@ -39,6 +49,9 @@ npconmode(bws,
 \method{npconmode}{default}(bws, 
           txdat, 
           tydat, 
+          proper = NULL,
+          proper.control = list(),
+          probabilities = FALSE,
           \dots)
 
 \method{npconmode}{conbandwidth}(bws,
@@ -46,6 +59,9 @@ npconmode(bws,
           tydat = stop("invoked without training data 'tydat'"),
           exdat,
           eydat,
+          proper = NULL,
+          proper.control = list(),
+          probabilities = FALSE,
           \dots)
 
 }
@@ -115,6 +131,26 @@ These arguments control where the conditional mode is evaluated.
 Further arguments are passed to the bandwidth-selection counterpart when bandwidths are computed internally.
 }
 
+  \item{probabilities}{
+    a logical value. If \code{TRUE}, store the full matrix of fitted
+    probabilities over the discrete response support in the returned object.
+    The default \code{FALSE} keeps returned objects compact.
+  }
+
+  \item{proper}{
+    a logical value or \code{NULL}. If \code{TRUE}, fitted probabilities over
+    the discrete response support are projected onto the probability simplex
+    before modal selection. If \code{FALSE}, legacy raw per-level values are
+    used. If \code{NULL}, the default is estimator-aware:
+    \code{FALSE} for \code{regtype="lc"} and \code{TRUE} otherwise.
+  }
+
+  \item{proper.control}{
+    a list of controls for discrete probability properization. Currently
+    \code{tol} may be supplied to set the numerical tolerance for
+    non-negativity and unit-mass checks.
+  }
+
   \item{\dots}{
     additional arguments supplied to \code{\link{npcdensbw}} when bandwidths
     are computed internally. These may include bandwidth type, kernel types,
@@ -138,7 +174,10 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \item{condens}{ a vector of numeric type containing the modal density
     estimates at each evaluation point}
   \item{conderr}{ a vector of numeric type containing asymptotic
-    standard errors for the modal density estimates at each evaluation point}
+    standard errors for the modal density estimates at each evaluation point.
+    If a row is materially properized by probability projection, this value is
+    set to \code{NA} for that row rather than reporting a standard error for
+    the unrepaired raw probability.}
   \item{xeval}{ a data frame of evaluation points }
   \item{yeval}{ a vector of type \code{factor} (or \code{ordered
       factor}) containing the actual outcomes, or \code{NA} if not
@@ -152,6 +191,14 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
     available }
   \item{fit.mcfadden}{ the McFadden-Puig-Kerschner performance measure
     or \code{NA} if outcomes are not available }
+  \item{probabilities}{ if requested, a matrix of fitted probabilities over
+    the discrete response support }
+  \item{probability.levels}{ if \code{probabilities} are stored, the response
+    support corresponding to the probability matrix columns }
+  \item{proper.requested, proper.applied, proper.info}{ metadata describing
+    whether discrete probability properization was requested, whether any row
+    was materially projected, and diagnostics for non-negativity and unit-mass
+    checks }
   \item{regtype, degree, nomad, search.engine}{ metadata mirrored from
     \code{bws} describing the conditional density regression type,
     local-polynomial degree, whether NOMAD automatic degree search was used,
