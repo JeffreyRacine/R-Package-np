@@ -3359,6 +3359,22 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     error("resident npcdens NOMAD shadow received degree vector of unexpected length");
   }
 
+#ifdef MPI2
+  if (comm[1] != MPI_COMM_NULL) {
+    /* Keep collective CV evaluations on the rank-0 NOMAD candidate. */
+    MPI_Bcast(REAL(rbw_r),
+              np_conditional_density_nomad_shadow.num_all_var,
+              MPI_DOUBLE,
+              0,
+              comm[1]);
+    MPI_Bcast(INTEGER(degree_i),
+              np_conditional_density_nomad_shadow.num_reg_continuous,
+              MPI_INT,
+              0,
+              comm[1]);
+  }
+#endif
+
   if (!np_conditional_density_nomad_shadow_refresh_degree(INTEGER(degree_i))) {
     bwm_eval_count += 1.0;
     bwm_invalid_count += 1.0;
