@@ -5146,6 +5146,9 @@ const int keep_kw_owner_local){
   // switch parallelisation strategies based on biggest stride
  
   int stride = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  int loop_stride = is_adaptive
+    ? MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1)
+    : stride;
   num_obs_eval_alloc = suppress_parallel ? num_obs_eval : (stride*iNum_Processors);
 
   int * igatherv = NULL, * idisplsv = NULL;
@@ -5225,7 +5228,8 @@ const int keep_kw_owner_local){
 
 #ifdef MPI2
   if((kw != NULL) && (!suppress_parallel)){
-    kw_work = (double *)calloc((size_t)num_obs_eval_alloc*(size_t)num_xt, sizeof(double));
+    const int kw_rows_alloc = is_adaptive ? loop_stride*iNum_Processors : num_obs_eval_alloc;
+    kw_work = (double *)calloc((size_t)kw_rows_alloc*(size_t)num_xt, sizeof(double));
     if(kw_work == NULL){
       status = KWSNP_ERR_BADINVOC;
       goto cleanup;
@@ -5727,8 +5731,8 @@ const int keep_kw_owner_local){
   } else {
 #ifdef MPI2
     if((!suppress_parallel) && (!gather_scatter)){
-      js = stride * my_rank;
-      je = MIN(num_obs_train - 1, js + stride - 1);
+      js = loop_stride * my_rank;
+      je = MIN(num_obs_train - 1, js + loop_stride - 1);
       ws = weighted_sum;
       p_ws = weighted_permutation_sum;
 
@@ -6417,8 +6421,9 @@ const int keep_kw_owner_local){
     }
 
     if((kw_work != NULL) && (!keep_kw_owner_local)){
+      const int kw_stride = is_adaptive ? loop_stride : stride;
       const int kw_count =
-        np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)stride,
+        np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)kw_stride,
                                                            (size_t)num_xt,
                                                            "kw_work MPI_Allgather"),
                                   "kw_work MPI_Allgather");
