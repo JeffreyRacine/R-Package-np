@@ -44,7 +44,12 @@ conmode =
            CCR.overall = NA,
            CCR.byoutcome = NA,
            fit.mcfadden = NA,
-           ntrain, trainiseval = FALSE){
+           ntrain, trainiseval = FALSE,
+           proper.requested = FALSE,
+           proper.applied = FALSE,
+           proper.info = NULL,
+           probabilities = NULL,
+           probability.levels = NULL){
 
     if (missing(bws) || missing(xeval) || missing(conmode) || missing(condens) || missing(ntrain))
       stop("improper invocation of conmode constructor")
@@ -77,12 +82,20 @@ conmode =
       conmode = conmode,
       condens = condens,
       conderr = conderr,
+      proper.requested = proper.requested,
+      proper.applied = proper.applied,
+      proper.info = proper.info,
       confusion.matrix = confusion.matrix,
       CCR.overall = CCR.overall,
       CCR.byoutcome = CCR.byoutcome,
       fit.mcfadden = fit.mcfadden,
       ntrain = ntrain,
       trainiseval = trainiseval)
+
+    if (!is.null(probabilities)) {
+      d$probabilities <- probabilities
+      d$probability.levels <- probability.levels
+    }
 
     metadata <- .npConmodeMetadataFromBws(bws)
     d[names(metadata)] <- metadata
@@ -107,6 +120,11 @@ print.conmode <- function(x, ...){
 
   cat(genBwKerStrs(x$bws))
   cat(genTimingStr(x$bws))
+  if (!is.null(x$proper.info) && isTRUE(x$proper.requested)) {
+    cat("Proper conditional probabilities: ",
+        if (isTRUE(x$proper.applied)) "projected" else "already proper",
+        "\n", sep="")
+  }
   
   cat("\n\n")
   if(!missing(...))
@@ -137,6 +155,23 @@ summary.conmode <- function(object, ...){
 
   cat(genBwKerStrs(object$bws))
   cat(genTimingStr(object$bws))
+  if (!is.null(object$proper.info)) {
+    cat("Proper conditional probabilities: ",
+        if (isTRUE(object$proper.requested)) {
+          if (isTRUE(object$proper.applied)) "projected" else "already proper"
+        } else {
+          "not requested"
+        },
+        "\n", sep="")
+    if (!is.null(object$proper.info$max.negative.violation.raw))
+      cat("  Max negative violation (raw): ",
+          signif(object$proper.info$max.negative.violation.raw, 6), "\n", sep="")
+    if (!is.null(object$proper.info$max.row.sum.deviation.raw))
+      cat("  Max row-sum deviation (raw): ",
+          signif(object$proper.info$max.row.sum.deviation.raw, 6), "\n", sep="")
+    if (!is.null(object$proper.info$repaired.rows))
+      cat("  Repaired rows: ", object$proper.info$repaired.rows, "\n", sep="")
+  }
   cat('\n\n')
   
 }

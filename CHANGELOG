@@ -1,5 +1,15 @@
 Changes from Version 0.70-1 to 0.70-2 [09-May-2026]
 
+* Added an explicit proper-discrete-probability contract for
+  `npconmode()`. Local-constant conditional-mode fits remain unchanged by
+  default because their categorical probabilities are proper by construction;
+  non-local-constant routes now default to projecting the fitted probabilities
+  over the discrete response support onto the probability simplex before
+  selecting and reporting the conditional mode. Binary outcomes are handled
+  through the complement identity, and the optional `probabilities = TRUE`
+  return component exposes the fitted probability matrix for inspection. The
+  MPI-aware path preserves the same contract across session dispatch.
+
 * Split restart-from-minimum controls into `powell.remin` and
   `nomad.remin`. Ordinary fixed-degree Powell-style searches retain
   `powell.remin = TRUE` by default, following the established Numerical
