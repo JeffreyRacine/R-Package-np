@@ -1,5 +1,8 @@
 test_that("profile demo launcher captures the R CMD BATCH transcript explicitly", {
-  makefile <- testthat::test_path("..", "..", "demo", "makefile")
+  makefile <- testthat::test_path("..", "..", "demo", "tools", "makefile")
+  if (!file.exists(makefile)) {
+    makefile <- testthat::test_path("..", "..", "demo", "makefile")
+  }
   skip_if_not(file.exists(makefile), "demo makefile unavailable in installed test context")
   lines <- readLines(makefile, warn = FALSE)
   text <- paste(lines, collapse = "\n")
@@ -11,7 +14,7 @@ test_that("profile demo launcher captures the R CMD BATCH transcript explicitly"
   )
   expect_match(
     text,
-    "R CMD BATCH --no-save \\.\\./\\$\\$\\{d\\}_npRmpi_profile\\.R \"\\$\\$batch_file\" > \"\\$\\$tmp_file\" 2>&1",
+    "R CMD BATCH --no-save \\$\\(DEMO_SRC\\)/\\$\\$\\{d\\}_npRmpi_profile\\.R \"\\$\\$batch_file\" > \"\\$\\$tmp_file\" 2>&1",
     perl = TRUE
   )
   expect_match(
