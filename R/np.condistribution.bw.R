@@ -824,17 +824,27 @@ npcdistbw.condbandwidth <-
     rep.int(1, length(x_ord_flat))
   )
 
-  list(
+  setup <- list(
     cont_flat = c(y_cont_flat, x_cont_flat),
-    cont_scale = c(EssDee(ycon), EssDee(xcon)) * nconfac,
+    cont_scale = .npConditionalNomadContScale(
+      ycon = ycon,
+      xcon = xcon,
+      iycon = template$iycon,
+      ixcon = template$ixcon,
+      nconfac = nconfac,
+      where = "npcdistbw"
+    ),
     cat_flat = c(y_uno_flat, y_ord_flat, x_uno_flat, x_ord_flat),
     ncatfac = ncatfac,
     bandwidth.scale.categorical = bandwidth.scale.categorical,
     cat_upper = cat_upper
   )
+  .npAssertConditionalNomadSetup(setup, where = "npcdistbw")
+  setup
 }
 
 .npcdistbw_nomad_point_to_bw <- function(point, template, setup) {
+  .npAssertConditionalNomadSetup(setup, where = "npcdistbw")
   point <- as.numeric(point)
   ncont <- length(setup$cont_flat)
   ncat <- length(setup$cat_flat)
@@ -856,6 +866,7 @@ npcdistbw.condbandwidth <-
 }
 
 .npcdistbw_nomad_bw_to_point <- function(bws, template, setup) {
+  .npAssertConditionalNomadSetup(setup, where = "npcdistbw")
   point <- numeric(length(setup$cont_flat) + length(setup$cat_flat))
 
   if (length(setup$cont_flat) > 0L) {
