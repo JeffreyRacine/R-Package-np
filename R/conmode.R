@@ -1,3 +1,41 @@
+.npConmodeMetadataFromBws <- function(bws) {
+  fields <- c(
+    "regtype",
+    "pregtype",
+    "basis",
+    "degree",
+    "bernstein.basis",
+    "regtype.engine",
+    "basis.engine",
+    "degree.engine",
+    "bernstein.basis.engine",
+    "degree.search",
+    "nomad.shortcut",
+    "nomad.time",
+    "powell.time"
+  )
+  out <- setNames(vector("list", length(fields)), fields)
+  for (field in fields) {
+    if (!is.null(bws[[field]]))
+      out[[field]] <- bws[[field]]
+  }
+  out$nomad <- if (!is.null(bws$nomad)) {
+    isTRUE(bws$nomad)
+  } else if (!is.null(bws$nomad.shortcut)) {
+    isTRUE(bws$nomad.shortcut$enabled)
+  } else {
+    NULL
+  }
+  out$search.engine <- if (!is.null(bws$search.engine)) {
+    as.character(bws$search.engine)[1L]
+  } else if (!is.null(bws$degree.search$mode)) {
+    as.character(bws$degree.search$mode)[1L]
+  } else {
+    NULL
+  }
+  out
+}
+
 conmode =
   function(bws, xeval, yeval = NA,
            conmode,
@@ -46,6 +84,9 @@ conmode =
       ntrain = ntrain,
       trainiseval = trainiseval)
 
+    metadata <- .npConmodeMetadataFromBws(bws)
+    d[names(metadata)] <- metadata
+
     class(d) = "conmode"
 
     d
@@ -62,9 +103,10 @@ print.conmode <- function(x, ...){
 
   print(matrix(x$xbw,ncol=x$xndim,dimnames=list(paste("Exp. Var. ",x$pscaling,":",sep=""),x$xnames)))
 
-  cat(genDenEstStr(x))
+  cat(genBwSelStr(x$bws))
 
   cat(genBwKerStrs(x$bws))
+  cat(genTimingStr(x$bws))
   
   cat("\n\n")
   if(!missing(...))
@@ -89,11 +131,12 @@ summary.conmode <- function(object, ...){
 
   print(matrix(object$xbw,ncol=object$xndim,dimnames=list(paste("Exp. Var. ",object$pscaling,":",sep=""),object$xnames)))
 
-  cat(genDenEstStr(object))
+  cat(genBwSelStr(object$bws))
   cat('\n')
   pCatGofStr(object)
 
   cat(genBwKerStrs(object$bws))
+  cat(genTimingStr(object$bws))
   cat('\n\n')
   
 }

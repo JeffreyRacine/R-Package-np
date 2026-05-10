@@ -2517,6 +2517,38 @@ EssDee <- function(y){
   return(a)
 }
 
+.npConditionalNomadContScale <- function(ycon, xcon, iycon, ixcon, nconfac, where) {
+  y_scale <- if (length(which(iycon)) > 0L) EssDee(ycon) else numeric(0L)
+  x_scale <- if (length(which(ixcon)) > 0L) EssDee(xcon) else numeric(0L)
+  cont_scale <- c(y_scale, x_scale) * nconfac
+  expected <- length(which(iycon)) + length(which(ixcon))
+
+  if (length(cont_scale) != expected) {
+    stop(sprintf(
+      "%s: internal NOMAD bandwidth scale mismatch (%d scale values for %d continuous bandwidth slots)",
+      where, length(cont_scale), expected
+    ))
+  }
+
+  cont_scale
+}
+
+.npAssertConditionalNomadSetup <- function(setup, where) {
+  if (length(setup$cont_scale) != length(setup$cont_flat)) {
+    stop(sprintf(
+      "%s: internal NOMAD bandwidth transform mismatch (%d continuous scales for %d continuous slots)",
+      where, length(setup$cont_scale), length(setup$cont_flat)
+    ))
+  }
+  if (length(setup$cat_upper) != length(setup$cat_flat)) {
+    stop(sprintf(
+      "%s: internal NOMAD bandwidth transform mismatch (%d categorical bounds for %d categorical slots)",
+      where, length(setup$cat_upper), length(setup$cat_flat)
+    ))
+  }
+  invisible(setup)
+}
+
 
 ##EssDee <- function(y){
 ##

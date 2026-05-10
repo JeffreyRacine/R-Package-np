@@ -18,6 +18,14 @@
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and
   \code{\link{plot}} for plotting options.
+
+  If \code{bws} is not an explicit \code{conbandwidth} object,
+  \code{npconmode} computes conditional density bandwidths by forwarding the
+  call to \code{\link{npcdensbw}}. The resulting \code{conbandwidth} object is
+  stored unchanged in the returned object's \code{bws} component. Regression
+  type, local-polynomial degree, and NOMAD/search metadata are also mirrored on
+  the returned \code{conmode} object for convenient inspection and summary
+  reporting; the bandwidth object remains the canonical source.
 }
 
 \usage{
@@ -108,10 +116,13 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
 }
 
   \item{\dots}{
-    additional arguments supplied to specify the bandwidth type,
-    kernel types, and so on, detailed below.
-    This is necessary if you specify bws as a \eqn{p+q}-vector and not
-    a \code{conbandwidth} object, and you do not desire the default behaviours.
+    additional arguments supplied to \code{\link{npcdensbw}} when bandwidths
+    are computed internally. These may include bandwidth type, kernel types,
+    \code{regtype}, \code{degree}, \code{nomad}, \code{search.engine},
+    \code{degree.max}, and related bandwidth-search controls. Automatic NOMAD
+    degree search requires at least one continuous explanatory variable. These
+    arguments are not used to alter an explicitly supplied
+    \code{conbandwidth} object.
   }
 
 }
@@ -119,6 +130,8 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \code{npconmode} returns a \code{conmode} object with the following
   components:
 
+  \item{bws}{ the \code{conbandwidth} object used to compute the conditional
+    mode }
   \item{conmode}{ a vector of type \code{factor} (or \code{ordered
       factor}) containing the conditional mode at each evaluation
     point}
@@ -139,6 +152,13 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
     available }
   \item{fit.mcfadden}{ the McFadden-Puig-Kerschner performance measure
     or \code{NA} if outcomes are not available }
+  \item{regtype, degree, nomad, search.engine}{ metadata mirrored from
+    \code{bws} describing the conditional density regression type,
+    local-polynomial degree, whether NOMAD automatic degree search was used,
+    and the search engine when available }
+  \item{degree.search, nomad.shortcut, nomad.time, powell.time}{ detailed
+    search metadata mirrored from \code{bws} when automatic degree search or
+    NOMAD/Powell refinement was used }
 
   The functions \code{\link{mode}}, and \code{\link{fitted}} may be used to
   extract the conditional mode estimates, and the conditional density
