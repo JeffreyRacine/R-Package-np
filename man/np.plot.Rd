@@ -183,6 +183,14 @@ Named options passed via \code{\dots} include:
         example \code{pch}, \code{cex}, \code{col}, and \code{bg}).
         Default is \code{TRUE}.
       }
+      \item{\code{legend}}{
+        legend control for vector-\code{tau} \code{npqreg} level
+        plots. \code{TRUE} draws the default legend,
+        \code{FALSE}, \code{NULL}, or \code{NA} suppresses it, a
+        single character string supplies the legend position, and a
+        list is merged into the default \code{\link{legend}} call for
+        custom labels, placement, or styling.
+      }
       \item{\code{data_rug}}{
         logical; when \code{TRUE}, draw a rug-style support cue for the
         plotted coordinates. For ordinary 1D base plots this behaves
