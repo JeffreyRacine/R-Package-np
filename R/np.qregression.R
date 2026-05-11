@@ -77,6 +77,14 @@ npqreg <-
   dots[keep]
 }
 
+.npqreg_strip_fit_controls_from_bw_call <- function(call) {
+  for (nm in c("tau", "gradients", "tol", "small", "itmax", "newdata")) {
+    if (nm %in% names(call))
+      call[[nm]] <- NULL
+  }
+  call
+}
+
 .npqreg_quantile_delta_from_conditional <- function(bws,
                                                     xdat,
                                                     ydat,
@@ -517,10 +525,18 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     sc$formula <- bws
     sc.bw <- sc
     sc.bw[[1]] <- quote(npcdistbw)
+    sc.bw <- .npqreg_strip_fit_controls_from_bw_call(sc.bw)
+    bws.named <- FALSE
+  } else if (bws.formula) {
+    sc.bw <- sc
+    sc.bw$`bws` <- NULL
+    sc.bw[[1]] <- quote(npcdistbw)
+    sc.bw <- .npqreg_strip_fit_controls_from_bw_call(sc.bw)
     bws.named <- FALSE
   } else {
     sc.bw <- sc
     sc.bw[[1]] <- quote(npcdistbw)
+    sc.bw <- .npqreg_strip_fit_controls_from_bw_call(sc.bw)
   }
 
   ## if bws was passed in explicitly, do not compute bandwidths

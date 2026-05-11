@@ -14,6 +14,29 @@ test_that("npconmode proper helper enforces binary complement probabilities", {
   expect_identical(out$proper.info$reason, "projected")
 })
 
+test_that("npconmode proper controls fail fast on invalid control objects", {
+  helper <- getFromNamespace(".npConmodeProperProbabilities", "np")
+  raw <- matrix(c(0.2, 0.8, 0.4, 0.6), ncol = 2L, byrow = TRUE)
+
+  expect_error(helper(raw, levels = c("0", "1"), proper.control = 1),
+               "'proper.control' must be a list", fixed = TRUE)
+  expect_error(helper(raw, levels = c("0", "1"), proper.control = list(foo = 1)),
+               "unused argument")
+  expect_error(helper(raw, levels = c("0", "1"), proper.control = list(tol = -1)),
+               "'proper.control$tol' must be a non-negative scalar", fixed = TRUE)
+})
+
+test_that("npconmode bandwidth route reports all-NA training data clearly", {
+  set.seed(20260511)
+  d <- data.frame(x = runif(30), y = factor(rbinom(30, 1L, .5), levels = 0:1))
+  bw <- npcdensbw(y ~ x, data = d, nmulti = 1L)
+  badx <- data.frame(x = rep(NA_real_, 10))
+  bady <- data.frame(y = factor(rep(NA, 10), levels = 0:1))
+
+  expect_error(npconmode(bws = bw, txdat = badx, tydat = bady),
+               "Training data has no rows without NAs", fixed = TRUE)
+})
+
 test_that("npconmode proper defaults follow the canonical regression type", {
   effective <- getFromNamespace(".npConmodeEffectiveProper", "np")
 

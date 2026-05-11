@@ -1430,6 +1430,7 @@ npcdistbw.default <-
 
     search.mc.names <- names(mc)
     lp.dot.args <- list(...)
+    .np_degree_reject_unknown_dots(lp.dot.args, "npcdistbw")
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
