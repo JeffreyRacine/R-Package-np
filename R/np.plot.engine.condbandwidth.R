@@ -66,38 +66,20 @@
       if (is.null(value)) default else value
     }
 
-    plot_legend_args <- function(default.args) {
-      value <- legend
-      if (is.null(value))
-        return(NULL)
-      if (is.logical(value)) {
-        if (length(value) != 1L)
-          stop("legend must be TRUE/FALSE, NULL, NA, a legend position string, or a list of graphics::legend arguments",
-               call. = FALSE)
-        if (is.na(value) || !isTRUE(value))
-          return(NULL)
-        return(default.args)
+    legend_for <- function(role) {
+      if (is.list(plot.legend) && any(names(plot.legend) %in% c("tau", "bands"))) {
+        if (!is.null(plot.legend[[role]])) plot.legend[[role]] else TRUE
+      } else {
+        plot.legend
       }
-      if (is.character(value) && length(value) == 1L && !is.na(value)) {
-        default.args$x <- value
-        return(default.args)
-      }
-      if (is.list(value)) {
-        show <- value$show
-        if (!is.null(show)) {
-          if (!is.logical(show) || length(show) != 1L)
-            stop("legend$show must be TRUE or FALSE", call. = FALSE)
-          value$show <- NULL
-          if (is.na(show) || !isTRUE(show))
-            return(NULL)
-        }
-        return(.np_plot_merge_user_args(default.args, value))
-      }
-      stop("legend must be TRUE/FALSE, NULL, NA, a legend position string, or a list of graphics::legend arguments",
-           call. = FALSE)
+    }
+
+    plot_legend_args <- function(default.args, value = plot.legend) {
+      .np_plot_legend_args(default.args, legend = value, context = "legend")
     }
 
     dots <- list(...)
+    plot.legend <- legend
     plot.user.args <- .np_plot_user_args(dots, "plot")
     bxp.user.args <- .np_plot_user_args(dots, "bxp")
     rgl.persp3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d.")
@@ -106,6 +88,7 @@
     rgl.grid3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d.")
     rgl.widget.user.args <- .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget.")
     rgl.legend3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.legend3d", "rgl.legend3d.")
+    rgl.legend3d.user.args <- .np_plot_merge_rgl_legend_control(rgl.legend3d.user.args, plot.legend)
     rgl.surface3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.surface3d.")
     bxp.args <- bxp.user.args
     if (!is.null(col)) bxp.args$col <- col
@@ -586,13 +569,12 @@
               lwd = scalar_default(lwd, par()$lwd)
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
-              band.cols <- .np_plot_all_band_colors()
-              legend("topright",
-                     legend = c("Pointwise","Simultaneous","Bonferroni"),
-                     lty = 1,
-                     col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
-                     lwd = 2.15 * scalar_default(lwd, par()$lwd),
-                     bty = "n")
+              .np_plot_draw_all_band_legend(
+                legend = plot.legend,
+                x = "topright",
+                lty = 1,
+                lwd = 2.15 * scalar_default(lwd, par()$lwd)
+              )
             }
           }
 
@@ -868,16 +850,22 @@
         }
         tau.legend.args <- plot_legend_args(
           list(x = "topright", legend = tau.labels, col = curve.col,
-               lty = curve.lty, lwd = curve.lwd, bty = "n")
+               lty = curve.lty, lwd = curve.lwd, bty = "n"),
+          value = legend_for("tau")
         )
         if (!is.null(tau.legend.args))
           do.call(graphics::legend, tau.legend.args)
         if (plot.errors.type == "all" && !is.null(err)) {
-          legend("topleft",
+          band.legend.args <- plot_legend_args(
+            list(x = "topleft",
                  legend = c("Pointwise", "Simultaneous", "Bonferroni"),
                  lty = c(2L, 3L, 4L),
                  col = par("col"),
-                 bty = "n")
+                 bty = "n"),
+            value = legend_for("bands")
+          )
+          if (!is.null(band.legend.args))
+            do.call(graphics::legend, band.legend.args)
         }
       }
 
@@ -1192,7 +1180,8 @@
                   ex = as.numeric(na.omit(ei)),
                   center = na.omit(if (plotOnEstimate) temp.dens else temp.err[,3]),
                   all.err = temp.all.err,
-                  xi.factor = xi.factor)
+                  xi.factor = xi.factor,
+                  legend = plot.legend)
               } else {
                 if (!xi.factor && !plotOnEstimate)
                   lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
@@ -1425,7 +1414,8 @@
                     ex = as.numeric(na.omit(ei)),
                     center = na.omit(if (plotOnEstimate) temp.dens else temp.err[,3]),
                     all.err = temp.all.err,
-                    xi.factor = xi.factor)
+                    xi.factor = xi.factor,
+                  legend = plot.legend)
                 } else {
                   if (!xi.factor && !plotOnEstimate)
                     lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
@@ -1559,7 +1549,8 @@
                   else
                     na.omit(data.err[,3*idx]),
                   all.err = data.err.all[[idx]],
-                  xi.factor = xi.factor)
+                  xi.factor = xi.factor,
+                  legend = plot.legend)
               } else {
                 if (!xi.factor && !plotOnEstimate)
                   lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)

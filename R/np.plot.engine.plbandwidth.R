@@ -65,6 +65,7 @@
     }
 
     dots <- list(...)
+    plot.legend <- if (!is.null(dots$legend)) dots$legend else TRUE
     plot.user.args <- .np_plot_user_args(dots, "plot")
     points.user.args <- .np_plot_user_args(dots, "points")
     persp.user.args <- .np_plot_user_args(dots, "persp")
@@ -75,6 +76,7 @@
     rgl.grid3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d.")
     rgl.widget.user.args <- .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget.")
     rgl.legend3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.legend3d", "rgl.legend3d.")
+    rgl.legend3d.user.args <- .np_plot_merge_rgl_legend_control(rgl.legend3d.user.args, plot.legend)
     rgl.points3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.points3d.")
     rgl.surface3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.surface3d.")
     if (!is.null(cex)) {
@@ -600,13 +602,12 @@
               lwd = scalar_default(lwd, par()$lwd)
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
-              band.cols <- .np_plot_all_band_colors()
-              legend("topright",
-                     legend = c("Pointwise","Simultaneous","Bonferroni"),
-                     lty = 1,
-                     col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
-                     lwd = 2.15 * scalar_default(lwd, par()$lwd),
-                     bty = "n")
+              .np_plot_draw_all_band_legend(
+                legend = plot.legend,
+                x = "topright",
+                lty = 1,
+                lwd = 2.15 * scalar_default(lwd, par()$lwd)
+              )
             }
           }
           if (overlay.ok)
@@ -918,7 +919,8 @@
                 ex = as.numeric(na.omit(ei)),
                 center = na.omit(if (plotOnEstimate) temp.mean else temp.err[,3]),
                 all.err = temp.all.err,
-                xi.factor = xi.factor)
+                xi.factor = xi.factor,
+                  legend = plot.legend)
             } else {
               draw.args <- list(
                 ex = as.numeric(na.omit(ei)),
@@ -1190,7 +1192,8 @@
                 ex = as.numeric(na.omit(ei)),
                 center = na.omit(if (plotOnEstimate) temp.mean else temp.err[,3]),
                 all.err = temp.all.err,
-                xi.factor = xi.factor)
+                xi.factor = xi.factor,
+                  legend = plot.legend)
             } else {
               draw.args <- list(
                 ex = as.numeric(na.omit(ei)),
@@ -1415,7 +1418,8 @@
                 else
                   na.omit(data.err[,3*plot.index]),
                 all.err = data.err.all[[plot.index]],
-                xi.factor = xi.factor)
+                xi.factor = xi.factor,
+                  legend = plot.legend)
             } else {
               if (!xi.factor && !plotOnEstimate)
                 lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)

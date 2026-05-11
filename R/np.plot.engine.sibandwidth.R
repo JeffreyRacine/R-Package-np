@@ -113,6 +113,7 @@
     }
 
     dots <- list(...)
+    plot.legend <- if (!is.null(dots$legend)) dots$legend else TRUE
     plot.user.args <- .np_plot_user_args(dots, "plot")
     bxp.user.args <- .np_plot_user_args(dots, "bxp")
     bxp.args <- bxp.user.args
@@ -267,7 +268,8 @@
               plot.errors.style = plot.errors.style,
               plot.errors.bar = plot.errors.bar,
               plot.errors.bar.num = plot.errors.bar.num,
-              lty = 2)
+              lty = 2,
+              legend = plot.legend)
           } else if (plot.errors.center == "estimate") {
             draw.errors(ex = na.omit(tobj$index[i.sort]),
                         ely = na.omit(temp.mean[i.sort] - temp.err[i.sort,1]),
@@ -434,7 +436,8 @@
                   plot.errors.style = plot.errors.style,
                   plot.errors.bar = plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
-                  lty = 2)
+                  lty = 2,
+                  legend = plot.legend)
               } else if (plot.errors.center == "estimate") {
                 lo.i <- bws$beta[i] * (temp.mean[i.sort] - temp.err[i.sort,1])
                 hi.i <- bws$beta[i] * (temp.mean[i.sort] + temp.err[i.sort,2])

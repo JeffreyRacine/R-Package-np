@@ -64,6 +64,7 @@
     }
 
     dots <- list(...)
+    plot.legend <- if (!is.null(dots$legend)) dots$legend else TRUE
     plot.user.args <- .np_plot_user_args(dots, "plot")
     bxp.user.args <- .np_plot_user_args(dots, "bxp")
     rgl.persp3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d.")
@@ -72,6 +73,7 @@
     rgl.grid3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d.")
     rgl.widget.user.args <- .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget.")
     rgl.legend3d.user.args <- .np_plot_collect_rgl_args(dots, "rgl.legend3d", "rgl.legend3d.")
+    rgl.legend3d.user.args <- .np_plot_merge_rgl_legend_control(rgl.legend3d.user.args, plot.legend)
     rgl.surface3d.user.args <- .np_plot_extract_prefixed_args(dots, "rgl.surface3d.")
     bxp.args <- bxp.user.args
     if (!is.null(col)) bxp.args$col <- col
@@ -538,13 +540,12 @@
               lwd = scalar_default(lwd, par()$lwd)
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
-              band.cols <- .np_plot_all_band_colors()
-              legend("topright",
-                     legend = c("Pointwise","Simultaneous","Bonferroni"),
-                     lty = 1,
-                     col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
-                     lwd = 2.15 * scalar_default(lwd, par()$lwd),
-                     bty = "n")
+              .np_plot_draw_all_band_legend(
+                legend = plot.legend,
+                x = "topright",
+                lty = 1,
+                lwd = 2.15 * scalar_default(lwd, par()$lwd)
+              )
             }
           }
 
@@ -813,7 +814,8 @@
                   ex = as.numeric(na.omit(ei)),
                   center = na.omit(if (plotOnEstimate) temp.dens else temp.err[,3]),
                   all.err = temp.all.err,
-                  xi.factor = xi.factor)
+                  xi.factor = xi.factor,
+                  legend = plot.legend)
               } else {
                 if (!xi.factor && !plotOnEstimate)
                   lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
@@ -1038,7 +1040,8 @@
                     ex = as.numeric(na.omit(ei)),
                     center = na.omit(if (plotOnEstimate) temp.dens else temp.err[,3]),
                     all.err = temp.all.err,
-                    xi.factor = xi.factor)
+                    xi.factor = xi.factor,
+                  legend = plot.legend)
                 } else {
                   if (!xi.factor && !plotOnEstimate)
                     lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
@@ -1171,7 +1174,8 @@
                   else
                     na.omit(data.err[,3*idx]),
                   all.err = data.err.all[[idx]],
-                  xi.factor = xi.factor)
+                  xi.factor = xi.factor,
+                  legend = plot.legend)
               } else {
                 if (!xi.factor && !plotOnEstimate)
                   lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
