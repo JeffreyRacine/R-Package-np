@@ -49,6 +49,7 @@
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
            plot.par.mfrow = TRUE,
+           plot.data.overlay = FALSE,
            proper = FALSE,
            proper.method = c("isotonic"),
            proper.control = list(),
@@ -174,11 +175,14 @@
     if (quantreg) {
       tau <- .npqreg_validate_tau(tau)
     }
+    plot.data.overlay <- .np_plot_match_flag(plot.data.overlay, "plot.data.overlay")
     multi.tau <- isTRUE(quantreg) && length(tau) > 1L
     if (multi.tau) {
       common.scale <- FALSE
       perspective <- FALSE
     }
+    if (isTRUE(quantreg) && isTRUE(plot.data.overlay) && !isTRUE(gradients))
+      common.scale <- FALSE
 
     plot.errors = (plot.errors.method != "none")
     proper.args <- .np_condist_validate_proper_args(
@@ -750,43 +754,72 @@
         if (is.null(tau.labels))
           tau.labels <- .npqreg_tau_labels(tau)
         mat.x <- if (xi.factor) seq_len(nkeep) else ei[seq_len(nkeep)]
-        plot.args <- list(
-          x = mat.x,
-          y = value,
-          type = scalar_default(type, if (xi.factor) "b" else "l"),
-          xlab = xlab.value,
-          ylab = ylab.value,
-          main = scalar_default(main, ""),
-          sub = scalar_default(sub, ""),
-          xaxt = if (xi.factor) "n" else "s"
-        )
+        curve.col <- rep(scalar_default(col, seq_len(ncol(value))), length.out = ncol(value))
+        curve.lty <- rep(scalar_default(lty, seq_len(ncol(value))), length.out = ncol(value))
+        curve.lwd <- rep(scalar_default(lwd, par()$lwd), length.out = ncol(value))
         error.ylim <- multi_tau_error_range(
           value = value,
           err = err,
           all.err = all.err,
           plotOnEstimate = plotOnEstimate
         )
+        y.range <- range(value, finite = TRUE)
+        if (!is.null(error.ylim))
+          y.range <- range(y.range, error.ylim, finite = TRUE)
+        overlay.ok <- isTRUE(quantreg) && isTRUE(plot.data.overlay) && !isTRUE(gradients)
+        if (overlay.ok && !is.null(ydat) && ncol(ydat) >= 1L)
+          y.range <- .np_plot_overlay_range(y.range, ydat[, 1L])
         if (!is.null(ylim)) {
-          plot.args$ylim <- ylim
-        } else if (!is.null(error.ylim)) {
-          plot.args$ylim <- error.ylim
+          y.range <- ylim
         }
+        plot.args <- list(
+          xlab = xlab.value,
+          ylab = ylab.value,
+          main = scalar_default(main, ""),
+          sub = scalar_default(sub, ""),
+          ylim = y.range,
+          cex.axis = scalar_default(cex.axis, par()$cex.axis),
+          cex.lab = scalar_default(cex.lab, par()$cex.lab),
+          cex.main = scalar_default(cex.main, par()$cex.main),
+          cex.sub = scalar_default(cex.sub, par()$cex.sub)
+        )
         if (!xi.factor && !is.null(xlim))
           plot.args$xlim <- xlim
-        plot.args$col <- scalar_default(col, seq_len(ncol(value)))
-        plot.args$lty <- scalar_default(lty, seq_len(ncol(value)))
-        plot.args$lwd <- scalar_default(lwd, par()$lwd)
-        plot.args$cex.axis <- scalar_default(cex.axis, par()$cex.axis)
-        plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
-        plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
-        plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
         plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
-        do.call(graphics::matplot, plot.args)
-        if (xi.factor)
-          axis(1, at = mat.x, labels = as.character(ei[seq_len(nkeep)]))
-        legend.col <- rep(plot.args$col, length.out = ncol(value))
-        legend.lty <- rep(plot.args$lty, length.out = ncol(value))
-        legend.lwd <- rep(plot.args$lwd, length.out = ncol(value))
+        if (overlay.ok) {
+          overlay.x <- if (xOrY == "x") xdat[, i] else ydat[, i]
+          overlay.y <- ydat[, 1L]
+          if (xi.factor) {
+            data.args <- plot.args
+            data.args$x <- overlay.x
+            data.args$y <- overlay.y
+            data.args$type <- NULL
+            data.args$lty <- NULL
+            data.args$lwd <- NULL
+            data.args$col <- NULL
+            do.call(graphics::plot, data.args)
+          } else {
+            overlay.args <- plot.args
+            overlay.args$x <- overlay.x
+            overlay.args$y <- overlay.y
+            overlay.args$type <- "p"
+            overlay.args$lty <- NULL
+            overlay.args$lwd <- NULL
+            overlay.args$pch <- scalar_default(overlay.args$pch, 20)
+            overlay.args$cex <- scalar_default(overlay.args$cex, 0.5)
+            overlay.args$col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+            do.call(graphics::plot, overlay.args)
+          }
+        } else {
+          empty.args <- plot.args
+          empty.args$x <- mat.x
+          empty.args$y <- value[, 1L]
+          empty.args$type <- "n"
+          empty.args$xaxt <- if (xi.factor) "n" else "s"
+          do.call(graphics::plot, empty.args)
+          if (xi.factor)
+            axis(1, at = mat.x, labels = as.character(ei[seq_len(nkeep)]))
+        }
         draw_multi_tau_errors(
           ei = ei,
           value = value,
@@ -794,10 +827,14 @@
           all.err = all.err,
           xi.factor = xi.factor,
           plotOnEstimate = plotOnEstimate,
-          cols = legend.col
+          cols = curve.col
         )
-        legend("topright", legend = tau.labels, col = legend.col,
-               lty = legend.lty, lwd = legend.lwd, bty = "n")
+        for (kk in seq_len(ncol(value))) {
+          lines(mat.x, value[, kk], type = scalar_default(type, "l"),
+                col = curve.col[[kk]], lty = curve.lty[[kk]], lwd = curve.lwd[[kk]])
+        }
+        legend("topright", legend = tau.labels, col = curve.col,
+               lty = curve.lty, lwd = curve.lwd, bty = "n")
         if (plot.errors.type == "all" && !is.null(err)) {
           legend("topleft",
                  legend = c("Pointwise", "Simultaneous", "Bonferroni"),
@@ -1053,6 +1090,10 @@
               else
                 c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))),
                   max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2]))))
+            overlay.ok <- isTRUE(quantreg) && isTRUE(plot.data.overlay) && !isTRUE(gradients)
+            if (overlay.ok && is.null(ylim))
+              plot.args$ylim <- .np_plot_overlay_range(if (is.null(plot.args$ylim)) range(temp.dens, finite = TRUE) else plot.args$ylim,
+                                                       ydat[, 1L])
             plot.args$xlab <- scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = "")))
             plot.args$ylab <- scalar_default(ylab, if (gradients) paste("GC", j, "of", tylabE) else tylabE)
             if (!xi.factor) {
@@ -1075,7 +1116,35 @@
               plot.args,
               if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
             )
-            do.call(plot.fun, plot.args)
+            if (overlay.ok) {
+              overlay.x <- if (xOrY == "x") xdat[, i] else ydat[, i]
+              overlay.y <- ydat[, 1L]
+              if (xi.factor) {
+                data.args <- plot.args
+                data.args$f <- NULL
+                data.args$z <- NULL
+                data.args$x <- overlay.x
+                data.args$y <- overlay.y
+                data.args$type <- NULL
+                data.args$lty <- NULL
+                data.args$lwd <- NULL
+                data.args$col <- NULL
+                do.call(graphics::plot, data.args)
+              } else {
+                data.args <- plot.args
+                data.args$x <- overlay.x
+                data.args$y <- overlay.y
+                data.args$type <- "p"
+                data.args$lty <- NULL
+                data.args$lwd <- NULL
+                data.args$pch <- scalar_default(data.args$pch, 20)
+                data.args$cex <- scalar_default(data.args$cex, 0.5)
+                data.args$col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+                do.call(graphics::plot, data.args)
+              }
+            } else {
+              do.call(plot.fun, plot.args)
+            }
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
@@ -1102,6 +1171,13 @@
                 do.call(draw.errors, draw.args)
               }
 
+            }
+            if (overlay.ok) {
+              line.x <- if (xi.factor) seq_len(length(ei)) else ei
+              lines(line.x, temp.dens, type = scalar_default(type, "l"),
+                    col = scalar_default(col, par()$col),
+                    lty = scalar_default(lty, par()$lty),
+                    lwd = scalar_default(lwd, par()$lwd))
             }
           }
         

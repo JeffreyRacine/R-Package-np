@@ -172,6 +172,14 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
   represented by \code{bws}. This includes the selected bandwidth type,
   kernels, local-polynomial regression type, selected polynomial degree,
   basis, and Bernstein-basis setting inherited from \code{\link{npcdistbw}}.
+  If the bandwidth object was selected with \code{nomad=TRUE}, the returned
+  conditional-distribution bandwidth object is an LP object: its
+  \code{regtype}/\code{regtype.engine} metadata identify the selected
+  local-polynomial route and its \code{degree}/\code{degree.engine} metadata
+  record the selected continuous-coordinate polynomial degree. \code{npqreg},
+  \code{\link{predict}}, and \code{\link{plot}} reuse this stored LP metadata;
+  plotting additional \code{tau} values does not recompute or downgrade the
+  selected degree.
   The one-dimensional inversion is carried out over the observed support
   of the dependent variable using the same selected conditional CDF
   estimator that is later used for quantile standard errors and gradients.

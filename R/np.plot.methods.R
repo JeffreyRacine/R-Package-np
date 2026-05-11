@@ -546,11 +546,12 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   if (!is.null(dots$plot.data.overlay) &&
-      !any(c("rbandwidth", "plbandwidth", "scbandwidth") %in% cls)) {
+      !any(c("rbandwidth", "plbandwidth", "scbandwidth") %in% cls) &&
+      !("condbandwidth" %in% cls && isTRUE(dots$quantreg))) {
     dots$plot.data.overlay <- .np_plot_match_flag(dots$plot.data.overlay,
                                                   "plot.data.overlay")
     if (isTRUE(dots$plot.data.overlay)) {
-      stop("plot.data.overlay=TRUE is available only for regression, partially linear, and smooth coefficient plot surfaces.",
+      stop("plot.data.overlay=TRUE is available only for regression, quantile regression, partially linear, and smooth coefficient plot surfaces.",
            call. = FALSE)
     }
     dots$plot.data.overlay <- NULL
@@ -786,6 +787,8 @@ np_render_control <- function(style = c("band", "bar"),
     dots$quantreg <- TRUE
   if (is.null(dots$tau) && !is.null(object$tau))
     dots$tau <- object$tau
+  if (is.null(dots$plot.data.overlay) && !isTRUE(dots$gradients))
+    dots$plot.data.overlay <- TRUE
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_singleindex <- function(object, ..., .plot_dots_call = NULL)

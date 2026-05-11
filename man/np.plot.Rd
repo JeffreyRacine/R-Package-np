@@ -122,7 +122,10 @@ Named options passed via \code{\dots} include:
         bandwidth object. With \code{errors="asymptotic"} or
         \code{errors="bootstrap"}, intervals are constructed separately for
         each requested \code{tau}; bootstrap work is shared across \code{tau}
-        values within each resample.
+        values within each resample. For \code{npqreg} objects whose
+        conditional-distribution bandwidths were selected with
+        \code{nomad=TRUE}, plotting reuses the stored LP
+        \code{regtype.engine} and selected \code{degree.engine} metadata.
       }
     }
 
@@ -167,14 +170,18 @@ Named options passed via \code{\dots} include:
     \strong{Rendering and view controls}
     \describe{
       \item{\code{data_overlay}}{
-        logical; when \code{TRUE}, overlay raw data points on regression
-        surface plots (currently \code{npreg}, \code{npscoef}, and
-        \code{npplreg}) and expand plot limits to include the data. The
-        option is ignored for derivative/gradient plots and coefficient
-        plots. Overlay points default to small, light markers and can be
-        customized with standard \code{points()} arguments passed via
-        \code{...} (for example \code{pch}, \code{cex}, \code{col}, and
-        \code{bg}). Default is \code{TRUE}.
+        logical; when \code{TRUE}, overlay raw data on regression,
+        quantile-regression, partially linear, and smooth coefficient
+        plot surfaces and expand plot limits to include the data. For
+        \code{npqreg} level plots the data layer is drawn first by
+        default, so quantile curves are overlaid on top; ordered and
+        factor conditioning variables use the natural boxplot-style
+        display from \code{plot()}. The option is ignored for
+        derivative/gradient plots and coefficient plots. Overlay points
+        default to small, light markers and can be customized with
+        standard \code{points()} arguments passed via \code{...} (for
+        example \code{pch}, \code{cex}, \code{col}, and \code{bg}).
+        Default is \code{TRUE}.
       }
       \item{\code{data_rug}}{
         logical; when \code{TRUE}, draw a rug-style support cue for the

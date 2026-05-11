@@ -34,6 +34,47 @@ test_that("npqreg works with multiple taus", {
   expect_equal(model_q25$tau, 0.25)
 })
 
+test_that("npqreg plot preserves NOMAD-selected LP degree metadata", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  set.seed(70511)
+  n <- 24L
+  d <- data.frame(
+    x = runif(n),
+    y = sin(runif(n)) + rnorm(n, sd = 0.05)
+  )
+  bw <- npcdistbw(
+    y ~ x,
+    data = d,
+    nomad = TRUE,
+    search.engine = "nomad",
+    degree.min = 0L,
+    degree.max = 1L,
+    degree.start = 1L,
+    degree.verify = FALSE,
+    nmulti = 1L,
+    nomad.nmulti = 0L
+  )
+  expect_identical(bw$regtype, "lp")
+  expect_identical(bw$regtype.engine, "lp")
+  expect_false(is.null(bw$degree))
+  expect_false(is.null(bw$degree.engine))
+
+  fit <- npqreg(bws = bw, tau = 0.5)
+  out <- plot(
+    fit,
+    output = "data",
+    perspective = FALSE,
+    tau = c(0.25, 0.5),
+    errors = "none",
+    neval = 5L
+  )
+
+  expect_true(all(vapply(out, inherits, logical(1), "qregression")))
+  expect_true(all(vapply(out, function(xi) identical(xi$bws$regtype.engine, "lp"), logical(1))))
+  expect_true(all(vapply(out, function(xi) identical(xi$bws$degree.engine, bw$degree.engine), logical(1))))
+})
+
 test_that("npqreg gradients populate qregression objects", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
