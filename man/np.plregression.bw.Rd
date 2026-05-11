@@ -513,6 +513,20 @@ or standard-deviation factors.
   for more information.
 }
 
+\section{Book And Method Pointers}{
+  \code{npplregbw} selects the bandwidths and, for local-polynomial
+  routes, child-specific degree/search metadata used by
+  \code{\link{npplreg}}. The target model is
+  \eqn{Y=X\beta+\Theta(Z)+\epsilon}; the bandwidth object controls the
+  nuisance regressions \eqn{E[Y\mid Z]} and \eqn{E[X_j\mid Z]} used in
+  the final partially linear solve.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 7
+  \emph{Semiparametric Partially Linear Models}, especially Sections 7.1,
+  7.2, and 7.4, and Racine (2019), Chapter 8 \emph{Semiparametric
+  Conditional Mean Function Estimation}.
+}
+
 \references{
 
  Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary

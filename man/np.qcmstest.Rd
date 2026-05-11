@@ -172,6 +172,21 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 
   \code{\link{summary}} supports object of type \code{cmstest}.
 }
+\section{Book And Method Pointers}{
+  \code{npqcmstest} tests a parametric conditional-quantile
+  specification against a nonparametric conditional-quantile
+  alternative at the supplied \eqn{\tau}. The test therefore sits at the
+  intersection of conditional CDF/quantile estimation and model
+  specification testing.
+
+  For book-length background, see Li and Racine (2007), Chapter 12
+  \emph{Model Specification Tests} and Chapter 6 \emph{Conditional CDF and
+  Quantile Estimation}. For the later workflow treatment of
+  conditional CDFs and quantiles, see Racine (2019), Chapter 4
+  \emph{Conditional Probability Density and Cumulative Distribution
+  Functions}.
+}
+
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.

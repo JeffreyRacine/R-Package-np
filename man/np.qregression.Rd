@@ -247,6 +247,22 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
 
 }
 
+\section{Book And Method Pointers}{
+  The conditional quantile target is the generalized inverse
+  \eqn{q_\tau(x)=\inf\{y:F(y\mid x)\ge \tau\}} of the conditional
+  distribution. The standard errors and gradients described above are
+  first-order delta-method quantities evaluated using the same selected
+  conditional CDF, conditional density, bandwidths, kernels, and
+  local-polynomial degree inherited from the supplied
+  \code{\link{npcdistbw}} object.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 6
+  \emph{Conditional CDF and Quantile Estimation}, especially Sections
+  6.3-6.5, and Racine (2019), Chapter 4 \emph{Conditional Probability
+  Density and Cumulative Distribution Functions}. The quasi-inverse
+  terminology follows Nelsen (2006).
+}
+
 \references{
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary

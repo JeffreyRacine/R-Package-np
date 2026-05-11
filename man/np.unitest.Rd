@@ -92,6 +92,19 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 
   \code{\link{summary}} supports object of type \code{unitest}.
 }
+\section{Book And Method Pointers}{
+  \code{npunitest} uses an entropy-distance measure to compare
+  univariate density or probability functions. The statistic is based on
+  the normalized Hellinger-type distance described in the entropy-test
+  literature referenced below.
+
+  For book-length background, see Racine (2019), Chapter 2
+  \emph{Continuous Density and Cumulative Distribution Functions},
+  especially the entropy and density-test material. For related density
+  and testing background, see Li and Racine (2007), Chapters 1, 12, and
+  13.
+}
+
 \references{
 
   Granger, C.W. and E. Maasoumi and J.S. Racine (2004), \dQuote{A

@@ -161,6 +161,20 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 
   \code{\link{summary}} supports object of type \code{cmstest}.
 }
+\section{Book And Method Pointers}{
+  \code{npcmstest} tests a parametric conditional-mean specification
+  against a nonparametric alternative, using residual-based bootstrap or
+  asymptotic calibration as selected by \code{distribution}. The
+  statistic is designed for continuous outcomes and fitted
+  \code{\link{lm}} or \code{\link{glm}} objects whose model frame, model
+  matrix, and response are available.
+
+  For book-length background, see Li and Racine (2007), Chapter 12
+  \emph{Model Specification Tests}, especially Section 12.1 and Section
+  12.1.2. For the conditional-mean estimation context used by the test,
+  see Racine (2019), Chapter 6 \emph{Conditional Mean Function Estimation}.
+}
+
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.

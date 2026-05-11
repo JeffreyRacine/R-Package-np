@@ -891,6 +891,19 @@ or standard-deviation factors.
   objects of type \code{condbandwidth}.
 }
 
+\section{Book And Method Pointers}{
+  \code{npcdistbw} selects response and conditioning bandwidths, and
+  when requested local-polynomial degree/search metadata, for the
+  conditional distribution target
+  \eqn{F(y\mid x)=\Pr(Y\le y\mid X=x)} estimated by
+  \code{\link{npcdist}} and inverted by \code{\link{npqreg}}.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 6
+  \emph{Conditional CDF and Quantile Estimation}, especially Sections 6.1,
+  6.2, 6.3, and 6.5, and Chapter 5 \emph{Conditional Density Estimation}.
+  The later workflow treatment is Racine (2019), Chapter 4.
+}
+
 \references{
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary

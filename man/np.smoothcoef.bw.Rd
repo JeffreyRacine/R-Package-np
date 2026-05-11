@@ -755,6 +755,18 @@ or standard-deviation factors.
 
 }
 
+\section{Book And Method Pointers}{
+  \code{npscoefbw} selects bandwidths for the smooth-coefficient model
+  \eqn{Y=X^\prime\beta(Z)+\epsilon}. The selected bandwidths control
+  the mixed-data smoothing over \eqn{Z} used to estimate the coefficient
+  functions \eqn{\beta_j(z)}.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 9
+  \emph{Additive and Smooth (Varying) Coefficient Semiparametric Models},
+  especially Sections 9.3-9.3.4, and Racine (2019), Chapter 8
+  \emph{Semiparametric Conditional Mean Function Estimation}.
+}
+
 \references{
 
  Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary

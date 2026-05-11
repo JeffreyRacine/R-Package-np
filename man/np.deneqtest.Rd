@@ -77,6 +77,18 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 
   \code{\link{summary}} supports object of type \code{deneqtest}.
 }
+\section{Book And Method Pointers}{
+  \code{npdeneqtest} compares two distributions by estimating the
+  integrated squared difference between their density or probability
+  functions. The two samples must have matching variables and data
+  types because the statistic compares like with like.
+
+  For book-length background, see Li and Racine (2007), Chapter 12
+  \emph{Model Specification Tests}, especially Section 12.2, and Chapter
+  13 \emph{Nonsmoothing Tests}, especially Section 13.2. For density and
+  mixed-data density context, see Racine (2019), Chapters 2 and 3.
+}
+
 \references{
   Li, Q. and E. Maasoumi and J.S. Racine (2009), \dQuote{A Nonparametric
     Test for Equality of Distributions with Mixed Categorical and

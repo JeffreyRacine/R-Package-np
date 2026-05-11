@@ -579,6 +579,18 @@ or standard-deviation factors.
   The functions  \code{\link{predict}}, \code{\link{summary}} and \code{\link{plot}} support
   objects of type \code{bandwidth}.
 }
+\section{Book And Method Pointers}{
+  \code{npudensbw} selects bandwidths for the unconditional density
+  target \eqn{f(x)} estimated by \code{\link{npudens}}. The continuous
+  scale factors and discrete smoothing parameters are those used in the
+  generalized product-kernel density estimator.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 1
+  \emph{Density Estimation}, especially Sections 1.3, 1.6, 1.8, and 1.9,
+  and Chapter 4 \emph{Kernel Estimation with Mixed Data}. The later
+  workflow treatment is Racine (2019), Chapters 2 and 3.
+}
+
 \references{
 
   Aitchison, J. and , C.G.G. Aitken (1976), \dQuote{Multivariate binary

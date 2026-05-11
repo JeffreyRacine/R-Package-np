@@ -616,6 +616,18 @@ or standard-deviation factors.
   The functions  \code{\link{predict}}, \code{\link{summary}} and \code{\link{plot}} support
   objects of type \code{bandwidth}.
 }
+\section{Book And Method Pointers}{
+  \code{npudistbw} selects bandwidths for the unconditional distribution
+  target \eqn{F(x)=\Pr(X\le x)} estimated by \code{\link{npudist}}.
+  The selected bandwidths control the integrated kernel factors used in
+  the mixed-data CDF estimator.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 1
+  \emph{Density Estimation}, especially Sections 1.4 and 1.5, and Chapter
+  4 \emph{Kernel Estimation with Mixed Data}. The later workflow treatment
+  is Racine (2019), Chapters 2 and 3.
+}
+
 \references{
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary

@@ -92,6 +92,18 @@ These arguments control bootstrap execution and reproducibility settings.
 
 \code{\link{summary}} supports object of type \code{deptest}.
 }
+\section{Book And Method Pointers}{
+  \code{npsdeptest} applies the dependence-test idea to a time series by
+  comparing the joint law of current and lagged values with the product
+  of their marginal laws. The lag and bootstrap choices determine the
+  serial-dependence alternatives being probed and the null calibration.
+
+  For book-length background, see Li and Racine (2007), Chapter 13
+  \emph{Nonsmoothing Tests}, especially Sections 13.4 and 13.5, and
+  Chapter 12 \emph{Model Specification Tests} for related distributional
+  tests. For entropy and density context, see Racine (2019), Chapter 2.
+}
+
 \references{
 
   Granger, C.W. and E. Maasoumi and J.S. Racine (2004), \dQuote{A

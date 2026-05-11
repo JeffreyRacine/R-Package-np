@@ -79,8 +79,8 @@ These arguments identify the bandwidth specification, formula/data interface, an
   }
 
 
-\subsection{Bandwidth Search Shortcut}{
-This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npcdensbw}} when bandwidths are computed inside \code{npcdens}.
+\subsection{Local-Polynomial Degree And Bandwidth Search}{
+This argument controls the recommended automatic local-polynomial NOMAD route, which jointly selects continuous polynomial degree and bandwidths when these are computed inside \code{npcdens}.
 }
 
   \item{nomad}{
@@ -90,7 +90,7 @@ This argument passes the recommended automatic local-polynomial NOMAD preset to 
     \code{search.engine}, \code{degree.select},
     \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
     \code{degree.verify}, and \code{bwtype} with the recommended
-    automatic LP NOMAD preset documented in \code{\link{npcdensbw}}.
+    automatic local-polynomial degree-and-bandwidth NOMAD preset documented in \code{\link{npcdensbw}}.
     Additional NOMAD tuning arguments such as \code{nomad.nmulti} may
     also be supplied through \code{\dots}; \code{nmulti} remains the
     outer restart count while \code{nomad.nmulti} controls inner
@@ -226,7 +226,7 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
 
-  For practitioners who want the recommended automatic LP NOMAD route
+  For practitioners who want the recommended automatic local-polynomial degree-and-bandwidth NOMAD route
   without spelling out all LP tuning arguments,
   \code{npcdens(..., nomad=TRUE)} and \code{npcdensbw(..., nomad=TRUE)}
   expand missing settings to the same documented preset. Explicit
@@ -259,6 +259,23 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
     errors of the gradients at the evaluation points }
   \item{log_likelihood}{ log likelihood of the conditional density estimate }
 
+}
+
+\section{Book And Method Pointers}{
+  The conditional density target is \eqn{f(y\mid x)}. In the
+  product-kernel formulation this can be viewed as estimating the joint
+  mixed-data density of \eqn{(Y,X)} and normalizing by the marginal
+  density of \eqn{X}, with local-polynomial routes using the selected
+  continuous-coordinate polynomial degree in the conditional fit. The
+  returned standard errors are asymptotic standard errors for the fitted
+  conditional density values, and gradient standard errors are returned
+  when gradients are requested and defined.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 5
+  \emph{Conditional Density Estimation}, especially Sections 5.1-5.4, and
+  Chapter 4 \emph{Kernel Estimation with Mixed Data}. The later workflow
+  treatment is Racine (2019), Chapter 4 \emph{Conditional Probability
+  Density and Cumulative Distribution Functions}.
 }
 
 \references{
