@@ -2507,6 +2507,7 @@ npcdensbw.default <-
 
     search.mc.names <- names(mc)
     lp.dot.args <- list(...)
+    .np_degree_reject_unknown_dots(lp.dot.args, "npcdensbw")
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
     degree.min.value <- nomad.shortcut$values$degree.min

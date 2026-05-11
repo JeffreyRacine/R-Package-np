@@ -314,6 +314,8 @@
 .npRmpi_has_active_slave_pool <- function(comm = 1L) {
   if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
     return(FALSE)
+  if (!isTRUE(getOption("npRmpi.pool.active", FALSE)))
+    return(FALSE)
   size <- tryCatch(mpi.comm.size(comm), error = function(e) NA_integer_)
   rank <- tryCatch(mpi.comm.rank(comm), error = function(e) NA_integer_)
   if (is.null(size) || is.null(rank) ||

@@ -512,6 +512,7 @@ npRmpi.init <- function(...,
         where = "npRmpi.init() reused-slave SPMD reset"
       )
       options(npRmpi.master.only = FALSE)
+      options(npRmpi.pool.active = TRUE)
       if (!quiet)
         mpi.hostinfo(comm)
       return(invisible(TRUE))
@@ -519,6 +520,7 @@ npRmpi.init <- function(...,
     mpi.spawn.Rslaves(..., nslaves = nslaves, comm = comm, quiet = quiet, nonblock = nonblock, sleep = sleep)
     mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE, comm = comm)
     options(npRmpi.master.only = FALSE)
+    options(npRmpi.pool.active = TRUE)
     return(invisible(TRUE))
   }
 
@@ -534,6 +536,7 @@ npRmpi.init <- function(...,
   np.mpi.initialize()
   mpi.barrier(0)
   options(npRmpi.master.only = FALSE)
+  options(npRmpi.pool.active = TRUE)
 
   rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
   rank <- if (is.na(rank)) 0L else as.integer(rank)
@@ -563,6 +566,13 @@ npRmpi.quit <- function(force = FALSE,
   dellog <- npValidateScalarLogical(dellog, "dellog")
   comm <- npValidatePositiveInteger(comm, "comm")
   mode <- match.arg(mode)
+  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+    .npRmpi_session_reset_spmd_state()
+    .npRmpi_attach_state_reset()
+    options(npRmpi.master.only = FALSE)
+    options(npRmpi.pool.active = FALSE)
+    return(invisible(FALSE))
+  }
   size.comm <- .npRmpi_safe_int(mpi.comm.size(comm))
   size.comm <- if (is.na(size.comm)) 0L else as.integer(size.comm)
   size.world <- .npRmpi_safe_int(mpi.comm.size(0))
@@ -587,6 +597,7 @@ npRmpi.quit <- function(force = FALSE,
     .npRmpi_session_reset_spmd_state()
     .npRmpi_attach_state_reset()
     options(npRmpi.master.only = FALSE)
+    options(npRmpi.pool.active = FALSE)
     return(invisible(FALSE))
   }
 
@@ -597,6 +608,7 @@ npRmpi.quit <- function(force = FALSE,
       .npRmpi_session_reset_spmd_state()
       .npRmpi_attach_state_reset()
       options(npRmpi.master.only = FALSE)
+      options(npRmpi.pool.active = FALSE)
       return(invisible(TRUE))
     }
     if (identical(attach.state, "closing")) {
@@ -678,6 +690,7 @@ npRmpi.quit <- function(force = FALSE,
   .npRmpi_session_reset_spmd_state()
   .npRmpi_attach_state_reset()
   options(npRmpi.master.only = FALSE)
+  options(npRmpi.pool.active = FALSE)
   invisible(TRUE)
 }
 

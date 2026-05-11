@@ -948,6 +948,23 @@
   npValidateNonNegativeInteger(dots[["random.seed"]], "random.seed")
 }
 
+.np_degree_reject_unknown_dots <- function(dots,
+                                           where,
+                                           allowed = c("random.seed")) {
+  if (is.null(dots) || length(dots) == 0L)
+    return(invisible(TRUE))
+
+  dot.names <- names(dots)
+  if (is.null(dot.names))
+    dot.names <- rep("", length(dots))
+
+  bad <- dot.names == "" | !(dot.names %in% allowed)
+  if (any(bad))
+    .np_reject_unused_dots(dots[bad], where)
+
+  invisible(TRUE)
+}
+
 .np_nomad_coerce_start_value <- function(x, type, lb, ub) {
   if (identical(as.integer(type), 3L)) {
     x <- if (is.finite(x) && x >= 0.5) 1 else 0

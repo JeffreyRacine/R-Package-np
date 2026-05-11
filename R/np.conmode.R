@@ -108,6 +108,24 @@ npconmode.call <-
   pmax(x - theta, 0)
 }
 
+.npConmodeNormalizeProperControl <- function(proper.control) {
+  if (is.null(proper.control))
+    return(list())
+  if (!is.list(proper.control) || is.data.frame(proper.control))
+    stop("'proper.control' must be a list")
+
+  nms <- names(proper.control)
+  if (is.null(nms))
+    nms <- rep("", length(proper.control))
+  bad <- nms == "" | !(nms %in% "tol")
+  if (any(bad))
+    stop(sprintf("unused argument%s in proper.control: %s",
+                 if (sum(bad) == 1L) "" else "s",
+                 paste(sQuote(nms[bad]), collapse = ", ")))
+
+  proper.control
+}
+
 .npConmodeProperProbabilities <- function(pmat,
                                           levels,
                                           proper = TRUE,
@@ -117,6 +135,7 @@ npconmode.call <-
   if (ncol(pmat) != length(levels))
     stop("internal error: probability matrix does not match the response support")
 
+  proper.control <- .npConmodeNormalizeProperControl(proper.control)
   tol <- proper.control$tol
   if (is.null(tol))
     tol <- sqrt(.Machine$double.eps)
@@ -256,7 +275,7 @@ npconmode.conbandwidth <-
       keep.rows[as.integer(rows.omit)] <- FALSE
 
     if (!any(keep.rows))
-      stop("Tranining data has no rows without NAs")
+      stop("Training data has no rows without NAs")
 
     txdat <- txdat[keep.rows,,drop = FALSE]
     tydat <- tydat[keep.rows,,drop = FALSE]
@@ -459,6 +478,7 @@ npconmode.default <- function(bws, txdat, tydat,
   sc.bw$probabilities <- NULL
   sc.bw$gradients <- NULL
   sc.bw$level <- NULL
+  sc.bw$newdata <- NULL
 
   bws.formula <- (!no.bws) && inherits(bws, "formula")
   if (bws.formula) {

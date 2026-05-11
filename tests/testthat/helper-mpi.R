@@ -8,7 +8,10 @@
     return(FALSE)
   if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
     return(FALSE)
-  isTRUE(try(mpi.comm.size(1) > 1, silent = TRUE))
+  active <- isTRUE(try(mpi.comm.size(1) > 1, silent = TRUE))
+  if (active)
+    options(npRmpi.pool.active = TRUE)
+  active
 }
 
 spawn_mpi_slaves <- function(n = 1L) {
