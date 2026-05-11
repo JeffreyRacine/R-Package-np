@@ -185,6 +185,23 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   \item{derr}{ standard errors of the cumulative distribution estimates }
 
 }
+\section{Book And Method Pointers}{
+  The unconditional distribution target is \eqn{F(x)=\Pr(X\le x)}.
+  The estimator replaces the density kernel factors by integrated
+  distribution-kernel factors where appropriate, while retaining the
+  same mixed-data product-kernel logic for continuous and ordered
+  components. The returned standard errors are asymptotic standard
+  errors for the estimated cumulative distribution values.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 1
+  \emph{Density Estimation}, especially Sections 1.4 and 1.5 for CDF
+  estimation and bandwidth selection, together with Chapter 4
+  \emph{Kernel Estimation with Mixed Data}. The later workflow
+  treatment is Racine (2019), Chapter 2 \emph{Continuous Density and
+  Cumulative Distribution Functions} and Chapter 3 \emph{Mixed-Data
+  Probability Density and Cumulative Distribution Functions}.
+}
+
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{ Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.

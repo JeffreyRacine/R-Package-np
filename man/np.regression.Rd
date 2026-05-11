@@ -82,8 +82,8 @@ These arguments identify the bandwidth specification, formula/data interface, an
   }
 
 
-\subsection{Bandwidth Search Shortcut}{
-This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npregbw}} when bandwidths are computed inside \code{npreg}.
+\subsection{Local-Polynomial Degree And Bandwidth Search}{
+This argument controls the recommended automatic local-polynomial NOMAD route, which jointly selects continuous polynomial degree and bandwidths when these are computed inside \code{npreg}.
 }
 
   \item{nomad}{
@@ -93,7 +93,7 @@ This argument passes the recommended automatic local-polynomial NOMAD preset to 
     \code{regtype}, \code{search.engine}, \code{degree.select},
     \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
     \code{degree.verify}, and \code{bwtype} with the recommended
-    automatic LP NOMAD preset documented in \code{\link{npregbw}}.
+    automatic local-polynomial degree-and-bandwidth NOMAD preset documented in \code{\link{npregbw}}.
     Additional NOMAD tuning arguments such as \code{nomad.nmulti} may
     also be supplied through \code{\dots}; \code{nmulti} remains the
     outer restart count while \code{nomad.nmulti} controls inner
@@ -339,6 +339,25 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   \item{SIGN}{ fraction of observations where fitted and observed values
   agree in sign }
 
+}
+
+\section{Book And Method Pointers}{
+  The regression target is the conditional mean
+  \eqn{m(x)=E[Y\mid X=x]}. Local-constant estimation can be written
+  schematically as \eqn{\hat m(x)=\sum_i W_i(x)Y_i}, where the weights
+  are normalized generalized product-kernel weights over the continuous,
+  unordered, and ordered components of \eqn{X}. Local-polynomial
+  regression replaces this scalar weighted average by a weighted least
+  squares fit in powers of the continuous coordinates around \eqn{x};
+  the fitted intercept is the estimate of \eqn{m(x)} and the fitted
+  slope terms give the reported gradients where available.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 2
+  \emph{Regression}, especially Sections 2.1, 2.2, 2.4, and 2.5, and
+  Chapter 4 \emph{Kernel Estimation with Mixed Data}, especially Sections
+  4.2 and 4.4. The later workflow treatment is Racine (2019), Chapter 6
+  \emph{Conditional Mean Function Estimation}, including the local
+  polynomial and mixed-data marginal-effect discussion.
 }
 
 \references{

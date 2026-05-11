@@ -907,6 +907,19 @@ or standard-deviation factors.
   objects of type \code{conbandwidth}.
 }
 
+\section{Book And Method Pointers}{
+  \code{npcdensbw} selects response and conditioning bandwidths, and
+  when requested local-polynomial degree/search metadata, for the
+  conditional density target \eqn{f(y\mid x)} estimated by
+  \code{\link{npcdens}}.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 5
+  \emph{Conditional Density Estimation}, especially Sections 5.1-5.4, and
+  Chapter 4 \emph{Kernel Estimation with Mixed Data}. The later workflow
+  treatment is Racine (2019), Chapter 4 \emph{Conditional Probability
+  Density and Cumulative Distribution Functions}.
+}
+
 \references{
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary

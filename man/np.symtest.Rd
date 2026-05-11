@@ -87,6 +87,19 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 
   \code{\link{summary}} supports object of type \code{symtest}.
 }
+\section{Book And Method Pointers}{
+  \code{npsymtest} tests symmetry by comparing the density or
+  probability function of the observed data with that of the data
+  reflected around the relevant center. The same entropy-distance logic
+  used by the univariate density tests underlies the statistic.
+
+  For book-length background, see Racine (2019), Chapter 2
+  \emph{Continuous Density and Cumulative Distribution Functions} and Li
+  and Racine (2007), Chapter 13 \emph{Nonsmoothing Tests} and Chapter 12
+  \emph{Model Specification Tests} where related density-feature tests are
+  treated.
+}
+
 \references{
 
   Granger, C.W. and E. Maasoumi and J.S. Racine (2004), \dQuote{A

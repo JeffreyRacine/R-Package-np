@@ -109,8 +109,8 @@ These arguments identify the bandwidth specification, formula/data interface, an
   }
 
 
-\subsection{Bandwidth Search Shortcut}{
-This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npscoefbw}} when bandwidths are computed inside \code{npscoef}.
+\subsection{Local-Polynomial Degree And Bandwidth Search}{
+This argument controls the recommended automatic local-polynomial NOMAD route, which jointly selects continuous polynomial degree and bandwidths when these are computed inside \code{npscoef}.
 }
 
   \item{nomad}{
@@ -120,7 +120,7 @@ This argument passes the recommended automatic local-polynomial NOMAD preset to 
     among \code{regtype}, \code{search.engine},
     \code{degree.select}, \code{bernstein.basis},
     \code{degree.min}, \code{degree.max}, \code{degree.verify}, and
-    \code{bwtype} with the recommended automatic LP NOMAD preset
+    \code{bwtype} with the recommended automatic local-polynomial degree-and-bandwidth NOMAD preset
     documented in \code{\link{npscoefbw}}. Additional NOMAD tuning
     arguments such as \code{nomad.nmulti} may also be supplied through
     \code{\dots}; \code{nmulti} remains the outer restart count while
@@ -271,6 +271,22 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   agree in sign }
 
 }
+\section{Book And Method Pointers}{
+  The smooth-coefficient model lets slopes vary with conditioning
+  variables, typically written
+  \eqn{Y=X^\prime\beta(Z)+\epsilon}. The functions estimate the
+  coefficient functions \eqn{\beta_j(z)} using mixed-data kernel
+  smoothing over \eqn{Z}, with the reported fitted values obtained by
+  combining the estimated coefficient functions with the corresponding
+  columns of \eqn{X}.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 9
+  \emph{Additive and Smooth (Varying) Coefficient Semiparametric Models},
+  especially Sections 9.3-9.3.4, and Racine (2019), Chapter 8
+  \emph{Semiparametric Conditional Mean Function Estimation}, especially
+  the varying-coefficient material.
+}
+
 \references{
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
@@ -317,7 +333,7 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   intended on mixed data types and will coerce the data to the same
   type.
 
-  For practitioners who want the recommended automatic LP NOMAD route
+  For practitioners who want the recommended automatic local-polynomial degree-and-bandwidth NOMAD route
   without spelling out all LP tuning arguments,
   \code{npscoef(..., nomad=TRUE)} and \code{npscoefbw(..., nomad=TRUE)}
   expand missing settings to the same documented preset. Explicit

@@ -206,6 +206,20 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
     \code{1}, the second with variable \code{4}).}
 
 }
+\section{Book And Method Pointers}{
+  \code{npsigtest} assesses predictor relevance in nonparametric
+  regression by comparing the fitted unrestricted regression with
+  restrictions implied by excluding or smoothing over selected
+  regressors. Bootstrap choices trade computational cost against
+  finite-sample behavior.
+
+  For book-length background, see Li and Racine (2007), Chapter 12
+  \emph{Model Specification Tests}, especially Sections 12.3 and 12.3.5,
+  and Chapter 13 \emph{Nonsmoothing Tests}, especially Section 13.3 where
+  relevant. For the underlying conditional-mean setting, see Racine
+  (2019), Chapter 6 \emph{Conditional Mean Function Estimation}.
+}
+
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.

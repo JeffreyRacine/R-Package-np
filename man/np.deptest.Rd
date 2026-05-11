@@ -84,6 +84,19 @@ These arguments control bootstrap execution and reproducibility settings.
 
 \code{\link{summary}} supports object of type \code{deptest}.
 }
+\section{Book And Method Pointers}{
+  \code{npdeptest} compares the joint density or probability law of two
+  variables with the product of their marginals. Departures from the
+  product form indicate dependence, lack of fit, or predictability
+  depending on how the two inputs are constructed.
+
+  For book-length background, see Li and Racine (2007), Chapter 13
+  \emph{Nonsmoothing Tests}, especially Sections 13.4 and 13.5, and
+  Chapter 12 \emph{Model Specification Tests}, especially Sections 12.4.1
+  and 12.4.3. For entropy and density context, see Racine (2019),
+  Chapter 2.
+}
+
 \references{
 
   Granger, C.W. and E. Maasoumi and J.S. Racine (2004), \dQuote{A

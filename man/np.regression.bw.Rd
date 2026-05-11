@@ -817,6 +817,19 @@ or standard-deviation factors.
   objects of this class.
 }
 
+\section{Book And Method Pointers}{
+  \code{npregbw} selects bandwidths and, when requested, local-polynomial
+  degree/search metadata for estimating the conditional mean
+  \eqn{m(x)=E[Y\mid X=x]}. For the estimator target and local-polynomial
+  interpretation, see \code{\link{npreg}}.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 2
+  \emph{Regression}, especially Sections 2.2, 2.4, and 2.5, and Chapter 4
+  \emph{Kernel Estimation with Mixed Data}, especially Sections 4.2 and
+  4.4. The later workflow treatment is Racine (2019), Chapter 6
+  \emph{Conditional Mean Function Estimation}.
+}
+
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.

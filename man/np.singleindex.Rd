@@ -86,8 +86,8 @@ These arguments identify the bandwidth specification, formula/data interface, an
   }
 
 
-\subsection{Bandwidth Search Shortcut}{
-This argument passes the recommended automatic local-polynomial NOMAD preset to \code{\link{npindexbw}} when bandwidths are computed inside \code{npindex}.
+\subsection{Local-Polynomial Degree And Bandwidth Search}{
+This argument controls the recommended automatic local-polynomial NOMAD route, which jointly selects continuous polynomial degree and bandwidths when these are computed inside \code{npindex}.
 }
 
   \item{nomad}{
@@ -97,7 +97,7 @@ This argument passes the recommended automatic local-polynomial NOMAD preset to 
     \code{regtype}, \code{search.engine}, \code{degree.select},
     \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
     \code{degree.verify}, and \code{bwtype} with the recommended
-    automatic LP NOMAD preset documented in \code{\link{npindexbw}}.
+    automatic local-polynomial degree-and-bandwidth NOMAD preset documented in \code{\link{npindexbw}}.
     Additional NOMAD tuning arguments such as \code{nomad.nmulti} may
     also be supplied through \code{\dots}; \code{nmulti} remains the
     outer restart count while \code{nomad.nmulti} controls inner
@@ -191,7 +191,7 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   A matrix of gradients along with average derivatives are computed and
   returned if \code{gradients=TRUE} is used.
 
-  For practitioners who want the recommended automatic LP NOMAD route
+  For practitioners who want the recommended automatic local-polynomial degree-and-bandwidth NOMAD route
   without spelling out all LP tuning arguments,
   \code{npindex(..., nomad=TRUE)} and \code{npindexbw(..., nomad=TRUE)}
   expand missing settings to the same documented preset. Explicit
@@ -242,6 +242,22 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
 }
 
 
+
+\section{Book And Method Pointers}{
+  The single-index model reduces a multivariate predictor to an index,
+  typically written \eqn{E[Y\mid X]=g(X^\prime\beta)} for continuous
+  outcomes, with a normalization on \eqn{\beta} for identification.
+  For binary outcomes, the Klein-Spady route estimates the corresponding
+  binary-choice probability through the index. The fitted index
+  regression, gradients, and average derivatives are computed from the
+  selected index direction and kernel regression fit.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 8
+  \emph{Semiparametric Single Index Models}, especially Sections 8.1,
+  8.2.1, 8.4, 8.5, and 8.10. The later workflow treatment is Racine
+  (2019), Chapter 8 \emph{Semiparametric Conditional Mean Function
+  Estimation}, especially the single-index material.
+}
 
 \references{
 

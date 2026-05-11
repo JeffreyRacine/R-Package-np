@@ -213,6 +213,23 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   from the resulting object. Also, \code{\link{summary}} supports
   \code{conmode} objects.
 }
+\section{Book And Method Pointers}{
+  The conditional-mode target is
+  \eqn{\arg\max_y \Pr(Y=y\mid X=x)} for a discrete response. In practice
+  \code{npconmode} estimates the conditional probability of each
+  response support point using \code{\link{npcdensbw}} /
+  \code{\link{npcdens}}, optionally projects non-local-constant fitted
+  probabilities onto the probability simplex, and then reports the
+  modal support point.
+
+  For book-length background, see Racine (2019), Chapter 4
+  \emph{Conditional Probability Density and Cumulative Distribution
+  Functions}, especially the binary and multinomial choice material,
+  and Li and Racine (2007), Chapter 5 \emph{Conditional Density
+  Estimation} together with Chapter 4 \emph{Kernel Estimation with Mixed
+  Data}.
+}
+
 \references{
   Aitchison, J. and  C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.

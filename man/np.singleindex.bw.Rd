@@ -574,6 +574,18 @@ or standard-deviation factors.
   objects of this class.
 }
 
+\section{Book And Method Pointers}{
+  \code{npindexbw} selects the index direction, bandwidth, and when
+  requested local-polynomial degree/search metadata for the single-index
+  model. The continuous-outcome target is typically written
+  \eqn{E[Y\mid X]=g(X^\prime\beta)}, with \eqn{\beta} normalized for
+  identification; binary outcomes use the Klein-Spady route.
+
+  For book-length derivations, see Li and Racine (2007), Chapter 8
+  \emph{Semiparametric Single Index Models}, especially Sections 8.1,
+  8.2.1, 8.4, 8.5, and 8.10, and Racine (2019), Chapter 8.
+}
+
 \references{
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
