@@ -33,6 +33,44 @@ test_that("npqreg works with multiple taus", {
   expect_equal(model_q25$tau, 0.25)
 })
 
+test_that("npqreg vector-tau plots support legend controls", {
+  set.seed(20260511)
+  n <- 24L
+  xdat <- data.frame(x = seq(0.05, 0.95, length.out = n))
+  ydat <- sin(2 * pi * xdat$x) + rnorm(n, sd = 0.05)
+  bw <- npcdistbw(
+    xdat = xdat,
+    ydat = ydat,
+    bws = c(0.5, 0.5),
+    bandwidth.compute = FALSE
+  )
+  fit <- npqreg(bws = bw, tau = c(0.25, 0.5, 0.75))
+
+  old.dev <- grDevices::dev.cur()
+  grDevices::pdf(file = tempfile(fileext = ".pdf"))
+  on.exit({
+    grDevices::dev.off()
+    if (old.dev > 1L)
+      grDevices::dev.set(old.dev)
+  }, add = TRUE)
+
+  expect_silent(plot(fit, perspective = FALSE, errors = "none", neval = 6L,
+                     legend = NULL))
+  expect_silent(plot(fit, perspective = FALSE, errors = "none", neval = 6L,
+                     legend = NA))
+  expect_silent(plot(fit, perspective = FALSE, errors = "none", neval = 6L,
+                     legend = "bottomright"))
+  expect_silent(plot(fit, perspective = FALSE, errors = "none", neval = 6L,
+                     legend = list(x = "bottomleft",
+                                   legend = c("low", "mid", "high"),
+                                   bty = "o")))
+  expect_error(
+    plot(fit, perspective = FALSE, errors = "none", neval = 6L,
+         legend = 1),
+    "legend must be TRUE/FALSE"
+  )
+})
+
 test_that("npqreg plot preserves NOMAD-selected LP degree metadata", {
   set.seed(70511)
   n <- 24L

@@ -252,7 +252,9 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
   \code{plot(fit, tau = c(0.25, 0.5, 0.75))}; this reuses the stored
   bandwidths and recomputes only the one-dimensional quantile extraction
   step for the requested \code{tau} values. Vector-\code{tau} plots are
-  overlaid and include a legend.
+  overlaid and include a legend; use \code{legend=FALSE},
+  \code{legend=NULL}, or a \code{legend=list(...)} control to suppress
+  or customize it.
 
 }
 

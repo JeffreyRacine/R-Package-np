@@ -33,6 +33,7 @@
            theta = 0.0,
            phi = 20.0,
            tau = 0.5,
+           legend = TRUE,
            view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
@@ -63,6 +64,37 @@
 
     scalar_default <- function(value, default) {
       if (is.null(value)) default else value
+    }
+
+    plot_legend_args <- function(default.args) {
+      value <- legend
+      if (is.null(value))
+        return(NULL)
+      if (is.logical(value)) {
+        if (length(value) != 1L)
+          stop("legend must be TRUE/FALSE, NULL, NA, a legend position string, or a list of graphics::legend arguments",
+               call. = FALSE)
+        if (is.na(value) || !isTRUE(value))
+          return(NULL)
+        return(default.args)
+      }
+      if (is.character(value) && length(value) == 1L && !is.na(value)) {
+        default.args$x <- value
+        return(default.args)
+      }
+      if (is.list(value)) {
+        show <- value$show
+        if (!is.null(show)) {
+          if (!is.logical(show) || length(show) != 1L)
+            stop("legend$show must be TRUE or FALSE", call. = FALSE)
+          value$show <- NULL
+          if (is.na(show) || !isTRUE(show))
+            return(NULL)
+        }
+        return(.np_plot_merge_user_args(default.args, value))
+      }
+      stop("legend must be TRUE/FALSE, NULL, NA, a legend position string, or a list of graphics::legend arguments",
+           call. = FALSE)
     }
 
     dots <- list(...)
@@ -834,8 +866,12 @@
           lines(mat.x, value[, kk], type = scalar_default(type, "l"),
                 col = curve.col[[kk]], lty = curve.lty[[kk]], lwd = curve.lwd[[kk]])
         }
-        legend("topright", legend = tau.labels, col = curve.col,
+        tau.legend.args <- plot_legend_args(
+          list(x = "topright", legend = tau.labels, col = curve.col,
                lty = curve.lty, lwd = curve.lwd, bty = "n")
+        )
+        if (!is.null(tau.legend.args))
+          do.call(graphics::legend, tau.legend.args)
         if (plot.errors.type == "all" && !is.null(err)) {
           legend("topleft",
                  legend = c("Pointwise", "Simultaneous", "Bonferroni"),
