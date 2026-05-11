@@ -6505,6 +6505,7 @@ plotFactor <- function(f, y, ...){
                                    itmax = 10000,
                                    ...) {
   tau <- .npqreg_validate_tau(tau)
+  .npqreg_assert_selected_cdf_metadata(bws)
   plot.fit.label <- if (length(tau) == 1L) {
     "Computing quantile-regression plot fit"
   } else {

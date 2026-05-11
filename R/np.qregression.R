@@ -33,7 +33,7 @@ npqreg <-
 }
 
 .npqreg_tau_labels <- function(tau) {
-  paste0("tau", format(tau, trim = TRUE, scientific = FALSE))
+  paste0("tau=", format(tau, trim = TRUE, scientific = FALSE))
 }
 
 .npqreg_napredict_eval <- function(omit, x) {

@@ -141,14 +141,14 @@ test_that("npqreg fixed asymptotic slice prototype matches current fitted-object
       xdat = x,
       ydat = y,
       neval = 6L,
-      band = band
+      plot.errors.type = band
     )
     stages <- proto(
       fit,
       xdat = x,
       ydat = y,
       neval = 6L,
-      band = band,
+      plot.errors.type = band,
       return.stages = TRUE
     )
 
@@ -201,7 +201,8 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
     method <- cases$method[ii]
     center <- cases$center[ii]
     boot.seed <- 8200L + ii
-    extra <- if (identical(method, "inid")) list() else list(boot_control = np_boot_control(blocklen = 3L))
+    plot.extra <- if (identical(method, "inid")) list() else list(boot_control = np_boot_control(blocklen = 3L))
+    proto.extra <- if (identical(method, "inid")) list() else list(plot.errors.boot.blocklen = 3L)
     set.seed(boot.seed)
     old <- suppressWarnings(do.call(plot, c(
       list(
@@ -218,7 +219,7 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
         perspective = FALSE,
         random.seed = boot.seed
       ),
-      extra
+      plot.extra
     )))
     set.seed(boot.seed)
     candidate <- suppressWarnings(do.call(proto, c(
@@ -227,12 +228,12 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
         xdat = x,
         ydat = y,
         neval = 5L,
-        bootstrap = method,
-        B = 11L,
-        center = center,
-        band = "pmzsd"
+        plot.errors.boot.method = method,
+        plot.errors.boot.num = 11L,
+        plot.errors.center = center,
+        plot.errors.type = "pmzsd"
       ),
-      extra
+      proto.extra
     )))
     set.seed(boot.seed)
     stages <- suppressWarnings(do.call(proto, c(
@@ -241,13 +242,13 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
         xdat = x,
         ydat = y,
         neval = 5L,
-        bootstrap = method,
-        B = 11L,
-        center = center,
-        band = "pmzsd",
+        plot.errors.boot.method = method,
+        plot.errors.boot.num = 11L,
+        plot.errors.center = center,
+        plot.errors.type = "pmzsd",
         return.stages = TRUE
       ),
-      extra
+      proto.extra
     )))
 
     for (nm in names(old)) {
@@ -335,7 +336,8 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
 
   for (method in c("inid", "fixed")) {
     boot.seed <- if (identical(method, "inid")) 8301L else 902L
-    extra <- if (identical(method, "fixed")) list(boot_control = np_boot_control(blocklen = 2L)) else list()
+    plot.extra <- if (identical(method, "fixed")) list(boot_control = np_boot_control(blocklen = 2L)) else list()
+    proto.extra <- if (identical(method, "fixed")) list(plot.errors.boot.blocklen = 2L) else list()
     boot.num <- if (identical(method, "fixed")) 5L else 7L
     set.seed(boot.seed)
     old.boot <- suppressWarnings(do.call(plot, c(
@@ -354,7 +356,7 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
         perspective = FALSE,
         random.seed = boot.seed
       ),
-      extra
+      plot.extra
     )))
     set.seed(boot.seed)
     candidate.boot <- suppressWarnings(do.call(proto.boot, c(
@@ -363,13 +365,13 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
         xdat = x,
         ydat = y,
         neval = 5L,
-        bootstrap = method,
-        B = boot.num,
-        center = "estimate",
-        band = "pmzsd",
+        plot.errors.boot.method = method,
+        plot.errors.boot.num = boot.num,
+        plot.errors.center = "estimate",
+        plot.errors.type = "pmzsd",
         gradients = TRUE
       ),
-      extra
+      proto.extra
     )))
     set.seed(boot.seed)
     stages.boot <- suppressWarnings(do.call(proto.boot, c(
@@ -378,14 +380,14 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
         xdat = x,
         ydat = y,
         neval = 5L,
-        bootstrap = method,
-        B = boot.num,
-        center = "estimate",
-        band = "pmzsd",
+        plot.errors.boot.method = method,
+        plot.errors.boot.num = boot.num,
+        plot.errors.center = "estimate",
+        plot.errors.type = "pmzsd",
         gradients = TRUE,
         return.stages = TRUE
       ),
-      extra
+      proto.extra
     )))
 
     for (nm in names(old.boot)) {
