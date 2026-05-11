@@ -51,6 +51,8 @@ print.qregression <- function(x, digits=NULL, ...){
       " in ", x$xndim + x$yndim, " variable(s)",
       "\n(", x$yndim, " dependent variable(s), and ", x$xndim, " explanatory variable(s))\n\n",
       sep="")
+  if (length(x$tau) > 1L)
+    cat("Tau values:", paste(format(x$tau, trim = TRUE), collapse = ", "), "\n\n")
   print(matrix(x$ybw,ncol=x$yndim,dimnames=list(paste("Dep. Var. ",x$pscaling,":",sep=""),x$ynames)))
 
   print(matrix(x$xbw,ncol=x$xndim,dimnames=list(paste("Exp. Var. ",x$pscaling,":",sep=""),x$xnames)))
@@ -69,7 +71,10 @@ fitted.qregression <- function(object, ...){
 }
 quantile.qregression <- function(x, ...){ x$quantile }
 predict.qregression <- function(object, se.fit = FALSE, ...) {
-  tr <- do.call(npqreg, c(list(bws = object$bws), list(...)))
+  dots <- list(...)
+  if (is.null(dots$tau))
+    dots$tau <- object$tau
+  tr <- do.call(npqreg, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = NA))
@@ -96,6 +101,8 @@ summary.qregression <- function(object, ...) {
       sep="")
 
   cat(genOmitStr(object))
+  if (length(object$tau) > 1L)
+    cat("Tau values:", paste(format(object$tau, trim = TRUE), collapse = ", "), "\n\n")
 
   print(matrix(object$ybw,ncol=object$yndim,dimnames=list(paste("Dep. Var. ",object$pscaling,":",sep=""),object$ynames)))
 

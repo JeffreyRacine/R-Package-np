@@ -106,8 +106,8 @@ These arguments control where the quantile regression is evaluated and which fit
 
 
   \item{tau}{
-    a numeric value specifying the quantile probability
-    \eqn{\tau}{tau}. Defaults to \code{0.5}.
+    a numeric scalar or vector specifying the quantile probability or
+    probabilities \eqn{\tau}{tau}. Defaults to \code{0.5}.
   }
 
 
@@ -215,34 +215,50 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
          {\hat f(\hat q_\tau(x)|x)} .
   }
 
+  When \code{npqreg} is called without an explicit \code{bws} object, it
+  first computes conditional distribution bandwidths using
+  \code{\link{npcdistbw}} and stores them in the returned object's
+  \code{bws} component. If a scalar \code{tau} was used initially and
+  additional quantiles are later desired as fitted objects, reuse those
+  selected bandwidths directly, for example
+  \code{npqreg(bws = fit$bws, tau = c(0.25, 0.5, 0.75))}. If the goal
+  is only to inspect additional quantiles graphically, use
+  \code{plot(fit, tau = c(0.25, 0.5, 0.75))}; this reuses the stored
+  bandwidths and recomputes only the one-dimensional quantile extraction
+  step for the requested \code{tau} values. Vector-\code{tau} plots are
+  overlaid and include a legend.
+
 }
 
 \value{
 
   \code{npqreg} returns a \code{npqregression} object.  The generic
   functions \code{\link{fitted}} (or \code{\link{quantile}}),
-  \code{\link{se}}, \code{\link{predict}} (when using
-  \code{\link{predict}} you must add the argument \code{tau=} to
-  generate predictions other than the median), and
-  \code{\link{gradients}}, extract (or generate) estimated values,
-  asymptotic standard errors on estimates, predictions, and gradients,
-  respectively, from the returned object. Furthermore, the functions
+  \code{\link{se}}, \code{\link{predict}}, and \code{\link{gradients}}
+  extract (or generate) estimated values, asymptotic standard errors on
+  estimates, predictions, and gradients, respectively, from the returned
+  object. \code{\link{predict}} uses the object's stored \code{tau}
+  value by default; supply \code{tau=} to override it. Furthermore, the functions
   \code{\link{summary}} and \code{\link{plot}} support objects of this
   type. The returned object has the following components:
 
   \item{eval}{ evaluation points }
   \item{quantile}{ estimation of the quantile regression function
-    (conditional quantile) at the  evaluation points }
+    (conditional quantile) at the evaluation points. If \code{tau} has
+    length greater than one this is an evaluation-by-\code{tau} matrix. }
   \item{quanterr}{ asymptotic standard errors of the quantile
     regression estimates, obtained from the conditional distribution
     standard error and the estimated conditional density at the fitted
-    quantile }
+    quantile. If \code{tau} has length greater than one this is an
+    evaluation-by-\code{tau} matrix. }
   \item{quantgrad}{ gradients of the conditional quantile with respect
     to the conditioning variables at each evaluation point, when
-    \code{gradients=TRUE} }
+    \code{gradients=TRUE}. If \code{tau} has length greater than one
+    this is an evaluation-by-gradient-by-\code{tau} array. }
   \item{quantgerr}{ asymptotic standard errors for gradients, when
-    \code{gradients=TRUE} }
-  \item{tau}{ the quantile probability computed }
+    \code{gradients=TRUE}. If \code{tau} has length greater than one
+    this is an evaluation-by-gradient-by-\code{tau} array. }
+  \item{tau}{ the quantile probability or probabilities computed }
 
 
 }
@@ -348,9 +364,18 @@ bw <- npcdistbw(gdp~ordered(year),data=Italy)
 
 summary(bw)
 
-model <- npqreg(bws=bw, tau=0.50)
+model <- npqreg(bws=bw, tau=c(0.25, 0.50, 0.75))
 
 summary(model)
+
+## If a scalar tau was used first, additional quantiles can reuse the
+## selected bandwidths without recomputing cross-validation. Use npqreg()
+## when the additional fitted values are needed as an object, or plot()
+## when graphical inspection is all that is desired.
+
+model.med <- npqreg(bws=bw, tau=0.50)
+model.more <- npqreg(bws=model.med$bws, tau=c(0.25, 0.50, 0.75))
+plot(model.med, tau=c(0.25, 0.50, 0.75))
 
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.

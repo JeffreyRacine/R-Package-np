@@ -116,8 +116,13 @@ Named options passed via \code{\dots} include:
         where implemented.
       }
       \item{\code{tau}}{
-        the quantile index used for quantile-regression-related plotting
-        routes when relevant.
+        the quantile index or indices used for quantile-regression-related
+        plotting routes when relevant. A vector of \code{tau} values overlays
+        the corresponding conditional quantile curves and reuses the stored
+        bandwidth object. With \code{errors="asymptotic"} or
+        \code{errors="bootstrap"}, intervals are constructed separately for
+        each requested \code{tau}; bootstrap work is shared across \code{tau}
+        values within each resample.
       }
     }
 

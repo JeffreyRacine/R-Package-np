@@ -11042,7 +11042,8 @@ plotFactor <- function(f, y, ...){
       tydat = y.train,
       exdat = exdat,
       tau = tau,
-      gradients = FALSE
+      gradients = FALSE,
+      need.errors = FALSE
     )$quantile)
   }
 
@@ -11116,14 +11117,19 @@ plotFactor <- function(f, y, ...){
     stop("invalid quantile gradient bootstrap dimensions")
 
   fit.fun <- function(x.train, y.train) {
-    as.vector(.np_plot_quantile_eval(
+    g <- .np_plot_quantile_eval(
       bws = bws,
       txdat = x.train,
       tydat = y.train,
       exdat = exdat,
       tau = tau,
       gradients = TRUE
-    )$quantgrad[, gradient.index, drop = TRUE])
+    )$quantgrad
+    if (length(dim(g)) == 3L) {
+      as.vector(g[, gradient.index, , drop = TRUE])
+    } else {
+      as.vector(g[, gradient.index, drop = TRUE])
+    }
   }
 
   t0 <- fit.fun(x.train = xdat, y.train = ydat)
@@ -11610,12 +11616,19 @@ plotFactor <- function(f, y, ...){
                                    exdat,
                                    tau = 0.5,
                                    gradients = FALSE,
+                                   need.errors = TRUE,
                                    tol = 1.490116e-04,
                                    small = 1.490116e-05,
                                    itmax = 10000,
                                    ...) {
+  tau <- .npqreg_validate_tau(tau)
+  plot.fit.label <- if (length(tau) == 1L) {
+    "Computing quantile-regression plot fit"
+  } else {
+    sprintf("Computing quantile-regression plot fit (%d tau values)", length(tau))
+  }
   .np_plot_activity_run(
-    label = "Computing quantile-regression plot fit",
+    label = plot.fit.label,
     {
       fit.start <- proc.time()[3]
       gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -11639,8 +11652,8 @@ plotFactor <- function(f, y, ...){
       xdat <- toFrame(txdat)
       ydat <- toFrame(tydat)
 
-      if (!is.numeric(tau) || length(tau) != 1L || is.na(tau) || tau <= 0 || tau >= 1)
-        stop("'tau' must be a single numeric value in (0,1)")
+      ntau <- length(tau)
+      tau.labels <- .npqreg_tau_labels(tau)
       if (ncol(ydat) != 1L)
         stop("'tydat' has more than one column")
 
@@ -11698,36 +11711,71 @@ plotFactor <- function(f, y, ...){
       if (!no.ex)
         exdat.df <- exdat
 
-      myout <- list(
-        yq = .npqreg_invert_selected_cdf(
+      fit.one.tau <- function(tau.i) {
+        yq <- .npqreg_invert_selected_cdf(
           bws = bws,
           xdat = xdat.df,
           ydat = ydat.df,
           exdat = txeval,
-          tau = tau,
+          tau = tau.i,
           tol = tol,
           small = small,
           itmax = itmax
-        ),
-        yqerr = NA,
-        yqgrad = NA
-      )
+        )
+        if (!isTRUE(need.errors) && !isTRUE(gradients)) {
+          return(list(
+            yq = yq,
+            yqerr = rep.int(NA_real_, length(yq)),
+            yqgrad = NA,
+            yqgerr = NA
+          ))
+        }
+        qdelta <- .npqreg_quantile_delta_from_conditional(
+          bws = bws,
+          xdat = xdat.df,
+          ydat = ydat.df,
+          exdat = txeval,
+          quantile = yq,
+          gradients = gradients
+        )
+        list(
+          yq = yq,
+          yqerr = qdelta$quanterr,
+          yqgrad = if (gradients) qdelta$quantgrad else NA,
+          yqgerr = if (gradients) qdelta$quantgerr else NA
+        )
+      }
 
-      qdelta <- .npqreg_quantile_delta_from_conditional(
-        bws = bws,
-        xdat = xdat.df,
-        ydat = ydat.df,
-        exdat = txeval,
-        quantile = myout$yq,
-        gradients = gradients
-      )
-      myout$yqerr <- qdelta$quanterr
-      if (gradients) {
-        myout$yqgrad <- qdelta$quantgrad
-        myout$yqgerr <- qdelta$quantgerr
+      tau.out <- lapply(tau, fit.one.tau)
+      if (ntau == 1L) {
+        myout <- tau.out[[1L]]
       } else {
-        myout$yqgrad <- NA
-        myout$yqgerr <- NA
+        myout <- list(
+          yq = do.call(cbind, lapply(tau.out, `[[`, "yq")),
+          yqerr = do.call(cbind, lapply(tau.out, `[[`, "yqerr")),
+          yqgrad = NA,
+          yqgerr = NA
+        )
+        colnames(myout$yq) <- tau.labels
+        colnames(myout$yqerr) <- tau.labels
+        if (gradients) {
+          p <- ncol(tau.out[[1L]]$yqgrad)
+          grad.names <- colnames(tau.out[[1L]]$yqgrad)
+          myout$yqgrad <- array(
+            NA_real_,
+            dim = c(enrow, p, ntau),
+            dimnames = list(NULL, grad.names, tau.labels)
+          )
+          myout$yqgerr <- array(
+            NA_real_,
+            dim = c(enrow, p, ntau),
+            dimnames = list(NULL, grad.names, tau.labels)
+          )
+          for (j in seq_len(ntau)) {
+            myout$yqgrad[, , j] <- tau.out[[j]]$yqgrad
+            myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
+          }
+        }
       }
 
       fit.elapsed <- proc.time()[3] - fit.start
@@ -12246,6 +12294,72 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
     err = cbind(t0 - bounds[, 1L], bounds[, 2L] - t0),
     all.err = all.err
   )
+}
+
+.np_plot_bootstrap_quantile_tau_payload <- function(boot.out,
+                                                    neval,
+                                                    tau,
+                                                    alpha,
+                                                    band.type,
+                                                    center,
+                                                    progress.label = NULL) {
+  tau <- .npqreg_validate_tau(tau)
+  ntau <- length(tau)
+  neval <- as.integer(neval)
+  if (ntau <= 1L)
+    return(NULL)
+  if (neval < 1L)
+    stop("invalid quantile bootstrap evaluation dimension", call. = FALSE)
+
+  expected <- neval * ntau
+  if (ncol(boot.out$t) != expected || length(boot.out$t0) != expected) {
+    stop("vector tau quantile bootstrap helper returned an incompatible payload", call. = FALSE)
+  }
+
+  tau.labels <- .npqreg_tau_labels(tau)
+  dimnames.err <- list(NULL, c("lower", "upper", "center"), tau.labels)
+  boot.err <- array(NA_real_, dim = c(neval, 3L, ntau), dimnames = dimnames.err)
+  boot.all.err <- vector("list", ntau)
+  names(boot.all.err) <- tau.labels
+
+  for (kk in seq_len(ntau)) {
+    idx <- (kk - 1L) * neval + seq_len(neval)
+    boot.t.k <- boot.out$t[, idx, drop = FALSE]
+    t0.k <- boot.out$t0[idx]
+    label.k <- if (is.null(progress.label)) {
+      sprintf("Constructing bootstrap %s bands (%s)", band.type, tau.labels[[kk]])
+    } else {
+      sprintf("%s (%s)", progress.label, tau.labels[[kk]])
+    }
+
+    if (identical(band.type, "pmzsd")) {
+      pmz.progress <- .np_plot_stage_progress_begin(
+        total = 2L,
+        label = sprintf("Computing bootstrap pmzsd errors (%s)", tau.labels[[kk]])
+      )
+      on.exit(.np_plot_progress_end(pmz.progress), add = TRUE)
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.t.k)
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 1L, force = TRUE)
+      boot.err[, 1:2, kk] <- qnorm(alpha / 2, lower.tail = FALSE) * boot.sd
+      pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
+    } else {
+      interval.summary <- .np_plot_bootstrap_interval_summary(
+        boot.t = boot.t.k,
+        t0 = t0.k,
+        alpha = alpha,
+        band.type = band.type,
+        progress.label = label.k
+      )
+      boot.err[, 1:2, kk] <- interval.summary$err
+      boot.all.err[[kk]] <- interval.summary$all.err
+    }
+
+    if (identical(center, "bias-corrected")) {
+      boot.err[, 3L, kk] <- 2 * t0.k - colMeans(boot.t.k)
+    }
+  }
+
+  list(boot.err = boot.err, boot.all.err = boot.all.err, bxp = list())
 }
 
 .np_plot_bootstrap_col_sds <- function(boot.t) {
@@ -13839,6 +13953,26 @@ compute.bootstrap.errors.conbandwidth =
       tdati <- bws$ydati
       ti <- slice.index - bws$xndim
     }
+
+    tau <- if (identical(tboo, "quant")) .npqreg_validate_tau(tau) else tau
+    if (identical(tboo, "quant") && length(tau) > 1L) {
+      tau.payload <- .np_plot_bootstrap_quantile_tau_payload(
+        boot.out = boot.out,
+        neval = nrow(exdat),
+        tau = tau,
+        alpha = plot.errors.alpha,
+        band.type = plot.errors.type,
+        center = plot.errors.center,
+        progress.label = interval.label
+      )
+      return(.npRmpi_profile_finalize_bootstrap(
+        boot.err = tau.payload$boot.err,
+        bxp = tau.payload$bxp,
+        boot.all.err = tau.payload$boot.all.err,
+        ctx = prof.ctx
+      ))
+    }
+
     all.bp <- .np_plot_boot_factor_boxplots(
       boot.t = boot.out$t,
       tdati = tdati,
