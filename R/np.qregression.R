@@ -757,6 +757,7 @@ npqreg.condbandwidth <-
 
 
 npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
+  nomad <- npValidateScalarLogical(nomad, "nomad")
   .npRmpi_require_active_slave_pool(where = "npqreg()")
   parallel.cond <- (!missing(bws)) &&
     .npRmpi_npqreg_should_localize(bws) &&
@@ -777,7 +778,20 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     fit.names <- c("newdata", "tau", "gradients", "tol", "small", "itmax")
     fit.dots <- .npqreg_fit_dots(dots[nzchar(dot.names) & dot.names %in% fit.names])
     bw.dots <- dots[!(nzchar(dot.names) & dot.names %in% fit.names)]
-    tbw <- do.call(npcdistbw, c(list(formula = bws), bw.dots))
+    bw.args <- c(list(formula = bws, nomad = nomad), bw.dots)
+    bw.call <- as.call(c(list(quote(npcdistbw)), bw.args))
+    use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
+      bw.call,
+      caller_env = parent.frame()
+    )
+    tbw <- if (use.outer.bandwidth.progress) {
+      .np_progress_select_bandwidth_enhanced(
+        "Selecting conditional distribution bandwidth",
+        do.call(npcdistbw, bw.args)
+      )
+    } else {
+      do.call(npcdistbw, bw.args)
+    }
     return(do.call(npqreg, c(list(bws = tbw), fit.dots)))
   }
 
@@ -821,12 +835,21 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
-    
+
+  use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
+    sc.bw,
+    caller_env = parent.frame()
+  )
+
   tbw <- if (!has.explicit.bws) {
-    .np_progress_select_bandwidth(
-      "Selecting conditional distribution bandwidth",
+    if (use.outer.bandwidth.progress) {
+      .np_progress_select_bandwidth_enhanced(
+        "Selecting conditional distribution bandwidth",
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+      )
+    } else {
       .np_eval_bw_call(sc.bw, caller_env = parent.frame())
-    )
+    }
   } else {
     .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   }

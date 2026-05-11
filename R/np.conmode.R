@@ -358,6 +358,7 @@ npconmode.default <- function(bws, txdat, tydat,
                               proper.control = list(),
                               probabilities = FALSE,
                               ...){
+  nomad <- npValidateScalarLogical(nomad, "nomad")
   .npRmpi_require_active_slave_pool(where = "npconmode()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -411,12 +412,21 @@ npconmode.default <- function(bws, txdat, tydat,
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
-    
+
+  use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
+    sc.bw,
+    caller_env = parent.frame()
+  )
+
   tbw <- if (!has.explicit.bws) {
-    .np_progress_select_bandwidth(
-      "Selecting conditional density bandwidth",
+    if (use.outer.bandwidth.progress) {
+      .np_progress_select_bandwidth_enhanced(
+        "Selecting conditional density bandwidth",
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+      )
+    } else {
       .np_eval_bw_call(sc.bw, caller_env = parent.frame())
-    )
+    }
   } else {
     .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   }

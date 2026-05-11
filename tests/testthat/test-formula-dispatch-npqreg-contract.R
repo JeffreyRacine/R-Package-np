@@ -18,3 +18,31 @@ test_that("named bws formula dispatch matches explicit npqreg bandwidth route", 
   expect_lt(max(abs(as.numeric(fit.named$quantile) - as.numeric(fit.pos$quantile))), 1e-2)
   expect_lt(max(abs(as.numeric(fit.named$quanterr) - as.numeric(fit.pos$quanterr))), 1e-2)
 })
+
+test_that("named bws formula dispatch forwards NOMAD shortcut controls", {
+  skip_if_not_installed("crs")
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  set.seed(20260511)
+  d <- data.frame(
+    x = seq(0.05, 0.95, length.out = 30),
+    y = sin(seq(0.05, 0.95, length.out = 30)) + rnorm(30, sd = 0.05)
+  )
+
+  capture.output(
+    fit.named <- npqreg(
+      bws = y ~ x,
+      data = d,
+      tau = 0.5,
+      nomad = TRUE,
+      nmulti = 1L,
+      nomad.nmulti = 1L,
+      degree.max = 1L
+    )
+  )
+
+  expect_s3_class(fit.named, "qregression")
+  expect_true(isTRUE(fit.named$bws$nomad.shortcut$enabled))
+  expect_identical(as.character(fit.named$bws$regtype.engine), "lp")
+})
