@@ -49,6 +49,7 @@ npconmode(bws, \dots)
 \method{npconmode}{default}(bws, 
           txdat, 
           tydat, 
+          nomad = FALSE,
           proper = NULL,
           proper.control = list(),
           probabilities = FALSE,
@@ -151,14 +152,36 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
     non-negativity and unit-mass checks.
   }
 
+
+\subsection{Local-Polynomial Degree And Bandwidth Search}{
+This argument controls the recommended automatic local-polynomial NOMAD route, which jointly selects continuous polynomial degree and bandwidths when conditional-density bandwidths are computed inside \code{npconmode}.
+}
+
+  \item{nomad}{
+    logical shortcut passed through to \code{\link{npcdensbw}} when
+    bandwidths are computed inside \code{npconmode}. When \code{TRUE},
+    the conditional-density bandwidth route fills any missing values
+    among \code{regtype}, \code{search.engine}, \code{degree.select},
+    \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
+    \code{degree.verify}, and \code{bwtype} with the recommended
+    automatic local-polynomial degree-and-bandwidth NOMAD preset documented in \code{\link{npcdensbw}}.
+    Additional NOMAD tuning arguments such as \code{nomad.nmulti} may
+    also be supplied through \code{\dots}; \code{nmulti} remains the
+    outer restart count while \code{nomad.nmulti} controls inner
+    \code{crs::snomadr()} multistarts within each outer restart.
+    Automatic NOMAD degree search requires at least one continuous
+    explanatory variable. After fitting, inspect
+    \code{fit$bws$nomad.shortcut} on the returned object \code{fit} to
+    see the normalized shortcut metadata.
+  }
+
   \item{\dots}{
     additional arguments supplied to \code{\link{npcdensbw}} when bandwidths
     are computed internally. These may include bandwidth type, kernel types,
     \code{regtype}, \code{degree}, \code{nomad}, \code{search.engine},
-    \code{degree.max}, and related bandwidth-search controls. Automatic NOMAD
-    degree search requires at least one continuous explanatory variable. These
-    arguments are not used to alter an explicitly supplied
-    \code{conbandwidth} object.
+    \code{nomad.nmulti}, \code{degree.max}, and related
+    bandwidth-search controls. These arguments are not used to alter an
+    explicitly supplied \code{conbandwidth} object.
   }
 
 }

@@ -756,7 +756,7 @@ npqreg.condbandwidth <-
   }
 
 
-npqreg.default <- function(bws, txdat, tydat, ...){
+npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npqreg()")
   parallel.cond <- (!missing(bws)) &&
     .npRmpi_npqreg_should_localize(bws) &&
