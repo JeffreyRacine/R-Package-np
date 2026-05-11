@@ -791,6 +791,183 @@ np_render_control <- function(style = c("band", "bar"),
     dots$plot.data.overlay <- TRUE
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
+.np_plot_conmode_data <- function(object, gradients = FALSE, level = NULL) {
+  lev <- if (!is.null(object$probability.levels)) {
+    as.character(object$probability.levels)
+  } else if (!is.null(object$probability.gradient.level)) {
+    as.character(object$probability.gradient.level)
+  } else {
+    levels(object$conmode)
+  }
+  lev <- unique(lev)
+  if (!length(lev))
+    stop("conmode object does not contain response-level metadata", call. = FALSE)
+
+  if (is.null(level)) {
+    if (isTRUE(gradients) && !is.null(object$probability.gradient.level)) {
+      level <- as.character(object$probability.gradient.level)
+    } else {
+      level <- lev[1L]
+    }
+  }
+  if (length(level) != 1L || is.na(level) || !(as.character(level) %in% lev))
+    stop("'level' must identify one response level in the fitted conmode object",
+         call. = FALSE)
+  level <- as.character(level)
+  level.idx <- match(level, lev)
+
+  if (isTRUE(gradients)) {
+    values <- object$probability.gradients
+    if (is.null(values))
+      stop("class-probability gradients/effects are not available: fit with gradients=TRUE",
+           call. = FALSE)
+    stored.level <- object$probability.gradient.level
+    if (!identical(as.character(level), as.character(stored.level)))
+      stop(sprintf("stored class-probability gradients are for level %s; refit with level=%s to plot that level",
+                   sQuote(as.character(stored.level)),
+                   sQuote(as.character(level))),
+           call. = FALSE)
+    p <- ncol(values)
+    ymat <- as.matrix(values)
+    value.name <- "effect"
+  } else {
+    values <- object$probabilities
+    if (is.null(values))
+      stop("class probabilities are not available: fit with probabilities=TRUE or gradients=TRUE",
+           call. = FALSE)
+    p <- object$xndim
+    ymat <- matrix(values[, level.idx], nrow = nrow(values), ncol = 1L)
+    if (p > 1L)
+      ymat <- ymat[, rep(1L, p), drop = FALSE]
+    value.name <- "probability"
+  }
+
+  xeval <- as.data.frame(object$xeval)
+  out <- vector("list", p)
+  xnames <- object$xnames
+  if (is.null(xnames) || length(xnames) != p)
+    xnames <- names(xeval)[seq_len(p)]
+  for (j in seq_len(p)) {
+    out[[j]] <- data.frame(
+      variable = xnames[j],
+      x = xeval[[j]],
+      value = ymat[, j],
+      level = level,
+      gradients = isTRUE(gradients),
+      stringsAsFactors = FALSE
+    )
+    names(out[[j]])[3L] <- value.name
+  }
+  names(out) <- xnames
+  out
+}
+
+.np_plot_conmode_panel <- function(dat,
+                                   gradients = FALSE,
+                                   level,
+                                   plot.user.args = list(),
+                                   data_rug = FALSE,
+                                   main = NULL,
+                                   xlab = NULL,
+                                   ylab = NULL) {
+  x <- dat$x
+  y <- if (isTRUE(gradients)) dat$effect else dat$probability
+  vname <- dat$variable[1L]
+  if (is.null(main))
+    main <- if (isTRUE(gradients)) {
+      paste0("Effect on Pr(Y=", level, "|X=x)")
+    } else {
+      paste0("Pr(Y=", level, "|X=x)")
+    }
+  if (is.null(xlab))
+    xlab <- vname
+  if (is.null(ylab))
+    ylab <- if (isTRUE(gradients)) "Effect" else "Probability"
+
+  if (is.factor(x) && !is.ordered(x)) {
+    args <- .np_plot_merge_user_args(
+      list(formula = y ~ x, xlab = xlab, ylab = ylab, main = main),
+      plot.user.args
+    )
+    do.call(graphics::boxplot, args)
+    return(invisible(NULL))
+  }
+
+  xplot <- if (is.ordered(x)) as.numeric(x) else x
+  ord <- order(xplot)
+  args <- .np_plot_merge_user_args(
+    list(x = xplot[ord], y = y[ord],
+         type = if (is.ordered(x) || is.numeric(xplot)) "l" else "p",
+         xlab = xlab, ylab = ylab, main = main),
+    plot.user.args
+  )
+  if (is.ordered(x)) {
+    args$xaxt <- "n"
+    do.call(graphics::plot, args)
+    graphics::axis(1L, at = seq_along(levels(x)), labels = levels(x))
+  } else {
+    do.call(graphics::plot, args)
+  }
+  if (isTRUE(data_rug) && is.numeric(xplot))
+    graphics::rug(xplot)
+  invisible(NULL)
+}
+
+.np_plot_conmode <- function(object, ...,
+                             gradients = FALSE,
+                             level = NULL,
+                             output = c("plot", "data", "plot-data"),
+                             data_rug = FALSE,
+                             layout = TRUE,
+                             legend = TRUE,
+                             .plot_dots_call = NULL) {
+  dots <- list(...)
+  dot.names <- .np_plot_dot_names(.plot_dots_call)
+  if (any(!nzchar(dot.names)))
+    stop("unnamed plot arguments are not supported for plot.conmode",
+         call. = FALSE)
+  allowed <- unique(c("gradients", "level", "output", "data_rug",
+                      "layout", "legend",
+                      .np_plot_graphics_arg_names()))
+  .np_plot_stop_unused_args(setdiff(dot.names[nzchar(dot.names)], allowed),
+                            allowed)
+  gradients <- npValidateScalarLogical(gradients, "gradients")
+  data_rug <- npValidateScalarLogical(data_rug, "data_rug")
+  plot.par.mfrow <- .np_plot_match_layout(layout)
+  output <- match.arg(output)
+  output <- .np_plot_scalar_match(output, c("plot", "data", "plot-data"), "output")
+  plot.user.args <- .np_plot_user_args(dots, "plot")
+
+  plot.data <- .np_plot_conmode_data(object, gradients = gradients, level = level)
+  level <- plot.data[[1L]]$level[1L]
+
+  if (identical(output, "data"))
+    return(plot.data)
+
+  oldpar <- NULL
+  if (isTRUE(plot.par.mfrow) && length(plot.data) > 1L) {
+    oldpar <- graphics::par(no.readonly = TRUE)
+    on.exit(graphics::par(oldpar), add = TRUE)
+    graphics::par(mfrow = grDevices::n2mfrow(length(plot.data)))
+  }
+
+  for (i in seq_along(plot.data)) {
+    panel.dots <- plot.user.args
+    if (!is.null(dots$main) && length(plot.data) > 1L)
+      panel.dots$main <- paste(dots$main, names(plot.data)[i], sep = ": ")
+    .np_plot_conmode_panel(
+      plot.data[[i]],
+      gradients = gradients,
+      level = level,
+      plot.user.args = panel.dots,
+      data_rug = data_rug
+    )
+  }
+
+  if (identical(output, "plot-data"))
+    return(plot.data)
+  invisible(object)
+}
 .np_plot_singleindex <- function(object, ..., .plot_dots_call = NULL)
   .np_plot_from_slot(object, "bws", ...,
                      .plot_dots_call = .plot_dots_call,
@@ -948,6 +1125,9 @@ plot.npdistribution <- function(x, ...)
 plot.qregression <- function(x, ...)
   .np_plot_qregression(x, ...,
                        .plot_dots_call = match.call(expand.dots = FALSE)$...)
+plot.conmode <- function(x, ...)
+  .np_plot_conmode(x, ...,
+                   .plot_dots_call = match.call(expand.dots = FALSE)$...)
 plot.singleindex <- function(x, ...)
   .np_plot_singleindex(x, ...,
                        .plot_dots_call = match.call(expand.dots = FALSE)$...)

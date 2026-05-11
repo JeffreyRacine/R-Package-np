@@ -49,7 +49,12 @@ conmode =
            proper.applied = FALSE,
            proper.info = NULL,
            probabilities = NULL,
-           probability.levels = NULL){
+           probability.levels = NULL,
+           probability.gradients = NULL,
+           probability.gradient.level = NULL,
+           probability.gradient.names = NULL,
+           probability.gradient.info = NULL,
+           gradients = FALSE){
 
     if (missing(bws) || missing(xeval) || missing(conmode) || missing(condens) || missing(ntrain))
       stop("improper invocation of conmode constructor")
@@ -90,11 +95,18 @@ conmode =
       CCR.byoutcome = CCR.byoutcome,
       fit.mcfadden = fit.mcfadden,
       ntrain = ntrain,
-      trainiseval = trainiseval)
+      trainiseval = trainiseval,
+      gradients = gradients)
 
     if (!is.null(probabilities)) {
       d$probabilities <- probabilities
       d$probability.levels <- probability.levels
+    }
+    if (!is.null(probability.gradients)) {
+      d$probability.gradients <- probability.gradients
+      d$probability.gradient.level <- probability.gradient.level
+      d$probability.gradient.names <- probability.gradient.names
+      d$probability.gradient.info <- probability.gradient.info
     }
 
     metadata <- .npConmodeMetadataFromBws(bws)
@@ -125,6 +137,13 @@ print.conmode <- function(x, ...){
         if (isTRUE(x$proper.applied)) "projected" else "already proper",
         "\n", sep="")
   }
+  if (isTRUE(x$gradients)) {
+    cat("Class-probability gradients/effects: available",
+        if (!is.null(x$probability.gradient.level))
+          paste0(" for level ", as.character(x$probability.gradient.level))
+        else "",
+        "\n", sep="")
+  }
   
   cat("\n\n")
   if(!missing(...))
@@ -136,6 +155,33 @@ fitted.conmode <- function(object, ...) {
  object$condens 
 }
 mode.conmode <- function(x) { x$conmode }
+predict.conmode <- function(object,
+                            newdata = NULL,
+                            type = c("class", "prob"),
+                            ...) {
+  type <- match.arg(type)
+  if (!is.null(newdata))
+    stop("newdata prediction for conmode objects is not yet available; refit or evaluate npconmode() with the desired evaluation data")
+  if (identical(type, "class"))
+    return(object$conmode)
+  probs <- object$probabilities
+  if (is.null(probs))
+    stop("class probabilities are not stored: fit with probabilities=TRUE")
+  probs
+}
+gradients.conmode <- function(x, level = NULL, errors = FALSE, ...) {
+  if (isTRUE(errors))
+    stop("gradient standard errors are not available for conmode objects")
+  gout <- x$probability.gradients
+  if (is.null(gout))
+    stop("class-probability gradients/effects are not available: fit with gradients=TRUE")
+  stored.level <- x$probability.gradient.level
+  if (!is.null(level) && !identical(as.character(level), as.character(stored.level)))
+    stop(sprintf("stored class-probability gradients are for level %s; refit with level=%s to obtain that level",
+                 sQuote(as.character(stored.level)),
+                 sQuote(as.character(level))))
+  gout
+}
 
 summary.conmode <- function(object, ...){
   cat("\nConditional Mode data: ", object$ntrain, " training points,",
@@ -171,6 +217,13 @@ summary.conmode <- function(object, ...){
           signif(object$proper.info$max.row.sum.deviation.raw, 6), "\n", sep="")
     if (!is.null(object$proper.info$repaired.rows))
       cat("  Repaired rows: ", object$proper.info$repaired.rows, "\n", sep="")
+  }
+  if (isTRUE(object$gradients)) {
+    cat("Class-probability gradients/effects: available",
+        if (!is.null(object$probability.gradient.level))
+          paste0(" for level ", as.character(object$probability.gradient.level))
+        else "",
+        "\n", sep="")
   }
   cat('\n\n')
   
