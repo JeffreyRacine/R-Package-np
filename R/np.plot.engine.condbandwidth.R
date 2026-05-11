@@ -174,6 +174,15 @@
       )
     }
 
+    if (quantreg) {
+      tau <- .npqreg_validate_tau(tau)
+    }
+    multi.tau <- isTRUE(quantreg) && length(tau) > 1L
+    if (multi.tau) {
+      common.scale <- FALSE
+      perspective <- FALSE
+    }
+
     plot.errors = (plot.errors.method != "none")
     proper.args <- .np_condist_validate_proper_args(
       proper = proper,
@@ -611,8 +620,193 @@
       temp.dens = replicate(maxneval, NA)
       ## plotting controls
       plot.bootstrap <- plot.errors.method == "bootstrap"
-      tylabE <- if (quantreg) paste(tau, "quantile") else paste("Conditional", if (cdf) "Distribution" else "Density")
+      tylabE <- if (quantreg) {
+        if (multi.tau) "Conditional quantile" else paste(tau, "quantile")
+      } else paste("Conditional", if (cdf) "Distribution" else "Density")
       plotOnEstimate <- (plot.errors.center == "estimate")
+
+      quantile_matrix_extract <- function(obj, jj) {
+        if (gradients) {
+          if (multi.tau) {
+            g <- obj$quantgrad
+            matrix(
+              g[, jj, , drop = FALSE],
+              nrow = dim(g)[1L],
+              dimnames = list(NULL, dimnames(g)[[3L]])
+            )
+          } else {
+            obj$quantgrad[, jj]
+          }
+        } else if (multi.tau) {
+          obj$quantile
+        } else {
+          obj$quantile
+        }
+      }
+
+      quantile_error_extract <- function(obj, jj) {
+        if (gradients) {
+          if (multi.tau) {
+            gerr <- obj$quantgerr
+            matrix(
+              gerr[, jj, , drop = FALSE],
+              nrow = dim(gerr)[1L],
+              dimnames = list(NULL, dimnames(gerr)[[3L]])
+            )
+          } else {
+            obj$quantgerr[, jj]
+          }
+        } else if (multi.tau) {
+          obj$quanterr
+        } else {
+          obj$quanterr
+        }
+      }
+
+      multi_tau_error_range <- function(value, err, all.err, plotOnEstimate) {
+        if (is.null(err))
+          return(NULL)
+        ntau <- dim(err)[3L]
+        ranges <- matrix(NA_real_, nrow = ntau, ncol = 2L)
+        for (kk in seq_len(ntau)) {
+          center.k <- if (plotOnEstimate) value[, kk] else err[, 3L, kk]
+          if (plot.errors.type == "all") {
+            ranges[kk, ] <- compute.all.error.range(center.k, all.err[[kk]])
+          } else {
+            ranges[kk, ] <- compute.default.error.range(center.k, err[, , kk])
+          }
+        }
+        rng <- range(ranges, finite = TRUE)
+        if (length(rng) == 2L && all(is.finite(rng)))
+          rng
+        else
+          NULL
+      }
+
+      draw_multi_tau_errors <- function(ei, value, err, all.err, xi.factor,
+                                        plotOnEstimate, cols) {
+        if (is.null(err))
+          return(invisible(NULL))
+        nkeep <- nrow(value)
+        mat.x <- if (xi.factor) seq_len(nkeep) else ei[seq_len(nkeep)]
+        ntau <- ncol(value)
+        cols <- rep(cols, length.out = ntau)
+        for (kk in seq_len(ntau)) {
+          center.k <- if (plotOnEstimate) value[, kk] else err[, 3L, kk]
+          if (plot.errors.type == "all") {
+            if (is.null(all.err) || is.null(all.err[[kk]]))
+              next
+            all.k <- all.err[[kk]]
+            lty.map <- c(pointwise = 2L, simultaneous = 3L, bonferroni = 4L)
+            for (nm in intersect(names(lty.map), names(all.k))) {
+              err.k <- all.k[[nm]]
+              if (is.null(err.k))
+                next
+              draw.errors(
+                ex = mat.x,
+                ely = center.k - err.k[, 1L],
+                ehy = center.k + err.k[, 2L],
+                plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = lty.map[[nm]],
+                col = cols[[kk]]
+              )
+            }
+          } else {
+            if (!xi.factor && !plotOnEstimate)
+              lines(mat.x, err[, 3L, kk], lty = 3, col = cols[[kk]])
+            draw.errors(
+              ex = mat.x,
+              ely = if (plotOnEstimate) value[, kk] - err[, 1L, kk] else err[, 3L, kk] - err[, 1L, kk],
+              ehy = if (plotOnEstimate) value[, kk] + err[, 2L, kk] else err[, 3L, kk] + err[, 2L, kk],
+              plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+              plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+              plot.errors.bar.num = plot.errors.bar.num,
+              lty = if (xi.factor) 1 else 2,
+              col = cols[[kk]]
+            )
+          }
+        }
+        invisible(NULL)
+      }
+
+      multi_tau_plotout_err <- function(err) {
+        if (is.null(err))
+          return(NULL)
+        out <- array(
+          NA_real_,
+          dim = c(dim(err)[1L], 2L, dim(err)[3L]),
+          dimnames = list(NULL, c("lower", "upper"), dimnames(err)[[3L]])
+        )
+        out[, 1L, ] <- -err[, 1L, ]
+        out[, 2L, ] <- err[, 2L, ]
+        out
+      }
+
+      plot_multi_tau <- function(ei, value, xi.factor, xlab.value, ylab.value,
+                                 err = NULL, all.err = NULL) {
+        nkeep <- nrow(value)
+        tau.labels <- colnames(value)
+        if (is.null(tau.labels))
+          tau.labels <- .npqreg_tau_labels(tau)
+        mat.x <- if (xi.factor) seq_len(nkeep) else ei[seq_len(nkeep)]
+        plot.args <- list(
+          x = mat.x,
+          y = value,
+          type = scalar_default(type, if (xi.factor) "b" else "l"),
+          xlab = xlab.value,
+          ylab = ylab.value,
+          main = scalar_default(main, ""),
+          sub = scalar_default(sub, ""),
+          xaxt = if (xi.factor) "n" else "s"
+        )
+        error.ylim <- multi_tau_error_range(
+          value = value,
+          err = err,
+          all.err = all.err,
+          plotOnEstimate = plotOnEstimate
+        )
+        if (!is.null(ylim)) {
+          plot.args$ylim <- ylim
+        } else if (!is.null(error.ylim)) {
+          plot.args$ylim <- error.ylim
+        }
+        if (!xi.factor && !is.null(xlim))
+          plot.args$xlim <- xlim
+        plot.args$col <- scalar_default(col, seq_len(ncol(value)))
+        plot.args$lty <- scalar_default(lty, seq_len(ncol(value)))
+        plot.args$lwd <- scalar_default(lwd, par()$lwd)
+        plot.args$cex.axis <- scalar_default(cex.axis, par()$cex.axis)
+        plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
+        plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
+        plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
+        plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
+        do.call(graphics::matplot, plot.args)
+        if (xi.factor)
+          axis(1, at = mat.x, labels = as.character(ei[seq_len(nkeep)]))
+        legend.col <- rep(plot.args$col, length.out = ncol(value))
+        legend.lty <- rep(plot.args$lty, length.out = ncol(value))
+        legend.lwd <- rep(plot.args$lwd, length.out = ncol(value))
+        draw_multi_tau_errors(
+          ei = ei,
+          value = value,
+          err = err,
+          all.err = all.err,
+          xi.factor = xi.factor,
+          plotOnEstimate = plotOnEstimate,
+          cols = legend.col
+        )
+        legend("topright", legend = tau.labels, col = legend.col,
+               lty = legend.lty, lwd = legend.lwd, bty = "n")
+        if (plot.errors.type == "all" && !is.null(err)) {
+          legend("topleft",
+                 legend = c("Pointwise", "Simultaneous", "Bonferroni"),
+                 lty = c(2L, 3L, 4L),
+                 col = par("col"),
+                 bty = "n")
+        }
+      }
 
       plot.index = 0
       xOrY = "x"
@@ -674,9 +868,9 @@
 
         eval.extract <- function(obj, jj){
           if (gradients) {
-            if (quantreg) obj$quantgrad[,jj] else obj$congrad[,jj]
+            if (quantreg) quantile_matrix_extract(obj, jj) else obj$congrad[,jj]
           } else if (quantreg) {
-            obj$quantile
+            quantile_matrix_extract(obj, jj)
           } else if (cdf) {
             obj$condist
           } else {
@@ -685,9 +879,9 @@
         }
         err.extract <- function(obj, jj){
           if (gradients) {
-            if (quantreg) rep(NA_real_, length(eval.extract(obj, jj))) else obj$congerr[,jj]
+            if (quantreg) quantile_error_extract(obj, jj) else obj$congerr[,jj]
           } else if (quantreg) {
-            obj$quanterr
+            quantile_error_extract(obj, jj)
           } else {
             obj$conderr
           }
@@ -701,12 +895,44 @@
         for (j in seq_len(dsf)){
           temp.boot = list()
           temp.all.err <- NULL
-          temp.dens[seq_len(xi.neval)] <- eval.extract(tobj, j)
+          temp.err <- matrix(data = NA, nrow = maxneval, ncol = 3)
+          temp.err.arr <- NULL
+          temp.eval <- eval.extract(tobj, j)
+          multi.eval <- is.matrix(temp.eval)
+          if (multi.eval) {
+            temp.dens.mat <- matrix(NA_real_, nrow = maxneval,
+                                    ncol = ncol(temp.eval),
+                                    dimnames = list(NULL, colnames(temp.eval)))
+            temp.dens.mat[seq_len(xi.neval), ] <- temp.eval
+            temp.dens[seq_len(xi.neval)] <- temp.eval[, 1L]
+          } else {
+            temp.dens[seq_len(xi.neval)] <- temp.eval
+          }
           
           if (plot.errors){
             if (plot.errors.method == "asymptotic") {
               terr.j <- err.extract(tobj, j)
-              asym.obj <- .np_plot_asymptotic_error_from_se(
+              if (multi.eval) {
+                ntau.j <- ncol(terr.j)
+                temp.err.arr <- array(
+                  NA_real_,
+                  dim = c(maxneval, 3L, ntau.j),
+                  dimnames = list(NULL, c("lower", "upper", "center"), colnames(terr.j))
+                )
+                temp.all.err <- vector("list", ntau.j)
+                names(temp.all.err) <- colnames(terr.j)
+                for (kk in seq_len(ntau.j)) {
+                  asym.obj <- .np_plot_asymptotic_error_from_se(
+                    se = terr.j[, kk],
+                    alpha = plot.errors.alpha,
+                    band.type = plot.errors.type,
+                    m = xi.neval
+                  )
+                  temp.err.arr[seq_len(xi.neval), 1:2, kk] <- asym.obj$err
+                  temp.all.err[[kk]] <- asym.obj$all.err
+                }
+              } else {
+                asym.obj <- .np_plot_asymptotic_error_from_se(
                   se = terr.j,
                   alpha = plot.errors.alpha,
                   band.type = plot.errors.type,
@@ -714,9 +940,10 @@
                 )
                 temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
                 temp.all.err <- asym.obj$all.err
+              }
             }
             else if (plot.errors.method == "bootstrap"){
-              temp.boot <- compute.bootstrap.errors(
+              temp.boot.raw <- compute.bootstrap.errors(
                         xdat = xdat,
                         ydat = ydat,
                         exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
@@ -741,10 +968,21 @@
                           gradient.index = j
                         ),
                         bws = bws)
-              temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
-              temp.all.err <- temp.boot[["boot.all.err"]]
-              temp.boot <- temp.boot[["bxp"]]
-              if (!plot.bxp.out){
+              if (multi.eval) {
+                temp.err.arr <- array(
+                  NA_real_,
+                  dim = c(maxneval, dim(temp.boot.raw[["boot.err"]])[2:3]),
+                  dimnames = dimnames(temp.boot.raw[["boot.err"]])
+                )
+                temp.err.arr[seq_len(xi.neval), , ] <- temp.boot.raw[["boot.err"]]
+                temp.all.err <- temp.boot.raw[["boot.all.err"]]
+                temp.boot <- temp.boot.raw[["bxp"]]
+              } else {
+                temp.err[seq_len(xi.neval),] <- temp.boot.raw[["boot.err"]]
+                temp.all.err <- temp.boot.raw[["boot.all.err"]]
+                temp.boot <- temp.boot.raw[["bxp"]]
+              }
+              if (!multi.eval && !plot.bxp.out){
                 temp.boot$out <- numeric()
                 temp.boot$group <- integer()
               }
@@ -761,8 +999,41 @@
               data.err[,seq(3*((plot.index-1)*dsf+j)-2,length=3)] = temp.err
               data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
             }
+          } else if (plot.behavior == "data" && multi.eval && plot.errors) {
+            err.name <- if (gradients) paste("gc", j, "err", sep = "") else "quanterr"
+            bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
+            multi.err <- temp.err.arr[seq_len(xi.neval), , , drop = FALSE]
+            plot.out[[plot.index]][[err.name]] <- multi_tau_plotout_err(multi.err)
+            plot.out[[plot.index]][[bias.name]] <-
+              temp.dens.mat[seq_len(xi.neval), , drop = FALSE] -
+              multi.err[, 3L, , drop = TRUE]
+            plot.out[[plot.index]]$bxp <- temp.boot
           } else if (plot.behavior != "data") {
             plot.layout <- .np_plot_layout_activate(plot.layout)
+            if (multi.eval) {
+              multi.err <- if (plot.errors) temp.err.arr[seq_len(xi.neval), , , drop = FALSE] else NULL
+              plot_multi_tau(
+                ei = ei,
+                value = temp.dens.mat[seq_len(xi.neval), , drop = FALSE],
+                xi.factor = xi.factor,
+                xlab.value = scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = ""))),
+                ylab.value = scalar_default(ylab, if (gradients) paste("GC", j, "of", tylabE) else tylabE),
+                err = multi.err,
+                all.err = temp.all.err
+              )
+              if (plot.rug && !xi.factor)
+                .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
+              if (plot.behavior != "plot" && plot.errors) {
+                err.name <- if (gradients) paste("gc", j, "err", sep = "") else "quanterr"
+                bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
+                plot.out[[plot.index]][[err.name]] <- multi_tau_plotout_err(multi.err)
+                plot.out[[plot.index]][[bias.name]] <-
+                  temp.dens.mat[seq_len(xi.neval), , drop = FALSE] -
+                  multi.err[, 3L, , drop = TRUE]
+                plot.out[[plot.index]]$bxp <- temp.boot
+              }
+              next
+            }
             ## plot evaluation
             plot.fun <- if (xi.factor) {
               .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -835,7 +1106,7 @@
             }
           }
         
-          if (plot.behavior != "plot" && plot.errors) {
+          if (plot.behavior != "plot" && plot.errors && !multi.eval) {
             err.name <- if (gradients) paste("gc", j, "err", sep = "") else if (quantreg) "quanterr" else "conderr"
             bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
             plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))

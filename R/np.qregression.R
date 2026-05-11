@@ -25,6 +25,34 @@ npqreg <-
                                      "lbc.dir", "dfc.dir", "cfac.dir", "initc.dir",
                                      "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir")
 
+.npqreg_validate_tau <- function(tau) {
+  if (!is.numeric(tau) || !length(tau) || anyNA(tau) ||
+      any(!is.finite(tau)) || any(tau <= 0) || any(tau >= 1))
+    stop("'tau' must contain numeric values in (0,1)")
+  as.double(tau)
+}
+
+.npqreg_tau_labels <- function(tau) {
+  paste0("tau", format(tau, trim = TRUE, scientific = FALSE))
+}
+
+.npqreg_napredict_eval <- function(omit, x) {
+  if (!length(omit))
+    return(x)
+  if (length(dim(x)) <= 2L)
+    return(napredict(omit, x))
+  d <- dim(x)
+  dn <- dimnames(x)
+  if (!is.null(dn))
+    dn[[1L]] <- NULL
+  out <- array(NA_real_,
+               dim = c(d[1L] + length(omit), d[-1L]),
+               dimnames = dn)
+  keep <- seq_len(dim(out)[1L])[-as.integer(omit)]
+  out[keep, , ] <- x
+  out
+}
+
 .npqreg_fit_dots <- function(dots, allow.bandwidth.controls = FALSE) {
   dot.names <- names(dots)
   if (is.null(dot.names))
@@ -257,12 +285,12 @@ npqreg.formula <-
     tbw$rows.omit <- as.vector(tbw$omit)
     tbw$nobs.omit <- length(tbw$rows.omit)
 
-    tbw$quantile <- napredict(tbw$omit, tbw$quantile)
-    tbw$quanterr <- napredict(tbw$omit, tbw$quanterr)
+    tbw$quantile <- .npqreg_napredict_eval(tbw$omit, tbw$quantile)
+    tbw$quanterr <- .npqreg_napredict_eval(tbw$omit, tbw$quanterr)
 
     if(tbw$gradients){
-        tbw$quantgrad <- napredict(tbw$omit, tbw$quantgrad)
-        tbw$quantgerr <- napredict(tbw$omit, tbw$quantgerr)
+        tbw$quantgrad <- .npqreg_napredict_eval(tbw$omit, tbw$quantgrad)
+        tbw$quantgerr <- .npqreg_napredict_eval(tbw$omit, tbw$quantgerr)
     }
 
     return(tbw)
@@ -314,8 +342,9 @@ npqreg.condbandwidth <-
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
 
-    if (!is.numeric(tau) || length(tau) != 1 || is.na(tau) || tau <= 0 || tau >= 1)
-      stop("'tau' must be a single numeric value in (0,1)")
+    tau <- .npqreg_validate_tau(tau)
+    ntau <- length(tau)
+    tau.labels <- .npqreg_tau_labels(tau)
 
     if (dim(tydat)[2] != 1)
       stop("'tydat' has more than one column")
@@ -388,36 +417,60 @@ npqreg.condbandwidth <-
     if (!no.ex)
       exdat.df <- exdat
 
-    myout <- list(
-      yq = .npqreg_invert_selected_cdf(
+    fit_one_tau <- function(tau_i) {
+      yq <- .npqreg_invert_selected_cdf(
         bws = bws,
         xdat = txdat.df,
         ydat = tydat.df,
         exdat = txeval,
-        tau = tau,
+        tau = tau_i,
         tol = tol,
         small = small,
         itmax = itmax
-      ),
-      yqerr = NA,
-      yqgrad = NA
-    )
-
-    qdelta <- .npqreg_quantile_delta_from_conditional(
+      )
+      qdelta <- .npqreg_quantile_delta_from_conditional(
         bws = bws,
         xdat = txdat.df,
         ydat = tydat.df,
         exdat = txeval,
-        quantile = myout$yq,
+        quantile = yq,
         gradients = gradients
       )
-    myout$yqerr <- qdelta$quanterr
-    if(gradients){
-      myout$yqgrad <- qdelta$quantgrad
-      myout$yqgerr <- qdelta$quantgerr
+      list(
+        yq = yq,
+        yqerr = qdelta$quanterr,
+        yqgrad = if (gradients) qdelta$quantgrad else NA,
+        yqgerr = if (gradients) qdelta$quantgerr else NA
+      )
+    }
+
+    tau.out <- lapply(tau, fit_one_tau)
+
+    if (ntau == 1L) {
+      myout <- tau.out[[1L]]
     } else {
-      myout$yqgrad = NA
-      myout$yqgerr = NA
+      myout <- list(
+        yq = do.call(cbind, lapply(tau.out, `[[`, "yq")),
+        yqerr = do.call(cbind, lapply(tau.out, `[[`, "yqerr")),
+        yqgrad = NA,
+        yqgerr = NA
+      )
+      colnames(myout$yq) <- tau.labels
+      colnames(myout$yqerr) <- tau.labels
+      if (gradients) {
+        p <- ncol(tau.out[[1L]]$yqgrad)
+        grad.names <- colnames(tau.out[[1L]]$yqgrad)
+        myout$yqgrad <- array(NA_real_,
+                              dim = c(enrow, p, ntau),
+                              dimnames = list(NULL, grad.names, tau.labels))
+        myout$yqgerr <- array(NA_real_,
+                              dim = c(enrow, p, ntau),
+                              dimnames = list(NULL, grad.names, tau.labels))
+        for (j in seq_len(ntau)) {
+          myout$yqgrad[, , j] <- tau.out[[j]]$yqgrad
+          myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
+        }
+      }
     }
 
 

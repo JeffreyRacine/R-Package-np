@@ -1828,7 +1828,7 @@ genRegEstStr <- function(x){
   basis.family.str <- if (is.null(basis.family)) "" else paste("\nLP Basis Family:", basis.family)
   basis.rep.str <- if (is.null(basis.rep)) "" else paste("\nLP Basis Representation:", basis.rep)
   ptype.str <- if (is.null(x$ptype)) "" else paste("\nBandwidth Type:", x$ptype)
-  tau.str <- if (is.null(x$tau)) "" else paste("\nTau:", x$tau)
+  tau.str <- if (is.null(x$tau)) "" else paste("\nTau:", paste(x$tau, collapse = ", "))
   paste(est.label.str, basis.family.str, basis.rep.str, ptype.str, tau.str, sep = "")
 }
 
