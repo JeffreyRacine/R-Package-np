@@ -105,7 +105,7 @@ np_render_control <- function(style = c("band", "bar"),
 
 .np_plot_canonical_arg_names <- function() {
   c("errors", "band", "alpha", "bootstrap", "B", "center",
-    "output", "data_overlay", "data_rug", "layout",
+    "output", "data_overlay", "data_rug", "layout", "legend",
     "factor_boxplot", "boxplot_outliers", "coef_index",
     "gradient_order", "common_scale", "proper_method", "proper_control",
     "renderer", "neval", "perspective",

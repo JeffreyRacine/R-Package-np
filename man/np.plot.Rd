@@ -184,12 +184,17 @@ Named options passed via \code{\dots} include:
         Default is \code{TRUE}.
       }
       \item{\code{legend}}{
-        legend control for vector-\code{tau} \code{npqreg} level
-        plots. \code{TRUE} draws the default legend,
+        legend control for legends drawn by the package, including
+        vector-\code{tau} \code{npqreg} level plots and
+        \code{band="all"} uncertainty legends. \code{TRUE} draws the
+        default legend,
         \code{FALSE}, \code{NULL}, or \code{NA} suppresses it, a
         single character string supplies the legend position, and a
         list is merged into the default \code{\link{legend}} call for
-        custom labels, placement, or styling.
+        custom labels, placement, or styling. For plot routes with
+        more than one package-drawn legend, named sublists such as
+        \code{legend=list(tau=list(x="topright"), bands=FALSE)} may
+        be used when a route distinguishes those legend roles.
       }
       \item{\code{data_rug}}{
         logical; when \code{TRUE}, draw a rug-style support cue for the

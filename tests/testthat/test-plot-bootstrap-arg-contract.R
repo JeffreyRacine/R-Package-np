@@ -115,3 +115,54 @@ test_that("plot contract: bootstrap args require explicit bootstrap mode across 
     fixed = TRUE
   )
 })
+
+test_that("plot contract: package legends are user-controllable on band-all plots (npRmpi)", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(20260511)
+  n <- 36L
+  x <- runif(n)
+  y <- sin(2 * pi * x) + rnorm(n, sd = 0.1)
+  rbw <- npregbw(
+    xdat = data.frame(x = x),
+    ydat = y,
+    bws = 0.35,
+    bandwidth.compute = FALSE
+  )
+
+  old.dev <- grDevices::dev.cur()
+  grDevices::pdf(file = tempfile(fileext = ".pdf"))
+  on.exit({
+    grDevices::dev.off()
+    if (old.dev > 1L)
+      grDevices::dev.set(old.dev)
+  }, add = TRUE)
+
+  expect_silent(suppressWarnings(plot(
+    rbw, xdat = data.frame(x = x), ydat = y, perspective = FALSE,
+    errors = "bootstrap", bootstrap = "wild", B = 9L, band = "all",
+    neval = 6L, legend = FALSE
+  )))
+  expect_silent(suppressWarnings(plot(
+    rbw, xdat = data.frame(x = x), ydat = y, perspective = FALSE,
+    errors = "bootstrap", bootstrap = "wild", B = 9L, band = "all",
+    neval = 6L, legend = "bottomright"
+  )))
+  expect_silent(suppressWarnings(plot(
+    rbw, xdat = data.frame(x = x), ydat = y, perspective = FALSE,
+    errors = "bootstrap", bootstrap = "wild", B = 9L, band = "all",
+    neval = 6L, legend = list(x = "bottomleft", bty = "o")
+  )))
+  expect_error(
+    suppressWarnings(plot(
+      rbw, xdat = data.frame(x = x), ydat = y, perspective = FALSE,
+      errors = "bootstrap", bootstrap = "wild", B = 9L, band = "all",
+      neval = 6L, legend = 1
+    )),
+    "legend must be TRUE/FALSE"
+  )
+})

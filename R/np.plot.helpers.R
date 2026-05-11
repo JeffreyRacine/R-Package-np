@@ -9210,6 +9210,7 @@ draw.all.error.types <- function(ex, center, all.err,
                                  plot.errors.bar = "|",
                                  plot.errors.bar.num = min(length(ex), 25),
                                  lty = 2, add.legend = TRUE, legend.loc = "topleft",
+                                 legend = TRUE,
                                  xi.factor = FALSE){
   if (is.null(all.err)) return(invisible(NULL))
 
@@ -9238,12 +9239,23 @@ draw.all.error.types <- function(ex, center, all.err,
   draw_one(all.err$bonferroni, band.cols[["bonferroni"]])
 
   if (add.legend) {
-    legend(legend.loc,
+    legend.value <- if (is.list(legend) && any(names(legend) %in% c("tau", "bands"))) {
+      if (!is.null(legend$bands)) legend$bands else TRUE
+    } else {
+      legend
+    }
+    legend.args <- .np_plot_legend_args(
+      list(x = legend.loc,
            legend = c("Pointwise","Simultaneous","Bonferroni"),
            lty = 2,
            col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
            lwd = 2,
-           bty = "n")
+           bty = "n"),
+      legend = legend.value,
+      context = "legend"
+    )
+    if (!is.null(legend.args))
+      do.call(graphics::legend, legend.args)
   }
 }
 
@@ -10503,6 +10515,100 @@ plotFactor <- function(f, y, ...){
     user.args <- user.args[keep]
   }
   c(base.args, user.args)
+}
+
+.np_plot_legend_args <- function(default.args,
+                                 legend = TRUE,
+                                 context = "legend") {
+  value <- legend
+  if (is.null(value))
+    return(NULL)
+  if (is.logical(value)) {
+    if (length(value) != 1L)
+      stop(sprintf("%s must be TRUE/FALSE, NULL, NA, a legend position string, or a list of graphics::legend arguments",
+                   context),
+           call. = FALSE)
+    if (is.na(value) || !isTRUE(value))
+      return(NULL)
+    return(default.args)
+  }
+  if (is.character(value) && length(value) == 1L && !is.na(value)) {
+    default.args$x <- value
+    return(default.args)
+  }
+  if (is.list(value)) {
+    show <- value$show
+    if (!is.null(show)) {
+      if (!is.logical(show) || length(show) != 1L)
+        stop(sprintf("%s$show must be TRUE or FALSE", context), call. = FALSE)
+      value$show <- NULL
+      if (is.na(show) || !isTRUE(show))
+        return(NULL)
+    }
+    return(.np_plot_merge_user_args(default.args, value))
+  }
+  stop(sprintf("%s must be TRUE/FALSE, NULL, NA, a legend position string, or a list of graphics::legend arguments",
+               context),
+       call. = FALSE)
+}
+
+.np_plot_draw_all_band_legend <- function(legend = TRUE,
+                                          x = "topright",
+                                          lty = 1,
+                                          lwd = 2,
+                                          bty = "n") {
+  band.cols <- .np_plot_all_band_colors()
+  legend.value <- if (is.list(legend) && any(names(legend) %in% c("tau", "bands"))) {
+      if (!is.null(legend$bands)) legend$bands else TRUE
+    } else {
+      legend
+    }
+  legend.args <- .np_plot_legend_args(
+    list(x = x,
+         legend = c("Pointwise","Simultaneous","Bonferroni"),
+         lty = lty,
+         col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
+         lwd = lwd,
+         bty = bty),
+    legend = legend.value,
+    context = "legend"
+  )
+  if (!is.null(legend.args))
+    do.call(graphics::legend, legend.args)
+  invisible(NULL)
+}
+
+.np_plot_merge_rgl_legend_control <- function(legend3d.args, legend = TRUE) {
+  legend.value <- if (is.list(legend) && any(names(legend) %in% c("tau", "bands"))) {
+      if (!is.null(legend$bands)) legend$bands else TRUE
+    } else {
+      legend
+    }
+  if (is.null(legend.value))
+    return(.np_plot_merge_override_args(legend3d.args, list(plot = FALSE)))
+  if (is.logical(legend.value)) {
+    if (length(legend.value) != 1L)
+      stop("legend must be TRUE/FALSE, NULL, NA, a legend position string, or a list of graphics::legend arguments",
+           call. = FALSE)
+    if (is.na(legend.value) || !isTRUE(legend.value))
+      return(.np_plot_merge_override_args(legend3d.args, list(plot = FALSE)))
+    return(legend3d.args)
+  }
+  if (is.character(legend.value) && length(legend.value) == 1L && !is.na(legend.value))
+    return(.np_plot_merge_override_args(list(x = legend.value), legend3d.args))
+  if (is.list(legend.value)) {
+    show <- legend.value$show
+    if (!is.null(show)) {
+      if (!is.logical(show) || length(show) != 1L)
+        stop("legend$show must be TRUE or FALSE", call. = FALSE)
+      legend.value$show <- NULL
+      if (is.na(show) || !isTRUE(show))
+        return(.np_plot_merge_override_args(legend3d.args, list(plot = FALSE)))
+    }
+    return(.np_plot_merge_override_args(legend.value, legend3d.args))
+  }
+  stop("legend must be TRUE/FALSE, NULL, NA, a legend position string, or a list of graphics::legend arguments",
+       call. = FALSE)
 }
 
 .np_plot_merge_override_args <- function(base.args, override.args) {
