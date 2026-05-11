@@ -71,6 +71,8 @@ npconmode.formula <-
     ev$conderr <- napredict(ev$omit, ev$conderr)
     if (!is.null(ev$probabilities))
       ev$probabilities <- napredict(ev$omit, ev$probabilities)
+    if (!is.null(ev$probability.gradients))
+      ev$probability.gradients <- .npConmodeNapredictArray(ev$omit, ev$probability.gradients)
 
     return(ev)
   }
@@ -201,6 +203,24 @@ npconmode.call <-
   list(indices = indices, condens = mdens, conderr = mderr)
 }
 
+.npConmodeNapredictArray <- function(omit, x) {
+  if (is.null(x) || !length(omit))
+    return(x)
+  dx <- dim(x)
+  if (is.null(dx) || length(dx) < 3L)
+    return(napredict(omit, x))
+
+  keep <- seq_len(dx[1L] + length(omit))[-as.integer(omit)]
+  dn <- dimnames(x)
+  if (!is.null(dn))
+    dn[[1L]] <- NULL
+  out <- array(NA_real_,
+               dim = c(dx[1L] + length(omit), dx[-1L]),
+               dimnames = dn)
+  out[keep,,] <- x
+  out
+}
+
 
 npconmode.conbandwidth <-
   function (bws,
@@ -210,8 +230,12 @@ npconmode.conbandwidth <-
             proper = NULL,
             proper.control = list(),
             probabilities = FALSE,
+            gradients = FALSE,
+            level = NULL,
             ...){
 
+    probabilities <- npValidateScalarLogical(probabilities, "probabilities")
+    gradients <- npValidateScalarLogical(gradients, "gradients")
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
 
@@ -271,8 +295,30 @@ npconmode.conbandwidth <-
                      levels = union(bws$ydati$all.lev[[1]], levels(eydat[,1])), ordered = is.ordered(tydat[,1]))
 
     nlev <- nlevels(efac)
+    level.values <- levels(efac)
+    if (is.null(level)) {
+      gradient.level <- level.values[1L]
+    } else {
+      if (length(level) != 1L || is.na(level) ||
+          !(as.character(level) %in% level.values))
+        stop("'level' must identify one response level in the fitted conmode object")
+      gradient.level <- as.character(level)
+    }
+    gradient.level.index <- match(gradient.level, level.values)
+    if (isTRUE(gradients)) {
+      if (bws$xndim < 1L)
+        stop("npconmode class-probability gradients/effects require at least one conditioning variable")
+    }
     pmat <- matrix(NA_real_, enrow, nlev)
     perr <- matrix(NA_real_, enrow, nlev)
+    pgrad <- if (isTRUE(gradients)) {
+      matrix(NA_real_,
+             nrow = enrow,
+             ncol = bws$xndim,
+             dimnames = list(NULL, bws$xnames))
+    } else {
+      NULL
+    }
 
     for (i in seq_len(nlevels(efac))) {
         dens.obj <- npcdens(
@@ -280,10 +326,16 @@ npconmode.conbandwidth <-
           tydat = tydat,
           exdat = if (no.ex) txdat else exdat,
           eydat = rep(efac[i], enrow),
-          bws = bws
+          bws = bws,
+          gradients = isTRUE(gradients) && identical(i, gradient.level.index)
         )
         pmat[, i] <- dens.obj$condens
         perr[, i] <- dens.obj$conderr
+        if (isTRUE(gradients) && identical(i, gradient.level.index)) {
+          if (is.null(dens.obj$congrad))
+            stop("internal error: conditional-density gradient was not returned")
+          pgrad[,] <- dens.obj$congrad
+        }
     }
 
     proper.effective <- .npConmodeEffectiveProper(bws, proper)
@@ -298,7 +350,6 @@ npconmode.conbandwidth <-
     mdens <- select$condens
     mderr <- select$conderr
     mderr[proper.out$repaired.rows] <- NA_real_
-
     cm.args <- list(
       bws = bws,
       xeval = if (no.ex) txdat else exdat,
@@ -309,11 +360,24 @@ npconmode.conbandwidth <-
       trainiseval = no.ex,
       proper.requested = proper.out$proper.requested,
       proper.applied = proper.out$proper.applied,
-      proper.info = proper.out$proper.info
+      proper.info = proper.out$proper.info,
+      gradients = gradients
     )
-    if (isTRUE(probabilities)) {
+    if (isTRUE(probabilities) || isTRUE(gradients)) {
       cm.args$probabilities <- proper.out$probabilities
       cm.args$probability.levels <- efac
+    }
+    if (isTRUE(gradients)) {
+      cm.args$probability.gradients <- pgrad
+      cm.args$probability.gradient.level <- gradient.level
+      cm.args$probability.gradient.names <- bws$xnames
+      cm.args$probability.gradient.info <- list(
+        target = "class probability",
+        response = if (nlev == 2L) "binary" else "multinomial",
+        level = gradient.level,
+        default.level = level.values[1L],
+        semantics = "smooth class-probability gradients/effects for one selected response level"
+      )
     }
     if (!(no.ey && !no.ex))
       cm.args$yeval <- if (no.ey) tydat else eydat
@@ -354,8 +418,12 @@ npconmode.default <- function(bws, txdat, tydat,
                               proper = NULL,
                               proper.control = list(),
                               probabilities = FALSE,
+                              gradients = FALSE,
+                              level = NULL,
                               ...){
   nomad <- npValidateScalarLogical(nomad, "nomad")
+  probabilities <- npValidateScalarLogical(probabilities, "probabilities")
+  gradients <- npValidateScalarLogical(gradients, "gradients")
   sc <- sys.call()
   sc.names <- names(sc)
 
@@ -386,6 +454,8 @@ npconmode.default <- function(bws, txdat, tydat,
   sc.bw$proper <- NULL
   sc.bw$proper.control <- NULL
   sc.bw$probabilities <- NULL
+  sc.bw$gradients <- NULL
+  sc.bw$level <- NULL
 
   bws.formula <- (!no.bws) && inherits(bws, "formula")
   if (bws.formula) {
@@ -438,5 +508,7 @@ npconmode.default <- function(bws, txdat, tydat,
   call.args$proper <- proper
   call.args$proper.control <- proper.control
   call.args$probabilities <- probabilities
+  call.args$gradients <- gradients
+  call.args$level <- level
   do.call(npconmode, c(call.args, list(...)))
 }

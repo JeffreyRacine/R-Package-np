@@ -111,3 +111,88 @@ test_that("npconmode NOMAD fit metadata propagates through evaluation and bandwi
   })
   expect_identical(bw.calls, 0L)
 })
+
+test_that("npconmode binary class-probability gradients are stored and plotted", {
+  set.seed(20260511)
+  n <- 70L
+  d <- data.frame(x = seq(-1, 1, length.out = n))
+  d$y <- factor(rbinom(n, 1L, plogis(1.25 * d$x)), levels = 0:1)
+
+  capture.output(
+    fit <- npconmode(
+      y ~ x,
+      data = d,
+      regtype = "ll",
+      bwmethod = "cv.ls",
+      nmulti = 1L,
+      probabilities = TRUE,
+      gradients = TRUE
+    )
+  )
+
+  expect_s3_class(fit, "conmode")
+  expect_true(isTRUE(fit$gradients))
+  expect_equal(rowSums(fit$probabilities), rep(1, n), tolerance = 1e-10)
+  expect_equal(as.character(fit$probability.gradient.level), "0")
+  expect_equal(predict(fit, type = "class"), fit$conmode)
+  expect_equal(predict(fit, type = "prob"), fit$probabilities)
+
+  gout <- gradients(fit)
+  expect_equal(dim(gout), c(n, 1L))
+
+  direct <- npcdens(
+    bws = fit$bws,
+    txdat = d["x"],
+    tydat = d["y"],
+    exdat = d["x"],
+    eydat = factor(rep("0", n), levels = levels(d$y)),
+    gradients = TRUE
+  )
+  expect_equal(as.vector(gout), as.vector(direct$congrad), tolerance = 1e-10)
+  expect_error(gradients(fit, errors = TRUE), "standard errors")
+  expect_error(gradients(fit, level = "1"), "stored class-probability gradients")
+
+  pdata <- plot(fit, output = "data")
+  expect_named(pdata, "x")
+  expect_equal(nrow(pdata$x), n)
+
+  grdata <- plot(fit, gradients = TRUE, output = "data")
+  expect_named(grdata, "x")
+  expect_true("effect" %in% names(grdata$x))
+  expect_error(plot(fit, gradients = TRUE, level = "1", output = "data"),
+               "stored class-probability gradients")
+
+  pdf(tempfile(fileext = ".pdf"))
+  expect_silent(plot(fit))
+  expect_silent(plot(fit, gradients = TRUE))
+  expect_error(plot(fit, errors = "bootstrap"), "unused plot argument")
+  grDevices::dev.off()
+})
+
+test_that("npconmode class-probability gradients are level-specific for multinomial responses", {
+  set.seed(20260511)
+  n <- 45L
+  d <- data.frame(x = seq(-1, 1, length.out = n))
+  d$y <- factor(sample(letters[1:3], n, replace = TRUE))
+
+  capture.output(
+    fit <- npconmode(
+      y ~ x,
+      data = d,
+      regtype = "ll",
+      bwmethod = "cv.ls",
+      nmulti = 1L,
+      probabilities = TRUE,
+      level = "b",
+      gradients = TRUE
+    )
+  )
+
+  expect_s3_class(fit, "conmode")
+  expect_equal(as.character(fit$probability.gradient.level), "b")
+  expect_equal(dim(gradients(fit)), c(n, 1L))
+  expect_equal(rowSums(fit$probabilities), rep(1, n), tolerance = 1e-10)
+  expect_error(gradients(fit, level = "c"), "stored class-probability gradients")
+  grdata <- plot(fit, gradients = TRUE, output = "data")
+  expect_equal(unique(grdata$x$level), "b")
+})

@@ -53,6 +53,8 @@ npconmode(bws,
           proper = NULL,
           proper.control = list(),
           probabilities = FALSE,
+          gradients = FALSE,
+          level = NULL,
           \dots)
 
 \method{npconmode}{conbandwidth}(bws,
@@ -63,6 +65,8 @@ npconmode(bws,
           proper = NULL,
           proper.control = list(),
           probabilities = FALSE,
+          gradients = FALSE,
+          level = NULL,
           \dots)
 
 }
@@ -135,7 +139,29 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \item{probabilities}{
     a logical value. If \code{TRUE}, store the full matrix of fitted
     probabilities over the discrete response support in the returned object.
-    The default \code{FALSE} keeps returned objects compact.
+    The default \code{FALSE} keeps returned objects compact. If
+    \code{gradients=TRUE}, probabilities are stored automatically because
+    they are the object-fed target for \code{\link{plot.conmode}}.
+  }
+
+  \item{gradients}{
+    a logical value. If \code{TRUE}, compute and store class-probability
+    gradients/effects for one response level with respect to the conditioning
+    variables. These are derivatives for continuous conditioning variables and
+    the corresponding smooth finite-change effects for discrete conditioning
+    variables as produced by the underlying \code{\link{npcdens}} gradient
+    route. The target is the smooth class probability
+    \eqn{\Pr(Y=\ell\mid X=x)}, not the derivative of the discrete modal class
+    label.
+  }
+
+  \item{level}{
+    response level for class-probability gradients/effects and
+    \code{plot.conmode} class-probability displays. If omitted, the default is
+    the base/reference response level, \code{levels(y)[1]}, for both factor and
+    ordered responses. Users should supply \code{level} explicitly when a
+    particular binary or multinomial outcome probability is of substantive
+    interest.
   }
 
   \item{proper}{
@@ -218,6 +244,13 @@ This argument controls the recommended automatic local-polynomial NOMAD route, w
     the discrete response support }
   \item{probability.levels}{ if \code{probabilities} are stored, the response
     support corresponding to the probability matrix columns }
+  \item{probability.gradients}{ if \code{gradients=TRUE}, a matrix whose
+    entries are class-probability gradients/effects for one selected response
+    level, indexed by evaluation row and conditioning variable }
+  \item{probability.gradient.level, probability.gradient.names,
+    probability.gradient.info}{ metadata describing the response support,
+    conditioning variables, and interpretation of
+    \code{probability.gradients} }
   \item{proper.requested, proper.applied, proper.info}{ metadata describing
     whether discrete probability properization was requested, whether any row
     was materially projected, and diagnostics for non-negativity and unit-mass
@@ -233,8 +266,15 @@ This argument controls the recommended automatic local-polynomial NOMAD route, w
   The functions \code{\link{mode}}, and \code{\link{fitted}} may be used to
   extract the conditional mode estimates, and the conditional density
   estimates at the conditional mode, respectively,
-  from the resulting object. Also, \code{\link{summary}} supports
-  \code{conmode} objects.
+  from the resulting object. The function \code{\link{gradients}} extracts
+  class-probability gradients/effects when \code{gradients=TRUE}. Also,
+  \code{\link{summary}} and \code{\link{plot}} support \code{conmode}
+  objects. For \code{plot.conmode}, first fit with
+  \code{probabilities=TRUE} so the plot can remain object-fed. The default
+  plot displays the fitted probability for the base/reference response level
+  \code{levels(y)[1]}; use \code{plot(fit, level=...)} to select another
+  outcome and \code{plot(fit, gradients=TRUE)} to display stored
+  class-probability effects.
 }
 \section{Book And Method Pointers}{
   The conditional-mode target is
@@ -244,6 +284,12 @@ This argument controls the recommended automatic local-polynomial NOMAD route, w
   \code{\link{npcdens}}, optionally projects non-local-constant fitted
   probabilities onto the probability simplex, and then reports the
   modal support point.
+
+  Setting \code{gradients=TRUE} stores class-probability effects for one
+  response level. If \code{level} is omitted, the base/reference response level
+  \code{levels(y)[1]} is used. These effects are useful for asking how the
+  fitted probability of a selected class changes with each covariate; they are
+  not gradients of the \code{arg max} classification rule itself.
 
   For book-length background, see Racine (2019), Chapter 4
   \emph{Conditional Probability Density and Cumulative Distribution
@@ -430,6 +476,26 @@ ccr
 summary(model.np)
 
 detach(birthwt)
+
+# EXAMPLE 3 (CLASS PROBABILITY EFFECTS): compute and plot
+# class-probability gradients/effects for one selected response level.
+# This example uses a small artificial sample so that it runs quickly.
+
+set.seed(42)
+n <- 100
+x <- seq(-1, 1, length.out=n)
+y <- factor(rbinom(n, 1, plogis(1.5*x)), levels=0:1)
+
+model.effects <- npconmode(y~x,
+                           regtype="ll",
+                           bwmethod="cv.ls",
+                           nmulti=1,
+                           probabilities=TRUE,
+                           gradients=TRUE)
+
+gradients(model.effects)
+plot(model.effects)
+plot(model.effects, gradients=TRUE)
 } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
