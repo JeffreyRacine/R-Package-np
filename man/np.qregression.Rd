@@ -33,7 +33,7 @@ npqreg(bws, \dots)
        itmax = 10000,
        \dots)
 
-\method{npqreg}{default}(bws, txdat, tydat, \dots)
+\method{npqreg}{default}(bws, txdat, tydat, nomad = FALSE, \dots)
 
 }
 
@@ -73,6 +73,27 @@ These arguments identify the bandwidth specification, formula/data interface, an
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
     \code{txdat}. Defaults to the training data used to
     compute the bandwidth object.
+  }
+
+
+\subsection{Local-Polynomial Degree And Bandwidth Search}{
+This argument controls the recommended automatic local-polynomial NOMAD route, which jointly selects continuous polynomial degree and bandwidths when conditional-distribution bandwidths are computed inside \code{npqreg}.
+}
+
+  \item{nomad}{
+    logical shortcut passed through to \code{\link{npcdistbw}} when
+    bandwidths are computed inside \code{npqreg}. When \code{TRUE}, the
+    conditional-distribution bandwidth route fills any missing values
+    among \code{regtype}, \code{search.engine}, \code{degree.select},
+    \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
+    \code{degree.verify}, and \code{bwtype} with the recommended
+    automatic local-polynomial degree-and-bandwidth NOMAD preset documented in \code{\link{npcdistbw}}.
+    Additional NOMAD tuning arguments such as \code{nomad.nmulti} may
+    also be supplied through \code{\dots}; \code{nmulti} remains the
+    outer restart count while \code{nomad.nmulti} controls inner
+    \code{crs::snomadr()} multistarts within each outer restart.
+    After fitting, inspect \code{fit$bws$nomad.shortcut} on the
+    returned object \code{fit} to see the normalized shortcut metadata.
   }
 
 
@@ -137,10 +158,12 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
 
   \item{\dots}{
     additional arguments supplied to specify the regression type,
-    bandwidth type, kernel types, training data, and so on.
+    local-polynomial degree search, bandwidth type, kernel types,
+    training data, and so on.
     To do this,
     you may specify any of \code{bwmethod}, \code{bwscaling},
-    \code{bwtype}, \code{cxkertype}, \code{cxkerorder},
+    \code{bwtype}, \code{regtype}, \code{degree}, \code{nomad},
+    \code{search.engine}, \code{nomad.nmulti}, \code{cxkertype}, \code{cxkerorder},
     \code{cykertype}, \code{cykerorder}, \code{uxkertype},
     \code{uykertype}, \code{oxkertype}, \code{oykertype}, as described
     in \code{\link{npcdistbw}}.

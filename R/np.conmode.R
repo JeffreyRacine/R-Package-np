@@ -350,6 +350,7 @@ npconmode.conbandwidth <-
   }
 
 npconmode.default <- function(bws, txdat, tydat,
+                              nomad = FALSE,
                               proper = NULL,
                               proper.control = list(),
                               probabilities = FALSE,

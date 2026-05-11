@@ -493,7 +493,7 @@ npqreg.condbandwidth <-
   }
 
 
-npqreg.default <- function(bws, txdat, tydat, ...){
+npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
 
