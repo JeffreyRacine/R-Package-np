@@ -256,6 +256,16 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
   \code{legend=NULL}, or a \code{legend=list(...)} control to suppress
   or customize it.
 
+  The \code{\link{predict}} method follows the usual S3
+  \code{newdata} convention. For formula fits, supply a data frame of
+  evaluation covariates via \code{predict(fit, newdata=...)}. For
+  non-formula fits, \code{newdata} is translated to the native
+  evaluator argument \code{exdat} when \code{exdat} is not supplied.
+  The native \code{exdat} argument remains available for advanced
+  workflows and takes precedence if both \code{newdata} and
+  \code{exdat} are supplied. If \code{tau} is omitted in
+  \code{predict}, the fitted object's stored \code{tau} value is used.
+
 }
 
 \value{

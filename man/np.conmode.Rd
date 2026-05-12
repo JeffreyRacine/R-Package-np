@@ -35,6 +35,18 @@
   \eqn{\Pr(Y=\ell_2\mid X=x)=1-\Pr(Y=\ell_1\mid X=x)}. Local-constant fits
   are already proper by construction, so omitted \code{proper} resolves to
   \code{FALSE} for \code{regtype="lc"} and to \code{TRUE} otherwise.
+
+  The \code{\link{predict}} method follows the usual S3
+  \code{newdata} convention. With no evaluation arguments,
+  \code{predict(fit)} extracts the stored modal class and
+  \code{predict(fit, type="prob")} extracts stored class probabilities
+  when the object was fitted with \code{probabilities=TRUE}. With
+  \code{newdata}, \code{predict} evaluates the conditional mode at the
+  supplied rows using the stored bandwidth object. Use
+  \code{type="prob"} to return the full matrix of fitted class
+  probabilities at the evaluation rows. Native evaluator arguments
+  \code{exdat} and \code{eydat} remain available for advanced workflows
+  and take precedence if supplied.
 }
 
 \usage{
@@ -406,6 +418,12 @@ ccr
 
 # Nonparametric
 summary(model.np)
+
+# Predict modal classes and fitted class probabilities at selected rows
+new.birthwt <- birthwt[1:5, c("smoke", "race", "ht", "ui", "ftv", "age", "lwt")]
+predict(model.np, newdata=new.birthwt)
+predict(npconmode(bws=bw, probabilities=TRUE),
+        newdata=new.birthwt, type="prob")
 
 detach(birthwt)
 

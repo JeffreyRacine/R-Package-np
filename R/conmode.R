@@ -155,18 +155,67 @@ fitted.conmode <- function(object, ...) {
  object$condens 
 }
 mode.conmode <- function(x) { x$conmode }
+
+.npConmodePredictHasNativeEvalArgs <- function(dots) {
+  any(c("exdat", "eydat") %in% names(dots))
+}
+
+.npConmodePredictSetNewdata <- function(dots, object, newdata) {
+  if (.npConmodePredictHasNativeEvalArgs(dots))
+    return(dots)
+
+  nd <- toFrame(newdata)
+  xnames <- object$xnames
+  ynames <- object$ynames
+
+  if (!is.null(xnames) && length(xnames) && all(xnames %in% names(nd))) {
+    dots$exdat <- nd[, xnames, drop = FALSE]
+    if (!is.null(ynames) && length(ynames) && all(ynames %in% names(nd)))
+      dots$eydat <- nd[, ynames, drop = FALSE]
+  } else {
+    dots$exdat <- nd
+  }
+
+  dots
+}
+
 predict.conmode <- function(object,
                             newdata = NULL,
                             type = c("class", "prob"),
                             ...) {
   type <- match.arg(type)
-  if (!is.null(newdata))
-    stop("newdata prediction for conmode objects is not yet available; refit or evaluate npconmode() with the desired evaluation data")
+  dots <- list(...)
+  has.native.eval <- .npConmodePredictHasNativeEvalArgs(dots)
+  has.eval <- !is.null(newdata) || has.native.eval
+
+  if (!has.eval) {
+    if (identical(type, "class"))
+      return(object$conmode)
+    probs <- object$probabilities
+    if (is.null(probs))
+      stop("class probabilities are not stored: fit with probabilities=TRUE")
+    return(probs)
+  }
+
+  if (!is.null(newdata) && !has.native.eval) {
+    if (!is.null(object$bws$formula))
+      dots$newdata <- newdata
+    else
+      dots <- .npConmodePredictSetNewdata(dots, object, newdata)
+  }
+
+  if (identical(type, "prob")) {
+    if (!is.null(dots$probabilities) && !isTRUE(dots$probabilities))
+      stop("predict.conmode(type = \"prob\") requires probabilities=TRUE for evaluation")
+    dots$probabilities <- TRUE
+  }
+
+  ev <- do.call(npconmode, c(list(bws = object$bws), dots))
   if (identical(type, "class"))
-    return(object$conmode)
-  probs <- object$probabilities
+    return(ev$conmode)
+  probs <- ev$probabilities
   if (is.null(probs))
-    stop("class probabilities are not stored: fit with probabilities=TRUE")
+    stop("class probabilities were not returned by the evaluation path")
   probs
 }
 gradients.conmode <- function(x, level = NULL, errors = FALSE, ...) {
