@@ -384,6 +384,195 @@ npqreg <-
   )
 }
 
+.npqreg_fit_tau_vector_parallel_matrix <- function(bws,
+                                                   xdat,
+                                                   ydat,
+                                                   exdat,
+                                                   tau,
+                                                   gradients = FALSE,
+                                                   tol,
+                                                   small,
+                                                   itmax,
+                                                   comm = 1L) {
+  exdat <- toFrame(exdat)
+  n.eval <- nrow(exdat)
+  tau <- .npqreg_validate_tau(tau)
+  gradients <- npValidateScalarLogical(gradients, "gradients")
+  grad.cols <- if (isTRUE(gradients)) as.integer(bws$xndim) else 0L
+  if (is.na(grad.cols) || grad.cols < 0L)
+    grad.cols <- 0L
+  cols.per.tau <- 2L + 2L * grad.cols
+
+  fit_chunk <- function(ex.chunk) {
+    pieces <- vector("list", length(tau))
+    for (j in seq_along(tau)) {
+      yq <- .npRmpi_with_local_cdist_eval(.npqreg_invert_selected_cdf(
+        bws = bws,
+        xdat = xdat,
+        ydat = ydat,
+        exdat = ex.chunk,
+        tau = tau[[j]],
+        tol = tol,
+        small = small,
+        itmax = itmax,
+        parallel = FALSE
+      ))
+      delta <- .npRmpi_with_local_cdist_eval(.npqreg_quantile_delta_from_conditional(
+        bws = bws,
+        xdat = xdat,
+        ydat = ydat,
+        exdat = ex.chunk,
+        quantile = yq,
+        gradients = gradients
+      ))
+      pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients))
+    }
+    do.call(cbind, pieces)
+  }
+
+  if (!.npRmpi_npqreg_parallel_ready(
+        bws = bws,
+        n.eval = n.eval,
+        comm = comm,
+        what = "npqreg tau block"
+      )) {
+    return(fit_chunk(exdat))
+  }
+
+  tasks <- .npRmpi_bootstrap_chunk_tasks(
+    B = n.eval,
+    chunk.size = .npRmpi_npqreg_chunk_size(n.eval = n.eval, comm = comm)
+  )
+  worker <- function(task, bws, xdat, ydat, exdat, tau, gradients, tol, small, itmax) {
+    idx <- seq.int(as.integer(task$start),
+                   length.out = as.integer(task$bsz))
+    ex.chunk <- exdat[idx, , drop = FALSE]
+    pieces <- vector("list", length(tau))
+    for (j in seq_along(tau)) {
+      yq <- .npRmpi_with_local_cdist_eval(.npqreg_invert_selected_cdf(
+        bws = bws,
+        xdat = xdat,
+        ydat = ydat,
+        exdat = ex.chunk,
+        tau = tau[[j]],
+        tol = tol,
+        small = small,
+        itmax = itmax,
+        parallel = FALSE
+      ))
+      delta <- .npRmpi_with_local_cdist_eval(.npqreg_quantile_delta_from_conditional(
+        bws = bws,
+        xdat = xdat,
+        ydat = ydat,
+        exdat = ex.chunk,
+        quantile = yq,
+        gradients = gradients
+      ))
+      pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients))
+    }
+    do.call(cbind, pieces)
+  }
+
+  .npRmpi_bootstrap_run_fanout(
+    tasks = tasks,
+    worker = worker,
+    ncol.out = length(tau) * cols.per.tau,
+    what = "npqreg tau block",
+    progress.label = "npqreg tau block",
+    profile.where = "npqreg:tau-block",
+    comm = comm,
+    master_local_chunk = TRUE,
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    tau = tau,
+    gradients = gradients,
+    tol = tol,
+    small = small,
+    itmax = itmax
+  )
+}
+
+.npqreg_fit_tau_vector_from_parallel_matrix <- function(mat,
+                                                        tau,
+                                                        gradients = FALSE,
+                                                        grad.names = NULL) {
+  tau <- .npqreg_validate_tau(tau)
+  gradients <- npValidateScalarLogical(gradients, "gradients")
+  grad.cols <- if (isTRUE(gradients)) {
+    per.tau.raw <- ncol(mat) / length(tau)
+    (per.tau.raw - 2L) / 2L
+  } else {
+    0L
+  }
+  if (!is.finite(grad.cols) || grad.cols < 0L || grad.cols != floor(grad.cols))
+    stop("internal error: malformed npqreg parallel gradient payload", call. = FALSE)
+  grad.cols <- as.integer(grad.cols)
+  cols.per.tau <- 2L + 2L * grad.cols
+  if (ncol(mat) != length(tau) * cols.per.tau)
+    stop("internal error: malformed npqreg parallel tau payload", call. = FALSE)
+
+  n.eval <- nrow(mat)
+  yq <- matrix(NA_real_, nrow = n.eval, ncol = length(tau))
+  yqerr <- matrix(NA_real_, nrow = n.eval, ncol = length(tau))
+  if (isTRUE(gradients)) {
+    yqgrad <- array(NA_real_, dim = c(n.eval, grad.cols, length(tau)))
+    yqgerr <- array(NA_real_, dim = c(n.eval, grad.cols, length(tau)))
+  }
+
+  for (j in seq_along(tau)) {
+    offset <- (j - 1L) * cols.per.tau
+    yq[, j] <- mat[, offset + 1L]
+    yqerr[, j] <- mat[, offset + 2L]
+    if (isTRUE(gradients) && grad.cols > 0L) {
+      grad.idx <- seq.int(offset + 3L, length.out = grad.cols)
+      gerr.idx <- seq.int(offset + 3L + grad.cols, length.out = grad.cols)
+      yqgrad[, , j] <- mat[, grad.idx, drop = FALSE]
+      yqgerr[, , j] <- mat[, gerr.idx, drop = FALSE]
+    }
+  }
+
+  tau.labels <- .npqreg_tau_labels(tau)
+  if (length(tau) == 1L) {
+    return(list(
+      yq = as.double(yq[, 1L]),
+      yqerr = as.double(yqerr[, 1L]),
+      yqgrad = if (isTRUE(gradients)) {
+        out <- yqgrad[, , 1L, drop = FALSE]
+        dim(out) <- c(n.eval, grad.cols)
+        if (!is.null(grad.names) && length(grad.names) == grad.cols)
+          colnames(out) <- grad.names
+        out
+      } else NA,
+      yqgerr = if (isTRUE(gradients)) {
+        out <- yqgerr[, , 1L, drop = FALSE]
+        dim(out) <- c(n.eval, grad.cols)
+        if (!is.null(grad.names) && length(grad.names) == grad.cols)
+          colnames(out) <- grad.names
+        out
+      } else NA
+    ))
+  }
+
+  colnames(yq) <- tau.labels
+  colnames(yqerr) <- tau.labels
+  if (isTRUE(gradients)) {
+    dimnames(yqgrad) <- list(NULL, NULL, tau.labels)
+    dimnames(yqgerr) <- list(NULL, NULL, tau.labels)
+    if (!is.null(grad.names) && length(grad.names) == grad.cols) {
+      dimnames(yqgrad)[[2L]] <- grad.names
+      dimnames(yqgerr)[[2L]] <- grad.names
+    }
+  }
+  list(
+    yq = yq,
+    yqerr = yqerr,
+    yqgrad = if (isTRUE(gradients)) yqgrad else NA,
+    yqgerr = if (isTRUE(gradients)) yqgerr else NA
+  )
+}
+
 .npqreg_assert_selected_cdf_metadata <- function(bws) {
   reg.engine <- if (is.null(bws$regtype.engine)) {
     if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
@@ -674,31 +863,37 @@ npqreg.condbandwidth <-
     if (!no.ex)
       exdat.df <- exdat
 
-    fit_one_tau <- function(tau_i) {
-      yq <- .npqreg_invert_selected_cdf(
+    if (isTRUE(parallel.cond)) {
+      mat <- .npqreg_fit_tau_vector_parallel_matrix(
         bws = bws,
         xdat = txdat.df,
         ydat = tydat.df,
         exdat = txeval,
-        tau = tau_i,
+        tau = tau,
+        gradients = gradients,
         tol = tol,
         small = small,
         itmax = itmax,
-        parallel = parallel.cond,
         comm = 1L
       )
-      qdelta <- if (isTRUE(parallel.cond)) {
-        .npqreg_quantile_delta_from_conditional_parallel(
+      myout <- .npqreg_fit_tau_vector_from_parallel_matrix(
+        mat,
+        tau = tau,
+        gradients = gradients
+      )
+    } else {
+      fit_one_tau <- function(tau_i) {
+        yq <- .npqreg_invert_selected_cdf(
           bws = bws,
           xdat = txdat.df,
           ydat = tydat.df,
           exdat = txeval,
-          quantile = yq,
-          gradients = gradients,
-          comm = 1L
+          tau = tau_i,
+          tol = tol,
+          small = small,
+          itmax = itmax
         )
-      } else {
-        .npqreg_quantile_delta_from_conditional(
+        qdelta <- .npqreg_quantile_delta_from_conditional(
           bws = bws,
           xdat = txdat.df,
           ydat = tydat.df,
@@ -706,40 +901,40 @@ npqreg.condbandwidth <-
           quantile = yq,
           gradients = gradients
         )
+        list(
+          yq = yq,
+          yqerr = qdelta$quanterr,
+          yqgrad = if (gradients) qdelta$quantgrad else NA,
+          yqgerr = if (gradients) qdelta$quantgerr else NA
+        )
       }
-      list(
-        yq = yq,
-        yqerr = qdelta$quanterr,
-        yqgrad = if (gradients) qdelta$quantgrad else NA,
-        yqgerr = if (gradients) qdelta$quantgerr else NA
-      )
-    }
 
-    tau.out <- lapply(tau, fit_one_tau)
+      tau.out <- lapply(tau, fit_one_tau)
 
-    if (ntau == 1L) {
-      myout <- tau.out[[1L]]
-    } else {
-      myout <- list(
-        yq = do.call(cbind, lapply(tau.out, `[[`, "yq")),
-        yqerr = do.call(cbind, lapply(tau.out, `[[`, "yqerr")),
-        yqgrad = NA,
-        yqgerr = NA
-      )
-      colnames(myout$yq) <- tau.labels
-      colnames(myout$yqerr) <- tau.labels
-      if (gradients) {
-        p <- ncol(tau.out[[1L]]$yqgrad)
-        grad.names <- colnames(tau.out[[1L]]$yqgrad)
-        myout$yqgrad <- array(NA_real_,
-                              dim = c(enrow, p, ntau),
-                              dimnames = list(NULL, grad.names, tau.labels))
-        myout$yqgerr <- array(NA_real_,
-                              dim = c(enrow, p, ntau),
-                              dimnames = list(NULL, grad.names, tau.labels))
-        for (j in seq_len(ntau)) {
-          myout$yqgrad[, , j] <- tau.out[[j]]$yqgrad
-          myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
+      if (ntau == 1L) {
+        myout <- tau.out[[1L]]
+      } else {
+        myout <- list(
+          yq = do.call(cbind, lapply(tau.out, `[[`, "yq")),
+          yqerr = do.call(cbind, lapply(tau.out, `[[`, "yqerr")),
+          yqgrad = NA,
+          yqgerr = NA
+        )
+        colnames(myout$yq) <- tau.labels
+        colnames(myout$yqerr) <- tau.labels
+        if (gradients) {
+          p <- ncol(tau.out[[1L]]$yqgrad)
+          grad.names <- colnames(tau.out[[1L]]$yqgrad)
+          myout$yqgrad <- array(NA_real_,
+                                dim = c(enrow, p, ntau),
+                                dimnames = list(NULL, grad.names, tau.labels))
+          myout$yqgerr <- array(NA_real_,
+                                dim = c(enrow, p, ntau),
+                                dimnames = list(NULL, grad.names, tau.labels))
+          for (j in seq_len(ntau)) {
+            myout$yqgrad[, , j] <- tau.out[[j]]$yqgrad
+            myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
+          }
         }
       }
     }

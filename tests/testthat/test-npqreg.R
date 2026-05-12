@@ -217,3 +217,55 @@ test_that("npqreg gradients populate qregression objects", {
     expect_lt(max(abs(fit$quantgrad[, j] - fd), na.rm = TRUE), 1e-3)
   }
 })
+
+test_that("npqreg vector-tau gradient fanout matches local evaluator", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old.local <- getOption("npRmpi.local.regression.mode")
+  old.min <- getOption("npRmpi.npqreg.parallel.min.eval")
+  old.chunk <- getOption("npRmpi.npqreg.chunk.size")
+  on.exit(options(npRmpi.local.regression.mode = old.local,
+                  npRmpi.npqreg.parallel.min.eval = old.min,
+                  npRmpi.npqreg.chunk.size = old.chunk),
+          add = TRUE)
+
+  set.seed(20260512)
+  n <- 72L
+  x <- sort(runif(n))
+  xdat <- data.frame(x = x)
+  ydat <- sin(2 * pi * x) + rnorm(n, sd = 0.15)
+  bw <- npcdistbw(
+    xdat = xdat,
+    ydat = ydat,
+    bws = c(0.45, 0.45),
+    bandwidth.compute = FALSE
+  )
+
+  options(npRmpi.local.regression.mode = TRUE,
+          npRmpi.npqreg.parallel.min.eval = 1L,
+          npRmpi.npqreg.chunk.size = 19L)
+  ref <- npqreg(
+    bws = bw,
+    txdat = xdat,
+    tydat = ydat,
+    tau = c(0.25, 0.5, 0.75),
+    gradients = TRUE
+  )
+
+  options(npRmpi.local.regression.mode = FALSE,
+          npRmpi.npqreg.parallel.min.eval = 1L,
+          npRmpi.npqreg.chunk.size = 19L)
+  fit <- npqreg(
+    bws = bw,
+    txdat = xdat,
+    tydat = ydat,
+    tau = c(0.25, 0.5, 0.75),
+    gradients = TRUE
+  )
+
+  expect_equal(fitted(fit), fitted(ref), tolerance = 0)
+  expect_equal(se(fit), se(ref), tolerance = 0)
+  expect_equal(gradients(fit), gradients(ref), tolerance = 0)
+  expect_equal(gradients(fit, errors = TRUE), gradients(ref, errors = TRUE), tolerance = 0)
+})
