@@ -1894,13 +1894,6 @@
   plot.errors.center <- match.arg(plot.errors.center)
   plot.errors.type <- match.arg(plot.errors.type)
   gradients <- npValidateScalarLogical(gradients, "gradients")
-  if (isTRUE(gradients) && identical(plot.errors.method, "asymptotic")) {
-    stop(
-      "asymptotic errors are unsupported for quantile regression gradients; use bootstrap errors",
-      call. = FALSE
-    )
-  }
-
   bws <- object$bws
   dat <- .np_plot_proto_clean_conditional_data(xdat = xdat, ydat = ydat)
   xdat <- dat$xdat

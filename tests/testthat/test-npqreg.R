@@ -193,3 +193,32 @@ test_that("npqreg gradients populate qregression objects", {
     expect_lt(max(abs(fit$quantgrad[, j] - fd), na.rm = TRUE), 1e-3)
   }
 })
+
+test_that("npqreg gradient plots support asymptotic errors", {
+  set.seed(70512)
+  n <- 48L
+  xdat <- data.frame(x = sort(runif(n)))
+  ydat <- sin(2 * pi * xdat$x) + rnorm(n, sd = 0.15)
+  bw <- npcdistbw(
+    xdat = xdat,
+    ydat = ydat,
+    bws = c(0.45, 0.45),
+    bandwidth.compute = FALSE,
+    cxkerbound = "range",
+    cykerbound = "range"
+  )
+  fit <- npqreg(bws = bw, tau = c(0.25, 0.5, 0.75), gradients = TRUE)
+
+  out <- plot(
+    fit,
+    gradients = TRUE,
+    output = "data",
+    perspective = FALSE,
+    errors = "asymptotic",
+    neval = 8L
+  )
+
+  expect_true(all(vapply(out, inherits, logical(1), "qregression")))
+  expect_true(all(is.finite(gradients(fit))))
+  expect_true(all(is.finite(gradients(fit, errors = TRUE))))
+})

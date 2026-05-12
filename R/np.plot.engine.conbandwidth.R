@@ -169,13 +169,6 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
 
-    if (plot.errors.method == "asymptotic" && quantreg && gradients) {
-      stop(
-        "asymptotic errors are unsupported for quantile regression gradients; use bootstrap errors",
-        call. = FALSE
-      )
-    }
-
     plot.errors = (plot.errors.method != "none")
     proper.args <- .np_condens_validate_proper_args(
       proper = proper,
