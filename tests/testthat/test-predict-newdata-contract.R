@@ -135,9 +135,12 @@ test_that("predict aliases newdata to exdat for default npqreg", {
     tolerance = 1e-12
   )
 
-  expect_error(
-    predict(fit, newdata = nd, exdat = nd),
-    "supply only one of 'newdata' or 'exdat'"
+  nd.native <- data.frame(x = c(0.15, 0.35, 0.65))
+  nd.standard <- data.frame(x = c(0.25, 0.55, 0.85))
+  expect_equal(
+    as.numeric(predict(fit, newdata = nd.standard, exdat = nd.native)),
+    as.numeric(predict(fit, exdat = nd.native)),
+    tolerance = 1e-12
   )
 })
 
