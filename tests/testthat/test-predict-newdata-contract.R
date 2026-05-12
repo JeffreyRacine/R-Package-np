@@ -108,6 +108,27 @@ test_that("predict aliases newdata to exdat/eydat for default npcdens/npcdist", 
   )
 })
 
+test_that("predict aliases newdata to exdat for default npqreg", {
+  set.seed(20260512)
+  x <- data.frame(x = runif(50))
+  y <- rnorm(50)
+  nd <- data.frame(x = c(0.2, 0.5, 0.8))
+
+  bw <- npcdistbw(
+    xdat = x,
+    ydat = data.frame(y = y),
+    bws = c(0.25, 0.25),
+    bandwidth.compute = FALSE
+  )
+  fit <- npqreg(bws = bw, txdat = x, tydat = y, tau = 0.5)
+
+  expect_equal(
+    as.numeric(predict(fit, newdata = nd)),
+    as.numeric(predict(fit, exdat = nd)),
+    tolerance = 1e-12
+  )
+})
+
 test_that("predict aliases newdata to the explicit-evaluation slice route for npcdens", {
   set.seed(20260322)
   x <- runif(70, -1, 1)
