@@ -37,7 +37,7 @@ npconmode.formula <-
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
-      has.ey <- succeedWithResponse(tt, newdata)
+      has.ey <- bws$variableNames[["response"]] %in% names(newdata)
 
       if (has.ey){
         umf.args <- list(formula = tt, data = newdata)
