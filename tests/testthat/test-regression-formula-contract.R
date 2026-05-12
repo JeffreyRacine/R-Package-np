@@ -67,3 +67,71 @@ test_that("npreg formula y.eval path matches explicit data path", {
   expect_equal(fit_formula$mean, fit_default$mean)
   expect_equal(fit_formula$merr, fit_default$merr)
 })
+
+test_that("npreg formula fixed-bandwidth predict works with autodispatch", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old.opts <- options(npRmpi.autodispatch = TRUE)
+  on.exit(options(old.opts), add = TRUE)
+
+  set.seed(20260512)
+  dat <- data.frame(
+    y = rnorm(48),
+    x = runif(48)
+  )
+  ex <- data.frame(x = seq(0.05, 0.95, length.out = 7))
+
+  bw <- npRmpi::npregbw(
+    y ~ x,
+    data = dat,
+    regtype = "ll",
+    bws = 0.35,
+    bandwidth.compute = FALSE
+  )
+
+  fit_formula <- npRmpi::npreg(bws = bw)
+  pred_formula <- predict(fit_formula, newdata = ex)
+
+  fit_explicit <- npRmpi::npreg(
+    bws = bw,
+    txdat = dat["x"],
+    tydat = dat$y,
+    exdat = ex["x"]
+  )
+
+  expect_equal(pred_formula, fitted(fit_explicit))
+})
+
+test_that("npreg direct formula scalar bandwidth works with autodispatch", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old.opts <- options(npRmpi.autodispatch = TRUE)
+  on.exit(options(old.opts), add = TRUE)
+
+  set.seed(20260512)
+  dat <- data.frame(
+    y = rnorm(48),
+    x = runif(48)
+  )
+
+  fit_formula <- npRmpi::npreg(
+    y ~ x,
+    data = dat,
+    regtype = "ll",
+    bws = 0.35
+  )
+  bw <- npRmpi::npregbw(
+    y ~ x,
+    data = dat,
+    regtype = "ll",
+    bws = 0.35,
+    bandwidth.compute = FALSE
+  )
+  fit_explicit <- npRmpi::npreg(
+    bws = bw,
+    txdat = dat["x"],
+    tydat = dat$y
+  )
+
+  expect_equal(fitted(fit_formula), fitted(fit_explicit))
+})
