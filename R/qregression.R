@@ -73,6 +73,8 @@ quantile.qregression <- function(x, ...){ x$quantile }
 predict.qregression <- function(object, se.fit = FALSE, ...) {
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
+  if (!has.formula.route && !is.null(dots$exdat) && !is.null(dots$newdata))
+    stop("supply only one of 'newdata' or 'exdat' for non-formula qregression prediction")
   if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
     dots$exdat <- dots$newdata
     dots$newdata <- NULL
