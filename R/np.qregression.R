@@ -559,6 +559,7 @@ npqreg.condbandwidth <-
            ...){
 
     fit.start <- proc.time()[3]
+    tau <- .npqreg_validate_tau(tau)
     fit.dots <- .npqreg_fit_dots(list(...))
     if (length(fit.dots))
       stop(sprintf("unused npqreg fit argument '%s'", names(fit.dots)[1L]))
@@ -599,7 +600,6 @@ npqreg.condbandwidth <-
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
 
-    tau <- .npqreg_validate_tau(tau)
     ntau <- length(tau)
     tau.labels <- .npqreg_tau_labels(tau)
 
@@ -766,17 +766,9 @@ npqreg.condbandwidth <-
 
 npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   nomad <- npValidateScalarLogical(nomad, "nomad")
-  .npRmpi_require_active_slave_pool(where = "npqreg()")
-  parallel.cond <- (!missing(bws)) &&
-    .npRmpi_npqreg_should_localize(bws) &&
-    .npRmpi_npqreg_parallel_context(bws, comm = 1L)
-  if (!missing(bws) &&
-      .npRmpi_npqreg_should_localize(bws) &&
-      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
-      !isTRUE(parallel.cond))
-    return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
-  if (.npRmpi_autodispatch_active() && !isTRUE(parallel.cond))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+  early.dots <- list(...)
+  if ("tau" %in% names(early.dots))
+    .npqreg_validate_tau(early.dots$tau)
 
   if (!missing(bws) && inherits(bws, "formula")) {
     dots <- list(...)
@@ -802,6 +794,18 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     }
     return(do.call(npqreg, c(list(bws = tbw), fit.dots)))
   }
+
+  .npRmpi_require_active_slave_pool(where = "npqreg()")
+  parallel.cond <- (!missing(bws)) &&
+    .npRmpi_npqreg_should_localize(bws) &&
+    .npRmpi_npqreg_parallel_context(bws, comm = 1L)
+  if (!missing(bws) &&
+      .npRmpi_npqreg_should_localize(bws) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+      !isTRUE(parallel.cond))
+    return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
+  if (.npRmpi_autodispatch_active() && !isTRUE(parallel.cond))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   sc <- sys.call()
   sc.names <- names(sc)

@@ -32,7 +32,9 @@ test_that("npRmpi.quit is harmless before MPI initialization", {
 test_that("active slave pool guard fails closed before npRmpi.init", {
   has.pool <- getFromNamespace(".npRmpi_has_active_slave_pool", "npRmpi")
   old.pool <- getOption("npRmpi.pool.active")
+  old.ctx <- getOption("npRmpi.autodispatch.context")
   on.exit(options(npRmpi.pool.active = old.pool), add = TRUE)
+  on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
 
   options(npRmpi.pool.active = FALSE)
   expect_false(has.pool())
@@ -41,5 +43,12 @@ test_that("active slave pool guard fails closed before npRmpi.init", {
       where = "abuse probe"
     ),
     "requires an active MPI slave pool"
+  )
+
+  options(npRmpi.autodispatch.context = TRUE)
+  expect_silent(
+    getFromNamespace(".npRmpi_require_active_slave_pool", "npRmpi")(
+      where = "worker payload"
+    )
   )
 })

@@ -80,6 +80,36 @@ test_that("npconmode formula route forwards NOMAD shortcut controls", {
   expect_identical(as.character(fit$bws$regtype.engine), "lp")
 })
 
+test_that("npconmode formula route treats response-free newdata strictly", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  nested_call <- function() {
+    set.seed(20260511)
+    d <- data.frame(x = sort(runif(50)))
+    d$y <- factor(rbinom(50, 1L, plogis(1.2 * d$x)), levels = 0:1)
+    nd <- data.frame(x = c(.1, .4, .8))
+
+    npconmode(
+      y ~ x,
+      data = d,
+      newdata = nd,
+      regtype = "ll",
+      bwmethod = "cv.ls",
+      nmulti = 1L,
+      probabilities = TRUE,
+      gradients = TRUE,
+      level = "1"
+    )
+  }
+
+  fit <- nested_call()
+  expect_s3_class(fit, "conmode")
+  expect_equal(length(fitted(fit)), 3L)
+  expect_equal(nrow(predict(fit, type = "prob")), 3L)
+  expect_equal(NROW(gradients(fit)), 3L)
+})
+
 test_that("npconmode NOMAD fit metadata propagates through evaluation and bandwidth plots", {
   skip_if_not_installed("crs")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")

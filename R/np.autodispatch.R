@@ -345,6 +345,9 @@
   .npRmpi_abort_if_rmpi_attached(where = where)
   if (isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
     return(invisible(TRUE))
+  if (isTRUE(.npRmpi_autodispatch_in_context()) ||
+      isTRUE(.npRmpi_manual_bcast_in_context()))
+    return(invisible(TRUE))
   if (.npRmpi_has_active_slave_pool(comm = comm))
     return(invisible(TRUE))
   stop(sprintf("%s requires an active MPI slave pool; call npRmpi.init(...) first", where))

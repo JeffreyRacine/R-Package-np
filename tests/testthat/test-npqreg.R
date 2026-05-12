@@ -35,6 +35,9 @@ test_that("npqreg works with multiple taus", {
 })
 
 test_that("npqreg formula route strips fit controls before bandwidth selection", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260511)
   d <- data.frame(x = runif(36), y = rnorm(36))
 
@@ -46,6 +49,20 @@ test_that("npqreg formula route strips fit controls before bandwidth selection",
   expect_equal(fit$tau, c(0.25, 0.5))
   expect_true(fit$gradients)
   expect_equal(ncol(fitted(fit)), 2L)
+})
+
+test_that("npqreg validates tau before MPI dispatch", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  set.seed(20260511)
+  d <- data.frame(x = runif(24), y = rnorm(24))
+
+  expect_error(
+    npqreg(y ~ x, data = d, tau = -0.1, nmulti = 1L),
+    "'tau' must contain numeric values in (0,1)",
+    fixed = TRUE
+  )
 })
 
 test_that("npqreg vector-tau plots support legend controls", {
