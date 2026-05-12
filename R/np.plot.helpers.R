@@ -11818,6 +11818,26 @@ plotFactor <- function(f, y, ...){
       if (!no.ex)
         exdat.df <- exdat
 
+      if ((isTRUE(need.errors) || isTRUE(gradients)) &&
+          .npRmpi_npqreg_parallel_context(bws, comm = 1L)) {
+        mat <- .npqreg_fit_tau_vector_parallel_matrix(
+          bws = bws,
+          xdat = xdat.df,
+          ydat = ydat.df,
+          exdat = txeval,
+          tau = tau,
+          gradients = gradients,
+          tol = tol,
+          small = small,
+          itmax = itmax,
+          comm = 1L
+        )
+        myout <- .npqreg_fit_tau_vector_from_parallel_matrix(
+          mat,
+          tau = tau,
+          gradients = gradients
+        )
+      } else {
       fit.one.tau <- function(tau.i) {
         yq <- .npqreg_invert_selected_cdf(
           bws = bws,
@@ -11883,6 +11903,7 @@ plotFactor <- function(f, y, ...){
             myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
           }
         }
+      }
       }
 
       fit.elapsed <- proc.time()[3] - fit.start
