@@ -144,6 +144,118 @@ test_that("predict aliases newdata to exdat for default npqreg", {
   )
 })
 
+test_that("predict supports formula newdata and vector tau for npqreg", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260512)
+  dat <- data.frame(
+    y = sin(runif(70)) + rnorm(70, sd = 0.1),
+    x = runif(70)
+  )
+  nd <- data.frame(x = c(0.2, 0.5, 0.8))
+
+  bw <- npcdistbw(
+    y ~ x,
+    data = dat,
+    bws = c(0.25, 0.25),
+    bandwidth.compute = FALSE
+  )
+  fit <- npqreg(bws = bw, tau = c(0.25, 0.5), gradients = TRUE)
+
+  pred <- predict(fit, newdata = nd)
+  expect_equal(dim(pred), c(nrow(nd), 2L))
+
+  se.pred <- predict(fit, newdata = nd, se.fit = TRUE)
+  expect_named(se.pred, c("fit", "se.fit", "df", "residual.scale"))
+  expect_equal(dim(se.pred$fit), c(nrow(nd), 2L))
+  expect_equal(dim(se.pred$se.fit), c(nrow(nd), 2L))
+})
+
+test_that("predict supports conmode formula newdata without changing extraction behavior", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260512)
+  dat <- data.frame(
+    y = factor(rbinom(80, 1, 0.45)),
+    x = runif(80),
+    z = factor(rbinom(80, 1, 0.5))
+  )
+  bw <- npcdensbw(
+    y ~ x + z,
+    data = dat,
+    bws = c(0.25, 0.3, 0.4),
+    bandwidth.compute = FALSE
+  )
+  fit <- npconmode(bws = bw, probabilities = TRUE)
+  fit.no.prob <- npconmode(bws = bw, probabilities = FALSE)
+  nd <- dat[1:5, c("x", "z")]
+  nd.with.y <- dat[1:5, c("y", "x", "z")]
+
+  expect_equal(predict(fit), fit$conmode)
+  expect_equal(predict(fit, type = "prob"), fit$probabilities)
+  expect_error(
+    predict(fit.no.prob, type = "prob"),
+    "class probabilities are not stored"
+  )
+
+  ref <- npconmode(bws = fit$bws, newdata = nd)
+  expect_equal(as.character(predict(fit, newdata = nd)), as.character(ref$conmode))
+
+  ref.prob <- npconmode(bws = fit$bws, newdata = nd, probabilities = TRUE)
+  expect_equal(
+    unname(predict(fit, newdata = nd, type = "prob")),
+    unname(ref.prob$probabilities),
+    tolerance = 1e-12
+  )
+
+  ref.with.y <- npconmode(bws = fit$bws, newdata = nd.with.y)
+  expect_equal(
+    as.character(predict(fit, newdata = nd.with.y)),
+    as.character(ref.with.y$conmode)
+  )
+  expect_error(
+    predict(fit, newdata = nd, type = "prob", probabilities = FALSE),
+    "requires probabilities=TRUE"
+  )
+})
+
+test_that("predict supports conmode native evaluation and native precedence", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260512)
+  xdat <- data.frame(
+    x = runif(70),
+    z = factor(rbinom(70, 1, 0.5))
+  )
+  ydat <- factor(rbinom(70, 1, 0.4))
+  bw <- npcdensbw(
+    xdat = xdat,
+    ydat = data.frame(y = ydat),
+    bws = c(0.25, 0.3, 0.4),
+    bandwidth.compute = FALSE
+  )
+  fit <- npconmode(bws = bw, txdat = xdat, tydat = ydat, probabilities = TRUE)
+  nd <- xdat[1:5, , drop = FALSE]
+  nd.native <- xdat[6:10, , drop = FALSE]
+
+  expect_equal(
+    as.character(predict(fit, newdata = nd)),
+    as.character(predict(fit, exdat = nd))
+  )
+  expect_equal(
+    unname(predict(fit, newdata = nd, type = "prob")),
+    unname(predict(fit, exdat = nd, type = "prob")),
+    tolerance = 1e-12
+  )
+  expect_equal(
+    as.character(predict(fit, newdata = nd, exdat = nd.native)),
+    as.character(predict(fit, exdat = nd.native))
+  )
+})
+
 test_that("predict aliases newdata to the explicit-evaluation slice route for npcdens/npcdist", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
