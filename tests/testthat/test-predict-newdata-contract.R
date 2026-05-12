@@ -112,6 +112,30 @@ test_that("predict aliases newdata to exdat/eydat for default npcdens/npcdist", 
   )
 })
 
+test_that("predict aliases newdata to exdat for default npqreg", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260512)
+  x <- data.frame(x = runif(50))
+  y <- rnorm(50)
+  nd <- data.frame(x = c(0.2, 0.5, 0.8))
+
+  bw <- npcdistbw(
+    xdat = x,
+    ydat = data.frame(y = y),
+    bws = c(0.25, 0.25),
+    bandwidth.compute = FALSE
+  )
+  fit <- npqreg(bws = bw, txdat = x, tydat = y, tau = 0.5)
+
+  expect_equal(
+    as.numeric(predict(fit, newdata = nd)),
+    as.numeric(predict(fit, exdat = nd)),
+    tolerance = 1e-12
+  )
+})
+
 test_that("predict aliases newdata to the explicit-evaluation slice route for npcdens/npcdist", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
