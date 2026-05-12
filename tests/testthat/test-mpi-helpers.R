@@ -15,6 +15,11 @@ test_that("npRmpi.quit() respects reuse/force", {
   options(npRmpi.reuse.slaves=TRUE)
   expect_true(isTRUE(try({ npRmpi.quit(force=FALSE); TRUE }, silent=TRUE)))
   expect_true(mpi.comm.size(1) > 1) # soft-close keeps pool alive
+  expect_true(isTRUE(getOption("npRmpi.pool.active", FALSE)))
+  expect_true(getFromNamespace(".npRmpi_has_active_slave_pool", "npRmpi")())
+  expect_silent(getFromNamespace(".npRmpi_require_active_slave_pool", "npRmpi")(
+    where = "soft-close probe"
+  ))
 
   expect_true(isTRUE(try({ npRmpi.quit(force=TRUE); TRUE }, silent=TRUE)))
   sz <- try(mpi.comm.size(1), silent=TRUE)

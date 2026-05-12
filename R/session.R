@@ -686,12 +686,15 @@ npRmpi.quit <- function(force = FALSE,
     return(invisible(TRUE))
   }
 
-  mpi.close.Rslaves(dellog = dellog, comm = comm, force = force)
+  close.status <- mpi.close.Rslaves(dellog = dellog, comm = comm, force = force)
+  soft.kept.pool <- !isTRUE(force) &&
+    isTRUE(getOption("npRmpi.reuse.slaves", FALSE)) &&
+    .npRmpi_session_has_active_pool(comm = comm)
   .npRmpi_session_reset_spmd_state()
   .npRmpi_attach_state_reset()
   options(npRmpi.master.only = FALSE)
-  options(npRmpi.pool.active = FALSE)
-  invisible(TRUE)
+  options(npRmpi.pool.active = isTRUE(soft.kept.pool))
+  invisible(close.status)
 }
 
 npRmpi.session.info <- function(comm=1){
