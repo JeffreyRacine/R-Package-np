@@ -127,6 +127,11 @@ test_that("predict aliases newdata to exdat for default npqreg", {
     as.numeric(predict(fit, exdat = nd)),
     tolerance = 1e-12
   )
+
+  expect_error(
+    predict(fit, newdata = nd, exdat = nd),
+    "supply only one of 'newdata' or 'exdat'"
+  )
 })
 
 test_that("predict aliases newdata to the explicit-evaluation slice route for npcdens", {
