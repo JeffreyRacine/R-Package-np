@@ -8,11 +8,7 @@
 }
 
 \usage{
-npcopula(bws,
-         data,
-         u = NULL,
-         n.quasi.inv = 1000,
-         er.quasi.inv = 1) 
+npcopula(bws, ...)
 }
 
 \arguments{
@@ -21,15 +17,23 @@ These arguments identify the bandwidth specification and source data.
 }
 
   \item{bws}{
-    an unconditional joint distribution (\code{npudistbw}) or joint
-    density (\code{npudensbw}) bandwidth object (if \code{bws} is
-    delivered via \code{npudistbw} the copula distribution is estimated,
-    while if \code{bws} is delivered via \code{npudensbw} the copula
-    density is estimated)
+    an unconditional joint distribution (\code{npudistbw}) bandwidth
+    object, an unconditional joint density (\code{npudensbw}) bandwidth
+    object, or a one-sided formula. If a formula is supplied,
+    \code{npcopula} first computes the required bandwidth object using
+    \code{npudistbw} when \code{target="distribution"} and
+    \code{npudensbw} when \code{target="density"}.
   }
 
   \item{data}{
-    a data frame containing variables used to construct \code{bws}
+    a data frame containing variables used to construct \code{bws}; when
+    \code{bws} is a formula, \code{data} is passed through to the
+    bandwidth selector.
+  }
+
+  \item{...}{
+    additional arguments passed to \code{npudistbw} or \code{npudensbw}
+    when \code{bws} is a formula.
   }
 
 
@@ -43,10 +47,32 @@ These arguments control the marginal probability grid and numerical inversion us
     constructing the grid used to compute the quasi-inverse (see details)
   }
 
+  \item{evaluation}{
+    evaluation route used when \code{bws} is a formula. The default
+    \code{"grid"} constructs a plot-ready probability grid for
+    two-dimensional copulas. Use \code{"sample"} to evaluate the copula
+    at the sample realizations.
+  }
+
   \item{n.quasi.inv}{
     number of grid points generated when \code{u} is provided in order to
     compute the quasi-inverse of each marginal distribution (see
     details)
+  }
+
+  \item{neval}{
+    number of probability values per margin used for the automatically
+    generated two-dimensional grid when \code{bws} is a formula and
+    \code{evaluation="grid"}.
+  }
+
+  \item{target}{
+    target used when \code{bws} is a formula. The default
+    \code{"distribution"} estimates the copula distribution using
+    \code{npudistbw}; \code{"density"} estimates the copula density using
+    \code{npudensbw}. When \code{bws} is already a bandwidth object, the
+    target is inferred from that object and a conflicting explicit
+    \code{target} is rejected.
   }
 
   \item{u}{
@@ -59,8 +85,8 @@ These arguments control the marginal probability grid and numerical inversion us
 }
 \value{
 
-  \code{npcopula} returns an object of type \code{\link{data.frame}}
-  with the following components
+  \code{npcopula} returns an object of class \code{"npcopula"} and
+  \code{\link{data.frame}} with the following components
 
   \item{copula}{
     the copula (bandwidth object obtained from \code{npudistbw}) or
@@ -74,6 +100,10 @@ These arguments control the marginal probability grid and numerical inversion us
   \item{data}{ the matrix of marginal quantiles constructed when
   \code{u} is provided (\code{data} returned has the same names as
   \code{data} inputted)}
+
+  The selected bandwidth object and display metadata are retained as
+  attributes. Use \code{attr(object, "bws")} to retrieve the bandwidth
+  object selected by the formula route.
 
 }
 \references{
@@ -113,6 +143,12 @@ These arguments control the marginal probability grid and numerical inversion us
   matrix of dimension 10000 by 2 which, though not memory intensive, may
   be computationally burdensome.
 
+  If \code{bws} is a formula and \code{u} is omitted, \code{npcopula}
+  automatically creates a two-dimensional probability grid when
+  \code{evaluation="grid"}. For higher-dimensional copulas, either
+  supply \code{u} explicitly or use \code{evaluation="sample"} to avoid
+  accidental grid expansion.
+
   The \sQuote{quasi-inverse} is computed via Definition 2.3.6 from
   Nelsen (2006). We compute an equi-quantile grid on the range of the
   data of length \code{n.quasi.inv/2}. We then extend the range of the
@@ -148,6 +184,28 @@ These arguments control the marginal probability grid and numerical inversion us
 
 \examples{
 \dontrun{
+## Minimal bivariate continuous example using the formula interface
+
+require(MASS)
+
+set.seed(42)
+n <- 1000
+rho <- 0.95
+Sigma <- matrix(c(1, rho, rho, 1), 2, 2)
+dat <- as.data.frame(mvrnorm(n = n, mu = c(0, 0), Sigma = Sigma))
+names(dat) <- c("x", "y")
+
+copula_fit <- npcopula(~ x + y, data = dat, neval = 20)
+summary(copula_fit)
+plot(copula_fit)
+
+## Reuse the selected bandwidth object for a custom probability grid
+u_grid <- data.frame(x = seq(0, 1, length.out = 10),
+                     y = seq(0, 1, length.out = 10))
+copula_custom <- npcopula(bws = attr(copula_fit, "bws"),
+                          data = dat,
+                          u = u_grid)
+
 ## Example 1: Bivariate Mixed Data
 
 require(MASS)
