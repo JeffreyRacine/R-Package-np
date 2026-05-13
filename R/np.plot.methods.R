@@ -866,6 +866,7 @@ np_render_control <- function(style = c("band", "bar"),
                                    gradients = FALSE,
                                    level,
                                    plot.user.args = list(),
+                                   line.user.args = list(),
                                    data_rug = FALSE,
                                    main = NULL,
                                    xlab = NULL,
@@ -899,6 +900,10 @@ np_render_control <- function(style = c("band", "bar"),
     list(x = xplot[ord], y = y[ord],
          type = if (is.ordered(x) || is.numeric(xplot)) "l" else "p",
          xlab = xlab, ylab = ylab, main = main),
+    line.user.args
+  )
+  args <- .np_plot_merge_user_args(
+    args,
     plot.user.args
   )
   if (is.ordered(x)) {
@@ -937,6 +942,9 @@ np_render_control <- function(style = c("band", "bar"),
   output <- match.arg(output)
   output <- .np_plot_scalar_match(output, c("plot", "data", "plot-data"), "output")
   plot.user.args <- .np_plot_user_args(dots, "plot")
+  line.user.args <- .np_plot_user_args(dots, "lines")
+  if (!is.null(dots$type))
+    line.user.args$type <- dots$type
 
   plot.data <- .np_plot_conmode_data(object, gradients = gradients, level = level)
   level <- plot.data[[1L]]$level[1L]
@@ -960,6 +968,7 @@ np_render_control <- function(style = c("band", "bar"),
       gradients = gradients,
       level = level,
       plot.user.args = panel.dots,
+      line.user.args = line.user.args,
       data_rug = data_rug
     )
   }
