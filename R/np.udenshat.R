@@ -1,3 +1,73 @@
+.np_udenshat_local_chunk <- function(bws,
+                                     tdat,
+                                     edat,
+                                     y = NULL,
+                                     output = c("matrix", "apply"),
+                                     n.train = nrow(tdat)) {
+  output <- match.arg(output)
+
+  if (identical(output, "apply")) {
+    if (is.null(y))
+      stop("argument 'y' is required when output='apply'")
+
+    rhs <- if (ncol(y) == 1L) {
+      y
+    } else {
+      lapply(seq_len(ncol(y)), function(j) y[, j, drop = FALSE])
+    }
+
+    apply_one <- function(rhs.col) {
+      if (identical(bws$type, "fixed")) {
+        .np_direct_operator_apply(
+          kbw = bws,
+          txdat = tdat,
+          exdat = edat,
+          operator = "normal",
+          rhs = rhs.col,
+          where = "npudenshat direct operator apply"
+        ) / n.train
+      } else {
+        .np_exact_operator_apply(
+          kbw = bws,
+          txdat = tdat,
+          exdat = edat,
+          operator = "normal",
+          rhs = rhs.col,
+          where = "npudenshat exact operator apply"
+        ) / n.train
+      }
+    }
+
+    out <- if (is.list(rhs)) {
+      do.call(cbind, lapply(rhs, apply_one))
+    } else {
+      apply_one(rhs)
+    }
+
+    if (ncol(out) == 1L)
+      return(as.vector(out))
+    return(out)
+  }
+
+  if (identical(bws$type, "fixed")) {
+    .np_direct_operator_matrix(
+      kbw = bws,
+      txdat = tdat,
+      exdat = edat,
+      operator = "normal",
+      where = "npudenshat direct operator"
+    ) / n.train
+  } else {
+    .np_exact_operator_matrix(
+      kbw = bws,
+      txdat = tdat,
+      exdat = edat,
+      operator = "normal",
+      where = "npudenshat exact operator"
+    ) / n.train
+  }
+}
+
 npudenshat <- function(bws,
                        tdat = stop("training data 'tdat' missing"),
                        edat,
@@ -56,71 +126,38 @@ npudenshat <- function(bws,
   }
 
   n.train <- nrow(tdat)
-  if (identical(output, "apply")) {
-    if (is.null(y))
-      stop("argument 'y' is required when output='apply'")
+  edat.full <- if (no.e) tdat else edat
 
-    rhs <- if (ncol(y) == 1L) {
-      y
-    } else {
-      lapply(seq_len(ncol(y)), function(j) y[, j, drop = FALSE])
-    }
-
-    apply_one <- function(rhs.col) {
-      if (identical(bws$type, "fixed")) {
-        .np_direct_operator_apply(
-          kbw = bws,
-          txdat = tdat,
-          exdat = if (no.e) tdat else edat,
-          operator = "normal",
-          rhs = rhs.col,
-          where = "npudenshat direct operator apply"
-        ) / n.train
-      } else {
-        .np_exact_operator_apply(
-          kbw = bws,
-          txdat = tdat,
-          exdat = if (no.e) tdat else edat,
-          operator = "normal",
-          rhs = rhs.col,
-          where = "npudenshat exact operator apply"
-        ) / n.train
-      }
-    }
-
-    out <- if (is.list(rhs)) {
-      do.call(cbind, lapply(rhs, apply_one))
-    } else {
-      apply_one(rhs)
-    }
-
-    if (ncol(out) == 1L)
-      return(as.vector(out))
-    return(out)
+  fanout <- .npRmpi_hat_operator_row_fanout(
+    fun.name = "npudenshat",
+    bws = bws,
+    tdat = tdat,
+    edat = edat.full,
+    y = y,
+    output = output,
+    what = "npudenshat"
+  )
+  if (!is.null(fanout)) {
+    if (ncol(fanout) == 1L)
+      return(as.vector(fanout))
+    return(fanout)
   }
 
-  if (identical(bws$type, "fixed")) {
-    H <- .np_direct_operator_matrix(
-      kbw = bws,
-      txdat = tdat,
-      exdat = if (no.e) tdat else edat,
-      operator = "normal",
-      where = "npudenshat direct operator"
-    ) / n.train
-  } else {
-    H <- .np_exact_operator_matrix(
-      kbw = bws,
-      txdat = tdat,
-      exdat = if (no.e) tdat else edat,
-      operator = "normal",
-      where = "npudenshat exact operator"
-    ) / n.train
-  }
+  H <- .np_udenshat_local_chunk(
+    bws = bws,
+    tdat = tdat,
+    edat = edat.full,
+    y = y,
+    output = output,
+    n.train = n.train
+  )
+  if (identical(output, "apply"))
+    return(H)
 
   class(H) <- c("npudenshat", "matrix")
   attr(H, "bws") <- bws
   attr(H, "tdat") <- tdat
-  attr(H, "edat") <- if (no.e) tdat else edat
+  attr(H, "edat") <- edat.full
   attr(H, "trainiseval") <- no.e
   attr(H, "rows.omit.train") <- rows.omit.train
   attr(H, "call") <- match.call(expand.dots = FALSE)

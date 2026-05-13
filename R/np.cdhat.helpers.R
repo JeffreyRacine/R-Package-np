@@ -195,7 +195,7 @@
                                             comm = 1L) {
   output <- match.arg(output)
 
-  if (!identical(fun.name, "npudisthat") || !identical(output, "apply"))
+  if (!fun.name %in% c("npudisthat", "npudenshat") || !identical(output, "apply"))
     return(NULL)
 
   if (!isTRUE(getOption("npRmpi.hat.operator.fanout", TRUE)) ||
@@ -214,7 +214,8 @@
     return(NULL)
 
   neval <- nrow(edat)
-  if (is.null(target.dist) || length(target.dist) != neval)
+  if (identical(fun.name, "npudisthat") &&
+      (is.null(target.dist) || length(target.dist) != neval))
     return(NULL)
 
   work.size <- as.double(nrow(tdat)) * as.double(neval) *
@@ -246,15 +247,26 @@
     on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
 
     rows <- as.integer(task$rows)
-    out <- .np_udisthat_local_chunk(
-      bws = bws,
-      tdat = tdat,
-      edat = edat[rows, , drop = FALSE],
-      y = y,
-      output = output,
-      target.dist = target.dist[rows],
-      n.train = nrow(tdat)
-    )
+    out <- if (identical(fun.name, "npudisthat")) {
+      .np_udisthat_local_chunk(
+        bws = bws,
+        tdat = tdat,
+        edat = edat[rows, , drop = FALSE],
+        y = y,
+        output = output,
+        target.dist = target.dist[rows],
+        n.train = nrow(tdat)
+      )
+    } else {
+      .np_udenshat_local_chunk(
+        bws = bws,
+        tdat = tdat,
+        edat = edat[rows, , drop = FALSE],
+        y = y,
+        output = output,
+        n.train = nrow(tdat)
+      )
+    }
     out <- as.matrix(out)
     if (!identical(dim(out), c(length(rows), as.integer(ncol.out))))
       out <- matrix(as.numeric(out), nrow = length(rows), ncol = as.integer(ncol.out))
@@ -279,7 +291,9 @@
       y = y,
       output = output,
       target.dist = if (is.null(target.dist)) NA_real_ else target.dist,
-      ncol.out = ncol.out
+      ncol.out = ncol.out,
+      .np_udisthat_local_chunk = .np_udisthat_local_chunk,
+      .np_udenshat_local_chunk = .np_udenshat_local_chunk
     )
   )
 }
