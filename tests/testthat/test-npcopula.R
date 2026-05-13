@@ -39,6 +39,17 @@ test_that("npcopula formula route builds a plot-ready grid by default", {
   expect_true(isTRUE(attr(fit, "u.auto")))
   expect_equal(attr(fit, "grid.dim"), c(4L, 4L))
   expect_true(inherits(attr(fit, "bws"), "dbandwidth"))
+
+  fixed.fit <- npcopula(
+    ~ x + y,
+    data = dat,
+    bws = c(0.7, 0.7),
+    bandwidth.compute = FALSE,
+    neval = 3
+  )
+  expect_s3_class(fixed.fit, "npcopula")
+  expect_equal(nrow(fixed.fit), 9L)
+  expect_true(inherits(attr(fixed.fit, "bws"), "dbandwidth"))
 })
 
 test_that("npcopula formula route can request sample evaluation and density target", {
@@ -53,6 +64,18 @@ test_that("npcopula formula route can request sample evaluation and density targ
   expect_equal(nrow(dens.fit), 9L)
   expect_identical(attr(dens.fit, "target"), "density")
   expect_true(inherits(attr(dens.fit, "bws"), "bandwidth"))
+
+  dens.fixed <- npcopula(
+    ~ x + y,
+    data = dat,
+    target = "density",
+    bws = c(0.7, 0.7),
+    bandwidth.compute = FALSE,
+    neval = 3
+  )
+  expect_equal(nrow(dens.fixed), 9L)
+  expect_identical(attr(dens.fixed, "target"), "density")
+  expect_true(inherits(attr(dens.fixed, "bws"), "bandwidth"))
 })
 
 test_that("npcopula formula route rejects unsafe automatic high-dimensional grids", {
@@ -87,7 +110,8 @@ test_that("npcopula fitted and basic plot methods work", {
                      theta = 20, phi = 25, shade = 0.3))
   expect_silent(plot(fit, view = "image", perspective = FALSE))
   expect_silent(plot(fit, view = "contour", perspective = FALSE))
-  expect_true("copula" %in% .np_progress_single_line_surfaces())
+  expect_true("copula" %in%
+                getFromNamespace(".np_progress_single_line_surfaces", "np")())
   expect_error(plot(fit, view = "image", renderer = "rgl"),
                "view='surface'")
 
