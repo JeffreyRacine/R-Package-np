@@ -87,14 +87,16 @@ npplregbw.formula <-
     xdat <- mf.xf
     zdat <- mf[, chromoly[[3]], drop = FALSE]
 
-    init.bws <- matrix(data = 0, nrow = 1 + ncol(xdat), ncol = ncol(zdat))
-    tbw <- npplregbw.default(
-      xdat = xdat,
-      ydat = ydat,
-      zdat = zdat,
-      bws = init.bws,
-      ...
-    )
+    dots <- list(...)
+    if ("bws" %in% names(dots)) {
+      tbw <- do.call(npplregbw,
+                     c(list(xdat = xdat, ydat = ydat, zdat = zdat), dots))
+    } else {
+      init.bws <- matrix(data = 0, nrow = 1 + ncol(xdat), ncol = ncol(zdat))
+      tbw <- do.call(npplregbw.default,
+                     c(list(xdat = xdat, ydat = ydat, zdat = zdat, bws = init.bws),
+                       dots))
+    }
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- match.call(expand.dots = FALSE)

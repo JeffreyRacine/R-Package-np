@@ -89,10 +89,13 @@ residuals.smoothcoefficient <- function(object, ...) {
 }
 se.smoothcoefficient <- function(x){ x$merr }
 predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
+  se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
 
-  if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
+  if ((!is.null(dots$exdat) || !is.null(dots$ezdat)) && !is.null(dots$newdata)) {
+    dots$newdata <- NULL
+  } else if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
     nd <- toFrame(dots$newdata)
     if (!is.null(object$bws$znames)) {
       need <- c(object$bws$xnames, object$bws$znames)

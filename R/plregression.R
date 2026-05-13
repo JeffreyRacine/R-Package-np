@@ -102,6 +102,7 @@ print.plregression <- function(x, digits=NULL, ...){
 }
 
 coef.plregression <- function(object, errors = FALSE, ...) {
+  errors <- npValidateScalarLogical(errors, "errors")
   if(!errors)
     return(object$xcoef)
   else
@@ -218,11 +219,14 @@ residuals.plregression <- function(object, ...) {
 }
 
 predict.plregression <- function(object, se.fit = FALSE, ...) {
+  se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   obj.bws <- .np_plreg_bws(object, where = "predict.plregression")
   dots <- list(...)
   has.formula.route <- !is.null(obj.bws$formula)
 
-  if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
+  if ((!is.null(dots$exdat) || !is.null(dots$ezdat)) && !is.null(dots$newdata)) {
+    dots$newdata <- NULL
+  } else if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
     nd <- toFrame(dots$newdata)
     need <- c(obj.bws$xnames, obj.bws$znames)
     if (!all(need %in% names(nd)))
@@ -235,7 +239,7 @@ predict.plregression <- function(object, se.fit = FALSE, ...) {
   tr <- do.call(npplreg, c(list(bws = obj.bws), dots))
   fit <- fitted(tr)
 
-  if (isTRUE(se.fit)) {
+  if (se.fit) {
     se.out <- .np_plreg_predict_se(bws = obj.bws, fit = tr)
     return(list(fit = fit, se.fit = se.out))
   }
