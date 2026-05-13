@@ -81,22 +81,37 @@ npcopula <- function(bws, ...) {
                              n.quasi.inv,
                              er.quasi.inv,
                              timing = NULL) {
-  class(result) <- c("npcopula", "data.frame")
-  attr(result, "bws") <- bws
-  attr(result, "data") <- data
-  attr(result, "target") <- target
-  attr(result, "density") <- identical(target, "density")
-  attr(result, "xnames") <- bws$xnames
-  attr(result, "ntrain") <- bws$nobs
-  attr(result, "u.provided") <- isTRUE(u.provided)
-  attr(result, "u.auto") <- isTRUE(u.auto)
-  attr(result, "evaluation") <- evaluation
-  attr(result, "grid.dim") <- grid.dim
-  attr(result, "neval") <- neval
-  attr(result, "n.quasi.inv") <- n.quasi.inv
-  attr(result, "er.quasi.inv") <- er.quasi.inv
-  attr(result, "timing") <- timing
-  result
+  d <- as.list(result)
+  d$bw <- bws$bw
+  d$bws <- bws
+  d$xnames <- bws$xnames
+  d$nobs <- nrow(result)
+  d$ndim <- bws$ndim
+  d$nord <- bws$nord
+  d$nuno <- bws$nuno
+  d$ncon <- bws$ncon
+  d$pscaling <- bws$pscaling
+  d$ptype <- bws$ptype
+  d$pckertype <- bws$pckertype
+  d$pukertype <- bws$pukertype
+  d$pokertype <- bws$pokertype
+  d$eval <- result
+  d$copulaerr <- NA
+  d$data <- data
+  d$target <- target
+  d$density <- identical(target, "density")
+  d$ntrain <- bws$nobs
+  d$trainiseval <- identical(evaluation, "sample")
+  d$u.provided <- isTRUE(u.provided)
+  d$u.auto <- isTRUE(u.auto)
+  d$evaluation <- evaluation
+  d$grid.dim <- grid.dim
+  d$neval <- neval
+  d$n.quasi.inv <- n.quasi.inv
+  d$er.quasi.inv <- er.quasi.inv
+  d$timing <- timing
+  class(d) <- "npcopula"
+  d
 }
 
 .npcopula_marginal_bw <- function(bws, data, j) {
@@ -117,28 +132,29 @@ npcopula <- function(bws, ...) {
 }
 
 .npcopula_grid_eval <- function(x) {
-  xnames <- attr(x, "xnames")
+  dat <- as.data.frame(x)
+  xnames <- x$xnames
   if (length(xnames) != 2L)
     stop("plot.npcopula currently supports two-dimensional copula displays")
-  grid.dim <- attr(x, "grid.dim")
+  grid.dim <- x$grid.dim
   if (is.null(grid.dim) || length(grid.dim) != 2L ||
-      prod(grid.dim) != nrow(x))
+      prod(grid.dim) != nrow(dat))
     stop("npcopula grid output cannot be reshaped into a two-dimensional surface")
-  u1 <- sort(unique(x$u1))
-  u2 <- sort(unique(x$u2))
+  u1 <- sort(unique(dat$u1))
+  u2 <- sort(unique(dat$u2))
   if (length(u1) != grid.dim[1L] || length(u2) != grid.dim[2L])
     stop("npcopula grid output is not rectangular")
-  xgrid <- as.data.frame(x[, xnames, drop = FALSE])
+  xgrid <- as.data.frame(dat[, xnames, drop = FALSE])
   list(
     u1 = u1,
     u2 = u2,
     xgrid = xgrid,
-    z = matrix(x$copula, nrow = length(u1), ncol = length(u2))
+    z = matrix(dat$copula, nrow = length(u1), ncol = length(u2))
   )
 }
 
 .npcopula_training_data <- function(x) {
-  data <- attr(x, "data")
+  data <- x$data
   if (is.null(data))
     stop("npcopula object does not retain the training data needed for intervals; refit with npcopula()")
   as.data.frame(data)
@@ -160,8 +176,8 @@ npcopula <- function(bws, ...) {
 }
 
 .npcopula_asymptotic_se <- function(x, data, xgrid) {
-  bws <- attr(x, "bws")
-  target <- attr(x, "target")
+  bws <- x$bws
+  target <- x$target
   density <- identical(target, "density")
   if (density) {
     joint <- npudens(tdat = data, edat = xgrid, bws = bws)
@@ -201,8 +217,8 @@ npcopula <- function(bws, ...) {
                                        B,
                                        method,
                                        blocklen) {
-  bws <- attr(x, "bws")
-  target <- attr(x, "target")
+  bws <- x$bws
+  target <- x$target
   density <- identical(target, "density")
   method <- match.arg(method, c("inid", "fixed", "geom"))
   B <- as.integer(B)
@@ -283,7 +299,7 @@ npcopula <- function(bws, ...) {
                                        plot.errors.boot.blocklen) {
   if (identical(plot.errors.method, "none"))
     return(NULL)
-  if (!identical(attr(x, "evaluation"), "grid"))
+  if (!identical(x$evaluation, "grid"))
     stop("npcopula intervals are available only for grid evaluation output")
 
   data <- .npcopula_training_data(x)
@@ -336,6 +352,7 @@ npcopula <- function(bws, ...) {
 }
 
 .npcopula_add_interval_columns <- function(x, payload) {
+  x <- as.data.frame(x)
   if (is.null(payload))
     return(x)
   x$center <- payload$center
@@ -351,11 +368,11 @@ npcopula <- function(bws, ...) {
 }
 
 print.npcopula <- function(x, ...) {
-  target <- attr(x, "target")
-  evaluation <- attr(x, "evaluation")
-  ntrain <- attr(x, "ntrain")
-  xnames <- attr(x, "xnames")
-  grid.dim <- attr(x, "grid.dim")
+  target <- x$target
+  evaluation <- x$evaluation
+  ntrain <- x$ntrain
+  xnames <- x$xnames
+  grid.dim <- x$grid.dim
 
   cat("\nKernel Copula ", if (identical(target, "density")) "Density" else "Distribution",
       ": ", ntrain, " training points, in ", length(xnames),
@@ -371,7 +388,7 @@ print.npcopula <- function(x, ...) {
 summary.npcopula <- function(object, ...) {
   print(object)
   cat("\nBandwidth summary:\n")
-  summary(attr(object, "bws"))
+  summary(object$bws)
   cat("\nCopula value summary:\n")
   print(summary(object$copula))
   invisible(object)
@@ -379,6 +396,19 @@ summary.npcopula <- function(object, ...) {
 
 fitted.npcopula <- function(object, ...) {
   object$copula
+}
+
+se.npcopula <- function(x) {
+  x$copulaerr
+}
+
+as.data.frame.npcopula <- function(x, row.names = NULL, optional = FALSE, ...) {
+  out <- x$eval
+  if (is.null(row.names)) {
+    row.names <- .set_row_names(nrow(out))
+  }
+  attr(out, "row.names") <- row.names
+  out
 }
 
 plot.npcopula <- function(x,
@@ -432,18 +462,18 @@ plot.npcopula <- function(x,
   if (identical(errors, "bootstrap"))
     .np_plot_reject_wild_unsupervised(bootstrap, "copula estimators")
   dots <- list(...)
-  target <- attr(x, "target")
+  target <- x$target
   target.label <- if (identical(target, "density")) "Copula Density" else "Copula"
   if (is.null(zlab))
     zlab <- target.label
   if (is.null(main))
     main <- target.label
 
-  xnames <- attr(x, "xnames")
+  xnames <- x$xnames
   if (length(xnames) != 2L)
     stop("plot.npcopula currently supports two-dimensional copula displays")
 
-  evaluation <- attr(x, "evaluation")
+  evaluation <- x$evaluation
   if (identical(evaluation, "sample")) {
     if (!identical(errors, "none"))
       stop("npcopula intervals are available only for grid evaluation output",
@@ -452,12 +482,12 @@ plot.npcopula <- function(x,
       stop("renderer='rgl' is supported only for grid surface displays in plot.npcopula",
            call. = FALSE)
     if (identical(output, "data"))
-      return(x)
+      return(as.data.frame(x))
     do.call(graphics::plot, c(list(x = x$u1, y = x$u2,
                                    xlab = xlab, ylab = ylab, main = main),
                               dots))
     if (identical(output, "plot-data"))
-      return(x)
+      return(as.data.frame(x))
     return(invisible(x))
   }
 
@@ -785,7 +815,7 @@ npcopula.default <- function(bws,
     er.quasi.inv = er.quasi.inv,
     u.auto = u.auto
   )
-  attr(result, "timing") <- proc.time()[3] - start.time
+  result$timing <- proc.time()[3] - start.time
   result
 }
 

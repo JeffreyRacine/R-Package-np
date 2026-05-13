@@ -8,20 +8,20 @@ test_that("npcopula basic functionality works", {
   # Copula CDF
   cop <- npcopula(data=faithful, bws=bw)
   expect_s3_class(cop, "npcopula")
-  expect_s3_class(cop, "data.frame")
+  expect_true(is.data.frame(as.data.frame(cop)))
   expect_true("copula" %in% names(cop))
-  expect_identical(attr(cop, "target"), "distribution")
-  expect_identical(attr(cop, "evaluation"), "sample")
+  expect_identical(cop$target, "distribution")
+  expect_identical(cop$evaluation, "sample")
   expect_true(all(cop$copula >= 0 & cop$copula <= 1))
   
   # Copula density
   bw_dens <- npudensbw(dat=faithful, bws=c(0.5, 5), bandwidth.compute=FALSE)
   cop_dens <- npcopula(data=faithful, bws=bw_dens)
   expect_s3_class(cop_dens, "npcopula")
-  expect_s3_class(cop_dens, "data.frame")
+  expect_true(is.data.frame(as.data.frame(cop_dens)))
   expect_true("copula" %in% names(cop_dens))
-  expect_identical(attr(cop_dens, "target"), "density")
-  expect_identical(attr(cop_dens, "evaluation"), "sample")
+  expect_identical(cop_dens$target, "density")
+  expect_identical(cop_dens$evaluation, "sample")
   expect_true(all(cop_dens$copula >= 0))
 })
 
@@ -32,13 +32,14 @@ test_that("npcopula formula route builds a plot-ready grid by default", {
   fit <- npcopula(~ x + y, data = dat, neval = 4, nmulti = 1)
 
   expect_s3_class(fit, "npcopula")
-  expect_s3_class(fit, "data.frame")
-  expect_equal(nrow(fit), 16L)
-  expect_identical(attr(fit, "target"), "distribution")
-  expect_identical(attr(fit, "evaluation"), "grid")
-  expect_true(isTRUE(attr(fit, "u.auto")))
-  expect_equal(attr(fit, "grid.dim"), c(4L, 4L))
-  expect_true(inherits(attr(fit, "bws"), "dbandwidth"))
+  expect_equal(nrow(as.data.frame(fit)), 16L)
+  expect_identical(fit$target, "distribution")
+  expect_identical(fit$evaluation, "grid")
+  expect_true(isTRUE(fit$u.auto))
+  expect_equal(fit$grid.dim, c(4L, 4L))
+  expect_true(inherits(fit$bws, "dbandwidth"))
+  expect_true(is.data.frame(fit$eval))
+  expect_equal(as.data.frame(fit), fit$eval, ignore_attr = TRUE)
 
   fixed.fit <- npcopula(
     ~ x + y,
@@ -48,8 +49,8 @@ test_that("npcopula formula route builds a plot-ready grid by default", {
     neval = 3
   )
   expect_s3_class(fixed.fit, "npcopula")
-  expect_equal(nrow(fixed.fit), 9L)
-  expect_true(inherits(attr(fixed.fit, "bws"), "dbandwidth"))
+  expect_equal(nrow(as.data.frame(fixed.fit)), 9L)
+  expect_true(inherits(fixed.fit$bws, "dbandwidth"))
 })
 
 test_that("npcopula formula route can request sample evaluation and density target", {
@@ -57,13 +58,13 @@ test_that("npcopula formula route can request sample evaluation and density targ
   dat <- data.frame(x = rnorm(40), y = 0.5 * rnorm(40) + rnorm(40, sd = 0.1))
 
   sample.fit <- npcopula(~ x + y, data = dat, evaluation = "sample", nmulti = 1)
-  expect_equal(nrow(sample.fit), nrow(dat))
-  expect_identical(attr(sample.fit, "evaluation"), "sample")
+  expect_equal(nrow(as.data.frame(sample.fit)), nrow(dat))
+  expect_identical(sample.fit$evaluation, "sample")
 
   dens.fit <- npcopula(~ x + y, data = dat, target = "density", neval = 3, nmulti = 1)
-  expect_equal(nrow(dens.fit), 9L)
-  expect_identical(attr(dens.fit, "target"), "density")
-  expect_true(inherits(attr(dens.fit, "bws"), "bandwidth"))
+  expect_equal(nrow(as.data.frame(dens.fit)), 9L)
+  expect_identical(dens.fit$target, "density")
+  expect_true(inherits(dens.fit$bws, "bandwidth"))
 
   dens.fixed <- npcopula(
     ~ x + y,
@@ -73,9 +74,9 @@ test_that("npcopula formula route can request sample evaluation and density targ
     bandwidth.compute = FALSE,
     neval = 3
   )
-  expect_equal(nrow(dens.fixed), 9L)
-  expect_identical(attr(dens.fixed, "target"), "density")
-  expect_true(inherits(attr(dens.fixed, "bws"), "bandwidth"))
+  expect_equal(nrow(as.data.frame(dens.fixed)), 9L)
+  expect_identical(dens.fixed$target, "density")
+  expect_true(inherits(dens.fixed$bws, "bandwidth"))
 })
 
 test_that("npcopula formula route rejects unsafe automatic high-dimensional grids", {
@@ -116,8 +117,8 @@ test_that("npcopula fitted and basic plot methods work", {
                "surface views")
 
   one.point <- npcopula(data = faithful, bws = bw, u = c(0.5, 0.5), n.quasi.inv = 40)
-  expect_equal(nrow(one.point), 1L)
-  expect_equal(attr(one.point, "grid.dim"), c(1L, 1L))
+  expect_equal(nrow(as.data.frame(one.point)), 1L)
+  expect_equal(one.point$grid.dim, c(1L, 1L))
 })
 
 test_that("npcopula perspective defaults follow shared surface convention", {
@@ -166,12 +167,12 @@ test_that("npcopula plot intervals work for grid surfaces", {
   asym <- plot(fit, output = "data", errors = "asymptotic", band = "all")
   expect_true(all(c("lower", "upper", "pointwise.lower",
                     "bonferroni.upper") %in% names(asym)))
-  expect_equal(nrow(asym), nrow(fit))
+  expect_equal(nrow(asym), nrow(as.data.frame(fit)))
 
   boot <- plot(fit, output = "data", errors = "bootstrap",
                bootstrap = "inid", B = 3, band = "pmzsd")
   expect_true(all(c("center", "lower", "upper") %in% names(boot)))
-  expect_equal(nrow(boot), nrow(fit))
+  expect_equal(nrow(boot), nrow(as.data.frame(fit)))
 
   dens.bw <- npudensbw(dat = dat, bws = c(0.7, 0.7),
                        bandwidth.compute = FALSE)
@@ -185,7 +186,7 @@ test_that("npcopula plot intervals work for grid surfaces", {
   dens <- plot(dens.fit, output = "data", errors = "bootstrap",
                bootstrap = "inid", B = 3, band = "pmzsd")
   expect_true(all(c("center", "lower", "upper") %in% names(dens)))
-  expect_equal(nrow(dens), nrow(dens.fit))
+  expect_equal(nrow(dens), nrow(as.data.frame(dens.fit)))
 
   sample.fit <- npcopula(~ x + y, data = dat, evaluation = "sample", nmulti = 1)
   expect_error(plot(sample.fit, errors = "asymptotic"), "grid evaluation")
