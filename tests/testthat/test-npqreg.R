@@ -60,6 +60,46 @@ test_that("npqreg formula route honors manual bws with gradients", {
   expect_equal(dim(gradients(fit)), c(nrow(d), 1L, 2L))
 })
 
+test_that("npqreg validates tau and continuous responses before fitting", {
+  set.seed(20260513)
+  d <- data.frame(x = runif(24), y = rnorm(24))
+  bw <- npcdistbw(
+    xdat = d["x"],
+    ydat = d["y"],
+    bws = c(0.4, 0.4),
+    bandwidth.compute = FALSE
+  )
+
+  expect_error(
+    npqreg(bws = bw, txdat = d["x"], tydat = d$y, tau = 0),
+    "'tau' must contain numeric values in (0,1)",
+    fixed = TRUE
+  )
+  expect_error(
+    npqreg(bws = bw, txdat = d["x"], tydat = d$y, tau = c(0.25, 1)),
+    "'tau' must contain numeric values in (0,1)",
+    fixed = TRUE
+  )
+  expect_error(
+    npqreg(bws = bw, txdat = d["x"], tydat = d$y, tau = NA_real_),
+    "'tau' must contain numeric values in (0,1)",
+    fixed = TRUE
+  )
+  expect_error(
+    npqreg(bws = bw, txdat = d["x"], tydat = d$y, tau = "0.5"),
+    "'tau' must contain numeric values in (0,1)",
+    fixed = TRUE
+  )
+
+  d$y_factor <- factor(rep(0:1, length.out = nrow(d)))
+  expect_error(
+    npqreg(y_factor ~ x, data = d, bws = c(0.4, 0.4),
+           bandwidth.compute = FALSE),
+    "'tydat' is not continuous",
+    fixed = TRUE
+  )
+})
+
 test_that("npqreg vector-tau plots support legend controls", {
   set.seed(20260511)
   n <- 24L

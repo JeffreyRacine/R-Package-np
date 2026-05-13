@@ -37,6 +37,18 @@ test_that("npconmode bandwidth route reports all-NA training data clearly", {
                "Training data has no rows without NAs", fixed = TRUE)
 })
 
+test_that("npconmode rejects non-categorical responses before modal fitting", {
+  set.seed(20260513)
+  d <- data.frame(x = runif(30), y = rnorm(30))
+
+  expect_error(
+    npconmode(y ~ x, data = d, bws = c(0.4, 0.4),
+              bandwidth.compute = FALSE),
+    "'tydat' must consist of one (1) discrete variable",
+    fixed = TRUE
+  )
+})
+
 test_that("npconmode proper defaults follow the canonical regression type", {
   effective <- getFromNamespace(".npConmodeEffectiveProper", "np")
 
@@ -244,7 +256,22 @@ test_that("npconmode class-probability gradients are level-specific for multinom
   expect_s3_class(fit, "conmode")
   expect_equal(as.character(fit$probability.gradient.level), "b")
   expect_equal(dim(gradients(fit)), c(n, 1L))
+  expect_true(all(fit$probabilities >= -1e-12))
   expect_equal(rowSums(fit$probabilities), rep(1, n), tolerance = 1e-10)
+  expect_error(
+    npconmode(
+      y ~ x,
+      data = d,
+      regtype = "ll",
+      bwmethod = "cv.ls",
+      nmulti = 1L,
+      probabilities = TRUE,
+      level = "z",
+      gradients = TRUE
+    ),
+    "'level' must identify one response level",
+    fixed = TRUE
+  )
   expect_error(gradients(fit, level = "c"), "stored class-probability gradients")
   grdata <- plot(fit, gradients = TRUE, output = "data")
   expect_equal(unique(grdata$x$level), "b")

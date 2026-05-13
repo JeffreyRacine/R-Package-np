@@ -107,6 +107,16 @@ test_that("npcopula validates probability-grid and quasi-inverse controls", {
     "numeric probability"
   )
   expect_error(
+    npcopula(data = faithful, bws = bw,
+             u = data.frame(eruptions = 1.2, waiting = 0.5)),
+    "u must lie in \\[0,1\\]"
+  )
+  expect_error(
+    npcopula(data = faithful, bws = bw,
+             u = data.frame(eruptions = 0.5)),
+    "u and bws are incompatible"
+  )
+  expect_error(
     npcopula(data = faithful, bws = bw, u = c(0.5, 0.5),
              n.quasi.inv = 2.5),
     "integer greater than one"
