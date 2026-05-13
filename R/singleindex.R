@@ -100,10 +100,13 @@ residuals.singleindex <- function(object, ...) {
  if(object$residuals) { return(object$resid) } else { return(npindex(bws = object$bws, residuals =TRUE)$resid) } 
 }
 predict.singleindex <- function(object, se.fit = FALSE, ...) {
+  se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
 
-  if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
+  if (!is.null(dots$exdat) && !is.null(dots$newdata)) {
+    dots$newdata <- NULL
+  } else if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
     dots$exdat <- dots$newdata
     dots$newdata <- NULL
   }
@@ -130,6 +133,7 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
 }
 se.singleindex <- function(x){ x$merr }
 gradients.singleindex <- function(x, errors = FALSE, ...) {
+  errors <- npValidateScalarLogical(errors, "errors")
   gout <- if (!errors) x$grad else x$gerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
     stop(if (!errors)
