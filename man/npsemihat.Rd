@@ -13,7 +13,7 @@ npindexhat(bws,
            txdat = stop("training data 'txdat' missing"),
            exdat = txdat,
            y = NULL,
-           output = c("matrix", "apply"),
+           output = c("matrix", "apply", "constraint"),
            s = 0L,
            fd.step = NULL,
            ...)
@@ -24,7 +24,7 @@ npplreghat(bws,
            exdat = txdat,
            ezdat = tzdat,
            y = NULL,
-           output = c("apply", "matrix"),
+           output = c("apply", "matrix", "constraint"),
            ...)
 
 npscoefhat(bws,
@@ -33,7 +33,7 @@ npscoefhat(bws,
            exdat = txdat,
            ezdat = tzdat,
            y = NULL,
-           output = c("matrix", "apply"),
+           output = c("matrix", "apply", "constraint"),
            ridge = 0,
            iterate = FALSE,
            leave.one.out = FALSE,
@@ -60,13 +60,13 @@ These arguments control operator output, derivative selection, finite-difference
   \item{fd.step}{Compatibility argument for \code{npindexhat(..., s=1)}. If supplied it must be a positive finite scalar, but the current \code{s=1} route uses the canonical exact derivative operator rather than finite-differencing the fit operator.}
 
 
-  \item{output}{Either \code{"matrix"} or \code{"apply"}.}
+  \item{output}{Either \code{"matrix"} for the hat matrix, \code{"apply"} for direct application to \code{y}, or \code{"constraint"} for the row-weighted transpose \code{t(H) * y}. Note that \code{npplreghat()} retains \code{"apply"} as its default for historical compatibility.}
 
 
   \item{s}{For \code{npindexhat}, \code{s=0} returns fit operator and \code{s=1} returns index-derivative operator.}
 
 
-  \item{y}{Optional response vector or matrix for apply mode.}
+  \item{y}{Optional response vector or matrix for apply mode. For \code{output = "constraint"}, \code{y} is required and must be a vector or one-column object.}
 
 
 \subsection{Partially Linear And Smooth-Coefficient Data}{
@@ -102,7 +102,9 @@ Reserved for future extensions.
 \value{
 If \code{output = "matrix"}, returns a hat matrix \eqn{H}. If
 \code{output = "apply"}, returns \eqn{H y} (or \eqn{H Y} for matrix
-right-hand-side input).
+right-hand-side input). If \code{output = "constraint"}, returns the
+constraint design matrix \eqn{\operatorname{diag}(y)H'} as represented in R by
+\code{t(H) * y}.
 }
 \details{
 These operators are intended for fixed-\eqn{X} workflows such as one-shot wild
@@ -123,6 +125,12 @@ Method-specific argument map:
 \code{npplreghat()} and \code{npscoefhat()} use \code{tzdat}/\code{ezdat};
 \code{npscoefhat()} additionally uses \code{ridge}, \code{iterate}, and
 \code{leave.one.out}.
+
+For \code{output = "constraint"}, the selected operator is first defined exactly
+as in \code{output = "matrix"} and the return value is \code{t(H) * y}. This is
+a convenience route for constrained quadratic-programming workflows; it does
+not solve a constrained estimation problem and it does not change the meaning
+of \code{output = "apply"}.
 }
 \examples{
 \dontrun{
@@ -139,6 +147,9 @@ ibw <- npindexbw(xdat = data.frame(x, x2 = x^2), ydat = y,
                  bws = c(0.5, 1.0, 1.0), bandwidth.compute = FALSE)
 iH <- npindexhat(bws = ibw, txdat = data.frame(x, x2 = x^2), output = "matrix")
 iH.fitted <- iH %*% y
+iA <- npindexhat(bws = ibw, txdat = data.frame(x, x2 = x^2),
+                 y = y, output = "constraint")
+all.equal(iA, t(iH) * y)
 ifit <- npindex(bws = ibw, txdat = data.frame(x, x2 = x^2), tydat = y)
 head(cbind(fitted(ifit), iH.fitted), n = 2L)
 

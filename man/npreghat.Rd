@@ -22,7 +22,7 @@ npreghat(bws, ...)
 \method{npreghat}{rbandwidth}(bws,
          txdat = stop("training data 'txdat' missing"),
          exdat, y = NULL,
-         output = c("matrix", "apply"),
+         output = c("matrix", "apply", "constraint"),
          basis = NULL,
          bernstein.basis = NULL,
          degree = NULL,
@@ -39,7 +39,7 @@ npreghat(bws, ...)
 
 \method{predict}{npreghat}(object, 
         newdata = NULL, y = NULL,
-        output = c("matrix", "apply"),
+        output = c("matrix", "apply", "constraint"),
         s = attr(object, "s"),
         leave.one.out = attr(object, "leave.one.out"),
         deriv = NULL, 
@@ -98,13 +98,13 @@ This argument identifies a fitted hat-operator object supplied to an S3 method.
 
 
 \subsection{Operator Output}{
-These arguments control whether the operator is returned as a matrix or applied directly.
+These arguments control whether the operator is returned as a matrix, applied directly, or returned as a quadratic-programming constraint design matrix.
 }
 
-  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
+  \item{output}{Either \code{"matrix"} for the hat matrix, \code{"apply"} for direct application to \code{y}, or \code{"constraint"} for the row-weighted transpose \code{t(H) * y}.}
 
 
-  \item{y}{Optional response vector or matrix for apply mode.}
+  \item{y}{Optional response vector or matrix for apply mode. For \code{output = "constraint"}, \code{y} is required and must be a vector or one-column object.}
 
 
 \subsection{Additional Arguments}{
@@ -122,10 +122,18 @@ e.g. \code{H \%*\% y}. Attributes on the matrix store metadata used by
 
 For \code{output = "apply"}, the function returns \code{H^{(s)} y} directly and
 accepts matrix right-hand sides for one-shot bootstrap-style calculations.
+
+For \code{output = "constraint"}, the function returns \code{t(H^{(s)}) * y},
+the row-weighted transpose commonly used as the design matrix in
+shape-constrained quadratic-programming examples. This is a convenience route
+that is exactly equivalent to obtaining \code{H} with \code{output = "matrix"}
+and then computing \code{t(H) * y}; it does not solve a constrained estimation
+problem.
 }
 \value{
 Either a hat matrix (class \code{"npreghat"}) or the applied result
-\code{H^{(s)} y}, depending on \code{output}.
+\code{H^{(s)} y}, or the constraint design matrix \code{t(H^{(s)}) * y},
+depending on \code{output}.
 }
 \examples{
 \dontrun{
@@ -134,6 +142,9 @@ bw <- npregbw(xdat = cps71$age, ydat = cps71$logwage,
               regtype = "ll", bandwidth.compute = FALSE, bws = 1.0)
 H <- npreghat(bws = bw, txdat = data.frame(age = cps71$age))
 H.fitted <- H %*% cps71$logwage
+A <- npreghat(bws = bw, txdat = data.frame(age = cps71$age),
+              y = cps71$logwage, output = "constraint")
+all.equal(A, t(H) * cps71$logwage)
 ghat <- npreg(bws = bw)
 head(cbind(fitted(ghat), H.fitted), n = 2L)
 }

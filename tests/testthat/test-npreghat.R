@@ -435,3 +435,78 @@ test_that("adaptive-nn npreghat matrix owner matches apply and npreg on selected
     }
   }
 })
+
+test_that("npreghat constraint output is exact row-weighted transpose", {
+  set.seed(20260513)
+  n <- 36L
+  x <- sort(runif(n))
+  y <- sin(2 * pi * x) + rnorm(n, sd = 0.05)
+  tx <- data.frame(x = x)
+  ex <- data.frame(x = seq(0.05, 0.95, length.out = 9L))
+
+  make_bw <- function(regtype, bwtype) {
+    args <- list(
+      xdat = tx,
+      ydat = y,
+      regtype = regtype,
+      bwtype = bwtype,
+      bandwidth.compute = FALSE,
+      bws = if (identical(bwtype, "fixed")) 0.25 else 7L
+    )
+    if (identical(regtype, "lp")) {
+      args$degree <- 2L
+      args$basis <- "glp"
+      args$bernstein.basis <- FALSE
+    }
+    do.call(npregbw, args)
+  }
+
+  for (regtype in c("lc", "ll", "lp")) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      bw <- make_bw(regtype, bwtype)
+      H <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix")
+      A <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = "constraint")
+      expect_equal(
+        A,
+        t(H) * y,
+        tolerance = 0,
+        ignore_attr = TRUE,
+        info = paste("mean", regtype, bwtype)
+      )
+
+      if (!identical(regtype, "lc")) {
+        H.grad <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix", s = 1L)
+        A.grad <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y,
+                           output = "constraint", s = 1L)
+        expect_equal(
+          A.grad,
+          t(H.grad) * y,
+          tolerance = 0,
+          ignore_attr = TRUE,
+          info = paste("gradient", regtype, bwtype)
+        )
+      }
+    }
+  }
+
+  bw <- make_bw("ll", "fixed")
+  H <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix")
+  expect_error(
+    npreghat(bws = bw, txdat = tx, exdat = ex, output = "constraint"),
+    "argument 'y' is required"
+  )
+  expect_error(
+    npreghat(bws = bw, txdat = tx, exdat = ex, y = cbind(y, y),
+             output = "constraint"),
+    "one-column"
+  )
+  expect_error(
+    npreghat(bws = bw, txdat = tx, exdat = ex, y = y[-1L],
+             output = "constraint"),
+    "must match"
+  )
+
+  H.obj <- npreghat(bws = bw, txdat = tx, output = "matrix")
+  A.pred <- predict(H.obj, newdata = ex, y = y, output = "constraint")
+  expect_equal(A.pred, t(H) * y, tolerance = 0, ignore_attr = TRUE)
+})

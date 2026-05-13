@@ -626,11 +626,28 @@ test_that("semihat apply mode matches core fits across bwtypes", {
         output = "matrix",
         iterate = FALSE
       )
+      sc.constraint <- npscoefhat(
+        bws = sc.bw,
+        txdat = tx.sc,
+        tzdat = tz.sc,
+        exdat = ex.sc,
+        ezdat = ez.sc,
+        y = y,
+        output = "constraint",
+        iterate = FALSE
+      )
       expect_equal(
         as.vector(sc.apply),
         as.vector(sc.H %*% y),
         tolerance = 1e-10,
         info = paste("npscoefhat helper parity", regtype, bwtype)
+      )
+      expect_equal(
+        sc.constraint,
+        t(sc.H) * y,
+        tolerance = 0,
+        ignore_attr = TRUE,
+        info = paste("npscoefhat constraint", regtype, bwtype)
       )
       if (identical(bwtype, "fixed")) {
         expect_equal(
@@ -659,11 +676,35 @@ test_that("semihat apply mode matches core fits across bwtypes", {
         y = y,
         output = "apply"
       )
+      pl.H <- npplreghat(
+        bws = pl.bw,
+        txdat = tx.pl,
+        tzdat = tz.pl,
+        exdat = ex.pl,
+        ezdat = ez.pl,
+        output = "matrix"
+      )
+      pl.constraint <- npplreghat(
+        bws = pl.bw,
+        txdat = tx.pl,
+        tzdat = tz.pl,
+        exdat = ex.pl,
+        ezdat = ez.pl,
+        y = y,
+        output = "constraint"
+      )
       expect_equal(
         as.vector(pl.apply),
         as.vector(pl.fit$mean),
         tolerance = 1e-8,
         info = paste("npplreghat", regtype, bwtype)
+      )
+      expect_equal(
+        pl.constraint,
+        t(pl.H) * y,
+        tolerance = 0,
+        ignore_attr = TRUE,
+        info = paste("npplreghat constraint", regtype, bwtype)
       )
 
       si.bw <- do.call(npindexbw, si.args)
@@ -696,6 +737,14 @@ test_that("semihat apply mode matches core fits across bwtypes", {
         output = "matrix",
         s = 0L
       )
+      si.constraint.mean <- npindexhat(
+        bws = si.bw,
+        txdat = tx.si,
+        exdat = ex.si,
+        y = y,
+        output = "constraint",
+        s = 0L
+      )
       si.apply.grad <- npindexhat(
         bws = si.bw,
         txdat = tx.si,
@@ -709,6 +758,14 @@ test_that("semihat apply mode matches core fits across bwtypes", {
         txdat = tx.si,
         exdat = ex.si,
         output = "matrix",
+        s = 1L
+      )
+      si.constraint.grad <- npindexhat(
+        bws = si.bw,
+        txdat = tx.si,
+        exdat = ex.si,
+        y = y,
+        output = "constraint",
         s = 1L
       )
       expect_equal(
@@ -730,6 +787,13 @@ test_that("semihat apply mode matches core fits across bwtypes", {
         info = paste("npindexhat mean matrix/apply", regtype, bwtype)
       )
       expect_equal(
+        si.constraint.mean,
+        t(si.H.mean) * y,
+        tolerance = 0,
+        ignore_attr = TRUE,
+        info = paste("npindexhat mean constraint", regtype, bwtype)
+      )
+      expect_equal(
         as.vector(si.apply.grad),
         as.vector(si.fit.grad$grad[, 1]),
         tolerance = 1e-8,
@@ -746,6 +810,13 @@ test_that("semihat apply mode matches core fits across bwtypes", {
         as.vector(si.apply.grad),
         tolerance = 1e-10,
         info = paste("npindexhat grad matrix/apply", regtype, bwtype)
+      )
+      expect_equal(
+        si.constraint.grad,
+        t(si.H.grad) * y,
+        tolerance = 0,
+        ignore_attr = TRUE,
+        info = paste("npindexhat grad constraint", regtype, bwtype)
       )
     }
   }
