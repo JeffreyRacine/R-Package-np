@@ -214,7 +214,10 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
 
   pdf(tempfile(fileext = ".pdf"))
   expect_silent(plot(fit))
+  expect_silent(plot(fit, col = "red", lwd = 2, lty = 2, type = "l"))
   expect_silent(plot(fit, gradients = TRUE))
+  expect_silent(plot(fit, gradients = TRUE, col = "blue", lwd = 2, lty = 3,
+                     type = "l"))
   expect_error(plot(fit, errors = "bootstrap"), "unused plot argument")
   grDevices::dev.off()
 })

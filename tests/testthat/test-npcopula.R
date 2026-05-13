@@ -83,6 +83,8 @@ test_that("npcopula fitted and basic plot methods work", {
   expect_equal(fitted(fit), fit$copula)
   expect_silent(plot(fit))
   expect_silent(plot(fit, col = NULL))
+  expect_silent(plot(fit, col = "lightblue", border = "grey40",
+                     theta = 20, phi = 25, shade = 0.3))
   expect_silent(plot(fit, view = "image", perspective = FALSE))
   expect_silent(plot(fit, view = "contour", perspective = FALSE))
   expect_true("copula" %in% .np_progress_single_line_surfaces())
