@@ -219,7 +219,7 @@ coef.sibandwidth <- function(object, ...) {
  names(tc) <- object$xnames
  return(tc)
 }
-predict.sibandwidth <- function(...) { do.call(npindex, list(...)) }
+predict.sibandwidth <- function(object, ...) { npindex(bws = object, ...) }
 
 summary.sibandwidth <- function(object, ...){
   cat("\nSingle Index Model",

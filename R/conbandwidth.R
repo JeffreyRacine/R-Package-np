@@ -312,4 +312,4 @@ summary.conbandwidth <- function(object, ...) {
   cat("\n\n")
 }
 
-predict.conbandwidth <- function(...) { do.call(npcdens, list(...)) }
+predict.conbandwidth <- function(object, ...) { npcdens(bws = object, ...) }

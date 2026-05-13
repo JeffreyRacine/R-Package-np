@@ -245,7 +245,7 @@ print.plbandwidth <- function(x, digits=NULL, ...){
   invisible(x)
 }
 
-predict.plbandwidth <- function(...) { do.call(npplreg, list(...)) }
+predict.plbandwidth <- function(object, ...) { npplreg(bws = object, ...) }
 
 summary.plbandwidth <- function(object, ...){
   cat("\nPartially Linear Model",

@@ -198,4 +198,4 @@ summary.bandwidth <- function(object, ...) {
 }
 
 
-predict.bandwidth <- function(...) { do.call(npudens, list(...)) }
+predict.bandwidth <- function(object, ...) { npudens(bws = object, ...) }
