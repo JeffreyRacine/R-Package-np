@@ -95,3 +95,36 @@ test_that("npcopula fitted and basic plot methods work", {
   expect_equal(nrow(one.point), 1L)
   expect_equal(attr(one.point, "grid.dim"), c(1L, 1L))
 })
+
+test_that("npcopula plot intervals work for grid surfaces", {
+  set.seed(44)
+  dat <- data.frame(x = rnorm(45), y = rnorm(45))
+  fit <- npcopula(~ x + y, data = dat, neval = 3, nmulti = 1)
+
+  asym <- plot(fit, output = "data", errors = "asymptotic", band = "all")
+  expect_true(all(c("lower", "upper", "pointwise.lower",
+                    "bonferroni.upper") %in% names(asym)))
+  expect_equal(nrow(asym), nrow(fit))
+
+  boot <- plot(fit, output = "data", errors = "bootstrap",
+               bootstrap = "inid", B = 3, band = "pmzsd")
+  expect_true(all(c("center", "lower", "upper") %in% names(boot)))
+  expect_equal(nrow(boot), nrow(fit))
+
+  dens.bw <- npudensbw(dat = dat, bws = c(0.7, 0.7),
+                       bandwidth.compute = FALSE)
+  dens.fit <- npcopula(
+    bws = dens.bw,
+    data = dat,
+    u = data.frame(x = seq(0.2, 0.8, length.out = 3),
+                   y = seq(0.2, 0.8, length.out = 3)),
+    n.quasi.inv = 40
+  )
+  dens <- plot(dens.fit, output = "data", errors = "bootstrap",
+               bootstrap = "inid", B = 3, band = "pmzsd")
+  expect_true(all(c("center", "lower", "upper") %in% names(dens)))
+  expect_equal(nrow(dens), nrow(dens.fit))
+
+  sample.fit <- npcopula(~ x + y, data = dat, evaluation = "sample", nmulti = 1)
+  expect_error(plot(sample.fit, errors = "asymptotic"), "grid evaluation")
+})
