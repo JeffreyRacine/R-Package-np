@@ -154,7 +154,6 @@ print.conmode <- function(x, ...){
 fitted.conmode <- function(object, ...) {
  object$condens 
 }
-mode.conmode <- function(x) { x$conmode }
 
 .npConmodePredictHasNativeEvalArgs <- function(dots) {
   any(c("exdat", "eydat") %in% names(dots))
