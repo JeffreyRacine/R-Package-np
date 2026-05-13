@@ -383,7 +383,7 @@ fitted.npcopula <- function(object, ...) {
 
 plot.npcopula <- function(x,
                           perspective = TRUE,
-                          view = c("surface", "contour", "image"),
+                          view = c("rotate", "fixed", "surface", "contour", "image"),
                           renderer = c("base", "rgl"),
                           errors = c("none", "bootstrap", "asymptotic"),
                           band = c("pointwise", "pmzsd", "bonferroni",
@@ -395,8 +395,8 @@ plot.npcopula <- function(x,
                           boot_control = np_boot_control(),
                           output = c("plot", "data", "plot-data", "both"),
                           legend = TRUE,
-                          theta = 45,
-                          phi = 30,
+                          theta = 0.0,
+                          phi = 20.0,
                           xlab = "u1",
                           ylab = "u2",
                           zlab = NULL,
@@ -408,6 +408,8 @@ plot.npcopula <- function(x,
   bootstrap.supplied <- !missing(bootstrap) || !missing(B) || !missing(center)
   interval.supplied <- !missing(band) || !missing(alpha)
   view <- match.arg(view)
+  surface.view <- view %in% c("rotate", "fixed", "surface")
+  rotate.surface <- identical(view, "rotate")
   renderer <- .np_plot_match_renderer(renderer)
   errors <- match.arg(errors)
   band <- match.arg(band)
@@ -460,9 +462,9 @@ plot.npcopula <- function(x,
   }
 
   if (!identical(errors, "none") &&
-      !(isTRUE(perspective) && identical(view, "surface")) &&
+      !(isTRUE(perspective) && surface.view) &&
       !identical(output, "data"))
-    stop("npcopula interval plotting requires view='surface' and perspective=TRUE",
+    stop("npcopula interval plotting requires a surface view and perspective=TRUE",
          call. = FALSE)
 
   grid <- .npcopula_grid_eval(x)
@@ -502,13 +504,19 @@ plot.npcopula <- function(x,
     zlim <- range(zlim.values, finite = TRUE)
   }
 
-  if (isTRUE(perspective) && identical(view, "surface")) {
+  if (isTRUE(perspective) && surface.view) {
     renderer <- .np_plot_validate_renderer_request(
       renderer = renderer,
       route = "plot.npcopula",
       perspective = perspective,
       supported.route = TRUE,
-      view = "fixed"
+      view = if (identical(renderer, "rgl")) {
+        "fixed"
+      } else if (rotate.surface) {
+        "rotate"
+      } else {
+        "fixed"
+      }
     )
     if (identical(renderer, "rgl")) {
       rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
@@ -560,41 +568,57 @@ plot.npcopula <- function(x,
       .np_plot_persp_surface_colors(z = z, col = col),
       alpha.f = 0.5
     )
-    persp.call <- list(x = u1, y = u2, z = z,
-                       theta = theta, phi = phi,
-                       xlab = xlab, ylab = ylab, zlab = zlab,
-                       main = main, col = persp.col, border = border)
-    if (!is.null(zlim))
-      persp.call$zlim <- zlim
-    persp.mat <- do.call(graphics::persp, .np_plot_merge_user_args(persp.call, persp.args))
-    if (!is.null(payload)) {
-      .np_plot_draw_error_wireframes_persp(
-        x = u1,
-        y = u2,
-        persp.mat = persp.mat,
-        plot.errors.type = band,
-        lerr = lerr,
-        herr = herr,
-        lerr.all = lerr.all,
-        herr.all = herr.all,
-        border = "grey40",
-        lwd = .np_plot_scalar_default(dots$lwd, par()$lwd)
-      )
-      if (identical(band, "all") && !is.null(lerr.all) && !is.null(herr.all) &&
-          isTRUE(legend)) {
-        .np_plot_draw_all_band_legend(legend = TRUE, x = "topright")
+    rotate.defaults <- .np_plot_rotate_defaults()
+    dtheta <- rotate.defaults$dtheta
+    frame.theta <- if (rotate.surface) {
+      (0:((360 %/% dtheta - 1L))) * dtheta + theta
+    } else {
+      theta
+    }
+    rotation.progress <- .np_plot_rotation_progress_begin(length(frame.theta))
+    on.exit(.np_plot_rotation_progress_end(rotation.progress), add = TRUE)
+
+    for (frame.idx in seq_along(frame.theta)) {
+      i <- frame.theta[[frame.idx]]
+      persp.call <- list(x = u1, y = u2, z = z,
+                         theta = i, phi = phi,
+                         ticktype = "detailed",
+                         xlab = xlab, ylab = ylab, zlab = zlab,
+                         main = main, col = persp.col, border = border)
+      if (!is.null(zlim))
+        persp.call$zlim <- zlim
+      persp.mat <- do.call(graphics::persp, .np_plot_merge_user_args(persp.call, persp.args))
+      if (!is.null(payload)) {
+        .np_plot_draw_error_wireframes_persp(
+          x = u1,
+          y = u2,
+          persp.mat = persp.mat,
+          plot.errors.type = band,
+          lerr = lerr,
+          herr = herr,
+          lerr.all = lerr.all,
+          herr.all = herr.all,
+          border = "grey40",
+          lwd = .np_plot_scalar_default(dots$lwd, par()$lwd)
+        )
+        if (identical(band, "all") && !is.null(lerr.all) && !is.null(herr.all) &&
+            isTRUE(legend)) {
+          .np_plot_draw_all_band_legend(legend = TRUE, x = "topright")
+        }
       }
+      rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)
+      Sys.sleep(if (rotate.surface) rotate.defaults$sleep else 0.5)
     }
   } else if (identical(view, "contour")) {
     if (identical(renderer, "rgl"))
-      stop("renderer='rgl' is supported only for view='surface' in plot.npcopula",
+      stop("renderer='rgl' is supported only for surface views in plot.npcopula",
            call. = FALSE)
     do.call(graphics::contour, c(list(x = u1, y = u2, z = z,
                                       xlab = xlab, ylab = ylab, main = main),
                                  dots))
   } else {
     if (identical(renderer, "rgl"))
-      stop("renderer='rgl' is supported only for view='surface' in plot.npcopula",
+      stop("renderer='rgl' is supported only for surface views in plot.npcopula",
            call. = FALSE)
     image.col <- if (is.null(col)) {
       grDevices::hcl.colors(100L, palette = "viridis")

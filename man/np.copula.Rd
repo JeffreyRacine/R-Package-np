@@ -40,7 +40,7 @@ npcopula(bws, \dots)
 
 \method{plot}{npcopula}(x,
         perspective = TRUE,
-        view = c("surface", "contour", "image"),
+        view = c("rotate", "fixed", "surface", "contour", "image"),
         renderer = c("base", "rgl"),
         errors = c("none", "bootstrap", "asymptotic"),
         band = c("pointwise", "pmzsd", "bonferroni",
@@ -52,8 +52,8 @@ npcopula(bws, \dots)
         boot_control = np_boot_control(),
         output = c("plot", "data", "plot-data", "both"),
         legend = TRUE,
-        theta = 45,
-        phi = 30,
+        theta = 0.0,
+        phi = 20.0,
         xlab = "u1",
         ylab = "u2",
         zlab = NULL,
@@ -189,7 +189,12 @@ displayed.
 
   \item{phi, theta}{
     viewing angles passed to \code{\link{persp}} or to the shared
-    \pkg{rgl} surface renderer.
+    \pkg{rgl} surface renderer. The defaults match the package-wide
+    surface-plot defaults used by the other perspective plot methods.
+    As with those methods, the exact default pair \code{theta = 0} and
+    \code{phi = 20} is remapped internally for \code{renderer="rgl"} to
+    account for the different viewing-angle convention used by \pkg{rgl};
+    explicitly supplied non-default angles are passed through.
   }
 
   \item{renderer}{
@@ -200,9 +205,12 @@ displayed.
   }
 
   \item{view}{
-    display type for grid output: surface, contour, or image. The
-    \code{"contour"} and \code{"image"} views are used with
-    \code{perspective=FALSE}.
+    display type for grid output. The default \code{"rotate"} draws a
+    rotating base \code{\link{persp}} surface using the same frame step
+    and delay as the other package perspective plots. Use
+    \code{"fixed"} for a single fixed surface, \code{"surface"} as a
+    backward-compatible fixed-surface alias, or \code{"contour"} and
+    \code{"image"} with \code{perspective=FALSE}.
   }
 
   \item{zlim}{
@@ -302,8 +310,11 @@ surface plots.
   The \code{plot.npcopula} method supports base \code{\link{persp}},
   \code{\link{contour}}, and \code{\link{image}} displays for
   two-dimensional grid output. Surface plots use the package-wide
-  viridis default palette. \code{renderer="rgl"} requests the shared
-  interactive \pkg{rgl} surface renderer.
+  viridis default palette, detailed perspective ticks, and the same
+  default viewing angles and base-graphics rotation cadence as the
+  other surface plot methods. \code{renderer="rgl"} requests the shared
+  interactive \pkg{rgl} surface renderer, using the same default-angle
+  remapping used by the other package surface plots.
 
   For grid surfaces, \code{plot.npcopula} can add asymptotic or
   bootstrap intervals. Distribution-copula asymptotic intervals use the
