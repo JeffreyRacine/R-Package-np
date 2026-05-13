@@ -46,7 +46,7 @@ npcopula <- function(bws, ...) {
     surface = "copula"
   )
   state$start_note_grace_sec <- 0
-  state
+  .np_progress_show_now(state, done = if (!is.null(total)) 0L else NULL)
 }
 
 .npcopula_progress_step <- function(state, done, detail) {
@@ -131,14 +131,20 @@ fitted.npcopula <- function(object, ...) {
 plot.npcopula <- function(x,
                           perspective = TRUE,
                           view = c("surface", "contour", "image"),
+                          renderer = c("base", "rgl"),
                           theta = 45,
                           phi = 30,
                           xlab = "u1",
                           ylab = "u2",
                           zlab = NULL,
                           main = NULL,
+                          col = NULL,
+                          border = "black",
+                          zlim = NULL,
                           ...) {
   view <- match.arg(view)
+  renderer <- .np_plot_match_renderer(renderer)
+  dots <- list(...)
   target <- attr(x, "target")
   target.label <- if (identical(target, "density")) "Copula Density" else "Copula"
   if (is.null(zlab))
@@ -152,8 +158,12 @@ plot.npcopula <- function(x,
 
   evaluation <- attr(x, "evaluation")
   if (identical(evaluation, "sample")) {
-    graphics::plot(x$u1, x$u2,
-                   xlab = xlab, ylab = ylab, main = main, ...)
+    if (identical(renderer, "rgl"))
+      stop("renderer='rgl' is supported only for grid surface displays in plot.npcopula",
+           call. = FALSE)
+    do.call(graphics::plot, c(list(x = x$u1, y = x$u2,
+                                   xlab = xlab, ylab = ylab, main = main),
+                              dots))
     return(invisible(x))
   }
 
@@ -169,14 +179,68 @@ plot.npcopula <- function(x,
 
   z <- matrix(x$copula, nrow = length(u1), ncol = length(u2))
   if (isTRUE(perspective) && identical(view, "surface")) {
-    graphics::persp(u1, u2, z,
-                    theta = theta, phi = phi,
-                    xlab = xlab, ylab = ylab, zlab = zlab,
-                    main = main, ...)
+    renderer <- .np_plot_validate_renderer_request(
+      renderer = renderer,
+      route = "plot.npcopula",
+      perspective = perspective,
+      supported.route = TRUE,
+      view = "fixed"
+    )
+    if (identical(renderer, "rgl")) {
+      rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
+      rgl.out <- .np_plot_render_surface_rgl(
+        x = u1,
+        y = u2,
+        z = z,
+        xlab = xlab,
+        ylab = ylab,
+        zlab = zlab,
+        main = main,
+        theta = rgl.view$theta,
+        phi = rgl.view$phi,
+        col = col,
+        border = border,
+        zlim = zlim,
+        par3d.args = .np_plot_collect_rgl_args(dots, "rgl.par3d", "rgl.par3d."),
+        view3d.args = .np_plot_collect_rgl_args(dots, "rgl.view3d", "rgl.view3d."),
+        persp3d.args = .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d."),
+        grid3d.args = .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d."),
+        widget.args = .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget.")
+      )
+      return(.np_plot_rgl_finalize(rgl.out = rgl.out))
+    }
+    persp.args <- .np_plot_user_args(dots, "persp")
+    persp.col <- grDevices::adjustcolor(
+      .np_plot_persp_surface_colors(z = z, col = col),
+      alpha.f = 0.5
+    )
+    persp.call <- list(x = u1, y = u2, z = z,
+                       theta = theta, phi = phi,
+                       xlab = xlab, ylab = ylab, zlab = zlab,
+                       main = main, col = persp.col, border = border)
+    if (!is.null(zlim))
+      persp.call$zlim <- zlim
+    do.call(graphics::persp, .np_plot_merge_user_args(persp.call, persp.args))
   } else if (identical(view, "contour")) {
-    graphics::contour(u1, u2, z, xlab = xlab, ylab = ylab, main = main, ...)
+    if (identical(renderer, "rgl"))
+      stop("renderer='rgl' is supported only for view='surface' in plot.npcopula",
+           call. = FALSE)
+    do.call(graphics::contour, c(list(x = u1, y = u2, z = z,
+                                      xlab = xlab, ylab = ylab, main = main),
+                                 dots))
   } else {
-    graphics::image(u1, u2, z, xlab = xlab, ylab = ylab, main = main, ...)
+    if (identical(renderer, "rgl"))
+      stop("renderer='rgl' is supported only for view='surface' in plot.npcopula",
+           call. = FALSE)
+    image.col <- if (is.null(col)) {
+      grDevices::hcl.colors(100L, palette = "viridis")
+    } else {
+      col
+    }
+    do.call(graphics::image, c(list(x = u1, y = u2, z = z,
+                                    xlab = xlab, ylab = ylab, main = main,
+                                    col = image.col),
+                               dots))
   }
   invisible(x)
 }

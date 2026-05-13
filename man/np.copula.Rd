@@ -82,6 +82,32 @@ These arguments control the marginal probability grid and numerical inversion us
     those corresponding to the sample realizations)
   }
 
+
+\subsection{Copula Plotting}{
+These arguments are used by the \code{plot.npcopula} method for two-dimensional grid output.
+}
+
+  \item{border}{
+    border color for the surface facets when \code{view="surface"}.
+  }
+
+  \item{col}{
+    optional surface or image colors. If omitted, \code{plot.npcopula}
+    uses the same viridis \code{\link{hcl.colors}} palette used by the
+    other modern surface plot methods.
+  }
+
+  \item{renderer}{
+    plotting renderer for surface displays. \code{"base"} uses
+    \code{\link{persp}}; \code{"rgl"} uses the shared package
+    \code{rgl} surface renderer when the suggested package \pkg{rgl} is
+    installed.
+  }
+
+  \item{zlim}{
+    optional z-axis limits for surface displays.
+  }
+
 }
 \value{
 
@@ -148,6 +174,12 @@ These arguments control the marginal probability grid and numerical inversion us
   \code{evaluation="grid"}. For higher-dimensional copulas, either
   supply \code{u} explicitly or use \code{evaluation="sample"} to avoid
   accidental grid expansion.
+
+  The \code{plot.npcopula} method supports base \code{\link{persp}},
+  \code{\link{contour}}, and \code{\link{image}} displays for
+  two-dimensional grid output. Surface plots use the package-wide
+  viridis default palette; \code{renderer="rgl"} requests the shared
+  interactive \pkg{rgl} surface renderer.
 
   The \sQuote{quasi-inverse} is computed via Definition 2.3.6 from
   Nelsen (2006). We compute an equi-quantile grid on the range of the
