@@ -322,17 +322,29 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
     expect_equal(candidate.none[[nm]]$quanterr, old.none[[nm]]$quanterr, info = nm)
   }
 
-  expect_error(
-    proto.asym(
-      fit,
-      xdat = x,
-      ydat = y,
-      neval = 5L,
-      gradients = TRUE
-    ),
-    "asymptotic errors are unsupported for quantile regression gradients; use bootstrap errors",
-    fixed = TRUE
+  old.asym <- suppressWarnings(plot(
+    fit,
+    xdat = x,
+    ydat = y,
+    output = "data",
+    errors = "asymptotic",
+    gradients = TRUE,
+    neval = 5L,
+    perspective = FALSE
+  ))
+  candidate.asym <- proto.asym(
+    fit,
+    xdat = x,
+    ydat = y,
+    neval = 5L,
+    gradients = TRUE
   )
+  expect_named(candidate.asym, names(old.asym))
+  for (nm in names(old.asym)) {
+    expect_equal(candidate.asym[[nm]]$xeval, old.asym[[nm]]$xeval, info = nm)
+    expect_equal(candidate.asym[[nm]]$quantgrad, old.asym[[nm]]$quantgrad, info = nm)
+    expect_equal(candidate.asym[[nm]]$quantgerr, old.asym[[nm]]$quantgerr, info = nm)
+  }
 
   for (method in c("inid", "fixed")) {
     boot.seed <- if (identical(method, "inid")) 8301L else 902L

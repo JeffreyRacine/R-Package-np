@@ -53,6 +53,17 @@ npqreg <-
   out
 }
 
+.npqreg_validate_newdata_terms <- function(newdata, xnames) {
+  nd <- toFrame(newdata)
+  missing.names <- setdiff(xnames, names(nd))
+  if (length(missing.names))
+    stop(sprintf(
+      "newdata must contain columns: %s",
+      paste(shQuote(xnames), collapse = ", ")
+    ), call. = FALSE)
+  invisible(TRUE)
+}
+
 .npqreg_fit_dots <- function(dots, allow.bandwidth.controls = FALSE) {
   dot.names <- names(dots)
   if (is.null(dot.names))
@@ -276,6 +287,7 @@ npqreg.formula <-
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
+      .npqreg_validate_newdata_terms(newdata, bws$variableNames[["terms"]])
       tt <- drop.terms(tt, match(bws$variableNames$response, attr(tt, 'term.labels')))
       umf.args <- list(formula = tt, data = newdata)
       umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())

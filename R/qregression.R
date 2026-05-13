@@ -87,15 +87,26 @@ quantile.qregression <- function(x, ...){ x$quantile }
 }
 
 predict.qregression <- function(object, se.fit = FALSE, ...) {
+  se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
-  if (!is.null(dots$newdata) && is.null(dots$exdat))
-    dots$newdata <- .npqreg_predict_newdata_to_exdat(object, dots$newdata)
-  if (!has.formula.route && !is.null(dots$exdat) && !is.null(dots$newdata))
+
+  if (!is.null(dots$exdat) && !is.null(dots$newdata))
     dots$newdata <- NULL
-  if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
-    dots$exdat <- dots$newdata
-    dots$newdata <- NULL
+  if (has.formula.route) {
+    if (!is.null(dots$exdat)) {
+      dots$newdata <- .npqreg_predict_newdata_to_exdat(object, dots$exdat)
+      dots$exdat <- NULL
+    } else if (!is.null(dots$newdata)) {
+      dots$newdata <- .npqreg_predict_newdata_to_exdat(object, dots$newdata)
+    }
+  } else {
+    if (!is.null(dots$newdata) && is.null(dots$exdat))
+      dots$newdata <- .npqreg_predict_newdata_to_exdat(object, dots$newdata)
+    if (is.null(dots$exdat) && !is.null(dots$newdata)) {
+      dots$exdat <- dots$newdata
+      dots$newdata <- NULL
+    }
   }
   if (is.null(dots$tau))
     dots$tau <- object$tau
@@ -109,6 +120,7 @@ predict.qregression <- function(object, se.fit = FALSE, ...) {
 
 se.qregression <- function(x) { x$quanterr }
 gradients.qregression <- function(x, errors = FALSE, ...) {
+  errors <- npValidateScalarLogical(errors, "errors")
   gout <- if (!errors) x$quantgrad else x$quantgerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
     stop(if (!errors)

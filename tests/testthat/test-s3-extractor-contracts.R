@@ -78,10 +78,12 @@ test_that("extractors fail clearly when optional quantities were not stored", {
   qreg <- structure(list(quantgrad = NA, quantgerr = NA), class = "qregression")
   expect_error(gradients(qreg), "gradients are not available")
   expect_error(gradients(qreg, errors = TRUE), "gradient standard errors are not available")
+  expect_error(gradients(qreg, errors = "yes"), "'errors' must be TRUE or FALSE", fixed = TRUE)
 
   conmode <- structure(list(), class = "conmode")
   expect_error(gradients(conmode), "class-probability gradients/effects are not available")
   expect_error(gradients(conmode, errors = TRUE), "gradient standard errors are not available")
+  expect_error(gradients(conmode, errors = "yes"), "'errors' must be TRUE or FALSE", fixed = TRUE)
 
   cdens <- structure(
     list(conderr = c(0.1, 0.2), proper.applied = TRUE),
