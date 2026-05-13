@@ -706,7 +706,11 @@ npcopula.formula <- function(bws,
   }
 
   bw.fun <- if (identical(target, "density")) npudensbw else npudistbw
-  bw.args <- c(list(formula = bws), if (is.null(data)) list() else list(data = data), list(...))
+  bw.args <- c(
+    list(formula = bws),
+    if (is.null(data)) list() else list(data = data),
+    list(...)
+  )
   bw <- .np_progress_select_bandwidth_enhanced(
     if (identical(target, "density")) "Selecting copula density bandwidth" else "Selecting copula distribution bandwidth",
     do.call(bw.fun, bw.args)
@@ -733,8 +737,69 @@ npcopula.default <- function(bws,
                              neval = 30,
                              n.quasi.inv = 1000,
                              er.quasi.inv = 1,
-                             u.auto = FALSE,
                              ...) {
+  dots <- list(...)
+  u.auto <- isTRUE(dots$u.auto)
+  dots$u.auto <- NULL
+  formula.from.u <- !missing(u) && inherits(u, "formula")
+  formula.arg <- if (formula.from.u) {
+    u
+  } else if (length(dots) && inherits(dots[[1L]], "formula")) {
+    dots[[1L]]
+  } else {
+    NULL
+  }
+  if (!is.null(formula.arg) &&
+      !isa(bws, "dbandwidth") && !isa(bws, "bandwidth")) {
+    if (length(dots) && inherits(dots[[1L]], "formula"))
+      dots[[1L]] <- NULL
+    .npRmpi_require_active_slave_pool(where = "npcopula()")
+    target.formula <- .npcopula_validate_target(
+      if (!missing(target) && !is.null(target)) target else c("distribution", "density")
+    )
+    evaluation.formula <- .npcopula_validate_evaluation(
+      if (!missing(evaluation)) evaluation else c("grid", "sample")
+    )
+    neval.formula <- .npcopula_validate_neval(if (!missing(neval)) neval else 30)
+    mf <- if (missing(data)) {
+      stats::model.frame(formula.arg)
+    } else {
+      stats::model.frame(formula.arg, data = data)
+    }
+    dat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
+    u.formula <- if (formula.from.u || missing(u)) NULL else u
+    auto.grid <- FALSE
+    if (is.null(u.formula) && identical(evaluation.formula, "grid")) {
+      if (ncol(dat) != 2L)
+        stop("automatic copula probability grids are supported only for two variables; supply 'u' or use evaluation='sample'")
+      u.formula <- .npcopula_make_auto_u(names(dat), neval.formula)
+      auto.grid <- TRUE
+    }
+    bw.fun <- if (identical(target.formula, "density")) npudensbw else npudistbw
+    bw.args <- c(
+      list(formula = formula.arg),
+      if (missing(data)) list() else list(data = data),
+      list(bws = bws),
+      dots
+    )
+    bw <- .np_progress_select_bandwidth_enhanced(
+      if (identical(target.formula, "density")) "Selecting copula density bandwidth" else "Selecting copula distribution bandwidth",
+      do.call(bw.fun, bw.args)
+    )
+    args <- c(
+      list(bws = bw,
+           data = dat,
+           u = u.formula,
+           target = target.formula,
+           evaluation = if (is.null(u.formula)) "sample" else "grid",
+           neval = neval.formula,
+           n.quasi.inv = n.quasi.inv,
+           er.quasi.inv = er.quasi.inv,
+           u.auto = auto.grid)
+    )
+    return(do.call(npcopula.default, args))
+  }
+
   .npRmpi_require_active_slave_pool(where = "npcopula()")
   evaluation <- .npcopula_validate_evaluation(evaluation)
   neval <- .npcopula_validate_neval(neval)

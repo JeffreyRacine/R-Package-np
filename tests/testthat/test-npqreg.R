@@ -51,6 +51,22 @@ test_that("npqreg formula route strips fit controls before bandwidth selection",
   expect_equal(ncol(fitted(fit)), 2L)
 })
 
+test_that("npqreg formula route honors manual bws with gradients", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  set.seed(20260513)
+  d <- data.frame(x = runif(35), y = rnorm(35))
+
+  fit <- npqreg(y ~ x, data = d, tau = c(0.25, 0.5),
+                gradients = TRUE, bws = c(0.3, 0.3),
+                bandwidth.compute = FALSE)
+
+  expect_s3_class(fit, "qregression")
+  expect_equal(dim(fitted(fit)), c(nrow(d), 2L))
+  expect_equal(dim(gradients(fit)), c(nrow(d), 1L, 2L))
+})
+
 test_that("npqreg validates tau before MPI dispatch", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)

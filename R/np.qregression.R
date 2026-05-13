@@ -990,6 +990,32 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     return(do.call(npqreg, c(list(bws = tbw), fit.dots)))
   }
 
+  if (!missing(txdat) && inherits(txdat, "formula") &&
+      !missing(bws) && !isa(bws, "condbandwidth")) {
+    dots <- list(...)
+    dot.names <- names(dots)
+    if (is.null(dot.names))
+      dot.names <- rep("", length(dots))
+    fit.names <- c("newdata", "tau", "gradients", "tol", "small", "itmax")
+    fit.dots <- .npqreg_fit_dots(dots[nzchar(dot.names) & dot.names %in% fit.names])
+    bw.dots <- dots[!(nzchar(dot.names) & dot.names %in% fit.names)]
+    bw.args <- c(list(formula = txdat, bws = bws, nomad = nomad), bw.dots)
+    bw.call <- as.call(c(list(quote(npcdistbw)), bw.args))
+    use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
+      bw.call,
+      caller_env = parent.frame()
+    )
+    tbw <- if (use.outer.bandwidth.progress) {
+      .np_progress_select_bandwidth_enhanced(
+        "Selecting conditional distribution bandwidth",
+        do.call(npcdistbw, bw.args)
+      )
+    } else {
+      do.call(npcdistbw, bw.args)
+    }
+    return(do.call(npqreg, c(list(bws = tbw), fit.dots)))
+  }
+
   .npRmpi_require_active_slave_pool(where = "npqreg()")
   parallel.cond <- (!missing(bws)) &&
     .npRmpi_npqreg_should_localize(bws) &&

@@ -70,9 +70,27 @@ fitted.qregression <- function(object, ...){
  object$quantile 
 }
 quantile.qregression <- function(x, ...){ x$quantile }
+.npqreg_predict_newdata_to_exdat <- function(object, newdata) {
+  if (is.data.frame(newdata) && !is.null(names(newdata))) {
+    xnames <- object$bws$xnames
+    if (length(xnames)) {
+      missing.names <- setdiff(xnames, names(newdata))
+      if (length(missing.names))
+        stop(sprintf(
+          "newdata must contain columns: %s",
+          paste(shQuote(xnames), collapse = ", ")
+        ), call. = FALSE)
+      return(newdata[, xnames, drop = FALSE])
+    }
+  }
+  newdata
+}
+
 predict.qregression <- function(object, se.fit = FALSE, ...) {
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
+  if (!is.null(dots$newdata) && is.null(dots$exdat))
+    dots$newdata <- .npqreg_predict_newdata_to_exdat(object, dots$newdata)
   if (!has.formula.route && !is.null(dots$exdat) && !is.null(dots$newdata))
     dots$newdata <- NULL
   if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {

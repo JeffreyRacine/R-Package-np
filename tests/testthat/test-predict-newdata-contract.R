@@ -142,6 +142,10 @@ test_that("predict aliases newdata to exdat for default npqreg", {
     as.numeric(predict(fit, exdat = nd.native)),
     tolerance = 1e-12
   )
+  expect_error(
+    predict(fit, newdata = data.frame(z = c(0.2, 0.5, 0.8))),
+    "newdata must contain columns"
+  )
 })
 
 test_that("predict supports formula newdata and vector tau for npqreg", {

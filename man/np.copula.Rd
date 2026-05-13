@@ -20,9 +20,9 @@ npcopula(bws, \dots)
 
 \method{npcopula}{formula}(bws,
         data = NULL,
+        u = NULL,
         target = c("distribution", "density"),
         evaluation = c("grid", "sample"),
-        u = NULL,
         neval = 30,
         n.quasi.inv = 1000,
         er.quasi.inv = 1,
