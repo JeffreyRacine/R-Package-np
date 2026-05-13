@@ -925,18 +925,18 @@ npcopula.default <- function(bws,
         sprintf("marginal %s at sample realizations", bws$xnames[j])
       )
       bw.j <- bws$bw[j]
-      bws.F.marginal <- do.call(npudistbw, list(
+      bws.F.marginal <- .npRmpi_with_local_regression(do.call(npudistbw, list(
                          dat = data[, bws$xnames[j], drop = FALSE],
                          bws = bw.j,
                          bandwidth.compute = FALSE,
                          bwtype = bw.type,
                          ckerorder = bw.ckerorder,
                          ckertype = bw.ckertype,
-                         okertype = bw.okertype))
+                         okertype = bw.okertype)))
 
-      u[,j] <- fitted(npudist(bws=bws.F.marginal,data=data))
+      u[,j] <- fitted(.npRmpi_with_local_regression(npudist(bws=bws.F.marginal,data=data)))
       if(density) {
-        bws.f.marginal <- do.call(npudensbw, list(
+        bws.f.marginal <- .npRmpi_with_local_regression(do.call(npudensbw, list(
                            dat = data[, bws$xnames[j], drop = FALSE],
                            bws = bw.j,
                            bandwidth.compute = FALSE,
@@ -944,8 +944,8 @@ npcopula.default <- function(bws,
                            ckerorder = bw.ckerorder,
                            ckertype = bw.ckertype,
                            okertype = bw.okertype,
-                           ukertype = bw.ukertype))
-        copula <- copula/NZD(fitted(npudens(bws=bws.f.marginal,data=data)))
+                           ukertype = bw.ukertype)))
+        copula <- copula/NZD(fitted(.npRmpi_with_local_regression(npudens(bws=bws.f.marginal,data=data))))
 
       }
     }
@@ -971,7 +971,7 @@ npcopula.default <- function(bws,
         x.eval <- sort(ordered(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal)))
       }
       bw.j <- bws$bw[j]
-      bws.F.marginal <- do.call(npudistbw, list(
+      bws.F.marginal <- .npRmpi_with_local_regression(do.call(npudistbw, list(
                                   dat = x.marginal,
                                   bws = bw.j,
                                   bandwidth.compute = FALSE,
@@ -979,10 +979,10 @@ npcopula.default <- function(bws,
                                   ckerorder = bw.ckerorder,
                                   ckertype = bw.ckertype,
                                   okertype = bw.okertype,
-                                  ukertype = bw.ukertype))
-      F <- fitted(npudist(tdat = x.marginal,
+                                  ukertype = bw.ukertype)))
+      F <- fitted(.npRmpi_with_local_regression(npudist(tdat = x.marginal,
                           edat = x.eval,
-                          bws = bws.F.marginal))
+                          bws = bws.F.marginal)))
       for (i in seq_len(n.u)) {
         u[u[,j]<min(F),j] <- min(F)
         u[u[,j]>max(F),j] <- max(F)
@@ -1024,7 +1024,7 @@ npcopula.default <- function(bws,
           sprintf("density marginal %s on expanded grid", bws$xnames[j])
         )
         bw.j <- bws$bw[j]
-        bws.f.marginal <- do.call(npudensbw, list(
+        bws.f.marginal <- .npRmpi_with_local_regression(do.call(npudensbw, list(
                            dat = data[, bws$xnames[j], drop = FALSE],
                            bws = bw.j,
                            bandwidth.compute = FALSE,
@@ -1032,16 +1032,16 @@ npcopula.default <- function(bws,
                            ckerorder = bw.ckerorder,
                            ckertype = bw.ckertype,
                            okertype = bw.okertype,
-                           ukertype = bw.ukertype))
+                           ukertype = bw.ukertype)))
         xeval <- data.frame(x.u[,j])
         names(xeval) <- bws$xnames[j]
-        copula <- copula/NZD(npudenshat(
+        copula <- copula/NZD(.npRmpi_with_local_regression(npudenshat(
           bws = bws.f.marginal,
           tdat = data[, bws$xnames[j], drop = FALSE],
           edat = xeval,
           y = unit.weights,
           output = "apply"
-        ))
+        )))
       }
     }
   }
