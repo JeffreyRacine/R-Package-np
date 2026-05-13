@@ -220,14 +220,18 @@ npcopula <- function(bws, ...) {
                                              blocklen,
                                              marginal.bws,
                                              nout) {
-  set.seed(as.integer(task$seed))
   bsz <- as.integer(task$bsz)
-  counts <- .npcopula_boot_counts(
-    n = nrow(data),
-    B = bsz,
-    method = method,
-    blocklen = blocklen
-  )
+  counts <- if (!is.null(task$counts)) {
+    .np_inid_counts_matrix(n = nrow(data), B = bsz, counts = task$counts)
+  } else {
+    set.seed(as.integer(task$seed))
+    .npcopula_boot_counts(
+      n = nrow(data),
+      B = bsz,
+      method = method,
+      blocklen = blocklen
+    )
+  }
   out <- matrix(NA_real_, nrow = bsz, ncol = nout)
   operator <- if (isTRUE(density)) "normal" else "integral"
 
@@ -258,6 +262,19 @@ npcopula <- function(bws, ...) {
   out
 }
 
+.npcopula_bootstrap_count_tasks <- function(counts, chunk.size) {
+  B <- ncol(counts)
+  starts <- seq.int(1L, B, by = as.integer(chunk.size))
+  lapply(starts, function(start) {
+    stopi <- min(B, start + as.integer(chunk.size) - 1L)
+    list(
+      start = as.integer(start),
+      bsz = as.integer(stopi - start + 1L),
+      counts = counts[, start:stopi, drop = FALSE]
+    )
+  })
+}
+
 .npcopula_bootstrap_values <- function(x,
                                        data,
                                        xgrid,
@@ -282,6 +299,12 @@ npcopula <- function(bws, ...) {
     NULL
   }
 
+  counts <- .npcopula_boot_counts(
+    n = nrow(data),
+    B = B,
+    method = method,
+    blocklen = blocklen
+  )
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
     chunk.size = .np_inid_chunk_size(n = nrow(data), B = B, progress_cap = TRUE),
@@ -295,7 +318,8 @@ npcopula <- function(bws, ...) {
     chunk.size = chunk.size,
     what = "npcopula-bootstrap"
   )
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  tasks <- .npcopula_bootstrap_count_tasks(counts = counts,
+                                           chunk.size = chunk.size)
   worker <- function(task,
                      data,
                      xgrid,
@@ -337,6 +361,7 @@ npcopula <- function(bws, ...) {
       .npcopula_boot_eval_weighted = .npcopula_boot_eval_weighted,
       .np_active_boot_sample = .np_active_boot_sample,
       .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact,
+      .np_inid_counts_matrix = .np_inid_counts_matrix,
       .np_block_counts_drawer = .np_block_counts_drawer
     ),
     data = data,
@@ -464,6 +489,64 @@ summary.npcopula <- function(object, ...) {
 
 fitted.npcopula <- function(object, ...) {
   object$copula
+}
+
+.npcopula_predict_newdata_to_u <- function(object, newdata) {
+  if (is.null(newdata))
+    return(NULL)
+  if (is.vector(newdata) && !is.list(newdata))
+    return(matrix(newdata, nrow = 1L))
+
+  nd <- as.data.frame(newdata)
+  xnames <- object$xnames
+  unames <- paste0("u", seq_along(xnames))
+  if (length(xnames) && all(xnames %in% names(nd)))
+    return(nd[, xnames, drop = FALSE])
+  if (length(unames) && all(unames %in% names(nd))) {
+    out <- nd[, unames, drop = FALSE]
+    names(out) <- xnames
+    return(out)
+  }
+  nd
+}
+
+predict.npcopula <- function(object,
+                             newdata = NULL,
+                             u = NULL,
+                             se.fit = FALSE,
+                             output = c("vector", "object", "data"),
+                             ...) {
+  output <- match.arg(output)
+  dots <- list(...)
+
+  if (is.null(u) && !is.null(newdata)) {
+    u <- .npcopula_predict_newdata_to_u(object, newdata)
+  } else if (!is.null(u)) {
+    u <- .npcopula_predict_newdata_to_u(object, u)
+  }
+
+  if (is.null(u) && !length(dots)) {
+    ev <- object
+  } else {
+    data <- dots$data
+    dots$data <- NULL
+    if (is.null(data))
+      data <- object$data
+    if (is.null(data))
+      stop("npcopula object does not retain the training data needed for prediction; refit with npcopula()")
+    args <- c(list(bws = object$bws, data = data),
+              if (is.null(u)) list() else list(u = u),
+              dots)
+    ev <- do.call(npcopula, args)
+  }
+
+  if (identical(output, "object"))
+    return(ev)
+  if (identical(output, "data"))
+    return(as.data.frame(ev))
+  if (se.fit)
+    return(list(fit = fitted(ev), se.fit = se(ev), df = ev$ntrain))
+  fitted(ev)
 }
 
 se.npcopula <- function(x) {

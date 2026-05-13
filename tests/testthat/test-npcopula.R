@@ -132,6 +132,40 @@ test_that("npcopula target conflicts with explicit bandwidth object fail clearly
   )
 })
 
+test_that("predict.npcopula evaluates stored bandwidths on probability grids", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  data("faithful")
+  bw <- npudistbw(dat = faithful, bws = c(0.5, 5), bandwidth.compute = FALSE)
+  u <- data.frame(eruptions = seq(0.2, 0.8, length.out = 3),
+                  waiting = seq(0.2, 0.8, length.out = 3))
+  fit <- npcopula(data = faithful, bws = bw, u = u, n.quasi.inv = 40)
+
+  expect_equal(predict(fit), fitted(fit))
+  expect_null(attr(fit, "bws"))
+
+  u.new <- data.frame(eruptions = c(0.25, 0.75),
+                      waiting = c(0.25, 0.75))
+  expected <- npcopula(bws = fit$bws, data = faithful, u = u.new,
+                       n.quasi.inv = 40)
+  expect_equal(predict(fit, u = u.new, n.quasi.inv = 40), fitted(expected))
+
+  u.alias <- data.frame(u1 = c(0.25, 0.75), u2 = c(0.25, 0.75))
+  expect_equal(predict(fit, newdata = u.alias, n.quasi.inv = 40),
+               fitted(expected))
+
+  pred.object <- predict(fit, u = u.new, n.quasi.inv = 40, output = "object")
+  expect_s3_class(pred.object, "npcopula")
+  expect_equal(as.data.frame(predict(fit, u = u.new, n.quasi.inv = 40,
+                                     output = "data")),
+               as.data.frame(expected),
+               ignore_attr = TRUE)
+
+  pred.se <- predict(fit, se.fit = TRUE)
+  expect_equal(pred.se$fit, fitted(fit))
+  expect_equal(pred.se$se.fit, se(fit))
+})
+
 test_that("npcopula fitted and basic plot methods work", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
