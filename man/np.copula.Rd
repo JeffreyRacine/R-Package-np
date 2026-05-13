@@ -87,14 +87,66 @@ These arguments control the marginal probability grid and numerical inversion us
 These arguments are used by the \code{plot.npcopula} method for two-dimensional grid output.
 }
 
+  \item{alpha}{
+    nominal size used for asymptotic or bootstrap intervals when
+    \code{errors!="none"}.
+  }
+
+  \item{B}{
+    number of bootstrap replications when \code{errors="bootstrap"}.
+  }
+
+  \item{band}{
+    interval type for plotted surfaces. Supported values are
+    \code{"pointwise"}, \code{"pmzsd"}, \code{"bonferroni"},
+    \code{"simultaneous"}, and \code{"all"}. The \code{"all"} option
+    overlays pointwise, simultaneous, and Bonferroni wireframes where
+    available.
+  }
+
   \item{border}{
     border color for the surface facets when \code{view="surface"}.
+  }
+
+  \item{bootstrap}{
+    bootstrap resampling method used when \code{errors="bootstrap"};
+    supported values are \code{"inid"}, \code{"fixed"}, and
+    \code{"geom"}. Wild bootstrap is not defined for copula surfaces.
+  }
+
+  \item{boot_control}{
+    optional \code{\link{np_boot_control}} object. For copula surfaces
+    the block length is used by the \code{"fixed"} and \code{"geom"}
+    block bootstrap routes.
+  }
+
+  \item{center}{
+    centering convention for bootstrap intervals, either
+    \code{"estimate"} or \code{"bias-corrected"}.
   }
 
   \item{col}{
     optional surface or image colors. If omitted, \code{plot.npcopula}
     uses the same viridis \code{\link{hcl.colors}} palette used by the
     other modern surface plot methods.
+  }
+
+  \item{errors}{
+    interval route for \code{plot.npcopula}: \code{"none"},
+    \code{"asymptotic"}, or \code{"bootstrap"}. Intervals are available
+    for two-dimensional grid evaluation output and are drawn as
+    transparent wireframes over the copula surface.
+  }
+
+  \item{legend}{
+    logical or legend-control value used for \code{band="all"} interval
+    overlays.
+  }
+
+  \item{output}{
+    plot return mode: \code{"plot"} draws the plot, \code{"data"}
+    returns the plotted data with interval columns when requested, and
+    \code{"plot-data"} draws and returns the data.
   }
 
   \item{renderer}{
@@ -180,6 +232,17 @@ These arguments are used by the \code{plot.npcopula} method for two-dimensional 
   two-dimensional grid output. Surface plots use the package-wide
   viridis default palette; \code{renderer="rgl"} requests the shared
   interactive \pkg{rgl} surface renderer.
+
+  For grid surfaces, \code{plot.npcopula} can add asymptotic or
+  bootstrap intervals via \code{errors}. Distribution-copula
+  asymptotic intervals use the joint distribution standard error
+  evaluated at the marginal quasi-inverse grid. Density-copula
+  asymptotic intervals use the plug-in delta-method denominator
+  correction corresponding to the estimator
+  \eqn{c(u)=f(x_u)/\prod_j f_j(x_{u,j})}. Bootstrap intervals resample
+  rows and recompute the plotted copula surface on the same probability
+  grid; \code{band="all"} overlays transparent pointwise,
+  simultaneous, and Bonferroni wireframes.
 
   The \sQuote{quasi-inverse} is computed via Definition 2.3.6 from
   Nelsen (2006). We compute an equi-quantile grid on the range of the

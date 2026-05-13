@@ -71,6 +71,7 @@ npcopula <- function(bws, ...) {
 
 .npcopula_object <- function(result,
                              bws,
+                             data,
                              target,
                              evaluation,
                              u.provided,
@@ -82,6 +83,7 @@ npcopula <- function(bws, ...) {
                              timing = NULL) {
   class(result) <- c("npcopula", "data.frame")
   attr(result, "bws") <- bws
+  attr(result, "data") <- data
   attr(result, "target") <- target
   attr(result, "density") <- identical(target, "density")
   attr(result, "xnames") <- bws$xnames
@@ -95,6 +97,257 @@ npcopula <- function(bws, ...) {
   attr(result, "er.quasi.inv") <- er.quasi.inv
   attr(result, "timing") <- timing
   result
+}
+
+.npcopula_marginal_bw <- function(bws, data, j) {
+  dat <- data[, bws$xnames[j], drop = FALSE]
+  continuous.slot <- if (!is.null(bws$icon)) match(j, bws$icon) else NA_integer_
+  marginal <- list(
+    bw = bws$bw[j],
+    type = bws$type,
+    ckerorder = bws$ckerorder,
+    ckertype = bws$ckertype,
+    ckerbound = bws$ckerbound,
+    ckerlb = if (!is.null(bws$ckerlb) && !is.na(continuous.slot)) bws$ckerlb[continuous.slot] else NULL,
+    ckerub = if (!is.null(bws$ckerub) && !is.na(continuous.slot)) bws$ckerub[continuous.slot] else NULL,
+    ukertype = bws$ukertype,
+    okertype = bws$okertype
+  )
+  .np_make_kbandwidth_unconditional(marginal, dat)
+}
+
+.npcopula_grid_eval <- function(x) {
+  xnames <- attr(x, "xnames")
+  if (length(xnames) != 2L)
+    stop("plot.npcopula currently supports two-dimensional copula displays")
+  grid.dim <- attr(x, "grid.dim")
+  if (is.null(grid.dim) || length(grid.dim) != 2L ||
+      prod(grid.dim) != nrow(x))
+    stop("npcopula grid output cannot be reshaped into a two-dimensional surface")
+  u1 <- sort(unique(x$u1))
+  u2 <- sort(unique(x$u2))
+  if (length(u1) != grid.dim[1L] || length(u2) != grid.dim[2L])
+    stop("npcopula grid output is not rectangular")
+  xgrid <- as.data.frame(x[, xnames, drop = FALSE])
+  list(
+    u1 = u1,
+    u2 = u2,
+    xgrid = xgrid,
+    z = matrix(x$copula, nrow = length(u1), ncol = length(u2))
+  )
+}
+
+.npcopula_training_data <- function(x) {
+  data <- attr(x, "data")
+  if (is.null(data))
+    stop("npcopula object does not retain the training data needed for intervals; refit with npcopula()")
+  as.data.frame(data)
+}
+
+.npcopula_marginal_density_product <- function(bws, data, xgrid) {
+  out <- rep.int(1.0, nrow(xgrid))
+  for (j in seq_along(bws$xnames)) {
+    mbw <- .npcopula_marginal_bw(bws, data, j)
+    xeval <- xgrid[, bws$xnames[j], drop = FALSE]
+    out <- out * .np_ksum_unconditional_eval_exact(
+      xdat = data[, bws$xnames[j], drop = FALSE],
+      exdat = xeval,
+      bws = mbw,
+      operator = "normal"
+    )
+  }
+  NZD(out)
+}
+
+.npcopula_asymptotic_se <- function(x, data, xgrid) {
+  bws <- attr(x, "bws")
+  target <- attr(x, "target")
+  density <- identical(target, "density")
+  if (density) {
+    joint <- npudens(tdat = data, edat = xgrid, bws = bws)
+    return(se(joint) / .npcopula_marginal_density_product(bws, data, xgrid))
+  }
+  joint <- npudist(tdat = data, edat = xgrid, bws = bws)
+  se(joint)
+}
+
+.npcopula_boot_counts <- function(n, B, method, blocklen) {
+  if (identical(method, "inid"))
+    return(.np_inid_counts_matrix(n = n, B = B))
+  drawer <- .np_block_counts_drawer(
+    n = n,
+    B = B,
+    blocklen = blocklen,
+    sim = method
+  )
+  .np_inid_counts_matrix(n = n, B = B, counts = drawer(1L, B))
+}
+
+.npcopula_boot_eval_weighted <- function(xdat, exdat, bws, operator, counts.col) {
+  active <- .np_active_boot_sample(xdat = xdat, counts.col = counts.col)
+  .np_ksum_unconditional_eval_exact(
+    xdat = active$xdat,
+    exdat = exdat,
+    bws = bws,
+    operator = operator,
+    weights = active$weights,
+    n.total = active$n.total
+  )
+}
+
+.npcopula_bootstrap_values <- function(x,
+                                       data,
+                                       xgrid,
+                                       B,
+                                       method,
+                                       blocklen) {
+  bws <- attr(x, "bws")
+  target <- attr(x, "target")
+  density <- identical(target, "density")
+  method <- match.arg(method, c("inid", "fixed", "geom"))
+  B <- as.integer(B)
+  if (B < 1L)
+    stop("B must be a positive integer")
+  if (!identical(method, "inid") &&
+      (is.null(blocklen) || length(blocklen) != 1L || is.na(blocklen)))
+    blocklen <- max(1L, floor(nrow(data)^(1/3)))
+  marginal.bws <- if (density) {
+    lapply(seq_along(bws$xnames), function(j) {
+      .npcopula_marginal_bw(bws, data, j)
+    })
+  } else {
+    NULL
+  }
+
+  counts <- .npcopula_boot_counts(
+    n = nrow(data),
+    B = B,
+    method = method,
+    blocklen = blocklen
+  )
+  tmat <- matrix(NA_real_, nrow = B, ncol = nrow(xgrid))
+  progress <- .np_plot_bootstrap_progress_begin(
+    total = B,
+    label = if (identical(method, "inid")) "Plot bootstrap inid" else "Plot bootstrap block"
+  )
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+
+  start <- 1L
+  chunk.size <- .np_inid_chunk_size(n = nrow(data), B = B, progress_cap = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    chunk.started <- .np_progress_now()
+    for (bb in start:stopi) {
+      joint <- .npcopula_boot_eval_weighted(
+        xdat = data,
+        exdat = xgrid,
+        bws = bws,
+        operator = if (density) "normal" else "integral",
+        counts.col = counts[, bb]
+      )
+      if (density) {
+        denom <- rep.int(1.0, nrow(xgrid))
+        for (j in seq_along(bws$xnames)) {
+          denom <- denom * .npcopula_boot_eval_weighted(
+            xdat = data[, bws$xnames[j], drop = FALSE],
+            exdat = xgrid[, bws$xnames[j], drop = FALSE],
+            bws = marginal.bws[[j]],
+            operator = "normal",
+            counts.col = counts[, bb]
+          )
+        }
+        joint <- joint / NZD(denom)
+      }
+      tmat[bb, ] <- joint
+    }
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = stopi - start + 1L,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = x$copula)
+}
+
+.npcopula_interval_payload <- function(x,
+                                       plot.errors.method,
+                                       plot.errors.alpha,
+                                       plot.errors.type,
+                                       plot.errors.center,
+                                       plot.errors.boot.method,
+                                       plot.errors.boot.num,
+                                       plot.errors.boot.blocklen) {
+  if (identical(plot.errors.method, "none"))
+    return(NULL)
+  if (!identical(attr(x, "evaluation"), "grid"))
+    stop("npcopula intervals are available only for grid evaluation output")
+
+  data <- .npcopula_training_data(x)
+  grid <- .npcopula_grid_eval(x)
+  se <- if (identical(plot.errors.method, "asymptotic")) {
+    .npcopula_asymptotic_se(x, data = data, xgrid = grid$xgrid)
+  } else {
+    rep(NA_real_, nrow(grid$xgrid))
+  }
+  boot.raw <- if (identical(plot.errors.method, "bootstrap")) {
+    boot.out <- .npcopula_bootstrap_values(
+      x = x,
+      data = data,
+      xgrid = grid$xgrid,
+      B = plot.errors.boot.num,
+      method = plot.errors.boot.method,
+      blocklen = plot.errors.boot.blocklen
+    )
+    if (identical(plot.errors.type, "pmzsd")) {
+      boot.err <- matrix(NA_real_, nrow = nrow(grid$xgrid), ncol = 3L)
+      boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
+      boot.err[, 1:2] <- qnorm(plot.errors.alpha / 2, lower.tail = FALSE) * boot.sd
+      boot.all.err <- NULL
+    } else {
+      interval.summary <- .np_plot_bootstrap_interval_summary(
+        boot.t = boot.out$t,
+        t0 = boot.out$t0,
+        alpha = plot.errors.alpha,
+        band.type = plot.errors.type
+      )
+      boot.err <- matrix(NA_real_, nrow = nrow(grid$xgrid), ncol = 3L)
+      boot.err[, 1:2] <- interval.summary$err
+      boot.all.err <- interval.summary$all.err
+    }
+    if (identical(plot.errors.center, "bias-corrected"))
+      boot.err[, 3L] <- 2 * boot.out$t0 - colMeans(boot.out$t)
+    list(boot.err = boot.err, boot.all.err = boot.all.err, bxp = list())
+  } else {
+    NULL
+  }
+  .np_plot_interval_payload(
+    estimate = x$copula,
+    se = se,
+    plot.errors.method = plot.errors.method,
+    plot.errors.alpha = plot.errors.alpha,
+    plot.errors.type = plot.errors.type,
+    plot.errors.center = plot.errors.center,
+    bootstrap_raw = boot.raw
+  )
+}
+
+.npcopula_add_interval_columns <- function(x, payload) {
+  if (is.null(payload))
+    return(x)
+  x$center <- payload$center
+  x$lower <- payload$center - payload$err[, 1L]
+  x$upper <- payload$center + payload$err[, 2L]
+  if (!is.null(payload$all.err)) {
+    for (nm in names(payload$all.err)) {
+      x[[paste0(nm, ".lower")]] <- payload$center - payload$all.err[[nm]][, 1L]
+      x[[paste0(nm, ".upper")]] <- payload$center + payload$all.err[[nm]][, 2L]
+    }
+  }
+  x
 }
 
 print.npcopula <- function(x, ...) {
@@ -132,6 +385,16 @@ plot.npcopula <- function(x,
                           perspective = TRUE,
                           view = c("surface", "contour", "image"),
                           renderer = c("base", "rgl"),
+                          errors = c("none", "bootstrap", "asymptotic"),
+                          band = c("pointwise", "pmzsd", "bonferroni",
+                                   "simultaneous", "all"),
+                          alpha = 0.05,
+                          bootstrap = c("inid", "fixed", "geom"),
+                          B = 1999,
+                          center = c("estimate", "bias-corrected"),
+                          boot_control = np_boot_control(),
+                          output = c("plot", "data", "plot-data", "both"),
+                          legend = TRUE,
                           theta = 45,
                           phi = 30,
                           xlab = "u1",
@@ -142,8 +405,30 @@ plot.npcopula <- function(x,
                           border = "black",
                           zlim = NULL,
                           ...) {
+  bootstrap.supplied <- !missing(bootstrap) || !missing(B) || !missing(center)
+  interval.supplied <- !missing(band) || !missing(alpha)
   view <- match.arg(view)
   renderer <- .np_plot_match_renderer(renderer)
+  errors <- match.arg(errors)
+  band <- match.arg(band)
+  bootstrap <- match.arg(bootstrap)
+  center <- match.arg(center)
+  output <- match.arg(output)
+  if (identical(output, "both"))
+    output <- "plot-data"
+  if (!is.numeric(alpha) || length(alpha) != 1L ||
+      is.na(alpha) || alpha <= 0 || alpha >= 0.5)
+    stop("alpha must lie in (0, 0.5)", call. = FALSE)
+  if (!is.numeric(B) || length(B) != 1L || is.na(B) || B < 1L)
+    stop("B must be a positive numeric scalar", call. = FALSE)
+  if (!inherits(boot_control, "np_boot_control"))
+    stop("boot_control must be created by np_boot_control()", call. = FALSE)
+  if (!identical(errors, "bootstrap") && bootstrap.supplied)
+    stop("bootstrap controls require errors = \"bootstrap\"", call. = FALSE)
+  if (identical(errors, "none") && interval.supplied)
+    stop("band and alpha require errors != \"none\"", call. = FALSE)
+  if (identical(errors, "bootstrap"))
+    .np_plot_reject_wild_unsupervised(bootstrap, "copula estimators")
   dots <- list(...)
   target <- attr(x, "target")
   target.label <- if (identical(target, "density")) "Copula Density" else "Copula"
@@ -158,26 +443,65 @@ plot.npcopula <- function(x,
 
   evaluation <- attr(x, "evaluation")
   if (identical(evaluation, "sample")) {
+    if (!identical(errors, "none"))
+      stop("npcopula intervals are available only for grid evaluation output",
+           call. = FALSE)
     if (identical(renderer, "rgl"))
       stop("renderer='rgl' is supported only for grid surface displays in plot.npcopula",
            call. = FALSE)
+    if (identical(output, "data"))
+      return(x)
     do.call(graphics::plot, c(list(x = x$u1, y = x$u2,
                                    xlab = xlab, ylab = ylab, main = main),
                               dots))
+    if (identical(output, "plot-data"))
+      return(x)
     return(invisible(x))
   }
 
-  grid.dim <- attr(x, "grid.dim")
-  if (is.null(grid.dim) || length(grid.dim) != 2L ||
-      prod(grid.dim) != nrow(x))
-    stop("npcopula grid output cannot be reshaped into a two-dimensional surface")
+  if (!identical(errors, "none") &&
+      !(isTRUE(perspective) && identical(view, "surface")) &&
+      !identical(output, "data"))
+    stop("npcopula interval plotting requires view='surface' and perspective=TRUE",
+         call. = FALSE)
 
-  u1 <- sort(unique(x$u1))
-  u2 <- sort(unique(x$u2))
-  if (length(u1) != grid.dim[1L] || length(u2) != grid.dim[2L])
-    stop("npcopula grid output is not rectangular")
+  grid <- .npcopula_grid_eval(x)
+  u1 <- grid$u1
+  u2 <- grid$u2
+  z <- grid$z
+  payload <- .npcopula_interval_payload(
+    x = x,
+    plot.errors.method = errors,
+    plot.errors.alpha = alpha,
+    plot.errors.type = band,
+    plot.errors.center = center,
+    plot.errors.boot.method = bootstrap,
+    plot.errors.boot.num = as.integer(B),
+    plot.errors.boot.blocklen = boot_control$blocklen
+  )
+  plot.data <- .npcopula_add_interval_columns(x, payload)
+  if (identical(output, "data"))
+    return(plot.data)
 
-  z <- matrix(x$copula, nrow = length(u1), ncol = length(u2))
+  lerr <- herr <- lerr.all <- herr.all <- NULL
+  if (!is.null(payload)) {
+    lerr <- matrix(payload$center - payload$err[, 1L],
+                   nrow = length(u1), ncol = length(u2))
+    herr <- matrix(payload$center + payload$err[, 2L],
+                   nrow = length(u1), ncol = length(u2))
+    if (identical(band, "all") && !is.null(payload$all.err)) {
+      lerr.all <- lapply(payload$all.err, function(te)
+        matrix(payload$center - te[, 1L], nrow = length(u1), ncol = length(u2)))
+      herr.all <- lapply(payload$all.err, function(te)
+        matrix(payload$center + te[, 2L], nrow = length(u1), ncol = length(u2)))
+    }
+  }
+  if (is.null(zlim)) {
+    zlim.values <- c(z, lerr, herr, unlist(lerr.all, use.names = FALSE),
+                     unlist(herr.all, use.names = FALSE))
+    zlim <- range(zlim.values, finite = TRUE)
+  }
+
   if (isTRUE(perspective) && identical(view, "surface")) {
     renderer <- .np_plot_validate_renderer_request(
       renderer = renderer,
@@ -205,9 +529,31 @@ plot.npcopula <- function(x,
         view3d.args = .np_plot_collect_rgl_args(dots, "rgl.view3d", "rgl.view3d."),
         persp3d.args = .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d."),
         grid3d.args = .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d."),
-        widget.args = .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget.")
+        widget.args = .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget."),
+        draw.extras = function() {
+          if (!is.null(payload)) {
+            .np_plot_error_surfaces_rgl(
+              x = u1,
+              y = u2,
+              plot.errors.type = band,
+              lerr = lerr,
+              herr = herr,
+              lerr.all = lerr.all,
+              herr.all = herr.all,
+              surface3d.args = .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d."),
+              legend3d.args = .np_plot_merge_rgl_legend_control(
+                .np_plot_collect_rgl_args(dots, "rgl.legend3d", "rgl.legend3d."),
+                legend = legend
+              )
+            )
+          }
+        }
       )
-      return(.np_plot_rgl_finalize(rgl.out = rgl.out))
+      return(.np_plot_rgl_finalize(
+        rgl.out = rgl.out,
+        plot.behavior = output,
+        plot.data = plot.data
+      ))
     }
     persp.args <- .np_plot_user_args(dots, "persp")
     persp.col <- grDevices::adjustcolor(
@@ -220,7 +566,25 @@ plot.npcopula <- function(x,
                        main = main, col = persp.col, border = border)
     if (!is.null(zlim))
       persp.call$zlim <- zlim
-    do.call(graphics::persp, .np_plot_merge_user_args(persp.call, persp.args))
+    persp.mat <- do.call(graphics::persp, .np_plot_merge_user_args(persp.call, persp.args))
+    if (!is.null(payload)) {
+      .np_plot_draw_error_wireframes_persp(
+        x = u1,
+        y = u2,
+        persp.mat = persp.mat,
+        plot.errors.type = band,
+        lerr = lerr,
+        herr = herr,
+        lerr.all = lerr.all,
+        herr.all = herr.all,
+        border = "grey40",
+        lwd = .np_plot_scalar_default(dots$lwd, par()$lwd)
+      )
+      if (identical(band, "all") && !is.null(lerr.all) && !is.null(herr.all) &&
+          isTRUE(legend)) {
+        .np_plot_draw_all_band_legend(legend = TRUE, x = "topright")
+      }
+    }
   } else if (identical(view, "contour")) {
     if (identical(renderer, "rgl"))
       stop("renderer='rgl' is supported only for view='surface' in plot.npcopula",
@@ -242,6 +606,8 @@ plot.npcopula <- function(x,
                                     col = image.col),
                                dots))
   }
+  if (identical(output, "plot-data"))
+    return(plot.data)
   invisible(x)
 }
 
@@ -536,6 +902,7 @@ npcopula.default <- function(bws,
   .npcopula_object(
     result = out,
     bws = bws,
+    data = data,
     target = target,
     evaluation = if (u.provided) "grid" else "sample",
     u.provided = u.provided,
