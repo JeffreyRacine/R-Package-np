@@ -195,6 +195,53 @@ npcopula <- function(bws, ...) {
   )
 }
 
+.npcopula_bootstrap_chunk_values <- function(task,
+                                             data,
+                                             xgrid,
+                                             bws,
+                                             density,
+                                             method,
+                                             blocklen,
+                                             marginal.bws,
+                                             nout) {
+  set.seed(as.integer(task$seed))
+  bsz <- as.integer(task$bsz)
+  counts <- .npcopula_boot_counts(
+    n = nrow(data),
+    B = bsz,
+    method = method,
+    blocklen = blocklen
+  )
+  out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+  operator <- if (isTRUE(density)) "normal" else "integral"
+
+  for (bb in seq_len(bsz)) {
+    joint <- .npcopula_boot_eval_weighted(
+      xdat = data,
+      exdat = xgrid,
+      bws = bws,
+      operator = operator,
+      counts.col = counts[, bb]
+    )
+    if (isTRUE(density)) {
+      denom <- rep.int(1.0, nrow(xgrid))
+      for (j in seq_along(bws$xnames)) {
+        denom <- denom * .npcopula_boot_eval_weighted(
+          xdat = data[, bws$xnames[j], drop = FALSE],
+          exdat = xgrid[, bws$xnames[j], drop = FALSE],
+          bws = marginal.bws[[j]],
+          operator = "normal",
+          counts.col = counts[, bb]
+        )
+      }
+      joint <- joint / NZD(denom)
+    }
+    out[bb, ] <- joint
+  }
+
+  out
+}
+
 .npcopula_bootstrap_values <- function(x,
                                        data,
                                        xgrid,
@@ -219,56 +266,77 @@ npcopula <- function(bws, ...) {
     NULL
   }
 
-  counts <- .npcopula_boot_counts(
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = nrow(data), B = B, progress_cap = TRUE),
+    comm = 1L,
+    include.master = TRUE
+  )
+  .npRmpi_bootstrap_fanout_enabled(
+    comm = 1L,
     n = nrow(data),
     B = B,
-    method = method,
-    blocklen = blocklen
+    chunk.size = chunk.size,
+    what = "npcopula-bootstrap"
   )
-  tmat <- matrix(NA_real_, nrow = B, ncol = nrow(xgrid))
-  progress <- .np_plot_bootstrap_progress_begin(
-    total = B,
-    label = if (identical(method, "inid")) "Plot bootstrap inid" else "Plot bootstrap block"
-  )
-  on.exit(.np_plot_progress_end(progress), add = TRUE)
-
-  start <- 1L
-  chunk.size <- .np_inid_chunk_size(n = nrow(data), B = B, progress_cap = TRUE)
-  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
-  while (start <= B) {
-    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
-    chunk.started <- .np_progress_now()
-    for (bb in start:stopi) {
-      joint <- .npcopula_boot_eval_weighted(
-        xdat = data,
-        exdat = xgrid,
-        bws = bws,
-        operator = if (density) "normal" else "integral",
-        counts.col = counts[, bb]
-      )
-      if (density) {
-        denom <- rep.int(1.0, nrow(xgrid))
-        for (j in seq_along(bws$xnames)) {
-          denom <- denom * .npcopula_boot_eval_weighted(
-            xdat = data[, bws$xnames[j], drop = FALSE],
-            exdat = xgrid[, bws$xnames[j], drop = FALSE],
-            bws = marginal.bws[[j]],
-            operator = "normal",
-            counts.col = counts[, bb]
-          )
-        }
-        joint <- joint / NZD(denom)
-      }
-      tmat[bb, ] <- joint
-    }
-    progress <- .np_plot_progress_tick(state = progress, done = stopi)
-    chunk.controller <- .np_plot_progress_chunk_observe(
-      controller = chunk.controller,
-      bsz = stopi - start + 1L,
-      elapsed.sec = .np_progress_now() - chunk.started
+  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  worker <- function(task,
+                     data,
+                     xgrid,
+                     bws,
+                     density,
+                     method,
+                     blocklen,
+                     marginal.bws,
+                     nout) {
+    .npcopula_bootstrap_chunk_values(
+      task = task,
+      data = data,
+      xgrid = xgrid,
+      bws = bws,
+      density = density,
+      method = method,
+      blocklen = blocklen,
+      marginal.bws = marginal.bws,
+      nout = nout
     )
-    start <- stopi + 1L
   }
+  progress.label <- if (identical(method, "inid")) {
+    "Plot bootstrap inid"
+  } else {
+    "Plot bootstrap block"
+  }
+  tmat <- .npRmpi_bootstrap_run_fanout(
+    tasks = tasks,
+    worker = worker,
+    ncol.out = nrow(xgrid),
+    what = "npcopula-bootstrap",
+    progress.label = progress.label,
+    profile.where = "mpi.applyLB:npcopula-bootstrap",
+    comm = 1L,
+    master_local_chunk = TRUE,
+    required.bindings = list(
+      .npcopula_bootstrap_chunk_values = .npcopula_bootstrap_chunk_values,
+      .npcopula_boot_counts = .npcopula_boot_counts,
+      .npcopula_boot_eval_weighted = .npcopula_boot_eval_weighted,
+      .np_active_boot_sample = .np_active_boot_sample,
+      .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact,
+      .np_block_counts_drawer = .np_block_counts_drawer
+    ),
+    data = data,
+    xgrid = xgrid,
+    bws = bws,
+    density = density,
+    method = method,
+    blocklen = blocklen,
+    marginal.bws = marginal.bws,
+    nout = nrow(xgrid)
+  )
+  if (anyNA(tmat))
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "fan-out returned incomplete results",
+      what = "npcopula-bootstrap"
+    )
 
   list(t = tmat, t0 = x$copula)
 }

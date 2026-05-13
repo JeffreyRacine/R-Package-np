@@ -167,3 +167,47 @@ test_that("npcopula plot intervals work for grid surfaces", {
   sample.fit <- npcopula(~ x + y, data = dat, evaluation = "sample", nmulti = 1)
   expect_error(plot(sample.fit, errors = "asymptotic"), "grid evaluation")
 })
+
+test_that("npcopula bootstrap plot uses MPI fanout", {
+  if (!spawn_mpi_slaves(2L)) skip("Could not spawn MPI slaves")
+
+  old.trace <- getOption("npRmpi.bootstrap.transport.trace.file", "")
+  old.chunk <- getOption("np.plot.inid.chunk.size", NULL)
+  trace.file <- tempfile("npcopula-bootstrap-trace-", fileext = ".csv")
+  options(
+    npRmpi.bootstrap.transport.trace.file = trace.file,
+    np.plot.inid.chunk.size = 4L
+  )
+  on.exit({
+    options(npRmpi.bootstrap.transport.trace.file = old.trace)
+    if (is.null(old.chunk)) {
+      options(np.plot.inid.chunk.size = NULL)
+    } else {
+      options(np.plot.inid.chunk.size = old.chunk)
+    }
+  }, add = TRUE)
+
+  set.seed(45)
+  n <- 80L
+  dat <- data.frame(
+    x = rnorm(n),
+    y = 0.7 * rnorm(n) + rnorm(n, sd = 0.2)
+  )
+  bw <- npudistbw(~ x + y, data = dat, bws = c(0.7, 0.7),
+                  bandwidth.compute = FALSE)
+  fit <- npcopula(
+    bws = bw,
+    data = dat,
+    u = data.frame(x = seq(0.2, 0.8, length.out = 3),
+                   y = seq(0.2, 0.8, length.out = 3)),
+    n.quasi.inv = 40
+  )
+
+  out <- plot(fit, output = "data", errors = "bootstrap",
+              bootstrap = "inid", B = 8, band = "pmzsd")
+  expect_equal(nrow(out), nrow(fit))
+  expect_true(file.exists(trace.file))
+  trace <- readLines(trace.file, warn = FALSE)
+  expect_true(any(grepl("what=npcopula-bootstrap.*event=fanout.start", trace)))
+  expect_true(any(grepl("what=npcopula-bootstrap.*event=fanout.done", trace)))
+})
