@@ -6,6 +6,7 @@
 \alias{print.npcopula}
 \alias{summary.npcopula}
 \alias{fitted.npcopula}
+\alias{predict.npcopula}
 \alias{se.npcopula}
 \alias{as.data.frame.npcopula}
 \title{Kernel Copula Estimation with Mixed Data Types}
@@ -38,6 +39,13 @@ npcopula(bws, \dots)
         neval = 30,
         n.quasi.inv = 1000,
         er.quasi.inv = 1,
+        \dots)
+
+\method{predict}{npcopula}(object,
+        newdata = NULL,
+        u = NULL,
+        se.fit = FALSE,
+        output = c("vector", "object", "data"),
         \dots)
 
 \method{plot}{npcopula}(x,
@@ -95,6 +103,8 @@ formula route.
   \item{\dots}{
     additional arguments. In \code{npcopula.formula}, these are passed
     to \code{\link{npudistbw}} or \code{\link{npudensbw}}. In
+    \code{predict.npcopula}, these are passed to \code{npcopula} for
+    evaluation with the stored bandwidth object and training data. In
     \code{plot.npcopula}, these are passed to the selected graphics
     routine, such as \code{\link{persp}}, \code{\link{contour}},
     \code{\link{image}}, or the shared \pkg{rgl} renderer.
@@ -123,6 +133,15 @@ estimated and where it is evaluated.
     when \code{u} is supplied or automatically generated.
   }
 
+  \item{newdata}{
+    optional prediction data for \code{predict.npcopula}. This is a
+    compatibility alias for \code{u}: it should contain marginal
+    probability values in \eqn{[0,1]}, either in columns named as the
+    original variables or in columns named \code{u1}, \code{u2}, ....
+    If both \code{u} and \code{newdata} are supplied, \code{u} takes
+    precedence.
+  }
+
   \item{neval}{
     number of probability values per margin in the automatically
     generated two-dimensional grid used when \code{bws} is a formula,
@@ -145,6 +164,15 @@ estimated and where it is evaluated.
     \code{expand.grid(u)}. If omitted with a formula route and
     \code{evaluation="grid"}, a two-dimensional grid is generated
     automatically.
+  }
+
+  \item{object}{
+    an object of class \code{"npcopula"} returned by \code{npcopula}.
+  }
+
+  \item{se.fit}{
+    logical value. If \code{TRUE}, \code{predict.npcopula} returns a
+    list with fitted values and the stored standard-error slot.
   }
 
 \subsection{Plot Display Controls}{
@@ -178,10 +206,14 @@ displayed.
   }
 
   \item{output}{
-    plot return mode. \code{"plot"} draws the plot, \code{"data"}
-    returns the plotted data with interval columns when requested, and
-    \code{"plot-data"} draws and returns the plotted data. \code{"both"}
-    is accepted as an alias for \code{"plot-data"}.
+    return mode. For \code{plot.npcopula}, \code{"plot"} draws the
+    plot, \code{"data"} returns the plotted data with interval columns
+    when requested, and \code{"plot-data"} draws and returns the
+    plotted data. \code{"both"} is accepted as an alias for
+    \code{"plot-data"}. For \code{predict.npcopula}, \code{"vector"}
+    returns fitted copula values, \code{"object"} returns the evaluated
+    \code{"npcopula"} object, and \code{"data"} returns
+    \code{as.data.frame()} on that object.
   }
 
   \item{perspective}{
@@ -365,9 +397,9 @@ surface plots.
 
   The source data, target, evaluation route, grid dimensions, and timing
   metadata are retained as list components. The functions
-  \code{\link{fitted}}, \code{\link{se}}, \code{\link{summary}},
-  \code{\link{as.data.frame}}, and \code{\link{plot}} support
-  \code{"npcopula"} objects.
+  \code{\link{fitted}}, \code{\link{predict}}, \code{\link{se}},
+  \code{\link{summary}}, \code{\link{as.data.frame}}, and
+  \code{\link{plot}} support \code{"npcopula"} objects.
 }
 
 \section{Book And Method Pointers}{
@@ -442,6 +474,9 @@ u_grid <- data.frame(x = seq(0.05, 0.95, length.out = 15),
                      y = seq(0.05, 0.95, length.out = 15))
 custom <- npcopula(bws = fit$bws, data = dat, u = u_grid)
 plot(custom, perspective = FALSE, view = "contour")
+predict(fit, u = u_grid)
+predict(fit, newdata = data.frame(u1 = c(0.25, 0.75),
+                                  u2 = c(0.25, 0.75)))
 
 ## Copula density uses npudensbw internally when target = "density".
 

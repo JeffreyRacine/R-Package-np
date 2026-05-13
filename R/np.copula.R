@@ -398,6 +398,64 @@ fitted.npcopula <- function(object, ...) {
   object$copula
 }
 
+.npcopula_predict_newdata_to_u <- function(object, newdata) {
+  if (is.null(newdata))
+    return(NULL)
+  if (is.vector(newdata) && !is.list(newdata))
+    return(matrix(newdata, nrow = 1L))
+
+  nd <- as.data.frame(newdata)
+  xnames <- object$xnames
+  unames <- paste0("u", seq_along(xnames))
+  if (length(xnames) && all(xnames %in% names(nd)))
+    return(nd[, xnames, drop = FALSE])
+  if (length(unames) && all(unames %in% names(nd))) {
+    out <- nd[, unames, drop = FALSE]
+    names(out) <- xnames
+    return(out)
+  }
+  nd
+}
+
+predict.npcopula <- function(object,
+                             newdata = NULL,
+                             u = NULL,
+                             se.fit = FALSE,
+                             output = c("vector", "object", "data"),
+                             ...) {
+  output <- match.arg(output)
+  dots <- list(...)
+
+  if (is.null(u) && !is.null(newdata)) {
+    u <- .npcopula_predict_newdata_to_u(object, newdata)
+  } else if (!is.null(u)) {
+    u <- .npcopula_predict_newdata_to_u(object, u)
+  }
+
+  if (is.null(u) && !length(dots)) {
+    ev <- object
+  } else {
+    data <- dots$data
+    dots$data <- NULL
+    if (is.null(data))
+      data <- object$data
+    if (is.null(data))
+      stop("npcopula object does not retain the training data needed for prediction; refit with npcopula()")
+    args <- c(list(bws = object$bws, data = data),
+              if (is.null(u)) list() else list(u = u),
+              dots)
+    ev <- do.call(npcopula, args)
+  }
+
+  if (identical(output, "object"))
+    return(ev)
+  if (identical(output, "data"))
+    return(as.data.frame(ev))
+  if (se.fit)
+    return(list(fit = fitted(ev), se.fit = se(ev), df = ev$ntrain))
+  fitted(ev)
+}
+
 se.npcopula <- function(x) {
   x$copulaerr
 }
