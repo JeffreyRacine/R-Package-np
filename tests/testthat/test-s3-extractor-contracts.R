@@ -95,3 +95,15 @@ test_that("extractors fail clearly when optional quantities were not stored", {
   )
   expect_error(se(cdist), "standard errors are unavailable for repaired conditional distributions")
 })
+
+test_that("conmode modal-class extraction uses predict rather than a fake mode method", {
+  ns <- asNamespace(getNamespaceName(environment(npconmode)))
+  s3 <- getNamespaceInfo(ns, "S3methods")
+
+  expect_false(exists("mode.conmode", envir = ns, inherits = FALSE))
+  expect_false(any(s3[, 1L] == "mode" & s3[, 2L] == "conmode"))
+
+  fit <- structure(list(conmode = factor(c("a", "b", "a"))), class = "conmode")
+  expect_equal(predict(fit), fit$conmode)
+  expect_identical(mode(fit), "list")
+})

@@ -91,6 +91,7 @@ S3method(print,smoothcoefficient)
 S3method(print,symtest)
 S3method(print,deneqtest)
 S3method(print,unitest)
+S3method(print,kbandwidth)
 ##
 
 
@@ -205,8 +206,6 @@ S3method(gradients, qregression)
 S3method(gradients, conmode)
 S3method(gradients, singleindex)
 
-S3method(mode, conmode)
-
 S3method(quantile, qregression)
 
 S3method(npudensbw, NULL)
@@ -215,6 +214,7 @@ S3method(npudensbw, default)
 S3method(npudensbw, bandwidth)
 
 S3method(as.double,bandwidth)
+S3method(as.double,kbandwidth)
 
 S3method(npudens, formula)
 S3method(npudens, call)
@@ -296,6 +296,9 @@ S3method(npksum, integer)
 S3method(npksum, numeric)
 S3method(npksum, formula)
 S3method(npksum, default)
+S3method(kbandwidth, integer)
+S3method(kbandwidth, numeric)
+S3method(kbandwidth, default)
 
 S3method(npqreg, formula)
 S3method(npqreg, call)
