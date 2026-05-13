@@ -141,20 +141,60 @@ test_that("npcopula fitted and basic plot methods work", {
   fit <- npcopula(data = faithful, bws = bw, u = u, n.quasi.inv = 40)
 
   expect_equal(fitted(fit), fit$copula)
-  expect_silent(plot(fit))
-  expect_silent(plot(fit, col = NULL))
+  expect_silent(plot(fit, view = "fixed"))
+  expect_silent(plot(fit, view = "fixed", col = NULL))
   expect_silent(plot(fit, col = "lightblue", border = "grey40",
-                     theta = 20, phi = 25, shade = 0.3))
+                     theta = 20, phi = 25, view = "fixed", shade = 0.3))
   expect_silent(plot(fit, view = "image", perspective = FALSE))
   expect_silent(plot(fit, view = "contour", perspective = FALSE))
   expect_true("copula" %in%
                 getFromNamespace(".np_progress_single_line_surfaces", "npRmpi")())
   expect_error(plot(fit, view = "image", renderer = "rgl"),
-               "view='surface'")
+               "surface views")
 
   one.point <- npcopula(data = faithful, bws = bw, u = c(0.5, 0.5), n.quasi.inv = 40)
   expect_equal(nrow(one.point), 1L)
   expect_equal(attr(one.point, "grid.dim"), c(1L, 1L))
+})
+
+test_that("npcopula perspective defaults follow shared surface convention", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  plot.method <- getS3method("plot", "npcopula")
+  form <- formals(plot.method)
+  expect_equal(form$theta, 0.0)
+  expect_equal(form$phi, 20.0)
+  expect_identical(eval(form$view)[1L], "rotate")
+
+  data("faithful")
+  bw <- npudistbw(dat = faithful, bws = c(0.5, 5), bandwidth.compute = FALSE)
+  u <- data.frame(eruptions = seq(0, 1, length.out = 3),
+                  waiting = seq(0, 1, length.out = 3))
+  fit <- npcopula(data = faithful, bws = bw, u = u, n.quasi.inv = 40)
+
+  captured <- new.env(parent = emptyenv())
+  captured$args <- list()
+  pdf(file = tempfile(fileext = ".pdf"))
+  on.exit(dev.off(), add = TRUE)
+  trace(
+    what = "persp",
+    where = asNamespace("graphics"),
+    tracer = bquote({
+      assign("args",
+             as.list(match.call()),
+             envir = .(captured))
+    }),
+    print = FALSE
+  )
+  on.exit(
+    try(untrace("persp", where = asNamespace("graphics")), silent = TRUE),
+    add = TRUE
+  )
+
+  expect_silent(plot(fit, view = "fixed"))
+  expect_equal(eval(captured$args$theta), 0.0)
+  expect_equal(eval(captured$args$phi), 20.0)
+  expect_identical(captured$args$ticktype, "detailed")
 })
 
 test_that("npcopula plot intervals work for grid surfaces", {
