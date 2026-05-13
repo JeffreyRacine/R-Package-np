@@ -174,6 +174,27 @@ test_that("predict supports formula newdata and vector tau for npqreg", {
   expect_named(se.pred, c("fit", "se.fit", "df", "residual.scale"))
   expect_equal(dim(se.pred$fit), c(nrow(nd), 2L))
   expect_equal(dim(se.pred$se.fit), c(nrow(nd), 2L))
+
+  nd.native <- data.frame(x = c(0.15, 0.35))
+  expect_equal(
+    as.numeric(predict(fit, exdat = nd.native, newdata = nd)),
+    as.numeric(predict(fit, newdata = nd.native)),
+    tolerance = 1e-12
+  )
+  expect_error(
+    predict(fit, se.fit = "yes"),
+    "'se.fit' must be TRUE or FALSE",
+    fixed = TRUE
+  )
+  x <- rep(0.1, nrow(nd))
+  expect_error(
+    npqreg(bws = bw, newdata = data.frame(z = x), tau = 0.5),
+    "newdata must contain columns"
+  )
+  expect_error(
+    predict(fit, newdata = data.frame(z = x)),
+    "newdata must contain columns"
+  )
 })
 
 test_that("predict supports conmode formula newdata without changing extraction behavior", {
@@ -222,6 +243,15 @@ test_that("predict supports conmode formula newdata without changing extraction 
   expect_error(
     predict(fit, newdata = nd, type = "prob", probabilities = FALSE),
     "requires probabilities=TRUE"
+  )
+  x <- rep(0.1, nrow(nd))
+  expect_error(
+    npconmode(bws = bw, newdata = data.frame(wrong = x)),
+    "newdata must contain columns"
+  )
+  expect_error(
+    predict(fit, newdata = data.frame(wrong = x)),
+    "newdata must contain columns"
   )
 })
 

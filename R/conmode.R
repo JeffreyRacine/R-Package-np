@@ -167,7 +167,13 @@ fitted.conmode <- function(object, ...) {
   xnames <- object$xnames
   ynames <- object$ynames
 
-  if (!is.null(xnames) && length(xnames) && all(xnames %in% names(nd))) {
+  if (!is.null(xnames) && length(xnames)) {
+    missing.names <- setdiff(xnames, names(nd))
+    if (length(missing.names))
+      stop(sprintf(
+        "newdata must contain columns: %s",
+        paste(shQuote(xnames), collapse = ", ")
+      ), call. = FALSE)
     dots$exdat <- nd[, xnames, drop = FALSE]
     if (!is.null(ynames) && length(ynames) && all(ynames %in% names(nd)))
       dots$eydat <- nd[, ynames, drop = FALSE]
@@ -218,6 +224,7 @@ predict.conmode <- function(object,
   probs
 }
 gradients.conmode <- function(x, level = NULL, errors = FALSE, ...) {
+  errors <- npValidateScalarLogical(errors, "errors")
   if (isTRUE(errors))
     stop("gradient standard errors are not available for conmode objects")
   gout <- x$probability.gradients

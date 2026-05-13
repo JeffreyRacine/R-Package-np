@@ -20,6 +20,17 @@ npconmode <-
     }
   }
 
+.npConmodeValidateNewdataTerms <- function(newdata, xnames) {
+  nd <- toFrame(newdata)
+  missing.names <- setdiff(xnames, names(nd))
+  if (length(missing.names))
+    stop(sprintf(
+      "newdata must contain columns: %s",
+      paste(shQuote(xnames), collapse = ", ")
+    ), call. = FALSE)
+  invisible(TRUE)
+}
+
 npconmode.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
@@ -37,6 +48,7 @@ npconmode.formula <-
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
+      .npConmodeValidateNewdataTerms(newdata, bws$variableNames[["terms"]])
       has.ey <- bws$variableNames[["response"]] %in% names(newdata)
 
       if (has.ey){
