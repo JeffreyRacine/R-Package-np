@@ -6,6 +6,8 @@
 \alias{print.npcopula}
 \alias{summary.npcopula}
 \alias{fitted.npcopula}
+\alias{se.npcopula}
+\alias{as.data.frame.npcopula}
 \title{Kernel Copula Estimation with Mixed Data Types}
 
 \description{
@@ -328,8 +330,8 @@ surface plots.
 }
 
 \value{
-  \code{npcopula} returns an object of class \code{"npcopula"} and
-  \code{\link{data.frame}}. The main columns are:
+  \code{npcopula} returns an object of class \code{"npcopula"}. The main
+  components are:
 
   \item{copula}{
     estimated copula distribution value or copula density value.
@@ -345,11 +347,27 @@ surface plots.
     probability grid when grid evaluation is used.
   }
 
-  The selected bandwidth object, source data, target, evaluation route,
-  grid dimensions, and timing metadata are retained as attributes. Use
-  \code{attr(object, "bws")} to retrieve the selected bandwidth object.
-  The functions \code{\link{fitted}}, \code{\link{summary}}, and
-  \code{\link{plot}} support \code{"npcopula"} objects.
+  \item{bws}{
+    selected unconditional distribution or density bandwidth object.
+  }
+
+  \item{eval}{
+    data frame containing the copula values, probability coordinates, and
+    quasi-inverse coordinates. \code{as.data.frame(object)} returns this
+    component for data-frame workflows.
+  }
+
+  \item{copulaerr}{
+    asymptotic or bootstrap standard-error slot. The fitted object stores
+    \code{NA} unless an interval-producing plotting route constructs
+    evaluation-specific intervals.
+  }
+
+  The source data, target, evaluation route, grid dimensions, and timing
+  metadata are retained as list components. The functions
+  \code{\link{fitted}}, \code{\link{se}}, \code{\link{summary}},
+  \code{\link{as.data.frame}}, and \code{\link{plot}} support
+  \code{"npcopula"} objects.
 }
 
 \section{Book And Method Pointers}{
@@ -424,7 +442,7 @@ plot(fit, errors = "bootstrap", bootstrap = "inid", B = 399,
 
 u_grid <- data.frame(x = seq(0.05, 0.95, length.out = 15),
                      y = seq(0.05, 0.95, length.out = 15))
-custom <- npcopula(bws = attr(fit, "bws"), data = dat, u = u_grid)
+custom <- npcopula(bws = fit$bws, data = dat, u = u_grid)
 plot(custom, perspective = FALSE, view = "contour")
 
 ## Copula density uses npudensbw internally when target = "density".
