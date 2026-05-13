@@ -119,7 +119,12 @@ test_that("npcopula fitted and basic plot methods work", {
 
   expect_equal(fitted(fit), fit$copula)
   expect_silent(plot(fit))
+  expect_silent(plot(fit, col = NULL))
+  expect_silent(plot(fit, view = "image", perspective = FALSE))
   expect_silent(plot(fit, view = "contour", perspective = FALSE))
+  expect_true("copula" %in% .np_progress_single_line_surfaces())
+  expect_error(plot(fit, view = "image", renderer = "rgl"),
+               "view='surface'")
 
   one.point <- npcopula(data = faithful, bws = bw, u = c(0.5, 0.5), n.quasi.inv = 40)
   expect_equal(nrow(one.point), 1L)

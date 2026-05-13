@@ -193,7 +193,8 @@
 }
 
 .np_progress_single_line_surfaces <- function() {
-  c("bandwidth", "plot_activity", "plot_bounded", "bootstrap", "lag", "iv_solve")
+  c("bandwidth", "plot_activity", "plot_bounded", "bootstrap", "lag", "iv_solve",
+    "copula")
 }
 
 .np_progress_renderer_for_surface <- function(surface, capability) {
