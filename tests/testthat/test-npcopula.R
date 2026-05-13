@@ -158,6 +158,8 @@ test_that("predict.npcopula evaluates stored bandwidths on probability grids", {
   pred.se <- predict(fit, se.fit = TRUE)
   expect_equal(pred.se$fit, fitted(fit))
   expect_equal(pred.se$se.fit, se(fit))
+  expect_error(predict(fit, se.fit = "yes"),
+               "'se.fit' must be TRUE or FALSE", fixed = TRUE)
 })
 
 test_that("npcopula fitted and basic plot methods work", {

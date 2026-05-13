@@ -464,6 +464,7 @@ predict.npcopula <- function(object,
                              se.fit = FALSE,
                              output = c("vector", "object", "data"),
                              ...) {
+  se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   output <- match.arg(output)
   dots <- list(...)
 
