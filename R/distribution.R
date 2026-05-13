@@ -65,10 +65,13 @@ fitted.npdistribution <- function(object, ...){
 se.npdistribution <- function(x){ x$derr }
 
 predict.npdistribution <- function(object, se.fit = FALSE, ...) {
+  se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
 
-  if (!has.formula.route && is.null(dots$edat) && !is.null(dots$newdata)) {
+  if (!is.null(dots$edat) && !is.null(dots$newdata)) {
+    dots$newdata <- NULL
+  } else if (!has.formula.route && is.null(dots$edat) && !is.null(dots$newdata)) {
     dots$edat <- dots$newdata
     dots$newdata <- NULL
   }

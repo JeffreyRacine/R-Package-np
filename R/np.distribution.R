@@ -37,6 +37,7 @@ npudist.formula <-
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
+      npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
       umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
       emf <- umf

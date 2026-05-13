@@ -37,6 +37,7 @@ npcdens.formula <-
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
+      npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
       umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
       emf <- umf
@@ -494,7 +495,8 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   if (.npRmpi_autodispatch_active() &&
       !isTRUE(nomad) &&
       !keep_local_shadow_nn &&
-      !keep_local_raw_degree1_cvls)
+      !keep_local_raw_degree1_cvls &&
+      !bws.formula)
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   ## autodispatch normalizes calls via match.call(), which can turn an
@@ -531,6 +533,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
+  sc.bw$newdata <- NULL
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,
