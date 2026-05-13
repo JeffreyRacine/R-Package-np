@@ -269,6 +269,14 @@ test_that("predict supports conmode native evaluation and native precedence", {
     tolerance = 1e-12
   )
   expect_equal(
+    as.character(predict(fit, newdata = nd, exdat = NULL)),
+    as.character(predict(fit, newdata = nd))
+  )
+  expect_error(
+    predict(fit, eydat = data.frame(y = ydat[1:5])),
+    "eydat.*exdat"
+  )
+  expect_equal(
     as.character(predict(fit, newdata = nd, exdat = nd.native)),
     as.character(predict(fit, exdat = nd.native))
   )

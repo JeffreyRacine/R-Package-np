@@ -270,7 +270,7 @@ Further arguments are passed to the regression estimator or bandwidth interpreta
 
 \value{
 
-  \code{npqreg} returns a \code{npqregression} object.  The generic
+  \code{npqreg} returns a \code{qregression} object.  The generic
   functions \code{\link{fitted}} (or \code{\link{quantile}}),
   \code{\link{se}}, \code{\link{predict}}, and \code{\link{gradients}}
   extract (or generate) estimated values, asymptotic standard errors on

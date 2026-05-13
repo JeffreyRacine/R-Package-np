@@ -156,7 +156,7 @@ fitted.conmode <- function(object, ...) {
 }
 
 .npConmodePredictHasNativeEvalArgs <- function(dots) {
-  any(c("exdat", "eydat") %in% names(dots))
+  "exdat" %in% names(dots) && !is.null(dots$exdat)
 }
 
 .npConmodePredictSetNewdata <- function(dots, object, newdata) {
@@ -175,7 +175,8 @@ fitted.conmode <- function(object, ...) {
         paste(shQuote(xnames), collapse = ", ")
       ), call. = FALSE)
     dots$exdat <- nd[, xnames, drop = FALSE]
-    if (!is.null(ynames) && length(ynames) && all(ynames %in% names(nd)))
+    if (is.null(dots$eydat) &&
+        !is.null(ynames) && length(ynames) && all(ynames %in% names(nd)))
       dots$eydat <- nd[, ynames, drop = FALSE]
   } else {
     dots$exdat <- nd
@@ -191,6 +192,10 @@ predict.conmode <- function(object,
   type <- match.arg(type)
   dots <- list(...)
   has.native.eval <- .npConmodePredictHasNativeEvalArgs(dots)
+  has.native.ey <- "eydat" %in% names(dots) && !is.null(dots$eydat)
+  if (isTRUE(has.native.ey) && !isTRUE(has.native.eval) && is.null(newdata))
+    stop("predict.conmode: 'eydat' requires 'exdat' for native evaluation",
+         call. = FALSE)
   has.eval <- !is.null(newdata) || has.native.eval
 
   if (!has.eval) {

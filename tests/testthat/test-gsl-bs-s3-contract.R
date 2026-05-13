@@ -84,6 +84,33 @@ test_that("np gsl.bs uses package-specific first class with compatibility superc
   expect_true(is.function(getS3method("predict", "np_gsl.bs")))
 })
 
+test_that("np gsl.bs rejects malformed derivative and knot inputs before native evaluation", {
+  x <- c(-1, -0.5, 0, 0.5, 1)
+
+  expect_error(gsl_bs_np(x, deriv = NA_integer_), "deriv")
+  expect_error(gsl_bs_np(x, deriv = -1L), "deriv")
+  expect_error(gsl_bs_np(x, deriv = 1.5), "deriv")
+  expect_error(gsl_bs_np(x, nbreak = NA_integer_), "nbreak")
+  expect_error(gsl_bs_np(x, nbreak = 1.5), "nbreak")
+  expect_error(gsl_bs_np(x, knots = NA_real_), "knots")
+  expect_error(gsl_bs_np(x, knots = 0.5), "knots")
+
+  bs_des_np <- getFromNamespace("bs.des", "np")
+  expect_error(
+    bs_des_np(x, degree = 3, nbreak = 4, deriv = c(0L, 1L)),
+    "length equal to x"
+  )
+  expect_error(
+    bs_des_np(x, degree = 3, nbreak = 4,
+              deriv = c(0L, 1L, NA_integer_, 0L, 1L)),
+    "deriv"
+  )
+  expect_error(
+    bs_des_np(x, degree = 3, nbreak = 4, deriv = rep(5L, length(x))),
+    "degree plus 2"
+  )
+})
+
 test_that("np gsl.bs predict dispatch matches legacy wrapper across supported newx forms", {
   method <- getS3method("predict", "np_gsl.bs")
 

@@ -275,10 +275,10 @@ This argument controls the recommended automatic local-polynomial NOMAD route, w
     search metadata mirrored from \code{bws} when automatic degree search or
     NOMAD/Powell refinement was used }
 
-  The functions \code{\link{mode}}, and \code{\link{fitted}} may be used to
-  extract the conditional mode estimates, and the conditional density
-  estimates at the conditional mode, respectively,
-  from the resulting object. The function \code{\link{gradients}} extracts
+  The function \code{\link{predict}} may be used to extract conditional mode
+  class predictions, while \code{\link{fitted}} extracts the conditional
+  density estimates at the conditional mode from the resulting object. The
+  function \code{\link{gradients}} extracts
   class-probability gradients/effects when \code{gradients=TRUE}. Also,
   \code{\link{summary}} and \code{\link{plot}} support \code{conmode}
   objects. For \code{plot.conmode}, first fit with

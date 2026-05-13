@@ -13,10 +13,26 @@ gsl.bs.default <- function(x,
   x <- as.vector(x)
   ## Some error checking
 
+  if (length(degree) != 1L || is.na(degree) || !is.finite(degree) ||
+      degree != floor(degree))
+    stop(" degree must be a positive integer")
+  if (length(deriv) != 1L || is.na(deriv) || !is.finite(deriv) ||
+      deriv != floor(deriv))
+    stop(" deriv must be a non-negative integer")
+  if (length(nbreak) != 1L || is.na(nbreak) || !is.finite(nbreak) ||
+      nbreak != floor(nbreak))
+    stop(" nbreak must be an integer at least 2")
   if(degree <= 0) stop(" degree must be a positive integer")
   if(deriv < 0) stop(" deriv must be a non-negative integer")
   if(deriv > degree +1 ) stop(" deriv must be smaller than degree plus 2") 
   if(nbreak <= 1) stop(" nbreak must be at least 2")
+
+  if(!is.null(knots)) {
+    if (length(knots) < 2L)
+      stop(" knots must contain at least two values")
+    if (anyNA(knots) || any(!is.finite(knots)))
+      stop(" knots must contain finite non-missing values")
+  }
 
 #  if(!is.null(knots)) nbreak <- length(knots)
   if(!is.null(knots)&&length(knots)!=nbreak) {
@@ -125,6 +141,20 @@ bs.des     <- function(x,
 		x <- as.vector(x)
 		n <- length(x)
 		deriv <- as.vector(deriv)
+    if (length(deriv) != n)
+      stop(" deriv must have length equal to x")
+    if (anyNA(deriv) || any(!is.finite(deriv)) || any(deriv != floor(deriv)))
+      stop(" deriv must contain finite non-missing integers")
+    if (any(deriv < 0))
+      stop(" deriv must be non-negative")
+    if (any(deriv > degree + 1))
+      stop(" deriv must be smaller than degree plus 2")
+    if(!is.null(knots)) {
+      if (length(knots) != nbreak)
+        stop(" knots length must match nbreak")
+      if (anyNA(knots) || any(!is.finite(knots)))
+        stop(" knots must contain finite non-missing values")
+    }
 
 		if(!is.null(x.min) && !is.null(x.max)) if(x.min >= x.max) stop(" x.min must be less than x.max")
 		if(is.null(x.min)) x.min <- min(x)

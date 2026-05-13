@@ -165,6 +165,13 @@ SEXP C_gsl_bspline(SEXP x,
   x_min_d = asReal(x_min);
   x_max_d = asReal(x_max);
 
+  if (degree_i == NA_INTEGER || degree_i < 0)
+    error("C_gsl_bspline: degree must be a non-negative integer");
+  if (nbreak_i == NA_INTEGER || nbreak_i < 2)
+    error("C_gsl_bspline: nbreak must be at least 2");
+  if (knots_int_i != 0 && XLENGTH(knots_r) < nbreak_i)
+    error("C_gsl_bspline: knots length must be at least nbreak");
+
   ncol = nbreak_i + degree_i - 1;
   PROTECT(bx = allocMatrix(REALSXP, n, ncol));
 
@@ -215,15 +222,26 @@ SEXP C_gsl_bspline_deriv(SEXP x,
   x_min_d = asReal(x_min);
   x_max_d = asReal(x_max);
 
+  if (degree_i == NA_INTEGER || degree_i < 0)
+    error("C_gsl_bspline_deriv: degree must be a non-negative integer");
+  if (nbreak_i == NA_INTEGER || nbreak_i < 2)
+    error("C_gsl_bspline_deriv: nbreak must be at least 2");
+  if (knots_int_i != 0 && XLENGTH(knots_r) < nbreak_i)
+    error("C_gsl_bspline_deriv: knots length must be at least nbreak");
   if ((int)XLENGTH(deriv_i) != n)
     error("C_gsl_bspline_deriv: deriv length must match x length");
 
   order_max = 0;
   if (n > 0) {
     int i;
-    for (i = 0; i < n; i++)
+    for (i = 0; i < n; i++) {
+      if (INTEGER(deriv_i)[i] == NA_INTEGER ||
+          INTEGER(deriv_i)[i] < 0 ||
+          INTEGER(deriv_i)[i] > degree_i + 1)
+        error("C_gsl_bspline_deriv: deriv entries must be integers in [0, degree + 1]");
       if (INTEGER(deriv_i)[i] > order_max)
         order_max = INTEGER(deriv_i)[i];
+    }
   }
 
   ncol = nbreak_i + degree_i - 1;

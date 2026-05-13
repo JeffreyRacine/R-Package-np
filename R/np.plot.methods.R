@@ -935,20 +935,6 @@ np_render_control <- function(style = c("band", "bar"),
     )
   }
 
-  if (isTRUE(length(plot.data) > 1L)) {
-    legend.args <- .np_plot_legend_args(
-      list(x = "topright",
-           legend = names(plot.data),
-           lty = 1L,
-           col = seq_along(plot.data),
-           bty = "n"),
-      legend = legend,
-      context = "legend"
-    )
-    if (!is.null(legend.args) && length(plot.data) == 1L)
-      do.call(graphics::legend, legend.args)
-  }
-
   if (identical(output, "plot-data"))
     return(plot.data)
   invisible(object)
