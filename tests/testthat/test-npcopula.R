@@ -132,6 +132,39 @@ test_that("npcopula target conflicts with explicit bandwidth object fail clearly
   )
 })
 
+test_that("npcopula validates probability-grid and quasi-inverse controls", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  data("faithful")
+  bw <- npudistbw(dat = faithful, bws = c(0.5, 5), bandwidth.compute = FALSE)
+
+  expect_error(
+    npcopula(data = faithful, bws = bw,
+             u = data.frame(eruptions = "a", waiting = "b")),
+    "numeric probability"
+  )
+  expect_error(
+    npcopula(data = faithful, bws = bw, u = c(0.5, 0.5),
+             n.quasi.inv = 2.5),
+    "integer greater than one"
+  )
+  expect_error(
+    npcopula(data = faithful, bws = bw, u = c(0.5, 0.5),
+             n.quasi.inv = NA),
+    "integer greater than one"
+  )
+  expect_error(
+    npcopula(data = faithful, bws = bw, u = c(0.5, 0.5),
+             er.quasi.inv = -1),
+    "non-negative finite"
+  )
+  expect_error(
+    npcopula(data = faithful, bws = bw, u = c(0.5, 0.5),
+             er.quasi.inv = NA),
+    "non-negative finite"
+  )
+})
+
 test_that("predict.npcopula evaluates stored bandwidths on probability grids", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 

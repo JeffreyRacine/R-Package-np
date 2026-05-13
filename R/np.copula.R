@@ -24,6 +24,47 @@ npcopula <- function(bws, ...) {
   as.integer(neval)
 }
 
+.npcopula_validate_n_quasi_inv <- function(n.quasi.inv) {
+  if (!is.numeric(n.quasi.inv) || length(n.quasi.inv) != 1L ||
+      is.na(n.quasi.inv) || !is.finite(n.quasi.inv) ||
+      n.quasi.inv != floor(n.quasi.inv) || n.quasi.inv < 2L)
+    stop("'n.quasi.inv' must be an integer greater than one")
+  as.integer(n.quasi.inv)
+}
+
+.npcopula_validate_er_quasi_inv <- function(er.quasi.inv) {
+  if (!is.numeric(er.quasi.inv) || length(er.quasi.inv) != 1L ||
+      is.na(er.quasi.inv) || !is.finite(er.quasi.inv) ||
+      er.quasi.inv < 0)
+    stop("'er.quasi.inv' must be a non-negative finite numeric scalar")
+  er.quasi.inv
+}
+
+.npcopula_validate_u <- function(u, num.var) {
+  if (is.null(u))
+    return(NULL)
+  if (is.vector(u) && !is.list(u))
+    u <- matrix(u, 1L, length(u))
+  if (is.data.frame(u)) {
+    if (!all(vapply(u, is.numeric, logical(1L))))
+      stop("'u' must contain numeric probability values")
+  } else if (!is.matrix(u)) {
+    stop("'u' must be a numeric vector, matrix, or data frame")
+  } else if (!is.numeric(u)) {
+    stop("'u' must contain numeric probability values")
+  }
+  if (ncol(u) != num.var)
+    stop("u and bws are incompatible")
+  u.check <- as.matrix(u)
+  if (anyNA(u.check))
+    stop("u must not contain missing values")
+  if (any(!is.finite(u.check)))
+    stop("u must contain finite probability values")
+  if (any(u.check > 1 | u.check < 0))
+    stop("u must lie in [0,1]")
+  u
+}
+
 .npcopula_make_auto_u <- function(xnames, neval) {
   out <- as.data.frame(
     replicate(length(xnames), seq(0, 1, length.out = neval), simplify = FALSE)
@@ -986,14 +1027,10 @@ npcopula.default <- function(bws,
   # Dispatching the full routine can deadlock because it nests many estimator
   # calls; those inner calls are already MPI-aware and dispatch independently.
   density <- identical(target, "density")
-  if(!is.null(u)) {
-    if(is.vector(u) && !is.list(u)) u <- matrix(u,1,length(u))
-    if(anyNA(u)) stop("u must not contain missing values")
-    if(any(u>1 | u<0, na.rm = TRUE)) stop("u must lie in [0,1]")
-  }
   num.var <- length(bws$xnames)
-  if(!is.null(u) && (ncol(u)!=num.var)) stop("u and bws are incompatible")
-  if(n.quasi.inv < 1) stop("n.quasi.inv must be a positive integer")
+  u <- .npcopula_validate_u(u, num.var)
+  n.quasi.inv <- .npcopula_validate_n_quasi_inv(n.quasi.inv)
+  er.quasi.inv <- .npcopula_validate_er_quasi_inv(er.quasi.inv)
   if(any(is.na(data))) stop("NA values present in data - recompute bw object with na.omit on data")
   if(bws$nuno>0) stop("unordered factors not suitable for copula estimation")
 
@@ -1004,10 +1041,6 @@ npcopula.default <- function(bws,
   bw.ckertype <- bws$ckertype
   bw.okertype <- bws$okertype
   bw.ukertype <- bws$ukertype
-
-  if(!is.null(u)) {
-    if(ncol(u) != num.var) stop(paste("matrix u must have ", num.var," columns",sep=""))
-  }
 
   progress.total <- .npcopula_progress_total(density = density,
                                              u.provided = u.provided,
