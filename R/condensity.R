@@ -105,6 +105,7 @@ se.condensity <- function(x){
   x$conderr
 }
 gradients.condensity <- function(x, errors = FALSE, ...) {
+  errors <- npValidateScalarLogical(errors, "errors")
   gout <- if (!errors) x$congrad else x$congerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
     stop(if (!errors)
@@ -115,9 +116,13 @@ gradients.condensity <- function(x, errors = FALSE, ...) {
 }
 
 predict.condensity <- function(object, se.fit = FALSE, ...) {
+  se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
   proper_arg <- dots[["proper", exact = TRUE]]
+
+  if ((!is.null(dots$exdat) || !is.null(dots$eydat)) && !is.null(dots$newdata))
+    dots$newdata <- NULL
 
   if (!has.formula.route &&
       is.null(dots$exdat) &&

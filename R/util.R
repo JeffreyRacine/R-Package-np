@@ -247,6 +247,27 @@ npValidateScalarLogical <- function(value, argname) {
   value
 }
 
+npValidateNewdataColumns <- function(newdata, required, argname = "newdata") {
+  nd <- toFrame(newdata)
+  required <- unique(as.character(required))
+  required <- required[nzchar(required)]
+  missing.names <- setdiff(required, names(nd))
+  if (length(missing.names) > 0L) {
+    stop(sprintf("%s must contain columns: %s",
+                 argname, paste(shQuote(required), collapse = ", ")),
+         call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+npValidateNewdataFormula <- function(newdata, formula, include.response = TRUE,
+                                     argname = "newdata") {
+  tt <- terms(formula)
+  if (!isTRUE(include.response))
+    tt <- delete.response(tt)
+  npValidateNewdataColumns(newdata, all.vars(tt), argname = argname)
+}
+
 .np_prepare_nomad_shortcut <- function(nomad,
                                        call_names,
                                        preset,

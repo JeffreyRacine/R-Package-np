@@ -50,6 +50,7 @@ npreg.formula <-
     has.eval <- !is.null(newdata)
     if (has.eval) {
       if (!y.eval){
+        npValidateNewdataFormula(newdata, tt, include.response = FALSE)
         tt <- delete.response(tt)
 
         orig.ts <- .np_terms_ts_mask(terms_obj = tt, data = newdata)
@@ -72,6 +73,8 @@ npreg.formula <-
         }
       }
       
+      if (y.eval)
+        npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
       umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
       emf <- umf

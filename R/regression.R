@@ -86,6 +86,7 @@ residuals.npregression <- function(object, ...) {
 }
 se.npregression <- function(x) { x$merr }
 gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...) {
+  errors <- npValidateScalarLogical(errors, "errors")
   gout <- if (!errors) x$grad else x$gerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
     stop(if (!errors)
@@ -117,10 +118,13 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
   gout.masked
 }
 predict.npregression <- function(object, se.fit = FALSE, ...) {
+  se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
 
-  if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
+  if (!is.null(dots$exdat) && !is.null(dots$newdata)) {
+    dots$newdata <- NULL
+  } else if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
     dots$exdat <- dots$newdata
     dots$newdata <- NULL
   }
