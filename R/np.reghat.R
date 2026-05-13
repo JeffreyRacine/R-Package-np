@@ -20,6 +20,28 @@ npreghat <-
     }
   }
 
+.np_hat_constraint_from_matrix <- function(H, y, where) {
+  if (is.null(y))
+    stop(sprintf("argument 'y' is required when output='constraint' in %s", where),
+         call. = FALSE)
+
+  if (is.factor(y) || is.vector(y)) {
+    y <- matrix(as.double(y), ncol = 1L)
+  } else {
+    y <- as.matrix(y)
+  }
+
+  if (ncol(y) != 1L)
+    stop(sprintf("output='constraint' currently requires vector or one-column 'y' in %s", where),
+         call. = FALSE)
+
+  if (nrow(y) != ncol(H))
+    stop(sprintf("length of 'y' must match the number of training columns in %s", where),
+         call. = FALSE)
+
+  t(H) * as.vector(y)
+}
+
 .npreghat_resolve_s <- function(s, deriv, ncon, con.names) {
   if (ncon == 0L)
     return(integer(0))
@@ -1079,7 +1101,7 @@ npreghat.rbandwidth <-
            txdat = stop("training data 'txdat' missing"),
            exdat,
            y = NULL,
-           output = c("matrix", "apply"),
+           output = c("matrix", "apply", "constraint"),
            basis = NULL,
            bernstein.basis = NULL,
            degree = NULL,
@@ -1213,6 +1235,8 @@ npreghat.rbandwidth <-
     }
 
     output <- match.arg(output)
+    constraint.output <- identical(output, "constraint")
+    matrix.output <- identical(output, "matrix") || constraint.output
     dots <- list(...)
     npRejectLegacyLpArgs(names(dots), where = "npreghat")
 
@@ -1425,6 +1449,9 @@ npreghat.rbandwidth <-
         return(out)
       }
 
+      if (constraint.output)
+        return(.np_hat_constraint_from_matrix(H, y, "npreghat"))
+
       class(H) <- c("npreghat", "matrix")
       attr(H, "bws") <- bws
       attr(H, "txdat") <- txdat
@@ -1514,7 +1541,7 @@ npreghat.rbandwidth <-
 
     ridge.used <- rep.int(0.0, neval)
 
-    if (identical(output, "matrix")) {
+    if (matrix.output) {
       H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
     } else {
       if (is.null(y))
@@ -1536,7 +1563,7 @@ npreghat.rbandwidth <-
       ridge.used[i] <- solve.out$ridge
       h.row <- kw[, i] * drop(W %*% solve.out$v)
 
-      if (identical(output, "matrix")) {
+      if (matrix.output) {
         H[i, ] <- h.row
       } else {
         out[i, ] <- drop(crossprod(h.row, y))
@@ -1548,6 +1575,9 @@ npreghat.rbandwidth <-
         return(as.vector(out))
       return(out)
     }
+
+    if (constraint.output)
+      return(.np_hat_constraint_from_matrix(H, y, "npreghat"))
 
     class(H) <- c("npreghat", "matrix")
     attr(H, "bws") <- bws
@@ -1585,7 +1615,7 @@ predict.npreghat <-
   function(object,
            newdata = NULL,
            y = NULL,
-           output = c("matrix", "apply"),
+           output = c("matrix", "apply", "constraint"),
            s = attr(object, "s"),
            leave.one.out = attr(object, "leave.one.out"),
            deriv = NULL,

@@ -60,6 +60,17 @@ test_that("npscoefhat reproduces npscoef fitted values and supports matrix RHS",
 
   expect_equal(as.vector(H.train %*% y), as.vector(fit.train$mean), tolerance = 1e-8)
   expect_equal(as.vector(H.eval %*% y), as.vector(fit.eval$mean), tolerance = 1e-8)
+  A.eval <- npscoefhat(
+    bws = bw,
+    txdat = tx,
+    tzdat = tz,
+    exdat = ex,
+    ezdat = ez,
+    y = y,
+    output = "constraint",
+    iterate = FALSE
+  )
+  expect_equal(A.eval, t(H.eval) * y, tolerance = 1e-14, ignore_attr = TRUE)
 
   ystar <- cbind(y, y + 0.1)
   hy <- npscoefhat(
@@ -184,6 +195,16 @@ test_that("npplreghat reproduces npplreg fitted values and supports matrix RHS",
 
   expect_equal(as.vector(H.train %*% y), as.vector(fit.train$mean), tolerance = 1e-8)
   expect_equal(as.vector(H.eval %*% y), as.vector(fit.eval$mean), tolerance = 1e-8)
+  A.eval <- npplreghat(
+    bws = bw,
+    txdat = tx,
+    tzdat = tz,
+    exdat = ex,
+    ezdat = ez,
+    y = y,
+    output = "constraint"
+  )
+  expect_equal(A.eval, t(H.eval) * y, tolerance = 1e-14, ignore_attr = TRUE)
 
   ystar <- cbind(y, y + 0.05)
   hy <- npplreghat(
@@ -629,6 +650,24 @@ test_that("npindexhat reproduces npindex fit and approximates gradient", {
 
   expect_equal(as.vector(H0 %*% y), as.vector(fit.mean$mean), tolerance = 1e-8)
   expect_equal(as.vector(H1 %*% y), as.vector(fit.grad$grad[, 1]), tolerance = 5e-3)
+  A0 <- npindexhat(
+    bws = bw,
+    txdat = tx,
+    exdat = tx,
+    y = y,
+    s = 0L,
+    output = "constraint"
+  )
+  A1 <- npindexhat(
+    bws = bw,
+    txdat = tx,
+    exdat = tx,
+    y = y,
+    s = 1L,
+    output = "constraint"
+  )
+  expect_equal(A0, t(H0) * y, tolerance = 1e-14, ignore_attr = TRUE)
+  expect_equal(A1, t(H1) * y, tolerance = 1e-14, ignore_attr = TRUE)
 
   ystar <- cbind(y, y - 0.05)
   hy <- npindexhat(

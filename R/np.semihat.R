@@ -935,14 +935,18 @@ npindexhat <-
            txdat = stop("training data 'txdat' missing"),
            exdat = txdat,
            y = NULL,
-           output = c("matrix", "apply"),
+           output = c("matrix", "apply", "constraint"),
            s = 0L,
            fd.step = NULL,
            ...){
 
     .np_reject_unused_dots(list(...), "npindexhat")
     output <- match.arg(output)
+    constraint.output <- identical(output, "constraint")
+    operator.output <- if (constraint.output) "matrix" else output
     .np_semihat_require_class(bws, "sibandwidth", "npindexhat")
+    if (is.null(y) && constraint.output)
+      stop("argument 'y' is required when output='constraint'")
     s <- as.integer(s)
     if (length(s) != 1L || is.na(s) || !(s %in% c(0L, 1L)))
       stop("argument 's' must be 0 (fit) or 1 (index derivative)")
@@ -971,45 +975,57 @@ npindexhat <-
     spec <- .npindex_resolve_spec(bws, where = "npindexhat")
 
     if (identical(spec$regtype.engine, "lc")) {
-      return(.np_indexhat_exact(
+      H <- .np_indexhat_exact(
         bws = bws,
         idx.train = idx.train,
         idx.eval = idx.eval,
         y = y,
-        output = output,
+        output = operator.output,
         s = s
-      ))
+      )
+      if (constraint.output)
+        return(.np_hat_constraint_from_matrix(H, y, "npindexhat"))
+      return(H)
     }
     if (s == 1L) {
-      return(.np_indexhat_exact(
+      H <- .np_indexhat_exact(
         bws = bws,
         idx.train = idx.train,
         idx.eval = idx.eval,
         y = y,
-        output = output,
+        output = operator.output,
         s = s
-      ))
+      )
+      if (constraint.output)
+        return(.np_hat_constraint_from_matrix(H, y, "npindexhat"))
+      return(H)
     }
     if (!identical(bws$type, "fixed")) {
-      return(.np_indexhat_exact(
+      H <- .np_indexhat_exact(
         bws = bws,
         idx.train = idx.train,
         idx.eval = idx.eval,
         y = y,
-        output = output,
+        output = operator.output,
         s = s
-      ))
+      )
+      if (constraint.output)
+        return(.np_hat_constraint_from_matrix(H, y, "npindexhat"))
+      return(H)
     }
 
     if (s == 0L) {
-      return(.np_indexhat_core(
+      H <- .np_indexhat_core(
         bws = bws,
         idx.train = idx.train,
         idx.eval = idx.eval,
         y = y,
-        output = output,
+        output = operator.output,
         ridge = 0.0
-      ))
+      )
+      if (constraint.output)
+        return(.np_hat_constraint_from_matrix(H, y, "npindexhat"))
+      return(H)
     }
 
     step <- if (is.null(fd.step)) {
@@ -1025,7 +1041,7 @@ npindexhat <-
     if (is.na(step) || !is.finite(step) || step <= 0)
       stop("argument 'fd.step' must be a positive finite scalar")
 
-    if (identical(output, "matrix")) {
+    if (identical(operator.output, "matrix")) {
       H.plus <- .np_indexhat_core(
         bws = bws,
         idx.train = idx.train,
@@ -1040,7 +1056,10 @@ npindexhat <-
         output = "matrix",
         ridge = 0.0
       )
-      return((H.plus - H.minus) / (2.0 * step))
+      H <- (H.plus - H.minus) / (2.0 * step)
+      if (constraint.output)
+        return(.np_hat_constraint_from_matrix(H, y, "npindexhat"))
+      return(H)
     }
 
     if (is.null(y))
@@ -1199,11 +1218,13 @@ npplreghat <-
            exdat = txdat,
            ezdat = tzdat,
            y = NULL,
-           output = c("apply", "matrix"),
+           output = c("apply", "matrix", "constraint"),
            ...){
 
     .np_reject_unused_dots(list(...), "npplreghat")
     output <- match.arg(output)
+    constraint.output <- identical(output, "constraint")
+    matrix.output <- identical(output, "matrix") || constraint.output
     .np_semihat_require_class(bws, "plbandwidth", "npplreghat")
     txdat <- toFrame(txdat)
     tzdat <- toFrame(tzdat)
@@ -1226,6 +1247,8 @@ npplreghat <-
 
     if (is.null(y) && identical(output, "apply"))
       stop("argument 'y' is required when output='apply'")
+    if (is.null(y) && constraint.output)
+      stop("argument 'y' is required when output='constraint'")
 
     x.train.num <- matrix(0.0, nrow = nrow(txdat), ncol = ncol(txdat))
     x.eval.num <- matrix(0.0, nrow = nrow(exdat), ncol = ncol(txdat))
@@ -1251,7 +1274,7 @@ npplreghat <-
     resx.train <- matrix(0.0, nrow = n, ncol = p)
     resx.eval <- matrix(0.0, nrow = m, ncol = p)
 
-    if (identical(output, "matrix")) {
+    if (matrix.output) {
       H.y.eval <- npreghat(
         bws = bws$bw$yzbw,
         txdat = tzdat,
@@ -1289,6 +1312,8 @@ npplreghat <-
       A <- qr.coef(qrR, H.y.train)
       A[is.na(A)] <- 0.0
       H <- H.y.eval + resx.eval %*% A
+      if (constraint.output)
+        return(.np_hat_constraint_from_matrix(H, y, "npplreghat"))
       return(H)
     }
 
@@ -1368,7 +1393,7 @@ npscoefhat <-
            exdat = txdat,
            ezdat = tzdat,
            y = NULL,
-           output = c("matrix", "apply"),
+           output = c("matrix", "apply", "constraint"),
            ridge = 0.0,
            iterate = FALSE,
            leave.one.out = FALSE,
@@ -1376,6 +1401,7 @@ npscoefhat <-
 
     .np_reject_unused_dots(list(...), "npscoefhat")
     output <- match.arg(output)
+    constraint.output <- identical(output, "constraint")
     .np_semihat_require_class(bws, "scbandwidth", "npscoefhat")
     iterate <- npValidateScalarLogical(iterate, "iterate")
     leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
@@ -1424,6 +1450,9 @@ npscoefhat <-
     n <- nrow(W.train)
     m <- nrow(W.eval)
     spec <- .npscoef_canonical_spec(source = bws, zdat = tzdat, where = "npscoefhat")
+
+    if (is.null(y) && constraint.output)
+      stop("argument 'y' is required when output='constraint'")
 
     if (identical(output, "apply")) {
       if (is.null(y))
@@ -1580,6 +1609,9 @@ npscoefhat <-
         }
       }
     }
+
+    if (constraint.output)
+      return(.np_hat_constraint_from_matrix(H, y, "npscoefhat"))
 
     H
   }
