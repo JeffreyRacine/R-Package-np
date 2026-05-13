@@ -1,6 +1,6 @@
 Package: npRmpi
 Version: 0.70-2
-Date: 2026-05-07
+Date: 2026-05-13
 Depends: R (>= 3.5.0)
 Imports: boot, cubature, methods, quadprog, quantreg, stats, parallel
 SystemRequirements: MPI
