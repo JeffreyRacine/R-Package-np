@@ -226,7 +226,7 @@ print.scbandwidth <- function(x, digits=NULL, ...){
   invisible(x)
 }
 
-predict.scbandwidth <- function(...) { do.call(npscoef, list(...)) }
+predict.scbandwidth <- function(object, ...) { npscoef(bws = object, ...) }
 
 summary.scbandwidth <- function(object, ...){
   cat("\nSmooth Coefficient Regression",

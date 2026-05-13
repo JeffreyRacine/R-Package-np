@@ -312,4 +312,4 @@ summary.condbandwidth <- function(object, ...) {
   cat("\n\n")
 }
 
-predict.condbandwidth <- function(...) { do.call(npcdist, list(...)) }
+predict.condbandwidth <- function(object, ...) { npcdist(bws = object, ...) }

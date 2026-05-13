@@ -198,4 +198,4 @@ summary.dbandwidth <- function(object, ...) {
 }
 
 
-predict.dbandwidth <- function(...) { do.call(npudist, list(...)) }
+predict.dbandwidth <- function(object, ...) { npudist(bws = object, ...) }
