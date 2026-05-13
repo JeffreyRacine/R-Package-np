@@ -353,14 +353,14 @@ npconmode.conbandwidth <-
     }
 
     for (i in seq_len(nlevels(efac))) {
-        dens.obj <- npcdens(
+        dens.obj <- .npRmpi_with_local_regression(npcdens(
           txdat = txdat,
           tydat = tydat,
           exdat = if (no.ex) txdat else exdat,
           eydat = rep(efac[i], enrow),
           bws = bws,
           gradients = isTRUE(gradients) && identical(i, gradient.level.index)
-        )
+        ))
         pmat[, i] <- dens.obj$condens
         perr[, i] <- dens.obj$conderr
         if (isTRUE(gradients) && identical(i, gradient.level.index)) {

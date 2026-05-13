@@ -217,9 +217,13 @@ npqreg <-
 .npRmpi_npqreg_parallel_ready <- function(bws,
                                           n.eval,
                                           comm = 1L,
-                                          what = "npqreg") {
+                                          what = "npqreg",
+                                          force.parallel = FALSE) {
   n.eval <- as.integer(n.eval)
-  if (is.na(n.eval) || n.eval < .npRmpi_npqreg_parallel_min_eval(comm = comm))
+  if (is.na(n.eval))
+    return(FALSE)
+  if (!isTRUE(force.parallel) &&
+      n.eval < .npRmpi_npqreg_parallel_min_eval(comm = comm))
     return(FALSE)
   if (!.npRmpi_npqreg_parallel_context(bws, comm = comm))
     return(FALSE)
@@ -232,6 +236,23 @@ npqreg <-
     what = what
   )
   TRUE
+}
+
+.npRmpi_npqreg_reset_worker_comm_state <- function(comm = 1L) {
+  if (isTRUE(.npRmpi_autodispatch_called_from_bcast()) ||
+      !isTRUE(.npRmpi_has_active_slave_pool(comm = comm)))
+    return(invisible(FALSE))
+
+  cmd <- quote({
+    try(.Call("C_np_set_local_regression_mode", FALSE, PACKAGE = "npRmpi"),
+        silent = TRUE)
+    try(.Call("C_np_set_active_comm", FALSE, as.integer(1L), PACKAGE = "npRmpi"),
+        silent = TRUE)
+    invisible(NULL)
+  })
+  try(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),
+      silent = TRUE)
+  invisible(TRUE)
 }
 
 .npqreg_selected_cdf_values_parallel <- function(bws,
@@ -258,6 +279,7 @@ npqreg <-
   }
 
   ycand <- as.double(ycand)
+  on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = comm), add = TRUE)
   tasks <- .npRmpi_bootstrap_chunk_tasks(
     B = n.eval,
     chunk.size = .npRmpi_npqreg_chunk_size(n.eval = n.eval, comm = comm)
@@ -336,6 +358,7 @@ npqreg <-
   }
 
   quantile <- as.double(quantile)
+  on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = comm), add = TRUE)
   tasks <- .npRmpi_bootstrap_chunk_tasks(
     B = n.eval,
     chunk.size = .npRmpi_npqreg_chunk_size(n.eval = n.eval, comm = comm)
@@ -404,7 +427,8 @@ npqreg <-
                                                    tol,
                                                    small,
                                                    itmax,
-                                                   comm = 1L) {
+                                                   comm = 1L,
+                                                   force.parallel = FALSE) {
   exdat <- toFrame(exdat)
   n.eval <- nrow(exdat)
   tau <- .npqreg_validate_tau(tau)
@@ -445,11 +469,13 @@ npqreg <-
         bws = bws,
         n.eval = n.eval,
         comm = comm,
-        what = "npqreg tau block"
+        what = "npqreg tau block",
+        force.parallel = force.parallel
       )) {
     return(fit_chunk(exdat))
   }
 
+  on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = comm), add = TRUE)
   tasks <- .npRmpi_bootstrap_chunk_tasks(
     B = n.eval,
     chunk.size = .npRmpi_npqreg_chunk_size(n.eval = n.eval, comm = comm)
@@ -640,7 +666,15 @@ npqreg <-
       )
     }
   } else {
-    .npqreg_selected_cdf_values
+    function(bws, xdat, ydat, exdat, ycand) {
+      .npRmpi_with_local_cdist_eval(.npqreg_selected_cdf_values(
+        bws = bws,
+        xdat = xdat,
+        ydat = ydat,
+        exdat = exdat,
+        ycand = ycand
+      ))
+    }
   }
 
   flo <- cdf_values(bws, xdat, ydat, exdat, lo)
@@ -748,6 +782,17 @@ npqreg.conbandwidth <-
   isa(bws, "condbandwidth")
 }
 
+.npRmpi_npqreg_eval_local_no_dispatch <- function(expr) {
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+  options(npRmpi.autodispatch.disable = TRUE)
+  options(npRmpi.autodispatch.context = TRUE)
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+  on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+  on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = 1L), add = TRUE)
+  force(expr)
+}
+
 npqreg.condbandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
@@ -780,19 +825,23 @@ npqreg.condbandwidth <-
     .npRmpi_require_active_slave_pool(where = "npqreg()")
     parallel.cond <- .npRmpi_npqreg_parallel_context(bws, comm = 1L)
     if (isTRUE(parallel.cond)) {
-      n.eval.pre <- tryCatch(
+      n.eval.pre <- suppressWarnings(as.integer(tryCatch(
         if (missing(exdat)) NROW(txdat) else NROW(exdat),
         error = function(e) NA_integer_
-      )
-      n.eval.pre <- suppressWarnings(as.integer(n.eval.pre)[1L])
+      ))[1L])
       if (is.na(n.eval.pre) ||
           n.eval.pre < .npRmpi_npqreg_parallel_min_eval(comm = 1L))
         parallel.cond <- FALSE
     }
+    if (isTRUE(parallel.cond))
+      on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = 1L), add = TRUE)
     if (.npRmpi_npqreg_should_localize(bws) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+        !isTRUE(.npRmpi_autodispatch_in_context()) &&
         !isTRUE(parallel.cond))
-      return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
+      return(.npRmpi_npqreg_eval_local_no_dispatch(
+        .npRmpi_eval_without_dispatch(match.call(), parent.frame())
+      ))
     if (.npRmpi_autodispatch_active() && !isTRUE(parallel.cond))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -886,7 +935,8 @@ npqreg.condbandwidth <-
         tol = tol,
         small = small,
         itmax = itmax,
-        comm = 1L
+        comm = 1L,
+        force.parallel = TRUE
       )
       myout <- .npqreg_fit_tau_vector_from_parallel_matrix(
         mat,
@@ -905,13 +955,15 @@ npqreg.condbandwidth <-
           small = small,
           itmax = itmax
         )
-        qdelta <- .npqreg_quantile_delta_from_conditional(
-          bws = bws,
-          xdat = txdat.df,
-          ydat = tydat.df,
-          exdat = txeval,
-          quantile = yq,
-          gradients = gradients
+        qdelta <- .npRmpi_with_local_cdist_eval(
+          .npqreg_quantile_delta_from_conditional(
+            bws = bws,
+            xdat = txdat.df,
+            ydat = tydat.df,
+            exdat = txeval,
+            quantile = yq,
+            gradients = gradients
+          )
         )
         list(
           yq = yq,
@@ -1032,11 +1084,25 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   parallel.cond <- (!missing(bws)) &&
     .npRmpi_npqreg_should_localize(bws) &&
     .npRmpi_npqreg_parallel_context(bws, comm = 1L)
+  if (isTRUE(parallel.cond)) {
+    n.eval.pre <- suppressWarnings(as.integer(tryCatch(
+      if (missing(txdat)) NA_integer_ else NROW(txdat),
+      error = function(e) NA_integer_
+    ))[1L])
+    if (is.na(n.eval.pre) ||
+        n.eval.pre < .npRmpi_npqreg_parallel_min_eval(comm = 1L))
+      parallel.cond <- FALSE
+  }
+  if (isTRUE(parallel.cond))
+    on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = 1L), add = TRUE)
   if (!missing(bws) &&
       .npRmpi_npqreg_should_localize(bws) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+      !isTRUE(.npRmpi_autodispatch_in_context()) &&
       !isTRUE(parallel.cond))
-    return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
+    return(.npRmpi_npqreg_eval_local_no_dispatch(
+      .npRmpi_eval_without_dispatch(match.call(), parent.frame())
+    ))
   if (.npRmpi_autodispatch_active() && !isTRUE(parallel.cond))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

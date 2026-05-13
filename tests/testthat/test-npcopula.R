@@ -80,6 +80,19 @@ test_that("npcopula formula route builds a plot-ready grid by default", {
   expect_s3_class(fixed.fit, "npcopula")
   expect_equal(nrow(as.data.frame(fixed.fit)), 9L)
   expect_true(inherits(fixed.fit$bws, "dbandwidth"))
+
+  u <- data.frame(x = c(0.25, 0.75), y = c(0.25, 0.75))
+  explicit.u.fit <- npcopula(
+    ~ x + y,
+    data = dat,
+    bws = c(0.7, 0.7),
+    bandwidth.compute = FALSE,
+    u = u,
+    n.quasi.inv = 40
+  )
+  expect_s3_class(explicit.u.fit, "npcopula")
+  expect_equal(nrow(as.data.frame(explicit.u.fit)), 4L)
+  expect_true(inherits(explicit.u.fit$bws, "dbandwidth"))
 })
 
 test_that("npcopula formula route can request sample evaluation and density target", {
@@ -207,6 +220,8 @@ test_that("predict.npcopula evaluates stored bandwidths on probability grids", {
   pred.se <- predict(fit, se.fit = TRUE)
   expect_equal(pred.se$fit, fitted(fit))
   expect_equal(pred.se$se.fit, se(fit))
+  expect_length(pred.se$se.fit, length(fitted(fit)))
+  expect_true(all(is.finite(pred.se$se.fit)))
   expect_error(predict(fit, se.fit = "yes"),
                "'se.fit' must be TRUE or FALSE", fixed = TRUE)
 })

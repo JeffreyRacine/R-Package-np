@@ -6879,7 +6879,12 @@ double *cv){
                            matrix_X_continuous,
                            matrix_bandwidth_var,
                            matrix_bandwidth_reg,
-                           lambda)==1){
+	                           lambda)==1){
+#ifdef MPI2
+    free(sum_kerf);
+    free(sum_ker_convolf);
+    free(sum_ker_marginalf);
+#endif
     free(lambda);
     free_mat(matrix_bandwidth_var,num_var_continuous);
     free_mat(matrix_bandwidth_reg,num_reg_continuous);

@@ -789,6 +789,14 @@ np_render_control <- function(style = c("band", "bar"),
     dots$tau <- object$tau
   if (is.null(dots$plot.data.overlay) && !isTRUE(dots$gradients))
     dots$plot.data.overlay <- TRUE
+  reset <- get0(".npRmpi_npqreg_reset_worker_comm_state",
+                envir = asNamespace("npRmpi"),
+                inherits = FALSE)
+  if (is.function(reset))
+    on.exit(reset(comm = 1L), add = TRUE)
+  old.local <- getOption("npRmpi.local.regression.mode", FALSE)
+  options(npRmpi.local.regression.mode = TRUE)
+  on.exit(options(npRmpi.local.regression.mode = old.local), add = TRUE)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_conmode_data <- function(object, gradients = FALSE, level = NULL) {

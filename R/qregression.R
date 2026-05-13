@@ -42,6 +42,13 @@ qregression <-
 
         class(d) <- "qregression"
 
+        reset <- get0(".npRmpi_npqreg_reset_worker_comm_state",
+                      envir = asNamespace("npRmpi"),
+                      inherits = FALSE)
+        if (is.function(reset) &&
+            !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+            reset(comm = 1L)
+
         return(d)
     }
 

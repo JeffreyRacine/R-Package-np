@@ -137,7 +137,7 @@ npcopula <- function(bws, ...) {
   d$pukertype <- bws$pukertype
   d$pokertype <- bws$pokertype
   d$eval <- result
-  d$copulaerr <- NA
+  d$copulaerr <- NULL
   d$data <- data
   d$target <- target
   d$density <- identical(target, "density")
@@ -226,6 +226,17 @@ npcopula <- function(bws, ...) {
   }
   joint <- npudist(tdat = data, edat = xgrid, bws = bws)
   se(joint)
+}
+
+.npcopula_eval_xgrid <- function(x) {
+  dat <- as.data.frame(x)
+  xnames <- x$xnames
+  if (length(xnames) && all(xnames %in% names(dat)))
+    return(as.data.frame(dat[, xnames, drop = FALSE]))
+  data <- .npcopula_training_data(x)
+  if (nrow(data) != length(x$copula))
+    stop("npcopula object does not retain evaluation coordinates needed for standard errors")
+  as.data.frame(data[, xnames, drop = FALSE])
 }
 
 .npcopula_boot_counts <- function(n, B, method, blocklen) {
@@ -592,7 +603,13 @@ predict.npcopula <- function(object,
 }
 
 se.npcopula <- function(x) {
-  x$copulaerr
+  if (!is.null(x$copulaerr) && length(x$copulaerr) == length(x$copula))
+    return(x$copulaerr)
+  .npcopula_asymptotic_se(
+    x = x,
+    data = .npcopula_training_data(x),
+    xgrid = .npcopula_eval_xgrid(x)
+  )
 }
 
 as.data.frame.npcopula <- function(x, row.names = NULL, optional = FALSE, ...) {
@@ -920,9 +937,15 @@ npcopula.default <- function(bws,
   dots <- list(...)
   u.auto <- isTRUE(dots$u.auto)
   dots$u.auto <- NULL
+  formula.from.target <- !missing(target) && inherits(target, "formula")
   formula.from.u <- !missing(u) && inherits(u, "formula")
-  formula.arg <- if (formula.from.u) {
+  formula.from.evaluation <- !missing(evaluation) && inherits(evaluation, "formula")
+  formula.arg <- if (formula.from.target) {
+    target
+  } else if (formula.from.u) {
     u
+  } else if (formula.from.evaluation) {
+    evaluation
   } else if (length(dots) && inherits(dots[[1L]], "formula")) {
     dots[[1L]]
   } else {
@@ -934,10 +957,16 @@ npcopula.default <- function(bws,
       dots[[1L]] <- NULL
     .npRmpi_require_active_slave_pool(where = "npcopula()")
     target.formula <- .npcopula_validate_target(
-      if (!missing(target) && !is.null(target)) target else c("distribution", "density")
+      if (!missing(target) && !is.null(target) && !formula.from.target)
+        target
+      else
+        c("distribution", "density")
     )
     evaluation.formula <- .npcopula_validate_evaluation(
-      if (!missing(evaluation)) evaluation else c("grid", "sample")
+      if (!missing(evaluation) && !formula.from.evaluation)
+        evaluation
+      else
+        c("grid", "sample")
     )
     neval.formula <- .npcopula_validate_neval(if (!missing(neval)) neval else 30)
     mf <- if (missing(data)) {

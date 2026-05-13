@@ -84,6 +84,33 @@ test_that("npRmpi gsl.bs uses package-specific first class with compatibility su
   expect_true(is.function(getS3method("predict", "npRmpi_gsl.bs")))
 })
 
+test_that("npRmpi gsl.bs rejects malformed derivative and knot inputs before native evaluation", {
+  x <- c(-1, -0.5, 0, 0.5, 1)
+
+  expect_error(gsl_bs_nprmpi(x, deriv = NA_integer_), "deriv")
+  expect_error(gsl_bs_nprmpi(x, deriv = -1L), "deriv")
+  expect_error(gsl_bs_nprmpi(x, deriv = 1.5), "deriv")
+  expect_error(gsl_bs_nprmpi(x, nbreak = NA_integer_), "nbreak")
+  expect_error(gsl_bs_nprmpi(x, nbreak = 1.5), "nbreak")
+  expect_error(gsl_bs_nprmpi(x, knots = NA_real_), "knots")
+  expect_error(gsl_bs_nprmpi(x, knots = 0.5), "knots")
+
+  bs_des_nprmpi <- getFromNamespace("bs.des", "npRmpi")
+  expect_error(
+    bs_des_nprmpi(x, degree = 3, nbreak = 4, deriv = c(0L, 1L)),
+    "length equal to x"
+  )
+  expect_error(
+    bs_des_nprmpi(x, degree = 3, nbreak = 4,
+                  deriv = c(0L, 1L, NA_integer_, 0L, 1L)),
+    "deriv"
+  )
+  expect_error(
+    bs_des_nprmpi(x, degree = 3, nbreak = 4, deriv = rep(5L, length(x))),
+    "degree plus 2"
+  )
+})
+
 test_that("npRmpi gsl.bs predict dispatch matches legacy wrapper across supported newx forms", {
   method <- getS3method("predict", "npRmpi_gsl.bs")
 
