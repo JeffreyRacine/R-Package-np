@@ -74,19 +74,18 @@ data(Engel95)
 Engel95 <- Engel95[order(Engel95$logexp),] 
 mpi.bcast.Robj2slave(Engel95)
 
-mpi.bcast.cmd(attach(Engel95),
-              caller.execute=TRUE)
-
-mpi.bcast.cmd(model.iv <- npregiv(y=food,
-                                  z=logexp,
-                                  w=logwages,
+mpi.bcast.cmd(model.iv <- npregiv(y=Engel95$food,
+                                  z=Engel95$logexp,
+                                  w=Engel95$logwages,
                                   method="Landweber-Fridman"),
               caller.execute=TRUE)
 phi <- model.iv$phi
 
 ## Compute the non-IV regression (i.e. regress y on z)
 
-mpi.bcast.cmd(ghat <- npreg(food~logexp,regtype="ll"),
+mpi.bcast.cmd(ghat <- npreg(xdat=Engel95$logexp,
+                            ydat=Engel95$food,
+                            regtype="ll"),
               caller.execute=TRUE)
 
 ## For the plots, restrict focal attention to the bulk of the data
@@ -95,21 +94,21 @@ mpi.bcast.cmd(ghat <- npreg(food~logexp,regtype="ll"),
 
 trim <- 0.0025
 
-plot(logexp,food,
+plot(Engel95$logexp,Engel95$food,
      ylab="Food Budget Share",
      xlab="log(Total Expenditure)",
-     xlim=quantile(logexp,c(trim,1-trim)),
-     ylim=quantile(food,c(trim,1-trim)),
+     xlim=quantile(Engel95$logexp,c(trim,1-trim)),
+     ylim=quantile(Engel95$food,c(trim,1-trim)),
      main="Nonparametric Instrumental Kernel Regression",
      type="p",
      cex=.5,
      col="lightgrey")
 
-lines(logexp,phi,col="blue",lwd=2,lty=2)
+lines(Engel95$logexp,phi,col="blue",lwd=2,lty=2)
 
-lines(logexp,fitted(ghat),col="red",lwd=2,lty=4)
+lines(Engel95$logexp,fitted(ghat),col="red",lwd=2,lty=4)
 
-legend(quantile(logexp,trim),quantile(food,1-trim),
+legend(quantile(Engel95$logexp,trim),quantile(Engel95$food,1-trim),
        c(expression(paste("Nonparametric IV: ",hat(varphi)(logexp))),
          "Nonparametric Regression: E(food | logexp)"),
        lty=c(2,4),

@@ -51,9 +51,9 @@
 \dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 data("oecdpanel")
-attach(oecdpanel)
+with(oecdpanel, {
 summary(oecdpanel)
-detach(oecdpanel)
+})
 } % enddontrun
 }
 \references{

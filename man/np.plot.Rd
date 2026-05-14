@@ -603,7 +603,7 @@ npRmpi.init(nslaves=1)
 # density will be evaluated for plotting purposes
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 data <- data.frame(ordered(year), gdp)
 
@@ -878,6 +878,7 @@ pred_both <- predict(
   proper.control = ctrl_both
 )
 plot(fhat_both)
+})
 npRmpi.quit()
 } else {
   message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")

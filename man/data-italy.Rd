@@ -48,12 +48,12 @@ npRmpi.init(nslaves=1)
 data("Italy")
 mpi.bcast.Robj2slave(Italy)
 
-attach(Italy)
+with(Italy, {
 
 plot(ordered(year), gdp, xlab="Year (ordered factor)",
      ylab="GDP (millions of Lire, 1990=base)")
 
-detach(Italy)
+})
 
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.
