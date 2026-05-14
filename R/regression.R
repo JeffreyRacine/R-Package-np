@@ -103,6 +103,20 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
   gorder <- npValidateGlpGradientOrder(regtype = x$bws$regtype,
                                        gradient.order = gradient.order,
                                        ncon = x$bws$ncon)
+  stored.order <- x$gradient.order
+  if (is.null(stored.order) && x$bws$ncon > 0L)
+    stored.order <- rep.int(1L, x$bws$ncon)
+  stored.order <- npValidateGlpGradientOrder(regtype = x$bws$regtype,
+                                             gradient.order = stored.order,
+                                             ncon = x$bws$ncon)
+  if (length(gorder)) {
+    defined.request <- (gorder <= x$bws$degree)
+    if (any(defined.request & (gorder != stored.order))) {
+      stop("requested gradient.order differs from the derivative order stored in this npregression object; refit or predict/evaluate with gradients=TRUE and the desired gradient.order",
+           call. = FALSE)
+    }
+  }
+
   gout.masked <- gout
   gout.masked[,] <- NA_real_
   cont.idx <- which(x$bws$icon)

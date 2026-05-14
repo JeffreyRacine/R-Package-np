@@ -98,7 +98,11 @@ Named options passed via \code{\dots} include:
       }
       \item{\code{gradient_order}, \code{gradients}}{
         derivative plotting controls for families that support
-        gradients/derivatives. For \code{npconmode} objects,
+        gradients/derivatives. For \code{npreg} local-polynomial
+        objects, \code{gradient_order} requests the continuous-predictor
+        derivative order to generate on the plot evaluation grid; if
+        omitted the first derivative/effect is plotted. For
+        \code{npconmode} objects,
         \code{gradients=TRUE} plots stored class-probability gradients/effects
         for the selected response level, computed by
         \code{npconmode(..., gradients=TRUE, level=...)}.
