@@ -969,7 +969,7 @@ npreghat <-
     integer(1L)
   }
 
-  if (isTRUE(local.mode) && .npRmpi_has_active_slave_pool(comm = 1L)) {
+  if (isTRUE(local.mode)) {
     old.mode <- .Call("C_np_set_local_regression_mode", TRUE, PACKAGE = "npRmpi")
     on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"), add = TRUE)
   }
