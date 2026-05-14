@@ -70,7 +70,36 @@
   )
 }
 
-.npcdhat_make_xhat_matrix <- function(bws, txdat, exdat) {
+.npcdhat_resolve_x_s <- function(bws, txdat, s = NULL, deriv = NULL, where = "npcdhat") {
+  if (is.null(s) && is.null(deriv))
+    return(NULL)
+
+  txdat <- toFrame(txdat)
+  ncon <- sum(bws$ixcon)
+  con.names <- names(txdat)[bws$ixcon]
+  if (!is.null(s) && !is.null(names(s))) {
+    sout <- integer(ncon)
+    names(sout) <- con.names
+    keep <- intersect(names(s), con.names)
+    if (length(keep))
+      sout[keep] <- as.integer(s[keep])
+    s <- sout
+  }
+  .npreghat_resolve_s(s = s, deriv = deriv, ncon = ncon, con.names = con.names)
+}
+
+.npcdhat_has_x_derivative <- function(s) {
+  length(s) > 0L && any(s > 0L)
+}
+
+.npcdhat_use_adaptive_ratio <- function(bws, x.s = NULL) {
+  regtype <- if (is.null(bws$regtype.engine)) bws$regtype else bws$regtype.engine
+  identical(bws$type, "adaptive_nn") &&
+    !.npcdhat_has_x_derivative(x.s) &&
+    identical(as.character(regtype), "lc")
+}
+
+.npcdhat_make_xhat_matrix <- function(bws, txdat, exdat, s = NULL) {
   xbw <- .npcdhat_make_xbw(bws = bws, txdat = txdat)
   spec <- npCanonicalConditionalRegSpec(
     regtype = if (is.null(xbw$regtype)) "lc" else as.character(xbw$regtype),
@@ -94,6 +123,15 @@
   }
 
   if (identical(regtype, "lc")) {
+    if (.npcdhat_has_x_derivative(s)) {
+      return(.npreghat_exact_lc_derivative_matrix_from_npksum_chunked(
+        bws = xbw,
+        txdat = txdat,
+        exdat = exdat,
+        s = s
+      ))
+    }
+
     return(.npreghat_exact_lc_matrix_from_kernel_weights(
       bws = xbw,
       txdat = txdat,
@@ -106,7 +144,7 @@
       bws = xbw,
       txdat = txdat,
       exdat = exdat,
-      s = integer(0)
+      s = s
     ))
   }
 
@@ -117,7 +155,8 @@
         H[i, ] <- .npreghat_exact_matrix_from_core(
           bws = xbw,
           txdat = txdat,
-          exdat = exdat[i, , drop = FALSE]
+          exdat = exdat[i, , drop = FALSE],
+          s = s
         )[1L, ]
       }
       return(H)
@@ -127,7 +166,7 @@
       bws = xbw,
       txdat = txdat,
       exdat = exdat,
-      s = integer(0),
+      s = s,
       basis = basis,
       degree = degree,
       bernstein.basis = bernstein
@@ -137,7 +176,8 @@
   .npreghat_exact_matrix_from_core(
     bws = xbw,
     txdat = txdat,
-    exdat = exdat
+    exdat = exdat,
+    s = s
   )
 }
 
@@ -405,8 +445,8 @@
   sweep((Kx * Ky) / nrow(txdat), 1L, pmax(denom, .Machine$double.eps), "/")
 }
 
-.npcdhat_exact_matrix <- function(bws, txdat, tydat, exdat, eydat, operator) {
-  if (identical(bws$type, "adaptive_nn")) {
+.npcdhat_exact_matrix <- function(bws, txdat, tydat, exdat, eydat, operator, x.s = NULL) {
+  if (.npcdhat_use_adaptive_ratio(bws = bws, x.s = x.s)) {
     return(.npcdhat_ratio_matrix(
       bws = bws,
       txdat = txdat,
@@ -421,7 +461,8 @@
   Hx <- .npcdhat_make_xhat_matrix(
     bws = bws,
     txdat = txdat,
-    exdat = exdat
+    exdat = exdat,
+    s = x.s
   )
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
@@ -433,8 +474,8 @@
   Hx * Gy
 }
 
-.npcdhat_exact_apply <- function(bws, txdat, tydat, exdat, eydat, rhs, operator) {
-  if (identical(bws$type, "adaptive_nn")) {
+.npcdhat_exact_apply <- function(bws, txdat, tydat, exdat, eydat, rhs, operator, x.s = NULL) {
+  if (.npcdhat_use_adaptive_ratio(bws = bws, x.s = x.s)) {
     H <- .npcdhat_ratio_matrix(
       bws = bws,
       txdat = txdat,
@@ -450,7 +491,8 @@
   Hx <- .npcdhat_make_xhat_matrix(
     bws = bws,
     txdat = txdat,
-    exdat = exdat
+    exdat = exdat,
+    s = x.s
   )
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
@@ -470,6 +512,8 @@
                           y,
                           output,
                           operator,
+                          x.deriv = NULL,
+                          x.s = NULL,
                           class_name,
                           where) {
   output <- match.arg(output, c("matrix", "apply"))
@@ -536,6 +580,18 @@
     eydat <- tydat
   }
 
+  if (!is.null(x.s) || !is.null(x.deriv)) {
+    x.s <- .npcdhat_resolve_x_s(
+      bws = bws,
+      txdat = txdat,
+      s = x.s,
+      deriv = x.deriv,
+      where = where
+    )
+  } else {
+    x.s <- NULL
+  }
+
   if (identical(output, "apply")) {
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
@@ -547,7 +603,8 @@
       exdat = exdat,
       eydat = eydat,
       rhs = y,
-      operator = operator
+      operator = operator,
+      x.s = x.s
     )
     if (ncol(out) == 1L)
       return(as.vector(out))
@@ -560,7 +617,8 @@
     tydat = tydat,
     exdat = exdat,
     eydat = eydat,
-    operator = operator
+    operator = operator,
+    x.s = x.s
   )
 
   class(H) <- c(class_name, "matrix")
@@ -571,6 +629,7 @@
   attr(H, "eydat") <- eydat
   attr(H, "trainiseval") <- no.exy
   attr(H, "rows.omit.train") <- rows.omit.train
+  attr(H, "s") <- x.s
   attr(H, "call") <- match.call(expand.dots = FALSE)
 
   if (!is.null(y)) {

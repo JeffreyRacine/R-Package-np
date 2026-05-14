@@ -81,6 +81,99 @@ test_that("npcdenshat apply mode matches matrix RHS multiplication", {
   expect_equal(hy, H %*% rhs, tolerance = 1e-12)
 })
 
+test_that("npcdenshat derivative hat operators match npcdens gradients", {
+  npcdenshat <- getFromNamespace("npcdenshat", "np")
+
+  set.seed(20260514)
+  n <- 24
+  x <- data.frame(x = sort(runif(n)))
+  y <- data.frame(y = sin(2 * pi * x$x) + rnorm(n, sd = 0.2))
+  ex <- data.frame(x = seq(0.1, 0.9, length.out = 8))
+  ey <- data.frame(y = seq(min(y$y), max(y$y), length.out = 8))
+  iota <- rep.int(1, n)
+
+  cfgs <- expand.grid(
+    bwtype = c("fixed", "generalized_nn", "adaptive_nn"),
+    regtype = c("lc", "ll", "lp"),
+    stringsAsFactors = FALSE
+  )
+
+  for (ii in seq_len(nrow(cfgs))) {
+    cfg <- cfgs[ii, ]
+    bw.args <- list(
+      xdat = x,
+      ydat = y,
+      regtype = cfg$regtype,
+      bwtype = cfg$bwtype,
+      bws = if (identical(cfg$bwtype, "fixed")) c(0.24, 0.28) else c(7, 7),
+      bandwidth.compute = FALSE
+    )
+    if (identical(cfg$regtype, "lp")) {
+      bw.args$basis <- "glp"
+      bw.args$degree <- 2L
+    }
+
+    bw <- do.call(npcdensbw, bw.args)
+    fit <- npcdens(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, gradients = TRUE)
+    H <- npcdenshat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, s = 1L)
+    hy <- npcdenshat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey,
+                     y = iota, output = "apply", deriv = 1L)
+
+    expect_s3_class(H, "npcdenshat")
+    expect_equal(attr(H, "s"), 1L)
+    expect_equal(
+      as.vector(H %*% iota),
+      as.vector(fit$congrad[, 1L]),
+      tolerance = 1e-10,
+      info = paste(cfg$bwtype, cfg$regtype)
+    )
+    expect_equal(
+      as.vector(hy),
+      as.vector(fit$congrad[, 1L]),
+      tolerance = 1e-10,
+      info = paste(cfg$bwtype, cfg$regtype, "apply")
+    )
+  }
+})
+
+test_that("npcdenshat named derivative selectors follow continuous x variables", {
+  npcdenshat <- getFromNamespace("npcdenshat", "np")
+
+  set.seed(20260515)
+  n <- 18
+  x <- data.frame(
+    x1 = sort(runif(n)),
+    x2 = sort(runif(n)),
+    f = factor(rep(c("a", "b"), length.out = n))
+  )
+  y <- data.frame(y = rnorm(n))
+  ex <- data.frame(
+    x1 = seq(0.1, 0.9, length.out = 6),
+    x2 = seq(0.2, 0.8, length.out = 6),
+    f = factor(rep(c("a", "b"), length.out = 6), levels = levels(x$f))
+  )
+  ey <- data.frame(y = seq(min(y$y), max(y$y), length.out = 6))
+
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "generalized_nn",
+    bws = c(7, 7, 7, 0.4),
+    bandwidth.compute = FALSE
+  )
+
+  fit <- npcdens(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, gradients = TRUE)
+  H <- npcdenshat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey,
+                  s = c(x2 = 1L))
+
+  expect_equal(
+    as.vector(H %*% rep.int(1, n)),
+    as.vector(fit$congrad[, 2L]),
+    tolerance = 1e-10
+  )
+})
+
 test_that("npcdenshat matches npcdens on multivariate and mixed common-use evaluation cells", {
   npcdenshat <- getFromNamespace("npcdenshat", "np")
 

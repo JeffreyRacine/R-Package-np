@@ -4,7 +4,9 @@ npcdenshat <- function(bws,
                        exdat,
                        eydat,
                        y = NULL,
-                       output = c("matrix", "apply")) {
+                       output = c("matrix", "apply"),
+                       deriv = NULL,
+                       s = NULL) {
   if (!inherits(bws, "conbandwidth")) {
     stop("argument 'bws' must inherit from class 'conbandwidth' in npcdenshat()")
   }
@@ -25,6 +27,8 @@ npcdenshat <- function(bws,
     y = y,
     output = output,
     operator = "normal",
+    x.deriv = deriv,
+    x.s = s,
     class_name = "npcdenshat",
     where = "npcdenshat"
   )
