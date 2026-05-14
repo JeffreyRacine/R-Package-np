@@ -1177,6 +1177,62 @@ np_render_control <- function(style = c("band", "bar"),
   )
 }
 
+.np_plot_conmode_surface_matrix <- function(payload) {
+  dims <- payload$grid$dims
+  matrix(payload$surface$probability, nrow = dims[1L], ncol = dims[2L])
+}
+
+.np_plot_conmode_validate_zlim <- function(zlim) {
+  if (is.null(zlim))
+    return(NULL)
+  if (!is.numeric(zlim) || length(zlim) != 2L || any(is.na(zlim)) ||
+      zlim[1L] >= zlim[2L])
+    stop("zlim must be a numeric length-two vector with zlim[1] < zlim[2]",
+         call. = FALSE)
+  zlim
+}
+
+.np_plot_conmode_surface_panel <- function(payload, dots) {
+  vars <- payload$grid$variables
+  x1 <- payload$grid$values[[1L]]
+  x2 <- payload$grid$values[[2L]]
+  z <- .np_plot_conmode_surface_matrix(payload)
+  zlim <- .np_plot_conmode_validate_zlim(dots$zlim)
+  if (is.null(zlim))
+    zlim <- c(0, 1)
+
+  theta <- .np_plot_scalar_default(dots$theta, 0)
+  phi <- .np_plot_scalar_default(dots$phi, 20)
+  main <- .np_plot_scalar_default(
+    dots$main,
+    paste0("Pr(Y=", payload$level, "|X=x)")
+  )
+  persp.args <- list(
+    x = x1,
+    y = x2,
+    z = z,
+    theta = theta,
+    phi = phi,
+    ticktype = "detailed",
+    xlab = .np_plot_scalar_default(dots$xlab, vars[1L]),
+    ylab = .np_plot_scalar_default(dots$ylab, vars[2L]),
+    zlab = .np_plot_scalar_default(dots$zlab, "Probability"),
+    zlim = zlim,
+    main = main,
+    col = grDevices::adjustcolor(
+      .np_plot_persp_surface_colors(z = z, col = dots$col),
+      alpha.f = 0.5
+    ),
+    border = .np_plot_scalar_default(dots$border, "black")
+  )
+  persp.args <- .np_plot_merge_user_args(
+    persp.args,
+    .np_plot_user_args(dots, "persp")
+  )
+  do.call(graphics::persp, persp.args)
+  invisible(NULL)
+}
+
 .np_plot_conmode_panel <- function(dat,
                                    gradients = FALSE,
                                    level,
@@ -1319,9 +1375,6 @@ np_render_control <- function(style = c("band", "bar"),
   if (identical(output, "both"))
     output <- "plot-data"
   output <- .np_plot_scalar_match(output, c("plot", "data", "plot-data"), "output")
-  if (isTRUE(perspective) && !identical(output, "data"))
-    stop("surface rendering is not yet implemented for plot.conmode; use output='data' to inspect the surface payload",
-         call. = FALSE)
   plot.user.args <- .np_plot_user_args(dots, "plot")
   line.user.args <- .np_plot_user_args(dots, "lines")
   if (!is.null(dots$type))
@@ -1347,6 +1400,15 @@ np_render_control <- function(style = c("band", "bar"),
     )
   } else {
     .np_plot_conmode_data(object, gradients = gradients, level = level)
+  }
+
+  if (isTRUE(perspective)) {
+    if (identical(output, "data"))
+      return(plot.data)
+    .np_plot_conmode_surface_panel(plot.data, dots)
+    if (identical(output, "plot-data"))
+      return(plot.data)
+    return(invisible(object))
   }
   level <- plot.data[[1L]]$level[1L]
 

@@ -322,10 +322,16 @@ test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
   expect_equal(surf.alias$grid$variables, c("x2", "x1"))
   expect_equal(surf.alias$grid$dims, c(5L, 5L))
 
-  expect_error(plot(fit, perspective = TRUE),
-               "surface rendering is not yet implemented")
-  expect_error(plot(fit, perspective = TRUE, output = "plot-data"),
-               "surface rendering is not yet implemented")
+  expect_silent({
+    grDevices::pdf(tempfile(fileext = ".pdf"))
+    on.exit(grDevices::dev.off(), add = TRUE)
+    plot(fit, perspective = TRUE, neval = 5L)
+    rendered <- plot(fit, perspective = TRUE, neval = 5L,
+                     output = "plot-data")
+  })
+  data.only <- plot(fit, perspective = TRUE, neval = 5L,
+                    output = "data")
+  expect_equal(rendered, data.only)
   expect_error(plot(fit, renderer = "rgl", output = "data"),
                "surface rendering is not yet implemented")
   expect_error(plot(fit, plot.vars = c("x1", "x2"), output = "data"),

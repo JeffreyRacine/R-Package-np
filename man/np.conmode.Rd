@@ -264,18 +264,23 @@ prediction/evaluation route, or plot route as appropriate.
     probability/effect display; common controls include
     \code{gradients}, \code{level}, \code{output}, \code{data_rug},
     \code{layout}, \code{legend}, \code{view}, \code{neval},
-    \code{grid_control}, and graphics arguments. The default
+    \code{grid_control}, \code{perspective}, \code{plot.vars}, and
+    graphics arguments. The default
     \code{view="sample"} draws the stored fitted probabilities/effects at the
     fitted evaluation points. The \code{view="fixed"} route constructs
     one-dimensional object-fed slices over each conditioning variable, holding
     the remaining variables at their \code{uocquantile} median/mode values;
     \code{np_grid_control(xtrim=..., xq=...)} may be used to adjust the slice
-    range and holdout quantiles. The public \code{output="both"} spelling is
+    range and holdout quantiles. With \code{perspective=TRUE}, the same
+    fixed-grid route draws a base-graphics probability surface for one selected
+    response level over two continuous conditioning variables; use
+    \code{plot.vars} to name the displayed pair when more than two continuous
+    conditioning variables are present. The public \code{output="both"} spelling is
     accepted as an alias for the historical \code{output="plot-data"}
     behavior. Probability/effect interval controls
     such as \code{errors}, \code{band}, \code{bootstrap}, \code{B}, and
-    \code{alpha}, and surface-rendering controls such as \code{renderer} and
-    \code{perspective}, are reserved for future object-fed extensions and
+    \code{alpha}, and interactive surface controls such as \code{renderer},
+    are reserved for future object-fed extensions and
     currently fail with route-specific messages rather than silently changing
     the target. See \code{\link{npcdensbw}} and \code{\link{plot.np}} for the
     complete bandwidth-selection and plotting argument surfaces.
@@ -349,8 +354,10 @@ prediction/evaluation route, or plot route as appropriate.
   object-fed probability/effect payloads at the fitted evaluation points. Use
   \code{view="fixed"} and \code{neval} to draw object-fed one-dimensional
   slices over each conditioning variable, with other variables held at their
-  median/mode values. At present, \code{plot.conmode} does not construct
-  probability/effect confidence bands or two-dimensional surface grids.
+  median/mode values. Use \code{perspective=TRUE} to draw a base-graphics
+  probability surface for one selected response level over two continuous
+  conditioning variables. At present, \code{plot.conmode} does not construct
+  probability/effect confidence bands or interactive \code{rgl} surfaces.
 }
 \section{Book And Method Pointers}{
   The conditional-mode target is
@@ -589,6 +596,18 @@ plot(model.effects)
 plot(model.effects, view="fixed", neval=25)
 plot(model.effects, gradients=TRUE)
 plot(model.effects, gradients=TRUE, view="fixed", neval=25)
+
+## A two-continuous-predictor fit can be displayed as a probability surface.
+## The default level is the base/reference response level.
+
+z <- runif(n, -1, 1)
+y2 <- factor(rbinom(n, 1, plogis(1.5*x - z)), levels=0:1)
+model.surface <- npconmode(y2~x+z,
+                           regtype="ll",
+                           bwmethod="cv.ls",
+                           nmulti=1,
+                           probabilities=TRUE)
+plot(model.surface, perspective=TRUE, neval=15)
 } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
