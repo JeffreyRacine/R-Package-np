@@ -1,5 +1,25 @@
 library(np)
 
+test_that("formula npcdist keeps estimator-only proper arguments out of bandwidth selection", {
+  set.seed(42)
+  x <- rnorm(40)
+  y <- x + rnorm(40)
+
+  fit <- npcdist(
+    y ~ x,
+    regtype = "lp",
+    degree = 1L,
+    bernstein = TRUE,
+    proper = TRUE,
+    gradients = TRUE,
+    nmulti = 1
+  )
+
+  expect_true(inherits(fit, "condistribution"))
+  expect_true(isTRUE(fit$proper.requested))
+  expect_equal(dim(fit$congrad), c(40L, 1L))
+})
+
 test_that("proper helper projection enforces monotone bounded slices", {
   p.fun <- getFromNamespace(".np_condist_project_bounded_isotonic", "np")
   w.fun <- getFromNamespace(".np_condens_trapezoid_weights", "np")

@@ -453,6 +453,10 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw$newdata <- NULL
+  sc.bw$gradients <- NULL
+  sc.bw$proper <- NULL
+  sc.bw$proper.method <- NULL
+  sc.bw$proper.control <- NULL
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,
