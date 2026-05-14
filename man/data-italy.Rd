@@ -18,12 +18,12 @@
 \source{Giovanni Baiocchi}
 \examples{
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 plot(ordered(year), gdp, xlab="Year (ordered factor)",
      ylab="GDP (millions of Lire, 1990=base)")
 
-detach(Italy)
+})
 }
 \references{
   Baiocchi, G. (2006), \dQuote{Economic Applications of Nonparametric

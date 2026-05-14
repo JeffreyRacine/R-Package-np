@@ -405,7 +405,7 @@ if (interactive()) Sys.sleep(5)
 # etc.
 
 data("cps71")
-attach(cps71)
+with(cps71, {
 
 error <- residuals(lm(logwage~age+I(age^2)))
 
@@ -424,7 +424,7 @@ ksum
 
 sum(ksum$ksum)
 
-detach(cps71)
+})
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -444,7 +444,7 @@ if (interactive()) Sys.sleep(5)
 # the numerator and denominator.
 
 data("cps71")
-attach(cps71)
+with(cps71, {
 
 bw <- npregbw(xdat=age, ydat=logwage)
 
@@ -472,7 +472,7 @@ fit.lc <- npksum(txdat=age, exdat=age.seq, tydat=logwage, bws=bw$bw)$ksum/
 
 fit.lc
 
-detach(cps71)
+})
 
 # EXAMPLE 4: For this example, we conduct least-squares cross-validation
 # for the local-constant regression estimator. We first write an R

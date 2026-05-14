@@ -421,7 +421,7 @@ birthwt$ht <- factor(birthwt$ht)
 birthwt$ui <- factor(birthwt$ui)
 birthwt$ftv <- ordered(birthwt$ftv)
 
-attach(birthwt)
+with(birthwt, {
 
 # Fit a parametric logit model with low (0/1) as the dependent
 # variable and age, lwt, and smoke (0/1) as the covariates
@@ -480,7 +480,7 @@ predict(model.np, newdata=new.birthwt)
 predict(npconmode(bws=bw, probabilities=TRUE),
         newdata=new.birthwt, type="prob")
 
-detach(birthwt)
+})
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we use the
 # birthweight data taken from the MASS library, and compute a parametric
@@ -490,7 +490,7 @@ detach(birthwt)
 
 library("MASS")
 data("birthwt")
-attach(birthwt)
+with(birthwt, {
 
 # Fit a parametric logit model with low (0/1) as the dependent
 # variable and age, lwt, and smoke (0/1) as the covariates
@@ -548,7 +548,7 @@ ccr
 # Nonparametric
 summary(model.np)
 
-detach(birthwt)
+})
 
 # EXAMPLE 3 (CLASS PROBABILITY EFFECTS): compute and plot
 # class-probability gradients/effects for one selected response level.

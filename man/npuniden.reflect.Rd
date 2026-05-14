@@ -153,14 +153,14 @@ legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
 ## Example 3: Age for working age males in the cps71 data set bounded
 ## below by 21 and above by 65
 data(cps71)
-attach(cps71)
+with(cps71, {
 model <- npuniden.reflect(age,a=21,b=65)
 par(mfrow=c(1,1))
 hist(age,prob=TRUE,main="",ylim=c(0,max(model$f)))
 lines(age,model$f)
 lines(density(age,bw=model$h),col=2)
 legend("topright",c("Data-Reflection","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
-detach(cps71)
+})
 } % enddontrun
 }
 \keyword{ nonparametric }

@@ -219,7 +219,7 @@ if (interactive()) Sys.sleep(5)
 ## Test for equality of log(wage) distributions
 
 data(wage1)
-attach(wage1)
+with(wage1, {
 lwage.male <- lwage[female=="Male"]
 lwage.female <- lwage[female=="Female"]
 
@@ -240,7 +240,7 @@ lines(f.f$x,f.f$y,col="red",lty=2)
 rug(lwage.male)
 legend(-1,1.2,c("Male","Female"),lty=c(1,2),col=c("black","red"))
 
-detach(wage1)
+})
 
 if (interactive()) Sys.sleep(5)
 

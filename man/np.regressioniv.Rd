@@ -584,7 +584,7 @@ phi <- fun1
 ivdata <- data.frame(y,z,w)
 ivdata <- ivdata[order(ivdata$z),]
 rm(y,z,w)
-attach(ivdata)
+with(ivdata, {
 
 model.iv <- npregiv(y=y,z=z,w=w)
 phi.iv <- model.iv$phi
@@ -621,7 +621,7 @@ legend("topright",
        col=c("black","blue","red"),
        lwd=c(2,2,2),
        bty="n")
-       
+})
 } % enddontrun
 }
 \keyword{ instrument }

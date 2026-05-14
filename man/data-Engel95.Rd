@@ -58,7 +58,7 @@ data(Engel95)
 Engel95 <- Engel95[order(Engel95$logexp),] 
 Engel95 <- Engel95[seq_len(min(120, nrow(Engel95))), ]
 
-attach(Engel95)
+with(Engel95, {
 
 model.iv <- npregiv(y=food,
                     z=logexp,
@@ -98,5 +98,6 @@ legend(quantile(logexp,trim),quantile(food,1-trim),
        lty=c(2,4),
        col=c("blue","red"),
        lwd=c(2,2))
+})
 } % enddontrun
 }

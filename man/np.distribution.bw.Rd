@@ -699,7 +699,7 @@ or standard-deviation factors.
 # data frame in which year is an ordered factor, GDP is continuous.
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 data <- data.frame(ordered(year), gdp)
 
@@ -797,14 +797,14 @@ bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(1, 1))
 
 summary(bw)
 
-detach(Italy)
+})
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous.
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 data <- data.frame(ordered(year), gdp)
 
@@ -901,7 +901,7 @@ bw <- npudistbw(dat=data, bws=c(1, 1))
 
 summary(bw)
 
-detach(Italy)
+})
 } % enddontrun
 }
 \keyword{nonparametric}

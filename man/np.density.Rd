@@ -258,7 +258,7 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
 # purposes.
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 # Compute bandwidths using likelihood cross-validation (default).
 
@@ -320,7 +320,7 @@ if (interactive()) Sys.sleep(5)
 
 if (interactive()) plot(bw)
 
-detach(Italy)
+})
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
@@ -330,7 +330,7 @@ detach(Italy)
 # purposes.
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 data <- data.frame(year=ordered(year), gdp)
 
@@ -394,7 +394,7 @@ if (interactive()) Sys.sleep(5)
 
 if (interactive()) plot(bw)
 
-detach(Italy)
+})
 
 # EXAMPLE 2 (INTERFACE=FORMULA): For this example, we load the old
 # faithful geyser data and compute the density and distribution
@@ -402,7 +402,7 @@ detach(Italy)
 
 library("datasets")
 data("faithful")
-attach(faithful)
+with(faithful, {
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
@@ -418,7 +418,7 @@ summary(bw)
 
 if (interactive()) plot(bw, xtrim=-0.2)
 
-detach(faithful)
+})
 
 # EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we load the old
 # faithful geyser data and compute the density and distribution
@@ -426,7 +426,7 @@ detach(faithful)
 
 library("datasets")
 data("faithful")
-attach(faithful)
+with(faithful, {
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
@@ -442,7 +442,7 @@ summary(bw)
 
 if (interactive()) plot(bw, xtrim=-0.2)
 
-detach(faithful)
+})
 } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS

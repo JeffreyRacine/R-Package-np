@@ -325,7 +325,7 @@ phi <- fun1
 ivdata <- data.frame(y,z,w,u,v)
 ivdata <- ivdata[order(ivdata$z),]
 rm(y,z,w,u,v)
-attach(ivdata)
+with(ivdata, {
 
 model.ivderiv <- npregivderiv(y=y,z=z,w=w)
 
@@ -341,6 +341,7 @@ plot(z,model.ivderiv$phi.prime,
      type="l",
      lwd=2)
 rug(z)     
+})
 } % enddontrun
 }
 \keyword{ instrument }

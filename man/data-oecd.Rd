@@ -48,9 +48,9 @@
 \source{ Thanasis Stengos }
 \examples{
 data("oecdpanel")
-attach(oecdpanel)
+with(oecdpanel, {
 summary(oecdpanel)
-detach(oecdpanel)
+})
 }
 \references{
 

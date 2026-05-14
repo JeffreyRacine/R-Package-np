@@ -1003,7 +1003,7 @@ or standard-deviation factors.
 
 data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
-attach(Italy)
+with(Italy, {
 
 bw <- npcdensbw(formula=gdp~ordered(year), nmulti=1)
 
@@ -1017,7 +1017,7 @@ summary(bw)
 # Note - see the example for npudensbw() for multiple illustrations
 # of how to change the kernel function, kernel order, and so forth.
 
-detach(Italy)
+})
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute the
 # likelihood cross-validated bandwidths (default) using a second-order
@@ -1026,7 +1026,7 @@ detach(Italy)
 
 data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
-attach(Italy)
+with(Italy, {
 
 bw <- npcdensbw(xdat=ordered(year), ydat=gdp, nmulti=1)
 
@@ -1040,7 +1040,7 @@ summary(bw)
 # Note - see the example for npudensbw() for multiple illustrations
 # of how to change the kernel function, kernel order, and so forth.
 
-detach(Italy)
+})
 } % enddontrun
 }
 \keyword{nonparametric}

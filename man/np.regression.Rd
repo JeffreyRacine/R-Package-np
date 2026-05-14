@@ -424,7 +424,7 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
 # Italian income panel (see Italy for details)
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 # First, compute the least-squares cross-validated bandwidths for the
 # local constant estimator (default).
@@ -449,7 +449,7 @@ summary(model)
 if (interactive()) plot(bw, errors="bootstrap")
 points(ordered(year), gdp, cex=.2, col="red")
 
-detach(Italy)
+})
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -460,7 +460,7 @@ if (interactive()) Sys.sleep(5)
 # Italian income panel (see Italy for details)
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 # First, compute the least-squares cross-validated bandwidths for the
 # local constant estimator (default).
@@ -485,7 +485,7 @@ summary(model)
 if (interactive()) plot(bw, errors="bootstrap")
 points(ordered(year), gdp, cex=.2, col="red")
 
-detach(Italy)
+})
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -548,7 +548,7 @@ if (interactive()) Sys.sleep(5)
 # - this may take a few minutes depending on the speed of your computer.
 
 data("oecdpanel")
-attach(oecdpanel)
+with(oecdpanel, {
 
 bw <- npregbw(formula=growth~
               factor(oecd)+
@@ -560,7 +560,7 @@ bw <- npregbw(formula=growth~
 
 if (interactive()) plot(bw, errors="asymptotic")
 
-detach(oecdpanel)
+})
 
 # EXAMPLE 3 (INTERFACE=DATA FRAME): For this example, we replicate the
 # nonparametric regression in Maasoumi, Racine, and Stengos
@@ -569,7 +569,7 @@ detach(oecdpanel)
 # - this may take a few minutes depending on the speed of your computer.
 
 data("oecdpanel")
-attach(oecdpanel)
+with(oecdpanel, {
 
 y <- growth
 X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
@@ -578,7 +578,7 @@ bw <- npregbw(xdat=X, ydat=y)
 
 if (interactive()) plot(bw, errors="asymptotic")
 
-detach(oecdpanel)
+})
 
 
 # EXAMPLE 4 (INTERFACE=FORMULA): Experimental data - the effect of
@@ -604,7 +604,7 @@ detach(oecdpanel)
 #       [,3]  dose  numeric  Dose in milligrams.
 
 library("datasets")
-attach(ToothGrowth)
+with(ToothGrowth, {
 
 # Note - in this example, there are six cells.
 
@@ -615,7 +615,7 @@ bw <- npregbw(formula=len~factor(supp)+ordered(dose))
 
 if (interactive()) plot(bw, errors="bootstrap", band="simultaneous")
 
-detach(ToothGrowth)
+})
 
 # EXAMPLE 4 (INTERFACE=DATA FRAME): Experimental data - the effect of
 # vitamin C on tooth growth in guinea pigs
@@ -640,7 +640,7 @@ detach(ToothGrowth)
 #       [,3]  dose  numeric  Dose in milligrams.
 
 library("datasets")
-attach(ToothGrowth)
+with(ToothGrowth, {
 
 # Note - in this example, there are six cells.
 
@@ -654,7 +654,7 @@ bw <- npregbw(X, y)
 
 if (interactive()) plot(bw, errors="bootstrap", band="simultaneous")
 
-detach(ToothGrowth)
+})
 
 # EXAMPLE 5 (INTERFACE=FORMULA): a pretty 2-d smoothing example adapted
 # from the R mgcv library which was written by Simon N. Wood.

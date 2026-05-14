@@ -583,7 +583,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 # density will be evaluated for plotting purposes
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 data <- data.frame(ordered(year), gdp)
 
@@ -858,6 +858,7 @@ pred_both <- predict(
   proper.control = ctrl_both
 )
 plot(fhat_both)
+})
 } % enddontrun
 }
 

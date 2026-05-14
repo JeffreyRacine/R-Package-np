@@ -407,7 +407,7 @@ prediction/evaluation route, or plot route as appropriate.
 # Baiocchi's Italian income panel (see Italy for details)
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 # Compute conditional distribution bandwidths and extract three
 # conditional quantiles using the same selected bandwidths.
@@ -427,14 +427,14 @@ model.med <- npqreg(gdp~ordered(year), tau=0.50)
 model.q <- npqreg(bws=model.med$bws, tau=c(0.25, 0.50, 0.75))
 plot(model.med, tau=c(0.25, 0.50, 0.75))
 
-detach(Italy)
+})
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
 # bivariate nonparametric quantile regression estimate for Giovanni
 # Baiocchi's Italian income panel (see Italy for details)
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 data <- data.frame(ordered(year), gdp)
 
 # First, compute the likelihood cross-validation bandwidths (default).
@@ -450,7 +450,7 @@ model.q <- npqreg(bws=bw, tau=c(0.25, 0.50, 0.75))
 
 plot(model.q)
 
-detach(Italy)
+})
 } % enddontrun
 }
 \keyword{nonparametric}

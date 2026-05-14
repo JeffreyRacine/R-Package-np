@@ -329,7 +329,7 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
 
 data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
-attach(Italy)
+with(Italy, {
 
 # First, compute the bandwidths... note that this may take a minute or
 # two depending on the speed of your computer.
@@ -351,7 +351,7 @@ summary(fhat)
 
 if (interactive()) plot(bw)
 
-detach(Italy)
+})
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
@@ -361,7 +361,7 @@ detach(Italy)
 
 data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
-attach(Italy)
+with(Italy, {
 
 # First, compute the bandwidths... note that this may take a minute or
 # two depending on the speed of your computer.
@@ -390,7 +390,7 @@ summary(fhat)
 
 if (interactive()) plot(bw)
 
-detach(Italy)
+})
 
 # EXAMPLE 2 (INTERFACE=FORMULA): For this example, we load the old
 # faithful geyser data from the R `datasets' library and compute the
@@ -398,7 +398,7 @@ detach(Italy)
 
 library("datasets")
 data("faithful")
-attach(faithful)
+with(faithful, {
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
@@ -412,7 +412,7 @@ summary(bw)
 
 if (interactive()) plot(bw)
 
-detach(faithful)
+})
 
 # EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we load the old
 # faithful geyser data from the R `datasets' library and compute the
@@ -420,7 +420,7 @@ detach(faithful)
 
 library("datasets")
 data("faithful")
-attach(faithful)
+with(faithful, {
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
@@ -442,7 +442,7 @@ summary(bw)
 
 if (interactive()) plot(bw)
 
-detach(faithful)
+})
 
 # EXAMPLE 3 (INTERFACE=FORMULA): Replicate the DGP of Klein & Spady
 # (1993) (see their description on page 405, pay careful attention to

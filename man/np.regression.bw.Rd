@@ -915,7 +915,7 @@ or standard-deviation factors.
 # Italian income panel (see Italy for details)
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 # Compute the least-squares cross-validated bandwidths for the local
 # constant estimator (default)
@@ -952,14 +952,14 @@ summary(bw)
 # multiple illustrations of how to change the kernel function, kernel
 # order, bandwidth type and so forth.
 
-detach(Italy)
+})
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
 # Bivariate nonparametric regression estimate for Giovanni Baiocchi's
 # Italian income panel (see Italy for details)
 
 data("Italy")
-attach(Italy)
+with(Italy, {
 
 # Compute the least-squares cross-validated bandwidths for the local
 # constant estimator (default)
@@ -996,7 +996,7 @@ summary(bw)
 # multiple illustrations of how to change the kernel function, kernel
 # order, bandwidth type and so forth.
 
-detach(Italy)
+})
 } % enddontrun
 }
 \keyword{nonparametric}

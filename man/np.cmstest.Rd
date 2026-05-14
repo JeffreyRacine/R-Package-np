@@ -231,7 +231,7 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 # that this parametric regression model is misspecified.
 
 data("cps71")
-attach(cps71)
+with(cps71, {
 
 model <- lm(logwage~age+I(age^2), x=TRUE, y=TRUE)
 
@@ -264,7 +264,7 @@ npcmstest(model = model, xdat = age, ydat = logwage, boot.num=9, nmulti = 1)
 # search tolerance, or feed in your own vector of bandwidths and so
 # forth.
 
-detach(cps71)
+})
 
 # EXAMPLE 2: For this example, we replicate the application in Maasoumi,
 # Racine, and Stengos (2007) (see oecdpanel for details). We
@@ -272,7 +272,7 @@ detach(cps71)
 # subject it to the model specification test.
 
 data("oecdpanel")
-attach(oecdpanel)
+with(oecdpanel, {
 
 model <- lm(growth ~ oecd +
             factor(year) +
@@ -292,7 +292,7 @@ X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 
 npcmstest(model = model, xdat = X, ydat = growth, boot.num=9, nmulti = 1)
 
-detach(oecdpanel)
+})
 } % enddontrun
 }
 \keyword{ nonparametric }

@@ -243,7 +243,7 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 library("quantreg")
 
 data("cps71")
-attach(cps71)
+with(cps71, {
 
 model <- rq(logwage~age+I(age^2), tau=0.5, model=TRUE)
 
@@ -275,7 +275,7 @@ X <- data.frame(age)
 
 npqcmstest(model = model, xdat = X, ydat = logwage, tau=0.5)
 
-detach(cps71)
+})
 } % enddontrun
 }
 \keyword{ nonparametric }

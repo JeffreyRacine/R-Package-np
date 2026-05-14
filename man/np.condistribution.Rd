@@ -339,7 +339,7 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
 
 data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
-attach(Italy)
+with(Italy, {
 
 # First, compute the bandwidths.
 
@@ -360,7 +360,7 @@ summary(Fhat)
 
 if (interactive()) plot(bw)
 
-detach(Italy)
+})
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
@@ -370,7 +370,7 @@ detach(Italy)
 
 data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
-attach(Italy)
+with(Italy, {
 
 # First, compute the bandwidths.
 
@@ -398,7 +398,7 @@ summary(Fhat)
 
 if (interactive()) plot(bw)
 
-detach(Italy)
+})
 
 # EXAMPLE 2 (INTERFACE=FORMULA): For this example, we load the old
 # faithful geyser data from the R `datasets' library and compute the
@@ -406,7 +406,7 @@ detach(Italy)
 
 library("datasets")
 data("faithful")
-attach(faithful)
+with(faithful, {
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
@@ -421,7 +421,7 @@ summary(bw)
 
 if (interactive()) plot(bw)
 
-detach(faithful)
+})
 
 # EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we load the old
 # faithful geyser data from the R `datasets' library and compute the
@@ -429,7 +429,7 @@ detach(faithful)
 
 library("datasets")
 data("faithful")
-attach(faithful)
+with(faithful, {
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
@@ -451,7 +451,7 @@ summary(bw)
 
 if (interactive()) plot(bw)
 
-detach(faithful)
+})
 
 # EXAMPLE 3: Variations on local polynomial conditional distribution
 # estimation with proper = TRUE.
