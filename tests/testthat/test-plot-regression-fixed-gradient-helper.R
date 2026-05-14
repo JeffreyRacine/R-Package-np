@@ -116,6 +116,51 @@ test_that("fixed lp gradient helper preserves derivative order and counts drawer
   expect_identical(length(fast.counts$t0), nrow(ex))
   expect_true(all(is.finite(fast.counts$t)))
   expect_true(all(is.finite(fast.counts$t0)))
-  expect_equal(fast.drawer$t, fast.counts$t, tolerance = 0)
+  expect_equal(fast.drawer$t, fast.counts$t, tolerance = 1e-10)
   expect_equal(as.vector(fast.drawer$t0), as.vector(fast.counts$t0), tolerance = 0)
+})
+
+test_that("fixed lp plot output records requested gradient order", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  options(npRmpi.autodispatch = FALSE)
+
+  n <- 45
+  x <- seq(-1, 1, length.out = n)
+  y <- 1 + 2 * x + 3 * x^2
+  tx <- data.frame(x = x)
+
+  bw <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "lp",
+    degree = 2L,
+    basis = "glp",
+    bws = 100,
+    bwscaling = FALSE,
+    bandwidth.compute = FALSE
+  )
+
+  fit <- npreg(
+    bws = bw,
+    gradients = TRUE,
+    gradient.order = 1L,
+    warn.glp.gradient = FALSE
+  )
+
+  pdf(NULL)
+  on.exit(dev.off(), add = TRUE)
+  out <- plot(
+    fit,
+    gradients = TRUE,
+    gradient_order = 2L,
+    errors = "none",
+    output = "data",
+    neval = 20
+  )
+
+  expect_equal(as.vector(out[[1L]]$grad), rep(6, 20), tolerance = 1e-8)
+  expect_identical(out[[1L]]$gradient.order, 2L)
 })

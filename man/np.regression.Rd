@@ -126,8 +126,9 @@ These arguments control where the regression is evaluated and which fitted quant
     integer (or integer vector with one entry per continuous predictor)
     specifying derivative order(s). Defaults to \code{1L}. Orders
     exceeding \code{degree} for a variable are returned as
-    \code{NA}; orders greater than one are currently reserved for
-    future extension and return \code{NA}.
+    \code{NA}. Higher-order derivatives are available for continuous
+    predictors when the requested order does not exceed the
+    corresponding local-polynomial degree.
   }
 
 
@@ -136,9 +137,10 @@ These arguments control where the regression is evaluated and which fitted quant
     returned in the resulting \code{npregression} object. Defaults to
     \code{FALSE}. For \code{regtype="lp"}, derivative components that
     are not defined (requested order exceeds the variable-specific
-    polynomial degree) are returned as \code{NA}. Higher-order GLP
-    derivatives (order \eqn{>1}) are reserved for future C-level
-    extraction and currently return \code{NA}.
+    polynomial degree) are returned as \code{NA}. For ordered and
+    unordered predictors the gradient columns are first-order
+    effects/contrasts where supported; \code{gradient.order} controls
+    derivative order for continuous predictors.
   }
 
 
@@ -277,11 +279,14 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   controls basis construction: \code{FALSE} (default) uses raw
   local-polynomial powers, while \code{TRUE} uses a Bernstein/B-spline basis. The
   homogeneous degree-0 and degree-1 cases remain
-  equivalent to \code{lc} and \code{ll}, respectively. Current GLP
-  derivative output is first-order for continuous predictors; higher
-  order and cross-partial extraction are reserved for future extension.
-  In mixed-data GLP settings, derivative entries for unordered/ordered
-  predictors are returned as \code{NA}.
+  equivalent to \code{lc} and \code{ll}, respectively. For continuous
+  predictors, \code{gradients=TRUE} returns the derivative order(s)
+  requested by \code{gradient.order}; the associated \code{gerr}
+  entries are standard errors for those same derivative orders. Both
+  raw and Bernstein/B-spline bases report fitted values and derivatives
+  on the original response/predictor scale. In mixed-data GLP settings,
+  unordered and ordered predictors contribute first-order
+  effects/contrasts rather than higher-order derivatives.
   When \code{npregbw(..., regtype="lp")} is used with
   \code{degree.select="manual"}, the degree vector remains fixed user
   input. When \code{degree.select != "manual"}, \code{npregbw} can

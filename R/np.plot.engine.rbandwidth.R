@@ -964,6 +964,7 @@
                            grad = na.omit(temp.mean),
                            gerr = na.omit(cbind(-temp.err[,1],
                              temp.err[,2])),
+                           gradient.order = gradient.order,
                            ntrain = dim(xdat)[1])
             plot.out[[i]]$gbias = na.omit(temp.mean - temp.err[,3])
           } else {

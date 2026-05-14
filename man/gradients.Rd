@@ -38,8 +38,11 @@ Optional local-polynomial derivative order controls.
     for \code{npregression} objects fitted with \code{regtype="lp"},
     optional derivative order request (scalar or one entry per
     continuous predictor). Orders exceeding the fitted polynomial degree
-    (or greater than one, pending future C-level support) are returned
-    as \code{NA}.
+    are returned as \code{NA}. If a different admissible derivative order
+    is desired, compute the fit, prediction, or evaluation with
+    \code{gradients=TRUE} and the desired \code{gradient.order};
+    \code{gradients()} extracts stored derivatives and does not
+    recompute another derivative order after fitting.
   }
 
 \subsection{Additional Arguments}{
@@ -57,7 +60,11 @@ Further method-specific arguments.
 }
 \details{
   This function provides a generic interface for extraction of gradients
-  from objects. For \code{qregression} objects, \code{errors=TRUE} returns
+  from objects. For \code{npregression} objects fitted with
+  \code{regtype="lp"}, \code{gradient.order} identifies the stored
+  continuous-predictor derivative order to extract; it is not a
+  post-fit recomputation control. For \code{qregression} objects,
+  \code{errors=TRUE} returns
   asymptotic standard errors for the quantile gradients when the object was
   fitted with \code{gradients=TRUE}.
 }
