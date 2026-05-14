@@ -263,7 +263,14 @@ prediction/evaluation route, or plot route as appropriate.
     \code{plot.conmode}, additional arguments control the object-fed
     probability/effect display; common controls include
     \code{gradients}, \code{level}, \code{output}, \code{data_rug},
-    \code{layout}, \code{legend}, and graphics arguments. See
+    \code{layout}, \code{legend}, and graphics arguments. The public
+    \code{output="both"} spelling is accepted as an alias for the historical
+    \code{output="plot-data"} behavior. Probability/effect interval controls
+    such as \code{errors}, \code{band}, \code{bootstrap}, \code{B}, and
+    \code{alpha}, and grid/surface controls such as \code{renderer},
+    \code{perspective}, \code{neval}, and \code{grid_control}, are reserved
+    for a future object-fed probability-plot extension and currently fail with
+    route-specific messages rather than silently changing the target. See
     \code{\link{npcdensbw}} and \code{\link{plot.np}} for the complete
     bandwidth-selection and plotting argument surfaces.
   }
@@ -332,7 +339,9 @@ prediction/evaluation route, or plot route as appropriate.
   plot displays the fitted probability for the base/reference response level
   \code{levels(y)[1]}; use \code{plot(fit, level=...)} to select another
   outcome and \code{plot(fit, gradients=TRUE)} to display stored
-  class-probability effects.
+  class-probability effects. At present, \code{plot.conmode} draws stored
+  object-fed probability/effect payloads; it does not construct
+  probability/effect confidence bands or surface grids.
 }
 \section{Book And Method Pointers}{
   The conditional-mode target is

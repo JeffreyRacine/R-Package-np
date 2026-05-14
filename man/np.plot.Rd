@@ -108,7 +108,10 @@ Named options passed via \code{\dots} include:
         notably \code{plot.conmode}. If omitted, the default for
         \code{npconmode} objects is the base/reference response level
         \code{levels(y)[1]}. These plots require probabilities stored by
-        \code{npconmode(..., probabilities=TRUE)}.
+        \code{npconmode(..., probabilities=TRUE)}. Currently
+        \code{plot.conmode} displays stored object-fed probability/effect
+        payloads only; probability/effect interval bands and surface grids are
+        not yet implemented for this route.
       }
       \item{\code{layout}}{
         \code{"auto"} or \code{TRUE} requests automatic
