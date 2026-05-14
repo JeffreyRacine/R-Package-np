@@ -753,7 +753,12 @@ np_render_control <- function(style = c("band", "bar"),
     dots$plot.data.overlay <- TRUE
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
-.np_plot_conmode_data <- function(object, gradients = FALSE, level = NULL) {
+.np_plot_conmode_data <- function(object,
+                                  gradients = FALSE,
+                                  level = NULL,
+                                  errors = "none",
+                                  alpha = 0.05,
+                                  band = "pointwise") {
   lev <- if (!is.null(object$probability.levels)) {
     as.character(object$probability.levels)
   } else if (!is.null(object$probability.gradient.level)) {
@@ -819,6 +824,25 @@ np_render_control <- function(style = c("band", "bar"),
       stringsAsFactors = FALSE
     )
     names(out[[j]])[3L] <- value.name
+    if (!isTRUE(gradients) && !identical(errors, "none")) {
+      se <- object$probability.errors
+      if (is.null(se))
+        stop("class-probability standard errors are not available: refit with probabilities=TRUE",
+             call. = FALSE)
+      se <- as.matrix(se)[, level.idx]
+      repaired <- object$probability.repaired.rows
+      if (!is.null(repaired)) {
+        repaired <- as.logical(repaired)
+        se[is.na(repaired) | repaired] <- NA_real_
+      }
+      out[[j]] <- .np_plot_conmode_add_interval_columns(
+        out[[j]],
+        se = se,
+        errors = errors,
+        alpha = alpha,
+        band = band
+      )
+    }
   }
   names(out) <- xnames
   out
@@ -939,12 +963,56 @@ np_render_control <- function(style = c("band", "bar"),
   xq
 }
 
+.np_plot_conmode_probability_se <- function(object,
+                                            xtrain,
+                                            ytrain,
+                                            exdat,
+                                            level) {
+  dens.obj <- npcdens(
+    txdat = xtrain,
+    tydat = ytrain,
+    exdat = exdat,
+    eydat = .np_plot_conmode_level_factor(ytrain, level, nrow(exdat)),
+    bws = object$bws
+  )
+  as.vector(dens.obj$conderr)
+}
+
+.np_plot_conmode_add_interval_columns <- function(dat,
+                                                  se,
+                                                  errors,
+                                                  alpha,
+                                                  band) {
+  payload <- .np_plot_interval_payload(
+    estimate = dat$probability,
+    se = se,
+    plot.errors.method = errors,
+    plot.errors.alpha = alpha,
+    plot.errors.type = band,
+    plot.errors.center = "estimate"
+  )
+  dat$stderr <- as.numeric(se)
+  dat$center <- payload$center
+  dat$lower <- payload$center - payload$err[, 1L]
+  dat$upper <- payload$center + payload$err[, 2L]
+  if (!is.null(payload$all.err)) {
+    for (nm in names(payload$all.err)) {
+      dat[[paste0(nm, ".lower")]] <- payload$center - payload$all.err[[nm]][, 1L]
+      dat[[paste0(nm, ".upper")]] <- payload$center + payload$all.err[[nm]][, 2L]
+    }
+  }
+  dat
+}
+
 .np_plot_conmode_grid_data <- function(object,
                                        gradients = FALSE,
                                        level = NULL,
                                        neval = 50L,
                                        xtrim = c(0, 1),
-                                       xq = NULL) {
+                                       xq = NULL,
+                                       errors = "none",
+                                       alpha = 0.05,
+                                       band = "pointwise") {
   if (!isTRUE(gradients) && is.null(object$probabilities))
     stop("class probabilities are not available: fit with probabilities=TRUE or gradients=TRUE",
          call. = FALSE)
@@ -1031,7 +1099,7 @@ np_render_control <- function(style = c("band", "bar"),
         proper = isTRUE(object$proper.requested),
         proper.control = proper.control
       )
-      out[[j]] <- data.frame(
+      dat <- data.frame(
         variable = xnames[j],
         x = exdat[[j]],
         probability = proper.out$probabilities[, match(level, lev)],
@@ -1040,6 +1108,24 @@ np_render_control <- function(style = c("band", "bar"),
         view = "fixed",
         stringsAsFactors = FALSE
       )
+      if (!identical(errors, "none")) {
+        se <- .np_plot_conmode_probability_se(
+          object = object,
+          xtrain = xtrain,
+          ytrain = ytrain,
+          exdat = exdat,
+          level = level
+        )
+        se[proper.out$repaired.rows] <- NA_real_
+        dat <- .np_plot_conmode_add_interval_columns(
+          dat,
+          se = se,
+          errors = errors,
+          alpha = alpha,
+          band = band
+        )
+      }
+      out[[j]] <- dat
     }
   }
   out
@@ -1078,7 +1164,10 @@ np_render_control <- function(style = c("band", "bar"),
                                           neval = 50L,
                                           xtrim = c(0, 1),
                                           xq = NULL,
-                                          plot.vars = NULL) {
+                                          plot.vars = NULL,
+                                          errors = "none",
+                                          alpha = 0.05,
+                                          band = "pointwise") {
   if (is.null(object$probabilities))
     stop("class probabilities are not available: fit with probabilities=TRUE or gradients=TRUE",
          call. = FALSE)
@@ -1158,6 +1247,23 @@ np_render_control <- function(style = c("band", "bar"),
     perspective = TRUE,
     stringsAsFactors = FALSE
   )
+  if (!identical(errors, "none")) {
+    se <- .np_plot_conmode_probability_se(
+      object = object,
+      xtrain = xtrain,
+      ytrain = ytrain,
+      exdat = exdat,
+      level = level
+    )
+    se[proper.out$repaired.rows] <- NA_real_
+    surface <- .np_plot_conmode_add_interval_columns(
+      surface,
+      se = se,
+      errors = errors,
+      alpha = alpha,
+      band = band
+    )
+  }
   held.vars <- setdiff(xnames, plot.vars)
   held <- if (length(held.vars)) base[, held.vars, drop = FALSE] else data.frame()
   structure(
@@ -1296,12 +1402,21 @@ np_render_control <- function(style = c("band", "bar"),
 
   xplot <- if (is.factor(x)) as.numeric(x) else x
   ord <- order(xplot)
+  interval.cols <- !isTRUE(gradients) && all(c("lower", "upper") %in% names(dat))
+  ylim.interval <- NULL
+  if (interval.cols) {
+    ylim.interval <- range(c(y, dat$lower, dat$upper), finite = TRUE)
+    if (!all(is.finite(ylim.interval)))
+      ylim.interval <- NULL
+  }
   args <- .np_plot_merge_user_args(
     list(x = xplot[ord], y = y[ord],
          type = if (is.factor(x) && !is.ordered(x)) "p" else "l",
          xlab = xlab, ylab = ylab, main = main),
     line.user.args
   )
+  if (is.null(args$ylim) && !is.null(ylim.interval))
+    args$ylim <- ylim.interval
   args <- .np_plot_merge_user_args(
     args,
     plot.user.args
@@ -1315,6 +1430,21 @@ np_render_control <- function(style = c("band", "bar"),
   }
   if (isTRUE(data_rug) && is.numeric(xplot))
     graphics::rug(xplot)
+  if (interval.cols) {
+    lower <- dat$lower[ord]
+    upper <- dat$upper[ord]
+    xord <- xplot[ord]
+    good <- is.finite(xord) & is.finite(lower) & is.finite(upper)
+    if (any(good)) {
+      if (is.factor(x) && !is.ordered(x)) {
+        graphics::segments(xord[good], lower[good], xord[good], upper[good],
+                           col = "gray45", lty = 2)
+      } else {
+        graphics::lines(xord[good], lower[good], col = "gray45", lty = 2)
+        graphics::lines(xord[good], upper[good], col = "gray45", lty = 2)
+      }
+    }
+  }
   invisible(NULL)
 }
 
@@ -1332,27 +1462,79 @@ np_render_control <- function(style = c("band", "bar"),
     stop("unnamed plot arguments are not supported for plot.conmode",
          call. = FALSE)
   interval.args <- c("errors", "band", "alpha", "bootstrap", "B", "center",
+                     "render_control",
                      "boot_control", "plot.errors.method", "plot.errors.type",
                      "plot.errors.alpha", "plot.errors.boot.method",
                      "plot.errors.boot.num", "plot.errors.boot.nonfixed",
                      "plot.errors.boot.wild", "plot.errors.boot.blocklen",
                      "plot.errors.center", "plot.errors.style",
                      "plot.errors.bar", "plot.errors.bar.num")
-  interval.supplied <- intersect(dot.names[nzchar(dot.names)], interval.args)
-  if (length(interval.supplied))
-    stop("class-probability/effect intervals are not yet implemented for plot.conmode",
-         call. = FALSE)
   surface.args <- c("renderer", "perspective", "persp", "plot.vars")
   grid.args <- c("neval", "grid_control", "view", "xtrim", "xq")
   grid.supplied <- intersect(dot.names[nzchar(dot.names)], grid.args)
   rgl.prefixed.args <- dot.names[startsWith(dot.names, "rgl.")]
   allowed <- unique(c("gradients", "level", "output", "data_rug",
                       "layout", "legend", grid.args, surface.args,
-                      rgl.prefixed.args,
+                      interval.args, rgl.prefixed.args,
                       .np_plot_graphics_arg_names()))
   .np_plot_stop_unused_args(setdiff(dot.names[nzchar(dot.names)], allowed),
                             allowed)
+  perspective.raw <- dots$perspective
+  persp.raw <- dots$persp
+  dots$perspective <- NULL
+  dots$persp <- NULL
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.conmode")
+  if (!is.null(perspective.raw))
+    dots$perspective <- perspective.raw
+  if (!is.null(persp.raw))
+    dots$persp <- persp.raw
+  if (!is.null(dots$plot.behavior)) {
+    output <- dots$plot.behavior
+    dots$plot.behavior <- NULL
+  }
+  if (!is.null(dots$plot.rug)) {
+    data_rug <- dots$plot.rug
+    dots$plot.rug <- NULL
+  }
+  if (!is.null(dots$plot.par.mfrow)) {
+    layout <- dots$plot.par.mfrow
+    dots$plot.par.mfrow <- NULL
+  }
+  errors <- if (is.null(dots$plot.errors.method)) "none" else
+    .np_plot_scalar_match(dots$plot.errors.method,
+                          c("none", "bootstrap", "asymptotic"),
+                          "plot.errors.method")
+  band <- if (is.null(dots$plot.errors.type)) "pointwise" else
+    .np_plot_scalar_match(dots$plot.errors.type,
+                          c("pmzsd", "pointwise", "bonferroni",
+                            "simultaneous", "all"),
+                          "plot.errors.type")
+  alpha <- if (is.null(dots$plot.errors.alpha)) 0.05 else
+    dots$plot.errors.alpha
+  center <- if (is.null(dots$plot.errors.center)) "estimate" else
+    .np_plot_scalar_match(dots$plot.errors.center,
+                          c("estimate", "bias-corrected"),
+                          "plot.errors.center")
+  if (!is.numeric(alpha) || length(alpha) != 1L ||
+      is.na(alpha) || alpha <= 0 || alpha >= 0.5)
+    stop("plot.errors.alpha must lie in (0, 0.5)", call. = FALSE)
+  if (identical(errors, "bootstrap"))
+    stop("bootstrap intervals are not yet implemented for plot.conmode class probabilities",
+         call. = FALSE)
+  if (!identical(center, "estimate") && !identical(errors, "bootstrap"))
+    stop("bias-corrected interval centering requires errors=\"bootstrap\"",
+         call. = FALSE)
+  unsupported.interval <- intersect(
+    names(dots),
+    c("plot.errors.style", "plot.errors.bar", "plot.errors.bar.num")
+  )
+  if (length(unsupported.interval))
+    stop("plot.conmode probability intervals currently use simple asymptotic line/error-bar rendering; render_control/style arguments are not yet implemented",
+         call. = FALSE)
   gradients <- npValidateScalarLogical(gradients, "gradients")
+  if (!identical(errors, "none") && isTRUE(gradients))
+    stop("plot.conmode intervals are available for class probabilities, not probability gradients/effects",
+         call. = FALSE)
   data_rug <- npValidateScalarLogical(data_rug, "data_rug")
   renderer <- "base"
   if (!is.null(dots$renderer))
@@ -1408,6 +1590,10 @@ np_render_control <- function(style = c("band", "bar"),
   if (identical(output, "both"))
     output <- "plot-data"
   output <- .np_plot_scalar_match(output, c("plot", "data", "plot-data"), "output")
+  if (!identical(errors, "none") && isTRUE(perspective) &&
+      !identical(output, "data"))
+    stop("surface probability intervals are available as output=\"data\" only; surface band rendering is not yet implemented for plot.conmode",
+         call. = FALSE)
   plot.user.args <- .np_plot_user_args(dots, "plot")
   line.user.args <- .np_plot_user_args(dots, "lines")
   if (!is.null(dots$type))
@@ -1420,7 +1606,10 @@ np_render_control <- function(style = c("band", "bar"),
       neval = neval,
       xtrim = xtrim,
       xq = xq,
-      plot.vars = dots$plot.vars
+      plot.vars = dots$plot.vars,
+      errors = errors,
+      alpha = alpha,
+      band = band
     )
   } else if (identical(view, "fixed")) {
     .np_plot_conmode_grid_data(
@@ -1429,10 +1618,20 @@ np_render_control <- function(style = c("band", "bar"),
       level = level,
       neval = neval,
       xtrim = xtrim,
-      xq = xq
+      xq = xq,
+      errors = errors,
+      alpha = alpha,
+      band = band
     )
   } else {
-    .np_plot_conmode_data(object, gradients = gradients, level = level)
+    .np_plot_conmode_data(
+      object,
+      gradients = gradients,
+      level = level,
+      errors = errors,
+      alpha = alpha,
+      band = band
+    )
   }
 
   if (isTRUE(perspective)) {
