@@ -252,6 +252,51 @@ test_that("npcopula fitted and basic plot methods work", {
   expect_equal(one.point$grid.dim, c(1L, 1L))
 })
 
+test_that("npcopula contour and image plots use descriptive default titles", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  data("faithful")
+  bw <- npudistbw(dat = faithful, bws = c(0.5, 5), bandwidth.compute = FALSE)
+  u <- data.frame(eruptions = seq(0, 1, length.out = 3),
+                  waiting = seq(0, 1, length.out = 3))
+  fit <- npcopula(data = faithful, bws = bw, u = u, n.quasi.inv = 40)
+
+  captured <- new.env(parent = emptyenv())
+  captured$contour <- NULL
+  captured$image <- NULL
+  pdf(file = tempfile(fileext = ".pdf"))
+  on.exit(dev.off(), add = TRUE)
+  trace(
+    what = "contour",
+    where = asNamespace("graphics"),
+    tracer = bquote({
+      assign("contour", as.list(match.call()), envir = .(captured))
+    }),
+    print = FALSE
+  )
+  on.exit(
+    try(untrace("contour", where = asNamespace("graphics")), silent = TRUE),
+    add = TRUE
+  )
+  trace(
+    what = "image",
+    where = asNamespace("graphics"),
+    tracer = bquote({
+      assign("image", as.list(match.call()), envir = .(captured))
+    }),
+    print = FALSE
+  )
+  on.exit(
+    try(untrace("image", where = asNamespace("graphics")), silent = TRUE),
+    add = TRUE
+  )
+
+  expect_silent(plot(fit, view = "contour", perspective = FALSE))
+  expect_silent(plot(fit, view = "image", perspective = FALSE))
+  expect_identical(eval(captured$contour$main), "Copula Contour")
+  expect_identical(eval(captured$image$main), "Contour Heatmap")
+})
+
 test_that("npcopula perspective defaults follow shared surface convention", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
@@ -292,6 +337,23 @@ test_that("npcopula perspective defaults follow shared surface convention", {
   expect_identical(captured$args$ticktype, "detailed")
 })
 
+test_that("npcopula zlim caps plotted surface without changing data", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  data("faithful")
+  bw <- npudistbw(dat = faithful, bws = c(0.5, 5), bandwidth.compute = FALSE)
+  u <- data.frame(eruptions = seq(0, 1, length.out = 3),
+                  waiting = seq(0, 1, length.out = 3))
+  fit <- npcopula(data = faithful, bws = bw, u = u, n.quasi.inv = 40)
+  fit$eval$copula[1L] <- 5
+  fit$copula <- fit$eval$copula
+
+  expect_gt(max(plot(fit, output = "data")$copula), 1)
+  pdf(file = tempfile(fileext = ".pdf"))
+  on.exit(dev.off(), add = TRUE)
+  expect_warning(plot(fit, view = "fixed", zlim = c(0, 1)), NA)
+})
+
 test_that("npcopula plot intervals work for grid surfaces", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
@@ -325,6 +387,47 @@ test_that("npcopula plot intervals work for grid surfaces", {
 
   sample.fit <- npcopula(~ x + y, data = dat, evaluation = "sample", nmulti = 1)
   expect_error(plot(sample.fit, errors = "asymptotic"), "grid evaluation")
+})
+
+test_that("npcopula plots mixed ordered grids on requested probability axes", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  set.seed(42)
+  n <- 80
+  n.eval <- 12
+  rho <- 0.99
+  x <- rnorm(n)
+  ylatent <- rho * x + sqrt(1 - rho^2) * rnorm(n)
+  dat <- data.frame(
+    x = x,
+    y = ordered(as.integer(cut(
+      ylatent,
+      quantile(ylatent, seq(0, 1, by = 0.1)),
+      include.lowest = TRUE
+    )) - 1)
+  )
+  fit <- npcopula(~ x + y, data = dat, neval = n.eval, nmulti = 1)
+
+  expect_equal(nrow(as.data.frame(fit)), n.eval * n.eval)
+  expect_equal(length(unique(fit$u.grid$u1)), n.eval)
+  expect_equal(length(unique(fit$u.grid$u2)), n.eval)
+  expect_lt(length(unique(as.data.frame(fit)$u2)), n.eval)
+  expect_silent(plot(fit, view = "contour", output = "data"))
+
+  empirical <- plot(fit, view = "empirical", output = "data")
+  expect_equal(nrow(empirical), n)
+  expect_true(all(c("u1", "u2") %in% names(empirical)))
+
+  all.payload <- plot(fit, view = "all", output = "data")
+  expect_equal(nrow(all.payload$copula), n.eval * n.eval)
+  expect_equal(nrow(all.payload$empirical), n)
+  expect_equal(nrow(all.payload$density), n.eval * n.eval)
+  expect_error(plot(fit, view = "all", renderer = "rgl"), "renderer='base'")
+
+  dens <- npcopula(~ x + y, data = dat, target = "density",
+                   neval = n.eval, nmulti = 1)
+  expect_error(plot(dens, view = "all"),
+               "requires a copula distribution object")
 })
 
 test_that("npcopula bootstrap plot uses MPI fanout", {

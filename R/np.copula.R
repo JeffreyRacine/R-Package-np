@@ -118,6 +118,8 @@ npcopula <- function(bws, ...) {
                              u.provided,
                              u.auto,
                              grid.dim,
+                             u.input = NULL,
+                             u.grid = NULL,
                              neval,
                              n.quasi.inv,
                              er.quasi.inv,
@@ -147,6 +149,8 @@ npcopula <- function(bws, ...) {
   d$u.auto <- isTRUE(u.auto)
   d$evaluation <- evaluation
   d$grid.dim <- grid.dim
+  d$u.input <- u.input
+  d$u.grid <- u.grid
   d$neval <- neval
   d$n.quasi.inv <- n.quasi.inv
   d$er.quasi.inv <- er.quasi.inv
@@ -181,8 +185,16 @@ npcopula <- function(bws, ...) {
   if (is.null(grid.dim) || length(grid.dim) != 2L ||
       prod(grid.dim) != nrow(dat))
     stop("npcopula grid output cannot be reshaped into a two-dimensional surface")
-  u1 <- sort(unique(dat$u1))
-  u2 <- sort(unique(dat$u2))
+  if (!is.null(x$u.grid)) {
+    ugrid <- as.data.frame(x$u.grid)
+    if (ncol(ugrid) != 2L || nrow(ugrid) != nrow(dat))
+      stop("npcopula requested grid metadata is incompatible with the fitted surface")
+    u1 <- sort(unique(ugrid[[1L]]))
+    u2 <- sort(unique(ugrid[[2L]]))
+  } else {
+    u1 <- sort(unique(dat$u1))
+    u2 <- sort(unique(dat$u2))
+  }
   if (length(u1) != grid.dim[1L] || length(u2) != grid.dim[2L])
     stop("npcopula grid output is not rectangular")
   xgrid <- as.data.frame(dat[, xnames, drop = FALSE])
@@ -192,6 +204,193 @@ npcopula <- function(bws, ...) {
     xgrid = xgrid,
     z = matrix(dat$copula, nrow = length(u1), ncol = length(u2))
   )
+}
+
+.npcopula_empirical_eval <- function(x) {
+  dat <- as.data.frame(x)
+  if (identical(x$evaluation, "sample") &&
+      all(c("u1", "u2") %in% names(dat))) {
+    return(dat[, c("u1", "u2"), drop = FALSE])
+  }
+  data <- .npcopula_training_data(x)
+  bws <- x$bws
+  out <- vector("list", length(bws$xnames))
+  for (j in seq_along(bws$xnames)) {
+    mbw <- .npcopula_marginal_bw(bws, data, j)
+    xdat <- data[, bws$xnames[j], drop = FALSE]
+    out[[j]] <- .np_ksum_unconditional_eval_exact(
+      xdat = xdat,
+      exdat = xdat,
+      bws = mbw,
+      operator = "integral"
+    )
+  }
+  out <- as.data.frame(out)
+  names(out) <- paste0("u", seq_along(out))
+  out
+}
+
+.npcopula_default_plot_main <- function(target.label, view) {
+  switch(view,
+         contour = paste(target.label, "Contour"),
+         image = if (identical(target.label, "Copula")) {
+           "Contour Heatmap"
+         } else {
+           paste(target.label, "Heatmap")
+         },
+         empirical = "Empirical Copula",
+         target.label)
+}
+
+.npcopula_validate_zlim <- function(zlim) {
+  if (is.null(zlim))
+    return(NULL)
+  if (!is.numeric(zlim) || length(zlim) != 2L ||
+      anyNA(zlim) || any(!is.finite(zlim)) || zlim[1L] >= zlim[2L])
+    stop("zlim must be a finite numeric vector of length two with zlim[1] < zlim[2]",
+         call. = FALSE)
+  zlim
+}
+
+.npcopula_clip_z_for_display <- function(z, zlim) {
+  if (is.null(z))
+    return(NULL)
+  if (is.null(zlim))
+    return(z)
+  pmin(pmax(z, zlim[1L]), zlim[2L])
+}
+
+.npcopula_clip_z_list_for_display <- function(zlist, zlim) {
+  if (is.null(zlist))
+    return(NULL)
+  lapply(zlist, .npcopula_clip_z_for_display, zlim = zlim)
+}
+
+.npcopula_density_companion <- function(x) {
+  if (isTRUE(x$density))
+    return(x)
+  data <- .npcopula_training_data(x)
+  f <- stats::as.formula(paste("~", paste(x$xnames, collapse = "+")))
+  bws <- x$bws
+  bw.args <- list(
+    formula = f,
+    data = data,
+    bws = bws$bw,
+    bandwidth.compute = FALSE,
+    bwtype = bws$type,
+    ckerorder = bws$ckerorder,
+    ckertype = bws$ckertype,
+    okertype = bws$okertype,
+    ukertype = bws$ukertype
+  )
+  if (!is.null(bws$ckerbound))
+    bw.args$ckerbound <- bws$ckerbound
+  if (!is.null(bws$ckerlb))
+    bw.args$ckerlb <- bws$ckerlb
+  if (!is.null(bws$ckerub))
+    bw.args$ckerub <- bws$ckerub
+  dbw <- .npRmpi_with_local_regression(do.call(npudensbw, bw.args))
+  .npRmpi_with_local_regression(.npcopula_eval(
+    bws = dbw,
+    data = data,
+    u = x$u.input,
+    target = "density",
+    evaluation = x$evaluation,
+    neval = x$neval,
+    n.quasi.inv = x$n.quasi.inv,
+    er.quasi.inv = x$er.quasi.inv,
+    u.auto = isTRUE(x$u.auto)
+  ))
+}
+
+.npcopula_draw_surface_base <- function(grid,
+                                        zlab,
+                                        main,
+                                        theta,
+                                        phi,
+                                        col,
+                                        border,
+                                        zlim,
+                                        xlab,
+                                        ylab,
+                                        dots) {
+  persp.args <- .np_plot_user_args(dots, "persp")
+  z <- .npcopula_clip_z_for_display(grid$z, zlim)
+  persp.col <- grDevices::adjustcolor(
+    .np_plot_persp_surface_colors(z = z, col = col),
+    alpha.f = 0.5
+  )
+  persp.call <- list(x = grid$u1, y = grid$u2, z = z,
+                     theta = theta, phi = phi,
+                     ticktype = "detailed",
+                     xlab = xlab, ylab = ylab, zlab = zlab,
+                     main = main, col = persp.col, border = border)
+  if (!is.null(zlim))
+    persp.call$zlim <- zlim
+  do.call(graphics::persp, .np_plot_merge_user_args(persp.call, persp.args))
+}
+
+.npcopula_plot_all <- function(x,
+                               xlab,
+                               ylab,
+                               theta,
+                               phi,
+                               col,
+                               border,
+                               zlim,
+                               dots,
+                               draw = TRUE) {
+  if (!identical(x$evaluation, "grid"))
+    stop("view='all' requires grid evaluation output", call. = FALSE)
+  grid <- .npcopula_grid_eval(x)
+  empirical <- .npcopula_empirical_eval(x)
+  density.obj <- .npcopula_density_companion(x)
+  density.grid <- .npcopula_grid_eval(density.obj)
+  out <- list(
+    copula = as.data.frame(x),
+    empirical = empirical,
+    density = as.data.frame(density.obj)
+  )
+  if (!isTRUE(draw))
+    return(out)
+  old.par <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(old.par), add = TRUE)
+  graphics::par(mfrow = c(2L, 2L))
+  do.call(graphics::contour, c(list(x = grid$u1, y = grid$u2, z = grid$z,
+                                    xlab = xlab, ylab = ylab,
+                                    main = "Copula Contour"),
+                               dots))
+  .npcopula_draw_surface_base(
+    grid = grid,
+    zlab = "Copula",
+    main = "Copula",
+    theta = theta,
+    phi = phi,
+    col = col,
+    border = border,
+    zlim = if (is.null(zlim)) c(0, 1) else zlim,
+    xlab = xlab,
+    ylab = ylab,
+    dots = dots
+  )
+  do.call(graphics::plot, c(list(x = empirical$u1, y = empirical$u2,
+                                 xlab = xlab, ylab = ylab, cex = 0.25,
+                                 main = "Empirical Copula"),
+                            dots))
+  .npcopula_draw_surface_base(
+    grid = density.grid,
+    zlab = "Copula Density",
+    main = "Copula Density",
+    theta = theta,
+    phi = phi,
+    col = col,
+    border = border,
+    zlim = NULL,
+    xlab = xlab,
+    ylab = ylab,
+    dots = dots
+  )
+  invisible(out)
 }
 
 .npcopula_training_data <- function(x) {
@@ -623,7 +822,8 @@ as.data.frame.npcopula <- function(x, row.names = NULL, optional = FALSE, ...) {
 
 plot.npcopula <- function(x,
                           perspective = TRUE,
-                          view = c("rotate", "fixed", "surface", "contour", "image"),
+                          view = c("rotate", "fixed", "surface", "contour", "image",
+                                   "empirical", "all"),
                           renderer = c("base", "rgl"),
                           errors = c("none", "bootstrap", "asymptotic"),
                           band = c("pointwise", "pmzsd", "bonferroni",
@@ -663,6 +863,7 @@ plot.npcopula <- function(x,
     stop("alpha must lie in (0, 0.5)", call. = FALSE)
   if (!is.numeric(B) || length(B) != 1L || is.na(B) || B < 1L)
     stop("B must be a positive numeric scalar", call. = FALSE)
+  zlim <- .npcopula_validate_zlim(zlim)
   if (!inherits(boot_control, "np_boot_control"))
     stop("boot_control must be created by np_boot_control()", call. = FALSE)
   if (!identical(errors, "bootstrap") && bootstrap.supplied)
@@ -674,14 +875,61 @@ plot.npcopula <- function(x,
   dots <- list(...)
   target <- x$target
   target.label <- if (identical(target, "density")) "Copula Density" else "Copula"
+  main.supplied <- !missing(main) && !is.null(main)
   if (is.null(zlab))
     zlab <- target.label
   if (is.null(main))
-    main <- target.label
+    main <- .npcopula_default_plot_main(target.label, view)
 
   xnames <- x$xnames
   if (length(xnames) != 2L)
     stop("plot.npcopula currently supports two-dimensional copula displays")
+
+  if (identical(view, "all")) {
+    if (isTRUE(x$density))
+      stop("view='all' requires a copula distribution object",
+           call. = FALSE)
+    if (!identical(errors, "none"))
+      stop("view='all' does not currently support interval overlays",
+           call. = FALSE)
+    if (identical(renderer, "rgl"))
+      stop("view='all' is currently supported only with renderer='base'",
+           call. = FALSE)
+    all.data <- .npcopula_plot_all(
+      x = x,
+      xlab = xlab,
+      ylab = ylab,
+      theta = theta,
+      phi = phi,
+      col = col,
+      border = border,
+      zlim = zlim,
+      dots = dots,
+      draw = !identical(output, "data")
+    )
+    if (identical(output, "data") || identical(output, "plot-data"))
+      return(all.data)
+    return(invisible(x))
+  }
+
+  if (identical(view, "empirical")) {
+    if (!identical(errors, "none"))
+      stop("view='empirical' does not support interval overlays",
+           call. = FALSE)
+    if (identical(renderer, "rgl"))
+      stop("renderer='rgl' is supported only for grid surface displays in plot.npcopula",
+           call. = FALSE)
+    empirical <- .npcopula_empirical_eval(x)
+    if (identical(output, "data"))
+      return(empirical)
+    do.call(graphics::plot, c(list(x = empirical$u1, y = empirical$u2,
+                                   xlab = xlab, ylab = ylab, cex = 0.25,
+                                   main = main),
+                              dots))
+    if (identical(output, "plot-data"))
+      return(empirical)
+    return(invisible(x))
+  }
 
   evaluation <- x$evaluation
   if (identical(evaluation, "sample")) {
@@ -711,6 +959,7 @@ plot.npcopula <- function(x,
   u1 <- grid$u1
   u2 <- grid$u2
   z <- grid$z
+  z.display <- .npcopula_clip_z_for_display(z, zlim)
   payload <- .npcopula_interval_payload(
     x = x,
     plot.errors.method = errors,
@@ -742,6 +991,12 @@ plot.npcopula <- function(x,
     zlim.values <- c(z, lerr, herr, unlist(lerr.all, use.names = FALSE),
                      unlist(herr.all, use.names = FALSE))
     zlim <- range(zlim.values, finite = TRUE)
+    z.display <- z
+  } else {
+    lerr <- .npcopula_clip_z_for_display(lerr, zlim)
+    herr <- .npcopula_clip_z_for_display(herr, zlim)
+    lerr.all <- .npcopula_clip_z_list_for_display(lerr.all, zlim)
+    herr.all <- .npcopula_clip_z_list_for_display(herr.all, zlim)
   }
 
   if (isTRUE(perspective) && surface.view) {
@@ -763,7 +1018,7 @@ plot.npcopula <- function(x,
       rgl.out <- .np_plot_render_surface_rgl(
         x = u1,
         y = u2,
-        z = z,
+        z = z.display,
         xlab = xlab,
         ylab = ylab,
         zlab = zlab,
@@ -805,7 +1060,7 @@ plot.npcopula <- function(x,
     }
     persp.args <- .np_plot_user_args(dots, "persp")
     persp.col <- grDevices::adjustcolor(
-      .np_plot_persp_surface_colors(z = z, col = col),
+      .np_plot_persp_surface_colors(z = z.display, col = col),
       alpha.f = 0.5
     )
     rotate.defaults <- .np_plot_rotate_defaults()
@@ -820,7 +1075,7 @@ plot.npcopula <- function(x,
 
     for (frame.idx in seq_along(frame.theta)) {
       i <- frame.theta[[frame.idx]]
-      persp.call <- list(x = u1, y = u2, z = z,
+      persp.call <- list(x = u1, y = u2, z = z.display,
                          theta = i, phi = phi,
                          ticktype = "detailed",
                          xlab = xlab, ylab = ylab, zlab = zlab,
@@ -1066,6 +1321,8 @@ npcopula.default <- function(bws,
 
   u.provided <- !is.null(u)
   grid.dim <- .npcopula_grid_dim(u, num.var)
+  u.input <- if (u.provided) as.data.frame(u) else NULL
+  u.requested <- u
   bw.type <- bws$type
   bw.ckerorder <- bws$ckerorder
   bw.ckertype <- bws$ckertype
@@ -1227,6 +1484,8 @@ npcopula.default <- function(bws,
     names(u) <- paste("u", seq_len(num.var), sep = "")
     out <- data.frame(copula,u)
   } else {
+    u.grid <- expand.grid(data.frame(u.requested))
+    names(u.grid) <- paste("u", seq_len(num.var), sep = "")
     u <- expand.grid(data.frame(u))
     names(u) <- paste("u", seq_len(num.var), sep = "")
     out <- data.frame(copula,u,x.u)
@@ -1241,6 +1500,8 @@ npcopula.default <- function(bws,
     u.provided = u.provided,
     u.auto = u.auto,
     grid.dim = grid.dim,
+    u.input = u.input,
+    u.grid = if (u.provided) u.grid else NULL,
     neval = neval,
     n.quasi.inv = n.quasi.inv,
     er.quasi.inv = er.quasi.inv
