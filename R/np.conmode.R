@@ -83,6 +83,10 @@ npconmode.formula <-
     ev$conderr <- napredict(ev$omit, ev$conderr)
     if (!is.null(ev$probabilities))
       ev$probabilities <- napredict(ev$omit, ev$probabilities)
+    if (!is.null(ev$probability.errors))
+      ev$probability.errors <- napredict(ev$omit, ev$probability.errors)
+    if (!is.null(ev$probability.repaired.rows))
+      ev$probability.repaired.rows <- napredict(ev$omit, ev$probability.repaired.rows)
     if (!is.null(ev$probability.gradients))
       ev$probability.gradients <- .npConmodeNapredictArray(ev$omit, ev$probability.gradients)
 
@@ -341,8 +345,8 @@ npconmode.conbandwidth <-
       if (bws$xndim < 1L)
         stop("npconmode class-probability gradients/effects require at least one conditioning variable")
     }
-    pmat <- matrix(NA_real_, enrow, nlev)
-    perr <- matrix(NA_real_, enrow, nlev)
+    pmat <- matrix(NA_real_, enrow, nlev, dimnames = list(NULL, level.values))
+    perr <- matrix(NA_real_, enrow, nlev, dimnames = list(NULL, level.values))
     pgrad <- if (isTRUE(gradients)) {
       matrix(NA_real_,
              nrow = enrow,
@@ -398,6 +402,9 @@ npconmode.conbandwidth <-
     if (isTRUE(probabilities) || isTRUE(gradients)) {
       cm.args$probabilities <- proper.out$probabilities
       cm.args$probability.levels <- efac
+      cm.args$probability.errors <- perr
+      cm.args$probability.errors[proper.out$repaired.rows, ] <- NA_real_
+      cm.args$probability.repaired.rows <- proper.out$repaired.rows
       if (!no.ex) {
         cm.args$xtrain <- txdat
         cm.args$ytrain <- tydat

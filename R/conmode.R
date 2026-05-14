@@ -50,6 +50,8 @@ conmode =
            proper.info = NULL,
            probabilities = NULL,
            probability.levels = NULL,
+           probability.errors = NULL,
+           probability.repaired.rows = NULL,
            probability.gradients = NULL,
            probability.gradient.level = NULL,
            probability.gradient.names = NULL,
@@ -103,6 +105,8 @@ conmode =
     if (!is.null(probabilities)) {
       d$probabilities <- probabilities
       d$probability.levels <- probability.levels
+      d$probability.errors <- probability.errors
+      d$probability.repaired.rows <- probability.repaired.rows
     }
     if (!is.null(probability.gradients)) {
       d$probability.gradients <- probability.gradients

@@ -233,6 +233,8 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   expect_s3_class(fit, "conmode")
   expect_true(isTRUE(fit$gradients))
   expect_equal(rowSums(fit$probabilities), rep(1, n), tolerance = 1e-10)
+  expect_equal(dim(fit$probability.errors), dim(fit$probabilities))
+  expect_equal(colnames(fit$probability.errors), colnames(fit$probabilities))
   expect_equal(as.character(fit$probability.gradient.level), "0")
   expect_equal(predict(fit, type = "class"), fit$conmode)
   expect_equal(predict(fit, type = "prob"), fit$probabilities)
@@ -257,6 +259,14 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   expect_equal(nrow(pdata$x), n)
   expect_equal(plot(fit, output = "both"), pdata)
 
+  perr <- plot(fit, output = "data", errors = "asymptotic",
+               band = "all", level = "0")
+  expect_true(all(c("stderr", "lower", "upper",
+                    "pointwise.lower", "bonferroni.upper") %in%
+                    names(perr$x)))
+  expect_equal(perr$x$stderr, fit$probability.errors[, "0"],
+               tolerance = 1e-12, ignore_attr = TRUE)
+
   grdata <- plot(fit, gradients = TRUE, output = "data")
   expect_named(grdata, "x")
   expect_true("effect" %in% names(grdata$x))
@@ -272,6 +282,11 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
                        type = "prob")[, "0"]
   expect_equal(grid.data$x$probability, grid.prob, tolerance = 1e-5)
 
+  grid.err <- plot(fit, view = "fixed", neval = 9L, output = "data",
+                   errors = "asymptotic", band = "pointwise", level = "0")
+  expect_true(all(c("stderr", "lower", "upper") %in% names(grid.err$x)))
+  expect_true(any(is.finite(grid.err$x$stderr)))
+
   grid.grad <- plot(fit, view = "fixed", neval = 9L,
                     gradients = TRUE, output = "data")
   expect_equal(nrow(grid.grad$x), 9L)
@@ -286,7 +301,9 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   expect_silent(plot(fit, gradients = TRUE, col = "blue", lwd = 2, lty = 3,
                      type = "l"))
   expect_error(plot(fit, errors = "bootstrap"),
-               "class-probability/effect intervals are not yet implemented")
+               "bootstrap intervals are not yet implemented")
+  expect_error(plot(fit, gradients = TRUE, errors = "asymptotic"),
+               "not probability gradients")
   expect_error(plot(fit, renderer = "rgl"),
                "renderer='rgl' is supported only")
   grDevices::dev.off()
@@ -329,6 +346,15 @@ test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
   expect_true(all(is.finite(surf$surface$probability)))
   expect_true(all(surf$surface$probability >= -1e-10))
   expect_true(all(surf$surface$probability <= 1 + 1e-10))
+
+  surf.err <- plot(fit, view = "fixed", perspective = TRUE,
+                   neval = 5L, output = "data",
+                   errors = "asymptotic", level = surf$level)
+  expect_true(all(c("stderr", "lower", "upper") %in% names(surf.err$surface)))
+  expect_true(any(is.finite(surf.err$surface$stderr)))
+  expect_error(plot(fit, view = "fixed", perspective = TRUE,
+                    neval = 5L, errors = "asymptotic"),
+               "output=\"data\" only", fixed = TRUE)
 
   nd <- data.frame(
     x1 = surf$surface$x1,

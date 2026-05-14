@@ -278,12 +278,17 @@ prediction/evaluation route, or plot route as appropriate.
     corresponding interactive surface when \pkg{rgl} is available. The public
     \code{output="both"} spelling is
     accepted as an alias for the historical \code{output="plot-data"}
-    behavior. Probability/effect interval controls
-    such as \code{errors}, \code{band}, \code{bootstrap}, \code{B}, and
-    \code{alpha} are reserved for future object-fed extensions and
-    currently fail with route-specific messages rather than silently changing
-    the target. See \code{\link{npcdensbw}} and \code{\link{plot.np}} for the
-    complete bandwidth-selection and plotting argument surfaces.
+    behavior. For class-probability plots, \code{errors="asymptotic"}
+    adds probability-level asymptotic standard errors and intervals for the
+    selected response level. These intervals target the smooth probability
+    \eqn{\Pr(Y=\ell\mid X=x)}, not the discrete modal class label. Rows whose
+    probabilities were materially repaired by simplex projection report
+    \code{NA} standard errors rather than treating raw conditional-density
+    standard errors as projected-probability standard errors. Surface
+    intervals are available as \code{output="data"} payload columns; surface
+    band rendering and \code{errors="bootstrap"} are intentionally deferred.
+    See \code{\link{npcdensbw}} and \code{\link{plot.np}} for the complete
+    bandwidth-selection and plotting argument surfaces.
   }
 
 }
@@ -320,6 +325,13 @@ prediction/evaluation route, or plot route as appropriate.
     the discrete response support }
   \item{probability.levels}{ if \code{probabilities} are stored, the response
     support corresponding to the probability matrix columns }
+  \item{probability.errors}{ if \code{probabilities} are stored, a matrix of
+    asymptotic standard errors for the raw selected-level conditional
+    probability estimates, with rows set to \code{NA} where simplex projection
+    materially repaired the fitted probability vector }
+  \item{probability.repaired.rows}{ if \code{probabilities} are stored, a
+    logical vector identifying rows whose fitted probability vector was
+    materially repaired by proper probability projection }
   \item{probability.gradients}{ if \code{gradients=TRUE}, a matrix whose
     entries are class-probability gradients/effects for one selected response
     level, indexed by evaluation row and conditioning variable }
@@ -357,8 +369,10 @@ prediction/evaluation route, or plot route as appropriate.
   median/mode values. Use \code{perspective=TRUE} to draw a base-graphics
   probability surface for one selected response level over two continuous
   conditioning variables, and \code{renderer="rgl"} for the corresponding
-  interactive surface. At present, \code{plot.conmode} does not construct
-  probability/effect confidence bands.
+  interactive surface. Use \code{errors="asymptotic"} for probability-level
+  standard errors and intervals in one-dimensional plots, or with
+  \code{output="data"} for surface interval payloads. Bootstrap intervals and
+  surface band rendering are not yet implemented for \code{plot.conmode}.
 }
 \section{Book And Method Pointers}{
   The conditional-mode target is
