@@ -292,6 +292,85 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   grDevices::dev.off()
 })
 
+test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  set.seed(20260514)
+  n <- 60L
+  d <- data.frame(
+    x1 = runif(n, -1, 1),
+    x2 = runif(n, -1, 1),
+    z = factor(sample(c("a", "b"), n, replace = TRUE))
+  )
+  eta <- 0.5 + d$x1 - 0.75 * d$x2 + 0.25 * (d$z == "b")
+  d$y <- factor(rbinom(n, 1L, plogis(eta)), levels = 0:1)
+
+  capture.output(
+    fit <- npconmode(
+      y ~ x1 + x2 + z,
+      data = d,
+      regtype = "ll",
+      bwmethod = "cv.ls",
+      nmulti = 1L,
+      probabilities = TRUE
+    )
+  )
+
+  surf <- plot(fit, view = "fixed", perspective = TRUE,
+               neval = 7L, output = "data")
+  expect_s3_class(surf, "np_conmode_surface_data")
+  expect_named(surf, c("surface", "grid", "held", "level", "levels", "proper"))
+  expect_equal(surf$grid$variables, c("x1", "x2"))
+  expect_equal(surf$grid$dims, c(7L, 7L))
+  expect_equal(nrow(surf$surface), 49L)
+  expect_true("z" %in% names(surf$held))
+  expect_equal(unique(surf$surface$view), "fixed")
+  expect_true(all(is.finite(surf$surface$probability)))
+  expect_true(all(surf$surface$probability >= -1e-10))
+  expect_true(all(surf$surface$probability <= 1 + 1e-10))
+
+  nd <- data.frame(
+    x1 = surf$surface$x1,
+    x2 = surf$surface$x2,
+    z = surf$held$z[rep(1L, nrow(surf$surface))]
+  )
+  pred <- predict(fit, newdata = nd, type = "prob")[, surf$level]
+  expect_equal(surf$surface$probability, pred, tolerance = 1e-5)
+
+  surf.alias <- plot(fit, view = "fixed", persp = TRUE,
+                     neval = 5L, output = "data",
+                     plot.vars = c("x2", "x1"))
+  expect_equal(surf.alias$grid$variables, c("x2", "x1"))
+  expect_equal(surf.alias$grid$dims, c(5L, 5L))
+
+  expect_error(plot(fit, perspective = TRUE),
+               "surface rendering is not yet implemented")
+  expect_error(plot(fit, perspective = TRUE, output = "plot-data"),
+               "surface rendering is not yet implemented")
+  expect_error(plot(fit, renderer = "rgl", output = "data"),
+               "surface rendering is not yet implemented")
+  expect_error(plot(fit, plot.vars = c("x1", "x2"), output = "data"),
+               "'plot.vars' is only supported")
+  expect_error(plot(fit, perspective = TRUE, persp = FALSE, output = "data"),
+               "conflicting plot.conmode arguments")
+  expect_error(plot(fit, perspective = TRUE, gradients = TRUE, output = "data"),
+               "not gradients")
+  expect_error(plot(fit, perspective = TRUE, plot.vars = c("x1", "z"),
+                    output = "data"),
+               "currently require continuous variables")
+
+  fit.one <- npconmode(
+    y ~ x1 + z,
+    data = d,
+    bws = c(0.5, 0.5, 0.5),
+    bandwidth.compute = FALSE,
+    probabilities = TRUE
+  )
+  expect_error(plot(fit.one, perspective = TRUE, output = "data"),
+               "require exactly two continuous conditioning variables")
+})
+
 test_that("npconmode class-probability gradients are level-specific for multinomial responses", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
