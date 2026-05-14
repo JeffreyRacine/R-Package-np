@@ -20,7 +20,7 @@ npqreg <-
     }
   }
 
-.npqreg.fit.control.names <- c("data", "newdata", "tau", "gradients", "tol", "small", "itmax")
+.npqreg.fit.control.names <- c("data", "newdata", "exdat", "tau", "gradients", "tol", "small", "itmax")
 .npqreg.removed.solver.controls <- c("ftol",
                                      "lbc.dir", "dfc.dir", "cfac.dir", "initc.dir",
                                      "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir")
@@ -89,7 +89,7 @@ npqreg <-
 }
 
 .npqreg_strip_fit_controls_from_bw_call <- function(call) {
-  for (nm in c("tau", "gradients", "tol", "small", "itmax", "newdata")) {
+  for (nm in c("tau", "gradients", "tol", "small", "itmax", "newdata", "exdat")) {
     if (nm %in% names(call))
       call[[nm]] <- NULL
   }
@@ -1034,7 +1034,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     dot.names <- names(dots)
     if (is.null(dot.names))
       dot.names <- rep("", length(dots))
-    fit.names <- c("newdata", "tau", "gradients", "tol", "small", "itmax")
+    fit.names <- c("newdata", "exdat", "tau", "gradients", "tol", "small", "itmax")
     fit.dots <- .npqreg_fit_dots(dots[nzchar(dot.names) & dot.names %in% fit.names])
     bw.dots <- dots[!(nzchar(dot.names) & dot.names %in% fit.names)]
     bw.args <- c(list(formula = bws, nomad = nomad), bw.dots)
@@ -1060,7 +1060,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     dot.names <- names(dots)
     if (is.null(dot.names))
       dot.names <- rep("", length(dots))
-    fit.names <- c("newdata", "tau", "gradients", "tol", "small", "itmax")
+    fit.names <- c("newdata", "exdat", "tau", "gradients", "tol", "small", "itmax")
     fit.dots <- .npqreg_fit_dots(dots[nzchar(dot.names) & dot.names %in% fit.names])
     bw.dots <- dots[!(nzchar(dot.names) & dot.names %in% fit.names)]
     bw.args <- c(list(formula = txdat, bws = bws, nomad = nomad), bw.dots)

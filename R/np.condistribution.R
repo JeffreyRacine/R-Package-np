@@ -539,6 +539,8 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw$newdata <- NULL
+  sc.bw$exdat <- NULL
+  sc.bw$eydat <- NULL
   sc.bw$gradients <- NULL
   sc.bw$proper <- NULL
   sc.bw$proper.method <- NULL

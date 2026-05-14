@@ -92,6 +92,34 @@ test_that("npcdens formula route keeps estimator-only proper arguments out of ba
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("npcdens formula route keeps native evaluation arguments out of bandwidth selection", {
+  skip_on_cran()
+  env <- local_npRmpi_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "set.seed(42)",
+      "x <- rnorm(40)",
+      "y <- x + rnorm(40)",
+      "nd <- data.frame(y=seq(min(y), max(y), length.out=7L), x=seq(min(x), max(x), length.out=7L))",
+      "fit <- npcdens(y ~ x, exdat=nd['x'], eydat=nd['y'], nmulti=1)",
+      "stopifnot(inherits(fit, 'condensity'))",
+      "stopifnot(length(fitted(fit)) == nrow(nd))",
+      "cat('NPCDENS_FORMULA_NATIVE_EVAL_ARGS_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("NPCDENS_FORMULA_NATIVE_EVAL_ARGS_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("npcdens fitted slice repair works in subprocess session mode", {
   skip_on_cran()
   env <- local_npRmpi_subprocess_env()

@@ -491,6 +491,8 @@ npconmode.default <- function(bws, txdat, tydat,
   sc.bw$gradients <- NULL
   sc.bw$level <- NULL
   sc.bw$newdata <- NULL
+  sc.bw$exdat <- NULL
+  sc.bw$eydat <- NULL
 
   bws.formula <- (!no.bws) && inherits(bws, "formula")
   if (bws.formula) {
