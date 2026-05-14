@@ -54,6 +54,8 @@ conmode =
            probability.gradient.level = NULL,
            probability.gradient.names = NULL,
            probability.gradient.info = NULL,
+           xtrain = NULL,
+           ytrain = NULL,
            gradients = FALSE){
 
     if (missing(bws) || missing(xeval) || missing(conmode) || missing(condens) || missing(ntrain))
@@ -107,6 +109,10 @@ conmode =
       d$probability.gradient.level <- probability.gradient.level
       d$probability.gradient.names <- probability.gradient.names
       d$probability.gradient.info <- probability.gradient.info
+    }
+    if (!is.null(xtrain) && !is.null(ytrain)) {
+      d$xtrain <- xtrain
+      d$ytrain <- ytrain
     }
 
     metadata <- .npConmodeMetadataFromBws(bws)

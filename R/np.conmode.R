@@ -398,6 +398,10 @@ npconmode.conbandwidth <-
     if (isTRUE(probabilities) || isTRUE(gradients)) {
       cm.args$probabilities <- proper.out$probabilities
       cm.args$probability.levels <- efac
+      if (!no.ex) {
+        cm.args$xtrain <- txdat
+        cm.args$ytrain <- tydat
+      }
     }
     if (isTRUE(gradients)) {
       cm.args$probability.gradients <- pgrad

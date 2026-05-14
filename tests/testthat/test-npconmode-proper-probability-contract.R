@@ -263,16 +263,32 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   expect_error(plot(fit, gradients = TRUE, level = "1", output = "data"),
                "stored class-probability gradients")
 
+  grid.data <- plot(fit, view = "fixed", neval = 9L, output = "data")
+  expect_named(grid.data, "x")
+  expect_equal(nrow(grid.data$x), 9L)
+  expect_equal(unique(grid.data$x$view), "fixed")
+  grid.prob <- predict(fit,
+                       newdata = data.frame(x = grid.data$x$x),
+                       type = "prob")[, "0"]
+  expect_equal(grid.data$x$probability, grid.prob, tolerance = 1e-5)
+
+  grid.grad <- plot(fit, view = "fixed", neval = 9L,
+                    gradients = TRUE, output = "data")
+  expect_equal(nrow(grid.grad$x), 9L)
+  expect_true("effect" %in% names(grid.grad$x))
+
   pdf(tempfile(fileext = ".pdf"))
   expect_silent(plot(fit))
+  expect_silent(plot(fit, view = "fixed", neval = 9L))
   expect_silent(plot(fit, col = "red", lwd = 2, lty = 2, type = "l"))
   expect_silent(plot(fit, gradients = TRUE))
+  expect_silent(plot(fit, gradients = TRUE, view = "fixed", neval = 9L))
   expect_silent(plot(fit, gradients = TRUE, col = "blue", lwd = 2, lty = 3,
                      type = "l"))
   expect_error(plot(fit, errors = "bootstrap"),
                "class-probability/effect intervals are not yet implemented")
   expect_error(plot(fit, renderer = "rgl"),
-               "grid/surface plotting is not yet implemented")
+               "surface rendering is not yet implemented")
   grDevices::dev.off()
 })
 
