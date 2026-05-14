@@ -114,6 +114,25 @@ test_that("npconmode formula route treats response-free newdata strictly", {
   expect_equal(NROW(gradients(fit)), 3L)
 })
 
+test_that("npconmode formula route keeps native exdat out of bandwidth selection", {
+  set.seed(20260514)
+  d <- data.frame(x = sort(runif(40)))
+  d$y <- factor(rbinom(40, 1L, plogis(0.5 + d$x)), levels = 0:1)
+  nd <- data.frame(x = c(0.2, 0.5, 0.8))
+
+  fit <- npconmode(
+    y ~ x,
+    data = d,
+    exdat = nd,
+    probabilities = TRUE,
+    nmulti = 1
+  )
+
+  expect_s3_class(fit, "conmode")
+  expect_equal(length(fitted(fit)), nrow(nd))
+  expect_equal(nrow(predict(fit, type = "prob")), nrow(nd))
+})
+
 test_that("npconmode NOMAD fit metadata propagates through evaluation and bandwidth plots", {
   skip_if_not_installed("crs")
 

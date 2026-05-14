@@ -20,7 +20,7 @@ npqreg <-
     }
   }
 
-.npqreg.fit.control.names <- c("data", "newdata", "tau", "gradients", "tol", "small", "itmax")
+.npqreg.fit.control.names <- c("data", "newdata", "exdat", "tau", "gradients", "tol", "small", "itmax")
 .npqreg.removed.solver.controls <- c("ftol",
                                      "lbc.dir", "dfc.dir", "cfac.dir", "initc.dir",
                                      "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir")
@@ -89,7 +89,7 @@ npqreg <-
 }
 
 .npqreg_strip_fit_controls_from_bw_call <- function(call) {
-  for (nm in c("tau", "gradients", "tol", "small", "itmax", "newdata")) {
+  for (nm in c("tau", "gradients", "tol", "small", "itmax", "newdata", "exdat")) {
     if (nm %in% names(call))
       call[[nm]] <- NULL
   }

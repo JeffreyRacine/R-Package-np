@@ -16,6 +16,26 @@ test_that("named bws formula dispatch matches explicit npqreg bandwidth route", 
   expect_lt(max(abs(as.numeric(fit.named$quanterr) - as.numeric(fit.pos$quanterr))), 1e-2)
 })
 
+test_that("formula npqreg keeps native exdat out of bandwidth selection", {
+  set.seed(20260514)
+  d <- data.frame(
+    x = seq(0.1, 0.9, length.out = 30)
+  )
+  d$y <- sin(2 * pi * d$x) + rnorm(nrow(d), sd = 0.08)
+  nd <- data.frame(x = c(0.2, 0.5, 0.8))
+
+  fit <- npqreg(
+    y ~ x,
+    data = d,
+    exdat = nd,
+    tau = 0.5,
+    nmulti = 1
+  )
+
+  expect_s3_class(fit, "qregression")
+  expect_equal(length(fitted(fit)), nrow(nd))
+})
+
 test_that("named bws formula dispatch forwards NOMAD shortcut controls", {
   skip_if_not_installed("crs")
 

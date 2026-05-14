@@ -20,6 +20,26 @@ test_that("formula npcdens keeps estimator-only proper arguments out of bandwidt
   expect_equal(dim(fit$congrad), c(40L, 1L))
 })
 
+test_that("formula npcdens keeps native evaluation arguments out of bandwidth selection", {
+  set.seed(42)
+  x <- rnorm(40)
+  y <- x + rnorm(40)
+  nd <- data.frame(
+    y = seq(min(y), max(y), length.out = 7L),
+    x = seq(min(x), max(x), length.out = 7L)
+  )
+
+  fit <- npcdens(
+    y ~ x,
+    exdat = nd["x"],
+    eydat = nd["y"],
+    nmulti = 1
+  )
+
+  expect_true(inherits(fit, "condensity"))
+  expect_equal(length(fitted(fit)), nrow(nd))
+})
+
 test_that("proper helper weights and projection satisfy core invariants", {
   w.fun <- getFromNamespace(".np_condens_trapezoid_weights", "np")
   p.fun <- getFromNamespace(".np_condens_project_weighted_simplex", "np")
