@@ -929,7 +929,7 @@ np_render_control <- function(style = c("band", "bar"),
 .np_plot_conmode <- function(object, ...,
                              gradients = FALSE,
                              level = NULL,
-                             output = c("plot", "data", "plot-data"),
+                             output = c("plot", "data", "plot-data", "both"),
                              data_rug = FALSE,
                              layout = TRUE,
                              legend = TRUE,
@@ -938,6 +938,23 @@ np_render_control <- function(style = c("band", "bar"),
   dot.names <- .np_plot_dot_names(.plot_dots_call)
   if (any(!nzchar(dot.names)))
     stop("unnamed plot arguments are not supported for plot.conmode",
+         call. = FALSE)
+  interval.args <- c("errors", "band", "alpha", "bootstrap", "B", "center",
+                     "boot_control", "plot.errors.method", "plot.errors.type",
+                     "plot.errors.alpha", "plot.errors.boot.method",
+                     "plot.errors.boot.num", "plot.errors.boot.nonfixed",
+                     "plot.errors.boot.wild", "plot.errors.boot.blocklen",
+                     "plot.errors.center", "plot.errors.style",
+                     "plot.errors.bar", "plot.errors.bar.num")
+  interval.supplied <- intersect(dot.names[nzchar(dot.names)], interval.args)
+  if (length(interval.supplied))
+    stop("class-probability/effect intervals are not yet implemented for plot.conmode",
+         call. = FALSE)
+  grid.args <- c("renderer", "perspective", "persp", "neval",
+                 "grid_control", "view")
+  grid.supplied <- intersect(dot.names[nzchar(dot.names)], grid.args)
+  if (length(grid.supplied))
+    stop("grid/surface plotting is not yet implemented for plot.conmode",
          call. = FALSE)
   allowed <- unique(c("gradients", "level", "output", "data_rug",
                       "layout", "legend",
@@ -948,6 +965,8 @@ np_render_control <- function(style = c("band", "bar"),
   data_rug <- npValidateScalarLogical(data_rug, "data_rug")
   plot.par.mfrow <- .np_plot_match_layout(layout)
   output <- match.arg(output)
+  if (identical(output, "both"))
+    output <- "plot-data"
   output <- .np_plot_scalar_match(output, c("plot", "data", "plot-data"), "output")
   plot.user.args <- .np_plot_user_args(dots, "plot")
   line.user.args <- .np_plot_user_args(dots, "lines")

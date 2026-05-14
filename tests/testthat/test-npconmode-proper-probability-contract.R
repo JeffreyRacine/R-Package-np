@@ -255,6 +255,7 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   pdata <- plot(fit, output = "data")
   expect_named(pdata, "x")
   expect_equal(nrow(pdata$x), n)
+  expect_equal(plot(fit, output = "both"), pdata)
 
   grdata <- plot(fit, gradients = TRUE, output = "data")
   expect_named(grdata, "x")
@@ -268,7 +269,10 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   expect_silent(plot(fit, gradients = TRUE))
   expect_silent(plot(fit, gradients = TRUE, col = "blue", lwd = 2, lty = 3,
                      type = "l"))
-  expect_error(plot(fit, errors = "bootstrap"), "unused plot argument")
+  expect_error(plot(fit, errors = "bootstrap"),
+               "class-probability/effect intervals are not yet implemented")
+  expect_error(plot(fit, renderer = "rgl"),
+               "grid/surface plotting is not yet implemented")
   grDevices::dev.off()
 })
 
