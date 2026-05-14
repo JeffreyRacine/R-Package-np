@@ -4,6 +4,8 @@
 \alias{npconmode.default}
 \alias{npconmode.formula}
 \alias{npconmode.conbandwidth}
+\alias{predict.conmode}
+\alias{plot.conmode}
 \title{ Kernel Modal Regression with Mixed Data Types }
 \description{
   \code{npconmode} performs kernel modal regression on mixed data,
@@ -81,6 +83,13 @@ npconmode(bws, \dots)
           level = NULL,
           \dots)
 
+\method{predict}{conmode}(object,
+          newdata = NULL,
+          type = c("class", "prob"),
+          \dots)
+
+\method{plot}{conmode}(x, \dots)
+
 }
 
 \arguments{
@@ -117,6 +126,14 @@ These arguments identify the bandwidth specification, formula/data interface, an
     compute the bandwidth object.
   }
 
+  \item{object}{
+    an object of class \code{"conmode"} returned by \code{npconmode}.
+  }
+
+  \item{x}{
+    an object of class \code{"conmode"} returned by \code{npconmode}.
+  }
+
 
 \subsection{Evaluation Data}{
 These arguments control where the conditional mode is evaluated.
@@ -142,10 +159,18 @@ These arguments control where the conditional mode is evaluated.
     omitted, the training data are used.
   }
 
+  \item{type}{
+    prediction type for \code{predict.conmode}. Use \code{"class"} to
+    return modal class predictions and \code{"prob"} to return the full
+    class-probability matrix. Probability prediction requires either a
+    stored probability matrix or an evaluation path with
+    \code{probabilities=TRUE}.
+  }
 
 
-\subsection{Additional Arguments}{
-Further arguments are passed to the bandwidth-selection counterpart when bandwidths are computed internally.
+\subsection{Probability And Gradient Controls}{
+These arguments control stored class probabilities, proper probability
+normalization, and level-specific class-probability effects.
 }
 
   \item{probabilities}{
@@ -212,13 +237,34 @@ This argument controls the recommended automatic local-polynomial NOMAD route, w
     see the normalized shortcut metadata.
   }
 
+\subsection{Additional Arguments}{
+Further arguments are passed to the bandwidth-selection counterpart,
+prediction/evaluation route, or plot route as appropriate.
+}
+
   \item{\dots}{
     additional arguments supplied to \code{\link{npcdensbw}} when bandwidths
-    are computed internally. These may include bandwidth type, kernel types,
-    \code{regtype}, \code{degree}, \code{nomad}, \code{search.engine},
-    \code{nomad.nmulti}, \code{degree.max}, and related
-    bandwidth-search controls. These arguments are not used to alter an
-    explicitly supplied \code{conbandwidth} object.
+    are computed internally, or arguments needed to interpret a numeric
+    \code{bws} vector. This is where bandwidth-selection controls such
+    as \code{bwmethod}, \code{bwtype}, and \code{bwscaling},
+    kernel/support controls such as \code{cxkertype}, \code{cykertype},
+    \code{cxkerorder}, \code{cykerorder}, \code{cxkerbound}, and
+    \code{cykerbound}, categorical kernel controls such as
+    \code{uxkertype}, \code{uykertype}, \code{oxkertype}, and
+    \code{oykertype}, search controls such as \code{nmulti} and
+    \code{scale.factor.search.lower}, and local-polynomial/NOMAD
+    controls such as \code{regtype}, \code{degree},
+    \code{bernstein.basis}, \code{degree.select}, and
+    \code{nomad.nmulti} are supplied. In \code{predict.conmode},
+    additional arguments are passed to \code{npconmode} for evaluation
+    with the stored bandwidth object; native \code{exdat} and
+    \code{eydat} take precedence over \code{newdata}. In
+    \code{plot.conmode}, additional arguments control the object-fed
+    probability/effect display; common controls include
+    \code{gradients}, \code{level}, \code{output}, \code{data_rug},
+    \code{layout}, \code{legend}, and graphics arguments. See
+    \code{\link{npcdensbw}} and \code{\link{plot.np}} for the complete
+    bandwidth-selection and plotting argument surfaces.
   }
 
 }

@@ -22,24 +22,24 @@
 npcopula(bws, \dots)
 
 \method{npcopula}{formula}(bws,
-        data = NULL,
-        u = NULL,
-        target = c("distribution", "density"),
-        evaluation = c("grid", "sample"),
-        neval = 30,
-        n.quasi.inv = 1000,
-        er.quasi.inv = 1,
-        \dots)
+         data = NULL,
+         u = NULL,
+         target = c("distribution", "density"),
+         evaluation = c("grid", "sample"),
+         neval = 30,
+         n.quasi.inv = 1000,
+         er.quasi.inv = 1,
+         \dots)
 
 \method{npcopula}{default}(bws,
-        data,
-        u = NULL,
-        target = NULL,
-        evaluation = c("sample", "grid"),
-        neval = 30,
-        n.quasi.inv = 1000,
-        er.quasi.inv = 1,
-        \dots)
+         data,
+         u = NULL,
+         target = NULL,
+         evaluation = c("sample", "grid"),
+         neval = 30,
+         n.quasi.inv = 1000,
+         er.quasi.inv = 1,
+         \dots)
 
 \method{predict}{npcopula}(object,
         newdata = NULL,
@@ -49,30 +49,30 @@ npcopula(bws, \dots)
         \dots)
 
 \method{plot}{npcopula}(x,
-        perspective = TRUE,
-        view = c("rotate", "fixed", "surface", "contour", "image",
-                 "empirical", "all"),
-        renderer = c("base", "rgl"),
-        errors = c("none", "bootstrap", "asymptotic"),
-        band = c("pointwise", "pmzsd", "bonferroni",
-                 "simultaneous", "all"),
-        alpha = 0.05,
-        bootstrap = c("inid", "fixed", "geom"),
-        B = 1999,
-        center = c("estimate", "bias-corrected"),
-        boot_control = np_boot_control(),
-        output = c("plot", "data", "plot-data", "both"),
-        legend = TRUE,
-        theta = 0.0,
-        phi = 20.0,
-        xlab = "u1",
-        ylab = "u2",
-        zlab = NULL,
-        main = NULL,
-        col = NULL,
-        border = "black",
-        zlim = NULL,
-        \dots)
+     perspective = TRUE,
+     view = c("rotate", "fixed", "surface", "contour", "image",
+              "empirical", "all"),
+     renderer = c("base", "rgl"),
+     errors = c("none", "bootstrap", "asymptotic"),
+     band = c("pointwise", "pmzsd", "bonferroni",
+              "simultaneous", "all"),
+     alpha = 0.05,
+     bootstrap = c("inid", "fixed", "geom"),
+     B = 1999,
+     center = c("estimate", "bias-corrected"),
+     boot_control = np_boot_control(),
+     output = c("plot", "data", "plot-data", "both"),
+     legend = TRUE,
+     theta = 0.0,
+     phi = 20.0,
+     xlab = "u1",
+     ylab = "u2",
+     zlab = NULL,
+     main = NULL,
+     col = NULL,
+     border = "black",
+     zlim = NULL,
+     \dots)
 }
 
 \arguments{
@@ -99,16 +99,6 @@ formula route.
     when \code{bws} is a formula, \code{data} is passed to the
     bandwidth selector. Copulas are defined here for numeric and ordered
     variables; unordered factors are rejected.
-  }
-
-  \item{\dots}{
-    additional arguments. In \code{npcopula.formula}, these are passed
-    to \code{\link{npudistbw}} or \code{\link{npudensbw}}. In
-    \code{predict.npcopula}, these are passed to \code{npcopula} for
-    evaluation with the stored bandwidth object and training data. In
-    \code{plot.npcopula}, these are passed to the selected graphics
-    routine, such as \code{\link{persp}}, \code{\link{contour}},
-    \code{\link{image}}, or the shared \pkg{rgl} renderer.
   }
 
 \subsection{Copula Target And Evaluation Grid}{
@@ -305,6 +295,29 @@ surface plots.
     \code{"asymptotic"}, or \code{"bootstrap"}. Intervals are available
     for two-dimensional grid evaluation output and are drawn as
     transparent wireframes over the copula surface.
+  }
+
+\subsection{Additional Arguments}{
+Further arguments are passed to the bandwidth-selection counterpart,
+prediction/evaluation route, or graphics renderer as appropriate.
+}
+
+  \item{\dots}{
+    additional arguments supplied to \code{\link{npudistbw}} or
+    \code{\link{npudensbw}} when \code{npcopula} computes bandwidths
+    internally, or arguments needed to interpret a numeric \code{bws}
+    vector. This is where bandwidth-selection controls such as
+    \code{bwmethod}, \code{bwtype}, and \code{bwscaling},
+    kernel/support controls such as \code{ckertype}, \code{ckerorder},
+    and \code{ckerbound}, categorical kernel controls such as
+    \code{ukertype} and \code{okertype}, and search controls such as
+    \code{nmulti} and \code{scale.factor.search.lower} are supplied.
+    In \code{predict.npcopula}, additional arguments are passed to
+    \code{npcopula} for evaluation with the stored bandwidth object and
+    training data. In \code{plot.npcopula}, additional arguments are
+    passed to the selected graphics routine, such as
+    \code{\link{persp}}, \code{\link{contour}}, \code{\link{image}}, or
+    the shared \pkg{rgl} renderer.
   }
 }
 

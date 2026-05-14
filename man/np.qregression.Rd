@@ -4,6 +4,8 @@
 \alias{npqreg.condbandwidth}
 \alias{npqreg.default}
 \alias{npqreg.formula}
+\alias{predict.qregression}
+\alias{plot.qregression}
 \title{Kernel Quantile Regression with Mixed Data Types}
 
 \description{
@@ -40,6 +42,10 @@ npqreg(bws, \dots)
        tydat, 
        nomad = FALSE,
        \dots)
+
+\method{predict}{qregression}(object, se.fit = FALSE, \dots)
+
+\method{plot}{qregression}(x, \dots)
 
 }
 
@@ -79,6 +85,14 @@ These arguments identify the bandwidth specification, formula/data interface, an
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
     \code{txdat}. Defaults to the training data used to
     compute the bandwidth object.
+  }
+
+  \item{object}{
+    an object of class \code{"qregression"} returned by \code{npqreg}.
+  }
+
+  \item{x}{
+    an object of class \code{"qregression"} returned by \code{npqreg}.
   }
 
 
@@ -126,6 +140,12 @@ These arguments control where the quantile regression is evaluated and which fit
     omitted, the training data are used.
   }
 
+  \item{se.fit}{
+    logical value. If \code{TRUE}, \code{predict.qregression} returns a
+    list with components \code{fit} and \code{se.fit}; otherwise it
+    returns fitted conditional quantiles.
+  }
+
 
   \item{tau}{
     a numeric scalar or vector specifying the quantile probability or
@@ -159,20 +179,34 @@ These arguments control the one-dimensional numerical quantile extraction step.
 
 
 \subsection{Additional Arguments}{
-Further arguments are passed to the regression estimator or bandwidth interpretation path as needed.
+Further arguments are passed to the bandwidth-selection counterpart,
+prediction/evaluation route, or plot route as appropriate.
 }
 
   \item{\dots}{
-    additional arguments supplied to specify the regression type,
-    local-polynomial degree search, bandwidth type, kernel types,
-    training data, and so on.
-    To do this,
-    you may specify any of \code{bwmethod}, \code{bwscaling},
-    \code{bwtype}, \code{regtype}, \code{degree}, \code{nomad},
-    \code{search.engine}, \code{nomad.nmulti}, \code{cxkertype}, \code{cxkerorder},
-    \code{cykertype}, \code{cykerorder}, \code{uxkertype},
-    \code{uykertype}, \code{oxkertype}, \code{oykertype}, as described
-    in \code{\link{npcdistbw}}.
+    additional arguments supplied to \code{\link{npcdistbw}} when
+    \code{npqreg} computes bandwidths internally, or arguments needed
+    to interpret a numeric \code{bws} vector. This is where bandwidth
+    selection controls such as \code{bwmethod}, \code{bwtype}, and
+    \code{bwscaling}, kernel/support controls such as
+    \code{cxkertype}, \code{cykertype}, \code{cxkerorder},
+    \code{cykerorder}, \code{cxkerbound}, and \code{cykerbound},
+    categorical kernel controls such as \code{uxkertype},
+    \code{uykertype}, \code{oxkertype}, and \code{oykertype}, search
+    controls such as \code{nmulti} and
+    \code{scale.factor.search.lower}, and local-polynomial/NOMAD
+    controls such as \code{regtype}, \code{degree},
+    \code{bernstein.basis}, \code{degree.select}, and
+    \code{nomad.nmulti} are supplied. In \code{predict.qregression},
+    additional arguments are passed to \code{npqreg} for evaluation
+    with the stored bandwidth object; common examples are
+    \code{newdata}, native \code{exdat}, and \code{tau}. In
+    \code{plot.qregression}, additional arguments are passed through
+    the package plot route; common controls include \code{tau},
+    \code{gradients}, \code{output}, \code{legend}, and graphics
+    arguments. See \code{\link{npcdistbw}} and \code{\link{plot.np}}
+    for the complete bandwidth-selection and plotting argument
+    surfaces.
   }
 }
 \details{
