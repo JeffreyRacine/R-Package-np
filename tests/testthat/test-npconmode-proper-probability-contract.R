@@ -269,7 +269,7 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   expect_error(plot(fit, errors = "bootstrap"),
                "class-probability/effect intervals are not yet implemented")
   expect_error(plot(fit, renderer = "rgl"),
-               "surface rendering is not yet implemented")
+               "renderer='rgl' is supported only")
   grDevices::dev.off()
 })
 
@@ -332,8 +332,20 @@ test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
   data.only <- plot(fit, perspective = TRUE, neval = 5L,
                     output = "data")
   expect_equal(rendered, data.only)
+  expect_equal(
+    plot(fit, perspective = TRUE, renderer = "rgl", neval = 5L,
+         output = "data"),
+    data.only
+  )
   expect_error(plot(fit, renderer = "rgl", output = "data"),
-               "surface rendering is not yet implemented")
+               "renderer='rgl' is supported only")
+  if (suppressWarnings(requireNamespace("rgl", quietly = TRUE))) {
+    rgl.rendered <- suppressWarnings(
+      plot(fit, perspective = TRUE, renderer = "rgl", neval = 5L,
+           output = "plot-data")
+    )
+    expect_equal(rgl.rendered, data.only)
+  }
   expect_error(plot(fit, plot.vars = c("x1", "x2"), output = "data"),
                "'plot.vars' is only supported")
   expect_error(plot(fit, perspective = TRUE, persp = FALSE, output = "data"),

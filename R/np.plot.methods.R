@@ -1192,7 +1192,7 @@ np_render_control <- function(style = c("band", "bar"),
   zlim
 }
 
-.np_plot_conmode_surface_panel <- function(payload, dots) {
+.np_plot_conmode_surface_panel <- function(payload, dots, renderer = "base") {
   vars <- payload$grid$variables
   x1 <- payload$grid$values[[1L]]
   x2 <- payload$grid$values[[2L]]
@@ -1207,6 +1207,34 @@ np_render_control <- function(style = c("band", "bar"),
     dots$main,
     paste0("Pr(Y=", payload$level, "|X=x)")
   )
+  xlab <- .np_plot_scalar_default(dots$xlab, vars[1L])
+  ylab <- .np_plot_scalar_default(dots$ylab, vars[2L])
+  zlab <- .np_plot_scalar_default(dots$zlab, "Probability")
+  border <- .np_plot_scalar_default(dots$border, "black")
+
+  if (identical(renderer, "rgl")) {
+    rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
+    return(.np_plot_render_surface_rgl(
+      x = x1,
+      y = x2,
+      z = z,
+      xlab = xlab,
+      ylab = ylab,
+      zlab = zlab,
+      main = main,
+      theta = rgl.view$theta,
+      phi = rgl.view$phi,
+      col = dots$col,
+      border = border,
+      zlim = zlim,
+      par3d.args = .np_plot_collect_rgl_args(dots, "rgl.par3d", "rgl.par3d."),
+      view3d.args = .np_plot_collect_rgl_args(dots, "rgl.view3d", "rgl.view3d."),
+      persp3d.args = .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d."),
+      grid3d.args = .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d."),
+      widget.args = .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget.")
+    ))
+  }
+
   persp.args <- list(
     x = x1,
     y = x2,
@@ -1214,16 +1242,16 @@ np_render_control <- function(style = c("band", "bar"),
     theta = theta,
     phi = phi,
     ticktype = "detailed",
-    xlab = .np_plot_scalar_default(dots$xlab, vars[1L]),
-    ylab = .np_plot_scalar_default(dots$ylab, vars[2L]),
-    zlab = .np_plot_scalar_default(dots$zlab, "Probability"),
+    xlab = xlab,
+    ylab = ylab,
+    zlab = zlab,
     zlim = zlim,
     main = main,
     col = grDevices::adjustcolor(
       .np_plot_persp_surface_colors(z = z, col = dots$col),
       alpha.f = 0.5
     ),
-    border = .np_plot_scalar_default(dots$border, "black")
+    border = border
   )
   persp.args <- .np_plot_merge_user_args(
     persp.args,
@@ -1317,16 +1345,18 @@ np_render_control <- function(style = c("band", "bar"),
   surface.args <- c("renderer", "perspective", "persp", "plot.vars")
   grid.args <- c("neval", "grid_control", "view", "xtrim", "xq")
   grid.supplied <- intersect(dot.names[nzchar(dot.names)], grid.args)
+  rgl.prefixed.args <- dot.names[startsWith(dot.names, "rgl.")]
   allowed <- unique(c("gradients", "level", "output", "data_rug",
                       "layout", "legend", grid.args, surface.args,
+                      rgl.prefixed.args,
                       .np_plot_graphics_arg_names()))
   .np_plot_stop_unused_args(setdiff(dot.names[nzchar(dot.names)], allowed),
                             allowed)
   gradients <- npValidateScalarLogical(gradients, "gradients")
   data_rug <- npValidateScalarLogical(data_rug, "data_rug")
+  renderer <- "base"
   if (!is.null(dots$renderer))
-    stop("surface rendering is not yet implemented for plot.conmode",
-         call. = FALSE)
+    renderer <- .np_plot_match_renderer(dots$renderer)
   perspective <- FALSE
   perspective.supplied <- !is.null(dots$perspective)
   persp.supplied <- !is.null(dots$persp)
@@ -1341,6 +1371,9 @@ np_render_control <- function(style = c("band", "bar"),
   }
   if (!is.null(dots$plot.vars) && !isTRUE(perspective))
     stop("'plot.vars' is only supported for fixed surface payloads with perspective=TRUE",
+         call. = FALSE)
+  if (!identical(renderer, "base") && !isTRUE(perspective))
+    stop("renderer='rgl' is supported only for fixed surface payloads with perspective=TRUE",
          call. = FALSE)
   if (isTRUE(perspective) && isTRUE(gradients))
     stop("surface plot.conmode payloads are currently available for probabilities, not gradients",
@@ -1405,7 +1438,14 @@ np_render_control <- function(style = c("band", "bar"),
   if (isTRUE(perspective)) {
     if (identical(output, "data"))
       return(plot.data)
-    .np_plot_conmode_surface_panel(plot.data, dots)
+    render.out <- .np_plot_conmode_surface_panel(plot.data, dots,
+                                                 renderer = renderer)
+    if (identical(renderer, "rgl"))
+      return(.np_plot_rgl_finalize(
+        rgl.out = render.out,
+        plot.behavior = output,
+        plot.data = plot.data
+      ))
     if (identical(output, "plot-data"))
       return(plot.data)
     return(invisible(object))

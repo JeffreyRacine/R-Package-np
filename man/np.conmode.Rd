@@ -264,8 +264,8 @@ prediction/evaluation route, or plot route as appropriate.
     probability/effect display; common controls include
     \code{gradients}, \code{level}, \code{output}, \code{data_rug},
     \code{layout}, \code{legend}, \code{view}, \code{neval},
-    \code{grid_control}, \code{perspective}, \code{plot.vars}, and
-    graphics arguments. The default
+    \code{grid_control}, \code{perspective}, \code{plot.vars},
+    \code{renderer}, and graphics arguments. The default
     \code{view="sample"} draws the stored fitted probabilities/effects at the
     fitted evaluation points. The \code{view="fixed"} route constructs
     one-dimensional object-fed slices over each conditioning variable, holding
@@ -275,12 +275,13 @@ prediction/evaluation route, or plot route as appropriate.
     fixed-grid route draws a base-graphics probability surface for one selected
     response level over two continuous conditioning variables; use
     \code{plot.vars} to name the displayed pair when more than two continuous
-    conditioning variables are present. The public \code{output="both"} spelling is
+    conditioning variables are present; \code{renderer="rgl"} requests the
+    corresponding interactive surface when \pkg{rgl} is available. The public
+    \code{output="both"} spelling is
     accepted as an alias for the historical \code{output="plot-data"}
     behavior. Probability/effect interval controls
     such as \code{errors}, \code{band}, \code{bootstrap}, \code{B}, and
-    \code{alpha}, and interactive surface controls such as \code{renderer},
-    are reserved for future object-fed extensions and
+    \code{alpha} are reserved for future object-fed extensions and
     currently fail with route-specific messages rather than silently changing
     the target. See \code{\link{npcdensbw}} and \code{\link{plot.np}} for the
     complete bandwidth-selection and plotting argument surfaces.
@@ -356,8 +357,9 @@ prediction/evaluation route, or plot route as appropriate.
   slices over each conditioning variable, with other variables held at their
   median/mode values. Use \code{perspective=TRUE} to draw a base-graphics
   probability surface for one selected response level over two continuous
-  conditioning variables. At present, \code{plot.conmode} does not construct
-  probability/effect confidence bands or interactive \code{rgl} surfaces.
+  conditioning variables, and \code{renderer="rgl"} for the corresponding
+  interactive surface. At present, \code{plot.conmode} does not construct
+  probability/effect confidence bands.
 }
 \section{Book And Method Pointers}{
   The conditional-mode target is
