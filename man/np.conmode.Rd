@@ -46,9 +46,11 @@
   \code{newdata}, \code{predict} evaluates the conditional mode at the
   supplied rows using the stored bandwidth object. Use
   \code{type="prob"} to return the full matrix of fitted class
-  probabilities at the evaluation rows. Native evaluator arguments
-  \code{exdat} and \code{eydat} remain available for advanced workflows
-  and take precedence if supplied.
+  probabilities at the evaluation rows. Use \code{se.fit=TRUE} with
+  \code{type="prob"} to return a list containing the class-probability matrix
+  and the matching asymptotic standard-error matrix. Native evaluator
+  arguments \code{exdat} and \code{eydat} remain available for advanced
+  workflows and take precedence if supplied.
 }
 
 \usage{
@@ -86,6 +88,7 @@ npconmode(bws,
 \method{predict}{conmode}(object,
           newdata = NULL,
           type = c("class", "prob"),
+          se.fit = FALSE,
           \dots)
 
 \method{plot}{conmode}(x, \dots)
@@ -165,6 +168,14 @@ These arguments control where the conditional mode is evaluated.
     class-probability matrix. Probability prediction requires either a
     stored probability matrix or an evaluation path with
     \code{probabilities=TRUE}.
+  }
+
+  \item{se.fit}{
+    a logical value for \code{predict.conmode}. If \code{TRUE} and
+    \code{type="prob"}, return a list with components \code{fit} and
+    \code{se.fit}, containing the class-probability matrix and matching
+    asymptotic standard-error matrix. Standard errors are for the smooth
+    class-probability target, not for the discrete modal class label.
   }
 
 
@@ -285,9 +296,12 @@ prediction/evaluation route, or plot route as appropriate.
     \eqn{\Pr(Y=\ell\mid X=x)}, not the discrete modal class label. Rows whose
     probabilities were materially repaired by simplex projection report
     \code{NA} standard errors rather than treating raw conditional-density
-    standard errors as projected-probability standard errors. Surface
-    intervals are available as \code{output="data"} payload columns; surface
-    band rendering and \code{errors="bootstrap"} are intentionally deferred.
+    standard errors as projected-probability standard errors. Bootstrap
+    intervals are available for one-dimensional \code{view="sample"} and
+    \code{view="fixed"} probability plots and use the stored bandwidth object
+    without recomputing bandwidths. Surface asymptotic intervals are available
+    as \code{output="data"} payload columns; surface band rendering and
+    surface bootstrap intervals are intentionally deferred.
     See \code{\link{npcdensbw}} and \code{\link{plot.np}} for the complete
     bandwidth-selection and plotting argument surfaces.
   }

@@ -758,7 +758,11 @@ np_render_control <- function(style = c("band", "bar"),
                                   level = NULL,
                                   errors = "none",
                                   alpha = 0.05,
-                                  band = "pointwise") {
+                                  band = "pointwise",
+                                  center = "estimate",
+                                  bootstrap = "inid",
+                                  B = 399L,
+                                  blocklen = NULL) {
   lev <- if (!is.null(object$probability.levels)) {
     as.character(object$probability.levels)
   } else if (!is.null(object$probability.gradient.level)) {
@@ -810,6 +814,27 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   xeval <- as.data.frame(object$xeval)
+  boot.raw <- NULL
+  boot.se <- NULL
+  if (!isTRUE(gradients) && identical(errors, "bootstrap")) {
+    training <- .np_plot_conmode_training_data(object)
+    boot.raw <- .np_plot_conmode_bootstrap_raw(
+      object = object,
+      xtrain = training$xtrain,
+      ytrain = training$ytrain,
+      exdat = xeval,
+      level = level,
+      levels = lev,
+      t0 = ymat[, 1L],
+      alpha = alpha,
+      band = band,
+      center = center,
+      method = bootstrap,
+      B = B,
+      blocklen = blocklen
+    )
+    boot.se <- rep(NA_real_, nrow(xeval))
+  }
   out <- vector("list", p)
   xnames <- object$xnames
   if (is.null(xnames) || length(xnames) != p)
@@ -825,22 +850,27 @@ np_render_control <- function(style = c("band", "bar"),
     )
     names(out[[j]])[3L] <- value.name
     if (!isTRUE(gradients) && !identical(errors, "none")) {
-      se <- object$probability.errors
-      if (is.null(se))
-        stop("class-probability standard errors are not available: refit with probabilities=TRUE",
-             call. = FALSE)
-      se <- as.matrix(se)[, level.idx]
-      repaired <- object$probability.repaired.rows
-      if (!is.null(repaired)) {
-        repaired <- as.logical(repaired)
-        se[is.na(repaired) | repaired] <- NA_real_
+      se <- rep(NA_real_, nrow(out[[j]]))
+      if (identical(errors, "asymptotic")) {
+        se <- object$probability.errors
+        if (is.null(se))
+          stop("class-probability standard errors are not available: refit with probabilities=TRUE",
+               call. = FALSE)
+        se <- as.matrix(se)[, level.idx]
+        repaired <- object$probability.repaired.rows
+        if (!is.null(repaired)) {
+          repaired <- as.logical(repaired)
+          se[is.na(repaired) | repaired] <- NA_real_
+        }
       }
       out[[j]] <- .np_plot_conmode_add_interval_columns(
         out[[j]],
-        se = se,
+        se = if (identical(errors, "bootstrap")) boot.se else se,
         errors = errors,
         alpha = alpha,
-        band = band
+        band = band,
+        center = center,
+        bootstrap_raw = boot.raw
       )
     }
   }
@@ -978,20 +1008,170 @@ np_render_control <- function(style = c("band", "bar"),
   as.vector(dens.obj$conderr)
 }
 
+.np_plot_conmode_proper_control <- function(object) {
+  out <- list()
+  if (!is.null(object$proper.info$tol))
+    out$tol <- object$proper.info$tol
+  out
+}
+
+.np_plot_conmode_probability_matrix <- function(object,
+                                                xtrain,
+                                                ytrain,
+                                                exdat,
+                                                levels) {
+  rhs <- rep.int(1.0, nrow(xtrain))
+  pmat <- matrix(NA_real_, nrow(exdat), length(levels),
+                 dimnames = list(NULL, levels))
+  for (k in seq_along(levels)) {
+    pmat[, k] <- npcdenshat(
+      bws = object$bws,
+      txdat = xtrain,
+      tydat = ytrain,
+      exdat = exdat,
+      eydat = .np_plot_conmode_level_factor(ytrain, levels[k], nrow(exdat)),
+      y = rhs,
+      output = "apply"
+    )
+  }
+  .npConmodeProperProbabilities(
+    pmat,
+    levels = levels,
+    proper = isTRUE(object$proper.requested),
+    proper.control = .np_plot_conmode_proper_control(object)
+  )
+}
+
+.np_plot_conmode_boot_counts <- function(n, B, method, blocklen) {
+  if (identical(method, "inid"))
+    return(.np_inid_counts_matrix(n = n, B = B))
+  drawer <- .np_block_counts_drawer(
+    n = n,
+    sim = method,
+    blocklen = blocklen,
+    B = B
+  )
+  .np_inid_counts_matrix(n = n, B = B, counts = drawer(1L, B))
+}
+
+.np_plot_conmode_bootstrap_values <- function(object,
+                                              xtrain,
+                                              ytrain,
+                                              exdat,
+                                              level,
+                                              levels,
+                                              t0,
+                                              B,
+                                              method,
+                                              blocklen) {
+  if (identical(method, "wild"))
+    stop("wild bootstrap is not available for class-probability plot.conmode intervals; use bootstrap=\"inid\", \"fixed\", or \"geom\"",
+         call. = FALSE)
+  B <- as.integer(B)
+  if (!is.numeric(B) || length(B) != 1L || is.na(B) || B < 1L)
+    stop("plot.errors.boot.num must be a positive integer", call. = FALSE)
+  n <- nrow(xtrain)
+  counts <- .np_plot_conmode_boot_counts(
+    n = n,
+    B = B,
+    method = method,
+    blocklen = blocklen
+  )
+  level.idx <- match(level, levels)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+  progress <- .np_plot_bootstrap_progress_begin(
+    total = B,
+    label = "Conmode probability bootstrap"
+  )
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+  for (bb in seq_len(B)) {
+    idx <- rep.int(seq_len(n), counts[, bb])
+    proper.out <- .np_plot_conmode_probability_matrix(
+      object = object,
+      xtrain = xtrain[idx, , drop = FALSE],
+      ytrain = ytrain[idx, , drop = FALSE],
+      exdat = exdat,
+      levels = levels
+    )
+    tmat[bb, ] <- proper.out$probabilities[, level.idx]
+    progress <- .np_plot_progress_tick(progress, bb)
+  }
+  list(t = tmat, t0 = t0)
+}
+
+.np_plot_conmode_bootstrap_raw <- function(object,
+                                           xtrain,
+                                           ytrain,
+                                           exdat,
+                                           level,
+                                           levels,
+                                           t0,
+                                           alpha,
+                                           band,
+                                           center,
+                                           method,
+                                           B,
+                                           blocklen) {
+  boot.out <- .np_plot_conmode_bootstrap_values(
+    object = object,
+    xtrain = xtrain,
+    ytrain = ytrain,
+    exdat = exdat,
+    level = level,
+    levels = levels,
+    t0 = t0,
+    B = B,
+    method = method,
+    blocklen = blocklen
+  )
+  if (identical(band, "pmzsd")) {
+    boot.err <- matrix(NA_real_, nrow = length(t0), ncol = 3L)
+    boot.sd <- .np_plot_bootstrap_col_sds(boot.out$t)
+    boot.err[, 1:2] <- stats::qnorm(alpha / 2, lower.tail = FALSE) * boot.sd
+    boot.all.err <- NULL
+  } else {
+    interval.summary <- .np_plot_bootstrap_interval_summary(
+      boot.t = boot.out$t,
+      t0 = boot.out$t0,
+      alpha = alpha,
+      band.type = band
+    )
+    boot.err <- matrix(NA_real_, nrow = length(t0), ncol = 3L)
+    boot.err[, 1:2] <- interval.summary$err
+    boot.all.err <- interval.summary$all.err
+  }
+  if (identical(center, "bias-corrected"))
+    boot.err[, 3L] <- 2 * boot.out$t0 - colMeans(boot.out$t)
+  list(
+    boot.err = boot.err,
+    boot.all.err = boot.all.err,
+    bxp = list(),
+    boot.t = boot.out$t
+  )
+}
+
 .np_plot_conmode_add_interval_columns <- function(dat,
                                                   se,
                                                   errors,
                                                   alpha,
-                                                  band) {
+                                                  band,
+                                                  center = "estimate",
+                                                  bootstrap_raw = NULL) {
   payload <- .np_plot_interval_payload(
     estimate = dat$probability,
     se = se,
     plot.errors.method = errors,
     plot.errors.alpha = alpha,
     plot.errors.type = band,
-    plot.errors.center = "estimate"
+    plot.errors.center = center,
+    bootstrap_raw = bootstrap_raw
   )
-  dat$stderr <- as.numeric(se)
+  dat$stderr <- if (identical(errors, "bootstrap") &&
+                    !is.null(bootstrap_raw$boot.t)) {
+    .np_plot_bootstrap_col_sds(bootstrap_raw$boot.t)
+  } else {
+    as.numeric(se)
+  }
   dat$center <- payload$center
   dat$lower <- payload$center - payload$err[, 1L]
   dat$upper <- payload$center + payload$err[, 2L]
@@ -1012,7 +1192,11 @@ np_render_control <- function(style = c("band", "bar"),
                                        xq = NULL,
                                        errors = "none",
                                        alpha = 0.05,
-                                       band = "pointwise") {
+                                       band = "pointwise",
+                                       center = "estimate",
+                                       bootstrap = "inid",
+                                       B = 399L,
+                                       blocklen = NULL) {
   if (!isTRUE(gradients) && is.null(object$probabilities))
     stop("class probabilities are not available: fit with probabilities=TRUE or gradients=TRUE",
          call. = FALSE)
@@ -1109,20 +1293,42 @@ np_render_control <- function(style = c("band", "bar"),
         stringsAsFactors = FALSE
       )
       if (!identical(errors, "none")) {
-        se <- .np_plot_conmode_probability_se(
-          object = object,
-          xtrain = xtrain,
-          ytrain = ytrain,
-          exdat = exdat,
-          level = level
-        )
-        se[proper.out$repaired.rows] <- NA_real_
+        boot.raw <- NULL
+        if (identical(errors, "bootstrap")) {
+          boot.raw <- .np_plot_conmode_bootstrap_raw(
+            object = object,
+            xtrain = xtrain,
+            ytrain = ytrain,
+            exdat = exdat,
+            level = level,
+            levels = lev,
+            t0 = dat$probability,
+            alpha = alpha,
+            band = band,
+            center = center,
+            method = bootstrap,
+            B = B,
+            blocklen = blocklen
+          )
+          se <- rep(NA_real_, nrow(exdat))
+        } else {
+          se <- .np_plot_conmode_probability_se(
+            object = object,
+            xtrain = xtrain,
+            ytrain = ytrain,
+            exdat = exdat,
+            level = level
+          )
+          se[proper.out$repaired.rows] <- NA_real_
+        }
         dat <- .np_plot_conmode_add_interval_columns(
           dat,
           se = se,
           errors = errors,
           alpha = alpha,
-          band = band
+          band = band,
+          center = center,
+          bootstrap_raw = boot.raw
         )
       }
       out[[j]] <- dat
@@ -1518,9 +1724,17 @@ np_render_control <- function(style = c("band", "bar"),
   if (!is.numeric(alpha) || length(alpha) != 1L ||
       is.na(alpha) || alpha <= 0 || alpha >= 0.5)
     stop("plot.errors.alpha must lie in (0, 0.5)", call. = FALSE)
-  if (identical(errors, "bootstrap"))
-    stop("bootstrap intervals are not yet implemented for plot.conmode class probabilities",
+  bootstrap <- if (is.null(dots$plot.errors.boot.method)) "inid" else
+    .np_plot_scalar_match(dots$plot.errors.boot.method,
+                          c("wild", "inid", "fixed", "geom"),
+                          "plot.errors.boot.method")
+  B <- if (is.null(dots$plot.errors.boot.num)) 399L else
+    dots$plot.errors.boot.num
+  if (!is.numeric(B) || length(B) != 1L || is.na(B) || B < 1)
+    stop("plot.errors.boot.num must be a positive numeric scalar",
          call. = FALSE)
+  B <- as.integer(B)
+  boot.blocklen <- dots$plot.errors.boot.blocklen
   if (!identical(center, "estimate") && !identical(errors, "bootstrap"))
     stop("bias-corrected interval centering requires errors=\"bootstrap\"",
          call. = FALSE)
@@ -1594,6 +1808,9 @@ np_render_control <- function(style = c("band", "bar"),
       !identical(output, "data"))
     stop("surface probability intervals are available as output=\"data\" only; surface band rendering is not yet implemented for plot.conmode",
          call. = FALSE)
+  if (identical(errors, "bootstrap") && isTRUE(perspective))
+    stop("surface bootstrap intervals are not yet implemented for plot.conmode; use one-dimensional views or errors=\"asymptotic\" with output=\"data\"",
+         call. = FALSE)
   plot.user.args <- .np_plot_user_args(dots, "plot")
   line.user.args <- .np_plot_user_args(dots, "lines")
   if (!is.null(dots$type))
@@ -1621,7 +1838,11 @@ np_render_control <- function(style = c("band", "bar"),
       xq = xq,
       errors = errors,
       alpha = alpha,
-      band = band
+      band = band,
+      center = center,
+      bootstrap = bootstrap,
+      B = B,
+      blocklen = boot.blocklen
     )
   } else {
     .np_plot_conmode_data(
@@ -1630,7 +1851,11 @@ np_render_control <- function(style = c("band", "bar"),
       level = level,
       errors = errors,
       alpha = alpha,
-      band = band
+      band = band,
+      center = center,
+      bootstrap = bootstrap,
+      B = B,
+      blocklen = boot.blocklen
     )
   }
 

@@ -198,8 +198,13 @@ fitted.conmode <- function(object, ...) {
 predict.conmode <- function(object,
                             newdata = NULL,
                             type = c("class", "prob"),
+                            se.fit = FALSE,
                             ...) {
   type <- match.arg(type)
+  se.fit <- npValidateScalarLogical(se.fit, "se.fit")
+  if (isTRUE(se.fit) && !identical(type, "prob"))
+    stop("predict.conmode(se.fit=TRUE) is available only for type=\"prob\"",
+         call. = FALSE)
   dots <- list(...)
   has.native.eval <- .npConmodePredictHasNativeEvalArgs(dots)
   has.native.ey <- "eydat" %in% names(dots) && !is.null(dots$eydat)
@@ -214,6 +219,12 @@ predict.conmode <- function(object,
     probs <- object$probabilities
     if (is.null(probs))
       stop("class probabilities are not stored: fit with probabilities=TRUE")
+    if (isTRUE(se.fit)) {
+      se <- object$probability.errors
+      if (is.null(se))
+        stop("class-probability standard errors are not stored: refit with probabilities=TRUE")
+      return(list(fit = probs, se.fit = se))
+    }
     return(probs)
   }
 
@@ -236,6 +247,12 @@ predict.conmode <- function(object,
   probs <- ev$probabilities
   if (is.null(probs))
     stop("class probabilities were not returned by the evaluation path")
+  if (isTRUE(se.fit)) {
+    se <- ev$probability.errors
+    if (is.null(se))
+      stop("class-probability standard errors were not returned by the evaluation path")
+    return(list(fit = probs, se.fit = se))
+  }
   probs
 }
 gradients.conmode <- function(x, level = NULL, errors = FALSE, ...) {
