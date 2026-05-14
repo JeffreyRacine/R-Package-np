@@ -413,6 +413,14 @@ prediction/evaluation route, or plot route as appropriate.
 
 library("MASS")
 data("birthwt")
+
+birthwt$low <- factor(birthwt$low)
+birthwt$smoke <- factor(birthwt$smoke)
+birthwt$race <- factor(birthwt$race)
+birthwt$ht <- factor(birthwt$ht)
+birthwt$ui <- factor(birthwt$ui)
+birthwt$ftv <- ordered(birthwt$ftv)
+
 attach(birthwt)
 
 # Fit a parametric logit model with low (0/1) as the dependent
@@ -428,11 +436,11 @@ attach(birthwt)
 # 'age' mother's age in years
 # 'lwt' mother's weight in pounds at last menstrual period
 
-model.logit <- glm(low~factor(smoke)+
-                   factor(race)+
-                   factor(ht)+
-                   factor(ui)+
-                   ordered(ftv)+
+model.logit <- glm(low~smoke+
+                   race+
+                   ht+
+                   ui+
+                   ftv+
                    age+
                    lwt,
                    family=binomial(link=logit))
@@ -445,13 +453,14 @@ ccr <- sum(diag(cm))/sum(cm)
 # Now do the same with a nonparametric model.  Note - this may take a
 # few minutes depending on the speed of your computer...
 
-bw <- npcdensbw(formula=factor(low)~factor(smoke)+
-                factor(race)+
-                factor(ht)+
-                factor(ui)+
-                ordered(ftv)+
+bw <- npcdensbw(formula=low~smoke+
+                race+
+                ht+
+                ui+
+                ftv+
                 age+
-                lwt)
+                lwt,
+                data=birthwt)
 
 model.np <- npconmode(bws=bw)
 

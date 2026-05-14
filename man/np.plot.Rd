@@ -4,7 +4,6 @@
 
 \alias{plot.bandwidth}
 \alias{plot.conbandwidth}
-\alias{plot.conmode}
 \alias{plot.plbandwidth}
 \alias{plot.rbandwidth}
 \alias{plot.scbandwidth}
