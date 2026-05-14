@@ -110,6 +110,86 @@ npcopula <- function(bws, ...) {
   num.var + 2L
 }
 
+.npcopula_expanded_grid_chunk_size <- function(n.eval) {
+  n.eval <- as.integer(n.eval)[1L]
+  opt <- suppressWarnings(as.integer(
+    getOption("np.npcopula.progress.chunk.size", 1000L)
+  )[1L])
+  if (is.na(opt) || opt < 1L)
+    opt <- 1000L
+  if (is.na(n.eval) || n.eval < 1L)
+    return(opt)
+  min(n.eval, opt)
+}
+
+.npcopula_expanded_grid_extra_steps <- function(n.eval, density, num.var) {
+  chunk.size <- .npcopula_expanded_grid_chunk_size(n.eval)
+  if (is.na(n.eval) || n.eval <= chunk.size)
+    return(0L)
+  n.chunks <- ceiling(n.eval / chunk.size)
+  n.chunks * (1L + if (density) num.var else 0L)
+}
+
+.npcopula_hat_apply_progress <- function(fun,
+                                         bws,
+                                         tdat,
+                                         edat,
+                                         y,
+                                         progress,
+                                         stage,
+                                         detail,
+                                         chunk.detail = detail) {
+  n.eval <- nrow(edat)
+  chunk.size <- .npcopula_expanded_grid_chunk_size(n.eval)
+
+  if (n.eval <= chunk.size) {
+    return(list(
+      value = fun(
+        bws = bws,
+        tdat = tdat,
+        edat = edat,
+        y = y,
+        output = "apply"
+      ),
+      progress = progress,
+      stage = stage
+    ))
+  }
+
+  n.chunks <- ceiling(n.eval / chunk.size)
+  out <- vector("list", n.chunks)
+  start <- 1L
+  chunk <- 1L
+  while (start <= n.eval) {
+    stopi <- min(n.eval, start + chunk.size - 1L)
+    done <- stage + chunk
+    progress <- .npcopula_progress_step(
+      progress, done,
+      sprintf("%s %d-%d/%d", chunk.detail, start, stopi, n.eval)
+    )
+    out[[chunk]] <- fun(
+      bws = bws,
+      tdat = tdat,
+      edat = edat[start:stopi, , drop = FALSE],
+      y = y,
+      output = "apply"
+    )
+    start <- stopi + 1L
+    chunk <- chunk + 1L
+  }
+  stage <- stage + n.chunks
+  progress <- .npcopula_progress_step(progress, stage, detail)
+
+  first <- out[[1L]]
+  value <- if (is.null(dim(first))) {
+    unlist(out, use.names = FALSE)
+  } else {
+    do.call(rbind, out)
+  }
+
+  list(value = value, progress = progress, stage = stage)
+}
+
 .npcopula_object <- function(result,
                              bws,
                              data,
@@ -1319,32 +1399,52 @@ npcopula.default <- function(bws,
     for (k in seq_len(ncol(x.u))) {
       if(is.ordered(data[,k])) x.u[,k] <- ordered(x.u[,k],levels=levels(data[,k]))
     }
+    progress$total <- progress$total + .npcopula_expanded_grid_extra_steps(
+      nrow(x.u), density = density, num.var = num.var
+    )
     unit.weights <- rep_len(1, nrow(data))
     if(!density) {
       stage <- stage + 1L
-      progress <- .npcopula_progress_step(progress, stage, "joint distribution on expanded grid")
-      copula <- npudisthat(
+      detail <- "joint distribution on expanded grid"
+      progress <- .npcopula_progress_step(progress, stage, detail)
+      hat.out <- .npcopula_hat_apply_progress(
+        fun = npudisthat,
         bws = bws,
         tdat = data,
         edat = x.u,
         y = unit.weights,
-        output = "apply"
+        progress = progress,
+        stage = stage,
+        detail = detail,
+        chunk.detail = "joint dist rows"
       )
+      copula <- hat.out$value
+      progress <- hat.out$progress
+      stage <- hat.out$stage
     } else {
       stage <- stage + 1L
-      progress <- .npcopula_progress_step(progress, stage, "joint density on expanded grid")
-      copula <- npudenshat(
+      detail <- "joint density on expanded grid"
+      progress <- .npcopula_progress_step(progress, stage, detail)
+      hat.out <- .npcopula_hat_apply_progress(
+        fun = npudenshat,
         bws = bws,
         tdat = data,
         edat = x.u,
         y = unit.weights,
-        output = "apply"
+        progress = progress,
+        stage = stage,
+        detail = detail,
+        chunk.detail = "joint dens rows"
       )
+      copula <- hat.out$value
+      progress <- hat.out$progress
+      stage <- hat.out$stage
       for (j in seq_len(num.var)) {
         stage <- stage + 1L
+        detail <- sprintf("density marginal %s on expanded grid", bws$xnames[j])
         progress <- .npcopula_progress_step(
           progress, stage,
-          sprintf("density marginal %s on expanded grid", bws$xnames[j])
+          detail
         )
         bws.f.marginal <- npudensbw(formula(paste("~",bws$xnames[j])),
                            bws=bws$bw[j],
@@ -1357,13 +1457,20 @@ npcopula.default <- function(bws,
                            data=data)
         xeval <- data.frame(x.u[,j])
         names(xeval) <- bws$xnames[j]
-        copula <- copula/NZD(npudenshat(
+        hat.out <- .npcopula_hat_apply_progress(
+          fun = npudenshat,
           bws = bws.f.marginal,
           tdat = data[, bws$xnames[j], drop = FALSE],
           edat = xeval,
           y = unit.weights,
-          output = "apply"
-        ))
+          progress = progress,
+          stage = stage,
+          detail = detail,
+          chunk.detail = sprintf("dens marginal %s rows", bws$xnames[j])
+        )
+        copula <- copula/NZD(hat.out$value)
+        progress <- hat.out$progress
+        stage <- hat.out$stage
       }
     }
   }
