@@ -64,6 +64,34 @@ local_npRmpi_subprocess_env <- function(extra = character()) {
   )
 }
 
+test_that("npcdist formula route keeps estimator-only proper arguments out of bandwidth selection", {
+  skip_on_cran()
+  env <- local_npRmpi_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+      "set.seed(42)",
+      "x <- rnorm(40)",
+      "y <- x + rnorm(40)",
+      "fit <- npcdist(y ~ x, regtype='lp', degree=1L, bernstein=TRUE, proper=TRUE, gradients=TRUE, nmulti=1)",
+      "stopifnot(inherits(fit, 'condistribution'))",
+      "stopifnot(isTRUE(fit$proper.requested))",
+      "stopifnot(identical(dim(fit$congrad), c(40L, 1L)))",
+      "cat('NPCDIST_FORMULA_PROPER_ARGS_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("NPCDIST_FORMULA_PROPER_ARGS_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("npcdist fitted slice repair works in subprocess session mode", {
   skip_on_cran()
   env <- local_npRmpi_subprocess_env()
