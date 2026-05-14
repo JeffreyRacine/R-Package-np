@@ -824,6 +824,199 @@ np_render_control <- function(style = c("band", "bar"),
   out
 }
 
+.np_plot_conmode_cast_like <- function(x, template) {
+  if (is.factor(template))
+    return(factor(as.character(x),
+                  levels = levels(template),
+                  ordered = is.ordered(template)))
+  if (is.integer(template))
+    return(as.integer(x))
+  if (is.numeric(template))
+    return(as.numeric(x))
+  x
+}
+
+.np_plot_conmode_grid_values <- function(x, neval, xtrim) {
+  if (is.factor(x)) {
+    return(factor(levels(x), levels = levels(x), ordered = is.ordered(x)))
+  }
+  rng <- stats::quantile(x, probs = xtrim, names = FALSE, na.rm = TRUE)
+  seq(rng[1L], rng[2L], length.out = neval)
+}
+
+.np_plot_conmode_base_row <- function(xtrain, xq) {
+  out <- xtrain[1L, , drop = FALSE]
+  for (j in seq_along(xtrain)) {
+    val <- uocquantile(xtrain[[j]], prob = xq[j])
+    out[[j]] <- .np_plot_conmode_cast_like(val, xtrain[[j]])
+  }
+  out
+}
+
+.np_plot_conmode_level_factor <- function(ytrain, level, n) {
+  y <- ytrain[[1L]]
+  factor(rep(level, n),
+         levels = levels(y),
+         ordered = is.ordered(y))
+}
+
+.np_plot_conmode_grid_data <- function(object,
+                                       gradients = FALSE,
+                                       level = NULL,
+                                       neval = 50L,
+                                       xtrim = c(0, 1),
+                                       xq = NULL) {
+  xtrain <- object$xtrain
+  ytrain <- object$ytrain
+  if ((is.null(xtrain) || is.null(ytrain)) &&
+      isTRUE(object$trainiseval) &&
+      !is.null(object$xeval) &&
+      !is.null(object$yeval)) {
+    xtrain <- object$xeval
+    ytrain <- object$yeval
+  }
+  if (is.null(xtrain) || is.null(ytrain))
+    stop("fixed-grid plot.conmode displays require an object fitted with probabilities=TRUE or gradients=TRUE",
+         call. = FALSE)
+  xtrain <- as.data.frame(xtrain)
+  ytrain <- as.data.frame(ytrain)
+
+  if (!isTRUE(gradients) && is.null(object$probabilities))
+    stop("class probabilities are not available: fit with probabilities=TRUE or gradients=TRUE",
+         call. = FALSE)
+  if (isTRUE(gradients) && is.null(object$probability.gradients))
+    stop("class-probability gradients/effects are not available: fit with gradients=TRUE",
+         call. = FALSE)
+
+  lev <- if (!is.null(object$probability.levels)) {
+    as.character(object$probability.levels)
+  } else {
+    levels(ytrain[[1L]])
+  }
+  lev <- unique(lev)
+  if (!length(lev))
+    stop("conmode object does not contain response-level metadata", call. = FALSE)
+
+  if (is.null(level)) {
+    if (isTRUE(gradients) && !is.null(object$probability.gradient.level)) {
+      level <- as.character(object$probability.gradient.level)
+    } else {
+      level <- lev[1L]
+    }
+  }
+  if (length(level) != 1L || is.na(level) || !(as.character(level) %in% lev))
+    stop("'level' must identify one response level in the fitted conmode object",
+         call. = FALSE)
+  level <- as.character(level)
+  if (isTRUE(gradients) &&
+      !identical(level, as.character(object$probability.gradient.level)))
+    stop(sprintf("stored class-probability gradients are for level %s; refit with level=%s to plot that level",
+                 sQuote(as.character(object$probability.gradient.level)),
+                 sQuote(level)),
+         call. = FALSE)
+
+  if (!is.numeric(neval) || length(neval) != 1L || is.na(neval) || neval < 2L)
+    stop("neval must be a numeric scalar at least 2 for fixed-grid plot.conmode displays",
+         call. = FALSE)
+  neval <- as.integer(neval)
+  if (!is.numeric(xtrim) || length(xtrim) != 2L ||
+      any(is.na(xtrim)) || any(xtrim < 0) || any(xtrim > 1) ||
+      xtrim[1L] >= xtrim[2L])
+    stop("xtrim must be a numeric length-two vector with 0 <= xtrim[1] < xtrim[2] <= 1",
+         call. = FALSE)
+
+  p <- ncol(xtrain)
+  xnames <- object$xnames
+  if (is.null(xnames) || length(xnames) != p)
+    xnames <- names(xtrain)
+  if (is.null(xq))
+    xq <- rep(0.5, p)
+  if (!is.numeric(xq) || any(is.na(xq)) || any(xq < 0) || any(xq > 1))
+    stop("xq must contain probabilities in [0,1]", call. = FALSE)
+  if (length(xq) == 1L)
+    xq <- rep(xq, p)
+  if (length(xq) != p)
+    stop("xq must be a scalar or have one entry for each conditioning variable",
+         call. = FALSE)
+
+  rhs <- rep.int(1.0, nrow(xtrain))
+  base <- .np_plot_conmode_base_row(xtrain, xq)
+  proper.control <- list()
+  if (!is.null(object$proper.info$tol))
+    proper.control$tol <- object$proper.info$tol
+  out <- vector("list", p)
+  names(out) <- xnames
+  ixcon <- object$bws$ixcon
+  if (is.null(ixcon) || length(ixcon) != p)
+    ixcon <- vapply(xtrain, is.numeric, logical(1L))
+
+  for (j in seq_len(p)) {
+    grid <- .np_plot_conmode_grid_values(xtrain[[j]], neval = neval,
+                                         xtrim = xtrim)
+    exdat <- base[rep(1L, length(grid)), , drop = FALSE]
+    exdat[[j]] <- .np_plot_conmode_cast_like(grid, xtrain[[j]])
+
+    if (isTRUE(gradients)) {
+      if (isTRUE(ixcon[j])) {
+        s <- integer(sum(ixcon))
+        names(s) <- xnames[ixcon]
+        s[xnames[j]] <- 1L
+        vals <- npcdenshat(
+          bws = object$bws,
+          txdat = xtrain,
+          tydat = ytrain,
+          exdat = exdat,
+          eydat = .np_plot_conmode_level_factor(ytrain, level, nrow(exdat)),
+          y = rhs,
+          output = "apply",
+          s = s
+        )
+      } else {
+        vals <- rep(0, nrow(exdat))
+      }
+      out[[j]] <- data.frame(
+        variable = xnames[j],
+        x = exdat[[j]],
+        effect = as.vector(vals),
+        level = level,
+        gradients = TRUE,
+        view = "fixed",
+        stringsAsFactors = FALSE
+      )
+    } else {
+      pmat <- matrix(NA_real_, nrow(exdat), length(lev),
+                     dimnames = list(NULL, lev))
+      for (k in seq_along(lev)) {
+        pmat[, k] <- npcdenshat(
+          bws = object$bws,
+          txdat = xtrain,
+          tydat = ytrain,
+          exdat = exdat,
+          eydat = .np_plot_conmode_level_factor(ytrain, lev[k], nrow(exdat)),
+          y = rhs,
+          output = "apply"
+        )
+      }
+      proper.out <- .npConmodeProperProbabilities(
+        pmat,
+        levels = lev,
+        proper = isTRUE(object$proper.requested),
+        proper.control = proper.control
+      )
+      out[[j]] <- data.frame(
+        variable = xnames[j],
+        x = exdat[[j]],
+        probability = proper.out$probabilities[, match(level, lev)],
+        level = level,
+        gradients = FALSE,
+        view = "fixed",
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  out
+}
+
 .np_plot_conmode_panel <- function(dat,
                                    gradients = FALSE,
                                    level,
@@ -847,7 +1040,8 @@ np_render_control <- function(style = c("band", "bar"),
   if (is.null(ylab))
     ylab <- if (isTRUE(gradients)) "Effect" else "Probability"
 
-  if (is.factor(x) && !is.ordered(x)) {
+  fixed.grid <- identical(dat$view[1L], "fixed")
+  if (is.factor(x) && !is.ordered(x) && !isTRUE(fixed.grid)) {
     args <- .np_plot_merge_user_args(
       list(formula = y ~ x, xlab = xlab, ylab = ylab, main = main),
       plot.user.args
@@ -856,11 +1050,11 @@ np_render_control <- function(style = c("band", "bar"),
     return(invisible(NULL))
   }
 
-  xplot <- if (is.ordered(x)) as.numeric(x) else x
+  xplot <- if (is.factor(x)) as.numeric(x) else x
   ord <- order(xplot)
   args <- .np_plot_merge_user_args(
     list(x = xplot[ord], y = y[ord],
-         type = if (is.ordered(x) || is.numeric(xplot)) "l" else "p",
+         type = if (is.factor(x) && !is.ordered(x)) "p" else "l",
          xlab = xlab, ylab = ylab, main = main),
     line.user.args
   )
@@ -868,7 +1062,7 @@ np_render_control <- function(style = c("band", "bar"),
     args,
     plot.user.args
   )
-  if (is.ordered(x)) {
+  if (is.factor(x)) {
     args$xaxt <- "n"
     do.call(graphics::plot, args)
     graphics::axis(1L, at = seq_along(levels(x)), labels = levels(x))
@@ -904,19 +1098,42 @@ np_render_control <- function(style = c("band", "bar"),
   if (length(interval.supplied))
     stop("class-probability/effect intervals are not yet implemented for plot.conmode",
          call. = FALSE)
-  grid.args <- c("renderer", "perspective", "persp", "neval",
-                 "grid_control", "view")
-  grid.supplied <- intersect(dot.names[nzchar(dot.names)], grid.args)
-  if (length(grid.supplied))
-    stop("grid/surface plotting is not yet implemented for plot.conmode",
+  surface.args <- c("renderer", "perspective", "persp")
+  surface.supplied <- intersect(dot.names[nzchar(dot.names)], surface.args)
+  if (length(surface.supplied))
+    stop("surface rendering is not yet implemented for plot.conmode",
          call. = FALSE)
+  grid.args <- c("neval", "grid_control", "view", "xtrim", "xq")
+  grid.supplied <- intersect(dot.names[nzchar(dot.names)], grid.args)
   allowed <- unique(c("gradients", "level", "output", "data_rug",
-                      "layout", "legend",
+                      "layout", "legend", grid.args, surface.args,
                       .np_plot_graphics_arg_names()))
   .np_plot_stop_unused_args(setdiff(dot.names[nzchar(dot.names)], allowed),
                             allowed)
   gradients <- npValidateScalarLogical(gradients, "gradients")
   data_rug <- npValidateScalarLogical(data_rug, "data_rug")
+  view <- dots$view
+  if (is.null(view))
+    view <- if (length(grid.supplied)) "fixed" else "sample"
+  view <- .np_plot_scalar_match(view, c("sample", "fixed"), "view")
+  neval <- dots$neval
+  if (is.null(neval))
+    neval <- 50L
+  xtrim <- dots$xtrim
+  xq <- dots$xq
+  if (!is.null(dots$grid_control)) {
+    if (!inherits(dots$grid_control, "np_grid_control"))
+      stop("grid_control must be created by np_grid_control()", call. = FALSE)
+    if (!is.null(dots$grid_control$slices))
+      stop("grid_control$slices is not yet supported for plot.conmode",
+           call. = FALSE)
+    if (!is.null(dots$grid_control$xtrim))
+      xtrim <- dots$grid_control$xtrim
+    if (!is.null(dots$grid_control$xq))
+      xq <- dots$grid_control$xq
+  }
+  if (is.null(xtrim))
+    xtrim <- c(0, 1)
   plot.par.mfrow <- .np_plot_match_layout(layout)
   output <- match.arg(output)
   if (identical(output, "both"))
@@ -927,7 +1144,18 @@ np_render_control <- function(style = c("band", "bar"),
   if (!is.null(dots$type))
     line.user.args$type <- dots$type
 
-  plot.data <- .np_plot_conmode_data(object, gradients = gradients, level = level)
+  plot.data <- if (identical(view, "fixed")) {
+    .np_plot_conmode_grid_data(
+      object,
+      gradients = gradients,
+      level = level,
+      neval = neval,
+      xtrim = xtrim,
+      xq = xq
+    )
+  } else {
+    .np_plot_conmode_data(object, gradients = gradients, level = level)
+  }
   level <- plot.data[[1L]]$level[1L]
 
   if (identical(output, "data"))
