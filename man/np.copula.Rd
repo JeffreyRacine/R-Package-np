@@ -50,7 +50,8 @@ npcopula(bws, \dots)
 
 \method{plot}{npcopula}(x,
         perspective = TRUE,
-        view = c("rotate", "fixed", "surface", "contour", "image"),
+        view = c("rotate", "fixed", "surface", "contour", "image",
+                 "empirical", "all"),
         renderer = c("base", "rgl"),
         errors = c("none", "bootstrap", "asymptotic"),
         band = c("pointwise", "pmzsd", "bonferroni",
@@ -161,7 +162,10 @@ estimated and where it is evaluated.
     optional matrix or data frame of marginal probability values in
     \eqn{[0,1]}. Each column corresponds to one variable in the copula.
     If supplied, \code{npcopula} evaluates on the Cartesian product
-    \code{expand.grid(u)}. If omitted with a formula route and
+    \code{expand.grid(u)}. For two-dimensional displays, the clearest
+    spelling is often \code{data.frame(u1 = u1.seq, u2 = u2.seq)};
+    names matching the original variables are also accepted for
+    compatibility. If omitted with a formula route and
     \code{evaluation="grid"}, a two-dimensional grid is generated
     automatically.
   }
@@ -219,6 +223,7 @@ displayed.
   \item{perspective}{
     logical value. If \code{TRUE}, draw a surface display; otherwise
     use \code{view} to choose \code{"contour"} or \code{"image"}.
+    The \code{"empirical"} and \code{"all"} views ignore this argument.
   }
 
   \item{phi, theta}{
@@ -244,7 +249,12 @@ displayed.
     and delay as the other package perspective plots. Use
     \code{"fixed"} for a single fixed surface, \code{"surface"} as a
     backward-compatible fixed-surface alias, or \code{"contour"} and
-    \code{"image"} with \code{perspective=FALSE}.
+    \code{"image"} with \code{perspective=FALSE}. Use
+    \code{"empirical"} to plot the empirical copula coordinates. Use
+    \code{"all"} for a base-graphics four-panel display containing the
+    copula contour, copula surface, empirical copula coordinates, and a
+    copula-density surface. The \code{"all"} view is not currently
+    supported with \code{renderer="rgl"}.
   }
 
   \item{zlim}{
@@ -348,7 +358,12 @@ surface plots.
   default viewing angles and base-graphics rotation cadence as the
   other surface plot methods. \code{renderer="rgl"} requests the shared
   interactive \pkg{rgl} surface renderer, using the same default-angle
-  remapping used by the other package surface plots.
+  remapping used by the other package surface plots. For mixed ordered
+  margins, grid displays are drawn against the requested probability
+  grid, while the returned \code{u} columns retain the attainable
+  marginal probability values produced by quasi-inversion. The
+  \code{"empirical"} view plots empirical copula coordinates, and
+  \code{"all"} gives a base-graphics four-panel diagnostic display.
 
   For grid surfaces, \code{plot.npcopula} can add asymptotic or
   bootstrap intervals. Distribution-copula asymptotic intervals use the
@@ -447,42 +462,117 @@ surface plots.
 
 \examples{
 \dontrun{
-## Minimal bivariate continuous example using the formula interface.
-
 library("MASS")
 
-set.seed(42)
-n <- 500
-rho <- 0.95
-Sigma <- matrix(c(1, rho, rho, 1), 2, 2)
-dat <- as.data.frame(mvrnorm(n = n, mu = c(0, 0), Sigma = Sigma))
-names(dat) <- c("x", "y")
+## Example 1: bivariate mixed data, continuous x and ordered y.
 
-fit <- npcopula(~ x + y, data = dat, neval = 20, nmulti = 1)
-summary(fit)
-plot(fit)
+set.seed(42)
+n <- 1000
+n.eval <- 30
+rho <- 0.99
+mu <- c(0, 0)
+Sigma <- matrix(c(1, rho, rho, 1), 2, 2)
+xy <- mvrnorm(n = n, mu = mu, Sigma = Sigma)
+mydat <- data.frame(
+  x = xy[, 1],
+  y = ordered(as.integer(cut(xy[, 2],
+    quantile(xy[, 2], seq(0, 1, by = .1)),
+    include.lowest = TRUE)) - 1)
+)
+
+grid.seq <- seq(0, 1, length.out = n.eval)
+grid.dat <- data.frame(u1 = grid.seq, u2 = grid.seq)
+
+## Estimate the copula distribution from an npudistbw() object.
+
+bw.cdf <- npudistbw(~ x + y, data = mydat, nmulti = 1)
+copula <- npcopula(bws = bw.cdf, data = mydat, u = grid.dat)
+summary(copula)
+
+## Native plotting replaces the older manual contour(), persp(), and
+## empirical scatterplot calls.
+
+plot(copula, perspective = FALSE, view = "contour")
+plot(copula, perspective = FALSE, view = "image")
+plot(copula, view = "fixed", zlim = c(0, 1))
+if (requireNamespace("rgl", quietly = TRUE))
+  plot(copula, view = "fixed", renderer = "rgl", zlim = c(0, 1))
+plot(copula)
+
+## Plot empirical copula coordinates from the retained sample data.
+
+plot(copula, view = "empirical")
+
+## Or request the four-panel base-graphics diagnostic display.
+
+plot(copula, view = "all")
+
+## Estimate and plot the copula density from an npudensbw() object.
+
+bw.pdf <- npudensbw(~ x + y, data = mydat, nmulti = 1)
+copula.dens <- npcopula(bws = bw.pdf, data = mydat, u = grid.dat)
+summary(copula.dens)
+plot(copula.dens, view = "fixed")
+if (requireNamespace("rgl", quietly = TRUE))
+  plot(copula.dens, view = "fixed", renderer = "rgl")
+plot(copula.dens)
 
 ## Intervals are available for two-dimensional grid surfaces.
 
-plot(fit, errors = "asymptotic", band = "pointwise")
-plot(fit, errors = "bootstrap", bootstrap = "inid", B = 399,
+plot(copula, errors = "asymptotic", band = "pointwise")
+plot(copula, errors = "bootstrap", bootstrap = "inid", B = 399,
      band = "pointwise")
 
-## Reuse the selected bandwidth object for a custom probability grid.
+## Prediction evaluates the retained bandwidth object on a supplied
+## probability grid.
 
-u_grid <- data.frame(x = seq(0.05, 0.95, length.out = 15),
-                     y = seq(0.05, 0.95, length.out = 15))
-custom <- npcopula(bws = fit$bws, data = dat, u = u_grid)
-plot(custom, perspective = FALSE, view = "contour")
-predict(fit, u = u_grid)
-predict(fit, newdata = data.frame(u1 = c(0.25, 0.75),
-                                  u2 = c(0.25, 0.75)))
+predict(copula, u = data.frame(x = c(0.25, 0.75),
+                               y = c(0.25, 0.75)))
+predict(copula, newdata = data.frame(u1 = c(0.25, 0.75),
+                                     u2 = c(0.25, 0.75)))
 
-## Copula density uses npudensbw internally when target = "density".
+## Example 2: bivariate continuous data.
 
-fit_dens <- npcopula(~ x + y, data = dat, target = "density",
-                     neval = 20, nmulti = 1)
-plot(fit_dens)
+set.seed(42)
+n <- 1000
+n.eval <- 30
+rho <- 0.99
+mu <- c(0, 0)
+Sigma <- matrix(c(1, rho, rho, 1), 2, 2)
+xy <- mvrnorm(n = n, mu = mu, Sigma = Sigma)
+mydat <- data.frame(x = xy[, 1], y = xy[, 2])
+
+grid.seq <- seq(0, 1, length.out = n.eval)
+grid.dat <- data.frame(u1 = grid.seq, u2 = grid.seq)
+
+bw.cdf <- npudistbw(~ x + y, data = mydat, nmulti = 1)
+copula <- npcopula(bws = bw.cdf, data = mydat, u = grid.dat)
+summary(copula)
+
+plot(copula, perspective = FALSE, view = "contour")
+plot(copula, perspective = FALSE, view = "image")
+plot(copula, view = "fixed", zlim = c(0, 1))
+if (requireNamespace("rgl", quietly = TRUE))
+  plot(copula, view = "fixed", renderer = "rgl", zlim = c(0, 1))
+plot(copula)
+plot(copula, view = "empirical")
+plot(copula, view = "all")
+
+bw.pdf <- npudensbw(~ x + y, data = mydat, nmulti = 1)
+copula.dens <- npcopula(bws = bw.pdf, data = mydat, u = grid.dat)
+summary(copula.dens)
+plot(copula.dens, view = "fixed", zlim = c(0, 40))
+if (requireNamespace("rgl", quietly = TRUE))
+  plot(copula.dens, view = "fixed", renderer = "rgl",
+       zlim = c(0, 40))
+plot(copula.dens, zlim = c(0, 40))
+
+## The formula interface is a shorter route when bandwidths do not need
+## to be reused explicitly.
+
+copula.short <- npcopula(~ x + y, data = mydat, neval = n.eval,
+                         nmulti = 1)
+plot(copula.short, view = "all")
 } % enddontrun
 }
 
