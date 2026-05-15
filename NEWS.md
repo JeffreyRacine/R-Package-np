@@ -1,7 +1,7 @@
 # np 0.70-3
 
-- Development version opened after CRAN publication of 0.70-2 on
-  XX-XX-XXXX. No post-release user-visible changes have been recorded yet.
+- Development version opened after CRAN publication of 0.70-2. No
+  post-release user-visible changes have been recorded yet.
 
 # np 0.70-2
 
