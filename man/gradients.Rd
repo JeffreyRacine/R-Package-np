@@ -9,9 +9,9 @@
 \usage{
 gradients(x, \dots)
 
-\method{gradients}{condensity}(x, errors = FALSE, \dots)
+\method{gradients}{condensity}(x, errors = FALSE, gradient.order = NULL, \dots)
 
-\method{gradients}{condistribution}(x, errors = FALSE, \dots)
+\method{gradients}{condistribution}(x, errors = FALSE, gradient.order = NULL, \dots)
 
 \method{gradients}{npregression}(x, errors = FALSE, gradient.order = NULL, \dots)
 
@@ -35,7 +35,8 @@ Optional local-polynomial derivative order controls.
 }
 
   \item{gradient.order}{
-    for \code{npregression} objects fitted with \code{regtype="lp"},
+    for \code{npregression}, \code{condensity}, and
+    \code{condistribution} objects fitted with \code{regtype="lp"},
     optional derivative order request (scalar or one entry per
     continuous predictor). Orders exceeding the fitted polynomial degree
     are returned as \code{NA}. If a different admissible derivative order
@@ -60,9 +61,10 @@ Further method-specific arguments.
 }
 \details{
   This function provides a generic interface for extraction of gradients
-  from objects. For \code{npregression} objects fitted with
-  \code{regtype="lp"}, \code{gradient.order} identifies the stored
-  continuous-predictor derivative order to extract; it is not a
+  from objects. For \code{npregression}, \code{condensity}, and
+  \code{condistribution} objects fitted with \code{regtype="lp"},
+  \code{gradient.order} identifies the stored continuous-predictor
+  derivative order to extract; it is not a
   post-fit recomputation control. For \code{qregression} objects,
   \code{errors=TRUE} returns
   asymptotic standard errors for the quantile gradients when the object was

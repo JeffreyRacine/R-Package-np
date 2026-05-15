@@ -662,6 +662,121 @@
   (Hx * Gy) %*% rhs
 }
 
+.npRmpi_cdhat_apply_row_tasks <- function(neval, workers, ntrain) {
+  neval <- as.integer(neval)
+  workers <- as.integer(workers)
+  ntrain <- as.integer(ntrain)
+  if (is.na(neval) || neval < 1L ||
+      is.na(workers) || workers < 1L ||
+      is.na(ntrain) || ntrain < 1L)
+    return(NULL)
+
+  max.entries <- suppressWarnings(as.numeric(getOption("npRmpi.cdhat.apply.fanout.max.entries", 2.5e7))[1L])
+  if (!is.finite(max.entries) || is.na(max.entries) || max.entries < 1)
+    max.entries <- 2.5e7
+
+  memory.block <- max(1L, as.integer(floor(max.entries / as.double(ntrain))))
+  balance.block <- max(1L, as.integer(ceiling(neval / as.double(workers + 1L))))
+  block.size <- min(memory.block, balance.block)
+  block.size <- min(block.size, neval)
+
+  starts <- seq.int(1L, neval, by = block.size)
+  lapply(starts, function(st) {
+    en <- min(neval, st + block.size - 1L)
+    rows <- seq.int(st, en)
+    list(rows = as.integer(rows), bsz = as.integer(length(rows)))
+  })
+}
+
+.npRmpi_cdhat_apply_fanout <- function(bws,
+                                        txdat,
+                                        tydat,
+                                        exdat,
+                                        eydat,
+                                        rhs,
+                                        operator,
+                                        x.s = NULL,
+                                        what = "conditional hat apply",
+                                        comm = 1L) {
+  if (!isTRUE(getOption("npRmpi.cdhat.apply.fanout", TRUE)) ||
+      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+      isTRUE(getOption("npRmpi.autodispatch.context", FALSE)) ||
+      isTRUE(getOption("npRmpi.autodispatch.disable", FALSE)) ||
+      isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+    return(NULL)
+
+  rank <- tryCatch(as.integer(mpi.comm.rank(comm = comm)), error = function(e) NA_integer_)
+  if (is.na(rank) || rank != 0L)
+    return(NULL)
+
+  workers <- tryCatch(.npRmpi_bootstrap_worker_count(comm = comm), error = function(e) 0L)
+  if (is.na(workers) || workers < 2L)
+    return(NULL)
+
+  neval <- nrow(exdat)
+  ntrain <- nrow(txdat)
+  ncol.out <- ncol(as.matrix(rhs))
+  work.size <- as.double(ntrain) * as.double(neval) * as.double(ncol.out)
+  min.work <- suppressWarnings(as.numeric(getOption("npRmpi.cdhat.apply.fanout.min.work", 5e7))[1L])
+  if (!is.finite(min.work) || is.na(min.work) || min.work < 0)
+    min.work <- 5e7
+  if (work.size < min.work)
+    return(NULL)
+
+  tasks <- .npRmpi_cdhat_apply_row_tasks(neval = neval, workers = workers, ntrain = ntrain)
+  if (!length(tasks) || length(tasks) < 2L)
+    return(NULL)
+
+  worker <- function(task) {
+    old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+    old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+    options(npRmpi.autodispatch.disable = TRUE)
+    options(npRmpi.autodispatch.context = TRUE)
+    on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+    on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+
+    rows <- as.integer(task$rows)
+    x.s.worker <- if (length(x.s)) x.s else NULL
+    out <- .npcdhat_exact_apply(
+      bws = bws,
+      txdat = txdat,
+      tydat = tydat,
+      exdat = exdat[rows, , drop = FALSE],
+      eydat = eydat[rows, , drop = FALSE],
+      rhs = rhs,
+      operator = operator,
+      x.s = x.s.worker
+    )
+    out <- as.matrix(out)
+    if (!identical(dim(out), c(length(rows), as.integer(ncol.out))))
+      out <- matrix(as.numeric(out), nrow = length(rows), ncol = as.integer(ncol.out))
+    out
+  }
+
+  .npRmpi_bootstrap_run_fanout(
+    tasks = tasks,
+    worker = worker,
+    ncol.out = ncol.out,
+    what = what,
+    progress.label = sprintf("%s evaluation rows", what),
+    profile.where = paste0("mpi.applyLB:", what),
+    comm = comm,
+    prefer.local.single_worker = FALSE,
+    master_local_chunk = TRUE,
+    required.bindings = list(
+      bws = bws,
+      txdat = txdat,
+      tydat = tydat,
+      exdat = exdat,
+      eydat = eydat,
+      rhs = rhs,
+      operator = operator,
+      x.s = if (is.null(x.s)) integer(0L) else x.s,
+      ncol.out = ncol.out
+    )
+  )
+}
+
 .npcdhat_core <- function(bws,
                           txdat,
                           tydat,
@@ -754,7 +869,7 @@
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
 
-    out <- .npcdhat_exact_apply(
+    out <- .npRmpi_cdhat_apply_fanout(
       bws = bws,
       txdat = txdat,
       tydat = tydat,
@@ -762,8 +877,21 @@
       eydat = eydat,
       rhs = y,
       operator = operator,
-      x.s = x.s
+      x.s = x.s,
+      what = paste0(where, " apply")
     )
+    if (is.null(out)) {
+      out <- .npcdhat_exact_apply(
+        bws = bws,
+        txdat = txdat,
+        tydat = tydat,
+        exdat = exdat,
+        eydat = eydat,
+        rhs = y,
+        operator = operator,
+        x.s = x.s
+      )
+    }
     if (ncol(out) == 1L)
       return(as.vector(out))
     return(out)
