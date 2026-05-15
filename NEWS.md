@@ -1,3 +1,8 @@
+# npRmpi 0.70-3
+
+- Development version opened after CRAN publication of 0.70-2 on
+  XX-XX-XXXX. No post-release user-visible changes have been recorded yet.
+
 # npRmpi 0.70-2
 
 - `npqreg()` is now a fully fledged MPI-aware quantile-regression front
