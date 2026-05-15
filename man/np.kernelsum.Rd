@@ -487,9 +487,10 @@ fit.lc
 
 # Increase the number of digits printed out by default in R and avoid
 # using scientific notation for this example (we wish to compare
-# objective function minima)
+# objective function minima), then restore the user's options on exit.
 
-options(scipen=100, digits=12)
+old <- options(scipen=100, digits=12)
+on.exit(options(old), add = TRUE)
 
 # Generate 100 observations from a simple DGP where one explanatory
 # variable is irrelevant.

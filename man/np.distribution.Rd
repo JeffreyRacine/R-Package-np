@@ -292,12 +292,12 @@ Fhat <- fitted(npudist(bws=bw, newdata=data.eval))
 
 # Coerce the data into a matrix for plotting with persp()
 
-F <- matrix(Fhat, length(unique(year)), 50)
+Fhat <- matrix(Fhat, length(unique(year)), 50)
 
 # Next, create a 3D perspective plot of the CDF F, and a 2D
 # contour plot.
 
-persp(as.integer(levels(year.seq)), gdp.seq, F, col="lightblue",
+persp(as.integer(levels(year.seq)), gdp.seq, Fhat, col="lightblue",
       ticktype="detailed", ylab="GDP", xlab="Year", zlab="Density",
       theta=300, phi=50)
 
@@ -307,7 +307,7 @@ if (interactive()) Sys.sleep(5)
 
 contour(as.integer(levels(year.seq)),
         gdp.seq,
-        F,
+        Fhat,
         xlab="Year",
         ylab="GDP",
         main = "Cumulative Distribution Contour Plot",
@@ -367,12 +367,12 @@ Fhat <- fitted(npudist(edat = data.eval, bws=bw))
 
 # Coerce the data into a matrix for plotting with persp()
 
-F <- matrix(Fhat, length(unique(year)), 50)
+Fhat <- matrix(Fhat, length(unique(year)), 50)
 
 # Next, create a 3D perspective plot of the CDF F, and a 2D
 # contour plot.
 
-persp(as.integer(levels(year.seq)), gdp.seq, F, col="lightblue",
+persp(as.integer(levels(year.seq)), gdp.seq, Fhat, col="lightblue",
       ticktype="detailed", ylab="GDP", xlab="Year",
       zlab="Cumulative Distribution",
       theta=300, phi=50)
@@ -383,7 +383,7 @@ if (interactive()) Sys.sleep(5)
 
 contour(as.integer(levels(year.seq)),
         gdp.seq,
-        F,
+        Fhat,
         xlab="Year",
         ylab="GDP",
         main = "Cumulative Distribution Contour Plot",

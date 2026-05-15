@@ -202,7 +202,7 @@ if (interactive()) Sys.sleep(5)
 t.test(x,y)
 ## F test for equality of variances and asymptotic
 ## critical values
-F <- var(x)/var(y)
+Fstat <- var(x)/var(y)
 qf(c(0.025,0.975),df1=n-1,df2=n-1)
 
 ## Plot the nonparametric density estimates on the same axes
