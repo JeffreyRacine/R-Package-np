@@ -1273,6 +1273,16 @@ npregbw.default <-
     xdat <- toFrame(xdat)
     yname <- deparse(substitute(ydat))
     lp.dot.args <- list(...)
+    if ("remin" %in% names(lp.dot.args)) {
+      legacy.remin <- npValidateScalarLogical(lp.dot.args$remin, "remin")
+      warning("npregbw: argument 'remin' is deprecated; use 'powell.remin' and 'nomad.remin'",
+              call. = FALSE)
+      if (missing(powell.remin))
+        powell.remin <- legacy.remin
+      if (missing(nomad.remin))
+        nomad.remin <- legacy.remin
+      lp.dot.args$remin <- NULL
+    }
     npRejectLegacyLpArgs(names(lp.dot.args), where = "npregbw")
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)

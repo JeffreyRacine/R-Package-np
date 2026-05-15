@@ -149,6 +149,11 @@ npreg.rbandwidth <-
     no.ey = missing(eydat)
     dots <- list(...)
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
+    if ("remin" %in% names(dots)) {
+      warning("npreg: bandwidth-selection argument 'remin' is ignored when a bandwidth object is supplied",
+              call. = FALSE)
+      dots$remin <- NULL
+    }
     npRejectLegacyLpArgs(names(dots), where = "npreg")
     warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
@@ -540,8 +545,10 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       reg.args$txdat <- txdat
     if (!missing(tydat))
       reg.args$tydat <- tydat
-    dots$.np_fit_progress_handoff <- TRUE
-    return(do.call(npreg, c(reg.args, dots)))
+    fit.dots <- dots
+    fit.dots$remin <- NULL
+    fit.dots$.np_fit_progress_handoff <- TRUE
+    return(do.call(npreg, c(reg.args, fit.dots)))
   }
 
   ## here we check to see if the function was called with tdat =
