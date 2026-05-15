@@ -6359,6 +6359,7 @@ plotFactor <- function(f, y, ...){
                                                           B,
                                                           cdf,
                                                           gradient.index,
+                                                          gradient.order = 1L,
                                                           counts = NULL,
                                                           counts.drawer = NULL,
                                                           progress.label = NULL) {
@@ -6382,7 +6383,8 @@ plotFactor <- function(f, y, ...){
       exdat = exdat,
       eydat = eydat,
       cdf = cdf,
-      gradients = TRUE
+      gradients = TRUE,
+      gradient.order = gradient.order
     )$congrad[, gradient.index, drop = TRUE])
   }
 
@@ -6799,6 +6801,7 @@ plotFactor <- function(f, y, ...){
                                       eydat,
                                       cdf = FALSE,
                                       gradients = FALSE,
+                                      gradient.order = 1L,
                                       proper = FALSE,
                                       proper.method = NULL,
                                       proper.control = list()) {
@@ -6818,6 +6821,7 @@ plotFactor <- function(f, y, ...){
     eydat = eydat,
     cdf = cdf,
     gradients = gradients,
+    gradient.order = gradient.order,
     proper = proper,
     proper.method = proper.method,
     proper.control = proper.control
@@ -6831,6 +6835,7 @@ plotFactor <- function(f, y, ...){
                                           eydat,
                                           cdf = FALSE,
                                           gradients = FALSE,
+                                          gradient.order = 1L,
                                           proper = FALSE,
                                           proper.method = NULL,
                                           proper.control = list()) {
@@ -6858,6 +6863,13 @@ plotFactor <- function(f, y, ...){
   npKernelBoundsCheckEval(exdat, bws$ixcon, bws$cxkerlb, bws$cxkerub, argprefix = "cxker")
   npKernelBoundsCheckEval(eydat, bws$iycon, bws$cykerlb, bws$cykerub, argprefix = "cyker")
 
+  hat.context <- list(
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat
+  )
+
   txeval <- exdat
   tyeval <- eydat
   tnrow <- nrow(xdat)
@@ -6883,34 +6895,17 @@ plotFactor <- function(f, y, ...){
   excon <- exdat[, bws$ixcon, drop = FALSE]
   exord <- exdat[, bws$ixord, drop = FALSE]
 
-  reg.engine <- if (is.null(bws$regtype.engine)) {
-    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  } else {
-    as.character(bws$regtype.engine)
-  }
-  basis.engine <- if (is.null(bws$basis.engine)) {
-    if (is.null(bws$basis)) "glp" else bws$basis
-  } else {
-    bws$basis.engine
-  }
-  degree.engine <- if (is.null(bws$degree.engine)) {
-    if (bws$xncon > 0L) {
-      if (identical(reg.engine, "lc")) rep.int(0L, bws$xncon) else npValidateGlpDegree(
-        regtype = "lp",
-        degree = bws$degree,
-        ncon = bws$xncon
-      )
-    } else {
-      integer(0)
-    }
-  } else {
-    as.integer(bws$degree.engine)
-  }
-  bernstein.engine <- if (is.null(bws$bernstein.basis.engine)) {
-    isTRUE(bws$bernstein.basis)
-  } else {
-    isTRUE(bws$bernstein.basis.engine)
-  }
+  reg.spec <- npConditionalRegEngineSpec(bws, where = "plot conditional")
+  reg.engine <- reg.spec$reg.engine
+  basis.engine <- reg.spec$basis.engine
+  degree.engine <- reg.spec$degree.engine
+  bernstein.engine <- reg.spec$bernstein.engine
+  glp.gradient.order <- npConditionalGradientOrder(
+    bws = bws,
+    reg.engine = reg.engine,
+    gradient.order = gradient.order,
+    where = "plot conditional"
+  )
 
   reg.c <- npRegtypeToC(
     regtype = if (identical(reg.engine, "lp")) "lp" else "lc",
@@ -7021,6 +7016,37 @@ plotFactor <- function(f, y, ...){
     myout$congrad <- myout$congrad[, rorder, drop = FALSE]
     myout$congerr <- matrix(data = myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
     myout$congerr <- myout$congerr[, rorder, drop = FALSE]
+
+    if (identical(reg.engine, "lp") && bws$xncon > 0L) {
+      cont.idx <- which(bws$ixcon)
+      invalid.order <- glp.gradient.order > degree.engine
+      if (any(invalid.order)) {
+        myout$congrad[, cont.idx[invalid.order]] <- NA_real_
+        myout$congerr[, cont.idx[invalid.order]] <- NA_real_
+        .np_warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
+      }
+
+      higher.order <- (glp.gradient.order > 1L) & !invalid.order
+      if (any(higher.order)) {
+        rhs <- rep.int(1.0, nrow(hat.context$xdat))
+        hat.fun <- if (isTRUE(cdf)) npcdisthat else npcdenshat
+        for (jj in which(higher.order)) {
+          svec <- integer(bws$xncon)
+          svec[jj] <- glp.gradient.order[jj]
+          myout$congrad[, cont.idx[jj]] <- as.vector(hat.fun(
+            bws = bws,
+            txdat = hat.context$xdat,
+            tydat = hat.context$ydat,
+            exdat = hat.context$exdat,
+            eydat = hat.context$eydat,
+            y = rhs,
+            output = "apply",
+            s = svec
+          ))
+          myout$congerr[, cont.idx[jj]] <- NA_real_
+        }
+      }
+    }
   } else {
     myout$congrad <- NA
     myout$congerr <- NA
@@ -7042,6 +7068,7 @@ plotFactor <- function(f, y, ...){
       ntrain = tnrow,
       trainiseval = FALSE,
       gradients = gradients,
+      gradient.order = if (identical(reg.engine, "lp")) glp.gradient.order else NULL,
       rows.omit = integer(0),
       timing = bws$timing,
       total.time = total.time,
@@ -7073,6 +7100,7 @@ plotFactor <- function(f, y, ...){
       ntrain = tnrow,
       trainiseval = FALSE,
       gradients = gradients,
+      gradient.order = if (identical(reg.engine, "lp")) glp.gradient.order else NULL,
       rows.omit = integer(0),
       timing = bws$timing,
       total.time = total.time,
@@ -8333,6 +8361,7 @@ compute.bootstrap.errors.conbandwidth =
            tau,
            gradients,
            gradient.index,
+           gradient.order = 1L,
            slice.index,
            plot.errors.boot.method,
            plot.errors.boot.nonfixed = c("exact", "frozen"),
@@ -8500,6 +8529,7 @@ compute.bootstrap.errors.conbandwidth =
           B = plot.errors.boot.num,
           cdf = cdf,
           gradient.index = gradient.index,
+          gradient.order = gradient.order,
           counts.drawer = counts.drawer,
           progress.label = progress.label
         ),
@@ -8668,6 +8698,7 @@ compute.bootstrap.errors.condbandwidth =
            tau,
            gradients,
            gradient.index,
+           gradient.order = 1L,
            slice.index,
            plot.errors.boot.method,
            plot.errors.boot.nonfixed = c("exact", "frozen"),
@@ -8688,6 +8719,7 @@ compute.bootstrap.errors.condbandwidth =
       tau = tau,
       gradients = gradients,
       gradient.index = gradient.index,
+      gradient.order = gradient.order,
       slice.index = slice.index,
       plot.errors.boot.method = plot.errors.boot.method,
       plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,

@@ -10,6 +10,7 @@
            neval = 50,
            quantreg = FALSE,
            gradients = FALSE,
+           gradient.order = 1L,
            common.scale = TRUE,
            perspective = TRUE,
            renderer = c("base", "rgl"),
@@ -904,7 +905,8 @@
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             eydat = eydat[seq_len(xi.neval),, drop = FALSE],
             cdf = cdf,
-            gradients = gradients
+            gradients = gradients,
+            gradient.order = gradient.order
           )
         }
         if (cdf && isTRUE(proper.args$proper.requested)) {
@@ -1006,6 +1008,7 @@
                         quantreg = quantreg,
                         tau = tau,
                         gradients = gradients,
+                        gradient.order = gradient.order,
                         gradient.index = j,
                         slice.index = plot.index,
                         plot.errors.boot.method = plot.errors.boot.method,
@@ -1251,6 +1254,7 @@
               eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
               cdf = cdf,
               gradients = gradients,
+              gradient.order = gradient.order,
               proper = isTRUE(proper.args$proper.requested),
               proper.method = proper.args$proper.method,
               proper.control = proper.args$proper.control
@@ -1313,6 +1317,7 @@
                           quantreg = quantreg,
                           tau = tau,
                           gradients = gradients,
+                          gradient.order = gradient.order,
                           gradient.index = j,
                           slice.index = plot.index,
                           plot.errors.boot.method = plot.errors.boot.method,

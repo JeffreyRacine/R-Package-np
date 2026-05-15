@@ -158,3 +158,55 @@ test_that("formula routes keep gradient.order out of bandwidth selection", {
   )
   expect_equal(fit.dist$gradient.order, 2L)
 })
+
+test_that("conditional plot data honors higher-order gradient requests", {
+  set.seed(20260514)
+  n <- 30
+  x <- data.frame(x = seq(-1, 1, length.out = n))
+  y <- data.frame(y = 1 + x$x + x$x^2)
+
+  for (constructor in list(npcdensbw, npcdistbw)) {
+    bw <- constructor(
+      xdat = x,
+      ydat = y,
+      regtype = "lp",
+      degree = 2L,
+      basis = "tensor",
+      bernstein.basis = FALSE,
+      bws = c(10, 10),
+      bandwidth.compute = FALSE
+    )
+
+    plot.out <- plot(
+      bw,
+      xdat = x,
+      ydat = y,
+      gradients = TRUE,
+      gradient.order = 2L,
+      xq = 0.5,
+      yq = 0.5,
+      neval = 8,
+      perspective = FALSE,
+      view = "fixed",
+      plot.behavior = "data",
+      plot.errors.method = "none"
+    )
+
+    slice <- plot.out[[1L]]
+    eval.fun <- if (inherits(bw, "condbandwidth")) npcdist else npcdens
+    fit <- eval.fun(
+      bws = bw,
+      txdat = x,
+      tydat = y,
+      exdat = slice$xeval,
+      eydat = slice$yeval,
+      gradients = TRUE,
+      gradient.order = 2L
+    )
+
+    expect_equal(slice$gradient.order, 2L)
+    expect_equal(as.vector(slice$congrad[, 1L]), as.vector(fit$congrad[, 1L]),
+                 tolerance = 1e-10)
+    expect_true(all(is.na(slice$congerr[, 1L])))
+  }
+})
