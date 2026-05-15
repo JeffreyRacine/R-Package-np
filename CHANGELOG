@@ -1,4 +1,4 @@
-Changes from Version 0.70-1 to 0.70-2 [13-May-2026]
+Changes from Version 0.70-1 to 0.70-2 [15-May-2026]
 
 * Promoted `npqreg()` to a fully fledged MPI-aware quantile-regression front
   end. It now supports formula/data calls that compute `npcdistbw()`
@@ -13,6 +13,11 @@ Changes from Version 0.70-1 to 0.70-2 [13-May-2026]
   metadata in returned objects, class-probability output, level-specific
   probability gradients, and `fitted()`, `predict()`, `summary()`, `print()`,
   `gradients()`, and `plot()` methods.
+
+* Extended `npconmode()` plotting to object-fed class-probability slices and
+  two-dimensional probability surfaces, including optional `rgl` rendering and
+  probability-level asymptotic intervals where defined. Surface bootstrap
+  intervals for class probabilities remain intentionally deferred.
 
 * Promoted `npcopula()` to a first-class MPI-aware copula estimator with
   formula/data and bandwidth-object workflows, automatic two-dimensional
@@ -56,6 +61,11 @@ Changes from Version 0.70-1 to 0.70-2 [13-May-2026]
   unhelpful hot start of the hot-start polish across session/attach/profile
   routes.
 
+* Preserved deprecated legacy `remin` compatibility for `npregbw()` and
+  `npreg()` while steering users to the new `powell.remin` and
+  `nomad.remin` controls. This protects downstream packages that still pass
+  `remin` through formula/front-end wrappers.
+
 * Exposed the same `powell.remin` and `nomad.remin` controls on single-index
   and smooth-coefficient bandwidth searches so `npindexbw(..., nomad = TRUE)` and
   `npscoefbw(..., nomad = TRUE)` have the same documented MPI-aware NOMAD
@@ -92,6 +102,15 @@ Changes from Version 0.70-1 to 0.70-2 [13-May-2026]
 * Added `npqreg()` gradient support using the conditional-quantile
   delta-method relationship between the conditional distribution derivative
   and conditional density, with plot-data support for quantile gradients.
+
+* Exposed higher-order continuous-derivative extraction for local-polynomial
+  conditional estimators where the selected polynomial degree supports the
+  requested derivative order. `npreg()`, `npcdens()`, and `npcdist()` now honor
+  `gradient.order` more consistently across fitted, evaluated, predicted, and
+  plotted objects, including vector orders over continuous predictors and
+  tensor/additive/Bernstein local-polynomial bases. The MPI implementation
+  dispatches the corresponding conditional hat-apply helper work across the
+  active worker pool where applicable.
 
 * Added asymptotic standard errors for `npqreg()` conditional quantiles and
   quantile gradients, and documented the implemented delta-method formulas
@@ -364,6 +383,16 @@ Changes from Version 0.70-1 to 0.70-2 [13-May-2026]
   bandwidth block routes, reducing repeated long inner-product work while
   preserving MPI rank ownership, profile/manual-broadcast aggregation, and
   numerical agreement with `np` up to floating-point summation order.
+
+* Repaired explicit-grid `npcopula()` evaluation so large probability grids
+  use the direct estimator route rather than an expanded-grid path with poor
+  scaling. This preserves numerical results while avoiding severe runtime
+  growth as the user increases the grid resolution.
+
+* Hardened bandwidth/front-end argument hygiene so estimator-only options such
+  as `proper` are not forwarded into bandwidth selectors that do not accept
+  them, preventing false-positive "unused argument" failures while preserving
+  the intended estimator behavior.
 
 * Restored MPI-aware fixed-bandwidth `npcdens` and `npcdist` fitting,
   evaluation, and prediction in profile/manual-broadcast mode for conditional

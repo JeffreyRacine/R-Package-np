@@ -28,6 +28,10 @@
 - `npconmode()` now fails early for non-categorical responses and
   validates formula-based `newdata` against the original right-hand-side
   variables.
+- `npconmode()` plotting now supports object-fed class-probability slices
+  and two-dimensional probability surfaces, optional `rgl` rendering, and
+  probability-level asymptotic intervals where defined. Surface bootstrap
+  intervals for class probabilities remain intentionally deferred.
 - `npcopula()` is now a first-class copula estimator. It supports
   formula/data and bandwidth-object workflows, automatic two-dimensional
   probability grids, explicit `u` evaluation grids, and ordinary
@@ -37,19 +41,38 @@
   richer `plot()` methods. Plotting supports base `persp`, `image`, and
   optional `rgl` rendering, with asymptotic and MPI-fanned bootstrap
   intervals for copula surfaces where defined.
+- `npcopula()` explicit-grid evaluation now uses the direct estimator
+  route, preserving numerical results while avoiding the severe runtime
+  growth of the previous expanded-grid path when users request larger
+  probability grids.
 - The automatic local-polynomial NOMAD controls have been split into
   explicit restart toggles: `powell.remin` for Powell restarts and
   `nomad.remin` for the second NOMAD hot start. This preserves the
   Powell Numerical Recipes restart default while allowing NOMAD hot
   starts to be controlled separately.
+- Deprecated legacy `remin` remains accepted by `npregbw()` and `npreg()`
+  with a warning and is mapped to the modern `powell.remin`/`nomad.remin`
+  controls where appropriate, preserving downstream compatibility while
+  documenting the new spelling.
 - Hat-operator helpers now support an additional constraint-oriented
   output route for objects needed by shape-constrained quadratic
   programming workflows, avoiding reimplementation of local-polynomial
   hat-matrix construction in user examples.
+- Local-polynomial derivative support has been broadened across the
+  conditional estimator family. `npreg()`, `npcdens()`, and `npcdist()`
+  now honor `gradient.order` more consistently for fitted, evaluated,
+  predicted, and plotted objects when the selected polynomial degree is
+  high enough, including vector derivative orders over continuous
+  predictors and tensor/additive/Bernstein local-polynomial bases. The
+  MPI implementation dispatches the corresponding conditional hat-apply
+  helper work across the active worker pool where applicable.
 - Core and semiparametric S3 prediction paths have been hardened around
   `newdata`, native evaluation-argument precedence, formula RHS
   validation, and `se.fit` handling while preserving `npRmpi` route
   independence.
+- Front-end/bandwidth argument hygiene has been tightened so
+  estimator-only controls such as `proper` are not forwarded into
+  bandwidth selectors that do not accept them.
 - MPI lifecycle and plotting routes received additional hardening,
   including soft `npRmpi.quit()` behavior, local object-fed plot
   computation where required, and explicit fanout of applicable
