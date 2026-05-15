@@ -548,6 +548,78 @@ npValidateGlpGradientOrder <- function(regtype,
   as.integer(gradient.order)
 }
 
+npConditionalRegEngineSpec <- function(bws, where = "conditional estimator") {
+  reg.engine <- if (is.null(bws$regtype.engine)) {
+    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  } else {
+    as.character(bws$regtype.engine)
+  }
+  basis.engine <- if (is.null(bws$basis.engine)) {
+    if (is.null(bws$basis)) "glp" else bws$basis
+  } else {
+    bws$basis.engine
+  }
+  degree.engine <- if (is.null(bws$degree.engine)) {
+    if (bws$xncon > 0L) {
+      if (identical(reg.engine, "lc")) {
+        rep.int(0L, bws$xncon)
+      } else {
+        npValidateGlpDegree(
+          regtype = "lp",
+          degree = bws$degree,
+          ncon = bws$xncon
+        )
+      }
+    } else {
+      integer(0)
+    }
+  } else {
+    as.integer(bws$degree.engine)
+  }
+  bernstein.engine <- if (is.null(bws$bernstein.basis.engine)) {
+    isTRUE(bws$bernstein.basis)
+  } else {
+    isTRUE(bws$bernstein.basis.engine)
+  }
+
+  if (!identical(reg.engine, "lp") && bws$xncon > 0L)
+    degree.engine <- rep.int(if (identical(reg.engine, "ll")) 1L else 0L, bws$xncon)
+
+  list(
+    reg.engine = reg.engine,
+    basis.engine = basis.engine,
+    degree.engine = degree.engine,
+    bernstein.engine = bernstein.engine
+  )
+}
+
+npConditionalGradientOrder <- function(bws,
+                                       reg.engine,
+                                       gradient.order,
+                                       where = "conditional estimator") {
+  if (bws$xncon == 0L)
+    return(integer(0))
+
+  gorder <- if (is.null(gradient.order)) {
+    rep.int(1L, bws$xncon)
+  } else {
+    npValidateGlpGradientOrder(
+      regtype = "lp",
+      gradient.order = gradient.order,
+      ncon = bws$xncon
+    )
+  }
+
+  if (!identical(reg.engine, "lp") && any(gorder > 1L)) {
+    stop(sprintf(
+      "%s supports gradient.order > 1 only for regtype='lp' continuous explanatory predictors",
+      where
+    ), call. = FALSE)
+  }
+
+  gorder
+}
+
 npCheckRegressionDesignCondition <- function(reg.code,
                                              xcon,
                                              basis = "glp",

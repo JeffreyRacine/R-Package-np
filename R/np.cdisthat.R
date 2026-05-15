@@ -4,7 +4,9 @@ npcdisthat <- function(bws,
                        exdat,
                        eydat,
                        y = NULL,
-                       output = c("matrix", "apply")) {
+                       output = c("matrix", "apply"),
+                       deriv = NULL,
+                       s = NULL) {
   if (!inherits(bws, "condbandwidth")) {
     stop("argument 'bws' must inherit from class 'condbandwidth' in npcdisthat()")
   }
@@ -25,6 +27,8 @@ npcdisthat <- function(bws,
     y = y,
     output = output,
     operator = "integral",
+    x.deriv = deriv,
+    x.s = s,
     class_name = "npcdisthat",
     where = "npcdisthat"
   )

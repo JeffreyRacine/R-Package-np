@@ -28,6 +28,7 @@ npcdist(bws, \dots)
         exdat,
         eydat,
         gradients = FALSE,
+        gradient.order = 1L,
         proper = FALSE,
         proper.method = c("isotonic"),
         proper.control = list(),
@@ -122,6 +123,18 @@ These arguments control where the fitted conditional distribution is evaluated a
   \item{gradients}{
     a logical value specifying whether to return estimates of the
     gradients at the evaluation points. Defaults to \code{FALSE}.
+  }
+
+
+  \item{gradient.order}{
+    derivative order for continuous explanatory-variable gradients when
+    \code{gradients = TRUE} and \code{regtype = "lp"}. A scalar is
+    recycled across continuous explanatory variables, or one value may
+    be supplied per continuous explanatory variable. The default
+    \code{1L} returns first derivatives. Higher orders are available
+    for continuous explanatory variables only and must not exceed the
+    corresponding local-polynomial degree; unordered and ordered
+    predictors retain their usual first-order discrete effects.
   }
 
 
@@ -232,6 +245,16 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   expand missing settings to the same documented preset. Explicit
   incompatible settings fail fast rather than being silently rewritten.
 
+  With \code{regtype = "lp"}, \code{gradients = TRUE} and
+  \code{gradient.order} greater than one expose higher-order derivative
+  estimates with respect to continuous explanatory variables. These
+  derivatives use the same local-polynomial basis, degree, Bernstein
+  option, bandwidths, and kernels as the fitted conditional
+  distribution. Asymptotic standard errors for these higher-order
+  derivative columns are not currently reported; the corresponding
+  entries of \code{congerr} are \code{NA}. Use bootstrap intervals when
+  inference on higher-order derivatives is required.
+
 }
 \value{
   \code{npcdist} returns a \code{condistribution} object. The generic
@@ -254,9 +277,14 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   \item{conderr}{ standard errors of the cumulative conditional distribution
     estimates }
   \item{congrad}{ if invoked with \code{gradients = TRUE}, estimates of
-    the gradients at the evaluation points }
+    the gradients at the evaluation points. For local-polynomial fits,
+    continuous-coordinate derivative orders are controlled by
+    \code{gradient.order}. }
   \item{congerr}{ if invoked with \code{gradients = TRUE}, standard
-    errors of the gradients at the evaluation points }
+    errors of the gradients at the evaluation points. Higher-order
+    continuous-coordinate derivative standard errors are currently
+    returned as \code{NA}; bootstrap inference is preferred for those
+    targets. }
   \item{log_likelihood}{ log likelihood of the cumulative conditional distribution estimate }
 
 }
