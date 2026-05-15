@@ -140,6 +140,54 @@ test_that("npcdenshat derivative hat operators match npcdens gradients", {
   }
 })
 
+test_that("npcdenshat lp Bernstein derivative operator matches npcdens gradients", {
+  skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  npcdenshat <- getFromNamespace("npcdenshat", "npRmpi")
+
+  set.seed(20260516)
+  n <- 36
+  x <- data.frame(x = seq(0, 1, length.out = n))
+  y <- data.frame(y = x$x^2 + 0.05 * sin(2 * pi * x$x))
+  ex <- data.frame(x = seq(0.1, 0.9, length.out = 10))
+  ey <- data.frame(y = seq(min(y$y) + 0.01, max(y$y) - 0.01, length.out = 10))
+  iota <- rep.int(1, n)
+
+  for (basis in c("glp", "additive", "tensor")) {
+    bw <- npcdensbw(
+      xdat = x,
+      ydat = y,
+      regtype = "lp",
+      basis = basis,
+      degree = 2L,
+      bernstein.basis = TRUE,
+      bwtype = "fixed",
+      bws = c(0.24, 0.28),
+      bandwidth.compute = FALSE
+    )
+
+    fit <- npcdens(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey, gradients = TRUE)
+    H <- npcdenshat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey,
+                    output = "matrix", s = 1L)
+    hy <- npcdenshat(bws = bw, txdat = x, tydat = y, exdat = ex, eydat = ey,
+                     y = iota, output = "apply", deriv = 1L)
+
+    expect_equal(
+      as.vector(H %*% iota),
+      as.vector(fit$congrad[, 1L]),
+      tolerance = 1e-10,
+      info = paste("matrix", basis)
+    )
+    expect_equal(
+      as.vector(hy),
+      as.vector(fit$congrad[, 1L]),
+      tolerance = 1e-10,
+      info = paste("apply", basis)
+    )
+  }
+})
+
 test_that("npcdenshat named derivative selectors follow continuous x variables", {
   npcdenshat <- getFromNamespace("npcdenshat", "npRmpi")
 

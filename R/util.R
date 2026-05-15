@@ -2732,7 +2732,7 @@ mypoly <- function(x,
         for (k in 0:r) {
           j <- idx - k
           if (j >= 0L && j <= m) {
-            out <- out + ((-1.0)^k) * choose(r, k) * choose(m, j) * (u^j) * ((1.0 - u)^(m - j))
+            out <- out + ((-1.0)^(r - k)) * choose(r, k) * choose(m, j) * (u^j) * ((1.0 - u)^(m - j))
           }
         }
         coef.deriv * out

@@ -156,13 +156,20 @@ test_that("npreghat lp bernstein path matches predict semantics", {
 
   fit.raw <- npreg(txdat = tx, tydat = y, exdat = ex, bws = bw.raw, gradients = FALSE, warn.glp.gradient = FALSE)
   fit.bern <- npreg(txdat = tx, tydat = y, exdat = ex, bws = bw.bern, gradients = FALSE, warn.glp.gradient = FALSE)
+  grad.raw <- npreg(txdat = tx, tydat = y, exdat = ex, bws = bw.raw, gradients = TRUE, warn.glp.gradient = FALSE)
+  grad.bern <- npreg(txdat = tx, tydat = y, exdat = ex, bws = bw.bern, gradients = TRUE, warn.glp.gradient = FALSE)
 
   hat.raw <- npreghat(bws = bw.raw, txdat = tx, exdat = ex, y = y, output = "apply", s = 0L)
   hat.bern <- npreghat(bws = bw.bern, txdat = tx, exdat = ex, y = y, output = "apply", s = 0L)
+  dhat.raw <- npreghat(bws = bw.raw, txdat = tx, exdat = ex, y = y, output = "apply", s = 1L)
+  dhat.bern <- npreghat(bws = bw.bern, txdat = tx, exdat = ex, y = y, output = "apply", s = 1L)
 
   expect_equal(as.vector(hat.raw), as.vector(fit.raw$mean), tolerance = 1e-8)
   expect_equal(as.vector(hat.bern), as.vector(fit.bern$mean), tolerance = 1e-8)
   expect_equal(as.vector(fit.bern$mean), as.vector(fit.raw$mean), tolerance = 1e-8)
+  expect_equal(as.vector(dhat.raw), as.vector(grad.raw$grad[, 1L]), tolerance = 1e-8)
+  expect_equal(as.vector(dhat.bern), as.vector(grad.bern$grad[, 1L]), tolerance = 1e-8)
+  expect_equal(as.vector(grad.bern$grad[, 1L]), as.vector(grad.raw$grad[, 1L]), tolerance = 1e-8)
 })
 
 test_that("npreghat apply mode matches npreg across bwtypes", {

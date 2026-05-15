@@ -357,7 +357,8 @@ npreghat <-
 
   if (identical(bws$type, "generalized_nn") &&
       any(degree > 1L) &&
-      isTRUE(getOption("np.tree"))) {
+      length(s) &&
+      any(s > 0L)) {
     return(.npreghat_exact_matrix_from_core(
       bws = bws,
       txdat = txdat,
