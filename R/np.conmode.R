@@ -31,6 +31,18 @@ npconmode <-
   invisible(TRUE)
 }
 
+.npConmodeValidateCategoricalResponse <- function(tydat) {
+  tydat <- toFrame(tydat)
+  if (NCOL(tydat) != 1L)
+    stop("'tydat' must consist of one (1) factor or ordered factor response",
+         call. = FALSE)
+  y <- tydat[[1L]]
+  if (!is.factor(y))
+    stop("npconmode requires a categorical response: supply 'tydat' as a factor or ordered factor",
+         call. = FALSE)
+  invisible(TRUE)
+}
+
 npconmode.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
@@ -45,6 +57,7 @@ npconmode.formula <-
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
+    .npConmodeValidateCategoricalResponse(tydat)
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
@@ -493,6 +506,12 @@ npconmode.default <- function(bws, txdat, tydat,
   if(tydat.named)
     tydat <- toFrame(tydat)
 
+  if(!no.tydat) {
+    if(!tydat.named)
+      tydat <- toFrame(tydat)
+    .npConmodeValidateCategoricalResponse(tydat)
+  }
+
   sc.bw <- sc
   
   sc.bw[[1]] <- quote(npcdensbw)
@@ -522,6 +541,22 @@ npconmode.default <- function(bws, txdat, tydat,
 
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
+  }
+
+  if (bws.formula && no.tydat) {
+    mf.call <- sc.bw
+    mf.call[[1]] <- quote(stats::model.frame)
+    keep <- match(c("formula", "data", "subset", "na.action"),
+                  names(mf.call), nomatch = 0L)
+    mf.call <- mf.call[c(1L, keep)]
+    if (!("formula" %in% names(mf.call)))
+      mf.call$formula <- bws
+    mf <- eval(mf.call, parent.frame())
+    y <- stats::model.response(mf)
+    if (is.null(y))
+      stop("npconmode requires a categorical response in the formula",
+           call. = FALSE)
+    .npConmodeValidateCategoricalResponse(data.frame(y))
   }
 
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
