@@ -76,6 +76,17 @@ npregbw.NULL <-
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     mc <- match.call(expand.dots = FALSE)
     dots <- list(...)
+    legacy.remin <- "remin" %in% names(dots)
+    if (isTRUE(legacy.remin)) {
+      legacy.remin.value <- npValidateScalarLogical(dots$remin, "remin")
+      warning("npregbw: argument 'remin' is deprecated; use 'powell.remin' and 'nomad.remin'",
+              call. = FALSE)
+      if (!("powell.remin" %in% names(dots)))
+        dots$powell.remin <- legacy.remin.value
+      if (!("nomad.remin" %in% names(dots)))
+        dots$nomad.remin <- legacy.remin.value
+      dots$remin <- NULL
+    }
     dot.names <- names(dots)
     degree.select.value <- if ("degree.select" %in% dot.names) {
       match.arg(as.character(dots$degree.select[[1L]]), c("manual", "coordinate", "exhaustive"))
@@ -104,7 +115,8 @@ npregbw.NULL <-
       automatic.degree.search = automatic.degree.search,
       search.engine = search.engine.value
     )
-    if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
+    if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search) &&
+        !isTRUE(legacy.remin))
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_as_generic_call("npregbw", mc),
         parent.frame()))
@@ -113,7 +125,8 @@ npregbw.NULL <-
 
     bws = double(dim(xdat)[2])
 
-    tbw <- npregbw.default(xdat = xdat, ydat = ydat, bws = bws, ...)
+    tbw <- do.call(npregbw.default,
+                   c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     environment(mc) <- parent.frame()
@@ -2045,6 +2058,16 @@ npregbw.default <-
            ...){
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     lp.dot.args <- list(...)
+    if ("remin" %in% names(lp.dot.args)) {
+      legacy.remin <- npValidateScalarLogical(lp.dot.args$remin, "remin")
+      warning("npregbw: argument 'remin' is deprecated; use 'powell.remin' and 'nomad.remin'",
+              call. = FALSE)
+      if (missing(powell.remin))
+        powell.remin <- legacy.remin
+      if (missing(nomad.remin))
+        nomad.remin <- legacy.remin
+      lp.dot.args$remin <- NULL
+    }
     npRejectLegacyLpArgs(names(lp.dot.args), where = "npregbw")
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)

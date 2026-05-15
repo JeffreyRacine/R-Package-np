@@ -176,6 +176,11 @@ npreg.rbandwidth <-
     dots <- list(...)
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     regtype.raw <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    if ("remin" %in% names(dots)) {
+      warning("npreg: bandwidth-selection argument 'remin' is ignored when a bandwidth object is supplied",
+              call. = FALSE)
+      dots$remin <- NULL
+    }
     basis.raw <- npValidateLpBasis(regtype = regtype.raw, basis = bws$basis)
     degree.raw <- npValidateGlpDegree(regtype = regtype.raw,
                                       degree = bws$degree,
@@ -701,8 +706,10 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       reg.args$txdat <- txdat
     if (!missing(tydat))
       reg.args$tydat <- tydat
-    dots$.np_fit_progress_handoff <- TRUE
-    return(do.call(npreg, c(reg.args, dots)))
+    fit.dots <- dots
+    fit.dots$remin <- NULL
+    fit.dots$.np_fit_progress_handoff <- TRUE
+    return(do.call(npreg, c(reg.args, fit.dots)))
   }
 
   has.fixed.bws.value <- !missing(bws) && !isa(bws, "rbandwidth")
