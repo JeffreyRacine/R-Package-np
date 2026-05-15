@@ -388,9 +388,9 @@ data("Italy")
 bw <- npcdistbw(formula=gdp~ordered(year),
                 data=Italy)
 
-F <- npcdist(bws=bw)
+Fhat <- npcdist(bws=bw)
 
-summary(F)
+summary(Fhat)
 
 ## Variations on local polynomial conditional distribution estimation
 ## with proper = TRUE.
