@@ -14,7 +14,9 @@ npcdisthat(bws,
            exdat,
            eydat,
            y = NULL,
-           output = c("matrix", "apply"))
+           output = c("matrix", "apply"),
+           deriv = NULL,
+           s = NULL)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
@@ -45,6 +47,15 @@ These arguments control whether the operator is returned as a matrix or applied 
   \item{y}{Optional right-hand side vector or matrix with one row per training observation.}
 
 
+\subsection{Derivative Controls}{
+These arguments request continuous-conditioning derivative hat operators.
+}
+
+  \item{deriv}{Optional derivative selector passed through to the continuous-conditioning derivative resolver.}
+
+  \item{s}{Optional derivative multi-index for continuous conditioning variables. The default \code{s = NULL} returns the ordinary conditional-distribution hat operator.}
+
+
 }
 \details{
 For \code{output = "matrix"}, the return value is a matrix with class
@@ -53,6 +64,15 @@ training data, evaluation data, and call metadata.
 
 For \code{output = "apply"}, the function returns \code{H y} directly. Matrix
 right-hand sides are applied column-wise.
+
+The optional \code{s} argument follows the derivative multi-index convention
+used by \code{\link{npreghat}} for continuous conditioning variables. The
+default \code{s = NULL} returns the ordinary conditional-distribution hat
+operator. Supplying one first derivative, for example \code{s = 1L} in a
+univariate continuous-\eqn{x} problem or \code{s = c(x2 = 1L)} in a
+multivariate problem, returns the hat operator for that component of the
+conditional-distribution gradient. This derivative route is intended to match
+\code{npcdist(..., gradients = TRUE)$congrad}.
 
 This helper is intended for object-fed repeated evaluation once a bandwidth
 object has already been constructed. It does not perform bandwidth selection.
