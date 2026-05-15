@@ -2,6 +2,7 @@ condistribution <-
     function(bws, xeval, yeval, condist, conderr = NA,
              congrad = NA, congerr = NA,           
              ntrain, trainiseval = FALSE, gradients = FALSE,
+             gradient.order = NULL,
              proper.requested = FALSE,
              proper.applied = FALSE,
              proper.method = NULL,
@@ -49,6 +50,7 @@ condistribution <-
             ntrain = ntrain,
             trainiseval = trainiseval,
             gradients = gradients,
+            gradient.order = gradient.order,
             proper.requested = proper.requested,
             proper.applied = proper.applied,
             proper.method = proper.method,
@@ -104,7 +106,7 @@ se.condistribution <- function(x){
   }
   x$conderr
 }
-gradients.condistribution <- function(x, errors = FALSE, ...) {
+gradients.condistribution <- function(x, errors = FALSE, gradient.order = NULL, ...) {
   errors <- npValidateScalarLogical(errors, "errors")
   gout <- if (!errors) x$congrad else x$congerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
@@ -112,7 +114,44 @@ gradients.condistribution <- function(x, errors = FALSE, ...) {
       "gradients are not available: fit the model with gradients=TRUE"
     else
       "gradient standard errors are not available: fit the model with gradients=TRUE")
-  gout
+
+  reg.spec <- npConditionalRegEngineSpec(x$bws, where = "gradients.condistribution")
+  if (!identical(reg.spec$reg.engine, "lp") || is.null(gradient.order))
+    return(gout)
+
+  if (!is.matrix(gout))
+    return(gout)
+
+  gorder <- npValidateGlpGradientOrder(regtype = "lp",
+                                       gradient.order = gradient.order,
+                                       ncon = x$bws$xncon)
+  stored.order <- x$gradient.order
+  if (is.null(stored.order) && x$bws$xncon > 0L)
+    stored.order <- rep.int(1L, x$bws$xncon)
+  stored.order <- npValidateGlpGradientOrder(regtype = "lp",
+                                             gradient.order = stored.order,
+                                             ncon = x$bws$xncon)
+  if (length(gorder)) {
+    defined.request <- (gorder <= reg.spec$degree.engine)
+    if (any(defined.request & (gorder != stored.order))) {
+      stop("requested gradient.order differs from the derivative order stored in this condistribution object; refit or predict/evaluate with gradients=TRUE and the desired gradient.order",
+           call. = FALSE)
+    }
+  }
+
+  gout.masked <- gout
+  gout.masked[,] <- NA_real_
+  cont.idx <- which(x$bws$ixcon)
+  if (length(cont.idx)) {
+    keep.cont <- (gorder <= reg.spec$degree.engine)
+    if (any(keep.cont)) {
+      keep.idx <- cont.idx[keep.cont]
+      gout.masked[, keep.idx] <- gout[, keep.idx, drop = FALSE]
+    }
+    if (any(gorder > reg.spec$degree.engine))
+      .np_warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
+  }
+  gout.masked
 }
 
 predict.condistribution <- function(object, se.fit = FALSE, ...) {
