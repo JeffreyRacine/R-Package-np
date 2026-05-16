@@ -1387,10 +1387,6 @@ double *mean_stderr){
     if(operator[i] != OP_NORMAL)
       return 0;
 
-  for(i = 0; i < num_reg_ordered; i++)
-    if(kernel_o[i] == 3)
-      return 0;
-
   if(!np_build_discrete_profile_index(num_obs_train,
                                       num_reg_unordered,
                                       num_reg_ordered,

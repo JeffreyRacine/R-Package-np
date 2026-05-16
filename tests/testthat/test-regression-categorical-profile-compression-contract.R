@@ -183,7 +183,7 @@ test_that("all-categorical regression tree route preserves native and predict ev
                tolerance = 1e-8)
 })
 
-test_that("all-categorical regression tree route leaves RLY evaluation on dense path", {
+test_that("all-categorical regression tree route preserves RLY evaluation", {
   skip_on_cran()
   .ensure_npreg_cat_profile_pool()
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
@@ -444,7 +444,50 @@ test_that("all-categorical regression tree route preserves bootstrap plot payloa
   compare_bootstrap_payloads("wild", 774L, exact.dense = FALSE)
 })
 
-test_that("all-categorical regression tree route leaves RLY bootstrap plots on dense path", {
+test_that("all-categorical regression profile bootstrap matches RLY hat algebra", {
+  skip_on_cran()
+  .ensure_npreg_cat_profile_pool()
+  old_opts <- options(np.messages = FALSE, np.tree = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260522)
+  n <- 256L
+  dat <- data.frame(
+    y = rnorm(n),
+    u1 = factor(sample(letters[1:2], n, TRUE)),
+    o1 = ordered(sample(1:5, n, TRUE))
+  )
+  dat$y <- as.numeric(dat$u1) + cos(as.numeric(dat$o1)) + 0.1 * dat$y
+  xdat <- dat[c("u1", "o1")]
+  ex <- xdat[c(seq_len(12L), seq_len(12L)), , drop = FALSE]
+
+  bw <- npregbw(
+    y ~ u1 + o1,
+    data = dat,
+    bwmethod = "cv.ls",
+    nmulti = 1,
+    ukertype = "liracine",
+    okertype = "racineliyan"
+  )
+  H.eval <- npreghat(bws = bw, txdat = xdat, exdat = ex, output = "matrix")
+  setup <- getFromNamespace(".np_regression_cat_profile_boot_setup", "npRmpi")(
+    xdat = xdat, exdat = ex, ydat = dat$y, bws = bw
+  )
+  expect_false(is.null(setup))
+
+  set.seed(886L)
+  counts <- replicate(13L, tabulate(sample.int(n, n, TRUE), nbins = n))
+  dense.inid <- getFromNamespace(".np_inid_lc_boot_from_hat", "npRmpi")(
+    H = H.eval, ydat = dat$y, B = 13L, counts = counts
+  )
+  profile.inid <- getFromNamespace(".np_inid_boot_from_regression_cat_profile", "npRmpi")(
+    setup = setup, B = 13L, counts = counts
+  )
+  expect_equal(profile.inid$t0, dense.inid$t0, tolerance = 1e-8)
+  expect_equal(profile.inid$t, dense.inid$t, tolerance = 1e-8)
+})
+
+test_that("all-categorical regression tree route preserves finite RLY bootstrap plots", {
   skip_on_cran()
   .ensure_npreg_cat_profile_pool()
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
@@ -493,6 +536,8 @@ test_that("all-categorical regression tree route leaves RLY bootstrap plots on d
   expect_equal(names(tree), names(dense))
   for (j in seq_along(dense)) {
     expect_equal(tree[[j]]$mean, dense[[j]]$mean, tolerance = 1e-8)
-    expect_equal(tree[[j]]$merr, dense[[j]]$merr, tolerance = 1e-8)
+    expect_equal(tree[[j]]$eval, dense[[j]]$eval)
+    expect_true(all(is.finite(tree[[j]]$merr)))
+    expect_true(all(is.finite(tree[[j]]$bias)))
   }
 })
