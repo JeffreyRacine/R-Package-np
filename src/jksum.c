@@ -1334,6 +1334,208 @@ cleanup:
   return ok;
 }
 
+static int np_regression_categorical_profile_fit(
+int *kernel_c,
+int *kernel_u,
+int *kernel_o,
+const int int_ll,
+const int BANDWIDTH_reg,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double *vector_Y,
+double *vector_scale_factor,
+double *lambda,
+int *num_categories,
+int *operator,
+double **matrix_categorical_vals,
+double *mean,
+double *mean_stderr){
+
+  int i, j, g, status;
+  int *prof_id = NULL, *prof_rep = NULL;
+  int nprof = 0;
+  double **profile_unordered = NULL, **profile_ordered = NULL;
+  double *counts = NULL, *sums = NULL, *sums2 = NULL, *weighted_sum = NULL;
+  double *profile_y[3];
+  double *profile_mean = NULL, *profile_stderr = NULL;
+  int ok = 0;
+
+  if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
+     (BANDWIDTH_reg != BW_FIXED) ||
+     (num_reg_continuous != 0) ||
+     ((num_reg_unordered + num_reg_ordered) <= 0) ||
+     (num_obs_train != num_obs_eval) ||
+     (matrix_X_unordered_train != matrix_X_unordered_eval) ||
+     (matrix_X_ordered_train != matrix_X_ordered_eval) ||
+     (vector_Y == NULL) ||
+     (mean == NULL) ||
+     (mean_stderr == NULL) ||
+     (lambda == NULL) ||
+     (operator == NULL))
+    return 0;
+
+  if((int_ll != LL_LC) && (int_ll != LL_LP))
+    return 0;
+
+  for(i = 0; i < (num_reg_unordered + num_reg_ordered); i++)
+    if(operator[i] != OP_NORMAL)
+      return 0;
+
+  for(i = 0; i < num_reg_ordered; i++)
+    if(kernel_o[i] == 3)
+      return 0;
+
+  if(!np_build_discrete_profile_index(num_obs_train,
+                                      num_reg_unordered,
+                                      num_reg_ordered,
+                                      matrix_X_unordered_train,
+                                      matrix_X_ordered_train,
+                                      &prof_id,
+                                      &prof_rep,
+                                      &nprof))
+    return 0;
+
+  if((nprof <= 0) || (4*nprof > 3*num_obs_train))
+    goto cleanup;
+
+  profile_unordered = alloc_tmatd(nprof, num_reg_unordered);
+  profile_ordered = alloc_tmatd(nprof, num_reg_ordered);
+  counts = alloc_vecd(nprof);
+  sums = alloc_vecd(nprof);
+  sums2 = alloc_vecd(nprof);
+  weighted_sum = alloc_vecd(3*nprof);
+  profile_mean = alloc_vecd(nprof);
+  profile_stderr = alloc_vecd(nprof);
+
+  if(((num_reg_unordered > 0) && profile_unordered == NULL) ||
+     ((num_reg_ordered > 0) && profile_ordered == NULL) ||
+     counts == NULL || sums == NULL || sums2 == NULL ||
+     weighted_sum == NULL || profile_mean == NULL || profile_stderr == NULL)
+    goto cleanup;
+
+  for(g = 0; g < nprof; g++){
+    const int rep = prof_rep[g];
+    counts[g] = 0.0;
+    sums[g] = 0.0;
+    sums2[g] = 0.0;
+    for(j = 0; j < num_reg_unordered; j++)
+      profile_unordered[j][g] = matrix_X_unordered_train[j][rep];
+    for(j = 0; j < num_reg_ordered; j++)
+      profile_ordered[j][g] = matrix_X_ordered_train[j][rep];
+  }
+
+  for(i = 0; i < num_obs_train; i++){
+    g = prof_id[i];
+    counts[g] += 1.0;
+    sums[g] += vector_Y[i];
+    sums2[g] += vector_Y[i]*vector_Y[i];
+  }
+
+  profile_y[0] = sums;
+  profile_y[1] = counts;
+  profile_y[2] = sums2;
+
+  status = kernel_weighted_sum_np(kernel_c,
+                                  kernel_u,
+                                  kernel_o,
+                                  BANDWIDTH_reg,
+                                  nprof,
+                                  nprof,
+                                  num_reg_unordered,
+                                  num_reg_ordered,
+                                  0,
+                                  0,
+                                  0,
+                                  1,
+                                  1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  operator,
+                                  OP_NOOP,
+                                  0,
+                                  0,
+                                  NULL,
+                                  1,
+                                  3,
+                                  0,
+                                  NP_TREE_FALSE,
+                                  0,
+                                  NULL,
+                                  NULL,
+                                  NULL,
+                                  NULL,
+                                  profile_unordered,
+                                  profile_ordered,
+                                  NULL,
+                                  profile_unordered,
+                                  profile_ordered,
+                                  NULL,
+                                  profile_y,
+                                  NULL,
+                                  NULL,
+                                  vector_scale_factor,
+                                  1,
+                                  NULL,
+                                  NULL,
+                                  lambda,
+                                  num_categories,
+                                  matrix_categorical_vals,
+                                  NULL,
+                                  weighted_sum,
+                                  NULL,
+                                  NULL,
+                                  NULL);
+
+  if(status != 0)
+    goto cleanup;
+
+  for(g = 0; g < nprof; g++){
+    const double A = weighted_sum[3*g];
+    const double B = weighted_sum[3*g + 1];
+    const double C = weighted_sum[3*g + 2];
+    double v;
+
+    if(!(fabs(B) > DBL_MIN) || !R_FINITE(B))
+      goto cleanup;
+
+    profile_mean[g] = A/B;
+    v = C/B - profile_mean[g]*profile_mean[g];
+    profile_stderr[g] = (v <= 0.0 || !R_FINITE(v)) ? 0.0 : sqrt(v/B);
+  }
+
+  for(i = 0; i < num_obs_train; i++){
+    g = prof_id[i];
+    mean[i] = profile_mean[g];
+    mean_stderr[i] = profile_stderr[g];
+  }
+
+  ok = 1;
+
+cleanup:
+  if(prof_id != NULL) free(prof_id);
+  if(prof_rep != NULL) free(prof_rep);
+  if(profile_unordered != NULL) free_tmat(profile_unordered);
+  if(profile_ordered != NULL) free_tmat(profile_ordered);
+  if(counts != NULL) free(counts);
+  if(sums != NULL) free(sums);
+  if(sums2 != NULL) free(sums2);
+  if(weighted_sum != NULL) free(weighted_sum);
+  if(profile_mean != NULL) free(profile_mean);
+  if(profile_stderr != NULL) free(profile_stderr);
+
+  return ok;
+}
+
 static inline uint64_t np_mix_u64(uint64_t x){
   x ^= x >> 30;
   x *= UINT64_C(0xbf58476d1ce4e5b9);
@@ -14572,6 +14774,35 @@ double *SIGN){
     for(int ii = 0; ii < num_obs_train; ii++){
       lc_Y[1][ii] = 1.0;
       lc_Y[2][ii] = vector_Y[ii]*vector_Y[ii];
+    }
+
+    if((!do_grad) &&
+       np_regression_categorical_profile_fit(kernel_c,
+                                             kernel_u,
+                                             kernel_o,
+                                             int_ll_est,
+                                             BANDWIDTH_reg,
+                                             num_obs_train,
+                                             num_obs_eval,
+                                             num_reg_unordered,
+                                             num_reg_ordered,
+                                             num_reg_continuous,
+                                             matrix_X_unordered_train,
+                                             matrix_X_ordered_train,
+                                             matrix_X_unordered_eval,
+                                             matrix_X_ordered_eval,
+                                             vector_Y,
+                                             vector_scale_factor,
+                                             lambda,
+                                             num_categories,
+                                             operator,
+                                             matrix_categorical_vals,
+                                             mean,
+                                             mean_stderr)){
+      free(meany);
+      free(lc_Y[1]);
+      free(lc_Y[2]);
+      goto finish_regression_estimation;
     }
     
     kernel_weighted_sum_np_ctx(kernel_c,
