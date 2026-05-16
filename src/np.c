@@ -8122,6 +8122,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int_glp_basis_extern = ((ibwmfunc == CDBWM_CVLS) && (int_ll_extern == LL_LP)) ? *glp_basis : 1;
 
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
+  int_TREE_PROFILE_X = myopti[CDBW_TREEI];
   if(int_ll_extern == LL_LP){
     int_TREE_Y = NP_TREE_FALSE;
     int_TREE_XY = NP_TREE_FALSE;
@@ -9072,6 +9073,7 @@ cleanup_np_distribution_conditional_bw:
     int_TREE_XY = NP_TREE_FALSE;
   }
 
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   int_WEIGHTS = 0;
 

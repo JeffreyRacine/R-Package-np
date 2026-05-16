@@ -283,6 +283,9 @@ test_that("npcdens categorical ML bandwidth search uses exact profile route", {
 })
 
 test_that("npcdens categorical LS bandwidth search uses exact profile objective", {
+  if (!spawn_mpi_slaves(1L)) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
   old.tree <- getOption("np.tree")
   old.messages <- getOption("np.messages")
   on.exit({
@@ -307,6 +310,40 @@ test_that("npcdens categorical LS bandwidth search uses exact profile objective"
 
   options(np.tree = TRUE)
   profile <- npcdensbw(y ~ x1 + x2, data = dat, bwmethod = "cv.ls", nmulti = 1)
+
+  expect_equal(profile$ybw, dense$ybw, tolerance = 1e-5)
+  expect_equal(profile$xbw, dense$xbw, tolerance = 1e-5)
+  expect_equal(profile$fval, dense$fval, tolerance = 1e-8)
+})
+
+test_that("npcdist categorical bandwidth search uses exact profile objective", {
+  if (!spawn_mpi_slaves(1L)) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  old.tree <- getOption("np.tree")
+  old.messages <- getOption("np.messages")
+  on.exit({
+    options(np.tree = old.tree)
+    options(np.messages = old.messages)
+  }, add = TRUE)
+  options(np.messages = FALSE)
+
+  set.seed(20260613L)
+  n <- 450L
+  x1 <- ordered(rbinom(n, 10L, 0.5))
+  x2 <- factor(rbinom(n, 1L, 0.45))
+  p <- plogis(as.numeric(as.character(x1)) / 5 + as.numeric(x2) / 3 - 1)
+  dat <- data.frame(
+    y = ordered(rbinom(n, 10L, p)),
+    x1 = x1,
+    x2 = x2
+  )
+
+  options(np.tree = FALSE)
+  dense <- npcdistbw(y ~ x1 + x2, data = dat, nmulti = 1)
+
+  options(np.tree = TRUE)
+  profile <- npcdistbw(y ~ x1 + x2, data = dat, nmulti = 1)
 
   expect_equal(profile$ybw, dense$ybw, tolerance = 1e-5)
   expect_equal(profile$xbw, dense$xbw, tolerance = 1e-5)
