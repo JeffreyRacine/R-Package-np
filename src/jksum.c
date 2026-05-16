@@ -22838,6 +22838,14 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                               double *pdf,
                                               double *pdf_stderr,
                                               double *log_likelihood){
+  /*
+    These caches are keyed by call-local row pointers.  Density/distribution
+    evaluation invokes this helper directly, so stale keys from an earlier
+    .Call can otherwise be reused when R/C allocation recycles addresses.
+  */
+  np_disc_profile_cache_clear();
+  np_cont_largeh_cache_clear();
+
   NP_GateOverrideCtx gate_ctx_local;
   np_gate_ctx_clear(&gate_ctx_local);
 
@@ -23145,6 +23153,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
   if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
   if(ov_disc_ord_const != NULL) free(ov_disc_ord_const);
+  np_disc_profile_cache_clear();
+  np_cont_largeh_cache_clear();
 
 }
 
