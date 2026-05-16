@@ -84,3 +84,39 @@ test_that("all-categorical regression tree route preserves ordered Racine-Li-Yan
     expect_lt(max(abs(as.numeric(bw_profile$bw) - as.numeric(bw_dense$bw))), 1e-8)
   }
 })
+
+test_that("all-categorical regression tree route preserves fitted values and errors", {
+  skip_on_cran()
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260516)
+  n <- 512L
+  dat <- data.frame(
+    y = rnorm(n),
+    u1 = factor(rbinom(n, 1L, 0.5)),
+    u2 = factor(sample(letters[1:3], n, TRUE)),
+    u3 = factor(sample(LETTERS[1:2], n, TRUE)),
+    o1 = ordered(sample(1:4, n, TRUE))
+  )
+  dat$y <- 1.5 * as.numeric(dat$u1) - 0.3 * as.numeric(dat$u2) +
+    0.25 * as.numeric(dat$u3) + sin(as.numeric(dat$o1)) + 0.1 * dat$y
+
+  options(np.tree = FALSE)
+  bw <- npregbw(
+    y ~ u1 + u2 + u3 + o1,
+    data = dat,
+    bwmethod = "cv.ls",
+    nmulti = 1,
+    ukertype = "aitchisonaitken",
+    okertype = "liracine"
+  )
+  fit_dense <- npreg(bws = bw)
+
+  options(np.tree = TRUE)
+  fit_profile <- npreg(bws = bw)
+
+  expect_equal(fitted(fit_profile), fitted(fit_dense), tolerance = 1e-8)
+  expect_equal(fit_profile$merr, fit_dense$merr, tolerance = 1e-8)
+  expect_equal(fit_profile$MSE, fit_dense$MSE, tolerance = 1e-10)
+})

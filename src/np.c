@@ -10380,6 +10380,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   ncatfac_extern = *ncatfac;
 
   int_TREE_X = myopti[REG_DOTREEI];
+  int_TREE_PROFILE_X = myopti[REG_DOTREEI];
   old_reg = myopti[REG_OLDREGI];
 
 #ifdef MPI2
@@ -10769,6 +10770,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   return;
 }
