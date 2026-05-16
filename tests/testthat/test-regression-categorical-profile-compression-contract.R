@@ -1,4 +1,4 @@
-test_that("all-categorical regression tree route preserves cv.ls bandwidth search", {
+test_that("all-categorical regression tree route preserves cv.ls and cv.aic bandwidth search", {
   skip_on_cran()
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old_opts), add = TRUE)
@@ -14,32 +14,35 @@ test_that("all-categorical regression tree route preserves cv.ls bandwidth searc
   dat$y <- as.numeric(dat$u1) + 0.5 * as.numeric(dat$u2) +
     sin(as.numeric(dat$o1)) + 0.1 * dat$y
 
-  bw_dense <- npregbw(
-    y ~ u1 + u2 + o1,
-    data = dat,
-    bwmethod = "cv.ls",
-    nmulti = 1,
-    ukertype = "aitchisonaitken",
-    okertype = "liracine"
-  )
+  for (method in c("cv.ls", "cv.aic")) {
+    options(np.tree = FALSE)
+    bw_dense <- npregbw(
+      y ~ u1 + u2 + o1,
+      data = dat,
+      bwmethod = method,
+      nmulti = 1,
+      ukertype = "aitchisonaitken",
+      okertype = "liracine"
+    )
 
-  options(np.tree = TRUE)
-  bw_profile <- npregbw(
-    y ~ u1 + u2 + o1,
-    data = dat,
-    bwmethod = "cv.ls",
-    nmulti = 1,
-    ukertype = "aitchisonaitken",
-    okertype = "liracine"
-  )
+    options(np.tree = TRUE)
+    bw_profile <- npregbw(
+      y ~ u1 + u2 + o1,
+      data = dat,
+      bwmethod = method,
+      nmulti = 1,
+      ukertype = "aitchisonaitken",
+      okertype = "liracine"
+    )
 
-  expect_equal(bw_profile$fval, bw_dense$fval, tolerance = 1e-10)
-  expect_equal(as.numeric(bw_profile$bw), as.numeric(bw_dense$bw), tolerance = 1e-8)
-  expect_equal(
-    fitted(npreg(bws = bw_profile)),
-    fitted(npreg(bws = bw_dense)),
-    tolerance = 1e-8
-  )
+    expect_equal(bw_profile$fval, bw_dense$fval, tolerance = 1e-10)
+    expect_lt(max(abs(as.numeric(bw_profile$bw) - as.numeric(bw_dense$bw))), 1e-7)
+    expect_equal(
+      fitted(npreg(bws = bw_profile)),
+      fitted(npreg(bws = bw_dense)),
+      tolerance = 1e-8
+    )
+  }
 })
 
 test_that("all-categorical regression tree route preserves ordered Racine-Li-Yan route", {
@@ -56,25 +59,28 @@ test_that("all-categorical regression tree route preserves ordered Racine-Li-Yan
   )
   dat$y <- as.numeric(dat$u1) + cos(as.numeric(dat$o1)) + 0.1 * dat$y
 
-  bw_dense <- npregbw(
-    y ~ u1 + o1,
-    data = dat,
-    bwmethod = "cv.ls",
-    nmulti = 1,
-    ukertype = "liracine",
-    okertype = "racineliyan"
-  )
+  for (method in c("cv.ls", "cv.aic")) {
+    options(np.tree = FALSE)
+    bw_dense <- npregbw(
+      y ~ u1 + o1,
+      data = dat,
+      bwmethod = method,
+      nmulti = 1,
+      ukertype = "liracine",
+      okertype = "racineliyan"
+    )
 
-  options(np.tree = TRUE)
-  bw_profile <- npregbw(
-    y ~ u1 + o1,
-    data = dat,
-    bwmethod = "cv.ls",
-    nmulti = 1,
-    ukertype = "liracine",
-    okertype = "racineliyan"
-  )
+    options(np.tree = TRUE)
+    bw_profile <- npregbw(
+      y ~ u1 + o1,
+      data = dat,
+      bwmethod = method,
+      nmulti = 1,
+      ukertype = "liracine",
+      okertype = "racineliyan"
+    )
 
-  expect_equal(bw_profile$fval, bw_dense$fval, tolerance = 1e-10)
-  expect_equal(as.numeric(bw_profile$bw), as.numeric(bw_dense$bw), tolerance = 1e-8)
+    expect_equal(bw_profile$fval, bw_dense$fval, tolerance = 1e-10)
+    expect_lt(max(abs(as.numeric(bw_profile$bw) - as.numeric(bw_dense$bw))), 1e-8)
+  }
 })

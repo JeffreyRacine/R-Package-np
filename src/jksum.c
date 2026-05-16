@@ -978,10 +978,11 @@ double **matrix_categorical_vals){
   return w;
 }
 
-static int np_regression_categorical_profile_cvls(
+static int np_regression_categorical_profile_cv(
 int *kernel_c,
 int *kernel_u,
 int *kernel_o,
+const int bwm,
 const int BANDWIDTH_reg,
 const int num_obs,
 const int num_reg_unordered,
@@ -995,7 +996,8 @@ double *vector_scale_factor,
 double *lambda,
 int *num_categories,
 int *operator,
-double *cv_out){
+double *cv_out,
+double *traceH_out){
 
   int i, j, g, status;
   int *prof_id = NULL, *prof_rep = NULL;
@@ -1024,6 +1026,12 @@ double *cv_out){
   for(i = 0; i < (num_reg_unordered + num_reg_ordered); i++)
     if(operator[i] != OP_NORMAL)
       return 0;
+
+  if((bwm != RBWM_CVLS) && (bwm != RBWM_CVAIC))
+    return 0;
+
+  if((bwm == RBWM_CVAIC) && (traceH_out == NULL))
+    return 0;
 
   for(i = 0; i < num_reg_ordered; i++)
     if(kernel_o[i] == 3)
@@ -1132,6 +1140,9 @@ double *cv_out){
   if(status != 0)
     goto cleanup;
 
+  if(bwm == RBWM_CVAIC)
+    *traceH_out = 0.0;
+
   for(g = 0; g < nprof; g++){
     const double A = weighted_sum[2*g];
     const double B = weighted_sum[2*g + 1];
@@ -1145,13 +1156,22 @@ double *cv_out){
                                                            lambda,
                                                            num_categories,
                                                            matrix_categorical_vals_extern);
-    const double D = B - L;
     double contrib;
 
-    if(!(fabs(D) > DBL_MIN) || !R_FINITE(D))
+    if(!(fabs(B) > DBL_MIN) || !R_FINITE(B))
       goto cleanup;
 
-    contrib = (B*B*sums2[g] - 2.0*B*A*sums[g] + counts[g]*A*A)/(D*D);
+    if(bwm == RBWM_CVLS){
+      const double D = B - L;
+      if(!(fabs(D) > DBL_MIN) || !R_FINITE(D))
+        goto cleanup;
+      contrib = (B*B*sums2[g] - 2.0*B*A*sums[g] + counts[g]*A*A)/(D*D);
+    } else {
+      const double m = A/B;
+      contrib = sums2[g] - 2.0*m*sums[g] + counts[g]*m*m;
+      *traceH_out += counts[g]*L/B;
+    }
+
     if(!R_FINITE(contrib) || contrib < -1e-7)
       goto cleanup;
     cv += contrib;
@@ -9042,26 +9062,30 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     goto finish_cv_path;
   }
 
-  if((bwm == RBWM_CVLS) && (int_ll_cv == LL_LC)){
+  if(((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)) && (int_ll_cv == LL_LC)){
     double profile_cv = DBL_MAX;
-    if(np_regression_categorical_profile_cvls(kernel_c,
-                                              kernel_u,
-                                              kernel_o,
-                                              BANDWIDTH_reg,
-                                              num_obs,
-                                              num_reg_unordered,
-                                              num_reg_ordered,
-                                              num_reg_continuous,
-                                              matrix_X_unordered,
-                                              matrix_X_ordered,
-                                              matrix_X_continuous,
-                                              vector_Y,
-                                              vector_scale_factor,
-                                              lambda,
-                                              num_categories,
-                                              operator,
-                                              &profile_cv)){
+    double profile_traceH = 0.0;
+    if(np_regression_categorical_profile_cv(kernel_c,
+                                            kernel_u,
+                                            kernel_o,
+                                            bwm,
+                                            BANDWIDTH_reg,
+                                            num_obs,
+                                            num_reg_unordered,
+                                            num_reg_ordered,
+                                            num_reg_continuous,
+                                            matrix_X_unordered,
+                                            matrix_X_ordered,
+                                            matrix_X_continuous,
+                                            vector_Y,
+                                            vector_scale_factor,
+                                            lambda,
+                                            num_categories,
+                                            operator,
+                                            &profile_cv,
+                                            &profile_traceH)){
       cv = profile_cv;
+      traceH = profile_traceH;
       goto finish_cv_path;
     }
   }
