@@ -1952,7 +1952,7 @@ static int np_build_discrete_profile_index(const int num_xt,
   *out_disc_prof_rep = NULL;
   *out_disc_nprof = 0;
 
-  if(num_xt <= 0 || (num_reg_unordered + num_reg_ordered) <= 1)
+  if(num_xt <= 0 || (num_reg_unordered + num_reg_ordered) <= 0)
     return 0;
 
   disc_prof_id = (int *)malloc((size_t)num_xt*sizeof(int));
