@@ -1072,6 +1072,271 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_cat_profile_rowsum <- function(x, id, G) {
+  rowsum(x = as.matrix(x),
+         group = factor(id, levels = seq_len(G)),
+         reorder = FALSE)
+}
+
+.np_cat_profile_keys <- function(codes) {
+  codes <- as.matrix(codes)
+  if (ncol(codes) == 1L)
+    return(as.character(codes[, 1L]))
+  do.call(paste, c(as.data.frame(codes), sep = "\r"))
+}
+
+.np_regression_cat_profile_kernel_matrix <- function(eval.codes,
+                                                     train.codes,
+                                                     xdat,
+                                                     bws) {
+  eval.codes <- as.matrix(eval.codes)
+  train.codes <- as.matrix(train.codes)
+  if (ncol(eval.codes) != ncol(train.codes))
+    stop("profile code matrices must have matching columns")
+
+  W <- matrix(1.0, nrow = nrow(eval.codes), ncol = nrow(train.codes))
+  lambda <- as.double(bws$bw)
+
+  for (j in seq_len(ncol(train.codes))) {
+    if (is.factor(xdat[[j]]) && !is.ordered(xdat[[j]])) {
+      same <- outer(eval.codes[, j], train.codes[, j], "==")
+      ncat <- nlevels(xdat[[j]])
+      if (ncat < 2L) {
+        Kj <- ifelse(same, 1.0, 0.0)
+      } else if (identical(bws$ukertype, "aitchisonaitken")) {
+        Kj <- ifelse(same, 1.0 - lambda[j], lambda[j] / (ncat - 1.0))
+      } else if (identical(bws$ukertype, "liracine")) {
+        Kj <- ifelse(same, 1.0, lambda[j])
+      } else {
+        stop("unsupported unordered categorical kernel in profile bootstrap")
+      }
+    } else if (is.ordered(xdat[[j]])) {
+      if (identical(bws$okertype, "racineliyan"))
+        stop("Racine-Li-Yan ordered kernel is not eligible for profile bootstrap")
+      d <- abs(outer(eval.codes[, j], train.codes[, j], "-"))
+      if (identical(bws$okertype, "wangvanryzin")) {
+        Kj <- ifelse(d == 0, 1.0 - lambda[j],
+                     (lambda[j]^d) * (1.0 - lambda[j]) * 0.5)
+      } else if (identical(bws$okertype, "liracine")) {
+        Kj <- lambda[j]^d
+      } else if (identical(bws$okertype, "nliracine")) {
+        Kj <- (lambda[j]^d) * (1.0 - lambda[j]) / (1.0 + lambda[j])
+      } else {
+        stop("unsupported ordered categorical kernel in profile bootstrap")
+      }
+    } else {
+      stop("profile bootstrap requires categorical predictors")
+    }
+    W <- W * Kj
+  }
+
+  W
+}
+
+.np_regression_cat_profile_boot_setup <- function(xdat, exdat, ydat, bws) {
+  if (!isTRUE(getOption("np.tree")))
+    return(NULL)
+  if (!identical(bws$type, "fixed"))
+    return(NULL)
+  if (!isTRUE(bws$ncon == 0L) || (bws$nuno + bws$nord) < 1L)
+    return(NULL)
+  if (identical(bws$okertype, "racineliyan") && isTRUE(bws$nord > 0L))
+    return(NULL)
+
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  if (!(identical(regtype, "lc") || identical(regtype, "lp")))
+    return(NULL)
+  if (identical(regtype, "lp") && length(bws$degree) && any(bws$degree > 0L))
+    return(NULL)
+
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  if (length(ydat) != nrow(xdat) || nrow(exdat) < 1L)
+    return(NULL)
+  if (ncol(xdat) != length(bws$bw) || ncol(exdat) != ncol(xdat))
+    return(NULL)
+  if (!all(vapply(xdat, function(z) is.factor(z) || is.ordered(z), logical(1))))
+    return(NULL)
+  if (!all(vapply(exdat, function(z) is.factor(z) || is.ordered(z), logical(1))))
+    return(NULL)
+  if (!all(vapply(seq_along(xdat), function(j) {
+    identical(is.ordered(xdat[[j]]), is.ordered(exdat[[j]])) &&
+      identical(levels(xdat[[j]]), levels(exdat[[j]]))
+  }, logical(1))))
+    return(NULL)
+
+  train.codes <- as.matrix(as.data.frame(lapply(xdat, as.integer)))
+  eval.codes <- as.matrix(as.data.frame(lapply(exdat, as.integer)))
+  train.keys <- .np_cat_profile_keys(train.codes)
+  eval.keys <- .np_cat_profile_keys(eval.codes)
+
+  train.profile.keys <- unique(train.keys)
+  eval.profile.keys <- unique(eval.keys)
+  train.id <- match(train.keys, train.profile.keys)
+  eval.id <- match(eval.keys, eval.profile.keys)
+  train.rep <- match(train.profile.keys, train.keys)
+  eval.rep <- match(eval.profile.keys, eval.keys)
+  G <- length(train.profile.keys)
+  A <- length(eval.profile.keys)
+
+  if (G < 1L || A < 1L || (4L * G > 3L * nrow(xdat)))
+    return(NULL)
+
+  train.profile.codes <- train.codes[train.rep, , drop = FALSE]
+  eval.profile.codes <- eval.codes[eval.rep, , drop = FALSE]
+  L.eval <- tryCatch(
+    .np_regression_cat_profile_kernel_matrix(
+      eval.codes = eval.profile.codes,
+      train.codes = train.profile.codes,
+      xdat = xdat,
+      bws = bws
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(L.eval))
+    return(NULL)
+
+  counts <- as.double(tabulate(train.id, nbins = G))
+  sums <- as.vector(.np_cat_profile_rowsum(ydat, train.id, G))
+  den.eval <- as.vector(L.eval %*% counts)
+  if (any(!is.finite(den.eval)) || any(!(abs(den.eval) > .Machine$double.xmin)))
+    return(NULL)
+  t0.profile <- as.vector(L.eval %*% sums / den.eval)
+
+  L.train <- tryCatch(
+    .np_regression_cat_profile_kernel_matrix(
+      eval.codes = train.profile.codes,
+      train.codes = train.profile.codes,
+      xdat = xdat,
+      bws = bws
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(L.train))
+    return(NULL)
+  den.train <- as.vector(L.train %*% counts)
+  if (any(!is.finite(den.train)) || any(!(abs(den.train) > .Machine$double.xmin)))
+    return(NULL)
+  fit.train.profile <- as.vector(L.train %*% sums / den.train)
+
+  list(
+    L.eval = L.eval,
+    train.id = train.id,
+    eval.id = eval.id,
+    G = G,
+    A = A,
+    counts = counts,
+    den.eval = den.eval,
+    t0 = t0.profile[eval.id],
+    ydat = ydat,
+    fit.train = fit.train.profile[train.id],
+    fit.train.profile = fit.train.profile
+  )
+}
+
+.np_inid_boot_from_regression_cat_profile <- function(setup,
+                                                      B,
+                                                      counts = NULL,
+                                                      counts.drawer = NULL,
+                                                      progress.label = NULL) {
+  B <- as.integer(B)
+  n <- length(setup$ydat)
+  if (B < 1L || n < 1L)
+    stop("invalid categorical profile bootstrap dimensions")
+
+  counts.mat <- if (!is.null(counts))
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  else NULL
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
+  prob <- rep.int(1 / n, n)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(setup$t0))
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size,
+                                                        progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    counts.chunk <- if (!is.null(counts.mat)) {
+      counts.mat[, start:stopi, drop = FALSE]
+    } else if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = prob)
+    }
+    Cg <- .np_cat_profile_rowsum(counts.chunk, setup$train.id, setup$G)
+    Sg <- .np_cat_profile_rowsum(counts.chunk * setup$ydat,
+                                 setup$train.id,
+                                 setup$G)
+    den <- tcrossprod(t(Cg), setup$L.eval)
+    num <- tcrossprod(t(Sg), setup$L.eval)
+    prof <- num / pmax(den, .Machine$double.eps)
+    tmat[start:stopi, ] <- prof[, setup$eval.id, drop = FALSE]
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = setup$t0)
+}
+
+.np_wild_boot_from_regression_cat_profile <- function(setup,
+                                                      B,
+                                                      wild,
+                                                      progress.label = NULL) {
+  B <- as.integer(B)
+  n <- length(setup$ydat)
+  if (B < 1L || n < 1L)
+    stop("invalid categorical profile wild bootstrap dimensions")
+
+  chunk.size <- .np_wild_chunk_size(n = n, B = B)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(setup$t0))
+  residuals <- setup$ydat - setup$fit.train
+  base.sums <- setup$counts * setup$fit.train.profile
+  wild <- .np_plot_normalize_wild(wild)
+  draw.fun <- if (identical(wild, "mammen")) .np_mammen_draws else .np_rademacher_draws
+  progress.label <- if (is.null(progress.label)) "Plot bootstrap wild" else progress.label
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size,
+                                                        progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    draws <- draw.fun(n = n, B = bsz)
+    Rg <- .np_cat_profile_rowsum(draws * residuals, setup$train.id, setup$G)
+    Sg <- sweep(Rg, 1L, base.sums, "+", check.margin = FALSE)
+    num <- tcrossprod(t(Sg), setup$L.eval)
+    prof <- sweep(num, 2L, setup$den.eval, "/", check.margin = FALSE)
+    tmat[start:stopi, ] <- prof[, setup$eval.id, drop = FALSE]
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = setup$t0)
+}
+
 .np_inid_lp_unpack_sym_row <- function(mrow, p) {
   A <- matrix(0.0, nrow = p, ncol = p)
   idx <- 1L
@@ -7698,6 +7963,16 @@ compute.bootstrap.errors.rbandwidth =
       stop("bootstrap=\"wild\" supports gradients only for continuous or categorical slices in compute.bootstrap.errors.rbandwidth", call. = FALSE)
     }
 
+    profile.setup <- NULL
+    if (!isTRUE(gradients)) {
+      profile.setup <- .np_regression_cat_profile_boot_setup(
+        xdat = xdat,
+        exdat = exdat,
+        ydat = ydat,
+        bws = bws
+      )
+    }
+
     inid.helper.ok <- TRUE
     block.helper.ok <- TRUE
 
@@ -7713,7 +7988,14 @@ compute.bootstrap.errors.rbandwidth =
         NULL
       }
       boot.out <- tryCatch(
-        if (identical(bws$type, "fixed")) {
+        if (!is.null(profile.setup)) {
+          .np_inid_boot_from_regression_cat_profile(
+            setup = profile.setup,
+            B = plot.errors.boot.num,
+            counts.drawer = counts.drawer,
+            progress.label = progress.label
+          )
+        } else if (identical(bws$type, "fixed")) {
           .np_inid_boot_from_regression(
             xdat = xdat,
             exdat = exdat,
@@ -7767,54 +8049,63 @@ compute.bootstrap.errors.rbandwidth =
     if (is.null(boot.out) && is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
-      fit.mean <- as.vector(suppressWarnings(npreghat(
-        bws = bws,
-        txdat = xdat,
-        exdat = xdat,
-        y = ydat,
-        output = "apply"
-      )))
-
-      s.vec <- NULL
-      if (gradients && !xi.factor) {
-        cpos <- match(slice.index, cont.idx)
-        gorder <- if (length(gradient.order) == 1L) {
-          rep.int(as.integer(gradient.order), length(cont.idx))
-        } else {
-          as.integer(gradient.order)
-        }
-        if (length(gorder) != length(cont.idx))
-          gorder <- rep.int(1L, length(cont.idx))
-        s.vec <- integer(length(cont.idx))
-        s.vec[cpos] <- gorder[cpos]
-      }
-
-      H <- suppressWarnings(npreghat(
-        bws = bws,
-        txdat = xdat,
-        exdat = exdat,
-        s = s.vec,
-        output = "matrix"
-      ))
-
-      boot.out <- if (gradients && xi.factor) {
-        .np_plot_boot_from_hat_wild_factor_effects(
-          H = H,
-          ydat = ydat,
-          fit.mean = fit.mean,
+      if (!is.null(profile.setup)) {
+        boot.out <- .np_wild_boot_from_regression_cat_profile(
+          setup = profile.setup,
           B = plot.errors.boot.num,
           wild = plot.errors.boot.wild,
           progress.label = progress.label
         )
       } else {
-        .np_plot_boot_from_hat_wild(
-          H = H,
-          ydat = ydat,
-          fit.mean = fit.mean,
-          B = plot.errors.boot.num,
-          wild = plot.errors.boot.wild,
-          progress.label = progress.label
-        )
+        fit.mean <- as.vector(suppressWarnings(npreghat(
+          bws = bws,
+          txdat = xdat,
+          exdat = xdat,
+          y = ydat,
+          output = "apply"
+        )))
+
+        s.vec <- NULL
+        if (gradients && !xi.factor) {
+          cpos <- match(slice.index, cont.idx)
+          gorder <- if (length(gradient.order) == 1L) {
+            rep.int(as.integer(gradient.order), length(cont.idx))
+          } else {
+            as.integer(gradient.order)
+          }
+          if (length(gorder) != length(cont.idx))
+            gorder <- rep.int(1L, length(cont.idx))
+          s.vec <- integer(length(cont.idx))
+          s.vec[cpos] <- gorder[cpos]
+        }
+
+        H <- suppressWarnings(npreghat(
+          bws = bws,
+          txdat = xdat,
+          exdat = exdat,
+          s = s.vec,
+          output = "matrix"
+        ))
+
+        boot.out <- if (gradients && xi.factor) {
+          .np_plot_boot_from_hat_wild_factor_effects(
+            H = H,
+            ydat = ydat,
+            fit.mean = fit.mean,
+            B = plot.errors.boot.num,
+            wild = plot.errors.boot.wild,
+            progress.label = progress.label
+          )
+        } else {
+          .np_plot_boot_from_hat_wild(
+            H = H,
+            ydat = ydat,
+            fit.mean = fit.mean,
+            B = plot.errors.boot.num,
+            wild = plot.errors.boot.wild,
+            progress.label = progress.label
+          )
+        }
       }
     }
 
