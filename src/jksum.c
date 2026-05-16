@@ -23745,15 +23745,15 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                                                                 double *cv){
   np_gate_override_clear();
 
-  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN) || (BANDWIDTH_den == BW_ADAP_NN)) &&
-     (int_ll_extern == LL_LP))
-    return np_conditional_density_cvml_lp_stream(vector_scale_factor, cv);
-
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int num_cvar = num_reg_continuous + num_var_continuous;
   const int num_uvar = num_reg_unordered + num_var_unordered;
   const int num_ovar = num_reg_ordered + num_var_ordered;
   const int num_all_var = num_reg + num_var_continuous + num_var_unordered + num_var_ordered;
+  const int use_lp_stream = (((BANDWIDTH_den == BW_FIXED) ||
+                              (BANDWIDTH_den == BW_GEN_NN) ||
+                              (BANDWIDTH_den == BW_ADAP_NN)) &&
+                             (int_ll_extern == LL_LP));
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs:1);
 
@@ -23903,6 +23903,256 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                            matrix_bandwidth_xy,
                            lambda_xy)==1){
     error("\n** Error: invalid bandwidth.");
+  }
+
+  if((int_TREE_PROFILE_X == NP_TREE_TRUE) &&
+     (BANDWIDTH_den == BW_FIXED) &&
+     (num_var_continuous == 0) &&
+     (num_reg_continuous == 0) &&
+     ((num_var_unordered + num_var_ordered) > 0) &&
+     ((num_reg_unordered + num_reg_ordered) > 0)){
+    int g, j, status_num, status_den;
+    int *xy_prof_id = NULL, *xy_prof_rep = NULL;
+    int *x_prof_id = NULL, *x_prof_rep = NULL;
+    int nprof_xy = 0, nprof_x = 0;
+    double **profile_xy_uno = NULL, **profile_xy_ord = NULL;
+    double **profile_x_uno = NULL, **profile_x_ord = NULL;
+    double *counts_xy = NULL, *counts_x = NULL;
+    double *weighted_num = NULL, *weighted_den = NULL;
+    double *profile_y_xy[1], *profile_y_x[1];
+    int profile_ok = 0;
+
+    if(np_build_discrete_profile_index(num_obs,
+                                       num_uvar,
+                                       num_ovar,
+                                       matrix_XY_unordered,
+                                       matrix_XY_ordered,
+                                       &xy_prof_id,
+                                       &xy_prof_rep,
+                                       &nprof_xy) &&
+       np_build_discrete_profile_index(num_obs,
+                                       num_reg_unordered,
+                                       num_reg_ordered,
+                                       matrix_X_unordered,
+                                       matrix_X_ordered,
+                                       &x_prof_id,
+                                       &x_prof_rep,
+                                       &nprof_x) &&
+       (nprof_xy > 0) &&
+       (nprof_x > 0) &&
+       (4*nprof_xy <= 3*num_obs) &&
+       (4*nprof_x <= 3*num_obs)){
+
+      profile_xy_uno = alloc_tmatd(nprof_xy, num_uvar);
+      profile_xy_ord = alloc_tmatd(nprof_xy, num_ovar);
+      profile_x_uno = alloc_tmatd(nprof_x, num_reg_unordered);
+      profile_x_ord = alloc_tmatd(nprof_x, num_reg_ordered);
+      counts_xy = alloc_vecd(nprof_xy);
+      counts_x = alloc_vecd(nprof_x);
+      weighted_num = alloc_vecd(nprof_xy);
+      weighted_den = alloc_vecd(nprof_x);
+
+      if(((num_uvar == 0) || (profile_xy_uno != NULL)) &&
+         ((num_ovar == 0) || (profile_xy_ord != NULL)) &&
+         ((num_reg_unordered == 0) || (profile_x_uno != NULL)) &&
+         ((num_reg_ordered == 0) || (profile_x_ord != NULL)) &&
+         counts_xy != NULL &&
+         counts_x != NULL &&
+         weighted_num != NULL &&
+         weighted_den != NULL){
+
+        for(g = 0; g < nprof_xy; g++){
+          const int rep = xy_prof_rep[g];
+          counts_xy[g] = 0.0;
+          for(j = 0; j < num_uvar; j++)
+            profile_xy_uno[j][g] = matrix_XY_unordered[j][rep];
+          for(j = 0; j < num_ovar; j++)
+            profile_xy_ord[j][g] = matrix_XY_ordered[j][rep];
+        }
+
+        for(g = 0; g < nprof_x; g++){
+          const int rep = x_prof_rep[g];
+          counts_x[g] = 0.0;
+          for(j = 0; j < num_reg_unordered; j++)
+            profile_x_uno[j][g] = matrix_X_unordered[j][rep];
+          for(j = 0; j < num_reg_ordered; j++)
+            profile_x_ord[j][g] = matrix_X_ordered[j][rep];
+        }
+
+        for(i = 0; i < num_obs; i++){
+          counts_xy[xy_prof_id[i]] += 1.0;
+          counts_x[x_prof_id[i]] += 1.0;
+        }
+
+        profile_y_xy[0] = counts_xy;
+        profile_y_x[0] = counts_x;
+
+        status_num = kernel_weighted_sum_np(kernel_cxy,
+                                            kernel_uxy,
+                                            kernel_oxy,
+                                            BANDWIDTH_den,
+                                            nprof_xy,
+                                            nprof_xy,
+                                            num_uvar,
+                                            num_ovar,
+                                            0,
+                                            0,
+                                            0,
+                                            1,
+                                            1,
+                                            0,
+                                            0,
+                                            0,
+                                            0,
+                                            0,
+                                            operator,
+                                            OP_NOOP,
+                                            0,
+                                            0,
+                                            NULL,
+                                            1,
+                                            1,
+                                            0,
+                                            NP_TREE_FALSE,
+                                            0,
+                                            NULL, NULL, NULL, NULL,
+                                            profile_xy_uno,
+                                            profile_xy_ord,
+                                            NULL,
+                                            profile_xy_uno,
+                                            profile_xy_ord,
+                                            NULL,
+                                            profile_y_xy,
+                                            NULL,
+                                            NULL,
+                                            vsf_xy,
+                                            1,
+                                            NULL,
+                                            NULL,
+                                            lambda_xy,
+                                            num_categories_extern_XY,
+                                            matrix_categorical_vals_extern_XY,
+                                            NULL,
+                                            weighted_num,
+                                            NULL,
+                                            NULL,
+                                            NULL);
+
+        status_den = kernel_weighted_sum_np(kernel_cx,
+                                            kernel_ux,
+                                            kernel_ox,
+                                            BANDWIDTH_den,
+                                            nprof_x,
+                                            nprof_x,
+                                            num_reg_unordered,
+                                            num_reg_ordered,
+                                            0,
+                                            0,
+                                            0,
+                                            1,
+                                            1,
+                                            0,
+                                            0,
+                                            0,
+                                            0,
+                                            0,
+                                            operator,
+                                            OP_NOOP,
+                                            0,
+                                            0,
+                                            NULL,
+                                            1,
+                                            1,
+                                            0,
+                                            NP_TREE_FALSE,
+                                            0,
+                                            NULL, NULL, NULL, NULL,
+                                            profile_x_uno,
+                                            profile_x_ord,
+                                            NULL,
+                                            profile_x_uno,
+                                            profile_x_ord,
+                                            NULL,
+                                            profile_y_x,
+                                            NULL,
+                                            NULL,
+                                            vsf_x,
+                                            1,
+                                            NULL,
+                                            NULL,
+                                            lambda_x,
+                                            num_categories_extern_X,
+                                            matrix_categorical_vals_extern_X,
+                                            NULL,
+                                            weighted_den,
+                                            NULL,
+                                            NULL,
+                                            NULL);
+
+        if((status_num == 0) && (status_den == 0)){
+          *cv = 0.0;
+          profile_ok = 1;
+          for(g = 0; g < nprof_xy; g++){
+            const int rep = xy_prof_rep[g];
+            const int xid = x_prof_id[rep];
+            const double self_xy = np_regression_cat_profile_self_weight(
+              kernel_uxy,
+              kernel_oxy,
+              num_uvar,
+              num_ovar,
+              profile_xy_uno,
+              profile_xy_ord,
+              g,
+              lambda_xy,
+              num_categories_extern_XY,
+              matrix_categorical_vals_extern_XY);
+            const double self_x = np_regression_cat_profile_self_weight(
+              kernel_ux,
+              kernel_ox,
+              num_reg_unordered,
+              num_reg_ordered,
+              profile_x_uno,
+              profile_x_ord,
+              xid,
+              lambda_x,
+              num_categories_extern_X,
+              matrix_categorical_vals_extern_X);
+            const double num = weighted_num[g] - self_xy;
+            const double den = weighted_den[xid] - self_x;
+
+            if((num <= DBL_MIN) || (den <= DBL_MIN) ||
+               (!R_FINITE(num)) || (!R_FINITE(den))){
+              profile_ok = 0;
+              break;
+            }
+            *cv -= counts_xy[g]*(log(num) - log(den));
+          }
+        }
+      }
+    }
+
+    if(xy_prof_id != NULL) free(xy_prof_id);
+    if(xy_prof_rep != NULL) free(xy_prof_rep);
+    if(x_prof_id != NULL) free(x_prof_id);
+    if(x_prof_rep != NULL) free(x_prof_rep);
+    if(profile_xy_uno != NULL) free_tmat(profile_xy_uno);
+    if(profile_xy_ord != NULL) free_tmat(profile_xy_ord);
+    if(profile_x_uno != NULL) free_tmat(profile_x_uno);
+    if(profile_x_ord != NULL) free_tmat(profile_x_ord);
+    if(counts_xy != NULL) free(counts_xy);
+    if(counts_x != NULL) free(counts_x);
+    if(weighted_num != NULL) free(weighted_num);
+    if(weighted_den != NULL) free(weighted_den);
+
+    if(profile_ok){
+      ret = 0;
+      goto cleanup_cvml_return;
+    }
+  }
+
+  if(use_lp_stream){
+    ret = np_conditional_density_cvml_lp_stream(vector_scale_factor, cv);
+    goto cleanup_cvml_return;
   }
 
   /* All-large-X shortcut for conditional-density ML CV:

@@ -819,17 +819,21 @@ npcdensbw.conbandwidth <-
   do.call(npcdensbw.conbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
 }
 
-.npcdensbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, bws, reg.args, opt.args) {
+.npcdensbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, bws, reg.args, opt.args,
+                                                      tree.flag = isTRUE(getOption("np.tree"))) {
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   old.messages <- getOption("np.messages")
+  old.tree <- getOption("np.tree")
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
 
   options(npRmpi.autodispatch.disable = TRUE)
+  options(np.tree = isTRUE(tree.flag))
   if (!isTRUE(rank == 0L))
     options(np.messages = FALSE)
 
   on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
   on.exit(options(np.messages = old.messages), add = TRUE)
+  on.exit(options(np.tree = old.tree), add = TRUE)
 
   .npcdensbw_run_fixed_degree(
     xdat = xdat,
@@ -855,14 +859,16 @@ npcdensbw.conbandwidth <-
         YDAT,
         BWS,
         REGARGS,
-        OPTARGS
+        OPTARGS,
+        TREEFLAG
       ),
       list(
         XDAT = xdat,
         YDAT = ydat,
         BWS = bws,
         REGARGS = reg.args,
-        OPTARGS = opt.args
+        OPTARGS = opt.args,
+        TREEFLAG = isTRUE(getOption("np.tree"))
       )
     )
     return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
