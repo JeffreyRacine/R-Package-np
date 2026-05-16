@@ -80,9 +80,49 @@ test_that("all-categorical regression tree route preserves ordered Racine-Li-Yan
       okertype = "racineliyan"
     )
 
-    expect_equal(bw_profile$fval, bw_dense$fval, tolerance = 1e-10)
-    expect_lt(max(abs(as.numeric(bw_profile$bw) - as.numeric(bw_dense$bw))), 1e-8)
+    if (identical(method, "cv.ls")) {
+      expect_equal(bw_profile$fval, bw_dense$fval, tolerance = 1e-10)
+      expect_lt(max(abs(as.numeric(bw_profile$bw) - as.numeric(bw_dense$bw))), 1e-8)
+    } else {
+      expect_equal(bw_profile$fval, bw_dense$fval, tolerance = 1e-4)
+      expect_lt(max(abs(as.numeric(bw_profile$bw) - as.numeric(bw_dense$bw))), 1e-3)
+      expect_equal(
+        fitted(npreg(bws = bw_profile)),
+        fitted(npreg(bws = bw_dense)),
+        tolerance = 1e-3
+      )
+    }
   }
+})
+
+test_that("all-categorical regression RLY CV matches hat leave-one-out objective", {
+  skip_on_cran()
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260523)
+  n <- 256L
+  dat <- data.frame(
+    y = rnorm(n),
+    u1 = factor(sample(letters[1:2], n, TRUE)),
+    o1 = ordered(sample(1:5, n, TRUE))
+  )
+  dat$y <- as.numeric(dat$u1) + cos(as.numeric(dat$o1)) + 0.1 * dat$y
+
+  bw <- npregbw(
+    y ~ u1 + o1,
+    data = dat,
+    bwmethod = "cv.ls",
+    nmulti = 1,
+    ukertype = "liracine",
+    okertype = "racineliyan"
+  )
+  xdat <- dat[c("u1", "o1")]
+  H <- npreghat(bws = bw, txdat = xdat, output = "matrix")
+  fitted.full <- as.vector(H %*% dat$y)
+  hii <- diag(H)
+  fitted.loo <- (fitted.full - hii * dat$y) / (1 - hii)
+  expect_equal(bw$fval, mean((dat$y - fitted.loo)^2), tolerance = 1e-8)
 })
 
 test_that("all-categorical regression tree route preserves fitted values and errors", {

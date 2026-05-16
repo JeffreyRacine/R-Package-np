@@ -1033,10 +1033,6 @@ double *traceH_out){
   if((bwm == RBWM_CVAIC) && (traceH_out == NULL))
     return 0;
 
-  for(i = 0; i < num_reg_ordered; i++)
-    if(kernel_o[i] == 3)
-      return 0;
-
   if(!np_build_discrete_profile_index(num_obs,
                                       num_reg_unordered,
                                       num_reg_ordered,
@@ -8884,7 +8880,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                  matrix_bandwidth,
                                  lambda,
                                  num_categories,
-                                 NULL,
+                                 matrix_categorical_vals_extern,
                                  NULL,
                                  &aicc,
                                  NULL,
@@ -8963,7 +8959,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                      matrix_bandwidth_eval,
                                      lambda,
                                      num_categories,
-                                     NULL,
+                                     matrix_categorical_vals_extern,
                                      NULL,
                                      kwm+j*nrcc22,
                                      NULL,
@@ -9034,7 +9030,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                        matrix_bandwidth_eval,
                                        lambda,
                                        num_categories,
-                                       NULL,
+                                       matrix_categorical_vals_extern,
                                        NULL,
                                        kwm+j*nrcc22,
                                        NULL,
@@ -9543,7 +9539,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                            matrix_bandwidth,
                            lambda,
                            num_categories,
-                           NULL,
+                           matrix_categorical_vals_extern,
                            NULL,
                            &aicc,
                            NULL, // no permutations
@@ -9617,7 +9613,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                            matrix_bandwidth,
                            lambda,
                            num_categories,
-                           NULL,
+                           matrix_categorical_vals_extern,
                            NULL,
                            mean,
                            NULL, // no permutations
@@ -9815,7 +9811,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    matrix_bandwidth_eval,
                                    lambda,
                                    num_categories,
-                                   NULL,
+                                   matrix_categorical_vals_extern,
                                    NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
@@ -9907,7 +9903,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    matrix_bandwidth_eval,
                                    lambda,
                                    num_categories,
-                                   NULL,
+                                   matrix_categorical_vals_extern,
                                    NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
@@ -10005,7 +10001,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                matrix_bandwidth_eval,
                                lambda,
                                num_categories,
-                               NULL,
+                               matrix_categorical_vals_extern,
                                NULL,
                                kwm+j*nrcc22,  // weighted sum
                                NULL, // no permutations
@@ -10090,7 +10086,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                  matrix_bandwidth_eval,
                                  lambda,
                                  num_categories,
-                                 NULL,
+                                 matrix_categorical_vals_extern,
                                  NULL,
                                  kwm+j*nrcc22, // weighted sum
                                  NULL, // no permutations
@@ -21314,7 +21310,7 @@ double *cv){
                          vector_scale_factor,
                          1,matrix_bandwidth,matrix_bandwidth,lambda,
                          num_categories,
-                         NULL,
+                         matrix_categorical_vals_extern,
                          NULL,
                          rho,  // weighted sum
                          NULL, // no permutations
@@ -21695,7 +21691,7 @@ double *cv){
                          vector_scale_factor,
                          1,matrix_bandwidth,matrix_bandwidth,lambda,
                          num_categories,
-                         NULL,
+                         matrix_categorical_vals_extern,
                          NULL, // no ocg
                          res,  // weighted sum
                          NULL, // no permutations
