@@ -120,3 +120,79 @@ test_that("all-categorical regression tree route preserves fitted values and err
   expect_equal(fit_profile$merr, fit_dense$merr, tolerance = 1e-8)
   expect_equal(fit_profile$MSE, fit_dense$MSE, tolerance = 1e-10)
 })
+
+test_that("all-categorical regression tree route preserves native and predict evaluation", {
+  skip_on_cran()
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260517)
+  n <- 640L
+  dat <- data.frame(
+    y = rnorm(n),
+    u1 = factor(rbinom(n, 1L, 0.5)),
+    u2 = factor(sample(letters[1:3], n, TRUE)),
+    o1 = ordered(sample(1:4, n, TRUE))
+  )
+  dat$y <- as.numeric(dat$u1) + 0.5 * as.numeric(dat$u2) +
+    sin(as.numeric(dat$o1)) + 0.1 * dat$y
+  ex <- dat[c(seq_len(40L), seq_len(40L), sample(seq_len(n), 80L, TRUE)),
+            c("u1", "u2", "o1"), drop = FALSE]
+
+  options(np.tree = FALSE)
+  bw <- npregbw(
+    y ~ u1 + u2 + o1,
+    data = dat,
+    bwmethod = "cv.ls",
+    nmulti = 1,
+    ukertype = "aitchisonaitken",
+    okertype = "liracine"
+  )
+  fit.base <- npreg(bws = bw)
+  fit.dense <- npreg(bws = bw, exdat = ex)
+  pred.dense <- predict(fit.base, newdata = ex, se.fit = TRUE)
+
+  options(np.tree = TRUE)
+  fit.profile <- npreg(bws = bw, exdat = ex)
+  pred.profile <- predict(fit.base, newdata = ex, se.fit = TRUE)
+
+  expect_equal(fitted(fit.profile), fitted(fit.dense), tolerance = 1e-8)
+  expect_equal(fit.profile$merr, fit.dense$merr, tolerance = 1e-8)
+  expect_equal(as.numeric(pred.profile$fit), as.numeric(pred.dense$fit),
+               tolerance = 1e-8)
+  expect_equal(as.numeric(pred.profile$se.fit), as.numeric(pred.dense$se.fit),
+               tolerance = 1e-8)
+})
+
+test_that("all-categorical regression tree route leaves RLY evaluation on dense path", {
+  skip_on_cran()
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260518)
+  n <- 256L
+  dat <- data.frame(
+    y = rnorm(n),
+    u1 = factor(sample(letters[1:2], n, TRUE)),
+    o1 = ordered(sample(1:5, n, TRUE))
+  )
+  dat$y <- as.numeric(dat$u1) + cos(as.numeric(dat$o1)) + 0.1 * dat$y
+  ex <- dat[c(seq_len(30L), seq_len(30L)), c("u1", "o1"), drop = FALSE]
+
+  options(np.tree = FALSE)
+  bw <- npregbw(
+    y ~ u1 + o1,
+    data = dat,
+    bwmethod = "cv.ls",
+    nmulti = 1,
+    ukertype = "liracine",
+    okertype = "racineliyan"
+  )
+  fit.dense <- npreg(bws = bw, exdat = ex)
+
+  options(np.tree = TRUE)
+  fit.profile <- npreg(bws = bw, exdat = ex)
+
+  expect_equal(fitted(fit.profile), fitted(fit.dense), tolerance = 1e-8)
+  expect_equal(fit.profile$merr, fit.dense$merr, tolerance = 1e-8)
+})
