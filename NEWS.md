@@ -1,7 +1,27 @@
 # npRmpi 0.70-3
 
-- Development version opened after CRAN publication of 0.70-2. No
-  post-release user-visible changes have been recorded yet.
+- Large-sample categorical-only regression now has an MPI-safe
+  profile-compressed execution route when `options(np.tree = TRUE)` is
+  enabled. For local constant categorical regression, repeated predictor
+  profiles are compressed before bandwidth cross-validation, fitting,
+  prediction/evaluation, standard errors, gradients where meaningful,
+  hat-helper use, and plot bootstrap helpers. This preserves the established
+  dense-route numerical contract while greatly reducing work for large samples
+  with many repeated factor/ordered predictor combinations.
+- Categorical-only unconditional density routes now use the same
+  profile-compression idea when `options(np.tree = TRUE)` is enabled. The
+  fixed-bandwidth fit/evaluation route and `npudensbw()` `cv.ml`/`cv.ls`
+  objective routes preserve dense-route objective values, selected
+  bandwidths/smoothing parameters, and fitted/evaluation values while avoiding
+  repeated computation over identical categorical profiles. Very fast
+  compressed routes may remain overhead-floor limited, so MPI acceleration is
+  most useful once the uncompressed work would be genuinely long-running.
+- Internal categorical-profile and large-bandwidth caches are now cleared at
+  the relevant top-level density, distribution, conditional-density,
+  conditional-distribution, and regression cleanup points. These caches are
+  keyed by call-local row pointers, so clearing them per `.Call` prevents stale
+  same-process state from leaking across unrelated data sets or MPI dispatch
+  modes.
 
 # npRmpi 0.70-2
 
