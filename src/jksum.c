@@ -1601,6 +1601,7 @@ double *log_likelihood){
   double *profile_y[1];
   int ok = 0;
   const double log_DBL_MIN = log(DBL_MIN);
+  int operator_kind = OP_NORMAL;
 
   if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
      (BANDWIDTH_den != BW_FIXED) ||
@@ -1614,9 +1615,16 @@ double *log_likelihood){
      (log_likelihood == NULL))
     return 0;
 
-  for(i = 0; i < (num_reg_unordered + num_reg_ordered); i++)
-    if(operator[i] != OP_NORMAL)
+  if((num_reg_unordered > 0) && (operator[0] == OP_INTEGRAL))
+    return 0;
+
+  for(i = 0; i < (num_reg_unordered + num_reg_ordered); i++){
+    if(i == 0)
+      operator_kind = operator[i];
+    if((operator[i] != operator_kind) ||
+       ((operator[i] != OP_NORMAL) && (operator[i] != OP_INTEGRAL)))
       return 0;
+  }
 
   if(!np_build_discrete_profile_index(num_obs_train,
                                       num_reg_unordered,
@@ -1740,8 +1748,12 @@ double *log_likelihood){
   for(i = 0; i < num_obs_eval; i++){
     const double p = profile_pdf_sum[eval_prof_id[i]]/(double)num_obs_train;
     pdf[i] = p;
-    pdf_stderr[i] = sqrt(p/(double)num_obs_train);
-    *log_likelihood += (p < DBL_MIN) ? log_DBL_MIN : log(p);
+    if(operator_kind == OP_NORMAL){
+      pdf_stderr[i] = sqrt(p/(double)num_obs_train);
+      *log_likelihood += (p < DBL_MIN) ? log_DBL_MIN : log(p);
+    } else {
+      pdf_stderr[i] = sqrt(p*(1.0-p)/(double)num_obs_train);
+    }
   }
 
   ok = 1;
@@ -23445,7 +23457,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 	    error("\n** Error: invalid bandwidth.");
 	  }
 
-  if((dop == OP_NORMAL) &&
+  if(((dop == OP_NORMAL) || (dop == OP_INTEGRAL)) &&
      np_density_categorical_profile_fit(kernel_c,
                                         kernel_u,
                                         kernel_o,

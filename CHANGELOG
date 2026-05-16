@@ -17,6 +17,11 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   compressed routes may remain overhead-floor limited, so MPI acceleration is
   most useful once the uncompressed work would be genuinely long-running.
 
+* Added profile compression for ordered-only unconditional distribution
+  fit/evaluation routes when `options(np.tree = TRUE)` is enabled. The fixed
+  smoothing-parameter route preserves fitted distribution values and standard
+  errors while avoiding repeated computation over identical ordered profiles.
+
 * Hardened internal categorical-profile and large-bandwidth cache cleanup
   across density, distribution, conditional-density, conditional-distribution,
   and regression cleanup paths. These caches are keyed by call-local row
