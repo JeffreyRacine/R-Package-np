@@ -1359,9 +1359,11 @@ double *mean,
 double *mean_stderr){
 
   int i, j, g, status;
-  int *prof_id = NULL, *prof_rep = NULL;
-  int nprof = 0;
-  double **profile_unordered = NULL, **profile_ordered = NULL;
+  int *train_prof_id = NULL, *train_prof_rep = NULL;
+  int *eval_prof_id = NULL, *eval_prof_rep = NULL;
+  int nprof_train = 0, nprof_eval = 0;
+  double **profile_unordered_train = NULL, **profile_ordered_train = NULL;
+  double **profile_unordered_eval = NULL, **profile_ordered_eval = NULL;
   double *counts = NULL, *sums = NULL, *sums2 = NULL, *weighted_sum = NULL;
   double *profile_y[3];
   double *profile_mean = NULL, *profile_stderr = NULL;
@@ -1371,9 +1373,6 @@ double *mean_stderr){
      (BANDWIDTH_reg != BW_FIXED) ||
      (num_reg_continuous != 0) ||
      ((num_reg_unordered + num_reg_ordered) <= 0) ||
-     (num_obs_train != num_obs_eval) ||
-     (matrix_X_unordered_train != matrix_X_unordered_eval) ||
-     (matrix_X_ordered_train != matrix_X_ordered_eval) ||
      (vector_Y == NULL) ||
      (mean == NULL) ||
      (mean_stderr == NULL) ||
@@ -1397,42 +1396,66 @@ double *mean_stderr){
                                       num_reg_ordered,
                                       matrix_X_unordered_train,
                                       matrix_X_ordered_train,
-                                      &prof_id,
-                                      &prof_rep,
-                                      &nprof))
+                                      &train_prof_id,
+                                      &train_prof_rep,
+                                      &nprof_train))
     return 0;
 
-  if((nprof <= 0) || (4*nprof > 3*num_obs_train))
+  if(!np_build_discrete_profile_index(num_obs_eval,
+                                      num_reg_unordered,
+                                      num_reg_ordered,
+                                      matrix_X_unordered_eval,
+                                      matrix_X_ordered_eval,
+                                      &eval_prof_id,
+                                      &eval_prof_rep,
+                                      &nprof_eval))
     goto cleanup;
 
-  profile_unordered = alloc_tmatd(nprof, num_reg_unordered);
-  profile_ordered = alloc_tmatd(nprof, num_reg_ordered);
-  counts = alloc_vecd(nprof);
-  sums = alloc_vecd(nprof);
-  sums2 = alloc_vecd(nprof);
-  weighted_sum = alloc_vecd(3*nprof);
-  profile_mean = alloc_vecd(nprof);
-  profile_stderr = alloc_vecd(nprof);
+  if((nprof_train <= 0) || (nprof_eval <= 0) ||
+     (4*nprof_train > 3*num_obs_train) ||
+     (4*nprof_eval > 3*num_obs_eval))
+    goto cleanup;
 
-  if(((num_reg_unordered > 0) && profile_unordered == NULL) ||
-     ((num_reg_ordered > 0) && profile_ordered == NULL) ||
+  profile_unordered_train = alloc_tmatd(nprof_train, num_reg_unordered);
+  profile_ordered_train = alloc_tmatd(nprof_train, num_reg_ordered);
+  profile_unordered_eval = alloc_tmatd(nprof_eval, num_reg_unordered);
+  profile_ordered_eval = alloc_tmatd(nprof_eval, num_reg_ordered);
+  counts = alloc_vecd(nprof_train);
+  sums = alloc_vecd(nprof_train);
+  sums2 = alloc_vecd(nprof_train);
+  weighted_sum = alloc_vecd(3*nprof_eval);
+  profile_mean = alloc_vecd(nprof_eval);
+  profile_stderr = alloc_vecd(nprof_eval);
+
+  if(((num_reg_unordered > 0) &&
+      (profile_unordered_train == NULL || profile_unordered_eval == NULL)) ||
+     ((num_reg_ordered > 0) &&
+      (profile_ordered_train == NULL || profile_ordered_eval == NULL)) ||
      counts == NULL || sums == NULL || sums2 == NULL ||
      weighted_sum == NULL || profile_mean == NULL || profile_stderr == NULL)
     goto cleanup;
 
-  for(g = 0; g < nprof; g++){
-    const int rep = prof_rep[g];
+  for(g = 0; g < nprof_train; g++){
+    const int rep = train_prof_rep[g];
     counts[g] = 0.0;
     sums[g] = 0.0;
     sums2[g] = 0.0;
     for(j = 0; j < num_reg_unordered; j++)
-      profile_unordered[j][g] = matrix_X_unordered_train[j][rep];
+      profile_unordered_train[j][g] = matrix_X_unordered_train[j][rep];
     for(j = 0; j < num_reg_ordered; j++)
-      profile_ordered[j][g] = matrix_X_ordered_train[j][rep];
+      profile_ordered_train[j][g] = matrix_X_ordered_train[j][rep];
+  }
+
+  for(g = 0; g < nprof_eval; g++){
+    const int rep = eval_prof_rep[g];
+    for(j = 0; j < num_reg_unordered; j++)
+      profile_unordered_eval[j][g] = matrix_X_unordered_eval[j][rep];
+    for(j = 0; j < num_reg_ordered; j++)
+      profile_ordered_eval[j][g] = matrix_X_ordered_eval[j][rep];
   }
 
   for(i = 0; i < num_obs_train; i++){
-    g = prof_id[i];
+    g = train_prof_id[i];
     counts[g] += 1.0;
     sums[g] += vector_Y[i];
     sums2[g] += vector_Y[i]*vector_Y[i];
@@ -1446,8 +1469,8 @@ double *mean_stderr){
                                   kernel_u,
                                   kernel_o,
                                   BANDWIDTH_reg,
-                                  nprof,
-                                  nprof,
+                                  nprof_train,
+                                  nprof_eval,
                                   num_reg_unordered,
                                   num_reg_ordered,
                                   0,
@@ -1474,11 +1497,11 @@ double *mean_stderr){
                                   NULL,
                                   NULL,
                                   NULL,
-                                  profile_unordered,
-                                  profile_ordered,
+                                  profile_unordered_train,
+                                  profile_ordered_train,
                                   NULL,
-                                  profile_unordered,
-                                  profile_ordered,
+                                  profile_unordered_eval,
+                                  profile_ordered_eval,
                                   NULL,
                                   profile_y,
                                   NULL,
@@ -1499,7 +1522,7 @@ double *mean_stderr){
   if(status != 0)
     goto cleanup;
 
-  for(g = 0; g < nprof; g++){
+  for(g = 0; g < nprof_eval; g++){
     const double A = weighted_sum[3*g];
     const double B = weighted_sum[3*g + 1];
     const double C = weighted_sum[3*g + 2];
@@ -1513,8 +1536,8 @@ double *mean_stderr){
     profile_stderr[g] = (v <= 0.0 || !R_FINITE(v)) ? 0.0 : sqrt(v/B);
   }
 
-  for(i = 0; i < num_obs_train; i++){
-    g = prof_id[i];
+  for(i = 0; i < num_obs_eval; i++){
+    g = eval_prof_id[i];
     mean[i] = profile_mean[g];
     mean_stderr[i] = profile_stderr[g];
   }
@@ -1522,10 +1545,14 @@ double *mean_stderr){
   ok = 1;
 
 cleanup:
-  if(prof_id != NULL) free(prof_id);
-  if(prof_rep != NULL) free(prof_rep);
-  if(profile_unordered != NULL) free_tmat(profile_unordered);
-  if(profile_ordered != NULL) free_tmat(profile_ordered);
+  if(train_prof_id != NULL) free(train_prof_id);
+  if(train_prof_rep != NULL) free(train_prof_rep);
+  if(eval_prof_id != NULL) free(eval_prof_id);
+  if(eval_prof_rep != NULL) free(eval_prof_rep);
+  if(profile_unordered_train != NULL) free_tmat(profile_unordered_train);
+  if(profile_ordered_train != NULL) free_tmat(profile_ordered_train);
+  if(profile_unordered_eval != NULL) free_tmat(profile_unordered_eval);
+  if(profile_ordered_eval != NULL) free_tmat(profile_ordered_eval);
   if(counts != NULL) free(counts);
   if(sums != NULL) free(sums);
   if(sums2 != NULL) free(sums2);
