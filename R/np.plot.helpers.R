@@ -1111,8 +1111,6 @@
         stop("unsupported unordered categorical kernel in profile bootstrap")
       }
     } else if (is.ordered(xdat[[j]])) {
-      if (identical(bws$okertype, "racineliyan"))
-        stop("Racine-Li-Yan ordered kernel is not eligible for profile bootstrap")
       d <- abs(outer(eval.codes[, j], train.codes[, j], "-"))
       if (identical(bws$okertype, "wangvanryzin")) {
         Kj <- ifelse(d == 0, 1.0 - lambda[j],
@@ -1121,6 +1119,12 @@
         Kj <- lambda[j]^d
       } else if (identical(bws$okertype, "nliracine")) {
         Kj <- (lambda[j]^d) * (1.0 - lambda[j]) / (1.0 + lambda[j])
+      } else if (identical(bws$okertype, "racineliyan")) {
+        support <- seq_len(nlevels(xdat[[j]]))
+        den <- vapply(train.codes[, j],
+                      function(x) sum(lambda[j]^abs(x - support)),
+                      numeric(1))
+        Kj <- t(t(lambda[j]^d) / den)
       } else {
         stop("unsupported ordered categorical kernel in profile bootstrap")
       }
@@ -1139,8 +1143,6 @@
   if (!identical(bws$type, "fixed"))
     return(NULL)
   if (!isTRUE(bws$ncon == 0L) || (bws$nuno + bws$nord) < 1L)
-    return(NULL)
-  if (identical(bws$okertype, "racineliyan") && isTRUE(bws$nord > 0L))
     return(NULL)
 
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
