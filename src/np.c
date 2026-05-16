@@ -4627,6 +4627,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   itmax=myopti[BW_ITMAXI];
   old_bw=myopti[BW_OLDBW];
   int_TREE_X = myopti[BW_DOTREEI];
+  int_TREE_PROFILE_X = myopti[BW_DOTREEI];
   scale_cat = myopti[BW_SCATI];
   bwm_use_transform = myopti[BW_TBNDI];
   if (BANDWIDTH_den_extern != BW_FIXED)
@@ -5310,6 +5311,7 @@ cleanup_np_density_bw:
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
