@@ -30,7 +30,9 @@
   `options(np.categorical.compress = TRUE)` is enabled. The route preserves
   fitted means, coefficient surfaces, asymptotic mean standard errors, and
   coefficient/gradient standard errors for training and evaluation fits while
-  avoiding repeated work over duplicate `Z` profiles.
+  avoiding repeated work over duplicate `Z` profiles. The corresponding
+  `npscoefhat(output = "apply")` path uses the same profile compression without
+  changing the explicit full-matrix `output = "matrix"` contract.
 - Internal categorical-profile and large-bandwidth caches are now cleared at
   the relevant top-level density, distribution, conditional-density,
   conditional-distribution, and regression cleanup points. These caches are

@@ -1454,12 +1454,96 @@ npscoefhat <-
     if (is.null(y) && constraint.output)
       stop("argument 'y' is required when output='constraint'")
 
+    cat.profile.apply.eligible <- identical(output, "apply") &&
+      identical(spec$regtype.engine, "lc") &&
+      !leave.one.out &&
+      identical(bws$type, "fixed") &&
+      (isTRUE(getOption("np.categorical.compress", TRUE)) ||
+         isTRUE(getOption("np.tree"))) &&
+      !miss.z &&
+      isTRUE(bws$ncon == 0L) &&
+      isTRUE((bws$nuno + bws$nord) > 0L)
+
+    npscoefhat_cat_profile_apply <- function(yy) {
+      train.codes <- .np_cat_profile_code_matrix(tzdat)
+      eval.codes <- .np_cat_profile_code_matrix(ezdat)
+      train.keys <- .np_cat_profile_keys(train.codes)
+      profile.keys <- unique(train.keys)
+      train.id <- match(train.keys, profile.keys)
+      train.rep <- match(profile.keys, train.keys)
+      train.profile.codes <- train.codes[train.rep, , drop = FALSE]
+      train.profile.dat <- tzdat[train.rep, , drop = FALSE]
+      G <- length(profile.keys)
+
+      L.eval <- .np_regression_cat_profile_kernel_matrix(
+        eval.codes = eval.codes,
+        train.codes = train.profile.codes,
+        xdat = train.profile.dat,
+        bws = bws
+      )
+
+      p <- ncol(W.train)
+      q <- ncol(yy)
+      sww.profile <- matrix(0.0, nrow = G, ncol = p * p)
+      wy.profile <- matrix(0.0, nrow = G, ncol = p * q)
+      for (j in seq_len(p)) {
+        for (k in seq_len(p)) {
+          sww.profile[, (j - 1L) * p + k] <-
+            .np_cat_profile_rowsum(W.train[, j] * W.train[, k],
+                                   train.id, G)[, 1L]
+        }
+        for (k in seq_len(q)) {
+          wy.profile[, (j - 1L) * q + k] <-
+            .np_cat_profile_rowsum(W.train[, j] * yy[, k],
+                                   train.id, G)[, 1L]
+        }
+      }
+
+      sww.eval <- L.eval %*% sww.profile
+      wy.eval <- L.eval %*% wy.profile
+      out <- matrix(0.0, nrow = m, ncol = q)
+      ridge.grid <- npRidgeSequenceFromBase(
+        n.train = n,
+        ridge.base = max(0.0, as.double(ridge)),
+        cap = 1.0
+      )
+      for (ii in seq_len(m)) {
+        XtWX <- matrix(sww.eval[ii, ], nrow = p, ncol = p, byrow = TRUE)
+        rhs <- matrix(wy.eval[ii, ], nrow = p, ncol = q, byrow = TRUE)
+        diag.loc <- cbind(seq_len(p), seq_len(p))
+        XtWX.diag <- XtWX[diag.loc]
+        solved <- FALSE
+        for (ridge.try in ridge.grid) {
+          A <- XtWX
+          if (ridge.try > 0)
+            A[diag.loc] <- XtWX.diag + ridge.try
+          v <- tryCatch(
+            solve(t(A), matrix(W.eval[ii, ], ncol = 1L)),
+            error = function(e) NULL
+          )
+          if (!is.null(v) && all(is.finite(v))) {
+            out[ii, ] <- drop(t(v) %*% rhs)
+            solved <- TRUE
+            break
+          }
+        }
+        if (!solved)
+          stop(sprintf("failed to solve local hat system at evaluation row %d", ii))
+      }
+      out
+    }
+
     if (identical(output, "apply")) {
       if (is.null(y))
         stop("argument 'y' is required when output='apply'")
       yy <- as.matrix(y)
       if (nrow(yy) != n)
         stop("number of rows in 'y' must equal number of training rows")
+      if (cat.profile.apply.eligible) {
+        out <- npscoefhat_cat_profile_apply(yy)
+        if (ncol(out) == 1L) return(as.vector(out))
+        return(out)
+      }
       out <- matrix(0.0, nrow = m, ncol = ncol(yy))
 
       if (identical(spec$regtype.engine, "lc")) {
