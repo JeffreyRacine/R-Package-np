@@ -2648,6 +2648,20 @@
   do.call(paste, c(as.data.frame(codes), sep = "\r"))
 }
 
+.np_cat_profile_code_matrix <- function(dat) {
+  mat <- as.matrix(toMatrix(toFrame(dat)))
+  storage.mode(mat) <- "double"
+  mat
+}
+
+.np_cat_ordered_support_values <- function(x) {
+  values <- suppressWarnings(as.numeric(levels(x)))
+  if (length(values) == nlevels(x) && !anyNA(values))
+    values
+  else
+    seq_len(nlevels(x))
+}
+
 .np_regression_cat_profile_kernel_matrix <- function(eval.codes,
                                                      train.codes,
                                                      xdat,
@@ -2683,7 +2697,7 @@
       } else if (identical(bws$okertype, "nliracine")) {
         Kj <- (lambda[j]^d) * (1.0 - lambda[j]) / (1.0 + lambda[j])
       } else if (identical(bws$okertype, "racineliyan")) {
-        support <- seq_len(nlevels(xdat[[j]]))
+        support <- .np_cat_ordered_support_values(xdat[[j]])
         den <- vapply(train.codes[, j],
                       function(x) sum(lambda[j]^abs(x - support)),
                       numeric(1))
@@ -2693,6 +2707,58 @@
       }
     } else {
       stop("profile bootstrap requires categorical predictors")
+    }
+    W <- W * Kj
+  }
+
+  W
+}
+
+.np_density_cat_profile_kernel_matrix <- function(eval.codes,
+                                                  train.codes,
+                                                  xdat,
+                                                  bws) {
+  eval.codes <- as.matrix(eval.codes)
+  train.codes <- as.matrix(train.codes)
+  if (ncol(eval.codes) != ncol(train.codes))
+    stop("profile code matrices must have matching columns")
+
+  W <- matrix(1.0, nrow = nrow(eval.codes), ncol = nrow(train.codes))
+  lambda <- as.double(bws$bw)
+
+  for (j in seq_len(ncol(train.codes))) {
+    if (is.factor(xdat[[j]]) && !is.ordered(xdat[[j]])) {
+      same <- outer(eval.codes[, j], train.codes[, j], "==")
+      ncat <- nlevels(xdat[[j]])
+      if (ncat < 2L) {
+        Kj <- ifelse(same, 1.0, 0.0)
+      } else if (identical(bws$ukertype, "aitchisonaitken")) {
+        Kj <- ifelse(same, 1.0 - lambda[j], lambda[j] / (ncat - 1.0))
+      } else if (identical(bws$ukertype, "liracine")) {
+        Kj <- ifelse(same, 1.0, lambda[j])
+      } else {
+        stop("unsupported unordered categorical kernel in density profile bootstrap")
+      }
+    } else if (is.ordered(xdat[[j]])) {
+      d <- abs(outer(eval.codes[, j], train.codes[, j], "-"))
+      if (identical(bws$okertype, "wangvanryzin")) {
+        Kj <- ifelse(d == 0, 1.0 - lambda[j],
+                     (lambda[j]^d) * (1.0 - lambda[j]) * 0.5)
+      } else if (identical(bws$okertype, "liracine")) {
+        Kj <- lambda[j]^d
+      } else if (identical(bws$okertype, "nliracine")) {
+        Kj <- (lambda[j]^d) * (1.0 - lambda[j]) / (1.0 + lambda[j])
+      } else if (identical(bws$okertype, "racineliyan")) {
+        support <- .np_cat_ordered_support_values(xdat[[j]])
+        den <- vapply(train.codes[, j],
+                      function(x) sum(lambda[j]^abs(x - support)),
+                      numeric(1))
+        Kj <- t(t(lambda[j]^d) / den)
+      } else {
+        stop("unsupported ordered categorical kernel in density profile bootstrap")
+      }
+    } else {
+      stop("density profile bootstrap requires categorical predictors")
     }
     W <- W * Kj
   }
@@ -2731,8 +2797,8 @@
   }, logical(1))))
     return(NULL)
 
-  train.codes <- as.matrix(as.data.frame(lapply(xdat, as.integer)))
-  eval.codes <- as.matrix(as.data.frame(lapply(exdat, as.integer)))
+  train.codes <- .np_cat_profile_code_matrix(xdat)
+  eval.codes <- .np_cat_profile_code_matrix(exdat)
   train.keys <- .np_cat_profile_keys(train.codes)
   eval.keys <- .np_cat_profile_keys(eval.codes)
 
@@ -2798,6 +2864,142 @@
     fit.train = fit.train.profile[train.id],
     fit.train.profile = fit.train.profile
   )
+}
+
+.np_unconditional_density_cat_profile_boot_setup <- function(xdat,
+                                                             exdat,
+                                                             bws,
+                                                             operator) {
+  if (!isTRUE(getOption("np.tree")))
+    return(NULL)
+  if (!identical(bws$type, "fixed"))
+    return(NULL)
+  if (!identical(operator, "normal"))
+    return(NULL)
+  if (!isTRUE(bws$ncon == 0L) || (bws$nuno + bws$nord) < 1L)
+    return(NULL)
+
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  if (nrow(xdat) < 1L || nrow(exdat) < 1L)
+    return(NULL)
+  if (ncol(xdat) != length(bws$bw) || ncol(exdat) != ncol(xdat))
+    return(NULL)
+  if (!all(vapply(xdat, function(z) is.factor(z) || is.ordered(z), logical(1))))
+    return(NULL)
+  if (!all(vapply(exdat, function(z) is.factor(z) || is.ordered(z), logical(1))))
+    return(NULL)
+  if (!all(vapply(seq_along(xdat), function(j) {
+    identical(is.ordered(xdat[[j]]), is.ordered(exdat[[j]])) &&
+      identical(levels(xdat[[j]]), levels(exdat[[j]]))
+  }, logical(1))))
+    return(NULL)
+
+  train.codes <- .np_cat_profile_code_matrix(xdat)
+  eval.codes <- .np_cat_profile_code_matrix(exdat)
+  train.keys <- .np_cat_profile_keys(train.codes)
+  eval.keys <- .np_cat_profile_keys(eval.codes)
+
+  train.profile.keys <- unique(train.keys)
+  eval.profile.keys <- unique(eval.keys)
+  train.id <- match(train.keys, train.profile.keys)
+  eval.id <- match(eval.keys, eval.profile.keys)
+  train.rep <- match(train.profile.keys, train.keys)
+  eval.rep <- match(eval.profile.keys, eval.keys)
+  G <- length(train.profile.keys)
+  A <- length(eval.profile.keys)
+
+  if (G < 1L || A < 1L || (4L * G > 3L * nrow(xdat)))
+    return(NULL)
+
+  train.profile.codes <- train.codes[train.rep, , drop = FALSE]
+  eval.profile.codes <- eval.codes[eval.rep, , drop = FALSE]
+  L.eval <- tryCatch(
+    .np_density_cat_profile_kernel_matrix(
+      eval.codes = eval.profile.codes,
+      train.codes = train.profile.codes,
+      xdat = xdat,
+      bws = bws
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(L.eval))
+    return(NULL)
+
+  counts <- as.double(tabulate(train.id, nbins = G))
+  n <- nrow(xdat)
+  t0.profile <- as.vector(L.eval %*% counts / n)
+
+  list(
+    L.eval = L.eval,
+    train.id = train.id,
+    eval.id = eval.id,
+    G = G,
+    A = A,
+    counts = counts,
+    n = n,
+    t0 = t0.profile[eval.id]
+  )
+}
+
+.np_inid_boot_from_unconditional_density_cat_profile <- function(setup,
+                                                                 B,
+                                                                 counts = NULL,
+                                                                 counts.drawer = NULL,
+                                                                 progress.label = NULL) {
+  B <- as.integer(B)
+  n <- setup$n
+  if (B < 1L || n < 1L || setup$G < 1L)
+    stop("invalid unconditional density profile bootstrap dimensions")
+
+  counts.mat <- if (!is.null(counts))
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  else NULL
+  chunk.size <- .np_inid_chunk_size(n = n, B = B,
+                                    progress_cap = !is.null(counts.drawer))
+  prob <- setup$counts / n
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(setup$t0))
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size,
+                                                        progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    profile.counts <- if (!is.null(counts.mat)) {
+      .np_cat_profile_rowsum(counts.mat[, start:stopi, drop = FALSE],
+                             setup$train.id,
+                             setup$G)
+    } else if (!is.null(counts.drawer)) {
+      .np_cat_profile_rowsum(
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi)),
+        setup$train.id,
+        setup$G
+      )
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = prob)
+    }
+
+    prof <- tcrossprod(t(profile.counts), setup$L.eval) / n
+    tmat[start:stopi, ] <- prof[, setup$eval.id, drop = FALSE]
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = setup$t0)
 }
 
 .np_inid_boot_from_regression_cat_profile <- function(setup,
@@ -6959,6 +7161,22 @@
 
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid unconditional inid bootstrap dimensions")
+
+  cat.setup <- .np_unconditional_density_cat_profile_boot_setup(
+    xdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    operator = operator
+  )
+  if (!is.null(cat.setup)) {
+    return(.np_inid_boot_from_unconditional_density_cat_profile(
+      setup = cat.setup,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
 
   progress.label <- if (is.null(progress.label)) {
     if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"

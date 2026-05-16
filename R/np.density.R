@@ -222,14 +222,12 @@ npudens.bandwidth <-
 
 npudens.default <- function(bws, tdat, ...){
   .npRmpi_require_active_slave_pool(where = "npudens()")
-  if (.npRmpi_autodispatch_active())
+  bws.formula.early <- (!missing(bws)) && inherits(bws, "formula")
+  tdat.formula.early <- (!missing(tdat)) && inherits(tdat, "formula")
+  if (.npRmpi_autodispatch_active() &&
+      !bws.formula.early &&
+      !tdat.formula.early)
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-
-  if (!missing(bws) && inherits(bws, "formula")) {
-    dots <- list(...)
-    tbw <- do.call(npudensbw, c(list(formula = bws), dots))
-    return(npudens(bws = tbw, ...))
-  }
 
   sc <- sys.call()
   sc.names <- names(sc)
@@ -244,15 +242,23 @@ npudens.default <- function(bws, tdat, ...){
   no.bws <- missing(bws)
   no.tdat <- missing(tdat)
   has.explicit.bws <- (!no.bws) && isa(bws, "bandwidth")
+  bws.formula <- bws.formula.early
+
+  if (bws.named && no.tdat && bws.formula) {
+    sc$`bws` <- NULL
+    sc$formula <- bws
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npudensbw)
+    bws.named <- FALSE
+  } else {
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npudensbw)
+  }
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
   if(tdat.named)
     tdat <- toFrame(tdat)
-
-  sc.bw <- sc
-  
-  sc.bw[[1]] <- quote(npudensbw)
 
   if(bws.named){
     sc.bw$bandwidth.compute <- FALSE

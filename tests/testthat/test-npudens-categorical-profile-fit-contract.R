@@ -154,3 +154,98 @@ test_that("one-coordinate categorical tree profiles match dense density and dist
   run_case("unordered", 0.25, 2001L)
   run_case("ordered", 0.25, 2002L)
 })
+
+test_that("npudens categorical bandwidth search is unchanged by tree profile route", {
+  if (!spawn_mpi_slaves(1L)) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  old.tree <- getOption("np.tree")
+  old.messages <- getOption("np.messages")
+  on.exit({
+    options(np.tree = old.tree)
+    options(np.messages = old.messages)
+  }, add = TRUE)
+  options(np.messages = FALSE)
+
+  set.seed(20260608L)
+  dat <- data.frame(
+    x = ordered(rbinom(800L, 10L, 0.5))
+  )
+
+  options(np.tree = FALSE)
+  dense <- npudensbw(~ x, data = dat, nmulti = 1)
+
+  options(np.tree = TRUE)
+  profile <- npudensbw(~ x, data = dat, nmulti = 1)
+
+  expect_equal(profile$bw, dense$bw, tolerance = 1e-9)
+  expect_equal(profile$fval, dense$fval, tolerance = 1e-10)
+})
+
+test_that("npudens categorical bootstrap profile route matches dense count algebra", {
+  if (!spawn_mpi_slaves(1L)) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  boot_fun <- getFromNamespace(".np_inid_boot_from_ksum_unconditional", "npRmpi")
+
+  old.tree <- getOption("np.tree")
+  old.messages <- getOption("np.messages")
+  on.exit({
+    options(np.tree = old.tree)
+    options(np.messages = old.messages)
+  }, add = TRUE)
+  options(np.messages = FALSE)
+
+  set.seed(20260609L)
+  dat <- data.frame(
+    x = ordered(rbinom(300L, 10L, 0.5))
+  )
+  edat <- data.frame(x = ordered(levels(dat$x), levels = levels(dat$x)))
+  bw <- npudensbw(~ x, data = dat, edat = edat,
+                  bws = 0.25, bandwidth.compute = FALSE)
+  counts <- replicate(5L, tabulate(sample.int(nrow(dat), nrow(dat), TRUE),
+                                   nbins = nrow(dat)))
+
+  options(np.tree = FALSE)
+  dense <- boot_fun(
+    xdat = dat,
+    exdat = edat,
+    bws = bw,
+    B = ncol(counts),
+    operator = "normal",
+    counts = counts
+  )
+
+  options(np.tree = TRUE)
+  profile <- boot_fun(
+    xdat = dat,
+    exdat = edat,
+    bws = bw,
+    B = ncol(counts),
+    operator = "normal",
+    counts = counts
+  )
+
+  expect_equal(profile$t0, dense$t0, tolerance = 1e-12)
+  expect_equal(profile$t, dense$t, tolerance = 1e-12)
+})
+
+test_that("npudens formula route accepts numeric bws for categorical data", {
+  if (!spawn_mpi_slaves(1L)) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  old.tree <- getOption("np.tree")
+  old.messages <- getOption("np.messages")
+  on.exit({
+    options(np.tree = old.tree)
+    options(np.messages = old.messages)
+  }, add = TRUE)
+  options(np.tree = TRUE, np.messages = FALSE)
+
+  set.seed(20260610L)
+  x <- ordered(rbinom(300L, 10L, 0.5))
+  fit <- npudens(~ x, bws = 0.25)
+
+  expect_s3_class(fit, "npdensity")
+  expect_length(fitted(fit), length(x))
+})
