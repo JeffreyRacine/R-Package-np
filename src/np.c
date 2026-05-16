@@ -62,6 +62,7 @@ int int_RESTART_FROM_MIN;
 int int_TREE_X;
 int int_TREE_Y;
 int int_TREE_XY;
+int int_TREE_PROFILE_X;
 int int_nn_k_min_extern = 1;
 
 /* Some externals for numerical routines */
@@ -1546,6 +1547,7 @@ static void np_shadow_reset_state_internal(void)
   int_TREE_X = NP_TREE_FALSE;
   int_TREE_Y = NP_TREE_FALSE;
   int_TREE_XY = NP_TREE_FALSE;
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
   int_LARGE_SF = 0;
   nconfac_extern = 0.0;
   ncatfac_extern = 0.0;
@@ -9577,6 +9579,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int_glp_bernstein_extern = *glp_bernstein;
   int_glp_basis_extern = *glp_basis;
 
+  int_TREE_PROFILE_X = myopti[RBW_DOTREEI];
   int_TREE_X = myopti[RBW_DOTREEI];
   scale_cat = myopti[RBW_SCATI];
   bwm_use_transform = myopti[RBW_TBNDI];
@@ -10263,6 +10266,7 @@ cleanup_np_regression_bw_mode:
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   np_glp_cv_clear_extern();
   np_reg_cv_core_clear_extern();
