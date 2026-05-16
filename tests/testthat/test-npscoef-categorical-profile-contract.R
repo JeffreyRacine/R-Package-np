@@ -120,3 +120,36 @@ test_that("npscoef categorical compression option leaves mixed z dense", {
                     errors = FALSE, iterate = FALSE)
   expect_equal(profile$mean, dense$mean, tolerance = 1e-10)
 })
+
+test_that("npscoefhat apply uses categorical profile route without changing output", {
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20260816L)
+  n <- 220L
+  xdat <- data.frame(x = rnorm(n))
+  zdat <- data.frame(
+    z = factor(sample(letters[1:4], n, TRUE)),
+    o = ordered(sample(1:5, n, TRUE))
+  )
+  ydat <- 1 + xdat$x + as.numeric(zdat$z) + as.numeric(zdat$o) +
+    rnorm(n, sd = 0.2)
+  bw <- npscoefbw(
+    xdat = xdat,
+    ydat = ydat,
+    zdat = zdat,
+    bws = c(0.25, 0.3),
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+  rhs <- cbind(ydat, ydat^2)
+
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
+  dense <- npscoefhat(bws = bw, txdat = xdat, tzdat = zdat,
+                     y = rhs, output = "apply")
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  profile <- npscoefhat(bws = bw, txdat = xdat, tzdat = zdat,
+                       y = rhs, output = "apply")
+  expect_equal(profile, dense, tolerance = 1e-8)
+})
