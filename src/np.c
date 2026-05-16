@@ -8571,6 +8571,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   dens_or_dist = myopti[CD_DODENI];
 
   int_TREE_XY = myopti[CD_TREEI]; // we just build a single xy tree
+  int_TREE_PROFILE_X = myopti[CD_TREEI];
   
   int_TREE_X = int_TREE_Y = NP_TREE_FALSE;
 

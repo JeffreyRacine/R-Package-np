@@ -23239,6 +23239,333 @@ cleanup_cvml_return:
 
 }
 
+static int np_conditional_categorical_profile_fit(
+int *kernel_uXY,
+int *kernel_oXY,
+int *kernel_uX,
+int *kernel_oX,
+int BANDWIDTH_den,
+int num_obs_train,
+int num_obs_eval,
+int num_Y_unordered,
+int num_Y_ordered,
+int num_Y_continuous,
+int num_X_unordered,
+int num_X_ordered,
+int num_X_continuous,
+double **matrix_XY_unordered_train,
+double **matrix_XY_ordered_train,
+double **matrix_XY_unordered_eval,
+double **matrix_XY_ordered_eval,
+double *vsf_XY,
+double *vsf_X,
+int *num_categories,
+int *num_categories_XY,
+double **matrix_categorical_vals,
+double **matrix_categorical_vals_XY,
+int *operator_XY,
+int *operator_X,
+int yop,
+double K_INT_KERNEL_P,
+int int_tree_profile,
+double *kdf,
+double *kdf_stderr,
+double *log_likelihood){
+
+  const int num_uXY = num_X_unordered + num_Y_unordered;
+  const int num_oXY = num_X_ordered + num_Y_ordered;
+  const int num_X = num_X_unordered + num_X_ordered;
+  const int num_Y = num_Y_unordered + num_Y_ordered;
+  const int is_cpdf = (yop == OP_NORMAL);
+  int i, j, g;
+  int *train_xy_id = NULL, *train_xy_rep = NULL;
+  int *eval_xy_id = NULL, *eval_xy_rep = NULL;
+  int *train_x_id = NULL, *train_x_rep = NULL;
+  int *eval_x_id = NULL, *eval_x_rep = NULL;
+  int nprof_train_xy = 0, nprof_eval_xy = 0;
+  int nprof_train_x = 0, nprof_eval_x = 0;
+  double **profile_xy_uno_train = NULL, **profile_xy_ord_train = NULL;
+  double **profile_xy_uno_eval = NULL, **profile_xy_ord_eval = NULL;
+  double **profile_x_uno_train = NULL, **profile_x_ord_train = NULL;
+  double **profile_x_uno_eval = NULL, **profile_x_ord_eval = NULL;
+  double *counts_xy = NULL, *counts_x = NULL;
+  double *profile_num = NULL, *profile_den = NULL;
+  double *profile_y[1];
+  int ok = 0;
+
+  if((int_tree_profile != NP_TREE_TRUE) ||
+     (BANDWIDTH_den != BW_FIXED) ||
+     (num_X_continuous != 0) ||
+     (num_Y_continuous != 0) ||
+     ((num_X + num_Y) <= 0) ||
+     (num_X <= 0) ||
+     (num_obs_train < 128) ||
+     (kdf == NULL) ||
+     (kdf_stderr == NULL) ||
+     (log_likelihood == NULL))
+    return 0;
+
+  if(!np_build_discrete_profile_index(num_obs_train,
+                                      num_uXY,
+                                      num_oXY,
+                                      matrix_XY_unordered_train,
+                                      matrix_XY_ordered_train,
+                                      &train_xy_id,
+                                      &train_xy_rep,
+                                      &nprof_train_xy))
+    return 0;
+
+  if(!np_build_discrete_profile_index(num_obs_eval,
+                                      num_uXY,
+                                      num_oXY,
+                                      matrix_XY_unordered_eval,
+                                      matrix_XY_ordered_eval,
+                                      &eval_xy_id,
+                                      &eval_xy_rep,
+                                      &nprof_eval_xy))
+    goto cleanup;
+
+  if(!np_build_discrete_profile_index(num_obs_train,
+                                      num_X_unordered,
+                                      num_X_ordered,
+                                      matrix_XY_unordered_train,
+                                      matrix_XY_ordered_train,
+                                      &train_x_id,
+                                      &train_x_rep,
+                                      &nprof_train_x))
+    goto cleanup;
+
+  if(!np_build_discrete_profile_index(num_obs_eval,
+                                      num_X_unordered,
+                                      num_X_ordered,
+                                      matrix_XY_unordered_eval,
+                                      matrix_XY_ordered_eval,
+                                      &eval_x_id,
+                                      &eval_x_rep,
+                                      &nprof_eval_x))
+    goto cleanup;
+
+  if((nprof_train_xy <= 0) || (nprof_eval_xy <= 0) ||
+     (nprof_train_x <= 0) || (nprof_eval_x <= 0) ||
+     (4*nprof_train_xy > 3*num_obs_train) ||
+     (4*nprof_eval_xy > 3*num_obs_eval) ||
+     (4*nprof_train_x > 3*num_obs_train) ||
+     (4*nprof_eval_x > 3*num_obs_eval))
+    goto cleanup;
+
+  profile_xy_uno_train = alloc_tmatd(nprof_train_xy, num_uXY);
+  profile_xy_ord_train = alloc_tmatd(nprof_train_xy, num_oXY);
+  profile_xy_uno_eval = alloc_tmatd(nprof_eval_xy, num_uXY);
+  profile_xy_ord_eval = alloc_tmatd(nprof_eval_xy, num_oXY);
+  profile_x_uno_train = alloc_tmatd(nprof_train_x, num_X_unordered);
+  profile_x_ord_train = alloc_tmatd(nprof_train_x, num_X_ordered);
+  profile_x_uno_eval = alloc_tmatd(nprof_eval_x, num_X_unordered);
+  profile_x_ord_eval = alloc_tmatd(nprof_eval_x, num_X_ordered);
+  counts_xy = alloc_vecd(nprof_train_xy);
+  counts_x = alloc_vecd(nprof_train_x);
+  profile_num = alloc_vecd(nprof_eval_xy);
+  profile_den = alloc_vecd(nprof_eval_x);
+
+  if(((num_uXY > 0) &&
+      (profile_xy_uno_train == NULL || profile_xy_uno_eval == NULL)) ||
+     ((num_oXY > 0) &&
+      (profile_xy_ord_train == NULL || profile_xy_ord_eval == NULL)) ||
+     ((num_X_unordered > 0) &&
+      (profile_x_uno_train == NULL || profile_x_uno_eval == NULL)) ||
+     ((num_X_ordered > 0) &&
+      (profile_x_ord_train == NULL || profile_x_ord_eval == NULL)) ||
+     counts_xy == NULL || counts_x == NULL ||
+     profile_num == NULL || profile_den == NULL)
+    goto cleanup;
+
+  for(g = 0; g < nprof_train_xy; g++){
+    const int rep = train_xy_rep[g];
+    counts_xy[g] = 0.0;
+    for(j = 0; j < num_uXY; j++)
+      profile_xy_uno_train[j][g] = matrix_XY_unordered_train[j][rep];
+    for(j = 0; j < num_oXY; j++)
+      profile_xy_ord_train[j][g] = matrix_XY_ordered_train[j][rep];
+  }
+  for(g = 0; g < nprof_eval_xy; g++){
+    const int rep = eval_xy_rep[g];
+    for(j = 0; j < num_uXY; j++)
+      profile_xy_uno_eval[j][g] = matrix_XY_unordered_eval[j][rep];
+    for(j = 0; j < num_oXY; j++)
+      profile_xy_ord_eval[j][g] = matrix_XY_ordered_eval[j][rep];
+  }
+  for(i = 0; i < num_obs_train; i++)
+    counts_xy[train_xy_id[i]] += 1.0;
+
+  for(g = 0; g < nprof_train_x; g++){
+    const int rep = train_x_rep[g];
+    counts_x[g] = 0.0;
+    for(j = 0; j < num_X_unordered; j++)
+      profile_x_uno_train[j][g] = matrix_XY_unordered_train[j][rep];
+    for(j = 0; j < num_X_ordered; j++)
+      profile_x_ord_train[j][g] = matrix_XY_ordered_train[j][rep];
+  }
+  for(g = 0; g < nprof_eval_x; g++){
+    const int rep = eval_x_rep[g];
+    for(j = 0; j < num_X_unordered; j++)
+      profile_x_uno_eval[j][g] = matrix_XY_unordered_eval[j][rep];
+    for(j = 0; j < num_X_ordered; j++)
+      profile_x_ord_eval[j][g] = matrix_XY_ordered_eval[j][rep];
+  }
+  for(i = 0; i < num_obs_train; i++)
+    counts_x[train_x_id[i]] += 1.0;
+
+  profile_y[0] = counts_xy;
+  if(kernel_weighted_sum_np(NULL,
+                            kernel_uXY,
+                            kernel_oXY,
+                            BANDWIDTH_den,
+                            nprof_train_xy,
+                            nprof_eval_xy,
+                            num_uXY,
+                            num_oXY,
+                            0,
+                            0,
+                            0,
+                            1,
+                            1,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            operator_XY,
+                            OP_NOOP,
+                            0,
+                            0,
+                            NULL,
+                            1,
+                            1,
+                            0,
+                            NP_TREE_FALSE,
+                            0,
+                            NULL,
+                            NULL,
+                            NULL,
+                            NULL,
+                            profile_xy_uno_train,
+                            profile_xy_ord_train,
+                            NULL,
+                            profile_xy_uno_eval,
+                            profile_xy_ord_eval,
+                            NULL,
+                            profile_y,
+                            NULL,
+                            NULL,
+                            vsf_XY,
+                            0,
+                            NULL,
+                            NULL,
+                            NULL,
+                            num_categories_XY,
+                            matrix_categorical_vals_XY,
+                            NULL,
+                            profile_num,
+                            NULL,
+                            NULL,
+                            NULL) != 0)
+    goto cleanup;
+
+  profile_y[0] = counts_x;
+  if(kernel_weighted_sum_np(NULL,
+                            kernel_uX,
+                            kernel_oX,
+                            BANDWIDTH_den,
+                            nprof_train_x,
+                            nprof_eval_x,
+                            num_X_unordered,
+                            num_X_ordered,
+                            0,
+                            0,
+                            0,
+                            1,
+                            1,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            operator_X,
+                            OP_NOOP,
+                            0,
+                            0,
+                            NULL,
+                            1,
+                            1,
+                            0,
+                            NP_TREE_FALSE,
+                            0,
+                            NULL,
+                            NULL,
+                            NULL,
+                            NULL,
+                            profile_x_uno_train,
+                            profile_x_ord_train,
+                            NULL,
+                            profile_x_uno_eval,
+                            profile_x_ord_eval,
+                            NULL,
+                            profile_y,
+                            NULL,
+                            NULL,
+                            vsf_X,
+                            0,
+                            NULL,
+                            NULL,
+                            NULL,
+                            num_categories + num_Y,
+                            matrix_categorical_vals + num_Y,
+                            NULL,
+                            profile_den,
+                            NULL,
+                            NULL,
+                            NULL) != 0)
+    goto cleanup;
+
+  *log_likelihood = 0.0;
+  for(i = 0; i < num_obs_eval; i++){
+    const double sk = copysign(DBL_MIN, profile_den[eval_x_id[i]]) + profile_den[eval_x_id[i]];
+    const double val = profile_num[eval_xy_id[i]]/sk;
+    kdf[i] = val;
+    if(is_cpdf){
+      *log_likelihood += (val < DBL_MIN) ? log(DBL_MIN) : log(val);
+      kdf_stderr[i] = sqrt(val*K_INT_KERNEL_P/sk);
+    } else {
+      kdf_stderr[i] = sqrt(val*(1.0-val)*K_INT_KERNEL_P/sk);
+    }
+  }
+
+  ok = 1;
+
+cleanup:
+  if(train_xy_id != NULL) free(train_xy_id);
+  if(train_xy_rep != NULL) free(train_xy_rep);
+  if(eval_xy_id != NULL) free(eval_xy_id);
+  if(eval_xy_rep != NULL) free(eval_xy_rep);
+  if(train_x_id != NULL) free(train_x_id);
+  if(train_x_rep != NULL) free(train_x_rep);
+  if(eval_x_id != NULL) free(eval_x_id);
+  if(eval_x_rep != NULL) free(eval_x_rep);
+  if(profile_xy_uno_train != NULL) free_tmat(profile_xy_uno_train);
+  if(profile_xy_ord_train != NULL) free_tmat(profile_xy_ord_train);
+  if(profile_xy_uno_eval != NULL) free_tmat(profile_xy_uno_eval);
+  if(profile_xy_ord_eval != NULL) free_tmat(profile_xy_ord_eval);
+  if(profile_x_uno_train != NULL) free_tmat(profile_x_uno_train);
+  if(profile_x_ord_train != NULL) free_tmat(profile_x_ord_train);
+  if(profile_x_uno_eval != NULL) free_tmat(profile_x_uno_eval);
+  if(profile_x_ord_eval != NULL) free_tmat(profile_x_ord_eval);
+  if(counts_xy != NULL) free(counts_xy);
+  if(counts_x != NULL) free(counts_x);
+  if(profile_num != NULL) free(profile_num);
+  if(profile_den != NULL) free(profile_den);
+
+  return ok;
+}
+
 void np_kernel_estimate_con_dens_dist_categorical(
 int KERNEL_Y,
 int KERNEL_unordered_Y,
@@ -23506,6 +23833,40 @@ double * log_likelihood
                         NULL, NULL, NULL,
                         NULL, NULL, NULL);
 
+  if((!do_grad) &&
+     np_conditional_categorical_profile_fit(kernel_uXY,
+                                            kernel_oXY,
+                                            kernel_uXY,
+                                            kernel_oXY,
+                                            BANDWIDTH_den,
+                                            num_obs_train,
+                                            num_obs_eval,
+                                            num_Y_unordered,
+                                            num_Y_ordered,
+                                            num_Y_continuous,
+                                            num_X_unordered,
+                                            num_X_ordered,
+                                            num_X_continuous,
+                                            matrix_XY_unordered_train,
+                                            matrix_XY_ordered_train,
+                                            matrix_XY_unordered_eval,
+                                            matrix_XY_ordered_eval,
+                                            vsf_XY,
+                                            vsf_X,
+                                            num_categories,
+                                            num_categories_XY,
+                                            matrix_categorical_vals,
+                                            matrix_categorical_vals_XY,
+                                            operator_XY,
+                                            operator_X,
+                                            yop,
+                                            K_INT_KERNEL_P,
+                                            int_TREE_PROFILE_X,
+                                            kdf,
+                                            kdf_stderr,
+                                            log_likelihood))
+    goto cleanup_con_dens_dist_categorical;
+
   // xy
   np_progress_fit_set_offset(0);
   np_activate_bounds_xy();
@@ -23753,6 +24114,7 @@ double * log_likelihood
 
   }
 
+cleanup_con_dens_dist_categorical:
   free(operator_XY);
   free(operator_X);
 
