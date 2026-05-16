@@ -6060,6 +6060,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   itmax=myopti[DBW_ITMAXI];
 
   int_TREE_X = myopti[DBW_DOTREEI];
+  int_TREE_PROFILE_X = myopti[DBW_DOTREEI];
   scale_cat = myopti[DBW_SCATI];
   bwm_use_transform = myopti[DBW_TBNDI];
   if (BANDWIDTH_den_extern != BW_FIXED)
@@ -6787,6 +6788,7 @@ cleanup_np_distribution_bw:
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
@@ -9987,6 +9989,7 @@ void np_density(double * tuno, double * tord, double * tcon,
   dens_or_dist = myopti[DEN_DODENI];
   old_dens = myopti[DEN_OLDI];
   int_TREE_X = myopti[DEN_TREEI];
+  int_TREE_PROFILE_X = myopti[DEN_TREEI];
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
@@ -10252,6 +10255,7 @@ void np_density(double * tuno, double * tord, double * tcon,
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
