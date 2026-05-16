@@ -226,3 +226,32 @@ test_that("npudens formula route accepts numeric bws for categorical data", {
   expect_s3_class(fit, "npdensity")
   expect_length(fitted(fit), length(x))
 })
+
+test_that("npcdens categorical ML bandwidth search uses exact profile route", {
+  old.tree <- getOption("np.tree")
+  old.messages <- getOption("np.messages")
+  on.exit({
+    options(np.tree = old.tree)
+    options(np.messages = old.messages)
+  }, add = TRUE)
+  options(np.messages = FALSE)
+
+  set.seed(20260611L)
+  n <- 700L
+  x <- ordered(rbinom(n, 10L, 0.5))
+  p <- plogis(as.numeric(as.character(x)) / 5 - 1)
+  dat <- data.frame(
+    y = ordered(rbinom(n, 10L, p)),
+    x = x
+  )
+
+  options(np.tree = FALSE)
+  dense <- npcdensbw(y ~ x, data = dat, bwmethod = "cv.ml", nmulti = 1)
+
+  options(np.tree = TRUE)
+  profile <- npcdensbw(y ~ x, data = dat, bwmethod = "cv.ml", nmulti = 1)
+
+  expect_equal(profile$ybw, dense$ybw, tolerance = 1e-8)
+  expect_equal(profile$xbw, dense$xbw, tolerance = 1e-8)
+  expect_equal(profile$fval, dense$fval, tolerance = 1e-8)
+})

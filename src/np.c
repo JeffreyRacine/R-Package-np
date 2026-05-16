@@ -6279,6 +6279,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_WEIGHTS = 0;
   old_cdens = myopti[CBW_OLDI];
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CBW_TREEI];
+  int_TREE_PROFILE_X = myopti[CBW_TREEI];
   scale_cat = myopti[CBW_SCATI];
   bwm_use_transform = 0;
   
@@ -7309,6 +7310,7 @@ cleanup_np_density_conditional_bw:
     free_kdtree(&kdt_extern_XY);
     int_TREE_XY = NP_TREE_FALSE;
   }
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
 
 
   int_WEIGHTS = 0;
