@@ -26,6 +26,13 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   smoothing-parameter route preserves fitted distribution values and standard
   errors while avoiding repeated computation over identical ordered profiles.
 
+* Added categorical-profile compression for fixed-bandwidth local-constant
+  `npscoef()` fits when all `Z` variables are categorical and
+  `options(np.categorical.compress = TRUE)` is enabled. The route preserves
+  fitted means, coefficient surfaces, asymptotic mean standard errors, and
+  coefficient/gradient standard errors for training and evaluation fits while
+  avoiding repeated work over duplicate `Z` profiles.
+
 * Hardened internal categorical-profile and large-bandwidth cache cleanup
   across density, distribution, conditional-density, conditional-distribution,
   and regression cleanup paths. These caches are keyed by call-local row
