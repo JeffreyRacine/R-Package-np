@@ -15,6 +15,11 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   bandwidths/smoothing parameters, and fitted/evaluation values while avoiding
   repeated computation over identical categorical profiles.
 
+* Added profile compression for ordered-only unconditional distribution
+  fit/evaluation routes when `options(np.tree = TRUE)` is enabled. The fixed
+  smoothing-parameter route preserves fitted distribution values and standard
+  errors while avoiding repeated computation over identical ordered profiles.
+
 * Hardened internal categorical-profile and large-bandwidth cache cleanup
   across density, distribution, conditional-density, conditional-distribution,
   and regression cleanup paths. These caches are keyed by call-local row

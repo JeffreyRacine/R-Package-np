@@ -14,6 +14,11 @@
   objective routes preserve dense-route objective values, selected
   bandwidths/smoothing parameters, and fitted/evaluation values while avoiding
   repeated computation over identical categorical profiles.
+- Ordered-only unconditional distribution fit/evaluation routes also use
+  profile compression when `options(np.tree = TRUE)` is enabled, preserving
+  fitted distribution values and standard errors for fixed smoothing
+  parameters while avoiding repeated computation over identical ordered
+  profiles.
 - Internal categorical-profile and large-bandwidth caches are now cleared at
   the relevant top-level density, distribution, conditional-density,
   conditional-distribution, and regression cleanup points. These caches are
