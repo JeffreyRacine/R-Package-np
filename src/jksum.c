@@ -10994,6 +10994,8 @@ double * cv){
   if(ov_cont_ok != NULL) free(ov_cont_ok);
   if(ov_cont_hmin != NULL) free(ov_cont_hmin);
   if(ov_cont_k0 != NULL) free(ov_cont_k0);
+  np_disc_profile_cache_clear();
+  np_cont_largeh_cache_clear();
 
   return(0);
 }
@@ -12182,6 +12184,8 @@ double *cv){
   free_mat(matrix_bandwidth_y, num_var_continuous);
 
   np_gate_override_clear();
+  np_disc_profile_cache_clear();
+  np_cont_largeh_cache_clear();
 
   return(0);
 
@@ -13926,6 +13930,8 @@ double *cv){
   np_gate_ctx_clear(&gate_x_ctx);
   np_gate_ctx_clear(&gate_y_ctx);
   np_gate_ctx_clear(&gate_xy_ctx);
+  np_disc_profile_cache_clear();
+  np_cont_largeh_cache_clear();
 
   return(0);
 }

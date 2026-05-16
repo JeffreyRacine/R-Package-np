@@ -1,7 +1,26 @@
 Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
 
-* Development version opened after CRAN publication of 0.70-2. No
-  post-release user-visible changes have been recorded yet.
+* Added a profile-compressed execution route for large-sample
+  categorical-only local-constant regression when `options(np.tree = TRUE)` is
+  enabled. Repeated predictor profiles are compressed before cross-validation,
+  fitting, prediction/evaluation, standard errors, gradients where meaningful,
+  hat-helper use, and plot bootstrap helpers, preserving dense-route numerical
+  results while reducing repeated work for large samples with many duplicate
+  categorical predictor combinations.
+
+* Added a profile-compressed execution route for categorical-only
+  unconditional density estimation when `options(np.tree = TRUE)` is enabled.
+  The fixed-bandwidth fit/evaluation path and `npudensbw()` `cv.ml`/`cv.ls`
+  objective paths preserve dense-route objective values, selected
+  bandwidths/smoothing parameters, and fitted/evaluation values while avoiding
+  repeated computation over identical categorical profiles.
+
+* Hardened internal categorical-profile and large-bandwidth cache cleanup
+  across density, distribution, conditional-density, conditional-distribution,
+  and regression cleanup paths. These caches are keyed by call-local row
+  pointers, so they are now cleared at relevant top-level `.Call` exits to
+  prevent stale same-process state from affecting later calls on unrelated
+  data.
 
 Changes from Version 0.70-1 to 0.70-2 [15-May-2026]
 
