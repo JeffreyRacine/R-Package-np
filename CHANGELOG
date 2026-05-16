@@ -34,6 +34,15 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   prevent stale same-process state from affecting later calls on unrelated
   data or MPI dispatch modes.
 
+* Fixed `npcdens()` and `npcdist()` formula calls with explicit numeric
+  smoothing parameters, such as `npcdist(y ~ x, data = dat, bws = c(.25,.25))`,
+  so `npRmpi` preserves the established formula-to-bandwidth-object rewrite
+  before MPI autodispatch. Focused tests cover both conditional density and
+  conditional distribution routes.
+
+* Hardened the `npudist()` formula route so formula calls are handled before
+  MPI autodispatch.
+
 Changes from Version 0.70-1 to 0.70-2 [15-May-2026]
 
 * Promoted `npqreg()` to a fully fledged MPI-aware quantile-regression front

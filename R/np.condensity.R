@@ -467,6 +467,10 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "conbandwidth")
   bws.formula <- (!no.bws) && inherits(bws, "formula")
+  txdat.formula <- (!no.txdat) && inherits(txdat, "formula")
+  dots <- list(...)
+  dots.formula <- (length(dots) > 0L && inherits(dots[[1L]], "formula")) ||
+    (!is.null(dots$formula) && inherits(dots$formula, "formula"))
   regtype.request <- if (has.explicit.bws) {
     if (is.null(bws$regtype.engine)) {
       if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
@@ -520,7 +524,9 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       !isTRUE(nomad) &&
       !keep_local_shadow_nn &&
       !keep_local_raw_degree1_cvls &&
-      !bws.formula)
+      !bws.formula &&
+      !txdat.formula &&
+      !dots.formula)
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   ## autodispatch normalizes calls via match.call(), which can turn an

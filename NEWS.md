@@ -31,6 +31,12 @@
   keyed by call-local row pointers, so clearing them per `.Call` prevents stale
   same-process state from leaking across unrelated data sets or MPI dispatch
   modes.
+- Fixed `npcdens()` and `npcdist()` formula calls with explicit numeric
+  smoothing parameters, such as `npcdist(y ~ x, data = dat, bws = c(.25,.25))`,
+  so `npRmpi` preserves the established formula-to-bandwidth-object rewrite
+  before MPI autodispatch.
+- Hardened the `npudist()` formula route so formula calls are handled before
+  MPI autodispatch.
 
 # npRmpi 0.70-2
 
