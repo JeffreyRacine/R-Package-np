@@ -183,8 +183,12 @@ test_that("public npcdensbw cv.ls fixed LP tree and serial evaluators agree at f
   )
 
   old_opt <- getOption("np.tree")
-  on.exit(options(np.tree = old_opt), add = TRUE)
-  options(np.tree = TRUE)
+  old_compress <- getOption("np.categorical.compress")
+  on.exit({
+    options(np.tree = old_opt)
+    options(np.categorical.compress = old_compress)
+  }, add = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
 
   bw.tree <- npcdensbw(
     xdat = x,
@@ -196,11 +200,11 @@ test_that("public npcdensbw cv.ls fixed LP tree and serial evaluators agree at f
     nmulti = 1
   )
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   serial.at.serial <- np:::.npcdensbw_eval_only(x, y$y1, bw.serial)$objective
   serial.at.tree <- np:::.npcdensbw_eval_only(x, y$y1, bw.tree)$objective
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   tree.at.serial <- np:::.npcdensbw_eval_only(x, y$y1, bw.serial)$objective
   tree.at.tree <- np:::.npcdensbw_eval_only(x, y$y1, bw.tree)$objective
 

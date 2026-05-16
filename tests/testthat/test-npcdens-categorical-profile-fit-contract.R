@@ -22,7 +22,7 @@ npc_categorical_profile_se <- function(fit) {
 }
 
 npc_categorical_profile_case <- function(fun, bwfun, dat, bws) {
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   bw <- bwfun(
@@ -32,10 +32,10 @@ npc_categorical_profile_case <- function(fun, bwfun, dat, bws) {
     bandwidth.compute = FALSE
   )
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   dense <- fun(bws = bw)
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   profile <- fun(bws = bw)
 
   eval_rows <- c(1L, 7L, 19L, 101L, 211L)

@@ -1204,7 +1204,7 @@
 }
 
 .np_regression_cat_profile_boot_setup <- function(xdat, exdat, ydat, bws) {
-  if (!isTRUE(getOption("np.tree")))
+  if (!npTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord))
     return(NULL)
   if (!identical(bws$type, "fixed"))
     return(NULL)
@@ -1307,7 +1307,7 @@
                                                              exdat,
                                                              bws,
                                                              operator) {
-  if (!isTRUE(getOption("np.tree")))
+  if (!npTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord))
     return(NULL)
   if (!identical(bws$type, "fixed"))
     return(NULL)
@@ -4322,7 +4322,10 @@
     mcv.numRow = attr(state$bws$xmcv, "num.row"),
     wncol = 1L,
     yncol = 1L,
-    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    int_do_tree = npDoTreeOrCategoricalCompress(
+      ncon = state$bws$ncon,
+      ncat = state$bws$nuno + state$bws$nord
+    ),
     return.kernel.weights = FALSE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,
@@ -7455,7 +7458,10 @@ plotFactor <- function(f, y, ...){
     ymcv.numRow = attr(bws$ymcv, "num.row"),
     xmcv.numRow = attr(bws$xmcv, "num.row"),
     densOrDist = if (isTRUE(cdf)) NP_DO_DIST else NP_DO_DENS,
-    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO
+    int_do_tree = npDoTreeOrCategoricalCompress(
+      ncon = bws$yncon + bws$xncon,
+      ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord
+    )
   )
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])

@@ -313,7 +313,7 @@
     mcv.numRow = attr(bws$xmcv, "num.row"),
     wncol = 0L,
     yncol = ncol(rhs),
-    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$yncon + bws$xncon, ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord),
     return.kernel.weights = isTRUE(return.kernel.weights),
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,

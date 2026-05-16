@@ -531,7 +531,10 @@ npreghat <-
   H <- matrix(0.0, nrow = neval, ncol = ntrain)
   chunk.size <- max(1L, min(as.integer(chunk.size), ntrain))
   bw.vec <- as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord]))
-  tree.flag <- isTRUE(getOption("np.tree"))
+  tree.flag <- npTreeOrCategoricalCompress(
+    ncon = bws$ncon,
+    ncat = bws$nuno + bws$nord
+  )
   grad.vec <- if (length(s) && any(s > 0L)) as.integer(s) else integer(0L)
   on.exit(
     tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
@@ -673,7 +676,7 @@ npreghat <-
     mcv.numRow = attr(bws$xmcv, "num.row"),
     wncol = 0L,
     yncol = 0L,
-    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord),
     return.kernel.weights = TRUE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,
@@ -862,7 +865,7 @@ npreghat <-
     regtype = reg.c$code,
     no.ex = no.ex,
     mcv.numRow = attr(bws$xmcv, "num.row"),
-    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord),
     old.reg = FALSE
   )
 

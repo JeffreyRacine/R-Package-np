@@ -1,6 +1,6 @@
 test_that("all-categorical regression tree route preserves cv.ls and cv.aic bandwidth search", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(42)
@@ -15,7 +15,7 @@ test_that("all-categorical regression tree route preserves cv.ls and cv.aic band
     sin(as.numeric(dat$o1)) + 0.1 * dat$y
 
   for (method in c("cv.ls", "cv.aic")) {
-    options(np.tree = FALSE)
+    options(np.tree = FALSE, np.categorical.compress = FALSE)
     bw_dense <- npregbw(
       y ~ u1 + u2 + o1,
       data = dat,
@@ -25,7 +25,7 @@ test_that("all-categorical regression tree route preserves cv.ls and cv.aic band
       okertype = "liracine"
     )
 
-    options(np.tree = TRUE)
+    options(np.tree = FALSE, np.categorical.compress = TRUE)
     bw_profile <- npregbw(
       y ~ u1 + u2 + o1,
       data = dat,
@@ -47,7 +47,7 @@ test_that("all-categorical regression tree route preserves cv.ls and cv.aic band
 
 test_that("all-categorical regression tree route preserves ordered Racine-Li-Yan route", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(314)
@@ -60,7 +60,7 @@ test_that("all-categorical regression tree route preserves ordered Racine-Li-Yan
   dat$y <- as.numeric(dat$u1) + cos(as.numeric(dat$o1)) + 0.1 * dat$y
 
   for (method in c("cv.ls", "cv.aic")) {
-    options(np.tree = FALSE)
+    options(np.tree = FALSE, np.categorical.compress = FALSE)
     bw_dense <- npregbw(
       y ~ u1 + o1,
       data = dat,
@@ -70,7 +70,7 @@ test_that("all-categorical regression tree route preserves ordered Racine-Li-Yan
       okertype = "racineliyan"
     )
 
-    options(np.tree = TRUE)
+    options(np.tree = FALSE, np.categorical.compress = TRUE)
     bw_profile <- npregbw(
       y ~ u1 + o1,
       data = dat,
@@ -97,7 +97,7 @@ test_that("all-categorical regression tree route preserves ordered Racine-Li-Yan
 
 test_that("all-categorical regression RLY CV matches hat leave-one-out objective", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260523)
@@ -127,7 +127,7 @@ test_that("all-categorical regression RLY CV matches hat leave-one-out objective
 
 test_that("all-categorical regression tree route preserves fitted values and errors", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260516)
@@ -142,7 +142,7 @@ test_that("all-categorical regression tree route preserves fitted values and err
   dat$y <- 1.5 * as.numeric(dat$u1) - 0.3 * as.numeric(dat$u2) +
     0.25 * as.numeric(dat$u3) + sin(as.numeric(dat$o1)) + 0.1 * dat$y
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   bw <- npregbw(
     y ~ u1 + u2 + u3 + o1,
     data = dat,
@@ -153,7 +153,7 @@ test_that("all-categorical regression tree route preserves fitted values and err
   )
   fit_dense <- npreg(bws = bw)
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   fit_profile <- npreg(bws = bw)
 
   expect_equal(fitted(fit_profile), fitted(fit_dense), tolerance = 1e-8)
@@ -163,7 +163,7 @@ test_that("all-categorical regression tree route preserves fitted values and err
 
 test_that("all-categorical regression tree route preserves native and predict evaluation", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260517)
@@ -179,7 +179,7 @@ test_that("all-categorical regression tree route preserves native and predict ev
   ex <- dat[c(seq_len(40L), seq_len(40L), sample(seq_len(n), 80L, TRUE)),
             c("u1", "u2", "o1"), drop = FALSE]
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   bw <- npregbw(
     y ~ u1 + u2 + o1,
     data = dat,
@@ -192,7 +192,7 @@ test_that("all-categorical regression tree route preserves native and predict ev
   fit.dense <- npreg(bws = bw, exdat = ex)
   pred.dense <- predict(fit.base, newdata = ex, se.fit = TRUE)
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   fit.profile <- npreg(bws = bw, exdat = ex)
   pred.profile <- predict(fit.base, newdata = ex, se.fit = TRUE)
 
@@ -206,7 +206,7 @@ test_that("all-categorical regression tree route preserves native and predict ev
 
 test_that("all-categorical regression tree route preserves RLY evaluation", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260518)
@@ -219,7 +219,7 @@ test_that("all-categorical regression tree route preserves RLY evaluation", {
   dat$y <- as.numeric(dat$u1) + cos(as.numeric(dat$o1)) + 0.1 * dat$y
   ex <- dat[c(seq_len(30L), seq_len(30L)), c("u1", "o1"), drop = FALSE]
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   bw <- npregbw(
     y ~ u1 + o1,
     data = dat,
@@ -230,7 +230,7 @@ test_that("all-categorical regression tree route preserves RLY evaluation", {
   )
   fit.dense <- npreg(bws = bw, exdat = ex)
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   fit.profile <- npreg(bws = bw, exdat = ex)
 
   expect_equal(fitted(fit.profile), fitted(fit.dense), tolerance = 1e-8)
@@ -239,7 +239,7 @@ test_that("all-categorical regression tree route preserves RLY evaluation", {
 
 test_that("all-categorical regression tree route preserves npreghat apply output", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260519)
@@ -268,7 +268,7 @@ test_that("all-categorical regression tree route preserves npreghat apply output
   H.train <- npreghat(bws = bw, txdat = xdat, output = "matrix")
   H.eval <- npreghat(bws = bw, txdat = xdat, exdat = ex, output = "matrix")
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   apply.train <- npreghat(bws = bw, txdat = xdat, y = dat$y,
                           output = "apply")
   apply.eval <- npreghat(bws = bw, txdat = xdat, exdat = ex, y = dat$y,
@@ -281,7 +281,7 @@ test_that("all-categorical regression tree route preserves npreghat apply output
 
 test_that("all-categorical regression tree route preserves deterministic plot payloads", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260520)
@@ -308,11 +308,11 @@ test_that("all-categorical regression tree route preserves deterministic plot pa
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   plot.dense <- plot(fit, plot.behavior = "data",
                      plot.errors.method = "none")
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   plot.profile <- plot(fit, plot.behavior = "data",
                        plot.errors.method = "none")
 
@@ -326,7 +326,7 @@ test_that("all-categorical regression tree route preserves deterministic plot pa
 
 test_that("all-categorical regression profile bootstrap matches hat algebra with fixed draws", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = TRUE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260521)
@@ -384,7 +384,7 @@ test_that("all-categorical regression profile bootstrap matches hat algebra with
 
 test_that("all-categorical regression tree route preserves bootstrap plot payloads", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260521)
@@ -423,15 +423,15 @@ test_that("all-categorical regression tree route preserves bootstrap plot payloa
     )
 
     set.seed(seed)
-    options(np.tree = FALSE)
+    options(np.tree = FALSE, np.categorical.compress = FALSE)
     dense <- do.call(plot, common)
 
     set.seed(seed)
-    options(np.tree = TRUE)
+    options(np.tree = FALSE, np.categorical.compress = TRUE)
     profile <- do.call(plot, common)
 
     set.seed(seed)
-    options(np.tree = TRUE)
+    options(np.tree = FALSE, np.categorical.compress = TRUE)
     profile.repeat <- do.call(plot, common)
 
     expect_equal(names(profile), names(dense))
@@ -452,7 +452,7 @@ test_that("all-categorical regression tree route preserves bootstrap plot payloa
 
 test_that("all-categorical regression profile bootstrap matches RLY hat algebra", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = TRUE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260522)
@@ -494,7 +494,7 @@ test_that("all-categorical regression profile bootstrap matches RLY hat algebra"
 
 test_that("all-categorical regression tree route preserves finite RLY bootstrap plots", {
   skip_on_cran()
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260522)
@@ -520,7 +520,7 @@ test_that("all-categorical regression tree route preserves finite RLY bootstrap 
   on.exit(grDevices::dev.off(), add = TRUE)
 
   set.seed(885L)
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   dense <- plot(fit,
                 plot.behavior = "data",
                 plot.errors.method = "bootstrap",
@@ -529,7 +529,7 @@ test_that("all-categorical regression tree route preserves finite RLY bootstrap 
                 plot.errors.type = "pointwise")
 
   set.seed(885L)
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   tree <- plot(fit,
                plot.behavior = "data",
                plot.errors.method = "bootstrap",
@@ -544,4 +544,60 @@ test_that("all-categorical regression tree route preserves finite RLY bootstrap 
     expect_true(all(is.finite(tree[[j]]$merr)))
     expect_true(all(is.finite(tree[[j]]$bias)))
   }
+})
+
+test_that("categorical compression option is isolated from continuous tree option", {
+  skip_on_cran()
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE,
+                      np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260620L)
+  n <- 256L
+  dat_cat <- data.frame(
+    y = rnorm(n),
+    u1 = factor(rbinom(n, 1L, 0.5)),
+    o1 = ordered(sample(1:4, n, TRUE))
+  )
+  dat_cat$y <- as.numeric(dat_cat$u1) + sin(as.numeric(dat_cat$o1)) +
+    0.1 * dat_cat$y
+
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
+  bw_dense <- npregbw(y ~ u1 + o1, data = dat_cat, nmulti = 1)
+  fit_dense <- npreg(bws = bw_dense)
+
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  bw_compress <- npregbw(y ~ u1 + o1, data = dat_cat, nmulti = 1)
+  fit_compress <- npreg(bws = bw_compress)
+
+  options(np.tree = TRUE, np.categorical.compress = FALSE)
+  bw_tree <- npregbw(y ~ u1 + o1, data = dat_cat, nmulti = 1)
+  fit_tree <- npreg(bws = bw_tree)
+
+  expect_equal(bw_compress$fval, bw_dense$fval, tolerance = 1e-10)
+  expect_equal(bw_tree$fval, bw_dense$fval, tolerance = 1e-10)
+  expect_equal(fitted(fit_compress), fitted(fit_dense), tolerance = 1e-8)
+  expect_equal(fitted(fit_tree), fitted(fit_dense), tolerance = 1e-8)
+
+  dat_mixed <- data.frame(
+    y = rnorm(n),
+    x = runif(n),
+    u1 = factor(rbinom(n, 1L, 0.5))
+  )
+  dat_mixed$y <- sin(2 * pi * dat_mixed$x) + as.numeric(dat_mixed$u1) +
+    0.1 * dat_mixed$y
+
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
+  bw_mixed_dense <- npregbw(y ~ x + u1, data = dat_mixed, nmulti = 1)
+  fit_mixed_dense <- npreg(bws = bw_mixed_dense)
+
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  bw_mixed_compress <- npregbw(y ~ x + u1, data = dat_mixed, nmulti = 1)
+  fit_mixed_compress <- npreg(bws = bw_mixed_compress)
+
+  expect_equal(bw_mixed_compress$fval, bw_mixed_dense$fval, tolerance = 1e-10)
+  expect_equal(as.numeric(bw_mixed_compress$bw), as.numeric(bw_mixed_dense$bw),
+               tolerance = 1e-8)
+  expect_equal(fitted(fit_mixed_compress), fitted(fit_mixed_dense),
+               tolerance = 1e-8)
 })

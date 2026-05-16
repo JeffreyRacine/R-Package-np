@@ -161,8 +161,12 @@ test_that("public npcdensbw cv.ml fixed LP route preserves tree parity", {
   )
 
   old_opt <- getOption("np.tree")
-  on.exit(options(np.tree = old_opt), add = TRUE)
-  options(np.tree = TRUE)
+  old_compress <- getOption("np.categorical.compress")
+  on.exit({
+    options(np.tree = old_opt)
+    options(np.categorical.compress = old_compress)
+  }, add = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
 
   bw.tree <- npcdensbw(
     xdat = x,
