@@ -1,0 +1,126 @@
+npscoef_profile_oracle <- function(xdat, ydat, zdat, bws, exdat = NULL,
+                                   ezdat = NULL) {
+  NZD <- getFromNamespace("NZD", "npRmpi")
+  npRidgeSequenceAdditive <- getFromNamespace("npRidgeSequenceAdditive", "npRmpi")
+
+  if (is.null(exdat))
+    exdat <- xdat
+  if (is.null(ezdat))
+    ezdat <- zdat
+
+  W.train <- as.matrix(data.frame(1, xdat))
+  W.eval <- as.matrix(data.frame(1, exdat))
+  yW <- cbind(ydat, W.train)
+  train.codes <- .np_cat_profile_code_matrix(zdat)
+  eval.codes <- .np_cat_profile_code_matrix(ezdat)
+  train.keys <- .np_cat_profile_keys(train.codes)
+  profile.keys <- unique(train.keys)
+  train.id <- match(train.keys, profile.keys)
+  train.rep <- match(profile.keys, train.keys)
+  G <- length(profile.keys)
+  L <- .np_regression_cat_profile_kernel_matrix(
+    eval.codes = eval.codes,
+    train.codes = train.codes[train.rep, , drop = FALSE],
+    xdat = zdat[train.rep, , drop = FALSE],
+    bws = bws
+  )
+
+  p <- ncol(yW)
+  cross.profile <- matrix(0.0, nrow = G, ncol = p * p)
+  for (j in seq_len(p)) {
+    for (k in seq_len(p)) {
+      cross.profile[, (j - 1L) * p + k] <-
+        .np_cat_profile_rowsum(yW[, j] * yW[, k], train.id, G)[, 1L]
+    }
+  }
+  main.flat <- L %*% cross.profile
+  main <- array(t(main.flat), dim = c(p, p, nrow(ezdat)))
+  tyw <- main[-1L, 1L, , drop = FALSE]
+  dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
+  tww <- main[-1L, -1L, , drop = FALSE]
+
+  ridge.grid <- npRidgeSequenceAdditive(n.train = nrow(xdat), cap = 1.0)
+  coef <- matrix(NA_real_, nrow = ncol(W.eval), ncol = nrow(W.eval))
+  for (i in seq_len(nrow(W.eval))) {
+    for (ridge in ridge.grid) {
+      ridge.val <- ridge * tyw[1L, i] / NZD(tww[1L, 1L, i])
+      theta <- tryCatch(
+        solve(tww[, , i] + diag(rep(ridge, nrow(tyw))),
+              tyw[, i] + c(ridge.val, rep(0, nrow(tyw) - 1L))),
+        error = function(e) e
+      )
+      if (!inherits(theta, "error")) {
+        coef[, i] <- theta
+        break
+      }
+    }
+  }
+  list(mean = as.vector(colSums(t(W.eval) * coef)),
+       beta = t(coef))
+}
+
+test_that("npscoef all-categorical profile route preserves fitted values", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  options(npRmpi.autodispatch = FALSE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = TRUE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20260516L)
+  n <- 100L
+  xdat <- data.frame(x = rnorm(n))
+  zdat <- data.frame(
+    z = factor(sample(letters[1:3], n, TRUE)),
+    o = ordered(sample(1:4, n, TRUE))
+  )
+  ydat <- 1 + 0.7 * xdat$x +
+    rowSums(as.data.frame(lapply(zdat, as.numeric))) +
+    rnorm(n, sd = 0.15)
+  bw <- npscoefbw(
+    xdat = xdat,
+    ydat = ydat,
+    zdat = zdat,
+    bws = c(0.25, 0.3),
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+  fit <- npscoef(bws = bw, txdat = xdat, tydat = ydat, tzdat = zdat,
+                 errors = FALSE, iterate = FALSE, betas = TRUE)
+  oracle <- npscoef_profile_oracle(xdat, ydat, zdat, bw)
+  expect_equal(fit$mean, oracle$mean, tolerance = 1e-8)
+  expect_equal(fit$beta, oracle$beta, tolerance = 1e-8)
+})
+
+test_that("npscoef all-categorical profile route preserves evaluation values", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  options(npRmpi.autodispatch = FALSE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = TRUE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20260616L)
+  n <- 100L
+  xdat <- data.frame(x = rnorm(n))
+  zdat <- data.frame(o = ordered(sample(1:5, n, TRUE)))
+  ydat <- 1 + 0.7 * xdat$x + as.numeric(zdat$o) + rnorm(n, sd = 0.15)
+  bw <- npscoefbw(
+    xdat = xdat,
+    ydat = ydat,
+    zdat = zdat,
+    bws = 0.3,
+    bandwidth.compute = FALSE,
+    regtype = "lc",
+    okertype = "racineliyan"
+  )
+  exdat <- data.frame(x = seq(min(xdat$x), max(xdat$x), length.out = 31L))
+  ezdat <- zdat[seq_len(31L), , drop = FALSE]
+  fit <- npscoef(bws = bw, txdat = xdat, tydat = ydat, tzdat = zdat,
+                 exdat = exdat, ezdat = ezdat,
+                 errors = FALSE, iterate = FALSE, betas = TRUE)
+  oracle <- npscoef_profile_oracle(xdat, ydat, zdat, bw,
+                                   exdat = exdat, ezdat = ezdat)
+  expect_equal(fit$mean, oracle$mean, tolerance = 1e-8)
+  expect_equal(fit$beta, oracle$beta, tolerance = 1e-8)
+})
