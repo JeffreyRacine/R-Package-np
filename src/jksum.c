@@ -15888,6 +15888,14 @@ double *SIGN){
   }
 
 finish_regression_estimation:
+  /*
+    These caches are keyed by row pointers into call-local matrices. They are
+    safe within a regression call, but not across later .Call invocations where
+    R/C allocation can reuse the same addresses for different data.
+  */
+  np_disc_profile_cache_clear();
+  np_cont_largeh_cache_clear();
+
   // clean up hash stuff
   if(do_grad && (num_reg_ordered > 0)){
     for(l = 0; l < num_reg_ordered; l++)
