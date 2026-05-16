@@ -933,6 +933,9 @@ static int np_build_discrete_profile_index(const int num_xt,
                                            int **out_disc_prof_rep,
                                            int *out_disc_nprof);
 
+static inline int np_disc_near_upper(const int kernel, const double lambda, const int ncat);
+static inline int np_disc_ordered_near_upper(const int kernel, const double lambda);
+
 static double np_regression_cat_profile_self_weight(
 int *kernel_u,
 int *kernel_o,
@@ -1242,6 +1245,16 @@ double *mean_stderr){
     if(operator[i] != OP_NORMAL)
       return 0;
 
+  for(i = 0; i < num_reg_unordered; i++)
+    if((lambda[i] > 0.5) ||
+       np_disc_near_upper(kernel_u[i], lambda[i], num_categories[i]))
+      return 0;
+
+  for(i = 0; i < num_reg_ordered; i++)
+    if((lambda[num_reg_unordered + i] > 0.5) ||
+       np_disc_ordered_near_upper(kernel_o[i], lambda[num_reg_unordered + i]))
+      return 0;
+
   if(!np_build_discrete_profile_index(num_obs_train,
                                       num_reg_unordered,
                                       num_reg_ordered,
@@ -1410,6 +1423,453 @@ cleanup:
   if(weighted_sum != NULL) free(weighted_sum);
   if(profile_mean != NULL) free(profile_mean);
   if(profile_stderr != NULL) free(profile_stderr);
+
+  return ok;
+}
+
+static int np_density_categorical_profile_fit(
+int *kernel_c,
+int *kernel_u,
+int *kernel_o,
+const int BANDWIDTH_den,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double *vector_scale_factor,
+double *lambda,
+int *num_categories,
+int *operator,
+double **matrix_categorical_vals,
+double *pdf,
+double *pdf_stderr,
+double *log_likelihood){
+
+  int i, j, g, status;
+  int *train_prof_id = NULL, *train_prof_rep = NULL;
+  int *eval_prof_id = NULL, *eval_prof_rep = NULL;
+  int nprof_train = 0, nprof_eval = 0;
+  double **profile_unordered_train = NULL, **profile_ordered_train = NULL;
+  double **profile_unordered_eval = NULL, **profile_ordered_eval = NULL;
+  double *counts = NULL, *profile_pdf_sum = NULL;
+  double *profile_y[1];
+  int ok = 0;
+  const double log_DBL_MIN = log(DBL_MIN);
+
+  if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
+     (BANDWIDTH_den != BW_FIXED) ||
+     (num_reg_continuous != 0) ||
+     ((num_reg_unordered + num_reg_ordered) <= 0) ||
+     (num_obs_train < 128) ||
+     (lambda == NULL) ||
+     (operator == NULL) ||
+     (pdf == NULL) ||
+     (pdf_stderr == NULL) ||
+     (log_likelihood == NULL))
+    return 0;
+
+  for(i = 0; i < (num_reg_unordered + num_reg_ordered); i++)
+    if(operator[i] != OP_NORMAL)
+      return 0;
+
+  if(!np_build_discrete_profile_index(num_obs_train,
+                                      num_reg_unordered,
+                                      num_reg_ordered,
+                                      matrix_X_unordered_train,
+                                      matrix_X_ordered_train,
+                                      &train_prof_id,
+                                      &train_prof_rep,
+                                      &nprof_train))
+    return 0;
+
+  if(!np_build_discrete_profile_index(num_obs_eval,
+                                      num_reg_unordered,
+                                      num_reg_ordered,
+                                      matrix_X_unordered_eval,
+                                      matrix_X_ordered_eval,
+                                      &eval_prof_id,
+                                      &eval_prof_rep,
+                                      &nprof_eval))
+    goto cleanup;
+
+  if((nprof_train <= 0) || (nprof_eval <= 0) ||
+     (4*nprof_train > 3*num_obs_train) ||
+     (4*nprof_eval > 3*num_obs_eval))
+    goto cleanup;
+
+  profile_unordered_train = alloc_tmatd(nprof_train, num_reg_unordered);
+  profile_ordered_train = alloc_tmatd(nprof_train, num_reg_ordered);
+  profile_unordered_eval = alloc_tmatd(nprof_eval, num_reg_unordered);
+  profile_ordered_eval = alloc_tmatd(nprof_eval, num_reg_ordered);
+  counts = alloc_vecd(nprof_train);
+  profile_pdf_sum = alloc_vecd(nprof_eval);
+
+  if(((num_reg_unordered > 0) &&
+      (profile_unordered_train == NULL || profile_unordered_eval == NULL)) ||
+     ((num_reg_ordered > 0) &&
+      (profile_ordered_train == NULL || profile_ordered_eval == NULL)) ||
+     counts == NULL || profile_pdf_sum == NULL)
+    goto cleanup;
+
+  for(g = 0; g < nprof_train; g++){
+    const int rep = train_prof_rep[g];
+    counts[g] = 0.0;
+    for(j = 0; j < num_reg_unordered; j++)
+      profile_unordered_train[j][g] = matrix_X_unordered_train[j][rep];
+    for(j = 0; j < num_reg_ordered; j++)
+      profile_ordered_train[j][g] = matrix_X_ordered_train[j][rep];
+  }
+
+  for(g = 0; g < nprof_eval; g++){
+    const int rep = eval_prof_rep[g];
+    for(j = 0; j < num_reg_unordered; j++)
+      profile_unordered_eval[j][g] = matrix_X_unordered_eval[j][rep];
+    for(j = 0; j < num_reg_ordered; j++)
+      profile_ordered_eval[j][g] = matrix_X_ordered_eval[j][rep];
+  }
+
+  for(i = 0; i < num_obs_train; i++)
+    counts[train_prof_id[i]] += 1.0;
+
+  profile_y[0] = counts;
+
+  status = kernel_weighted_sum_np(kernel_c,
+                                  kernel_u,
+                                  kernel_o,
+                                  BANDWIDTH_den,
+                                  nprof_train,
+                                  nprof_eval,
+                                  num_reg_unordered,
+                                  num_reg_ordered,
+                                  0,
+                                  0,
+                                  0,
+                                  1,
+                                  1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  operator,
+                                  OP_NOOP,
+                                  0,
+                                  0,
+                                  NULL,
+                                  1,
+                                  1,
+                                  0,
+                                  NP_TREE_FALSE,
+                                  0,
+                                  NULL,
+                                  NULL,
+                                  NULL,
+                                  NULL,
+                                  profile_unordered_train,
+                                  profile_ordered_train,
+                                  NULL,
+                                  profile_unordered_eval,
+                                  profile_ordered_eval,
+                                  NULL,
+                                  profile_y,
+                                  NULL,
+                                  NULL,
+                                  vector_scale_factor,
+                                  1,
+                                  NULL,
+                                  NULL,
+                                  lambda,
+                                  num_categories,
+                                  matrix_categorical_vals,
+                                  NULL,
+                                  profile_pdf_sum,
+                                  NULL,
+                                  NULL,
+                                  NULL);
+
+  if(status != 0)
+    goto cleanup;
+
+  *log_likelihood = 0.0;
+  for(i = 0; i < num_obs_eval; i++){
+    const double p = profile_pdf_sum[eval_prof_id[i]]/(double)num_obs_train;
+    pdf[i] = p;
+    pdf_stderr[i] = sqrt(p/(double)num_obs_train);
+    *log_likelihood += (p < DBL_MIN) ? log_DBL_MIN : log(p);
+  }
+
+  ok = 1;
+
+cleanup:
+  if(train_prof_id != NULL) free(train_prof_id);
+  if(train_prof_rep != NULL) free(train_prof_rep);
+  if(eval_prof_id != NULL) free(eval_prof_id);
+  if(eval_prof_rep != NULL) free(eval_prof_rep);
+  if(profile_unordered_train != NULL) free_tmat(profile_unordered_train);
+  if(profile_ordered_train != NULL) free_tmat(profile_ordered_train);
+  if(profile_unordered_eval != NULL) free_tmat(profile_unordered_eval);
+  if(profile_ordered_eval != NULL) free_tmat(profile_ordered_eval);
+  if(counts != NULL) free(counts);
+  if(profile_pdf_sum != NULL) free(profile_pdf_sum);
+
+  return ok;
+}
+
+static int np_density_categorical_profile_cv(
+int *kernel_c,
+int *kernel_u,
+int *kernel_o,
+const int do_convolution_cv,
+const int BANDWIDTH_den,
+const int num_obs,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+double **matrix_X_unordered,
+double **matrix_X_ordered,
+double *vector_scale_factor,
+double *lambda,
+int *num_categories,
+double **matrix_categorical_vals,
+double *cv){
+
+  int i, j, g, status;
+  int *prof_id = NULL, *prof_rep = NULL;
+  int nprof = 0;
+  int *operator = NULL;
+  double **profile_unordered = NULL, **profile_ordered = NULL;
+  double *counts = NULL, *weighted_sum = NULL, *weighted_conv = NULL;
+  double *profile_y[1];
+  int ok = 0;
+  const double log_DBL_MIN = log(DBL_MIN);
+
+  if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
+     (BANDWIDTH_den != BW_FIXED) ||
+     (num_reg_continuous != 0) ||
+     ((num_reg_unordered + num_reg_ordered) <= 0) ||
+     (num_obs < 128) ||
+     (lambda == NULL) ||
+     (cv == NULL))
+    return 0;
+
+  if(!np_build_discrete_profile_index(num_obs,
+                                      num_reg_unordered,
+                                      num_reg_ordered,
+                                      matrix_X_unordered,
+                                      matrix_X_ordered,
+                                      &prof_id,
+                                      &prof_rep,
+                                      &nprof))
+    return 0;
+
+  if((nprof <= 0) || (4*nprof > 3*num_obs))
+    goto cleanup;
+
+  operator = (int *)malloc(sizeof(int)*(num_reg_unordered + num_reg_ordered));
+  profile_unordered = alloc_tmatd(nprof, num_reg_unordered);
+  profile_ordered = alloc_tmatd(nprof, num_reg_ordered);
+  counts = alloc_vecd(nprof);
+  weighted_sum = alloc_vecd(nprof);
+  if(do_convolution_cv)
+    weighted_conv = alloc_vecd(nprof);
+
+  if(operator == NULL ||
+     ((num_reg_unordered > 0) && profile_unordered == NULL) ||
+     ((num_reg_ordered > 0) && profile_ordered == NULL) ||
+     counts == NULL || weighted_sum == NULL ||
+     (do_convolution_cv && weighted_conv == NULL))
+    goto cleanup;
+
+  for(g = 0; g < nprof; g++){
+    const int rep = prof_rep[g];
+    counts[g] = 0.0;
+    for(j = 0; j < num_reg_unordered; j++)
+      profile_unordered[j][g] = matrix_X_unordered[j][rep];
+    for(j = 0; j < num_reg_ordered; j++)
+      profile_ordered[j][g] = matrix_X_ordered[j][rep];
+  }
+
+  for(i = 0; i < num_obs; i++)
+    counts[prof_id[i]] += 1.0;
+
+  profile_y[0] = counts;
+
+  for(i = 0; i < (num_reg_unordered + num_reg_ordered); i++)
+    operator[i] = OP_NORMAL;
+
+  status = kernel_weighted_sum_np(kernel_c,
+                                  kernel_u,
+                                  kernel_o,
+                                  BANDWIDTH_den,
+                                  nprof,
+                                  nprof,
+                                  num_reg_unordered,
+                                  num_reg_ordered,
+                                  0,
+                                  0,
+                                  0,
+                                  1,
+                                  1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  operator,
+                                  OP_NOOP,
+                                  0,
+                                  0,
+                                  NULL,
+                                  1,
+                                  1,
+                                  0,
+                                  NP_TREE_FALSE,
+                                  0,
+                                  NULL,
+                                  NULL,
+                                  NULL,
+                                  NULL,
+                                  profile_unordered,
+                                  profile_ordered,
+                                  NULL,
+                                  profile_unordered,
+                                  profile_ordered,
+                                  NULL,
+                                  profile_y,
+                                  NULL,
+                                  NULL,
+                                  vector_scale_factor,
+                                  1,
+                                  NULL,
+                                  NULL,
+                                  lambda,
+                                  num_categories,
+                                  matrix_categorical_vals,
+                                  NULL,
+                                  weighted_sum,
+                                  NULL,
+                                  NULL,
+                                  NULL);
+
+  if(status != 0)
+    goto cleanup;
+
+  if(!do_convolution_cv){
+    *cv = 0.0;
+    for(g = 0; g < nprof; g++){
+      const double L = np_regression_cat_profile_self_weight(kernel_u,
+                                                             kernel_o,
+                                                             num_reg_unordered,
+                                                             num_reg_ordered,
+                                                             profile_unordered,
+                                                             profile_ordered,
+                                                             g,
+                                                             lambda,
+                                                             num_categories,
+                                                             matrix_categorical_vals);
+      const double rho = weighted_sum[g] - L;
+      if(!(rho > 0.0) || !R_FINITE(rho))
+        goto cleanup;
+      *cv -= counts[g]*((rho < DBL_MIN) ? log_DBL_MIN : log(rho/(num_obs - 1.0)));
+    }
+  } else {
+    double cv1 = 0.0, cv2 = 0.0;
+    for(i = 0; i < (num_reg_unordered + num_reg_ordered); i++)
+      operator[i] = OP_CONVOLUTION;
+
+    status = kernel_weighted_sum_np(kernel_c,
+                                    kernel_u,
+                                    kernel_o,
+                                    BANDWIDTH_den,
+                                    nprof,
+                                    nprof,
+                                    num_reg_unordered,
+                                    num_reg_ordered,
+                                    0,
+                                    0,
+                                    0,
+                                    1,
+                                    1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    operator,
+                                    OP_NOOP,
+                                    0,
+                                    0,
+                                    NULL,
+                                    1,
+                                    1,
+                                    0,
+                                    NP_TREE_FALSE,
+                                    0,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    profile_unordered,
+                                    profile_ordered,
+                                    NULL,
+                                    profile_unordered,
+                                    profile_ordered,
+                                    NULL,
+                                    profile_y,
+                                    NULL,
+                                    NULL,
+                                    vector_scale_factor,
+                                    1,
+                                    NULL,
+                                    NULL,
+                                    lambda,
+                                    num_categories,
+                                    matrix_categorical_vals,
+                                    NULL,
+                                    weighted_conv,
+                                    NULL,
+                                    NULL,
+                                    NULL);
+
+    if(status != 0)
+      goto cleanup;
+
+    for(g = 0; g < nprof; g++){
+      const double L = np_regression_cat_profile_self_weight(kernel_u,
+                                                             kernel_o,
+                                                             num_reg_unordered,
+                                                             num_reg_ordered,
+                                                             profile_unordered,
+                                                             profile_ordered,
+                                                             g,
+                                                             lambda,
+                                                             num_categories,
+                                                             matrix_categorical_vals);
+      cv1 += counts[g]*weighted_conv[g];
+      cv2 += counts[g]*(weighted_sum[g] - L);
+    }
+
+    cv1 /= (double)num_obs*(double)num_obs;
+    cv2 /= (double)num_obs*((double)num_obs - 1.0);
+    *cv = cv1 - 2.0*cv2;
+  }
+
+  ok = R_FINITE(*cv);
+
+cleanup:
+  if(prof_id != NULL) free(prof_id);
+  if(prof_rep != NULL) free(prof_rep);
+  if(operator != NULL) free(operator);
+  if(profile_unordered != NULL) free_tmat(profile_unordered);
+  if(profile_ordered != NULL) free_tmat(profile_ordered);
+  if(counts != NULL) free(counts);
+  if(weighted_sum != NULL) free(weighted_sum);
+  if(weighted_conv != NULL) free(weighted_conv);
 
   return ok;
 }
@@ -21109,6 +21569,34 @@ double *cv){
     error("\n** Error: invalid bandwidth.");
   }
 
+  if(np_density_categorical_profile_cv(kernel_c,
+                                       kernel_u,
+                                       kernel_o,
+                                       0,
+                                       BANDWIDTH_den,
+                                       num_obs,
+                                       num_reg_unordered,
+                                       num_reg_ordered,
+                                       num_reg_continuous,
+                                       matrix_X_unordered,
+                                       matrix_X_ordered,
+                                       vector_scale_factor,
+                                       lambda,
+                                       num_categories,
+                                       matrix_categorical_vals_extern,
+                                       cv)){
+    free(operator);
+    free(kernel_c);
+    free(kernel_u);
+    free(kernel_o);
+    free(rho);
+    free(lambda);
+    free_mat(matrix_bandwidth, num_reg_continuous);
+    np_disc_profile_cache_clear();
+    np_cont_largeh_cache_clear();
+    return(0);
+  }
+
   if((num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
     int ok_all = 1;
 
@@ -21438,6 +21926,26 @@ double *cv){
                            matrix_bandwidth,
                            lambda)==1){
     error("\n** Error: invalid bandwidth.");
+  }
+
+  if(np_density_categorical_profile_cv(kernel_c,
+                                       kernel_u,
+                                       kernel_o,
+                                       1,
+                                       BANDWIDTH_den,
+                                       num_obs,
+                                       num_reg_unordered,
+                                       num_reg_ordered,
+                                       num_reg_continuous,
+                                       matrix_X_unordered,
+                                       matrix_X_ordered,
+                                       vector_scale_factor,
+                                       lambda,
+                                       num_categories,
+                                       matrix_categorical_vals,
+                                       cv)){
+    status = 0;
+    goto cleanup_density_convolution_cv;
   }
 
   if(bounded_scalar_quadrature){
@@ -21843,6 +22351,39 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 		MPI_Finalize();
 #endif
     error("\n** Error: invalid bandwidth.");
+  }
+
+  if((dop == OP_NORMAL) &&
+     np_density_categorical_profile_fit(kernel_c,
+                                        kernel_u,
+                                        kernel_o,
+                                        BANDWIDTH_den,
+                                        num_obs_train,
+                                        num_obs_eval,
+                                        num_reg_unordered,
+                                        num_reg_ordered,
+                                        num_reg_continuous,
+                                        matrix_X_unordered_train,
+                                        matrix_X_ordered_train,
+                                        matrix_X_unordered_eval,
+                                        matrix_X_ordered_eval,
+                                        vector_scale_factor,
+                                        lambda,
+                                        num_categories,
+                                        operator,
+                                        matrix_categorical_vals,
+                                        pdf,
+                                        pdf_stderr,
+                                        log_likelihood)){
+    free(operator);
+    free(kernel_c);
+    free(kernel_u);
+    free(kernel_o);
+    free(lambda);
+    free_mat(matrix_bandwidth, num_reg_continuous);
+    np_disc_profile_cache_clear();
+    np_cont_largeh_cache_clear();
+    return;
   }
 
   if((num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
