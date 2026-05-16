@@ -63,6 +63,7 @@ int int_RESTART_FROM_MIN;
 int int_TREE_X;
 int int_TREE_Y;
 int int_TREE_XY;
+int int_TREE_PROFILE_X;
 int int_nn_k_min_extern = 1;
 
 static int np_mpi_local_regression_mode = 0;
@@ -1685,6 +1686,7 @@ static void np_shadow_reset_state_internal(void)
   int_TREE_X = NP_TREE_FALSE;
   int_TREE_Y = NP_TREE_FALSE;
   int_TREE_XY = NP_TREE_FALSE;
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
   int_LARGE_SF = 0;
   nconfac_extern = 0.0;
   ncatfac_extern = 0.0;
@@ -1956,6 +1958,7 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
     vector_glp_degree_extern = NULL;
   }
 
+  int_TREE_PROFILE_X = myopti[RBW_DOTREEI];
   int_TREE_X = myopti[RBW_DOTREEI];
   scale_cat = myopti[RBW_SCATI];
   bwm_use_transform = myopti[RBW_TBNDI];
@@ -5959,6 +5962,7 @@ cleanup_np_density_bw:
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
@@ -10343,6 +10347,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int_nn_k_min_extern =
     ((BANDWIDTH_reg_extern != BW_FIXED) && (num_reg_continuous_extern > 0)) ? 2 : 1;
 
+  int_TREE_PROFILE_X = myopti[RBW_DOTREEI];
   int_TREE_X = myopti[RBW_DOTREEI];
   scale_cat = myopti[RBW_SCATI];
   bwm_use_transform = myopti[RBW_TBNDI];
@@ -10999,6 +11004,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 cleanup_np_regression_bw_mode:
   /* Free data objects */
   bwm_clear_floor_context();
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
