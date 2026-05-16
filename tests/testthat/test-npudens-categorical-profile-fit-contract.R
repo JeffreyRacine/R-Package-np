@@ -7,9 +7,11 @@ test_that("npudens all-categorical tree profile fit matches dense fit", {
   }
 
   old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")
   on.exit({
     options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
     options(np.messages = old.messages)
   }, add = TRUE)
   options(np.messages = FALSE)
@@ -42,7 +44,7 @@ test_that("npudens all-categorical tree profile fit matches dense fit", {
       form <- ~ u1 + o1
     }
 
-    options(np.tree = FALSE)
+    options(np.tree = FALSE, np.categorical.compress = FALSE)
     bw.dense <- npudensbw(
       form,
       data = dat,
@@ -54,7 +56,7 @@ test_that("npudens all-categorical tree profile fit matches dense fit", {
     )
     fit.dense <- npudens(bws = bw.dense)
 
-    options(np.tree = TRUE)
+    options(np.tree = FALSE, np.categorical.compress = TRUE)
     bw.profile <- npudensbw(
       form,
       data = dat,
@@ -97,9 +99,11 @@ test_that("one-coordinate categorical tree profiles match dense density and dist
   }
 
   old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")
   on.exit({
     options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
     options(np.messages = old.messages)
   }, add = TRUE)
   options(np.messages = FALSE)
@@ -119,7 +123,7 @@ test_that("one-coordinate categorical tree profiles match dense density and dist
 
     edat <- edat[sample.int(nrow(edat), ne, TRUE), , drop = FALSE]
 
-    options(np.tree = FALSE)
+    options(np.tree = FALSE, np.categorical.compress = FALSE)
     dens.bw.dense <- npudensbw(~ x, data = dat, edat = edat,
                                bws = bws, bandwidth.compute = FALSE)
     dens.dense <- npudens(bws = dens.bw.dense)
@@ -129,7 +133,7 @@ test_that("one-coordinate categorical tree profiles match dense density and dist
       dist.dense <- npudist(bws = dist.bw.dense)
     }
 
-    options(np.tree = TRUE)
+    options(np.tree = FALSE, np.categorical.compress = TRUE)
     dens.bw.profile <- npudensbw(~ x, data = dat, edat = edat,
                                  bws = bws, bandwidth.compute = FALSE)
     dens.profile <- npudens(bws = dens.bw.profile)
@@ -160,9 +164,11 @@ test_that("npudens categorical bandwidth search is unchanged by tree profile rou
   on.exit(close_mpi_slaves(), add = TRUE)
 
   old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")
   on.exit({
     options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
     options(np.messages = old.messages)
   }, add = TRUE)
   options(np.messages = FALSE)
@@ -172,10 +178,10 @@ test_that("npudens categorical bandwidth search is unchanged by tree profile rou
     x = ordered(rbinom(800L, 10L, 0.5))
   )
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   dense <- npudensbw(~ x, data = dat, nmulti = 1)
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   profile <- npudensbw(~ x, data = dat, nmulti = 1)
 
   expect_equal(profile$bw, dense$bw, tolerance = 1e-9)
@@ -189,9 +195,11 @@ test_that("npudens categorical bootstrap profile route matches dense count algeb
   boot_fun <- getFromNamespace(".np_inid_boot_from_ksum_unconditional", "npRmpi")
 
   old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")
   on.exit({
     options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
     options(np.messages = old.messages)
   }, add = TRUE)
   options(np.messages = FALSE)
@@ -206,7 +214,7 @@ test_that("npudens categorical bootstrap profile route matches dense count algeb
   counts <- replicate(5L, tabulate(sample.int(nrow(dat), nrow(dat), TRUE),
                                    nbins = nrow(dat)))
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   dense <- boot_fun(
     xdat = dat,
     exdat = edat,
@@ -216,7 +224,7 @@ test_that("npudens categorical bootstrap profile route matches dense count algeb
     counts = counts
   )
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   profile <- boot_fun(
     xdat = dat,
     exdat = edat,
@@ -235,12 +243,14 @@ test_that("npudens formula route accepts numeric bws for categorical data", {
   on.exit(close_mpi_slaves(), add = TRUE)
 
   old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")
   on.exit({
     options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
     options(np.messages = old.messages)
   }, add = TRUE)
-  options(np.tree = TRUE, np.messages = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE, np.messages = FALSE)
 
   set.seed(20260610L)
   x <- ordered(rbinom(300L, 10L, 0.5))
@@ -255,9 +265,11 @@ test_that("npcdens categorical ML bandwidth search uses exact profile route", {
   on.exit(close_mpi_slaves(), add = TRUE)
 
   old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")
   on.exit({
     options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
     options(np.messages = old.messages)
   }, add = TRUE)
   options(np.messages = FALSE)
@@ -271,10 +283,10 @@ test_that("npcdens categorical ML bandwidth search uses exact profile route", {
     x = x
   )
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   dense <- npcdensbw(y ~ x, data = dat, bwmethod = "cv.ml", nmulti = 1)
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   profile <- npcdensbw(y ~ x, data = dat, bwmethod = "cv.ml", nmulti = 1)
 
   expect_equal(profile$ybw, dense$ybw, tolerance = 1e-8)
@@ -287,9 +299,11 @@ test_that("npcdens categorical LS bandwidth search uses exact profile objective"
   on.exit(close_mpi_slaves(), add = TRUE)
 
   old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")
   on.exit({
     options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
     options(np.messages = old.messages)
   }, add = TRUE)
   options(np.messages = FALSE)
@@ -305,10 +319,10 @@ test_that("npcdens categorical LS bandwidth search uses exact profile objective"
     x2 = x2
   )
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   dense <- npcdensbw(y ~ x1 + x2, data = dat, bwmethod = "cv.ls", nmulti = 1)
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   profile <- npcdensbw(y ~ x1 + x2, data = dat, bwmethod = "cv.ls", nmulti = 1)
 
   expect_equal(profile$ybw, dense$ybw, tolerance = 1e-5)
@@ -321,9 +335,11 @@ test_that("npcdist categorical bandwidth search uses exact profile objective", {
   on.exit(close_mpi_slaves(), add = TRUE)
 
   old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")
   on.exit({
     options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
     options(np.messages = old.messages)
   }, add = TRUE)
   options(np.messages = FALSE)
@@ -339,10 +355,10 @@ test_that("npcdist categorical bandwidth search uses exact profile objective", {
     x2 = x2
   )
 
-  options(np.tree = FALSE)
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
   dense <- npcdistbw(y ~ x1 + x2, data = dat, nmulti = 1)
 
-  options(np.tree = TRUE)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
   profile <- npcdistbw(y ~ x1 + x2, data = dat, nmulti = 1)
 
   expect_equal(profile$ybw, dense$ybw, tolerance = 1e-5)

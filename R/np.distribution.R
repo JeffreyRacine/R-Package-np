@@ -178,7 +178,7 @@ npudist.dbandwidth <-
       mcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DIST,
       old.dist = FALSE,
-      int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO)
+      int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord))
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
     myout <- .np_with_compiled_fit_progress(

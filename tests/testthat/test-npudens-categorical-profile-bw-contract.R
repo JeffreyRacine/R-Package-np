@@ -3,9 +3,11 @@ test_that("npudens all-categorical tree profile bandwidth CV matches dense CV", 
     spawn_mpi_slaves(1L)
 
   old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")
   on.exit({
     options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
     options(np.messages = old.messages)
     if (exists("close_mpi_slaves", mode = "function"))
       close_mpi_slaves()
@@ -36,7 +38,7 @@ test_that("npudens all-categorical tree profile bandwidth CV matches dense CV", 
       form <- ~ u1 + o1
     }
 
-    options(np.tree = FALSE)
+    options(np.tree = FALSE, np.categorical.compress = FALSE)
     bw.dense <- npudensbw(
       form,
       data = dat,
@@ -46,7 +48,7 @@ test_that("npudens all-categorical tree profile bandwidth CV matches dense CV", 
       okertype = okertype
     )
 
-    options(np.tree = TRUE)
+    options(np.tree = FALSE, np.categorical.compress = TRUE)
     bw.profile <- npudensbw(
       form,
       data = dat,

@@ -36,6 +36,17 @@
     supported by the selected kernel/operator combination. Default is
     \code{FALSE}.
 
+    \item \code{np.categorical.compress} (logical): enables exact
+    unique-profile compression for eligible all-categorical routes. This is
+    distinct from \code{np.tree}: no continuous kd-tree is requested merely
+    because categorical compression is enabled. The default is \code{TRUE}.
+    In \pkg{npRmpi}, categorical-only regression compression remains on the
+    legacy \code{np.tree} activation path pending separate MPI-specific
+    validation of the new switch for that estimator route.
+    Set \code{options(np.categorical.compress = FALSE, np.tree = FALSE)} to
+    force the historical dense categorical route for debugging or timing
+    comparisons.
+
     \item \code{np.largeh.rel.tol} (numeric): relative tolerance used by the
     continuous large-\eqn{h} shortcut. When all standardized distances for a
     continuous predictor are sufficiently close to zero, the corresponding
@@ -81,6 +92,7 @@ npRmpi.init(nslaves=1)
 
 old <- options(
   np.tree = TRUE,
+  np.categorical.compress = TRUE,
   np.messages = FALSE,
   np.largeh.rel.tol = 1e-3,
   np.disc.upper.rel.tol = 1e-2

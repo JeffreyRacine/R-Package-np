@@ -1,23 +1,27 @@
 # npRmpi 0.70-3
 
-- Large-sample categorical-only regression now has an MPI-safe
-  profile-compressed execution route when `options(np.tree = TRUE)` is
-  enabled. For local constant categorical regression, repeated predictor
-  profiles are compressed before bandwidth cross-validation, fitting,
-  prediction/evaluation, standard errors, gradients where meaningful,
-  hat-helper use, and plot bootstrap helpers. This preserves the established
-  dense-route numerical contract while greatly reducing work for large samples
-  with many repeated factor/ordered predictor combinations.
+- Large-sample categorical-only regression keeps the previously validated
+  MPI-safe profile-compressed route under the legacy
+  `options(np.tree = TRUE)` switch. The new
+  `options(np.categorical.compress = TRUE)` switch is separated from
+  `np.tree` for routes whose MPI activation has been revalidated in this
+  tranche; regression bandwidth search and the MPI regression estimator remain
+  on the legacy `np.tree` activation path pending a separate MPI-specific
+  proof. This preserves the established dense-route numerical contract while
+  retaining the fast categorical regression path for users who explicitly
+  enable `np.tree`.
 - Categorical-only unconditional density routes now use the same
-  profile-compression idea when `options(np.tree = TRUE)` is enabled. The
-  fixed-bandwidth fit/evaluation route and `npudensbw()` `cv.ml`/`cv.ls`
-  objective routes preserve dense-route objective values, selected
-  bandwidths/smoothing parameters, and fitted/evaluation values while avoiding
-  repeated computation over identical categorical profiles. Very fast
+  profile-compression idea when `options(np.categorical.compress = TRUE)` is
+  enabled. The fixed-bandwidth fit/evaluation route preserves dense-route
+  fitted/evaluation values while avoiding repeated computation over identical
+  categorical profiles. Bandwidth-search profile compression remains gated by
+  the legacy tree option until the objective route is separately revalidated.
+  Very fast
   compressed routes may remain overhead-floor limited, so MPI acceleration is
   most useful once the uncompressed work would be genuinely long-running.
 - Ordered-only unconditional distribution fit/evaluation routes also use
-  profile compression when `options(np.tree = TRUE)` is enabled, preserving
+  profile compression when `options(np.categorical.compress = TRUE)` is
+  enabled, preserving
   fitted distribution values and standard errors for fixed smoothing
   parameters while avoiding repeated computation over identical ordered
   profiles.

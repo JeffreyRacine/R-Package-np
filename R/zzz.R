@@ -159,6 +159,8 @@
 
     if (is.null(getOption("np.tree")))
       options(np.tree = FALSE)
+    if (is.null(getOption("np.categorical.compress")))
+      options(np.categorical.compress = TRUE)
     if (is.null(getOption("np.largeh.rel.tol")))
       options(np.largeh.rel.tol = 1e-3)
     if (is.null(getOption("np.disc.upper.rel.tol")))
@@ -224,6 +226,8 @@
 
   if (is.null(getOption("np.tree")))
     options(np.tree = FALSE)
+  if (is.null(getOption("np.categorical.compress")))
+    options(np.categorical.compress = TRUE)
   if (is.null(getOption("np.largeh.rel.tol")))
     options(np.largeh.rel.tol = 1e-3)
   if (is.null(getOption("np.disc.upper.rel.tol")))
@@ -267,4 +271,25 @@
           action = "append")
   if ("np" %in% loadedNamespaces())
     .npRmpi_after_np_load()
+}
+
+npTreeOrCategoricalCompress <- function(ncon = 0L, ncat = 0L) {
+  if (isTRUE(getOption("np.tree")))
+    return(TRUE)
+
+  if (!isTRUE(getOption("np.categorical.compress", TRUE)))
+    return(FALSE)
+
+  ncon <- if (is.null(ncon) || !length(ncon)) 0L else sum(as.integer(ncon), na.rm = TRUE)
+  ncat <- if (is.null(ncat) || !length(ncat)) 0L else sum(as.integer(ncat), na.rm = TRUE)
+
+  isTRUE(ncon == 0L) && isTRUE(ncat > 0L)
+}
+
+npDoTreeOrCategoricalCompress <- function(ncon = 0L, ncat = 0L) {
+  if (npTreeOrCategoricalCompress(ncon = ncon, ncat = ncat)) {
+    DO_TREE_YES
+  } else {
+    DO_TREE_NO
+  }
 }

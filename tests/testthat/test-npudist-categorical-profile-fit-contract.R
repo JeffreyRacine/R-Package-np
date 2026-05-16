@@ -12,7 +12,7 @@ test_that("npudist all-ordered profile route preserves fitted distribution", {
       o3 = ordered(sample(1:4, n, TRUE))
     )
 
-    old <- options(np.tree = FALSE)
+    old <- options(np.tree = FALSE, np.categorical.compress = FALSE)
     dense_bw <- npudistbw(
       ~ o1 + o2 + o3,
       data = dat,
@@ -23,7 +23,7 @@ test_that("npudist all-ordered profile route preserves fitted distribution", {
     dense <- npudist(bws = dense_bw)
     options(old)
 
-    old <- options(np.tree = TRUE)
+    old <- options(np.tree = FALSE, np.categorical.compress = TRUE)
     profile_bw <- npudistbw(
       ~ o1 + o2 + o3,
       data = dat,
