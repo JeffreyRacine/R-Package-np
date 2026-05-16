@@ -305,3 +305,194 @@ test_that("all-categorical regression tree route preserves deterministic plot pa
     expect_equal(plot.profile[[j]]$eval, plot.dense[[j]]$eval)
   }
 })
+
+test_that("all-categorical regression profile bootstrap matches hat algebra with fixed draws", {
+  skip_on_cran()
+  .ensure_npreg_cat_profile_pool()
+  old_opts <- options(np.messages = FALSE, np.tree = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260521)
+  n <- 256L
+  dat <- data.frame(
+    y = rnorm(n),
+    u1 = factor(rbinom(n, 1L, 0.5)),
+    u2 = factor(sample(letters[1:3], n, TRUE)),
+    o1 = ordered(sample(1:4, n, TRUE))
+  )
+  dat$y <- as.numeric(dat$u1) - 0.25 * as.numeric(dat$u2) +
+    cos(as.numeric(dat$o1)) + 0.1 * dat$y
+  xdat <- dat[c("u1", "u2", "o1")]
+  ex <- xdat[c(seq_len(12L), seq_len(12L)), , drop = FALSE]
+
+  bw <- npregbw(
+    y ~ u1 + u2 + o1,
+    data = dat,
+    bwmethod = "cv.ls",
+    nmulti = 1,
+    ukertype = "aitchisonaitken",
+    okertype = "liracine"
+  )
+  H.eval <- npreghat(bws = bw, txdat = xdat, exdat = ex, output = "matrix")
+  H.train <- npreghat(bws = bw, txdat = xdat, output = "matrix")
+  setup <- getFromNamespace(".np_regression_cat_profile_boot_setup", "npRmpi")(
+    xdat = xdat, exdat = ex, ydat = dat$y, bws = bw
+  )
+  expect_false(is.null(setup))
+
+  set.seed(551L)
+  counts <- replicate(13L, tabulate(sample.int(n, n, TRUE), nbins = n))
+  dense.inid <- getFromNamespace(".np_inid_lc_boot_from_hat", "npRmpi")(
+    H = H.eval, ydat = dat$y, B = 13L, counts = counts
+  )
+  profile.inid <- getFromNamespace(".np_inid_boot_from_regression_cat_profile", "npRmpi")(
+    setup = setup, B = 13L, counts = counts
+  )
+  expect_equal(profile.inid$t0, dense.inid$t0, tolerance = 1e-8)
+  expect_equal(profile.inid$t, dense.inid$t, tolerance = 1e-8)
+
+  fit.train <- as.vector(H.train %*% dat$y)
+  set.seed(552L)
+  dense.wild <- getFromNamespace(".np_plot_boot_from_hat_wild", "npRmpi")(
+    H = H.eval, ydat = dat$y, fit.mean = fit.train,
+    B = 13L, wild = "rademacher"
+  )
+  set.seed(552L)
+  profile.wild <- getFromNamespace(".np_wild_boot_from_regression_cat_profile", "npRmpi")(
+    setup = setup, B = 13L, wild = "rademacher"
+  )
+  set.seed(552L)
+  profile.wild.repeat <- getFromNamespace(".np_wild_boot_from_regression_cat_profile", "npRmpi")(
+    setup = setup, B = 13L, wild = "rademacher"
+  )
+  expect_equal(profile.wild$t0, dense.wild$t0, tolerance = 1e-8)
+  expect_equal(profile.wild.repeat$t, profile.wild$t, tolerance = 1e-8)
+  expect_true(all(is.finite(profile.wild$t)))
+})
+
+test_that("all-categorical regression tree route preserves bootstrap plot payloads", {
+  skip_on_cran()
+  .ensure_npreg_cat_profile_pool()
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260521)
+  n <- 512L
+  dat <- data.frame(
+    y = rnorm(n),
+    u1 = factor(rbinom(n, 1L, 0.5)),
+    u2 = factor(sample(letters[1:3], n, TRUE)),
+    o1 = ordered(sample(1:4, n, TRUE))
+  )
+  dat$y <- as.numeric(dat$u1) - 0.25 * as.numeric(dat$u2) +
+    cos(as.numeric(dat$o1)) + 0.1 * dat$y
+
+  bw <- npregbw(
+    y ~ u1 + u2 + o1,
+    data = dat,
+    bwmethod = "cv.ls",
+    nmulti = 1,
+    ukertype = "aitchisonaitken",
+    okertype = "liracine"
+  )
+  fit <- npreg(bws = bw)
+
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  compare_bootstrap_payloads <- function(method, seed, exact.dense = TRUE) {
+    common <- list(
+      x = fit,
+      plot.behavior = "data",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = method,
+      plot.errors.boot.num = 41L,
+      plot.errors.boot.blocklen = 3L,
+      plot.errors.type = "pointwise"
+    )
+
+    set.seed(seed)
+    options(np.tree = FALSE)
+    dense <- do.call(plot, common)
+
+    set.seed(seed)
+    options(np.tree = TRUE)
+    profile <- do.call(plot, common)
+
+    set.seed(seed)
+    options(np.tree = TRUE)
+    profile.repeat <- do.call(plot, common)
+
+    expect_equal(names(profile), names(dense))
+    expect_equal(profile.repeat, profile, tolerance = 1e-8)
+    for (j in seq_along(profile)) {
+      expect_equal(profile[[j]]$mean, dense[[j]]$mean, tolerance = 1e-8)
+      expect_equal(profile[[j]]$eval, dense[[j]]$eval)
+      expect_true(all(is.finite(profile[[j]]$merr)))
+      expect_true(all(is.finite(profile[[j]]$bias)))
+      if (isTRUE(exact.dense)) {
+        expect_equal(profile[[j]]$merr, dense[[j]]$merr, tolerance = 1e-8)
+        expect_equal(profile[[j]]$bias, dense[[j]]$bias, tolerance = 1e-8)
+        expect_equal(profile[[j]]$bxp, dense[[j]]$bxp, tolerance = 1e-8)
+      }
+    }
+  }
+
+  compare_bootstrap_payloads("inid", 771L, exact.dense = FALSE)
+  compare_bootstrap_payloads("fixed", 772L, exact.dense = FALSE)
+  compare_bootstrap_payloads("geom", 773L, exact.dense = FALSE)
+  compare_bootstrap_payloads("wild", 774L, exact.dense = FALSE)
+})
+
+test_that("all-categorical regression tree route leaves RLY bootstrap plots on dense path", {
+  skip_on_cran()
+  .ensure_npreg_cat_profile_pool()
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260522)
+  n <- 256L
+  dat <- data.frame(
+    y = rnorm(n),
+    u1 = factor(sample(letters[1:2], n, TRUE)),
+    o1 = ordered(sample(1:5, n, TRUE))
+  )
+  dat$y <- as.numeric(dat$u1) + cos(as.numeric(dat$o1)) + 0.1 * dat$y
+
+  bw <- npregbw(
+    y ~ u1 + o1,
+    data = dat,
+    bwmethod = "cv.ls",
+    nmulti = 1,
+    ukertype = "liracine",
+    okertype = "racineliyan"
+  )
+  fit <- npreg(bws = bw)
+
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  set.seed(885L)
+  options(np.tree = FALSE)
+  dense <- plot(fit,
+                plot.behavior = "data",
+                plot.errors.method = "bootstrap",
+                plot.errors.boot.method = "inid",
+                plot.errors.boot.num = 41L,
+                plot.errors.type = "pointwise")
+
+  set.seed(885L)
+  options(np.tree = TRUE)
+  tree <- plot(fit,
+               plot.behavior = "data",
+               plot.errors.method = "bootstrap",
+               plot.errors.boot.method = "inid",
+               plot.errors.boot.num = 41L,
+               plot.errors.type = "pointwise")
+
+  expect_equal(names(tree), names(dense))
+  for (j in seq_along(dense)) {
+    expect_equal(tree[[j]]$mean, dense[[j]]$mean, tolerance = 1e-8)
+    expect_equal(tree[[j]]$merr, dense[[j]]$merr, tolerance = 1e-8)
+  }
+})
