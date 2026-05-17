@@ -156,3 +156,49 @@ test_that("npscoefhat apply uses categorical profile route", {
   oracle <- npscoef_profile_oracle(xdat, ydat, zdat, bw)
   expect_equal(got[, 1L], oracle$mean, tolerance = 1e-8)
 })
+
+test_that("npscoef plot-bootstrap inid helper uses categorical profiles exactly", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  options(npRmpi.autodispatch = FALSE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20260816L)
+  n <- 80L
+  B <- 8L
+  xdat <- data.frame(x = rnorm(n))
+  zdat <- data.frame(
+    z = factor(sample(letters[1:3], n, TRUE)),
+    o = ordered(sample(1:4, n, TRUE))
+  )
+  ydat <- 1 + 0.8 * xdat$x + as.numeric(zdat$z) -
+    0.4 * as.numeric(zdat$o) + rnorm(n, sd = 0.2)
+  bw <- npscoefbw(
+    xdat = xdat,
+    ydat = ydat,
+    zdat = zdat,
+    bws = c(0.25, 0.3),
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+  exdat <- xdat[seq_len(19L), , drop = FALSE]
+  ezdat <- zdat[seq_len(19L), , drop = FALSE]
+  counts <- replicate(B, tabulate(sample.int(n, n, TRUE), nbins = n))
+  boot <- getFromNamespace(".np_inid_boot_from_scoef_frozen", "npRmpi")
+
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
+  dense <- boot(txdat = xdat, ydat = ydat, tzdat = zdat,
+                exdat = exdat, ezdat = ezdat, bws = bw, B = B,
+                counts = counts, progress.label = "dense")
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  profile <- boot(txdat = xdat, ydat = ydat, tzdat = zdat,
+                  exdat = exdat, ezdat = ezdat, bws = bw, B = B,
+                  counts = counts, progress.label = "profile")
+
+  expect_true(isTRUE(all.equal(profile$t0, dense$t0, tolerance = 1e-8,
+                               check.attributes = FALSE)))
+  expect_true(isTRUE(all.equal(profile$t, dense$t, tolerance = 1e-8,
+                               check.attributes = FALSE)))
+})

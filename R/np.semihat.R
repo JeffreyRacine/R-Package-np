@@ -704,7 +704,9 @@
   ezdat <- toFrame(ezdat)
   leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
   spec <- .npscoef_canonical_spec(source = bws, zdat = tzdat, where = where)
-  same.eval <- isTRUE(all.equal(tzdat, ezdat, check.attributes = FALSE))
+  same.eval <- nrow(tzdat) == nrow(ezdat) &&
+    ncol(tzdat) == ncol(ezdat) &&
+    isTRUE(all.equal(tzdat, ezdat, check.attributes = FALSE))
 
   if (leave.one.out && !same.eval) {
     stop("leave.one.out=TRUE requires evaluation 'z' data to match training 'z' data")

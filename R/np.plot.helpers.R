@@ -4355,6 +4355,30 @@
   if (length(ydat) != nrow(txdat))
     stop("length of ydat must match training rows in smooth coefficient inid helper")
 
+  profile.eligible <- identical(bws$regtype, "lc") &&
+    !leave.one.out &&
+    identical(bws$type, "fixed") &&
+    (isTRUE(getOption("np.categorical.compress", TRUE)) ||
+       isTRUE(getOption("np.tree"))) &&
+    !miss.z &&
+    isTRUE(bws$ncon == 0L) &&
+    isTRUE((bws$nuno + bws$nord) > 0L)
+
+  if (profile.eligible) {
+    return(.np_inid_boot_from_scoef_cat_profile(
+      txdat = txdat,
+      ydat = .np_inid_scoef_numeric_y(ydat = ydat, bws = bws),
+      tzdat = tzdat,
+      exdat = exdat,
+      ezdat = ezdat,
+      bws = bws,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
+
   hat.args <- list(
     bws = bws,
     txdat = txdat,
@@ -4377,6 +4401,169 @@
     counts.drawer = counts.drawer,
     progress.label = progress.label
   )
+}
+
+.np_inid_boot_from_scoef_cat_profile <- function(txdat,
+                                                 ydat,
+                                                 tzdat,
+                                                 exdat,
+                                                 ezdat,
+                                                 bws,
+                                                 B,
+                                                 counts = NULL,
+                                                 counts.drawer = NULL,
+                                                 progress.label = NULL,
+                                                 ridge = 0.0) {
+  txdat <- adjustLevels(txdat, bws$xdati)
+  exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+  tzdat <- adjustLevels(tzdat, bws$zdati)
+  ezdat <- adjustLevels(ezdat, bws$zdati, allowNewCells = TRUE)
+
+  X.train <- toMatrix(txdat)
+  X.eval <- toMatrix(exdat)
+  W.train <- cbind(1.0, X.train)
+  W.eval <- cbind(1.0, X.eval)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+  n <- nrow(W.train)
+  m <- nrow(W.eval)
+  p <- ncol(W.train)
+
+  train.codes <- .np_cat_profile_code_matrix(tzdat)
+  eval.codes <- .np_cat_profile_code_matrix(ezdat)
+  train.keys <- .np_cat_profile_keys(train.codes)
+  profile.keys <- unique(train.keys)
+  train.id <- match(train.keys, profile.keys)
+  train.rep <- match(profile.keys, train.keys)
+  G <- length(profile.keys)
+  L.eval <- .np_regression_cat_profile_kernel_matrix(
+    eval.codes = eval.codes,
+    train.codes = train.codes[train.rep, , drop = FALSE],
+    xdat = tzdat[train.rep, , drop = FALSE],
+    bws = bws
+  )
+
+  sww.profile <- matrix(0.0, nrow = G, ncol = p * p)
+  swy.profile <- matrix(0.0, nrow = G, ncol = p)
+  for (j in seq_len(p)) {
+    for (k in seq_len(p)) {
+      sww.profile[, (j - 1L) * p + k] <-
+        .np_cat_profile_rowsum(W.train[, j] * W.train[, k],
+                               train.id, G)[, 1L]
+    }
+    swy.profile[, j] <-
+      .np_cat_profile_rowsum(W.train[, j] * ydat, train.id, G)[, 1L]
+  }
+
+  sww.eval <- L.eval %*% sww.profile
+  swy.eval <- L.eval %*% swy.profile
+  ridge.grid <- npRidgeSequenceFromBase(
+    n.train = n,
+    ridge.base = max(0.0, as.double(ridge)),
+    cap = 1.0
+  )
+  V <- matrix(NA_real_, nrow = p, ncol = m)
+  for (ii in seq_len(m)) {
+    XtWX <- matrix(sww.eval[ii, ], nrow = p, ncol = p, byrow = TRUE)
+    diag.loc <- cbind(seq_len(p), seq_len(p))
+    XtWX.diag <- XtWX[diag.loc]
+    solved <- FALSE
+    for (ridge.try in ridge.grid) {
+      A <- XtWX
+      if (ridge.try > 0)
+        A[diag.loc] <- XtWX.diag + ridge.try
+      v <- tryCatch(
+        solve(t(A), matrix(W.eval[ii, ], ncol = 1L)),
+        error = function(e) NULL
+      )
+      if (!is.null(v) && all(is.finite(v))) {
+        V[, ii] <- drop(v)
+        solved <- TRUE
+        break
+      }
+    }
+    if (!solved)
+      stop(sprintf("failed to solve smooth coefficient profile bootstrap row %d", ii))
+  }
+
+  t0 <- as.vector(colSums(V * t(swy.eval)))
+  tmat <- matrix(NA_real_, nrow = B, ncol = m)
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    for (bb in seq_len(B)) {
+      cw.profile <- matrix(0.0, nrow = G, ncol = p)
+      cwy.profile <- matrix(0.0, nrow = G, ncol = p)
+      counts.b <- counts.mat[, bb]
+      for (j in seq_len(p)) {
+        cw.profile[, j] <-
+          .np_cat_profile_rowsum(counts.b * W.train[, j],
+                                 train.id, G)[, 1L]
+        cwy.profile[, j] <-
+          .np_cat_profile_rowsum(counts.b * W.train[, j] * ydat,
+                                 train.id, G)[, 1L]
+      }
+      den <- L.eval %*% cw.profile
+      num <- L.eval %*% cwy.profile
+      tmat[bb, ] <- colSums(V * t(num)) /
+        pmax(colSums(V * t(den)), .Machine$double.eps)
+    }
+    return(list(t = tmat, t0 = t0))
+  }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B,
+                                    progress_cap = !is.null(counts.drawer))
+  prob <- rep.int(1 / n, n)
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size,
+                                                        progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    counts.chunk <- if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = prob)
+    }
+    for (jj in seq_len(bsz)) {
+      bb <- start + jj - 1L
+      cw.profile <- matrix(0.0, nrow = G, ncol = p)
+      cwy.profile <- matrix(0.0, nrow = G, ncol = p)
+      counts.b <- counts.chunk[, jj]
+      for (j in seq_len(p)) {
+        cw.profile[, j] <-
+          .np_cat_profile_rowsum(counts.b * W.train[, j],
+                                 train.id, G)[, 1L]
+        cwy.profile[, j] <-
+          .np_cat_profile_rowsum(counts.b * W.train[, j] * ydat,
+                                 train.id, G)[, 1L]
+      }
+      den <- L.eval %*% cw.profile
+      num <- L.eval %*% cwy.profile
+      tmat[bb, ] <- colSums(V * t(num)) /
+        pmax(colSums(V * t(den)), .Machine$double.eps)
+    }
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
 }
 
 .np_inid_boot_from_scoef_localpoly_fixed <- function(txdat,
