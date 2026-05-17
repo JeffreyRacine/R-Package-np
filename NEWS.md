@@ -23,12 +23,13 @@
   route preserves the objective value to numerical precision while allowing
   harmless optimizer-path drift in selected smoothing parameters, especially
   near upper-bound or large-bandwidth regions where the objective is flat.
-- Ordered-only unconditional distribution fit/evaluation routes also use
+- Ordered-only unconditional distribution bandwidth search and fit/evaluation
+  routes also use
   profile compression when `options(np.categorical.compress = TRUE)` is
-  enabled, preserving
-  fitted distribution values and standard errors for fixed smoothing
-  parameters while avoiding repeated computation over identical ordered
-  profiles.
+  enabled, preserving selected smoothing parameters, objective values, fitted
+  distribution values, and standard errors while avoiding repeated computation
+  over identical ordered profiles where the distribution route can exploit the
+  compressed representation.
 - Fixed-bandwidth local-constant `npscoef()` fits now use categorical-profile
   compression when all `Z` variables are categorical and
   `options(np.categorical.compress = TRUE)` is enabled. The route preserves
