@@ -1664,13 +1664,43 @@ npValidateRegressionNnLowerBound <- function(bws,
 }
 
 
+.np_formula_quote_name_if_needed <- function(x) {
+  reserved <- c("if", "else", "repeat", "while", "function", "for", "in",
+                "next", "break", "TRUE", "FALSE", "NULL", "Inf", "NaN", "NA",
+                "NA_integer_", "NA_real_", "NA_complex_", "NA_character_")
+  vapply(x, function(term) {
+    if (make.names(term) == term && !(term %in% reserved))
+      return(term)
+
+    paste0("`", gsub("`", "\\\\`", term), "`")
+  }, character(1), USE.NAMES = FALSE)
+}
+
 explodeFormula <- function(formula, data=NULL){
   formula.terms <- if (is.null(data)) terms(formula) else terms(formula, data = data)
   response <- if (length(formula) == 3L) all.vars(formula[[2L]]) else character(0)
-  res <- list(response, attr(formula.terms, "term.labels"))
+  term.labels.raw <- attr(formula.terms, "term.labels")
+  term.labels <- ifelse(grepl("^`[^`]+`$", term.labels.raw),
+                        substring(term.labels.raw, 2L, nchar(term.labels.raw) - 1L),
+                        term.labels.raw)
+  res <- list(response, term.labels)
   stopifnot(all(sapply(res,length) > 0))
   names(res) <- c("response","terms")
+  attr(res, "formula.labels") <- list(
+    response = if (length(formula) == 3L) .np_formula_quote_name_if_needed(response) else character(0),
+    terms = term.labels.raw
+  )
   res
+}
+
+.np_formula_quote_if_needed <- function(x) {
+  vapply(x, function(term) {
+    parsed <- try(parse(text = term), silent = TRUE)
+    if (!inherits(parsed, "try-error"))
+      return(term)
+
+    paste0("`", gsub("`", "\\\\`", term), "`")
+  }, character(1), USE.NAMES = FALSE)
 }
 
 

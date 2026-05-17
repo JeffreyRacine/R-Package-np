@@ -47,7 +47,10 @@ npcdistbw.formula <-
     variableNames <- if(m[2] > 0) explodeFormula(formula.obj, data = data) else explodeFormula(formula.obj)
 
     ## make formula evaluable, then eval
-    varsPlus <- lapply(variableNames, paste, collapse=" + ")
+    formula.labels <- attr(variableNames, "formula.labels")
+    if (is.null(formula.labels))
+      formula.labels <- lapply(variableNames, .np_formula_quote_if_needed)
+    varsPlus <- lapply(formula.labels, paste, collapse=" + ")
     mf[["formula"]] <- as.formula(paste(" ~ ", varsPlus[[1]]," + ",
                                         varsPlus[[2]]),
                                   env = environment(formula))
