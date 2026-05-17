@@ -14,8 +14,10 @@
   profile-compression idea when `options(np.categorical.compress = TRUE)` is
   enabled. The fixed-bandwidth fit/evaluation route preserves dense-route
   fitted/evaluation values while avoiding repeated computation over identical
-  categorical profiles. Bandwidth-search profile compression remains gated by
-  the legacy tree option until the objective route is separately revalidated.
+  categorical profiles, and the bandwidth-search route now uses the same
+  compressed support representation for all-categorical data. As with other
+  flat categorical search surfaces, selected smoothing parameters may drift by
+  optimizer-path amounts while preserving the objective scale.
 - Categorical-only conditional density and conditional distribution bandwidth
   searches now honor `options(np.categorical.compress = TRUE)`. The promoted
   route preserves the objective value to numerical precision while allowing
