@@ -11,8 +11,10 @@
   profile-compression idea when `options(np.categorical.compress = TRUE)` is
   enabled. The fixed-bandwidth fit/evaluation route preserves dense-route
   fitted/evaluation values while avoiding repeated computation over identical
-  categorical profiles. Bandwidth-search profile compression remains gated by
-  the legacy tree option until the objective route is separately revalidated.
+  categorical profiles, and the bandwidth-search route now uses the same
+  compressed support representation for all-categorical data. As with other
+  flat categorical search surfaces, selected smoothing parameters may drift by
+  optimizer-path amounts while preserving the objective scale.
   Very fast
   compressed routes may remain overhead-floor limited, so MPI acceleration is
   most useful once the uncompressed work would be genuinely long-running.

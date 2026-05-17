@@ -250,7 +250,9 @@ npudensbw.bandwidth <-
         nord = dim(dord)[2],
         ncon = dim(dcon)[2],
         old.dens = FALSE,
-        int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+        int_do_tree = npDoTreeOrCategoricalCompress(
+          ncon = dim(dcon)[2],
+          ncat = dim(duno)[2] + dim(dord)[2]),
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)

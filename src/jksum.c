@@ -1076,6 +1076,7 @@ static int np_build_discrete_profile_index(const int num_xt,
 
 static inline int np_disc_near_upper(const int kernel, const double lambda, const int ncat);
 static inline int np_disc_ordered_near_upper(const int kernel, const double lambda);
+static inline int np_disc_near_const_kernel(const double k_same, const double k_diff);
 
 static double np_regression_cat_profile_self_weight(
 int *kernel_u,
@@ -1096,7 +1097,17 @@ double **matrix_categorical_vals){
 
   for(j = 0; j < num_reg_unordered; j++){
     const int ku = (kernel_u[j] >= 0 && kernel_u[j] < nuk) ? kernel_u[j] : 0;
-    w *= ukf[ku](1, lambda[j], num_categories[j]);
+    const int ncat = (num_categories != NULL) ? num_categories[j] : 0;
+    const double lam = lambda[j];
+    if(np_disc_near_upper(ku, lam, ncat)){
+      const double ks = ukf[ku](1, lam, ncat);
+      const double kd = ukf[ku](0, lam, ncat);
+      if(np_disc_near_const_kernel(ks, kd)){
+        w *= 0.5*(ks + kd);
+        continue;
+      }
+    }
+    w *= ukf[ku](1, lam, ncat);
   }
 
   for(j = 0; j < num_reg_ordered; j++){
@@ -1106,6 +1117,17 @@ double **matrix_categorical_vals){
     const double *cats = (matrix_categorical_vals != NULL) ? matrix_categorical_vals[oi] : NULL;
     const double cl = (cats != NULL && ncat > 0) ? cats[0] : profile_ordered[j][profile_idx];
     const double ch = (cats != NULL && ncat > 0) ? cats[ncat - 1] : profile_ordered[j][profile_idx];
+
+    if(ncat > 0 && np_disc_ordered_near_upper(ko, lambda[oi])){
+      const double k0 = np_ordered_eval_kernel(ko, cl, cl, lambda[oi],
+                                               0, NULL, cats, ncat, cl, ch);
+      const double k1 = np_ordered_eval_kernel(ko, cl, ch, lambda[oi],
+                                               0, NULL, cats, ncat, cl, ch);
+      if(np_disc_near_const_kernel(k0, k1)){
+        w *= 0.5*(k0 + k1);
+        continue;
+      }
+    }
 
     w *= np_ordered_eval_kernel(ko,
                                 profile_ordered[j][profile_idx],
