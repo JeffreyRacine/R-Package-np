@@ -10331,6 +10331,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                             &profile_traceH)){
       cv = profile_cv;
       traceH = profile_traceH;
+      np_fastcv_alllarge_hits++;
       goto finish_cv_path;
     }
   }
@@ -11908,8 +11909,10 @@ double *cv){
   np_gate_ctx_clear(&gate_y_ctx);
 
   if((BANDWIDTH_den == BW_FIXED) &&
-     (np_conditional_distribution_cvls_categorical_profile_stream(vector_scale_factor, cv) == 0))
+     (np_conditional_distribution_cvls_categorical_profile_stream(vector_scale_factor, cv) == 0)){
+    np_fastcv_alllarge_hits++;
     return 0;
+  }
 
   if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN) || (BANDWIDTH_den == BW_ADAP_NN)) &&
      (int_ll_extern == LL_LP))
@@ -23253,6 +23256,7 @@ int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
   if((BANDWIDTH_den_extern == BW_FIXED) &&
      (np_conditional_distribution_cvls_categorical_profile_stream(vector_scale_factor, cv) == 0)){
     np_glp_cv_clear_extern();
+    np_fastcv_alllarge_hits++;
     return 0;
   }
 
@@ -23812,6 +23816,7 @@ double *cv){
                                        num_categories,
                                        matrix_categorical_vals_extern,
                                        cv)){
+    np_fastcv_alllarge_hits++;
     free(operator);
     free(kernel_c);
     free(kernel_u);
@@ -24171,6 +24176,7 @@ double *cv){
                                        num_categories,
                                        matrix_categorical_vals,
                                        cv)){
+    np_fastcv_alllarge_hits++;
     status = 0;
     goto cleanup_density_convolution_cv;
   }
@@ -25264,6 +25270,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
     if(weighted_den != NULL) free(weighted_den);
 
     if(profile_ok){
+      np_fastcv_alllarge_hits++;
       ret = 0;
       goto cleanup_cvml_return;
     }
