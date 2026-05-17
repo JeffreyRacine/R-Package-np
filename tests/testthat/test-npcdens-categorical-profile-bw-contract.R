@@ -42,3 +42,32 @@ test_that("all-categorical conditional bandwidth search respects compression con
   compare_bw(npcdistbw, make_data(20260623L, ordered_y = TRUE,
                                   ordered_x = TRUE))
 })
+
+test_that("npcdist generated ordered grids preserve interval-labelled levels", {
+  skip_on_cran()
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE,
+                      np.categorical.compress = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260624L)
+  n <- 180L
+  x.raw <- rnorm(n)
+  z.raw <- rnorm(n)
+  s.raw <- x.raw + z.raw + rnorm(n, sd = 0.5)
+  dat <- data.frame(
+    y = ordered(cut(s.raw, quantile(s.raw, seq(0, 1, length.out = 5)),
+                    include.lowest = TRUE)),
+    x = ordered(cut(x.raw, quantile(x.raw, seq(0, 1, length.out = 5)),
+                    include.lowest = TRUE)),
+    z = ordered(cut(z.raw, quantile(z.raw, seq(0, 1, length.out = 5)),
+                    include.lowest = TRUE))
+  )
+
+  expect_warning(
+    bw <- npcdistbw(y ~ x + z, data = dat, nmulti = 1,
+                    oxkertype = "liracine", oykertype = "liracine"),
+    NA
+  )
+  expect_true(is.finite(bw$fval))
+})

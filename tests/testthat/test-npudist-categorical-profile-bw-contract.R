@@ -80,3 +80,34 @@ test_that("npudist ordered-categorical profile bandwidth CV supports training-gr
   expect_equal(profile$fval, dense$fval, tolerance = 1e-8)
   expect_gt(profile$num.feval.fast, 0)
 })
+
+test_that("npudist generated ordered grids preserve interval-labelled levels", {
+  old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
+  old.messages <- getOption("np.messages")
+  on.exit({
+    options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
+    options(np.messages = old.messages)
+  }, add = TRUE)
+  options(np.messages = FALSE, np.tree = FALSE,
+          np.categorical.compress = TRUE)
+
+  set.seed(20260542L)
+  n <- 180L
+  x1 <- rnorm(n)
+  x2 <- rnorm(n)
+  dat <- data.frame(
+    o1 = ordered(cut(x1, quantile(x1, seq(0, 1, length.out = 5)),
+                     include.lowest = TRUE)),
+    o2 = ordered(cut(x2, quantile(x2, seq(0, 1, length.out = 5)),
+                     include.lowest = TRUE))
+  )
+
+  expect_warning(
+    bw <- npudistbw(~ o1 + o2, data = dat, nmulti = 1,
+                    okertype = "liracine"),
+    NA
+  )
+  expect_true(is.finite(bw$fval))
+})
