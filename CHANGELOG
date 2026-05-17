@@ -19,6 +19,13 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   categorical profiles. Bandwidth-search profile compression remains gated by
   the legacy tree option until the objective route is separately revalidated.
 
+* Added categorical-profile compression activation for categorical-only
+  conditional density and conditional distribution bandwidth searches under
+  `options(np.categorical.compress = TRUE)`. The accepted contract is objective
+  preservation to numerical precision, with selected smoothing-parameter drift
+  allowed when it is optimizer-path drift in flat upper-bound or large-bandwidth
+  regions.
+
 * Added profile compression for ordered-only unconditional distribution
   fit/evaluation routes when `options(np.categorical.compress = TRUE)` is
   enabled. The fixed

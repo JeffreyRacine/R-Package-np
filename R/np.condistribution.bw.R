@@ -348,7 +348,9 @@ npcdistbw.condbandwidth <-
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
         cdf_on_train = cdf_on_train,
-        int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+        int_do_tree = npDoTreeOrCategoricalCompress(
+          ncon = dim(ycon)[2] + dim(xcon)[2],
+          ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
         scale.init.categorical.sample=scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
@@ -702,7 +704,9 @@ npcdistbw.condbandwidth <-
     xnord = dim(xord)[2],
     xncon = dim(xcon)[2],
     cdf_on_train = cdf_on_train,
-    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    int_do_tree = npDoTreeOrCategoricalCompress(
+      ncon = dim(ycon)[2] + dim(xcon)[2],
+      ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
     transform.bounds = FALSE
