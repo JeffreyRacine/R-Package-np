@@ -41,6 +41,9 @@
   conditional-distribution, and regression cleanup points. These caches are
   keyed by call-local row pointers, so clearing them per `.Call` prevents stale
   same-process state from leaking across unrelated data sets.
+- Formula variables whose names contain dots, such as `y.irr ~ x`, are no
+  longer mistaken for the formula wildcard `.` in conditional density and
+  conditional distribution bandwidth routes.
 
 # np 0.70-2
 

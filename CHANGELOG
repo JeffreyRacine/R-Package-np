@@ -49,6 +49,11 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   prevent stale same-process state from affecting later calls on unrelated
   data.
 
+* Fixed formula parsing for variables whose names contain dots, such as
+  `y.irr ~ x`, so these ordinary variable names are no longer mistaken for the
+  formula wildcard `.` in conditional density and conditional distribution
+  bandwidth routes.
+
 Changes from Version 0.70-1 to 0.70-2 [15-May-2026]
 
 * Promoted `npqreg()` to a fully fledged quantile-regression front end. It
