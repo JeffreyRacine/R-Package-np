@@ -332,7 +332,7 @@ npcdistbw.condbandwidth <-
 
         evy <- oydat[seq_len(nog),,drop = FALSE]
         for (i in seq_len(ncol(evy))) {
-          evy[,i] <- uocquantile(oydat[,i], probs)
+          evy[,i] <- cast(uocquantile(oydat[,i], probs), oydat[,i])
         }
 
         evy <- toMatrix(evy)
@@ -798,7 +798,7 @@ npcdistbw.condbandwidth <-
     probs <- seq(0, 1, length.out = nog)
     evy <- oydat[seq_len(nog),, drop = FALSE]
     for (i in seq_len(ncol(evy)))
-      evy[, i] <- uocquantile(oydat[, i], probs)
+      evy[, i] <- cast(uocquantile(oydat[, i], probs), oydat[, i])
     evy <- toMatrix(evy)
     gyuno <- evy[, bws$iyuno, drop = FALSE]
     gyord <- evy[, bws$iyord, drop = FALSE]

@@ -261,7 +261,7 @@ npudistbw.dbandwidth <-
         probs <- seq(0,1,length.out = nog)
         ev <- odat[seq_len(nog),,drop = FALSE]
         for (i in seq_len(ncol(ev))) {
-          ev[,i] <- uocquantile(odat[,i], probs)
+          ev[,i] <- cast(uocquantile(odat[,i], probs), odat[,i])
         }
 
         ev <- toMatrix(ev)
