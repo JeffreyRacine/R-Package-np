@@ -206,6 +206,15 @@ npplreg.call <-
     local.direct <- isTRUE(identical(bws$type, "generalized_nn"))
 
     reg_mean <- function(regbw, ytrain, zeval = NULL) {
+      out <- .np_regression_cat_profile_mean(
+        bws = regbw,
+        txdat = zdat,
+        tydat = ytrain,
+        exdat = zeval
+      )
+      if (!is.null(out))
+        return(as.vector(out))
+
       args <- list(
         bws = regbw,
         txdat = zdat,
@@ -375,26 +384,29 @@ npplreg.plbandwidth <-
       }
     }
 
-    use.cat.compress <- identical(bws$regtype, "lc") &&
-      !isTRUE(getOption("np.tree")) &&
-      isTRUE(getOption("np.categorical.compress", TRUE)) &&
-      is.list(bws$bw$yzbw) &&
-      isTRUE(bws$bw$yzbw$ncon == 0L) &&
-      isTRUE((bws$bw$yzbw$nuno + bws$bw$yzbw$nord) > 0L)
+    reg_mean <- function(regbw, ytrain, zeval = NULL) {
+      out <- .np_regression_cat_profile_mean(
+        bws = regbw,
+        txdat = tzdat,
+        tydat = ytrain,
+        exdat = zeval
+      )
+      if (!is.null(out))
+        return(as.vector(out))
 
-    if (use.cat.compress) {
-      old.tree <- getOption("np.tree")
-      options(np.tree = TRUE)
-      on.exit(options(np.tree = old.tree), add = TRUE)
+      args <- list(txdat = tzdat, tydat = ytrain, bws = regbw)
+      if (!is.null(zeval))
+        args$exdat <- zeval
+      as.vector(fitted(do.call(npreg, args)))
     }
     
     ## y on z
-    mmy = npreg(txdat = tzdat, tydat = tydat, bws = bws$bw$yzbw)
+    yhat.train <- reg_mean(regbw = bws$bw$yzbw, ytrain = tydat)
 
-    resy <- tmp.ty - mmy$mean
+    resy <- tmp.ty - yhat.train
 
     if (!no.exz)
-      mmy.eval = npreg(txdat = tzdat, tydat = tydat, exdat = ezdat, bws = bws$bw$yzbw)
+      yhat.eval <- reg_mean(regbw = bws$bw$yzbw, ytrain = tydat, zeval = ezdat)
 
     
     ## x on z
@@ -421,23 +433,23 @@ npplreg.plbandwidth <-
     )
 
     for (i in seq_len(ncol)) {
-      mm = npreg(txdat=tzdat, tydat=txdat[,i], bws = bws$bw[[i+1]])
+      xhat.train <- reg_mean(regbw = bws$bw[[i+1]], ytrain = txdat[, i])
 
       if (is.factor(txdat[1,i])){
         tmp.dat <- adjustLevels(txdat[,i, drop=FALSE], bws$bw[[i+1]]$ydati)
-        resx[,i] <- (bws$bw[[i+1]]$ydati$all.dlev[[1]])[as.integer(tmp.dat[,1])] - mm$mean
+        resx[,i] <- (bws$bw[[i+1]]$ydati$all.dlev[[1]])[as.integer(tmp.dat[,1])] - xhat.train
       } else {
-        resx[,i] <- txdat[,i] - mm$mean
+        resx[,i] <- txdat[,i] - xhat.train
       }
 
       if(!no.exz) {
-        mm = npreg(txdat=tzdat, tydat=txdat[,i], exdat=ezdat, bws = bws$bw[[i+1]])
+        xhat.eval <- reg_mean(regbw = bws$bw[[i+1]], ytrain = txdat[, i], zeval = ezdat)
 
         if (is.factor(txdat[1,i])){
           tmp.dat <- adjustLevels(exdat[,i, drop=FALSE], bws$bw[[i+1]]$ydati)
-          resx.eval[,i] <- (bws$bw[[i+1]]$ydati$all.dlev[[1]])[as.integer(tmp.dat[,1])] - mm$mean
+          resx.eval[,i] <- (bws$bw[[i+1]]$ydati$all.dlev[[1]])[as.integer(tmp.dat[,1])] - xhat.eval
         } else {
-          resx.eval[,i] <- exdat[,i] - mm$mean
+          resx.eval[,i] <- exdat[,i] - xhat.eval
         }
       }
 
@@ -459,14 +471,14 @@ npplreg.plbandwidth <-
     ## computes the standard errors of B using the model matrix
     ## and the MSE of the training data predictions
 
-    Bvcov = sum((tmp.ty-(mmy$mean + resx  %*% B))^2)/
+    Bvcov = sum((tmp.ty-(yhat.train + resx  %*% B))^2)/
       (dim(txdat)[1]-dim(txdat)[2]-dim(tzdat)[2])*
       chol2inv(chol(t(model.matrix(model))%*%model.matrix(model)))
 
     Berr = sqrt(diag(Bvcov))
 
-    train.ply =  mmy$mean + resx %*% B
-    ply = if (no.exz) train.ply else mmy.eval$mean + resx.eval %*% B
+    train.ply =  yhat.train + resx %*% B
+    ply = if (no.exz) train.ply else yhat.eval + resx.eval %*% B
 
     if (!no.ey) {
       RSQ = RSQfunc(tmp.ey, ply)

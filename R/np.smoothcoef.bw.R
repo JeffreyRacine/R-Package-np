@@ -10,14 +10,6 @@ npscoefbw <-
 
 npscoefbw.formula <-
   function(formula, data, subset, na.action, call, ...){
-    orig.ts <- if (missing(data))
-      .np_terms_ts_mask(terms_obj = terms(formula),
-                        data = environment(formula),
-                        eval_env = environment(formula))
-    else .np_terms_ts_mask(terms_obj = terms(formula, data = data),
-                           data = data,
-                           eval_env = environment(formula))
-
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
@@ -35,6 +27,22 @@ npscoefbw.formula <-
     chromoly <- explodePipe(formula.obj, env = environment(formula))
 
     bronze <- sapply(chromoly, paste, collapse = " + ")
+    formula.all <- if (missing(data)) {
+      terms(as.formula(paste(" ~ ", paste(bronze, collapse = " + ")),
+                       env = environment(formula)))
+    } else {
+      terms(as.formula(paste(" ~ ", paste(bronze, collapse = " + ")),
+                       env = environment(formula)), data = data)
+    }
+
+    orig.ts <- if (missing(data))
+      .np_terms_ts_mask(terms_obj = formula.all,
+                        data = environment(formula.all),
+                        eval_env = environment(formula.all))
+    else .np_terms_ts_mask(terms_obj = formula.all,
+                           data = data,
+                           eval_env = environment(formula.all))
+
     mf[["formula"]] <-
       as.formula(paste(bronze[1]," ~ ",
                        paste(bronze[2:length(bronze)],
@@ -1878,6 +1886,146 @@ npscoefbw.scbandwidth <-
       coef.out
     }
 
+    lc_cat_profile_loo_mean <- function(sbw) {
+      train.codes <- .np_cat_profile_code_matrix(zdat.df)
+      train.keys <- .np_cat_profile_keys(train.codes)
+      profile.keys <- unique(train.keys)
+      train.id <- match(train.keys, profile.keys)
+      train.rep <- match(profile.keys, train.keys)
+      train.profile.codes <- train.codes[train.rep, , drop = FALSE]
+      train.profile.dat <- zdat.df[train.rep, , drop = FALSE]
+      G <- length(profile.keys)
+
+      L.eval <- .np_regression_cat_profile_kernel_matrix(
+        eval.codes = train.codes,
+        train.codes = train.profile.codes,
+        xdat = train.profile.dat,
+        bws = sbw
+      )
+
+      yW.local <- cbind(ydat, W)
+      p <- ncol(yW.local)
+      cross.profile <- matrix(0.0, nrow = G, ncol = p * p)
+      for (j in seq_len(p)) {
+        for (k in seq_len(p)) {
+          cross.profile[, (j - 1L) * p + k] <-
+            .np_cat_profile_rowsum(yW.local[, j] * yW.local[, k],
+                                   train.id, G)[, 1L]
+        }
+      }
+
+      flat <- L.eval %*% cross.profile
+      self.weight <- L.eval[cbind(seq_len(n), train.id)]
+      mean.loo <- rep(maxPenalty, n)
+      ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
+      nc <- ncol(W)
+
+      solve_one <- function(ii) {
+        mat.full <- matrix(flat[ii, ], nrow = p, ncol = p)
+        mat.full <- mat.full - self.weight[ii] *
+          tcrossprod(yW.local[ii, ])
+        tyw.ii <- mat.full[-1L, 1L]
+        tww.ii <- mat.full[-1L, -1L, drop = FALSE]
+
+        ridge.idx <- 1L
+        ridge <- ridge.grid[ridge.idx]
+        repeat {
+          ridge.val <- ridge * tyw.ii[1L] / NZD(tww.ii[1L, 1L])
+          beta.ii <- tryCatch(
+            solve(tww.ii + diag(rep(ridge, nc)),
+                  tyw.ii + c(ridge.val, rep(0, nc - 1L))),
+            error = function(e) e
+          )
+          if (!inherits(beta.ii, "error")) {
+            return(as.double(W[ii,, drop = FALSE] %*% beta.ii))
+          }
+          ridge.idx <- ridge.idx + 1L
+          if (ridge.idx > length(ridge.grid))
+            break
+          ridge <- ridge.grid[ridge.idx]
+        }
+        maxPenalty
+      }
+
+      ridge <- ridge.grid[1L]
+      for (gg in seq_len(G)) {
+        idx <- which(train.id == gg)
+        rep.idx <- train.rep[gg]
+        mat.full <- matrix(flat[rep.idx, ], nrow = p, ncol = p)
+        tyw.full <- mat.full[-1L, 1L]
+        tww.full <- mat.full[-1L, -1L, drop = FALSE]
+        inv.full <- tryCatch(
+          solve(tww.full + diag(rep(ridge, nc))),
+          error = function(e) e
+        )
+        if (inherits(inv.full, "error")) {
+          mean.loo[idx] <- vapply(idx, solve_one, numeric(1))
+          next
+        }
+
+        Wg <- W[idx,, drop = FALSE]
+        yg <- ydat[idx]
+        sg <- self.weight[idx]
+        rhs <- matrix(rep(tyw.full, each = length(idx)),
+                      nrow = length(idx), ncol = nc)
+        rhs <- rhs - sg * Wg * yg
+        tww11 <- tww.full[1L, 1L] - sg * Wg[, 1L] * Wg[, 1L]
+        rhs[, 1L] <- rhs[, 1L] + ridge * rhs[, 1L] / NZD(tww11)
+
+        u <- Wg %*% inv.full
+        denom <- 1.0 - sg * rowSums(u * Wg)
+        base <- rhs %*% inv.full
+        alpha <- rowSums(u * rhs)
+        beta <- base + (sg * alpha / denom) * u
+        pred <- rowSums(Wg * beta)
+        bad <- !is.finite(pred) | !is.finite(denom) |
+          abs(denom) < sqrt(.Machine$double.eps)
+        if (any(bad))
+          pred[bad] <- vapply(idx[bad], solve_one, numeric(1))
+        mean.loo[idx] <- pred
+      }
+
+      mean.loo
+    }
+
+    lc_cat_profile_partial_loo <- function(sbw, wj, partial.y) {
+      train.codes <- .np_cat_profile_code_matrix(zdat.df)
+      train.keys <- .np_cat_profile_keys(train.codes)
+      profile.keys <- unique(train.keys)
+      train.id <- match(train.keys, profile.keys)
+      train.rep <- match(profile.keys, train.keys)
+      train.profile.codes <- train.codes[train.rep, , drop = FALSE]
+      train.profile.dat <- zdat.df[train.rep, , drop = FALSE]
+      G <- length(profile.keys)
+
+      L.eval <- .np_regression_cat_profile_kernel_matrix(
+        eval.codes = train.codes,
+        train.codes = train.profile.codes,
+        xdat = train.profile.dat,
+        bws = sbw
+      )
+
+      num.profile <- .np_cat_profile_rowsum(partial.y * wj, train.id, G)[, 1L]
+      den.profile <- .np_cat_profile_rowsum(wj * wj, train.id, G)[, 1L]
+      num <- as.vector(L.eval %*% num.profile)
+      den <- as.vector(L.eval %*% den.profile)
+      self.weight <- L.eval[cbind(seq_len(n), train.id)]
+      num <- num - self.weight * partial.y * wj
+      den <- den - self.weight * wj * wj
+
+      wj * num / NZD(den)
+    }
+
+    use_cat_profile_cv_lc <- function(sbw) {
+      identical(reg.engine, "lc") &&
+        identical(sbw$type, "fixed") &&
+        (isTRUE(getOption("np.categorical.compress", TRUE)) ||
+           isTRUE(getOption("np.tree"))) &&
+        !miss.z &&
+        isTRUE(sbw$ncon == 0L) &&
+        isTRUE((sbw$nuno + sbw$nord) > 0L)
+    }
+
     lp_full_coef <- function(sbw, leave.one.out.eval) {
       lp_state <- .npscoef_lp_state(
         bws = sbw,
@@ -2067,39 +2215,44 @@ npscoefbw.scbandwidth <-
                 (!is.null(fixed.lower) && any(param < fixed.lower)) ||
                 ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
-            cv_state$objective_fast <- npscoef_fast_eligible(sbw)
+            cv_state$objective_fast <- npscoef_fast_eligible(sbw) ||
+              use_cat_profile_cv_lc(sbw)
 
             if (identical(reg.engine, "lc")) {
-              tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
-                            leave.one.out = TRUE)$ksum
+              if (use_cat_profile_cv_lc(sbw)) {
+                mean.loo <- lc_cat_profile_loo_mean(sbw)
+              } else {
+                tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
+                              leave.one.out = TRUE)$ksum
 
-              mean.loo <- rep(maxPenalty,n)
-              ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
-              ridge <- rep.int(ridge.grid[1L], n)
-              ridge.idx <- rep.int(1L, n)
-              doridge <- rep.int(TRUE, n)
+                mean.loo <- rep(maxPenalty,n)
+                ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
+                ridge <- rep.int(ridge.grid[1L], n)
+                ridge.idx <- rep.int(1L, n)
+                doridge <- rep.int(TRUE, n)
 
-              nc <- ncol(tww[-1,-1,1])
+                nc <- ncol(tww[-1,-1,1])
 
-              while(any(doridge)){
-                iloo <- which(doridge)
-                for (ii in iloo) {
-                  doridge[ii] <- FALSE
-                  ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
-                  beta.ii <- tryCatch(
-                    solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
-                          tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
-                    error = function(e) e
-                  )
-                  if (inherits(beta.ii, "error")) {
-                    ridge.idx[ii] <- ridge.idx[ii] + 1L
-                    if (ridge.idx[ii] <= length(ridge.grid)) {
-                      ridge[ii] <- ridge.grid[ridge.idx[ii]]
-                      doridge[ii] <- TRUE
+                while(any(doridge)){
+                  iloo <- which(doridge)
+                  for (ii in iloo) {
+                    doridge[ii] <- FALSE
+                    ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
+                    beta.ii <- tryCatch(
+                      solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
+                            tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
+                      error = function(e) e
+                    )
+                    if (inherits(beta.ii, "error")) {
+                      ridge.idx[ii] <- ridge.idx[ii] + 1L
+                      if (ridge.idx[ii] <= length(ridge.grid)) {
+                        ridge[ii] <- ridge.grid[ridge.idx[ii]]
+                        doridge[ii] <- TRUE
+                      }
+                      beta.ii <- rep(maxPenalty, nc)
                     }
-                    beta.ii <- rep(maxPenalty, nc)
+                    mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
                   }
-                  mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
                 }
               }
             } else {
@@ -2142,7 +2295,8 @@ npscoefbw.scbandwidth <-
                 (!is.null(fixed.lower) && any(param < fixed.lower)) ||
                 ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
-            cv_state$objective_fast <- npscoef_fast_eligible(sbw)
+            cv_state$objective_fast <- npscoef_fast_eligible(sbw) ||
+              use_cat_profile_cv_lc(sbw)
 
             if (backfit.iterate){
               bws$bw.fitted[,partial.index] <- param
@@ -2151,13 +2305,21 @@ npscoefbw.scbandwidth <-
             } else {
               wj <- W[,partial.index]
               if (identical(reg.engine, "lc")) {
-                tww <- npksum(txdat=zdat,
-                              tydat=cbind(partial.orig * wj, wj * wj),
-                              weights=cbind(partial.orig * wj, 1),
-                              bws=sbw,
-                              leave.one.out=TRUE)$ksum
+                if (use_cat_profile_cv_lc(sbw)) {
+                  partial.loo <- lc_cat_profile_partial_loo(
+                    sbw = sbw,
+                    wj = wj,
+                    partial.y = partial.orig
+                  )
+                } else {
+                  tww <- npksum(txdat=zdat,
+                                tydat=cbind(partial.orig * wj, wj * wj),
+                                weights=cbind(partial.orig * wj, 1),
+                                bws=sbw,
+                                leave.one.out=TRUE)$ksum
 
-                partial.loo <- wj * tww[1,2,]/NZD(tww[2,2,])
+                  partial.loo <- wj * tww[1,2,]/NZD(tww[2,2,])
+                }
               } else {
                 partial.loo <- wj * lp_partial_coef(
                   sbw = sbw,

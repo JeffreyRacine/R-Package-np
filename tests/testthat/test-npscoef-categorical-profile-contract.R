@@ -133,6 +133,39 @@ test_that("npscoef all-categorical profile route preserves evaluation values", {
   expect_equal(fit$beta, oracle$beta, tolerance = 1e-8)
 })
 
+test_that("npscoef all-categorical profile route preserves bandwidth CV", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  options(npRmpi.autodispatch = FALSE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20261017L)
+  n <- 80L
+  dat <- data.frame(
+    y = rnorm(n),
+    x1 = rnorm(n),
+    x2 = rnorm(n),
+    z1 = factor(sample(letters[1:3], n, TRUE)),
+    z2 = ordered(sample(1:4, n, TRUE)),
+    z3 = factor(sample(c("a", "b"), n, TRUE))
+  )
+  dat$y <- 1 + 0.6 * dat$x1 - 0.3 * dat$x2 +
+    as.numeric(dat$z1) - 0.5 * as.numeric(dat$z2) +
+    rnorm(n, sd = 0.2)
+
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
+  dense <- npscoefbw(y ~ x1 + x2 | z1 + z2 + z3,
+                     data = dat, regtype = "lc", nmulti = 1)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  profile <- npscoefbw(y ~ x1 + x2 | z1 + z2 + z3,
+                       data = dat, regtype = "lc", nmulti = 1)
+
+  expect_equal(profile$fval, dense$fval, tolerance = 1e-8)
+  expect_gt(profile$num.feval.fast, 0L)
+})
+
 test_that("npscoefhat apply uses categorical profile route", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   options(npRmpi.autodispatch = FALSE)
