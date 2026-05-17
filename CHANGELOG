@@ -32,8 +32,9 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   fitted means, coefficient surfaces, asymptotic mean standard errors, and
   coefficient/gradient standard errors for training and evaluation fits while
   avoiding repeated work over duplicate `Z` profiles. The corresponding
-  `npscoefhat(output = "apply")` path uses the same profile compression without
-  changing the explicit full-matrix `output = "matrix"` contract.
+  `npscoefhat(output = "apply")` path and count-based plot-bootstrap helper
+  use the same profile compression without changing the explicit full-matrix
+  `output = "matrix"` contract.
 
 * Hardened internal categorical-profile and large-bandwidth cache cleanup
   across density, distribution, conditional-density, conditional-distribution,
