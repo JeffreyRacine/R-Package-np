@@ -374,6 +374,19 @@ npplreg.plbandwidth <-
         tmp.ey <- as.double(eydat)
       }
     }
+
+    use.cat.compress <- identical(bws$regtype, "lc") &&
+      !isTRUE(getOption("np.tree")) &&
+      isTRUE(getOption("np.categorical.compress", TRUE)) &&
+      is.list(bws$bw$yzbw) &&
+      isTRUE(bws$bw$yzbw$ncon == 0L) &&
+      isTRUE((bws$bw$yzbw$nuno + bws$bw$yzbw$nord) > 0L)
+
+    if (use.cat.compress) {
+      old.tree <- getOption("np.tree")
+      options(np.tree = TRUE)
+      on.exit(options(np.tree = old.tree), add = TRUE)
+    }
     
     ## y on z
     mmy = npreg(txdat = tzdat, tydat = tydat, bws = bws$bw$yzbw)

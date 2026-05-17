@@ -46,6 +46,10 @@
   before MPI autodispatch.
 - Hardened the `npudist()` formula route so formula calls are handled before
   MPI autodispatch.
+- `npplreg()` now activates the already validated categorical regression
+  compression path for its internal all-categorical `Z` regressions when
+  `options(np.categorical.compress = TRUE)` is enabled, without requiring users
+  to turn on the broader legacy `options(np.tree = TRUE)` switch.
 
 # npRmpi 0.70-2
 

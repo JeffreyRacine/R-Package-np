@@ -237,3 +237,38 @@ test_that("npplreg residuals stay training-length when evaluation x/z are suppli
   expect_equal(as.numeric(eval.fit.noey$resid), as.numeric(train.fit$resid), tolerance = 0)
   expect_equal(as.numeric(eval.fit.ey$resid), as.numeric(train.fit$resid), tolerance = 0)
 })
+
+test_that("npplreg uses categorical compression for all-categorical z", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  options(npRmpi.autodispatch = FALSE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20260916L)
+  n <- 80L
+  xdat <- data.frame(x = rnorm(n))
+  zdat <- data.frame(
+    z = factor(sample(letters[1:3], n, TRUE)),
+    o = ordered(sample(1:4, n, TRUE))
+  )
+  ydat <- 1 + 1.5 * xdat$x + as.numeric(zdat$z) +
+    0.4 * as.numeric(zdat$o) + rnorm(n, sd = 0.3)
+  bw <- npplregbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = ydat,
+    bws = matrix(c(0.25, 0.25, 0.3, 0.3), nrow = 2L, ncol = 2L),
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  compressed <- npplreg(bws = bw, txdat = xdat, tzdat = zdat, tydat = ydat)
+  options(np.tree = TRUE, np.categorical.compress = TRUE)
+  legacy.tree <- npplreg(bws = bw, txdat = xdat, tzdat = zdat, tydat = ydat)
+
+  expect_equal(compressed$mean, legacy.tree$mean, tolerance = 1e-8)
+  expect_equal(coef(compressed), coef(legacy.tree), tolerance = 1e-8)
+})

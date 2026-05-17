@@ -53,6 +53,11 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
 * Hardened the `npudist()` formula route so formula calls are handled before
   MPI autodispatch.
 
+* Updated `npplreg()` so its internal all-categorical `Z` regressions use the
+  already validated categorical regression compression path when
+  `options(np.categorical.compress = TRUE)` is enabled, without requiring users
+  to turn on the broader legacy `options(np.tree = TRUE)` switch.
+
 Changes from Version 0.70-1 to 0.70-2 [15-May-2026]
 
 * Promoted `npqreg()` to a fully fledged MPI-aware quantile-regression front
