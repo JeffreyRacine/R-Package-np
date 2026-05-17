@@ -74,6 +74,31 @@ test_that("npcdistbw formula path preserves omitted-row metadata", {
   expect_identical(bw$nobs, 5L)
 })
 
+test_that("npcdistbw formula path handles non-syntactic variable names", {
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  dat <- data.frame(
+    check.names = FALSE,
+    "y var" = runif(8),
+    "x var" = runif(8)
+  )
+
+  bw <- np::npcdistbw(
+    `y var` ~ `x var`,
+    data = dat,
+    bws = c(0.5, 0.5),
+    bandwidth.compute = FALSE
+  )
+  fit <- np::npcdist(bws = bw)
+
+  expect_s3_class(bw, "condbandwidth")
+  expect_s3_class(fit, "condistribution")
+  expect_identical(bw$variableNames$response, "y var")
+  expect_identical(bw$variableNames$terms, "x var")
+  expect_identical(length(fitted(fit)), nrow(dat))
+})
+
 test_that("npcdistbw rejects mismatched x bandwidth object types with current message", {
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old_opts), add = TRUE)
