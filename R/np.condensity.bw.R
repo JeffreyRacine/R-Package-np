@@ -821,6 +821,23 @@ npcdensbw.conbandwidth <-
   do.call(npcdensbw.conbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
 }
 
+.npcdensbw_fixed_degree_tree_flag <- function(xdat, ydat, bws) {
+  if (is.recursive(bws) &&
+      !is.null(bws$yncon) &&
+      !is.null(bws$xncon)) {
+    return(npTreeOrCategoricalCompress(
+      ncon = bws$yncon + bws$xncon,
+      ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord))
+  }
+
+  x.info <- untangle(toFrame(xdat))
+  y.info <- untangle(toFrame(ydat))
+  npTreeOrCategoricalCompress(
+    ncon = sum(x.info$icon) + sum(y.info$icon),
+    ncat = sum(x.info$iuno) + sum(x.info$iord) +
+      sum(y.info$iuno) + sum(y.info$iord))
+}
+
 .npcdensbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, bws, reg.args, opt.args,
                                                       tree.flag = NULL) {
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -828,9 +845,7 @@ npcdensbw.conbandwidth <-
   old.tree <- getOption("np.tree")
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   if (is.null(tree.flag)) {
-    tree.flag <- npTreeOrCategoricalCompress(
-      ncon = bws$yncon + bws$xncon,
-      ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord)
+    tree.flag <- .npcdensbw_fixed_degree_tree_flag(xdat, ydat, bws)
   }
 
   options(npRmpi.autodispatch.disable = TRUE)
@@ -875,9 +890,7 @@ npcdensbw.conbandwidth <-
         BWS = bws,
         REGARGS = reg.args,
         OPTARGS = opt.args,
-        TREEFLAG = npTreeOrCategoricalCompress(
-          ncon = bws$yncon + bws$xncon,
-          ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord)
+        TREEFLAG = .npcdensbw_fixed_degree_tree_flag(xdat, ydat, bws)
       )
     )
     return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
@@ -2621,16 +2634,17 @@ npcdensbw.default <-
         points.supplied = "cvls.quadrature.points" %in% mc.names
       )
     }
-    tbw <- do.call(conbandwidth, bw.args)
-    .npRmpi_require_active_slave_pool(where = "npcdensbw()")
-    keep_local_shadow_nn <- bandwidth.compute &&
-      identical(tbw$regtype.engine, "lp") &&
-      identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
-      identical(tbw$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
-    if (.npRmpi_autodispatch_active() &&
-        !keep_local_shadow_nn &&
-        is.null(degree.search))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    if (is.null(degree.search)) {
+      tbw <- do.call(conbandwidth, bw.args)
+      .npRmpi_require_active_slave_pool(where = "npcdensbw()")
+      keep_local_shadow_nn <- bandwidth.compute &&
+        identical(tbw$regtype.engine, "lp") &&
+        identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
+        identical(tbw$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
+      if (.npRmpi_autodispatch_active() &&
+          !keep_local_shadow_nn)
+        return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    }
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(mc)

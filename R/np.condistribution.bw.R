@@ -1943,20 +1943,21 @@ npcdistbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     reg.args <- bw.args[setdiff(names(bw.args), c("xbw", "ybw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
-    tbw <- do.call(condbandwidth, bw.args)
-    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    use.local.compiled.adaptive.cvls <- bandwidth.compute &&
-      identical(tbw$method, "cv.ls") &&
-      identical(tbw$type, "adaptive_nn")
-    keep_local_cvls_nn <- bandwidth.compute &&
-      identical(tbw$method, "cv.ls") &&
-      (use.local.compiled.adaptive.cvls ||
-       (identical(tbw$regtype.engine, "lp") &&
-        identical(tbw$type, "generalized_nn")))
-    if (.npRmpi_autodispatch_active() &&
-        !keep_local_cvls_nn &&
-        is.null(degree.search))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    if (is.null(degree.search)) {
+      tbw <- do.call(condbandwidth, bw.args)
+      .npRmpi_require_active_slave_pool(where = "npcdistbw()")
+      use.local.compiled.adaptive.cvls <- bandwidth.compute &&
+        identical(tbw$method, "cv.ls") &&
+        identical(tbw$type, "adaptive_nn")
+      keep_local_cvls_nn <- bandwidth.compute &&
+        identical(tbw$method, "cv.ls") &&
+        (use.local.compiled.adaptive.cvls ||
+         (identical(tbw$regtype.engine, "lp") &&
+          identical(tbw$type, "generalized_nn")))
+      if (.npRmpi_autodispatch_active() &&
+          !keep_local_cvls_nn)
+        return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    }
 
     ## next grab dummies for actual bandwidth selection and perform call
 

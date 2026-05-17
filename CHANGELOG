@@ -75,6 +75,11 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   expands the actual wildcard form `y ~ .` using the supplied `data` frame,
   matching the conditional-distribution route.
 
+* Fixed MPI conditional-density and conditional-distribution NOMAD degree-search
+  routes so Powell refinement and promoted wrappers such as `npconmode()` use
+  the intended bandwidth-object construction path rather than the non-degree
+  pre-search autodispatch preflight.
+
 Changes from Version 0.70-1 to 0.70-2 [15-May-2026]
 
 * Promoted `npqreg()` to a fully fledged MPI-aware quantile-regression front

@@ -60,6 +60,10 @@
   conditional distribution bandwidth routes. The conditional-density bandwidth
   formula route also now expands the actual wildcard form `y ~ .` using the
   supplied `data` frame, matching the conditional-distribution route.
+- Fixed MPI conditional-density and conditional-distribution NOMAD degree-search
+  routes so Powell refinement and promoted wrappers such as `npconmode()` reach
+  the intended bandwidth-object construction path rather than the pre-search
+  autodispatch preflight used by non-degree-search routes.
 
 # npRmpi 0.70-2
 

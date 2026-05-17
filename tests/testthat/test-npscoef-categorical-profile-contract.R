@@ -2,6 +2,14 @@ npscoef_profile_oracle <- function(xdat, ydat, zdat, bws, exdat = NULL,
                                    ezdat = NULL) {
   NZD <- getFromNamespace("NZD", "npRmpi")
   npRidgeSequenceAdditive <- getFromNamespace("npRidgeSequenceAdditive", "npRmpi")
+  .np_cat_profile_code_matrix <-
+    getFromNamespace(".np_cat_profile_code_matrix", "npRmpi")
+  .np_cat_profile_keys <-
+    getFromNamespace(".np_cat_profile_keys", "npRmpi")
+  .np_regression_cat_profile_kernel_matrix <-
+    getFromNamespace(".np_regression_cat_profile_kernel_matrix", "npRmpi")
+  .np_cat_profile_rowsum <-
+    getFromNamespace(".np_cat_profile_rowsum", "npRmpi")
 
   if (is.null(exdat))
     exdat <- xdat

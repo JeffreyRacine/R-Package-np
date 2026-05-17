@@ -6751,8 +6751,8 @@
     wncol = 0L,
     yncol = 0L,
     int_do_tree = npDoTreeOrCategoricalCompress(
-      ncon = state$bws$ncon,
-      ncat = state$bws$nuno + state$bws$nord
+      ncon = bws$ncon,
+      ncat = bws$nuno + bws$nord
     ),
     return.kernel.weights = TRUE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
@@ -8117,7 +8117,10 @@
     mcv.numRow = attr(state$bws$xmcv, "num.row"),
     wncol = 1L,
     yncol = 1L,
-    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    int_do_tree = npDoTreeOrCategoricalCompress(
+      ncon = state$bws$ncon,
+      ncat = state$bws$nuno + state$bws$nord
+    ),
     return.kernel.weights = FALSE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,

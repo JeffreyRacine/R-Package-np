@@ -11,7 +11,8 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = FALSE
+  eval = FALSE,
+  purl = FALSE
 )
 ```
 
@@ -44,7 +45,7 @@ rely on `mode = "auto"`.
 
 ## Recommended starting point: session mode
 
-```{r}
+```{r, purl = FALSE}
 library(npRmpi)
 
 npRmpi.init(nslaves = 1)
@@ -73,7 +74,7 @@ NOMAD backend provided by the suggested package `crs`, so install `crs` first
 if you want to use `nomad = TRUE` or
 `search.engine = "nomad"`/`"nomad+powell"`.
 
-```{r}
+```{r, purl = FALSE}
 if (requireNamespace("crs", quietly = TRUE) &&
     utils::packageVersion("crs") >= package_version("0.15-41")) {
   npRmpi.init(nslaves = 1)
@@ -111,7 +112,7 @@ practical starting point is `attach` mode under `mpiexec`.
 Use attach mode when the MPI world is already launched via `mpiexec` and you
 want `npRmpi.init(mode = "attach")` to be the startup entry point.
 
-```{r}
+```{r, purl = FALSE}
 library(npRmpi)
 npRmpi.init(mode = "attach")
 
@@ -140,7 +141,7 @@ especially on larger or heterogeneous clusters. In this route,
 with `inst/Rprofile` (or `R_PROFILE_USER`) and then initialized explicitly
 inside the script.
 
-```{r}
+```{r, purl = FALSE}
 mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)
 
 set.seed(1)
