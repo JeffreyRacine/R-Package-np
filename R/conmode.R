@@ -142,6 +142,7 @@ print.conmode <- function(x, ...){
 
   cat(genBwKerStrs(x$bws))
   cat(genTimingStr(x$bws))
+  cat("\n")
   if (!is.null(x$proper.info) && isTRUE(x$proper.requested)) {
     cat("Proper conditional probabilities: ",
         if (isTRUE(x$proper.applied)) "projected" else "already proper",
@@ -288,6 +289,7 @@ summary.conmode <- function(object, ...){
 
   cat(genBwKerStrs(object$bws))
   cat(genTimingStr(object$bws))
+  cat("\n")
   if (!is.null(object$proper.info)) {
     cat("Proper conditional probabilities: ",
         if (isTRUE(object$proper.requested)) {
