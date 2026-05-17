@@ -54,7 +54,9 @@
   to turn on the broader legacy `options(np.tree = TRUE)` switch.
 - Formula variables whose names contain dots, such as `y.irr ~ x`, are no
   longer mistaken for the formula wildcard `.` in conditional density and
-  conditional distribution bandwidth routes.
+  conditional distribution bandwidth routes. The conditional-density bandwidth
+  formula route also now expands the actual wildcard form `y ~ .` using the
+  supplied `data` frame, matching the conditional-distribution route.
 
 # npRmpi 0.70-2
 

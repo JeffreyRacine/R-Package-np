@@ -19,3 +19,45 @@ test_that("formula variables may contain dots without triggering wildcard expans
   expect_equal(bw.dens$variableNames$terms, "x")
   expect_equal(bw.dist$variableNames$terms, "x")
 })
+
+test_that("conditional density formula dot expands only as wildcard", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260625L)
+  old_opts <- options(np.messages = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  dat <- data.frame(
+    y = ordered(rbinom(80L, 1L, 0.5)),
+    x = factor(rbinom(80L, 1L, 0.5)),
+    z = factor(rbinom(80L, 1L, 0.5))
+  )
+
+  bw <- npcdensbw(y ~ ., data = dat, bws = c(0.2, 0.2, 0.2),
+                  bandwidth.compute = FALSE)
+
+  expect_equal(bw$variableNames$response, "y")
+  expect_equal(bw$variableNames$terms, c("x", "z"))
+})
+
+test_that("conditional distribution formula dot expands only as wildcard", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260626L)
+  old_opts <- options(np.messages = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  dat <- data.frame(
+    y = ordered(rbinom(80L, 1L, 0.5)),
+    x = factor(rbinom(80L, 1L, 0.5)),
+    z = factor(rbinom(80L, 1L, 0.5))
+  )
+
+  bw <- npcdistbw(y ~ ., data = dat, bws = c(0.2, 0.2, 0.2),
+                  bandwidth.compute = FALSE)
+
+  expect_equal(bw$variableNames$response, "y")
+  expect_equal(bw$variableNames$terms, c("x", "z"))
+})

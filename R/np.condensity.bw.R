@@ -14,7 +14,7 @@ npcdensbw.formula <-
       .np_terms_ts_mask(terms_obj = terms(formula),
                         data = environment(formula),
                         eval_env = environment(formula))
-    else .np_terms_ts_mask(terms_obj = terms(formula),
+    else .np_terms_ts_mask(terms_obj = terms(formula, data = data),
                            data = data,
                            eval_env = environment(formula))
 
@@ -33,7 +33,7 @@ npcdensbw.formula <-
                                         formula_call = formula.call,
                                         eval_env = parent.frame())
 
-    variableNames <- explodeFormula(formula.obj)
+    variableNames <- if(m[2] > 0) explodeFormula(formula.obj, data = data) else explodeFormula(formula.obj)
 
     ## make formula evaluable, then eval
     varsPlus <- lapply(variableNames, paste, collapse=" + ")
