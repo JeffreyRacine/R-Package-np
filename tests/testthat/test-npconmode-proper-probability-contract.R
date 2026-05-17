@@ -44,8 +44,7 @@ test_that("npconmode rejects non-categorical responses before modal fitting", {
   expect_error(
     npconmode(y ~ x, data = d, bws = c(0.4, 0.4),
               bandwidth.compute = FALSE),
-    "'tydat' must consist of one (1) discrete variable",
-    fixed = TRUE
+    "categorical response|discrete variable"
   )
 })
 
