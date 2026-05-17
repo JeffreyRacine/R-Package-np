@@ -37,6 +37,44 @@ test_that("npplreg direct-fit objects expose canonical and compatibility bandwid
   expect_equal(model$bw$fval, model$bws$fval)
 })
 
+test_that("npplreg all-categorical z profile route preserves fitted values", {
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20261018L)
+  n <- 520L
+  dat <- data.frame(
+    y = rnorm(n),
+    x1 = rnorm(n),
+    x2 = rnorm(n),
+    z1 = factor(sample(letters[1:3], n, TRUE)),
+    z2 = ordered(sample(1:4, n, TRUE)),
+    z3 = factor(sample(c("a", "b"), n, TRUE))
+  )
+  dat$y <- 1 + 0.4 * dat$x1 - 0.2 * dat$x2 +
+    as.numeric(dat$z1) + 0.3 * as.numeric(dat$z2) +
+    rnorm(n, sd = 0.15)
+  bw <- npplregbw(
+    y ~ x1 + x2 | z1 + z2 + z3,
+    data = dat,
+    bws = matrix(c(0.15, 0.25, 0.3,
+                   0.45, 0.35, 0.4,
+                   0.4, 0.45, 0.2),
+                 nrow = 3L, byrow = TRUE),
+    bandwidth.compute = FALSE
+  )
+
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
+  dense <- npplreg(bws = bw)
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  profile <- npplreg(bws = bw)
+
+  expect_equal(coef(profile), coef(dense), tolerance = 1e-8)
+  expect_equal(fitted(profile), fitted(dense), tolerance = 1e-7)
+  expect_equal(vcov(profile), vcov(dense), tolerance = 1e-10)
+})
+
 test_that("plregression methods remain compatible with legacy objects lacking bws", {
   set.seed(11)
   n <- 80

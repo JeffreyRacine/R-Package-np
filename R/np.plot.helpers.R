@@ -1151,6 +1151,98 @@
   W
 }
 
+.np_regression_cat_profile_mean <- function(bws, txdat, tydat, exdat = NULL) {
+  if (!npTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord))
+    return(NULL)
+  if (!identical(bws$type, "fixed"))
+    return(NULL)
+  if (!isTRUE(bws$ncon == 0L) || (bws$nuno + bws$nord) < 1L)
+    return(NULL)
+
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  if (!(identical(regtype, "lc") || identical(regtype, "lp")))
+    return(NULL)
+  if (identical(regtype, "lp") && length(bws$degree) && any(bws$degree > 0L))
+    return(NULL)
+
+  txdat <- toFrame(txdat)
+  no.ex <- is.null(exdat)
+  if (no.ex) {
+    exdat <- txdat
+  } else {
+    exdat <- toFrame(exdat)
+    if (!(txdat %~% exdat))
+      return(NULL)
+  }
+
+  if (ncol(txdat) != length(bws$bw) || ncol(exdat) != ncol(txdat))
+    return(NULL)
+  if (length(tydat) != nrow(txdat))
+    return(NULL)
+
+  if (!all(vapply(txdat, function(z) is.factor(z) || is.ordered(z), logical(1))))
+    return(NULL)
+  if (!all(vapply(exdat, function(z) is.factor(z) || is.ordered(z), logical(1))))
+    return(NULL)
+
+  if (is.factor(tydat)) {
+    tydat <- adjustLevels(data.frame(tydat), bws$ydati)[, 1L]
+    tydat <- (bws$ydati$all.dlev[[1L]])[as.integer(tydat)]
+  } else {
+    tydat <- as.double(tydat)
+  }
+  if (anyNA(tydat))
+    return(NULL)
+
+  txdat <- adjustLevels(txdat, bws$xdati)
+  exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+
+  if (!all(vapply(seq_along(txdat), function(j) {
+    identical(is.ordered(txdat[[j]]), is.ordered(exdat[[j]])) &&
+      identical(levels(txdat[[j]]), levels(exdat[[j]]))
+  }, logical(1))))
+    return(NULL)
+
+  train.codes <- .np_cat_profile_code_matrix(txdat)
+  eval.codes <- .np_cat_profile_code_matrix(exdat)
+  if (anyNA(train.codes) || anyNA(eval.codes))
+    return(NULL)
+
+  train.keys <- .np_cat_profile_keys(train.codes)
+  eval.keys <- .np_cat_profile_keys(eval.codes)
+  train.profile.keys <- unique(train.keys)
+  eval.profile.keys <- unique(eval.keys)
+  train.id <- match(train.keys, train.profile.keys)
+  eval.id <- match(eval.keys, eval.profile.keys)
+  train.rep <- match(train.profile.keys, train.keys)
+  eval.rep <- match(eval.profile.keys, eval.keys)
+  G <- length(train.profile.keys)
+
+  train.profile.codes <- train.codes[train.rep, , drop = FALSE]
+  eval.profile.codes <- eval.codes[eval.rep, , drop = FALSE]
+  train.profile.dat <- txdat[train.rep, , drop = FALSE]
+  L.eval <- tryCatch(
+    .np_regression_cat_profile_kernel_matrix(
+      eval.codes = eval.profile.codes,
+      train.codes = train.profile.codes,
+      xdat = train.profile.dat,
+      bws = bws
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(L.eval))
+    return(NULL)
+
+  counts <- as.double(tabulate(train.id, nbins = G))
+  sums <- as.vector(.np_cat_profile_rowsum(tydat, train.id, G))
+  den <- as.vector(L.eval %*% counts)
+  if (any(!is.finite(den)) || any(!(abs(den) > .Machine$double.xmin)))
+    return(NULL)
+
+  profile.mean <- as.vector(L.eval %*% sums / den)
+  profile.mean[eval.id]
+}
+
 .np_density_cat_profile_kernel_matrix <- function(eval.codes,
                                                   train.codes,
                                                   xdat,
