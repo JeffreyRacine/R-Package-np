@@ -1886,18 +1886,35 @@ npscoefbw.scbandwidth <-
       coef.out
     }
 
-    lc_cat_profile_loo_mean <- function(sbw) {
-      train.codes <- .np_cat_profile_code_matrix(zdat.df)
-      train.keys <- .np_cat_profile_keys(train.codes)
-      profile.keys <- unique(train.keys)
-      train.id <- match(train.keys, profile.keys)
-      train.rep <- match(profile.keys, train.keys)
-      train.profile.codes <- train.codes[train.rep, , drop = FALSE]
-      train.profile.dat <- zdat.df[train.rep, , drop = FALSE]
-      G <- length(profile.keys)
+    cat.profile.cv <- NULL
+    get_cat_profile_cv <- function() {
+      if (is.null(cat.profile.cv)) {
+        train.codes <- .np_cat_profile_code_matrix(zdat.df)
+        train.keys <- .np_cat_profile_keys(train.codes)
+        profile.keys <- unique(train.keys)
+        train.id <- match(train.keys, profile.keys)
+        train.rep <- match(profile.keys, train.keys)
+        train.profile.codes <- train.codes[train.rep, , drop = FALSE]
+        train.profile.dat <- zdat.df[train.rep, , drop = FALSE]
+        cat.profile.cv <<- list(
+          train.id = train.id,
+          train.profile.codes = train.profile.codes,
+          train.profile.dat = train.profile.dat,
+          G = length(profile.keys)
+        )
+      }
+      cat.profile.cv
+    }
 
-      L.eval <- .np_regression_cat_profile_kernel_matrix(
-        eval.codes = train.codes,
+    lc_cat_profile_loo_mean <- function(sbw) {
+      cp <- get_cat_profile_cv()
+      train.id <- cp$train.id
+      train.profile.codes <- cp$train.profile.codes
+      train.profile.dat <- cp$train.profile.dat
+      G <- cp$G
+
+      L.profile <- .np_regression_cat_profile_kernel_matrix(
+        eval.codes = train.profile.codes,
         train.codes = train.profile.codes,
         xdat = train.profile.dat,
         bws = sbw
@@ -1914,15 +1931,16 @@ npscoefbw.scbandwidth <-
         }
       }
 
-      flat <- L.eval %*% cross.profile
-      self.weight <- L.eval[cbind(seq_len(n), train.id)]
+      flat.profile <- L.profile %*% cross.profile
+      self.weight.profile <- L.profile[cbind(seq_len(G), seq_len(G))]
       mean.loo <- rep(maxPenalty, n)
       ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
       nc <- ncol(W)
 
       solve_one <- function(ii) {
-        mat.full <- matrix(flat[ii, ], nrow = p, ncol = p)
-        mat.full <- mat.full - self.weight[ii] *
+        gg <- train.id[ii]
+        mat.full <- matrix(flat.profile[gg, ], nrow = p, ncol = p)
+        mat.full <- mat.full - self.weight.profile[gg] *
           tcrossprod(yW.local[ii, ])
         tyw.ii <- mat.full[-1L, 1L]
         tww.ii <- mat.full[-1L, -1L, drop = FALSE]
@@ -1950,8 +1968,7 @@ npscoefbw.scbandwidth <-
       ridge <- ridge.grid[1L]
       for (gg in seq_len(G)) {
         idx <- which(train.id == gg)
-        rep.idx <- train.rep[gg]
-        mat.full <- matrix(flat[rep.idx, ], nrow = p, ncol = p)
+        mat.full <- matrix(flat.profile[gg, ], nrow = p, ncol = p)
         tyw.full <- mat.full[-1L, 1L]
         tww.full <- mat.full[-1L, -1L, drop = FALSE]
         inv.full <- tryCatch(
@@ -1965,7 +1982,7 @@ npscoefbw.scbandwidth <-
 
         Wg <- W[idx,, drop = FALSE]
         yg <- ydat[idx]
-        sg <- self.weight[idx]
+        sg <- rep.int(self.weight.profile[gg], length(idx))
         rhs <- matrix(rep(tyw.full, each = length(idx)),
                       nrow = length(idx), ncol = nc)
         rhs <- rhs - sg * Wg * yg
@@ -1989,17 +2006,14 @@ npscoefbw.scbandwidth <-
     }
 
     lc_cat_profile_partial_loo <- function(sbw, wj, partial.y) {
-      train.codes <- .np_cat_profile_code_matrix(zdat.df)
-      train.keys <- .np_cat_profile_keys(train.codes)
-      profile.keys <- unique(train.keys)
-      train.id <- match(train.keys, profile.keys)
-      train.rep <- match(profile.keys, train.keys)
-      train.profile.codes <- train.codes[train.rep, , drop = FALSE]
-      train.profile.dat <- zdat.df[train.rep, , drop = FALSE]
-      G <- length(profile.keys)
+      cp <- get_cat_profile_cv()
+      train.id <- cp$train.id
+      train.profile.codes <- cp$train.profile.codes
+      train.profile.dat <- cp$train.profile.dat
+      G <- cp$G
 
-      L.eval <- .np_regression_cat_profile_kernel_matrix(
-        eval.codes = train.codes,
+      L.profile <- .np_regression_cat_profile_kernel_matrix(
+        eval.codes = train.profile.codes,
         train.codes = train.profile.codes,
         xdat = train.profile.dat,
         bws = sbw
@@ -2007,9 +2021,9 @@ npscoefbw.scbandwidth <-
 
       num.profile <- .np_cat_profile_rowsum(partial.y * wj, train.id, G)[, 1L]
       den.profile <- .np_cat_profile_rowsum(wj * wj, train.id, G)[, 1L]
-      num <- as.vector(L.eval %*% num.profile)
-      den <- as.vector(L.eval %*% den.profile)
-      self.weight <- L.eval[cbind(seq_len(n), train.id)]
+      num <- as.vector(L.profile %*% num.profile)[train.id]
+      den <- as.vector(L.profile %*% den.profile)[train.id]
+      self.weight <- L.profile[cbind(seq_len(G), seq_len(G))][train.id]
       num <- num - self.weight * partial.y * wj
       den <- den - self.weight * wj * wj
 
