@@ -534,7 +534,9 @@ npcdensbw.conbandwidth <-
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
         old.cdens = FALSE,
-        int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+        int_do_tree = npDoTreeOrCategoricalCompress(
+          ncon = dim(ycon)[2] + dim(xcon)[2],
+          ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds,
@@ -820,11 +822,16 @@ npcdensbw.conbandwidth <-
 }
 
 .npcdensbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, bws, reg.args, opt.args,
-                                                      tree.flag = isTRUE(getOption("np.tree"))) {
+                                                      tree.flag = NULL) {
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   old.messages <- getOption("np.messages")
   old.tree <- getOption("np.tree")
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+  if (is.null(tree.flag)) {
+    tree.flag <- npTreeOrCategoricalCompress(
+      ncon = bws$yncon + bws$xncon,
+      ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord)
+  }
 
   options(npRmpi.autodispatch.disable = TRUE)
   options(np.tree = isTRUE(tree.flag))
@@ -868,7 +875,9 @@ npcdensbw.conbandwidth <-
         BWS = bws,
         REGARGS = reg.args,
         OPTARGS = opt.args,
-        TREEFLAG = isTRUE(getOption("np.tree"))
+        TREEFLAG = npTreeOrCategoricalCompress(
+          ncon = bws$yncon + bws$xncon,
+          ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord)
       )
     )
     return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
@@ -1092,7 +1101,9 @@ npcdensbw.conbandwidth <-
     xnord = dim(xord)[2],
     xncon = dim(xcon)[2],
     old.cdens = FALSE,
-    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    int_do_tree = npDoTreeOrCategoricalCompress(
+      ncon = dim(ycon)[2] + dim(xcon)[2],
+      ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
     transform.bounds = FALSE,
@@ -1367,7 +1378,9 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
     xnord = dim(xord)[2],
     xncon = dim(xcon)[2],
     old.cdens = FALSE,
-    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    int_do_tree = npDoTreeOrCategoricalCompress(
+      ncon = dim(ycon)[2] + dim(xcon)[2],
+      ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
     transform.bounds = FALSE,
