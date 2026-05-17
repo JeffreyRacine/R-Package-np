@@ -1,14 +1,13 @@
 Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
 
-* Kept the previously validated MPI-safe profile-compressed route for
-  large-sample categorical-only local-constant regression under the legacy
-  `options(np.tree = TRUE)` switch. The new
-  `options(np.categorical.compress = TRUE)` switch is separated from
-  `np.tree` for routes whose MPI activation has been revalidated in this
-  tranche; regression bandwidth search and the MPI regression estimator remain
-  on the legacy `np.tree` activation path pending a separate MPI-specific
-  proof. This preserves dense-route numerical results while retaining the fast
-  categorical regression path for users who explicitly enable `np.tree`.
+* Updated large-sample categorical-only local-constant regression so the
+  MPI-safe profile-compressed route is activated by
+  `options(np.categorical.compress = TRUE)`, which is enabled by default.
+  The legacy `options(np.tree = TRUE)` switch also enables the same route for
+  compatibility. Repeated predictor profiles are compressed before bandwidth
+  search, fitting, prediction/evaluation, standard errors, hat-helper use, and
+  plot bootstrap helpers, preserving dense-route numerical results while
+  reducing repeated work.
 
 * Added a profile-compressed execution route for categorical-only
   unconditional density estimation when

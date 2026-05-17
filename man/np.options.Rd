@@ -40,9 +40,6 @@
     unique-profile compression for eligible all-categorical routes. This is
     distinct from \code{np.tree}: no continuous kd-tree is requested merely
     because categorical compression is enabled. The default is \code{TRUE}.
-    In \pkg{npRmpi}, categorical-only regression compression remains on the
-    legacy \code{np.tree} activation path pending separate MPI-specific
-    validation of the new switch for that estimator route.
     Set \code{options(np.categorical.compress = FALSE, np.tree = FALSE)} to
     force the historical dense categorical route for debugging or timing
     comparisons.

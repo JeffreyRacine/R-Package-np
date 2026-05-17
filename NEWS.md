@@ -1,15 +1,12 @@
 # npRmpi 0.70-3
 
-- Large-sample categorical-only regression keeps the previously validated
-  MPI-safe profile-compressed route under the legacy
-  `options(np.tree = TRUE)` switch. The new
-  `options(np.categorical.compress = TRUE)` switch is separated from
-  `np.tree` for routes whose MPI activation has been revalidated in this
-  tranche; regression bandwidth search and the MPI regression estimator remain
-  on the legacy `np.tree` activation path pending a separate MPI-specific
-  proof. This preserves the established dense-route numerical contract while
-  retaining the fast categorical regression path for users who explicitly
-  enable `np.tree`.
+- Large-sample categorical-only regression now uses the MPI-safe
+  profile-compressed route under `options(np.categorical.compress = TRUE)`,
+  which is enabled by default. The legacy `options(np.tree = TRUE)` switch
+  also enables the same route for compatibility. Repeated predictor profiles
+  are compressed before bandwidth search, fitting, prediction/evaluation,
+  standard errors, hat-helper use, and plot bootstrap helpers, preserving the
+  established dense-route numerical contract while reducing repeated work.
 - Categorical-only unconditional density routes now use the same
   profile-compression idea when `options(np.categorical.compress = TRUE)` is
   enabled. The fixed-bandwidth fit/evaluation route preserves dense-route
