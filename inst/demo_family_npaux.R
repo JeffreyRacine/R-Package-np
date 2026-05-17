@@ -161,9 +161,9 @@ npaux_demo_execute <- function(family, payload) {
              out <- npaux_demo_num(bw$bw, 1L)
              if (is.na(out)) npaux_demo_num(bw$bandwidth, 1L) else out
            },
-           estimate.first = npaux_demo_num(fit, 1L),
-           estimate.second = npaux_demo_num(fit, 2L),
-           fitted.length = NROW(fit))
+           estimate.first = npaux_demo_num(fit$copula, 1L),
+           estimate.second = npaux_demo_num(fit$copula, 2L),
+           fitted.length = length(fit$copula))
     },
     npqreg = {
       bw <- npcdistbw(y ~ x, data = payload$data)
