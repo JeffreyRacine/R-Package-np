@@ -6,9 +6,8 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   The legacy `options(np.tree = TRUE)` switch also enables eligible
   categorical compression for compatibility. Repeated predictor profiles are
   compressed before fitting, prediction/evaluation, standard errors, gradients
-  where meaningful, hat-helper use, and plot bootstrap helpers. Bandwidth-search
-  compression remains gated by `np.tree` pending separate cross-repo MPI
-  validation. This preserves dense-route numerical results while reducing
+  where meaningful, bandwidth search, hat-helper use, and plot bootstrap
+  helpers. This preserves dense-route numerical results while reducing
   repeated work for large samples with many duplicate categorical predictor
   combinations.
 

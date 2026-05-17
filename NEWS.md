@@ -6,10 +6,9 @@
   also enables eligible categorical compression for compatibility. For local
   constant categorical regression, repeated predictor profiles are compressed
   before fitting, prediction/evaluation, standard errors, gradients where
-  meaningful, hat-helper use, and plot bootstrap helpers. Bandwidth-search
-  compression remains gated by `np.tree` pending separate cross-repo MPI
-  validation. This preserves the established dense-route numerical contract
-  while greatly reducing work for large samples with many repeated
+  meaningful, bandwidth search, hat-helper use, and plot bootstrap helpers.
+  This preserves the established dense-route numerical contract while greatly
+  reducing work for large samples with many repeated
   factor/ordered predictor combinations.
 - Categorical-only unconditional density routes now use the same
   profile-compression idea when `options(np.categorical.compress = TRUE)` is
