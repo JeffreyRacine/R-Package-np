@@ -11224,6 +11224,261 @@ finish_cv_path:
   return(cv);
 }
 
+static int np_distribution_cvls_ordered_profile_stream(
+int KERNEL_den,
+int KERNEL_den_unordered,
+int KERNEL_den_ordered,
+int BANDWIDTH_den,
+int num_obs_train,
+int num_obs_eval,
+int num_reg_unordered,
+int num_reg_ordered,
+int num_reg_continuous,
+int cdfontrain,
+double ** matrix_X_unordered_train,
+double ** matrix_X_ordered_train,
+double ** matrix_X_continuous_train,
+double ** matrix_X_unordered_eval,
+double ** matrix_X_ordered_eval,
+double ** matrix_X_continuous_eval,
+double * vsf,
+int * num_categories,
+double ** matrix_categorical_vals,
+double * cv){
+
+  int g, h, l, status = 1;
+  int *train_id = NULL, *train_rep = NULL, *eval_id = NULL, *eval_rep = NULL;
+  int nprof_train = 0, nprof_eval = 0;
+  int *kernel_o = NULL, *operator = NULL;
+  double **profile_train = NULL, **profile_eval = NULL;
+  double *lambda = NULL, *counts_train = NULL, *counts_eval = NULL, *cdf_sum = NULL, *kw = NULL;
+  double *profile_y[1];
+
+  (void)KERNEL_den_unordered;
+  (void)matrix_X_unordered_train;
+  (void)matrix_X_continuous_train;
+  (void)matrix_X_unordered_eval;
+  (void)matrix_X_continuous_eval;
+
+  if((cv == NULL) || (vsf == NULL))
+    return 1;
+  if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
+     (BANDWIDTH_den != BW_FIXED) ||
+     (num_obs_train <= 1) ||
+     (num_reg_unordered != 0) ||
+     (num_reg_continuous != 0) ||
+     (num_reg_ordered <= 0))
+    return 1;
+  if((!cdfontrain) && (num_obs_eval <= 0))
+    return 1;
+
+  if(!np_build_discrete_profile_index(num_obs_train,
+                                      0,
+                                      num_reg_ordered,
+                                      NULL,
+                                      matrix_X_ordered_train,
+                                      &train_id,
+                                      &train_rep,
+                                      &nprof_train))
+    goto cleanup_profile_cdf;
+
+  if(cdfontrain){
+    eval_id = train_id;
+    eval_rep = train_rep;
+    nprof_eval = nprof_train;
+  } else if(!np_build_discrete_profile_index(num_obs_eval,
+                                             0,
+                                             num_reg_ordered,
+                                             NULL,
+                                             matrix_X_ordered_eval,
+                                             &eval_id,
+                                             &eval_rep,
+                                             &nprof_eval)){
+    goto cleanup_profile_cdf;
+  }
+
+  if((nprof_train <= 0) || (nprof_eval <= 0) ||
+     (4*nprof_train > 3*num_obs_train) ||
+     ((!cdfontrain) && (4*nprof_eval > 3*num_obs_eval)))
+    goto cleanup_profile_cdf;
+  if(((double)nprof_train * (double)nprof_eval) > (double)INT_MAX)
+    goto cleanup_profile_cdf;
+
+  profile_train = alloc_tmatd(nprof_train, num_reg_ordered);
+  profile_eval = cdfontrain ? profile_train : alloc_tmatd(nprof_eval, num_reg_ordered);
+  kernel_o = (int *)calloc((size_t)num_reg_ordered, sizeof(int));
+  operator = (int *)calloc((size_t)num_reg_ordered, sizeof(int));
+  lambda = alloc_vecd(num_reg_ordered);
+  counts_train = alloc_vecd(nprof_train);
+  counts_eval = alloc_vecd(nprof_eval);
+  cdf_sum = alloc_vecd(nprof_eval);
+  kw = alloc_vecd(nprof_eval*nprof_train);
+
+  if((profile_train == NULL) ||
+     ((!cdfontrain) && (profile_eval == NULL)) ||
+     (kernel_o == NULL) ||
+     (operator == NULL) ||
+     (lambda == NULL) ||
+     (counts_train == NULL) ||
+     (counts_eval == NULL) ||
+     (cdf_sum == NULL) ||
+     (kw == NULL))
+    goto cleanup_profile_cdf;
+
+  for(g = 0; g < nprof_train; g++){
+    const int rep = train_rep[g];
+    counts_train[g] = 0.0;
+    for(l = 0; l < num_reg_ordered; l++)
+      profile_train[l][g] = matrix_X_ordered_train[l][rep];
+  }
+
+  if(!cdfontrain){
+    for(h = 0; h < nprof_eval; h++){
+      const int rep = eval_rep[h];
+      counts_eval[h] = 0.0;
+      for(l = 0; l < num_reg_ordered; l++)
+        profile_eval[l][h] = matrix_X_ordered_eval[l][rep];
+    }
+  } else {
+    for(h = 0; h < nprof_eval; h++)
+      counts_eval[h] = 0.0;
+  }
+
+  for(g = 0; g < num_obs_train; g++)
+    counts_train[train_id[g]] += 1.0;
+  if(cdfontrain){
+    for(h = 0; h < nprof_eval; h++)
+      counts_eval[h] = counts_train[h];
+  } else {
+    for(h = 0; h < num_obs_eval; h++)
+      counts_eval[eval_id[h]] += 1.0;
+  }
+
+  profile_y[0] = counts_train;
+  for(l = 0; l < num_reg_ordered; l++){
+    kernel_o[l] = KERNEL_den_ordered;
+    operator[l] = OP_INTEGRAL;
+  }
+
+  if(kernel_bandwidth_mean(KERNEL_den,
+                           BANDWIDTH_den,
+                           num_obs_train,
+                           cdfontrain ? num_obs_train : num_obs_eval,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           num_reg_ordered,
+                           0,
+                           vsf,
+                           NULL,
+                           NULL,
+                           NULL,
+                           NULL,
+                           NULL,
+                           NULL,
+                           lambda) == 1)
+    goto cleanup_profile_cdf;
+
+  status = kernel_weighted_sum_np(NULL,
+                                  NULL,
+                                  kernel_o,
+                                  BANDWIDTH_den,
+                                  nprof_train,
+                                  nprof_eval,
+                                  0,
+                                  num_reg_ordered,
+                                  0,
+                                  0,
+                                  0,
+                                  1,
+                                  1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  operator,
+                                  OP_NOOP,
+                                  0,
+                                  0,
+                                  NULL,
+                                  1,
+                                  1,
+                                  0,
+                                  NP_TREE_FALSE,
+                                  0,
+                                  NULL,
+                                  NULL, NULL, NULL,
+                                  NULL,
+                                  profile_train,
+                                  NULL,
+                                  NULL,
+                                  profile_eval,
+                                  NULL,
+                                  profile_y,
+                                  NULL,
+                                  NULL,
+                                  vsf,
+                                  1,
+                                  NULL,
+                                  NULL,
+                                  lambda,
+                                  num_categories,
+                                  matrix_categorical_vals,
+                                  NULL,
+                                  cdf_sum,
+                                  NULL,
+                                  kw,
+                                  NULL);
+  if(status != 0)
+    goto cleanup_profile_cdf;
+
+  *cv = 0.0;
+  for(h = 0; h < nprof_eval; h++){
+    for(g = 0; g < nprof_train; g++){
+      double multiplicity = counts_train[g]*counts_eval[h];
+      if(cdfontrain && (g == h))
+        multiplicity -= counts_train[g];
+      if(multiplicity <= 0.0)
+        continue;
+
+      {
+        int indy = 1;
+        double tvd;
+        for(l = 0; (l < num_reg_ordered) && (indy != 0); l++)
+          indy *= (profile_train[l][g] <= profile_eval[l][h]);
+        tvd = ((double)indy) - (cdf_sum[h] - kw[h*nprof_train + g])/((double)num_obs_train - 1.0);
+        *cv += multiplicity*tvd*tvd;
+      }
+    }
+  }
+
+  *cv /= (double)num_obs_train*(double)(cdfontrain ? num_obs_train : num_obs_eval);
+  if(R_FINITE(*cv)){
+    np_fastcv_alllarge_hits++;
+    status = 0;
+  }
+
+cleanup_profile_cdf:
+  if((!cdfontrain) && (eval_id != NULL)) free(eval_id);
+  if((!cdfontrain) && (eval_rep != NULL)) free(eval_rep);
+  if(train_id != NULL) free(train_id);
+  if(train_rep != NULL) free(train_rep);
+  if(kernel_o != NULL) free(kernel_o);
+  if(operator != NULL) free(operator);
+  if(lambda != NULL) free(lambda);
+  if(profile_train != NULL) free_tmat(profile_train);
+  if((!cdfontrain) && (profile_eval != NULL)) free_tmat(profile_eval);
+  if(counts_train != NULL) free(counts_train);
+  if(counts_eval != NULL) free(counts_eval);
+  if(cdf_sum != NULL) free(cdf_sum);
+  if(kw != NULL) free(kw);
+
+  return status;
+}
+
 double np_kernel_estimate_distribution_ls_cv( 
 int KERNEL_den,
 int KERNEL_den_unordered,
@@ -11246,6 +11501,28 @@ double * vsf,
 int * num_categories,
 double ** matrix_categorical_vals,
 double * cv){
+  if(np_distribution_cvls_ordered_profile_stream(KERNEL_den,
+                                                 KERNEL_den_unordered,
+                                                 KERNEL_den_ordered,
+                                                 BANDWIDTH_den,
+                                                 num_obs_train,
+                                                 num_obs_eval,
+                                                 num_reg_unordered,
+                                                 num_reg_ordered,
+                                                 num_reg_continuous,
+                                                 cdfontrain,
+                                                 matrix_X_unordered_train,
+                                                 matrix_X_ordered_train,
+                                                 matrix_X_continuous_train,
+                                                 matrix_X_unordered_eval,
+                                                 matrix_X_ordered_eval,
+                                                 matrix_X_continuous_eval,
+                                                 vsf,
+                                                 num_categories,
+                                                 matrix_categorical_vals,
+                                                 cv) == 0)
+    return 0;
+
   NP_GateOverrideCtx gate_ctx_local;
   np_gate_ctx_clear(&gate_ctx_local);
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs_eval:

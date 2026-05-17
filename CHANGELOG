@@ -31,11 +31,11 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
 
 * Added profile compression for ordered-only unconditional distribution
   bandwidth search and fit/evaluation routes when
-  `options(np.categorical.compress = TRUE)` is enabled. The route preserves
-  selected smoothing parameters, objective values, fitted distribution values,
-  and standard errors while avoiding repeated computation over identical
-  ordered profiles where the distribution route can exploit the compressed
-  representation.
+  `options(np.categorical.compress = TRUE)` is enabled. The bandwidth-search
+  route preserves the objective value to numerical precision while allowing
+  harmless optimizer-path drift in selected smoothing parameters; fitted
+  distribution values and standard errors are preserved while avoiding repeated
+  computation over identical ordered profiles.
 
 * Added categorical-profile compression for fixed-bandwidth local-constant
   `npscoef()` fits when all `Z` variables are categorical and

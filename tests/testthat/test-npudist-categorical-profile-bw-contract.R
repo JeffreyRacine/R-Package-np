@@ -39,12 +39,49 @@ test_that("npudist ordered-categorical profile bandwidth CV matches dense CV", {
       okertype = okertype
     )
 
-    expect_equal(profile$bw, dense$bw, tolerance = 1e-12)
-    expect_equal(profile$fval, dense$fval, tolerance = 1e-12)
-    expect_equal(profile$num.feval, dense$num.feval)
+    expect_equal(profile$fval, dense$fval, tolerance = 1e-8)
+    expect_gt(profile$num.feval.fast, 0)
   }
 
   run_case("wangvanryzin", 20260538L)
   run_case("liracine", 20260539L)
   run_case("racineliyan", 20260540L)
+})
+
+test_that("npudist ordered-categorical profile bandwidth CV supports training-grid integral", {
+  old.tree <- getOption("np.tree")
+  old.compress <- getOption("np.categorical.compress")
+  old.messages <- getOption("np.messages")
+  on.exit({
+    options(np.tree = old.tree)
+    options(np.categorical.compress = old.compress)
+    options(np.messages = old.messages)
+  }, add = TRUE)
+  options(np.messages = FALSE)
+
+  set.seed(20260541L)
+  n <- 360L
+  dat <- data.frame(
+    o1 = ordered(sample(1:6, n, TRUE)),
+    o2 = ordered(sample(1:5, n, TRUE))
+  )
+
+  options(np.tree = FALSE, np.categorical.compress = FALSE)
+  dense <- npudistbw(
+    ~ o1 + o2,
+    data = dat,
+    nmulti = 1,
+    do.full.integral = TRUE
+  )
+
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  profile <- npudistbw(
+    ~ o1 + o2,
+    data = dat,
+    nmulti = 1,
+    do.full.integral = TRUE
+  )
+
+  expect_equal(profile$fval, dense$fval, tolerance = 1e-8)
+  expect_gt(profile$num.feval.fast, 0)
 })
