@@ -1476,12 +1476,9 @@ npValidateRegressionNnLowerBound <- function(bws,
 
 
 explodeFormula <- function(formula, data=NULL){
-  if("." %in% attr(terms(formula), "term.labels")) {
-      if(is.null(data)) stop("'.' in formula and no 'data' argument")
-      formula <- terms(formula, data=data)
-  }
-  res <- strsplit(strsplit(paste(deparse(formula), collapse=""),
-                           " *[~] *")[[1]], " *[+] *")
+  formula.terms <- if (is.null(data)) terms(formula) else terms(formula, data = data)
+  response <- if (length(formula) == 3L) all.vars(formula[[2L]]) else character(0)
+  res <- list(response, attr(formula.terms, "term.labels"))
   stopifnot(all(sapply(res,length) > 0))
   names(res) <- c("response","terms")
   res
