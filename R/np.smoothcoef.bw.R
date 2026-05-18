@@ -604,6 +604,7 @@ npscoefbw.scbandwidth <-
     }
 
     cat.profile.cv <- NULL
+    on.exit({ cat.profile.cv <- NULL }, add = TRUE)
     get_cat_profile_cv <- function() {
       if (is.null(cat.profile.cv)) {
         train.codes <- .np_cat_profile_code_matrix(zdat.df)
@@ -623,9 +624,20 @@ npscoefbw.scbandwidth <-
                                      train.id, length(profile.keys))[, 1L]
           }
         }
+        profile.index <- split(seq_along(train.id), train.id)
+        profile.rows <- lapply(profile.index, function(idx) {
+          Wg <- W[idx, , drop = FALSE]
+          list(
+            idx = idx,
+            Wg = Wg,
+            Wgy = Wg * ydat[idx],
+            w1sq = Wg[, 1L] * Wg[, 1L]
+          )
+        })
         cat.profile.cv <<- list(
           train.id = train.id,
-          profile.index = split(seq_along(train.id), train.id),
+          profile.index = profile.index,
+          profile.rows = profile.rows,
           train.profile.codes = train.profile.codes,
           train.profile.dat = train.profile.dat,
           G = length(profile.keys),
@@ -642,6 +654,7 @@ npscoefbw.scbandwidth <-
       cp <- get_cat_profile_cv()
       train.id <- cp$train.id
       profile.index <- cp$profile.index
+      profile.rows <- cp$profile.rows
       train.profile.codes <- cp$train.profile.codes
       train.profile.dat <- cp$train.profile.dat
       G <- cp$G
@@ -692,7 +705,8 @@ npscoefbw.scbandwidth <-
 
       ridge <- ridge.grid[1L]
       for (gg in seq_len(G)) {
-        idx <- profile.index[[gg]]
+        row.state <- profile.rows[[gg]]
+        idx <- row.state$idx
         mat.full <- matrix(flat.profile[gg, ], nrow = p, ncol = p)
         tyw.full <- mat.full[-1L, 1L]
         tww.full <- mat.full[-1L, -1L, drop = FALSE]
@@ -705,13 +719,11 @@ npscoefbw.scbandwidth <-
           next
         }
 
-        Wg <- W[idx,, drop = FALSE]
-        yg <- ydat[idx]
-        sg <- rep.int(self.weight.profile[gg], length(idx))
-        rhs <- matrix(rep(tyw.full, each = length(idx)),
-                      nrow = length(idx), ncol = nc)
-        rhs <- rhs - sg * Wg * yg
-        tww11 <- tww.full[1L, 1L] - sg * Wg[, 1L] * Wg[, 1L]
+        Wg <- row.state$Wg
+        sg <- self.weight.profile[gg]
+        rhs <- matrix(tyw.full, nrow = length(idx), ncol = nc, byrow = TRUE)
+        rhs <- rhs - sg * row.state$Wgy
+        tww11 <- tww.full[1L, 1L] - sg * row.state$w1sq
         rhs[, 1L] <- rhs[, 1L] + ridge * rhs[, 1L] / NZD(tww11)
 
         u <- Wg %*% inv.full
