@@ -212,6 +212,41 @@ test_that("public npcdensbw cv.ls fixed LP tree and serial evaluators agree at f
   expect_equal(tree.at.tree, serial.at.tree, tolerance = 2e-2)
 })
 
+test_that("npcdensbw cv.ls fixed continuous stream does not route through legacy tree rows", {
+  set.seed(145)
+  n <- 36L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = rnorm(n))
+
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lc",
+    bwmethod = "cv.ls",
+    bws = c(0.5, 0.6, 0.7),
+    bandwidth.compute = FALSE
+  )
+
+  old_opts <- options(np.tree = TRUE, np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  expect_equal(
+    np:::.npcdensbw_tree_code(
+      bw,
+      ncon = bw$yncon + bw$xncon,
+      ncat = bw$ynuno + bw$ynord + bw$xnuno + bw$xnord
+    ),
+    np:::DO_TREE_NO
+  )
+
+  tree.obj <- np:::.npcdensbw_eval_only(x, y, bw)$objective
+
+  options(np.tree = FALSE)
+  serial.obj <- np:::.npcdensbw_eval_only(x, y, bw)$objective
+
+  expect_equal(tree.obj, serial.obj, tolerance = 1e-12)
+})
+
 test_that("public npcdensbw cv.ls generalized-nn LP route activates with ll == lp parity", {
   set.seed(143)
   n <- 36L
