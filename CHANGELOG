@@ -14,6 +14,13 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   least-squares objective probes inherit the same fixed-bandwidth Gaussian
   convolution improvement.
 
+* Improved local-polynomial conditional density and conditional distribution
+  least-squares cross-validation objective evaluation with a size-aware
+  row-block policy. The accepted route leaves bounded-quadrature caps in place,
+  bounds transient memory by sample size, and preserves objective values to
+  numerical precision while materially reducing evaluator overhead in
+  fixed-bandwidth CVLS probes run through serial and MPI sessions.
+
 * Updated large-sample categorical-only local-constant regression so the
   MPI-safe profile-compressed route is activated by
   `options(np.categorical.compress = TRUE)`, which is enabled by default.

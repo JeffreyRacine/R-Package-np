@@ -12,6 +12,12 @@
   convolution portion of the objective calculation. Conditional-density
   least-squares objective probes inherit the same fixed-bandwidth Gaussian
   convolution improvement.
+- Conditional density and conditional distribution least-squares
+  cross-validation now use a size-aware row-block policy for local-polynomial
+  objective evaluation. The accepted route keeps the bounded-quadrature cap
+  unchanged, bounds transient memory by sample size, and preserves objective
+  values to numerical precision while materially reducing evaluator overhead
+  for fixed-bandwidth CVLS probes in serial and MPI sessions.
 - Large-sample categorical-only regression now uses the MPI-safe
   profile-compressed route under `options(np.categorical.compress = TRUE)`,
   which is enabled by default. The legacy `options(np.tree = TRUE)` switch

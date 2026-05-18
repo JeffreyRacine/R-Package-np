@@ -19399,7 +19399,15 @@ static int np_conditional_y_row_stream_core(double *vector_scale_factor,
                                              row_out);
 }
 
-static int np_conditional_lp_cvls_block_size(void){
+static int np_conditional_lp_cvls_block_size(const int n){
+  const size_t target_bytes = (size_t)256 * (size_t)1024 * (size_t)1024;
+  const size_t denom = (size_t)32 * (size_t)MAX(1, n);
+  size_t block = (denom > 0) ? target_bytes / denom : (size_t)64;
+
+  if(block >= 1024) return 1024;
+  if(block >= 512) return 512;
+  if(block >= 256) return 256;
+  if(block >= 128) return 128;
   return 64;
 }
 
@@ -21188,7 +21196,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   const int num_obs = num_obs_train_extern;
   const NPBoundedCVLSConditionalQuadContext *quad_ctx =
     &np_bounded_cvls_conditional_quad_ctx;
-  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(), 64));
+  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(num_obs), 64));
   int q = 0;
   int use_quad_context = 0;
   double quad_lb[2] = {0.0, 0.0};
@@ -21364,7 +21372,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   const int nuno = num_var_unordered_extern;
   const int nord = num_var_ordered_extern;
   int q = np_bounded_cvls_conditional_grid_points(ncon);
-  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(), 64));
+  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(num_obs), 64));
   size_t total_eval = 0;
   NPConditionalYRowCtx yctx = {0};
   double *yrow = NULL, *eval_weight = NULL, *fit_block = NULL, *lin_block = NULL, *quad_block = NULL;
@@ -22224,7 +22232,7 @@ static int np_conditional_density_cvls_categorical_profile_stream(double *vector
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
-  const int block_size = MIN(np_conditional_lp_cvls_block_size(), MAX(1, num_obs));
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
   const int nblocks = (num_obs + block_size - 1)/block_size;
   double **xblock = NULL, **xblock_full = NULL, **yblock = NULL, **yconvblock = NULL;
   double *quad_cross = NULL;
@@ -23257,7 +23265,7 @@ int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
                                                double *cv){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
-  const int block_size = MIN(np_conditional_lp_cvls_block_size(), MAX(1, num_train));
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
   const int nblocks = (num_train + block_size - 1)/block_size;
   double **xblock = NULL, **yintblock = NULL;
   double *fit_cross = NULL;
