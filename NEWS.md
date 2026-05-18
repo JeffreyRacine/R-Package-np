@@ -18,6 +18,12 @@
   unchanged, bounds transient memory by sample size, and preserves objective
   values to numerical precision while materially reducing evaluator overhead
   for fixed-bandwidth CVLS probes in serial and MPI sessions.
+- Local-polynomial conditional density maximum-likelihood cross-validation now
+  uses the same bounded-memory block machinery for fixed and generalized
+  nearest-neighbor bandwidths. Focused `npcdensbw(..., bwmethod = "cv.ml",
+  regtype = "lp")` probes preserve objective values and selected bandwidths to
+  numerical precision in serial and MPI sessions while reducing objective and
+  full-search runtime.
 - Large-sample categorical-only regression now uses the MPI-safe
   profile-compressed route under `options(np.categorical.compress = TRUE)`,
   which is enabled by default. The legacy `options(np.tree = TRUE)` switch
@@ -32,8 +38,7 @@
   categorical profiles, and the bandwidth-search route now uses the same
   compressed support representation for all-categorical data. As with other
   flat categorical search surfaces, selected smoothing parameters may drift by
-  optimizer-path amounts while preserving the objective scale.
-  Very fast
+  optimizer-path amounts while preserving the objective scale. Very fast
   compressed routes may remain overhead-floor limited, so MPI acceleration is
   most useful once the uncompressed work would be genuinely long-running.
 - Categorical-only conditional density and conditional distribution bandwidth

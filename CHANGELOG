@@ -21,6 +21,13 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   numerical precision while materially reducing evaluator overhead in
   fixed-bandwidth CVLS probes run through serial and MPI sessions.
 
+* Improved local-polynomial conditional density maximum-likelihood
+  cross-validation objective evaluation by reusing the bounded-memory block
+  machinery for fixed and generalized nearest-neighbor bandwidths. Focused
+  `npcdensbw(..., bwmethod = "cv.ml", regtype = "lp")` probes preserved
+  objective values and selected bandwidths to numerical precision in serial and
+  MPI sessions while reducing objective and full-search runtime.
+
 * Updated large-sample categorical-only local-constant regression so the
   MPI-safe profile-compressed route is activated by
   `options(np.categorical.compress = TRUE)`, which is enabled by default.
@@ -38,8 +45,7 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   categorical profiles, and the bandwidth-search path now uses the same
   compressed support representation for all-categorical data. As with other
   flat categorical search surfaces, selected smoothing parameters may drift by
-  optimizer-path amounts while preserving the objective scale.
-  Very fast
+  optimizer-path amounts while preserving the objective scale. Very fast
   compressed routes may remain overhead-floor limited, so MPI acceleration is
   most useful once the uncompressed work would be genuinely long-running.
 
