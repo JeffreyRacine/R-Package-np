@@ -13,6 +13,10 @@
   convolution portion of the objective calculation. Conditional-density
   least-squares objective probes inherit the same fixed-bandwidth Gaussian
   convolution improvement.
+- Non-Gaussian scalar-bandwidth convolution helpers now hoist the response
+  bandwidth power outside the inner loop, improving fixed-bandwidth
+  least-squares density cross-validation with compact-support kernels while
+  preserving objective values exactly in focused probes.
 - Conditional density and conditional distribution least-squares
   cross-validation now use a size-aware row-block policy for local-polynomial
   objective evaluation. The accepted route keeps the bounded-quadrature cap

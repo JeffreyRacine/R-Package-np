@@ -15,6 +15,11 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   least-squares objective probes inherit the same fixed-bandwidth Gaussian
   convolution improvement.
 
+* Hoisted the scalar response-bandwidth power outside the non-Gaussian
+  convolution inner loop. Focused Epanechnikov
+  `npudensbw(..., bwmethod = "cv.ls")` probes preserved objective values
+  exactly while reducing fixed-bandwidth convolution runtime.
+
 * Improved local-polynomial conditional density and conditional distribution
   least-squares cross-validation objective evaluation with a size-aware
   row-block policy. The accepted route leaves bounded-quadrature caps in place,
