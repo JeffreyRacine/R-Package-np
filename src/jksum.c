@@ -4870,8 +4870,47 @@ void np_ckernelv(const int KERNEL,
     }                                                                              \
   } while(0)
 
+#define NP_CKERNELV_APPLY_GAUSS2()                                                  \
+  do {                                                                              \
+    if(xl == NULL){                                                                 \
+      if(!bin_do_xw){                                                               \
+        for(i = 0; i < num_xt; i++){                                                \
+          const double z = (x-xt[i])*zscale;                                        \
+          result[i] = invnorm*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z);                   \
+        }                                                                           \
+      } else {                                                                      \
+        for(i = 0; i < num_xt; i++){                                                \
+          if(xw[i] == 0.0) continue;                                                \
+          const double z = (x-xt[i])*zscale;                                        \
+          result[i] = xw[i]*invnorm*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z);             \
+        }                                                                           \
+      }                                                                             \
+    } else {                                                                        \
+      if(!bin_do_xw){                                                               \
+        for(int m = 0; m < xl->n; m++){                                             \
+          const int istart = xl->istart[m];                                         \
+          const int nlev = xl->nlev[m];                                             \
+          for(i = istart; i < istart+nlev; i++){                                    \
+            const double z = (x-xt[i])*zscale;                                      \
+            result[i] = invnorm*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z);                 \
+          }                                                                         \
+        }                                                                           \
+      } else {                                                                      \
+        for(int m = 0; m < xl->n; m++){                                             \
+          const int istart = xl->istart[m];                                         \
+          const int nlev = xl->nlev[m];                                             \
+          for(i = istart; i < istart+nlev; i++){                                    \
+            if(xw[i] == 0.0) continue;                                              \
+            const double z = (x-xt[i])*zscale;                                      \
+            result[i] = xw[i]*invnorm*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z);           \
+          }                                                                         \
+        }                                                                           \
+      }                                                                             \
+    }                                                                               \
+  } while(0)
+
   switch(KERNEL){
-    case 0: NP_CKERNELV_APPLY(np_gauss2); break;
+    case 0: NP_CKERNELV_APPLY_GAUSS2(); break;
     case 1: NP_CKERNELV_APPLY(np_gauss4); break;
     case 2: NP_CKERNELV_APPLY(np_gauss6); break;
     case 3: NP_CKERNELV_APPLY(np_gauss8); break;
