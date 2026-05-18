@@ -6,6 +6,12 @@
   local-polynomial CV evaluation while preserving objective values to
   numerical precision; adjacent density bandwidth probes preserve their
   objective values as well.
+- Shared weighted outer-product accumulation in `npksum()` now uses a guarded
+  BLAS `dgemm` route when the operation is dense, non-permuted, and
+  memory-bounded. Focused fixed-bandwidth probes preserve objective values to
+  numerical precision while substantially accelerating high-basis
+  local-polynomial regression and smooth-coefficient objective rows; small and
+  scalar routes remain on the established loop path.
 - Unconditional density least-squares cross-validation now uses a leaner
   fixed-bandwidth Gaussian convolution loop. Fixed-bandwidth
   `npudensbw(..., bwmethod = "cv.ls")` objective probes preserve objective

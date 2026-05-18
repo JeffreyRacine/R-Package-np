@@ -7,6 +7,13 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   numerical precision; adjacent density bandwidth probes preserved objective
   values as well.
 
+* Added a guarded BLAS `dgemm` route for shared weighted outer-product
+  accumulation in `npksum()` when the operation is dense, non-permuted, and
+  memory-bounded. Focused fixed-bandwidth probes preserved objective values to
+  numerical precision while substantially accelerating high-basis
+  local-polynomial regression and smooth-coefficient objective rows; small and
+  scalar routes remain on the established loop path.
+
 * Improved the fixed-bandwidth Gaussian convolution loop used by
   unconditional density least-squares cross-validation. Fixed-bandwidth
   `npudensbw(..., bwmethod = "cv.ls")` objective probes preserved objective
