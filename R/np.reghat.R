@@ -290,7 +290,8 @@ npreghat <-
     exdat = if (miss.ex) NULL else eval.data,
     leave.one.out = FALSE,
     bandwidth.divide = identical(bws$type, "adaptive_nn"),
-    kernel.pow = 1.0
+    kernel.pow = 1.0,
+    int.do.tree = .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord)
   )
 
   xcon.train <- as.matrix(txdat[, bws$icon, drop = FALSE])
@@ -385,7 +386,8 @@ npreghat <-
     exdat = if (miss.ex) NULL else eval.data,
     leave.one.out = FALSE,
     bandwidth.divide = TRUE,
-    kernel.pow = 1.0
+    kernel.pow = 1.0,
+    int.do.tree = .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord)
   )
 
   W.train <- W.lp(
@@ -531,9 +533,9 @@ npreghat <-
   H <- matrix(0.0, nrow = neval, ncol = ntrain)
   chunk.size <- max(1L, min(as.integer(chunk.size), ntrain))
   bw.vec <- as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord]))
-  tree.flag <- npTreeOrCategoricalCompress(
-    ncon = bws$ncon,
-    ncat = bws$nuno + bws$nord
+  tree.flag <- identical(
+    .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    DO_TREE_YES
   )
   grad.vec <- if (length(s) && any(s > 0L)) as.integer(s) else integer(0L)
   on.exit(
@@ -579,7 +581,8 @@ npreghat <-
                                       leave.one.out = FALSE,
                                       bandwidth.divide = TRUE,
                                       kernel.pow = 1.0,
-                                      operator = NULL) {
+                                      operator = NULL,
+                                      int.do.tree = NULL) {
   miss.ex <- is.null(exdat)
   txdat <- toFrame(txdat)
   if (!miss.ex) {
@@ -598,6 +601,8 @@ npreghat <-
   bandwidth.divide <- npValidateScalarLogical(bandwidth.divide, "bandwidth.divide")
   if (!miss.ex && leave.one.out)
     stop("you may not specify 'leave.one.out = TRUE' and provide evaluation data")
+  if (is.null(int.do.tree))
+    int.do.tree <- npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord)
 
   if (is.null(operator)) {
     operator <- rep.int("normal", length(txdat))
@@ -676,7 +681,7 @@ npreghat <-
     mcv.numRow = attr(bws$xmcv, "num.row"),
     wncol = 0L,
     yncol = 0L,
-    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    int_do_tree = int.do.tree,
     return.kernel.weights = TRUE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,
@@ -865,7 +870,7 @@ npreghat <-
     regtype = reg.c$code,
     no.ex = no.ex,
     mcv.numRow = attr(bws$xmcv, "num.row"),
-    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    int_do_tree = .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
     old.reg = FALSE
   )
 
