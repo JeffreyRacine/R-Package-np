@@ -115,6 +115,32 @@ npcdistbw.formula <-
   force(expr)
 }
 
+.npcdistbw_tree_code <- function(bws, ncon, ncat) {
+  code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat)
+
+  if (!identical(code, DO_TREE_YES))
+    return(code)
+
+  method <- if (!is.null(bws$method) && length(bws$method)) {
+    as.character(bws$method[1L])
+  } else {
+    "cv.ls"
+  }
+  bwtype <- if (!is.null(bws$type) && length(bws$type)) {
+    as.character(bws$type[1L])
+  } else {
+    "fixed"
+  }
+
+  if (ncon > 0L &&
+      identical(method, "cv.ls") &&
+      bwtype %in% c("fixed", "generalized_nn")) {
+    return(DO_TREE_NO)
+  }
+
+  code
+}
+
 .npRmpi_npcdistbw_bounded_adaptive_requested <- function(bwtype = NULL,
                                                          cxkerbound = "none",
                                                          cykerbound = "none",
@@ -405,7 +431,8 @@ npcdistbw.condbandwidth <-
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
         cdf_on_train = cdf_on_train,
-        int_do_tree = npDoTreeOrCategoricalCompress(
+        int_do_tree = .npcdistbw_tree_code(
+          bws = bws,
           ncon = dim(ycon)[2] + dim(xcon)[2],
           ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
         scale.init.categorical.sample=scale.init.categorical.sample,
@@ -862,7 +889,8 @@ npcdistbw.condbandwidth <-
     xnord = dim(xord)[2],
     xncon = dim(xcon)[2],
     cdf_on_train = cdf_on_train,
-    int_do_tree = npDoTreeOrCategoricalCompress(
+    int_do_tree = .npcdistbw_tree_code(
+      bws = bws,
       ncon = dim(ycon)[2] + dim(xcon)[2],
       ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = FALSE,
