@@ -275,7 +275,7 @@ npregbw.rbandwidth <-
         nord = bws$nord,
         ncon = bws$ncon,
         regtype = reg.c$code,
-        int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+        int_do_tree = .npregbw_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
@@ -419,6 +419,40 @@ npregbw.rbandwidth <-
     )
   }
   out
+}
+
+.npregbw_tree_code <- function(bws, ncon, ncat) {
+  code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat)
+
+  if (!identical(code, DO_TREE_YES))
+    return(code)
+
+  method <- if (!is.null(bws$method) && length(bws$method)) {
+    as.character(bws$method[1L])
+  } else {
+    "cv.ls"
+  }
+  bwtype <- if (!is.null(bws$type) && length(bws$type)) {
+    as.character(bws$type[1L])
+  } else {
+    "fixed"
+  }
+  regtype <- if (!is.null(bws$regtype.engine) && length(bws$regtype.engine)) {
+    as.character(bws$regtype.engine[1L])
+  } else if (!is.null(bws$regtype) && length(bws$regtype)) {
+    as.character(bws$regtype[1L])
+  } else {
+    "lc"
+  }
+
+  if (ncon > 0L &&
+      identical(method, "cv.ls") &&
+      bwtype %in% c("fixed", "generalized_nn") &&
+      !identical(regtype, "lc")) {
+    return(DO_TREE_NO)
+  }
+
+  code
 }
 
 .npregbw_eval_only <- function(xdat,
@@ -566,7 +600,7 @@ npregbw.rbandwidth <-
     nord = bws$nord,
     ncon = bws$ncon,
     regtype = reg.c$code,
-    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    int_do_tree = .npregbw_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = dfc.dir,
     transform.bounds = transform.bounds
