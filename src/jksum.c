@@ -4563,6 +4563,7 @@ void np_p_ckernelv(const int KERNEL,
   const int bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
   const double sgn = swap_xxt ? -1.0 : 1.0;
+  const double zscale = sgn/h;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
   double * const pxw = (bin_do_xw ? p_result : &unit_weight);
@@ -4606,14 +4607,14 @@ void np_p_ckernelv(const int KERNEL,
       } else {
         if(p_xl == NULL){
           for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*zscale)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
           }
         } else {
           for (int m = 0; m < p_xl->n; m++){
             const int istart = p_xl->istart[m];
             const int nlev = p_xl->nlev[m];
             for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*zscale)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
             }
           }
         }
@@ -4632,13 +4633,13 @@ void np_p_ckernelv(const int KERNEL,
 
   if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      const double kn = invnorm*k[KERNEL]((x-xt[i])*sgn/h);
+      const double kn = invnorm*k[KERNEL]((x-xt[i])*zscale);
 
       result[i] = xw[j]*kn;
       kbuf[i] = kn;
       
       if(do_perm)
-        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*zscale)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
 
     }
 
@@ -4655,7 +4656,7 @@ void np_p_ckernelv(const int KERNEL,
       const int istart = xl->istart[m];
       const int nlev = xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        const double kn = invnorm*k[KERNEL]((x-xt[i])*sgn/h);
+        const double kn = invnorm*k[KERNEL]((x-xt[i])*zscale);
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
@@ -4667,7 +4668,7 @@ void np_p_ckernelv(const int KERNEL,
         const int istart = p_xl->istart[m];
         const int nlev = p_xl->nlev[m];
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*zscale)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
         }
       }
     }
@@ -4708,6 +4709,7 @@ void np_ckernelv(const int KERNEL,
   const int bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
   const double sgn = swap_xxt ? -1.0 : 1.0;
+  const double zscale = sgn/h;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
   if((!skip_largeh_check) && np_cont_largeh_is_active(KERNEL, xt, num_xt, x, h, xl)){
@@ -4726,12 +4728,12 @@ void np_ckernelv(const int KERNEL,
     if(xl == NULL){                                                                \
       if(!bin_do_xw){                                                              \
         for(i = 0; i < num_xt; i++){                                               \
-          result[i] = invnorm*fn((x-xt[i])*sgn/h);                                 \
+          result[i] = invnorm*fn((x-xt[i])*zscale);                                 \
         }                                                                          \
       } else {                                                                     \
         for(i = 0; i < num_xt; i++){                                               \
           if(xw[i] == 0.0) continue;                                               \
-          result[i] = xw[i]*invnorm*fn((x-xt[i])*sgn/h);                           \
+          result[i] = xw[i]*invnorm*fn((x-xt[i])*zscale);                           \
         }                                                                          \
       }                                                                            \
     } else {                                                                       \
@@ -4740,7 +4742,7 @@ void np_ckernelv(const int KERNEL,
           const int istart = xl->istart[m];                                        \
           const int nlev = xl->nlev[m];                                            \
           for(i = istart; i < istart+nlev; i++){                                   \
-            result[i] = invnorm*fn((x-xt[i])*sgn/h);                               \
+            result[i] = invnorm*fn((x-xt[i])*zscale);                               \
           }                                                                        \
         }                                                                          \
       } else {                                                                     \
@@ -4749,7 +4751,7 @@ void np_ckernelv(const int KERNEL,
           const int nlev = xl->nlev[m];                                            \
           for(i = istart; i < istart+nlev; i++){                                   \
             if(xw[i] == 0.0) continue;                                             \
-            result[i] = xw[i]*invnorm*fn((x-xt[i])*sgn/h);                         \
+            result[i] = xw[i]*invnorm*fn((x-xt[i])*zscale);                         \
           }                                                                        \
         }                                                                          \
       }                                                                            \
@@ -4828,11 +4830,11 @@ void np_ckernelv(const int KERNEL,
       if(xl == NULL){
         if(!bin_do_xw){
           for(i = 0; i < num_xt; i++)
-            result[i] = invnorm*k[kernel]((x-xt[i])*sgn/h);
+            result[i] = invnorm*k[kernel]((x-xt[i])*zscale);
         } else {
           for(i = 0; i < num_xt; i++){
             if(xw[i] == 0.0) continue;
-            result[i] = xw[i]*invnorm*k[kernel]((x-xt[i])*sgn/h);
+            result[i] = xw[i]*invnorm*k[kernel]((x-xt[i])*zscale);
           }
         }
       } else {
@@ -4841,11 +4843,11 @@ void np_ckernelv(const int KERNEL,
           const int nlev = xl->nlev[m];
           if(!bin_do_xw){
             for(i = istart; i < istart+nlev; i++)
-              result[i] = invnorm*k[kernel]((x-xt[i])*sgn/h);
+              result[i] = invnorm*k[kernel]((x-xt[i])*zscale);
           } else {
             for(i = istart; i < istart+nlev; i++){
               if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*invnorm*k[kernel]((x-xt[i])*sgn/h);
+              result[i] = xw[i]*invnorm*k[kernel]((x-xt[i])*zscale);
             }
           }
         }
