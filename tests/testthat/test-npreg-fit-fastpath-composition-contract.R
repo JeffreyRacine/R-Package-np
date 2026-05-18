@@ -48,4 +48,9 @@ test_that("npreg non-LC fit stream does not route through legacy tree rows", {
     npRmpi:::.npreg_fit_tree_code(bw.lp, ncon = bw.lp$ncon, ncat = bw.lp$nuno + bw.lp$nord),
     npRmpi:::DO_TREE_NO
   )
+
+  hat.off <- npreghat(bws = bw.lp, txdat = x, y = y, output = "apply")
+  options(np.tree = TRUE)
+  hat.on <- npreghat(bws = bw.lp, txdat = x, y = y, output = "apply")
+  expect_equal(hat.on, hat.off, tolerance = 1e-12)
 })
