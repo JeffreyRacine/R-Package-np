@@ -205,20 +205,15 @@ static void np_blas_dgemm_tn_int(const int m,
                   FCONE FCONE);
 }
 
-static int np_outer_weighted_sum_blas(double * const * const pmat_A,
-                                      const int have_A,
-                                      const int max_A,
-                                      double * const * const pmat_B,
-                                      const int have_B,
-                                      const int max_B,
-                                      const double * const weights,
-                                      const int num_weights,
-                                      const int symmetric,
-                                      const double db,
-                                      double * const result){
-  if((pmat_A == NULL) || (pmat_B == NULL) || (weights == NULL) ||
-     (result == NULL) || (num_weights < 64) || (max_A <= 1) ||
-     (max_B <= 1) || ((size_t)max_A*(size_t)max_B < 16))
+static int np_outer_weighted_sum_blas_eligible(const int max_A,
+                                               const int max_B,
+                                               const int num_weights,
+                                               const int symmetric,
+                                               size_t * const nA_out,
+                                               size_t * const nB_out,
+                                               size_t * const nC_out){
+  if((num_weights < 64) || (max_A <= 1) || (max_B <= 1) ||
+     ((size_t)max_A*(size_t)max_B < 16))
     return 0;
 
   if(symmetric && (max_A != max_B))
@@ -234,22 +229,85 @@ static int np_outer_weighted_sum_blas(double * const * const pmat_A,
      (nC > scratch_doubles) || ((nA + nB + nC) > scratch_doubles))
     return 0;
 
-  double *Apack = (double *)malloc(nA*sizeof(double));
-  double *Bpack = (double *)malloc(nB*sizeof(double));
-  double *C = (double *)malloc(nC*sizeof(double));
+  if(nA_out != NULL) *nA_out = nA;
+  if(nB_out != NULL) *nB_out = nB;
+  if(nC_out != NULL) *nC_out = nC;
 
-  if((Apack == NULL) || (Bpack == NULL) || (C == NULL)){
-    if(Apack != NULL) free(Apack);
-    if(Bpack != NULL) free(Bpack);
-    if(C != NULL) free(C);
-    return 0;
-  }
+  return 1;
+}
+
+static double *np_outer_weighted_sum_pack_A(double * const * const pmat_A,
+                                            const int have_A,
+                                            const int max_A,
+                                            const int max_B,
+                                            const int num_weights,
+                                            const int symmetric){
+  size_t nA = 0;
+
+  if((pmat_A == NULL) ||
+     !np_outer_weighted_sum_blas_eligible(max_A, max_B, num_weights, symmetric,
+                                          &nA, NULL, NULL))
+    return NULL;
+
+  double *Apack = (double *)malloc(nA*sizeof(double));
+  if(Apack == NULL)
+    return NULL;
 
   for(int j = 0; j < max_A; j++){
     double * const Aj = Apack + (size_t)j*(size_t)num_weights;
     const double * const srcA = pmat_A[j];
     for(int k = 0; k < num_weights; k++)
       Aj[k] = srcA[k*have_A];
+  }
+
+  return Apack;
+}
+
+static int np_outer_weighted_sum_blas(double * const * const pmat_A,
+                                      const int have_A,
+                                      const int max_A,
+                                      double * const * const pmat_B,
+                                      const int have_B,
+                                      const int max_B,
+                                      const double * const weights,
+                                      const int num_weights,
+                                      const int symmetric,
+                                      const double db,
+                                      double * const result,
+                                      const double * const Apack_pre){
+  if((pmat_A == NULL) || (pmat_B == NULL) || (weights == NULL) ||
+     (result == NULL))
+    return 0;
+
+  size_t nA = 0, nB = 0, nC = 0;
+
+  if(!np_outer_weighted_sum_blas_eligible(max_A, max_B, num_weights, symmetric,
+                                          &nA, &nB, &nC))
+    return 0;
+
+  double *Apack = NULL;
+  const double *Ause = Apack_pre;
+  double *Bpack = (double *)malloc(nB*sizeof(double));
+  double *C = (double *)malloc(nC*sizeof(double));
+
+  if(Ause == NULL)
+    Apack = (double *)malloc(nA*sizeof(double));
+
+  if(((Ause == NULL) && (Apack == NULL)) || (Bpack == NULL) || (C == NULL)){
+    if(Apack != NULL) free(Apack);
+    if(Bpack != NULL) free(Bpack);
+    if(C != NULL) free(C);
+    return 0;
+  }
+
+  if(Ause == NULL){
+    for(int j = 0; j < max_A; j++){
+      double * const Aj = Apack + (size_t)j*(size_t)num_weights;
+      const double * const srcA = pmat_A[j];
+      for(int k = 0; k < num_weights; k++)
+        Aj[k] = srcA[k*have_A];
+    }
+    Ause = Apack;
   }
 
   for(int i = 0; i < max_B; i++){
@@ -259,7 +317,7 @@ static int np_outer_weighted_sum_blas(double * const * const pmat_A,
       Bi[k] = (weights[k] == 0.0) ? 0.0 : srcB[k*have_B]*weights[k]/db;
   }
 
-  np_blas_dgemm_tn_int(max_A, max_B, num_weights, Apack, Bpack, C);
+  np_blas_dgemm_tn_int(max_A, max_B, num_weights, Ause, Bpack, C);
 
   if(!symmetric){
     for(int j = 0; j < max_A; j++)
@@ -5644,7 +5702,8 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
                            const int gather_scatter,
                            const int bandwidth_divide, const double dband,
                            double * const result,
-                           const XL * const xl){
+                           const XL * const xl,
+                           const double * const Apack_pre){
 
   int i,j,k, l = parallel_sum?which_l:0;
   const int kstride = (parallel_sum ? (MAX(ncol_A, 1)*MAX(ncol_B, 1)) : 0);
@@ -5753,7 +5812,8 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
          np_outer_weighted_sum_blas(pmat_A, have_A, max_A,
                                     pmat_B, have_B, max_B,
                                     use_wpow ? wbuf : weights, num_weights,
-                                    symmetric, use_wpow ? unit_weight : db, result)){
+                                    symmetric, use_wpow ? unit_weight : db, result,
+                                    Apack_pre)){
         if(do_leave_one_out)
           weights[which_k] = temp;
 
@@ -6227,6 +6287,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   double *lambda = NULL, **matrix_bandwidth = NULL, **matrix_alt_bandwidth = NULL, **m = NULL;
   double *tprod = NULL, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
   double *perm_kbuf = NULL;
+  double *blas_Apack = NULL;
   int use_disc_profile_cache = 0, disc_nprof = 0, disc_mark_token = 1;
   int disc_profile_from_override = 0;
   int disc_profile_from_global_cache = 0;
@@ -6862,6 +6923,14 @@ const NP_GateOverrideCtx * const gate_override_ctx){
 
   m = matrix_bandwidth;
 
+  if((!nws) && (!do_psum) && (!gather_scatter) && (sgn == NULL) &&
+     (!np_ks_tree_use) && (ncol_W > 0) &&
+     np_outer_weighted_sum_blas_eligible(MAX(ncol_W, 1), MAX(ncol_Y, 1),
+                                         num_xt, symmetric, NULL, NULL, NULL)){
+    blas_Apack = np_outer_weighted_sum_pack_A(matrix_W, 1, MAX(ncol_W, 1),
+                                             MAX(ncol_Y, 1), num_xt, symmetric);
+  }
+
     /* do sums */
   for(j=js; j <= je; j++, ws = (ws==NULL ? NULL : ws+ws_step), p_ws=(p_ws == NULL ? NULL : p_ws+ws_step)){
     R_CheckUserInterrupt();
@@ -7377,7 +7446,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
                               symmetric,
                               gather_scatter,
                               1, dband,
-                              ws, pxl);
+                              ws, pxl,
+                              blas_Apack);
       }
 
 
@@ -7391,7 +7461,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
                                 symmetric,
                                 gather_scatter,
                                 1, p_dband[ii],
-                                p_ws + ii*num_obs_eval*sum_element_length, (p_pxl == NULL) ? NULL : (p_pxl+ii));
+                                p_ws + ii*num_obs_eval*sum_element_length, (p_pxl == NULL) ? NULL : (p_pxl+ii),
+                                blas_Apack);
         }
 
     }
@@ -7471,6 +7542,7 @@ cleanup:
 
   free(tprod);
   free(bpow);
+  if(blas_Apack != NULL) free(blas_Apack);
   
   clean_xl(pxl);
   clean_nl(&nls);
