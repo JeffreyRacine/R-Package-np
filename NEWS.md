@@ -16,6 +16,10 @@
   bandwidth power outside the inner loop, improving fixed-bandwidth
   least-squares density cross-validation with compact-support kernels while
   preserving objective values exactly in focused probes.
+- Continuous-kernel vector helpers now reuse the loop-invariant signed inverse
+  bandwidth scale inside their inner loops. Focused density, conditional
+  density, and regression objective probes preserve serial/MPI objective
+  parity while reducing repeated scaling work in shared C hot paths.
 - Conditional density and conditional distribution least-squares
   cross-validation now use a size-aware row-block policy for local-polynomial
   objective evaluation. The accepted route keeps the bounded-quadrature cap

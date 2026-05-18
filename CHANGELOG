@@ -20,6 +20,11 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   exactly in serial and MPI builds while reducing fixed-bandwidth convolution
   runtime.
 
+* Reused the loop-invariant signed inverse bandwidth scale inside continuous
+  kernel-vector helper loops. Focused density, conditional density, and
+  regression objective probes preserved serial/MPI objective parity while
+  reducing repeated scaling work in shared C hot paths.
+
 * Improved local-polynomial conditional density and conditional distribution
   least-squares cross-validation objective evaluation with a size-aware
   row-block policy. The accepted route leaves bounded-quadrature caps in place,
