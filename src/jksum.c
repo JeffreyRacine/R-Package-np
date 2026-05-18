@@ -5011,9 +5011,24 @@ void np_convol_ckernelv(const int KERNEL,
     np_aconvol_rect, np_aconvol_tgauss2
   };
 
+  if(xt_h_is_scalar){
+    const double hy = xt_h[0];
+    const double hy_power = ipow(hy, power);
+
+    for(i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+      double kval;
+
+      if(xw[j] == 0.0) continue;
+
+      kval = k[KERNEL](x, xt[i], h, hy);
+      result[i] = xw[j]*kval/hy_power;
+    }
+    return;
+  }
+
   for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
     double kval;
-    const double hy = xt_h_is_scalar ? xt_h[0] : xt_h[i];
+    const double hy = xt_h[i];
 
     if(xw[j] == 0.0) continue;
 
