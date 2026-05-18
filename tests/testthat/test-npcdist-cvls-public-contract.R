@@ -143,6 +143,47 @@ test_that("public npcdistbw cv.ls fixed LP/LL route activates with ll == lp pari
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-8)
 })
 
+test_that("npcdistbw cv.ls fixed continuous stream does not route through legacy tree rows", {
+  data("wage1")
+  x <- wage1[, c("married", "female", "nonwhite", "educ", "exper", "tenure")]
+  y <- wage1["lwage"]
+
+  bw <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    degree = rep(1L, 3L),
+    bwmethod = "cv.ls",
+    cxkertype = "epanechnikov",
+    cykertype = "epanechnikov",
+    bws = c(1, 0.1, 0.1, 0.1, 5, 10, 5),
+    bandwidth.compute = FALSE
+  )
+
+  old_opts <- options(np.tree = TRUE, np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  expect_equal(
+    np:::.npcdistbw_tree_code(
+      bw,
+      ncon = bw$yncon + bw$xncon,
+      ncat = bw$ynuno + bw$ynord + bw$xnuno + bw$xnord
+    ),
+    np:::DO_TREE_NO
+  )
+
+  tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
+           error = function(e) NULL)
+  tree.obj <- np:::.npcdistbw_eval_only(x, y, bws = bw)$objective
+
+  options(np.tree = FALSE)
+  tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
+           error = function(e) NULL)
+  serial.obj <- np:::.npcdistbw_eval_only(x, y, bws = bw)$objective
+
+  expect_equal(tree.obj, serial.obj, tolerance = 1e-12)
+})
+
 test_that("public npcdistbw cv.ls generalized-nn LP route activates with ll == lp parity", {
   set.seed(20260312)
   n <- 24L
