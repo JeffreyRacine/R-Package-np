@@ -6,6 +6,13 @@
   local-polynomial CV evaluation while preserving objective values to
   numerical precision; adjacent density bandwidth probes preserve their
   objective values as well.
+- Unconditional density least-squares cross-validation now uses a leaner
+  fixed-bandwidth Gaussian convolution loop. Fixed-bandwidth
+  `npudensbw(..., bwmethod = "cv.ls")` objective probes preserve objective
+  values exactly in the focused validation rows while materially reducing the
+  convolution portion of the objective calculation. Conditional-density
+  least-squares objective probes inherit the same fixed-bandwidth Gaussian
+  convolution improvement.
 - Large-sample categorical-only regression now has a profile-compressed
   execution route controlled by `options(np.categorical.compress = TRUE)`,
   which is enabled by default. The legacy `options(np.tree = TRUE)` switch
