@@ -204,14 +204,132 @@ npplreg.call <-
     }
 
     local.direct <- isTRUE(identical(bws$type, "generalized_nn"))
+    cat.profile.cache <- new.env(parent = emptyenv())
+
+    reg_mean_cat_cached <- function(regbw, ytrain, zeval = NULL) {
+      if (!npTreeOrCategoricalCompress(ncon = regbw$ncon,
+                                       ncat = regbw$nuno + regbw$nord))
+        return(NULL)
+      if (!identical(regbw$type, "fixed"))
+        return(NULL)
+      if (!isTRUE(regbw$ncon == 0L) || (regbw$nuno + regbw$nord) < 1L)
+        return(NULL)
+
+      regtype <- if (is.null(regbw$regtype)) "lc" else as.character(regbw$regtype)
+      if (!(identical(regtype, "lc") || identical(regtype, "lp")))
+        return(NULL)
+      if (identical(regtype, "lp") && length(regbw$degree) && any(regbw$degree > 0L))
+        return(NULL)
+
+      if (ncol(zdat) != length(regbw$bw) || length(ytrain) != nrow(zdat))
+        return(NULL)
+      if (!is.null(zeval) && ncol(zeval) != ncol(zdat))
+        return(NULL)
+      if (!is.null(zeval) && !(zdat %~% zeval))
+        return(NULL)
+      if (!all(vapply(zdat, function(z) is.factor(z) || is.ordered(z), logical(1))))
+        return(NULL)
+      if (!is.null(zeval) &&
+          !all(vapply(zeval, function(z) is.factor(z) || is.ordered(z), logical(1))))
+        return(NULL)
+
+      if (is.null(cat.profile.cache$xdati)) {
+        tx.adj <- adjustLevels(zdat, regbw$xdati)
+        eval.plot <- if (no.exz) tx.adj else adjustLevels(ezdat, regbw$xdati, allowNewCells = TRUE)
+
+        if (!all(vapply(seq_along(tx.adj), function(j) {
+          identical(is.ordered(tx.adj[[j]]), is.ordered(eval.plot[[j]])) &&
+            identical(levels(tx.adj[[j]]), levels(eval.plot[[j]]))
+        }, logical(1))))
+          return(NULL)
+
+        train.codes <- .np_cat_profile_code_matrix(tx.adj)
+        if (anyNA(train.codes))
+          return(NULL)
+        train.keys <- .np_cat_profile_keys(train.codes)
+        train.profile.keys <- unique(train.keys)
+        train.id <- match(train.keys, train.profile.keys)
+        train.rep <- match(train.profile.keys, train.keys)
+        G <- length(train.profile.keys)
+
+        eval_cache <- function(dat) {
+          codes <- .np_cat_profile_code_matrix(dat)
+          if (anyNA(codes))
+            return(NULL)
+          keys <- .np_cat_profile_keys(codes)
+          profile.keys <- unique(keys)
+          rep.idx <- match(profile.keys, keys)
+          list(
+            id = match(keys, profile.keys),
+            profile.codes = codes[rep.idx, , drop = FALSE],
+            profile.keys = profile.keys
+          )
+        }
+
+        eval.train.cache <- eval_cache(tx.adj)
+        eval.plot.cache <- eval_cache(eval.plot)
+        if (is.null(eval.train.cache) || is.null(eval.plot.cache))
+          return(NULL)
+
+        cat.profile.cache$xdati <- regbw$xdati
+        cat.profile.cache$train.id <- train.id
+        cat.profile.cache$train.profile.codes <- train.codes[train.rep, , drop = FALSE]
+        cat.profile.cache$train.profile.dat <- tx.adj[train.rep, , drop = FALSE]
+        cat.profile.cache$G <- G
+        cat.profile.cache$counts <- as.double(tabulate(train.id, nbins = G))
+        cat.profile.cache$eval.train <- eval.train.cache
+        cat.profile.cache$eval.plot <- eval.plot.cache
+      } else if (!identical(cat.profile.cache$xdati, regbw$xdati)) {
+        return(NULL)
+      }
+
+      if (is.factor(ytrain)) {
+        ytrain <- adjustLevels(data.frame(ytrain), regbw$ydati)[, 1L]
+        ytrain <- (regbw$ydati$all.dlev[[1L]])[as.integer(ytrain)]
+      } else {
+        ytrain <- as.double(ytrain)
+      }
+      if (anyNA(ytrain))
+        return(NULL)
+
+      eval.cache <- if (is.null(zeval)) {
+        cat.profile.cache$eval.train
+      } else {
+        cat.profile.cache$eval.plot
+      }
+      L.eval <- tryCatch(
+        .np_regression_cat_profile_kernel_matrix(
+          eval.codes = eval.cache$profile.codes,
+          train.codes = cat.profile.cache$train.profile.codes,
+          xdat = cat.profile.cache$train.profile.dat,
+          bws = regbw
+        ),
+        error = function(e) NULL
+      )
+      if (is.null(L.eval))
+        return(NULL)
+
+      sums <- as.vector(.np_cat_profile_rowsum(ytrain,
+                                               cat.profile.cache$train.id,
+                                               cat.profile.cache$G))
+      den <- as.vector(L.eval %*% cat.profile.cache$counts)
+      if (any(!is.finite(den)) || any(!(abs(den) > .Machine$double.xmin)))
+        return(NULL)
+
+      profile.mean <- as.vector(L.eval %*% sums / den)
+      profile.mean[eval.cache$id]
+    }
 
     reg_mean <- function(regbw, ytrain, zeval = NULL) {
-      out <- .np_regression_cat_profile_mean(
-        bws = regbw,
-        txdat = zdat,
-        tydat = ytrain,
-        exdat = zeval
-      )
+      out <- reg_mean_cat_cached(regbw = regbw, ytrain = ytrain, zeval = zeval)
+      if (is.null(out)) {
+        out <- .np_regression_cat_profile_mean(
+          bws = regbw,
+          txdat = zdat,
+          tydat = ytrain,
+          exdat = zeval
+        )
+      }
       if (!is.null(out))
         return(as.vector(out))
 
