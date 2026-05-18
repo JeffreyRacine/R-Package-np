@@ -5727,9 +5727,14 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
         if(kpow == 1){
           for (k = 0; k < num_weights; k++, l+=linc){
             if(weights[k] == 0.0) continue;
+            const double wk = weights[k]/db;
+            double * const resk = result + k*kstride;
+            const int loff = l*have_A;
+            const int lboff = l*have_B;
             for (j = 0; j < max_A; j++){
+              const double aj = pmat_A[j][loff];
               for (i = 0; i <= j; i++){
-                result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+                resk[j*max_B+i] += aj*pmat_B[i][lboff]*wk;
               }
             }
           }

@@ -1,5 +1,10 @@
 # npRmpi 0.70-3
 
+- Local-polynomial regression cross-validation now uses a leaner hot
+  symmetric weighted-sum loop. Fixed-bandwidth `npregbw(..., regtype = "lp",
+  bwmethod = "cv.ls")` objective probes in active MPI sessions match serial
+  `np` objective values to numerical precision while substantially reducing
+  local-polynomial CV evaluation time.
 - Large-sample categorical-only regression now uses the MPI-safe
   profile-compressed route under `options(np.categorical.compress = TRUE)`,
   which is enabled by default. The legacy `options(np.tree = TRUE)` switch
