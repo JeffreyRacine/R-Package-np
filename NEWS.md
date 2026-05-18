@@ -5,6 +5,13 @@
   bwmethod = "cv.ls")` objective probes in active MPI sessions match serial
   `np` objective values to numerical precision while substantially reducing
   local-polynomial CV evaluation time.
+- Unconditional density least-squares cross-validation now uses a leaner
+  fixed-bandwidth Gaussian convolution loop. Fixed-bandwidth
+  `npudensbw(..., bwmethod = "cv.ls")` objective probes preserve objective
+  values exactly in the focused validation rows while materially reducing the
+  convolution portion of the objective calculation. Conditional-density
+  least-squares objective probes inherit the same fixed-bandwidth Gaussian
+  convolution improvement.
 - Large-sample categorical-only regression now uses the MPI-safe
   profile-compressed route under `options(np.categorical.compress = TRUE)`,
   which is enabled by default. The legacy `options(np.tree = TRUE)` switch

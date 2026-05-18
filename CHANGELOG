@@ -6,6 +6,14 @@ Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
   serial `np` objective values to numerical precision while substantially
   reducing local-polynomial CV evaluation time.
 
+* Improved the fixed-bandwidth Gaussian convolution loop used by
+  unconditional density least-squares cross-validation. Fixed-bandwidth
+  `npudensbw(..., bwmethod = "cv.ls")` objective probes preserved objective
+  values exactly in the focused validation rows while materially reducing the
+  convolution portion of the objective calculation. Conditional-density
+  least-squares objective probes inherit the same fixed-bandwidth Gaussian
+  convolution improvement.
+
 * Updated large-sample categorical-only local-constant regression so the
   MPI-safe profile-compressed route is activated by
   `options(np.categorical.compress = TRUE)`, which is enabled by default.

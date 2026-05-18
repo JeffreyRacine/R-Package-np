@@ -4973,7 +4973,7 @@ void np_convol_ckernelv(const int KERNEL,
                         const double * const xt, const int num_xt, 
                         const int do_xw,
                         const double x, 
-                        double * xt_h,
+                        double * xt_h, 
                         const int xt_h_is_scalar,
                         const double h, 
                         double * const result,
@@ -4984,6 +4984,26 @@ void np_convol_ckernelv(const int KERNEL,
 
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
+
+  if((KERNEL == 0) && xt_h_is_scalar){
+    const double hy = xt_h[0];
+    const double h2 = h*h + hy*hy;
+    const double sqrt_h2 = sqrt(h2);
+    const double coef = 0.3989422803*h*hy;
+    const double expo = -0.5/h2;
+    const double hy_power = ipow(hy, power);
+
+    for(i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+      double kval;
+      const double d = x - xt[i];
+
+      if(xw[j] == 0.0) continue;
+
+      kval = coef*exp(expo*d*d)/sqrt_h2;
+      result[i] = xw[j]*kval/hy_power;
+    }
+    return;
+  }
 
   double (* const k[])(double,double,double,double) = { 
     np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
