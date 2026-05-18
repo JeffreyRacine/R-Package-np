@@ -22179,7 +22179,6 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
   const int num_obs = num_obs_train_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
   double **xblock = NULL, **yblock = NULL;
-  double *fit_cross = NULL;
   int i0, ii;
   int status = 1;
 
@@ -22195,8 +22194,7 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
 
   xblock = alloc_tmatd(num_obs, block_size);
   yblock = alloc_tmatd(num_obs, block_size);
-  fit_cross = alloc_vecd(block_size*block_size);
-  if((xblock == NULL) || (yblock == NULL) || (fit_cross == NULL))
+  if((xblock == NULL) || (yblock == NULL))
     goto cleanup_cvml_lp_block;
 
   *cv = 0.0;
@@ -22208,9 +22206,8 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
     if(np_conditional_y_block_stream_op_core(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0)
       goto cleanup_cvml_lp_block;
 
-    np_blas_dgemm_tn_int(ib, ib, num_obs, xblock[0], yblock[0], fit_cross);
     for(ii = 0; ii < ib; ii++){
-      const double fit = fit_cross[ii + ii*ib];
+      const double fit = np_blas_ddot_int(num_obs, xblock[ii], yblock[ii]);
 
       /* Match bkcde's default smooth penalty for negative LP delete-one densities. */
       if(fit > DBL_MIN){
@@ -22228,7 +22225,6 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
 cleanup_cvml_lp_block:
   if(xblock != NULL) free_tmat(xblock);
   if(yblock != NULL) free_tmat(yblock);
-  if(fit_cross != NULL) free(fit_cross);
   np_glp_cv_clear_extern();
   return status;
 }
