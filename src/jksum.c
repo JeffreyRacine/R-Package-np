@@ -5802,6 +5802,8 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
   if (do_leave_one_out) {
     temp = weights[which_k];
     weights[which_k] = 0.0;
+    if(use_wpow)
+      wbuf[which_k] = 0.0;
   }
 
   if(scalar_sum_fast){
@@ -5859,13 +5861,15 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
   
   if(xl == NULL){
     if(!gather_scatter){
-      if((kpow == 1) && (!parallel_sum) && (!have_sgn) &&
+      if(!parallel_sum && (!have_sgn) &&
          np_outer_weighted_sum_blas(pmat_A, have_A, max_A,
                                     pmat_B, have_B, max_B,
-                                    weights, num_weights,
-                                    symmetric, db, result)){
+                                    use_wpow ? wbuf : weights, num_weights,
+                                    symmetric, use_wpow ? unit_weight : db, result)){
         if(do_leave_one_out)
           weights[which_k] = temp;
+
+        safe_free(wbuf);
 
         return;
       }
