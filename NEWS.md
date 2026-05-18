@@ -19,6 +19,11 @@
   unchanged, bounds transient memory by sample size, and preserves objective
   values to numerical precision while materially reducing evaluator overhead
   for fixed-bandwidth CVLS probes.
+- Local-polynomial conditional density maximum-likelihood cross-validation now
+  uses the same bounded-memory block machinery for fixed and generalized
+  nearest-neighbor bandwidths. Focused `npcdensbw(..., bwmethod = "cv.ml",
+  regtype = "lp")` probes preserve objective values and selected bandwidths to
+  numerical precision while reducing objective and full-search runtime.
 - Large-sample categorical-only regression now has a profile-compressed
   execution route controlled by `options(np.categorical.compress = TRUE)`,
   which is enabled by default. The legacy `options(np.tree = TRUE)` switch

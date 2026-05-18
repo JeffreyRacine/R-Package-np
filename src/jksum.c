@@ -21074,6 +21074,9 @@ cleanup_cdist_all_large:
   return status;
 }
 
+static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_factor,
+                                                       double *cv);
+
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
@@ -21097,6 +21100,12 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
     np_fastcv_alllarge_hits++;
     return 0;
   }
+
+  if((BANDWIDTH_den_extern == BW_FIXED || BANDWIDTH_den_extern == BW_GEN_NN) &&
+     (int_TREE_X != NP_TREE_TRUE) &&
+     (int_TREE_Y != NP_TREE_TRUE) &&
+     (np_conditional_density_cvml_lp_block_stream(vector_scale_factor, cv) == 0))
+    return 0;
 
   xrow = alloc_vecd(MAX(1, num_obs));
   yrow = alloc_vecd(MAX(1, num_obs));
@@ -21147,6 +21156,65 @@ cleanup_cvml_lp_stream:
   np_glp_cv_clear_extern();
   if(xrow != NULL) free(xrow);
   if(yrow != NULL) free(yrow);
+  return status;
+}
+
+static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_factor,
+                                                       double *cv){
+  const int num_obs = num_obs_train_extern;
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
+  double **xblock = NULL, **yblock = NULL;
+  double *fit_cross = NULL;
+  int i0, ii;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
+    return 1;
+  if(int_ll_extern != LL_LP)
+    return 1;
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
+    return 1;
+  if((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE))
+    return 1;
+
+  xblock = alloc_tmatd(num_obs, block_size);
+  yblock = alloc_tmatd(num_obs, block_size);
+  fit_cross = alloc_vecd(block_size*block_size);
+  if((xblock == NULL) || (yblock == NULL) || (fit_cross == NULL))
+    goto cleanup_cvml_lp_block;
+
+  *cv = 0.0;
+  for(i0 = 0; i0 < num_obs; i0 += block_size){
+    const int ib = MIN(block_size, num_obs - i0);
+
+    if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
+      goto cleanup_cvml_lp_block;
+    if(np_conditional_y_block_stream_op_core(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0)
+      goto cleanup_cvml_lp_block;
+
+    np_blas_dgemm_tn_int(ib, ib, num_obs, xblock[0], yblock[0], fit_cross);
+    for(ii = 0; ii < ib; ii++){
+      const double fit = fit_cross[ii + ii*ib];
+
+      /* Match bkcde's default smooth penalty for negative LP delete-one densities. */
+      if(fit > DBL_MIN){
+        *cv -= log(fit);
+      } else if(fit < -DBL_MIN){
+        *cv += log(-fit) - 2.0*log(DBL_MIN);
+      } else {
+        *cv -= log(DBL_MIN);
+      }
+    }
+  }
+
+  status = 0;
+
+cleanup_cvml_lp_block:
+  if(xblock != NULL) free_tmat(xblock);
+  if(yblock != NULL) free_tmat(yblock);
+  if(fit_cross != NULL) free(fit_cross);
+  np_glp_cv_clear_extern();
   return status;
 }
 
