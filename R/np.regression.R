@@ -22,6 +22,26 @@ npreg <-
     }
   }
 
+.npreg_fit_tree_code <- function(bws, ncon, ncat) {
+  code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat)
+
+  if (!identical(code, DO_TREE_YES))
+    return(code)
+
+  regtype <- if (!is.null(bws$regtype.engine) && length(bws$regtype.engine)) {
+    as.character(bws$regtype.engine[1L])
+  } else if (!is.null(bws$regtype) && length(bws$regtype)) {
+    as.character(bws$regtype[1L])
+  } else {
+    "lc"
+  }
+
+  if (ncon > 0L && !identical(regtype, "lc"))
+    return(DO_TREE_NO)
+
+  code
+}
+
 npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
 
@@ -538,7 +558,7 @@ npreg.rbandwidth <-
       regtype = reg.c$code,
       no.ex = no.ex,
       mcv.numRow = attr(bws$xmcv, "num.row"),
-      int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+      int_do_tree = .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
       old.reg = FALSE)
 
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
