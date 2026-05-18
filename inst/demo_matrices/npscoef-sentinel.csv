@@ -1,5 +1,5 @@
 family,case,tier,enabled,default_n,floor_n,regtype,bwmethod,nomad,degree,degree.max,bwtype,gradients,why
 npscoef,npscoef_lc_ls,sentinel,TRUE,15000,1000,lc,cv.ls,FALSE,,,fixed,TRUE,default_smooth_coefficient_local_constant_route
-npscoef,npscoef_ll_ls,sentinel,TRUE,15000,1000,ll,cv.ls,FALSE,,,fixed,TRUE,smooth_coefficient_local_linear_route
+npscoef,npscoef_ll_ls,sentinel,TRUE,20000,1000,ll,cv.ls,FALSE,,,fixed,TRUE,smooth_coefficient_local_linear_route
 npscoef,npscoef_lp1_ls,sentinel,TRUE,15000,1000,lp,cv.ls,FALSE,1,,fixed,TRUE,smooth_coefficient_explicit_local_polynomial_degree_1_route
 npscoef,npscoef_lp_nomad,sentinel,TRUE,5000,1000,lp,cv.ls,TRUE,,1,fixed,FALSE,smooth_coefficient_nomad_powell_degree_search_route
