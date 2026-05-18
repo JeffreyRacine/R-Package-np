@@ -1,5 +1,11 @@
 # np 0.70-3
 
+- Local-polynomial regression cross-validation now uses a leaner hot
+  symmetric weighted-sum loop. Fixed-bandwidth `npregbw(..., regtype = "lp",
+  bwmethod = "cv.ls")` objective probes show substantially faster
+  local-polynomial CV evaluation while preserving objective values to
+  numerical precision; adjacent density bandwidth probes preserve their
+  objective values as well.
 - Large-sample categorical-only regression now has a profile-compressed
   execution route controlled by `options(np.categorical.compress = TRUE)`,
   which is enabled by default. The legacy `options(np.tree = TRUE)` switch
