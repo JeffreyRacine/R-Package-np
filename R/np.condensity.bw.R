@@ -108,6 +108,32 @@ npcdensbw.formula <-
   invisible(TRUE)
 }
 
+.npcdensbw_tree_code <- function(bws, ncon, ncat) {
+  code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat)
+
+  if (!identical(code, DO_TREE_YES))
+    return(code)
+
+  method <- if (!is.null(bws$method) && length(bws$method)) {
+    as.character(bws$method[1L])
+  } else {
+    "cv.ml"
+  }
+  bwtype <- if (!is.null(bws$type) && length(bws$type)) {
+    as.character(bws$type[1L])
+  } else {
+    "fixed"
+  }
+
+  if (ncon > 0L &&
+      identical(method, "cv.ls") &&
+      bwtype %in% c("fixed", "generalized_nn")) {
+    return(DO_TREE_NO)
+  }
+
+  code
+}
+
 .npcdensbw_validate_scale_factor_lower_bound <- function(value,
                                                          argname = "scale.factor.search.lower") {
   if (length(value) != 1L || !is.numeric(value) || is.na(value) ||
@@ -537,7 +563,8 @@ npcdensbw.conbandwidth <-
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
         old.cdens = FALSE,
-        int_do_tree = npDoTreeOrCategoricalCompress(
+        int_do_tree = .npcdensbw_tree_code(
+          bws = bws,
           ncon = dim(ycon)[2] + dim(xcon)[2],
           ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
         scale.init.categorical.sample = scale.init.categorical.sample,
@@ -1117,7 +1144,8 @@ npcdensbw.conbandwidth <-
     xnord = dim(xord)[2],
     xncon = dim(xcon)[2],
     old.cdens = FALSE,
-    int_do_tree = npDoTreeOrCategoricalCompress(
+    int_do_tree = .npcdensbw_tree_code(
+      bws = bws,
       ncon = dim(ycon)[2] + dim(xcon)[2],
       ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = FALSE,
@@ -1394,7 +1422,8 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
     xnord = dim(xord)[2],
     xncon = dim(xcon)[2],
     old.cdens = FALSE,
-    int_do_tree = npDoTreeOrCategoricalCompress(
+    int_do_tree = .npcdensbw_tree_code(
+      bws = bws,
       ncon = dim(ycon)[2] + dim(xcon)[2],
       ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = FALSE,
