@@ -118,7 +118,7 @@ npcdistbw.formula <-
 
   if (ncon > 0L &&
       identical(method, "cv.ls") &&
-      bwtype %in% c("fixed", "generalized_nn")) {
+      identical(bwtype, "generalized_nn")) {
     return(DO_TREE_NO)
   }
 
