@@ -99,7 +99,7 @@ double meand(int n, double *vector);
 double ran3(int *idum);
 double gasdev(int *idum);
 double chidev(int *idum, int df);
-void reset_nr_rng_state(void);
+void np_reset_nr_rng_state(void);
 
 double standerrd(int n, double *vector);
 

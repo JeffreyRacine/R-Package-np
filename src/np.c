@@ -1336,11 +1336,11 @@ void spinner(int num) {
 
 void np_set_seed(int * num){
   int_RANDOM_SEED = *num;
-  reset_nr_rng_state();
+  np_reset_nr_rng_state();
 }
 
 static void np_reset_c_rng_for_bandwidth_search(void){
-  reset_nr_rng_state();
+  np_reset_nr_rng_state();
 }
 
 SEXP C_np_dim_basis(SEXP basis_code,
