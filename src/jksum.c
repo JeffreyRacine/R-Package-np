@@ -8870,7 +8870,6 @@ static inline int np_reg_cv_use_canonical_glp_fixed_kernel(const int int_ll,
                                                            const int use_bernstein){
   if((bwm != RBWM_CVLS) ||
      (BANDWIDTH_reg != BW_FIXED) ||
-     ks_tree_use ||
      (num_reg_continuous <= 0))
     return 0;
 
@@ -9020,7 +9019,8 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     double **matrix_bandwidth,
     const int *glp_terms_in,
     const int glp_nterms_in,
-    double **glp_basis_in){
+    double **glp_basis_in,
+    const int use_tree){
   NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
   const double epsilon = 1.0/(double)MAX(1, num_obs);
   int i, j, a, b, l, sf_flag = 0;
@@ -9075,7 +9075,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
 
   moments = (double *)calloc((size_t)num_obs, (size_t)nterms*(size_t)nterms*sizeof(double));
   rhs = (double *)calloc((size_t)num_obs, (size_t)nterms*sizeof(double));
-  kw = alloc_vecd(MAX(1, num_obs - 1));
+  kw = alloc_vecd(MAX(1, use_tree ? num_obs : (num_obs - 1)));
   xj = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
   train_u = (double **)malloc((size_t)MAX(1, num_reg_unordered)*sizeof(double *));
   train_o = (double **)malloc((size_t)MAX(1, num_reg_ordered)*sizeof(double *));
@@ -9098,29 +9098,44 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
      (DELTA == NULL) || (SHIFT == NULL) || (SHIFTINV == NULL) || (TMP == NULL))
     goto cleanup_glp_cv;
 
+  if(use_tree &&
+     ((int_TREE_X != NP_TREE_TRUE) ||
+      (kdt_extern_X == NULL) ||
+      (ipt_lookup_extern_X == NULL)))
+    goto cleanup_glp_cv;
+
   for(j = 0; j < num_obs - 1; j++){
-    const double yj = vector_Y[j];
+    const int eval_idx = use_tree ? ipt_lookup_extern_X[j] : j;
+    const double yj = vector_Y[eval_idx];
     const int nsub = num_obs - j - 1;
+    const int train_count = use_tree ? num_obs : nsub;
+    double **call_train_u = use_tree ? matrix_X_unordered : train_u;
+    double **call_train_o = use_tree ? matrix_X_ordered : train_o;
+    double **call_train_c = use_tree ? matrix_X_continuous : train_c;
+    const int tree_code = use_tree ? int_TREE_X : NP_TREE_FALSE;
+    KDT *tree_ptr = use_tree ? kdt_extern_X : NULL;
 
     for(l = 0; l < num_reg_unordered; l++){
-      eval_u[l][0] = matrix_X_unordered[l][j];
+      eval_u[l][0] = matrix_X_unordered[l][eval_idx];
       train_u[l] = matrix_X_unordered[l] + j + 1;
     }
     for(l = 0; l < num_reg_ordered; l++){
-      eval_o[l][0] = matrix_X_ordered[l][j];
+      eval_o[l][0] = matrix_X_ordered[l][eval_idx];
       train_o[l] = matrix_X_ordered[l] + j + 1;
     }
     for(l = 0; l < num_reg_continuous; l++){
-      eval_c[l][0] = matrix_X_continuous[l][j];
+      eval_c[l][0] = matrix_X_continuous[l][eval_idx];
       matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][0];
       train_c[l] = matrix_X_continuous[l] + j + 1;
     }
+
+    memset(kw, 0, (size_t)MAX(1, train_count)*sizeof(double));
 
     if(kernel_weighted_sum_np_ctx(kernel_c,
                                   kernel_u,
                                   kernel_o,
                                   BW_FIXED,
-                                  nsub,
+                                  train_count,
                                   1,
                                   num_reg_unordered,
                                   num_reg_ordered,
@@ -9142,15 +9157,15 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   1,
                                   0,
                                   0,
-                                  NP_TREE_FALSE,
+                                  tree_code,
                                   0,
+                                  tree_ptr,
                                   NULL,
                                   NULL,
                                   NULL,
-                                  NULL,
-                                  train_u,
-                                  train_o,
-                                  train_c,
+                                  call_train_u,
+                                  call_train_o,
+                                  call_train_c,
                                   eval_u,
                                   eval_o,
                                   eval_c,
@@ -9172,25 +9187,27 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
       goto cleanup_glp_cv;
 
     for(i = 0; i < nsub; i++){
-      const int ii = j + 1 + i;
-      const double w = kw[i];
+      const int orig_ii = j + 1 + i;
+      const int ii = use_tree ? ipt_lookup_extern_X[orig_ii] : orig_ii;
+      const int widx = use_tree ? ii : i;
+      const double w = kw[widx];
       const double yi = vector_Y[ii];
       double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
-      double * const si = moments + (size_t)ii*(size_t)nterms*(size_t)nterms;
+      double * const si = moments + (size_t)orig_ii*(size_t)nterms*(size_t)nterms;
       double * const tj = rhs + (size_t)j*(size_t)nterms;
-      double * const ti = rhs + (size_t)ii*(size_t)nterms;
+      double * const ti = rhs + (size_t)orig_ii*(size_t)nterms;
 
       if(w == 0.0)
         continue;
 
       for(a = 0; a < nterms; a++){
         const double bia = basis[a][ii];
-        const double bja = basis[a][j];
+        const double bja = basis[a][eval_idx];
         tj[a] += w*bia*yi;
         ti[a] += w*bja*yj;
         for(b = 0; b < nterms; b++){
           sj[a*nterms+b] += w*bia*basis[b][ii];
-          si[a*nterms+b] += w*bja*basis[b][j];
+          si[a*nterms+b] += w*bja*basis[b][eval_idx];
         }
       }
     }
@@ -9200,13 +9217,14 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   result.traceH = 0.0;
 
   for(j = 0; j < num_obs; j++){
+    const int eval_idx = use_tree ? ipt_lookup_extern_X[j] : j;
     const double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
     const double * const tj = rhs + (size_t)j*(size_t)nterms;
     double nepsilon = 0.0;
     double fit = 0.0;
 
     for(l = 0; l < num_reg_continuous; l++)
-      xj[l] = matrix_X_continuous[l][j];
+      xj[l] = matrix_X_continuous[l][eval_idx];
 
     if(!np_glp_center_raw_moments_at_eval(num_reg_continuous,
                                           terms,
@@ -9238,7 +9256,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     fit = DELTA[0][0];
 
     {
-      const double dy = vector_Y[j] - fit;
+      const double dy = vector_Y[eval_idx] - fit;
       result.cv += dy*dy;
     }
   }
@@ -9397,7 +9415,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                                    matrix_bandwidth,
                                                    glp_terms,
                                                    glp_nterms,
-                                                   basis);
+                                                   basis,
+                                                   ks_tree_use);
       goto cleanup_lp_cv;
     }
 
@@ -10217,7 +10236,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                           matrix_bandwidth,
                                           NULL,
                                           0,
-                                          NULL);
+                                          NULL,
+                                          ks_tree_use);
     cv = glp_result.cv;
     traceH = glp_result.traceH;
     goto finish_cv_path;
