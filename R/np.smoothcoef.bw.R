@@ -289,6 +289,12 @@ npscoefbw.NULL <-
   tdati <- if (is.null(sbw$zdati)) sbw$xdati else sbw$zdati
   eval.zdat <- toFrame(eval.zdat)
 
+  if (any(tdati$icon) && !isTRUE(getOption("np.largeh", TRUE)))
+    return(FALSE)
+  if ((any(tdati$iuno) || any(tdati$iord)) &&
+      !isTRUE(getOption("np.largelambda", TRUE)))
+    return(FALSE)
+
   fast_largeh_tol <- getOption("np.largeh.rel.tol", 1e-3)
   if (!is.numeric(fast_largeh_tol) || length(fast_largeh_tol) != 1L ||
       is.na(fast_largeh_tol) || !is.finite(fast_largeh_tol) ||

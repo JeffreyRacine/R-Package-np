@@ -1,5 +1,13 @@
 # npRmpi 0.70-3
 
+- Continuous large-bandwidth shortcut evaluations can now be disabled with
+  `options(np.largeh = FALSE)`, and discrete near-upper-bandwidth shortcut
+  evaluations can now be disabled with `options(np.largelambda = FALSE)`.
+  Both remain enabled by default and are synchronized to MPI workers in
+  autodispatch sessions. These switches are intended for diagnostic timing and
+  reproducibility studies that need to separate tree effects from
+  large-bandwidth and large-lambda fast paths without changing the canonical
+  dense/tree objective machinery.
 - Local-polynomial regression cross-validation now uses a leaner hot
   symmetric weighted-sum loop. Fixed-bandwidth `npregbw(..., regtype = "lp",
   bwmethod = "cv.ls")` objective probes in active MPI sessions match serial
