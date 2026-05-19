@@ -1363,8 +1363,6 @@ double nconfac_extern = 0.0;
 double ncatfac_extern = 0.0;
 static int np_shadow_state_active = 0;
 
-extern int iff;
-
 double np_tgauss2_b = 3.0, np_tgauss2_alpha = 1.030174731161562;
 double np_tgauss2_c0 = .004565578246317041;
 
@@ -1411,7 +1409,11 @@ void spinner(int num) {
 
 void np_set_seed(int * num){
   int_RANDOM_SEED = *num;
-  iff = 0;
+  reset_nr_rng_state();
+}
+
+static void np_reset_c_rng_for_bandwidth_search(void){
+  reset_nr_rng_state();
 }
 
 SEXP C_np_dim_basis(SEXP basis_code,
@@ -3678,6 +3680,8 @@ SEXP C_np_regression_bw(SEXP runo,
                         SEXP ckerlb,
                         SEXP ckerub)
 {
+  np_reset_c_rng_for_bandwidth_search();
+
   return C_np_regression_bw_common(runo, rord, rcon, y, mysd, myopti, myoptd,
                                    rbw, hist_len, penalty_mode, penalty_mult,
                                    glp_degree, glp_bernstein, glp_basis,
@@ -4059,6 +4063,8 @@ SEXP C_np_density_bw(SEXP myuno,
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
 
+  np_reset_c_rng_for_bandwidth_search();
+
   if(hlen < 1) hlen = 1;
 
   PROTECT(myuno_r = coerceVector(myuno, REALSXP));
@@ -4143,6 +4149,8 @@ SEXP C_np_distribution_bw(SEXP myuno,
   int ncon = 0;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
+
+  np_reset_c_rng_for_bandwidth_search();
 
   if(hlen < 1) hlen = 1;
 
@@ -4451,6 +4459,8 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
                                       SEXP cykerlb,
                                       SEXP cykerub)
 {
+  np_reset_c_rng_for_bandwidth_search();
+
   return C_np_distribution_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
                                                  cg_uno, cg_ord, cg_con, mysd, myopti, myoptd,
                                                  bw, hist_len, penalty_mode, penalty_mult,
@@ -4512,6 +4522,8 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
                                  SEXP cykerlb,
                                  SEXP cykerub)
 {
+  np_reset_c_rng_for_bandwidth_search();
+
   return C_np_density_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
                                             mysd, myopti, myoptd, bw, hist_len,
                                             penalty_mode, penalty_mult,

@@ -514,6 +514,15 @@ double erfun(double x)
 #define FAC (1.0/MBIG)
 
 int iff = 0;
+static int gasdev_iset = 0;
+static double gasdev_gset = 0.0;
+
+void reset_nr_rng_state(void)
+{
+    iff = 0;
+    gasdev_iset = 0;
+    gasdev_gset = 0.0;
+}
 
 double ran3(int *idum)
 {
@@ -568,14 +577,12 @@ most machines, then uses a Box-Mueller transformation. */
 
 double gasdev(int *idum)
 {
-    static int iset=0;
-    static double gset;
     double fac;
     double r;
     double v1;
     double v2;
 
-    if (iset == 0)
+    if (gasdev_iset == 0)
     {
         do
         {
@@ -584,14 +591,14 @@ double gasdev(int *idum)
             r=v1*v1+v2*v2;
         } while (r >= 1.0 || r == 0.0);
         fac= (double) sqrt(-2.0*log(r)/r);
-        gset=v1*fac;
-        iset=1;
+        gasdev_gset=v1*fac;
+        gasdev_iset=1;
         return v2*fac;
     }
     else
     {
-        iset=0;
-        return gset;
+        gasdev_iset=0;
+        return gasdev_gset;
     }
 }
 
