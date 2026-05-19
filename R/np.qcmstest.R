@@ -72,6 +72,7 @@ npqcmstest <- function(formula,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
+  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
 
 
   distribution = match.arg(distribution)
@@ -307,7 +308,7 @@ npqcmstest <- function(formula,
   
   ## Restore seed
 
-  .np_seed_exit(seed.state)
+  .np_seed_exit(seed.state, remove_if_absent = TRUE)
   
   cmstest(Jn = tJn$Jn,
           In = tJn$In,

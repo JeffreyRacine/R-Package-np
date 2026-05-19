@@ -26,6 +26,7 @@ npsymtest <- function(data = NULL,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
+  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
   .np_progress_note("Computing bandwidths")
 
   ## If of type ts convert to numeric to handle time series data
@@ -228,7 +229,7 @@ npsymtest <- function(data = NULL,
 
   ## Restore seed
 
-  .np_seed_exit(seed.state)
+  .np_seed_exit(seed.state, remove_if_absent = TRUE)
   
   symtest(Srho = test.stat,
           Srho.bootstrap = resampled.stat,

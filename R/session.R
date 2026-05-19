@@ -488,10 +488,7 @@ npRmpi.init <- function(...,
     autodispatch.verify.options = autodispatch.verify.options,
     autodispatch.option.sync = autodispatch.option.sync
   )
-  if (isTRUE(effective.autodispatch))
-    .npRmpi_autodispatch_prime_options()
-  else
-    options(npRmpi.autodispatch.option.snapshot = NULL)
+  options(npRmpi.autodispatch.option.snapshot = NULL)
   .npRmpi_session_reset_spmd_state()
   .npRmpi_attach_state_reset()
 

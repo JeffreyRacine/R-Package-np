@@ -15,16 +15,12 @@ mpi.finalize <- function(){
 }
 
 mpi.exit <- function(){
-    if (mpi.is.master())
-    	message("Detaching Rmpi. Rmpi cannot be used unless relaunching R.")
-    .Call("mpi_finalize",PACKAGE = "npRmpi")
-    options(npRmpi.mpi.initialized = FALSE)
+    mpi.finalize()
     detach(package:npRmpi)
 }
 
 mpi.quit <- function(save="no"){
-    .Call("mpi_finalize",PACKAGE = "npRmpi")
-    options(npRmpi.mpi.initialized = FALSE)
+    mpi.finalize()
     q(save=save,runLast=FALSE)
 }
 

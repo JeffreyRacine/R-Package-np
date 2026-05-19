@@ -1523,7 +1523,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   on.exit(options(np.messages = old.messages), add = TRUE)
   on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
 
-  set.seed(as.integer(random.seed))
+  seed.state <- .np_seed_enter(random.seed)
+  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
   if (isTRUE(rank == 0L))
     .np_nomad_baseline_note(degree.search$start.degree)
 

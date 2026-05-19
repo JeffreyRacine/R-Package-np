@@ -1637,6 +1637,7 @@ npscoefbw.scbandwidth <-
     ## Save seed prior to setting
 
     seed.state <- .np_seed_enter(random.seed)
+    on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
 
 
     miss.z <- missing(zdat)
@@ -2680,7 +2681,7 @@ npscoefbw.scbandwidth <-
 
     ## Restore seed
 
-    .np_seed_exit(seed.state)
+    .np_seed_exit(seed.state, remove_if_absent = TRUE)
 
     bws <- scbandwidth(bw = bws$bw,
                        regtype = regtype,

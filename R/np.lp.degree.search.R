@@ -1862,6 +1862,16 @@
     if (isTRUE(state$interrupted))
       break
 
+    if (is.null(solution_i) && !is.null(state$error)) {
+      if (!is.null(state$progress_state)) {
+        state$progress_state <- .np_progress_abort(
+          state = state$progress_state,
+          detail = state$error
+        )
+      }
+      stop(state$error, call. = FALSE)
+    }
+
     post_restart_best <- if (is.null(state$best_record) || is.null(state$best_record$objective)) {
       if (identical(direction, "min")) Inf else -Inf
     } else {
@@ -1989,6 +1999,15 @@
         NULL
       }
     )
+    if (is.null(solution_i) && !is.null(state$error)) {
+      if (!is.null(state$progress_state)) {
+        state$progress_state <- .np_progress_abort(
+          state = state$progress_state,
+          detail = state$error
+        )
+      }
+      stop(state$error, call. = FALSE)
+    }
     post_restart_best <- if (is.null(state$best_record) || is.null(state$best_record$objective)) {
       if (identical(direction, "min")) Inf else -Inf
     } else {
