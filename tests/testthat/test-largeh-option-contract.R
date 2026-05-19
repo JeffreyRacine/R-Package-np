@@ -237,6 +237,47 @@ test_that("np.largeh and np.largelambda both gate mixed fast objective rows", {
   expect_equal(as.numeric(sc.both2$num.feval.fast[1L]), 1)
 })
 
+test_that("np.largeh toggles conditional density eval-only fast counts", {
+  skip_on_cran()
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "old_opts <- options(np.messages = FALSE, np.tree = FALSE, np.largeh = TRUE, np.largelambda = TRUE)",
+      "on.exit(options(old_opts), add = TRUE)",
+      "npRmpi.init(nslaves = 1, quiet = TRUE)",
+      "on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
+      "set.seed(105)",
+      "n <- 80L",
+      "xdat <- data.frame(x = runif(n))",
+      "ydat <- data.frame(y = runif(n))",
+      "bws <- npcdensbw(xdat = xdat, ydat = ydat, regtype = 'lc', bwmethod = 'cv.ml',",
+      "                  cxkertype = 'epanechnikov', cykertype = 'epanechnikov',",
+      "                  bandwidth.compute = FALSE, bws = c(1e8, 1e8))",
+      "options(np.largeh = TRUE)",
+      "enabled <- npRmpi:::.npcdensbw_eval_only(xdat = xdat, ydat = ydat, bws = bws)",
+      "options(np.largeh = FALSE)",
+      "disabled <- npRmpi:::.npcdensbw_eval_only(xdat = xdat, ydat = ydat, bws = bws)",
+      "options(np.largeh = TRUE)",
+      "reenabled <- npRmpi:::.npcdensbw_eval_only(xdat = xdat, ydat = ydat, bws = bws)",
+      "stopifnot(isTRUE(all.equal(enabled$objective, disabled$objective, tolerance = 1e-10)))",
+      "stopifnot(isTRUE(all.equal(enabled$objective, reenabled$objective, tolerance = 1e-10)))",
+      "stopifnot(identical(as.numeric(enabled$num.feval.fast[1L]), 1))",
+      "stopifnot(identical(as.numeric(disabled$num.feval.fast[1L]), 0))",
+      "stopifnot(identical(as.numeric(reenabled$num.feval.fast[1L]), 1))",
+      "cat('NPCDENS_LARGEH_OPTION_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("NPCDENS_LARGEH_OPTION_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("np.largeh toggles unconditional distribution bandwidth fast counts", {
   skip_on_cran()
   env <- npRmpi_subprocess_env()

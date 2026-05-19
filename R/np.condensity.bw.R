@@ -1023,7 +1023,8 @@ npcdensbw.conbandwidth <-
                                  ydat,
                                  bws,
                                  invalid.penalty = c("baseline", "dbmax"),
-                                 penalty.multiplier = 10) {
+                                 penalty.multiplier = 10,
+                                 force.local = TRUE) {
   invalid.penalty <- match.arg(invalid.penalty)
 
   ydat <- toFrame(ydat)
@@ -1188,33 +1189,42 @@ npcdensbw.conbandwidth <-
                                                 bws$cykerub[bws$iycon],
                                                 bws$cykerbound)
 
-  out <- .Call(
-    "C_np_density_conditional_bw_eval",
-    as.double(yuno),
-    as.double(yord),
-    as.double(ycon),
-    as.double(xuno),
-    as.double(xord),
-    as.double(xcon),
-    as.double(mysd),
-    as.integer(myopti),
-    as.double(myoptd),
-    as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
-    as.integer(1L),
-    as.integer(penalty_mode),
-    as.double(penalty.multiplier),
-    as.integer(degree.code),
-    as.integer(bernstein.engine),
-    as.integer(basis.code),
-    as.integer(reg.code),
-    as.double(cxker.bounds.c$lb),
-    as.double(cxker.bounds.c$ub),
-    as.double(cyker.bounds.c$lb),
-    as.double(cyker.bounds.c$ub),
-    PACKAGE = "npRmpi"
-  )
+  eval_call <- function() {
+    .Call(
+      "C_np_density_conditional_bw_eval",
+      as.double(yuno),
+      as.double(yord),
+      as.double(ycon),
+      as.double(xuno),
+      as.double(xord),
+      as.double(xcon),
+      as.double(mysd),
+      as.integer(myopti),
+      as.double(myoptd),
+      as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                  bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                  bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+      as.integer(1L),
+      as.integer(penalty_mode),
+      as.double(penalty.multiplier),
+      as.integer(degree.code),
+      as.integer(bernstein.engine),
+      as.integer(basis.code),
+      as.integer(reg.code),
+      as.double(cxker.bounds.c$lb),
+      as.double(cxker.bounds.c$ub),
+      as.double(cyker.bounds.c$lb),
+      as.double(cyker.bounds.c$ub),
+      PACKAGE = "npRmpi"
+    )
+  }
+  out <- if (isTRUE(force.local) &&
+             .npRmpi_has_active_slave_pool(comm = 1L) &&
+             !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    .npRmpi_with_local_regression(eval_call())
+  } else {
+    eval_call()
+  }
 
   list(
     objective = as.numeric(out$fval[1L]),
