@@ -1016,8 +1016,19 @@ nptgauss <- function(b){
 }
 
 numNotIn <- function(x){
-  while(is.element(num <- rnorm(1),x)){}
-  num
+  x <- as.numeric(x)
+  x <- x[is.finite(x)]
+  if (!length(x))
+    return(0)
+
+  candidate <- 0
+  if (!is.element(candidate, x))
+    return(candidate)
+
+  xrange <- range(x)
+  span <- diff(xrange)
+  step <- if (is.finite(span) && span > 0) span + 1 else 1
+  xrange[1L] - step
 }
 
 dlev <- function(x){
