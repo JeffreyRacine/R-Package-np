@@ -51,6 +51,40 @@ test_that("npregbw NOMAD degree search fails fast when crs is unavailable", {
   )
 })
 
+test_that("npregbw NOMAD degree search fails fast on solver errors after baseline", {
+  skip_if_not_installed("crs")
+
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260519)
+  dat <- data.frame(x = sort(runif(16)))
+  dat$y <- dat$x + rnorm(nrow(dat), sd = 0.05)
+
+  trace(
+    what = crs::snomadr,
+    tracer = quote(stop("forced NOMAD failure", call. = FALSE)),
+    print = FALSE
+  )
+  on.exit(untrace(crs::snomadr), add = TRUE)
+
+  expect_error(
+    np::npregbw(
+      y ~ x,
+      data = dat,
+      regtype = "lp",
+      degree.select = "coordinate",
+      search.engine = "nomad",
+      degree.min = 0L,
+      degree.max = 1L,
+      bwtype = "fixed",
+      bwmethod = "cv.ls",
+      nmulti = 1L
+    ),
+    "forced NOMAD failure"
+  )
+})
+
 test_that("npregbw forwards nomad.nmulti to inner crs::snomadr multistarts", {
   skip_if_not_installed("crs")
 

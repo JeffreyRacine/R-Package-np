@@ -27,7 +27,7 @@
 
 .np_with_seed <- function(random.seed = 42L, code) {
   seed.state <- .np_seed_enter(random.seed)
-  on.exit(.np_seed_exit(seed.state), add = TRUE)
+  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
   force(code)
 }
 

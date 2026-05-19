@@ -1,5 +1,6 @@
 np_seed_enter <- getFromNamespace(".np_seed_enter", "np")
 np_seed_exit <- getFromNamespace(".np_seed_exit", "np")
+np_with_seed <- getFromNamespace(".np_with_seed", "np")
 
 test_that(".np_seed_exit restores prior seed when one exists", {
   had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
@@ -40,5 +41,24 @@ test_that(".np_seed_exit remove_if_absent drops synthetic seed", {
   state <- np_seed_enter(42)
   expect_true(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
   np_seed_exit(state, remove_if_absent = TRUE)
+  expect_false(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+})
+
+test_that(".np_with_seed restores absent seed state", {
+  had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  if (had_seed) {
+    seed_orig <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    rm(".Random.seed", envir = .GlobalEnv)
+  }
+  on.exit({
+    if (had_seed) {
+      assign(".Random.seed", seed_orig, envir = .GlobalEnv)
+    } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+      rm(".Random.seed", envir = .GlobalEnv)
+    }
+  }, add = TRUE)
+
+  expect_false(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+  expect_equal(np_with_seed(42, runif(1)), np_with_seed(42, runif(1)))
   expect_false(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
 })
