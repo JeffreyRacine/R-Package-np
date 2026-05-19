@@ -652,6 +652,7 @@ npplreg.plbandwidth <-
 npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   .npRmpi_require_active_slave_pool(where = "npplreg()")
   explicit.plbandwidth <- (!missing(bws)) && inherits(bws, "plbandwidth")
+  formula.forwarded <- (!missing(txdat)) && inherits(txdat, "formula")
   nomad <- npValidateScalarLogical(nomad, "nomad")
   degree.select.value <- if (isTRUE(nomad)) {
     "coordinate"
@@ -661,6 +662,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     "manual"
   }
   if (.npRmpi_autodispatch_active() &&
+      !formula.forwarded &&
       (explicit.plbandwidth || identical(degree.select.value, "manual")) &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))

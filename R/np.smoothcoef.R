@@ -146,6 +146,7 @@ npscoef.call <-
 npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   .npRmpi_require_active_slave_pool(where = "npscoef()")
   explicit.scbandwidth <- (!missing(bws)) && inherits(bws, "scbandwidth")
+  formula.forwarded <- (!missing(txdat)) && inherits(txdat, "formula")
   nomad <- npValidateScalarLogical(nomad, "nomad")
   degree.select.value <- if (isTRUE(nomad)) {
     "coordinate"
@@ -159,6 +160,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
     return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   if (.npRmpi_autodispatch_active() &&
+      !formula.forwarded &&
       (explicit.scbandwidth || identical(degree.select.value, "manual")))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
