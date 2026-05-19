@@ -2198,6 +2198,11 @@ typedef struct {
 
 static NP_ContLargeHCache np_cont_largeh_cache = {0};
 static uint64_t np_fastcv_alllarge_hits = 0;
+static int np_runtime_tol_cache_ready = 0;
+static int np_largeh_enabled_cache = 1;
+static int np_largelambda_enabled_cache = 1;
+static double np_largeh_rel_tol_cache = 1e-3;
+static double np_disc_rel_tol_cache = 1e-2;
 /*
   Keep only true all-large shortcuts enabled.
   Partial per-variable gate shortcuts are disabled by default to avoid
@@ -2207,6 +2212,7 @@ static const int np_partial_gate_features_enabled = 0;
 
 void np_fastcv_alllarge_hits_reset(void){
   np_fastcv_alllarge_hits = 0;
+  np_runtime_tol_cache_ready = 0;
 }
 
 double np_fastcv_alllarge_hits_get(void){
@@ -2229,6 +2235,7 @@ static inline void np_cont_largeh_cache_clear(void){
   if(np_cont_largeh_cache.cont_hmin != NULL) free(np_cont_largeh_cache.cont_hmin);
   if(np_cont_largeh_cache.cont_k0 != NULL) free(np_cont_largeh_cache.cont_k0);
   memset(&np_cont_largeh_cache, 0, sizeof(np_cont_largeh_cache));
+  np_runtime_tol_cache_ready = 0;
 }
 
 static int np_disc_profile_cache_match(const int num_xt,
@@ -2356,15 +2363,38 @@ static inline double np_get_option_double(const char * const name, const double 
   return fallback;
 }
 
-/*
-  Lean LL/CVLS hot path for fixed bandwidth with one continuous regressor.
-  Returns 1 on success and writes *cv_out, else 0 to signal fallback.
-*/
-static int np_runtime_tol_cache_ready = 0;
-static double np_largeh_rel_tol_cache = 1e-3;
-static double np_disc_rel_tol_cache = 1e-2;
+static inline int np_get_option_logical(const char * const name, const int fallback){
+  const SEXP sym = Rf_install(name);
+  const SEXP val = Rf_GetOption1(sym);
+
+  if(val == R_NilValue)
+    return fallback;
+
+  if(TYPEOF(val) == LGLSXP && XLENGTH(val) > 0)
+    return (LOGICAL(val)[0] == NA_LOGICAL) ? fallback : (LOGICAL(val)[0] != 0);
+
+  if(TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
+    return (INTEGER(val)[0] == NA_INTEGER) ? fallback : (INTEGER(val)[0] != 0);
+
+  if(TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
+    return isfinite(REAL(val)[0]) ? (REAL(val)[0] != 0.0) : fallback;
+
+  return fallback;
+}
 
 static inline void np_refresh_runtime_tolerances(void);
+
+static inline int np_largeh_enabled(void){
+  if(!np_runtime_tol_cache_ready)
+    np_refresh_runtime_tolerances();
+  return np_largeh_enabled_cache;
+}
+
+static inline int np_largelambda_enabled(void){
+  if(!np_runtime_tol_cache_ready)
+    np_refresh_runtime_tolerances();
+  return np_largelambda_enabled_cache;
+}
 
 static inline double np_cont_largeh_k0(const int kernel){
   switch(kernel){
@@ -2383,7 +2413,9 @@ static inline double np_cont_largeh_k0(const int kernel){
 }
 
 static inline double np_cont_largeh_utol(const int kernel, const double rel_tol){
-  const double rt = (rel_tol <= 0.0) ? 1e-3 : rel_tol;
+  if(rel_tol <= 0.0)
+    return 0.0;
+  const double rt = rel_tol;
   switch(kernel){
     case 0: case 1: case 2: case 3: case 9:
       /* For Gaussian-like kernels, relative deviation near 0 is ~ u^2/2. */
@@ -2402,7 +2434,7 @@ static inline double np_cont_largeh_utol(const int kernel, const double rel_tol)
 static inline double np_cont_largeh_rel_tol(void){
   if(!np_runtime_tol_cache_ready)
     np_refresh_runtime_tolerances();
-  return np_largeh_rel_tol_cache;
+  return np_largeh_enabled_cache ? np_largeh_rel_tol_cache : 0.0;
 }
 
 static int np_cont_largeh_build_params(const int num_obs_train,
@@ -2426,7 +2458,7 @@ static int np_cont_largeh_build_params(const int num_obs_train,
   *out_hmin = NULL;
   *out_k0 = NULL;
 
-  if(num_reg_continuous <= 0 || kernel_c == NULL || x_train == NULL || x_eval == NULL)
+  if(!np_largeh_enabled() || num_reg_continuous <= 0 || kernel_c == NULL || x_train == NULL || x_eval == NULL)
     return 0;
 
   cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
@@ -2585,7 +2617,7 @@ static inline int np_cont_largeh_is_active(const int kernel,
                                            const double x,
                                            const double h,
                                            const XL * const xl){
-  if((h == 0.0) || !isfinite(h) || !np_cont_largeh_kernel_supported(kernel))
+  if(!np_largeh_enabled() || (h == 0.0) || !isfinite(h) || !np_cont_largeh_kernel_supported(kernel))
     return 0;
 
   const double utol = np_cont_largeh_utol(kernel, np_cont_largeh_rel_tol());
@@ -2617,12 +2649,14 @@ static inline int np_cont_largeh_is_active(const int kernel,
 static inline double np_disc_rel_tol(void){
   if(!np_runtime_tol_cache_ready)
     np_refresh_runtime_tolerances();
-  return np_disc_rel_tol_cache;
+  return np_largelambda_enabled_cache ? np_disc_rel_tol_cache : 0.0;
 }
 
 static inline void np_refresh_runtime_tolerances(void){
   const double largeh_dflt = 1e-3;
   const double largeh_optv = np_get_option_double("np.largeh.rel.tol", largeh_dflt);
+  np_largeh_enabled_cache = np_get_option_logical("np.largeh", 1);
+  np_largelambda_enabled_cache = np_get_option_logical("np.largelambda", 1);
   if(isfinite(largeh_optv) && largeh_optv > 0.0 && largeh_optv < 0.1) {
     np_largeh_rel_tol_cache = largeh_optv;
   } else {
@@ -2681,7 +2715,7 @@ static inline double np_disc_unordered_upper(const int kernel, const int ncat){
 }
 
 static inline int np_disc_near_upper(const int kernel, const double lambda, const int ncat){
-  if(!isfinite(lambda) || !np_disc_unordered_has_upper(kernel))
+  if(!np_largelambda_enabled() || !isfinite(lambda) || !np_disc_unordered_has_upper(kernel))
     return 0;
   const double up = np_disc_unordered_upper(kernel, ncat);
   double tol = np_disc_rel_tol()*fabs(up);
@@ -2691,6 +2725,8 @@ static inline int np_disc_near_upper(const int kernel, const double lambda, cons
 }
 
 static inline int np_disc_near_const_kernel(const double k_same, const double k_diff){
+  if(!np_largelambda_enabled())
+    return 0;
   const double scale = fmax(1.0, fmax(fabs(k_same), fabs(k_diff)));
   return fabs(k_same - k_diff) <= np_disc_rel_tol()*scale;
 }
@@ -2871,7 +2907,7 @@ static inline int np_disc_ordered_has_upper(const int kernel){
 }
 
 static inline int np_disc_ordered_near_upper(const int kernel, const double lambda){
-  if(!isfinite(lambda) || !np_disc_ordered_has_upper(kernel))
+  if(!np_largelambda_enabled() || !isfinite(lambda) || !np_disc_ordered_has_upper(kernel))
     return 0;
   const double up = 1.0;
   double tol = np_disc_rel_tol()*fabs(up);

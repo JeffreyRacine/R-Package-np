@@ -42,11 +42,23 @@
     force the historical dense categorical route for debugging or timing
     comparisons.
 
+    \item \code{np.largeh} (logical): enables continuous large-\eqn{h}
+    shortcut evaluations. Default is \code{TRUE}. Set
+    \code{options(np.largeh = FALSE)} to keep tree/dense routing unchanged
+    while forcing continuous large-bandwidth objective rows through the
+    ordinary kernel-summation machinery for diagnostic timing comparisons.
+
     \item \code{np.largeh.rel.tol} (numeric): relative tolerance used by the
     continuous large-\eqn{h} shortcut. When all standardized distances for a
     continuous predictor are sufficiently close to zero, the corresponding
     kernel factor is approximated by \eqn{K(0)} to reduce repeated kernel
     evaluations. Default is \code{1e-3}. Valid range is \code{(0, 0.1)}.
+
+    \item \code{np.largelambda} (logical): enables discrete near-upper
+    bandwidth shortcut evaluations. Default is \code{TRUE}. Set
+    \code{options(np.largelambda = FALSE)} to keep categorical routing
+    unchanged while forcing near-upper discrete bandwidth rows through the
+    ordinary category-comparison machinery for diagnostic timing comparisons.
 
     \item \code{np.disc.upper.rel.tol} (numeric): relative tolerance used by
     the discrete upper-bound shortcut for bandwidths near their feasible upper
@@ -79,6 +91,8 @@
 old <- options(
   np.tree = TRUE,
   np.categorical.compress = TRUE,
+  np.largeh = TRUE,
+  np.largelambda = TRUE,
   np.messages = FALSE,
   np.largeh.rel.tol = 1e-3,
   np.disc.upper.rel.tol = 1e-2

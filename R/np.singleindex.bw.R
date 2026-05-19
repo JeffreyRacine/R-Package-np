@@ -349,6 +349,9 @@ npindexbw.NULL <-
 }
 
 .npindexbw_fast_eligible <- function(h, bws, eval.index) {
+  if (!isTRUE(getOption("np.largeh", TRUE)))
+    return(FALSE)
+
   if (!identical(bws$type, "fixed"))
     return(FALSE)
 
