@@ -10285,7 +10285,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
-  int * ipt = NULL;  // point permutation, see tree.c
+  int * ipt = NULL, *ipt_lookup = NULL;  // point permutation, see tree.c
 
   double **matrix_y;
 
@@ -10484,8 +10484,16 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE_X == NP_TREE_TRUE){
+    ipt_lookup = (int *)malloc(num_obs_train_extern*sizeof(int));
+    if(!(ipt_lookup != NULL))
+      error("!(ipt_lookup != NULL)");
+
     build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                  4*num_reg_continuous_extern, ipt, &kdt_extern_X);
+    for(i = 0; i < num_obs_train_extern; i++)
+      ipt_lookup[ipt[i]] = i;
+    ipt_extern_X = ipt;
+    ipt_lookup_extern_X = ipt_lookup;
 
     //put training data into tree-order using the index array
 
@@ -11033,6 +11041,9 @@ cleanup_np_regression_bw_mode:
   free(vector_continuous_stddev);
 
   safe_free(ipt);
+  safe_free(ipt_lookup);
+  ipt_extern_X = NULL;
+  ipt_lookup_extern_X = NULL;
   if(int_TREE_X == NP_TREE_TRUE){
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;

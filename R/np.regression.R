@@ -36,9 +36,6 @@ npreg <-
     "lc"
   }
 
-  if (ncon > 0L && !identical(regtype, "lc"))
-    return(DO_TREE_NO)
-
   code
 }
 
