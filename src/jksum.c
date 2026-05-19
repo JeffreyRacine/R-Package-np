@@ -20377,10 +20377,13 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
 
   if((rows_out == NULL) || (vector_scale_factor == NULL))
     return 1;
-  if(int_TREE_X == NP_TREE_TRUE)
-    return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN))
+    return 1;
+  if((int_TREE_X == NP_TREE_TRUE) && (BANDWIDTH_den_extern != BW_FIXED))
+    return 1;
+  if((int_TREE_X == NP_TREE_TRUE) &&
+     ((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL)))
     return 1;
   if((eval_start < 0) || (block_rows <= 0) || ((eval_start + block_rows) > num_train))
     return 1;
@@ -20497,7 +20500,11 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
   }
 
   for(i = 0; i < block_rows; i++){
-    const int eval_pos = eval_start + i;
+    const int eval_idx = eval_start + i;
+    int eval_pos = eval_idx;
+
+    if((int_TREE_X == NP_TREE_TRUE) && (ipt_lookup_extern_X != NULL))
+      eval_pos = ipt_lookup_extern_X[eval_idx];
 
     memset(rows_out[i], 0, (size_t)num_train*sizeof(double));
     for(l = 0; l < num_reg_unordered_extern; l++)
@@ -20554,8 +20561,10 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
         row_sum += kw[j];
       if(!(row_sum > DBL_MIN))
         goto cleanup_xweight_block;
-      for(j = 0; j < num_train; j++)
-        rows_out[i][j] = kw[j]/row_sum;
+      for(j = 0; j < num_train; j++){
+        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+        rows_out[i][orig_j] = kw[j]/row_sum;
+      }
     } else {
       const int k = np_glp_cv_cache.nterms;
 
@@ -20565,8 +20574,13 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                     k,
                                     kw,
                                     eval_pos,
-                                    rows_out[i]) != 0)
+                                    mean_row) != 0)
           goto cleanup_xweight_block;
+
+        for(j = 0; j < num_train; j++){
+          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          rows_out[i][orig_j] = mean_row[j];
+        }
       } else {
         for(l = 0; l < k; l++){
           RHS[l][0] = np_glp_cv_cache.basis[l][eval_pos];
@@ -20595,9 +20609,10 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
 
         for(j = 0; j < num_train; j++){
           double zju = 0.0;
+          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
           for(l = 0; l < k; l++)
             zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
-          rows_out[i][j] = kw[j]*zju;
+          rows_out[i][orig_j] = kw[j]*zju;
         }
       }
     }
@@ -20667,10 +20682,13 @@ static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
 
   if((rows_out == NULL) || (vector_scale_factor == NULL))
     return 1;
-  if(int_TREE_Y == NP_TREE_TRUE)
-    return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN))
+    return 1;
+  if((int_TREE_Y == NP_TREE_TRUE) && (BANDWIDTH_den_extern != BW_FIXED))
+    return 1;
+  if((int_TREE_Y == NP_TREE_TRUE) &&
+     ((ipt_extern_Y == NULL) || (ipt_lookup_extern_Y == NULL)))
     return 1;
   if((eval_start < 0) || (block_rows <= 0) || ((eval_start + block_rows) > num_train))
     return 1;
@@ -20753,7 +20771,11 @@ static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
     goto cleanup_yweight_block;
 
   for(i = 0; i < block_rows; i++){
-    const int eval_pos = eval_start + i;
+    const int eval_idx = eval_start + i;
+    int eval_pos = eval_idx;
+
+    if((int_TREE_Y == NP_TREE_TRUE) && (ipt_lookup_extern_Y != NULL))
+      eval_pos = ipt_lookup_extern_Y[eval_idx];
 
     memset(rows_out[i], 0, (size_t)num_train*sizeof(double));
     for(l = 0; l < num_var_unordered_extern; l++)
@@ -20801,8 +20823,10 @@ static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
     }
     np_conditional_pop_bounds(&bounds_state);
 
-    for(j = 0; j < num_train; j++)
-      rows_out[i][j] = kw[j];
+    for(j = 0; j < num_train; j++){
+      const int orig_j = (int_TREE_Y == NP_TREE_TRUE) ? ipt_extern_Y[j] : j;
+      rows_out[i][orig_j] = kw[j];
+    }
   }
 
   status = 0;
@@ -20841,8 +20865,9 @@ static void np_conditional_lp_all_large_ctx_clear(NPConditionalLpAllLargeCtx *ct
   memset(ctx, 0, sizeof(*ctx));
 }
 
-static int np_conditional_lp_all_large_ctx_prepare(double *vector_scale_factor,
-                                                   NPConditionalLpAllLargeCtx *ctx){
+static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_factor,
+                                                        NPConditionalLpAllLargeCtx *ctx,
+                                                        const int allow_tree){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int use_bernstein = (int_glp_bernstein_extern != 0);
@@ -20864,7 +20889,8 @@ static int np_conditional_lp_all_large_ctx_prepare(double *vector_scale_factor,
     return 1;
   if(BANDWIDTH_den_extern != BW_FIXED)
     return 1;
-  if((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE))
+  if((!allow_tree) &&
+     ((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)))
     return 1;
   if((num_train <= 0) || (num_reg_continuous_extern <= 0))
     return 1;
@@ -21023,6 +21049,16 @@ cleanup_all_large_prepare:
   return status;
 }
 
+static int np_conditional_lp_all_large_ctx_prepare(double *vector_scale_factor,
+                                                   NPConditionalLpAllLargeCtx *ctx){
+  return np_conditional_lp_all_large_ctx_prepare_core(vector_scale_factor, ctx, 0);
+}
+
+static int np_conditional_lp_all_large_ctx_prepare_cvml(double *vector_scale_factor,
+                                                        NPConditionalLpAllLargeCtx *ctx){
+  return np_conditional_lp_all_large_ctx_prepare_core(vector_scale_factor, ctx, 1);
+}
+
 static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeCtx *ctx,
                                                   const double *rhs_row,
                                                   const int eval_pos,
@@ -21131,29 +21167,44 @@ static double np_conditional_lp_all_large_quad_eval(const NPConditionalLpAllLarg
 static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_factor,
                                                            double *cv){
   NPConditionalLpAllLargeCtx ctx = {0};
-  double *yrow = NULL, *cross_terms = NULL, *beta = NULL;
-  int i;
+  double *yrow = NULL, *yrow_xorder = NULL, *cross_terms = NULL, *beta = NULL;
+  int i, j;
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL))
     return 1;
-  if(np_conditional_lp_all_large_ctx_prepare(vector_scale_factor, &ctx) != 0)
+  if(np_conditional_lp_all_large_ctx_prepare_cvml(vector_scale_factor, &ctx) != 0)
     goto cleanup_cvml_all_large;
 
   yrow = alloc_vecd(MAX(1, ctx.num_train));
+  if(int_TREE_X == NP_TREE_TRUE)
+    yrow_xorder = alloc_vecd(MAX(1, ctx.num_train));
   cross_terms = alloc_vecd(MAX(1, ctx.nterms));
   beta = alloc_vecd(MAX(1, ctx.nterms));
-  if((yrow == NULL) || (cross_terms == NULL) || (beta == NULL))
+  if((yrow == NULL) ||
+     ((int_TREE_X == NP_TREE_TRUE) && (yrow_xorder == NULL)) ||
+     (cross_terms == NULL) || (beta == NULL))
     goto cleanup_cvml_all_large;
 
   *cv = 0.0;
   for(i = 0; i < ctx.num_train; i++){
     double fit;
+    const double *rhs_row = yrow;
+    int eval_pos = i;
 
     if(np_conditional_y_row_stream_op_core(vector_scale_factor, i, OP_NORMAL, yrow) != 0)
       goto cleanup_cvml_all_large;
 
-    fit = np_conditional_lp_all_large_row_fit(&ctx, yrow, i, cross_terms, beta, 1);
+    if(int_TREE_X == NP_TREE_TRUE){
+      if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
+        goto cleanup_cvml_all_large;
+      eval_pos = ipt_lookup_extern_X[i];
+      for(j = 0; j < ctx.num_train; j++)
+        yrow_xorder[j] = yrow[ipt_extern_X[j]];
+      rhs_row = yrow_xorder;
+    }
+
+    fit = np_conditional_lp_all_large_row_fit(&ctx, rhs_row, eval_pos, cross_terms, beta, 1);
 
     if(fit > DBL_MIN){
       *cv -= log(fit);
@@ -21168,6 +21219,7 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
 
 cleanup_cvml_all_large:
   if(yrow != NULL) free(yrow);
+  if(yrow_xorder != NULL) free(yrow_xorder);
   if(cross_terms != NULL) free(cross_terms);
   if(beta != NULL) free(beta);
   np_conditional_lp_all_large_ctx_clear(&ctx);
@@ -21320,9 +21372,10 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
     return 0;
   }
 
-  if((BANDWIDTH_den_extern == BW_FIXED || BANDWIDTH_den_extern == BW_GEN_NN) &&
-     (int_TREE_X != NP_TREE_TRUE) &&
-     (int_TREE_Y != NP_TREE_TRUE) &&
+  if((BANDWIDTH_den_extern == BW_FIXED ||
+      ((BANDWIDTH_den_extern == BW_GEN_NN) &&
+       (int_TREE_X != NP_TREE_TRUE) &&
+       (int_TREE_Y != NP_TREE_TRUE))) &&
      (np_conditional_density_cvml_lp_block_stream(vector_scale_factor, cv) == 0))
     return 0;
 
@@ -21393,7 +21446,8 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN))
     return 1;
-  if((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE))
+  if(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
+     (BANDWIDTH_den_extern != BW_FIXED))
     return 1;
 
   xblock = alloc_tmatd(num_obs, block_size);
