@@ -1205,19 +1205,18 @@ nptgauss <- function(b){
 }
 
 numNotIn <- function(x){
-  x <- as.numeric(x)
+  x <- unique(as.numeric(x))
   x <- x[is.finite(x)]
-  if (!length(x))
+  if (!length(x) || !(0 %in% x))
     return(0)
 
-  candidate <- 0
-  if (!is.element(candidate, x))
-    return(candidate)
+  n.unique <- length(x)
+  if (n.unique >= .Machine$integer.max)
+    stop("too many category codes to construct a deterministic padding value", call. = FALSE)
 
-  xrange <- range(x)
-  span <- diff(xrange)
-  step <- if (is.finite(span) && span > 0) span + 1 else 1
-  xrange[1L] - step
+  candidate.max <- as.integer(n.unique + 1)
+  candidates <- c(seq_len(candidate.max), -seq_len(candidate.max))
+  candidates[match(FALSE, candidates %in% x)]
 }
 
 dlev <- function(x){

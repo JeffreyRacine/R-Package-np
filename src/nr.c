@@ -517,7 +517,7 @@ int iff = 0;
 static int gasdev_iset = 0;
 static double gasdev_gset = 0.0;
 
-void reset_nr_rng_state(void)
+void np_reset_nr_rng_state(void)
 {
     iff = 0;
     gasdev_iset = 0;
