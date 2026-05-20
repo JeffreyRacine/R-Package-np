@@ -2196,6 +2196,7 @@ typedef struct {
 
 static NP_ContLargeHCache np_cont_largeh_cache = {0};
 static uint64_t np_fastcv_alllarge_hits = 0;
+static uint64_t np_guarded_cvml_hits = 0;
 static int np_runtime_tol_cache_ready = 0;
 static int np_largeh_enabled_cache = 1;
 static int np_largelambda_enabled_cache = 1;
@@ -2215,6 +2216,18 @@ void np_fastcv_alllarge_hits_reset(void){
 
 double np_fastcv_alllarge_hits_get(void){
   return (double)np_fastcv_alllarge_hits;
+}
+
+void np_guarded_cvml_hits_reset(void){
+  np_guarded_cvml_hits = 0;
+}
+
+void np_guarded_cvml_hit(void){
+  np_guarded_cvml_hits++;
+}
+
+double np_guarded_cvml_hits_get(void){
+  return (double)np_guarded_cvml_hits;
 }
 
 static inline void np_disc_profile_cache_clear(void){
