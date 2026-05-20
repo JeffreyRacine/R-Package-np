@@ -298,7 +298,7 @@ npudensbw.bandwidth <-
       tbw$ifval = myout$fval[2]
       tbw$num.feval <- sum(myout$eval.history[is.finite(myout$eval.history)])
       tbw$num.feval.fast <- myout$fast.history[1]
-      tbw$num.feval.guarded <- if (identical(tbw$method, "cv.ml")) myout$guarded.history[1] else NA_real_
+      tbw$num.feval.guarded <- if (identical(as.character(tbw$method)[1L], "cv.ml")) myout$guarded.history[1] else NA_real_
       tbw$fval.history <- myout$fval.history
       tbw$eval.history <- myout$eval.history
       tbw$invalid.history <- myout$invalid.history
