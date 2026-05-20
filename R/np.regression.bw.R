@@ -1523,14 +1523,7 @@ npregbw.default <-
           yname = yname,
           degree.search = degree.search,
           nomad.inner.nmulti = nomad.inner.nmulti,
-          random.seed = random.seed.value,
-          nomad.opts = list(
-            DIRECTION_TYPE = "ORTHO 2N",
-            QUAD_MODEL_SEARCH = "no",
-            NM_SEARCH = "no",
-            SPECULATIVE_SEARCH = "no",
-            EVAL_OPPORTUNISTIC = "no"
-          )
+          random.seed = random.seed.value
         )
       }
       tbw <- .npregbw_attach_degree_search(

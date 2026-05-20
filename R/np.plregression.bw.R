@@ -1033,13 +1033,6 @@ npplregbw.plbandwidth =
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     remin = isTRUE(opt.args$nomad.remin),
-    nomad.opts = list(
-      DIRECTION_TYPE = "ORTHO 2N",
-      QUAD_MODEL_SEARCH = "no",
-      NM_SEARCH = "no",
-      SPECULATIVE_SEARCH = "no",
-      EVAL_OPPORTUNISTIC = "no"
-    ),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
