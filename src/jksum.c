@@ -9783,6 +9783,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   double **basis_local = NULL;
   double *ones = NULL;
   double *moments = NULL, *rhs = NULL, *kw = NULL, *xj = NULL;
+  double *eval_ybasis = NULL, *eval_outer = NULL;
   double *vsf = NULL;
   double **train_u = NULL, **train_o = NULL, **train_c = NULL;
   MATRIX eval_u = NULL, eval_o = NULL, eval_c = NULL;
@@ -9813,6 +9814,9 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   }
 
   if((terms == NULL) || (basis == NULL) || (nterms <= 0))
+    goto cleanup_glp_cv;
+
+  if(nterms > INT_MAX/nterms)
     goto cleanup_glp_cv;
 
   use_sparse_tree = use_tree &&
@@ -9848,6 +9852,10 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     eval_o = mat_creat(num_reg_ordered, 1, UNDEFINED);
     eval_c = mat_creat(num_reg_continuous, 1, UNDEFINED);
     matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
+    if(nterms >= 3){
+      eval_ybasis = alloc_vecd(MAX(1, nterms));
+      eval_outer = alloc_vecd(MAX(1, nterms*nterms));
+    }
   }
 
   KWM = mat_creat(nterms, nterms, UNDEFINED);
@@ -9861,7 +9869,8 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
      (!use_sparse_tree && ((kw == NULL) ||
                            (train_u == NULL) || (train_o == NULL) || (train_c == NULL) ||
                            (eval_u == NULL) || (eval_o == NULL) || (eval_c == NULL) ||
-                           (matrix_bandwidth_eval == NULL))) ||
+                           (matrix_bandwidth_eval == NULL) ||
+                           ((nterms >= 3) && ((eval_ybasis == NULL) || (eval_outer == NULL))))) ||
      (KWM == NULL) || (XTKY == NULL) ||
      (DELTA == NULL) || (SHIFT == NULL) || (SHIFTINV == NULL) || (TMP == NULL))
     goto cleanup_glp_cv;
@@ -9905,6 +9914,16 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     double **call_train_c = use_tree ? matrix_X_continuous : train_c;
     const int tree_code = use_tree ? int_TREE_X : NP_TREE_FALSE;
     KDT *tree_ptr = use_tree ? kdt_extern_X : NULL;
+
+    if((!use_sparse_tree) && (nterms >= 3)){
+      for(a = 0; a < nterms; a++){
+        const double bja = basis[a][eval_idx];
+        const int aoff = a*nterms;
+        eval_ybasis[a] = bja*yj;
+        for(b = 0; b < nterms; b++)
+          eval_outer[aoff+b] = bja*basis[b][eval_idx];
+      }
+    }
 
     for(l = 0; l < num_reg_unordered; l++){
       eval_u[l][0] = matrix_X_unordered[l][eval_idx];
@@ -9977,28 +9996,52 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   NULL) != 0)
       goto cleanup_glp_cv;
 
-    for(i = 0; i < nsub; i++){
-      const int orig_ii = j + 1 + i;
-      const int ii = use_tree ? ipt_lookup_extern_X[orig_ii] : orig_ii;
-      const int widx = use_tree ? ii : i;
-      const double w = kw[widx];
-      const double yi = vector_Y[ii];
-      double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
-      double * const si = moments + (size_t)orig_ii*(size_t)nterms*(size_t)nterms;
-      double * const tj = rhs + (size_t)j*(size_t)nterms;
-      double * const ti = rhs + (size_t)orig_ii*(size_t)nterms;
+    if(nterms >= 3){
+      for(i = 0; i < nsub; i++){
+        const int orig_ii = j + 1 + i;
+        const int ii = use_tree ? ipt_lookup_extern_X[orig_ii] : orig_ii;
+        const int widx = use_tree ? ii : i;
+        const double w = kw[widx];
 
-      if(w == 0.0)
-        continue;
+        if(w == 0.0)
+          continue;
 
-      for(a = 0; a < nterms; a++){
-        const double bia = basis[a][ii];
-        const double bja = basis[a][eval_idx];
-        tj[a] += w*bia*yi;
-        ti[a] += w*bja*yj;
-        for(b = 0; b < nterms; b++){
-          sj[a*nterms+b] += w*bia*basis[b][ii];
-          si[a*nterms+b] += w*bja*basis[b][eval_idx];
+        np_glp_accumulate_pair(nterms,
+                               basis,
+                               vector_Y,
+                               moments,
+                               rhs,
+                               j,
+                               eval_ybasis,
+                               eval_outer,
+                               orig_ii,
+                               ii,
+                               w);
+      }
+    } else {
+      for(i = 0; i < nsub; i++){
+        const int orig_ii = j + 1 + i;
+        const int ii = use_tree ? ipt_lookup_extern_X[orig_ii] : orig_ii;
+        const int widx = use_tree ? ii : i;
+        const double w = kw[widx];
+        const double yi = vector_Y[ii];
+        double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
+        double * const si = moments + (size_t)orig_ii*(size_t)nterms*(size_t)nterms;
+        double * const tj = rhs + (size_t)j*(size_t)nterms;
+        double * const ti = rhs + (size_t)orig_ii*(size_t)nterms;
+
+        if(w == 0.0)
+          continue;
+
+        for(a = 0; a < nterms; a++){
+          const double bia = basis[a][ii];
+          const double bja = basis[a][eval_idx];
+          tj[a] += w*bia*yi;
+          ti[a] += w*bja*yj;
+          for(b = 0; b < nterms; b++){
+            sj[a*nterms+b] += w*bia*basis[b][ii];
+            si[a*nterms+b] += w*bja*basis[b][eval_idx];
+          }
         }
       }
     }
@@ -10073,6 +10116,8 @@ cleanup_glp_cv:
   if(rhs != NULL) free(rhs);
   if(xj != NULL) free(xj);
   if(kw != NULL) free(kw);
+  if(eval_ybasis != NULL) free(eval_ybasis);
+  if(eval_outer != NULL) free(eval_outer);
   if(terms_local != NULL) free(terms_local);
   if(basis_local != NULL) free(basis_local);
   if(ones != NULL) free(ones);
