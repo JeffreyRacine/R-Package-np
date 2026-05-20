@@ -21717,6 +21717,9 @@ typedef struct {
   double **basis;
   MATRIX XtXINV;
   double *hdiag;
+  MATRIX XtXINV_original_order;
+  double **basis_original_order;
+  double *hdiag_original_order;
 } NPConditionalLpAllLargeCtx;
 
 static void np_conditional_lp_all_large_ctx_clear(NPConditionalLpAllLargeCtx *ctx){
@@ -21724,12 +21727,16 @@ static void np_conditional_lp_all_large_ctx_clear(NPConditionalLpAllLargeCtx *ct
     return;
   if(ctx->XtXINV != NULL) mat_free(ctx->XtXINV);
   if(ctx->hdiag != NULL) free(ctx->hdiag);
+  if(ctx->XtXINV_original_order != NULL) mat_free(ctx->XtXINV_original_order);
+  if(ctx->basis_original_order != NULL) free_mat(ctx->basis_original_order, ctx->nterms);
+  if(ctx->hdiag_original_order != NULL) free(ctx->hdiag_original_order);
   memset(ctx, 0, sizeof(*ctx));
 }
 
 static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_factor,
                                                         NPConditionalLpAllLargeCtx *ctx,
-                                                        const int allow_tree){
+                                                        const int allow_tree,
+                                                        const int build_original_order){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int use_bernstein = (int_glp_bernstein_extern != 0);
@@ -21738,6 +21745,7 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
   double *vsfx = NULL, *lambdax = NULL, *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double **matrix_bandwidth_x = NULL;
   MATRIX XtX = NULL;
+  MATRIX XtX_original = NULL;
   int ov_cont_from_cache = 0;
   int i, a, b;
   int status = 1;
@@ -21887,6 +21895,59 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
     ctx->hdiag[i] = hii;
   }
 
+  if(build_original_order && (int_TREE_X == NP_TREE_TRUE) && (ipt_extern_X != NULL)){
+    ctx->basis_original_order = alloc_matd(num_train, np_glp_cv_cache.nterms);
+    ctx->hdiag_original_order = alloc_vecd(MAX(1, num_train));
+    XtX_original = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
+    ctx->XtXINV_original_order = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
+    if((ctx->basis_original_order == NULL) ||
+       (ctx->hdiag_original_order == NULL) ||
+       (XtX_original == NULL) ||
+       (ctx->XtXINV_original_order == NULL))
+      goto cleanup_all_large_prepare;
+
+    for(i = 0; i < num_train; i++){
+      const int orig_i = ipt_extern_X[i];
+      for(a = 0; a < np_glp_cv_cache.nterms; a++)
+        ctx->basis_original_order[a][orig_i] = np_glp_cv_cache.basis[a][i];
+    }
+
+    for(a = 0; a < np_glp_cv_cache.nterms; a++){
+      for(b = 0; b < np_glp_cv_cache.nterms; b++)
+        XtX_original[a][b] = 0.0;
+    }
+
+    for(i = 0; i < num_train; i++){
+      for(a = 0; a < np_glp_cv_cache.nterms; a++){
+        const double za = ctx->basis_original_order[a][i];
+        for(b = a; b < np_glp_cv_cache.nterms; b++){
+          const double zb = ctx->basis_original_order[b][i];
+          XtX_original[a][b] += za*zb;
+          if(b != a)
+            XtX_original[b][a] += za*zb;
+        }
+      }
+    }
+
+    if(np_mat_bad_rcond_sym(XtX_original, 1.0e-10))
+      goto cleanup_all_large_prepare;
+    if(mat_inv(XtX_original, ctx->XtXINV_original_order) == NULL)
+      goto cleanup_all_large_prepare;
+
+    for(i = 0; i < num_train; i++){
+      double hii = 0.0;
+      for(a = 0; a < np_glp_cv_cache.nterms; a++){
+        double s = 0.0;
+        for(b = 0; b < np_glp_cv_cache.nterms; b++)
+          s += ctx->XtXINV_original_order[a][b]*ctx->basis_original_order[b][i];
+        hii += ctx->basis_original_order[a][i]*s;
+      }
+      if((!isfinite(hii)) || (hii >= 1.0))
+        goto cleanup_all_large_prepare;
+      ctx->hdiag_original_order[i] = hii;
+    }
+  }
+
   ctx->ready = 1;
   ctx->num_train = num_train;
   ctx->nterms = np_glp_cv_cache.nterms;
@@ -21895,6 +21956,7 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
 
 cleanup_all_large_prepare:
   if(XtX != NULL) mat_free(XtX);
+  if(XtX_original != NULL) mat_free(XtX_original);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
   if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
@@ -21913,13 +21975,23 @@ cleanup_all_large_prepare:
 
 static int np_conditional_lp_all_large_ctx_prepare_cvml(double *vector_scale_factor,
                                                         NPConditionalLpAllLargeCtx *ctx){
-  return np_conditional_lp_all_large_ctx_prepare_core(vector_scale_factor, ctx, 1);
+  return np_conditional_lp_all_large_ctx_prepare_core(vector_scale_factor, ctx, 1, 1);
 }
 
 static int np_conditional_lp_all_large_ctx_prepare_cvls_tree(double *vector_scale_factor,
                                                              NPConditionalLpAllLargeCtx *ctx){
-  return np_conditional_lp_all_large_ctx_prepare_core(vector_scale_factor, ctx, 1);
+  return np_conditional_lp_all_large_ctx_prepare_core(vector_scale_factor, ctx, 1, 0);
 }
+
+static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
+                                                        MATRIX XtXINV,
+                                                        double **basis,
+                                                        const double *hdiag,
+                                                        const double *rhs_row,
+                                                        const int eval_pos,
+                                                        double *cross_terms,
+                                                        double *beta,
+                                                        const int leave_one_out);
 
 static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeCtx *ctx,
                                                   const double *rhs_row,
@@ -21927,22 +21999,42 @@ static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeC
                                                   double *cross_terms,
                                                   double *beta,
                                                   const int leave_one_out){
+  return np_conditional_lp_all_large_row_fit_basis(ctx,
+                                                   ctx->XtXINV,
+                                                   ctx->basis,
+                                                   ctx->hdiag,
+                                                   rhs_row,
+                                                   eval_pos,
+                                                   cross_terms,
+                                                   beta,
+                                                   leave_one_out);
+}
+
+static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
+                                                        MATRIX XtXINV,
+                                                        double **basis,
+                                                        const double *hdiag,
+                                                        const double *rhs_row,
+                                                        const int eval_pos,
+                                                        double *cross_terms,
+                                                        double *beta,
+                                                        const int leave_one_out){
   double fit = 0.0;
   int a, b;
 
   for(a = 0; a < ctx->nterms; a++)
-    cross_terms[a] = np_blas_ddot_int(ctx->num_train, rhs_row, ctx->basis[a]);
+    cross_terms[a] = np_blas_ddot_int(ctx->num_train, rhs_row, basis[a]);
 
   for(a = 0; a < ctx->nterms; a++){
     double s = 0.0;
     for(b = 0; b < ctx->nterms; b++)
-      s += ctx->XtXINV[a][b]*cross_terms[b];
+      s += XtXINV[a][b]*cross_terms[b];
     beta[a] = s;
-    fit += ctx->basis[a][eval_pos]*s;
+    fit += basis[a][eval_pos]*s;
   }
 
   if(leave_one_out)
-    fit = (fit - ctx->hdiag[eval_pos]*rhs_row[eval_pos]) / NZD_POS(1.0 - ctx->hdiag[eval_pos]);
+    fit = (fit - hdiag[eval_pos]*rhs_row[eval_pos]) / NZD_POS(1.0 - hdiag[eval_pos]);
 
   return fit;
 }
@@ -22075,16 +22167,30 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
     if(np_conditional_y_row_stream_op_core(vector_scale_factor, i, OP_NORMAL, yrow) != 0)
       goto cleanup_cvml_all_large;
 
-    if(int_TREE_X == NP_TREE_TRUE){
-      if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
-        goto cleanup_cvml_all_large;
-      eval_pos = ipt_lookup_extern_X[i];
-      for(j = 0; j < ctx.num_train; j++)
-        yrow_xorder[j] = yrow[ipt_extern_X[j]];
-      rhs_row = yrow_xorder;
+    if((int_TREE_X == NP_TREE_TRUE) &&
+       (ctx.XtXINV_original_order != NULL) &&
+       (ctx.basis_original_order != NULL) &&
+       (ctx.hdiag_original_order != NULL)){
+      fit = np_conditional_lp_all_large_row_fit_basis(&ctx,
+                                                      ctx.XtXINV_original_order,
+                                                      ctx.basis_original_order,
+                                                      ctx.hdiag_original_order,
+                                                      yrow,
+                                                      i,
+                                                      cross_terms,
+                                                      beta,
+                                                      1);
+    } else {
+      if(int_TREE_X == NP_TREE_TRUE){
+        if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
+          goto cleanup_cvml_all_large;
+        eval_pos = ipt_lookup_extern_X[i];
+        for(j = 0; j < ctx.num_train; j++)
+          yrow_xorder[j] = yrow[ipt_extern_X[j]];
+        rhs_row = yrow_xorder;
+      }
+      fit = np_conditional_lp_all_large_row_fit(&ctx, rhs_row, eval_pos, cross_terms, beta, 1);
     }
-
-    fit = np_conditional_lp_all_large_row_fit(&ctx, rhs_row, eval_pos, cross_terms, beta, 1);
 
     if(fit > DBL_MIN){
       *cv -= log(fit);
