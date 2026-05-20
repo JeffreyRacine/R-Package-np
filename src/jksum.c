@@ -9183,12 +9183,14 @@ static inline int np_glp_tree_support_prepare_row(NPGLPTreeSupportCtx *ctx,
     const double h = matrix_bandwidth[l][0];
     const double xeval = matrix_X_continuous[l][eval_idx];
     const double hinv = 1.0/h;
-    const int use_largeh = np_cont_largeh_is_active(kc,
-                                                    matrix_X_continuous[l],
-                                                    num_obs,
-                                                    xeval,
-                                                    h,
-                                                    NULL);
+    /*
+     * Keep the sparse tree LP path numerically identical to dense evaluation.
+     * The caller handles the all-continuous-large case with the canonical
+     * global fast objective before reaching this iterator.  Applying large-h
+     * one dimension at a time here changes the finite-bandwidth objective when
+     * only some dimensions are above the tolerance.
+     */
+    const int use_largeh = 0;
 
     ctx->row_largeh[l] = use_largeh;
     ctx->row_cont_const[l] = use_largeh ? (np_cont_largeh_k0(kc)*hinv) : 0.0;
