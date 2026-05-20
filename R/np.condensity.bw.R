@@ -686,7 +686,7 @@ npcdensbw.conbandwidth <-
       tbw$initial.fval <- if (length(myout$fval) >= 3L) myout$fval[3L] else NA_real_
       tbw$num.feval <- sum(myout$eval.history[is.finite(myout$eval.history)])
       tbw$num.feval.fast <- myout$fast.history[1]
-      tbw$num.feval.guarded <- if (identical(tbw$method, "cv.ml")) myout$guarded.history[1] else NA_real_
+      tbw$num.feval.guarded <- if (identical(as.character(tbw$method)[1L], "cv.ml")) myout$guarded.history[1] else NA_real_
       tbw$fval.history <- myout$fval.history
       tbw$eval.history <- myout$eval.history
       tbw$invalid.history <- myout$invalid.history
@@ -1232,12 +1232,19 @@ npcdensbw.conbandwidth <-
     objective = as.numeric(out$fval[1L]),
     num.feval = 1L,
     num.feval.fast = as.numeric(as.numeric(out$fast.history[1L]) > 0),
-    num.feval.guarded = if (identical(bws$method, "cv.ml")) {
+    num.feval.guarded = if (identical(as.character(bws$method)[1L], "cv.ml")) {
       as.numeric(as.numeric(out$guarded.history[1L]) > 0)
     } else {
       NA_real_
     }
   )
+}
+
+.npcdensbw_count_or_zero <- function(x) {
+  x <- suppressWarnings(as.numeric(x[1L]))
+  if (length(x) == 0L || is.na(x) || !is.finite(x))
+    return(0)
+  x
 }
 
 npRmpiNomadShadowPrepareConditionalDensity <- function(c.uno,
@@ -1982,7 +1989,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       payload$ifval <- NA_real_
       payload$num.feval <- as.numeric(nomad.num.feval.total)
       payload$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
-      payload$num.feval.guarded <- if (identical(payload$method, "cv.ml")) as.numeric(nomad.num.feval.guarded.total) else NA_real_
+      payload$num.feval.guarded <- if (identical(as.character(payload$method)[1L], "cv.ml")) as.numeric(nomad.num.feval.guarded.total) else NA_real_
       payload$fval.history <- NA_real_
       payload$eval.history <- NA_real_
       payload$invalid.history <- NA_real_
@@ -2024,7 +2031,12 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       powell.elapsed <- proc.time()[3L] - powell.start
       direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
       direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
-      direct.payload$num.feval.guarded <- as.numeric(direct.payload$num.feval.guarded[1L]) + as.numeric(hot.payload$num.feval.guarded[1L])
+      direct.payload$num.feval.guarded <- if (identical(as.character(direct.payload$method)[1L], "cv.ml")) {
+        .npcdensbw_count_or_zero(direct.payload$num.feval.guarded) +
+          .npcdensbw_count_or_zero(hot.payload$num.feval.guarded)
+      } else {
+        NA_real_
+      }
       hot.payload$num.feval <- direct.payload$num.feval
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
       hot.payload$num.feval.guarded <- direct.payload$num.feval.guarded
@@ -2189,7 +2201,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     )
     nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
-    nomad.num.feval.guarded.total <<- nomad.num.feval.guarded.total + as.numeric(out$num.feval.guarded[1L])
+    nomad.num.feval.guarded.total <<- nomad.num.feval.guarded.total + .npcdensbw_count_or_zero(out$num.feval.guarded)
 
     list(
       objective = out$objective,
