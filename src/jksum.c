@@ -9410,6 +9410,526 @@ static int np_glp_center_raw_moments_at_eval(const int ncon,
   return 1;
 }
 
+static int np_glp_fixed_tree_sparse_supported(const int num_reg_unordered,
+                                              const int num_reg_ordered,
+                                              const int num_reg_continuous,
+                                              const int *kernel_c,
+                                              const int *operator){
+  int i;
+
+  if((num_reg_continuous <= 0) ||
+     (kernel_c == NULL) ||
+     (operator == NULL) ||
+     (kdt_extern_X == NULL) ||
+     (ipt_extern_X == NULL) ||
+     (ipt_lookup_extern_X == NULL) ||
+     (int_TREE_X != NP_TREE_TRUE))
+    return 0;
+
+  for(i = 0; i < num_reg_continuous + num_reg_unordered + num_reg_ordered; i++)
+    if(operator[i] != OP_NORMAL)
+      return 0;
+
+  for(i = 0; i < num_reg_continuous; i++){
+    const int kc = kernel_c[i];
+    if((kc < 0) || (kc >= OP_NCFUN))
+      return 0;
+    if((fabs(cksup[kc][0]) == DBL_MAX) || (fabs(cksup[kc][1]) == DBL_MAX))
+      return 0;
+  }
+
+  return 1;
+}
+
+static inline double np_glp_sparse_okernel_noop(const int kernel,
+                                                const double x,
+                                                const double y,
+                                                const double lambda,
+                                                const double cl,
+                                                const double ch){
+  switch(kernel){
+    case 0: return np_owang_van_ryzin(x, y, lambda, cl, ch);
+    case 1: return np_oli_racine(x, y, lambda, cl, ch);
+    case 2: return np_onli_racine(x, y, lambda, cl, ch);
+    case 3: return np_oracine_li_yan(x, y, lambda, cl, ch);
+    default: return 0.0;
+  }
+}
+
+typedef struct {
+  NL nls;
+  XL xl;
+  int *active_dims;
+  int *row_largeh;
+  double *row_cont_const;
+  double *bb;
+} NPGLPTreeSupportCtx;
+
+static int np_glp_tree_support_ctx_init(NPGLPTreeSupportCtx *ctx,
+                                        const int num_reg_continuous){
+  memset(ctx, 0, sizeof(*ctx));
+  ctx->nls.node = (int *)malloc(sizeof(int));
+  ctx->active_dims = (int *)malloc((size_t)num_reg_continuous*sizeof(int));
+  ctx->row_largeh = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+  ctx->row_cont_const = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+  ctx->bb = (double *)malloc((size_t)2*(size_t)num_reg_continuous*sizeof(double));
+
+  if((ctx->nls.node == NULL) ||
+     (ctx->active_dims == NULL) ||
+     (ctx->row_largeh == NULL) ||
+     (ctx->row_cont_const == NULL) ||
+     (ctx->bb == NULL))
+    return 0;
+
+  ctx->nls.node[0] = 0;
+  ctx->nls.n = ctx->nls.nalloc = 1;
+  return 1;
+}
+
+static void np_glp_tree_support_ctx_free(NPGLPTreeSupportCtx *ctx){
+  clean_xl(&ctx->xl);
+  clean_nl(&ctx->nls);
+  if(ctx->active_dims != NULL) free(ctx->active_dims);
+  if(ctx->row_largeh != NULL) free(ctx->row_largeh);
+  if(ctx->row_cont_const != NULL) free(ctx->row_cont_const);
+  if(ctx->bb != NULL) free(ctx->bb);
+  memset(ctx, 0, sizeof(*ctx));
+}
+
+static inline int np_glp_tree_support_prepare_row(NPGLPTreeSupportCtx *ctx,
+                                                  const int num_obs,
+                                                  const int num_reg_continuous,
+                                                  int *kernel_c,
+                                                  double **matrix_X_continuous,
+                                                  double **matrix_bandwidth,
+                                                  const int eval_idx){
+  int l;
+  int active_n = 0;
+  int all_largeh = (num_reg_continuous > 0);
+
+  ctx->xl.n = 0;
+
+  for(l = 0; l < num_reg_continuous; l++){
+    const int kc = kernel_c[l];
+    const double h = matrix_bandwidth[l][0];
+    const double xeval = matrix_X_continuous[l][eval_idx];
+    const int use_largeh = np_cont_largeh_is_active(kc,
+                                                    matrix_X_continuous[l],
+                                                    num_obs,
+                                                    xeval,
+                                                    h,
+                                                    NULL);
+
+    ctx->row_largeh[l] = use_largeh;
+    ctx->row_cont_const[l] = use_largeh ? (np_cont_largeh_k0(kc)/h) : 0.0;
+    all_largeh &= use_largeh;
+    if(!use_largeh){
+      ctx->active_dims[active_n++] = l;
+      ctx->bb[2*l] = -cksup[kc][1];
+      ctx->bb[2*l+1] = -cksup[kc][0];
+      ctx->bb[2*l] = (fabs(ctx->bb[2*l]) == DBL_MAX) ? ctx->bb[2*l] : (xeval + ctx->bb[2*l]*h);
+      ctx->bb[2*l+1] = (fabs(ctx->bb[2*l+1]) == DBL_MAX) ? ctx->bb[2*l+1] : (xeval + ctx->bb[2*l+1]*h);
+    }
+  }
+
+  if(all_largeh || active_n == 0){
+    merge_end_xl(&ctx->xl, &kdt_extern_X->kdn[0]);
+  } else if(active_n < num_reg_continuous){
+    boxSearchNLPartial(kdt_extern_X, &ctx->nls, ctx->bb, NULL, &ctx->xl, ctx->active_dims, active_n);
+  } else {
+    boxSearchNL(kdt_extern_X, &ctx->nls, ctx->bb, NULL, &ctx->xl);
+  }
+
+  return 1;
+}
+
+static inline double np_glp_tree_support_weight(const NPGLPTreeSupportCtx *ctx,
+                                                const int num_obs,
+                                                const int num_reg_unordered,
+                                                const int num_reg_ordered,
+                                                const int num_reg_continuous,
+                                                double **matrix_X_unordered,
+                                                double **matrix_X_ordered,
+                                                double **matrix_X_continuous,
+                                                int *num_categories,
+                                                int *kernel_c,
+                                                int *kernel_u,
+                                                int *kernel_o,
+                                                double *lambda,
+                                                double **matrix_bandwidth,
+                                                const int eval_idx,
+                                                const int tree_idx,
+                                                int *ok){
+  int l;
+  double w = 1.0;
+
+  *ok = 1;
+
+  for(l = 0; l < num_reg_continuous; l++){
+    const int kc = kernel_c[l];
+    const double h = matrix_bandwidth[l][0];
+    const double xeval = matrix_X_continuous[l][eval_idx];
+    if(ctx->row_largeh[l]){
+      w *= ctx->row_cont_const[l];
+    } else {
+      w *= allck[kc]((xeval - matrix_X_continuous[l][tree_idx])/h)/h;
+    }
+
+    if(w == 0.0)
+      return 0.0;
+  }
+
+  for(l = 0; l < num_reg_unordered; l++){
+    const int ku = kernel_u[l];
+    if((ku < 0) || (ku > 1)){
+      *ok = 0;
+      return 0.0;
+    }
+    w *= alluk[ku](matrix_X_unordered[l][tree_idx] == matrix_X_unordered[l][eval_idx],
+                   lambda[l],
+                   num_categories[l]);
+    if(w == 0.0)
+      return 0.0;
+  }
+
+  for(l = 0; l < num_reg_ordered; l++){
+    const int ko = kernel_o[l];
+    const int lcat = num_reg_unordered + l;
+    const double cl = matrix_categorical_vals_extern[lcat][0];
+    const double ch = matrix_categorical_vals_extern[lcat][num_categories[lcat] - 1];
+    w *= np_glp_sparse_okernel_noop(ko,
+                                    matrix_X_ordered[l][tree_idx],
+                                    matrix_X_ordered[l][eval_idx],
+                                    lambda[num_reg_unordered + l],
+                                    cl,
+                                    ch);
+    if(w == 0.0)
+      return 0.0;
+  }
+
+  (void)num_obs;
+  return w;
+}
+
+static inline void np_glp_accumulate_pair(const int nterms,
+                                          double **basis,
+                                          double *vector_Y,
+                                          double *moments,
+                                          double *rhs,
+                                          const int row_j,
+                                          const int eval_idx,
+                                          const int orig_ii,
+                                          const int tree_ii,
+                                          const double w){
+  int a, b;
+  const double yj = vector_Y[eval_idx];
+  const double yi = vector_Y[tree_ii];
+  double * const sj = moments + (size_t)row_j*(size_t)nterms*(size_t)nterms;
+  double * const si = moments + (size_t)orig_ii*(size_t)nterms*(size_t)nterms;
+  double * const tj = rhs + (size_t)row_j*(size_t)nterms;
+  double * const ti = rhs + (size_t)orig_ii*(size_t)nterms;
+
+  for(a = 0; a < nterms; a++){
+    const double bia = basis[a][tree_ii];
+    const double bja = basis[a][eval_idx];
+    tj[a] += w*bia*yi;
+    ti[a] += w*bja*yj;
+    for(b = 0; b < nterms; b++){
+      sj[a*nterms+b] += w*bia*basis[b][tree_ii];
+      si[a*nterms+b] += w*bja*basis[b][eval_idx];
+    }
+  }
+}
+
+
+static inline void np_glp_accumulate_row(const int nterms,
+                                         double **basis,
+                                         double *vector_Y,
+                                         double *moments,
+                                         double *rhs,
+                                         const int row_j,
+                                         const int tree_ii,
+                                         const double w){
+  int a, b;
+  const double yi = vector_Y[tree_ii];
+  double * const sj = moments + (size_t)row_j*(size_t)nterms*(size_t)nterms;
+  double * const tj = rhs + (size_t)row_j*(size_t)nterms;
+
+  for(a = 0; a < nterms; a++){
+    const double bia = basis[a][tree_ii];
+    tj[a] += w*bia*yi;
+    for(b = 0; b < nterms; b++)
+      sj[a*nterms+b] += w*bia*basis[b][tree_ii];
+  }
+}
+
+static int np_glp_tree_oracle_enabled(void){
+  const char *flag = getenv("NP_GLP_TREE_ORACLE");
+  return (flag != NULL) && (flag[0] != '\0') && strcmp(flag, "0") != 0;
+}
+
+static int np_glp_fixed_tree_sparse_accumulate(
+    const int num_obs,
+    const int num_reg_unordered,
+    const int num_reg_ordered,
+    const int num_reg_continuous,
+    double **matrix_X_unordered,
+    double **matrix_X_ordered,
+    double **matrix_X_continuous,
+    double *vector_Y,
+    int *num_categories,
+    int *kernel_c,
+    int *kernel_u,
+    int *kernel_o,
+    int *operator,
+    double *lambda,
+    double **matrix_bandwidth,
+    double *vector_scale_factor,
+    const int nterms,
+    double **basis,
+    double *moments,
+    double *rhs,
+    const int use_mpi_transport){
+  int i, j, k;
+  int status = 0;
+  NPGLPTreeSupportCtx sctx = {0};
+  const int do_oracle = np_glp_tree_oracle_enabled();
+  double *kw_oracle = NULL;
+  int *oracle_mark = NULL;
+  int oracle_token = 1;
+  int oracle_rows = 0, oracle_pairs = 0, oracle_missing = 0, oracle_mismatch = 0;
+  double oracle_max_abs = 0.0;
+  MATRIX oracle_eval_u = NULL, oracle_eval_o = NULL, oracle_eval_c = NULL;
+  MATRIX oracle_bw_eval = NULL;
+  double oracle_mean_dummy = 0.0;
+
+  if(!np_glp_fixed_tree_sparse_supported(num_reg_unordered,
+                                         num_reg_ordered,
+                                         num_reg_continuous,
+                                         kernel_c,
+                                         operator))
+    return 0;
+
+  if(!np_glp_tree_support_ctx_init(&sctx, num_reg_continuous))
+    goto cleanup_sparse;
+
+  if(do_oracle){
+    kw_oracle = alloc_vecd(num_obs);
+    oracle_mark = (int *)calloc((size_t)num_obs, sizeof(int));
+    oracle_eval_u = mat_creat(num_reg_unordered, 1, UNDEFINED);
+    oracle_eval_o = mat_creat(num_reg_ordered, 1, UNDEFINED);
+    oracle_eval_c = mat_creat(num_reg_continuous, 1, UNDEFINED);
+    oracle_bw_eval = alloc_tmatd(1, num_reg_continuous);
+    if((kw_oracle == NULL) ||
+       (oracle_mark == NULL) ||
+       (oracle_eval_u == NULL) ||
+       (oracle_eval_o == NULL) ||
+       (oracle_eval_c == NULL) ||
+       (oracle_bw_eval == NULL))
+      goto cleanup_sparse;
+  }
+
+  for(j = 0; j < (use_mpi_transport ? num_obs : (num_obs - 1)); j++){
+    const int eval_idx = ipt_lookup_extern_X[j];
+#ifdef MPI2
+    if(use_mpi_transport && ((j % iNum_Processors) != my_rank))
+      continue;
+#endif
+    if(!np_glp_tree_support_prepare_row(&sctx,
+                                        num_obs,
+                                        num_reg_continuous,
+                                        kernel_c,
+                                        matrix_X_continuous,
+                                        matrix_bandwidth,
+                                        eval_idx))
+      goto cleanup_sparse;
+
+    if(do_oracle){
+      int l;
+      memset(kw_oracle, 0, (size_t)num_obs*sizeof(double));
+      if(oracle_token == INT_MAX){
+        memset(oracle_mark, 0, (size_t)num_obs*sizeof(int));
+        oracle_token = 1;
+      } else {
+        oracle_token++;
+      }
+
+      for(l = 0; l < num_reg_unordered; l++)
+        oracle_eval_u[l][0] = matrix_X_unordered[l][eval_idx];
+      for(l = 0; l < num_reg_ordered; l++)
+        oracle_eval_o[l][0] = matrix_X_ordered[l][eval_idx];
+      for(l = 0; l < num_reg_continuous; l++){
+        oracle_eval_c[l][0] = matrix_X_continuous[l][eval_idx];
+        oracle_bw_eval[l][0] = matrix_bandwidth[l][0];
+      }
+
+      if(kernel_weighted_sum_np_ctx(kernel_c,
+                                    kernel_u,
+                                    kernel_o,
+                                    BW_FIXED,
+                                    num_obs,
+                                    1,
+                                    num_reg_unordered,
+                                    num_reg_ordered,
+                                    num_reg_continuous,
+                                    0,
+                                    0,
+                                    1,
+                                    1,
+                                    1,
+                                    0,
+                                    0,
+                                    use_mpi_transport ? 1 : 0,
+                                    use_mpi_transport ? j : 0,
+                                    operator,
+                                    OP_NOOP,
+                                    0,
+                                    0,
+                                    NULL,
+                                    1,
+                                    0,
+                                    0,
+                                    int_TREE_X,
+                                    0,
+                                    kdt_extern_X,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    matrix_X_unordered,
+                                    matrix_X_ordered,
+                                    matrix_X_continuous,
+                                    oracle_eval_u,
+                                    oracle_eval_o,
+                                    oracle_eval_c,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    vector_scale_factor,
+                                    1,
+                                    matrix_bandwidth,
+                                    oracle_bw_eval,
+                                    lambda,
+                                    num_categories,
+                                    matrix_categorical_vals_extern,
+                                    NULL,
+                                    &oracle_mean_dummy,
+                                    NULL,
+                                    kw_oracle,
+                                    NULL) != 0)
+        goto cleanup_sparse;
+    }
+
+    for(i = 0; i < sctx.xl.n; i++){
+      const int istart = sctx.xl.istart[i];
+      const int iend = istart + sctx.xl.nlev[i];
+
+      for(k = istart; k < iend; k++){
+        const int orig_ii = ipt_extern_X[k];
+        const int ii = k;
+        int ok = 1;
+        const double w = np_glp_tree_support_weight(&sctx,
+                                                    num_obs,
+                                                    num_reg_unordered,
+                                                    num_reg_ordered,
+                                                    num_reg_continuous,
+                                                    matrix_X_unordered,
+                                                    matrix_X_ordered,
+                                                    matrix_X_continuous,
+                                                    num_categories,
+                                                    kernel_c,
+                                                    kernel_u,
+                                                    kernel_o,
+                                                    lambda,
+                                                    matrix_bandwidth,
+                                                    eval_idx,
+                                                    ii,
+                                                    &ok);
+
+        if(use_mpi_transport){
+          if(orig_ii == j)
+            continue;
+        } else if(orig_ii <= j) {
+          continue;
+        }
+
+        if(!ok)
+          goto cleanup_sparse;
+
+        if(w != 0.0){
+          if(do_oracle){
+            const double ow = kw_oracle[ii];
+            const double absdiff = fabs(w - ow);
+            const double tol = 1e-10 + 1e-10*fabs(ow);
+            oracle_pairs++;
+            oracle_mark[ii] = oracle_token;
+            oracle_max_abs = MAX(oracle_max_abs, absdiff);
+            if(absdiff > tol)
+              oracle_mismatch++;
+          }
+          if(use_mpi_transport){
+            np_glp_accumulate_row(nterms,
+                                  basis,
+                                  vector_Y,
+                                  moments,
+                                  rhs,
+                                  j,
+                                  ii,
+                                  w);
+          } else {
+            np_glp_accumulate_pair(nterms,
+                                   basis,
+                                   vector_Y,
+                                   moments,
+                                   rhs,
+                                   j,
+                                   eval_idx,
+                                   orig_ii,
+                                   ii,
+                                   w);
+          }
+        }
+      }
+    }
+
+    if(do_oracle){
+      int orig_ii;
+      const int orig_start = use_mpi_transport ? 0 : (j + 1);
+      oracle_rows++;
+      for(orig_ii = orig_start; orig_ii < num_obs; orig_ii++){
+        const int ii = ipt_lookup_extern_X[orig_ii];
+        if(orig_ii == j)
+          continue;
+        if((kw_oracle[ii] != 0.0) && (oracle_mark[ii] != oracle_token))
+          oracle_missing++;
+      }
+    }
+  }
+
+  if(do_oracle){
+    REprintf("NP_GLP_TREE_ORACLE rows=%d pairs=%d missing=%d mismatch=%d max_abs=%.17g\n",
+             oracle_rows,
+             oracle_pairs,
+             oracle_missing,
+             oracle_mismatch,
+             oracle_max_abs);
+    if((oracle_missing != 0) || (oracle_mismatch != 0))
+      goto cleanup_sparse;
+  }
+
+  status = 1;
+
+cleanup_sparse:
+  np_glp_tree_support_ctx_free(&sctx);
+  if(kw_oracle != NULL) free(kw_oracle);
+  if(oracle_mark != NULL) free(oracle_mark);
+  if(oracle_eval_u != NULL) mat_free(oracle_eval_u);
+  if(oracle_eval_o != NULL) mat_free(oracle_eval_o);
+  if(oracle_eval_c != NULL) mat_free(oracle_eval_c);
+  if(oracle_bw_eval != NULL) free_tmat(oracle_bw_eval);
+  return status;
+}
+
+
 static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     const int int_ll,
     const int num_obs,
@@ -9450,6 +9970,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   MATRIX matrix_bandwidth_eval = NULL;
   MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL, SHIFT = NULL, SHIFTINV = NULL, TMP = NULL;
   double mean_dummy = 0.0;
+  int use_sparse_tree = 0;
 #ifdef MPI2
   const int use_mpi_transport = (iNum_Processors > 1);
 #else
@@ -9482,6 +10003,13 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   if((terms == NULL) || (basis == NULL) || (nterms <= 0))
     NP_GLP_CV_FAIL();
 
+  use_sparse_tree = use_tree &&
+    np_glp_fixed_tree_sparse_supported(num_reg_unordered,
+                                       num_reg_ordered,
+                                       num_reg_continuous,
+                                       kernel_c,
+                                       operator);
+
   if((sf_flag = (int_LARGE_SF == 0))){
     int_LARGE_SF = 1;
     vsf = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
@@ -9495,15 +10023,18 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
 
   moments = (double *)calloc((size_t)num_obs, (size_t)nterms*(size_t)nterms*sizeof(double));
   rhs = (double *)calloc((size_t)num_obs, (size_t)nterms*sizeof(double));
-  kw = alloc_vecd(MAX(1, num_obs));
   xj = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
-  train_u = (double **)malloc((size_t)MAX(1, num_reg_unordered)*sizeof(double *));
-  train_o = (double **)malloc((size_t)MAX(1, num_reg_ordered)*sizeof(double *));
-  train_c = (double **)malloc((size_t)MAX(1, num_reg_continuous)*sizeof(double *));
-  eval_u = mat_creat(num_reg_unordered, 1, UNDEFINED);
-  eval_o = mat_creat(num_reg_ordered, 1, UNDEFINED);
-  eval_c = mat_creat(num_reg_continuous, 1, UNDEFINED);
-  matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
+
+  if(!use_sparse_tree){
+    kw = alloc_vecd(MAX(1, num_obs));
+    train_u = (double **)malloc((size_t)MAX(1, num_reg_unordered)*sizeof(double *));
+    train_o = (double **)malloc((size_t)MAX(1, num_reg_ordered)*sizeof(double *));
+    train_c = (double **)malloc((size_t)MAX(1, num_reg_continuous)*sizeof(double *));
+    eval_u = mat_creat(num_reg_unordered, 1, UNDEFINED);
+    eval_o = mat_creat(num_reg_ordered, 1, UNDEFINED);
+    eval_c = mat_creat(num_reg_continuous, 1, UNDEFINED);
+    matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
+  }
   KWM = mat_creat(nterms, nterms, UNDEFINED);
   XTKY = mat_creat(nterms, 1, UNDEFINED);
   DELTA = mat_creat(nterms, 1, UNDEFINED);
@@ -9511,10 +10042,12 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   SHIFTINV = mat_creat(nterms, nterms, UNDEFINED);
   TMP = mat_creat(nterms, nterms, UNDEFINED);
 
-  if((moments == NULL) || (rhs == NULL) || (kw == NULL) || (xj == NULL) ||
-     (train_u == NULL) || (train_o == NULL) || (train_c == NULL) ||
-     (eval_u == NULL) || (eval_o == NULL) || (eval_c == NULL) ||
-     (matrix_bandwidth_eval == NULL) || (KWM == NULL) || (XTKY == NULL) ||
+  if((moments == NULL) || (rhs == NULL) || (xj == NULL) ||
+     (!use_sparse_tree && ((kw == NULL) ||
+                           (train_u == NULL) || (train_o == NULL) || (train_c == NULL) ||
+                           (eval_u == NULL) || (eval_o == NULL) || (eval_c == NULL) ||
+                           (matrix_bandwidth_eval == NULL))) ||
+     (KWM == NULL) || (XTKY == NULL) ||
      (DELTA == NULL) || (SHIFT == NULL) || (SHIFTINV == NULL) || (TMP == NULL))
     NP_GLP_CV_FAIL();
 
@@ -9533,6 +10066,33 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   }
 #endif
 
+  if(use_sparse_tree){
+    double * const moments_acc = use_mpi_transport ? moments_local : moments;
+    double * const rhs_acc = use_mpi_transport ? rhs_local : rhs;
+
+    if(!np_glp_fixed_tree_sparse_accumulate(num_obs,
+                                            num_reg_unordered,
+                                            num_reg_ordered,
+                                            num_reg_continuous,
+                                            matrix_X_unordered,
+                                            matrix_X_ordered,
+                                            matrix_X_continuous,
+                                            vector_Y,
+                                            num_categories,
+                                            kernel_c,
+                                            kernel_u,
+                                            kernel_o,
+                                            operator,
+                                            lambda,
+                                            matrix_bandwidth,
+                                            vsf,
+                                            nterms,
+                                            basis,
+                                            moments_acc,
+                                            rhs_acc,
+                                            use_mpi_transport))
+      NP_GLP_CV_FAIL();
+  } else {
   for(j = 0; j < (use_mpi_transport ? num_obs : (num_obs - 1)); j++){
     const int eval_idx = use_tree ? ipt_lookup_extern_X[j] : j;
     const double yj = vector_Y[eval_idx];
@@ -9673,6 +10233,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     }
   }
 
+  }
 glp_cv_collective_gate:
 #ifdef MPI2
   if(use_mpi_transport && np_mpi_rank_failure_injected("NP_RMPI_INJECT_GLP_CV_FAIL_RANK"))
