@@ -9419,13 +9419,19 @@ static int np_glp_fixed_tree_sparse_supported(const int num_reg_unordered,
                                               const int *operator){
   int i;
 
-  if((num_reg_continuous <= 0) ||
+  if((num_reg_unordered < 0) ||
+     (num_reg_ordered < 0) ||
+     (num_reg_continuous <= 0) ||
      (kernel_c == NULL) ||
      (operator == NULL) ||
      (kdt_extern_X == NULL) ||
      (ipt_extern_X == NULL) ||
      (ipt_lookup_extern_X == NULL) ||
      (int_TREE_X != NP_TREE_TRUE))
+    return 0;
+
+  if(((num_reg_unordered > 0) && (kernel_u == NULL)) ||
+     ((num_reg_ordered > 0) && (kernel_o == NULL)))
     return 0;
 
   for(i = 0; i < num_reg_continuous + num_reg_unordered + num_reg_ordered; i++)
@@ -9494,8 +9500,17 @@ static int np_glp_tree_support_ctx_init(NPGLPTreeSupportCtx *ctx,
      (ctx->row_cont_const == NULL) ||
      (ctx->row_xeval == NULL) ||
      (ctx->row_hinv == NULL) ||
-     (ctx->bb == NULL))
+     (ctx->bb == NULL)){
+    if(ctx->nls.node != NULL) free(ctx->nls.node);
+    if(ctx->active_dims != NULL) free(ctx->active_dims);
+    if(ctx->row_largeh != NULL) free(ctx->row_largeh);
+    if(ctx->row_cont_const != NULL) free(ctx->row_cont_const);
+    if(ctx->row_xeval != NULL) free(ctx->row_xeval);
+    if(ctx->row_hinv != NULL) free(ctx->row_hinv);
+    if(ctx->bb != NULL) free(ctx->bb);
+    memset(ctx, 0, sizeof(*ctx));
     return 0;
+  }
 
   ctx->nls.node[0] = 0;
   ctx->nls.n = ctx->nls.nalloc = 1;
@@ -9865,6 +9880,9 @@ static int np_glp_fixed_tree_sparse_accumulate(
                                          operator))
     return 0;
 
+  if((nterms <= 0) || (nterms > INT_MAX/nterms))
+    return 0;
+
   eval_ybasis = alloc_vecd(MAX(1, nterms));
   eval_outer = alloc_vecd(MAX(1, nterms*nterms));
   if((eval_ybasis == NULL) || (eval_outer == NULL))
@@ -9933,7 +9951,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
         oracle_bw_eval[l][0] = matrix_bandwidth[l][0];
       }
 
-	      if(kernel_weighted_sum_np_ctx(kernel_c,
+      if(kernel_weighted_sum_np_ctx(kernel_c,
                                     kernel_u,
                                     kernel_o,
                                     BW_FIXED,
@@ -9985,9 +10003,9 @@ static int np_glp_fixed_tree_sparse_accumulate(
                                     &oracle_mean_dummy,
                                     NULL,
                                     kw_oracle,
-	                                    NULL) != 0)
-	        goto cleanup_sparse;
-	    }
+                                    NULL) != 0)
+        goto cleanup_sparse;
+    }
 
     if((!do_oracle) &&
        (num_reg_continuous == 1) &&
