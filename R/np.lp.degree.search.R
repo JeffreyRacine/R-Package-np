@@ -1233,6 +1233,19 @@
   starts
 }
 
+.np_nomad_default_opts <- function(random.seed, nomad.opts = list()) {
+  base <- list(
+    SEED = as.integer(random.seed),
+    RNG_ALT_SEEDING = TRUE,
+    DIRECTION_TYPE = "ORTHO 2N",
+    QUAD_MODEL_SEARCH = "no",
+    NM_SEARCH = "no",
+    SPECULATIVE_SEARCH = "no",
+    EVAL_OPPORTUNISTIC = "no"
+  )
+  utils::modifyList(base, if (is.null(nomad.opts)) list() else nomad.opts)
+}
+
 .np_nomad_progress_detail <- function(current_degree,
                                       best_record,
                                       iteration = NULL,
@@ -1717,13 +1730,7 @@
     nomad.start <- proc.time()[3L]
     solution_i <- tryCatch(
       {
-        solver.opts <- utils::modifyList(
-          list(
-            SEED = as.integer(random.seed),
-            RNG_ALT_SEEDING = TRUE
-          ),
-          nomad.opts
-        )
+        solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
         crs::snomadr(
           eval.f = wrapped_eval,
           n = length(x0),
@@ -1857,13 +1864,7 @@
     nomad.start <- proc.time()[3L]
     solution_i <- tryCatch(
       {
-        solver.opts <- utils::modifyList(
-          list(
-            SEED = as.integer(random.seed),
-            RNG_ALT_SEEDING = TRUE
-          ),
-          nomad.opts
-        )
+        solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
         crs::snomadr(
           eval.f = wrapped_eval,
           n = length(x0),
