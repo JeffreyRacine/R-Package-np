@@ -44,6 +44,13 @@ static inline double NZD(const double a){
 static inline double NZD_POS(const double a){
   return (a > DBL_EPSILON) ? a : DBL_EPSILON;
 }
+static inline double np_guarded_cvml_contribution(const double fit){
+  if(fit > DBL_MIN)
+    return -log(fit);
+  if(fit < -DBL_MIN)
+    return log(-fit) - 2.0*log(DBL_MIN);
+  return -log(DBL_MIN);
+}
 void np_fastcv_alllarge_hits_reset(void);
 double np_fastcv_alllarge_hits_get(void);
 int np_mpi_local_regression_active(void);

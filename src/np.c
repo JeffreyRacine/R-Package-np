@@ -3419,28 +3419,6 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
       evals = 0.0;
   }
 
-  if ((BANDWIDTH_den_extern == BW_FIXED) &&
-      (!np_bw_candidate_is_admissible(
-          np_conditional_density_nomad_shadow.num_all_var,
-          bwm_use_transform,
-          KERNEL_den_extern,
-          KERNEL_reg_unordered_extern,
-          BANDWIDTH_den_extern,
-          BANDWIDTH_den_extern,
-          0,
-          num_obs_train_extern,
-          num_var_continuous_extern,
-          num_var_unordered_extern,
-          num_var_ordered_extern,
-          num_reg_continuous_extern,
-          num_reg_unordered_extern,
-          num_reg_ordered_extern,
-          num_categories_extern,
-          np_conditional_density_nomad_shadow.vector_scale_factor))) {
-    val = DBL_MAX;
-    fast = 0.0;
-  }
-
   PROTECT(out = allocVector(REALSXP, 3));
   REAL(out)[0] = -val;
   REAL(out)[1] = evals;
