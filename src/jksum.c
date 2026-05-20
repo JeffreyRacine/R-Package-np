@@ -10213,6 +10213,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   double *ones = NULL;
   double *moments = NULL, *rhs = NULL, *kw = NULL, *xj = NULL;
   double *moments_local = NULL, *rhs_local = NULL;
+  double *eval_ybasis = NULL, *eval_outer = NULL;
   double *vsf = NULL;
   double **train_u = NULL, **train_o = NULL, **train_c = NULL;
   MATRIX eval_u = NULL, eval_o = NULL, eval_c = NULL;
@@ -10252,6 +10253,9 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   if((terms == NULL) || (basis == NULL) || (nterms <= 0))
     NP_GLP_CV_FAIL();
 
+  if(nterms > INT_MAX/nterms)
+    NP_GLP_CV_FAIL();
+
   use_sparse_tree = use_tree &&
     np_glp_fixed_tree_sparse_supported(num_reg_unordered,
                                        num_reg_ordered,
@@ -10285,6 +10289,10 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     eval_o = mat_creat(num_reg_ordered, 1, UNDEFINED);
     eval_c = mat_creat(num_reg_continuous, 1, UNDEFINED);
     matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
+    if((!use_mpi_transport) && (nterms >= 3)){
+      eval_ybasis = alloc_vecd(MAX(1, nterms));
+      eval_outer = alloc_vecd(MAX(1, nterms*nterms));
+    }
   }
   KWM = mat_creat(nterms, nterms, UNDEFINED);
   XTKY = mat_creat(nterms, 1, UNDEFINED);
@@ -10297,7 +10305,9 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
      (!use_sparse_tree && ((kw == NULL) ||
                            (train_u == NULL) || (train_o == NULL) || (train_c == NULL) ||
                            (eval_u == NULL) || (eval_o == NULL) || (eval_c == NULL) ||
-                           (matrix_bandwidth_eval == NULL))) ||
+                           (matrix_bandwidth_eval == NULL) ||
+                           ((!use_mpi_transport) && (nterms >= 3) &&
+                            ((eval_ybasis == NULL) || (eval_outer == NULL))))) ||
      (KWM == NULL) || (XTKY == NULL) ||
      (DELTA == NULL) || (SHIFT == NULL) || (SHIFTINV == NULL) || (TMP == NULL))
     NP_GLP_CV_FAIL();
@@ -10364,6 +10374,16 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     double * const moments_acc = moments;
     double * const rhs_acc = rhs;
 #endif
+
+    if((!use_sparse_tree) && (!use_mpi_transport) && (nterms >= 3)){
+      for(a = 0; a < nterms; a++){
+        const double bja = basis[a][eval_idx];
+        const int aoff = a*nterms;
+        eval_ybasis[a] = bja*yj;
+        for(b = 0; b < nterms; b++)
+          eval_outer[aoff+b] = bja*basis[b][eval_idx];
+      }
+    }
 
     for(l = 0; l < num_reg_unordered; l++){
       eval_u[l][0] = matrix_X_unordered[l][eval_idx];
@@ -10454,6 +10474,28 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
           for(b = 0; b < nterms; b++)
             sj[a*nterms+b] += w*bia*basis[b][ii];
         }
+      }
+    } else if(nterms >= 3){
+      for(i = 0; i < nsub; i++){
+        const int orig_ii = j + 1 + i;
+        const int ii = use_tree ? ipt_lookup_extern_X[orig_ii] : orig_ii;
+        const int widx = use_tree ? ii : i;
+        const double w = kw[widx];
+
+        if(w == 0.0)
+          continue;
+
+        np_glp_accumulate_pair(nterms,
+                               basis,
+                               vector_Y,
+                               moments_acc,
+                               rhs_acc,
+                               j,
+                               eval_ybasis,
+                               eval_outer,
+                               orig_ii,
+                               ii,
+                               w);
       }
     } else {
       for(i = 0; i < nsub; i++){
@@ -10577,6 +10619,8 @@ cleanup_glp_cv:
   if(rhs_local != NULL) free(rhs_local);
   if(xj != NULL) free(xj);
   if(kw != NULL) free(kw);
+  if(eval_ybasis != NULL) free(eval_ybasis);
+  if(eval_outer != NULL) free(eval_outer);
   if(terms_local != NULL) free(terms_local);
   if(basis_local != NULL) free(basis_local);
   if(ones != NULL) free(ones);
