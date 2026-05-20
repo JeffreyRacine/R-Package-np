@@ -885,8 +885,6 @@ double *cv)
 	double *lambda;
 	double **matrix_bandwidth;
 
-	double log_DBL_MIN = log(DBL_MIN);
-
 	double *p_xj1;
 	double *p_xi1;
 	double *p_xj2;
@@ -987,19 +985,12 @@ double *cv)
 
 				pdf = sum_ker/prod_nh;
 
-				if(pdf > DBL_MIN)
+				if(!(pdf > DBL_MIN) && (int_VERBOSE == 1))
 				{
-					*cv -= log(pdf);
+					REprintf("\r                                                                           ");
+					REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
-				else
-				{
-					*cv -= log_DBL_MIN;
-					if(int_VERBOSE == 1)
-					{
-						REprintf("\r                                                                           ");
-						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-					}
-				}
+				*cv += np_guarded_cvml_contribution(pdf);
 
 			}
 
@@ -1042,19 +1033,12 @@ double *cv)
 
 				pdf = sum_ker/prod_nh;
 
-				if(pdf > DBL_MIN)
+				if(!(pdf > DBL_MIN) && (int_VERBOSE == 1))
 				{
-					*cv -= log(pdf);
+					REprintf("\r                                                                           ");
+					REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
-				else
-				{
-					*cv -= log_DBL_MIN;
-					if(int_VERBOSE == 1)
-					{
-						REprintf("\r                                                                           ");
-						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-					}
-				}
+				*cv += np_guarded_cvml_contribution(pdf);
 
 			}
 
@@ -1099,19 +1083,12 @@ double *cv)
 
 				pdf = sum_ker/prod_nh;
 
-				if(pdf > DBL_MIN)
+				if(!(pdf > DBL_MIN) && (int_VERBOSE == 1))
 				{
-					*cv -= log(pdf);
+					REprintf("\r                                                                           ");
+					REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
-				else
-				{
-					*cv -= log_DBL_MIN;
-					if(int_VERBOSE == 1)
-					{
-						REprintf("\r                                                                           ");
-						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-					}
-				}
+				*cv += np_guarded_cvml_contribution(pdf);
 
 			}
 
@@ -1167,19 +1144,12 @@ double *cv)
 
 			pdf = sum_ker/prod_nh;
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1))
 			{
-				*cv -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				*cv -= log_DBL_MIN;
-				if(int_VERBOSE == 1)
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-				}
-			}
+			*cv += np_guarded_cvml_contribution(pdf);
 
 		}
 
@@ -1231,19 +1201,12 @@ double *cv)
 
 			pdf = sum_ker;
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1))
 			{
-				*cv -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				*cv -= log_DBL_MIN;
-				if(int_VERBOSE == 1)
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-				}
-			}
+			*cv += np_guarded_cvml_contribution(pdf);
 
 		}
 	}
@@ -1300,19 +1263,12 @@ double *cv)
 
 				pdf = sum_ker/prod_nh;
 
-				if(pdf > DBL_MIN)
+				if(!(pdf > DBL_MIN) && (int_VERBOSE == 1) && (my_rank == 0))
 				{
-					cv_MPI -= log(pdf);
+					REprintf("\r                                                                           ");
+					REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
-				else
-				{
-					cv_MPI -= log_DBL_MIN;
-					if((int_VERBOSE == 1)&&(my_rank == 0))
-					{
-						REprintf("\r                                                                           ");
-						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-					}
-				}
+				cv_MPI += np_guarded_cvml_contribution(pdf);
 
 			}
 
@@ -1354,19 +1310,12 @@ double *cv)
 
 				pdf = sum_ker/prod_nh;
 
-				if(pdf > DBL_MIN)
+				if(!(pdf > DBL_MIN) && (int_VERBOSE == 1) && (my_rank == 0))
 				{
-					cv_MPI -= log(pdf);
+					REprintf("\r                                                                           ");
+					REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
-				else
-				{
-					cv_MPI -= log_DBL_MIN;
-					if((int_VERBOSE == 1)&&(my_rank == 0))
-					{
-						REprintf("\r                                                                           ");
-						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-					}
-				}
+				cv_MPI += np_guarded_cvml_contribution(pdf);
 
 			}
 
@@ -1410,19 +1359,12 @@ double *cv)
 
 				pdf = sum_ker/prod_nh;
 
-				if(pdf > DBL_MIN)
+				if(!(pdf > DBL_MIN) && (int_VERBOSE == 1) && (my_rank == 0))
 				{
-					cv_MPI -= log(pdf);
+					REprintf("\r                                                                           ");
+					REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
-				else
-				{
-					cv_MPI -= log_DBL_MIN;
-					if((int_VERBOSE == 1)&&(my_rank == 0))
-					{
-						REprintf("\r                                                                           ");
-						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-					}
-				}
+				cv_MPI += np_guarded_cvml_contribution(pdf);
 
 			}
 
@@ -1477,19 +1419,12 @@ double *cv)
 
 			pdf = sum_ker/prod_nh;
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1) && (my_rank == 0))
 			{
-				cv_MPI -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				cv_MPI -= log_DBL_MIN;
-				if((int_VERBOSE == 1)&&(my_rank == 0))
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-				}
-			}
+			cv_MPI += np_guarded_cvml_contribution(pdf);
 
 		}
 
@@ -1540,19 +1475,12 @@ double *cv)
 
 			pdf = sum_ker;
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1) && (my_rank == 0))
 			{
-				cv_MPI -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				cv_MPI -= log_DBL_MIN;
-				if((int_VERBOSE == 1)&&(my_rank == 0))
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
-				}
-			}
+			cv_MPI += np_guarded_cvml_contribution(pdf);
 
 		}
 	}
@@ -1624,8 +1552,6 @@ double *cv)
 	double *lambda;
 	double **matrix_bandwidth_var;
 	double **matrix_bandwidth_reg;
-
-	double log_DBL_MIN = log(DBL_MIN);
 
 	#ifdef MPI2
 	double cv_MPI;
@@ -1744,19 +1670,12 @@ double *cv)
 
       pdf = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1))
 			{
-				*cv -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				*cv -= log_DBL_MIN;
-				if(int_VERBOSE == 1)
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
-				}
-			}
+			*cv += np_guarded_cvml_contribution(pdf);
 
 		}
 
@@ -1832,19 +1751,12 @@ double *cv)
 
 			pdf = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1))
 			{
-				*cv -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				*cv -= log_DBL_MIN;
-				if(int_VERBOSE == 1)
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
-				}
-			}
+			*cv += np_guarded_cvml_contribution(pdf);
 
 		}
 
@@ -1927,19 +1839,12 @@ double *cv)
 
 			pdf = sum_ker/NZD(sum_ker_marginal);
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1))
 			{
-				*cv -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				*cv -= log_DBL_MIN;
-				if(int_VERBOSE == 1)
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
-				}
-			}
+			*cv += np_guarded_cvml_contribution(pdf);
 
 		}
 	}
@@ -2023,19 +1928,12 @@ double *cv)
 
       pdf = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1) && (my_rank == 0))
 			{
-				cv_MPI -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				cv_MPI -= log_DBL_MIN;
-				if((int_VERBOSE == 1)&&(my_rank == 0))
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
-				}
-			}
+			cv_MPI += np_guarded_cvml_contribution(pdf);
 
 		}
 
@@ -2111,19 +2009,12 @@ double *cv)
 
 			pdf = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1) && (my_rank == 0))
 			{
-				cv_MPI -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				cv_MPI -= log_DBL_MIN;
-				if((int_VERBOSE == 1)&&(my_rank == 0))
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
-				}
-			}
+			cv_MPI += np_guarded_cvml_contribution(pdf);
 
 		}
 
@@ -2206,19 +2097,12 @@ double *cv)
 
 			pdf = sum_ker/NZD(sum_ker_marginal);
 
-			if(pdf > DBL_MIN)
+			if(!(pdf > DBL_MIN) && (int_VERBOSE == 1) && (my_rank == 0))
 			{
-				cv_MPI -= log(pdf);
+				REprintf("\r                                                                           ");
+				REprintf("\r** Guarded CVML contribution in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 			}
-			else
-			{
-				cv_MPI -= log_DBL_MIN;
-				if((int_VERBOSE == 1)&&(my_rank == 0))
-				{
-					REprintf("\r                                                                           ");
-					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
-				}
-			}
+			cv_MPI += np_guarded_cvml_contribution(pdf);
 
 		}
 	}

@@ -1815,8 +1815,6 @@ double *cv){
   double *counts = NULL, *weighted_sum = NULL, *weighted_conv = NULL;
   double *profile_y[1];
   int ok = 0;
-  const double log_DBL_MIN = log(DBL_MIN);
-
   if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
      (BANDWIDTH_den != BW_FIXED) ||
      (num_reg_continuous != 0) ||
@@ -1941,10 +1939,10 @@ double *cv){
                                                              lambda,
                                                              num_categories,
                                                              matrix_categorical_vals);
-      const double rho = weighted_sum[g] - L;
-      if(!(rho > 0.0) || !R_FINITE(rho))
+      const double fit = (weighted_sum[g] - L)/(num_obs - 1.0);
+      if(!R_FINITE(fit))
         goto cleanup;
-      *cv -= counts[g]*((rho < DBL_MIN) ? log_DBL_MIN : log(rho/(num_obs - 1.0)));
+      *cv += counts[g]*np_guarded_cvml_contribution(fit);
     }
   } else {
     double cv1 = 0.0, cv2 = 0.0;
@@ -22192,13 +22190,7 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
       fit = np_conditional_lp_all_large_row_fit(&ctx, rhs_row, eval_pos, cross_terms, beta, 1);
     }
 
-    if(fit > DBL_MIN){
-      *cv -= log(fit);
-    } else if(fit < -DBL_MIN){
-      *cv += log(-fit) - 2.0*log(DBL_MIN);
-    } else {
-      *cv -= log(DBL_MIN);
-    }
+    *cv += np_guarded_cvml_contribution(fit);
   }
 
   status = 0;
@@ -22431,14 +22423,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
     for(j = 0; j < num_obs; j++)
       fit += xrow[j]*yrow[j];
 
-    /* Match bkcde's default smooth penalty for negative LP delete-one densities. */
-    if(fit > DBL_MIN){
-      *cv -= log(fit);
-    } else if(fit < -DBL_MIN){
-      *cv += log(-fit) - 2.0*log(DBL_MIN);
-    } else {
-      *cv -= log(DBL_MIN);
-    }
+    *cv += np_guarded_cvml_contribution(fit);
   }
 
   status = 0;
@@ -22488,14 +22473,7 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
     for(ii = 0; ii < ib; ii++){
       const double fit = np_blas_ddot_int(num_obs, xblock[ii], yblock[ii]);
 
-      /* Match bkcde's default smooth penalty for negative LP delete-one densities. */
-      if(fit > DBL_MIN){
-        *cv -= log(fit);
-      } else if(fit < -DBL_MIN){
-        *cv += log(-fit) - 2.0*log(DBL_MIN);
-      } else {
-        *cv -= log(DBL_MIN);
-      }
+      *cv += np_guarded_cvml_contribution(fit);
     }
   }
 
@@ -23860,7 +23838,7 @@ int np_shadow_proof_cv_con_density_ml(double *vector_scale_factor, double *cv){
     for(j = 0; j < num_obs_train_extern; j++)
       fit += weights[(size_t)i*(size_t)num_obs_train_extern + (size_t)j] *
         yrow[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
-    *cv -= log((fit > DBL_MIN) ? fit : DBL_MIN);
+    *cv += np_guarded_cvml_contribution(fit);
   }
 
   status = 0;
@@ -24052,7 +24030,6 @@ double *cv){
   num_obs_alloc = num_obs;
 #endif
 
-	const double log_DBL_MIN = log(DBL_MIN);
   double * rho = (double *)malloc(num_obs_alloc*sizeof(double));
   
   if(rho == NULL)
@@ -24341,8 +24318,10 @@ double *cv){
   
   
 
-  for(i = 0, *cv = 0.0; i < num_obs; i++)
-    *cv -= (rho[i] < DBL_MIN) ? log_DBL_MIN : log(rho[i]/(num_obs-1.0));
+  for(i = 0, *cv = 0.0; i < num_obs; i++){
+    const double fit = rho[i]/(num_obs-1.0);
+    *cv += np_guarded_cvml_contribution(fit);
+  }
     
 
   free(operator);
@@ -25551,12 +25530,11 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
             const double num = weighted_num[g] - self_xy;
             const double den = weighted_den[xid] - self_x;
 
-            if((num <= DBL_MIN) || (den <= DBL_MIN) ||
-               (!R_FINITE(num)) || (!R_FINITE(den))){
+            if((den <= DBL_MIN) || (!R_FINITE(num)) || (!R_FINITE(den))){
               profile_ok = 0;
               break;
             }
-            *cv -= counts_xy[g]*(log(num) - log(den));
+            *cv += counts_xy[g]*np_guarded_cvml_contribution(num/den);
           }
         }
       }
@@ -25737,7 +25715,6 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
       double *lambda_y = NULL;
       const int num_var_tot = num_var_continuous + num_var_unordered + num_var_ordered;
       const int y_bwmdim = 1;
-      const double log_DBL_MIN = log(DBL_MIN);
 
       operator_y = (int *)malloc(sizeof(int)*MAX(1,num_var_tot));
       kernel_cy = (int *)malloc(sizeof(int)*MAX(1,num_var_continuous));
@@ -25845,12 +25822,12 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
         *cv = 0.0;
         ret = 0;
         for(i = 0; i < num_obs; i++){
-          if(rho_y[i] < DBL_MIN){
-            *cv -= log_DBL_MIN;
+          const double fit = rho_y[i]/(num_obs - 1.0);
+          if(!R_FINITE(fit)){
             ret = 1;
-          } else {
-            *cv -= log(rho_y[i]/(num_obs - 1.0));
+            break;
           }
+          *cv += np_guarded_cvml_contribution(fit);
         }
       }
 
