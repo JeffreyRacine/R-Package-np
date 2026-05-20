@@ -686,6 +686,7 @@ npcdensbw.conbandwidth <-
       tbw$initial.fval <- if (length(myout$fval) >= 3L) myout$fval[3L] else NA_real_
       tbw$num.feval <- sum(myout$eval.history[is.finite(myout$eval.history)])
       tbw$num.feval.fast <- myout$fast.history[1]
+      tbw$num.feval.guarded <- if (identical(tbw$method, "cv.ml")) myout$guarded.history[1] else NA_real_
       tbw$fval.history <- myout$fval.history
       tbw$eval.history <- myout$eval.history
       tbw$invalid.history <- myout$invalid.history
@@ -762,6 +763,7 @@ npcdensbw.conbandwidth <-
                         ifval = tbw$ifval,
                         num.feval = tbw$num.feval,
                         num.feval.fast = tbw$num.feval.fast,
+                        num.feval.guarded = tbw$num.feval.guarded,
                         fval.history = tbw$fval.history,
                         eval.history = tbw$eval.history,
                         invalid.history = tbw$invalid.history,
@@ -1229,7 +1231,12 @@ npcdensbw.conbandwidth <-
   list(
     objective = as.numeric(out$fval[1L]),
     num.feval = 1L,
-    num.feval.fast = as.numeric(as.numeric(out$fast.history[1L]) > 0)
+    num.feval.fast = as.numeric(as.numeric(out$fast.history[1L]) > 0),
+    num.feval.guarded = if (identical(bws$method, "cv.ml")) {
+      as.numeric(as.numeric(out$guarded.history[1L]) > 0)
+    } else {
+      NA_real_
+    }
   )
 }
 
@@ -1569,6 +1576,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       powell.time = NA_real_,
       num.feval.total = 0,
       num.feval.fast.total = 0,
+      num.feval.guarded.total = 0,
       method = degree.search$engine
     ))
   mpi.barrier(1L)
@@ -1578,6 +1586,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   }, add = TRUE)
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
+  nomad.num.feval.guarded.total <- 0
 
   eval_fun <- function(point) {
     point <- as.numeric(point)
@@ -1594,12 +1603,14 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     )
     nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out[2L])
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out[3L])
+    nomad.num.feval.guarded.total <<- nomad.num.feval.guarded.total + as.numeric(out[4L])
 
     list(
       objective = as.numeric(out[1L]),
       degree = degree,
       num.feval = as.numeric(out[2L]),
-      num.feval.fast = as.numeric(out[3L])
+      num.feval.fast = as.numeric(out[3L]),
+      num.feval.guarded = as.numeric(out[4L])
     )
   }
 
@@ -1659,6 +1670,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   search.result$powell.time <- NA_real_
   search.result$num.feval.total <- as.numeric(nomad.num.feval.total)
   search.result$num.feval.fast.total <- as.numeric(nomad.num.feval.fast.total)
+  search.result$num.feval.guarded.total <- as.numeric(nomad.num.feval.guarded.total)
   search.result
 }
 
@@ -1905,6 +1917,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
+  nomad.num.feval.guarded.total <- 0
   direct.meta.context <- if (is.recursive(bws) &&
                              !is.null(bws$nconfac) &&
                              !is.null(bws$ncatfac) &&
@@ -1969,6 +1982,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       payload$ifval <- NA_real_
       payload$num.feval <- as.numeric(nomad.num.feval.total)
       payload$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
+      payload$num.feval.guarded <- if (identical(payload$method, "cv.ml")) as.numeric(nomad.num.feval.guarded.total) else NA_real_
       payload$fval.history <- NA_real_
       payload$eval.history <- NA_real_
       payload$invalid.history <- NA_real_
@@ -2010,8 +2024,10 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       powell.elapsed <- proc.time()[3L] - powell.start
       direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
       direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+      direct.payload$num.feval.guarded <- as.numeric(direct.payload$num.feval.guarded[1L]) + as.numeric(hot.payload$num.feval.guarded[1L])
       hot.payload$num.feval <- direct.payload$num.feval
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+      hot.payload$num.feval.guarded <- direct.payload$num.feval.guarded
       if (!is.null(hot.payload$method) && length(hot.payload$method))
         hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
       hot.objective <- as.numeric(hot.payload$fval[1L])
@@ -2108,6 +2124,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       nomad.num.feval.total <- as.numeric(search.result$num.feval.total[1L])
     if (!is.null(search.result$num.feval.fast.total))
       nomad.num.feval.fast.total <- as.numeric(search.result$num.feval.fast.total[1L])
+    if (!is.null(search.result$num.feval.guarded.total))
+      nomad.num.feval.guarded.total <- as.numeric(search.result$num.feval.guarded.total[1L])
     best.solution <- NULL
     if (!is.null(search.result$best.restart) &&
         is.finite(search.result$best.restart) &&
@@ -2171,12 +2189,14 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     )
     nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
+    nomad.num.feval.guarded.total <<- nomad.num.feval.guarded.total + as.numeric(out$num.feval.guarded[1L])
 
     list(
       objective = out$objective,
       degree = degree,
       num.feval = out$num.feval,
-      num.feval.fast = out$num.feval.fast
+      num.feval.fast = out$num.feval.fast,
+      num.feval.guarded = out$num.feval.guarded
     )
   }
 

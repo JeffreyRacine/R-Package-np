@@ -2365,9 +2365,15 @@ genBwSelStr <- function(x){
   nfe.str <- ""
   if(!(is.null(x$num.feval) || (length(x$num.feval) == 1L && is.na(x$num.feval)))){
     nfe.str <- paste("\nNumber of Function Evaluations: ", format(x$num.feval), sep="")
+    nfe.parts <- character()
     if(!(is.null(x$num.feval.fast) || (length(x$num.feval.fast) == 1L && is.na(x$num.feval.fast)))){
-      nfe.str <- paste(nfe.str, " (fast = ", format(x$num.feval.fast), ")", sep="")
+      nfe.parts <- c(nfe.parts, paste("fast = ", format(x$num.feval.fast), sep = ""))
     }
+    if(!(is.null(x$num.feval.guarded) || (length(x$num.feval.guarded) == 1L && is.na(x$num.feval.guarded)))){
+      nfe.parts <- c(nfe.parts, paste("guarded = ", format(x$num.feval.guarded), sep = ""))
+    }
+    if(length(nfe.parts) > 0L)
+      nfe.str <- paste(nfe.str, " (", paste(nfe.parts, collapse = ", "), ")", sep="")
   }
 
   pregtype <- npFormatRegressionType(x)

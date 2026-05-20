@@ -356,6 +356,7 @@ static double (*bwmfunc_raw)(double *) = NULL;
 static double bwm_eval_count = 0.0;
 static double bwm_invalid_count = 0.0;
 static double bwm_fast_eval_count = 0.0;
+static double bwm_guarded_eval_count = 0.0;
 static clock_t bwm_progress_started_clock = 0;
 static clock_t bwm_progress_last_signal_clock = 0;
 static int bwm_progress_last_signal_eval = 0;
@@ -785,10 +786,12 @@ static void bwm_reset_counters(void)
   bwm_eval_count = 0.0;
   bwm_invalid_count = 0.0;
   bwm_fast_eval_count = 0.0;
+  bwm_guarded_eval_count = 0.0;
   bwm_progress_started_clock = clock();
   bwm_progress_last_signal_clock = bwm_progress_started_clock;
   bwm_progress_last_signal_eval = 0;
   np_fastcv_alllarge_hits_reset();
+  np_guarded_cvml_hits_reset();
 }
 
 static void bwm_maybe_signal_activity(void)
@@ -1043,6 +1046,7 @@ static double bwmfunc_wrapper(double *p)
 {
   double val;
   double *use_p = p;
+  double guarded_before;
 
   bwm_eval_count += 1.0;
   if (!bwm_active_floor_candidate_ok(p)) {
@@ -1059,7 +1063,10 @@ static double bwmfunc_wrapper(double *p)
     use_p = bwm_transform_buf;
   }
 
+  guarded_before = np_guarded_cvml_hits_get();
   val = bwmfunc_raw(use_p);
+  if(np_guarded_cvml_hits_get() > guarded_before)
+    bwm_guarded_eval_count += 1.0;
   bwm_maybe_signal_activity();
 
   if (!R_FINITE(val) || val == DBL_MAX) {
@@ -3348,6 +3355,7 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
   SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   int i;
   double val, fast = 0.0, fast_before = 0.0, evals = 0.0, eval_before = 0.0;
+  double guarded = 0.0, guarded_before = 0.0;
 
   if (!np_conditional_density_nomad_shadow.active)
     error("resident npcdens NOMAD shadow state is not active");
@@ -3385,10 +3393,11 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
     val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
-    PROTECT(out = allocVector(REALSXP, 3));
+    PROTECT(out = allocVector(REALSXP, 4));
     REAL(out)[0] = -val;
     REAL(out)[1] = 1.0;
     REAL(out)[2] = 0.0;
+    REAL(out)[3] = 0.0;
     UNPROTECT(3);
     return out;
   }
@@ -3402,11 +3411,15 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
   }
   eval_before = bwm_eval_count;
   fast_before = np_fastcv_alllarge_hits_get();
+  guarded_before = np_guarded_cvml_hits_get();
   val = bwmfunc_wrapper(np_conditional_density_nomad_shadow.vector_scale_factor);
   fast = np_fastcv_alllarge_hits_get() - fast_before;
+  guarded = np_guarded_cvml_hits_get() - guarded_before;
   evals = bwm_eval_count - eval_before;
   if (fast < 0.0)
     fast = 0.0;
+  if (guarded < 0.0)
+    guarded = 0.0;
   if (evals < 0.0)
     evals = 0.0;
 
@@ -3419,10 +3432,11 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
       evals = 0.0;
   }
 
-  PROTECT(out = allocVector(REALSXP, 3));
+  PROTECT(out = allocVector(REALSXP, 4));
   REAL(out)[0] = -val;
   REAL(out)[1] = evals;
   REAL(out)[2] = fast;
+  REAL(out)[3] = (guarded > 0.0) ? 1.0 : 0.0;
   UNPROTECT(3);
   return out;
 }
@@ -3485,6 +3499,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * objective_function_values, double * objective_function_evals,
                    double * objective_function_invalid, double * timing,
                    double * objective_function_fast,
+                   double * objective_function_guarded,
                    int * penalty_mode, double * penalty_mult,
                    double * ckerlb, double * ckerub);
 void np_distribution_bw(double * myuno, double * myord, double * mycon,
@@ -3502,6 +3517,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * objective_function_values, double * objective_function_evals,
                                double * objective_function_invalid, double * timing,
                                double * objective_function_fast,
+                               double * objective_function_guarded,
                                int * penalty_mode, double * penalty_mult,
                                int * glp_degree,
                                int * glp_bernstein,
@@ -4033,7 +4049,7 @@ SEXP C_np_density_bw(SEXP myuno,
   SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
-  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_guarded=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -4068,15 +4084,16 @@ SEXP C_np_density_bw(SEXP myuno,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
+  PROTECT(out_guarded = allocVector(REALSXP, 1));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_density_bw(REAL(myuno_r), REAL(myord_r), REAL(mycon_r),
                 REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                 REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
-                REAL(out_fast),
+                REAL(out_fast), REAL(out_guarded),
                 &pmode, &pmult, ckerlb_p, ckerub_p);
 
-  PROTECT(out = allocVector(VECSXP, 7));
+  PROTECT(out = allocVector(VECSXP, 8));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -4084,8 +4101,9 @@ SEXP C_np_density_bw(SEXP myuno,
   SET_VECTOR_ELT(out, 4, out_invalid_hist);
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
+  SET_VECTOR_ELT(out, 7, out_guarded);
 
-  PROTECT(out_names = allocVector(STRSXP, 7));
+  PROTECT(out_names = allocVector(STRSXP, 8));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -4093,9 +4111,10 @@ SEXP C_np_density_bw(SEXP myuno,
   SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
+  SET_STRING_ELT(out_names, 7, mkChar("guarded.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(18);
+  UNPROTECT(19);
   return out;
 }
 
@@ -4216,7 +4235,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   SEXP cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
-  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_guarded=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -4265,18 +4284,19 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
+  PROTECT(out_guarded = allocVector(REALSXP, 1));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_density_conditional_bw(REAL(c_uno_r), REAL(c_ord_r), REAL(c_con_r),
                             REAL(u_uno_r), REAL(u_ord_r), REAL(u_con_r), REAL(mysd_r),
                             INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                             REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
-                            REAL(out_fast), &pmode, &pmult,
+                            REAL(out_fast), REAL(out_guarded), &pmode, &pmult,
                             INTEGER(degree_i), &bern, &basis, &ll_mode,
                             cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
                             eval_only);
 
-  PROTECT(out = allocVector(VECSXP, 7));
+  PROTECT(out = allocVector(VECSXP, 8));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -4284,8 +4304,9 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   SET_VECTOR_ELT(out, 4, out_invalid_hist);
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
+  SET_VECTOR_ELT(out, 7, out_guarded);
 
-  PROTECT(out_names = allocVector(STRSXP, 7));
+  PROTECT(out_names = allocVector(STRSXP, 8));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -4293,9 +4314,10 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
+  SET_STRING_ELT(out_names, 7, mkChar("guarded.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(24);
+  UNPROTECT(25);
   return out;
 }
 
@@ -5202,6 +5224,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * objective_function_values, double * objective_function_evals,
                    double * objective_function_invalid, double * timing,
                    double * objective_function_fast,
+                   double * objective_function_guarded,
                    int * penalty_mode, double * penalty_mult,
                    double * ckerlb, double * ckerub){
   int_nn_k_min_extern = 1;
@@ -5226,6 +5249,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   
   int i,j;
   double fast_eval_total = 0.0;
+  double guarded_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int enforce_fixed_feasibility;
@@ -5685,6 +5709,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   objective_function_invalid[0]=bwm_invalid_count;
   bwm_snapshot_fast_counters();
   fast_eval_total += bwm_fast_eval_count;
+  guarded_eval_total += bwm_guarded_eval_count;
 
   if(iMultistart == IMULTI_TRUE){
     if (enforce_fixed_feasibility) {
@@ -5850,6 +5875,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
+      guarded_eval_total += bwm_guarded_eval_count;
       np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
@@ -5927,6 +5953,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   fval[0] = -fret;
   fval[1] = iImproved;
   objective_function_fast[0] = fast_eval_total;
+  objective_function_guarded[0] = guarded_eval_total;
 
   /* end return data */
 
@@ -6802,6 +6829,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * objective_function_values, double * objective_function_evals,
                                double * objective_function_invalid, double * timing,
                                double * objective_function_fast,
+                               double * objective_function_guarded,
                                int * penalty_mode, double * penalty_mult,
                                int * glp_degree,
                                int * glp_bernstein,
@@ -6835,6 +6863,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int i,j;
   int need_y_side = 0;
   double fast_eval_total = 0.0;
+  double guarded_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
   int enforce_fixed_feasibility;
@@ -7633,6 +7662,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   objective_function_invalid[0]=bwm_invalid_count;
   bwm_snapshot_fast_counters();
   fast_eval_total += bwm_fast_eval_count;
+  guarded_eval_total += bwm_guarded_eval_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -7797,6 +7827,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
+      guarded_eval_total += bwm_guarded_eval_count;
       np_progress_bandwidth_multistart_step(iMs_counter+1, iNum_Multistart);
     }
 
@@ -7878,6 +7909,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   fval[1] = iImproved;
   fval[2] = -fret_initial;
   objective_function_fast[0] = fast_eval_total;
+  objective_function_guarded[0] = guarded_eval_total;
   /* end return data */
 
 cleanup_np_density_conditional_bw:
