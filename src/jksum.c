@@ -21622,11 +21622,6 @@ cleanup_all_large_prepare:
   return status;
 }
 
-static int np_conditional_lp_all_large_ctx_prepare(double *vector_scale_factor,
-                                                   NPConditionalLpAllLargeCtx *ctx){
-  return np_conditional_lp_all_large_ctx_prepare_core(vector_scale_factor, ctx, 0);
-}
-
 static int np_conditional_lp_all_large_ctx_prepare_cvml(double *vector_scale_factor,
                                                         NPConditionalLpAllLargeCtx *ctx){
   return np_conditional_lp_all_large_ctx_prepare_core(vector_scale_factor, ctx, 1);
