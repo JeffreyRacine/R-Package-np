@@ -8909,7 +8909,7 @@ typedef struct {
   int ok;
 } NPRegCvLpResult;
 
-static inline int np_reg_cv_use_canonical_glp_fixed_kernel(const int int_ll,
+static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int int_ll,
                                                            const int bwm,
                                                            const int BANDWIDTH_reg,
                                                            const int num_reg_continuous,
@@ -9050,7 +9050,7 @@ static int np_glp_center_raw_moments_at_eval(const int ncon,
   return 1;
 }
 
-static int np_glp_fixed_tree_sparse_supported(const int num_reg_unordered,
+static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
                                               const int num_reg_ordered,
                                               const int num_reg_continuous,
                                               const int *kernel_c,
@@ -9097,7 +9097,7 @@ static int np_glp_fixed_tree_sparse_supported(const int num_reg_unordered,
   return 1;
 }
 
-static inline double np_glp_sparse_okernel_noop(const int kernel,
+static inline double np_lp_sparse_okernel_noop(const int kernel,
                                                 const double x,
                                                 const double y,
                                                 const double lambda,
@@ -9121,9 +9121,9 @@ typedef struct {
   double *row_xeval;
   double *row_hinv;
   double *bb;
-} NPGLPTreeSupportCtx;
+} NPLPTreeSupportCtx;
 
-static int np_glp_tree_support_ctx_init(NPGLPTreeSupportCtx *ctx,
+static int np_lp_tree_support_ctx_init(NPLPTreeSupportCtx *ctx,
                                         const int num_reg_continuous){
   memset(ctx, 0, sizeof(*ctx));
   ctx->nls.node = (int *)malloc(sizeof(int));
@@ -9157,7 +9157,7 @@ static int np_glp_tree_support_ctx_init(NPGLPTreeSupportCtx *ctx,
   return 1;
 }
 
-static void np_glp_tree_support_ctx_free(NPGLPTreeSupportCtx *ctx){
+static void np_lp_tree_support_ctx_free(NPLPTreeSupportCtx *ctx){
   clean_xl(&ctx->xl);
   clean_nl(&ctx->nls);
   if(ctx->active_dims != NULL) free(ctx->active_dims);
@@ -9169,7 +9169,7 @@ static void np_glp_tree_support_ctx_free(NPGLPTreeSupportCtx *ctx){
   memset(ctx, 0, sizeof(*ctx));
 }
 
-static inline int np_glp_tree_support_prepare_row(NPGLPTreeSupportCtx *ctx,
+static inline int np_lp_tree_support_prepare_row(NPLPTreeSupportCtx *ctx,
                                                   const int num_obs,
                                                   const int num_reg_continuous,
                                                   int *kernel_c,
@@ -9221,7 +9221,7 @@ static inline int np_glp_tree_support_prepare_row(NPGLPTreeSupportCtx *ctx,
   return 1;
 }
 
-static inline double np_glp_cont_weight_scaled(const int kc,
+static inline double np_lp_cont_weight_scaled(const int kc,
                                                const double z,
                                                const double hinv){
   switch(kc){
@@ -9237,7 +9237,7 @@ static inline double np_glp_cont_weight_scaled(const int kc,
   }
 }
 
-static inline double np_glp_tree_support_weight(const NPGLPTreeSupportCtx *ctx,
+static inline double np_lp_tree_support_weight(const NPLPTreeSupportCtx *ctx,
                                                 const int num_obs,
                                                 const int num_reg_unordered,
                                                 const int num_reg_ordered,
@@ -9264,7 +9264,7 @@ static inline double np_glp_tree_support_weight(const NPGLPTreeSupportCtx *ctx,
       w *= ctx->row_cont_const[l];
     } else {
       const double z = (ctx->row_xeval[l] - matrix_X_continuous[l][tree_idx])*ctx->row_hinv[l];
-      w *= np_glp_cont_weight_scaled(kc, z, ctx->row_hinv[l]);
+      w *= np_lp_cont_weight_scaled(kc, z, ctx->row_hinv[l]);
     }
 
     if(w == 0.0)
@@ -9289,7 +9289,7 @@ static inline double np_glp_tree_support_weight(const NPGLPTreeSupportCtx *ctx,
     const int lcat = num_reg_unordered + l;
     const double cl = matrix_categorical_vals_extern[lcat][0];
     const double ch = matrix_categorical_vals_extern[lcat][num_categories[lcat] - 1];
-    w *= np_glp_sparse_okernel_noop(ko,
+    w *= np_lp_sparse_okernel_noop(ko,
                                     matrix_X_ordered[l][tree_idx],
                                     matrix_X_ordered[l][eval_idx],
                                     lambda[num_reg_unordered + l],
@@ -9303,7 +9303,7 @@ static inline double np_glp_tree_support_weight(const NPGLPTreeSupportCtx *ctx,
   return w;
 }
 
-static inline void np_glp_accumulate_pair(const int nterms,
+static inline void np_lp_accumulate_pair(const int nterms,
                                           double **basis,
                                           double *vector_Y,
                                           double *moments,
@@ -9449,7 +9449,7 @@ static inline void np_glp_accumulate_pair(const int nterms,
   }
 }
 
-static inline void np_glp_cvls_support_add(const int row,
+static inline void np_lp_cvls_support_add(const int row,
                                            const int orig_idx,
                                            const int data_idx,
                                            const double w,
@@ -9484,7 +9484,7 @@ static int np_glp_support_order_cmp(const void *pa, const void *pb){
   return (a[0] > b[0]) - (a[0] < b[0]);
 }
 
-static int np_glp_cvls_lowsupport_fit(const int nterms,
+static int np_lp_cvls_lowsupport_fit(const int nterms,
                                       const int m,
                                       double **basis,
                                       double *vector_Y,
@@ -9569,12 +9569,14 @@ cleanup_lowsupport:
   return 0;
 }
 
-static int np_glp_tree_oracle_enabled(void){
-  const char *flag = getenv("NP_GLP_TREE_ORACLE");
+static int np_lp_tree_oracle_enabled(void){
+  const char *flag = getenv("NP_LP_TREE_ORACLE");
+  if(flag == NULL)
+    flag = getenv("NP_GLP_TREE_ORACLE");
   return (flag != NULL) && (flag[0] != '\0') && strcmp(flag, "0") != 0;
 }
 
-static int np_glp_fixed_tree_sparse_accumulate(
+static int np_lp_fixed_tree_sparse_accumulate(
     const int num_obs,
     const int num_reg_unordered,
     const int num_reg_ordered,
@@ -9602,8 +9604,8 @@ static int np_glp_fixed_tree_sparse_accumulate(
     double *support_weight){
   int i, j, k;
   int status = 0;
-  NPGLPTreeSupportCtx sctx = {0};
-  const int do_oracle = np_glp_tree_oracle_enabled();
+  NPLPTreeSupportCtx sctx = {0};
+  const int do_oracle = np_lp_tree_oracle_enabled();
   double *kw_oracle = NULL;
   int *oracle_mark = NULL;
   int oracle_token = 1;
@@ -9615,7 +9617,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
   double *eval_ybasis = NULL;
   double *eval_outer = NULL;
 
-  if(!np_glp_fixed_tree_sparse_supported(num_reg_unordered,
+  if(!np_lp_fixed_tree_sparse_supported(num_reg_unordered,
                                          num_reg_ordered,
                                          num_reg_continuous,
                                          kernel_c,
@@ -9632,7 +9634,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
   if((eval_ybasis == NULL) || (eval_outer == NULL))
     goto cleanup_sparse;
 
-  if(!np_glp_tree_support_ctx_init(&sctx, num_reg_continuous))
+  if(!np_lp_tree_support_ctx_init(&sctx, num_reg_continuous))
     goto cleanup_sparse;
 
   if(do_oracle){
@@ -9664,7 +9666,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
         eval_outer[aoff+b] = bja*basis[b][eval_idx];
     }
 
-    if(!np_glp_tree_support_prepare_row(&sctx,
+    if(!np_lp_tree_support_prepare_row(&sctx,
                                         num_obs,
                                         num_reg_continuous,
                                         kernel_c,
@@ -9774,12 +9776,12 @@ static int np_glp_fixed_tree_sparse_accumulate(
           if(orig_ii <= j)
             continue;
 
-          w = np_glp_cont_weight_scaled(kc0,
+          w = np_lp_cont_weight_scaled(kc0,
                                         (xeval0 - matrix_X_continuous[0][ii])*hinv0,
                                         hinv0);
           if(w != 0.0){
             if(track_lowsupport){
-              np_glp_cvls_support_add(j,
+              np_lp_cvls_support_add(j,
                                       orig_ii,
                                       ii,
                                       w,
@@ -9788,7 +9790,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
                                       support_orig,
                                       support_data,
                                       support_weight);
-              np_glp_cvls_support_add(orig_ii,
+              np_lp_cvls_support_add(orig_ii,
                                       j,
                                       eval_idx,
                                       w,
@@ -9798,7 +9800,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
                                       support_data,
                                       support_weight);
             }
-            np_glp_accumulate_pair(nterms,
+            np_lp_accumulate_pair(nterms,
                                    basis,
                                    vector_Y,
                                    moments,
@@ -9831,7 +9833,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
         if(orig_ii <= j)
           continue;
 
-        const double w = np_glp_tree_support_weight(&sctx,
+        const double w = np_lp_tree_support_weight(&sctx,
                                                     num_obs,
                                                     num_reg_unordered,
                                                     num_reg_ordered,
@@ -9853,7 +9855,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
 
         if(w != 0.0){
           if(track_lowsupport){
-            np_glp_cvls_support_add(j,
+            np_lp_cvls_support_add(j,
                                     orig_ii,
                                     ii,
                                     w,
@@ -9862,7 +9864,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
                                     support_orig,
                                     support_data,
                                     support_weight);
-            np_glp_cvls_support_add(orig_ii,
+            np_lp_cvls_support_add(orig_ii,
                                     j,
                                     eval_idx,
                                     w,
@@ -9882,7 +9884,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
             if(absdiff > tol)
               oracle_mismatch++;
           }
-          np_glp_accumulate_pair(nterms,
+          np_lp_accumulate_pair(nterms,
                                  basis,
                                  vector_Y,
                                  moments,
@@ -9909,7 +9911,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
   }
 
   if(do_oracle){
-    REprintf("NP_GLP_TREE_ORACLE rows=%d pairs=%d missing=%d mismatch=%d max_abs=%.17g\n",
+    REprintf("NP_LP_TREE_ORACLE rows=%d pairs=%d missing=%d mismatch=%d max_abs=%.17g\n",
              oracle_rows,
              oracle_pairs,
              oracle_missing,
@@ -9924,7 +9926,7 @@ static int np_glp_fixed_tree_sparse_accumulate(
 cleanup_sparse:
   if(eval_ybasis != NULL) free(eval_ybasis);
   if(eval_outer != NULL) free(eval_outer);
-  np_glp_tree_support_ctx_free(&sctx);
+  np_lp_tree_support_ctx_free(&sctx);
   if(kw_oracle != NULL) free(kw_oracle);
   if(oracle_mark != NULL) free(oracle_mark);
   if(oracle_eval_u != NULL) mat_free(oracle_eval_u);
@@ -9934,7 +9936,7 @@ cleanup_sparse:
   return status;
 }
 
-static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
+static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
     const int int_ll,
     const int bwm,
     const int num_obs,
@@ -9992,7 +9994,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     basis_local = (double **)malloc((size_t)nterms*sizeof(double *));
     ones = alloc_vecd(num_obs);
     if((terms_local == NULL) || (basis_local == NULL) || (ones == NULL))
-      goto cleanup_glp_cv;
+      goto cleanup_lp_cv;
     for(i = 0; i < num_obs; i++)
       ones[i] = 1.0;
     basis_local[0] = ones;
@@ -10005,13 +10007,13 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   }
 
   if((terms == NULL) || (basis == NULL) || (nterms <= 0))
-    goto cleanup_glp_cv;
+    goto cleanup_lp_cv;
 
   if(nterms > INT_MAX/nterms)
-    goto cleanup_glp_cv;
+    goto cleanup_lp_cv;
 
   use_sparse_tree = use_tree &&
-    np_glp_fixed_tree_sparse_supported(num_reg_unordered,
+    np_lp_fixed_tree_sparse_supported(num_reg_unordered,
                                        num_reg_ordered,
                                        num_reg_continuous,
                                        kernel_c,
@@ -10023,7 +10025,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
     int_LARGE_SF = 1;
     vsf = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
     if(vsf == NULL)
-      goto cleanup_glp_cv;
+      goto cleanup_lp_cv;
     for(l = 0; l < num_reg_continuous; l++)
       vsf[l] = matrix_bandwidth[l][0];
   } else {
@@ -10075,13 +10077,13 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                            ((nterms >= 3) && ((eval_ybasis == NULL) || (eval_outer == NULL))))) ||
      (KWM == NULL) || (XTKY == NULL) ||
      (DELTA == NULL) || (SHIFT == NULL) || (SHIFTINV == NULL) || (TMP == NULL))
-    goto cleanup_glp_cv;
+    goto cleanup_lp_cv;
 
   if(use_tree &&
      ((int_TREE_X != NP_TREE_TRUE) ||
       (kdt_extern_X == NULL) ||
       (ipt_lookup_extern_X == NULL)))
-    goto cleanup_glp_cv;
+    goto cleanup_lp_cv;
 
   if(bwm == RBWM_CVAIC){
     tsf = int_LARGE_SF;
@@ -10137,13 +10139,13 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   NULL,
                                   NULL) != 0){
       int_LARGE_SF = tsf;
-      goto cleanup_glp_cv;
+      goto cleanup_lp_cv;
     }
     int_LARGE_SF = tsf;
   }
 
   if(use_sparse_tree){
-    if(!np_glp_fixed_tree_sparse_accumulate(num_obs,
+    if(!np_lp_fixed_tree_sparse_accumulate(num_obs,
                                             num_reg_unordered,
                                             num_reg_ordered,
                                             num_reg_continuous,
@@ -10168,7 +10170,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                             support_orig,
                                             support_data,
                                             support_weight))
-      goto cleanup_glp_cv;
+      goto cleanup_lp_cv;
   } else {
   for(j = 0; j < num_obs - 1; j++){
     const int eval_idx = use_tree ? ipt_lookup_extern_X[j] : j;
@@ -10260,7 +10262,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   NULL,
                                   kw,
                                   NULL) != 0)
-      goto cleanup_glp_cv;
+      goto cleanup_lp_cv;
 
     if(nterms >= 3){
       for(i = 0; i < nsub; i++){
@@ -10273,7 +10275,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
           continue;
 
         if(track_lowsupport){
-          np_glp_cvls_support_add(j,
+          np_lp_cvls_support_add(j,
                                   orig_ii,
                                   ii,
                                   w,
@@ -10282,7 +10284,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   support_orig,
                                   support_data,
                                   support_weight);
-          np_glp_cvls_support_add(orig_ii,
+          np_lp_cvls_support_add(orig_ii,
                                   j,
                                   eval_idx,
                                   w,
@@ -10292,7 +10294,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   support_data,
                                   support_weight);
         }
-        np_glp_accumulate_pair(nterms,
+        np_lp_accumulate_pair(nterms,
                                basis,
                                vector_Y,
                                moments,
@@ -10320,7 +10322,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
           continue;
 
         if(track_lowsupport){
-          np_glp_cvls_support_add(j,
+          np_lp_cvls_support_add(j,
                                   orig_ii,
                                   ii,
                                   w,
@@ -10329,7 +10331,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                   support_orig,
                                   support_data,
                                   support_weight);
-          np_glp_cvls_support_add(orig_ii,
+          np_lp_cvls_support_add(orig_ii,
                                   j,
                                   eval_idx,
                                   w,
@@ -10382,7 +10384,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
                                             TMP,
                                             KWM,
                                             XTKY))
-        goto cleanup_glp_cv;
+        goto cleanup_lp_cv;
     } else {
       for(a = 0; a < nterms; a++){
         XTKY[a][0] = tj[a];
@@ -10407,7 +10409,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
 
     if(track_lowsupport &&
        (support_count[j] <= nterms) &&
-       np_glp_cvls_lowsupport_fit(nterms,
+       np_lp_cvls_lowsupport_fit(nterms,
                                   support_count[j],
                                   basis,
                                   vector_Y,
@@ -10424,13 +10426,13 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
         KWM[a][a] += epsilon;
       nepsilon += epsilon;
       if(nepsilon > 128.0*epsilon)
-        goto cleanup_glp_cv;
+        goto cleanup_lp_cv;
     }
 
     XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
     if(nepsilon > 0.0){
       if(mat_solve(KWM, XTKY, DELTA) == NULL)
-        goto cleanup_glp_cv;
+        goto cleanup_lp_cv;
     }
 
     if(center_raw_basis){
@@ -10452,12 +10454,12 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
         int ok00 = 0;
         hii = mat_inv00(KWM, &ok00);
         if(!ok00)
-          goto cleanup_glp_cv;
+          goto cleanup_lp_cv;
       } else {
         for(a = 0; a < nterms; a++)
           XTKY[a][0] = eval_basis[a];
         if(mat_solve(KWM, XTKY, DELTA) == NULL)
-          goto cleanup_glp_cv;
+          goto cleanup_lp_cv;
         for(a = 0; a < nterms; a++)
           hii += eval_basis[a]*DELTA[a][0];
       }
@@ -10467,7 +10469,7 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
 
   result.ok = 1;
 
-cleanup_glp_cv:
+cleanup_lp_cv:
   if(train_u != NULL) free(train_u);
   if(train_o != NULL) free(train_o);
   if(train_c != NULL) free(train_c);
@@ -10581,8 +10583,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     goto cleanup_lp_cv;
 
   {
-    const int use_canonical_glp_kernel =
-      np_reg_cv_use_canonical_glp_fixed_kernel(LL_LP,
+    const int use_canonical_lp_kernel =
+      np_reg_cv_use_canonical_lp_fixed_kernel(LL_LP,
                                                bwm,
                                                BANDWIDTH_reg,
                                                num_reg_continuous,
@@ -10606,8 +10608,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                                         &ov_cont_k0,
                                                         &ov_cont_from_cache);
 
-    if(use_canonical_glp_kernel && !all_large_gate){
-      result = np_regression_cv_glp_rawbasis_fixed(LL_LP,
+    if(use_canonical_lp_kernel && !all_large_gate){
+      result = np_regression_cv_lp_rawbasis_fixed(LL_LP,
                                                    bwm,
                                                    num_obs,
                                                    num_reg_unordered,
@@ -11422,14 +11424,14 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     }
   }
 
-  if(np_reg_cv_use_canonical_glp_fixed_kernel(int_ll_cv,
+  if(np_reg_cv_use_canonical_lp_fixed_kernel(int_ll_cv,
                                               bwm,
                                               BANDWIDTH_reg,
                                               num_reg_continuous,
                                               ks_tree_use,
                                               0)){
-    NPRegCvLpResult glp_result =
-      np_regression_cv_glp_rawbasis_fixed(int_ll_cv,
+    NPRegCvLpResult lp_result =
+      np_regression_cv_lp_rawbasis_fixed(int_ll_cv,
                                           bwm,
                                           num_obs,
                                           num_reg_unordered,
@@ -11451,8 +11453,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                           0,
                                           NULL,
                                           ks_tree_use);
-    cv = glp_result.cv;
-    traceH = glp_result.traceH;
+    cv = lp_result.cv;
+    traceH = lp_result.traceH;
     goto finish_cv_path;
   }
 
