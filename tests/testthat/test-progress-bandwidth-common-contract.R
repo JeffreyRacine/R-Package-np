@@ -134,6 +134,36 @@ test_that("dark-launched bandwidth engine preserves nmulti=1 iteration heartbeat
   expect_false(any(grepl("multistart", lines, fixed = TRUE)))
 })
 
+test_that("bandwidth selection emits its initial line before long first evaluations", {
+  select_bw <- getFromNamespace(".np_progress_select_bandwidth", "np")
+  set_total <- getFromNamespace(".np_progress_bandwidth_set_total", "np")
+  activity_bw <- getFromNamespace(".np_progress_bandwidth_activity_step", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.bandwidth.enhanced = TRUE,
+    np.progress.start.grace.unknown.sec = 60
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      value <- select_bw("Selecting density bandwidth", {
+        set_total(2L)
+        activity_bw(2L)
+        7
+      })
+      expect_identical(value, 7)
+    },
+    now = progress_time_values(c(0, 0, 56, 58))
+  )
+
+  lines <- shadow_lines(actual)
+
+  expect_identical(lines[[1L]], "[np] Bandwidth selection (multistart 1/2)")
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/2, iteration 2, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
+})
+
 test_that("dark-launched bandwidth engine switches from iteration to estimate mode after first completion", {
   select_bw <- getFromNamespace(".np_progress_select_bandwidth", "np")
   set_total <- getFromNamespace(".np_progress_bandwidth_set_total", "np")

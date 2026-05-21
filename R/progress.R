@@ -1724,7 +1724,7 @@
   state <- .np_progress_runtime$bandwidth_state
   total <- suppressWarnings(as.integer(total)[1L])
 
-  if (is.null(state) || is.na(total) || total <= 1L) {
+  if (is.null(state) || is.na(total) || total < 1L) {
     return(invisible(NULL))
   }
 
@@ -1735,10 +1735,18 @@
   }
 
   if (.np_progress_bandwidth_enhanced_state(state)) {
-    .np_progress_runtime$bandwidth_state <- .np_progress_bandwidth_register_nmulti(
+    state <- .np_progress_bandwidth_register_nmulti(
       state = state,
       total = total
     )
+    if (isTRUE(state$start_note_pending)) {
+      state$start_note_grace_sec <- 0
+      state <- .np_progress_maybe_emit_start_note(
+        state = state,
+        now = state$started
+      )
+    }
+    .np_progress_runtime$bandwidth_state <- state
     return(invisible(NULL))
   }
 
