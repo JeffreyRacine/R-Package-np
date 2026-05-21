@@ -1971,7 +1971,7 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
   if (XLENGTH(scale_r) != XLENGTH(y_r))
     error("C_np_lsqregression_bw: scale length must match y length");
 
-  ncon = (int)INTEGER(myopti_i)[REG_NCONI];
+  ncon = (int)INTEGER(myopti_i)[RBW_NCONI];
   ckerlb_p = REAL(ckerlb_r);
   ckerub_p = REAL(ckerub_r);
   if ((XLENGTH(ckerlb_r) == 0 || XLENGTH(ckerub_r) == 0) && ncon > 0) {
@@ -10480,14 +10480,14 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
           have_multistart_best = 1;
           iImproved = iMs_counter+1;
           *timing = timing_extern;
-          np_copy_scale_factor(vector_scale_factor_multistart, vector_scale_factor, num_var);
+          np_copy_scale_factor(vector_scale_factor_multistart, vector_scale_factor, num_search_var);
         }
       } else if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
         *timing = timing_extern;
         
-        for(i = 1; i <= num_var; i++)	
+        for(i = 1; i <= num_search_var; i++)
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
       objective_function_values[iMs_counter]=fret;
@@ -10504,10 +10504,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     if (enforce_fixed_feasibility) {
       if (have_multistart_best) {
         fret = fret_best;
-        np_copy_scale_factor(vector_scale_factor, vector_scale_factor_multistart, num_var);
+        np_copy_scale_factor(vector_scale_factor, vector_scale_factor_multistart, num_search_var);
         have_start_best = 1;
         fret_start_best = fret_best;
-        np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor_multistart, num_var);
+        np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor_multistart, num_search_var);
       } else {
         have_start_best = 0;
         fret = DBL_MAX;
@@ -10515,7 +10515,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     } else {
       fret = fret_best;
 
-      for(i = 1; i <= num_var; i++)
+      for(i = 1; i <= num_search_var; i++)
         vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
     }
 
