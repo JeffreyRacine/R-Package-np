@@ -11170,9 +11170,17 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(do_ocg && (num_reg_ordered_extern > 0)){
+    if(num_obs_eval_extern < 0 ||
+       (size_t)num_obs_eval_extern > SIZE_MAX / (size_t)num_reg_ordered_extern ||
+       ((size_t)num_reg_ordered_extern * (size_t)num_obs_eval_extern) > SIZE_MAX / sizeof(int))
+      error("ordered index buffer size overflow");
+
+    size_t ordered_index_count = (size_t)num_reg_ordered_extern * (size_t)num_obs_eval_extern;
     otabs = (struct th_table *)malloc(num_reg_ordered_extern*sizeof(struct th_table));
     matrix_ordered_indices = (int **)malloc(num_reg_ordered_extern*sizeof(int *));
-    int * tc = (int *)malloc(num_reg_ordered_extern*num_obs_eval_extern*sizeof(int));
+    int * tc = (int *)malloc(ordered_index_count*sizeof(int));
+    if(tc == NULL)
+      error("failed to allocate ordered index buffer");
     for(i = 0; i < num_reg_ordered_extern; i++)
       matrix_ordered_indices[i] = tc + i*num_obs_eval_extern;
   }

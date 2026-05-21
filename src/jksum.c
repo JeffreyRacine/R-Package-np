@@ -15898,7 +15898,10 @@ double *SIGN){
   if(do_grad && (num_reg_ordered > 0)){
     otabs = (struct th_table *)malloc(num_reg_ordered*sizeof(struct th_table));
     matrix_ordered_indices = (int **)malloc(num_reg_ordered*sizeof(int *));
-    int * tc = (int *)malloc(num_reg_ordered*num_obs_eval*sizeof(int));
+    int * tc = (int *)np_jksum_malloc_array3_or_die((size_t)num_reg_ordered,
+                                                    (size_t)num_obs_eval,
+                                                    sizeof(int),
+                                                    "ordered index buffer");
     for(l = 0; l < num_reg_ordered; l++)
       matrix_ordered_indices[l] = tc + l*num_obs_eval;
 
