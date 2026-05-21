@@ -273,40 +273,42 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
 }
 
 plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
-                               plot.data.overlay = !gradient,
+                               gradients = gradient,
+                               plot.data.overlay = !gradients,
                                xlab = NULL, ylab = NULL, ylim = NULL, ...) {
-  gradient <- npValidateScalarLogical(gradient, "gradient")
+  gradients <- npValidateScalarLogical(gradients, "gradients")
   plot.data.overlay <- npValidateScalarLogical(plot.data.overlay,
                                                "plot.data.overlay")
+  refit_for_plot <- function(object, tau.values, want.gradients) {
+    nplsqreg(
+      bws = object$bws,
+      txdat = object$bws$xdat,
+      tydat = object$bws$ydat,
+      exdat = object$xeval,
+      tau = tau.values,
+      gradients = want.gradients
+    )
+  }
   if (!is.null(tau)) {
     tau <- .nplsqreg_validate_tau_values(tau)
     if (length(tau) != length(x$tau) || !isTRUE(all.equal(tau, x$tau))) {
       if (length(x$tau) != 1L)
         stop("plot tau expansion from an existing vector-tau nplsqreg object is not supported; refit with the requested tau values",
              call. = FALSE)
-      start.bws <- x$reg.bws
-      start.bws$method <- "cv.ls"
-      start.bws$pmethod <- "Least Squares Cross-Validation"
-      x <- nplsqreg(
-        bws = start.bws,
-        txdat = x$bws$xdat,
-        tydat = x$bws$ydat,
-        exdat = x$xeval,
-        tau = tau,
-        scale = x$bws$scale,
-        gradients = gradient
-      )
+      x <- refit_for_plot(x, tau, gradients)
     }
   }
+  if (isTRUE(gradients) && !isTRUE(x$gradients))
+    x <- refit_for_plot(x, x$tau, TRUE)
   if (x$ndim != 1L)
     stop("plot.lsqregression currently supports one explanatory variable",
          call. = FALSE)
 
   xraw <- x$xeval[[1L]]
   xpos <- if (is.factor(xraw)) as.numeric(xraw) else as.numeric(xraw)
-  y <- if (gradient) gradients.lsqregression(x) else fitted.lsqregression(x)
+  y <- if (gradients) gradients.lsqregression(x) else fitted.lsqregression(x)
   multi.tau <- length(x$tau) > 1L
-  if (gradient && multi.tau) {
+  if (gradients && multi.tau) {
     if (length(dim(y)) != 3L || dim(y)[2L] != 1L)
       stop("vector-tau gradient plots require one explanatory variable",
            call. = FALSE)
@@ -314,14 +316,14 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
     dim(y) <- c(dim(y)[1L], dim(y)[3L])
     colnames(y) <- .nplsqreg_tau_labels(x$tau)
   }
-  if (!gradient && multi.tau && is.null(colnames(y)))
+  if (!gradients && multi.tau && is.null(colnames(y)))
     colnames(y) <- .nplsqreg_tau_labels(x$tau)
   ord <- order(xpos)
 
   if (is.null(xlab))
     xlab <- x$xnames[1L]
   if (is.null(ylab))
-    ylab <- if (gradient) {
+    ylab <- if (gradients) {
       "Gradient"
     } else if (multi.tau) {
       "Conditional quantile"
@@ -331,7 +333,7 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
 
   if (is.null(ylim)) {
     yr <- range(y, finite = TRUE)
-    if (plot.data.overlay && !gradient)
+    if (plot.data.overlay && !gradients)
       yr <- range(yr, x$bws$ydat, finite = TRUE)
     ylim <- grDevices::extendrange(yr)
   }
@@ -342,7 +344,7 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
   if (is.factor(xraw)) {
     graphics::axis(1, at = seq_along(levels(xraw)), labels = levels(xraw))
   }
-  if (plot.data.overlay && !gradient) {
+  if (plot.data.overlay && !gradients) {
     xtrain <- x$bws$xdat[[1L]]
     if (is.factor(xtrain)) {
       graphics::boxplot(x$bws$ydat ~ xtrain, add = TRUE, axes = FALSE,
