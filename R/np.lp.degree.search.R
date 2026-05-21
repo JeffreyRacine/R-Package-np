@@ -1349,7 +1349,7 @@
     sprintf("%s %s...", state$pkg_prefix, state$label)
   }
 
-  state
+  .np_progress_show_now(state)
 }
 
 .np_nomad_baseline_note <- function(degree) {
