@@ -200,20 +200,12 @@ gradients.lsqregression <- function(x, errors = FALSE, ...) {
   gout
 }
 
-.nplsqreg_predict_newdata_to_exdat <- function(object, newdata) {
-  if (is.data.frame(newdata) && !is.null(names(newdata))) {
-    xnames <- object$xnames
-    if (length(xnames)) {
-      missing.names <- setdiff(xnames, names(newdata))
-      if (length(missing.names))
-        stop(sprintf(
-          "newdata must contain columns: %s",
-          paste(shQuote(xnames), collapse = ", ")
-        ), call. = FALSE)
-      return(newdata[, xnames, drop = FALSE])
-    }
-  }
-  newdata
+.nplsqreg_predict_formula_newdata_to_exdat <- function(object, newdata) {
+  tt <- stats::terms(object$bws$formula)
+  rhs <- stats::delete.response(tt)
+  npValidateNewdataFormula(newdata, rhs, include.response = FALSE)
+  mf <- stats::model.frame(formula = rhs, data = newdata)
+  mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
 }
 
 predict.lsqregression <- function(object, se.fit = FALSE, ...) {
@@ -245,10 +237,8 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
 
   if (has.formula.route) {
-    if (!is.null(dots$exdat)) {
-      dots$exdat <- .nplsqreg_predict_newdata_to_exdat(object, dots$exdat)
-    } else if (!is.null(dots$newdata)) {
-      dots$exdat <- .nplsqreg_predict_newdata_to_exdat(object, dots$newdata)
+    if (is.null(dots$exdat) && !is.null(dots$newdata)) {
+      dots$exdat <- .nplsqreg_predict_formula_newdata_to_exdat(object, dots$newdata)
       dots$newdata <- NULL
     }
   } else {
