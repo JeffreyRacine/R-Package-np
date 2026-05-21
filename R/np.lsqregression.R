@@ -763,6 +763,7 @@ nplsqregbw <-
 .nplsqreg_combine_bandwidths <- function(bw.list, tau, tau.search = "full",
                                          fit.order = seq_along(tau),
                                          warm.start.from = rep(NA_integer_, length(tau)),
+                                         tau.search.controls = NULL,
                                          call = NULL) {
   if (!length(bw.list))
     stop("internal error: no scalar nplsqreg bandwidths to combine",
@@ -788,6 +789,7 @@ nplsqregbw <-
   out$tau.search <- tau.search
   out$fit.order <- as.integer(fit.order)
   out$warm.start.from <- as.integer(warm.start.from)
+  out$tau.search.controls <- tau.search.controls
   out$pilot.shared <- TRUE
   out$call <- call
   class(out) <- "lsqregressionbandwidth"
@@ -837,6 +839,7 @@ nplsqregbw <-
   out$tau.search <- tau.search
   out$fit.order <- bws$fit.order
   out$warm.start.from <- bws$warm.start.from
+  out$tau.search.controls <- bws$tau.search.controls
   out$pilot.shared <- TRUE
   out$call <- call
   class(out) <- "lsqregression"
@@ -911,6 +914,20 @@ nplsqregbw.default <-
       }
       warm.start.from <- rep(NA_integer_, length(tau.raw))
       previous.idx <- NA_integer_
+      refined.extra.args <- list(...)
+      tau.search.controls <- NULL
+      if (identical(tau.search, "refined")) {
+        refined.extra.args$nmulti <- 1L
+        refined.extra.args$powell.remin <- FALSE
+        refined.extra.args$nomad.remin <- FALSE
+        refined.extra.args$nomad.nmulti <- 0L
+        tau.search.controls <- list(
+          nmulti = 1L,
+          powell.remin = FALSE,
+          nomad.remin = FALSE,
+          nomad.nmulti = 0L
+        )
+      }
       for (j in fit.order) {
         one.args <- list(
           xdat = xdat,
@@ -937,7 +954,7 @@ nplsqregbw.default <-
           one.args$bws <- warm.bws
           warm.start.from[[j]] <- previous.idx
         }
-        bw.list[[j]] <- do.call(nplsqregbw.default, c(one.args, list(...)))
+        bw.list[[j]] <- do.call(nplsqregbw.default, c(one.args, refined.extra.args))
         if (is.null(shared.scale))
           shared.scale <- bw.list[[j]]$scale
         previous.idx <- j
@@ -948,6 +965,7 @@ nplsqregbw.default <-
         tau.search = tau.search,
         fit.order = fit.order,
         warm.start.from = warm.start.from,
+        tau.search.controls = tau.search.controls,
         call = match.call(expand.dots = FALSE))
       environment(out$call) <- parent.frame()
       return(out)
