@@ -285,13 +285,29 @@ plot.lsqregression <- function(x, gradient = FALSE,
   xraw <- x$xeval[[1L]]
   xpos <- if (is.factor(xraw)) as.numeric(xraw) else as.numeric(xraw)
   y <- if (gradient) gradients.lsqregression(x) else fitted.lsqregression(x)
+  multi.tau <- length(x$tau) > 1L
+  if (gradient && multi.tau) {
+    if (length(dim(y)) != 3L || dim(y)[2L] != 1L)
+      stop("vector-tau gradient plots require one explanatory variable",
+           call. = FALSE)
+    y <- y[, 1L, , drop = FALSE]
+    dim(y) <- c(dim(y)[1L], dim(y)[3L])
+    colnames(y) <- .nplsqreg_tau_labels(x$tau)
+  }
+  if (!gradient && multi.tau && is.null(colnames(y)))
+    colnames(y) <- .nplsqreg_tau_labels(x$tau)
   ord <- order(xpos)
 
   if (is.null(xlab))
     xlab <- x$xnames[1L]
   if (is.null(ylab))
-    ylab <- if (gradient) "Gradient" else paste("Quantile tau =",
-                                                format(x$tau, trim = TRUE))
+    ylab <- if (gradient) {
+      "Gradient"
+    } else if (multi.tau) {
+      "Conditional quantile"
+    } else {
+      paste("Quantile tau =", format(x$tau, trim = TRUE))
+    }
 
   if (is.null(ylim)) {
     yr <- range(y, finite = TRUE)
@@ -300,15 +316,31 @@ plot.lsqregression <- function(x, gradient = FALSE,
     ylim <- grDevices::extendrange(yr)
   }
 
-  graphics::plot(xpos[ord], y[ord], type = "l", xlab = xlab, ylab = ylab,
+  graphics::plot(xpos[ord], if (multi.tau) y[ord, 1L] else y[ord],
+                 type = "n", xlab = xlab, ylab = ylab,
                  ylim = ylim, xaxt = if (is.factor(xraw)) "n" else "s", ...)
   if (is.factor(xraw)) {
     graphics::axis(1, at = seq_along(levels(xraw)), labels = levels(xraw))
   }
   if (plot.data.overlay && !gradient) {
     xtrain <- x$bws$xdat[[1L]]
-    xtrain <- if (is.factor(xtrain)) as.numeric(xtrain) else as.numeric(xtrain)
-    graphics::points(xtrain, x$bws$ydat)
+    if (is.factor(xtrain)) {
+      graphics::boxplot(x$bws$ydat ~ xtrain, add = TRUE, axes = FALSE,
+                        outline = FALSE, col = "grey90", border = "grey60")
+    } else {
+      xtrain <- as.numeric(xtrain)
+      graphics::points(xtrain, x$bws$ydat)
+    }
+  }
+  if (multi.tau) {
+    cols <- seq_len(length(x$tau))
+    mat <- as.matrix(y)
+    for (j in seq_along(x$tau))
+      graphics::lines(xpos[ord], mat[ord, j], col = cols[j], lty = j)
+    graphics::legend("topright", legend = .nplsqreg_tau_labels(x$tau),
+                     col = cols, lty = seq_along(x$tau), bty = "n")
+  } else {
+    graphics::lines(xpos[ord], y[ord])
   }
   invisible(x)
 }
