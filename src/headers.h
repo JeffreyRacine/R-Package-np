@@ -291,7 +291,7 @@ double max_unordered_bw(int num_categories,
                         int kernel);
 
 // some general np and R-c interface related defines
-#define safe_free(x) if((x) != NULL) free((x))
+#define safe_free(x) do { if((x) != NULL) free((x)); } while(0)
 
 #define SF_NORMAL 0
 #define SF_ARB    1

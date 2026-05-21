@@ -9754,8 +9754,11 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   if(int_TREE_X == NP_TREE_TRUE){
     ipt_lookup = (int *)malloc(num_obs_train_extern*sizeof(int));
-    if(!(ipt_lookup != NULL))
+    if(!(ipt_lookup != NULL)){
+      safe_free(ipt);
+      ipt = NULL;
       error("!(ipt_lookup != NULL)");
+    }
 
     build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                  4*num_reg_continuous_extern, ipt, &kdt_extern_X);
