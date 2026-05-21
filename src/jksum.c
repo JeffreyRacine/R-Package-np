@@ -10891,13 +10891,24 @@ glp_cv_collective_gate:
     if(any_fail)
       goto cleanup_glp_cv;
 
-    MPI_Allreduce(moments_local, moments, num_obs*nterms*nterms, MPI_DOUBLE, MPI_SUM, comm[1]);
-    MPI_Allreduce(rhs_local, rhs, num_obs*nterms, MPI_DOUBLE, MPI_SUM, comm[1]);
+    const int moments_count = np_jksum_mpi_count_or_die(
+      np_jksum_size_mul3_or_die((size_t)num_obs, (size_t)nterms, (size_t)nterms,
+                                "np_glp_cvls moments Allreduce"),
+      "np_glp_cvls moments Allreduce");
+    const int row_terms_count = np_jksum_mpi_count_or_die(
+      np_jksum_size_mul_or_die((size_t)num_obs, (size_t)nterms,
+                               "np_glp_cvls row-term Allreduce"),
+      "np_glp_cvls row-term Allreduce");
+    const int row_count = np_jksum_mpi_count_or_die((size_t)num_obs,
+                                                    "np_glp_cvls row Allreduce");
+
+    MPI_Allreduce(moments_local, moments, moments_count, MPI_DOUBLE, MPI_SUM, comm[1]);
+    MPI_Allreduce(rhs_local, rhs, row_terms_count, MPI_DOUBLE, MPI_SUM, comm[1]);
     if(track_lowsupport){
-      MPI_Allreduce(support_count_local, support_count, num_obs, MPI_INT, MPI_SUM, comm[1]);
-      MPI_Allreduce(support_orig_local, support_orig, num_obs*nterms, MPI_INT, MPI_MAX, comm[1]);
-      MPI_Allreduce(support_data_local, support_data, num_obs*nterms, MPI_INT, MPI_MAX, comm[1]);
-      MPI_Allreduce(support_weight_local, support_weight, num_obs*nterms, MPI_DOUBLE, MPI_SUM, comm[1]);
+      MPI_Allreduce(support_count_local, support_count, row_count, MPI_INT, MPI_SUM, comm[1]);
+      MPI_Allreduce(support_orig_local, support_orig, row_terms_count, MPI_INT, MPI_MAX, comm[1]);
+      MPI_Allreduce(support_data_local, support_data, row_terms_count, MPI_INT, MPI_MAX, comm[1]);
+      MPI_Allreduce(support_weight_local, support_weight, row_terms_count, MPI_DOUBLE, MPI_SUM, comm[1]);
     }
   }
 #endif

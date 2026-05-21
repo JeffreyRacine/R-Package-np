@@ -1241,6 +1241,7 @@ numNotIn <- function(x){
 
   candidate.max <- as.integer(n.unique + 1)
   candidates <- c(seq_len(candidate.max), -seq_len(candidate.max))
+  # The candidate set is larger than the finite unique set, so one value is absent.
   candidates[match(FALSE, candidates %in% x)]
 }
 
