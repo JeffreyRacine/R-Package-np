@@ -435,6 +435,69 @@ test_that("NOMAD progress fuses component context with dynamic fields", {
   )
 })
 
+test_that("NOMAD degree search emits its initial line before long first evaluations", {
+  nomad_begin <- getFromNamespace(".np_nomad_progress_begin", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.unknown.sec = 60
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      state <- nomad_begin(
+        nmulti = 2L,
+        baseline_degree = 0L,
+        best_record = list(degree = 0L)
+      )
+      expect_true(is.list(state))
+    },
+    now = progress_time_values(c(0, 56))
+  )
+
+  lines <- shadow_lines(actual)
+
+  expect_true(grepl("^\\[npRmpi\\] Selecting degree and bandwidth \\(", lines[[1L]]))
+  expect_true(grepl("multistart 1/2", lines[[1L]], fixed = TRUE))
+  expect_true(grepl("deg \\(", lines[[1L]]))
+})
+
+test_that("NOMAD degree search redraws external bandwidth progress immediately", {
+  progress_begin <- getFromNamespace(".np_progress_begin", "npRmpi")
+  nomad_configure <- getFromNamespace(".np_nomad_progress_configure", "npRmpi")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.unknown.sec = 60
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      state <- progress_begin(
+        label = "Selecting conditional density bandwidth",
+        domain = "general",
+        surface = "bandwidth"
+      )
+      state <- nomad_configure(
+        state = state,
+        nmulti = 2L,
+        baseline_degree = 0L,
+        best_record = list(degree = 0L)
+      )
+      expect_true(is.list(state))
+    },
+    now = progress_time_values(c(0, 56))
+  )
+
+  lines <- shadow_lines(actual)
+
+  expect_true(grepl("^\\[npRmpi\\] Selecting degree and bandwidth \\(", lines[[1L]]))
+  expect_true(grepl("multistart 1/2", lines[[1L]], fixed = TRUE))
+  expect_true(grepl("deg \\(", lines[[1L]]))
+})
+
 test_that("dark-launched bandwidth engine preserves nmulti=1 iteration heartbeats", {
   select_bw <- getFromNamespace(".np_progress_select_bandwidth", "npRmpi")
   activity_bw <- getFromNamespace(".np_progress_bandwidth_activity_step", "npRmpi")
