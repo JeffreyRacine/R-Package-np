@@ -75,6 +75,7 @@ extern double **matrix_Y_ordered_eval_extern;
 extern double *vector_Y_extern;
 extern double *vector_lsq_scale_extern;
 extern double *vector_lsq_loss_extern;
+extern double *vector_lsq_q_extern;
 extern double np_lsq_tau_extern;
 extern double np_lsq_delta_lower_extern;
 extern double np_lsq_delta_upper_extern;
@@ -193,7 +194,6 @@ double cv_func_lsqregression_categorical_check(double *vector_scale_factor){
     num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const double delta = vector_scale_factor[nvar + 1];
   double zdelta;
-  double *vector_Q = NULL;
   int i;
 
   if((delta <= np_lsq_delta_lower_extern) ||
@@ -218,16 +218,18 @@ double cv_func_lsqregression_categorical_check(double *vector_scale_factor){
                                  vector_scale_factor) == 1)
     return(DBL_MAX);
 
-  if((vector_lsq_scale_extern == NULL) || (vector_lsq_loss_extern == NULL))
+  if((vector_lsq_scale_extern == NULL) ||
+     (vector_lsq_loss_extern == NULL) ||
+     (vector_lsq_q_extern == NULL))
     return(DBL_MAX);
 
   zdelta = qnorm(delta, 0.0, 1.0, 1, 0);
   if(!R_FINITE(zdelta))
     return(DBL_MAX);
 
-  vector_Q = alloc_vecd(num_obs_train_extern);
   for(i = 0; i < num_obs_train_extern; i++)
-    vector_Q[i] = vector_lsq_loss_extern[i] + vector_lsq_scale_extern[i]*zdelta;
+    vector_lsq_q_extern[i] =
+      vector_lsq_loss_extern[i] + vector_lsq_scale_extern[i]*zdelta;
 
   start = clock();
   cv = (np_kernel_estimate_regression_categorical_ls_aic(
@@ -244,13 +246,12 @@ double cv_func_lsqregression_categorical_check(double *vector_scale_factor){
                                                           matrix_X_unordered_train_extern,
                                                           matrix_X_ordered_train_extern,
                                                           matrix_X_continuous_train_extern,
-                                                          vector_Q,
+                                                          vector_lsq_q_extern,
                                                           &vector_scale_factor[1],
                                                           num_categories_extern));
   diff = clock() - start;
   timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
 
-  safe_free(vector_Q);
   return(cv);
 }
 

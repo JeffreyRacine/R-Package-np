@@ -1244,6 +1244,7 @@ double *vector_Y_eval_extern;
 double *vector_Y_null;
 double *vector_lsq_scale_extern;
 double *vector_lsq_loss_extern;
+double *vector_lsq_q_extern;
 double np_lsq_tau_extern=0.5;
 double np_lsq_delta_lower_extern=DBL_EPSILON;
 double np_lsq_delta_upper_extern=1.0-DBL_EPSILON;
@@ -9888,6 +9889,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   vector_Y_extern = alloc_vecd(num_obs_train_extern);
   vector_lsq_scale_extern = lsq_check_mode ? alloc_vecd(num_obs_train_extern) : NULL;
+  vector_lsq_q_extern = lsq_check_mode ? alloc_vecd(num_obs_train_extern) : NULL;
 	
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_y = alloc_matd(num_search_var + 1, num_search_var +1);
@@ -10587,7 +10589,9 @@ cleanup_np_regression_bw_mode:
 
   safe_free(vector_Y_extern);
   safe_free(vector_lsq_scale_extern);
+  safe_free(vector_lsq_q_extern);
   vector_lsq_loss_extern = NULL;
+  vector_lsq_q_extern = NULL;
 
   free_mat(matrix_y, num_search_var + 1);
   safe_free(vector_scale_factor);
