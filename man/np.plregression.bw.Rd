@@ -247,7 +247,7 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     \code{bwtype="fixed"}. Explicit incompatible settings error
     immediately; in particular, \code{nomad=TRUE} currently requires
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
-    search, \code{bernstein.basis=TRUE}, no explicit \code{degree},
+    search, no explicit \code{degree},
     and \code{search.engine \%in\% c("nomad", "nomad+powell")}.
     This shortcut does not change the meaning of \code{nmulti} or
     \code{nomad.nmulti}: \code{nmulti} remains the outer restart count,
@@ -290,8 +290,9 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     \code{"nomad"} omits the Powell refinement. \code{"cell"} profiles
     the criterion over the admissible degree grid using repeated
     fixed-degree bandwidth solves.
-    NOMAD-based search currently requires fixed-bandwidth child
-    templates, \code{degree.verify=FALSE}, and the suggested package
+    NOMAD-based search supports fixed, generalized-nearest-neighbor,
+    and adaptive-nearest-neighbor child templates; it currently
+    requires \code{degree.verify=FALSE} and the suggested package
     \pkg{crs} to be installed.
   }
 

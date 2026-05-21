@@ -171,20 +171,32 @@ test_that("npregbw nomad shortcut fails fast on incompatible explicit settings",
     "nomad=TRUE requires regtype='lp'"
   )
 
-  expect_error(
-    np::npregbw(xdat = x, ydat = y, nomad = TRUE, bwtype = "adaptive_nn"),
-    "nomad=TRUE currently requires bwtype='fixed'"
+  bw_adaptive <- np::npregbw(
+    xdat = x,
+    ydat = y,
+    nomad = TRUE,
+    bwtype = "adaptive_nn",
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 1L
   )
+  expect_identical(bw_adaptive$type, "adaptive_nn")
 
   expect_error(
     np::npregbw(xdat = x, ydat = y, nomad = TRUE, degree = 1L),
     "does not support an explicit degree"
   )
 
-  expect_error(
-    np::npregbw(xdat = x, ydat = y, nomad = TRUE, bernstein.basis = FALSE),
-    "requires bernstein.basis=TRUE"
+  bw_raw <- np::npregbw(
+    xdat = x,
+    ydat = y,
+    nomad = TRUE,
+    bernstein.basis = FALSE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 1L
   )
+  expect_false(isTRUE(bw_raw$bernstein.basis))
 
   expect_error(
     np::npregbw(xdat = x, ydat = y, nomad = TRUE, search.engine = "cell"),

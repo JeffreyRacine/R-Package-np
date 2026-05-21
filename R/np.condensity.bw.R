@@ -1181,7 +1181,10 @@ npcdensbw.conbandwidth <-
       ext_bw <- cont_point * setup$cont_scale
       bws[setup$cont_flat] <- if (isTRUE(template$scaling)) cont_point else ext_bw
     } else {
-      bws[setup$cont_flat] <- round(cont_point)
+      nn_bw <- round(cont_point)
+      nn_upper <- if (!is.null(setup$nobs)) max(1L, as.integer(setup$nobs) - 1L) else Inf
+      nn_bw[!is.finite(nn_bw)] <- 1
+      bws[setup$cont_flat] <- pmax(1, pmin(nn_upper, nn_bw))
     }
   }
 
@@ -1944,10 +1947,6 @@ npcdensbw.default <-
           !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
               c("nomad", "nomad+powell")))
         stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
-      if ("bernstein.basis" %in% mc.names &&
-          !isTRUE(npValidateGlpBernstein(regtype = "lp",
-                                        bernstein.basis = nomad.shortcut$values$bernstein.basis)))
-        stop("nomad=TRUE currently requires bernstein.basis=TRUE")
       if ("degree.verify" %in% mc.names &&
           isTRUE(npValidateScalarLogical(nomad.shortcut$values$degree.verify, "degree.verify")))
         stop("nomad=TRUE currently requires degree.verify=FALSE")

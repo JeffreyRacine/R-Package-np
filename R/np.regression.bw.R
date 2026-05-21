@@ -1463,10 +1463,6 @@ npregbw.default <-
           !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
               c("nomad", "nomad+powell")))
         stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
-      if ("bernstein.basis" %in% mc.names &&
-          !isTRUE(npValidateGlpBernstein(regtype = "lp",
-                                        bernstein.basis = nomad.shortcut$values$bernstein.basis)))
-        stop("nomad=TRUE currently requires bernstein.basis=TRUE")
       if ("degree.verify" %in% mc.names &&
           isTRUE(npValidateScalarLogical(nomad.shortcut$values$degree.verify, "degree.verify")))
         stop("nomad=TRUE currently requires degree.verify=FALSE")

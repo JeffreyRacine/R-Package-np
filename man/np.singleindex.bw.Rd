@@ -301,7 +301,7 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     \code{bwtype="fixed"}. Explicit incompatible settings error
     immediately; in particular, \code{nomad=TRUE} currently requires
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
-    search, \code{bernstein.basis=TRUE}, no explicit \code{degree},
+    search, no explicit \code{degree},
     and \code{search.engine \%in\% c("nomad", "nomad+powell")}.
     This shortcut does not change the meaning of \code{nmulti} or
     \code{nomad.nmulti}: \code{nmulti} remains the outer restart count,

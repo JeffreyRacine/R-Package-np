@@ -174,14 +174,26 @@ test_that("npcdens and npcdist nomad shortcuts fail fast on incompatible setting
     np::npcdensbw(xdat = x, ydat = y, nomad = TRUE, regtype = "ll"),
     "nomad=TRUE requires regtype='lp'"
   )
-  expect_error(
-    np::npcdensbw(xdat = x, ydat = y, nomad = TRUE, bernstein.basis = FALSE),
-    "requires bernstein.basis=TRUE"
+  bw_raw <- np::npcdensbw(
+    xdat = x,
+    ydat = y,
+    nomad = TRUE,
+    bernstein.basis = FALSE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 1L
   )
-  expect_error(
-    np::npcdistbw(xdat = x, ydat = y, nomad = TRUE, bwtype = "adaptive_nn"),
-    "requires bwtype='fixed'"
+  expect_false(isTRUE(bw_raw$bernstein.basis))
+  bw_adaptive <- np::npcdistbw(
+    xdat = x,
+    ydat = y,
+    nomad = TRUE,
+    bwtype = "adaptive_nn",
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 1L
   )
+  expect_identical(bw_adaptive$type, "adaptive_nn")
   expect_error(
     np::npcdistbw(xdat = x, ydat = y, nomad = TRUE, search.engine = "cell"),
     "requires search.engine='nomad' or 'nomad\\+powell'"

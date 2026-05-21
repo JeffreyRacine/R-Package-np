@@ -1154,10 +1154,6 @@ npindexbw.default <-
           !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
               c("nomad", "nomad+powell")))
         stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
-      if ("bernstein.basis" %in% mc.names &&
-          !isTRUE(npValidateGlpBernstein(regtype = "lp",
-                                        bernstein.basis = nomad.shortcut$values$bernstein.basis)))
-        stop("nomad=TRUE currently requires bernstein.basis=TRUE")
       if ("degree.verify" %in% mc.names &&
           isTRUE(npValidateScalarLogical(nomad.shortcut$values$degree.verify, "degree.verify")))
         stop("nomad=TRUE currently requires degree.verify=FALSE")
@@ -1203,8 +1199,12 @@ npindexbw.default <-
       degree.select = degree.select.value
     )
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
+    spec.mc.names <- mc.names
+    if (isTRUE(nomad.shortcut$enabled))
+      spec.mc.names <- unique(c(spec.mc.names, "regtype", "bernstein.basis"))
+
     spec <- npResolveCanonicalConditionalRegSpec(
-      mc.names = mc.names,
+      mc.names = spec.mc.names,
       regtype = if (!is.null(nomad.shortcut$values$regtype)) nomad.shortcut$values$regtype else regtype,
       basis = basis,
       degree = degree.setup,
@@ -1215,6 +1215,31 @@ npindexbw.default <-
     if (!is.null(degree.search)) {
       spec$bernstein.basis <- degree.search$bernstein.basis
       spec$bernstein.basis.engine <- degree.search$bernstein.basis
+    }
+    initial.bwtype <- if (!is.null(nomad.shortcut$values$bwtype)) {
+      as.character(nomad.shortcut$values$bwtype)[1L]
+    } else if ("bwtype" %in% dot.names) {
+      as.character(dots$bwtype)[1L]
+    } else {
+      "fixed"
+    }
+    if (isTRUE(bandwidth.compute) &&
+        !is.null(degree.search) &&
+        initial.bwtype %in% c("generalized_nn", "adaptive_nn")) {
+      h.candidate <- .npindex_nn_candidate_bandwidth(
+        h = bws[p + 1L],
+        bwtype = initial.bwtype,
+        nobs = nrow(xdat)
+      )
+      bws[p + 1L] <- if (isTRUE(h.candidate$ok)) {
+        h.candidate$value
+      } else {
+        .npindex_default_start_bandwidth(
+          fit = NULL,
+          bwtype = initial.bwtype,
+          nobs = nrow(xdat)
+        )
+      }
     }
     tbw <- sibandwidth(beta = bws[seq_len(p)],
                        h = bws[p+1L], ...,

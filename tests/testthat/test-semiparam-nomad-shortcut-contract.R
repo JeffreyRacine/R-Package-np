@@ -255,14 +255,27 @@ test_that("semiparametric nomad shortcuts fail fast on incompatible settings", {
     np::npplregbw(xdat = xdat, zdat = zdat, ydat = y, nomad = TRUE, regtype = "ll"),
     "nomad=TRUE requires regtype='lp'"
   )
-  expect_error(
-    np::npscoefbw(xdat = xdat, zdat = zdat, ydat = y, nomad = TRUE, bernstein.basis = FALSE),
-    "requires bernstein.basis=TRUE"
+  bw_raw <- np::npscoefbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = y,
+    nomad = TRUE,
+    bernstein.basis = FALSE,
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 1L
   )
-  expect_error(
-    np::npindexbw(xdat = data.frame(x1 = runif(10), x2 = runif(10)), ydat = y, nomad = TRUE, bwtype = "adaptive_nn"),
-    "requires bwtype='fixed'"
+  expect_false(isTRUE(bw_raw$bernstein.basis))
+  bw_adaptive <- np::npindexbw(
+    xdat = data.frame(x1 = runif(10), x2 = runif(10)),
+    ydat = y,
+    nomad = TRUE,
+    bwtype = "adaptive_nn",
+    degree.max = 1L,
+    nmulti = 1L,
+    nomad.nmulti = 1L
   )
+  expect_identical(bw_adaptive$type, "adaptive_nn")
   expect_error(
     np::npplregbw(xdat = xdat, zdat = zdat, ydat = y, nomad.nmulti = 1L),
     "nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad\\+powell'"
