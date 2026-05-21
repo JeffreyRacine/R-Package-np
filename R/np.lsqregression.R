@@ -761,6 +761,8 @@ nplsqregbw <-
 }
 
 .nplsqreg_combine_bandwidths <- function(bw.list, tau, tau.search = "full",
+                                         fit.order = seq_along(tau),
+                                         warm.start.from = rep(NA_integer_, length(tau)),
                                          call = NULL) {
   if (!length(bw.list))
     stop("internal error: no scalar nplsqreg bandwidths to combine",
@@ -784,7 +786,8 @@ nplsqregbw <-
   colnames(out$qdat) <- labels
   out$tau.bws <- stats::setNames(bw.list, labels)
   out$tau.search <- tau.search
-  out$fit.order <- seq_along(tau)
+  out$fit.order <- as.integer(fit.order)
+  out$warm.start.from <- as.integer(warm.start.from)
   out$pilot.shared <- TRUE
   out$call <- call
   class(out) <- "lsqregressionbandwidth"
@@ -832,6 +835,8 @@ nplsqregbw <-
   out$optim <- stats::setNames(lapply(fit.list, `[[`, "optim"), labels)
   out$tau.fits <- stats::setNames(fit.list, labels)
   out$tau.search <- tau.search
+  out$fit.order <- bws$fit.order
+  out$warm.start.from <- bws$warm.start.from
   out$pilot.shared <- TRUE
   out$call <- call
   class(out) <- "lsqregression"
@@ -892,13 +897,21 @@ nplsqregbw.default <-
     tau.raw <- .nplsqreg_validate_tau_values(tau)
     tau.search <- .nplsqreg_validate_tau_search(tau.search)
     if (length(tau.raw) > 1L) {
-      if (!identical(tau.search, "full"))
-        stop("tau.search='refined' is not implemented in this nplsqreg tranche",
-             call. = FALSE)
       bws.missing <- missing(bws)
       bw.list <- vector("list", length(tau.raw))
       shared.scale <- scale
-      for (j in seq_along(tau.raw)) {
+      if (identical(tau.search, "refined")) {
+        central <- which.min(abs(tau.raw - 0.5))
+        fit.order <- c(
+          central,
+          setdiff(order(abs(tau.raw - tau.raw[[central]])), central)
+        )
+      } else {
+        fit.order <- seq_along(tau.raw)
+      }
+      warm.start.from <- rep(NA_integer_, length(tau.raw))
+      previous.idx <- NA_integer_
+      for (j in fit.order) {
         one.args <- list(
           xdat = xdat,
           ydat = ydat,
@@ -913,16 +926,28 @@ nplsqregbw.default <-
           delta.bounds = delta.bounds,
           optim.control = optim.control
         )
-        if (!bws.missing)
+        if (!bws.missing) {
           one.args$bws <- bws
+        } else if (identical(tau.search, "refined") &&
+                   !is.na(previous.idx) &&
+                   !is.null(bw.list[[previous.idx]]$reg.bws)) {
+          warm.bws <- bw.list[[previous.idx]]$reg.bws
+          warm.bws$method <- "cv.ls"
+          warm.bws$pmethod <- "Least Squares Cross-Validation"
+          one.args$bws <- warm.bws
+          warm.start.from[[j]] <- previous.idx
+        }
         bw.list[[j]] <- do.call(nplsqregbw.default, c(one.args, list(...)))
         if (is.null(shared.scale))
           shared.scale <- bw.list[[j]]$scale
+        previous.idx <- j
       }
       out <- .nplsqreg_combine_bandwidths(
         bw.list = bw.list,
         tau = tau.raw,
         tau.search = tau.search,
+        fit.order = fit.order,
+        warm.start.from = warm.start.from,
         call = match.call(expand.dots = FALSE))
       environment(out$call) <- parent.frame()
       return(out)
