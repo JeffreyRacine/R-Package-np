@@ -264,12 +264,32 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
   }
 }
 
-plot.lsqregression <- function(x, gradient = FALSE,
+plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
                                plot.data.overlay = !gradient,
                                xlab = NULL, ylab = NULL, ylim = NULL, ...) {
   gradient <- npValidateScalarLogical(gradient, "gradient")
   plot.data.overlay <- npValidateScalarLogical(plot.data.overlay,
                                                "plot.data.overlay")
+  if (!is.null(tau)) {
+    tau <- .nplsqreg_validate_tau_values(tau)
+    if (length(tau) != length(x$tau) || !isTRUE(all.equal(tau, x$tau))) {
+      if (length(x$tau) != 1L)
+        stop("plot tau expansion from an existing vector-tau nplsqreg object is not supported; refit with the requested tau values",
+             call. = FALSE)
+      start.bws <- x$reg.bws
+      start.bws$method <- "cv.ls"
+      start.bws$pmethod <- "Least Squares Cross-Validation"
+      x <- nplsqreg(
+        bws = start.bws,
+        txdat = x$bws$xdat,
+        tydat = x$bws$ydat,
+        exdat = x$xeval,
+        tau = tau,
+        scale = x$bws$scale,
+        gradients = gradient
+      )
+    }
+  }
   if (x$ndim != 1L)
     stop("plot.lsqregression currently supports one explanatory variable",
          call. = FALSE)
