@@ -763,6 +763,7 @@ nplsqregbw <-
 .nplsqreg_combine_bandwidths <- function(bw.list, tau, tau.search = "full",
                                          fit.order = seq_along(tau),
                                          warm.start.from = rep(NA_integer_, length(tau)),
+                                         warm.start.degree = vector("list", length(tau)),
                                          tau.search.controls = NULL,
                                          call = NULL) {
   if (!length(bw.list))
@@ -789,6 +790,7 @@ nplsqregbw <-
   out$tau.search <- tau.search
   out$fit.order <- as.integer(fit.order)
   out$warm.start.from <- as.integer(warm.start.from)
+  out$warm.start.degree <- warm.start.degree
   out$tau.search.controls <- tau.search.controls
   out$pilot.shared <- TRUE
   out$call <- call
@@ -839,6 +841,7 @@ nplsqregbw <-
   out$tau.search <- tau.search
   out$fit.order <- bws$fit.order
   out$warm.start.from <- bws$warm.start.from
+  out$warm.start.degree <- bws$warm.start.degree
   out$tau.search.controls <- bws$tau.search.controls
   out$pilot.shared <- TRUE
   out$call <- call
@@ -889,6 +892,7 @@ nplsqregbw.default <-
            delta = NULL,
            scale = NULL,
            regtype.pilot = c("auto", "ll", "lc", "lp"),
+           nomad = FALSE,
            nomad.pilot = FALSE,
            pilot.args = list(),
            bandwidth.compute = TRUE,
@@ -913,6 +917,7 @@ nplsqregbw.default <-
         fit.order <- seq_along(tau.raw)
       }
       warm.start.from <- rep(NA_integer_, length(tau.raw))
+      warm.start.degree <- vector("list", length(tau.raw))
       previous.idx <- NA_integer_
       refined.extra.args <- list(...)
       tau.search.controls <- NULL
@@ -929,6 +934,7 @@ nplsqregbw.default <-
         )
       }
       for (j in fit.order) {
+        extra.args <- refined.extra.args
         one.args <- list(
           xdat = xdat,
           ydat = ydat,
@@ -937,6 +943,7 @@ nplsqregbw.default <-
           delta = delta,
           scale = shared.scale,
           regtype.pilot = regtype.pilot,
+          nomad = nomad,
           nomad.pilot = nomad.pilot,
           pilot.args = pilot.args,
           bandwidth.compute = bandwidth.compute,
@@ -952,9 +959,15 @@ nplsqregbw.default <-
           warm.bws$method <- "cv.ls"
           warm.bws$pmethod <- "Least Squares Cross-Validation"
           one.args$bws <- warm.bws
+          if (!is.null(warm.bws$degree) &&
+              isTRUE(warm.bws$ncon > 0L) &&
+              length(warm.bws$degree) == warm.bws$ncon) {
+            warm.start.degree[[j]] <- as.integer(warm.bws$degree)
+            extra.args$degree.start <- warm.bws$degree
+          }
           warm.start.from[[j]] <- previous.idx
         }
-        bw.list[[j]] <- do.call(nplsqregbw.default, c(one.args, refined.extra.args))
+        bw.list[[j]] <- do.call(nplsqregbw.default, c(one.args, extra.args))
         if (is.null(shared.scale))
           shared.scale <- bw.list[[j]]$scale
         previous.idx <- j
@@ -965,6 +978,7 @@ nplsqregbw.default <-
         tau.search = tau.search,
         fit.order = fit.order,
         warm.start.from = warm.start.from,
+        warm.start.degree = warm.start.degree,
         tau.search.controls = tau.search.controls,
         call = match.call(expand.dots = FALSE))
       environment(out$call) <- parent.frame()
@@ -972,6 +986,7 @@ nplsqregbw.default <-
     }
     tau <- .nplsqreg_validate_tau(tau.raw)
     regtype.pilot <- match.arg(regtype.pilot)
+    nomad <- npValidateScalarLogical(nomad, "nomad")
     nomad.pilot <- npValidateScalarLogical(nomad.pilot, "nomad.pilot")
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute,
                                                  "bandwidth.compute")
@@ -993,7 +1008,6 @@ nplsqregbw.default <-
            call. = FALSE)
 
     dots <- list(...)
-    nomad <- if (!is.null(dots$nomad)) npValidateScalarLogical(dots$nomad, "nomad") else FALSE
     if (isTRUE(nomad) && !isTRUE(bandwidth.compute))
       stop("nplsqregbw nomad=TRUE requires bandwidth.compute=TRUE",
            call. = FALSE)
