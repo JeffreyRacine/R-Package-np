@@ -791,8 +791,8 @@ npplregbw.plbandwidth =
   child.templates <- template$bw
   if (!length(child.templates))
     stop("automatic degree search with search.engine='nomad' could not initialize child bandwidth templates")
-  if (any(vapply(child.templates, function(tb) !identical(tb$type, "fixed"), logical(1))))
-    stop("automatic degree search with search.engine='nomad' currently requires bwtype='fixed'")
+  if (any(vapply(child.templates, function(tb) !(tb$type %in% c("fixed", "generalized_nn", "adaptive_nn")), logical(1))))
+    stop("automatic degree search with search.engine='nomad' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
 
   child.responses <- .npplregbw_child_responses(
     xdat = xdat,
@@ -858,6 +858,7 @@ npplregbw.plbandwidth =
     child.reg.args$degree <- as.integer(degree)
     child.reg.args$bernstein.basis <- degree.search$bernstein.basis
     child.reg.args$bandwidth.compute <- NULL
+    child.reg.args$bwtype <- child.templates[[i]]$type
     resp <- child.responses[[i]]
     tbw <- .npregbw_build_rbandwidth(
       xdat = zdat,
@@ -1747,29 +1748,19 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
   child.setup <- search.state$child.setup
   child.point.length <- search.state$child.point.length
 
-  child_cont_lower <- function(i) {
-    npGetScaleFactorSearchLower(
-      child.templates[[i]],
-      argname = "child scale.factor.search.lower"
-    )
-  }
-
-  child.lower <- unlist(lapply(seq_along(child.setup), function(i) {
-    c(rep.int(child_cont_lower(i), length(child.setup[[i]]$cont_idx)),
-      rep.int(0, length(child.setup[[i]]$cat_idx)))
-  }), use.names = FALSE)
-  child.upper <- unlist(lapply(child.setup, function(setup) {
-    c(rep.int(1e6, length(setup$cont_idx)), setup$cat_upper * setup$bandwidth.scale.categorical)
-  }), use.names = FALSE)
+  child.bounds <- lapply(seq_along(child.templates), function(i) {
+    .npregbw_nomad_bw_bounds(template = child.templates[[i]], setup = child.setup[[i]])
+  })
+  child.lower <- unlist(lapply(child.bounds, `[[`, "lower"), use.names = FALSE)
+  child.upper <- unlist(lapply(child.bounds, `[[`, "upper"), use.names = FALSE)
+  child.bbin <- unlist(lapply(child.bounds, `[[`, "bbin"), use.names = FALSE)
   child.start <- unlist(lapply(seq_along(child.templates), function(i) {
     raw <- child.templates[[i]]$bw
     point.start <- if (all(raw == 0)) NULL else .npregbw_nomad_bw_to_point(raw, template = child.templates[[i]], setup = child.setup[[i]])
-    .np_nomad_complete_start_point(
+    .npregbw_nomad_complete_bw_start_point(
       point = point.start,
-      lower = c(rep.int(child_cont_lower(i), length(child.setup[[i]]$cont_idx)),
-                rep.int(0, length(child.setup[[i]]$cat_idx))),
-      upper = c(rep.int(1e6, length(child.setup[[i]]$cont_idx)), child.setup[[i]]$cat_upper * child.setup[[i]]$bandwidth.scale.categorical),
-      ncont = length(child.setup[[i]]$cont_idx)
+      bounds = child.bounds[[i]],
+      setup = child.setup[[i]]
     )
   }), use.names = FALSE)
   bwdim <- length(child.start)
@@ -1779,7 +1770,7 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
   x0 <- c(child.start, as.integer(degree.search$start.degree))
   lb <- c(child.lower, degree.search$lower)
   ub <- c(child.upper, degree.search$upper)
-  bbin <- c(rep.int(0L, bwdim), rep.int(1L, ndeg))
+  bbin <- c(child.bbin, rep.int(1L, ndeg))
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
@@ -2243,8 +2234,9 @@ npplregbw.default =
           !identical(as.character(match.arg(nomad.shortcut$values$regtype, c("lc", "ll", "lp")))[1L], "lp"))
         stop("nomad=TRUE requires regtype='lp'")
       if ("bwtype" %in% dot.names &&
-          !identical(as.character(match.arg(nomad.shortcut$values$bwtype, c("fixed", "generalized_nn", "adaptive_nn")))[1L], "fixed"))
-        stop("nomad=TRUE currently requires bwtype='fixed'")
+          !(as.character(match.arg(nomad.shortcut$values$bwtype, c("fixed", "generalized_nn", "adaptive_nn")))[1L] %in%
+              c("fixed", "generalized_nn", "adaptive_nn")))
+        stop("nomad=TRUE requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
       if ("degree.select" %in% mc.names &&
           identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
         stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
