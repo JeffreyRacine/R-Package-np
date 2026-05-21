@@ -508,6 +508,7 @@ static int bwm_use_transform = 0;
 static int bwm_num_reg_continuous = 0;
 static int bwm_num_reg_unordered = 0;
 static int bwm_num_reg_ordered = 0;
+static int bwm_num_extra_params = 0;
 static int bwm_kernel_unordered = 0;
 static int *bwm_num_categories = NULL;
 static double *bwm_transform_buf = NULL;
@@ -1058,8 +1059,11 @@ static double bwmfunc_wrapper(double *p)
 
   if (bwm_use_transform) {
     int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
-    bwm_reserve_transform_buf(n + 1);
+    int i;
+    bwm_reserve_transform_buf(n + bwm_num_extra_params + 1);
     bwm_apply_transform(p, bwm_transform_buf, n);
+    for (i = 1; i <= bwm_num_extra_params; i++)
+      bwm_transform_buf[n + i] = p[n + i];
     use_p = bwm_transform_buf;
   }
 
@@ -1096,12 +1100,15 @@ static void np_copy_scale_factor_for_raw(double *dest, const double *src, int n)
 static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
 {
   double val;
+  int i;
 
   if (!bwm_use_transform)
     return bwmfunc_raw(vector_scale_factor);
 
-  double *tmp = alloc_vecd(n + 1);
+  double *tmp = alloc_vecd(n + bwm_num_extra_params + 1);
   np_copy_scale_factor_for_raw(tmp, vector_scale_factor, n);
+  for (i = 1; i <= bwm_num_extra_params; i++)
+    tmp[n + i] = vector_scale_factor[n + i];
   val = bwmfunc_raw(tmp);
   safe_free(tmp);
   return val;
@@ -1309,6 +1316,12 @@ double *vector_T_extern;
 double *vector_T_resample;
 double *vector_Y_eval_extern;
 double *vector_Y_null;
+double *vector_lsq_scale_extern;
+double *vector_lsq_loss_extern;
+double *vector_lsq_q_extern;
+double np_lsq_tau_extern=0.5;
+double np_lsq_delta_lower_extern=DBL_EPSILON;
+double np_lsq_delta_upper_extern=1.0-DBL_EPSILON;
 
 
 int int_ll_extern=0;
@@ -1805,6 +1818,7 @@ static void np_regression_nomad_shadow_clear_internal(void)
   bwm_num_reg_continuous = 0;
   bwm_num_reg_unordered = 0;
   bwm_num_reg_ordered = 0;
+  bwm_num_extra_params = 0;
   bwm_kernel_unordered = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
@@ -2510,6 +2524,7 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   bwm_num_reg_continuous = 0;
   bwm_num_reg_unordered = 0;
   bwm_num_reg_ordered = 0;
+  bwm_num_extra_params = 0;
   bwm_kernel_unordered = 0;
   bwm_num_categories = NULL;
   bwm_kernel_unordered_vec = NULL;
@@ -3455,7 +3470,14 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                   int * glp_bernstein,
                                   int * glp_basis,
                                   double * ckerlb, double * ckerub,
-                                  const int eval_only);
+                                  const int eval_only,
+                                  const int lsq_check_mode,
+                                  double * lsq_scale,
+                                  const double lsq_tau,
+                                  const double lsq_delta_start,
+                                  const double lsq_delta_lower,
+                                  const double lsq_delta_upper,
+                                  double * lsq_delta_out);
 
 void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * euno, double * eord, double * econ, double * ey,
@@ -3630,7 +3652,8 @@ static SEXP C_np_regression_bw_common(SEXP runo,
                         REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                         REAL(out_fast),
                         &pmode, &pmult, INTEGER(degree_i), &bern, &basis, ckerlb_p, ckerub_p,
-                        eval_only);
+                        eval_only, 0, NULL, 0.5, 0.5, DBL_EPSILON,
+                        1.0 - DBL_EPSILON, NULL);
 
   PROTECT(out = allocVector(VECSXP, 7));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -3701,6 +3724,177 @@ SEXP C_np_regression_bw_eval(SEXP runo,
                                    rbw, hist_len, penalty_mode, penalty_mult,
                                    glp_degree, glp_bernstein, glp_basis,
                                    ckerlb, ckerub, 1);
+}
+
+static SEXP C_np_lsqregression_bw_common(SEXP runo,
+                                         SEXP rord,
+                                         SEXP rcon,
+                                         SEXP y,
+                                         SEXP scale,
+                                         SEXP tau,
+                                         SEXP delta_start,
+                                         SEXP delta_bounds,
+                                         SEXP mysd,
+                                         SEXP myopti,
+                                         SEXP myoptd,
+                                         SEXP rbw,
+                                         SEXP hist_len,
+                                         SEXP penalty_mode,
+                                         SEXP penalty_mult,
+                                         SEXP glp_degree,
+                                         SEXP glp_bernstein,
+                                         SEXP glp_basis,
+                                         SEXP ckerlb,
+                                         SEXP ckerub,
+                                         const int eval_only)
+{
+  SEXP runo_r = R_NilValue, rord_r = R_NilValue, rcon_r = R_NilValue;
+  SEXP y_r = R_NilValue, scale_r = R_NilValue, mysd_r = R_NilValue;
+  SEXP myopti_i = R_NilValue, myoptd_r = R_NilValue, rbw_r = R_NilValue;
+  SEXP degree_i = R_NilValue, ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
+  SEXP delta_bounds_r = R_NilValue;
+  SEXP out = R_NilValue, out_names = R_NilValue;
+  SEXP out_bw = R_NilValue, out_delta = R_NilValue, out_fval = R_NilValue;
+  SEXP out_fval_hist = R_NilValue, out_eval_hist = R_NilValue;
+  SEXP out_invalid_hist = R_NilValue, out_timing = R_NilValue;
+  SEXP out_fast = R_NilValue;
+  int hlen = asInteger(hist_len);
+  int pmode = asInteger(penalty_mode);
+  double pmult = asReal(penalty_mult);
+  int bern = asInteger(glp_bernstein);
+  int basis = asInteger(glp_basis);
+  int ncon = 0;
+  double delta_out = asReal(delta_start);
+  double * ckerlb_p = NULL;
+  double * ckerub_p = NULL;
+
+  if (hlen < 1)
+    hlen = 1;
+
+  PROTECT(runo_r = coerceVector(runo, REALSXP));
+  PROTECT(rord_r = coerceVector(rord, REALSXP));
+  PROTECT(rcon_r = coerceVector(rcon, REALSXP));
+  PROTECT(y_r = coerceVector(y, REALSXP));
+  PROTECT(scale_r = coerceVector(scale, REALSXP));
+  PROTECT(delta_bounds_r = coerceVector(delta_bounds, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
+  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
+  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
+  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
+  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  if (XLENGTH(myoptd_r) <= RBW_SFLOORD)
+    error("C_np_lsqregression_bw: myoptd is missing scale.factor.lower.bound");
+  if (XLENGTH(delta_bounds_r) < 2)
+    error("C_np_lsqregression_bw: delta_bounds must have length 2");
+  if (XLENGTH(scale_r) != XLENGTH(y_r))
+    error("C_np_lsqregression_bw: scale length must match y length");
+
+  ncon = (int)INTEGER(myopti_i)[RBW_NCONI];
+  resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
+
+  PROTECT(out_bw = allocVector(REALSXP, XLENGTH(rbw_r)));
+  PROTECT(out_delta = allocVector(REALSXP, 1));
+  PROTECT(out_fval = allocVector(REALSXP, 3));
+  PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_timing = allocVector(REALSXP, 1));
+  PROTECT(out_fast = allocVector(REALSXP, 1));
+
+  memcpy(REAL(out_bw), REAL(rbw_r), (size_t)XLENGTH(rbw_r) * sizeof(double));
+
+  np_regression_bw_mode(REAL(runo_r), REAL(rord_r), REAL(rcon_r), REAL(y_r),
+                        REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
+                        REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
+                        REAL(out_fast),
+                        &pmode, &pmult, INTEGER(degree_i), &bern, &basis, ckerlb_p, ckerub_p,
+                        eval_only, 1, REAL(scale_r), asReal(tau), asReal(delta_start),
+                        REAL(delta_bounds_r)[0], REAL(delta_bounds_r)[1], &delta_out);
+  REAL(out_delta)[0] = delta_out;
+
+  PROTECT(out = allocVector(VECSXP, 8));
+  SET_VECTOR_ELT(out, 0, out_bw);
+  SET_VECTOR_ELT(out, 1, out_delta);
+  SET_VECTOR_ELT(out, 2, out_fval);
+  SET_VECTOR_ELT(out, 3, out_fval_hist);
+  SET_VECTOR_ELT(out, 4, out_eval_hist);
+  SET_VECTOR_ELT(out, 5, out_invalid_hist);
+  SET_VECTOR_ELT(out, 6, out_timing);
+  SET_VECTOR_ELT(out, 7, out_fast);
+
+  PROTECT(out_names = allocVector(STRSXP, 8));
+  SET_STRING_ELT(out_names, 0, mkChar("bw"));
+  SET_STRING_ELT(out_names, 1, mkChar("delta"));
+  SET_STRING_ELT(out_names, 2, mkChar("fval"));
+  SET_STRING_ELT(out_names, 3, mkChar("fval.history"));
+  SET_STRING_ELT(out_names, 4, mkChar("eval.history"));
+  SET_STRING_ELT(out_names, 5, mkChar("invalid.history"));
+  SET_STRING_ELT(out_names, 6, mkChar("timing"));
+  SET_STRING_ELT(out_names, 7, mkChar("fast.history"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(23);
+  return out;
+}
+
+SEXP C_np_lsqregression_bw(SEXP runo,
+                           SEXP rord,
+                           SEXP rcon,
+                           SEXP y,
+                           SEXP scale,
+                           SEXP tau,
+                           SEXP delta_start,
+                           SEXP delta_bounds,
+                           SEXP mysd,
+                           SEXP myopti,
+                           SEXP myoptd,
+                           SEXP rbw,
+                           SEXP hist_len,
+                           SEXP penalty_mode,
+                           SEXP penalty_mult,
+                           SEXP glp_degree,
+                           SEXP glp_bernstein,
+                           SEXP glp_basis,
+                           SEXP ckerlb,
+                           SEXP ckerub)
+{
+  np_reset_c_rng_for_bandwidth_search();
+  return C_np_lsqregression_bw_common(runo, rord, rcon, y, scale, tau,
+                                      delta_start, delta_bounds, mysd, myopti,
+                                      myoptd, rbw, hist_len, penalty_mode,
+                                      penalty_mult, glp_degree, glp_bernstein,
+                                      glp_basis, ckerlb, ckerub, 0);
+}
+
+SEXP C_np_lsqregression_bw_eval(SEXP runo,
+                                SEXP rord,
+                                SEXP rcon,
+                                SEXP y,
+                                SEXP scale,
+                                SEXP tau,
+                                SEXP delta_start,
+                                SEXP delta_bounds,
+                                SEXP mysd,
+                                SEXP myopti,
+                                SEXP myoptd,
+                                SEXP rbw,
+                                SEXP hist_len,
+                                SEXP penalty_mode,
+                                SEXP penalty_mult,
+                                SEXP glp_degree,
+                                SEXP glp_bernstein,
+                                SEXP glp_basis,
+                                SEXP ckerlb,
+                                SEXP ckerub)
+{
+  return C_np_lsqregression_bw_common(runo, rord, rcon, y, scale, tau,
+                                      delta_start, delta_bounds, mysd, myopti,
+                                      myoptd, rbw, hist_len, penalty_mode,
+                                      penalty_mult, glp_degree, glp_bernstein,
+                                      glp_basis, ckerlb, ckerub, 1);
 }
 
 SEXP C_np_regression(SEXP tuno,
@@ -7592,8 +7786,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                lbd_dir, hbd_dir, d_dir, initd_dir,
                                matrix_X_continuous_train_extern,
                                matrix_Y_continuous_train_extern);
-
-
       powell(0,
              0,
              vector_scale_factor,
@@ -10301,7 +10493,14 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                   int * glp_bernstein,
                                   int * glp_basis,
                                   double * ckerlb, double * ckerub,
-                                  const int eval_only){
+                                  const int eval_only,
+                                  const int lsq_check_mode,
+                                  double * lsq_scale,
+                                  const double lsq_tau,
+                                  const double lsq_delta_start,
+                                  const double lsq_delta_lower,
+                                  const double lsq_delta_upper,
+                                  double * lsq_delta_out){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
@@ -10326,7 +10525,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   int i,j;
   double fast_eval_total = 0.0;
-  int num_var;
+  int num_var, num_search_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int enforce_fixed_feasibility;
   int have_start_best, have_multistart_best;
@@ -10343,6 +10542,18 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   bwm_clear_floor_context();
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
+  num_search_var = num_var + (lsq_check_mode ? 1 : 0);
+  if(lsq_check_mode && ((lsq_scale == NULL) ||
+                        (!R_FINITE(lsq_tau)) ||
+                        (lsq_tau <= 0.0) ||
+                        (lsq_tau >= 1.0) ||
+                        (!R_FINITE(lsq_delta_start)) ||
+                        (!R_FINITE(lsq_delta_lower)) ||
+                        (!R_FINITE(lsq_delta_upper)) ||
+                        (lsq_delta_lower <= 0.0) ||
+                        (lsq_delta_upper >= 1.0) ||
+                        (lsq_delta_lower >= lsq_delta_upper)))
+    error("C_np_lsqregression_bw: invalid tau, delta bounds, or scale");
 
   num_obs_train_extern = myopti[RBW_NOBSI];
   iMultistart = myopti[RBW_IMULTII];
@@ -10422,12 +10633,14 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
 
   vector_Y_extern = alloc_vecd(num_obs_train_extern);
+  vector_lsq_scale_extern = lsq_check_mode ? alloc_vecd(num_obs_train_extern) : NULL;
+  vector_lsq_q_extern = lsq_check_mode ? alloc_vecd(num_obs_train_extern) : NULL;
 	
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
-  matrix_y = alloc_matd(num_var + 1, num_var +1);
-  vector_scale_factor = alloc_vecd(num_var + 1);
-  vector_scale_factor_startbest = alloc_vecd(num_var + 1);
-  vsfh = alloc_vecd(num_var + 1);
+  matrix_y = alloc_matd(num_search_var + 1, num_search_var +1);
+  vector_scale_factor = alloc_vecd(num_search_var + 1);
+  vector_scale_factor_startbest = alloc_vecd(num_search_var + 1);
+  vsfh = alloc_vecd(num_search_var + 1);
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
@@ -10463,6 +10676,14 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   /* response variable */
   for( i=0;i<num_obs_train_extern;i++ )
     vector_Y_extern[i] = y[i];
+  if(lsq_check_mode){
+    for( i=0;i<num_obs_train_extern;i++ )
+      vector_lsq_scale_extern[i] = lsq_scale[i];
+    vector_lsq_loss_extern = vector_Y_extern;
+    np_lsq_tau_extern = lsq_tau;
+    np_lsq_delta_lower_extern = lsq_delta_lower;
+    np_lsq_delta_upper_extern = lsq_delta_upper;
+  }
 
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
@@ -10538,6 +10759,11 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     /* response variable */
     for( i=0;i<num_obs_train_extern;i++ )
       vector_Y_extern[i] = y[ipt[i]];
+    if(lsq_check_mode){
+      for( i=0;i<num_obs_train_extern;i++ )
+        vector_lsq_scale_extern[i] = lsq_scale[ipt[i]];
+      vector_lsq_loss_extern = vector_Y_extern;
+    }
     
     //boxSearch(kdt_extern, 0, tb, &nl);
   }
@@ -10590,6 +10816,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                     lbd_init, hbd_init, d_init,
                                     matrix_X_continuous_train_extern,
                                     matrix_Y_continuous_train_extern);
+  if(lsq_check_mode)
+    vector_scale_factor[num_var + 1] =
+      MIN(MAX(lsq_delta_start, lsq_delta_lower + DBL_EPSILON),
+          lsq_delta_upper - DBL_EPSILON);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -10632,6 +10862,14 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                            lbd_dir, hbd_dir, d_dir, initd_dir,
                            matrix_X_continuous_train_extern,
                            matrix_Y_continuous_train_extern);
+  if(lsq_check_mode){
+    for(i = 1; i <= num_search_var; i++){
+      matrix_y[i][num_var + 1] = 0.0;
+      matrix_y[num_var + 1][i] = 0.0;
+    }
+    matrix_y[num_var + 1][num_var + 1] =
+      0.25*(lsq_delta_upper - lsq_delta_lower);
+  }
 
 
   /* When multistarting, set counter */
@@ -10639,9 +10877,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   iMs_counter = 0;
 
   /* assign the function to be optimized */
-  switch(myopti[RBW_MI]){
+  switch(lsq_check_mode ? RBWM_CVCHECK : myopti[RBW_MI]){
   case RBWM_CVAIC : bwmfunc = cv_func_regression_categorical_aic_c; break;
   case RBWM_CVLS : bwmfunc = cv_func_regression_categorical_ls; break;
+  case RBWM_CVCHECK : bwmfunc = cv_func_lsqregression_categorical_check; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
     error("np.c: invalid bandwidth selection method.");break;
   }
@@ -10652,6 +10891,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   bwm_num_reg_continuous = num_reg_continuous_extern;
   bwm_num_reg_unordered = num_reg_unordered_extern;
   bwm_num_reg_ordered = num_reg_ordered_extern;
+  bwm_num_extra_params = lsq_check_mode ? 1 : 0;
   bwm_kernel_unordered = KERNEL_reg_unordered_extern;
   bwm_num_categories = num_categories_extern;
   bwm_set_floor_context(
@@ -10674,7 +10914,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     bwm_scale_factor_lower_bound);
   if (bwm_use_transform) {
     int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
-    bwm_reserve_transform_buf(n + 1);
+    bwm_reserve_transform_buf(n + bwm_num_extra_params + 1);
   }
   bwm_reset_counters();
 
@@ -10703,7 +10943,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
         vector_scale_factor)) {
     have_start_best = 1;
     fret_start_best = fret_initial;
-    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_search_var);
   }
 
   if(!eval_only){
@@ -10712,7 +10952,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
            vector_scale_factor,
            vector_scale_factor,
            matrix_y,
-           num_var,
+           num_search_var,
            ftol,
            tol,
            small,
@@ -10739,13 +10979,21 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                lbd_dir, hbd_dir, d_dir, initd_dir,
                                matrix_X_continuous_train_extern,
                                matrix_Y_continuous_train_extern);
+      if(lsq_check_mode){
+        for(i = 1; i <= num_search_var; i++){
+          matrix_y[i][num_var + 1] = 0.0;
+          matrix_y[num_var + 1][i] = 0.0;
+        }
+        matrix_y[num_var + 1][num_var + 1] =
+          0.25*(lsq_delta_upper - lsq_delta_lower);
+      }
 
       powell(0,
              0,
              vector_scale_factor,
              vector_scale_factor,
              matrix_y,
-             num_var,
+             num_search_var,
              ftol,
              tol,
              small,
@@ -10780,13 +11028,13 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
       ((!have_start_best) || (fret < fret_start_best))) {
     have_start_best = 1;
     fret_start_best = fret;
-    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
+    np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_search_var);
   }
 
   if (enforce_fixed_feasibility) {
     if (have_start_best) {
       fret = fret_start_best;
-      np_copy_scale_factor(vector_scale_factor, vector_scale_factor_startbest, num_var);
+      np_copy_scale_factor(vector_scale_factor, vector_scale_factor_startbest, num_search_var);
     } else {
       fret = DBL_MAX;
     }
@@ -10815,9 +11063,9 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     } else {
       fret_best = fret;
     }
-    vector_scale_factor_multistart = alloc_vecd(num_var + 1);
+    vector_scale_factor_multistart = alloc_vecd(num_search_var + 1);
 
-    for(i = 1; i <= num_var; i++)
+    for(i = 1; i <= num_search_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
     np_progress_bandwidth_multistart_step(1, iNum_Multistart);
 
@@ -10851,6 +11099,11 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                         lbd_init, hbd_init, d_init,
                                         matrix_X_continuous_train_extern,
                                         matrix_Y_continuous_train_extern);
+      if(lsq_check_mode){
+        int delta_seed = int_RANDOM_SEED + iMs_counter;
+        vector_scale_factor[num_var + 1] =
+          lsq_delta_lower + (lsq_delta_upper - lsq_delta_lower)*ran3(&delta_seed);
+      }
 
       initialize_nr_directions(BANDWIDTH_reg_extern,
                                num_obs_train_extern,
@@ -10868,6 +11121,15 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                lbd_dir, hbd_dir, d_dir, initd_dir,
                                matrix_X_continuous_train_extern,
                                matrix_Y_continuous_train_extern);
+      if(lsq_check_mode){
+        int delta_seed = int_RANDOM_SEED + 7919 + iMs_counter;
+        for(i = 1; i <= num_search_var; i++){
+          matrix_y[i][num_var + 1] = 0.0;
+          matrix_y[num_var + 1][i] = 0.0;
+        }
+        matrix_y[num_var + 1][num_var + 1] =
+          0.25*(lsq_delta_upper - lsq_delta_lower)*MAX(ran3(&delta_seed), DBL_EPSILON);
+      }
 
 
       /* Conduct direction set search */
@@ -10879,7 +11141,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
              vector_scale_factor,
              vector_scale_factor,
              matrix_y,
-             num_var,
+             num_search_var,
              ftol,
              tol,
              small,
@@ -10906,6 +11168,14 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                  lbd_dir, hbd_dir, d_dir, initd_dir,
                                  matrix_X_continuous_train_extern,
                                  matrix_Y_continuous_train_extern);
+        if(lsq_check_mode){
+          for(i = 1; i <= num_search_var; i++){
+            matrix_y[i][num_var + 1] = 0.0;
+            matrix_y[num_var + 1][i] = 0.0;
+          }
+          matrix_y[num_var + 1][num_var + 1] =
+            0.25*(lsq_delta_upper - lsq_delta_lower);
+        }
 
 						
         powell(0,
@@ -10913,7 +11183,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                vector_scale_factor,
                vector_scale_factor,
                matrix_y,
-               num_var,
+               num_search_var,
                ftol,
                tol,
                small,
@@ -10949,14 +11219,14 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
           have_multistart_best = 1;
           iImproved = iMs_counter+1;
           *timing = timing_extern;
-          np_copy_scale_factor(vector_scale_factor_multistart, vector_scale_factor, num_var);
+          np_copy_scale_factor(vector_scale_factor_multistart, vector_scale_factor, num_search_var);
         }
       } else if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
         *timing = timing_extern;
         
-        for(i = 1; i <= num_var; i++)	
+        for(i = 1; i <= num_search_var; i++)
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
       objective_function_values[iMs_counter]=fret;
@@ -10973,10 +11243,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     if (enforce_fixed_feasibility) {
       if (have_multistart_best) {
         fret = fret_best;
-        np_copy_scale_factor(vector_scale_factor, vector_scale_factor_multistart, num_var);
+        np_copy_scale_factor(vector_scale_factor, vector_scale_factor_multistart, num_search_var);
         have_start_best = 1;
         fret_start_best = fret_best;
-        np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor_multistart, num_var);
+        np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor_multistart, num_search_var);
       } else {
         have_start_best = 0;
         fret = DBL_MAX;
@@ -10984,7 +11254,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     } else {
       fret = fret_best;
 
-      for(i = 1; i <= num_var; i++)
+      for(i = 1; i <= num_search_var; i++)
         vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
     }
 
@@ -11037,6 +11307,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   }
   for( i=0; i<num_var; i++ )
     rbw[i]=vector_scale_factor[i+1];
+  if(lsq_check_mode && (lsq_delta_out != NULL))
+    lsq_delta_out[0] = vector_scale_factor[num_var + 1];
 
   fval[0] = fret;
   fval[1] = iImproved;
@@ -11054,8 +11326,13 @@ cleanup_np_regression_bw_mode:
   free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
 
   safe_free(vector_Y_extern);
+  safe_free(vector_lsq_scale_extern);
+  safe_free(vector_lsq_q_extern);
+  vector_lsq_scale_extern = NULL;
+  vector_lsq_loss_extern = NULL;
+  vector_lsq_q_extern = NULL;
 
-  free_mat(matrix_y, num_var + 1);
+  free_mat(matrix_y, num_search_var + 1);
   safe_free(vector_scale_factor);
   safe_free(vector_scale_factor_startbest);
   safe_free(vsfh);
@@ -11087,6 +11364,7 @@ cleanup_np_regression_bw_mode:
   int_glp_basis_extern = 1;
   np_clear_estimator_extern_aliases();
   int_nn_k_min_extern = 1;
+  bwm_num_extra_params = 0;
 
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
@@ -11114,7 +11392,8 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                         objective_function_fast,
                         penalty_mode, penalty_mult,
                         glp_degree, glp_bernstein, glp_basis,
-                        ckerlb, ckerub, 0);
+                        ckerlb, ckerub, 0, 0, NULL, 0.5, 0.5,
+                        DBL_EPSILON, 1.0 - DBL_EPSILON, NULL);
 }
 
 

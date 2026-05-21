@@ -117,6 +117,7 @@
 
   allowed <- list(
     npreg = "rbandwidth",
+    nplsqreg = "lsqregressionbandwidth",
     npplreg = "plbandwidth",
     npindex = "sibandwidth",
     npscoef = "scbandwidth"
@@ -158,6 +159,7 @@
 
   regression.calls <- c(
     "npreg", "npregbw", "npplreg", "npplregbw",
+    "nplsqreg", "nplsqregbw",
     "npqreg", "npqregbw", "npscoef", "npscoefbw",
     "npindex", "npindexbw"
   )
@@ -520,6 +522,7 @@
     "autodispatch.npudistbw.cv",
     "autodispatch.npcdensbw.cv",
     "autodispatch.npcdistbw.cv",
+    "autodispatch.nplsqreg.core",
     "autodispatch.npqreg.core",
     "autodispatch.npconmode.core",
     "autodispatch.npksum.core",
@@ -779,6 +782,18 @@
         payload = payload,
         envelope = envelope,
         allowed_calls = c("npqreg", "npqreg.default", "npqreg.formula", "npqreg.call", "npqreg.condbandwidth", "npqreg.conbandwidth"),
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.nplsqreg.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.nplsqreg.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("nplsqreg", "nplsqreg.default", "nplsqreg.formula", "nplsqreg.lsqregressionbandwidth",
+                          "nplsqregbw", "nplsqregbw.default", "nplsqregbw.formula", "nplsqregbw.lsqregressionbandwidth"),
         where = "SPMD non-core opcode guard"
       )
     )
@@ -1247,6 +1262,11 @@
   .npRmpi_autodispatch_call_name_in(mc, c("npqreg", "npqreg.default", "npqreg.formula", "npqreg.call", "npqreg.condbandwidth", "npqreg.conbandwidth"))
 }
 
+.npRmpi_autodispatch_is_nplsqreg_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("nplsqreg", "nplsqreg.default", "nplsqreg.formula", "nplsqreg.lsqregressionbandwidth",
+                                          "nplsqregbw", "nplsqregbw.default", "nplsqregbw.formula", "nplsqregbw.lsqregressionbandwidth"))
+}
+
 .npRmpi_autodispatch_is_npconmode_core <- function(mc) {
   .npRmpi_autodispatch_call_name_in(mc, c("npconmode", "npconmode.default", "npconmode.formula", "npconmode.call", "npconmode.conbandwidth"))
 }
@@ -1320,6 +1340,8 @@
     return("autodispatch.npcdens.core")
   if (.npRmpi_autodispatch_is_npcdist_core(mc = mc))
     return("autodispatch.npcdist.core")
+  if (.npRmpi_autodispatch_is_nplsqreg_core(mc = mc))
+    return("autodispatch.nplsqreg.core")
   if (.npRmpi_autodispatch_is_npqreg_core(mc = mc))
     return("autodispatch.npqreg.core")
   if (.npRmpi_autodispatch_is_npconmode_core(mc = mc))

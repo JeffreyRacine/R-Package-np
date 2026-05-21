@@ -14,6 +14,7 @@
 #include "headers.h"
 
 #include <R.h>
+#include <Rmath.h>
 
 #ifdef MPI2
 
@@ -72,6 +73,12 @@ extern double **matrix_Y_unordered_eval_extern;
 extern double **matrix_Y_ordered_eval_extern;
 
 extern double *vector_Y_extern;
+extern double *vector_lsq_scale_extern;
+extern double *vector_lsq_loss_extern;
+extern double *vector_lsq_q_extern;
+extern double np_lsq_tau_extern;
+extern double np_lsq_delta_lower_extern;
+extern double np_lsq_delta_upper_extern;
 extern double *vector_T_extern;
 extern double *vector_Y_eval_extern;
 
@@ -118,9 +125,6 @@ extern int cdfontrain_extern;
 
 // timing
 extern double timing_extern;
-
-#define RBWM_CVAIC 0
-#define RBWM_CVLS 1
 
 #define LL_LC  0
 #define LL_LL  1
@@ -181,6 +185,74 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
 
     return(cv);
 
+}
+
+double cv_func_lsqregression_categorical_check(double *vector_scale_factor){
+  double cv = 0.0;
+  clock_t start, diff;
+  const int nvar =
+    num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+  const double delta = vector_scale_factor[nvar + 1];
+  double zdelta;
+  int i;
+
+  if((delta <= np_lsq_delta_lower_extern) ||
+     (delta >= np_lsq_delta_upper_extern) ||
+     (!R_FINITE(delta)))
+    return(DBL_MAX);
+
+  if(check_valid_scale_factor_cv(
+                                 KERNEL_reg_extern,
+                                 KERNEL_reg_unordered_extern,
+                                 BANDWIDTH_reg_extern,
+                                 BANDWIDTH_reg_extern,
+                                 0,
+                                 num_obs_train_extern,
+                                 0,
+                                 0,
+                                 0,
+                                 num_reg_continuous_extern,
+                                 num_reg_unordered_extern,
+                                 num_reg_ordered_extern,
+                                 num_categories_extern,
+                                 vector_scale_factor) == 1)
+    return(DBL_MAX);
+
+  if((vector_lsq_scale_extern == NULL) ||
+     (vector_lsq_loss_extern == NULL) ||
+     (vector_lsq_q_extern == NULL))
+    return(DBL_MAX);
+
+  zdelta = qnorm(delta, 0.0, 1.0, 1, 0);
+  if(!R_FINITE(zdelta))
+    return(DBL_MAX);
+
+  for(i = 0; i < num_obs_train_extern; i++)
+    vector_lsq_q_extern[i] =
+      vector_lsq_loss_extern[i] + vector_lsq_scale_extern[i]*zdelta;
+
+  start = clock();
+  cv = (np_kernel_estimate_regression_categorical_ls_aic(
+                                                          int_ll_extern,
+                                                          RBWM_CVCHECK,
+                                                          KERNEL_reg_extern,
+                                                          KERNEL_reg_unordered_extern,
+                                                          KERNEL_reg_ordered_extern,
+                                                          BANDWIDTH_reg_extern,
+                                                          num_obs_train_extern,
+                                                          num_reg_unordered_extern,
+                                                          num_reg_ordered_extern,
+                                                          num_reg_continuous_extern,
+                                                          matrix_X_unordered_train_extern,
+                                                          matrix_X_ordered_train_extern,
+                                                          matrix_X_continuous_train_extern,
+                                                          vector_lsq_q_extern,
+                                                          &vector_scale_factor[1],
+                                                          num_categories_extern));
+  diff = clock() - start;
+  timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
+
+  return(cv);
 }
 
 double cv_func_regression_categorical_ls_nn(double *vector_scale_factor)
