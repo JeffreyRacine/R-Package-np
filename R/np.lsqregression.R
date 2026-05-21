@@ -849,6 +849,9 @@ nplsqregbw.default <-
     } else if (isa(bws, "lsqregressionbandwidth")) {
       return(nplsqregbw.lsqregressionbandwidth(bws, tau = tau))
     } else if (isa(bws, "rbandwidth")) {
+      if (identical(bws$method, "cv.check"))
+        stop("fit$reg.bws is internal nplsqreg regression state; use fit$bws for exact nplsqreg bandwidth reuse or pass an ordinary npregbw rbandwidth object as a starting value",
+             call. = FALSE)
       start.bws <- bws
     } else {
       start.bws <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat,

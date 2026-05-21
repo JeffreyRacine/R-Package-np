@@ -49,6 +49,8 @@ and training data.
     a formula, an \code{lsqregressionbandwidth} object returned by
     \code{\link{nplsqregbw}}, an \code{rbandwidth} object, a numeric
     bandwidth vector, or omitted for automatic bandwidth selection.
+    Exact nplsqreg reuse is through the fitted object's \code{$bws}
+    component; \code{$reg.bws} is internal regression state.
   }
 
   \item{data}{

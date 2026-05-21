@@ -44,7 +44,10 @@ and training data.
   \item{bws}{
     a formula, an \code{lsqregressionbandwidth} object, an
     \code{rbandwidth} object, a numeric bandwidth vector, or omitted for
-    automatic selection.
+    automatic selection. Ordinary \code{\link{npregbw}} \code{rbandwidth}
+    objects may be used as starting values. Exact nplsqreg reuse is through
+    an \code{lsqregressionbandwidth} object, typically \code{fit$bws};
+    \code{fit$reg.bws} is internal regression state.
   }
 
   \item{data}{
