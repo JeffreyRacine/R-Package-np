@@ -109,6 +109,8 @@ extern double **matrix_Y_unordered_eval_extern;
 extern double **matrix_Y_ordered_eval_extern;
 
 extern double *vector_Y_extern;
+extern double *vector_lsq_loss_extern;
+extern double np_lsq_tau_extern;
 extern double *vector_T_extern;
 extern double *vector_Y_eval_extern;
 
@@ -8893,7 +8895,8 @@ static int np_reg_cv_all_large_gate(const int BANDWIDTH_reg,
 static inline int np_reg_cv_use_symmetric_dropone_path(const int bwm,
                                                        const int ks_tree_use,
                                                        const int BANDWIDTH_reg){
-  return (bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN);
+  return (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
+    ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN);
 }
 
 /* Canonical selector for density CV tree bypass in all-large/adaptive regimes. */
@@ -8909,6 +8912,21 @@ typedef struct {
   int ok;
 } NPRegCvLpResult;
 
+static inline double np_check_loss_value(const double residual, const double tau)
+{
+  return residual * (tau - (residual < 0.0 ? 1.0 : 0.0));
+}
+
+static inline double np_regression_cv_loss_value(const int bwm,
+                                                 const double fit_response,
+                                                 const double loss_response)
+{
+  const double residual = loss_response - fit_response;
+  return (bwm == RBWM_CVCHECK) ?
+    np_check_loss_value(residual, np_lsq_tau_extern) :
+    residual*residual;
+}
+
 static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int int_ll,
                                                            const int bwm,
                                                            const int BANDWIDTH_reg,
@@ -8922,7 +8940,7 @@ static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int int_ll,
     return (int_ll == LL_LP) &&
       (int_glp_basis_extern == 1);
 
-  if(bwm != RBWM_CVLS)
+  if((bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK))
     return 0;
 
   if(int_ll == LL_LL)
@@ -8941,7 +8959,7 @@ static inline int np_reg_cv_use_canonical_ll_degree1_lp_objective(const int int_
                                                                   const int num_reg_continuous,
                                                                   const int ks_tree_use){
   return (int_ll == LL_LL) &&
-    (bwm == RBWM_CVLS) &&
+    ((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)) &&
     (BANDWIDTH_reg == BW_FIXED) &&
     (num_reg_continuous > 0) &&
     (!ks_tree_use);
@@ -9983,7 +10001,7 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
   int use_sparse_tree = 0;
   int tsf = 0;
   const int center_raw_basis = (int_glp_bernstein_extern == 0) && (int_glp_basis_extern == 1);
-  const int track_lowsupport = (bwm == RBWM_CVLS);
+  const int track_lowsupport = (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK);
 
   if((num_obs <= 0) || (num_reg_continuous <= 0))
     return result;
@@ -10444,8 +10462,11 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
     }
 
     {
-      const double dy = vector_Y[eval_idx] - fit;
-      result.cv += dy*dy;
+      const double loss_y =
+        (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+        vector_lsq_loss_extern[eval_idx] :
+        vector_Y[eval_idx];
+      result.cv += np_regression_cv_loss_value(bwm, fit, loss_y);
     }
 
     if(bwm == RBWM_CVAIC){
@@ -10699,11 +10720,17 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                 hii += zj*XtXINV[j][b]*basis[b][i];
             }
             {
-              const double err = vector_Y[i] - yhat;
-              if(bwm == RBWM_CVLS){
+              const double loss_y =
+                (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+                vector_lsq_loss_extern[i] :
+                vector_Y[i];
+              const double err = loss_y - yhat;
+              if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
                 const double den = NZD_POS(1.0 - hii);
                 const double err_loo = err/den;
-                result.cv += err_loo*err_loo;
+                result.cv += (bwm == RBWM_CVCHECK) ?
+                  np_check_loss_value(err_loo, np_lsq_tau_extern) :
+                  err_loo*err_loo;
               } else {
                 result.cv += err*err;
                 result.traceH += hii;
@@ -11054,8 +11081,11 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
           for(i = 0; i < nrc1; i++)
             mhat += evalv[i]*DELTA[i][0];
           {
-            const double dy = vector_Y[j]-mhat;
-            result.cv += dy*dy;
+            const double loss_y =
+              (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+              vector_lsq_loss_extern[j] :
+              vector_Y[j];
+            result.cv += np_regression_cv_loss_value(bwm, mhat, loss_y);
           }
         }
 
@@ -11155,7 +11185,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   int ov_cont_from_cache = 0;
 
-  const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
+  const int leave_one_out = ((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK))?1:0;
 
   if(!np_reg_cv_core_cache_prepare(KERNEL_reg,
                                    KERNEL_unordered_reg,
@@ -11399,11 +11429,17 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
               }
             }
 
-            const double err = vector_Y[i] - yhat;
-            if(bwm == RBWM_CVLS){
+            const double loss_y =
+              (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+              vector_lsq_loss_extern[i] :
+              vector_Y[i];
+            const double err = loss_y - yhat;
+            if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
               const double den = NZD_POS(1.0 - hii);
               const double err_loo = err/den;
-              cv += err_loo*err_loo;
+              cv += (bwm == RBWM_CVCHECK) ?
+                np_check_loss_value(err_loo, np_lsq_tau_extern) :
+                err_loo*err_loo;
             } else {
               cv += err*err;
               traceH += hii;
@@ -11601,8 +11637,11 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     for(int ii = 0; ii < num_obs; ii++){
       const int ii2 = 2*ii;
       const double sk = copysign(DBL_MIN, mean[ii2+1]) + mean[ii2+1];
-      const double dy = vector_Y[ii]-mean[ii2]/sk;
-      cv += dy*dy;
+      const double loss_y =
+        (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+        vector_lsq_loss_extern[ii] :
+        vector_Y[ii];
+      cv += np_regression_cv_loss_value(bwm, mean[ii2]/sk, loss_y);
       if(bwm == RBWM_CVAIC){
         if(BANDWIDTH_reg != BW_ADAP_NN){
           traceH += aicc/sk;
@@ -12117,8 +12156,11 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         if(mat_solve(KWM, XTKY, DELTA) == NULL)
           error("mat_solve failed after ridge adjustment");
       }
-      const double dy = vector_Y[j]-DELTA[0][0];
-      cv += dy*dy; 
+      const double loss_y =
+        (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+        vector_lsq_loss_extern[j] :
+        vector_Y[j];
+      cv += np_regression_cv_loss_value(bwm, DELTA[0][0], loss_y);
     }
     
     for(int ii = 0; ii < (nrc1); ii++){

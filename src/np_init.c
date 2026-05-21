@@ -26,6 +26,8 @@ extern SEXP C_np_kernelsum(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP,
 extern SEXP C_np_quantile_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_lsqregression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_lsqregression_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_progress_signal(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_progress_fit_begin(SEXP);
@@ -61,6 +63,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_quantile_conditional",      (DL_FUNC) &C_np_quantile_conditional,      19},
     {"C_np_regression_bw",             (DL_FUNC) &C_np_regression_bw,             16},
     {"C_np_regression_bw_eval",        (DL_FUNC) &C_np_regression_bw_eval,        16},
+    {"C_np_lsqregression_bw",          (DL_FUNC) &C_np_lsqregression_bw,          20},
+    {"C_np_lsqregression_bw_eval",     (DL_FUNC) &C_np_lsqregression_bw_eval,     20},
     {"C_np_regression",                (DL_FUNC) &C_np_regression,                24},
     {"C_np_set_seed",                  (DL_FUNC) &C_np_set_seed,                   1},
     {"C_np_set_tgauss2",               (DL_FUNC) &C_np_set_tgauss2,                1},
