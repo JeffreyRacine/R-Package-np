@@ -139,7 +139,9 @@ print.lsqregressionbandwidth <- function(x, digits = NULL, ...) {
   invisible(x)
 }
 
-summary.lsqregressionbandwidth <- print.lsqregressionbandwidth
+summary.lsqregressionbandwidth <- function(object, ...) {
+  print.lsqregressionbandwidth(object, ...)
+}
 
 print.lsqregression <- function(x, digits = NULL, ...) {
   cat("\nLocation-scale quantile regression data: ", x$ntrain,

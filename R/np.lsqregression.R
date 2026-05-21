@@ -884,9 +884,9 @@ nplsqregbw.NULL <- function(...) {
 }
 
 nplsqregbw.default <-
-  function(xdat = stop("invoked without data 'xdat'"),
+  function(bws,
+           xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
-           bws,
            tau = 0.5,
            tau.search = c("full", "refined"),
            delta = NULL,
