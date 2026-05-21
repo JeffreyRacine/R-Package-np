@@ -374,6 +374,31 @@ npRejectRenamedScaleFactorSearchArgs <- function(arg.names,
        call. = FALSE)
 }
 
+npRejectUnsupportedLpDegreeSearchArgs <- function(arg.names,
+                                                  where = "bandwidth search") {
+  if (is.null(arg.names) || !length(arg.names))
+    return(invisible(NULL))
+
+  unsupported <- c(
+    "nomad", "nomad.nmulti", "nomad.remin",
+    "search.engine",
+    "degree", "degree.select", "degree.min", "degree.max", "degree.start",
+    "degree.restarts", "degree.max.cycles", "degree.verify",
+    "random.seed",
+    "regtype", "basis", "bernstein.basis"
+  )
+  bad <- intersect(unsupported, arg.names[nzchar(arg.names)])
+  if (!length(bad))
+    return(invisible(NULL))
+
+  labels <- paste(sprintf("'%s'", bad), collapse = ", ")
+  stop(sprintf("unused argument%s in %s: %s",
+               if (length(bad) == 1L) "" else "s",
+               where,
+               labels),
+       call. = FALSE)
+}
+
 npValidateScaleFactorLowerBound <- function(value,
                                             argname = "scale.factor.search.lower") {
   if (!is.numeric(value) || length(value) != 1L || is.na(value) ||

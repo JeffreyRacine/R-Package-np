@@ -1,6 +1,7 @@
 npudistbw <- function(...){
   mc <- match.call(expand.dots = FALSE)
   npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npudistbw")
+  npRejectUnsupportedLpDegreeSearchArgs(names(mc$...), where = "npudistbw")
   target <- .np_bw_dispatch_target(dots = mc$...,
                                    data_arg_names = c("dat", "gdat"),
                                    eval_env = parent.frame())
