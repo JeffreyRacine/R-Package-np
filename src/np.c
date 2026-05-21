@@ -1213,9 +1213,6 @@ static int np_bw_candidate_is_admissible_with_floor(
   double *tmp = NULL;
   int invalid = 0;
 
-  if (BANDWIDTH != BW_FIXED)
-    return 1;
-
   if (use_transform) {
     tmp = alloc_vecd(n + 1);
     np_copy_scale_factor(tmp, vector_scale_factor, n);
@@ -1239,7 +1236,8 @@ static int np_bw_candidate_is_admissible_with_floor(
     num_categories,
     candidate);
 
-  if ((invalid == 0) &&
+  if ((BANDWIDTH == BW_FIXED) &&
+      (invalid == 0) &&
       !np_fixed_continuous_floor_ok_cv_with_coeff(
         KERNEL,
         num_obs,
@@ -10365,7 +10363,9 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   BANDWIDTH_reg_extern=myopti[RBW_REGI];
   BANDWIDTH_den_extern=0;
-  enforce_fixed_feasibility = ((BANDWIDTH_reg_extern == BW_FIXED) && (!eval_only));
+  enforce_fixed_feasibility = (((BANDWIDTH_reg_extern == BW_FIXED) ||
+                                (BANDWIDTH_reg_extern == BW_GEN_NN) ||
+                                (BANDWIDTH_reg_extern == BW_ADAP_NN)) && (!eval_only));
 
   itmax=myopti[RBW_ITMAXI];
   int_RESTART_FROM_MIN = myopti[RBW_REMINI];

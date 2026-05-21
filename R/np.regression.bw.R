@@ -1351,12 +1351,96 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   }
 
   list(
+    type = as.character(template$type[1L]),
+    nobs = nrow,
     cont_scale = cont_scale,
     cont_idx = cont_idx,
     cat_idx = cat_idx,
     ncatfac = ncatfac,
     bandwidth.scale.categorical = bandwidth.scale.categorical,
     cat_upper = cat_upper
+  )
+}
+
+.npregbw_nomad_bw_bounds <- function(template, setup) {
+  ncon <- length(setup$cont_idx)
+  ncat <- length(setup$cat_idx)
+
+  if (ncon > 0L) {
+    if (identical(setup$type, "fixed")) {
+      cont_lower <- npGetScaleFactorSearchLower(
+        template,
+        argname = "template$scale.factor.search.lower"
+      )
+      cont_lower <- rep.int(cont_lower, ncon)
+      cont_upper <- rep.int(1e6, ncon)
+      cont_bbin <- rep.int(0L, ncon)
+    } else {
+      nn_lower <- npRegressionNnLowerBound(template)
+      nn_upper <- max(nn_lower, as.integer(setup$nobs) - 1L)
+      cont_lower <- rep.int(nn_lower, ncon)
+      cont_upper <- rep.int(nn_upper, ncon)
+      cont_bbin <- rep.int(1L, ncon)
+    }
+  } else {
+    cont_lower <- cont_upper <- numeric(0L)
+    cont_bbin <- integer(0L)
+  }
+
+  cat_lower <- rep.int(0, ncat)
+  cat_upper <- setup$cat_upper * setup$bandwidth.scale.categorical
+  cat_bbin <- rep.int(0L, ncat)
+
+  list(
+    lower = c(cont_lower, cat_lower),
+    upper = c(cont_upper, cat_upper),
+    bbin = c(cont_bbin, cat_bbin),
+    ncon = ncon,
+    ncat = ncat
+  )
+}
+
+.npregbw_nomad_complete_bw_start_point <- function(point, bounds, setup) {
+  if (identical(setup$type, "fixed")) {
+    return(.np_nomad_complete_start_point(
+      point = point,
+      lower = bounds$lower,
+      upper = bounds$upper,
+      ncont = bounds$ncon
+    ))
+  }
+
+  n <- length(bounds$lower)
+  out <- rep(NA_real_, n)
+
+  if (!is.null(point)) {
+    point <- as.numeric(point)
+    if (length(point) == n)
+      out <- point
+  }
+
+  ncon <- bounds$ncon
+  if (ncon > 0L) {
+    cont.idx <- seq_len(ncon)
+    cont.default <- sqrt(bounds$upper[cont.idx])
+    cont.default <- pmax(bounds$lower[cont.idx], pmin(bounds$upper[cont.idx], cont.default))
+    bad <- !is.finite(out[cont.idx]) | out[cont.idx] <= 0 |
+      out[cont.idx] < bounds$lower[cont.idx] | out[cont.idx] > bounds$upper[cont.idx]
+    out[cont.idx][bad] <- cont.default[bad]
+  }
+
+  if (bounds$ncat > 0L) {
+    cat.idx <- ncon + seq_len(bounds$ncat)
+    cat.default <- pmax(bounds$lower[cat.idx], pmin(bounds$upper[cat.idx], 0.5 * bounds$upper[cat.idx]))
+    bad <- !is.finite(out[cat.idx]) |
+      out[cat.idx] < bounds$lower[cat.idx] | out[cat.idx] > bounds$upper[cat.idx]
+    out[cat.idx][bad] <- cat.default[bad]
+  }
+
+  vapply(
+    seq_len(n),
+    function(i) .np_nomad_coerce_start_value(out[i], type = bounds$bbin[i], lb = bounds$lower[i], ub = bounds$upper[i]),
+    numeric(1L)
   )
 }
 
@@ -1367,9 +1451,13 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   ncat <- length(setup$cat_idx)
 
   if (ncon > 0L) {
-    gamma <- point[seq_len(ncon)]
-    ext_bw <- gamma * setup$cont_scale
-    bws[setup$cont_idx] <- if (isTRUE(template$scaling)) gamma else ext_bw
+    cont_point <- point[seq_len(ncon)]
+    if (identical(setup$type, "fixed")) {
+      ext_bw <- cont_point * setup$cont_scale
+      bws[setup$cont_idx] <- if (isTRUE(template$scaling)) cont_point else ext_bw
+    } else {
+      bws[setup$cont_idx] <- round(cont_point)
+    }
   }
 
   if (ncat > 0L) {
@@ -1386,10 +1474,14 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
 
   if (length(setup$cont_idx) > 0L) {
     raw <- bws[setup$cont_idx]
-    point[seq_along(setup$cont_idx)] <- if (isTRUE(template$scaling)) {
-      raw
+    point[seq_along(setup$cont_idx)] <- if (identical(setup$type, "fixed")) {
+      if (isTRUE(template$scaling)) {
+        raw
+      } else {
+        raw / setup$cont_scale
+      }
     } else {
-      raw / setup$cont_scale
+      round(raw)
     }
   }
 
@@ -1638,18 +1730,15 @@ npRmpiNomadShadowSearchRegression <- function(template,
     yname = yname
   )
 
-  if (!identical(template$type, "fixed"))
-    stop("automatic degree search with search.engine='nomad' currently requires bwtype='fixed'")
+  if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
+    stop("automatic degree search with search.engine='nomad' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
 
   setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
 
-  cont_lower <- npGetScaleFactorSearchLower(template,
-                                            argname = "template$scale.factor.search.lower")
-  bw_lower <- c(rep.int(cont_lower, ncon), rep.int(0, ncat))
-  bw_upper <- c(rep.int(1e6, ncon), setup$cat_upper * setup$bandwidth.scale.categorical)
+  bw_bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
 
   point.start <- if (all(template$bw == 0)) {
     NULL
@@ -1657,17 +1746,16 @@ npRmpiNomadShadowSearchRegression <- function(template,
     .npregbw_nomad_bw_to_point(template$bw, template = template, setup = setup)
   }
   x0 <- c(
-    .np_nomad_complete_start_point(
+    .npregbw_nomad_complete_bw_start_point(
       point = point.start,
-      lower = bw_lower,
-      upper = bw_upper,
-      ncont = ncon
+      bounds = bw_bounds,
+      setup = setup
     ),
     as.integer(degree.search$start.degree)
   )
-  lb <- c(bw_lower, degree.search$lower)
-  ub <- c(bw_upper, degree.search$upper)
-  bbin <- c(rep.int(0L, ncon + ncat), rep.int(1L, ncon))
+  lb <- c(bw_bounds$lower, degree.search$lower)
+  ub <- c(bw_bounds$upper, degree.search$upper)
+  bbin <- c(bw_bounds$bbin, rep.int(1L, ncon))
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
@@ -2134,8 +2222,9 @@ npregbw.default <-
           !identical(as.character(match.arg(nomad.shortcut$values$regtype, c("lc", "ll", "lp")))[1L], "lp"))
         stop("nomad=TRUE requires regtype='lp'")
       if ("bwtype" %in% mc.names &&
-          !identical(as.character(match.arg(nomad.shortcut$values$bwtype, c("fixed", "generalized_nn", "adaptive_nn")))[1L], "fixed"))
-        stop("nomad=TRUE currently requires bwtype='fixed'")
+          !(as.character(match.arg(nomad.shortcut$values$bwtype, c("fixed", "generalized_nn", "adaptive_nn")))[1L] %in%
+              c("fixed", "generalized_nn", "adaptive_nn")))
+        stop("nomad=TRUE requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
       if ("degree.select" %in% mc.names &&
           identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
         stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
