@@ -304,7 +304,8 @@ summary.condbandwidth <- function(object, ...) {
   cat(genOmitStr(object))
   cat(genBwSelStr(object))
 
-  cat(paste("\n", genBwScaleStrs(object), sep=""))
+  cat("\n")
+  cat(genBwScaleStrs(object))
   cat(genBwKerStrs(object))
 
   cat(genTimingStr(object))
