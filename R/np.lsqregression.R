@@ -757,9 +757,7 @@ nplsqregbw.default <-
                    !is.na(previous.idx) &&
                    !is.null(bw.list[[previous.idx]]$reg.bws)) {
           warm.bws <- bw.list[[previous.idx]]$reg.bws
-          warm.bws$method <- "cv.ls"
-          warm.bws$pmethod <- "Least Squares Cross-Validation"
-          one.args$bws <- warm.bws
+          one.args$bws <- as.numeric(warm.bws$bw)
           if (!is.null(warm.bws$degree) &&
               isTRUE(warm.bws$ncon > 0L) &&
               length(warm.bws$degree) == warm.bws$ncon) {
@@ -1000,6 +998,12 @@ nplsqreg.formula <-
     out$call <- match.call(expand.dots = FALSE)
     environment(out$call) <- parent.frame()
     out$bws$formula <- bws
+    if (!is.null(out$bws$tau.bws))
+      for (j in seq_along(out$bws$tau.bws))
+        out$bws$tau.bws[[j]]$formula <- bws
+    if (!is.null(out$tau.fits))
+      for (j in seq_along(out$tau.fits))
+        out$tau.fits[[j]]$bws$formula <- bws
     out
   }
 
