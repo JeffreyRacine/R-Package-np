@@ -168,15 +168,22 @@ nplsqregbw <-
 }
 
 .nplsqreg_optimizer_controls <- function(dots, optim.control) {
+  itmax <- if (!is.null(optim.control$maxit)) {
+    npValidatePositiveInteger(optim.control$maxit, "optim.control$maxit")
+  } else {
+    10000L
+  }
+  if (!is.null(dots$itmax))
+    itmax <- npValidatePositiveInteger(dots$itmax, "itmax")
+
   out <- list(
     nmulti = if (!is.null(dots$nmulti)) npValidateNmulti(dots$nmulti) else 1L,
-    itmax = if (!is.null(dots$itmax)) npValidatePositiveInteger(dots$itmax, "itmax") else 100L,
+    itmax = itmax,
     ftol = if (!is.null(dots$ftol)) npValidatePositiveFiniteNumeric(dots$ftol, "ftol") else 1.490116e-07,
     tol = if (!is.null(dots$tol)) npValidatePositiveFiniteNumeric(dots$tol, "tol") else 1.490116e-04,
+    small = if (!is.null(dots$small)) npValidatePositiveFiniteNumeric(dots$small, "small") else 1.490116e-05,
     powell.remin = if (!is.null(dots$powell.remin)) npValidateScalarLogical(dots$powell.remin, "powell.remin") else TRUE
   )
-  if (!is.null(optim.control$maxit))
-    out$itmax <- npValidatePositiveInteger(optim.control$maxit, "optim.control$maxit")
   out
 }
 
@@ -812,7 +819,7 @@ nplsqregbw.default <-
       reg.dots$basis <- NULL
       reg.dots$bernstein.basis <- NULL
     }
-    opt.args <- c(reg.dots, list(optim.control = optim.control))
+    opt.args <- utils::modifyList(dots, controls)
 
     if (is.null(scale)) {
       pilot <- .nplsqreg_scale_pilot(
