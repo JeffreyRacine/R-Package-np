@@ -40,12 +40,32 @@ nplsqregbw <-
     }
   }
 
+.nplsqreg_validate_tau_values <- function(tau, allow.duplicates = FALSE) {
+  if (!is.numeric(tau) || !length(tau) || anyNA(tau) ||
+      any(!is.finite(tau)) || any(tau <= 0) || any(tau >= 1))
+    stop("'tau' must contain finite numeric values in (0, 1)",
+         call. = FALSE)
+  tau <- as.numeric(tau)
+  if (!isTRUE(allow.duplicates) && anyDuplicated(tau))
+    stop("duplicate 'tau' values are not supported in this nplsqreg tranche",
+         call. = FALSE)
+  tau
+}
+
 .nplsqreg_validate_tau <- function(tau) {
-  if (!is.numeric(tau) || length(tau) != 1L || is.na(tau) ||
-      !is.finite(tau) || tau <= 0 || tau >= 1)
+  tau <- .nplsqreg_validate_tau_values(tau, allow.duplicates = TRUE)
+  if (length(tau) != 1L)
     stop("'tau' must be a single finite numeric value in (0, 1)",
          call. = FALSE)
-  as.numeric(tau)
+  tau
+}
+
+.nplsqreg_tau_labels <- function(tau) {
+  paste0("tau=", format(tau, trim = TRUE, scientific = FALSE))
+}
+
+.nplsqreg_validate_tau_search <- function(tau.search) {
+  match.arg(tau.search, c("full", "refined"))
 }
 
 .nplsqreg_check_loss <- function(u, tau) {
@@ -206,7 +226,7 @@ nplsqregbw <-
     "nomad", "nomad.nmulti", "nomad.remin", "search.engine",
     "degree.select", "degree.min", "degree.max", "degree.start",
     "degree.restarts", "degree.max.cycles", "degree.verify",
-    "optim.control", "delta.bounds"
+    "optim.control", "delta.bounds", "tau.search"
   )
   dots[setdiff(names(dots), optimizer.names)]
 }
@@ -740,6 +760,84 @@ nplsqregbw <-
   result
 }
 
+.nplsqreg_combine_bandwidths <- function(bw.list, tau, tau.search = "full",
+                                         call = NULL) {
+  if (!length(bw.list))
+    stop("internal error: no scalar nplsqreg bandwidths to combine",
+         call. = FALSE)
+  tau <- .nplsqreg_validate_tau_values(tau)
+  if (length(bw.list) != length(tau))
+    stop("internal error: tau and bandwidth-list lengths differ",
+         call. = FALSE)
+  labels <- .nplsqreg_tau_labels(tau)
+  first <- bw.list[[1L]]
+  out <- first
+  out$bw <- do.call(cbind, lapply(bw.list, `[[`, "bw"))
+  colnames(out$bw) <- labels
+  out$tau <- tau
+  out$delta <- stats::setNames(vapply(bw.list, `[[`, numeric(1L), "delta"),
+                              labels)
+  out$objective <- stats::setNames(
+    vapply(bw.list, function(z) as.numeric(z$objective[1L]), numeric(1L)),
+    labels)
+  out$qdat <- do.call(cbind, lapply(bw.list, `[[`, "qdat"))
+  colnames(out$qdat) <- labels
+  out$tau.bws <- stats::setNames(bw.list, labels)
+  out$tau.search <- tau.search
+  out$fit.order <- seq_along(tau)
+  out$pilot.shared <- TRUE
+  out$call <- call
+  class(out) <- "lsqregressionbandwidth"
+  out
+}
+
+.nplsqreg_combine_fits <- function(fit.list, tau, bws, tau.search = "full",
+                                   call = NULL) {
+  if (!length(fit.list))
+    stop("internal error: no scalar nplsqreg fits to combine", call. = FALSE)
+  tau <- .nplsqreg_validate_tau_values(tau)
+  if (length(fit.list) != length(tau))
+    stop("internal error: tau and fit-list lengths differ", call. = FALSE)
+  labels <- .nplsqreg_tau_labels(tau)
+  first <- fit.list[[1L]]
+  out <- first
+  out$bw <- bws$bw
+  out$bws <- bws
+  out$reg.bws <- stats::setNames(lapply(fit.list, `[[`, "reg.bws"), labels)
+  out$fit <- stats::setNames(lapply(fit.list, `[[`, "fit"), labels)
+  out$tau <- tau
+  out$delta <- bws$delta
+  out$quantile <- do.call(cbind, lapply(fit.list, `[[`, "quantile"))
+  colnames(out$quantile) <- labels
+  out$quanterr <- do.call(cbind, lapply(fit.list, `[[`, "quanterr"))
+  colnames(out$quanterr) <- labels
+  if (isTRUE(first$gradients)) {
+    p <- ncol(fit.list[[1L]]$quantgrad)
+    grad.names <- colnames(fit.list[[1L]]$quantgrad)
+    out$quantgrad <- array(NA_real_,
+                           dim = c(nrow(fit.list[[1L]]$quantgrad), p, length(tau)),
+                           dimnames = list(NULL, grad.names, labels))
+    out$quantgerr <- array(NA_real_,
+                           dim = c(nrow(fit.list[[1L]]$quantgerr), p, length(tau)),
+                           dimnames = list(NULL, grad.names, labels))
+    for (j in seq_along(tau)) {
+      out$quantgrad[, , j] <- fit.list[[j]]$quantgrad
+      out$quantgerr[, , j] <- fit.list[[j]]$quantgerr
+    }
+  } else {
+    out$quantgrad <- NA
+    out$quantgerr <- NA
+  }
+  out$objective <- bws$objective
+  out$optim <- stats::setNames(lapply(fit.list, `[[`, "optim"), labels)
+  out$tau.fits <- stats::setNames(fit.list, labels)
+  out$tau.search <- tau.search
+  out$pilot.shared <- TRUE
+  out$call <- call
+  class(out) <- "lsqregression"
+  out
+}
+
 nplsqregbw.formula <-
   function(bws, data = NULL, tau = 0.5, ...) {
     tt <- terms(bws)
@@ -763,8 +861,8 @@ nplsqregbw.formula <-
   }
 
 nplsqregbw.lsqregressionbandwidth <- function(bws, tau = bws$tau, ...) {
-  tau <- .nplsqreg_validate_tau(tau)
-  if (!isTRUE(all.equal(tau, bws$tau)))
+  tau <- .nplsqreg_validate_tau_values(tau)
+  if (length(tau) != length(bws$tau) || !isTRUE(all.equal(tau, bws$tau)))
     stop("cross-tau nplsqreg bandwidth-object reuse is not supported",
          call. = FALSE)
   bws
@@ -779,6 +877,7 @@ nplsqregbw.default <-
            ydat = stop("invoked without data 'ydat'"),
            bws,
            tau = 0.5,
+           tau.search = c("full", "refined"),
            delta = NULL,
            scale = NULL,
            regtype.pilot = c("auto", "ll", "lc", "lp"),
@@ -790,7 +889,45 @@ nplsqregbw.default <-
            ...) {
 
     elapsed.start <- proc.time()[3]
-    tau <- .nplsqreg_validate_tau(tau)
+    tau.raw <- .nplsqreg_validate_tau_values(tau)
+    tau.search <- .nplsqreg_validate_tau_search(tau.search)
+    if (length(tau.raw) > 1L) {
+      if (!identical(tau.search, "full"))
+        stop("tau.search='refined' is not implemented in this nplsqreg tranche",
+             call. = FALSE)
+      bws.missing <- missing(bws)
+      bw.list <- vector("list", length(tau.raw))
+      shared.scale <- scale
+      for (j in seq_along(tau.raw)) {
+        one.args <- list(
+          xdat = xdat,
+          ydat = ydat,
+          tau = tau.raw[[j]],
+          tau.search = "full",
+          delta = delta,
+          scale = shared.scale,
+          regtype.pilot = regtype.pilot,
+          nomad.pilot = nomad.pilot,
+          pilot.args = pilot.args,
+          bandwidth.compute = bandwidth.compute,
+          delta.bounds = delta.bounds,
+          optim.control = optim.control
+        )
+        if (!bws.missing)
+          one.args$bws <- bws
+        bw.list[[j]] <- do.call(nplsqregbw.default, c(one.args, list(...)))
+        if (is.null(shared.scale))
+          shared.scale <- bw.list[[j]]$scale
+      }
+      out <- .nplsqreg_combine_bandwidths(
+        bw.list = bw.list,
+        tau = tau.raw,
+        tau.search = tau.search,
+        call = match.call(expand.dots = FALSE))
+      environment(out$call) <- parent.frame()
+      return(out)
+    }
+    tau <- .nplsqreg_validate_tau(tau.raw)
     regtype.pilot <- match.arg(regtype.pilot)
     nomad.pilot <- npValidateScalarLogical(nomad.pilot, "nomad.pilot")
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute,
@@ -1007,14 +1144,36 @@ nplsqreg.formula <-
 
 nplsqreg.lsqregressionbandwidth <-
   function(bws, txdat = NULL, tydat = NULL, tau = bws$tau, ...) {
-    tau <- .nplsqreg_validate_tau(tau)
-    if (!isTRUE(all.equal(tau, bws$tau)))
+    tau <- .nplsqreg_validate_tau_values(tau)
+    if (length(tau) != length(bws$tau) || !isTRUE(all.equal(tau, bws$tau)))
       stop("cross-tau nplsqreg bandwidth-object reuse is not supported",
            call. = FALSE)
     if (is.null(txdat))
       txdat <- bws$xdat
     if (is.null(tydat))
       tydat <- bws$ydat
+    if (length(tau) > 1L) {
+      if (is.null(bws$tau.bws) || length(bws$tau.bws) != length(tau))
+        stop("vector nplsqreg bandwidth object lacks per-tau bandwidth state",
+             call. = FALSE)
+      fit.list <- lapply(seq_along(tau), function(j) {
+        one.bws <- bws$tau.bws[[j]]
+        one.bws$formula <- bws$formula
+        nplsqreg.default(bws = one.bws,
+                         txdat = txdat,
+                         tydat = tydat,
+                         tau = tau[[j]],
+                         ...)
+      })
+      out <- .nplsqreg_combine_fits(
+        fit.list = fit.list,
+        tau = tau,
+        bws = bws,
+        tau.search = if (is.null(bws$tau.search)) "full" else bws$tau.search,
+        call = match.call(expand.dots = FALSE))
+      environment(out$call) <- parent.frame()
+      return(out)
+    }
     nplsqreg.default(bws = bws, txdat = txdat, tydat = tydat, tau = tau, ...)
   }
 
@@ -1032,12 +1191,12 @@ nplsqreg.default <-
            residuals = FALSE,
            ...) {
 
-    tau <- .nplsqreg_validate_tau(tau)
+    tau.raw <- .nplsqreg_validate_tau_values(tau)
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
 
     if (missing(bws) || !isa(bws, "lsqregressionbandwidth")) {
-      bw.args <- list(xdat = txdat, ydat = tydat, tau = tau)
+      bw.args <- list(xdat = txdat, ydat = tydat, tau = tau.raw)
       if (!missing(bws))
         bw.args$bws <- bws
       bw <- do.call(nplsqregbw, c(bw.args, list(...)))
@@ -1047,6 +1206,18 @@ nplsqreg.default <-
         fit.args$exdat <- exdat
       return(do.call(nplsqreg, fit.args))
     }
+
+    if (length(tau.raw) > 1L)
+      return(nplsqreg.lsqregressionbandwidth(
+        bws = bws,
+        txdat = txdat,
+        tydat = tydat,
+        tau = tau.raw,
+        gradients = gradients,
+        residuals = residuals,
+        ...
+      ))
+    tau <- .nplsqreg_validate_tau(tau.raw)
 
     if (!isTRUE(all.equal(tau, bws$tau)))
       stop("cross-tau nplsqreg bandwidth-object reuse is not supported",

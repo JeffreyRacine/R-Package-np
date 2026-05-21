@@ -122,10 +122,20 @@ lsqregression <-
 
 print.lsqregressionbandwidth <- function(x, digits = NULL, ...) {
   cat("\nLocation-scale quantile regression bandwidth object\n", sep = "")
-  cat("Tau: ", format(x$tau, trim = TRUE),
-      "  Delta: ", format(x$delta, trim = TRUE),
-      "  Objective: ", format(x$objective, trim = TRUE), "\n\n", sep = "")
-  print(x$reg.bws, digits = digits)
+  if (length(x$tau) > 1L) {
+    cat("Tau values: ", paste(format(x$tau, trim = TRUE), collapse = ", "),
+        "\n", sep = "")
+    cat("Tau search: ", if (is.null(x$tau.search)) "full" else x$tau.search,
+        "\n\n", sep = "")
+    print(data.frame(tau = x$tau,
+                     delta = as.numeric(x$delta),
+                     objective = as.numeric(x$objective)))
+  } else {
+    cat("Tau: ", format(x$tau, trim = TRUE),
+        "  Delta: ", format(x$delta, trim = TRUE),
+        "  Objective: ", format(x$objective, trim = TRUE), "\n\n", sep = "")
+    print(x$reg.bws, digits = digits)
+  }
   invisible(x)
 }
 
@@ -137,14 +147,24 @@ print.lsqregression <- function(x, digits = NULL, ...) {
       if (x$trainiseval) "" else paste(" and ", x$nobs,
                                        " evaluation points,", sep = ""),
       " in ", x$ndim, " variable(s)\n", sep = "")
-  cat("Tau: ", format(x$tau, trim = TRUE),
-      "  Delta: ", format(x$delta, trim = TRUE),
-      "  Objective: ", format(x$objective, trim = TRUE), "\n\n", sep = "")
-  print(matrix(x$bw, ncol = x$ndim,
-               dimnames = list(paste(x$pscaling, ":", sep = ""),
-                               x$xnames)))
-  cat(genRegEstStr(x$fit))
-  cat(genBwKerStrs(x$reg.bws))
+  if (length(x$tau) > 1L) {
+    cat("Tau values: ", paste(format(x$tau, trim = TRUE), collapse = ", "),
+        "\n", sep = "")
+    cat("Tau search: ", if (is.null(x$tau.search)) "full" else x$tau.search,
+        "\n\n", sep = "")
+    print(data.frame(tau = x$tau,
+                     delta = as.numeric(x$delta),
+                     objective = as.numeric(x$objective)))
+  } else {
+    cat("Tau: ", format(x$tau, trim = TRUE),
+        "  Delta: ", format(x$delta, trim = TRUE),
+        "  Objective: ", format(x$objective, trim = TRUE), "\n\n", sep = "")
+    print(matrix(x$bw, ncol = x$ndim,
+                 dimnames = list(paste(x$pscaling, ":", sep = ""),
+                                 x$xnames)))
+    cat(genRegEstStr(x$fit))
+    cat(genBwKerStrs(x$reg.bws))
+  }
   cat("\n\n")
   if (!missing(...))
     print(..., digits = digits)
@@ -196,6 +216,26 @@ gradients.lsqregression <- function(x, errors = FALSE, ...) {
 
 predict.lsqregression <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
+  if (length(object$tau) > 1L) {
+    if (is.null(object$tau.fits) || length(object$tau.fits) != length(object$tau))
+      stop("vector nplsqreg object lacks per-tau fit state", call. = FALSE)
+    labels <- .nplsqreg_tau_labels(object$tau)
+    pred <- lapply(object$tau.fits, predict.lsqregression,
+                   se.fit = se.fit, ...)
+    if (se.fit) {
+      fit <- do.call(cbind, lapply(pred, `[[`, "fit"))
+      se.out <- do.call(cbind, lapply(pred, `[[`, "se.fit"))
+      colnames(fit) <- labels
+      colnames(se.out) <- labels
+      return(list(fit = fit,
+                  se.fit = se.out,
+                  df = pred[[1L]]$df,
+                  residual.scale = pred[[1L]]$residual.scale))
+    }
+    out <- do.call(cbind, pred)
+    colnames(out) <- labels
+    return(out)
+  }
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
 
