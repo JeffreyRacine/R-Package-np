@@ -1645,43 +1645,52 @@ npscoefbw.scbandwidth <-
   template.reg.args$regtype <- "lp"
   template.reg.args$degree <- as.integer(degree.search$start.degree)
   template.reg.args$bernstein.basis <- degree.search$bernstein.basis
+  template.type <- if (is.recursive(bws) && !is.null(bws$type) && length(bws$type)) {
+    as.character(bws$type[1L])
+  } else if (!is.null(template.reg.args$bwtype) && length(template.reg.args$bwtype)) {
+    as.character(template.reg.args$bwtype[1L])
+  } else {
+    "fixed"
+  }
+  template.bws <- bws
+  if (!identical(template.type, "fixed") &&
+      is.numeric(template.bws) &&
+      length(template.bws) > 0L &&
+      all(template.bws == 0)) {
+    nn.start <- max(2L, min(as.integer(NROW(eval.zdat)) - 1L, as.integer(round(sqrt(NROW(eval.zdat))))))
+    template.bws <- rep.int(as.double(nn.start), length(template.bws))
+  }
 
   template <- .npscoefbw_build_scbandwidth(
     xdat = xdat,
     ydat = ydat,
     zdat = zdat,
-    bws = bws,
+    bws = template.bws,
     bandwidth.compute = FALSE,
     reg.args = template.reg.args
   )
 
-  if (!identical(template$type, "fixed"))
-    stop("automatic degree search with search.engine='nomad' currently requires bwtype='fixed'")
+  if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
+    stop("automatic degree search with search.engine='nomad' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
   setup <- .npregbw_nomad_bw_setup(xdat = eval.zdat, template = template)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
   ndeg <- length(degree.search$start.degree)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(NCOL(eval.zdat)) else npValidateNmulti(opt.args$nmulti[1L])
 
-  cont_lower <- npGetScaleFactorSearchLower(
-    template,
-    argname = "template$scale.factor.search.lower"
-  )
-  bw_lower <- c(rep.int(cont_lower, ncon), rep.int(0, ncat))
-  bw_upper <- c(rep.int(1e6, ncon), setup$cat_upper * setup$bandwidth.scale.categorical)
+  bw_bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
 
   x0 <- c(
-    .np_nomad_complete_start_point(
+    .npregbw_nomad_complete_bw_start_point(
       point = if (all(template$bw == 0)) NULL else .npregbw_nomad_bw_to_point(template$bw, template = template, setup = setup),
-      lower = bw_lower,
-      upper = bw_upper,
-      ncont = ncon
+      bounds = bw_bounds,
+      setup = setup
     ),
     as.integer(degree.search$start.degree)
   )
-  lb <- c(bw_lower, degree.search$lower)
-  ub <- c(bw_upper, degree.search$upper)
-  bbin <- c(rep.int(0L, ncon + ncat), rep.int(1L, ndeg))
+  lb <- c(bw_bounds$lower, degree.search$lower)
+  ub <- c(bw_bounds$upper, degree.search$upper)
+  bbin <- c(bw_bounds$bbin, rep.int(1L, ndeg))
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
@@ -1698,6 +1707,7 @@ npscoefbw.scbandwidth <-
     eval.reg.args$regtype <- "lp"
     eval.reg.args$degree <- degree
     eval.reg.args$bernstein.basis <- degree.search$bernstein.basis
+    eval.reg.args$bwtype <- template$type
 
     tbw <- .npscoefbw_build_scbandwidth(
       xdat = xdat,
@@ -1737,6 +1747,7 @@ npscoefbw.scbandwidth <-
       final.reg.args$regtype <- "lp"
       final.reg.args$degree <- degree
       final.reg.args$bernstein.basis <- degree.search$bernstein.basis
+      final.reg.args$bwtype <- template$type
 
       tbw <- .npscoefbw_build_scbandwidth(
         xdat = xdat,
@@ -1766,6 +1777,7 @@ npscoefbw.scbandwidth <-
       hot.reg.args$regtype <- "lp"
       hot.reg.args$degree <- degree
       hot.reg.args$bernstein.basis <- degree.search$bernstein.basis
+      hot.reg.args$bwtype <- template$type
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
         strategy = "single_iteration",
@@ -2047,8 +2059,9 @@ npscoefbw.default <-
           !identical(as.character(match.arg(nomad.shortcut$values$regtype, c("lc", "ll", "lp")))[1L], "lp"))
         stop("nomad=TRUE requires regtype='lp'")
       if ("bwtype" %in% mc.names &&
-          !identical(as.character(match.arg(nomad.shortcut$values$bwtype, c("fixed", "generalized_nn", "adaptive_nn")))[1L], "fixed"))
-        stop("nomad=TRUE currently requires bwtype='fixed'")
+          !(as.character(match.arg(nomad.shortcut$values$bwtype, c("fixed", "generalized_nn", "adaptive_nn")))[1L] %in%
+              c("fixed", "generalized_nn", "adaptive_nn")))
+        stop("nomad=TRUE requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
       if ("degree.select" %in% mc.names &&
           identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
         stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
