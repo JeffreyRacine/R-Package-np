@@ -60,16 +60,43 @@ nplsqregbw <-
   as.numeric(scale)
 }
 
-.nplsqreg_scale_pilot <- function(xdat, ydat, dots) {
-  mean.args <- c(list(txdat = xdat, tydat = ydat), dots)
+.nplsqreg_scale_pilot <- function(xdat, ydat, dots,
+                                  regtype.pilot = c("auto", "ll", "lc", "lp"),
+                                  nomad.pilot = FALSE,
+                                  pilot.args = list()) {
+  xdat <- toFrame(xdat)
+  regtype.pilot <- match.arg(regtype.pilot)
+  nomad.pilot <- npValidateScalarLogical(nomad.pilot, "nomad.pilot")
+  if (!is.list(pilot.args))
+    stop("'pilot.args' must be a list", call. = FALSE)
+
+  ncon <- sum(vapply(xdat, function(z) inherits(z, c("integer", "numeric")),
+                     logical(1)))
+  if (isTRUE(nomad.pilot)) {
+    if (!(regtype.pilot %in% c("auto", "lp")))
+      stop("nomad.pilot=TRUE requires regtype.pilot='auto' or 'lp'",
+           call. = FALSE)
+    regtype.pilot <- "lp"
+  } else if (identical(regtype.pilot, "auto")) {
+    regtype.pilot <- if (ncon > 0L) "ll" else "lc"
+  }
+
+  pilot.dots <- utils::modifyList(dots, pilot.args)
+  pilot.dots$regtype <- regtype.pilot
+  if (isTRUE(nomad.pilot))
+    pilot.dots$nomad <- TRUE
+
+  mean.args <- c(list(txdat = xdat, tydat = ydat), pilot.dots)
   mean.fit <- do.call(npreg, mean.args)
   res <- as.numeric(ydat) - as.numeric(fitted(mean.fit))
-  scale.args <- c(list(txdat = xdat, tydat = res^2), dots)
-  scale.fit <- do.call(npreg, scale.args)
-  scale <- sqrt(abs(as.numeric(fitted(scale.fit))))
-  floor <- sqrt(.Machine$double.eps)
-  scale[!is.finite(scale) | scale <= floor] <- floor
-  list(scale = scale, mean.fit = mean.fit, scale.fit = scale.fit)
+  scale.fit <- npreg(bws = mean.fit$bws, txdat = xdat, tydat = res^2)
+  variance.hat <- as.numeric(fitted(scale.fit))
+  floor <- .Machine$double.eps
+  variance.hat <- pmax(floor, variance.hat)
+  variance.hat[!is.finite(variance.hat)] <- floor
+  scale <- sqrt(variance.hat)
+  list(scale = scale, mean.fit = mean.fit, scale.fit = scale.fit,
+       regtype.pilot = regtype.pilot, nomad.pilot = nomad.pilot)
 }
 
 .nplsqreg_rebuild_rbandwidth <- function(template, bw, ydat, xdat = NULL,
@@ -754,6 +781,9 @@ nplsqregbw.default <-
            tau = 0.5,
            delta = NULL,
            scale = NULL,
+           regtype.pilot = c("auto", "ll", "lc", "lp"),
+           nomad.pilot = FALSE,
+           pilot.args = list(),
            bandwidth.compute = TRUE,
            delta.bounds = c(1e-4, 1 - 1e-4),
            optim.control = list(maxit = 50L),
@@ -761,6 +791,8 @@ nplsqregbw.default <-
 
     elapsed.start <- proc.time()[3]
     tau <- .nplsqreg_validate_tau(tau)
+    regtype.pilot <- match.arg(regtype.pilot)
+    nomad.pilot <- npValidateScalarLogical(nomad.pilot, "nomad.pilot")
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute,
                                                  "bandwidth.compute")
     controls <- .nplsqreg_optimizer_controls(list(...), optim.control)
@@ -795,9 +827,19 @@ nplsqregbw.default <-
     opt.args <- c(reg.dots, list(optim.control = optim.control))
 
     if (is.null(scale)) {
-      pilot <- .nplsqreg_scale_pilot(xdat, ydat, reg.dots)
+      pilot <- .nplsqreg_scale_pilot(
+        xdat = xdat,
+        ydat = ydat,
+        dots = reg.dots,
+        regtype.pilot = regtype.pilot,
+        nomad.pilot = nomad.pilot,
+        pilot.args = pilot.args)
       scale <- pilot$scale
-      scale.type <- "fan-yao"
+      scale.type <- if (isTRUE(pilot$nomad.pilot)) {
+        "pilot-nomad"
+      } else {
+        paste0("pilot-", pilot$regtype.pilot)
+      }
       mean.fit <- pilot$mean.fit
       scale.fit <- pilot$scale.fit
     } else {

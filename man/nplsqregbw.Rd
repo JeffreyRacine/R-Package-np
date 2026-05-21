@@ -8,7 +8,7 @@
 \alias{summary.lsqregressionbandwidth}
 \title{Bandwidth selection for location-scale conditional quantile regression}
 \description{
-Selects fixed bandwidths and the scalar location-scale shift parameter
+Selects bandwidths and the scalar location-scale shift parameter
 \code{delta} for \code{\link{nplsqreg}} by minimizing leave-one-out check
 loss.
 }
@@ -20,17 +20,21 @@ nplsqregbw(bws, ...)
     \code{rbandwidth} object, a numeric bandwidth vector, or omitted for
     automatic selection.}
   \item{...}{additional arguments, including \code{xdat}, \code{ydat},
-    \code{tau}, \code{delta}, \code{scale}, \code{regtype}, \code{degree},
-    and kernel/bandwidth arguments forwarded to \code{\link{npregbw}}.}
+    \code{tau}, \code{delta}, \code{scale}, \code{regtype},
+    \code{regtype.pilot}, \code{nomad.pilot}, \code{pilot.args},
+    \code{degree}, and kernel/bandwidth arguments forwarded to
+    \code{\link{npregbw}}.}
 }
 \details{
-The default pilot scale is a Fan-Yao-style residual scale: first
-\code{\link{npreg}} estimates the conditional mean, then \code{\link{npreg}}
-smooths squared residuals, and the square root of that fitted variance is used
-as \code{scale_hat}. A positive user-supplied scale vector may be provided via
-\code{scale}.
+The default pilot scale is a residual scale: first \code{\link{npreg}}
+estimates the conditional mean, then \code{\link{npreg}} smooths squared
+residuals using the same bandwidth object, and the square root of the floored
+fitted variance is used as \code{scale_hat}. By default \code{regtype.pilot =
+"auto"} uses local linear smoothing when continuous predictors are present and
+local constant smoothing for categorical-only designs. A positive user-supplied
+scale vector may be provided via \code{scale}.
 
-This scratch implementation supports fixed bandwidths and scalar \code{tau}.
+This scratch implementation supports scalar \code{tau}.
 }
 \value{
 An object of class \code{lsqregressionbandwidth}.
