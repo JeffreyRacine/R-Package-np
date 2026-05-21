@@ -232,9 +232,10 @@ These arguments control regression type, local-polynomial specification, and opt
     \code{"nomad"} performs the direct joint NOMAD search without the
     Powell refinement. \code{"cell"} uses the legacy profiled
     degree-grid search built from repeated fixed-degree bandwidth
-    solves. NOMAD-based search currently requires \code{bwtype="fixed"},
-    \code{degree.verify=FALSE}, and the suggested package
-    \pkg{crs} to be installed.
+    solves. NOMAD-based search supports \code{bwtype="fixed"},
+    \code{bwtype="generalized_nn"}, and \code{bwtype="adaptive_nn"};
+    it currently requires \code{degree.verify=FALSE} and the suggested
+    package \pkg{crs} to be installed.
   }
 
   \item{nomad}{
@@ -250,7 +251,7 @@ These arguments control regression type, local-polynomial specification, and opt
     \code{bwtype="fixed"}. Explicit incompatible settings error
     immediately; in particular, \code{nomad=TRUE} currently requires
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
-    search, \code{bernstein.basis=TRUE}, no explicit \code{degree},
+    search, no explicit \code{degree},
     at least one continuous predictor, and
     \code{search.engine \%in\% c("nomad", "nomad+powell")}.
     This shortcut does not change the meaning of \code{nmulti} or
