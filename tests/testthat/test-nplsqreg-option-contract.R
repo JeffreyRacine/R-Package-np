@@ -145,6 +145,19 @@ test_that("nplsqreg plot uses quantile plot contract for multiple slices", {
                errors = "bootstrap", B = 3L)
   expect_true(all(c("quanterr", "bias") %in% names(bout$cd1)))
 
+  dat2 <- data.frame(
+    y = dat$y,
+    x1 = seq(0, 1, length.out = nrow(dat)),
+    x2 = cos(seq(0, 2, length.out = nrow(dat)))
+  )
+  fit2 <- nplsqreg(y ~ x1 + x2, data = dat2, tau = 0.5,
+                   scale = scale0, nmulti = 1L,
+                   optim.control = list(maxit = 2L))
+  out2 <- plot(fit2, output = "data", perspective = FALSE, neval = 6L)
+  expect_identical(names(out2), c("cd1", "cd2"))
+  expect_s3_class(out2$cd1, "lsqregression")
+  expect_s3_class(out2$cd2, "lsqregression")
+
   expect_error(
     plot(fit$tau.fits[[1L]], tau = c(0.25, 0.5), output = "data",
          perspective = FALSE),
