@@ -186,6 +186,39 @@ test_that("nplsqreg vector tau applies estimator options to each full-search tau
   expect_true(any(grepl("Bandwidth Selection Method: Check-Loss Cross-Validation", out.bw, fixed = TRUE)))
 })
 
+test_that("nplsqreg NOMAD vector tau summary reports per-tau degrees", {
+  options(np.messages = FALSE)
+  set.seed(20260524)
+  dat <- data.frame(
+    y = sin(seq(0, 2 * pi, length.out = 24L)) + rnorm(24L, sd = 0.1),
+    x1 = seq(0, 1, length.out = 24L),
+    x2 = cos(seq(0, 2, length.out = 24L))
+  )
+
+  fit <- nplsqreg(
+    y ~ x1 + x2,
+    data = dat,
+    tau = c(0.25, 0.5),
+    tau.search = "full",
+    nomad = TRUE,
+    scale = rep(1, nrow(dat)),
+    nmulti = 1L,
+    nomad.nmulti = 0L,
+    degree.max = 1L,
+    degree.restarts = 0L,
+    optim.control = list(maxit = 1L)
+  )
+
+  out.fit <- capture.output(summary(fit))
+  out.bw <- capture.output(summary(fit$bws))
+  expect_true(any(grepl("Continuous LP Degree(s):", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("Continuous LP Degree(s):", out.bw, fixed = TRUE)))
+  expect_true(any(grepl("tau=0.25", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("tau=0.50", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("x1", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("x2", out.fit, fixed = TRUE)))
+})
+
 test_that("nplsqreg residuals accessor exposes requested residuals", {
   options(np.messages = FALSE)
   set.seed(20260522)

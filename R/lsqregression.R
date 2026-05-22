@@ -264,8 +264,68 @@ lsqregression <-
   cat("\n")
 }
 
+.nplsqreg_degree_matrix <- function(x) {
+  bws <- if (inherits(x, "lsqregression")) x$bws else x
+  if (length(bws$tau) <= 1L || is.null(bws$tau.bws))
+    return(NULL)
+
+  first.rbw <- bws$tau.bws[[1L]]$reg.bws
+  if (is.null(first.rbw) || !identical(first.rbw$regtype, "lp") ||
+      isTRUE(first.rbw$ncon <= 0L))
+    return(NULL)
+
+  has.degree.search <- any(vapply(
+    bws$tau.bws,
+    function(z) {
+      rbw <- z$reg.bws
+      isTRUE(rbw$nomad.shortcut$enabled) || !is.null(rbw$degree.search)
+    },
+    logical(1L)))
+  if (!isTRUE(has.degree.search) && isTRUE(bws$child.degree.common))
+    return(NULL)
+
+  cont.names <- first.rbw$xnames[first.rbw$icon]
+  if (!length(cont.names))
+    cont.names <- paste0("x", seq_len(first.rbw$ncon))
+
+  degree.list <- lapply(bws$tau.bws, function(z) {
+    d <- z$reg.bws$degree
+    if (is.null(d) || !length(d))
+      return(rep.int(NA_integer_, length(cont.names)))
+    d <- as.integer(d)
+    if (length(d) == length(cont.names))
+      return(d)
+    rep_len(d, length(cont.names))
+  })
+
+  out <- do.call(rbind, degree.list)
+  rownames(out) <- .nplsqreg_tau_labels(bws$tau)
+  colnames(out) <- cont.names
+  out
+}
+
+.nplsqreg_degree_display <- function(x) {
+  degree.mat <- .nplsqreg_degree_matrix(x)
+  if (is.null(degree.mat))
+    return(invisible(FALSE))
+
+  cat("\nContinuous LP Degree(s):\n")
+  print(degree.mat)
+  invisible(TRUE)
+}
+
 .nplsqreg_summary_kernel_source <- function(x) {
   .nplsqreg_primary_reg_bws(x)
+}
+
+.nplsqreg_regression_type_label <- function(x) {
+  bws <- if (inherits(x, "lsqregression")) x$bws else x
+  rbw <- .nplsqreg_summary_kernel_source(x)
+  if (length(bws$tau) > 1L && identical(rbw$regtype, "lp")) {
+    rbw <- rbw
+    rbw$child.degree.common <- isTRUE(bws$child.degree.common)
+  }
+  npFormatRegressionType(rbw)
 }
 
 .nplsqreg_summary_header <- function(x, bandwidth = FALSE) {
@@ -299,9 +359,10 @@ lsqregression <-
   cat("Dep. Var. Name:", paste(bws$ynames, collapse = ", "), "\n\n")
   .nplsqreg_bandwidth_display(bws)
   .nplsqreg_delta_objective_display(bws)
+  .nplsqreg_degree_display(bws)
 
   if (bandwidth) {
-    cat("\nRegression Type:", npFormatRegressionType(rbw))
+    cat("\nRegression Type:", .nplsqreg_regression_type_label(bws))
     cat("\nBandwidth Selection Method:", bws$pmethod)
     if (!identical(bws$formula, NULL))
       cat("\nFormula:", paste(deparse(bws$formula), collapse = "\n"))
