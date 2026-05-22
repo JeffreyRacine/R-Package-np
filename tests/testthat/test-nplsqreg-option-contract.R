@@ -144,3 +144,35 @@ test_that("session nplsqreg formula subset and na.action match explicit fit path
   expect_true(any(grepl("NPLSQREG_FORMULA_SUBSET_NA_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
+
+test_that("session nplsqreg NOMAD vector tau summary reports per-tau degrees", {
+  skip_on_cran()
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves = 1L, quiet = TRUE)",
+      "options(np.messages = FALSE)",
+      "set.seed(20260524)",
+      "dat <- data.frame(y = sin(seq(0, 2 * pi, length.out = 24L)) + rnorm(24L, sd = 0.1), x1 = seq(0, 1, length.out = 24L), x2 = cos(seq(0, 2, length.out = 24L)))",
+      "fit <- nplsqreg(y ~ x1 + x2, data = dat, tau = c(0.25, 0.5), tau.search = 'full', nomad = TRUE, scale = rep(1, nrow(dat)), nmulti = 1L, nomad.nmulti = 0L, degree.max = 1L, degree.restarts = 0L, optim.control = list(maxit = 1L))",
+      "out.fit <- capture.output(summary(fit))",
+      "out.bw <- capture.output(summary(fit$bws))",
+      "stopifnot(any(grepl('Continuous LP Degree(s):', out.fit, fixed = TRUE)))",
+      "stopifnot(any(grepl('Continuous LP Degree(s):', out.bw, fixed = TRUE)))",
+      "stopifnot(any(grepl('tau=0.25', out.fit, fixed = TRUE)))",
+      "stopifnot(any(grepl('tau=0.50', out.fit, fixed = TRUE)))",
+      "stopifnot(any(grepl('x1', out.fit, fixed = TRUE)))",
+      "stopifnot(any(grepl('x2', out.fit, fixed = TRUE)))",
+      "cat('NPLSQREG_NOMAD_DEGREE_SUMMARY_OK\\n')"
+    ),
+    timeout = 90L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("NPLSQREG_NOMAD_DEGREE_SUMMARY_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
