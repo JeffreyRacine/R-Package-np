@@ -2002,7 +2002,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * objective_function_fast,
                    double * objective_function_guarded,
                    int * penalty_mode, double * penalty_mult,
-                   double * ckerlb, double * ckerub);
+                   double * ckerlb, double * ckerub,
+                   const int eval_only);
 void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         double * myeuno, double * myeord, double * myecon, double * mysd,
                         int * myopti, double * myoptd, double * myans, double * fval,
@@ -2010,7 +2011,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         double * objective_function_invalid, double * timing,
                         double * objective_function_fast,
                         int * penalty_mode, double * penalty_mult,
-                        double * ckerlb, double * ckerub);
+                        double * ckerlb, double * ckerub,
+                        const int eval_only);
 void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * u_uno, double * u_ord, double * u_con,
                                double * mysd,
@@ -4380,18 +4382,19 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
   return out;
 }
 
-SEXP C_np_density_bw(SEXP myuno,
-                     SEXP myord,
-                     SEXP mycon,
-                     SEXP mysd,
-                     SEXP myopti,
-                     SEXP myoptd,
-                     SEXP bw,
-                     SEXP hist_len,
-                     SEXP penalty_mode,
-                     SEXP penalty_mult,
-                     SEXP ckerlb,
-                     SEXP ckerub)
+static SEXP C_np_density_bw_common(SEXP myuno,
+                                   SEXP myord,
+                                   SEXP mycon,
+                                   SEXP mysd,
+                                   SEXP myopti,
+                                   SEXP myoptd,
+                                   SEXP bw,
+                                   SEXP hist_len,
+                                   SEXP penalty_mode,
+                                   SEXP penalty_mult,
+                                   SEXP ckerlb,
+                                   SEXP ckerub,
+                                   const int eval_only)
 {
   SEXP myuno_r=R_NilValue, myord_r=R_NilValue, mycon_r=R_NilValue, mysd_r=R_NilValue;
   SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
@@ -4404,8 +4407,6 @@ SEXP C_np_density_bw(SEXP myuno,
   int ncon = 0;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
-
-  np_reset_c_rng_for_bandwidth_search();
 
   if(hlen < 1) hlen = 1;
 
@@ -4440,7 +4441,7 @@ SEXP C_np_density_bw(SEXP myuno,
                 REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                 REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                 REAL(out_fast), REAL(out_guarded),
-                &pmode, &pmult, ckerlb_p, ckerub_p);
+                &pmode, &pmult, ckerlb_p, ckerub_p, eval_only);
   bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
   PROTECT(out = allocVector(VECSXP, 9));
@@ -4470,12 +4471,28 @@ SEXP C_np_density_bw(SEXP myuno,
   return out;
 }
 
-SEXP C_np_distribution_bw(SEXP myuno,
+SEXP C_np_density_bw(SEXP myuno,
+                     SEXP myord,
+                     SEXP mycon,
+                     SEXP mysd,
+                     SEXP myopti,
+                     SEXP myoptd,
+                     SEXP bw,
+                     SEXP hist_len,
+                     SEXP penalty_mode,
+                     SEXP penalty_mult,
+                     SEXP ckerlb,
+                     SEXP ckerub)
+{
+  np_reset_c_rng_for_bandwidth_search();
+  return C_np_density_bw_common(myuno, myord, mycon, mysd, myopti, myoptd,
+                                bw, hist_len, penalty_mode, penalty_mult,
+                                ckerlb, ckerub, 0);
+}
+
+SEXP C_np_density_bw_eval(SEXP myuno,
                           SEXP myord,
                           SEXP mycon,
-                          SEXP myeuno,
-                          SEXP myeord,
-                          SEXP myecon,
                           SEXP mysd,
                           SEXP myopti,
                           SEXP myoptd,
@@ -4485,6 +4502,28 @@ SEXP C_np_distribution_bw(SEXP myuno,
                           SEXP penalty_mult,
                           SEXP ckerlb,
                           SEXP ckerub)
+{
+  return C_np_density_bw_common(myuno, myord, mycon, mysd, myopti, myoptd,
+                                bw, hist_len, penalty_mode, penalty_mult,
+                                ckerlb, ckerub, 1);
+}
+
+static SEXP C_np_distribution_bw_common(SEXP myuno,
+                                        SEXP myord,
+                                        SEXP mycon,
+                                        SEXP myeuno,
+                                        SEXP myeord,
+                                        SEXP myecon,
+                                        SEXP mysd,
+                                        SEXP myopti,
+                                        SEXP myoptd,
+                                        SEXP bw,
+                                        SEXP hist_len,
+                                        SEXP penalty_mode,
+                                        SEXP penalty_mult,
+                                        SEXP ckerlb,
+                                        SEXP ckerub,
+                                        const int eval_only)
 {
   SEXP myuno_r=R_NilValue, myord_r=R_NilValue, mycon_r=R_NilValue;
   SEXP myeuno_r=R_NilValue, myeord_r=R_NilValue, myecon_r=R_NilValue, mysd_r=R_NilValue;
@@ -4498,8 +4537,6 @@ SEXP C_np_distribution_bw(SEXP myuno,
   int ncon = 0;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
-
-  np_reset_c_rng_for_bandwidth_search();
 
   if(hlen < 1) hlen = 1;
 
@@ -4534,7 +4571,7 @@ SEXP C_np_distribution_bw(SEXP myuno,
                      INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                      REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                      REAL(out_fast),
-                     &pmode, &pmult, ckerlb_p, ckerub_p);
+                     &pmode, &pmult, ckerlb_p, ckerub_p, eval_only);
   bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
   PROTECT(out = allocVector(VECSXP, 8));
@@ -4560,6 +4597,49 @@ SEXP C_np_distribution_bw(SEXP myuno,
 
   UNPROTECT(22);
   return out;
+}
+
+SEXP C_np_distribution_bw(SEXP myuno,
+                          SEXP myord,
+                          SEXP mycon,
+                          SEXP myeuno,
+                          SEXP myeord,
+                          SEXP myecon,
+                          SEXP mysd,
+                          SEXP myopti,
+                          SEXP myoptd,
+                          SEXP bw,
+                          SEXP hist_len,
+                          SEXP penalty_mode,
+                          SEXP penalty_mult,
+                          SEXP ckerlb,
+                          SEXP ckerub)
+{
+  np_reset_c_rng_for_bandwidth_search();
+  return C_np_distribution_bw_common(myuno, myord, mycon, myeuno, myeord, myecon,
+                                     mysd, myopti, myoptd, bw, hist_len,
+                                     penalty_mode, penalty_mult, ckerlb, ckerub, 0);
+}
+
+SEXP C_np_distribution_bw_eval(SEXP myuno,
+                               SEXP myord,
+                               SEXP mycon,
+                               SEXP myeuno,
+                               SEXP myeord,
+                               SEXP myecon,
+                               SEXP mysd,
+                               SEXP myopti,
+                               SEXP myoptd,
+                               SEXP bw,
+                               SEXP hist_len,
+                               SEXP penalty_mode,
+                               SEXP penalty_mult,
+                               SEXP ckerlb,
+                               SEXP ckerub)
+{
+  return C_np_distribution_bw_common(myuno, myord, mycon, myeuno, myeord, myecon,
+                                     mysd, myopti, myoptd, bw, hist_len,
+                                     penalty_mode, penalty_mult, ckerlb, ckerub, 1);
 }
 
 static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
@@ -5120,7 +5200,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * objective_function_fast,
                    double * objective_function_guarded,
                    int * penalty_mode, double * penalty_mult,
-                   double * ckerlb, double * ckerub){
+                   double * ckerlb, double * ckerub,
+                   const int eval_only){
   int_nn_k_min_extern = 1;
   /* Likelihood bandwidth selection for density estimation */
 
@@ -5172,7 +5253,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   num_obs_train_extern = myopti[BW_NOBSI];
   iMultistart = myopti[BW_IMULTII];
   iNum_Multistart = myopti[BW_NMULTII];
-  if (iNum_Multistart < 1)
+  if (!eval_only && iNum_Multistart < 1)
     error("C_np_density_bw: nmulti must be a positive integer");
 
   KERNEL_den_extern = myopti[BW_CKRNEVI];
@@ -5182,7 +5263,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int_use_starting_values= myopti[BW_USTARTI];
   int_LARGE_SF=myopti[BW_LSFI];
   BANDWIDTH_den_extern=myopti[BW_DENI];
-  enforce_fixed_feasibility = (BANDWIDTH_den_extern == BW_FIXED);
+  enforce_fixed_feasibility = ((BANDWIDTH_den_extern == BW_FIXED) && (!eval_only));
   int_RESTART_FROM_MIN = myopti[BW_REMINI];
   int_MINIMIZE_IO = myopti[BW_MINIOI];
 
@@ -5199,7 +5280,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     bwm_reserve_transform_buf(n + 1);
   }
   bwm_nn_cache_configure_for_powell(BANDWIDTH_den_extern,
-                                    0,
+                                    eval_only,
                                     0,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
@@ -5489,6 +5570,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   }
 
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret = fret_initial;
   iImproved = 0;
   have_start_best = 0;
   have_multistart_best = 0;
@@ -5516,23 +5598,25 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
   }
 
-  powell(0,
-         0,
-         vector_scale_factor,
-         vector_scale_factor,
-         matrix_y,
-         num_var,
-         ftol,
-         tol,
-         small,
-         itmax,
-         &iter,
-         &fret,
-         bwmfunc_wrapper);
+  if(!eval_only){
+    powell(0,
+           0,
+           vector_scale_factor,
+           vector_scale_factor,
+           matrix_y,
+           num_var,
+           ftol,
+           tol,
+           small,
+           itmax,
+           &iter,
+           &fret,
+           bwmfunc_wrapper);
+  }
 
   /* int_RESTART_FROM_MIN needs to be set */
 
-  if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
+  if((!eval_only) && (int_RESTART_FROM_MIN == RE_MIN_TRUE)){
 
     initialize_nr_directions(BANDWIDTH_den_extern,
                              num_obs_train_extern,
@@ -5612,7 +5696,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   fast_eval_total += bwm_fast_eval_count;
   guarded_eval_total += bwm_guarded_eval_count;
 
-  if(iMultistart == IMULTI_TRUE){
+  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
@@ -5909,7 +5993,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         double * objective_function_invalid, double * timing,
                         double * objective_function_fast,
                         int * penalty_mode, double * penalty_mult,
-                        double * ckerlb, double * ckerub){
+                        double * ckerlb, double * ckerub,
+                        const int eval_only){
   int_nn_k_min_extern = 1;
   /* Likelihood bandwidth selection for density estimation */
 
@@ -5964,7 +6049,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   iMultistart = myopti[DBW_IMULTII];
   iNum_Multistart = myopti[DBW_NMULTII];
-  if (iNum_Multistart < 1)
+  if (!eval_only && iNum_Multistart < 1)
     error("C_np_distribution_bw: nmulti must be a positive integer");
 
   KERNEL_den_extern = myopti[DBW_CKRNEVI];
@@ -5974,7 +6059,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int_use_starting_values= myopti[DBW_USTARTI];
   int_LARGE_SF=myopti[DBW_LSFI];
   BANDWIDTH_den_extern=myopti[DBW_DENI];
-  enforce_fixed_feasibility = (BANDWIDTH_den_extern == BW_FIXED);
+  enforce_fixed_feasibility = ((BANDWIDTH_den_extern == BW_FIXED) && (!eval_only));
   int_RESTART_FROM_MIN = myopti[DBW_REMINI];
   int_MINIMIZE_IO = myopti[DBW_MINIOI];
 
@@ -5991,7 +6076,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     bwm_reserve_transform_buf(n + 1);
   }
   bwm_nn_cache_configure_for_powell(BANDWIDTH_den_extern,
-                                    0,
+                                    eval_only,
                                     0,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
@@ -6322,6 +6407,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   }
 
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret = fret_initial;
   iImproved = 0;
   have_start_best = 0;
   have_multistart_best = 0;
@@ -6349,23 +6435,25 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_var);
   }
 
-  powell(0,
-         0,
-         vector_scale_factor,
-         vector_scale_factor,
-         matrix_y,
-         num_var,
-         ftol,
-         tol,
-         small,
-         itmax,
-         &iter,
-         &fret,
-         bwmfunc_wrapper);
+  if(!eval_only){
+    powell(0,
+           0,
+           vector_scale_factor,
+           vector_scale_factor,
+           matrix_y,
+           num_var,
+           ftol,
+           tol,
+           small,
+           itmax,
+           &iter,
+           &fret,
+           bwmfunc_wrapper);
+  }
 
   /* int_RESTART_FROM_MIN needs to be set */
 
-  if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
+  if((!eval_only) && (int_RESTART_FROM_MIN == RE_MIN_TRUE)){
     initialize_nr_directions(BANDWIDTH_den_extern,
                              num_obs_train_extern,
                              num_reg_continuous_extern,
@@ -6443,7 +6531,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   fast_eval_total += bwm_fast_eval_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
-  if(iMultistart == IMULTI_TRUE){
+  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
@@ -7452,6 +7540,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   }
 
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret = fret_initial;
   iImproved = 0;
   have_start_best = 0;
   have_multistart_best = 0;
@@ -8595,6 +8684,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   }
 
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret = fret_initial;
   iImproved = 0;
   have_start_best = 0;
   have_multistart_best = 0;
@@ -10548,6 +10638,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   bwm_reset_counters();
 
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret = fret_initial;
   iImproved = 0;
   have_start_best = 0;
   have_multistart_best = 0;
