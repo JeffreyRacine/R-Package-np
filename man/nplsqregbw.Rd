@@ -58,6 +58,16 @@ and training data.
     from \code{environment(bws)}.
   }
 
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used by
+    the formula method.
+  }
+
+  \item{na.action}{
+    a function specifying the action to take when missing values are found
+    by the formula method.
+  }
+
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data used as training data.
   }
