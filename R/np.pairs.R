@@ -50,7 +50,8 @@ np.pairs.plot <- function(pair_list) {
                   ylim = range(y_pred, na.rm = TRUE))
       polygon(c(ydat, rev(ydat)),
               c(y_pred, y_pred * 0),
-              col = grey(0, 0.25), border = NA)
+              col = .np_plot_viridis_at(c(density = 0.68), alpha = 0.25)[["density"]],
+              border = NA)
       axis(1)
       axis(2)
       mtext("Density Estimate", 2, line = 2.5, cex = 1)
@@ -66,8 +67,8 @@ np.pairs.plot <- function(pair_list) {
       plot.new()
       plot.window(xlim = range(xdat, na.rm = TRUE),
                   ylim = range(ydat, na.rm = TRUE))
-      points(xdat, ydat, col = grey(0, 0.5), pch = 16, cex = 1.5)
-      lines(xdat, y_pred, lwd = 2, col = rgb(0, 0, 1, 1))
+      points(xdat, ydat, col = .np_plot_color("data_overlay"), pch = 16, cex = 1.5)
+      lines(xdat, y_pred, lwd = 2, col = .np_plot_viridis_at(c(fit = 0.78))[["fit"]])
       axis(1)
       axis(2)
       mtext(y2_label, 2, line = 2.5, cex = 1)
