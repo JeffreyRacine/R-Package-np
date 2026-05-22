@@ -734,6 +734,37 @@
   state
 }
 
+.np_progress_prepare_for_external_output <- function(state) {
+  if (is.null(state) ||
+      !isTRUE(state$enabled) ||
+      !isTRUE(state$visible) ||
+      !identical(state$renderer, "single_line") ||
+      !isTRUE(state$rendered)) {
+    return(state)
+  }
+
+  line <- state$last_line
+  if (is.null(line) || !is.character(line) || length(line) != 1L || is.na(line)) {
+    line <- state$start_note
+  }
+
+  snapshot <- .np_progress_make_snapshot(
+    state = state,
+    line = line,
+    render_line = "",
+    event = "finish",
+    now = .np_progress_now(),
+    done = state$last_done,
+    detail = state$last_emitted_detail
+  )
+  .np_progress_render_single_line(snapshot = snapshot, event = "finish")
+
+  state$rendered <- FALSE
+  state$last_render_width <- 0L
+  state$last_line <- NULL
+  state
+}
+
 .np_progress_show_now <- function(state, done = NULL, detail = NULL) {
   if (is.null(state) || !isTRUE(state$enabled) || !isTRUE(state$visible)) {
     return(state)
