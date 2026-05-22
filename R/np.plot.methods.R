@@ -1522,7 +1522,7 @@ np_render_control <- function(style = c("band", "bar"),
   xlab <- .np_plot_scalar_default(dots$xlab, vars[1L])
   ylab <- .np_plot_scalar_default(dots$ylab, vars[2L])
   zlab <- .np_plot_scalar_default(dots$zlab, "Probability")
-  border <- .np_plot_scalar_default(dots$border, "black")
+  border <- .np_plot_scalar_default(dots$border, .np_plot_color("surface_border"))
 
   if (identical(renderer, "rgl")) {
     rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
@@ -1644,10 +1644,10 @@ np_render_control <- function(style = c("band", "bar"),
     if (any(good)) {
       if (is.factor(x) && !is.ordered(x)) {
         graphics::segments(xord[good], lower[good], xord[good], upper[good],
-                           col = "gray45", lty = 2)
+                           col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
       } else {
-        graphics::lines(xord[good], lower[good], col = "gray45", lty = 2)
-        graphics::lines(xord[good], upper[good], col = "gray45", lty = 2)
+        graphics::lines(xord[good], lower[good], col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
+        graphics::lines(xord[good], upper[good], col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
       }
     }
   }

@@ -555,7 +555,7 @@
                                                        xlab = NULL,
                                                        ylab = NULL,
                                                        zlab = NULL,
-                                                       col = "lightblue",
+                                                       col = NULL,
                                                        theta = 0.0,
                                                        phi = 20.0,
                                                        ...) {
@@ -582,6 +582,7 @@
   main <- if (is.null(main)) value.label else main
 
   if (isTRUE(perspective)) {
+    persp.col <- .np_plot_persp_surface_colors(z = z, col = col)
     graphics::persp(
       x = x,
       y = y,
@@ -592,7 +593,7 @@
       ylab = ylab,
       zlab = zlab,
       main = main,
-      col = col,
+      col = persp.col,
       ...
     )
   } else {
@@ -603,7 +604,7 @@
       xlab = xlab,
       ylab = ylab,
       main = main,
-      col = grDevices::hcl.colors(64L, "YlOrRd", rev = TRUE),
+      col = grDevices::hcl.colors(64L, palette = "viridis"),
       ...
     )
   }
@@ -2375,7 +2376,7 @@
                                                           xlab = NULL,
                                                           ylab = NULL,
                                                           zlab = NULL,
-                                                          col = "lightblue",
+                                                          col = NULL,
                                                           theta = 0.0,
                                                           phi = 20.0,
                                                           ...) {
@@ -2418,6 +2419,7 @@
   main <- if (is.null(main)) value.label else main
 
   if (isTRUE(perspective)) {
+    persp.col <- .np_plot_persp_surface_colors(z = z, col = col)
     graphics::persp(
       x = x,
       y = y,
@@ -2428,7 +2430,7 @@
       ylab = ylab,
       zlab = zlab,
       main = main,
-      col = col,
+      col = persp.col,
       ...
     )
   } else {
@@ -2439,7 +2441,7 @@
       xlab = xlab,
       ylab = ylab,
       main = main,
-      col = grDevices::hcl.colors(64L, "YlOrRd", rev = TRUE),
+      col = grDevices::hcl.colors(64L, palette = "viridis"),
       ...
     )
   }

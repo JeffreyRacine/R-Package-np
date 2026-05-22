@@ -5515,12 +5515,12 @@ gen.tflabel = function(condition, tlabel, flabel){
   paste(if (isTRUE(condition)) tlabel else flabel)
 }
 
-draw.error.bands = function(ex, ely, ehy, lty = 2, col = par("col")){
+draw.error.bands = function(ex, ely, ehy, lty = .np_plot_lty("interval"), col = par("col")){
   lines(ex,ely,lty=lty,col=col)
   lines(ex,ehy,lty=lty,col=col)
 }
 
-draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, col = par("col")){
+draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = .np_plot_lty("interval"), col = par("col")){
   yy = double(3*length(ex))
   jj = seq_along(ex)*3
 
@@ -5590,7 +5590,7 @@ draw.all.error.types <- function(ex, center, all.err,
                                  plot.errors.style = "band",
                                  plot.errors.bar = "|",
                                  plot.errors.bar.num = min(length(ex), 25),
-                                 lty = 2, add.legend = TRUE, legend.loc = "topleft",
+                                 lty = .np_plot_lty("interval"), add.legend = TRUE, legend.loc = "topleft",
                                  legend = TRUE,
                                  xi.factor = FALSE){
   if (is.null(all.err)) return(invisible(NULL))
@@ -5628,9 +5628,9 @@ draw.all.error.types <- function(ex, center, all.err,
     legend.args <- .np_plot_legend_args(
       list(x = legend.loc,
            legend = c("Pointwise","Simultaneous","Bonferroni"),
-           lty = 2,
+           lty = .np_plot_lty("interval"),
            col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
-           lwd = 2,
+           lwd = .np_plot_lwd("band_all_1d"),
            bty = "n"),
       legend = legend.value,
       context = "legend"
@@ -5666,7 +5666,7 @@ plotFactor <- function(f, y, ...){
 
   l.y = unlist(lapply(y, function (p) { c(0,p,NA) }))
 
-  line.args <- list(x = l.f, y = l.y, lty = 2)
+  line.args <- list(x = l.f, y = l.y, lty = .np_plot_lty("interval"))
   if (!is.null(dot.args$col)) line.args$col <- dot.args$col
   if (!is.null(dot.args$lty)) line.args$lty <- dot.args$lty
   if (!is.null(dot.args$lwd)) line.args$lwd <- dot.args$lwd
@@ -5720,7 +5720,7 @@ plotFactor <- function(f, y, ...){
     max(existing.range[2L], yr[2L], na.rm = TRUE))
 }
 
-.np_plot_overlay_points_1d <- function(x, y, col = NULL, pch = 20, cex = 0.5, ...) {
+.np_plot_overlay_points_1d <- function(x, y, col = NULL, pch = .np_plot_pch("data_overlay"), cex = .np_plot_cex("data_overlay"), ...) {
   if (is.null(x) || is.null(y))
     return(invisible(FALSE))
   if (is.factor(x) || is.ordered(x))
@@ -5731,16 +5731,16 @@ plotFactor <- function(f, y, ...){
     return(invisible(FALSE))
 
   if (is.null(col))
-    col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+    col <- .np_plot_color("data_overlay")
   if (is.null(pch))
-    pch <- 20
+    pch <- .np_plot_pch("data_overlay")
   if (is.null(cex))
-    cex <- 0.5
+    cex <- .np_plot_cex("data_overlay")
   points(x[ok], y[ok], pch = pch, cex = cex, col = col, ...)
   invisible(TRUE)
 }
 
-.np_plot_overlay_points_factor <- function(x, y, col = NULL, pch = 20, cex = 0.5, ...) {
+.np_plot_overlay_points_factor <- function(x, y, col = NULL, pch = .np_plot_pch("data_overlay"), cex = .np_plot_cex("data_overlay"), ...) {
   if (is.null(x) || is.null(y))
     return(invisible(FALSE))
   if (!(is.factor(x) || is.ordered(x)))
@@ -5751,16 +5751,16 @@ plotFactor <- function(f, y, ...){
     return(invisible(FALSE))
 
   if (is.null(col))
-    col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+    col <- .np_plot_color("data_overlay")
   if (is.null(pch))
-    pch <- 20
+    pch <- .np_plot_pch("data_overlay")
   if (is.null(cex))
-    cex <- 0.5
+    cex <- .np_plot_cex("data_overlay")
   points(x[ok], y[ok], pch = pch, cex = cex, col = col, ...)
   invisible(TRUE)
 }
 
-.np_plot_overlay_points_persp <- function(x1, x2, y, persp.mat, col = NULL, pch = 20, cex = 0.5, ...) {
+.np_plot_overlay_points_persp <- function(x1, x2, y, persp.mat, col = NULL, pch = .np_plot_pch("data_overlay"), cex = .np_plot_cex("data_overlay"), ...) {
   if (is.null(x1) || is.null(x2) || is.null(y))
     return(invisible(FALSE))
 
@@ -5769,11 +5769,11 @@ plotFactor <- function(f, y, ...){
     return(invisible(FALSE))
 
   if (is.null(col))
-    col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+    col <- .np_plot_color("data_overlay")
   if (is.null(pch))
-    pch <- 20
+    pch <- .np_plot_pch("data_overlay")
   if (is.null(cex))
-    cex <- 0.5
+    cex <- .np_plot_cex("data_overlay")
   xyz <- trans3d(x1[ok], x2[ok], y[ok], persp.mat)
   points(xyz, pch = pch, cex = cex, col = col, ...)
   invisible(TRUE)
@@ -5795,7 +5795,7 @@ plotFactor <- function(f, y, ...){
       x = x1[ok],
       y = x2[ok],
       z = y[ok],
-      color = grDevices::adjustcolor("gray20", alpha.f = 0.6),
+      color = .np_plot_color("support"),
       alpha = 0.6,
       size = 5
     ),
@@ -5851,7 +5851,7 @@ plotFactor <- function(f, y, ...){
   args <- .np_plot_merge_override_args(
     list(
       x = x[ok],
-      col = grDevices::adjustcolor("gray20", alpha.f = 0.6),
+      col = .np_plot_color("support"),
       quiet = TRUE
     ),
     rug.args
@@ -5892,8 +5892,8 @@ plotFactor <- function(f, y, ...){
       y0 = lower$y,
       x1 = upper$x,
       y1 = upper$y,
-      col = grDevices::adjustcolor("gray20", alpha.f = 0.55),
-      lwd = 1.25
+      col = .np_plot_color("support_floor"),
+      lwd = .np_plot_lwd("support")
     ),
     segments.args
   )
@@ -5928,9 +5928,9 @@ plotFactor <- function(f, y, ...){
       x = rbind(x1[ok], x1[ok]),
       y = rbind(x2[ok], x2[ok]),
       z = rbind(rep.int(zfloor, sum(ok)), rep.int(ztop, sum(ok))),
-      color = grDevices::adjustcolor("gray20", alpha.f = 0.55),
+      color = .np_plot_color("support_floor"),
       alpha = 0.55,
-      lwd = 2
+      lwd = .np_plot_lwd("support_floor")
     ),
     segments3d.args
   )
@@ -5971,8 +5971,8 @@ plotFactor <- function(f, y, ...){
         y0 = pts$y[1L],
         x1 = pts$x[2L],
         y1 = pts$y[2L],
-        col = grDevices::adjustcolor("grey60", alpha.f = 0.45),
-        lwd = 0.9
+        col = .np_plot_color("support_grid"),
+        lwd = .np_plot_lwd("support_grid")
       ),
       grid.args
     )
@@ -6063,10 +6063,10 @@ plotFactor <- function(f, y, ...){
                    simultaneous = "Simultaneous",
                    bonferroni = "Bonferroni")[drawn.bands],
         col = unname(band.cols[drawn.bands]),
-        lty = 1,
-        lwd = 2.15,
-        cex = 0.8,
-        bg = "white",
+        lty = .np_plot_lty("solid"),
+        lwd = .np_plot_lwd("band_all_surface"),
+        cex = .np_plot_cex("legend"),
+        bg = .np_plot_color("legend_bg"),
         bty = "n"
       ),
       legend3d.args
@@ -6075,8 +6075,8 @@ plotFactor <- function(f, y, ...){
     return(invisible(TRUE))
   }
 
-  draw_one(lerr, "grey40")
-  draw_one(herr, "grey40")
+  draw_one(lerr, .np_plot_color("context_wire"))
+  draw_one(herr, .np_plot_color("context_wire"))
   invisible(TRUE)
 }
 
@@ -6158,11 +6158,177 @@ plotFactor <- function(f, y, ...){
   as.vector(matrix(colorlut[scaled], nrow = nrow(zfacet), ncol = ncol(zfacet)))
 }
 
+.np_plot_viridis_at <- function(x, begin = 0.12, end = 0.88, alpha = 1) {
+  x.names <- names(x)
+  x <- as.double(x)
+  x <- pmax.int(0, pmin.int(1, x))
+  grid <- grDevices::hcl.colors(256L, palette = "viridis")
+  pos <- begin + x * (end - begin)
+  idx <- 1L + round(pos * (length(grid) - 1L))
+  idx <- pmax.int(1L, pmin.int(length(grid), idx))
+  cols <- grid[idx]
+  if (!identical(alpha, 1))
+    cols <- grDevices::adjustcolor(cols, alpha.f = alpha)
+  names(cols) <- x.names
+  cols
+}
+
+.np_plot_color <- function(role, alpha = NULL) {
+  role <- as.character(role)[1L]
+  spec <- switch(
+    role,
+    primary = list(col = "black", alpha = 1),
+    median = list(col = "black", alpha = 1),
+    surface_border = list(col = "black", alpha = 1),
+    context_border = list(col = "grey", alpha = 1),
+    context_wire = list(col = .np_plot_color("context_wire"), alpha = 1),
+    data_overlay = list(col = "gray30", alpha = 0.35),
+    support = list(col = "gray20", alpha = 0.60),
+    support_floor = list(col = "gray20", alpha = 0.55),
+    support_grid = list(col = "grey60", alpha = 0.45),
+    component_context = list(col = .np_plot_color("component_context"), alpha = 1),
+    interval_context = list(col = .np_plot_color("interval_context"), alpha = 1),
+    legend_bg = list(col = .np_plot_color("legend_bg"), alpha = 1),
+    stop("unknown plot color role: ", role, call. = FALSE)
+  )
+  alpha <- if (is.null(alpha)) spec$alpha else alpha
+  if (isTRUE(all.equal(alpha, 1))) spec$col else grDevices::adjustcolor(spec$col, alpha.f = alpha)
+}
+
+.np_plot_lty <- function(role) {
+  role <- as.character(role)[1L]
+  switch(
+    role,
+    solid = 1L,
+    interval = 2L,
+    center = 3L,
+    lower_quantile = 2L,
+    upper_quantile = 4L,
+    pointwise = 2L,
+    simultaneous = 3L,
+    bonferroni = 4L,
+    stop("unknown plot line-type role: ", role, call. = FALSE)
+  )
+}
+
+.np_plot_lwd <- function(role, base = graphics::par()$lwd) {
+  role <- as.character(role)[1L]
+  base <- as.double(base)[1L]
+  switch(
+    role,
+    primary = base,
+    surface_border = 0.8 * base,
+    interval = base,
+    band_all_1d = 2 * base,
+    band_all_surface = 2.15 * base,
+    interval_surface = 2 * base,
+    support = 1.25 * base,
+    support_floor = 2 * base,
+    support_grid = 0.9 * base,
+    quantile_multi = 1.5 * base,
+    component_context = base,
+    stop("unknown plot line-width role: ", role, call. = FALSE)
+  )
+}
+
+.np_plot_pch <- function(role) {
+  role <- as.character(role)[1L]
+  switch(
+    role,
+    data_overlay = 20L,
+    stop("unknown plot point-character role: ", role, call. = FALSE)
+  )
+}
+
+.np_plot_cex <- function(role) {
+  role <- as.character(role)[1L]
+  switch(
+    role,
+    data_overlay = 0.5,
+    copula_pair = 0.25,
+    legend = 0.8,
+    stop("unknown plot character-expansion role: ", role, call. = FALSE)
+  )
+}
+
 .np_plot_all_band_colors <- function() {
-  c(
-    pointwise = "#D55E00",
-    simultaneous = "#7B3294",
-    bonferroni = "#0072B2"
+  .np_plot_viridis_at(
+    c(pointwise = 0.18, simultaneous = 0.50, bonferroni = 0.78)
+  )
+}
+
+.np_plot_is_median_tau <- function(tau, tol = 1.0e-12) {
+  is.finite(tau) & abs(tau - 0.5) <= tol
+}
+
+.np_plot_tau_values_from_labels <- function(tau.labels, ntau) {
+  if (is.null(tau.labels))
+    return(NULL)
+  tau.labels <- as.character(tau.labels)
+  tau <- suppressWarnings(as.numeric(sub("^tau[[:space:]]*=[[:space:]]*", "", tau.labels)))
+  if (length(tau) != ntau || anyNA(tau) || any(!is.finite(tau)) ||
+      any(tau <= 0) || any(tau >= 1))
+    return(NULL)
+  tau
+}
+
+.np_plot_quantile_aesthetics <- function(ntau,
+                                         tau = NULL,
+                                         tau.labels = NULL,
+                                         col = NULL,
+                                         lty = NULL,
+                                         lwd = NULL) {
+  ntau <- as.integer(ntau)[1L]
+  if (is.na(ntau) || ntau < 1L)
+    stop("'ntau' must be a positive integer", call. = FALSE)
+
+  if (is.null(tau))
+    tau <- .np_plot_tau_values_from_labels(tau.labels, ntau)
+  if (!is.null(tau)) {
+    tau <- as.double(tau)
+    if (length(tau) != ntau || anyNA(tau) || any(!is.finite(tau)) ||
+        any(tau <= 0) || any(tau >= 1))
+      tau <- NULL
+  }
+
+  multi <- ntau > 1L
+  if (is.null(col)) {
+    curve.col <- if (is.null(tau)) {
+      seq_len(ntau)
+    } else {
+      med <- .np_plot_is_median_tau(tau)
+      out <- .np_plot_viridis_at(tau)
+      out[med] <- .np_plot_color("median")
+      unname(out)
+    }
+  } else {
+    curve.col <- col
+  }
+
+  if (is.null(lty)) {
+    curve.lty <- if (is.null(tau)) {
+      seq_len(ntau)
+    } else {
+      med <- .np_plot_is_median_tau(tau)
+      out <- rep.int(.np_plot_lty("lower_quantile"), ntau)
+      out[med] <- .np_plot_lty("solid")
+      out[!med & tau > 0.5] <- .np_plot_lty("upper_quantile")
+      out
+    }
+  } else {
+    curve.lty <- lty
+  }
+
+  if (is.null(lwd)) {
+    curve.lwd <- rep(if (multi) .np_plot_lwd("quantile_multi") else graphics::par()$lwd, ntau)
+  } else {
+    curve.lwd <- lwd
+  }
+
+  list(
+    col = rep(curve.col, length.out = ntau),
+    lty = rep(curve.lty, length.out = ntau),
+    lwd = rep(curve.lwd, length.out = ntau)
   )
 }
 
@@ -6222,7 +6388,7 @@ plotFactor <- function(f, y, ...){
                                              zmat,
                                              persp.mat,
                                              col,
-                                             lwd = 0.8) {
+                                             lwd = .np_plot_lwd("surface_border")) {
   row_pts <- .np_plot_project_wire_matrix_persp(
     xmat = templates$row_x,
     ymat = templates$row_y,
@@ -6254,15 +6420,15 @@ plotFactor <- function(f, y, ...){
                                                  herr = NULL,
                                                  lerr.all = NULL,
                                                  herr.all = NULL,
-                                                 border = "grey",
-                                                 lwd = 0.8) {
+                                                 border = .np_plot_color("context_border"),
+                                                 lwd = .np_plot_lwd("surface_border")) {
   templates <- .np_plot_wireframe_templates_persp(x = x, y = y)
 
   if (identical(as.character(plot.errors.type)[1L], "all") &&
       !is.null(lerr.all) && !is.null(herr.all)) {
     band.cols <- .np_plot_all_band_colors()
     band.alpha <- .np_plot_all_band_alpha()
-    band.lwd <- 2.15 * lwd
+    band.lwd <- .np_plot_lwd("band_all_surface", lwd)
 
     for (bn in c("pointwise", "simultaneous", "bonferroni")) {
       band.col <- grDevices::adjustcolor(band.cols[[bn]], alpha.f = band.alpha[[bn]])
@@ -6288,10 +6454,10 @@ plotFactor <- function(f, y, ...){
   }
 
   wire.col <- grDevices::adjustcolor(
-    "black",
+    .np_plot_color("primary"),
     alpha.f = max(.np_plot_error_wire_alpha(plot.errors.type = plot.errors.type), 0.18)
   )
-  wire.lwd <- 2.0 * lwd
+  wire.lwd <- .np_plot_lwd("interval_surface", lwd)
 
   .np_plot_draw_wire_surface_persp(
     templates = templates,
@@ -6433,7 +6599,7 @@ plotFactor <- function(f, y, ...){
                                         theta,
                                         phi,
                                         col = NULL,
-                                        border = "black",
+                                        border = .np_plot_color("surface_border"),
                                         zlim = NULL,
                                         par3d.args = list(),
                                         view3d.args = list(),
@@ -6633,8 +6799,8 @@ plotFactor <- function(f, y, ...){
 
 .np_plot_draw_all_band_legend <- function(legend = TRUE,
                                           x = "topright",
-                                          lty = 1,
-                                          lwd = 2,
+                                          lty = .np_plot_lty("solid"),
+                                          lwd = .np_plot_lwd("band_all_1d"),
                                           bty = "n") {
   band.cols <- .np_plot_all_band_colors()
   legend.value <- if (is.list(legend) && any(names(legend) %in% c("tau", "bands"))) {
@@ -6735,7 +6901,7 @@ plotFactor <- function(f, y, ...){
       }
     } else {
       if (!xi.factor && !plotOnEstimate)
-        graphics::lines(mat.x, err[, 3L, kk], lty = 3, col = cols[[kk]])
+        graphics::lines(mat.x, err[, 3L, kk], lty = .np_plot_lty("center"), col = cols[[kk]])
       lower.k <- if (plotOnEstimate) value[, kk] - err[, 1L, kk] else err[, 3L, kk] - err[, 1L, kk]
       upper.k <- if (plotOnEstimate) value[, kk] + err[, 2L, kk] else err[, 3L, kk] + err[, 2L, kk]
       good <- complete.cases(mat.x, lower.k, upper.k)
@@ -6764,6 +6930,7 @@ plotFactor <- function(f, y, ...){
                                          err = NULL,
                                          all.err = NULL,
                                          tau.labels = colnames(value),
+                                         tau = NULL,
                                          overlay.x = NULL,
                                          overlay.y = NULL,
                                          plot.data.overlay = FALSE,
@@ -6794,12 +6961,17 @@ plotFactor <- function(f, y, ...){
   if (is.null(tau.labels))
     tau.labels <- colnames(value)
   mat.x <- if (xi.factor) seq_len(nkeep) else ei[seq_len(nkeep)]
-  curve.col <- rep(scalar_default(col, seq_len(ncol(value))),
-                   length.out = ncol(value))
-  curve.lty <- rep(scalar_default(lty, seq_len(ncol(value))),
-                   length.out = ncol(value))
-  curve.lwd <- rep(scalar_default(lwd, graphics::par()$lwd),
-                   length.out = ncol(value))
+  curve.aes <- .np_plot_quantile_aesthetics(
+    ntau = ncol(value),
+    tau = tau,
+    tau.labels = tau.labels,
+    col = col,
+    lty = lty,
+    lwd = lwd
+  )
+  curve.col <- curve.aes$col
+  curve.lty <- curve.aes$lty
+  curve.lwd <- curve.aes$lwd
   error.ylim <- .np_plot_multi_tau_error_range(
     value = value,
     err = err,
@@ -6850,7 +7022,7 @@ plotFactor <- function(f, y, ...){
       overlay.args$lwd <- NULL
       overlay.args$pch <- scalar_default(overlay.args$pch, 20)
       overlay.args$cex <- scalar_default(overlay.args$cex, 0.5)
-      overlay.args$col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+      overlay.args$col <- .np_plot_color("data_overlay")
       do.call(graphics::plot, overlay.args)
     }
   } else {
@@ -6894,7 +7066,7 @@ plotFactor <- function(f, y, ...){
     band.legend.args <- .np_plot_legend_args(
       list(x = "topleft",
            legend = c("Pointwise", "Simultaneous", "Bonferroni"),
-           lty = c(2L, 3L, 4L),
+           lty = c(.np_plot_lty("pointwise"), .np_plot_lty("simultaneous"), .np_plot_lty("bonferroni")),
            col = graphics::par("col"),
            bty = "n"),
       legend = .np_plot_legend_role(legend, "bands"),

@@ -462,7 +462,7 @@
           z = treg,
           zlim = zlim,
           col = col,
-          border = scalar_default(border, "black"),
+          border = scalar_default(border, .np_plot_color("surface_border")),
           xlab = xlab.val,
           ylab = ylab.val,
           zlab = zlab.val,
@@ -545,13 +545,13 @@
                              z = treg,
                              zlim = zlim,
                              col = persp.col,
-                             border = scalar_default(border, "black"),
+                             border = scalar_default(border, .np_plot_color("surface_border")),
                              ticktype = "detailed",
                              cex.axis = scalar_default(cex.axis, par()$cex.axis),
                              cex.lab = scalar_default(cex.lab, par()$cex.lab),
                              cex.main = scalar_default(cex.main, par()$cex.main),
                              cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                             lwd = 0.8 * scalar_default(lwd, par()$lwd),
+                             lwd = .np_plot_lwd("surface_border", scalar_default(lwd, par()$lwd)),
                              xlab = xlab.val,
                              ylab = ylab.val,
                              zlab = zlab.val,
@@ -586,15 +586,15 @@
               herr = herr,
               lerr.all = lerr.all,
               herr.all = herr.all,
-              border = scalar_default(border, "grey"),
+              border = scalar_default(border, .np_plot_color("context_border")),
               lwd = scalar_default(lwd, par()$lwd)
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
                 legend = plot.legend,
                 x = "topright",
-                lty = 1,
-                lwd = 2.15 * scalar_default(lwd, par()$lwd)
+                lty = .np_plot_lty("solid"),
+                lwd = .np_plot_lwd("band_all_surface", scalar_default(lwd, par()$lwd))
               )
             }
           }
@@ -907,7 +907,7 @@
               l.f <- rep(ei, each = 3)
               l.f[3 * seq_along(ei)] <- NA
               l.y <- unlist(lapply(temp.mean, function(p) c(0, p, NA)))
-              lines(x = l.f, y = l.y, lty = 2)
+              lines(x = l.f, y = l.y, lty = .np_plot_lty("interval"))
               point.args <- list(x = ei, y = temp.mean)
               if (!is.null(col)) point.args$col <- col
               if (!is.null(points.user.args$pch)) point.args$pch <- points.user.args$pch
@@ -926,7 +926,7 @@
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             if (!xi.factor && !plotOnEstimate)
-              lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+              lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
 
             if (plot.errors.type == "all") {
               draw.all.error.types(
@@ -936,7 +936,7 @@
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = 2,
+                lty = .np_plot_lty("interval"),
                 add.legend = TRUE,
                 legend = plot.legend)
             } else {
@@ -947,7 +947,7 @@
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = 2
+                lty = .np_plot_lty("interval")
               )
               do.call(draw.errors, draw.args)
             }
@@ -1177,7 +1177,7 @@
                 l.f <- rep(ei, each = 3)
                 l.f[3 * seq_along(ei)] <- NA
                 l.y <- unlist(lapply(temp.mean, function(p) c(0, p, NA)))
-                lines(x = l.f, y = l.y, lty = 2)
+                lines(x = l.f, y = l.y, lty = .np_plot_lty("interval"))
                 point.args <- list(x = ei, y = temp.mean)
                 if (!is.null(col)) point.args$col <- col
                 if (!is.null(points.user.args$pch)) point.args$pch <- points.user.args$pch
@@ -1196,7 +1196,7 @@
             ## error plotting evaluation
             if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
               if (!xi.factor && !plotOnEstimate)
-                lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+                lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
 
               if (plot.errors.type == "all") {
                 draw.all.error.types(
@@ -1206,7 +1206,7 @@
                   plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                   plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
-                  lty = 2,
+                  lty = .np_plot_lty("interval"),
                   add.legend = TRUE,
                 legend = plot.legend)
               } else {
@@ -1217,7 +1217,7 @@
                   plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                   plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
-                  lty = 2
+                  lty = .np_plot_lty("interval")
                 )
                 do.call(draw.errors, draw.args)
               }
@@ -1408,7 +1408,7 @@
               l.f <- rep(allei[,plot.index], each = 3)
               l.f[3 * seq_along(allei[,plot.index])] <- NA
               l.y <- unlist(lapply(data.eval[,plot.index], function(p) c(0, p, NA)))
-              lines(x = l.f, y = l.y, lty = 2)
+              lines(x = l.f, y = l.y, lty = .np_plot_lty("interval"))
               point.args <- list(x = allei[,plot.index], y = data.eval[,plot.index])
               if (!is.null(col)) point.args$col <- col
               if (!is.null(points.user.args$pch)) point.args$pch <- points.user.args$pch
@@ -1427,7 +1427,7 @@
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             if (!xi.factor && !plotOnEstimate)
-              lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+              lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
 
             if (plot.errors.type == "all") {
               draw.all.error.types(
@@ -1437,7 +1437,7 @@
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = 2,
+                lty = .np_plot_lty("interval"),
                 add.legend = TRUE,
                 legend = plot.legend)
             } else {
@@ -1448,7 +1448,7 @@
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = 2
+                lty = .np_plot_lty("interval")
               )
               do.call(draw.errors, draw.args)
             }

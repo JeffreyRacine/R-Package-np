@@ -268,7 +268,7 @@
               plot.errors.style = plot.errors.style,
               plot.errors.bar = plot.errors.bar,
               plot.errors.bar.num = plot.errors.bar.num,
-              lty = 2,
+              lty = .np_plot_lty("interval"),
               legend = plot.legend)
           } else if (plot.errors.center == "estimate") {
             draw.errors(ex = na.omit(tobj$index[i.sort]),
@@ -277,16 +277,16 @@
                         plot.errors.style = plot.errors.style,
                         plot.errors.bar = plot.errors.bar,
                         plot.errors.bar.num = plot.errors.bar.num,
-                        lty = 2)
+                        lty = .np_plot_lty("interval"))
           } else if (plot.errors.center == "bias-corrected") {
-            lines(na.omit(tobj$index[i.sort]), na.omit(temp.err[i.sort,3]), lty = 3)
+            lines(na.omit(tobj$index[i.sort]), na.omit(temp.err[i.sort,3]), lty = .np_plot_lty("center"))
             draw.errors(ex = na.omit(tobj$index[i.sort]),
                         ely = na.omit(temp.err[i.sort,3] - temp.err[i.sort,1]),
                         ehy = na.omit(temp.err[i.sort,3] + temp.err[i.sort,2]),
                         plot.errors.style  = plot.errors.style,
                         plot.errors.bar = plot.errors.bar,
                         plot.errors.bar.num = plot.errors.bar.num,
-                        lty = 2)
+                        lty = .np_plot_lty("interval"))
           }
         } else {
           plot.args <- list(x = tobj$index[i.sort],
@@ -436,7 +436,7 @@
                   plot.errors.style = plot.errors.style,
                   plot.errors.bar = plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
-                  lty = 2,
+                  lty = .np_plot_lty("interval"),
                   legend = plot.legend)
               } else if (plot.errors.center == "estimate") {
                 lo.i <- bws$beta[i] * (temp.mean[i.sort] - temp.err[i.sort,1])
@@ -447,18 +447,18 @@
                             plot.errors.style = plot.errors.style,
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
-                            lty = 2)
+                            lty = .np_plot_lty("interval"))
               } else if (plot.errors.center == "bias-corrected") {
                 lo.i <- bws$beta[i] * (temp.err[i.sort,3] - temp.err[i.sort,1])
                 hi.i <- bws$beta[i] * (temp.err[i.sort,3] + temp.err[i.sort,2])
-                lines(na.omit(tobj$index[i.sort]), na.omit(bws$beta[i] * temp.err[i.sort,3]), lty = 3)
+                lines(na.omit(tobj$index[i.sort]), na.omit(bws$beta[i] * temp.err[i.sort,3]), lty = .np_plot_lty("center"))
                 draw.errors(ex = na.omit(tobj$index[i.sort]),
                             ely = na.omit(pmin(lo.i, hi.i)),
                             ehy = na.omit(pmax(lo.i, hi.i)),
                             plot.errors.style  = plot.errors.style,
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
-                            lty = 2)
+                            lty = .np_plot_lty("interval"))
               }
             }
           }

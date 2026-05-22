@@ -398,7 +398,7 @@ npcopula <- function(bws, ...) {
     dots = dots
   )
   do.call(graphics::plot, c(list(x = empirical$u1, y = empirical$u2,
-                                 xlab = xlab, ylab = ylab, cex = 0.25,
+                                 xlab = xlab, ylab = ylab, cex = .np_plot_cex("copula_pair"),
                                  main = "Empirical Copula"),
                             dots))
   .npcopula_draw_surface_base(
@@ -773,7 +773,7 @@ plot.npcopula <- function(x,
                           zlab = NULL,
                           main = NULL,
                           col = NULL,
-                          border = "black",
+                          border = .np_plot_color("surface_border"),
                           zlim = NULL,
                           ...) {
   bootstrap.supplied <- !missing(bootstrap) || !missing(B) || !missing(center)
@@ -854,7 +854,7 @@ plot.npcopula <- function(x,
     if (identical(output, "data"))
       return(empirical)
     do.call(graphics::plot, c(list(x = empirical$u1, y = empirical$u2,
-                                   xlab = xlab, ylab = ylab, cex = 0.25,
+                                   xlab = xlab, ylab = ylab, cex = .np_plot_cex("copula_pair"),
                                    main = main),
                               dots))
     if (identical(output, "plot-data"))
@@ -1024,7 +1024,7 @@ plot.npcopula <- function(x,
           herr = herr,
           lerr.all = lerr.all,
           herr.all = herr.all,
-          border = "grey40",
+          border = .np_plot_color("context_wire"),
           lwd = .np_plot_scalar_default(dots$lwd, par()$lwd)
         )
         if (identical(band, "all") && !is.null(lerr.all) && !is.null(herr.all) &&

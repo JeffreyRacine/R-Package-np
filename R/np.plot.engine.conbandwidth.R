@@ -421,7 +421,7 @@
           z = tdens,
           zlim = zlim,
           col = col,
-          border = scalar_default(border, "black"),
+          border = scalar_default(border, .np_plot_color("surface_border")),
           xlab = xlab.val,
           ylab = ylab.val,
           zlab = zlab.val,
@@ -486,13 +486,13 @@
                              tdens,
                              zlim = zlim,
                              col = persp.col,
-                             border = scalar_default(border, "black"),
+                             border = scalar_default(border, .np_plot_color("surface_border")),
                              ticktype = "detailed",
                              cex.axis = scalar_default(cex.axis, par()$cex.axis),
                              cex.lab = scalar_default(cex.lab, par()$cex.lab),
                              cex.main = scalar_default(cex.main, par()$cex.main),
                              cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                             lwd = 0.8 * scalar_default(lwd, par()$lwd),
+                             lwd = .np_plot_lwd("surface_border", scalar_default(lwd, par()$lwd)),
                              xlab = xlab.val,
                              ylab = ylab.val,
                              zlab = zlab.val,
@@ -530,15 +530,15 @@
               herr = herr,
               lerr.all = lerr.all,
               herr.all = herr.all,
-              border = scalar_default(border, "grey"),
+              border = scalar_default(border, .np_plot_color("context_border")),
               lwd = scalar_default(lwd, par()$lwd)
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
                 legend = plot.legend,
                 x = "topright",
-                lty = 1,
-                lwd = 2.15 * scalar_default(lwd, par()$lwd)
+                lty = .np_plot_lty("solid"),
+                lwd = .np_plot_lwd("band_all_surface", scalar_default(lwd, par()$lwd))
               )
             }
           }
@@ -814,7 +814,7 @@
                   legend = plot.legend)
               } else {
                 if (!xi.factor && !plotOnEstimate)
-                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
                 draw.args <- list(
                   ex = as.numeric(na.omit(ei)),
                   ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
@@ -1042,7 +1042,7 @@
                   legend = plot.legend)
                 } else {
                   if (!xi.factor && !plotOnEstimate)
-                    lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+                    lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
                   draw.args <- list(
                     ex = as.numeric(na.omit(ei)),
                     ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
@@ -1176,7 +1176,7 @@
                   legend = plot.legend)
               } else {
                 if (!xi.factor && !plotOnEstimate)
-                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
                 draw.args <- list(
                   ex = as.numeric(na.omit(allei[,plot.index])),
                   ely = if (plotOnEstimate) na.omit(data.eval[,idx] - data.err[,3*idx-2]) else na.omit(data.err[,3*idx] - data.err[,3*idx-2]),

@@ -438,7 +438,7 @@
           z = tdens,
           zlim = zlim,
           col = col,
-          border = scalar_default(border, "black"),
+          border = scalar_default(border, .np_plot_color("surface_border")),
           xlab = xlab.val,
           ylab = ylab.val,
           zlab = zlab.val,
@@ -503,13 +503,13 @@
                              tdens,
                              zlim = zlim,
                              col = persp.col,
-                             border = scalar_default(border, "black"),
+                             border = scalar_default(border, .np_plot_color("surface_border")),
                              ticktype = "detailed",
                              cex.axis = scalar_default(cex.axis, par()$cex.axis),
                              cex.lab = scalar_default(cex.lab, par()$cex.lab),
                              cex.main = scalar_default(cex.main, par()$cex.main),
                              cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                             lwd = 0.8 * scalar_default(lwd, par()$lwd),
+                             lwd = .np_plot_lwd("surface_border", scalar_default(lwd, par()$lwd)),
                              xlab = xlab.val,
                              ylab = ylab.val,
                              zlab = zlab.val,
@@ -547,15 +547,15 @@
               herr = herr,
               lerr.all = lerr.all,
               herr.all = herr.all,
-              border = scalar_default(border, "grey"),
+              border = scalar_default(border, .np_plot_color("context_border")),
               lwd = scalar_default(lwd, par()$lwd)
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
                 legend = plot.legend,
                 x = "topright",
-                lty = 1,
-                lwd = 2.15 * scalar_default(lwd, par()$lwd)
+                lty = .np_plot_lty("solid"),
+                lwd = .np_plot_lwd("band_all_surface", scalar_default(lwd, par()$lwd))
               )
             }
           }
@@ -568,8 +568,13 @@
         return ( list(cd1 = cd1) )
     } else {
 
-      dsf = if (gradients) bws$xndim else 1
+      quantreg.gradient.diagonal <- isTRUE(quantreg) && isTRUE(gradients)
+      dsf <- if (gradients && !quantreg.gradient.diagonal) bws$xndim else 1L
       tot.dim = bws$xndim + bws$yndim - quantreg
+
+      gradient_component_index <- function(slice.index, component.index) {
+        if (quantreg.gradient.diagonal) slice.index else component.index
+      }
 
       plot.layout <- .np_plot_layout_begin(
         plot.behavior = plot.behavior,
@@ -690,6 +695,7 @@
           err = err,
           all.err = all.err,
           tau.labels = tau.labels,
+          tau = tau,
           overlay.x = if (xOrY == "x") xdat[, i] else ydat[, i],
           overlay.y = ydat[, 1L],
           plot.data.overlay = isTRUE(quantreg) && isTRUE(plot.data.overlay) && !isTRUE(gradients),
@@ -802,11 +808,12 @@
         }
 
         for (j in seq_len(dsf)){
+          grad.j <- gradient_component_index(i, j)
           temp.boot = list()
           temp.all.err <- NULL
           temp.err <- matrix(data = NA, nrow = maxneval, ncol = 3)
           temp.err.arr <- NULL
-          temp.eval <- eval.extract(tobj, j)
+          temp.eval <- eval.extract(tobj, grad.j)
           multi.eval <- is.matrix(temp.eval)
           if (multi.eval) {
             temp.dens.mat <- matrix(NA_real_, nrow = maxneval,
@@ -820,7 +827,7 @@
           
           if (plot.errors){
             if (plot.errors.method == "asymptotic") {
-              terr.j <- err.extract(tobj, j)
+              terr.j <- err.extract(tobj, grad.j)
               if (multi.eval) {
                 ntau.j <- ncol(terr.j)
                 temp.err.arr <- array(
@@ -862,7 +869,7 @@
                         tau = tau,
                         gradients = gradients,
                         gradient.order = gradient.order,
-                        gradient.index = j,
+                        gradient.index = grad.j,
                         slice.index = plot.index,
                         plot.errors.boot.method = plot.errors.boot.method,
                         plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
@@ -875,7 +882,7 @@
                           bws = bws,
                           slice.index = plot.index,
                           gradients = gradients,
-                          gradient.index = j
+                          gradient.index = grad.j
                         ),
                         bws = bws)
               if (multi.eval) {
@@ -910,8 +917,8 @@
               data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
             }
           } else if (plot.behavior == "data" && multi.eval && plot.errors) {
-            err.name <- if (gradients) paste("gc", j, "err", sep = "") else "quanterr"
-            bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
+            err.name <- if (gradients) paste("gc", grad.j, "err", sep = "") else "quanterr"
+            bias.name <- if (gradients) paste("gc", grad.j, "bias", sep = "") else "bias"
             multi.err <- temp.err.arr[seq_len(xi.neval), , , drop = FALSE]
             plot.out[[plot.index]][[err.name]] <- multi_tau_plotout_err(multi.err)
             plot.out[[plot.index]][[bias.name]] <-
@@ -927,15 +934,15 @@
                 value = temp.dens.mat[seq_len(xi.neval), , drop = FALSE],
                 xi.factor = xi.factor,
                 xlab.value = scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = ""))),
-                ylab.value = scalar_default(ylab, if (gradients) paste("GC", j, "of", tylabE) else tylabE),
+                ylab.value = scalar_default(ylab, if (gradients) paste("GC", grad.j, "of", tylabE) else tylabE),
                 err = multi.err,
                 all.err = temp.all.err
               )
               if (plot.rug && !xi.factor)
                 .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
               if (plot.behavior != "plot" && plot.errors) {
-                err.name <- if (gradients) paste("gc", j, "err", sep = "") else "quanterr"
-                bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
+                err.name <- if (gradients) paste("gc", grad.j, "err", sep = "") else "quanterr"
+                bias.name <- if (gradients) paste("gc", grad.j, "bias", sep = "") else "bias"
                 plot.out[[plot.index]][[err.name]] <- multi_tau_plotout_err(multi.err)
                 plot.out[[plot.index]][[bias.name]] <-
                   temp.dens.mat[seq_len(xi.neval), , drop = FALSE] -
@@ -969,7 +976,7 @@
               plot.args$ylim <- .np_plot_overlay_range(if (is.null(plot.args$ylim)) range(temp.dens, finite = TRUE) else plot.args$ylim,
                                                        ydat[, 1L])
             plot.args$xlab <- scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = "")))
-            plot.args$ylab <- scalar_default(ylab, if (gradients) paste("GC", j, "of", tylabE) else tylabE)
+            plot.args$ylab <- scalar_default(ylab, if (gradients) paste("GC", grad.j, "of", tylabE) else tylabE)
             if (!xi.factor) {
               plot.args$type <- scalar_default(type, "l")
               plot.args$lty <- scalar_default(lty, par()$lty)
@@ -1013,7 +1020,7 @@
                 data.args$lwd <- NULL
                 data.args$pch <- scalar_default(data.args$pch, 20)
                 data.args$cex <- scalar_default(data.args$cex, 0.5)
-                data.args$col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+                data.args$col <- .np_plot_color("data_overlay")
                 do.call(graphics::plot, data.args)
               }
             } else {
@@ -1033,7 +1040,7 @@
                   legend = plot.legend)
               } else {
                 if (!xi.factor && !plotOnEstimate)
-                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
                 draw.args <- list(
                   ex = as.numeric(na.omit(ei)),
                   ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
@@ -1057,8 +1064,8 @@
           }
         
           if (plot.behavior != "plot" && plot.errors && !multi.eval) {
-            err.name <- if (gradients) paste("gc", j, "err", sep = "") else if (quantreg) "quanterr" else "conderr"
-            bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
+            err.name <- if (gradients) paste("gc", grad.j, "err", sep = "") else if (quantreg) "quanterr" else "conderr"
+            bias.name <- if (gradients) paste("gc", grad.j, "bias", sep = "") else "bias"
             plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))
             plot.out[[plot.index]][[bias.name]] <- na.omit(temp.dens - temp.err[,3])
             plot.out[[plot.index]]$bxp <- temp.boot
@@ -1269,7 +1276,7 @@
                   legend = plot.legend)
                 } else {
                   if (!xi.factor && !plotOnEstimate)
-                    lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+                    lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
                   draw.args <- list(
                     ex = as.numeric(na.omit(ei)),
                     ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
@@ -1347,6 +1354,7 @@
           xi.factor = all.isFactor[plot.index]
 
           for (j in seq_len(dsf)){
+            grad.j <- if (plot.index <= bws$xndim) gradient_component_index(i, j) else j
             plot.layout <- .np_plot_layout_activate(plot.layout)
             ## plot evaluation
             idx <- (plot.index-1)*dsf+j
@@ -1365,7 +1373,7 @@
               plot.args$y <- data.eval[,idx]
             plot.args$ylim <- c(y.min, y.max)
             plot.args$xlab <- scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = "")))
-            plot.args$ylab <- scalar_default(ylab, if (gradients) paste("GC", j, "of", tylabE) else tylabE)
+            plot.args$ylab <- scalar_default(ylab, if (gradients) paste("GC", grad.j, "of", tylabE) else tylabE)
             if (!xi.factor) {
               plot.args$type <- scalar_default(type, "l")
               plot.args$lty <- scalar_default(lty, par()$lty)
@@ -1404,7 +1412,7 @@
                   legend = plot.legend)
               } else {
                 if (!xi.factor && !plotOnEstimate)
-                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
                 draw.args <- list(
                   ex = as.numeric(na.omit(allei[,plot.index])),
                   ely = if (plotOnEstimate) na.omit(data.eval[,idx] - data.err[,3*idx-2]) else na.omit(data.err[,3*idx] - data.err[,3*idx-2]),
