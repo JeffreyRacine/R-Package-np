@@ -556,6 +556,19 @@ gradients.lsqregression <- function(x, errors = FALSE, ...) {
   idx
 }
 
+.nplsqreg_plot_progress_target <- function(progress.target, tau.label,
+                                           include.tau = TRUE) {
+  if (!isTRUE(include.tau))
+    return(progress.target)
+  tau.label <- if (is.null(tau.label)) NULL else as.character(tau.label)[1L]
+  if (is.null(tau.label) || !nzchar(tau.label) || is.na(tau.label))
+    return(progress.target)
+  progress.target <- if (is.null(progress.target)) NULL else as.character(progress.target)[1L]
+  if (is.null(progress.target) || !nzchar(progress.target) || is.na(progress.target))
+    return(tau.label)
+  sprintf("%s, %s", tau.label, progress.target)
+}
+
 .np_plot_lsqregression_eval <- function(bws,
                                         txdat,
                                         tydat,
@@ -805,7 +818,11 @@ compute.bootstrap.errors.lsqregressionbandwidth <-
         plot.errors.center = plot.errors.center,
         plot.errors.type = plot.errors.type,
         plot.errors.alpha = plot.errors.alpha,
-        progress.target = progress.target,
+        progress.target = .nplsqreg_plot_progress_target(
+          progress.target = progress.target,
+          tau.label = .npqreg_tau_labels(tau)[[1L]],
+          include.tau = length(tau) > 1L || length(bws$tau) > 1L
+        ),
         bws = one$reg.bws
       ))
     }
@@ -813,6 +830,7 @@ compute.bootstrap.errors.lsqregressionbandwidth <-
     if (is.null(bws$tau.bws) || length(bws$tau.bws) < max(idx))
       stop("vector nplsqreg bandwidth object lacks per-tau bandwidth state",
            call. = FALSE)
+    tau.labels <- .npqreg_tau_labels(tau)
     one.out <- lapply(seq_along(idx), function(j) {
       one <- bws$tau.bws[[idx[[j]]]]
       compute.bootstrap.errors.rbandwidth(
@@ -829,12 +847,14 @@ compute.bootstrap.errors.lsqregressionbandwidth <-
         plot.errors.center = plot.errors.center,
         plot.errors.type = plot.errors.type,
         plot.errors.alpha = plot.errors.alpha,
-        progress.target = progress.target,
+        progress.target = .nplsqreg_plot_progress_target(
+          progress.target = progress.target,
+          tau.label = tau.labels[[j]]
+        ),
         bws = one$reg.bws
       )
     })
 
-    tau.labels <- .npqreg_tau_labels(tau)
     boot.err <- array(
       NA_real_,
       dim = c(nrow(exdat), 3L, length(tau)),

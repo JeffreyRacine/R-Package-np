@@ -821,6 +821,22 @@ nplsqregbw.default <-
       return(.npRmpi_autodispatch_call(mc.dispatch, environment()))
 
     elapsed.start <- proc.time()[3]
+    progress.wrapped <- isTRUE(.np_progress_runtime$nplsqreg_bw_wrapped)
+    if (isTRUE(bandwidth.compute) &&
+        !progress.wrapped &&
+        !.np_progress_bandwidth_active()) {
+      mc <- match.call(expand.dots = TRUE)
+      old.progress.wrapped <- .np_progress_runtime$nplsqreg_bw_wrapped
+      .np_progress_runtime$nplsqreg_bw_wrapped <- TRUE
+      on.exit({
+        .np_progress_runtime$nplsqreg_bw_wrapped <- old.progress.wrapped
+      }, add = TRUE)
+      return(.np_progress_select_bandwidth_enhanced(
+        "Selecting least-squares quantile regression bandwidth",
+        eval.parent(mc)
+      ))
+    }
+
     tau.raw <- .nplsqreg_validate_tau_values(tau)
     tau.search <- .nplsqreg_validate_tau_search(tau.search)
     regtype.supplied <- !missing(regtype)

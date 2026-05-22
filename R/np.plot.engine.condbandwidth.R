@@ -874,7 +874,7 @@
                           bws = bws,
                           slice.index = plot.index,
                           gradients = gradients,
-                          gradient.index = if (gradients) i else 0L
+                          gradient.index = j
                         ),
                         bws = bws)
               if (multi.eval) {
@@ -1183,7 +1183,7 @@
                             bws = bws,
                             slice.index = plot.index,
                             gradients = gradients,
-                            gradient.index = if (gradients) i else 0L
+                            gradient.index = j
                           ),
                           proper = isTRUE(proper.args$proper.requested),
                           proper.method = proper.args$proper.method,

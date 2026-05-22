@@ -3557,11 +3557,9 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid exact regression bootstrap dimensions")
 
-  # Exact plot bootstrap repeatedly refits on resamples; keep nonfixed direct
-  # regression evaluations local so the helper does not re-enter pooled MPI
-  # execution while a plot-owned worker/bootstrap context is active.
-  use.local.direct <- identical(bws$type, "generalized_nn") ||
-    identical(bws$type, "adaptive_nn")
+  # Exact plot bootstrap repeatedly refits on resamples; keep direct regression
+  # evaluations local so plot-owned bootstrap work cannot re-enter pooled MPI.
+  use.local.direct <- TRUE
 
   fit_one <- function(x.train, y.train) {
     fit <- .np_regression_direct(
