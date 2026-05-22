@@ -743,7 +743,7 @@ nplsqregbw <-
 }
 
 nplsqregbw.formula <-
-  function(bws, data = NULL, tau = 0.5, ...) {
+  function(bws, data = NULL, tau = 0.5, subset, na.action, ...) {
     .npRmpi_require_active_slave_pool(where = "nplsqregbw()")
 
     tt <- terms(bws)
@@ -1079,7 +1079,7 @@ nplsqregbw.default <-
 
 nplsqreg.formula <-
   function(bws, data = NULL, newdata = NULL, tau = 0.5,
-           gradients = FALSE, residuals = FALSE, ...) {
+           gradients = FALSE, residuals = FALSE, subset, na.action, ...) {
 
     .npRmpi_require_active_slave_pool(where = "nplsqreg()")
 

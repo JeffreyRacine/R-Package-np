@@ -26,7 +26,7 @@
 nplsqreg(bws, \dots)
 
 \method{nplsqreg}{formula}(bws, data = NULL, newdata = NULL, tau = 0.5,
-       gradients = FALSE, residuals = FALSE, \dots)
+       gradients = FALSE, residuals = FALSE, subset, na.action, \dots)
 
 \method{nplsqreg}{lsqregressionbandwidth}(bws, txdat = NULL, tydat = NULL,
        tau = bws$tau, \dots)

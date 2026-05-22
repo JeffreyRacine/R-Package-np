@@ -107,3 +107,40 @@ test_that("session nplsqreg honors estimator bandwidth options separately from p
   expect_true(any(grepl("NPLSQREG_OPTION_CONTRACT_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
+
+test_that("session nplsqreg formula subset and na.action match explicit fit path", {
+  skip_on_cran()
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves = 1L, quiet = TRUE)",
+      "options(np.messages = FALSE)",
+      "set.seed(20260523)",
+      "dat <- data.frame(y = sin(seq(0, 2 * pi, length.out = 30L)) + rnorm(30L, sd = 0.1), x = seq(0, 1, length.out = 30L))",
+      "dat$y[c(4L, 17L)] <- NA_real_",
+      "dat$x[9L] <- NA_real_",
+      "keep <- dat$x > 0.15",
+      "mf <- model.frame(y ~ x, data = dat, subset = keep, na.action = na.omit)",
+      "xdat <- mf[, 'x', drop = FALSE]",
+      "ydat <- model.response(mf)",
+      "scale.sub <- rep(1, nrow(mf))",
+      "fit.form <- nplsqreg(y ~ x, data = dat, subset = keep, na.action = na.omit, scale = scale.sub, nmulti = 1L, optim.control = list(maxit = 2L))",
+      "fit.exp <- nplsqreg(bws = fit.form$bws, txdat = xdat, tydat = ydat)",
+      "stopifnot(identical(fit.form$ntrain, nrow(mf)))",
+      "stopifnot(identical(fit.form$xnames, 'x'))",
+      "stopifnot(identical(fit.form$ynames, 'y'))",
+      "stopifnot(isTRUE(all.equal(fitted(fit.form), fitted(fit.exp))))",
+      "stopifnot(inherits(fit.form$bws$formula, 'formula'))",
+      "cat('NPLSQREG_FORMULA_SUBSET_NA_OK\\n')"
+    ),
+    timeout = 90L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("NPLSQREG_FORMULA_SUBSET_NA_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
