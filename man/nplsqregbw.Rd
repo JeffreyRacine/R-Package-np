@@ -159,6 +159,14 @@ These arguments control the main check-loss bandwidth and
     \code{search.engine}, \code{degree.min}, \code{degree.max},
     \code{degree.start}, \code{degree.restarts}, \code{powell.remin},
     \code{nomad.remin}, and \code{nomad.nmulti}.
+    The explanatory-variable kernel aliases used by \code{\link{npqreg}}
+    and \code{\link{npcdistbw}}, such as \code{cxkertype},
+    \code{cxkerorder}, \code{uxkertype}, and \code{oxkertype}, are
+    accepted and mapped to the corresponding regression-kernel controls.
+    Response-side conditional-distribution kernel controls such as
+    \code{cykertype} are not meaningful for the location-scale
+    transformed-response estimator and fail clearly rather than being
+    ignored.
   }
 }
 \details{

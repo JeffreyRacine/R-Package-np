@@ -211,9 +211,70 @@ nplsqregbw <-
     "nomad", "nomad.nmulti", "nomad.remin", "search.engine",
     "degree.select", "degree.min", "degree.max", "degree.start",
     "degree.restarts", "degree.max.cycles", "degree.verify",
-    "optim.control", "delta.bounds", "tau.search"
+    "optim.control", "delta.bounds", "tau.search",
+    "random.seed", "nomad.opts"
   )
   dots[setdiff(names(dots), optimizer.names)]
+}
+
+.nplsqreg_normalize_dots <- function(dots, where = "nplsqreg") {
+  if (!length(dots))
+    return(dots)
+  dot.names <- names(dots)
+  if (is.null(dot.names))
+    dot.names <- rep("", length(dots))
+  if (any(!nzchar(dot.names)))
+    stop(sprintf("%s requires named optional arguments", where), call. = FALSE)
+
+  x.aliases <- c(cxkertype = "ckertype",
+                 cxkerorder = "ckerorder",
+                 cxkerbound = "ckerbound",
+                 cxkerlb = "ckerlb",
+                 cxkerub = "ckerub",
+                 uxkertype = "ukertype",
+                 oxkertype = "okertype")
+  y.aliases <- c("cykertype", "cykerorder", "cykerbound", "cykerlb",
+                 "cykerub", "uykertype", "oykertype")
+
+  y.hits <- intersect(dot.names, y.aliases)
+  if (length(y.hits))
+    stop(sprintf(
+      "%s does not use response-side conditional-distribution kernel controls: %s",
+      where, paste(y.hits, collapse = ", ")
+    ), call. = FALSE)
+
+  for (alias in intersect(names(x.aliases), dot.names)) {
+    target <- x.aliases[[alias]]
+    if (target %in% dot.names && !identical(dots[[alias]], dots[[target]]))
+      stop(sprintf("conflicting '%s' and '%s' arguments", alias, target),
+           call. = FALSE)
+    dots[[target]] <- dots[[alias]]
+    dots[[alias]] <- NULL
+    dot.names <- names(dots)
+  }
+
+  optimizer.names <- c(
+    "nmulti", "itmax", "ftol", "tol", "small", "powell.remin",
+    "nomad", "nomad.nmulti", "nomad.remin", "search.engine",
+    "degree.select", "degree.min", "degree.max", "degree.start",
+    "degree.restarts", "degree.max.cycles", "degree.verify",
+    "optim.control", "delta.bounds", "tau.search",
+    "random.seed", "nomad.opts"
+  )
+  reg.names <- setdiff(names(formals(getS3method("npregbw", "default"))),
+                       c("xdat", "ydat", "bws", "bandwidth.compute", "..."))
+  eval.names <- c("newdata", "exdat", "data")
+  allowed <- unique(c(reg.names, optimizer.names))
+  bad <- setdiff(names(dots), allowed)
+  if (length(bad)) {
+    if (any(bad %in% eval.names))
+      stop(sprintf(
+        "%s evaluation argument '%s' reached bandwidth selection unexpectedly",
+        where, bad[bad %in% eval.names][1L]
+      ), call. = FALSE)
+    stop(sprintf("unused %s argument '%s'", where, bad[1L]), call. = FALSE)
+  }
+  dots
 }
 
 .nplsqreg_call_fixed_degree_core <- function(xdat, ydat, scale, tau, bws,
@@ -753,7 +814,8 @@ nplsqregbw.default <-
       warm.start.from <- rep(NA_integer_, length(tau.raw))
       warm.start.degree <- vector("list", length(tau.raw))
       previous.idx <- NA_integer_
-      refined.extra.args <- list(...)
+      refined.extra.args <- .nplsqreg_normalize_dots(list(...),
+                                                     where = "nplsqregbw")
       tau.search.controls <- NULL
       if (identical(tau.search, "refined")) {
         refined.extra.args$nmulti <- 1L
@@ -824,7 +886,8 @@ nplsqregbw.default <-
     nomad.pilot <- npValidateScalarLogical(nomad.pilot, "nomad.pilot")
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute,
                                                  "bandwidth.compute")
-    controls <- .nplsqreg_optimizer_controls(list(...), optim.control)
+    dots <- .nplsqreg_normalize_dots(list(...), where = "nplsqregbw")
+    controls <- .nplsqreg_optimizer_controls(dots, optim.control)
     xdat <- toFrame(xdat)
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
@@ -841,7 +904,6 @@ nplsqregbw.default <-
       stop("'delta.bounds' must be a two-value numeric interval inside (0, 1)",
            call. = FALSE)
 
-    dots <- list(...)
     if (isTRUE(nomad) && !isTRUE(bandwidth.compute))
       stop("nplsqregbw nomad=TRUE requires bandwidth.compute=TRUE",
            call. = FALSE)
@@ -1007,6 +1069,9 @@ nplsqreg.formula <-
     .npRmpi_require_active_slave_pool(where = "nplsqreg()")
 
     tt <- terms(bws)
+    dots <- list(...)
+    native.exdat <- dots$exdat
+    dots$exdat <- NULL
     mc <- match.call(expand.dots = FALSE)
     m <- match(c("bws", "data", "subset", "na.action"),
                names(mc), nomatch = 0)
@@ -1020,8 +1085,15 @@ nplsqreg.formula <-
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
 
-    has.eval <- !is.null(newdata)
-    if (has.eval) {
+    has.eval <- !is.null(native.exdat) || !is.null(newdata)
+    if (!is.null(native.exdat)) {
+      npValidateNewdataFormula(native.exdat, delete.response(tt),
+                               include.response = FALSE)
+      emf <- do.call(stats::model.frame,
+                     list(formula = delete.response(tt), data = native.exdat),
+                     envir = parent.frame())
+      exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]
+    } else if (has.eval) {
       npValidateNewdataFormula(newdata, delete.response(tt),
                                include.response = FALSE)
       emf <- do.call(stats::model.frame,
@@ -1031,12 +1103,16 @@ nplsqreg.formula <-
     }
 
     out <- if (has.eval) {
-      nplsqreg.default(txdat = xdat, tydat = ydat, tau = tau,
-                       exdat = exdat, gradients = gradients,
-                       residuals = residuals, ...)
+      do.call(nplsqreg.default,
+              c(list(txdat = xdat, tydat = ydat, tau = tau,
+                     exdat = exdat, gradients = gradients,
+                     residuals = residuals),
+                dots))
     } else {
-      nplsqreg.default(txdat = xdat, tydat = ydat, tau = tau,
-                       gradients = gradients, residuals = residuals, ...)
+      do.call(nplsqreg.default,
+              c(list(txdat = xdat, tydat = ydat, tau = tau,
+                     gradients = gradients, residuals = residuals),
+                dots))
     }
     out$call <- match.call(expand.dots = FALSE)
     environment(out$call) <- parent.frame()
@@ -1111,29 +1187,39 @@ nplsqreg.default <-
     tau.raw <- .nplsqreg_validate_tau_values(tau)
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
+    dots <- list(...)
+    native.newdata <- dots$newdata
+    dots$newdata <- NULL
+    dots$exdat <- NULL
 
     if (missing(bws) || !isa(bws, "lsqregressionbandwidth")) {
       bw.args <- list(xdat = txdat, ydat = tydat, tau = tau.raw)
       if (!missing(bws))
         bw.args$bws <- bws
-      bw <- do.call("nplsqregbw", c(bw.args, list(...)))
+      bw <- do.call("nplsqregbw", c(bw.args, dots))
       fit.args <- list(bws = bw, txdat = txdat, tydat = tydat,
                        gradients = gradients, residuals = residuals)
       if (!missing(exdat))
         fit.args$exdat <- exdat
+      else if (!is.null(native.newdata))
+        fit.args$exdat <- native.newdata
       return(do.call("nplsqreg.lsqregressionbandwidth", fit.args))
     }
 
-    if (length(tau.raw) > 1L)
-      return(nplsqreg.lsqregressionbandwidth(
-        bws = bws,
-        txdat = txdat,
-        tydat = tydat,
-        tau = tau.raw,
-        gradients = gradients,
-        residuals = residuals,
-        ...
-      ))
+    if (length(tau.raw) > 1L) {
+      reuse.args <- list(bws = bws,
+                         txdat = txdat,
+                         tydat = tydat,
+                         tau = tau.raw,
+                         gradients = gradients,
+                         residuals = residuals)
+      if (!missing(exdat))
+        reuse.args$exdat <- exdat
+      else if (!is.null(native.newdata))
+        reuse.args$newdata <- native.newdata
+      return(do.call(nplsqreg.lsqregressionbandwidth,
+                     c(reuse.args, dots)))
+    }
     tau <- .nplsqreg_validate_tau(tau.raw)
 
     if (!isTRUE(all.equal(tau, bws$tau)))
@@ -1147,9 +1233,12 @@ nplsqreg.default <-
 
     fit.args <- list(bws = bws$reg.bws, txdat = txdat, tydat = bws$qdat,
                      gradients = gradients, residuals = residuals)
+    eval.present <- !missing(exdat) || !is.null(native.newdata)
     if (!missing(exdat))
       fit.args$exdat <- exdat
-    fit <- do.call(npreg, c(fit.args, list(...)))
+    else if (!is.null(native.newdata))
+      fit.args$exdat <- native.newdata
+    fit <- do.call(npreg, c(fit.args, dots))
 
     quant <- fitted(fit)
     qerr <- se(fit)
@@ -1170,7 +1259,7 @@ nplsqreg.default <-
       quantgrad = qgrad,
       quantgerr = qgerr,
       ntrain = nrow(txdat),
-      trainiseval = missing(exdat),
+      trainiseval = !eval.present,
       gradients = gradients,
       residuals = residuals,
       resid = resid.out,
