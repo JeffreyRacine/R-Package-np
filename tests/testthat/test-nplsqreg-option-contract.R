@@ -55,6 +55,12 @@ test_that("session nplsqreg honors estimator bandwidth options separately from p
       "stopifnot(all(c('quanterr', 'bias') %in% names(aout$cd1)))",
       "bout <- plot(fit.plot, output = 'data', perspective = FALSE, neval = 5L, errors = 'bootstrap', B = 3L)",
       "stopifnot(all(c('quanterr', 'bias') %in% names(bout$cd1)))",
+      "dat2 <- data.frame(y = dat.plot$y, x1 = seq(0, 1, length.out = nrow(dat.plot)), x2 = cos(seq(0, 2, length.out = nrow(dat.plot))))",
+      "fit2 <- nplsqreg(y ~ x1 + x2, data = dat2, tau = 0.5, scale = rep(1, nrow(dat2)), nmulti = 1L, optim.control = list(maxit = 2L))",
+      "out2 <- plot(fit2, output = 'data', perspective = FALSE, neval = 6L)",
+      "stopifnot(identical(names(out2), c('cd1', 'cd2')))",
+      "stopifnot(inherits(out2$cd1, 'lsqregression'))",
+      "stopifnot(inherits(out2$cd2, 'lsqregression'))",
       "stopifnot(inherits(try(plot(fit.plot$tau.fits[[1L]], tau = c(0.25, 0.5), output = 'data', perspective = FALSE), silent = TRUE), 'try-error'))",
       "cat('NPLSQREG_OPTION_CONTRACT_OK\\n')"
     ),
