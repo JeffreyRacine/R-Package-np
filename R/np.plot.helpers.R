@@ -10897,22 +10897,26 @@ plotFactor <- function(f, y, ...){
   cols
 }
 
+.np_plot_viridis_role <- function(x) {
+  unname(.np_plot_viridis_at(x))[1L]
+}
+
 .np_plot_color <- function(role, alpha = NULL) {
   role <- as.character(role)[1L]
   spec <- switch(
     role,
-    primary = list(col = "black", alpha = 1),
-    median = list(col = "black", alpha = 1),
-    surface_border = list(col = "black", alpha = 1),
-    context_border = list(col = "grey", alpha = 1),
-    context_wire = list(col = "grey40", alpha = 1),
-    data_overlay = list(col = "gray30", alpha = 0.35),
-    support = list(col = "gray20", alpha = 0.60),
-    support_floor = list(col = "gray20", alpha = 0.55),
-    support_grid = list(col = "grey60", alpha = 0.45),
-    component_context = list(col = "gray70", alpha = 1),
-    interval_context = list(col = "gray45", alpha = 1),
-    legend_bg = list(col = "white", alpha = 1),
+    primary = list(col = .np_plot_viridis_role(0.02), alpha = 1),
+    median = list(col = .np_plot_viridis_role(0.02), alpha = 1),
+    surface_border = list(col = .np_plot_viridis_role(0.02), alpha = 1),
+    context_border = list(col = .np_plot_viridis_role(0.30), alpha = 1),
+    context_wire = list(col = .np_plot_viridis_role(0.25), alpha = 1),
+    data_overlay = list(col = .np_plot_viridis_role(0.08), alpha = 0.35),
+    support = list(col = .np_plot_viridis_role(0.12), alpha = 0.60),
+    support_floor = list(col = .np_plot_viridis_role(0.18), alpha = 0.55),
+    support_grid = list(col = .np_plot_viridis_role(0.50), alpha = 0.45),
+    component_context = list(col = .np_plot_viridis_role(0.68), alpha = 1),
+    interval_context = list(col = .np_plot_viridis_role(0.78), alpha = 1),
+    legend_bg = list(col = .np_plot_viridis_role(0.98), alpha = 0.18),
     stop("unknown plot color role: ", role, call. = FALSE)
   )
   alpha <- if (is.null(alpha)) spec$alpha else alpha
