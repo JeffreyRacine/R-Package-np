@@ -52,6 +52,7 @@ npudistbw(\dots)
           nmulti,
           penalty.multiplier = 10,
           powell.remin = TRUE,
+          bwsolver = c("powell", "mads", "mads+powell"),
           scale.init.categorical.sample = FALSE,
           scale.factor.search.lower = NULL,
           small = 1.490116e-05,
@@ -95,6 +96,7 @@ npudistbw(\dots)
           okertype,
           penalty.multiplier,
           powell.remin,
+          bwsolver = c("powell", "mads", "mads+powell"),
           scale.init.categorical.sample,
           scale.factor.search.lower = NULL,
           small,
@@ -414,6 +416,14 @@ These controls set optimizer tolerances, restart behavior, invalid-candidate pen
     logical flag controlling Powell restart-from-minimum behavior. When
     \code{TRUE}, the Powell-style search restarts from the located minimum
     for a minor gain in accuracy. Defaults to \code{TRUE}.
+  }
+
+  \item{bwsolver}{
+    bandwidth optimizer for fixed-degree searches. The default
+    \code{"powell"} preserves the historical Powell route. \code{"mads"}
+    uses \code{crs::snomadr()} over the bandwidth coordinates, and
+    \code{"mads+powell"} applies one Powell hot start from the MADS
+    solution.
   }
 
   \item{small}{

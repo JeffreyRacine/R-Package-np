@@ -56,6 +56,7 @@ npcdistbw(\dots)
           nmulti,
           penalty.multiplier = 10,
           powell.remin = TRUE,
+          bwsolver = c("powell", "mads", "mads+powell"),
           scale.init.categorical.sample = FALSE,
           scale.factor.search.lower = NULL,
           small = 1.490116e-05,
@@ -107,6 +108,7 @@ npcdistbw(\dots)
           penalty.multiplier,
           nomad.remin = FALSE,
           powell.remin,
+          bwsolver = c("powell", "mads", "mads+powell"),
           scale.init.categorical.sample,
           scale.factor.search.lower = NULL,
           small,
@@ -670,6 +672,15 @@ These controls set optimizer tolerances, restart behavior, invalid-candidate pen
     this controls only the final Powell bandwidth-polish step. The default
     is \code{TRUE} for ordinary Powell routes and \code{FALSE} for the
     Powell polish after NOMAD unless explicitly supplied.
+  }
+
+  \item{bwsolver}{
+    bandwidth optimizer for fixed-degree searches. The default
+    \code{"powell"} preserves the historical Powell route. \code{"mads"}
+    uses \code{crs::snomadr()} over the bandwidth coordinates, and
+    \code{"mads+powell"} applies one Powell hot start from the MADS
+    solution. Use \code{search.engine} rather than \code{bwsolver} for
+    automatic degree search.
   }
 
   \item{small}{
