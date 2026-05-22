@@ -56,6 +56,7 @@ npudensbw(\dots)
           small = 1.490116e-05,
           tol = 1.490116e-04,
           transform.bounds = FALSE,
+          eval.only = FALSE,
           \dots)
 
 \method{npudensbw}{default}(dat = stop("invoked without input data 'dat'"),
@@ -407,6 +408,12 @@ These controls set optimizer tolerances, restart behavior, invalid-candidate pen
     applies an internal transformation that maps the unconstrained
     search to the feasible bandwidth domain. Defaults to
     \code{FALSE}.}
+
+  \item{eval.only}{
+    internal logical flag used by solver wrappers to evaluate an
+    existing bandwidth candidate without running a bandwidth search.
+    Ordinary users should leave this at its default \code{FALSE}.
+  }
 
 
 \subsection{Additional Arguments}{
