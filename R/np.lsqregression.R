@@ -673,6 +673,13 @@ nplsqregbw <-
   out$warm.start.degree <- warm.start.degree
   out$tau.search.controls <- tau.search.controls
   out$pilot.shared <- TRUE
+  out$child.degree.common <- all(vapply(
+    bw.list,
+    function(z) identical(z$reg.bws$degree, first$reg.bws$degree),
+    logical(1L)))
+  out$total.time <- .nplsqreg_sum_times(lapply(bw.list, function(z) z$total.time))
+  out$optim.time <- out$total.time
+  out$fit.time <- NA_real_
   out$call <- call
   class(out) <- "lsqregressionbandwidth"
   out
@@ -724,6 +731,12 @@ nplsqregbw <-
   out$warm.start.degree <- bws$warm.start.degree
   out$tau.search.controls <- bws$tau.search.controls
   out$pilot.shared <- TRUE
+  out$child.degree.common <- isTRUE(bws$child.degree.common)
+  optim.time <- .nplsqreg_sum_times(bws$total.time)
+  fit.time <- .nplsqreg_sum_times(lapply(fit.list, function(z) z$fit.time))
+  out$optim.time <- optim.time
+  out$fit.time <- fit.time
+  out$total.time <- .nplsqreg_sum_times(optim.time, fit.time)
   out$call <- call
   class(out) <- "lsqregression"
   out
@@ -748,6 +761,8 @@ nplsqregbw.formula <-
     xdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
     out <- nplsqregbw(xdat = xdat, ydat = ydat, tau = tau, ...)
     out$formula <- bws
+    out <- .nplsqreg_set_response_name(
+      out, .nplsqreg_formula_response_name(bws))
     out$call <- match.call(expand.dots = FALSE)
     environment(out$call) <- parent.frame()
     out
@@ -1070,6 +1085,7 @@ nplsqreg.formula <-
 
     tt <- terms(bws)
     dots <- list(...)
+    response.name <- .nplsqreg_formula_response_name(bws)
     native.exdat <- dots$exdat
     dots$exdat <- NULL
     mc <- match.call(expand.dots = FALSE)
@@ -1117,6 +1133,7 @@ nplsqreg.formula <-
     out$call <- match.call(expand.dots = FALSE)
     environment(out$call) <- parent.frame()
     out$bws$formula <- bws
+    out <- .nplsqreg_set_response_name(out, response.name)
     if (!is.null(out$bws$tau.bws))
       for (j in seq_along(out$bws$tau.bws))
         out$bws$tau.bws[[j]]$formula <- bws
