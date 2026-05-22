@@ -68,4 +68,12 @@ test_that("nplsqreg vector tau applies estimator options to each full-search tau
     function(bw) identical(bw$reg.bws$regtype, "ll"),
     logical(1)
   )))
+
+  out.fit <- capture.output(summary(fit))
+  out.bw <- capture.output(summary(fit$bws))
+  expect_true(any(grepl("regtype", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("bandwidth", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("powell", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("regtype", out.bw, fixed = TRUE)))
+  expect_true(any(grepl("bandwidth", out.bw, fixed = TRUE)))
 })
