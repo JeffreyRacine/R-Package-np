@@ -348,6 +348,15 @@ npBwsolverUsesMads <- function(value) {
   npValidateBwsolver(value) %in% c("mads", "mads+powell")
 }
 
+npRejectUnsupportedBwsolver <- function(dots, where) {
+  if (!is.list(dots) || !("bwsolver" %in% names(dots)))
+    return(invisible(FALSE))
+  stop(sprintf(
+    "bwsolver is not supported by %s; use that family's documented optimizer controls",
+    where
+  ), call. = FALSE)
+}
+
 npValidatePositiveFiniteNumeric <- function(value, argname) {
   if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
       !is.finite(value) || value <= 0)

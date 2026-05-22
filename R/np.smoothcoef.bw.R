@@ -346,6 +346,9 @@ npscoefbw.scbandwidth <-
            dfac.init = 1.0,
            scale.factor.search.lower = NULL,
            ...){
+
+    dots <- list(...)
+    npRejectUnsupportedBwsolver(dots, "npscoefbw")
     
     ## Save seed prior to setting
 
@@ -2009,6 +2012,9 @@ npscoefbw.default <-
            dfac.init = 1.0,
            scale.factor.search.lower = NULL,
            ...){
+
+    dots <- list(...)
+    npRejectUnsupportedBwsolver(dots, "npscoefbw")
 
     if (!missing(bwmethod) && identical(match.arg(bwmethod, c("cv.ls", "manual")), "manual") &&
         missing(bws))

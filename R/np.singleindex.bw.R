@@ -1109,6 +1109,7 @@ npindexbw.default <-
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
     dots <- list(...)
+    npRejectUnsupportedBwsolver(dots, "npindexbw")
     dot.names <- names(dots)
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
@@ -1377,6 +1378,9 @@ npindexbw.sibandwidth <-
            scale.factor.init = 0.5,
            scale.factor.search.lower = NULL,
            ...){
+
+    dots <- list(...)
+    npRejectUnsupportedBwsolver(dots, "npindexbw")
 
     ## Save seed prior to setting
 

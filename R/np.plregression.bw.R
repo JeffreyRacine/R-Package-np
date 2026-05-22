@@ -1064,6 +1064,7 @@ npplregbw.default =
     zdat <- toFrame(zdat)
 
     dots <- list(...)
+    npRejectUnsupportedBwsolver(dots, "npplregbw")
     dot.names <- names(dots)
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
