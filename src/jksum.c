@@ -8946,7 +8946,12 @@ static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int int_ll,
   if(int_ll == LL_LL)
     return 1;
 
+  /*
+    Bernstein LP fixed-kernel objectives are faster through the packed BLAS
+    basis path below.
+  */
   if((int_ll == LL_LP) &&
+     (!use_bernstein) &&
      (int_glp_basis_extern == 1))
     return 1;
 
