@@ -208,6 +208,11 @@ These arguments control the main check-loss bandwidth and
   Racine, J.S. and K. Li (2017), \dQuote{Nonparametric conditional quantile
   estimation: A locally weighted quantile kernel approach,} Journal of
   Econometrics, 201, 72-94. \doi{10.1016/j.jeconom.2017.06.020}
+
+  Racine, J.S. and I. Van Keilegom (2020), \dQuote{A smooth
+  nonparametric, multivariate, mixed-data location-scale test,} Journal
+  of Business & Economic Statistics, 38, 784-795.
+  \doi{10.1080/07350015.2019.1574227}
 }
 \author{
   Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
