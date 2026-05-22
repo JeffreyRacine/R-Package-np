@@ -6181,14 +6181,14 @@ plotFactor <- function(f, y, ...){
     median = list(col = "black", alpha = 1),
     surface_border = list(col = "black", alpha = 1),
     context_border = list(col = "grey", alpha = 1),
-    context_wire = list(col = .np_plot_color("context_wire"), alpha = 1),
+    context_wire = list(col = "grey40", alpha = 1),
     data_overlay = list(col = "gray30", alpha = 0.35),
     support = list(col = "gray20", alpha = 0.60),
     support_floor = list(col = "gray20", alpha = 0.55),
     support_grid = list(col = "grey60", alpha = 0.45),
-    component_context = list(col = .np_plot_color("component_context"), alpha = 1),
-    interval_context = list(col = .np_plot_color("interval_context"), alpha = 1),
-    legend_bg = list(col = .np_plot_color("legend_bg"), alpha = 1),
+    component_context = list(col = "gray70", alpha = 1),
+    interval_context = list(col = "gray45", alpha = 1),
+    legend_bg = list(col = "white", alpha = 1),
     stop("unknown plot color role: ", role, call. = FALSE)
   )
   alpha <- if (is.null(alpha)) spec$alpha else alpha
