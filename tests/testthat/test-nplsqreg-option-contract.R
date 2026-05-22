@@ -114,6 +114,41 @@ test_that("predict.lsqregression handles newdata, exdat, se.fit, and vector tau"
   expect_identical(colnames(pv$se.fit), c("tau=0.25", "tau=0.50"))
 })
 
+test_that("nplsqreg formula subset and na.action match explicit mixed-data path", {
+  options(np.messages = FALSE)
+  set.seed(20260523)
+  dat <- data.frame(
+    y = sin(seq(0, 2 * pi, length.out = 36L)) + rnorm(36L, sd = 0.1),
+    x = seq(0, 1, length.out = 36L),
+    o = ordered(rep(1:4, length.out = 36L))
+  )
+  dat$y[c(4L, 21L)] <- NA_real_
+  dat$x[9L] <- NA_real_
+  keep <- dat$x > 0.15
+  mf <- model.frame(y ~ x + o, data = dat, subset = keep,
+                    na.action = na.omit)
+  xdat <- mf[, c("x", "o"), drop = FALSE]
+  ydat <- model.response(mf)
+  scale.sub <- rep(1, nrow(mf))
+
+  bw.form <- nplsqregbw(y ~ x + o, data = dat, subset = keep,
+                        na.action = na.omit, scale = scale.sub,
+                        nmulti = 1L, optim.control = list(maxit = 2L))
+  bw.exp <- nplsqregbw(xdat = xdat, ydat = ydat, scale = scale.sub,
+                       nmulti = 1L, optim.control = list(maxit = 2L))
+  expect_equal(bw.form$bw, bw.exp$bw)
+  expect_identical(bw.form$nobs, nrow(mf))
+  expect_identical(bw.form$xnames, c("x", "o"))
+  expect_identical(bw.form$ynames, "y")
+
+  fit.form <- nplsqreg(y ~ x + o, data = dat, subset = keep,
+                       na.action = na.omit, scale = scale.sub,
+                       nmulti = 1L, optim.control = list(maxit = 2L))
+  expect_identical(fit.form$ntrain, nrow(mf))
+  expect_identical(fit.form$xnames, c("x", "o"))
+  expect_identical(fit.form$ynames, "y")
+})
+
 test_that("nplsqreg vector tau applies estimator options to each full-search tau", {
   options(np.messages = FALSE)
   set.seed(20260521)

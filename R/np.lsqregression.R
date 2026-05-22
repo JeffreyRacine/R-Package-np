@@ -725,7 +725,7 @@ nplsqregbw <-
 }
 
 nplsqregbw.formula <-
-  function(bws, data = NULL, tau = 0.5, ...) {
+  function(bws, data = NULL, tau = 0.5, subset, na.action, ...) {
     tt <- terms(bws)
     mc <- match.call(expand.dots = FALSE)
     m <- match(c("bws", "data", "subset", "na.action"),
@@ -1050,7 +1050,7 @@ nplsqregbw.default <-
 
 nplsqreg.formula <-
   function(bws, data = NULL, newdata = NULL, tau = 0.5,
-           gradients = FALSE, residuals = FALSE, ...) {
+           gradients = FALSE, residuals = FALSE, subset, na.action, ...) {
 
     tt <- terms(bws)
     dots <- list(...)

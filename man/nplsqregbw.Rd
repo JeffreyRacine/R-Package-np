@@ -15,7 +15,8 @@
 \usage{
 nplsqregbw(bws, \dots)
 
-\method{nplsqregbw}{formula}(bws, data = NULL, tau = 0.5, \dots)
+\method{nplsqregbw}{formula}(bws, data = NULL, tau = 0.5,
+       subset, na.action, \dots)
 
 \method{nplsqregbw}{lsqregressionbandwidth}(bws, tau = bws$tau, \dots)
 
