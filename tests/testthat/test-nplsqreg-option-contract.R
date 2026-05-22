@@ -129,6 +129,14 @@ test_that("nplsqreg residuals accessor exposes requested residuals", {
                          optim.control = list(maxit = 2L))
   expect_length(residuals(fit.scalar), nrow(dat))
   expect_equal(residuals(fit.scalar), fit.scalar$resid)
+  expect_equal(residuals(fit.scalar), dat$y - fitted(fit.scalar))
+
+  eval.dat <- dat[seq_len(5L), "x", drop = FALSE]
+  fit.eval <- nplsqreg(y ~ x, data = dat, newdata = eval.dat, tau = 0.5,
+                       scale = scale0, residuals = TRUE, nmulti = 1L,
+                       optim.control = list(maxit = 2L))
+  expect_length(fitted(fit.eval), nrow(eval.dat))
+  expect_length(residuals(fit.eval), nrow(dat))
 
   fit.vector <- nplsqreg(y ~ x, data = dat, tau = c(0.25, 0.5),
                          scale = scale0, residuals = TRUE, nmulti = 1L,

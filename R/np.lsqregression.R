@@ -1205,7 +1205,7 @@ nplsqreg.default <-
       stop("number of explanatory data and response data do not match")
 
     fit.args <- list(bws = bws$reg.bws, txdat = txdat, tydat = bws$qdat,
-                     gradients = gradients, residuals = residuals)
+                     gradients = gradients)
     eval.present <- !missing(exdat) || !is.null(native.newdata)
     if (!missing(exdat))
       fit.args$exdat <- exdat
@@ -1217,9 +1217,17 @@ nplsqreg.default <-
     qerr <- se(fit)
     qgrad <- if (gradients) gradients(fit) else NA
     qgerr <- if (gradients) gradients(fit, errors = TRUE) else NA
-    resid.out <- if (residuals) tydat - fitted(npreg(bws = bws$reg.bws,
-                                                    txdat = txdat,
-                                                    tydat = bws$qdat)) else NA
+    resid.out <- if (residuals) {
+      if (eval.present) {
+        tydat - fitted(npreg(bws = bws$reg.bws,
+                             txdat = txdat,
+                             tydat = bws$qdat))
+      } else {
+        tydat - fitted(fit)
+      }
+    } else {
+      NA
+    }
 
     out <- lsqregression(
       bws = bws,
