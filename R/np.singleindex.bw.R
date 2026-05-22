@@ -1452,6 +1452,7 @@ npindexbw.default <-
     mc <- match.call(expand.dots = FALSE)
     search.mc.names <- names(mc)
     dots <- list(...)
+    npRejectUnsupportedBwsolver(dots, "npindexbw")
     dot.names <- names(dots)
     degree.select.value <- if (isTRUE(npValidateScalarLogical(nomad, "nomad"))) {
       "coordinate"
@@ -1759,6 +1760,10 @@ npindexbw.sibandwidth <-
            scale.factor.init = 0.5,
            scale.factor.search.lower = NULL,
            ...){
+
+    dots <- list(...)
+    npRejectUnsupportedBwsolver(dots, "npindexbw")
+
     ## Save seed prior to setting
 
     seed.state <- .np_seed_enter(random.seed)

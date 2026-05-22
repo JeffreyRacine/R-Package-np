@@ -1646,6 +1646,10 @@ npscoefbw.scbandwidth <-
            dfac.init = 1.0,
            scale.factor.search.lower = NULL,
            ...){
+
+    dots <- list(...)
+    npRejectUnsupportedBwsolver(dots, "npscoefbw")
+
     ## Save seed prior to setting
 
     seed.state <- .np_seed_enter(random.seed)
@@ -2787,6 +2791,9 @@ npscoefbw.default <-
            scale.factor.search.lower = NULL,
            ...){
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")
+    dots <- list(...)
+    npRejectUnsupportedBwsolver(dots, "npscoefbw")
+
     if (!missing(bwmethod) && identical(match.arg(bwmethod, c("cv.ls", "manual")), "manual") &&
         missing(bws))
       stop("bwmethod='manual' requires argument 'bws'")
@@ -2802,7 +2809,6 @@ npscoefbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
-    dots <- list(...)
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
       call_names = mc.names,

@@ -220,6 +220,7 @@ nplsqregbw <-
 .nplsqreg_normalize_dots <- function(dots, where = "nplsqreg") {
   if (!length(dots))
     return(dots)
+  npRejectUnsupportedBwsolver(dots, where)
   dot.names <- names(dots)
   if (is.null(dot.names))
     dot.names <- rep("", length(dots))
