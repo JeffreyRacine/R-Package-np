@@ -712,6 +712,7 @@ nplsqregbw.default <-
            tau.search = c("full", "refined"),
            delta = NULL,
            scale = NULL,
+           regtype = c("lc", "ll", "lp"),
            regtype.pilot = c("auto", "ll", "lc", "lp"),
            nomad = FALSE,
            nomad.pilot = FALSE,
@@ -733,6 +734,9 @@ nplsqregbw.default <-
     elapsed.start <- proc.time()[3]
     tau.raw <- .nplsqreg_validate_tau_values(tau)
     tau.search <- .nplsqreg_validate_tau_search(tau.search)
+    regtype.supplied <- !missing(regtype)
+    if (regtype.supplied)
+      regtype <- match.arg(regtype)
     if (length(tau.raw) > 1L) {
       bws.missing <- missing(bws)
       bw.list <- vector("list", length(tau.raw))
@@ -780,6 +784,8 @@ nplsqregbw.default <-
           delta.bounds = delta.bounds,
           optim.control = optim.control
         )
+        if (regtype.supplied)
+          one.args$regtype <- regtype
         if (!bws.missing) {
           one.args$bws <- bws
         } else if (identical(tau.search, "refined") &&
@@ -839,7 +845,12 @@ nplsqregbw.default <-
     if (isTRUE(nomad) && !isTRUE(bandwidth.compute))
       stop("nplsqregbw nomad=TRUE requires bandwidth.compute=TRUE",
            call. = FALSE)
+    if (isTRUE(nomad) && regtype.supplied && !identical(regtype, "lp"))
+      stop("nplsqregbw nomad=TRUE requires regtype='lp' when regtype is supplied",
+           call. = FALSE)
     reg.dots <- .nplsqreg_strip_optimizer_dots(dots)
+    if (regtype.supplied)
+      reg.dots$regtype <- regtype
     if (isTRUE(nomad)) {
       reg.dots$regtype <- NULL
       reg.dots$degree <- NULL

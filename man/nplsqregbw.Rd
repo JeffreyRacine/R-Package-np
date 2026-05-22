@@ -26,6 +26,7 @@ nplsqregbw(bws, \dots)
        tau.search = c("full", "refined"),
        delta = NULL,
        scale = NULL,
+       regtype = c("lc", "ll", "lp"),
        regtype.pilot = c("auto", "ll", "lc", "lp"),
        nomad = FALSE,
        nomad.pilot = FALSE,
@@ -116,6 +117,12 @@ the location-scale transformation.
 These arguments control the main check-loss bandwidth and
 \code{delta} optimization.
 }
+
+  \item{regtype}{
+    regression type for the main transformed-response fit and check-loss
+    bandwidth search. This is independent of \code{regtype.pilot} and
+    follows \code{\link{npregbw}} semantics.
+  }
 
   \item{delta}{
     optional starting value for the shift parameter. If omitted, the
