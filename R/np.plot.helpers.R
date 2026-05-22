@@ -5929,8 +5929,8 @@ plotFactor <- function(f, y, ...){
       y = rbind(x2[ok], x2[ok]),
       z = rbind(rep.int(zfloor, sum(ok)), rep.int(ztop, sum(ok))),
       color = .np_plot_color("support_floor"),
-      alpha = 0.55,
-      lwd = .np_plot_lwd("support_floor")
+      alpha = 0.40,
+      lwd = .np_plot_lwd("support")
     ),
     segments3d.args
   )
