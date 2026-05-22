@@ -1530,6 +1530,42 @@
   value
 }
 
+.np_nomad_capture_snomadr <- function(expr, capture.output = TRUE) {
+  if (!isTRUE(capture.output)) {
+    return(list(value = force(expr), output = character()))
+  }
+
+  value <- NULL
+  output <- utils::capture.output(
+    value <- force(expr),
+    type = "output"
+  )
+
+  list(value = value, output = output)
+}
+
+.np_nomad_external_output_lines <- function(lines) {
+  lines <- as.character(lines)
+  lines <- trimws(lines)
+  lines <- lines[!is.na(lines) & nzchar(lines)]
+  unique(lines)
+}
+
+.np_nomad_emit_external_output <- function(lines, progress_state, seen) {
+  lines <- .np_nomad_external_output_lines(lines)
+  lines <- lines[!(lines %in% seen)]
+  if (!length(lines) || !isTRUE(.np_progress_enabled())) {
+    return(list(progress_state = progress_state, seen = seen))
+  }
+
+  progress_state <- .np_progress_prepare_for_external_output(progress_state)
+  for (line in lines) {
+    .np_message("NOMAD: ", line)
+  }
+
+  list(progress_state = progress_state, seen = c(seen, lines))
+}
+
 .np_nomad_search <- function(engine = c("nomad", "nomad+powell"),
                              baseline_record,
                              start_degree = NULL,
@@ -1579,6 +1615,7 @@
   state$best_restart_index <- NA_integer_
   state$restart_durations <- numeric()
   state$restart_eval_id <- 0L
+  state$external_output_seen <- character()
 
   set_progress_state <- function(value) {
     state$progress_state <- value
@@ -1800,7 +1837,7 @@
     solution_i <- tryCatch(
       {
         solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
-        crs::snomadr(
+        nomad.call <- .np_nomad_capture_snomadr(crs::snomadr(
           eval.f = wrapped_eval,
           n = length(x0),
           bbin = as.integer(bbin),
@@ -1813,7 +1850,15 @@
           opts = solver.opts,
           display.nomad.progress = display.nomad.progress,
           snomadr.environment = environment(wrapped_eval)
+        ), capture.output = !isTRUE(display.nomad.progress))
+        emitted <- .np_nomad_emit_external_output(
+          lines = nomad.call$output,
+          progress_state = state$progress_state,
+          seen = state$external_output_seen
         )
+        set_progress_state(emitted$progress_state)
+        state$external_output_seen <- emitted$seen
+        nomad.call$value
       },
       interrupt = function(e) {
         state$interrupted <- TRUE
@@ -1935,7 +1980,7 @@
     solution_i <- tryCatch(
       {
         solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
-        crs::snomadr(
+        nomad.call <- .np_nomad_capture_snomadr(crs::snomadr(
           eval.f = wrapped_eval,
           n = length(x0),
           bbin = as.integer(bbin),
@@ -1948,7 +1993,15 @@
           opts = solver.opts,
           display.nomad.progress = display.nomad.progress,
           snomadr.environment = environment(wrapped_eval)
+        ), capture.output = !isTRUE(display.nomad.progress))
+        emitted <- .np_nomad_emit_external_output(
+          lines = nomad.call$output,
+          progress_state = state$progress_state,
+          seen = state$external_output_seen
         )
+        set_progress_state(emitted$progress_state)
+        state$external_output_seen <- emitted$seen
+        nomad.call$value
       },
       interrupt = function(e) {
         state$interrupted <- TRUE

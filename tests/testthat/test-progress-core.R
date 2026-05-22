@@ -307,6 +307,51 @@ test_that("warning helper prefixes package warnings", {
   expect_identical(warnings, "[npRmpi] kernel order ignored")
 })
 
+test_that("NOMAD external output clears single-line progress and uses package messages", {
+  begin <- getFromNamespace(".np_progress_begin", "npRmpi")
+  show_now <- getFromNamespace(".np_progress_show_now", "npRmpi")
+  emit_nomad <- getFromNamespace(".np_nomad_emit_external_output", "npRmpi")
+  reset <- getFromNamespace(".np_progress_reset_registry", "npRmpi")
+  trace <- list()
+
+  recorder <- function(snapshot, event = c("render", "finish", "abort")) {
+    event <- match.arg(event)
+    trace[[length(trace) + 1L]] <<- list(event = event, line = snapshot$line)
+    invisible(snapshot)
+  }
+
+  old_opts <- options(np.messages = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
+  messages <- with_nprmpi_bindings(
+    list(
+      .np_progress_is_interactive = function() TRUE,
+      .np_progress_is_master = function() TRUE,
+      .np_progress_renderer_for_surface = function(surface, capability) "single_line",
+      .np_progress_render_single_line = recorder,
+      .np_progress_now = progress_time_values(c(0, 0.1, 0.2))
+    ),
+    {
+      reset()
+      on.exit(reset(), add = TRUE)
+      state <- begin("Selecting degree and bandwidth", surface = "bandwidth")
+      state <- show_now(state)
+      capture_messages_only({
+        emitted <- emit_nomad(
+          c("All variables are granular.", "All variables are granular."),
+          state,
+          character()
+        )
+        expect_identical(emitted$seen, "All variables are granular.")
+      })
+    }
+  )
+
+  events <- vapply(trace, `[[`, character(1L), "event")
+  expect_true("finish" %in% events)
+  expect_identical(normalize_messages(messages), "[npRmpi] NOMAD: All variables are granular.")
+})
+
 test_that("bandwidth selection helper suppresses legacy output and drives bounded updates", {
   select_bw <- getFromNamespace(".np_progress_select_bandwidth", "npRmpi")
   set_total <- getFromNamespace(".np_progress_bandwidth_set_total", "npRmpi")
