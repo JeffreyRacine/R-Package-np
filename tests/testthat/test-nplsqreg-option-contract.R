@@ -74,6 +74,46 @@ test_that("nplsqreg formula route honors native exdat precedence", {
   expect_false(fit$trainiseval)
 })
 
+test_that("predict.lsqregression handles newdata, exdat, se.fit, and vector tau", {
+  options(np.messages = FALSE)
+  set.seed(20260523)
+  dat <- data.frame(
+    y = sin(seq(0, 2 * pi, length.out = 30L)) + rnorm(30L, sd = 0.1),
+    x = seq(0, 1, length.out = 30L),
+    u = factor(rep(letters[1:3], length.out = 30L))
+  )
+  scale0 <- rep(1, nrow(dat))
+  newdata <- dat[seq_len(5L), c("x", "u"), drop = FALSE]
+  exdat <- dat[seq_len(2L), c("x", "u"), drop = FALSE]
+
+  fit <- nplsqreg(y ~ x + u, data = dat, scale = scale0,
+                  nmulti = 1L, optim.control = list(maxit = 2L))
+  p.new <- predict(fit, newdata = newdata)
+  ref.new <- fitted(nplsqreg(bws = fit$bws, exdat = newdata))
+  expect_equal(p.new, ref.new)
+
+  p.both <- predict(fit, newdata = newdata, exdat = exdat)
+  ref.exdat <- predict(fit, exdat = exdat)
+  expect_length(p.both, nrow(exdat))
+  expect_equal(p.both, ref.exdat)
+
+  p.se <- predict(fit, newdata = newdata, se.fit = TRUE)
+  expect_true(all(c("fit", "se.fit", "df", "residual.scale") %in% names(p.se)))
+  expect_length(p.se$fit, nrow(newdata))
+  expect_length(p.se$se.fit, nrow(newdata))
+
+  fit.vec <- nplsqreg(y ~ x, data = dat, tau = c(0.25, 0.5),
+                      scale = scale0, nmulti = 1L,
+                      optim.control = list(maxit = 2L))
+  nd.x <- dat[seq_len(4L), "x", drop = FALSE]
+  pv <- predict(fit.vec, newdata = nd.x, se.fit = TRUE)
+  expect_true(is.matrix(pv$fit))
+  expect_true(is.matrix(pv$se.fit))
+  expect_identical(dim(pv$fit), c(nrow(nd.x), length(fit.vec$tau)))
+  expect_identical(colnames(pv$fit), c("tau=0.25", "tau=0.50"))
+  expect_identical(colnames(pv$se.fit), c("tau=0.25", "tau=0.50"))
+})
+
 test_that("nplsqreg vector tau applies estimator options to each full-search tau", {
   options(np.messages = FALSE)
   set.seed(20260521)
