@@ -111,6 +111,36 @@ test_that("nplsqreg vector tau applies estimator options to each full-search tau
   expect_true(any(grepl("Bandwidth Selection Method: Check-Loss Cross-Validation", out.bw, fixed = TRUE)))
 })
 
+test_that("nplsqreg residuals accessor exposes requested residuals", {
+  options(np.messages = FALSE)
+  set.seed(20260522)
+  dat <- data.frame(
+    y = cos(seq(0, 2 * pi, length.out = 24L)) + rnorm(24L, sd = 0.1),
+    x = seq(0, 1, length.out = 24L)
+  )
+  scale0 <- rep(1, nrow(dat))
+
+  fit.no <- nplsqreg(y ~ x, data = dat, tau = 0.5, scale = scale0,
+                     nmulti = 1L, optim.control = list(maxit = 2L))
+  expect_error(residuals(fit.no), "refit with residuals=TRUE")
+
+  fit.scalar <- nplsqreg(y ~ x, data = dat, tau = 0.5, scale = scale0,
+                         residuals = TRUE, nmulti = 1L,
+                         optim.control = list(maxit = 2L))
+  expect_length(residuals(fit.scalar), nrow(dat))
+  expect_equal(residuals(fit.scalar), fit.scalar$resid)
+
+  fit.vector <- nplsqreg(y ~ x, data = dat, tau = c(0.25, 0.5),
+                         scale = scale0, residuals = TRUE, nmulti = 1L,
+                         optim.control = list(maxit = 2L))
+  r <- residuals(fit.vector)
+  expect_true(is.matrix(r))
+  expect_identical(dim(r), c(nrow(dat), length(fit.vector$tau)))
+  expect_identical(colnames(r), c("tau=0.25", "tau=0.50"))
+  expect_equal(r[, 1L], fit.vector$tau.fits[[1L]]$resid)
+  expect_equal(r[, 2L], fit.vector$tau.fits[[2L]]$resid)
+})
+
 test_that("nplsqreg plot uses quantile plot contract for multiple slices", {
   options(np.messages = FALSE)
   set.seed(20260522)

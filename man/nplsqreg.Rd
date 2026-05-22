@@ -6,6 +6,7 @@
 \alias{fitted.lsqregression}
 \alias{quantile.lsqregression}
 \alias{predict.lsqregression}
+\alias{residuals.lsqregression}
 \alias{se.lsqregression}
 \alias{gradients.lsqregression}
 \alias{summary.lsqregression}
@@ -157,10 +158,11 @@ selection, prediction, or plotting route.
 \value{
   \code{nplsqreg} returns an object of class \code{lsqregression}. The
   generic functions \code{\link{fitted}}, \code{\link{quantile}},
-  \code{\link{se}}, \code{\link{predict}}, and \code{\link{gradients}}
-  extract estimated conditional quantiles, asymptotic standard errors from
-  the transformed-response regression, predictions, and gradients or
-  categorical effects. The functions \code{\link{summary}},
+  \code{\link{se}}, \code{\link{predict}}, \code{\link{residuals}}, and
+  \code{\link{gradients}} extract estimated conditional quantiles,
+  asymptotic standard errors from the transformed-response regression,
+  predictions, residuals when requested, and gradients or categorical
+  effects. The functions \code{\link{summary}},
   \code{\link{print}}, and \code{\link{plot}} support objects of this type.
 }
 \references{

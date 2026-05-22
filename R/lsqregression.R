@@ -433,6 +433,32 @@ se.lsqregression <- function(x) {
   x$quanterr
 }
 
+.nplsqreg_residuals_unavailable <- function(x) {
+  is.null(x) ||
+    !length(x) ||
+    (length(x) == 1L && (is.logical(x) || is.numeric(x)) && is.na(x))
+}
+
+residuals.lsqregression <- function(object, ...) {
+  if (length(object$tau) > 1L) {
+    if (is.null(object$tau.fits) || length(object$tau.fits) != length(object$tau))
+      stop("residuals are not available: vector nplsqreg object lacks per-tau fit state",
+           call. = FALSE)
+    resid.list <- lapply(object$tau.fits, function(z) z$resid)
+    if (any(vapply(resid.list, .nplsqreg_residuals_unavailable, logical(1L))))
+      stop("residuals are not available: refit with residuals=TRUE",
+           call. = FALSE)
+    out <- do.call(cbind, resid.list)
+    colnames(out) <- .nplsqreg_tau_labels(object$tau)
+    return(out)
+  }
+
+  if (.nplsqreg_residuals_unavailable(object$resid))
+    stop("residuals are not available: refit with residuals=TRUE",
+         call. = FALSE)
+  object$resid
+}
+
 gradients.lsqregression <- function(x, errors = FALSE, ...) {
   errors <- npValidateScalarLogical(errors, "errors")
   gout <- if (!errors) x$quantgrad else x$quantgerr
