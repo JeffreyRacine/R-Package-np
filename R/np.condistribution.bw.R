@@ -182,6 +182,7 @@ npcdistbw.condbandwidth <-
            nmulti,
            penalty.multiplier = 10,
            powell.remin = TRUE,
+           bwsolver = c("powell", "mads", "mads+powell"),
            scale.init.categorical.sample = FALSE,
            scale.factor.search.lower = NULL,
            small = 1.490116e-05,
@@ -196,6 +197,7 @@ npcdistbw.condbandwidth <-
       nmulti <- npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2])
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    bwsolver <- npValidateBwsolver(bwsolver)
     remin <- npValidateScalarLogical(powell.remin, "powell.remin")
     do.full.integral <- npValidateScalarLogical(do.full.integral, "do.full.integral")
     scale.init.categorical.sample <-
@@ -221,6 +223,86 @@ npcdistbw.condbandwidth <-
 
     if (dim(ydat)[1] != dim(xdat)[1])
       stop(paste("number of rows of", "'ydat'", "does not match", "'xdat'"))
+
+    if (bandwidth.compute && npBwsolverUsesMads(bwsolver)) {
+      bws.regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+      bws.pregtype <- if (is.null(bws$pregtype)) "Local-Constant" else bws$pregtype
+      bws.basis <- if (is.null(bws$basis)) "glp" else bws$basis
+      bws.degree <- if (is.null(bws$degree)) NULL else bws$degree
+      bws.bernstein <- isTRUE(bws$bernstein.basis)
+      bws.regtype.engine <- if (is.null(bws$regtype.engine)) bws.regtype else bws$regtype.engine
+      bws.basis.engine <- if (is.null(bws$basis.engine)) bws.basis else bws$basis.engine
+      bws.degree.engine <- if (is.null(bws$degree.engine)) bws.degree else bws$degree.engine
+      bws.bernstein.engine <- isTRUE(bws$bernstein.basis.engine)
+
+      return(.npcdistbw_run_fixed_degree_mads(
+        xdat = xdat,
+        ydat = ydat,
+        bws = c(bws$ybw, bws$xbw),
+        reg.args = list(
+          bwmethod = bws$method,
+          bwscaling = bws$scaling,
+          bwtype = bws$type,
+          cxkertype = bws$cxkertype,
+          cxkerorder = bws$cxkerorder,
+          cxkerbound = bws$cxkerbound,
+          cxkerlb = bws$cxkerlb,
+          cxkerub = bws$cxkerub,
+          cykertype = bws$cykertype,
+          cykerorder = bws$cykerorder,
+          cykerbound = bws$cykerbound,
+          cykerlb = bws$cykerlb,
+          cykerub = bws$cykerub,
+          uxkertype = bws$uxkertype,
+          oxkertype = bws$oxkertype,
+          uykertype = bws$uykertype,
+          oykertype = bws$oykertype,
+          regtype = bws.regtype,
+          pregtype = bws.pregtype,
+          basis = bws.basis,
+          degree = bws.degree,
+          bernstein.basis = bws.bernstein,
+          regtype.engine = bws.regtype.engine,
+          basis.engine = bws.basis.engine,
+          degree.engine = bws.degree.engine,
+          bernstein.basis.engine = bws.bernstein.engine,
+          scale.factor.search.lower = scale.factor.search.lower
+        ),
+        opt.args = list(
+          bandwidth.compute = TRUE,
+          gydat = gydat,
+          nmulti = nmulti,
+          nomad.remin = FALSE,
+          powell.remin = powell.remin,
+          itmax = itmax,
+          do.full.integral = do.full.integral,
+          ngrid = ngrid,
+          ftol = ftol,
+          tol = tol,
+          small = small,
+          memfac = memfac,
+          lbc.dir = lbc.dir,
+          dfc.dir = dfc.dir,
+          cfac.dir = cfac.dir,
+          initc.dir = initc.dir,
+          lbd.dir = lbd.dir,
+          hbd.dir = hbd.dir,
+          dfac.dir = dfac.dir,
+          initd.dir = initd.dir,
+          scale.factor.init.lower = scale.factor.init.lower,
+          scale.factor.init.upper = scale.factor.init.upper,
+          scale.factor.init = scale.factor.init,
+          lbd.init = lbd.init,
+          hbd.init = hbd.init,
+          dfac.init = dfac.init,
+          scale.init.categorical.sample = scale.init.categorical.sample,
+          transform.bounds = transform.bounds,
+          invalid.penalty = invalid.penalty,
+          penalty.multiplier = penalty.multiplier
+        ),
+        bwsolver = bwsolver
+      ))
+    }
 
     if ((any(bws$iycon) &&
          !all(vapply(as.data.frame(ydat[, bws$iycon]), inherits, logical(1), c("integer", "numeric")))) ||
@@ -901,23 +983,23 @@ npcdistbw.condbandwidth <-
   )
 
   myoptd <- list(
-    ftol = 0,
-    tol = 0,
-    small = 0,
-    memfac = 0,
-    lbc.dir = 0,
-    cfac.dir = 0,
-    initc.dir = 0,
-    lbd.dir = 0,
-    hbd.dir = 0,
-    dfac.dir = 0,
-    initd.dir = 0,
-    lbc.init = 0,
-    hbc.init = 0,
-    cfac.init = 0,
-    lbd.init = 0,
-    hbd.init = 0,
-    dfac.init = 0,
+    ftol = 1.490116e-07,
+    tol = 1.490116e-04,
+    small = 1.490116e-05,
+    memfac = 500.0,
+    lbc.dir = 0.5,
+    cfac.dir = 2.5*(3.0-sqrt(5)),
+    initc.dir = 1.0,
+    lbd.dir = 0.1,
+    hbd.dir = 1.0,
+    dfac.dir = 0.25*(3.0-sqrt(5)),
+    initd.dir = 1.0,
+    lbc.init = 0.1,
+    hbc.init = 2.0,
+    cfac.init = 0.5,
+    lbd.init = 0.1,
+    hbd.init = 0.9,
+    dfac.init = 0.375,
     nconfac = nconfac,
     ncatfac = ncatfac,
     scale.factor.lower.bound = npResolveScaleFactorLowerBound(
@@ -985,6 +1067,157 @@ npcdistbw.condbandwidth <-
   )
 
   do.call(npcdistbw.condbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
+}
+
+.npcdistbw_run_fixed_degree_mads <- function(xdat,
+                                             ydat,
+                                             bws,
+                                             reg.args,
+                                             opt.args,
+                                             bwsolver = c("mads", "mads+powell")) {
+  bwsolver <- npValidateBwsolver(bwsolver)
+  opt.value <- function(name, default = NULL) {
+    if (!is.null(opt.args[[name]])) opt.args[[name]] else default
+  }
+
+  template <- .npcdistbw_build_condbandwidth(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws,
+    bandwidth.compute = FALSE,
+    reg.args = reg.args
+  )
+  if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
+    stop("bwsolver='mads' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
+
+  setup <- .npcdistbw_nomad_bw_setup(xdat = xdat, ydat = ydat, template = template)
+  setup$nobs <- nrow(toFrame(xdat))
+  bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
+  bounds <- .npcdistbw_nomad_bw_bounds(template = template, setup = setup)
+  x0 <- .npcdistbw_nomad_complete_bw_start_point(
+    point = {
+      raw <- c(template$ybw, template$xbw)
+      if (all(raw == 0)) NULL else .npcdistbw_nomad_bw_to_point(raw, template = template, setup = setup)
+    },
+    bounds = bounds,
+    template = template
+  )
+  mads.num.feval.total <- 0
+  mads.num.feval.fast.total <- 0
+
+  eval_fun <- function(point) {
+    bw_vec <- .npcdistbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
+    tbw <- .npcdistbw_build_condbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bw_vec,
+      bandwidth.compute = FALSE,
+      reg.args = reg.args
+    )
+    out <- .npcdistbw_eval_only(
+      xdat = xdat,
+      ydat = ydat,
+      gydat = opt.args$gydat,
+      bws = tbw,
+      do.full.integral = opt.value("do.full.integral", FALSE),
+      ngrid = opt.value("ngrid", 100L),
+      invalid.penalty = opt.value("invalid.penalty", "baseline"),
+      penalty.multiplier = opt.value("penalty.multiplier", 10)
+    )
+    mads.num.feval.total <<- mads.num.feval.total + as.numeric(out$num.feval[1L])
+    mads.num.feval.fast.total <<- mads.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
+
+    list(
+      objective = out$objective,
+      degree = integer(0L),
+      num.feval = out$num.feval
+    )
+  }
+
+  build_payload <- function(point, best_record, solution, interrupted) {
+    bw_vec <- .npcdistbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
+    final.tbw <- .npcdistbw_build_condbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bw_vec,
+      bandwidth.compute = FALSE,
+      reg.args = reg.args
+    )
+    final.tbw$fval <- as.numeric(best_record$objective)
+    final.tbw$ifval <- as.numeric(best_record$objective)
+    final.tbw$num.feval <- as.numeric(mads.num.feval.total)
+    final.tbw$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
+    final.tbw$fval.history <- as.numeric(best_record$objective)
+    final.tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
+    final.tbw$invalid.history <- 0
+    final.tbw$timing <- NA_real_
+    final.tbw$total.time <- NA_real_
+    direct.payload <- npcdistbw.condbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      bws = final.tbw,
+      bandwidth.compute = FALSE
+    )
+    direct.payload$num.feval <- as.numeric(mads.num.feval.total)
+    direct.payload$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
+    direct.objective <- as.numeric(best_record$objective)
+    powell.elapsed <- NA_real_
+
+    if (identical(bwsolver, "mads+powell")) {
+      hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
+        opt.args,
+        strategy = "disable_multistart",
+        remin = isTRUE(opt.args$powell.remin)
+      )
+      hot.start <- proc.time()[3L]
+      hot.payload <- .npcdistbw_run_fixed_degree(
+        xdat = xdat,
+        ydat = ydat,
+        bws = bw_vec,
+        reg.args = reg.args,
+        opt.args = hot.opt.args
+      )
+      powell.elapsed <- proc.time()[3L] - hot.start
+      direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
+      direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+      hot.payload$num.feval <- direct.payload$num.feval
+      hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+      hot.objective <- as.numeric(hot.payload$fval[1L])
+      if (is.finite(hot.objective) &&
+          .np_degree_better(hot.objective, direct.objective, direction = "min"))
+        return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
+    }
+
+    list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
+  }
+
+  search.result <- .np_nomad_search(
+    engine = "nomad",
+    baseline_record = NULL,
+    start_degree = integer(0L),
+    x0 = x0,
+    bbin = bounds$bbin,
+    lb = bounds$lower,
+    ub = bounds$upper,
+    eval_fun = eval_fun,
+    build_payload = build_payload,
+    direction = "min",
+    objective_name = "fval",
+    nmulti = opt.value("nmulti", npDefaultNmulti(dim(ydat)[2L] + dim(xdat)[2L])),
+    nomad.inner.nmulti = opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L)),
+    random.seed = opt.value("random.seed", 42L),
+    handoff_before_build = identical(bwsolver, "mads+powell"),
+    remin = isTRUE(opt.args$nomad.remin),
+    nomad.opts = opt.value("nomad.opts", list())
+  )
+  search.result$method <- bwsolver
+  out <- search.result$best_payload
+  out$bwsolver <- bwsolver
+  out$search.engine <- bwsolver
+  out$nomad.time <- as.numeric(search.result$nomad.time[1L])
+  out$powell.time <- as.numeric(search.result$powell.time[1L])
+  out$total.time <- as.numeric(search.result$optim.time[1L])
+  .np_attach_nomad_restart_summary(out, search.result)
 }
 
 .npcdistbw_nomad_bw_setup <- function(xdat,
@@ -1836,6 +2069,7 @@ npcdistbw.default <-
            penalty.multiplier,
            nomad.remin = FALSE,
            powell.remin,
+           bwsolver = c("powell", "mads", "mads+powell"),
            scale.init.categorical.sample,
            scale.factor.search.lower = NULL,
            small,
@@ -1996,6 +2230,11 @@ npcdistbw.default <-
       bernstein.basis = bernstein.value,
       bernstein.named = bernstein.named
     )
+    if (!is.null(degree.search) &&
+        "bwsolver" %in% search.mc.names &&
+        npBwsolverUsesMads(bwsolver)) {
+      stop("bwsolver is for fixed-degree bandwidth searches; use search.engine for automatic degree search")
+    }
     nomad.inner <- .np_nomad_validate_inner_multistart(
       call_names = search.mc.names,
       dot.args = lp.dot.args,
@@ -2070,7 +2309,7 @@ npcdistbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(mc)
-    margs <- c("gydat", "nmulti", "nomad.remin", "powell.remin", "itmax", "do.full.integral", "ngrid", "ftol",
+    margs <- c("gydat", "nmulti", "nomad.remin", "powell.remin", "bwsolver", "itmax", "do.full.integral", "ngrid", "ftol",
                "tol", "small", "memfac",
                "lbc.dir", "dfc.dir", "cfac.dir","initc.dir",
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir",

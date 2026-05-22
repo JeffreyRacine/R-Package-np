@@ -123,7 +123,125 @@ npudistbw.NULL <-
     tbw
   }
 
-npudistbw.dbandwidth <-
+.npudistbw_run_mads <- function(dat,
+                                bws,
+                                gdat = NULL,
+                                opt.args,
+                                bwsolver = c("mads", "mads+powell")) {
+  bwsolver <- npValidateBwsolver(bwsolver)
+  template <- bws
+  if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
+    stop("bwsolver='mads' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
+
+  setup <- .npregbw_nomad_bw_setup(xdat = dat, template = template)
+  bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
+  point.start <- if (all(template$bw == 0)) NULL else .npregbw_nomad_bw_to_point(template$bw, template = template, setup = setup)
+  x0 <- .npregbw_nomad_complete_bw_start_point(point = point.start, bounds = bounds, setup = setup)
+  opt.value <- function(name, default) {
+    if (is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
+  mads.num.feval.total <- 0
+  mads.num.feval.fast.total <- 0
+
+  eval_fun <- function(point) {
+    bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
+    tbw <- bws
+    tbw$bw <- bw_vec
+    out <- npudistbw.dbandwidth(
+      dat = dat,
+      bws = tbw,
+      gdat = gdat,
+      bandwidth.compute = TRUE,
+      nmulti = 1L,
+      powell.remin = FALSE,
+      invalid.penalty = opt.value("invalid.penalty", "baseline"),
+      penalty.multiplier = opt.value("penalty.multiplier", 10),
+      scale.factor.search.lower = opt.value("scale.factor.search.lower", NULL),
+      do.full.integral = opt.value("do.full.integral", FALSE),
+      ngrid = opt.value("ngrid", 100L),
+      memfac = opt.value("memfac", 500.0),
+      bwsolver = "powell",
+      eval.only = TRUE
+    )
+    mads.num.feval.total <<- mads.num.feval.total + as.numeric(out$num.feval[1L])
+    mads.num.feval.fast.total <<- mads.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
+    list(objective = out$fval, degree = integer(0L), num.feval = out$num.feval)
+  }
+
+  build_payload <- function(point, best_record, solution, interrupted) {
+    bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
+    final.tbw <- bws
+    final.tbw$bw <- bw_vec
+    final.tbw$fval <- final.tbw$ifval <- as.numeric(best_record$objective)
+    final.tbw$num.feval <- as.numeric(mads.num.feval.total)
+    final.tbw$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
+    final.tbw$fval.history <- as.numeric(best_record$objective)
+    final.tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
+    final.tbw$invalid.history <- 0
+    final.tbw$timing <- NA_real_
+    direct.payload <- npudistbw.dbandwidth(dat = dat, bws = final.tbw, gdat = gdat, bandwidth.compute = FALSE)
+    direct.objective <- as.numeric(best_record$objective)
+    powell.elapsed <- NA_real_
+
+    if (identical(bwsolver, "mads+powell")) {
+      hot.start <- proc.time()[3L]
+      hot.payload <- npudistbw.dbandwidth(
+        dat = dat,
+        bws = final.tbw,
+        gdat = gdat,
+        bandwidth.compute = TRUE,
+        nmulti = 1L,
+        powell.remin = isTRUE(opt.args$powell.remin),
+        invalid.penalty = opt.value("invalid.penalty", "baseline"),
+        penalty.multiplier = opt.value("penalty.multiplier", 10),
+        scale.factor.search.lower = opt.value("scale.factor.search.lower", NULL),
+        do.full.integral = opt.value("do.full.integral", FALSE),
+        ngrid = opt.value("ngrid", 100L),
+        memfac = opt.value("memfac", 500.0),
+        bwsolver = "powell"
+      )
+      powell.elapsed <- proc.time()[3L] - hot.start
+      hot.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
+      hot.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+      hot.objective <- as.numeric(hot.payload$fval[1L])
+      if (is.finite(hot.objective) &&
+          .np_degree_better(hot.objective, direct.objective, direction = "min"))
+        return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
+    }
+
+    list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
+  }
+
+  search.result <- .np_nomad_search(
+    engine = "nomad",
+    baseline_record = NULL,
+    start_degree = integer(0L),
+    x0 = x0,
+    bbin = bounds$bbin,
+    lb = bounds$lower,
+    ub = bounds$upper,
+    eval_fun = eval_fun,
+    build_payload = build_payload,
+    direction = "min",
+    objective_name = "fval",
+    nmulti = opt.value("nmulti", npDefaultNmulti(dim(toFrame(dat))[2L])),
+    nomad.inner.nmulti = opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L)),
+    random.seed = opt.value("random.seed", 42L),
+    handoff_before_build = identical(bwsolver, "mads+powell"),
+    remin = isTRUE(opt.args$nomad.remin),
+    nomad.opts = opt.value("nomad.opts", list())
+  )
+  search.result$method <- bwsolver
+  out <- search.result$best_payload
+  out$bwsolver <- bwsolver
+  out$search.engine <- bwsolver
+  out$nomad.time <- as.numeric(search.result$nomad.time[1L])
+  out$powell.time <- as.numeric(search.result$powell.time[1L])
+  out$total.time <- as.numeric(search.result$optim.time[1L])
+  .np_attach_nomad_restart_summary(out, search.result)
+}
+
+npudistbw.dbandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
            bws,
            gdat = NULL,
@@ -151,14 +269,18 @@ npudistbw.dbandwidth <-
            nmulti,
            penalty.multiplier = 10,
            powell.remin = TRUE,
+           bwsolver = c("powell", "mads", "mads+powell"),
            scale.init.categorical.sample = FALSE,
            scale.factor.search.lower = NULL,
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
+           eval.only = FALSE,
            ...){
     elapsed.start <- proc.time()[3]
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    bwsolver <- npValidateBwsolver(bwsolver)
+    eval.only <- npValidateScalarLogical(eval.only, "eval.only")
     remin <- npValidateScalarLogical(powell.remin, "powell.remin")
     do.full.integral <- npValidateScalarLogical(do.full.integral, "do.full.integral")
     scale.init.categorical.sample <-
@@ -223,6 +345,7 @@ npudistbw.dbandwidth <-
     ## numeric type.
 
     odat <- dat
+    dat.frame <- dat
     dat = toMatrix(dat)
 
     duno = dat[, bws$iuno, drop = FALSE]
@@ -275,6 +398,33 @@ npudistbw.dbandwidth <-
 
     invalid.penalty <- match.arg(invalid.penalty)
     penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
+
+    if (bandwidth.compute && !eval.only && npBwsolverUsesMads(bwsolver)) {
+      return(.npudistbw_run_mads(
+        dat = dat.frame,
+        bws = bws,
+        gdat = gdat,
+        opt.args = list(
+          nmulti = nmulti,
+          mads.nmulti = list(...)$mads.nmulti,
+          nomad.nmulti = list(...)$nomad.nmulti,
+          nomad.remin = if (is.null(list(...)$nomad.remin)) FALSE else list(...)$nomad.remin,
+          powell.remin = remin,
+          bwsolver = bwsolver,
+          itmax = itmax,
+          ftol = ftol,
+          tol = tol,
+          small = small,
+          invalid.penalty = invalid.penalty,
+          penalty.multiplier = penalty.multiplier,
+          scale.factor.search.lower = scale.factor.search.lower,
+          do.full.integral = do.full.integral,
+          ngrid = ngrid,
+          memfac = memfac
+        ),
+        bwsolver = bwsolver
+      ))
+    }
 
     if (bandwidth.compute){
       cont.start <- npContinuousSearchStartControls(
@@ -334,7 +484,7 @@ npudistbw.dbandwidth <-
 
       if (bws$method != "normal-reference"){
         myout <-
-          .Call("C_np_distribution_bw",
+          .Call(if (isTRUE(eval.only)) "C_np_distribution_bw_eval" else "C_np_distribution_bw",
                 as.double(duno), as.double(dord), as.double(dcon),
                 as.double(guno), as.double(gord), as.double(gcon), as.double(mysd),
                 as.integer(myopti), as.double(myoptd),
@@ -479,6 +629,7 @@ npudistbw.default <-
            okertype,
            penalty.multiplier,
            powell.remin,
+           bwsolver = c("powell", "mads", "mads+powell"),
            scale.init.categorical.sample,
            scale.factor.search.lower = NULL,
            small,
@@ -523,7 +674,7 @@ npudistbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("gdat","bandwidth.compute", "nmulti", "powell.remin", "itmax",
+    margs <- c("gdat","bandwidth.compute", "nmulti", "powell.remin", "bwsolver", "itmax",
                "do.full.integral", "ngrid", "ftol", "tol",
                "small", "lbc.dir", "dfc.dir", "cfac.dir", "initc.dir",
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir",
@@ -532,7 +683,8 @@ npudistbw.default <-
                "scale.init.categorical.sample", "scale.factor.search.lower", "memfac",
                "transform.bounds",
                "invalid.penalty",
-               "penalty.multiplier")
+               "penalty.multiplier",
+               "mads.nmulti", "nomad.nmulti", "nomad.remin")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 

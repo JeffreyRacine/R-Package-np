@@ -510,6 +510,14 @@ npValidateNmulti <- function(value, argname = "nmulti") {
   npValidatePositiveInteger(value, argname)
 }
 
+npValidateBwsolver <- function(value, argname = "bwsolver") {
+  match.arg(value, c("powell", "mads", "mads+powell"))
+}
+
+npBwsolverUsesMads <- function(value) {
+  npValidateBwsolver(value) %in% c("mads", "mads+powell")
+}
+
 npValidatePositiveFiniteNumeric <- function(value, argname) {
   if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
       !is.finite(value) || value <= 0)

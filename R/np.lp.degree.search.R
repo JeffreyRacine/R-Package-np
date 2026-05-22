@@ -1408,6 +1408,7 @@
   out <- opt.args
   out$nmulti <- .np_nomad_powell_hotstart_nmulti(strategy)
   out$powell.remin <- isTRUE(remin)
+  out$bwsolver <- "powell"
   out
 }
 
