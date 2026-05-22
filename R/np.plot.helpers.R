@@ -10513,9 +10513,9 @@ plotFactor <- function(f, y, ...){
       x = x1[ok],
       y = x2[ok],
       z = y[ok],
-      color = .np_plot_color("support"),
-      alpha = 0.6,
-      size = 5
+      color = .np_plot_color("data_overlay", alpha = 1),
+      alpha = 0.35,
+      size = 2
     ),
     points3d.args
   )
