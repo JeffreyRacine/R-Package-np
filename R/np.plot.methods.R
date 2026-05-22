@@ -656,6 +656,9 @@ np_render_control <- function(style = c("band", "bar"),
     bws = object$bws,
     context = "plot.npdensity"
   )
+  if ("plot.rug" %in% .np_plot_dot_names(.plot_dots_call))
+    stop("unused plot argument: plot.rug; did you mean data_rug?",
+         call. = FALSE)
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity")
   plot.rug <- FALSE
@@ -704,6 +707,8 @@ np_render_control <- function(style = c("band", "bar"),
     }
   }
 
+  if (isTRUE(plot.rug))
+    dots$plot.rug <- TRUE
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_condensity <- function(object, ..., .plot_dots_call = NULL) {
