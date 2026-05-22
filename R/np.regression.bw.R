@@ -371,6 +371,7 @@ npregbw.rbandwidth <-
       tbw$initial.fval <- if (length(myout$fval) >= 3L) myout$fval[3L] else NA_real_
       tbw$num.feval <- sum(myout$eval.history[is.finite(myout$eval.history)])
       tbw$num.feval.fast <- myout$fast.history[1]
+      tbw$nn.cache <- .np_nn_cache_stats(myout$nn.cache)
       tbw$fval.history <- myout$fval.history
       tbw$eval.history <- myout$eval.history
       tbw$invalid.history <- myout$invalid.history
@@ -429,6 +430,7 @@ npregbw.rbandwidth <-
                       ifval = tbw$ifval,
                       num.feval = tbw$num.feval,
                       num.feval.fast = tbw$num.feval.fast,
+                      nn.cache = tbw$nn.cache,
                       fval.history = tbw$fval.history,
                       eval.history = tbw$eval.history,
                       invalid.history = tbw$invalid.history,
@@ -727,6 +729,7 @@ npregbw.rbandwidth <-
     bw = as.numeric(out$bw[rorder]),
     num.feval = sum(out$eval.history[is.finite(out$eval.history)]),
     num.feval.fast = as.numeric(out$fast.history[1L]),
+    nn.cache = .np_nn_cache_stats(out$nn.cache),
     fval.history = out$fval.history,
     eval.history = out$eval.history,
     invalid.history = out$invalid.history,
@@ -745,6 +748,7 @@ npregbw.rbandwidth <-
   tbw$ifval <- core$ifval
   tbw$num.feval <- core$num.feval
   tbw$num.feval.fast <- core$num.feval.fast
+  tbw$nn.cache <- core$nn.cache
   tbw$fval.history <- core$fval.history
   tbw$eval.history <- core$eval.history
   tbw$invalid.history <- core$invalid.history

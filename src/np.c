@@ -360,6 +360,20 @@ static double bwm_guarded_eval_count = 0.0;
 static clock_t bwm_progress_started_clock = 0;
 static clock_t bwm_progress_last_signal_clock = 0;
 static int bwm_progress_last_signal_eval = 0;
+static int bwm_nn_cache_active = 0;
+static int bwm_nn_cache_key_len = 0;
+static size_t bwm_nn_cache_capacity = 0;
+static size_t bwm_nn_cache_size = 0;
+static int *bwm_nn_cache_keys = NULL;
+static double *bwm_nn_cache_values = NULL;
+static unsigned char *bwm_nn_cache_used = NULL;
+static double bwm_nn_cache_visits = 0.0;
+static double bwm_nn_cache_unique = 0.0;
+static double bwm_nn_cache_repeats = 0.0;
+static double bwm_nn_cache_raw_evals = 0.0;
+static double bwm_nn_cache_hits = 0.0;
+static double bwm_nn_cache_hits_window = 0.0;
+static int bwm_nn_cache_alloc_failed = 0;
 
 typedef struct {
   int active;
@@ -791,8 +805,321 @@ static void bwm_reset_counters(void)
   bwm_progress_started_clock = clock();
   bwm_progress_last_signal_clock = bwm_progress_started_clock;
   bwm_progress_last_signal_eval = 0;
+  bwm_nn_cache_hits_window = 0.0;
   np_fastcv_alllarge_hits_reset();
   np_guarded_cvml_hits_reset();
+}
+
+static void bwm_nn_cache_free(void)
+{
+  safe_free(bwm_nn_cache_keys);
+  safe_free(bwm_nn_cache_values);
+  safe_free(bwm_nn_cache_used);
+  bwm_nn_cache_keys = NULL;
+  bwm_nn_cache_values = NULL;
+  bwm_nn_cache_used = NULL;
+  bwm_nn_cache_capacity = 0;
+  bwm_nn_cache_size = 0;
+}
+
+static void bwm_nn_cache_reset_stats(void)
+{
+  bwm_nn_cache_visits = 0.0;
+  bwm_nn_cache_unique = 0.0;
+  bwm_nn_cache_repeats = 0.0;
+  bwm_nn_cache_raw_evals = 0.0;
+  bwm_nn_cache_hits = 0.0;
+  bwm_nn_cache_hits_window = 0.0;
+  bwm_nn_cache_alloc_failed = 0;
+}
+
+static int bwm_nn_cache_env_enabled(void)
+{
+  const char *flag = getenv("NP_NN_POWELL_CACHE_INSTRUMENT");
+  if (flag == NULL || flag[0] == '\0')
+    return 1;
+  if ((strcmp(flag, "0") == 0) ||
+      (strcmp(flag, "false") == 0) ||
+      (strcmp(flag, "FALSE") == 0) ||
+      (strcmp(flag, "off") == 0) ||
+      (strcmp(flag, "OFF") == 0) ||
+      (strcmp(flag, "no") == 0) ||
+      (strcmp(flag, "NO") == 0))
+    return 0;
+  return 1;
+}
+
+static int bwm_nn_cache_collective_enabled(int local_enabled)
+{
+#ifdef MPI2
+  int global_enabled = local_enabled ? 1 : 0;
+  if (comm[1] != MPI_COMM_NULL)
+    MPI_Allreduce(MPI_IN_PLACE, &global_enabled, 1, MPI_INT, MPI_MIN, comm[1]);
+  return global_enabled;
+#else
+  return local_enabled ? 1 : 0;
+#endif
+}
+
+static int bwm_nn_cache_collective_hit(int local_hit)
+{
+#ifdef MPI2
+  int global_hit = local_hit ? 1 : 0;
+  if (bwm_nn_cache_active && comm[1] != MPI_COMM_NULL)
+    MPI_Allreduce(MPI_IN_PLACE, &global_hit, 1, MPI_INT, MPI_MIN, comm[1]);
+  return global_hit;
+#else
+  return local_hit ? 1 : 0;
+#endif
+}
+
+static uint64_t bwm_nn_cache_hash_key(const int *key, int key_len)
+{
+  int i;
+  uint64_t h = UINT64_C(1469598103934665603);
+  for (i = 0; i < key_len; i++) {
+    uint32_t x = (uint32_t) key[i];
+    h ^= (uint64_t) x;
+    h *= UINT64_C(1099511628211);
+    h ^= (uint64_t) (x >> 16);
+    h *= UINT64_C(1099511628211);
+  }
+  return h;
+}
+
+static int bwm_nn_cache_key_equal(const int *stored, const int *key, int key_len)
+{
+  int i;
+  for (i = 0; i < key_len; i++)
+    if (stored[i] != key[i])
+      return 0;
+  return 1;
+}
+
+static int bwm_nn_cache_alloc_table(size_t capacity)
+{
+  size_t nkey;
+  if (bwm_nn_cache_key_len <= 0)
+    return 0;
+  nkey = capacity * (size_t)bwm_nn_cache_key_len;
+  bwm_nn_cache_keys = (int *)calloc(nkey, sizeof(int));
+  bwm_nn_cache_values = (double *)calloc(capacity, sizeof(double));
+  bwm_nn_cache_used = (unsigned char *)calloc(capacity, sizeof(unsigned char));
+  if ((bwm_nn_cache_keys == NULL) ||
+      (bwm_nn_cache_values == NULL) ||
+      (bwm_nn_cache_used == NULL)) {
+    bwm_nn_cache_free();
+    bwm_nn_cache_alloc_failed = 1;
+    bwm_nn_cache_active = 0;
+    return 0;
+  }
+  bwm_nn_cache_capacity = capacity;
+  bwm_nn_cache_size = 0;
+  return 1;
+}
+
+static int bwm_nn_cache_rehash(size_t new_capacity)
+{
+  int *old_keys = bwm_nn_cache_keys;
+  double *old_values = bwm_nn_cache_values;
+  unsigned char *old_used = bwm_nn_cache_used;
+  size_t old_capacity = bwm_nn_cache_capacity;
+  size_t i;
+
+  bwm_nn_cache_keys = NULL;
+  bwm_nn_cache_values = NULL;
+  bwm_nn_cache_used = NULL;
+  bwm_nn_cache_capacity = 0;
+  bwm_nn_cache_size = 0;
+  if (!bwm_nn_cache_alloc_table(new_capacity)) {
+    safe_free(old_keys);
+    safe_free(old_values);
+    safe_free(old_used);
+    return 0;
+  }
+
+  for (i = 0; i < old_capacity; i++) {
+    if (old_used[i]) {
+      const int *key = old_keys + i * (size_t)bwm_nn_cache_key_len;
+      uint64_t h = bwm_nn_cache_hash_key(key, bwm_nn_cache_key_len);
+      size_t slot = (size_t)(h & (uint64_t)(bwm_nn_cache_capacity - 1));
+      while (bwm_nn_cache_used[slot])
+        slot = (slot + 1) & (bwm_nn_cache_capacity - 1);
+      memcpy(bwm_nn_cache_keys + slot * (size_t)bwm_nn_cache_key_len,
+             key,
+             (size_t)bwm_nn_cache_key_len * sizeof(int));
+      bwm_nn_cache_values[slot] = old_values[i];
+      bwm_nn_cache_used[slot] = 1;
+      bwm_nn_cache_size++;
+    }
+  }
+
+  safe_free(old_keys);
+  safe_free(old_values);
+  safe_free(old_used);
+  return 1;
+}
+
+static int bwm_nn_cache_lookup(const int *key, double *value)
+{
+  uint64_t h;
+  size_t slot;
+
+  if (!bwm_nn_cache_active || bwm_nn_cache_capacity == 0)
+    return 0;
+
+  h = bwm_nn_cache_hash_key(key, bwm_nn_cache_key_len);
+  slot = (size_t)(h & (uint64_t)(bwm_nn_cache_capacity - 1));
+  while (bwm_nn_cache_used[slot]) {
+    int *stored = bwm_nn_cache_keys + slot * (size_t)bwm_nn_cache_key_len;
+    if (bwm_nn_cache_key_equal(stored, key, bwm_nn_cache_key_len)) {
+      if (value != NULL)
+        value[0] = bwm_nn_cache_values[slot];
+      return 1;
+    }
+    slot = (slot + 1) & (bwm_nn_cache_capacity - 1);
+  }
+
+  return 0;
+}
+
+static int bwm_nn_cache_insert(const int *key, double value)
+{
+  uint64_t h;
+  size_t slot;
+
+  if (!bwm_nn_cache_active || bwm_nn_cache_capacity == 0)
+    return 0;
+
+  if ((bwm_nn_cache_size + 1) * 10 >= bwm_nn_cache_capacity * 7) {
+    if (!bwm_nn_cache_rehash(bwm_nn_cache_capacity * 2))
+      return 0;
+  }
+
+  h = bwm_nn_cache_hash_key(key, bwm_nn_cache_key_len);
+  slot = (size_t)(h & (uint64_t)(bwm_nn_cache_capacity - 1));
+  while (bwm_nn_cache_used[slot]) {
+    int *stored = bwm_nn_cache_keys + slot * (size_t)bwm_nn_cache_key_len;
+    if (bwm_nn_cache_key_equal(stored, key, bwm_nn_cache_key_len)) {
+      bwm_nn_cache_values[slot] = value;
+      return 1;
+    }
+    slot = (slot + 1) & (bwm_nn_cache_capacity - 1);
+  }
+
+  memcpy(bwm_nn_cache_keys + slot * (size_t)bwm_nn_cache_key_len,
+         key,
+         (size_t)bwm_nn_cache_key_len * sizeof(int));
+  bwm_nn_cache_values[slot] = value;
+  bwm_nn_cache_used[slot] = 1;
+  bwm_nn_cache_size++;
+  return 0;
+}
+
+static void bwm_nn_cache_configure_for_powell(
+  int bandwidth,
+  int eval_only,
+  int extra_params,
+  int num_continuous,
+  int num_unordered,
+  int num_ordered)
+{
+  bwm_nn_cache_free();
+  bwm_nn_cache_reset_stats();
+  bwm_nn_cache_active = 0;
+  bwm_nn_cache_key_len = 0;
+
+  if (!bwm_nn_cache_collective_enabled(
+        bwm_nn_cache_env_enabled() &&
+        !eval_only &&
+        extra_params == 0 &&
+        ((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)) &&
+        num_continuous > 0 &&
+        num_unordered == 0 &&
+        num_ordered == 0))
+    return;
+
+  bwm_nn_cache_key_len = num_continuous;
+  bwm_nn_cache_active = 1;
+  if (!bwm_nn_cache_alloc_table(2048))
+    return;
+}
+
+static int bwm_nn_cache_make_key(double *p, int **key_out, int *stack_key)
+{
+  int i;
+  int *key = stack_key;
+
+  if (bwm_nn_cache_key_len > 16) {
+    key = (int *)malloc((size_t)bwm_nn_cache_key_len * sizeof(int));
+    if (key == NULL) {
+      bwm_nn_cache_alloc_failed = 1;
+      bwm_nn_cache_active = 0;
+      return 0;
+    }
+  }
+
+  for (i = 0; i < bwm_nn_cache_key_len; i++)
+    key[i] = np_fround(p[i + 1]);
+
+  key_out[0] = key;
+  return 1;
+}
+
+static void bwm_nn_cache_free_key(int *key, int *stack_key)
+{
+  if (key != stack_key)
+    free(key);
+}
+
+static void bwm_nn_cache_note_raw_eval(void)
+{
+  if (bwm_nn_cache_active)
+    bwm_nn_cache_raw_evals += 1.0;
+}
+
+static int bwm_nn_cache_get(double *p, double *value, int **key_out, int *stack_key)
+{
+  int *key = NULL;
+
+  if (!bwm_nn_cache_active || bwm_nn_cache_key_len <= 0)
+    return 0;
+  if (!bwm_nn_cache_make_key(p, &key, stack_key))
+    return 0;
+
+  bwm_nn_cache_visits += 1.0;
+  if (bwm_nn_cache_lookup(key, value)) {
+    bwm_nn_cache_repeats += 1.0;
+    bwm_nn_cache_hits += 1.0;
+    bwm_nn_cache_hits_window += 1.0;
+    key_out[0] = NULL;
+    bwm_nn_cache_free_key(key, stack_key);
+    return 1;
+  }
+
+  bwm_nn_cache_unique += 1.0;
+  key_out[0] = key;
+  return 0;
+}
+
+static void bwm_nn_cache_put(int *key, int *stack_key, double value)
+{
+  if (key != NULL)
+    bwm_nn_cache_insert(key, value);
+  if (key != NULL)
+    bwm_nn_cache_free_key(key, stack_key);
+}
+
+static void bwm_nn_cache_write_stats(double *out)
+{
+  out[0] = bwm_nn_cache_active ? 1.0 : 0.0;
+  out[1] = (double)bwm_nn_cache_key_len;
+  out[2] = bwm_nn_cache_visits;
+  out[3] = bwm_nn_cache_unique;
+  out[4] = bwm_nn_cache_repeats;
+  out[5] = bwm_nn_cache_raw_evals;
+  out[6] = bwm_nn_cache_hits;
+  out[7] = bwm_nn_cache_alloc_failed ? 1.0 : 0.0;
 }
 
 static void bwm_maybe_signal_activity(void)
@@ -820,7 +1147,7 @@ static void bwm_maybe_signal_activity(void)
 
 static inline void bwm_snapshot_fast_counters(void)
 {
-  bwm_fast_eval_count = np_fastcv_alllarge_hits_get();
+  bwm_fast_eval_count = np_fastcv_alllarge_hits_get() + bwm_nn_cache_hits_window;
 }
 
 static double bwm_sigmoid(double x)
@@ -1048,6 +1375,9 @@ static double bwmfunc_wrapper(double *p)
   double val;
   double *use_p = p;
   double guarded_before;
+  int cache_stack_key[16];
+  int *cache_key = NULL;
+  int cache_hit = 0;
 
   bwm_eval_count += 1.0;
   if (!bwm_active_floor_candidate_ok(p)) {
@@ -1067,10 +1397,23 @@ static double bwmfunc_wrapper(double *p)
     use_p = bwm_transform_buf;
   }
 
-  guarded_before = np_guarded_cvml_hits_get();
-  val = bwmfunc_raw(use_p);
-  if(np_guarded_cvml_hits_get() > guarded_before)
-    bwm_guarded_eval_count += 1.0;
+  cache_hit = bwm_nn_cache_get(use_p, &val, &cache_key, cache_stack_key);
+  if (cache_hit && !bwm_nn_cache_collective_hit(1)) {
+    bwm_nn_cache_repeats -= 1.0;
+    bwm_nn_cache_hits -= 1.0;
+    bwm_nn_cache_hits_window -= 1.0;
+    cache_hit = 0;
+  } else if (!cache_hit) {
+    bwm_nn_cache_collective_hit(0);
+  }
+  if (!cache_hit) {
+    guarded_before = np_guarded_cvml_hits_get();
+    val = bwmfunc_raw(use_p);
+    bwm_nn_cache_note_raw_eval();
+    bwm_nn_cache_put(cache_key, cache_stack_key, val);
+    if(np_guarded_cvml_hits_get() > guarded_before)
+      bwm_guarded_eval_count += 1.0;
+  }
   bwm_maybe_signal_activity();
 
   if (!R_FINITE(val) || val == DBL_MAX) {
@@ -3606,7 +3949,7 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   SEXP out = R_NilValue, out_names = R_NilValue;
   SEXP out_bw = R_NilValue, out_fval = R_NilValue, out_fval_hist = R_NilValue;
   SEXP out_eval_hist = R_NilValue, out_invalid_hist = R_NilValue, out_timing = R_NilValue;
-  SEXP out_fast = R_NilValue;
+  SEXP out_fast = R_NilValue, out_nn_cache = R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -3644,6 +3987,7 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
 
   memcpy(REAL(out_bw), REAL(rbw_r), (size_t)XLENGTH(rbw_r) * sizeof(double));
 
@@ -3654,8 +3998,9 @@ static SEXP C_np_regression_bw_common(SEXP runo,
                         &pmode, &pmult, INTEGER(degree_i), &bern, &basis, ckerlb_p, ckerub_p,
                         eval_only, 0, NULL, 0.5, 0.5, DBL_EPSILON,
                         1.0 - DBL_EPSILON, NULL);
+  bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
-  PROTECT(out = allocVector(VECSXP, 7));
+  PROTECT(out = allocVector(VECSXP, 8));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -3663,8 +4008,9 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   SET_VECTOR_ELT(out, 4, out_invalid_hist);
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
+  SET_VECTOR_ELT(out, 7, out_nn_cache);
 
-  PROTECT(out_names = allocVector(STRSXP, 7));
+  PROTECT(out_names = allocVector(STRSXP, 8));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -3672,9 +4018,10 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
+  SET_STRING_ELT(out_names, 7, mkChar("nn.cache"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(20);
+  UNPROTECT(21);
   return out;
 }
 
@@ -3757,7 +4104,7 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
   SEXP out_bw = R_NilValue, out_delta = R_NilValue, out_fval = R_NilValue;
   SEXP out_fval_hist = R_NilValue, out_eval_hist = R_NilValue;
   SEXP out_invalid_hist = R_NilValue, out_timing = R_NilValue;
-  SEXP out_fast = R_NilValue;
+  SEXP out_fast = R_NilValue, out_nn_cache = R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -3803,6 +4150,7 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
 
   memcpy(REAL(out_bw), REAL(rbw_r), (size_t)XLENGTH(rbw_r) * sizeof(double));
 
@@ -3814,8 +4162,9 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
                         eval_only, 1, REAL(scale_r), asReal(tau), asReal(delta_start),
                         REAL(delta_bounds_r)[0], REAL(delta_bounds_r)[1], &delta_out);
   REAL(out_delta)[0] = delta_out;
+  bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
-  PROTECT(out = allocVector(VECSXP, 8));
+  PROTECT(out = allocVector(VECSXP, 9));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_delta);
   SET_VECTOR_ELT(out, 2, out_fval);
@@ -3824,8 +4173,9 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
   SET_VECTOR_ELT(out, 5, out_invalid_hist);
   SET_VECTOR_ELT(out, 6, out_timing);
   SET_VECTOR_ELT(out, 7, out_fast);
+  SET_VECTOR_ELT(out, 8, out_nn_cache);
 
-  PROTECT(out_names = allocVector(STRSXP, 8));
+  PROTECT(out_names = allocVector(STRSXP, 9));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("delta"));
   SET_STRING_ELT(out_names, 2, mkChar("fval"));
@@ -3834,9 +4184,10 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
   SET_STRING_ELT(out_names, 5, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 6, mkChar("timing"));
   SET_STRING_ELT(out_names, 7, mkChar("fast.history"));
+  SET_STRING_ELT(out_names, 8, mkChar("nn.cache"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(23);
+  UNPROTECT(24);
   return out;
 }
 
@@ -4241,7 +4592,7 @@ SEXP C_np_density_bw(SEXP myuno,
   SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
-  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_guarded=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_guarded=R_NilValue, out_nn_cache=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -4277,6 +4628,7 @@ SEXP C_np_density_bw(SEXP myuno,
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
   PROTECT(out_guarded = allocVector(REALSXP, 1));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_density_bw(REAL(myuno_r), REAL(myord_r), REAL(mycon_r),
@@ -4284,8 +4636,9 @@ SEXP C_np_density_bw(SEXP myuno,
                 REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                 REAL(out_fast), REAL(out_guarded),
                 &pmode, &pmult, ckerlb_p, ckerub_p);
+  bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
-  PROTECT(out = allocVector(VECSXP, 8));
+  PROTECT(out = allocVector(VECSXP, 9));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -4294,8 +4647,9 @@ SEXP C_np_density_bw(SEXP myuno,
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
   SET_VECTOR_ELT(out, 7, out_guarded);
+  SET_VECTOR_ELT(out, 8, out_nn_cache);
 
-  PROTECT(out_names = allocVector(STRSXP, 8));
+  PROTECT(out_names = allocVector(STRSXP, 9));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -4304,9 +4658,10 @@ SEXP C_np_density_bw(SEXP myuno,
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
   SET_STRING_ELT(out_names, 7, mkChar("guarded.history"));
+  SET_STRING_ELT(out_names, 8, mkChar("nn.cache"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(19);
+  UNPROTECT(20);
   return out;
 }
 
@@ -4331,7 +4686,7 @@ SEXP C_np_distribution_bw(SEXP myuno,
   SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
-  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_nn_cache=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -4366,6 +4721,7 @@ SEXP C_np_distribution_bw(SEXP myuno,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_distribution_bw(REAL(myuno_r), REAL(myord_r), REAL(mycon_r),
@@ -4374,8 +4730,9 @@ SEXP C_np_distribution_bw(SEXP myuno,
                      REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                      REAL(out_fast),
                      &pmode, &pmult, ckerlb_p, ckerub_p);
+  bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
-  PROTECT(out = allocVector(VECSXP, 7));
+  PROTECT(out = allocVector(VECSXP, 8));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -4383,8 +4740,9 @@ SEXP C_np_distribution_bw(SEXP myuno,
   SET_VECTOR_ELT(out, 4, out_invalid_hist);
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
+  SET_VECTOR_ELT(out, 7, out_nn_cache);
 
-  PROTECT(out_names = allocVector(STRSXP, 7));
+  PROTECT(out_names = allocVector(STRSXP, 8));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -4392,9 +4750,10 @@ SEXP C_np_distribution_bw(SEXP myuno,
   SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
+  SET_STRING_ELT(out_names, 7, mkChar("nn.cache"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(21);
+  UNPROTECT(22);
   return out;
 }
 
@@ -4427,7 +4786,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   SEXP cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
-  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_guarded=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_guarded=R_NilValue, out_nn_cache=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -4477,6 +4836,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
   PROTECT(out_guarded = allocVector(REALSXP, 1));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_density_conditional_bw(REAL(c_uno_r), REAL(c_ord_r), REAL(c_con_r),
@@ -4487,8 +4847,9 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
                             INTEGER(degree_i), &bern, &basis, &ll_mode,
                             cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
                             eval_only);
+  bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
-  PROTECT(out = allocVector(VECSXP, 8));
+  PROTECT(out = allocVector(VECSXP, 9));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -4497,8 +4858,9 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
   SET_VECTOR_ELT(out, 7, out_guarded);
+  SET_VECTOR_ELT(out, 8, out_nn_cache);
 
-  PROTECT(out_names = allocVector(STRSXP, 8));
+  PROTECT(out_names = allocVector(STRSXP, 9));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -4507,9 +4869,10 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
   SET_STRING_ELT(out_names, 7, mkChar("guarded.history"));
+  SET_STRING_ELT(out_names, 8, mkChar("nn.cache"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(25);
+  UNPROTECT(26);
   return out;
 }
 
@@ -4544,7 +4907,7 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, degree_i=R_NilValue, cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
-  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_nn_cache=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -4591,6 +4954,7 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_distribution_conditional_bw(REAL(c_uno_r), REAL(c_ord_r), REAL(c_con_r),
@@ -4602,8 +4966,9 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
                                  INTEGER(degree_i), &bern, &basis, &ll_mode,
                                  cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
                                  eval_only);
+  bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
-  PROTECT(out = allocVector(VECSXP, 7));
+  PROTECT(out = allocVector(VECSXP, 8));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -4611,8 +4976,9 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   SET_VECTOR_ELT(out, 4, out_invalid_hist);
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
+  SET_VECTOR_ELT(out, 7, out_nn_cache);
 
-  PROTECT(out_names = allocVector(STRSXP, 7));
+  PROTECT(out_names = allocVector(STRSXP, 8));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -4620,9 +4986,10 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
+  SET_STRING_ELT(out_names, 7, mkChar("nn.cache"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(27);
+  UNPROTECT(28);
   return out;
 }
 
@@ -5496,6 +5863,12 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     int n = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
     bwm_reserve_transform_buf(n + 1);
   }
+  bwm_nn_cache_configure_for_powell(BANDWIDTH_den_extern,
+                                    0,
+                                    0,
+                                    num_reg_continuous_extern,
+                                    num_reg_unordered_extern,
+                                    num_reg_ordered_extern);
 
   ftol=myoptd[BW_FTOLD];
   tol=myoptd[BW_TOLD];
@@ -6152,6 +6525,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 cleanup_np_density_bw:
   /* Free data objects */
   bwm_clear_floor_context();
+  bwm_nn_cache_free();
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
@@ -6279,6 +6653,12 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     int n = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
     bwm_reserve_transform_buf(n + 1);
   }
+  bwm_nn_cache_configure_for_powell(BANDWIDTH_den_extern,
+                                    0,
+                                    0,
+                                    num_reg_continuous_extern,
+                                    num_reg_unordered_extern,
+                                    num_reg_ordered_extern);
 
   ftol=myoptd[DBW_FTOLD];
   tol=myoptd[DBW_TOLD];
@@ -6969,6 +7349,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 cleanup_np_distribution_bw:
   /* Free data objects */
   bwm_clear_floor_context();
+  bwm_nn_cache_free();
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
@@ -7168,6 +7549,12 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       num_var_ordered_extern + num_reg_ordered_extern;
     bwm_reserve_transform_buf(n + 1);
   }
+  bwm_nn_cache_configure_for_powell(BANDWIDTH_den_extern,
+                                    eval_only,
+                                    0,
+                                    num_var_continuous_extern + num_reg_continuous_extern,
+                                    num_var_unordered_extern + num_reg_unordered_extern,
+                                    num_var_ordered_extern + num_reg_ordered_extern);
 
   ftol=myoptd[CBW_FTOLD];
   tol=myoptd[CBW_TOLD];
@@ -8107,6 +8494,7 @@ cleanup_np_density_conditional_bw:
 
   np_bounded_cvls_conditional_quad_context_clear_extern();
   bwm_clear_floor_context();
+  bwm_nn_cache_free();
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
   free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
@@ -8350,6 +8738,12 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       num_var_ordered_extern + num_reg_ordered_extern;
     bwm_reserve_transform_buf(n + 1);
   }
+  bwm_nn_cache_configure_for_powell(BANDWIDTH_den_extern,
+                                    eval_only,
+                                    0,
+                                    num_var_continuous_extern + num_reg_continuous_extern,
+                                    num_var_unordered_extern + num_reg_unordered_extern,
+                                    num_var_ordered_extern + num_reg_ordered_extern);
 
   ftol=myoptd[CDBW_FTOLD];
   tol=myoptd[CDBW_TOLD];
@@ -9222,6 +9616,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 cleanup_np_distribution_conditional_bw:
   /* Free data objects */
   bwm_clear_floor_context();
+  bwm_nn_cache_free();
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
   free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
@@ -10540,6 +10935,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   num_reg_ordered_extern = myopti[RBW_NORDI];
   np_reset_y_side_extern();
   bwm_clear_floor_context();
+  bwm_nn_cache_free();
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
   num_search_var = num_var + (lsq_check_mode ? 1 : 0);
@@ -10596,6 +10992,12 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   bwm_use_transform = myopti[RBW_TBNDI];
   if (BANDWIDTH_reg_extern != BW_FIXED)
     bwm_use_transform = 0;
+  bwm_nn_cache_configure_for_powell(BANDWIDTH_reg_extern,
+                                    eval_only,
+                                    lsq_check_mode ? 1 : 0,
+                                    num_reg_continuous_extern,
+                                    num_reg_unordered_extern,
+                                    num_reg_ordered_extern);
 
   ftol=myoptd[RBW_FTOLD];
   tol=myoptd[RBW_TOLD];
@@ -11319,6 +11721,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 cleanup_np_regression_bw_mode:
   /* Free data objects */
   bwm_clear_floor_context();
+  bwm_nn_cache_free();
   int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
