@@ -12782,6 +12782,18 @@ plotFactor <- function(f, y, ...){
                                    small = 1.490116e-05,
                                    itmax = 10000,
                                    ...) {
+  if (inherits(bws, "lsqregressionbandwidth")) {
+    return(.np_plot_lsqregression_eval(
+      bws = bws,
+      txdat = txdat,
+      tydat = tydat,
+      exdat = exdat,
+      tau = tau,
+      gradients = gradients,
+      need.errors = need.errors,
+      ...
+    ))
+  }
   tau <- .npqreg_validate_tau(tau)
   .npqreg_assert_selected_cdf_metadata(bws)
   plot.fit.label <- if (length(tau) == 1L) {
