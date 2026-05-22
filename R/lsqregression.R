@@ -20,6 +20,8 @@ lsqregressionbandwidth <-
 
     d <- list(
       bw = reg.bws$bw,
+      xbw = reg.bws$bw,
+      ybw = rep.int(NA_real_, 1L),
       bws = reg.bws,
       reg.bws = reg.bws,
       tau = tau,
@@ -39,14 +41,36 @@ lsqregressionbandwidth <-
       ynames = reg.bws$ynames,
       nobs = reg.bws$nobs,
       ndim = reg.bws$ndim,
+      xndim = reg.bws$ndim,
+      yndim = 1L,
       nord = reg.bws$nord,
       nuno = reg.bws$nuno,
       ncon = reg.bws$ncon,
+      xnord = reg.bws$nord,
+      xnuno = reg.bws$nuno,
+      xncon = reg.bws$ncon,
+      ynord = 0L,
+      ynuno = 0L,
+      yncon = 1L,
+      ixcon = reg.bws$icon,
+      ixuno = reg.bws$iuno,
+      ixord = reg.bws$iord,
+      iycon = TRUE,
+      iyuno = FALSE,
+      iyord = FALSE,
       pscaling = reg.bws$pscaling,
       ptype = reg.bws$ptype,
       pckertype = reg.bws$pckertype,
       pukertype = reg.bws$pukertype,
       pokertype = reg.bws$pokertype,
+      pcxkertype = reg.bws$pckertype,
+      puxkertype = reg.bws$pukertype,
+      poxkertype = reg.bws$pokertype,
+      pcykertype = "unused",
+      puykertype = "unused",
+      poykertype = "unused",
+      xdati = reg.bws$xdati,
+      ydati = reg.bws$ydati,
       regtype = reg.bws$regtype,
       pregtype = reg.bws$pregtype,
       basis = reg.bws$basis,
@@ -241,6 +265,105 @@ gradients.lsqregression <- function(x, errors = FALSE, ...) {
   gout
 }
 
+.nplsqreg_match_plot_tau <- function(requested, stored) {
+  requested <- .npqreg_validate_tau(requested)
+  stored <- .npqreg_validate_tau(stored)
+  idx <- integer(length(requested))
+  tol <- sqrt(.Machine$double.eps)
+  for (j in seq_along(requested)) {
+    hit <- which(abs(stored - requested[[j]]) <= tol)
+    if (!length(hit))
+      stop("plot tau values for nplsqreg must have been fitted; refit nplsqreg with the requested tau values before plotting",
+           call. = FALSE)
+    idx[[j]] <- hit[[1L]]
+  }
+  idx
+}
+
+.np_plot_lsqregression_eval <- function(bws,
+                                        txdat,
+                                        tydat,
+                                        exdat,
+                                        tau = bws$tau,
+                                        gradients = FALSE,
+                                        need.errors = TRUE,
+                                        gradient.order = 1L,
+                                        ...) {
+  .np_plot_activity_run(
+    label = if (length(tau) == 1L) {
+      "Computing location-scale quantile plot fit"
+    } else {
+      sprintf("Computing location-scale quantile plot fit (%d tau values)",
+              length(tau))
+    },
+    expr = {
+      tau <- .npqreg_validate_tau(tau)
+      gradients <- npValidateScalarLogical(gradients, "gradients")
+      need.errors <- npValidateScalarLogical(need.errors, "need.errors")
+      txdat <- toFrame(txdat)
+      tydat <- as.numeric(toFrame(tydat)[[1L]])
+      exdat <- toFrame(exdat)
+
+      fit.one <- function(one.bws, tau.i) {
+        fit <- .np_plot_regression_eval(
+          bws = one.bws$reg.bws,
+          xdat = txdat,
+          ydat = one.bws$qdat,
+          exdat = exdat,
+          gradients = gradients,
+          gradient.order = gradient.order,
+          need.asymptotic = need.errors
+        )
+        lsqregression(
+          bws = one.bws,
+          fit = fit,
+          xeval = exdat,
+          tau = tau.i,
+          delta = one.bws$delta,
+          quantile = fit$mean,
+          quanterr = if (need.errors) fit$merr else rep.int(NA_real_, length(fit$mean)),
+          quantgrad = if (gradients) fit$grad else NA,
+          quantgerr = if (gradients && need.errors) fit$gerr else NA,
+          ntrain = nrow(txdat),
+          trainiseval = FALSE,
+          gradients = gradients,
+          residuals = FALSE,
+          resid = NA,
+          call = NULL
+        )
+      }
+
+      if (length(tau) == 1L) {
+        idx.one <- .nplsqreg_match_plot_tau(tau, bws$tau)
+        one.bws <- if (length(bws$tau) == 1L) bws else bws$tau.bws[[idx.one]]
+        if (is.null(one.bws))
+          stop("vector nplsqreg bandwidth object lacks per-tau bandwidth state",
+               call. = FALSE)
+        return(fit.one(one.bws, tau))
+      }
+
+      idx <- .nplsqreg_match_plot_tau(tau, bws$tau)
+      if (is.null(bws$tau.bws) || length(bws$tau.bws) < max(idx))
+        stop("vector nplsqreg bandwidth object lacks per-tau bandwidth state",
+             call. = FALSE)
+      fit.list <- lapply(seq_along(idx), function(j)
+        fit.one(bws$tau.bws[[idx[[j]]]], tau[[j]]))
+      sub.bws <- .nplsqreg_combine_bandwidths(
+        bw.list = lapply(idx, function(i) bws$tau.bws[[i]]),
+        tau = tau,
+        tau.search = if (is.null(bws$tau.search)) "full" else bws$tau.search
+      )
+      .nplsqreg_combine_fits(
+        fit.list = fit.list,
+        tau = tau,
+        bws = sub.bws,
+        tau.search = if (is.null(bws$tau.search)) "full" else bws$tau.search,
+        call = NULL
+      )
+    }
+  )
+}
+
 .nplsqreg_predict_formula_newdata_to_exdat <- function(object, newdata) {
   tt <- stats::terms(object$bws$formula)
   rhs <- stats::delete.response(tt)
@@ -312,12 +435,14 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
   dots.call <- match.call(expand.dots = FALSE)$...
   .np_plot_validate_public_dots(
     dots.call,
-    method = .np_plot_rbandwidth_engine,
-    bws = x$reg.bws,
+    method = .np_plot_condbandwidth_engine,
+    bws = x$bws,
     context = "plot.lsqregression"
   )
   dots <- .np_plot_normalize_public_dots(list(...),
                                          context = "plot.lsqregression")
+  random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
+  dots$random.seed <- NULL
   if (!is.null(dots$gradient)) {
     gradients <- dots$gradient
     dots$gradient <- NULL
@@ -327,6 +452,8 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
     dots$gradients <- NULL
   }
   gradients <- npValidateScalarLogical(gradients, "gradients")
+  tau <- if (is.null(tau)) x$tau else .npqreg_validate_tau(tau)
+
   if (is.null(plot.data.overlay)) {
     plot.data.overlay <- if (!is.null(dots$plot.data.overlay)) {
       dots$plot.data.overlay
@@ -337,144 +464,107 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
   dots$plot.data.overlay <- NULL
   plot.data.overlay <- npValidateScalarLogical(plot.data.overlay,
                                                "plot.data.overlay")
-  plot.behavior <- if (is.null(dots$plot.behavior)) {
-    "plot"
-  } else {
-    match.arg(dots$plot.behavior, c("plot", "plot-data", "data"))
-  }
-  dots$plot.behavior <- NULL
-  plot.errors.method <- if (is.null(dots$plot.errors.method)) {
-    "none"
-  } else {
-    match.arg(dots$plot.errors.method,
-              c("none", "bootstrap", "asymptotic"))
-  }
-  dots$plot.errors.method <- plot.errors.method
-  plot.errors <- !identical(plot.errors.method, "none")
-  dots$plot.rug <- NULL
-  plot.legend <- if (is.null(dots$legend)) TRUE else dots$legend
-  dots$legend <- NULL
 
-  refit_for_plot <- function(object, tau.values, want.gradients) {
-    nplsqreg(
-      bws = object$bws,
-      txdat = object$bws$xdat,
-      tydat = object$bws$ydat,
-      exdat = object$xeval,
-      tau = tau.values,
-      gradients = want.gradients
-    )
-  }
-  if (!is.null(tau)) {
-    tau <- .nplsqreg_validate_tau_values(tau)
-    if (length(tau) != length(x$tau) || !isTRUE(all.equal(tau, x$tau))) {
-      if (length(x$tau) != 1L)
-        stop("plot tau expansion from an existing vector-tau nplsqreg object is not supported; refit with the requested tau values",
-             call. = FALSE)
-      x <- refit_for_plot(x, tau, gradients)
-    }
-  }
-  if (isTRUE(gradients) && !isTRUE(x$gradients))
-    x <- refit_for_plot(x, x$tau, TRUE)
-  if (x$ndim != 1L)
-    stop("plot.lsqregression currently supports one explanatory variable",
-         call. = FALSE)
+  if (!is.null(xlab)) dots$xlab <- xlab
+  if (!is.null(ylab)) dots$ylab <- ylab
+  if (!is.null(ylim)) dots$ylim <- ylim
 
-  plot_data_one <- function(object) {
-    args <- c(
-      list(
-        bws = object$reg.bws,
-        xdat = object$bws$xdat,
-        ydat = object$bws$qdat,
-        gradients = gradients,
-        plot.behavior = "data",
-        plot.par.mfrow = FALSE
-      ),
-      dots
-    )
-    do.call(.np_plot_rbandwidth_engine, args)[[1L]]
-  }
-
-  multi.tau <- length(x$tau) > 1L
-  tau.fits <- if (multi.tau) x$tau.fits else list(x)
-  tau.labels <- .nplsqreg_tau_labels(x$tau)
-  plot.out <- stats::setNames(lapply(tau.fits, plot_data_one), tau.labels)
-  get.value <- function(object)
-    as.numeric(if (gradients) gradients(object) else fitted(object))
-  get.se <- function(object)
-    if (gradients) gradients(object, errors = TRUE) else se(object)
-  y <- do.call(cbind, lapply(plot.out, get.value))
-  colnames(y) <- tau.labels
-  yerr <- NULL
-  if (plot.errors) {
-    yerr <- array(NA_real_, dim = c(nrow(y), 3L, ncol(y)),
-                  dimnames = list(NULL, NULL, tau.labels))
-    for (j in seq_along(plot.out)) {
-      se.j <- get.se(plot.out[[j]])
-      if (is.null(se.j))
-        next
-      se.j <- as.matrix(se.j)
-      yerr[, 1L, j] <- -se.j[, 1L]
-      yerr[, 2L, j] <- se.j[, 2L]
-      bias.j <- if (gradients) plot.out[[j]]$gbias else plot.out[[j]]$bias
-      if (!is.null(bias.j) && length(bias.j) == nrow(y))
-        yerr[, 3L, j] <- y[, j] - bias.j
-    }
-  }
-
-  if (identical(plot.behavior, "data"))
-    return(plot.out)
-
-  if (is.null(xlab))
-    xlab <- x$xnames[1L]
-  if (is.null(ylab))
-    ylab <- if (gradients) {
-      "Gradient"
-    } else if (multi.tau) {
-      "Conditional quantile"
-    } else {
-      paste(x$tau, "quantile")
-    }
-
-  xeval <- plot.out[[1L]]$eval[[1L]]
-  xfactor <- is.factor(xeval)
-
-  plot.user.args <- .np_plot_user_args(dots, "plot")
-  .np_plot_quantile_overlay_1d(
-    ei = xeval,
-    value = y,
-    xi.factor = xfactor,
-    xlab.value = xlab,
-    ylab.value = ylab,
-    err = yerr,
-    all.err = NULL,
-    tau.labels = tau.labels,
-    overlay.x = x$bws$xdat[[1L]],
-    overlay.y = x$bws$ydat,
-    plot.data.overlay = plot.data.overlay,
-    gradients = gradients,
-    plotOnEstimate = identical(plot.errors.method, "none") ||
-      identical(dots$plot.errors.center, "estimate"),
-    plot.errors.type = if (is.null(dots$plot.errors.type)) "pmzsd" else dots$plot.errors.type,
-    plot.errors.style = if (is.null(dots$plot.errors.style)) "band" else dots$plot.errors.style,
-    plot.errors.bar = if (is.null(dots$plot.errors.bar)) "|" else dots$plot.errors.bar,
-    plot.errors.bar.num = if (is.null(dots$plot.errors.bar.num)) min(nrow(y), 25) else dots$plot.errors.bar.num,
-    plot.user.args = plot.user.args,
-    legend = plot.legend,
-    col = dots$col,
-    lty = dots$lty,
-    lwd = dots$lwd,
-    type = dots$type,
-    xlim = dots$xlim,
-    ylim = ylim,
-    main = dots$main,
-    sub = dots$sub,
-    cex.axis = dots$cex.axis,
-    cex.lab = dots$cex.lab,
-    cex.main = dots$cex.main,
-    cex.sub = dots$cex.sub
+  args <- c(
+    list(
+      bws = x$bws,
+      xdat = x$bws$xdat,
+      ydat = toFrame(x$bws$ydat),
+      quantreg = TRUE,
+      tau = tau,
+      gradients = gradients,
+      plot.data.overlay = plot.data.overlay
+    ),
+    dots
   )
-  if (identical(plot.behavior, "plot-data"))
-    return(plot.out)
-  invisible(x)
+  .np_with_seed(random.seed, do.call(.np_plot_condbandwidth_engine, args))
 }
+
+compute.bootstrap.errors.lsqregressionbandwidth <-
+  function(xdat, ydat,
+           exdat, eydat,
+           cdf,
+           quantreg,
+           tau,
+           gradients,
+           gradient.index,
+           gradient.order = 1L,
+           slice.index,
+           plot.errors.boot.method,
+           plot.errors.boot.nonfixed = c("exact", "frozen"),
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.alpha,
+           progress.target = NULL,
+           ...,
+           bws) {
+    if (!isTRUE(quantreg))
+      stop("location-scale quantile bootstrap requires quantreg=TRUE",
+           call. = FALSE)
+    tau <- .npqreg_validate_tau(tau)
+    idx <- .nplsqreg_match_plot_tau(tau, bws$tau)
+    if (length(idx) == 1L && length(bws$tau) == 1L) {
+      one <- bws
+      return(compute.bootstrap.errors.rbandwidth(
+        xdat = xdat,
+        ydat = one$qdat,
+        exdat = exdat,
+        gradients = gradients,
+        gradient.order = gradient.order,
+        slice.index = slice.index,
+        plot.errors.boot.method = plot.errors.boot.method,
+        plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+        plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+        plot.errors.boot.num = plot.errors.boot.num,
+        plot.errors.center = plot.errors.center,
+        plot.errors.type = plot.errors.type,
+        plot.errors.alpha = plot.errors.alpha,
+        progress.target = progress.target,
+        bws = one$reg.bws
+      ))
+    }
+
+    if (is.null(bws$tau.bws) || length(bws$tau.bws) < max(idx))
+      stop("vector nplsqreg bandwidth object lacks per-tau bandwidth state",
+           call. = FALSE)
+    one.out <- lapply(seq_along(idx), function(j) {
+      one <- bws$tau.bws[[idx[[j]]]]
+      compute.bootstrap.errors.rbandwidth(
+        xdat = xdat,
+        ydat = one$qdat,
+        exdat = exdat,
+        gradients = gradients,
+        gradient.order = gradient.order,
+        slice.index = slice.index,
+        plot.errors.boot.method = plot.errors.boot.method,
+        plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
+        plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+        plot.errors.boot.num = plot.errors.boot.num,
+        plot.errors.center = plot.errors.center,
+        plot.errors.type = plot.errors.type,
+        plot.errors.alpha = plot.errors.alpha,
+        progress.target = progress.target,
+        bws = one$reg.bws
+      )
+    })
+
+    tau.labels <- .npqreg_tau_labels(tau)
+    boot.err <- array(
+      NA_real_,
+      dim = c(nrow(exdat), 3L, length(tau)),
+      dimnames = list(NULL, c("lower", "upper", "center"), tau.labels)
+    )
+    boot.all.err <- vector("list", length(tau))
+    names(boot.all.err) <- tau.labels
+    for (j in seq_along(one.out)) {
+      boot.err[, , j] <- one.out[[j]]$boot.err
+      boot.all.err[[j]] <- one.out[[j]]$boot.all.err
+    }
+    list(boot.err = boot.err, bxp = list(), boot.all.err = boot.all.err)
+  }

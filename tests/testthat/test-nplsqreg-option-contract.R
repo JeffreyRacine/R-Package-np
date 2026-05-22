@@ -109,3 +109,44 @@ test_that("nplsqreg vector tau applies estimator options to each full-search tau
   expect_true(any(grepl("regtype", out.bw, fixed = TRUE)))
   expect_true(any(grepl("bandwidth", out.bw, fixed = TRUE)))
 })
+
+test_that("nplsqreg plot uses quantile plot contract for multiple slices", {
+  options(np.messages = FALSE)
+  set.seed(20260522)
+  dat <- data.frame(
+    y = sin(seq(0, 2, length.out = 32L)) + rnorm(32L, sd = 0.1),
+    x = seq(0, 1, length.out = 32L),
+    z = ordered(rep(1:4, length.out = 32L))
+  )
+  scale0 <- rep(1, nrow(dat))
+
+  fit <- nplsqreg(y ~ x + z, data = dat, tau = c(0.25, 0.5),
+                  tau.search = "full", scale = scale0, nmulti = 1L,
+                  optim.control = list(maxit = 2L))
+
+  out <- plot(fit, output = "data", perspective = FALSE, neval = 6L)
+  expect_identical(names(out), c("cd1", "cd2"))
+  expect_s3_class(out$cd1, "lsqregression")
+  expect_s3_class(out$cd2, "lsqregression")
+  expect_true(is.matrix(out$cd1$quantile))
+  expect_identical(colnames(out$cd1$quantile), c("tau=0.25", "tau=0.50"))
+
+  gout <- plot(fit, output = "data", perspective = FALSE, neval = 6L,
+               gradients = TRUE)
+  expect_identical(names(gout), c("cd1", "cd2"))
+  expect_true(length(dim(gout$cd1$quantgrad)) == 3L)
+
+  aout <- plot(fit, output = "data", perspective = FALSE, neval = 6L,
+               errors = "asymptotic")
+  expect_true(all(c("quanterr", "bias") %in% names(aout$cd1)))
+
+  bout <- plot(fit, output = "data", perspective = FALSE, neval = 5L,
+               errors = "bootstrap", B = 3L)
+  expect_true(all(c("quanterr", "bias") %in% names(bout$cd1)))
+
+  expect_error(
+    plot(fit$tau.fits[[1L]], tau = c(0.25, 0.5), output = "data",
+         perspective = FALSE),
+    "must have been fitted"
+  )
+})
