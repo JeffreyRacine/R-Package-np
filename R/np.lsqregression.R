@@ -444,6 +444,7 @@ nplsqregbw <-
     ifval = as.numeric(out$fval[2L]),
     num.feval = sum(out$eval.history[is.finite(out$eval.history)]),
     num.feval.fast = as.numeric(out$fast.history[1L]),
+    nn.cache = .np_nn_cache_stats(out$nn.cache),
     fval.history = out$fval.history,
     eval.history = out$eval.history,
     invalid.history = out$invalid.history,
@@ -1048,6 +1049,7 @@ nplsqregbw.default <-
     reg.bws$pmethod <- "Check-Loss Cross-Validation"
     reg.bws$ifval <- core$ifval
     reg.bws$num.feval.fast <- core$num.feval.fast
+    reg.bws$nn.cache <- core$nn.cache
     reg.bws$fval.history <- core$fval.history
     reg.bws$eval.history <- core$eval.history
     reg.bws$invalid.history <- core$invalid.history

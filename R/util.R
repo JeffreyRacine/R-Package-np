@@ -2872,3 +2872,13 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
     stop(conditionMessage(val$error), call. = FALSE)
   stop(sprintf("unable to evaluate call argument '%s'", arg), call. = FALSE)
 }
+
+.np_nn_cache_stats <- function(x) {
+  if (is.null(x))
+    return(NULL)
+  x <- as.numeric(x)
+  nms <- c("enabled", "key.length", "visits", "unique", "repeats",
+           "raw.evals", "hits", "allocation.failed")
+  names(x) <- nms[seq_along(x)]
+  x
+}
