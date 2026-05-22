@@ -77,7 +77,15 @@ lsqregressionbandwidth <-
       degree = reg.bws$degree,
       bernstein.basis = reg.bws$bernstein.basis,
       method = "cv.check",
-      pmethod = "Check-Loss Cross-Validation")
+      pmethod = "Check-Loss Cross-Validation",
+      fval = objective,
+      num.feval = reg.bws$num.feval,
+      num.feval.fast = reg.bws$num.feval.fast,
+      rows.omit = reg.bws$rows.omit,
+      nobs.omit = reg.bws$nobs.omit,
+      total.time = reg.bws$total.time,
+      optim.time = reg.bws$total.time,
+      fit.time = NA)
 
     class(d) <- "lsqregressionbandwidth"
     d
@@ -107,6 +115,8 @@ lsqregression <-
 
     d <- list(
       bw = bws$bw,
+      xbw = bws$xbw,
+      ybw = bws$ybw,
       bws = bws,
       reg.bws = bws$reg.bws,
       fit = fit,
@@ -114,14 +124,33 @@ lsqregression <-
       ynames = bws$ynames,
       nobs = nrow(xeval),
       ndim = bws$ndim,
+      xndim = bws$xndim,
+      yndim = bws$yndim,
       nord = bws$nord,
       nuno = bws$nuno,
       ncon = bws$ncon,
+      xnord = bws$xnord,
+      xnuno = bws$xnuno,
+      xncon = bws$xncon,
+      ynord = bws$ynord,
+      ynuno = bws$ynuno,
+      yncon = bws$yncon,
       pscaling = bws$pscaling,
       ptype = bws$ptype,
       pckertype = bws$pckertype,
       pukertype = bws$pukertype,
       pokertype = bws$pokertype,
+      pcxkertype = bws$pcxkertype,
+      puxkertype = bws$puxkertype,
+      poxkertype = bws$poxkertype,
+      pcykertype = bws$pcykertype,
+      puykertype = bws$puykertype,
+      poykertype = bws$poykertype,
+      regtype = bws$regtype,
+      pregtype = bws$pregtype,
+      basis = bws$basis,
+      degree = bws$degree,
+      bernstein.basis = bws$bernstein.basis,
       xeval = xeval,
       tau = tau,
       delta = delta,
@@ -138,6 +167,9 @@ lsqregression <-
       resid = resid,
       objective = bws$objective,
       optim = bws$optim,
+      total.time = .nplsqreg_sum_times(bws$total.time, fit$total.time),
+      optim.time = bws$total.time,
+      fit.time = fit$total.time,
       call = call)
 
     class(d) <- "lsqregression"
@@ -153,6 +185,153 @@ lsqregression <-
   else
     paste(format(x, digits = digits, trim = TRUE, scientific = FALSE),
           collapse = ",")
+}
+
+.nplsqreg_sum_times <- function(...) {
+  x <- unlist(list(...), recursive = TRUE, use.names = FALSE)
+  x <- suppressWarnings(as.numeric(x))
+  x <- x[is.finite(x)]
+  if (!length(x))
+    return(NA_real_)
+  sum(x)
+}
+
+.nplsqreg_primary_bws <- function(x) {
+  if (inherits(x, "lsqregression"))
+    x <- x$bws
+  if (length(x$tau) > 1L && !is.null(x$tau.bws))
+    return(x$tau.bws[[1L]])
+  x
+}
+
+.nplsqreg_primary_reg_bws <- function(x) {
+  bws <- .nplsqreg_primary_bws(x)
+  if (!is.null(bws$reg.bws))
+    return(bws$reg.bws)
+  bws
+}
+
+.nplsqreg_search_label <- function(x) {
+  methods <- if (length(x$tau) > 1L && !is.null(x$tau.bws)) {
+    vapply(x$tau.bws, function(z) {
+      ds <- z$reg.bws$degree.search
+      if (!is.null(ds$mode))
+        return(as.character(ds$mode)[1L])
+      if (!is.null(ds$engine))
+        return(as.character(ds$engine)[1L])
+      if (isTRUE(z$reg.bws$nomad.shortcut$enabled))
+        return("nomad")
+      "powell"
+    }, character(1L))
+  } else {
+    rbw <- .nplsqreg_primary_reg_bws(x)
+    ds <- rbw$degree.search
+    if (!is.null(ds$mode))
+      as.character(ds$mode)[1L]
+    else if (!is.null(ds$engine))
+      as.character(ds$engine)[1L]
+    else if (isTRUE(rbw$nomad.shortcut$enabled))
+      "nomad"
+    else
+      "powell"
+  }
+  if (length(unique(methods)) == 1L) methods[[1L]] else "tau-specific"
+}
+
+.nplsqreg_bandwidth_display <- function(x) {
+  bws <- if (inherits(x, "lsqregression")) x$bws else x
+  label <- paste("Exp. Var. ", bws$pscaling, ":", sep = "")
+  if (length(bws$tau) > 1L) {
+    bw <- as.matrix(bws$bw)
+    rownames(bw) <- bws$xnames
+    colnames(bw) <- .nplsqreg_tau_labels(bws$tau)
+    cat(label, "\n", sep = "")
+    print(t(bw))
+  } else {
+    print(matrix(bws$bw, ncol = bws$xndim,
+                 dimnames = list(label, bws$xnames)))
+  }
+}
+
+.nplsqreg_delta_objective_display <- function(x) {
+  bws <- if (inherits(x, "lsqregression")) x$bws else x
+  cat("\nDelta:", paste(format(bws$delta, trim = TRUE), collapse = ", "))
+  cat("\nCheck-Loss Objective:",
+      paste(format(bws$objective, trim = TRUE), collapse = ", "))
+  cat("\nSearch Method:", .nplsqreg_search_label(bws))
+  if (length(bws$tau) > 1L)
+    cat("\nTau Search:", if (is.null(bws$tau.search)) "full" else bws$tau.search)
+  cat("\n")
+}
+
+.nplsqreg_summary_kernel_source <- function(x) {
+  .nplsqreg_primary_reg_bws(x)
+}
+
+.nplsqreg_summary_header <- function(x, bandwidth = FALSE) {
+  bws <- if (inherits(x, "lsqregression")) x$bws else x
+  if (bandwidth) {
+    cat("\nLocation-Scale Quantile Regression Bandwidth Data: ",
+        bws$nobs, " observations, ",
+        bws$xndim + bws$yndim, " variable(s)",
+        "\n(", bws$yndim, " dependent variable(s), and ", bws$xndim,
+        " explanatory variable(s))\n\n", sep = "")
+  } else {
+    cat("\nLocation-Scale Quantile Regression Data: ", x$ntrain,
+        " training points,",
+        if (x$trainiseval) "" else paste(" and ", x$nobs,
+                                         " evaluation points,\n", sep = ""),
+        " in ", bws$xndim + bws$yndim, " variable(s)",
+        "\n(", bws$yndim, " dependent variable(s), and ", bws$xndim,
+        " explanatory variable(s))\n\n", sep = "")
+  }
+}
+
+.nplsqreg_summary_common <- function(x, bandwidth = FALSE) {
+  bws <- if (inherits(x, "lsqregression")) x$bws else x
+  rbw <- .nplsqreg_summary_kernel_source(x)
+  .nplsqreg_summary_header(x, bandwidth = bandwidth)
+  cat(genOmitStr(bws))
+  if (length(bws$tau) > 1L)
+    cat("Tau values:", paste(format(bws$tau, trim = TRUE), collapse = ", "),
+        "\n\n")
+
+  cat("Dep. Var. Name:", paste(bws$ynames, collapse = ", "), "\n\n")
+  .nplsqreg_bandwidth_display(bws)
+  .nplsqreg_delta_objective_display(bws)
+
+  if (bandwidth) {
+    cat("\nRegression Type:", npFormatRegressionType(rbw))
+    cat("\nBandwidth Selection Method:", bws$pmethod)
+    if (!identical(bws$formula, NULL))
+      cat("\nFormula:", paste(deparse(bws$formula), collapse = "\n"))
+    cat("\nBandwidth Type:", bws$ptype)
+  } else {
+    cat(genRegEstStr(x))
+  }
+  cat(genBwKerStrs(rbw))
+  cat(genTimingStr(x))
+  cat("\n\n")
+  invisible(x)
+}
+
+.nplsqreg_formula_response_name <- function(formula) {
+  paste(deparse(stats::formula(formula)[[2L]]), collapse = "")
+}
+
+.nplsqreg_set_response_name <- function(x, response.name) {
+  x$ynames <- response.name
+  if (!is.null(x$reg.bws))
+    x$reg.bws$ynames <- response.name
+  if (!is.null(x$bws))
+    x$bws <- .nplsqreg_set_response_name(x$bws, response.name)
+  if (!is.null(x$tau.bws))
+    x$tau.bws <- lapply(x$tau.bws, .nplsqreg_set_response_name,
+                        response.name = response.name)
+  if (!is.null(x$tau.fits))
+    x$tau.fits <- lapply(x$tau.fits, .nplsqreg_set_response_name,
+                         response.name = response.name)
+  x
 }
 
 .nplsqreg_tau_state_table <- function(x, digits = NULL) {
@@ -207,7 +386,7 @@ print.lsqregressionbandwidth <- function(x, digits = NULL, ...) {
 }
 
 summary.lsqregressionbandwidth <- function(object, ...) {
-  print.lsqregressionbandwidth(object, ...)
+  .nplsqreg_summary_common(object, bandwidth = TRUE)
 }
 
 print.lsqregression <- function(x, digits = NULL, ...) {
@@ -239,7 +418,7 @@ print.lsqregression <- function(x, digits = NULL, ...) {
 }
 
 summary.lsqregression <- function(object, ...) {
-  print.lsqregression(object, ...)
+  .nplsqreg_summary_common(object, bandwidth = FALSE)
 }
 
 fitted.lsqregression <- function(object, ...) {

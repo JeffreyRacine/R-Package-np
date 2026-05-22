@@ -103,11 +103,12 @@ test_that("nplsqreg vector tau applies estimator options to each full-search tau
 
   out.fit <- capture.output(summary(fit))
   out.bw <- capture.output(summary(fit$bws))
-  expect_true(any(grepl("regtype", out.fit, fixed = TRUE)))
-  expect_true(any(grepl("bandwidth", out.fit, fixed = TRUE)))
-  expect_true(any(grepl("powell", out.fit, fixed = TRUE)))
-  expect_true(any(grepl("regtype", out.bw, fixed = TRUE)))
-  expect_true(any(grepl("bandwidth", out.bw, fixed = TRUE)))
+  expect_true(any(grepl("Location-Scale Quantile Regression Data", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("Exp. Var. Bandwidth", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("Search Method: powell", out.fit, fixed = TRUE)))
+  expect_true(any(grepl("Location-Scale Quantile Regression Bandwidth Data", out.bw, fixed = TRUE)))
+  expect_true(any(grepl("Exp. Var. Bandwidth", out.bw, fixed = TRUE)))
+  expect_true(any(grepl("Bandwidth Selection Method: Check-Loss Cross-Validation", out.bw, fixed = TRUE)))
 })
 
 test_that("nplsqreg plot uses quantile plot contract for multiple slices", {
