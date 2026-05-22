@@ -27,6 +27,13 @@ test_that("session nplsqreg honors estimator bandwidth options separately from p
       "stopifnot(identical(fit.vec$bws$tau.search, 'full'))",
       "stopifnot(identical(fit.vec$bws$fit.order, seq_along(fit.vec$tau)))",
       "stopifnot(all(vapply(fit.vec$bws$tau.bws, function(bw) identical(bw$reg.bws$regtype, 'll'), logical(1))))",
+      "out.fit <- capture.output(summary(fit.vec))",
+      "out.bw <- capture.output(summary(fit.vec$bws))",
+      "stopifnot(any(grepl('regtype', out.fit, fixed = TRUE)))",
+      "stopifnot(any(grepl('bandwidth', out.fit, fixed = TRUE)))",
+      "stopifnot(any(grepl('powell', out.fit, fixed = TRUE)))",
+      "stopifnot(any(grepl('regtype', out.bw, fixed = TRUE)))",
+      "stopifnot(any(grepl('bandwidth', out.bw, fixed = TRUE)))",
       "cat('NPLSQREG_OPTION_CONTRACT_OK\\n')"
     ),
     timeout = 90L,

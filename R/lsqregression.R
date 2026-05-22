@@ -128,6 +128,51 @@ lsqregression <-
     d
   }
 
+.nplsqreg_format_compact <- function(x, digits = NULL) {
+  if (is.null(x) || !length(x))
+    return("")
+  x <- as.numeric(x)
+  if (is.null(digits))
+    paste(format(x, trim = TRUE, scientific = FALSE), collapse = ",")
+  else
+    paste(format(x, digits = digits, trim = TRUE, scientific = FALSE),
+          collapse = ",")
+}
+
+.nplsqreg_tau_state_table <- function(x, digits = NULL) {
+  bw.list <- if (!is.null(x$tau.bws)) {
+    x$tau.bws
+  } else if (!is.null(x$bws) && !is.null(x$bws$tau.bws)) {
+    x$bws$tau.bws
+  } else {
+    NULL
+  }
+  if (is.null(bw.list))
+    return(data.frame(tau = x$tau,
+                      delta = as.numeric(x$delta),
+                      objective = as.numeric(x$objective)))
+
+  rows <- lapply(seq_along(bw.list), function(j) {
+    one <- bw.list[[j]]
+    rbw <- one$reg.bws
+    dsearch <- rbw$degree.search
+    data.frame(
+      tau = as.numeric(x$tau[[j]]),
+      delta = as.numeric(one$delta),
+      objective = as.numeric(one$objective),
+      regtype = if (is.null(rbw$regtype)) "" else rbw$regtype,
+      degree = .nplsqreg_format_compact(rbw$degree, digits = digits),
+      bwtype = if (is.null(rbw$type)) "" else rbw$type,
+      bandwidth = .nplsqreg_format_compact(rbw$bw, digits = digits),
+      search = if (!is.null(dsearch$mode)) dsearch$mode else "powell",
+      nomad = isTRUE(rbw$nomad.shortcut$enabled),
+      feval = if (is.null(rbw$num.feval)) NA_real_ else as.numeric(rbw$num.feval),
+      stringsAsFactors = FALSE
+    )
+  })
+  do.call(rbind, rows)
+}
+
 print.lsqregressionbandwidth <- function(x, digits = NULL, ...) {
   cat("\nLocation-scale quantile regression bandwidth object\n", sep = "")
   if (length(x$tau) > 1L) {
@@ -135,9 +180,7 @@ print.lsqregressionbandwidth <- function(x, digits = NULL, ...) {
         "\n", sep = "")
     cat("Tau search: ", if (is.null(x$tau.search)) "full" else x$tau.search,
         "\n\n", sep = "")
-    print(data.frame(tau = x$tau,
-                     delta = as.numeric(x$delta),
-                     objective = as.numeric(x$objective)))
+    print(.nplsqreg_tau_state_table(x, digits = digits), row.names = FALSE)
   } else {
     cat("Tau: ", format(x$tau, trim = TRUE),
         "  Delta: ", format(x$delta, trim = TRUE),
@@ -162,9 +205,7 @@ print.lsqregression <- function(x, digits = NULL, ...) {
         "\n", sep = "")
     cat("Tau search: ", if (is.null(x$tau.search)) "full" else x$tau.search,
         "\n\n", sep = "")
-    print(data.frame(tau = x$tau,
-                     delta = as.numeric(x$delta),
-                     objective = as.numeric(x$objective)))
+    print(.nplsqreg_tau_state_table(x, digits = digits), row.names = FALSE)
   } else {
     cat("Tau: ", format(x$tau, trim = TRUE),
         "  Delta: ", format(x$delta, trim = TRUE),
