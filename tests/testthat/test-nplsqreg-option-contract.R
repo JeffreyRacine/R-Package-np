@@ -28,10 +28,10 @@ test_that("nplsqreg honors estimator bandwidth options separately from pilot opt
   fit.ker <- nplsqreg(
     y ~ x + u + o,
     data = dat,
-    ckertype = "epanechnikov",
-    ckerorder = 4L,
-    ukertype = "liracine",
-    okertype = "wangvanryzin",
+    cxkertype = "epanechnikov",
+    cxkerorder = 4L,
+    uxkertype = "liracine",
+    oxkertype = "wangvanryzin",
     scale = scale0,
     nmulti = 1L,
     optim.control = list(maxit = 2L)
@@ -40,6 +40,38 @@ test_that("nplsqreg honors estimator bandwidth options separately from pilot opt
   expect_identical(as.integer(fit.ker$bws$reg.bws$ckerorder), 4L)
   expect_identical(fit.ker$bws$reg.bws$ukertype, "liracine")
   expect_identical(fit.ker$bws$reg.bws$okertype, "wangvanryzin")
+
+  expect_error(
+    nplsqreg(y ~ x, data = dat, cykertype = "epanechnikov",
+             scale = scale0, nmulti = 1L,
+             optim.control = list(maxit = 2L)),
+    "response-side"
+  )
+  expect_error(
+    nplsqreg(y ~ x, data = dat, total_nonsense = TRUE,
+             scale = scale0, nmulti = 1L,
+             optim.control = list(maxit = 2L)),
+    "unused nplsqregbw argument"
+  )
+})
+
+test_that("nplsqreg formula route honors native exdat precedence", {
+  options(np.messages = FALSE)
+  set.seed(20260521)
+  dat <- data.frame(
+    y = sin(seq(0, 2 * pi, length.out = 30L)) + rnorm(30L, sd = 0.1),
+    x = seq(0, 1, length.out = 30L),
+    u = factor(rep(letters[1:3], length.out = 30L))
+  )
+  scale0 <- rep(1, nrow(dat))
+  newdata <- dat[seq_len(5L), c("x", "u"), drop = FALSE]
+  exdat <- dat[seq_len(2L), c("x", "u"), drop = FALSE]
+
+  fit <- nplsqreg(y ~ x + u, data = dat, newdata = newdata,
+                  exdat = exdat, scale = scale0,
+                  nmulti = 1L, optim.control = list(maxit = 2L))
+  expect_identical(fit$nobs, 2L)
+  expect_false(fit$trainiseval)
 })
 
 test_that("nplsqreg vector tau applies estimator options to each full-search tau", {
