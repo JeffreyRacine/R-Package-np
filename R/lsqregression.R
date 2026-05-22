@@ -479,8 +479,10 @@ gradients.lsqregression <- function(x, errors = FALSE, ...) {
 }
 
 .nplsqreg_match_plot_tau <- function(requested, stored) {
-  requested <- .npqreg_validate_tau(requested)
-  stored <- .npqreg_validate_tau(stored)
+  requested <- .nplsqreg_validate_tau_values(requested,
+                                             allow.duplicates = TRUE)
+  stored <- .nplsqreg_validate_tau_values(stored,
+                                          allow.duplicates = TRUE)
   idx <- integer(length(requested))
   tol <- sqrt(.Machine$double.eps)
   for (j in seq_along(requested)) {
@@ -510,7 +512,7 @@ gradients.lsqregression <- function(x, errors = FALSE, ...) {
               length(tau))
     },
     expr = {
-      tau <- .npqreg_validate_tau(tau)
+      tau <- .nplsqreg_validate_tau_values(tau, allow.duplicates = TRUE)
       gradients <- npValidateScalarLogical(gradients, "gradients")
       need.errors <- npValidateScalarLogical(need.errors, "need.errors")
       txdat <- toFrame(txdat)
@@ -665,7 +667,11 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
     dots$gradients <- NULL
   }
   gradients <- npValidateScalarLogical(gradients, "gradients")
-  tau <- if (is.null(tau)) x$tau else .npqreg_validate_tau(tau)
+  tau <- if (is.null(tau)) {
+    x$tau
+  } else {
+    .nplsqreg_validate_tau_values(tau, allow.duplicates = TRUE)
+  }
 
   if (is.null(plot.data.overlay)) {
     plot.data.overlay <- if (!is.null(dots$plot.data.overlay)) {
@@ -720,7 +726,7 @@ compute.bootstrap.errors.lsqregressionbandwidth <-
     if (!isTRUE(quantreg))
       stop("location-scale quantile bootstrap requires quantreg=TRUE",
            call. = FALSE)
-    tau <- .npqreg_validate_tau(tau)
+    tau <- .nplsqreg_validate_tau_values(tau, allow.duplicates = TRUE)
     idx <- .nplsqreg_match_plot_tau(tau, bws$tau)
     if (length(idx) == 1L && length(bws$tau) == 1L) {
       one <- bws
