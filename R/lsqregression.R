@@ -274,11 +274,54 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
 
 plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
                                gradients = gradient,
-                               plot.data.overlay = !gradients,
+                               plot.data.overlay = NULL,
                                xlab = NULL, ylab = NULL, ylim = NULL, ...) {
+  dots.call <- match.call(expand.dots = FALSE)$...
+  .np_plot_validate_public_dots(
+    dots.call,
+    method = .np_plot_rbandwidth_engine,
+    bws = x$reg.bws,
+    context = "plot.lsqregression"
+  )
+  dots <- .np_plot_normalize_public_dots(list(...),
+                                         context = "plot.lsqregression")
+  if (!is.null(dots$gradient)) {
+    gradients <- dots$gradient
+    dots$gradient <- NULL
+  }
+  if (!is.null(dots$gradients)) {
+    gradients <- dots$gradients
+    dots$gradients <- NULL
+  }
   gradients <- npValidateScalarLogical(gradients, "gradients")
+  if (is.null(plot.data.overlay)) {
+    plot.data.overlay <- if (!is.null(dots$plot.data.overlay)) {
+      dots$plot.data.overlay
+    } else {
+      !isTRUE(gradients)
+    }
+  }
+  dots$plot.data.overlay <- NULL
   plot.data.overlay <- npValidateScalarLogical(plot.data.overlay,
                                                "plot.data.overlay")
+  plot.behavior <- if (is.null(dots$plot.behavior)) {
+    "plot"
+  } else {
+    match.arg(dots$plot.behavior, c("plot", "plot-data", "data"))
+  }
+  dots$plot.behavior <- NULL
+  plot.errors.method <- if (is.null(dots$plot.errors.method)) {
+    "none"
+  } else {
+    match.arg(dots$plot.errors.method,
+              c("none", "bootstrap", "asymptotic"))
+  }
+  dots$plot.errors.method <- plot.errors.method
+  plot.errors <- !identical(plot.errors.method, "none")
+  dots$plot.rug <- NULL
+  plot.legend <- if (is.null(dots$legend)) TRUE else dots$legend
+  dots$legend <- NULL
+
   refit_for_plot <- function(object, tau.values, want.gradients) {
     nplsqreg(
       bws = object$bws,
@@ -304,21 +347,50 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
     stop("plot.lsqregression currently supports one explanatory variable",
          call. = FALSE)
 
-  xraw <- x$xeval[[1L]]
-  xpos <- if (is.factor(xraw)) as.numeric(xraw) else as.numeric(xraw)
-  y <- if (gradients) gradients.lsqregression(x) else fitted.lsqregression(x)
-  multi.tau <- length(x$tau) > 1L
-  if (gradients && multi.tau) {
-    if (length(dim(y)) != 3L || dim(y)[2L] != 1L)
-      stop("vector-tau gradient plots require one explanatory variable",
-           call. = FALSE)
-    y <- y[, 1L, , drop = FALSE]
-    dim(y) <- c(dim(y)[1L], dim(y)[3L])
-    colnames(y) <- .nplsqreg_tau_labels(x$tau)
+  plot_data_one <- function(object) {
+    args <- c(
+      list(
+        bws = object$reg.bws,
+        xdat = object$bws$xdat,
+        ydat = object$bws$qdat,
+        gradients = gradients,
+        plot.behavior = "data",
+        plot.par.mfrow = FALSE
+      ),
+      dots
+    )
+    do.call(.np_plot_rbandwidth_engine, args)[[1L]]
   }
-  if (!gradients && multi.tau && is.null(colnames(y)))
-    colnames(y) <- .nplsqreg_tau_labels(x$tau)
-  ord <- order(xpos)
+
+  multi.tau <- length(x$tau) > 1L
+  tau.fits <- if (multi.tau) x$tau.fits else list(x)
+  tau.labels <- .nplsqreg_tau_labels(x$tau)
+  plot.out <- stats::setNames(lapply(tau.fits, plot_data_one), tau.labels)
+  get.value <- function(object)
+    as.numeric(if (gradients) gradients(object) else fitted(object))
+  get.se <- function(object)
+    if (gradients) gradients(object, errors = TRUE) else se(object)
+  y <- do.call(cbind, lapply(plot.out, get.value))
+  colnames(y) <- tau.labels
+  yerr <- NULL
+  if (plot.errors) {
+    yerr <- array(NA_real_, dim = c(nrow(y), 3L, ncol(y)),
+                  dimnames = list(NULL, NULL, tau.labels))
+    for (j in seq_along(plot.out)) {
+      se.j <- get.se(plot.out[[j]])
+      if (is.null(se.j))
+        next
+      se.j <- as.matrix(se.j)
+      yerr[, 1L, j] <- -se.j[, 1L]
+      yerr[, 2L, j] <- se.j[, 2L]
+      bias.j <- if (gradients) plot.out[[j]]$gbias else plot.out[[j]]$bias
+      if (!is.null(bias.j) && length(bias.j) == nrow(y))
+        yerr[, 3L, j] <- y[, j] - bias.j
+    }
+  }
+
+  if (identical(plot.behavior, "data"))
+    return(plot.out)
 
   if (is.null(xlab))
     xlab <- x$xnames[1L]
@@ -328,41 +400,48 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
     } else if (multi.tau) {
       "Conditional quantile"
     } else {
-      paste("Quantile tau =", format(x$tau, trim = TRUE))
+      paste(x$tau, "quantile")
     }
 
-  if (is.null(ylim)) {
-    yr <- range(y, finite = TRUE)
-    if (plot.data.overlay && !gradients)
-      yr <- range(yr, x$bws$ydat, finite = TRUE)
-    ylim <- grDevices::extendrange(yr)
-  }
+  xeval <- plot.out[[1L]]$eval[[1L]]
+  xfactor <- is.factor(xeval)
 
-  graphics::plot(xpos[ord], if (multi.tau) y[ord, 1L] else y[ord],
-                 type = "n", xlab = xlab, ylab = ylab,
-                 ylim = ylim, xaxt = if (is.factor(xraw)) "n" else "s", ...)
-  if (is.factor(xraw)) {
-    graphics::axis(1, at = seq_along(levels(xraw)), labels = levels(xraw))
-  }
-  if (plot.data.overlay && !gradients) {
-    xtrain <- x$bws$xdat[[1L]]
-    if (is.factor(xtrain)) {
-      graphics::boxplot(x$bws$ydat ~ xtrain, add = TRUE, axes = FALSE,
-                        outline = FALSE, col = "grey90", border = "grey60")
-    } else {
-      xtrain <- as.numeric(xtrain)
-      graphics::points(xtrain, x$bws$ydat)
-    }
-  }
-  if (multi.tau) {
-    cols <- seq_len(length(x$tau))
-    mat <- as.matrix(y)
-    for (j in seq_along(x$tau))
-      graphics::lines(xpos[ord], mat[ord, j], col = cols[j], lty = j)
-    graphics::legend("topright", legend = .nplsqreg_tau_labels(x$tau),
-                     col = cols, lty = seq_along(x$tau), bty = "n")
-  } else {
-    graphics::lines(xpos[ord], y[ord])
-  }
+  plot.user.args <- .np_plot_user_args(dots, "plot")
+  .np_plot_quantile_overlay_1d(
+    ei = xeval,
+    value = y,
+    xi.factor = xfactor,
+    xlab.value = xlab,
+    ylab.value = ylab,
+    err = yerr,
+    all.err = NULL,
+    tau.labels = tau.labels,
+    overlay.x = x$bws$xdat[[1L]],
+    overlay.y = x$bws$ydat,
+    plot.data.overlay = plot.data.overlay,
+    gradients = gradients,
+    plotOnEstimate = identical(plot.errors.method, "none") ||
+      identical(dots$plot.errors.center, "estimate"),
+    plot.errors.type = if (is.null(dots$plot.errors.type)) "pmzsd" else dots$plot.errors.type,
+    plot.errors.style = if (is.null(dots$plot.errors.style)) "band" else dots$plot.errors.style,
+    plot.errors.bar = if (is.null(dots$plot.errors.bar)) "|" else dots$plot.errors.bar,
+    plot.errors.bar.num = if (is.null(dots$plot.errors.bar.num)) min(nrow(y), 25) else dots$plot.errors.bar.num,
+    plot.user.args = plot.user.args,
+    legend = plot.legend,
+    col = dots$col,
+    lty = dots$lty,
+    lwd = dots$lwd,
+    type = dots$type,
+    xlim = dots$xlim,
+    ylim = ylim,
+    main = dots$main,
+    sub = dots$sub,
+    cex.axis = dots$cex.axis,
+    cex.lab = dots$cex.lab,
+    cex.main = dots$cex.main,
+    cex.sub = dots$cex.sub
+  )
+  if (identical(plot.behavior, "plot-data"))
+    return(plot.out)
   invisible(x)
 }

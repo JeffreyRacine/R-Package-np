@@ -11377,6 +11377,255 @@ plotFactor <- function(f, y, ...){
   invisible(NULL)
 }
 
+.np_plot_legend_role <- function(legend, role) {
+  if (is.list(legend) && any(names(legend) %in% c("tau", "bands"))) {
+    if (!is.null(legend[[role]])) legend[[role]] else TRUE
+  } else {
+    legend
+  }
+}
+
+.np_plot_multi_tau_error_range <- function(value,
+                                           err,
+                                           all.err,
+                                           plotOnEstimate,
+                                           plot.errors.type) {
+  if (is.null(err))
+    return(NULL)
+  ntau <- dim(err)[3L]
+  ranges <- matrix(NA_real_, nrow = ntau, ncol = 2L)
+  for (kk in seq_len(ntau)) {
+    center.k <- if (plotOnEstimate) value[, kk] else err[, 3L, kk]
+    if (identical(plot.errors.type, "all")) {
+      if (is.null(all.err) || is.null(all.err[[kk]]))
+        next
+      ranges[kk, ] <- compute.all.error.range(center.k, all.err[[kk]])
+    } else {
+      if (!any(is.finite(center.k)) ||
+          !any(is.finite(err[, 1L, kk])) ||
+          !any(is.finite(err[, 2L, kk])))
+        next
+      ranges[kk, ] <- compute.default.error.range(center.k, err[, , kk])
+    }
+  }
+  if (!any(is.finite(ranges)))
+    return(NULL)
+  rng <- range(ranges, finite = TRUE)
+  if (length(rng) == 2L && all(is.finite(rng))) rng else NULL
+}
+
+.np_plot_draw_multi_tau_errors <- function(ei,
+                                           value,
+                                           err,
+                                           all.err,
+                                           xi.factor,
+                                           plotOnEstimate,
+                                           cols,
+                                           plot.errors.type,
+                                           plot.errors.style,
+                                           plot.errors.bar,
+                                           plot.errors.bar.num) {
+  if (is.null(err))
+    return(invisible(NULL))
+  nkeep <- nrow(value)
+  mat.x <- if (xi.factor) seq_len(nkeep) else ei[seq_len(nkeep)]
+  ntau <- ncol(value)
+  cols <- rep(cols, length.out = ntau)
+  for (kk in seq_len(ntau)) {
+    center.k <- if (plotOnEstimate) value[, kk] else err[, 3L, kk]
+    if (identical(plot.errors.type, "all")) {
+      if (is.null(all.err) || is.null(all.err[[kk]]))
+        next
+      all.k <- all.err[[kk]]
+      lty.map <- c(pointwise = 2L, simultaneous = 3L, bonferroni = 4L)
+      for (nm in intersect(names(lty.map), names(all.k))) {
+        err.k <- all.k[[nm]]
+        if (is.null(err.k))
+          next
+        draw.errors(
+          ex = mat.x,
+          ely = center.k - err.k[, 1L],
+          ehy = center.k + err.k[, 2L],
+          plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+          plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+          plot.errors.bar.num = plot.errors.bar.num,
+          lty = lty.map[[nm]],
+          col = cols[[kk]]
+        )
+      }
+    } else {
+      if (!xi.factor && !plotOnEstimate)
+        graphics::lines(mat.x, err[, 3L, kk], lty = 3, col = cols[[kk]])
+      lower.k <- if (plotOnEstimate) value[, kk] - err[, 1L, kk] else err[, 3L, kk] - err[, 1L, kk]
+      upper.k <- if (plotOnEstimate) value[, kk] + err[, 2L, kk] else err[, 3L, kk] + err[, 2L, kk]
+      good <- complete.cases(mat.x, lower.k, upper.k)
+      if (!any(good))
+        next
+      draw.errors(
+        ex = mat.x[good],
+        ely = lower.k[good],
+        ehy = upper.k[good],
+        plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+        plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
+        plot.errors.bar.num = plot.errors.bar.num,
+        lty = if (xi.factor) 1 else 2,
+        col = cols[[kk]]
+      )
+    }
+  }
+  invisible(NULL)
+}
+
+.np_plot_quantile_overlay_1d <- function(ei,
+                                         value,
+                                         xi.factor,
+                                         xlab.value,
+                                         ylab.value,
+                                         err = NULL,
+                                         all.err = NULL,
+                                         tau.labels = colnames(value),
+                                         overlay.x = NULL,
+                                         overlay.y = NULL,
+                                         plot.data.overlay = FALSE,
+                                         gradients = FALSE,
+                                         plotOnEstimate = TRUE,
+                                         plot.errors.type = "pointwise",
+                                         plot.errors.style = "band",
+                                         plot.errors.bar = "|",
+                                         plot.errors.bar.num = min(nrow(value), 25),
+                                         plot.user.args = list(),
+                                         legend = TRUE,
+                                         col = NULL,
+                                         lty = NULL,
+                                         lwd = NULL,
+                                         type = NULL,
+                                         xlim = NULL,
+                                         ylim = NULL,
+                                         main = NULL,
+                                         sub = NULL,
+                                         cex.axis = NULL,
+                                         cex.lab = NULL,
+                                         cex.main = NULL,
+                                         cex.sub = NULL) {
+  scalar_default <- function(value, default) {
+    if (is.null(value)) default else value
+  }
+  nkeep <- nrow(value)
+  if (is.null(tau.labels))
+    tau.labels <- colnames(value)
+  mat.x <- if (xi.factor) seq_len(nkeep) else ei[seq_len(nkeep)]
+  curve.col <- rep(scalar_default(col, seq_len(ncol(value))),
+                   length.out = ncol(value))
+  curve.lty <- rep(scalar_default(lty, seq_len(ncol(value))),
+                   length.out = ncol(value))
+  curve.lwd <- rep(scalar_default(lwd, graphics::par()$lwd),
+                   length.out = ncol(value))
+  error.ylim <- .np_plot_multi_tau_error_range(
+    value = value,
+    err = err,
+    all.err = all.err,
+    plotOnEstimate = plotOnEstimate,
+    plot.errors.type = plot.errors.type
+  )
+  y.range <- range(value, finite = TRUE)
+  if (!is.null(error.ylim))
+    y.range <- range(y.range, error.ylim, finite = TRUE)
+  overlay.ok <- isTRUE(plot.data.overlay) && !isTRUE(gradients)
+  if (overlay.ok && !is.null(overlay.y))
+    y.range <- .np_plot_overlay_range(y.range, overlay.y)
+  if (!is.null(ylim))
+    y.range <- ylim
+
+  plot.args <- list(
+    xlab = xlab.value,
+    ylab = ylab.value,
+    main = scalar_default(main, ""),
+    sub = scalar_default(sub, ""),
+    ylim = y.range,
+    cex.axis = scalar_default(cex.axis, graphics::par()$cex.axis),
+    cex.lab = scalar_default(cex.lab, graphics::par()$cex.lab),
+    cex.main = scalar_default(cex.main, graphics::par()$cex.main),
+    cex.sub = scalar_default(cex.sub, graphics::par()$cex.sub)
+  )
+  if (!xi.factor && !is.null(xlim))
+    plot.args$xlim <- xlim
+  plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
+
+  if (overlay.ok && !is.null(overlay.x) && !is.null(overlay.y)) {
+    if (xi.factor) {
+      data.args <- plot.args
+      data.args$x <- overlay.x
+      data.args$y <- overlay.y
+      data.args$type <- NULL
+      data.args$lty <- NULL
+      data.args$lwd <- NULL
+      data.args$col <- NULL
+      do.call(graphics::plot, data.args)
+    } else {
+      overlay.args <- plot.args
+      overlay.args$x <- overlay.x
+      overlay.args$y <- overlay.y
+      overlay.args$type <- "p"
+      overlay.args$lty <- NULL
+      overlay.args$lwd <- NULL
+      overlay.args$pch <- scalar_default(overlay.args$pch, 20)
+      overlay.args$cex <- scalar_default(overlay.args$cex, 0.5)
+      overlay.args$col <- grDevices::adjustcolor("gray30", alpha.f = 0.35)
+      do.call(graphics::plot, overlay.args)
+    }
+  } else {
+    empty.args <- plot.args
+    empty.args$x <- mat.x
+    empty.args$y <- value[, 1L]
+    empty.args$type <- "n"
+    empty.args$xaxt <- if (xi.factor) "n" else "s"
+    do.call(graphics::plot, empty.args)
+    if (xi.factor)
+      graphics::axis(1, at = mat.x, labels = as.character(ei[seq_len(nkeep)]))
+  }
+
+  .np_plot_draw_multi_tau_errors(
+    ei = ei,
+    value = value,
+    err = err,
+    all.err = all.err,
+    xi.factor = xi.factor,
+    plotOnEstimate = plotOnEstimate,
+    cols = curve.col,
+    plot.errors.type = plot.errors.type,
+    plot.errors.style = plot.errors.style,
+    plot.errors.bar = plot.errors.bar,
+    plot.errors.bar.num = plot.errors.bar.num
+  )
+  for (kk in seq_len(ncol(value))) {
+    graphics::lines(mat.x, value[, kk], type = scalar_default(type, "l"),
+                    col = curve.col[[kk]], lty = curve.lty[[kk]],
+                    lwd = curve.lwd[[kk]])
+  }
+  tau.legend.args <- .np_plot_legend_args(
+    list(x = "topright", legend = tau.labels, col = curve.col,
+         lty = curve.lty, lwd = curve.lwd, bty = "n"),
+    legend = .np_plot_legend_role(legend, "tau"),
+    context = "legend"
+  )
+  if (!is.null(tau.legend.args))
+    do.call(graphics::legend, tau.legend.args)
+  if (identical(plot.errors.type, "all") && !is.null(err)) {
+    band.legend.args <- .np_plot_legend_args(
+      list(x = "topleft",
+           legend = c("Pointwise", "Simultaneous", "Bonferroni"),
+           lty = c(2L, 3L, 4L),
+           col = graphics::par("col"),
+           bty = "n"),
+      legend = .np_plot_legend_role(legend, "bands"),
+      context = "legend"
+    )
+    if (!is.null(band.legend.args))
+      do.call(graphics::legend, band.legend.args)
+  }
+  invisible(NULL)
+}
+
 .np_plot_merge_rgl_legend_control <- function(legend3d.args, legend = TRUE) {
   legend.value <- if (is.list(legend) && any(names(legend) %in% c("tau", "bands"))) {
       if (!is.null(legend$bands)) legend$bands else TRUE
