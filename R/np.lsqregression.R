@@ -243,7 +243,7 @@ nplsqregbw <-
     "optim.control", "delta.bounds", "tau.search",
     "random.seed", "nomad.opts"
   )
-  reg.names <- setdiff(names(formals(getS3method("npregbw", "default"))),
+  reg.names <- setdiff(names(formals(utils::getS3method("npregbw", "default"))),
                        c("xdat", "ydat", "bws", "bandwidth.compute", "..."))
   eval.names <- c("newdata", "exdat", "data")
   allowed <- unique(c(reg.names, optimizer.names))
@@ -401,26 +401,39 @@ nplsqregbw <-
   )
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon],
                                          bws$ckerub[bws$icon])
-  cfun <- if (isTRUE(bandwidth.compute)) {
-    "C_np_lsqregression_bw"
+  out <- if (isTRUE(bandwidth.compute)) {
+    .Call(
+      "C_np_lsqregression_bw",
+      as.double(runo), as.double(rord), as.double(rcon),
+      as.double(ydat), as.double(scale),
+      as.double(tau), as.double(delta), as.double(delta.bounds),
+      as.double(mysd), as.integer(myopti), as.double(myoptd),
+      as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+      as.integer(nmulti),
+      as.integer(penalty.mode), as.double(penalty.multiplier),
+      as.integer(degree.c),
+      as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+      as.integer(npLpBasisCode(reg.spec$basis.engine)),
+      as.double(cker.bounds.c$lb), as.double(cker.bounds.c$ub),
+      PACKAGE = "np"
+    )
   } else {
-    "C_np_lsqregression_bw_eval"
+    .Call(
+      "C_np_lsqregression_bw_eval",
+      as.double(runo), as.double(rord), as.double(rcon),
+      as.double(ydat), as.double(scale),
+      as.double(tau), as.double(delta), as.double(delta.bounds),
+      as.double(mysd), as.integer(myopti), as.double(myoptd),
+      as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+      as.integer(nmulti),
+      as.integer(penalty.mode), as.double(penalty.multiplier),
+      as.integer(degree.c),
+      as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+      as.integer(npLpBasisCode(reg.spec$basis.engine)),
+      as.double(cker.bounds.c$lb), as.double(cker.bounds.c$ub),
+      PACKAGE = "np"
+    )
   }
-  out <- .Call(
-    cfun,
-    as.double(runo), as.double(rord), as.double(rcon),
-    as.double(ydat), as.double(scale),
-    as.double(tau), as.double(delta), as.double(delta.bounds),
-    as.double(mysd), as.integer(myopti), as.double(myoptd),
-    as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-    as.integer(nmulti),
-    as.integer(penalty.mode), as.double(penalty.multiplier),
-    as.integer(degree.c),
-    as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
-    as.integer(npLpBasisCode(reg.spec$basis.engine)),
-    as.double(cker.bounds.c$lb), as.double(cker.bounds.c$ub),
-    PACKAGE = "np"
-  )
   rorder <- numeric(length(bws$bw))
   ord.idx <- seq_along(bws$bw)
   rorder[c(ord.idx[bws$icon], ord.idx[bws$iuno], ord.idx[bws$iord])] <- ord.idx
