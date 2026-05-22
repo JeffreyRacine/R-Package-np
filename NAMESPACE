@@ -172,6 +172,7 @@ S3method(fitted, smoothcoefficient)
 S3method(as.data.frame,npcopula)
 
 S3method(residuals, npregression)
+S3method(residuals, lsqregression)
 S3method(residuals, plregression)
 S3method(residuals, singleindex)
 S3method(residuals, smoothcoefficient)
