@@ -1766,6 +1766,11 @@ npregbw.default <-
       bernstein.basis = bernstein.value,
       bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% search.mc.names)
     )
+    if (!is.null(degree.search) &&
+        "bwsolver" %in% search.mc.names &&
+        npBwsolverUsesMads(bwsolver)) {
+      stop("bwsolver is for fixed-degree bandwidth searches; use search.engine for automatic degree search")
+    }
     nomad.inner.named <- "nomad.nmulti" %in% search.mc.names
     nomad.inner.nmulti <- if (nomad.inner.named) {
       npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti")
