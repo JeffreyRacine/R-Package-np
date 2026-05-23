@@ -54,8 +54,7 @@ nplsqregbw <-
     !isTRUE(.npRmpi_autodispatch_in_context()) &&
     !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
     !inherits(call.name, "try-error") &&
-    !identical(call.name, "autodispatch-call") &&
-    !any(grepl("^\\.\\.[0-9]+$", all.names(mc)))
+    !identical(call.name, "autodispatch-call")
 }
 
 .nplsqreg_validate_tau_values <- function(tau, allow.duplicates = FALSE) {
