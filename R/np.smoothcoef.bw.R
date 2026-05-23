@@ -1433,10 +1433,18 @@ npscoefbw.NULL <-
 
   lower <- 2L
   upper <- max(1L, as.integer(nobs) - 1L)
+  hard.upper <- .Machine$integer.max / 2
   vapply(param, function(h) {
     if (!is.finite(h))
       return(NA_real_)
-    as.double(max(lower, min(upper, .np_round_half_to_even(h))))
+    k <- .np_round_half_to_even(h)
+    if (k > upper &&
+        npLargeNnEnabled() &&
+        bwtype %in% c("generalized_nn", "adaptive_nn") &&
+        k <= hard.upper) {
+      return(as.double(k))
+    }
+    as.double(max(lower, min(upper, k)))
   }, numeric(1))
 }
 
@@ -1529,10 +1537,19 @@ npscoefbw.NULL <-
       )
     ))
 
-  lower <- 2L
-  upper <- max(1L, as.integer(nobs) - 1L)
-  start <- max(lower, min(upper, .np_round_half_to_even(sqrt(nobs))))
-  rep.int(as.double(start), length(param))
+  start <- if (npLargeNnEnabled() &&
+               bwtype %in% c("generalized_nn", "adaptive_nn") &&
+               is.finite(start.controls$scale.factor.init) &&
+               start.controls$scale.factor.init > max(1L, as.integer(nobs) - 1L)) {
+    start.controls$scale.factor.init
+  } else {
+    sqrt(nobs)
+  }
+  .npscoef_nn_candidate_bandwidth(
+    param = rep.int(as.double(start), length(param)),
+    bwtype = bwtype,
+    nobs = nobs
+  )
 }
 
 .npscoef_random_start_bandwidth <- function(param,
