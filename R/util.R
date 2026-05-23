@@ -1661,6 +1661,62 @@ npValidateLargeNnContinuousBandwidth <- function(bws,
   invisible(bws)
 }
 
+npValidateConditionalLargeNn <- function(bws,
+                                         where,
+                                         nobs = NULL) {
+  if (is.null(bws$type) ||
+      identical(as.character(bws$type)[1L], "fixed") ||
+      is.null(bws$ixcon) ||
+      is.null(bws$iycon)) {
+    return(invisible(bws))
+  }
+
+  nobs <- if (is.null(nobs)) bws$nobs else nobs
+  if (is.null(nobs))
+    return(invisible(bws))
+
+  upper <- as.integer(nobs) - 1L
+  if (!is.finite(upper) || upper < 1L)
+    return(invisible(bws))
+
+  xbw <- as.double(bws$xbw)
+  ybw <- as.double(bws$ybw)
+  xicon <- which(as.logical(bws$ixcon))
+  yicon <- which(as.logical(bws$iycon))
+  offenders <- FALSE
+  if (length(xicon))
+    offenders <- offenders || any(is.finite(xbw[xicon]) & xbw[xicon] > upper)
+  if (length(yicon))
+    offenders <- offenders || any(is.finite(ybw[yicon]) & ybw[yicon] > upper)
+
+  if (!isTRUE(offenders))
+    return(invisible(bws))
+
+  bwtype <- as.character(bws$type)[1L]
+  if (!(bwtype %in% c("generalized_nn", "adaptive_nn"))) {
+    stop(
+      sprintf(
+        "%s: extended nearest-neighbor bandwidths above n-1 are not enabled for bwtype='%s'",
+        where,
+        bwtype
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (!npLargeNnEnabled()) {
+    stop(
+      sprintf(
+        "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+        where
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(bws)
+}
+
 npValidateRegressionLargeNn <- function(bws,
                                         where,
                                         bandwidth.compute = FALSE) {

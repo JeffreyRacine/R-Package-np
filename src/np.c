@@ -697,6 +697,68 @@ static double *np_continuous_largenn_eval_upper_alloc(
   return upper;
 }
 
+static double *np_conditional_largenn_upper_alloc(
+  const int bandwidth,
+  const int kernel_x,
+  const int kernel_y,
+  const int num_obs_train,
+  const int num_obs_y_eval,
+  const int num_reg_continuous,
+  const int num_var_continuous,
+  double **matrix_x_train,
+  double **matrix_y_train,
+  double **matrix_y_eval)
+{
+  const int total_continuous = num_reg_continuous + num_var_continuous;
+  double *upper = NULL;
+  double *x_upper = NULL;
+  double *y_upper = NULL;
+  int i;
+
+  if (!np_largenn_enabled_np() ||
+      !((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)) ||
+      num_obs_train < 2 ||
+      total_continuous <= 0) {
+    return NULL;
+  }
+
+  upper = alloc_vecd(total_continuous);
+
+  if (num_reg_continuous > 0) {
+    x_upper = np_continuous_largenn_upper_alloc(
+      bandwidth,
+      kernel_x,
+      num_obs_train,
+      num_obs_train,
+      num_reg_continuous,
+      matrix_x_train,
+      matrix_x_train);
+  }
+
+  if (num_var_continuous > 0) {
+    y_upper = np_continuous_largenn_upper_alloc(
+      bandwidth,
+      kernel_y,
+      num_obs_train,
+      num_obs_y_eval,
+      num_var_continuous,
+      matrix_y_train,
+      matrix_y_eval);
+  }
+
+  for (i = 0; i < num_reg_continuous; i++)
+    upper[i] = (x_upper != NULL) ? x_upper[i] : (double)(num_obs_train - 1);
+
+  for (i = 0; i < num_var_continuous; i++)
+    upper[num_reg_continuous + i] =
+      (y_upper != NULL) ? y_upper[i] : (double)(num_obs_train - 1);
+
+  safe_free(x_upper);
+  safe_free(y_upper);
+
+  return upper;
+}
+
 static int np_has_finite_cker_bounds(const double *lb, const double *ub, const int n)
 {
   int i;
@@ -7595,6 +7657,27 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   np_refresh_support_counts_extern();
   np_validate_nonfixed_support_counts_extern("C_np_density_conditional_bw", BANDWIDTH_den_extern);
 
+  vector_largenn_upper_extern = (!eval_only) ?
+    np_conditional_largenn_upper_alloc(
+      BANDWIDTH_den_extern,
+      KERNEL_reg_extern,
+      KERNEL_den_extern,
+      num_obs_train_extern,
+      num_obs_train_extern,
+      num_reg_continuous_extern,
+      num_var_continuous_extern,
+      matrix_X_continuous_train_extern,
+      matrix_Y_continuous_train_extern,
+      matrix_Y_continuous_train_extern) :
+    np_continuous_largenn_eval_upper_alloc(
+      BANDWIDTH_den_extern,
+      num_obs_train_extern,
+      num_reg_continuous_extern + num_var_continuous_extern,
+      myans);
+  int_largenn_upper_num_extern =
+    (vector_largenn_upper_extern != NULL) ?
+    (num_reg_continuous_extern + num_var_continuous_extern) : 0;
+
   if((ibwmfunc == CBWM_CVLS) && (int_ll_extern == LL_LP)){
     if(np_bounded_cvls_conditional_quad_context_prepare_extern() != 0){
       bw_error_msg = "C_np_density_conditional_bw: failed to prepare bounded cv.ls quadrature context";
@@ -8166,6 +8249,9 @@ cleanup_np_density_conditional_bw:
   np_bounded_cvls_conditional_quad_context_clear_extern();
   bwm_clear_floor_context();
   bwm_nn_cache_free();
+  safe_free(vector_largenn_upper_extern);
+  vector_largenn_upper_extern = NULL;
+  int_largenn_upper_num_extern = 0;
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
   free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
@@ -8766,6 +8852,26 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   np_refresh_support_counts_extern();
   np_validate_nonfixed_support_counts_extern("C_np_distribution_conditional_bw", BANDWIDTH_den_extern);
 
+  vector_largenn_upper_extern = (!eval_only) ?
+    np_conditional_largenn_upper_alloc(
+      BANDWIDTH_den_extern,
+      KERNEL_reg_extern,
+      KERNEL_den_extern,
+      num_obs_train_extern,
+      num_obs_eval_extern,
+      num_reg_continuous_extern,
+      num_var_continuous_extern,
+      matrix_X_continuous_train_extern,
+      matrix_Y_continuous_train_extern,
+      matrix_Y_continuous_eval_extern) :
+    np_continuous_largenn_eval_upper_alloc(
+      BANDWIDTH_den_extern,
+      num_obs_train_extern,
+      num_reg_continuous_extern + num_var_continuous_extern,
+      myans);
+  int_largenn_upper_num_extern =
+    (vector_largenn_upper_extern != NULL) ?
+    (num_reg_continuous_extern + num_var_continuous_extern) : 0;
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -9290,6 +9396,9 @@ cleanup_np_distribution_conditional_bw:
   /* Free data objects */
   bwm_clear_floor_context();
   bwm_nn_cache_free();
+  safe_free(vector_largenn_upper_extern);
+  vector_largenn_upper_extern = NULL;
+  int_largenn_upper_num_extern = 0;
 
   free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
   free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
