@@ -454,6 +454,8 @@ static int *bwm_num_categories = NULL;
 static double *bwm_transform_buf = NULL;
 static int bwm_transform_buf_len = 0;
 
+static void bwm_nn_cache_free(void);
+
 static void bwm_reserve_transform_buf(int needed_len)
 {
   double *tmp = NULL;
@@ -474,6 +476,7 @@ void np_release_static_buffers(int *unused)
     bwm_transform_buf = NULL;
   }
   bwm_transform_buf_len = 0;
+  bwm_nn_cache_free();
 }
 static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;
