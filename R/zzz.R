@@ -52,7 +52,7 @@ npTreeMode <- function(value = getOption("np.tree", "auto")) {
   if (identical(value, FALSE))
     return("off")
   if (is.character(value) && length(value) == 1L &&
-      identical(tolower(value), "auto"))
+      identical(unname(tolower(value)), "auto"))
     return("auto")
   stop("option 'np.tree' must be TRUE, FALSE, or \"auto\"", call. = FALSE)
 }

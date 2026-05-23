@@ -156,10 +156,11 @@ Further arguments are passed to bandwidth or distribution routines as needed.
   Cross-validated bandwidth selection is used by default
   (\code{\link{npudistbw}}). For large datasets this can be
   computationally demanding. In such cases one might instead consider a
-  rule-of-thumb bandwidth (\code{bwmethod="normal-reference"}) or,
-  alternatively, use kd-trees (\code{options(np.tree=TRUE)} along with a
-  bounded kernel (\code{ckertype="epanechnikov"})), both of which will
-  reduce the computational burden appreciably.
+  rule-of-thumb bandwidth (\code{bwmethod="normal-reference"}) or bounded
+  kernels such as \code{ckertype="epanechnikov"}. The default
+  \code{options(np.tree="auto")} uses kd-trees for eligible bounded-kernel
+  continuous routes; \code{options(np.tree=TRUE)} remains available to force
+  kd-tree use explicitly.
 }
 \author{
     Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine
