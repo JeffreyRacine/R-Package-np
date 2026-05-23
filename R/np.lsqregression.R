@@ -97,6 +97,21 @@ nplsqregbw <-
   as.numeric(scale)
 }
 
+.nplsqreg_scale_pilot_fit <- function(xdat, ydat, pilot.dots,
+                                      regtype.pilot, nomad.pilot) {
+  mean.bw <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat), pilot.dots))
+  mean.fit <- npreg(bws = mean.bw, txdat = xdat, tydat = ydat)
+  res <- as.numeric(ydat) - as.numeric(fitted(mean.fit))
+  scale.fit <- npreg(bws = mean.fit$bws, txdat = xdat, tydat = res^2)
+  variance.hat <- as.numeric(fitted(scale.fit))
+  floor <- .Machine$double.eps
+  variance.hat <- pmax(floor, variance.hat)
+  variance.hat[!is.finite(variance.hat)] <- floor
+  scale <- sqrt(variance.hat)
+  list(scale = scale, mean.fit = mean.fit, scale.fit = scale.fit,
+       regtype.pilot = regtype.pilot, nomad.pilot = nomad.pilot)
+}
+
 .nplsqreg_scale_pilot <- function(xdat, ydat, dots,
                                   regtype.pilot = c("auto", "ll", "lc", "lp"),
                                   nomad.pilot = FALSE,
@@ -123,17 +138,42 @@ nplsqregbw <-
   if (isTRUE(nomad.pilot))
     pilot.dots$nomad <- TRUE
 
-  mean.args <- c(list(txdat = xdat, tydat = ydat), pilot.dots)
-  mean.fit <- do.call(npreg, mean.args)
-  res <- as.numeric(ydat) - as.numeric(fitted(mean.fit))
-  scale.fit <- npreg(bws = mean.fit$bws, txdat = xdat, tydat = res^2)
-  variance.hat <- as.numeric(fitted(scale.fit))
-  floor <- .Machine$double.eps
-  variance.hat <- pmax(floor, variance.hat)
-  variance.hat[!is.finite(variance.hat)] <- floor
-  scale <- sqrt(variance.hat)
-  list(scale = scale, mean.fit = mean.fit, scale.fit = scale.fit,
-       regtype.pilot = regtype.pilot, nomad.pilot = nomad.pilot)
+  pilot.bwtype <- if (is.null(pilot.dots$bwtype)) {
+    "fixed"
+  } else {
+    as.character(pilot.dots$bwtype[1L])
+  }
+  mpi.size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) 1L)
+
+  if (identical(pilot.bwtype, "generalized_nn") &&
+      !identical(regtype.pilot, "lc") &&
+      isTRUE(getOption("npRmpi.autodispatch.context", FALSE)) &&
+      is.finite(mpi.size) &&
+      mpi.size > 1L) {
+    rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+    if (isTRUE(rank == 0L)) {
+      out <- .npRmpi_with_local_regression(
+        .nplsqreg_scale_pilot_fit(
+          xdat = xdat,
+          ydat = ydat,
+          pilot.dots = pilot.dots,
+          regtype.pilot = regtype.pilot,
+          nomad.pilot = nomad.pilot
+        )
+      )
+      mpi.bcast.Robj(out, rank = 0L, comm = 1L)
+      return(out)
+    }
+    return(mpi.bcast.Robj(rank = 0L, comm = 1L))
+  }
+
+  .nplsqreg_scale_pilot_fit(
+    xdat = xdat,
+    ydat = ydat,
+    pilot.dots = pilot.dots,
+    regtype.pilot = regtype.pilot,
+    nomad.pilot = nomad.pilot
+  )
 }
 
 .nplsqreg_rebuild_rbandwidth <- function(template, bw, ydat, xdat = NULL,
