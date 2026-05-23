@@ -23,7 +23,7 @@ npreg <-
   }
 
 .npreg_fit_tree_code <- function(bws, ncon, ncat) {
-  code <- if (npUseContinuousTree(ncon = ncon)) DO_TREE_YES else DO_TREE_NO
+  code <- if (npUseContinuousTree(ncon = ncon, bws = bws)) DO_TREE_YES else DO_TREE_NO
 
   if (!identical(code, DO_TREE_YES))
     return(code)
@@ -35,6 +35,9 @@ npreg <-
   } else {
     "lc"
   }
+
+  if (!identical(regtype, "lc"))
+    return(DO_TREE_NO)
 
   code
 }

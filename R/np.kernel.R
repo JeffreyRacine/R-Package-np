@@ -336,7 +336,7 @@ npksum.default <-
       mcv.numRow = attr(bws$xmcv, "num.row"),
       wncol = dim.in[1],
       yncol = dim.in[2],
-      int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+      int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord, bws = bws),
       return.kernel.weights = return.kernel.weights,
       permutation.operator = poperator.num,
 	      compute.score = compute.score,

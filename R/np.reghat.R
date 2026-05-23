@@ -354,10 +354,11 @@ npreghat <-
   ntrain <- nrow(txdat)
   neval <- nrow(eval.data)
   want.grad <- length(s) > 0L && any(s > 0L)
+  tree.enabled <- npUseContinuousTree(ncon = bws$ncon, bws = bws)
 
   if (identical(bws$type, "generalized_nn") &&
       any(degree > 1L) &&
-      isTRUE(getOption("np.tree"))) {
+      tree.enabled) {
     return(.npreghat_exact_matrix_from_core(
       bws = bws,
       txdat = txdat,
@@ -368,7 +369,7 @@ npreghat <-
 
   if (identical(bws$type, "generalized_nn") &&
       any(degree > 1L) &&
-      !isTRUE(getOption("np.tree"))) {
+      !tree.enabled) {
     return(.npreghat_exact_lp_matrix_from_regression_core_chunked(
       bws = bws,
       txdat = txdat,
@@ -602,7 +603,7 @@ npreghat <-
   if (!miss.ex && leave.one.out)
     stop("you may not specify 'leave.one.out = TRUE' and provide evaluation data")
   if (is.null(int.do.tree))
-    int.do.tree <- npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord)
+    int.do.tree <- npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord, bws = bws)
 
   if (is.null(operator)) {
     operator <- rep.int("normal", length(txdat))

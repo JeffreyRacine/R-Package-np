@@ -1,5 +1,10 @@
 # np 0.70-3
 
+- `options(np.tree = "auto")` is now the default tree mode. In auto mode,
+  continuous kd-tree routes are enabled only for bounded-support continuous
+  kernels (`"epanechnikov"` and `"uniform"`); `np.tree = TRUE` remains the
+  explicit force-on override and `np.tree = FALSE` remains the force-off
+  diagnostic path.
 - Powell bandwidth searches for eligible continuous-only generalized/adaptive
   nearest-neighbor routes now expose their exact repeated-integer-candidate
   cache through `options(np.powell.cache = TRUE/FALSE)`. The cache remains
@@ -52,11 +57,11 @@
   numerical precision while reducing objective and full-search runtime.
 - Large-sample categorical-only regression now has a profile-compressed
   execution route controlled by `options(np.categorical.compress = TRUE)`,
-  which is enabled by default. The legacy `options(np.tree = TRUE)` switch
-  also enables eligible categorical compression for compatibility. For local
-  constant categorical regression, repeated predictor profiles are compressed
-  before fitting, prediction/evaluation, standard errors, gradients where
-  meaningful, bandwidth search, hat-helper use, and plot bootstrap helpers.
+  which is enabled by default. This categorical route is independent of
+  `options(np.tree)`. For local constant categorical regression, repeated
+  predictor profiles are compressed before fitting, prediction/evaluation,
+  standard errors, gradients where meaningful, bandwidth search, hat-helper
+  use, and plot bootstrap helpers.
   This preserves the established dense-route numerical contract while greatly
   reducing work for large samples with many repeated
   factor/ordered predictor combinations.
