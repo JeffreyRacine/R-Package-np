@@ -39,6 +39,9 @@ test_that("np.tree auto mode is bounded-kernel continuous tree only", {
 
   expect_true(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "epanechnikov"))
   expect_true(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "uniform"))
+  options(np.tree = c(mode = "auto"))
+  expect_true(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "epanechnikov"))
+  options(np.tree = "auto")
   expect_false(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "gaussian"))
   expect_false(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "truncated gaussian"))
   expect_false(npRmpi:::npUseContinuousTree(ncon = 1L))

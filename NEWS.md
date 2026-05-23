@@ -110,7 +110,7 @@
 - `npplreg()` now activates the already validated categorical regression
   compression path for its internal all-categorical `Z` regressions when
   `options(np.categorical.compress = TRUE)` is enabled, without requiring users
-  to turn on the broader legacy `options(np.tree = TRUE)` switch.
+  to request continuous kd-tree acceleration through `options(np.tree)`.
 - Formula variables whose names contain dots, such as `y.irr ~ x`, are no
   longer mistaken for the formula wildcard `.` in conditional density and
   conditional distribution bandwidth routes. The conditional-density bandwidth
