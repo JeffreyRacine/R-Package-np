@@ -420,11 +420,12 @@ typedef struct {
   double *cykerub;
   double *cxykerlb;
   double *cxykerub;
+  double *largenn_upper;
 } NPConditionalDensityNomadShadowCtx;
 
 static NPConditionalDensityNomadShadowCtx np_conditional_density_nomad_shadow =
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, NULL, NULL, NULL, NULL, NULL, NULL,
-   NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+   NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 
 static void np_regression_nomad_shadow_clear_internal(void);
 static void np_conditional_density_nomad_shadow_clear_internal(void);
@@ -559,6 +560,7 @@ static int bwm_kernel_unordered_len = 0;
 static double bwm_scale_factor_lower_bound = 0.1;
 double *vector_largenn_upper_extern = NULL;
 int int_largenn_upper_num_extern = 0;
+int int_conditional_nomad_shadow_extern = 0;
 static const char *bwm_deferred_error = NULL;
 
 void np_bwm_set_deferred_error(const char *msg)
@@ -3089,6 +3091,7 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   safe_free(np_conditional_density_nomad_shadow.cykerub);
   safe_free(np_conditional_density_nomad_shadow.cxykerlb);
   safe_free(np_conditional_density_nomad_shadow.cxykerub);
+  safe_free(np_conditional_density_nomad_shadow.largenn_upper);
   safe_free(bwm_kernel_unordered_vec);
 
   safe_free(np_conditional_density_nomad_shadow.ipt_x);
@@ -3156,10 +3159,14 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   vector_cxykerub_extern = NULL;
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;
+  vector_largenn_upper_extern = NULL;
+  int_largenn_upper_num_extern = 0;
+  int_conditional_nomad_shadow_extern = 0;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
   int_ll_extern = LL_LC;
   int_nn_k_min_extern = 1;
+  np_conditional_density_nomad_shadow.largenn_upper = NULL;
   BANDWIDTH_den_extern = 0;
   BANDWIDTH_reg_extern = 0;
   KERNEL_reg_extern = 0;
@@ -3191,8 +3198,6 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
 
 static void np_conditional_density_nomad_shadow_refresh_penalty(void)
 {
-  int i;
-
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
 
@@ -3201,48 +3206,11 @@ static void np_conditional_density_nomad_shadow_refresh_penalty(void)
 
   {
     double pmult = np_conditional_density_nomad_shadow.penalty_multiplier;
-    double baseline;
 
     if (pmult < 1.0)
       pmult = 1.0;
 
-    baseline = bwmfunc_raw_current_scale(
-      np_conditional_density_nomad_shadow.vector_scale_factor,
-      np_conditional_density_nomad_shadow.num_all_var);
-    bwm_eval_count += 1.0;
-    if (!R_FINITE(baseline) || baseline == DBL_MAX)
-      bwm_invalid_count += 1.0;
-    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = alloc_vecd(np_conditional_density_nomad_shadow.num_all_var + 1);
-      if (tmp == NULL)
-        return;
-      np_copy_scale_factor_for_raw(
-        tmp,
-        np_conditional_density_nomad_shadow.vector_scale_factor,
-        np_conditional_density_nomad_shadow.num_all_var);
-      for (i = 1; i <= (bwm_num_reg_continuous); i++)
-        tmp[i] *= 2.0;
-      for (i = 0; i < bwm_num_reg_unordered; i++) {
-        int idx = bwm_num_reg_continuous + 1 + i;
-        double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
-        tmp[idx] = 0.5 * maxbw;
-      }
-      for (i = 0; i < bwm_num_reg_ordered; i++) {
-        int idx = bwm_num_reg_continuous + bwm_num_reg_unordered + 1 + i;
-        tmp[idx] = 0.5;
-      }
-      baseline = bwmfunc_raw(tmp);
-      bwm_eval_count += 1.0;
-      if (!R_FINITE(baseline) || baseline == DBL_MAX)
-        bwm_invalid_count += 1.0;
-      safe_free(tmp);
-    }
-
-    if (!R_FINITE(baseline) || baseline == DBL_MAX)
-      bwm_penalty_value = pmult * 1.0e6;
-    else
-      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
-
+    bwm_penalty_value = pmult * 1.0e6;
     if (R_FINITE(bwm_penalty_value))
       bwm_penalty_mode = 1;
   }
@@ -3731,6 +3699,22 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   for (j = 0; j < num_all_cvar; j++)
     vector_continuous_stddev_extern[j] = mysd[j];
 
+  np_conditional_density_nomad_shadow.largenn_upper =
+    np_conditional_largenn_upper_alloc(
+      BANDWIDTH_den_extern,
+      KERNEL_reg_extern,
+      KERNEL_den_extern,
+      num_obs_train_extern,
+      num_obs_train_extern,
+      num_reg_continuous_extern,
+      num_var_continuous_extern,
+      matrix_X_continuous_train_extern,
+      matrix_Y_continuous_train_extern,
+      matrix_Y_continuous_train_extern);
+  vector_largenn_upper_extern = np_conditional_density_nomad_shadow.largenn_upper;
+  int_largenn_upper_num_extern =
+    (vector_largenn_upper_extern != NULL) ? num_all_cvar : 0;
+
   if ((int_ll_extern == LL_LP) &&
       (!np_glp_cv_prepare_extern(int_ll_extern,
                                  num_obs_train_extern,
@@ -3872,6 +3856,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   free_mat(matrix_y, num_all_var + 1);
   safe_free(vsfh);
   np_conditional_density_nomad_shadow.active = 1;
+  int_conditional_nomad_shadow_extern = 1;
   return 1;
 
 fail:

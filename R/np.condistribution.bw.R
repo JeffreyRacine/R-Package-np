@@ -1626,7 +1626,13 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
 
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("automatic degree search with search.engine='nomad' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
-  setup <- .npcdistbw_nomad_bw_setup(xdat = xdat, ydat = ydat, template = template)
+  setup <- .npcdistbw_nomad_bw_setup(
+    xdat = xdat,
+    ydat = ydat,
+    template = template,
+    allow.large.nn = TRUE,
+    gydat = opt.args$gydat
+  )
   setup$nobs <- nrow(toFrame(xdat))
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   ndeg <- length(degree.search$start.degree)
