@@ -44,6 +44,15 @@
     force the historical dense categorical route for debugging or timing
     comparisons.
 
+    \item \code{np.powell.cache} (logical): enables exact caching of repeated
+    integer nearest-neighbor candidates in Powell bandwidth searches for
+    eligible continuous-only generalized/adaptive nearest-neighbor routes.
+    Default is \code{TRUE}. Set \code{options(np.powell.cache = FALSE)} to
+    force every repeated Powell candidate through the objective evaluator for
+    diagnostic timing comparisons. This option is synchronized to MPI workers
+    in autodispatch sessions. MADS/NOMAD solver caching is separate and is not
+    controlled by this option.
+
     \item \code{np.largeh} (logical): enables continuous large-\eqn{h}
     shortcut evaluations. Default is \code{TRUE}. Set
     \code{options(np.largeh = FALSE)} to keep tree/dense routing unchanged
@@ -102,6 +111,7 @@ npRmpi.init(nslaves=1)
 old <- options(
   np.tree = TRUE,
   np.categorical.compress = TRUE,
+  np.powell.cache = TRUE,
   np.largeh = TRUE,
   np.largelambda = TRUE,
   np.messages = FALSE,

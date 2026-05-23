@@ -1,5 +1,11 @@
 # npRmpi 0.70-3
 
+- Powell bandwidth searches for eligible continuous-only generalized/adaptive
+  nearest-neighbor routes now expose their exact repeated-integer-candidate
+  cache through `options(np.powell.cache = TRUE/FALSE)`. The cache remains
+  enabled by default and is synchronized to MPI workers in autodispatch
+  sessions; disabling it is intended for diagnostic timing and teaching
+  comparisons.
 - Continuous large-bandwidth shortcut evaluations can now be disabled with
   `options(np.largeh = FALSE)`, and discrete near-upper-bandwidth shortcut
   evaluations can now be disabled with `options(np.largelambda = FALSE)`.

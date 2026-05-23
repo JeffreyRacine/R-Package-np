@@ -849,6 +849,16 @@ static int bwm_nn_cache_env_enabled(void)
   return 1;
 }
 
+static int bwm_nn_cache_user_enabled(void)
+{
+  SEXP opt = Rf_GetOption1(Rf_install("np.powell.cache"));
+  if (opt != R_NilValue) {
+    int enabled = asLogical(opt);
+    return enabled == TRUE;
+  }
+  return bwm_nn_cache_env_enabled();
+}
+
 static int bwm_nn_cache_collective_enabled(int local_enabled)
 {
 #ifdef MPI2
@@ -1030,7 +1040,7 @@ static void bwm_nn_cache_configure_for_powell(
   bwm_nn_cache_key_len = 0;
 
   if (!bwm_nn_cache_collective_enabled(
-        bwm_nn_cache_env_enabled() &&
+        bwm_nn_cache_user_enabled() &&
         !eval_only &&
         extra_params == 0 &&
         ((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)) &&
