@@ -2899,3 +2899,79 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
   names(x) <- nms[seq_along(x)]
   x
 }
+
+.np_r_nn_cache_new <- function(enabled, key.length = 0L) {
+  cache <- new.env(parent = emptyenv(), hash = FALSE)
+  cache$enabled <- isTRUE(enabled)
+  cache$key.length <- if (isTRUE(cache$enabled)) as.integer(key.length) else 0L
+  cache$store <- new.env(parent = emptyenv(), hash = TRUE)
+  cache$visits <- 0
+  cache$unique <- 0
+  cache$repeats <- 0
+  cache$raw.evals <- 0
+  cache$hits <- 0
+  cache$allocation.failed <- 0
+  cache
+}
+
+.np_r_nn_cache_key <- function(key) {
+  paste(as.integer(key), collapse = "\r")
+}
+
+.np_r_nn_cache_get <- function(cache, key) {
+  if (!is.environment(cache) || !isTRUE(cache$enabled))
+    return(list(hit = FALSE, token = NULL, value = NULL))
+  token <- .np_r_nn_cache_key(key)
+  cache$visits <- cache$visits + 1
+  if (exists(token, envir = cache$store, inherits = FALSE)) {
+    cache$repeats <- cache$repeats + 1
+    cache$hits <- cache$hits + 1
+    return(list(
+      hit = TRUE,
+      token = token,
+      value = get(token, envir = cache$store, inherits = FALSE)
+    ))
+  }
+  cache$unique <- cache$unique + 1
+  list(hit = FALSE, token = token, value = NULL)
+}
+
+.np_r_nn_cache_put <- function(cache, token, value) {
+  if (!is.environment(cache) || !isTRUE(cache$enabled) || is.null(token))
+    return(invisible(FALSE))
+  assign(token, value, envir = cache$store)
+  cache$raw.evals <- cache$raw.evals + 1
+  invisible(TRUE)
+}
+
+.np_r_nn_cache_stats <- function(cache) {
+  if (!is.environment(cache))
+    return(NULL)
+  c(
+    enabled = if (isTRUE(cache$enabled)) 1 else 0,
+    key.length = as.numeric(cache$key.length),
+    visits = cache$visits,
+    unique = cache$unique,
+    repeats = cache$repeats,
+    raw.evals = cache$raw.evals,
+    hits = cache$hits,
+    allocation.failed = cache$allocation.failed
+  )
+}
+
+.np_r_nn_cache_combine_stats <- function(stats) {
+  stats <- Filter(Negate(is.null), stats)
+  if (!length(stats))
+    return(NULL)
+  nms <- c("enabled", "key.length", "visits", "unique", "repeats",
+           "raw.evals", "hits", "allocation.failed")
+  mat <- do.call(rbind, lapply(stats, function(x) {
+    x <- as.numeric(x)
+    names(x) <- nms[seq_along(x)]
+    x[nms]
+  }))
+  out <- colSums(mat, na.rm = TRUE)
+  out["enabled"] <- as.numeric(any(mat[, "enabled"] > 0))
+  out["key.length"] <- max(mat[, "key.length"], na.rm = TRUE)
+  out
+}
