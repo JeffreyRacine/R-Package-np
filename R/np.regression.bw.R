@@ -210,6 +210,11 @@ npregbw.rbandwidth <-
       where = "npregbw",
       allow.zero.placeholder = TRUE
     )
+    npValidateRegressionLargeNn(
+      bws,
+      where = "npregbw",
+      bandwidth.compute = bandwidth.compute
+    )
 
     if ((any(bws$icon) &&
          !all(vapply(xdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||

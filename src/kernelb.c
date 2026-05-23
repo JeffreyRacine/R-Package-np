@@ -7,8 +7,10 @@
 #include <math.h>
 #include <float.h>
 #include <errno.h>
+#include <limits.h>
 
 #include <R.h>
+#include <Rinternals.h>
 #include "headers.h"
 
 #ifdef MPI2
@@ -28,6 +30,56 @@ extern int int_LARGE_SF;
 extern double nconfac_extern;
 extern double ncatfac_extern;
 extern double * vector_continuous_stddev_extern;
+
+static int np_largenn_enabled(void)
+{
+	const SEXP val = Rf_GetOption1(Rf_install("np.largenn"));
+	const int flag = Rf_asLogical(val);
+	return flag == TRUE;
+}
+
+static int np_nn_lookup_from_scale(const int num_obs_train,
+const int allow_extended,
+const double scale_factor,
+int *lookup_k,
+double *distance_scale)
+{
+	const int max_k = num_obs_train - 1;
+	int rounded_k;
+
+	if((lookup_k == NULL) || (distance_scale == NULL) || (max_k < 1))
+	{
+		return(1);
+	}
+
+	if(!isfinite(scale_factor) || (scale_factor < 1.0) || (scale_factor > ((double)INT_MAX / 2.0)))
+	{
+		return(1);
+	}
+
+	rounded_k = np_fround(scale_factor);
+
+	if(rounded_k < 1)
+	{
+		return(1);
+	}
+
+	if(rounded_k > max_k)
+	{
+		if(!allow_extended || !np_largenn_enabled())
+		{
+			return(1);
+		}
+
+		*lookup_k = max_k;
+		*distance_scale = ((double)rounded_k)/((double)max_k);
+		return(0);
+	}
+
+	*lookup_k = rounded_k;
+	*distance_scale = 1.0;
+	return(0);
+}
 
 /*
 int int_DEBUG;
@@ -91,6 +143,8 @@ double **matrix_bandwidth_deriv)
 	double *pointer_bw;
 	double *pointer_bwd;
 	double *pointer_nn;
+	double nn_scale;
+	int int_nn_k;
 
 #ifdef MPI2 
 	int stride;
@@ -326,7 +380,12 @@ double **matrix_bandwidth_deriv)
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, 0,matrix_X_train[i], matrix_X_eval[i], np_fround(vector_scale_factor[i]), nn_distance)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, (num_var_cont == 0), vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
+			{
+				return(1);
+			}
+
+			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, 0,matrix_X_train[i], matrix_X_eval[i], int_nn_k, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -340,8 +399,8 @@ double **matrix_bandwidth_deriv)
 			for(j=0; j < num_obs_eval; j++)
 			{
 
-				*pointer_bw++ = *pointer_nn;
-				*pointer_bwd++ = *pointer_nn++;
+				*pointer_bw++ = nn_scale * *pointer_nn;
+				*pointer_bwd++ = nn_scale * *pointer_nn++;
 
 			}
 
@@ -352,7 +411,12 @@ double **matrix_bandwidth_deriv)
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, 0, matrix_Y_train[i], matrix_Y_eval[i], np_fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 0, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
+			{
+				return(1);
+			}
+
+			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, 0, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -365,7 +429,7 @@ double **matrix_bandwidth_deriv)
 			for(j=0; j < num_obs_eval; j++)
 			{
 
-				*pointer_bw++ = *pointer_nn++;
+				*pointer_bw++ = nn_scale * *pointer_nn++;
 
 			}
 
@@ -551,6 +615,8 @@ int kernel_bandwidth_mean(int KERNEL,
 
 	double *pointer_bw;
 	double *pointer_nn;
+	double nn_scale;
+	int int_nn_k;
 
 #ifdef MPI2
 	int stride;
@@ -692,7 +758,12 @@ fact constant. */
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_X_train[i], matrix_X_eval[i], np_fround(vector_scale_factor[i]), nn_distance)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, (num_var_cont == 0), vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
+			{
+				return(1);
+			}
+
+			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_X_train[i], matrix_X_eval[i], int_nn_k, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -705,7 +776,7 @@ fact constant. */
 			for(j=0; j < num_obs_eval; j++)
 			{
 
-				*pointer_bw++ = *pointer_nn++;
+				*pointer_bw++ = nn_scale * *pointer_nn++;
 
 			}
 
@@ -716,7 +787,12 @@ fact constant. */
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_Y_train[i], matrix_Y_eval[i], np_fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 0, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
+			{
+				return(1);
+			}
+
+			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -729,7 +805,7 @@ fact constant. */
 			for(j=0; j < num_obs_eval; j++)
 			{
 
-				*pointer_bw++ = *pointer_nn++;
+				*pointer_bw++ = nn_scale * *pointer_nn++;
 
 			}
 
@@ -866,5 +942,3 @@ fact constant. */
 	return(0);
 
 }
-
-
