@@ -1501,20 +1501,22 @@ npLargeNnEnabled <- function() {
   isTRUE(getOption("np.largenn", FALSE))
 }
 
-npRegressionLargeNnNomadUpper <- function(xdat,
-                                          template,
+npContinuousLargeNnNomadUpper <- function(traindat,
+                                          bwtype,
+                                          ckertype,
                                           cont.idx,
+                                          evaldat = NULL,
                                           safety.margin = 1.5,
                                           hard.upper = .Machine$integer.max / 4) {
   ncon <- length(cont.idx)
-  nobs <- NROW(xdat)
+  nobs <- NROW(traindat)
   base.k <- as.integer(nobs) - 1L
   fallback <- rep.int(as.double(base.k), ncon)
+  bwtype <- as.character(bwtype)[1L]
 
   if (!npLargeNnEnabled() ||
       ncon < 1L ||
-      !inherits(template, "rbandwidth") ||
-      !(as.character(template$type)[1L] %in% c("generalized_nn", "adaptive_nn")) ||
+      !(bwtype %in% c("generalized_nn", "adaptive_nn")) ||
       base.k < 1L) {
     return(fallback)
   }
@@ -1523,7 +1525,7 @@ npRegressionLargeNnNomadUpper <- function(xdat,
   if (!is.finite(rel.tol) || rel.tol <= 0 || rel.tol >= 0.1)
     rel.tol <- 1e-3
 
-  kern <- as.character(template$ckertype)[1L]
+  kern <- as.character(ckertype)[1L]
   utol <- switch(kern,
     gaussian = sqrt(-2.0 * log(1.0 - rel.tol)),
     epanechnikov = sqrt(rel.tol),
@@ -1535,27 +1537,35 @@ npRegressionLargeNnNomadUpper <- function(xdat,
   if (!is.finite(utol) || utol <= 0)
     return(fallback)
 
-  xdat <- toFrame(xdat)
+  traindat <- toFrame(traindat)
+  evaldat <- if (is.null(evaldat)) traindat else toFrame(evaldat)
   upper <- fallback
 
   for (j in seq_along(cont.idx)) {
-    vals <- as.double(xdat[[cont.idx[j]]])
-    vals <- vals[is.finite(vals)]
-    if (length(vals) < 2L)
+    train.vals <- as.double(traindat[[cont.idx[j]]])
+    train.vals <- train.vals[is.finite(train.vals)]
+    eval.vals <- as.double(evaldat[[cont.idx[j]]])
+    eval.vals <- eval.vals[is.finite(eval.vals)]
+    if (length(train.vals) < 2L || length(eval.vals) < 1L)
       next
 
-    xmin <- min(vals)
-    xmax <- max(vals)
-    xrange <- xmax - xmin
-    if (!is.finite(xrange) || xrange <= 0)
+    xmin <- min(train.vals)
+    xmax <- max(train.vals)
+    train.range <- xmax - xmin
+    if (!is.finite(train.range) || train.range <= 0)
       next
 
-    saturated <- pmax(abs(vals - xmin), abs(xmax - vals))
+    eval.saturated <- pmax(abs(eval.vals - xmin), abs(xmax - eval.vals))
+    saturated <- if (identical(bwtype, "adaptive_nn")) {
+      pmax(abs(train.vals - xmin), abs(xmax - train.vals))
+    } else {
+      eval.saturated
+    }
     base.h.min <- min(saturated[is.finite(saturated) & saturated > 0])
     if (!is.finite(base.h.min) || base.h.min <= 0)
       next
 
-    h.large <- xrange / utol
+    h.large <- max(eval.saturated[is.finite(eval.saturated)], train.range) / utol
     if (!is.finite(h.large) || h.large <= base.h.min)
       next
 
@@ -1567,9 +1577,26 @@ npRegressionLargeNnNomadUpper <- function(xdat,
   upper
 }
 
+npRegressionLargeNnNomadUpper <- function(xdat,
+                                          template,
+                                          cont.idx,
+                                          safety.margin = 1.5,
+                                          hard.upper = .Machine$integer.max / 4) {
+  if (!inherits(template, "rbandwidth"))
+    return(rep.int(as.double(as.integer(NROW(xdat)) - 1L), length(cont.idx)))
+
+  npContinuousLargeNnNomadUpper(
+    traindat = xdat,
+    bwtype = template$type,
+    ckertype = template$ckertype,
+    cont.idx = cont.idx,
+    safety.margin = safety.margin,
+    hard.upper = hard.upper
+  )
+}
+
 npRegressionHasExtendedNn <- function(bws) {
-  if (!inherits(bws, "rbandwidth") ||
-      is.null(bws$type) ||
+  if (is.null(bws$type) ||
       !(as.character(bws$type)[1L] %in% c("generalized_nn", "adaptive_nn")) ||
       is.null(bws$icon) ||
       !any(bws$icon) ||
@@ -1583,6 +1610,55 @@ npRegressionHasExtendedNn <- function(bws) {
 
   bw <- as.double(bws$bw)
   any(is.finite(bw[bws$icon]) & bw[bws$icon] > upper)
+}
+
+npValidateLargeNnContinuousBandwidth <- function(bws,
+                                                 where,
+                                                 nobs = NULL) {
+  if (is.null(bws$type) ||
+      identical(as.character(bws$type)[1L], "fixed") ||
+      is.null(bws$icon) ||
+      !any(bws$icon)) {
+    return(invisible(bws))
+  }
+
+  nobs <- if (is.null(nobs)) bws$nobs else nobs
+  if (is.null(nobs))
+    return(invisible(bws))
+
+  upper <- as.integer(nobs) - 1L
+  if (!is.finite(upper) || upper < 1L)
+    return(invisible(bws))
+
+  bw <- as.double(bws$bw)
+  icon <- which(as.logical(bws$icon))
+  offenders <- is.finite(bw[icon]) & bw[icon] > upper
+  if (!any(offenders))
+    return(invisible(bws))
+
+  bwtype <- as.character(bws$type)[1L]
+  if (!(bwtype %in% c("generalized_nn", "adaptive_nn"))) {
+    stop(
+      sprintf(
+        "%s: extended nearest-neighbor bandwidths above n-1 are not enabled for bwtype='%s'",
+        where,
+        bwtype
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (!npLargeNnEnabled()) {
+    stop(
+      sprintf(
+        "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+        where
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(bws)
 }
 
 npValidateRegressionLargeNn <- function(bws,

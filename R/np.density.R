@@ -98,6 +98,8 @@ npudens.bandwidth <-
        !all(vapply(as.data.frame(tdat[, bws$iuno]), inherits, logical(1), "factor"))))
     stop("supplied bandwidths do not match 'tdat' in type")
 
+  npValidateLargeNnContinuousBandwidth(bws, where = "npudens")
+
   tdat <- na.omit(tdat)
   rows.omit <- unclass(na.action(tdat))
 

@@ -113,7 +113,12 @@ npudistbw.NULL <-
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("bwsolver='mads' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
 
-  setup <- .npregbw_nomad_bw_setup(xdat = dat, template = template)
+  setup <- .npregbw_nomad_bw_setup(
+    xdat = dat,
+    template = template,
+    allow.large.nn = TRUE,
+    evaldat = if (is.null(gdat)) dat else gdat
+  )
   bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
   point.start <- if (all(template$bw == 0)) NULL else .npregbw_nomad_bw_to_point(template$bw, template = template, setup = setup)
   x0 <- .npregbw_nomad_complete_bw_start_point(point = point.start, bounds = bounds, setup = setup)
@@ -300,6 +305,8 @@ npudistbw.dbandwidth <-
         (any(bws$iuno) &&
          !all(vapply(as.data.frame(dat[, bws$iuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'dat'", "in type"))
+
+    npValidateLargeNnContinuousBandwidth(bws, where = "npudistbw")
 
     if(any(bws$iuno))
       stop("distribution bandwidth selection does not support unordered data types")
