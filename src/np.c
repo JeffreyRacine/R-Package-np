@@ -775,6 +775,16 @@ static int bwm_nn_cache_env_enabled(void)
   return 1;
 }
 
+static int bwm_nn_cache_user_enabled(void)
+{
+  SEXP opt = Rf_GetOption1(Rf_install("np.powell.cache"));
+  if (opt != R_NilValue) {
+    int enabled = asLogical(opt);
+    return enabled == TRUE;
+  }
+  return bwm_nn_cache_env_enabled();
+}
+
 static uint64_t bwm_nn_cache_hash_key(const int *key, int key_len)
 {
   int i;
@@ -931,7 +941,7 @@ static void bwm_nn_cache_configure_for_powell(
   bwm_nn_cache_active = 0;
   bwm_nn_cache_key_len = 0;
 
-  if (!bwm_nn_cache_env_enabled())
+  if (!bwm_nn_cache_user_enabled())
     return;
   if (eval_only || extra_params != 0)
     return;

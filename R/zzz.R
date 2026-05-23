@@ -21,6 +21,8 @@
     options(np.tree = FALSE)
   if (is.null(getOption("np.categorical.compress")))
     options(np.categorical.compress = TRUE)
+  if (is.null(getOption("np.powell.cache")))
+    options(np.powell.cache = .np_powell_cache_default())
   if (is.null(getOption("np.largeh")))
     options(np.largeh = TRUE)
   if (is.null(getOption("np.largelambda")))
@@ -29,6 +31,13 @@
     options(np.largeh.rel.tol = 1e-3)
   if (is.null(getOption("np.disc.upper.rel.tol")))
     options(np.disc.upper.rel.tol = 1e-2)
+}
+
+.np_powell_cache_default <- function() {
+  flag <- Sys.getenv("NP_NN_POWELL_CACHE_INSTRUMENT", unset = "")
+  if (!nzchar(flag))
+    return(TRUE)
+  !(flag %in% c("0", "false", "FALSE", "off", "OFF", "no", "NO"))
 }
 
 npCountVars <- function(x) {
