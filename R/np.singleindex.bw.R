@@ -1458,10 +1458,30 @@ npindexbw.sibandwidth <-
           xmat <- xdat
           wmat <- cbind(ydat, 1.0)
           bandwidth_eval_count <- 0L
+          r.nn.cache.surface <- !isTRUE(only.optimize.beta) &&
+            identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
+          r.nn.cache.eligible <- r.nn.cache.surface &&
+            isTRUE(getOption("np.powell.cache", TRUE))
+          r.nn.cache <- if (r.nn.cache.surface) {
+            .np_r_nn_cache_new(r.nn.cache.eligible, key.length = length(beta.idx) + 1L)
+          } else {
+            NULL
+          }
 
           bandwidth_progress_step <- function() {
             bandwidth_eval_count <<- bandwidth_eval_count + 1L
             .np_progress_bandwidth_activity_step(done = bandwidth_eval_count)
+            invisible(NULL)
+          }
+          r_nn_cache_lookup <- function(beta, h) {
+            if (!is.environment(r.nn.cache) || !isTRUE(r.nn.cache$enabled))
+              return(list(hit = FALSE, token = NULL, value = NULL))
+            token <- .np_r_nn_cache_param_key(doubles = beta, integers = as.integer(h))
+            .np_r_nn_cache_get_token(r.nn.cache, token)
+          }
+          r_nn_cache_store <- function(token, value, penalty) {
+            if (is.finite(value) && value < penalty)
+              .np_r_nn_cache_put(r.nn.cache, token, value)
             invisible(NULL)
           }
           fixed.h.lower <- NULL
@@ -1491,6 +1511,11 @@ npindexbw.sibandwidth <-
             h <- h.candidate$value
             if (!is.null(fixed.h.lower) && h < fixed.h.lower)
               return(ichimuraMaxPenalty)
+            cache.hit <- r_nn_cache_lookup(beta, h)
+            if (isTRUE(cache.hit$hit)) {
+              num.feval.fast.overall <<- num.feval.fast.overall + 1L
+              return(cache.hit$value)
+            }
 
             ## Next we define the sum of squared leave-one-out residuals
 
@@ -1559,7 +1584,9 @@ npindexbw.sibandwidth <-
             ## return an infinite penalty for negative h
 
             if(h > 0) {
-              return(sum.squares.leave.one.out(beta,h))
+              fv <- sum.squares.leave.one.out(beta,h)
+              r_nn_cache_store(cache.hit$token, fv, ichimuraMaxPenalty)
+              return(fv)
             } else {
               return(ichimuraMaxPenalty)
             }
@@ -1590,6 +1617,11 @@ npindexbw.sibandwidth <-
             h <- h.candidate$value
             if (!is.null(fixed.h.lower) && h < fixed.h.lower)
               return(sqrt(.Machine$double.xmax))
+            cache.hit <- r_nn_cache_lookup(beta, h)
+            if (isTRUE(cache.hit$hit)) {
+              num.feval.fast.overall <<- num.feval.fast.overall + 1L
+              return(cache.hit$value)
+            }
 
             ## Next we define the sum of logs
 
@@ -1668,7 +1700,9 @@ npindexbw.sibandwidth <-
             ## return an infinite penalty for negative h
 
             if(h > 0) {
-              return(sum.log.leave.one.out(beta,h))
+              fv <- sum.log.leave.one.out(beta,h)
+              r_nn_cache_store(cache.hit$token, fv, sqrt(.Machine$double.xmax))
+              return(fv)
             } else {
               ## No natural counterpart to var of y here, unlike Ichimura above...
               return(sqrt(.Machine$double.xmax))
@@ -1839,6 +1873,7 @@ npindexbw.sibandwidth <-
           bws$ifval <- best
           bws$num.feval <- num.feval.overall
           bws$num.feval.fast <- num.feval.fast.overall
+          bws$nn.cache <- .np_r_nn_cache_stats(r.nn.cache)
           bws$numimp <- numimp
           bws$fval.vector <- fval.value
         }
@@ -1852,6 +1887,7 @@ npindexbw.sibandwidth <-
     ## Restore seed
 
     .np_seed_exit(seed.state, remove_if_absent = TRUE)
+    nn.cache <- bws$nn.cache
 
     bws <- sibandwidth(beta = bws$beta,
                        h = bws$bw,
@@ -1883,6 +1919,7 @@ npindexbw.sibandwidth <-
                        optim.method = optim.method,
                        only.optimize.beta = only.optimize.beta,
                        total.time = total.time)
+    bws$nn.cache <- nn.cache
     bws <- npSetScaleFactorSearchLower(bws, scale.factor.search.lower)
 
     bws

@@ -2918,10 +2918,13 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
   paste(as.integer(key), collapse = "\r")
 }
 
-.np_r_nn_cache_get <- function(cache, key) {
+.np_r_nn_cache_param_key <- function(doubles = numeric(0), integers = integer(0)) {
+  paste(c(sprintf("%.17g", as.double(doubles)), as.integer(integers)), collapse = "\r")
+}
+
+.np_r_nn_cache_get_token <- function(cache, token) {
   if (!is.environment(cache) || !isTRUE(cache$enabled))
     return(list(hit = FALSE, token = NULL, value = NULL))
-  token <- .np_r_nn_cache_key(key)
   cache$visits <- cache$visits + 1
   if (exists(token, envir = cache$store, inherits = FALSE)) {
     cache$repeats <- cache$repeats + 1
@@ -2934,6 +2937,10 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
   }
   cache$unique <- cache$unique + 1
   list(hit = FALSE, token = token, value = NULL)
+}
+
+.np_r_nn_cache_get <- function(cache, key) {
+  .np_r_nn_cache_get_token(cache, .np_r_nn_cache_key(key))
 }
 
 .np_r_nn_cache_put <- function(cache, token, value) {
