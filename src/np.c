@@ -11935,7 +11935,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);
-  vector_continuous_stddev_extern = NULL;
+  np_clear_estimator_extern_aliases();
 
   safe_free(lambda);
 
