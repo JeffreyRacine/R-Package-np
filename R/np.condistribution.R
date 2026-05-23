@@ -163,6 +163,8 @@ npcdist.condbandwidth <-
         (any(bws$iyuno) &&
          !all(vapply(tydat[, bws$iyuno, drop = FALSE], inherits, logical(1), "factor"))))
       stop("supplied bandwidths do not match 'tydat' in type")
+
+    npValidateConditionalLargeNn(bws, where = "npcdist")
     
     ## catch and destroy NA's
     keep.rows <- rep_len(TRUE, nrow(txdat))

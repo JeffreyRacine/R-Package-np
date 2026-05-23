@@ -510,6 +510,8 @@ npcdensbw.conbandwidth <-
          !all(vapply(as.data.frame(xdat[, bws$ixuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
 
+    npValidateConditionalLargeNn(bws, where = "npcdensbw")
+
     ## catch and destroy NA's
     goodrows <- seq_len(nrow(xdat))
     rows.omit <- unclass(na.action(na.omit(data.frame(xdat,ydat))))
@@ -1784,7 +1786,12 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("bwsolver='mads' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
 
-  setup <- .npcdensbw_nomad_bw_setup(xdat = xdat, ydat = ydat, template = template)
+  setup <- .npcdensbw_nomad_bw_setup(
+    xdat = xdat,
+    ydat = ydat,
+    template = template,
+    allow.large.nn = TRUE
+  )
   setup$nobs <- nrow(toFrame(xdat))
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   bounds <- .npcdensbw_nomad_bw_bounds(template = template, setup = setup)
@@ -1930,7 +1937,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
 .npcdensbw_nomad_bw_setup <- function(xdat,
                                       ydat,
                                       template,
-                                      bandwidth.scale.categorical = 1e4) {
+                                      bandwidth.scale.categorical = 1e4,
+                                      allow.large.nn = FALSE) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   xmat <- toMatrix(xdat)
@@ -1964,6 +1972,27 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     rep.int(1, length(x_ord_flat))
   )
 
+  cont_largenn_upper <- if (isTRUE(allow.large.nn)) {
+    c(
+      npContinuousLargeNnNomadUpper(
+        traindat = ydat,
+        evaldat = ydat,
+        bwtype = template$type,
+        ckertype = template$cykertype,
+        cont.idx = which(template$iycon)
+      ),
+      npContinuousLargeNnNomadUpper(
+        traindat = xdat,
+        evaldat = xdat,
+        bwtype = template$type,
+        ckertype = template$cxkertype,
+        cont.idx = which(template$ixcon)
+      )
+    )
+  } else {
+    NULL
+  }
+
   setup <- list(
     cont_flat = c(y_cont_flat, x_cont_flat),
     cont_scale = .npConditionalNomadContScale(
@@ -1977,7 +2006,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     cat_flat = c(y_uno_flat, y_ord_flat, x_uno_flat, x_ord_flat),
     ncatfac = ncatfac,
     bandwidth.scale.categorical = bandwidth.scale.categorical,
-    cat_upper = cat_upper
+    cat_upper = cat_upper,
+    cont_largenn_upper = cont_largenn_upper
   )
   .npAssertConditionalNomadSetup(setup, where = "npcdensbw")
   setup
@@ -1997,7 +2027,14 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       bws[setup$cont_flat] <- if (isTRUE(template$scaling)) cont_point else ext_bw
     } else {
       nn_bw <- round(cont_point)
-      nn_upper <- if (!is.null(setup$nobs)) max(1L, as.integer(setup$nobs) - 1L) else Inf
+      nn_upper <- if (!is.null(setup$cont_largenn_upper) &&
+                      length(setup$cont_largenn_upper) == length(setup$cont_flat)) {
+        pmax(1, as.double(setup$cont_largenn_upper))
+      } else if (!is.null(setup$nobs)) {
+        rep.int(max(1L, as.integer(setup$nobs) - 1L), length(setup$cont_flat))
+      } else {
+        rep.int(Inf, length(setup$cont_flat))
+      }
       nn_bw[!is.finite(nn_bw)] <- 1
       bws[setup$cont_flat] <- pmax(1, pmin(nn_upper, nn_bw))
     }
@@ -2058,9 +2095,14 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       cont_bbin <- rep.int(0L, ncont)
     } else {
       nn_lower <- 1L
-      nn_upper <- max(nn_lower, as.integer(setup$nobs) - 1L)
+      nn_upper <- if (!is.null(setup$cont_largenn_upper) &&
+                      length(setup$cont_largenn_upper) == ncont) {
+        pmax(nn_lower, as.double(setup$cont_largenn_upper))
+      } else {
+        rep.int(max(nn_lower, as.integer(setup$nobs) - 1L), ncont)
+      }
       cont_lower <- rep.int(nn_lower, ncont)
-      cont_upper <- rep.int(nn_upper, ncont)
+      cont_upper <- nn_upper
       cont_bbin <- rep.int(1L, ncont)
     }
   } else {

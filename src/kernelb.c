@@ -380,7 +380,7 @@ double **matrix_bandwidth_deriv)
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(np_nn_lookup_from_scale(num_obs_train, (num_var_cont == 0), vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
 			{
 				return(1);
 			}
@@ -411,7 +411,7 @@ double **matrix_bandwidth_deriv)
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(np_nn_lookup_from_scale(num_obs_train, 0, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
 			{
 				return(1);
 			}
@@ -445,7 +445,7 @@ double **matrix_bandwidth_deriv)
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(np_nn_lookup_from_scale(num_obs_train, (num_var_cont == 0), vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
 			{
 				return(1);
 			}
@@ -475,7 +475,7 @@ double **matrix_bandwidth_deriv)
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(np_nn_lookup_from_scale(num_obs_train, 0, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
 			{
 				return(1);
 			}
@@ -768,7 +768,7 @@ fact constant. */
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(np_nn_lookup_from_scale(num_obs_train, (num_var_cont == 0), vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
 			{
 				return(1);
 			}
@@ -797,7 +797,7 @@ fact constant. */
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(np_nn_lookup_from_scale(num_obs_train, 0, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
 			{
 				return(1);
 			}
@@ -831,7 +831,7 @@ fact constant. */
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(np_nn_lookup_from_scale(num_obs_train, (num_var_cont == 0), vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
 			{
 				return(1);
 			}
@@ -859,7 +859,7 @@ fact constant. */
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(np_nn_lookup_from_scale(num_obs_train, 0, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
 			{
 				return(1);
 			}
