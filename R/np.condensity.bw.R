@@ -109,7 +109,7 @@ npcdensbw.formula <-
 }
 
 .npcdensbw_tree_code <- function(bws, ncon, ncat) {
-  code <- if (npUseContinuousTree(ncon = ncon)) DO_TREE_YES else DO_TREE_NO
+  code <- if (npUseContinuousTree(ncon = ncon, bws = bws)) DO_TREE_YES else DO_TREE_NO
 
   if (!identical(code, DO_TREE_YES))
     return(code)
@@ -938,16 +938,19 @@ npcdensbw.conbandwidth <-
   do.call(npcdensbw.conbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
 }
 
-.npcdensbw_fixed_degree_tree_flag <- function(xdat, ydat, bws) {
+.npcdensbw_fixed_degree_tree_flag <- function(xdat, ydat, bws, reg.args = list()) {
   if (is.recursive(bws) &&
       !is.null(bws$yncon) &&
       !is.null(bws$xncon)) {
-    return(npUseContinuousTree(ncon = bws$yncon + bws$xncon))
+    return(npUseContinuousTree(ncon = bws$yncon + bws$xncon, bws = bws))
   }
 
   x.info <- untangle(toFrame(xdat))
   y.info <- untangle(toFrame(ydat))
-  npUseContinuousTree(ncon = sum(x.info$icon) + sum(y.info$icon))
+  npUseContinuousTree(
+    ncon = sum(x.info$icon) + sum(y.info$icon),
+    ckertype = c(reg.args$cykertype, reg.args$cxkertype)
+  )
 }
 
 .npcdensbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, bws, reg.args, opt.args,
@@ -957,7 +960,7 @@ npcdensbw.conbandwidth <-
   old.tree <- getOption("np.tree")
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   if (is.null(tree.flag)) {
-    tree.flag <- .npcdensbw_fixed_degree_tree_flag(xdat, ydat, bws)
+    tree.flag <- .npcdensbw_fixed_degree_tree_flag(xdat, ydat, bws, reg.args = reg.args)
   }
 
   options(npRmpi.autodispatch.disable = TRUE)
@@ -1002,7 +1005,7 @@ npcdensbw.conbandwidth <-
         BWS = bws,
         REGARGS = reg.args,
         OPTARGS = opt.args,
-        TREEFLAG = .npcdensbw_fixed_degree_tree_flag(xdat, ydat, bws)
+        TREEFLAG = .npcdensbw_fixed_degree_tree_flag(xdat, ydat, bws, reg.args = reg.args)
       )
     )
     return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))

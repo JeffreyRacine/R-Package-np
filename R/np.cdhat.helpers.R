@@ -470,7 +470,7 @@
     mcv.numRow = attr(bws$xmcv, "num.row"),
     wncol = 0L,
     yncol = ncol(rhs),
-    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$yncon + bws$xncon, ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord),
+    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$yncon + bws$xncon, ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord, bws = bws),
     return.kernel.weights = isTRUE(return.kernel.weights),
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,

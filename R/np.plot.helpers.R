@@ -6845,7 +6845,8 @@
     yncol = 0L,
     int_do_tree = npDoTreeOrCategoricalCompress(
       ncon = bws$ncon,
-      ncat = bws$nuno + bws$nord
+      ncat = bws$nuno + bws$nord,
+      bws = bws
     ),
     return.kernel.weights = TRUE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
@@ -8212,7 +8213,8 @@
     yncol = 1L,
     int_do_tree = npDoTreeOrCategoricalCompress(
       ncon = state$bws$ncon,
-      ncat = state$bws$nuno + state$bws$nord
+      ncat = state$bws$nuno + state$bws$nord,
+      bws = state$bws
     ),
     return.kernel.weights = FALSE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
@@ -10249,7 +10251,8 @@ plotFactor <- function(f, y, ...){
     densOrDist = if (isTRUE(cdf)) NP_DO_DIST else NP_DO_DENS,
     int_do_tree = npDoTreeOrCategoricalCompress(
       ncon = bws$yncon + bws$xncon,
-      ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord
+      ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord,
+      bws = bws
     )
   )
 

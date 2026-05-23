@@ -32,9 +32,11 @@
     number of mid-run plot/bootstrap heartbeat lines emitted between the
     initial start notice and final completion line. Default is \code{3}.
 
-    \item \code{np.tree} (logical): enables kd-tree acceleration when
-    supported by the selected kernel/operator combination. Default is
-    \code{FALSE}.
+    \item \code{np.tree} (logical or \code{"auto"}): controls kd-tree
+    acceleration for continuous variables. \code{TRUE} forces eligible tree
+    routes on, \code{FALSE} disables them, and \code{"auto"} enables trees
+    only when active continuous kernels are bounded support
+    (\code{"epanechnikov"} or \code{"uniform"}). Default is \code{"auto"}.
 
     \item \code{np.categorical.compress} (logical): enables exact
     unique-profile compression for eligible all-categorical routes. This is
@@ -109,7 +111,7 @@
 npRmpi.init(nslaves=1)
 
 old <- options(
-  np.tree = TRUE,
+  np.tree = "auto",
   np.categorical.compress = TRUE,
   np.powell.cache = TRUE,
   np.largeh = TRUE,

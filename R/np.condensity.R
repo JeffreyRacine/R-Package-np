@@ -336,7 +336,7 @@ npcdens.conbandwidth <- function(bws,
       ymcv.numRow = attr(bws$ymcv, "num.row"),
       xmcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DENS,
-      int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$yncon + bws$xncon, ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord))
+      int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$yncon + bws$xncon, ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord, bws = bws))
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])

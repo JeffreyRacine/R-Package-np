@@ -1,5 +1,10 @@
 # npRmpi 0.70-3
 
+- `options(np.tree = "auto")` is now the default tree mode. In auto mode,
+  continuous kd-tree routes are enabled only for bounded-support continuous
+  kernels (`"epanechnikov"` and `"uniform"`); `np.tree = TRUE` remains the
+  explicit force-on override and `np.tree = FALSE` remains the force-off
+  diagnostic path.
 - Powell bandwidth searches for eligible continuous-only generalized/adaptive
   nearest-neighbor routes now expose their exact repeated-integer-candidate
   cache through `options(np.powell.cache = TRUE/FALSE)`. The cache remains
@@ -54,11 +59,11 @@
   full-search runtime.
 - Large-sample categorical-only regression now uses the MPI-safe
   profile-compressed route under `options(np.categorical.compress = TRUE)`,
-  which is enabled by default. The legacy `options(np.tree = TRUE)` switch
-  also enables the same route for compatibility. Repeated predictor profiles
-  are compressed before bandwidth search, fitting, prediction/evaluation,
-  standard errors, hat-helper use, and plot bootstrap helpers, preserving the
-  established dense-route numerical contract while reducing repeated work.
+  which is enabled by default. This categorical route is independent of
+  `options(np.tree)`. Repeated predictor profiles are compressed before
+  bandwidth search, fitting, prediction/evaluation, standard errors,
+  hat-helper use, and plot bootstrap helpers, preserving the established
+  dense-route numerical contract while reducing repeated work.
 - Categorical-only unconditional density routes now use the same
   profile-compression idea when `options(np.categorical.compress = TRUE)` is
   enabled. The fixed-bandwidth fit/evaluation route preserves dense-route

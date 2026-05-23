@@ -31,6 +31,30 @@ test_that("tree and categorical compression predicates are orthogonal", {
   expect_identical(unname(observed), unname(expected))
 })
 
+test_that("np.tree auto mode is bounded-kernel continuous tree only", {
+  old_opts <- options(np.messages = FALSE,
+                      np.tree = "auto",
+                      np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  expect_true(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "epanechnikov"))
+  expect_true(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "uniform"))
+  expect_false(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "gaussian"))
+  expect_false(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "truncated gaussian"))
+  expect_false(npRmpi:::npUseContinuousTree(ncon = 1L))
+  expect_false(npRmpi:::npUseContinuousTree(ncon = 0L, ckertype = "epanechnikov"))
+
+  expect_false(npRmpi:::npUseCategoricalCompress(ncon = 0L, ncat = 2L))
+  options(np.categorical.compress = TRUE)
+  expect_true(npRmpi:::npUseCategoricalCompress(ncon = 0L, ncat = 2L))
+
+  options(np.tree = TRUE)
+  expect_true(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "gaussian"))
+
+  options(np.tree = FALSE)
+  expect_false(npRmpi:::npUseContinuousTree(ncon = 1L, ckertype = "epanechnikov"))
+})
+
 test_that("np.tree alone does not enable all-categorical profile helpers", {
   old_opts <- options(np.messages = FALSE,
                       np.tree = FALSE,
@@ -64,6 +88,48 @@ test_that("np.tree alone does not enable all-categorical profile helpers", {
   options(np.tree = TRUE, np.categorical.compress = FALSE)
   expect_equal(
     npRmpi:::.npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    npRmpi:::DO_TREE_NO
+  )
+})
+
+test_that("np.tree auto inspects active bandwidth-object kernels", {
+  old_opts <- options(np.messages = FALSE,
+                      np.tree = "auto",
+                      np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260523)
+  n <- 48L
+  xdat <- data.frame(x1 = runif(n), x2 = runif(n))
+  ydat <- xdat$x1 - xdat$x2 + rnorm(n, sd = 0.1)
+  xdati <- npRmpi:::untangle(xdat)
+  ydati <- npRmpi:::untangle(data.frame(ydat))
+
+  bw.epan <- npRmpi:::rbandwidth(
+    bw = c(0.35, 0.35),
+    nobs = nrow(xdat),
+    xdati = xdati,
+    ydati = ydati,
+    regtype = "lc",
+    ckertype = "epanechnikov",
+    bandwidth.compute = FALSE
+  )
+  bw.gauss <- npRmpi:::rbandwidth(
+    bw = c(0.35, 0.35),
+    nobs = nrow(xdat),
+    xdati = xdati,
+    ydati = ydati,
+    regtype = "lc",
+    ckertype = "gaussian",
+    bandwidth.compute = FALSE
+  )
+
+  expect_equal(
+    npRmpi:::.npreg_fit_tree_code(bw.epan, ncon = bw.epan$ncon, ncat = 0L),
+    npRmpi:::DO_TREE_YES
+  )
+  expect_equal(
+    npRmpi:::.npreg_fit_tree_code(bw.gauss, ncon = bw.gauss$ncon, ncat = 0L),
     npRmpi:::DO_TREE_NO
   )
 })
