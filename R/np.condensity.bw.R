@@ -108,7 +108,7 @@ npcdensbw.formula <-
 }
 
 .npcdensbw_tree_code <- function(bws, ncon, ncat) {
-  code <- if (npUseContinuousTree(ncon = ncon, bws = bws)) DO_TREE_YES else DO_TREE_NO
+  code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bws)
 
   if (!identical(code, DO_TREE_YES))
     return(code)
