@@ -173,8 +173,12 @@ npindexbw.NULL <-
 
   lower <- 2L
   upper <- max(1L, as.integer(nobs) - 1L)
+  hard.upper <- .Machine$integer.max / 2
   k <- .np_round_half_to_even(h)
-  list(ok = (k >= lower) && (k <= upper), value = as.double(k))
+  upper.ok <- (k <= upper) ||
+    (npLargeNnEnabled() && (k <= hard.upper) &&
+       (as.character(bwtype)[1L] %in% c("generalized_nn", "adaptive_nn")))
+  list(ok = (k >= lower) && upper.ok, value = as.double(k))
 }
 
 .npindexbw_h_start_controls <- function(scale.factor.init.lower = 0.1,
@@ -231,6 +235,17 @@ npindexbw.NULL <-
   if (!candidate$ok) {
     if (identical(bwtype, "fixed")) {
       stop(sprintf("%s: bandwidth must be positive and finite", where), call. = FALSE)
+    }
+    upper <- max(2L, as.integer(nobs) - 1L)
+    if (!identical(bwtype, "fixed") && is.finite(h) && h > upper &&
+        !npLargeNnEnabled()) {
+      stop(
+        sprintf(
+          "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+          where
+        ),
+        call. = FALSE
+      )
     }
     stop(
       sprintf(

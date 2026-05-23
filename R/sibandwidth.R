@@ -18,9 +18,10 @@
     stop(sprintf("%s: nearest-neighbor bandwidth must be finite", where), call. = FALSE)
 
   upper <- max(1L, as.integer(nobs) - 1L)
+  hard.upper <- .Machine$integer.max / 2
   tol <- sqrt(.Machine$double.eps)
   rounded <- .np_round_half_to_even(h)
-  if ((h < 1) || (h > upper) || (abs(h - rounded) > tol)) {
+  if ((h < 1) || (abs(h - rounded) > tol)) {
     stop(
       sprintf(
         "%s: nearest-neighbor bandwidth must be an integer in [1, %d]",
@@ -29,6 +30,28 @@
       ),
       call. = FALSE
     )
+  }
+
+  if (h > upper) {
+    if (!npLargeNnEnabled()) {
+      stop(
+        sprintf(
+          "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+          where
+        ),
+        call. = FALSE
+      )
+    }
+    if (h > hard.upper) {
+      stop(
+        sprintf(
+          "%s: extended nearest-neighbor bandwidth must not exceed %.0f",
+          where,
+          hard.upper
+        ),
+        call. = FALSE
+      )
+    }
   }
 
   invisible(as.double(rounded))
