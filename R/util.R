@@ -1690,6 +1690,72 @@ npLargeNnEnabled <- function() {
   isTRUE(getOption("np.largenn", FALSE))
 }
 
+npRegressionLargeNnNomadUpper <- function(xdat,
+                                          template,
+                                          cont.idx,
+                                          safety.margin = 1.5,
+                                          hard.upper = .Machine$integer.max / 4) {
+  ncon <- length(cont.idx)
+  nobs <- NROW(xdat)
+  base.k <- as.integer(nobs) - 1L
+  fallback <- rep.int(as.double(base.k), ncon)
+
+  if (!npLargeNnEnabled() ||
+      ncon < 1L ||
+      !inherits(template, "rbandwidth") ||
+      !(as.character(template$type)[1L] %in% c("generalized_nn", "adaptive_nn")) ||
+      base.k < 1L) {
+    return(fallback)
+  }
+
+  rel.tol <- getOption("np.largeh.rel.tol", 1e-3)
+  if (!is.finite(rel.tol) || rel.tol <= 0 || rel.tol >= 0.1)
+    rel.tol <- 1e-3
+
+  kern <- as.character(template$ckertype)[1L]
+  utol <- switch(kern,
+    gaussian = sqrt(-2.0 * log(1.0 - rel.tol)),
+    epanechnikov = sqrt(rel.tol),
+    uniform = 1.0 - 32.0 * .Machine$double.eps,
+    "truncated gaussian" = sqrt(-2.0 * log(1.0 - rel.tol)),
+    0.0
+  )
+
+  if (!is.finite(utol) || utol <= 0)
+    return(fallback)
+
+  xdat <- toFrame(xdat)
+  upper <- fallback
+
+  for (j in seq_along(cont.idx)) {
+    vals <- as.double(xdat[[cont.idx[j]]])
+    vals <- vals[is.finite(vals)]
+    if (length(vals) < 2L)
+      next
+
+    xmin <- min(vals)
+    xmax <- max(vals)
+    xrange <- xmax - xmin
+    if (!is.finite(xrange) || xrange <= 0)
+      next
+
+    saturated <- pmax(abs(vals - xmin), abs(xmax - vals))
+    base.h.min <- min(saturated[is.finite(saturated) & saturated > 0])
+    if (!is.finite(base.h.min) || base.h.min <= 0)
+      next
+
+    h.large <- xrange / utol
+    if (!is.finite(h.large) || h.large <= base.h.min)
+      next
+
+    k.upper <- ceiling(as.double(base.k) * h.large / base.h.min * safety.margin)
+    if (is.finite(k.upper))
+      upper[j] <- min(hard.upper, max(as.double(base.k), k.upper))
+  }
+
+  upper
+}
+
 npRegressionHasExtendedNn <- function(bws) {
   if (!inherits(bws, "rbandwidth") ||
       is.null(bws$type) ||
