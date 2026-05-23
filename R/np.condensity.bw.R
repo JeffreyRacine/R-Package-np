@@ -1620,7 +1620,12 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
                                                       nomad.inner.nmulti = 0L,
                                                       random.seed = 42L,
                                                       use.runtime.bandwidth.progress = FALSE,
-                                                      remin = FALSE) {
+                                                      remin = FALSE,
+                                                      xdat = NULL,
+                                                      ydat = NULL,
+                                                      reg.args = NULL,
+                                                      opt.args = NULL,
+                                                      direct.meta.context = NULL) {
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   old.messages <- getOption("np.messages")
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -1757,8 +1762,143 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     search.result$method <- degree.search$engine
   }
 
-  search.result$best_payload <- NULL
-  search.result$powell.time <- NA_real_
+  if (!is.null(xdat) &&
+      !is.null(ydat) &&
+      !is.null(reg.args) &&
+      !is.null(opt.args) &&
+      !is.null(direct.meta.context) &&
+      !is.null(search.result$best_point) &&
+      !is.null(search.result$best)) {
+    best.solution <- NULL
+    if (!is.null(search.result$best.restart) &&
+        is.finite(search.result$best.restart) &&
+        length(search.result$restart.results) >= as.integer(search.result$best.restart)) {
+      best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
+    }
+
+    build_shadow_payload <- function(point, best_record, solution, interrupted) {
+      point <- as.numeric(point)
+      degree <- as.integer(best_record$degree)
+      bw_vec <- .npcdensbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
+      powell.elapsed <- NA_real_
+
+      build_direct_payload <- function() {
+        final.reg.args <- reg.args
+        final.reg.args$regtype <- "lp"
+        final.reg.args$pregtype <- "Local-Polynomial"
+        final.reg.args$degree <- degree
+        final.reg.args$bernstein.basis <- degree.search$bernstein.basis
+        final.reg.args$regtype.engine <- "lp"
+        final.reg.args$degree.engine <- degree
+        final.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
+
+        payload <- .npcdensbw_build_conbandwidth(
+          xdat = xdat,
+          ydat = ydat,
+          bws = bw_vec,
+          bandwidth.compute = FALSE,
+          reg.args = final.reg.args
+        )
+        payload$nconfac <- direct.meta.context$nconfac
+        payload$ncatfac <- direct.meta.context$ncatfac
+        payload$sdev <- direct.meta.context$sdev
+        payload <- .np_refresh_xy_bandwidth_metadata(payload)
+        payload$method <- if (!is.null(payload$method) && length(payload$method)) {
+          as.character(payload$method[1L])
+        } else if (!is.null(reg.args$bwmethod) && length(reg.args$bwmethod)) {
+          as.character(reg.args$bwmethod[1L])
+        } else {
+          "cv.ml"
+        }
+        payload$pmethod <- bwmToPrint(payload$method)
+        payload$fval <- as.numeric(best_record$objective)
+        payload$ifval <- NA_real_
+        payload$num.feval <- as.numeric(nomad.num.feval.total)
+        payload$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
+        payload$num.feval.guarded <- if (identical(as.character(payload$method)[1L], "cv.ml")) as.numeric(nomad.num.feval.guarded.total) else NA_real_
+        payload$fval.history <- NA_real_
+        payload$eval.history <- NA_real_
+        payload$invalid.history <- NA_real_
+        payload$timing <- NA_real_
+        payload$total.time <- NA_real_
+        payload
+      }
+
+      direct.payload <- build_direct_payload()
+      if (is.null(direct.payload$timing.profile) && is.list(best_record$timing.profile))
+        direct.payload$timing.profile <- best_record$timing.profile
+      direct.objective <- as.numeric(best_record$objective)
+
+      if (identical(degree.search$engine, "nomad+powell")) {
+        hot.reg.args <- reg.args
+        hot.reg.args$regtype <- "lp"
+        hot.reg.args$pregtype <- "Local-Polynomial"
+        hot.reg.args$degree <- degree
+        hot.reg.args$bernstein.basis <- degree.search$bernstein.basis
+        hot.reg.args$regtype.engine <- "lp"
+        hot.reg.args$degree.engine <- degree
+        hot.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
+        hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
+          opt.args,
+          strategy = "disable_multistart",
+          remin = isTRUE(opt.args$powell.remin)
+        )
+        powell.start <- proc.time()[3L]
+        hot.payload <- .npcdensbw_with_powell_refinement_progress(
+          degree,
+          .npcdensbw_run_fixed_degree_collective(
+            xdat = xdat,
+            ydat = ydat,
+            bws = bw_vec,
+            reg.args = hot.reg.args,
+            opt.args = hot.opt.args
+          )
+        )
+        powell.elapsed <- proc.time()[3L] - powell.start
+        direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
+        direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+        direct.payload$num.feval.guarded <- if (identical(as.character(direct.payload$method)[1L], "cv.ml")) {
+          .npcdensbw_count_or_zero(direct.payload$num.feval.guarded) +
+            .npcdensbw_count_or_zero(hot.payload$num.feval.guarded)
+        } else {
+          NA_real_
+        }
+        hot.payload$num.feval <- direct.payload$num.feval
+        hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+        hot.payload$num.feval.guarded <- direct.payload$num.feval.guarded
+        if (!is.null(hot.payload$method) && length(hot.payload$method))
+          hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
+        hot.objective <- as.numeric(hot.payload$fval[1L])
+        if (is.finite(hot.objective) &&
+            .np_degree_better(hot.objective, direct.objective, direction = "max")) {
+          return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
+        }
+      }
+
+      list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
+    }
+
+    payload.result <- build_shadow_payload(
+      point = search.result$best_point,
+      best_record = search.result$best,
+      solution = best.solution,
+      interrupted = !isTRUE(search.result$completed)
+    )
+    if (is.list(payload.result) && !is.null(payload.result$payload)) {
+      search.result$best_payload <- payload.result$payload
+      if (!is.null(payload.result$powell.time))
+        search.result$powell.time <- as.numeric(payload.result$powell.time[1L])
+      if (!is.null(payload.result$objective) &&
+          .np_degree_better(payload.result$objective, search.result$best$objective, direction = "max")) {
+        search.result$best$objective <- as.numeric(payload.result$objective[1L])
+      }
+    }
+  }
+
+  if (is.null(search.result$best_payload))
+    search.result$best_payload <- NULL
+  if (is.null(search.result$powell.time))
+    search.result$powell.time <- NA_real_
   search.result$num.feval.total <- as.numeric(nomad.num.feval.total)
   search.result$num.feval.fast.total <- as.numeric(nomad.num.feval.fast.total)
   search.result$num.feval.guarded.total <- as.numeric(nomad.num.feval.guarded.total)
@@ -2475,7 +2615,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       upper = degree.search$upper,
       basis = degree.search$basis,
       nobs = degree.search$nobs,
-      start.user = degree.search$start.user
+      start.user = degree.search$start.user,
+      bernstein.basis = degree.search$bernstein.basis
     )
 
     mc <- substitute(
@@ -2492,7 +2633,12 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
         INNERNMULTI,
         RSEED,
         RPROGRESS,
-        REMIN
+        REMIN,
+        XDAT,
+        YDAT,
+        REGARGS,
+        OPTARGS,
+        DIRECTMETA
       ),
       list(
         TEMPLATE = search.template,
@@ -2507,7 +2653,12 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
         INNERNMULTI = nomad.inner.nmulti,
         RSEED = random.seed,
         RPROGRESS = TRUE,
-        REMIN = isTRUE(opt.args$nomad.remin)
+        REMIN = isTRUE(opt.args$nomad.remin),
+        XDAT = xdat,
+        YDAT = ydat,
+        REGARGS = reg.args,
+        OPTARGS = opt.args,
+        DIRECTMETA = direct.meta.context
       )
     )
 
@@ -2529,12 +2680,20 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
     }
 
-    payload_result <- build_payload(
-      point = search.result$best_point,
-      best_record = search.result$best,
-      solution = best.solution,
-      interrupted = !isTRUE(search.result$completed)
-    )
+    payload_result <- if (!is.null(search.result$best_payload)) {
+      list(
+        payload = search.result$best_payload,
+        objective = search.result$best$objective,
+        powell.time = search.result$powell.time
+      )
+    } else {
+      build_payload(
+        point = search.result$best_point,
+        best_record = search.result$best,
+        solution = best.solution,
+        interrupted = !isTRUE(search.result$completed)
+      )
+    }
 
     if (is.list(payload_result) && !is.null(payload_result$payload)) {
       search.result$best_payload <- payload_result$payload
