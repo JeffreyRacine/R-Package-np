@@ -651,6 +651,38 @@ static double *np_regression_largenn_upper_alloc(
   return upper;
 }
 
+static double *np_regression_largenn_eval_upper_alloc(
+  const int bandwidth,
+  const int num_obs,
+  const int num_reg_continuous,
+  const double *rbw)
+{
+  const int base_k = num_obs - 1;
+  const double hard_upper = (double)INT_MAX / 4.0;
+  double *upper = NULL;
+  int i;
+
+  if (!np_largenn_enabled_np() ||
+      !((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)) ||
+      num_obs < 2 ||
+      num_reg_continuous <= 0 ||
+      rbw == NULL) {
+    return NULL;
+  }
+
+  upper = alloc_vecd(num_reg_continuous);
+  for (i = 0; i < num_reg_continuous; i++) {
+    double candidate = rbw[i];
+    if (!R_FINITE(candidate) || candidate < (double)base_k)
+      candidate = (double)base_k;
+    if (candidate > hard_upper)
+      candidate = hard_upper;
+    upper[i] = candidate;
+  }
+
+  return upper;
+}
+
 static int np_has_finite_cker_bounds(const double *lb, const double *ub, const int n)
 {
   int i;
@@ -10673,7 +10705,11 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
       num_obs_train_extern,
       num_reg_continuous_extern,
       matrix_X_continuous_train_extern) :
-    NULL;
+    np_regression_largenn_eval_upper_alloc(
+      BANDWIDTH_reg_extern,
+      num_obs_train_extern,
+      num_reg_continuous_extern,
+      rbw);
   int_largenn_upper_num_extern =
     (vector_largenn_upper_extern != NULL) ? num_reg_continuous_extern : 0;
 

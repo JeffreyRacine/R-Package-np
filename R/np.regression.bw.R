@@ -856,7 +856,7 @@ npregbw.rbandwidth <-
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("bwsolver='mads' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
 
-  setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template)
+  setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template, allow.large.nn = TRUE)
   bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
   point.start <- if (all(template$bw == 0)) {
     NULL
@@ -1000,7 +1000,10 @@ npregbw.rbandwidth <-
   .np_degree_search_engine_controls(search.engine)
 }
 
-.npregbw_nomad_bw_setup <- function(xdat, template, bandwidth.scale.categorical = 1e4) {
+.npregbw_nomad_bw_setup <- function(xdat,
+                                    template,
+                                    bandwidth.scale.categorical = 1e4,
+                                    allow.large.nn = FALSE) {
   xdat <- toFrame(xdat)
   xmat <- toMatrix(xdat)
   rcon <- xmat[, template$icon, drop = FALSE]
@@ -1024,6 +1027,16 @@ npregbw.rbandwidth <-
     }
   }
 
+  cont_largenn_upper <- if (isTRUE(allow.large.nn)) {
+    npRegressionLargeNnNomadUpper(
+      xdat = xdat,
+      template = template,
+      cont.idx = cont_idx
+    )
+  } else {
+    NULL
+  }
+
   list(
     type = as.character(template$type[1L]),
     nobs = nrow,
@@ -1032,7 +1045,8 @@ npregbw.rbandwidth <-
     cat_idx = cat_idx,
     ncatfac = ncatfac,
     bandwidth.scale.categorical = bandwidth.scale.categorical,
-    cat_upper = cat_upper
+    cat_upper = cat_upper,
+    cont_largenn_upper = cont_largenn_upper
   )
 }
 
@@ -1051,9 +1065,14 @@ npregbw.rbandwidth <-
       cont_bbin <- rep.int(0L, ncon)
     } else {
       nn_lower <- npRegressionNnLowerBound(template)
-      nn_upper <- max(nn_lower, as.integer(setup$nobs) - 1L)
+      nn_upper <- if (!is.null(setup$cont_largenn_upper) &&
+                      length(setup$cont_largenn_upper) == ncon) {
+        pmax(nn_lower, as.double(setup$cont_largenn_upper))
+      } else {
+        rep.int(max(nn_lower, as.integer(setup$nobs) - 1L), ncon)
+      }
       cont_lower <- rep.int(nn_lower, ncon)
-      cont_upper <- rep.int(nn_upper, ncon)
+      cont_upper <- nn_upper
       cont_bbin <- rep.int(1L, ncon)
     }
   } else {
@@ -1261,7 +1280,7 @@ npregbw.rbandwidth <-
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("automatic degree search with search.engine='nomad' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
 
-  setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template)
+  setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template, allow.large.nn = TRUE)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
