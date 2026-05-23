@@ -93,6 +93,16 @@ test_that("np.tree alone does not enable all-categorical profile helpers", {
     npRmpi:::.npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
     npRmpi:::DO_TREE_NO
   )
+
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  expect_equal(
+    npRmpi:::.npregbw_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    npRmpi:::DO_TREE_YES
+  )
+  expect_equal(
+    npRmpi:::.npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    npRmpi:::DO_TREE_YES
+  )
 })
 
 test_that("np.tree auto inspects active bandwidth-object kernels", {
