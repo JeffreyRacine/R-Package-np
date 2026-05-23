@@ -51,3 +51,43 @@ test_that("np.powell.cache controls continuous NN Powell caching under MPI", {
 
   expect_equal(out$status, 0L, info = paste(out$output, collapse = "\n"))
 })
+
+test_that("np.powell.cache controls npscoef continuous NN R optimizer caching under MPI", {
+  env <- npRmpi_subprocess_env("NP_RMPI_NO_REUSE_SLAVES=1")
+  skip_if(is.null(env))
+
+  out <- npRmpi_run_rscript_subprocess(
+    c(
+      "library(npRmpi)",
+      "npRmpi.init(nslaves = 1L, quiet = TRUE)",
+      "run_bw <- function(bwtype, cache) {",
+      "  set.seed(20260523)",
+      "  n <- 80L",
+      "  z1 <- runif(n)",
+      "  z2 <- runif(n)",
+      "  x <- rnorm(n)",
+      "  y <- 1 + (0.5 + sin(2 * pi * z1)) * x + 0.25 * cos(2 * pi * z2) + rnorm(n, sd = 0.2)",
+      "  old <- options(np.messages = FALSE, np.powell.cache = cache)",
+      "  on.exit(options(old), add = TRUE)",
+      "  npscoefbw(xdat = data.frame(x = x), ydat = y, zdat = data.frame(z1 = z1, z2 = z2), regtype = 'lc', bwtype = bwtype, ckertype = 'epanechnikov', nmulti = 1L, optim.maxit = 35L, optim.maxattempts = 1L)",
+      "}",
+      "for (bwtype in c('generalized_nn', 'adaptive_nn')) {",
+      "  cached <- run_bw(bwtype, TRUE)",
+      "  uncached <- run_bw(bwtype, FALSE)",
+      "  stopifnot(isTRUE(all.equal(cached$bw, uncached$bw, tolerance = 0)))",
+      "  stopifnot(isTRUE(all.equal(cached$fval, uncached$fval, tolerance = 0)))",
+      "  stopifnot(identical(as.numeric(cached$num.feval[1L]), as.numeric(uncached$num.feval[1L])))",
+      "  stopifnot(identical(unname(cached$nn.cache[['enabled']]), 1))",
+      "  stopifnot(unname(cached$nn.cache[['hits']]) > 0)",
+      "  stopifnot(as.numeric(cached$num.feval.fast[1L]) >= unname(cached$nn.cache[['hits']]))",
+      "  stopifnot(as.numeric(cached$num.feval.fast[1L]) <= as.numeric(cached$num.feval[1L]))",
+      "  stopifnot(identical(unname(uncached$nn.cache[['enabled']]), 0))",
+      "  stopifnot(identical(unname(uncached$nn.cache[['hits']]), 0))",
+      "}"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(out$status, 0L, info = paste(out$output, collapse = "\n"))
+})
