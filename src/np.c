@@ -1295,19 +1295,23 @@ static void bwm_nn_cache_configure_for_powell(
   int num_unordered,
   int num_ordered)
 {
+  const int structurally_eligible =
+    !eval_only &&
+    extra_params == 0 &&
+    ((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)) &&
+    num_continuous > 0 &&
+    num_unordered == 0 &&
+    num_ordered == 0;
+
   bwm_nn_cache_free();
   bwm_nn_cache_reset_stats();
   bwm_nn_cache_active = 0;
   bwm_nn_cache_key_len = 0;
 
-  if (!bwm_nn_cache_collective_enabled(
-        bwm_nn_cache_user_enabled() &&
-        !eval_only &&
-        extra_params == 0 &&
-        ((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)) &&
-        num_continuous > 0 &&
-        num_unordered == 0 &&
-        num_ordered == 0))
+  if (!structurally_eligible)
+    return;
+
+  if (!bwm_nn_cache_collective_enabled(bwm_nn_cache_user_enabled()))
     return;
 
   bwm_nn_cache_key_len = num_continuous;
@@ -12696,7 +12700,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);
-  vector_continuous_stddev_extern = NULL;
+  np_clear_estimator_extern_aliases();
 
   safe_free(lambda);
 
