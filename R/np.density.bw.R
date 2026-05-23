@@ -128,7 +128,7 @@ npudensbw.NULL <-
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("bwsolver='mads' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
 
-  setup <- .npregbw_nomad_bw_setup(xdat = dat, template = template)
+  setup <- .npregbw_nomad_bw_setup(xdat = dat, template = template, allow.large.nn = TRUE)
   bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
   point.start <- if (all(template$bw == 0)) NULL else .npregbw_nomad_bw_to_point(template$bw, template = template, setup = setup)
   x0 <- .npregbw_nomad_complete_bw_start_point(point = point.start, bounds = bounds, setup = setup)
@@ -301,6 +301,8 @@ npudensbw.bandwidth <-
         (any(bws$iuno) &&
          !all(vapply(as.data.frame(dat[, bws$iuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'dat'", "in type"))
+
+    npValidateLargeNnContinuousBandwidth(bws, where = "npudensbw")
 
     dat <- na.omit(dat)
     rows.omit <- unclass(na.action(dat))

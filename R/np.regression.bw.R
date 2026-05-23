@@ -1556,8 +1556,10 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
 .npregbw_nomad_bw_setup <- function(xdat,
                                     template,
                                     bandwidth.scale.categorical = 1e4,
-                                    allow.large.nn = FALSE) {
+                                    allow.large.nn = FALSE,
+                                    evaldat = NULL) {
   xdat <- toFrame(xdat)
+  evaldat <- if (is.null(evaldat)) xdat else toFrame(evaldat)
   xmat <- toMatrix(xdat)
   rcon <- xmat[, template$icon, drop = FALSE]
   mysd <- EssDee(rcon)
@@ -1581,9 +1583,11 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   }
 
   cont_largenn_upper <- if (isTRUE(allow.large.nn)) {
-    npRegressionLargeNnNomadUpper(
-      xdat = xdat,
-      template = template,
+    npContinuousLargeNnNomadUpper(
+      traindat = xdat,
+      evaldat = evaldat,
+      bwtype = template$type,
+      ckertype = template$ckertype,
       cont.idx = cont_idx
     )
   } else {
