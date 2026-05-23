@@ -280,7 +280,7 @@ test_that("warning helper prefixes package warnings", {
   expect_identical(warnings, "[np] kernel order ignored")
 })
 
-test_that("NOMAD external output clears single-line progress and uses package messages", {
+test_that("NOMAD external output is transient under single-line progress", {
   begin <- getFromNamespace(".np_progress_begin", "np")
   show_now <- getFromNamespace(".np_progress_show_now", "np")
   emit_nomad <- getFromNamespace(".np_nomad_emit_external_output", "np")
@@ -320,8 +320,10 @@ test_that("NOMAD external output clears single-line progress and uses package me
   )
 
   events <- vapply(trace, `[[`, character(1L), "event")
-  expect_true("finish" %in% events)
-  expect_identical(normalize_messages(messages), "[np] NOMAD: All variables are granular.")
+  lines <- vapply(trace, `[[`, character(1L), "line")
+  expect_equal(sum(events == "finish"), 2L)
+  expect_true(any(grepl("NOMAD: All variables are granular.", lines, fixed = TRUE)))
+  expect_identical(messages, character())
 })
 
 test_that("bandwidth selection helper suppresses legacy output and drives bounded updates", {
