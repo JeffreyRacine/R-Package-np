@@ -1497,6 +1497,75 @@ npRegressionNnLowerBound <- function(bws) {
   2L
 }
 
+npLargeNnEnabled <- function() {
+  isTRUE(getOption("np.largenn", FALSE))
+}
+
+npRegressionHasExtendedNn <- function(bws) {
+  if (!inherits(bws, "rbandwidth") ||
+      is.null(bws$type) ||
+      !(as.character(bws$type)[1L] %in% c("generalized_nn", "adaptive_nn")) ||
+      is.null(bws$icon) ||
+      !any(bws$icon) ||
+      is.null(bws$nobs)) {
+    return(FALSE)
+  }
+
+  upper <- as.double(as.integer(bws$nobs) - 1L)
+  if (!is.finite(upper) || upper < 1)
+    return(FALSE)
+
+  bw <- as.double(bws$bw)
+  any(is.finite(bw[bws$icon]) & bw[bws$icon] > upper)
+}
+
+npValidateRegressionLargeNn <- function(bws,
+                                        where,
+                                        bandwidth.compute = FALSE) {
+  if (!inherits(bws, "rbandwidth") ||
+      is.null(bws$type) ||
+      identical(as.character(bws$type)[1L], "fixed") ||
+      is.null(bws$icon) ||
+      !any(bws$icon) ||
+      is.null(bws$nobs)) {
+    return(invisible(bws))
+  }
+
+  upper <- as.integer(bws$nobs) - 1L
+  if (!is.finite(upper) || upper < 1L)
+    return(invisible(bws))
+
+  bw <- as.double(bws$bw)
+  icon <- which(as.logical(bws$icon))
+  offenders <- is.finite(bw[icon]) & bw[icon] > upper
+  if (!any(offenders))
+    return(invisible(bws))
+
+  bwtype <- as.character(bws$type)[1L]
+  if (!(bwtype %in% c("generalized_nn", "adaptive_nn"))) {
+    stop(
+      sprintf(
+        "%s: extended nearest-neighbor bandwidths above n-1 are not enabled for bwtype='%s'",
+        where,
+        bwtype
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (!npLargeNnEnabled()) {
+    stop(
+      sprintf(
+        "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+        where
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(bws)
+}
+
 npValidateRegressionNnLowerBound <- function(bws,
                                              where,
                                              allow.zero.placeholder = FALSE) {
@@ -2121,11 +2190,17 @@ genBwSelStr <- function(x){
   pmethod.str <- if (is.null(x$pmethod)) "" else paste("\nBandwidth Selection Method:", x$pmethod)
   formula.str <- if (!identical(x$formula, NULL)) paste("\nFormula:", paste(deparse(x$formula), collapse = "\n")) else ""
   ptype.str <- if (is.null(x$ptype)) "" else paste("\nBandwidth Type: ", x$ptype, sep = "")
+  largenn.str <- if (npRegressionHasExtendedNn(x)) {
+    "\nExtended NN: K above n-1 scales the saturated nearest-neighbor bandwidth"
+  } else {
+    ""
+  }
 
   paste(pregtype.str,
         pmethod.str,
         formula.str,
         ptype.str,
+        largenn.str,
         fval.str,
         nfe.str,
         sep = "")

@@ -8826,8 +8826,9 @@ static int np_reg_cv_all_large_gate(const int BANDWIDTH_reg,
                                     double **ov_cont_hmin,
                                     double **ov_cont_k0,
                                     int *ov_cont_from_cache){
-  int i;
-  int all_large_gate = (BANDWIDTH_reg == BW_FIXED);
+  int i, j;
+  int all_large_gate = (BANDWIDTH_reg == BW_FIXED) ||
+    ((BANDWIDTH_reg == BW_GEN_NN) && (num_reg_continuous > 0));
   if((ov_cont_ok == NULL) || (ov_cont_hmin == NULL) || (ov_cont_k0 == NULL) ||
      (ov_cont_from_cache == NULL))
     return 0;
@@ -8867,9 +8868,21 @@ static int np_reg_cv_all_large_gate(const int BANDWIDTH_reg,
     }
 
     for(i = 0; i < num_reg_continuous; i++){
-      const double h = matrix_bandwidth[i][0];
-      if((*ov_cont_ok == NULL) || (!(*ov_cont_ok)[i]) || (!isfinite(h)) ||
-         (fabs(h) < (*ov_cont_hmin)[i]))
+      double hmin = DBL_MAX;
+      if((BANDWIDTH_reg == BW_FIXED) && matrix_bandwidth[i] != NULL){
+        hmin = fabs(matrix_bandwidth[i][0]);
+      } else if((BANDWIDTH_reg == BW_GEN_NN) && matrix_bandwidth[i] != NULL){
+        for(j = 0; j < num_obs; j++){
+          const double h = matrix_bandwidth[i][j];
+          if(!isfinite(h)){
+            hmin = DBL_MAX;
+            break;
+          }
+          hmin = MIN(hmin, fabs(h));
+        }
+      }
+      if((*ov_cont_ok == NULL) || (!(*ov_cont_ok)[i]) ||
+         (!isfinite(hmin)) || (hmin < (*ov_cont_hmin)[i]))
         return 0;
     }
   }

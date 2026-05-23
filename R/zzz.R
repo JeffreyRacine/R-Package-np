@@ -27,6 +27,8 @@
     options(np.largeh = TRUE)
   if (is.null(getOption("np.largelambda")))
     options(np.largelambda = TRUE)
+  if (is.null(getOption("np.largenn")))
+    options(np.largenn = FALSE)
   if (is.null(getOption("np.largeh.rel.tol")))
     options(np.largeh.rel.tol = 1e-3)
   if (is.null(getOption("np.disc.upper.rel.tol")))

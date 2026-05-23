@@ -483,6 +483,8 @@ static double bwm_penalty_value = DBL_MAX;
 static int *bwm_kernel_unordered_vec = NULL;
 static int bwm_kernel_unordered_len = 0;
 static double bwm_scale_factor_lower_bound = 0.1;
+double *vector_largenn_upper_extern = NULL;
+int int_largenn_upper_num_extern = 0;
 static const char *bwm_deferred_error = NULL;
 
 void np_bwm_set_deferred_error(const char *msg)
@@ -504,6 +506,149 @@ static void bwm_set_scale_factor_lower_bound(double value)
 {
   bwm_scale_factor_lower_bound =
     (R_FINITE(value) && (value >= 0.0)) ? value : 0.1;
+}
+
+static int np_get_option_logical_np(const char * const name, const int fallback)
+{
+  const SEXP val = Rf_GetOption1(Rf_install(name));
+
+  if (val == R_NilValue)
+    return fallback;
+  if (TYPEOF(val) == LGLSXP && XLENGTH(val) > 0)
+    return (LOGICAL(val)[0] == NA_LOGICAL) ? fallback : (LOGICAL(val)[0] != 0);
+  if (TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
+    return (INTEGER(val)[0] == NA_INTEGER) ? fallback : (INTEGER(val)[0] != 0);
+  if (TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
+    return R_FINITE(REAL(val)[0]) ? (REAL(val)[0] != 0.0) : fallback;
+
+  return fallback;
+}
+
+static double np_get_option_double_np(const char * const name, const double fallback)
+{
+  const SEXP val = Rf_GetOption1(Rf_install(name));
+
+  if (val == R_NilValue)
+    return fallback;
+  if (TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
+    return REAL(val)[0];
+  if (TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
+    return (double)INTEGER(val)[0];
+  if (TYPEOF(val) == LGLSXP && XLENGTH(val) > 0)
+    return (double)LOGICAL(val)[0];
+
+  return fallback;
+}
+
+static int np_largenn_enabled_np(void)
+{
+  return np_get_option_logical_np("np.largenn", 0);
+}
+
+static double np_largenn_utol_np(const int kernel, const double rel_tol)
+{
+  if (rel_tol <= 0.0)
+    return 0.0;
+
+  switch (kernel) {
+    case 0: case 1: case 2: case 3: case 9:
+      return sqrt(-2.0 * log(1.0 - rel_tol));
+    case 4: case 5: case 6: case 7:
+      return sqrt(rel_tol);
+    case 8:
+      return 1.0 - 32.0 * DBL_EPSILON;
+    default:
+      return 0.0;
+  }
+}
+
+static double *np_regression_largenn_upper_alloc(
+  const int bandwidth,
+  const int kernel,
+  const int num_obs,
+  const int num_reg_continuous,
+  double **matrix_x_continuous)
+{
+  const int base_k = num_obs - 1;
+  const double rel_tol_default = 1e-3;
+  const double rel_tol_opt = np_get_option_double_np("np.largeh.rel.tol", rel_tol_default);
+  const double rel_tol =
+    (R_FINITE(rel_tol_opt) && rel_tol_opt > 0.0 && rel_tol_opt < 0.1) ? rel_tol_opt : rel_tol_default;
+  const double safety_margin = 1.5;
+  const double hard_upper = (double)INT_MAX / 4.0;
+  double *upper = NULL;
+  double *nn_distance = NULL;
+  int i, j;
+
+  if (!np_largenn_enabled_np() ||
+      !((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)) ||
+      num_obs < 2 ||
+      num_reg_continuous <= 0 ||
+      matrix_x_continuous == NULL) {
+    return NULL;
+  }
+
+  upper = alloc_vecd(num_reg_continuous);
+  nn_distance = alloc_vecd(num_obs);
+
+  for (i = 0; i < num_reg_continuous; i++) {
+    double xmin = DBL_MAX, xmax = -DBL_MAX;
+    double base_h_min = DBL_MAX;
+    double h_large = DBL_MAX;
+    double k_upper = (double)base_k;
+    const double utol = np_largenn_utol_np(kernel, rel_tol);
+
+    upper[i] = (double)base_k;
+
+    for (j = 0; j < num_obs; j++) {
+      const double v = matrix_x_continuous[i][j];
+      if (!R_FINITE(v))
+        continue;
+      xmin = MIN(xmin, v);
+      xmax = MAX(xmax, v);
+    }
+
+    if (!(xmax >= xmin) || !(utol > 0.0) || !R_FINITE(utol))
+      continue;
+
+    if (bandwidth == BW_GEN_NN) {
+      if (compute_nn_distance_train_eval(num_obs, num_obs, 0,
+                                         matrix_x_continuous[i],
+                                         matrix_x_continuous[i],
+                                         base_k,
+                                         nn_distance) == 1) {
+        continue;
+      }
+    } else {
+      if (compute_nn_distance(num_obs, 0,
+                              matrix_x_continuous[i],
+                              base_k,
+                              nn_distance) == 1) {
+        continue;
+      }
+    }
+
+    for (j = 0; j < num_obs; j++) {
+      if (R_FINITE(nn_distance[j]) && nn_distance[j] > 0.0)
+        base_h_min = MIN(base_h_min, nn_distance[j]);
+    }
+
+    if (!(base_h_min > 0.0) || !R_FINITE(base_h_min))
+      continue;
+
+    h_large = (xmax - xmin) / utol;
+    if (R_FINITE(h_large) && h_large > base_h_min) {
+      k_upper = ceil(((double)base_k) * h_large / base_h_min * safety_margin);
+      if (!R_FINITE(k_upper) || k_upper < (double)base_k)
+        k_upper = (double)base_k;
+      if (k_upper > hard_upper)
+        k_upper = hard_upper;
+      upper[i] = k_upper;
+    }
+  }
+
+  safe_free(nn_distance);
+  return upper;
 }
 
 static int np_has_finite_cker_bounds(const double *lb, const double *ub, const int n)
@@ -10521,6 +10666,16 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   np_refresh_support_counts_extern();
   np_validate_nonfixed_support_counts_extern("C_np_regression_bw", BANDWIDTH_reg_extern);
 
+  vector_largenn_upper_extern = (!eval_only) ?
+    np_regression_largenn_upper_alloc(
+      BANDWIDTH_reg_extern,
+      KERNEL_reg_extern,
+      num_obs_train_extern,
+      num_reg_continuous_extern,
+      matrix_X_continuous_train_extern) :
+    NULL;
+  int_largenn_upper_num_extern =
+    (vector_largenn_upper_extern != NULL) ? num_reg_continuous_extern : 0;
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -11054,6 +11209,9 @@ cleanup_np_regression_bw_mode:
   /* Free data objects */
   bwm_clear_floor_context();
   bwm_nn_cache_free();
+  safe_free(vector_largenn_upper_extern);
+  vector_largenn_upper_extern = NULL;
+  int_largenn_upper_num_extern = 0;
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
