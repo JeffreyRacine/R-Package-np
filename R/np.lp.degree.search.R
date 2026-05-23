@@ -1552,6 +1552,38 @@
   unique(lines)
 }
 
+.np_nomad_render_external_output <- function(line, progress_state) {
+  if (is.null(progress_state) ||
+      !isTRUE(progress_state$enabled) ||
+      !isTRUE(progress_state$visible) ||
+      !identical(progress_state$renderer, "single_line")) {
+    return(FALSE)
+  }
+
+  line <- .np_io_prefix_text(paste0("NOMAD: ", line))
+  render_line <- .np_progress_ellipsize_middle(
+    line,
+    max_width = max(20L, getOption("width", 80L) - 1L)
+  )
+  snapshot <- .np_progress_make_snapshot(
+    state = progress_state,
+    line = line,
+    render_line = render_line,
+    event = "render",
+    now = .np_progress_now(),
+    done = progress_state$last_done,
+    detail = progress_state$last_emitted_detail
+  )
+  .np_progress_render_single_line(snapshot = snapshot, event = "render")
+
+  transient_state <- progress_state
+  transient_state$rendered <- TRUE
+  transient_state$last_render_width <- nchar(render_line, type = "width")
+  transient_state$last_line <- line
+  .np_progress_prepare_for_external_output(transient_state)
+  TRUE
+}
+
 .np_nomad_emit_external_output <- function(lines, progress_state, seen) {
   lines <- .np_nomad_external_output_lines(lines)
   lines <- lines[!(lines %in% seen)]
@@ -1561,7 +1593,9 @@
 
   progress_state <- .np_progress_prepare_for_external_output(progress_state)
   for (line in lines) {
-    .np_message("NOMAD: ", line)
+    if (!isTRUE(.np_nomad_render_external_output(line, progress_state))) {
+      .np_message("NOMAD: ", line)
+    }
   }
 
   list(progress_state = progress_state, seen = c(seen, lines))

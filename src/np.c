@@ -655,7 +655,7 @@ static double *np_regression_largenn_upper_alloc(
   int i, j;
 
   if (!np_largenn_enabled_np() ||
-      bandwidth != BW_GEN_NN ||
+      !((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)) ||
       num_obs < 2 ||
       num_reg_continuous <= 0 ||
       matrix_x_continuous == NULL) {
@@ -685,12 +685,21 @@ static double *np_regression_largenn_upper_alloc(
     if (!(xmax >= xmin) || !(utol > 0.0) || !R_FINITE(utol))
       continue;
 
-    if (compute_nn_distance_train_eval(num_obs, num_obs, 0,
-                                       matrix_x_continuous[i],
-                                       matrix_x_continuous[i],
-                                       base_k,
-                                       nn_distance) == 1) {
-      continue;
+    if (bandwidth == BW_GEN_NN) {
+      if (compute_nn_distance_train_eval(num_obs, num_obs, 0,
+                                         matrix_x_continuous[i],
+                                         matrix_x_continuous[i],
+                                         base_k,
+                                         nn_distance) == 1) {
+        continue;
+      }
+    } else {
+      if (compute_nn_distance(num_obs, 0,
+                              matrix_x_continuous[i],
+                              base_k,
+                              nn_distance) == 1) {
+        continue;
+      }
     }
 
     for (j = 0; j < num_obs; j++) {

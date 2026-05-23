@@ -487,7 +487,10 @@ static int compute_nn_distance_observation_support_subset(int num_obs,
   support_count = NULL;
   support_radius = NULL;
 
-  if ((query_start < 0) || (query_end >= num_obs) || (query_start > query_end))
+  if (query_start > query_end)
+    return 0;
+
+  if ((query_start < 0) || (query_end >= num_obs))
     return 1;
 
   if (build_sorted_unique_support(num_obs, vector_data, &support, &support_count, &support_n) != 0)
@@ -645,7 +648,10 @@ static int compute_nn_distance_train_eval_observation_support_subset(int num_obs
   support = NULL;
   support_count = NULL;
 
-  if ((query_start < 0) || (query_end >= num_obs_eval) || (query_start > query_end))
+  if (query_start > query_end)
+    return 0;
+
+  if ((query_start < 0) || (query_end >= num_obs_eval))
     return 1;
 
   if (build_sorted_unique_support(num_obs_train, vector_data_train, &support, &support_count, &support_n) != 0)
@@ -903,10 +909,8 @@ int initialize_nr_directions(int BANDWIDTH,
   }else{
     for(i = 1; i <= num_reg_continuous; i++){
       const double bw_max =
-        (BANDWIDTH == BW_GEN_NN) ?
+        ((BANDWIDTH == BW_GEN_NN) || (BANDWIDTH == BW_ADAP_NN)) ?
         np_largenn_upper_for_reg(i - 1, (double)(num_obs - 1)) :
-        (BANDWIDTH == BW_ADAP_NN) ?
-        (double)(num_obs - 1) :
         (double)(simple_unique(num_obs,matrix_x_continuous[i-1]) - 1);
       matrix_y[i][i] = ceil(MIN(vector_scale_factor[i], bw_max - vector_scale_factor[i])*(random ? ran3(&seed): 1.0));
     }
@@ -1033,7 +1037,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
         }
       } else {
         const double bw_kmax =
-          (BANDWIDTH == BW_GEN_NN) ?
+          ((BANDWIDTH == BW_GEN_NN) || (BANDWIDTH == BW_ADAP_NN)) ?
           np_largenn_upper_for_reg(i, (double)(num_obs - 1)) :
           count_bw ? (double)(num_obs - 1) : (double)(simple_unique(num_obs,matrix_x_continuous[i]) - 1);
         if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_kmax)){

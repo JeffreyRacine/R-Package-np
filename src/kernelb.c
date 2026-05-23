@@ -445,7 +445,12 @@ double **matrix_bandwidth_deriv)
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(compute_nn_distance(num_obs_train, 0, matrix_X_train[i], np_fround(vector_scale_factor[i]), nn_distance)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, (num_var_cont == 0), vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
+			{
+				return(1);
+			}
+
+			if(compute_nn_distance(num_obs_train, 0, matrix_X_train[i], int_nn_k, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -459,8 +464,8 @@ double **matrix_bandwidth_deriv)
 			for(j=0; j < num_obs_train; j++)
 			{
 
-				*pointer_bw++ = *pointer_nn;
-				*pointer_bwd++ = *pointer_nn++;
+				*pointer_bw++ = nn_scale * *pointer_nn;
+				*pointer_bwd++ = nn_scale * *pointer_nn++;
 
 			}
 
@@ -470,7 +475,12 @@ double **matrix_bandwidth_deriv)
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(compute_nn_distance(num_obs_train, 0, matrix_Y_train[i], np_fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 0, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
+			{
+				return(1);
+			}
+
+			if(compute_nn_distance(num_obs_train, 0, matrix_Y_train[i], int_nn_k, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -483,7 +493,7 @@ double **matrix_bandwidth_deriv)
 			for(j=0; j < num_obs_train; j++)
 			{
 
-				*pointer_bw++ = *pointer_nn++;
+				*pointer_bw++ = nn_scale * *pointer_nn++;
 
 			}
 
@@ -821,7 +831,12 @@ fact constant. */
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_X_train[i], np_fround(vector_scale_factor[i]), nn_distance)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, (num_var_cont == 0), vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
+			{
+				return(1);
+			}
+
+			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_X_train[i], int_nn_k, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -834,7 +849,7 @@ fact constant. */
 			for(j=0; j < num_obs_train; j++)
 			{
 
-				*pointer_bw++ = *pointer_nn++;
+				*pointer_bw++ = nn_scale * *pointer_nn++;
 
 			}
 
@@ -844,7 +859,12 @@ fact constant. */
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_Y_train[i], np_fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
+			if(np_nn_lookup_from_scale(num_obs_train, 0, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
+			{
+				return(1);
+			}
+
+			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_Y_train[i], int_nn_k, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -857,7 +877,7 @@ fact constant. */
 			for(j=0; j < num_obs_train; j++)
 			{
 
-				*pointer_bw++ = *pointer_nn++;
+				*pointer_bw++ = nn_scale * *pointer_nn++;
 
 			}
 

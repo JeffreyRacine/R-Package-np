@@ -9287,6 +9287,144 @@ static int np_reg_cv_all_large_gate(const int BANDWIDTH_reg,
   return 1;
 }
 
+static int np_largenn_mpi_lc_all_large_gate(const int BANDWIDTH_reg,
+                                            const int int_ll_cv,
+                                            const int num_obs,
+                                            const int num_reg_continuous,
+                                            const int num_reg_unordered,
+                                            const int num_reg_ordered,
+                                            const int * const kernel_c,
+                                            double **matrix_X_continuous,
+                                            double **matrix_bandwidth){
+  const int static_ok =
+    (BANDWIDTH_reg == BW_GEN_NN) &&
+    (int_ll_cv == LL_LC) &&
+    (num_reg_continuous > 0) &&
+    (num_reg_unordered == 0) &&
+    (num_reg_ordered == 0) &&
+    np_largeh_enabled() &&
+    np_get_option_logical("np.largenn", 0);
+  double *local_hmin = NULL, *global_hmin = NULL;
+  int *cont_ok = NULL;
+  double *cont_hmin = NULL, *cont_k0 = NULL;
+  int build_ok = 0;
+  int global_ok = 0;
+  int i;
+
+  if(!static_ok)
+    return 0;
+
+  local_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+  global_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+  if((local_hmin == NULL) || (global_hmin == NULL))
+    goto finish;
+
+  for(i = 0; i < num_reg_continuous; i++){
+    local_hmin[i] = DBL_MAX;
+    global_hmin[i] = DBL_MAX;
+  }
+
+  build_ok = np_cont_largeh_build_params(num_obs,
+                                         num_obs,
+                                         num_reg_continuous,
+                                         kernel_c,
+                                         matrix_X_continuous,
+                                         matrix_X_continuous,
+                                         np_cont_largeh_rel_tol(),
+                                         &cont_ok,
+                                         &cont_hmin,
+                                         &cont_k0);
+
+  if(build_ok && (matrix_bandwidth != NULL)){
+    for(i = 0; i < num_reg_continuous; i++){
+      int j;
+      if((cont_ok == NULL) || (!cont_ok[i]) || (matrix_bandwidth[i] == NULL)){
+        local_hmin[i] = -DBL_MAX;
+        continue;
+      }
+      for(j = 0; j < num_obs; j++){
+        const double h = matrix_bandwidth[i][j];
+        if(!isfinite(h)){
+          local_hmin[i] = -DBL_MAX;
+          break;
+        }
+        local_hmin[i] = MIN(local_hmin[i], fabs(h));
+      }
+    }
+  } else {
+    for(i = 0; i < num_reg_continuous; i++)
+      local_hmin[i] = -DBL_MAX;
+  }
+
+#ifdef MPI2
+  MPI_Allreduce(local_hmin, global_hmin, num_reg_continuous, MPI_DOUBLE, MPI_MIN, comm[1]);
+#else
+  for(i = 0; i < num_reg_continuous; i++)
+    global_hmin[i] = local_hmin[i];
+#endif
+
+  global_ok = build_ok;
+  for(i = 0; i < num_reg_continuous; i++){
+    if((cont_ok == NULL) || (!cont_ok[i]) || (cont_hmin == NULL) ||
+       (!isfinite(global_hmin[i])) || (global_hmin[i] < cont_hmin[i])){
+      global_ok = 0;
+      break;
+    }
+  }
+
+finish:
+  if(local_hmin != NULL) free(local_hmin);
+  if(global_hmin != NULL) free(global_hmin);
+  if(cont_ok != NULL) free(cont_ok);
+  if(cont_hmin != NULL) free(cont_hmin);
+  if(cont_k0 != NULL) free(cont_k0);
+  return global_ok;
+}
+
+static inline double np_check_loss_value(const double residual, const double tau);
+
+static int np_largenn_lc_fast_objective(const int bwm,
+                                        const int num_obs,
+                                        const double * const vector_Y,
+                                        double * const cv,
+                                        double * const traceH){
+  double ybar = 0.0;
+  double cv_sum = 0.0;
+  double trace_sum = 0.0;
+  const double hii = 1.0/(double)MAX(1, num_obs);
+  int i;
+
+  if((num_obs <= 0) || (vector_Y == NULL) || (cv == NULL) || (traceH == NULL))
+    return 0;
+
+  for(i = 0; i < num_obs; i++)
+    ybar += vector_Y[i];
+  ybar /= (double)num_obs;
+
+  for(i = 0; i < num_obs; i++){
+    const double loss_y =
+      (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+      vector_lsq_loss_extern[i] :
+      vector_Y[i];
+    const double err = loss_y - ybar;
+
+    if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
+      const double den = NZD_POS(1.0 - hii);
+      const double err_loo = err/den;
+      cv_sum += (bwm == RBWM_CVCHECK) ?
+        np_check_loss_value(err_loo, np_lsq_tau_extern) :
+        err_loo*err_loo;
+    } else {
+      cv_sum += err*err;
+      trace_sum += hii;
+    }
+  }
+
+  *cv = cv_sum;
+  *traceH = trace_sum;
+  return 1;
+}
+
 /* Canonical selector for CVLS route between full symmetric drop-one and reduced branch. */
 static inline int np_reg_cv_use_symmetric_dropone_path(const int bwm,
                                                        const int ks_tree_use,
@@ -11220,6 +11358,24 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                            lambda)==1){
     
     return(DBL_MAX);
+  }
+  if(np_largenn_mpi_lc_all_large_gate(BANDWIDTH_reg,
+                                      int_ll_cv,
+                                      num_obs,
+                                      num_reg_continuous,
+                                      num_reg_unordered,
+                                      num_reg_ordered,
+                                      kernel_c,
+                                      matrix_X_continuous,
+                                      matrix_bandwidth)){
+    if(np_largenn_lc_fast_objective(bwm,
+                                    num_obs,
+                                    vector_Y,
+                                    &cv,
+                                    &traceH)){
+      np_fastcv_alllarge_hits++;
+      goto finish_cv_path;
+    }
   }
   if(int_ll_cv == LL_LP){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
