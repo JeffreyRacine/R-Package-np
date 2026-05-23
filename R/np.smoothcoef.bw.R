@@ -2086,8 +2086,8 @@ npscoefbw.scbandwidth <-
     use_cat_profile_cv_lc <- function(sbw) {
       identical(reg.engine, "lc") &&
         identical(sbw$type, "fixed") &&
-        (isTRUE(getOption("np.categorical.compress", TRUE)) ||
-           isTRUE(getOption("np.tree"))) &&
+        npUseCategoricalCompress(ncon = sbw$ncon,
+                                 ncat = sbw$nuno + sbw$nord) &&
         !miss.z &&
         isTRUE(sbw$ncon == 0L) &&
         isTRUE((sbw$nuno + sbw$nord) > 0L)
@@ -2585,8 +2585,8 @@ npscoefbw.scbandwidth <-
                 ## estimate partial residuals
                 partial.orig <- W[,j] * scoef$beta[,j] + resid.full
                 current.partial.profile <- if (identical(reg.engine, "lc") &&
-                    (isTRUE(getOption("np.categorical.compress", TRUE)) ||
-                       isTRUE(getOption("np.tree"))) &&
+                    npUseCategoricalCompress(ncon = bws$ncon,
+                                             ncat = bws$nuno + bws$nord) &&
                     !miss.z &&
                     isTRUE(bws$ncon == 0L) &&
                     isTRUE((bws$nuno + bws$nord) > 0L)) {

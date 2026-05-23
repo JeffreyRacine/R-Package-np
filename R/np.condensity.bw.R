@@ -109,7 +109,7 @@ npcdensbw.formula <-
 }
 
 .npcdensbw_tree_code <- function(bws, ncon, ncat) {
-  code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat)
+  code <- if (npUseContinuousTree(ncon = ncon)) DO_TREE_YES else DO_TREE_NO
 
   if (!identical(code, DO_TREE_YES))
     return(code)
@@ -942,17 +942,12 @@ npcdensbw.conbandwidth <-
   if (is.recursive(bws) &&
       !is.null(bws$yncon) &&
       !is.null(bws$xncon)) {
-    return(npTreeOrCategoricalCompress(
-      ncon = bws$yncon + bws$xncon,
-      ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord))
+    return(npUseContinuousTree(ncon = bws$yncon + bws$xncon))
   }
 
   x.info <- untangle(toFrame(xdat))
   y.info <- untangle(toFrame(ydat))
-  npTreeOrCategoricalCompress(
-    ncon = sum(x.info$icon) + sum(y.info$icon),
-    ncat = sum(x.info$iuno) + sum(x.info$iord) +
-      sum(y.info$iuno) + sum(y.info$iord))
+  npUseContinuousTree(ncon = sum(x.info$icon) + sum(y.info$icon))
 }
 
 .npcdensbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, bws, reg.args, opt.args,

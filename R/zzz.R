@@ -281,21 +281,29 @@
     .npRmpi_after_np_load()
 }
 
-npTreeOrCategoricalCompress <- function(ncon = 0L, ncat = 0L) {
-  if (isTRUE(getOption("np.tree")))
-    return(TRUE)
+npCountVars <- function(x) {
+  if (is.null(x) || !length(x))
+    return(0L)
+  sum(as.integer(x), na.rm = TRUE)
+}
 
-  if (!isTRUE(getOption("np.categorical.compress", TRUE)))
-    return(FALSE)
+npUseContinuousTree <- function(ncon = 0L) {
+  isTRUE(getOption("np.tree")) && isTRUE(npCountVars(ncon) > 0L)
+}
 
-  ncon <- if (is.null(ncon) || !length(ncon)) 0L else sum(as.integer(ncon), na.rm = TRUE)
-  ncat <- if (is.null(ncat) || !length(ncat)) 0L else sum(as.integer(ncat), na.rm = TRUE)
+npUseCategoricalCompress <- function(ncon = 0L, ncat = 0L) {
+  isTRUE(getOption("np.categorical.compress", TRUE)) &&
+    isTRUE(npCountVars(ncon) == 0L) &&
+    isTRUE(npCountVars(ncat) > 0L)
+}
 
-  isTRUE(ncon == 0L) && isTRUE(ncat > 0L)
+npUseKernelAccelerationFlag <- function(ncon = 0L, ncat = 0L) {
+  npUseContinuousTree(ncon = ncon) ||
+    npUseCategoricalCompress(ncon = ncon, ncat = ncat)
 }
 
 npDoTreeOrCategoricalCompress <- function(ncon = 0L, ncat = 0L) {
-  if (npTreeOrCategoricalCompress(ncon = ncon, ncat = ncat)) {
+  if (npUseKernelAccelerationFlag(ncon = ncon, ncat = ncat)) {
     DO_TREE_YES
   } else {
     DO_TREE_NO

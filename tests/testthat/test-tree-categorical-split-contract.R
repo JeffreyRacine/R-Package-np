@@ -1,0 +1,100 @@
+library(npRmpi)
+
+test_that("tree and categorical compression predicates are orthogonal", {
+  old_opts <- options(np.messages = FALSE,
+                      np.tree = FALSE,
+                      np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  cases <- expand.grid(tree = c(FALSE, TRUE),
+                       compress = c(FALSE, TRUE))
+  observed <- lapply(seq_len(nrow(cases)), function(i) {
+    options(np.tree = cases$tree[i],
+            np.categorical.compress = cases$compress[i])
+    c(
+      categorical = npRmpi:::npUseCategoricalCompress(ncon = 0L, ncat = 2L),
+      continuous_tree = npRmpi:::npUseContinuousTree(ncon = 2L),
+      mixed_flag = npRmpi:::npUseKernelAccelerationFlag(ncon = 1L, ncat = 2L),
+      allcat_flag = npRmpi:::npUseKernelAccelerationFlag(ncon = 0L, ncat = 2L)
+    )
+  })
+  observed <- do.call(rbind, observed)
+
+  expected <- rbind(
+    c(FALSE, FALSE, FALSE, FALSE),
+    c(FALSE, TRUE, TRUE, FALSE),
+    c(TRUE, FALSE, FALSE, TRUE),
+    c(TRUE, TRUE, TRUE, TRUE)
+  )
+  colnames(expected) <- colnames(observed)
+
+  expect_identical(unname(observed), unname(expected))
+})
+
+test_that("np.tree alone does not enable all-categorical profile helpers", {
+  old_opts <- options(np.messages = FALSE,
+                      np.tree = FALSE,
+                      np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260522)
+  n <- 48L
+  xdat <- data.frame(
+    u1 = factor(sample(letters[1:3], n, TRUE)),
+    o1 = ordered(sample(1:4, n, TRUE))
+  )
+  ydat <- as.numeric(xdat$u1) + as.numeric(xdat$o1) + rnorm(n, sd = 0.1)
+  bws <- npRmpi:::rbandwidth(
+    bw = c(0.2, 0.3),
+    nobs = nrow(xdat),
+    xdati = npRmpi:::untangle(xdat),
+    ydati = npRmpi:::untangle(data.frame(ydat)),
+    regtype = "lc",
+    bandwidth.compute = FALSE
+  )
+
+  options(np.tree = TRUE, np.categorical.compress = FALSE)
+  expect_null(npRmpi:::.np_regression_cat_profile_mean(bws, xdat, ydat))
+
+  options(np.tree = FALSE, np.categorical.compress = TRUE)
+  profile.mean <- npRmpi:::.np_regression_cat_profile_mean(bws, xdat, ydat)
+  expect_type(profile.mean, "double")
+  expect_length(profile.mean, n)
+
+  options(np.tree = TRUE, np.categorical.compress = FALSE)
+  expect_equal(
+    npRmpi:::.npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    npRmpi:::DO_TREE_NO
+  )
+})
+
+test_that("continuous and mixed tree route helpers still honor np.tree", {
+  old_opts <- options(np.messages = FALSE,
+                      np.tree = TRUE,
+                      np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(20260522)
+  n <- 48L
+  xdat <- data.frame(
+    x1 = runif(n),
+    u1 = factor(sample(letters[1:3], n, TRUE))
+  )
+  ydat <- sin(2 * pi * xdat$x1) + as.numeric(xdat$u1) + rnorm(n, sd = 0.1)
+  bws <- npRmpi:::rbandwidth(
+    bw = c(0.35, 0.2),
+    nobs = nrow(xdat),
+    xdati = npRmpi:::untangle(xdat),
+    ydati = npRmpi:::untangle(data.frame(ydat)),
+    regtype = "lc",
+    bandwidth.compute = FALSE
+  )
+
+  expect_true(npRmpi:::npUseContinuousTree(ncon = bws$ncon))
+  expect_false(npRmpi:::npUseCategoricalCompress(ncon = bws$ncon,
+                                                 ncat = bws$nuno + bws$nord))
+  expect_equal(
+    npRmpi:::.npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    npRmpi:::DO_TREE_YES
+  )
+})

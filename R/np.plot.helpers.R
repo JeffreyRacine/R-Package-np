@@ -2715,7 +2715,8 @@
 }
 
 .np_regression_cat_profile_mean <- function(bws, txdat, tydat, exdat = NULL) {
-  if (!npTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord))
+  if (!npUseCategoricalCompress(ncon = bws$ncon,
+                                ncat = bws$nuno + bws$nord))
     return(NULL)
   if (!identical(bws$type, "fixed"))
     return(NULL)
@@ -2859,7 +2860,8 @@
 }
 
 .np_regression_cat_profile_boot_setup <- function(xdat, exdat, ydat, bws) {
-  if (!npTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord))
+  if (!npUseCategoricalCompress(ncon = bws$ncon,
+                                ncat = bws$nuno + bws$nord))
     return(NULL)
   if (!identical(bws$type, "fixed"))
     return(NULL)
@@ -2962,7 +2964,8 @@
                                                              exdat,
                                                              bws,
                                                              operator) {
-  if (!npTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord))
+  if (!npUseCategoricalCompress(ncon = bws$ncon,
+                                ncat = bws$nuno + bws$nord))
     return(NULL)
   if (!identical(bws$type, "fixed"))
     return(NULL)
@@ -4448,8 +4451,8 @@
   profile.eligible <- identical(bws$regtype, "lc") &&
     !leave.one.out &&
     identical(bws$type, "fixed") &&
-    (isTRUE(getOption("np.categorical.compress", TRUE)) ||
-       isTRUE(getOption("np.tree"))) &&
+    npUseCategoricalCompress(ncon = bws$ncon,
+                             ncat = bws$nuno + bws$nord) &&
     !miss.z &&
     isTRUE(bws$ncon == 0L) &&
     isTRUE((bws$nuno + bws$nord) > 0L)
