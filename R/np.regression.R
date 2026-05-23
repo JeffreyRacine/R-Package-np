@@ -23,7 +23,7 @@ npreg <-
   }
 
 .npreg_fit_tree_code <- function(bws, ncon, ncat) {
-  code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat)
+  code <- if (npUseContinuousTree(ncon = ncon)) DO_TREE_YES else DO_TREE_NO
 
   if (!identical(code, DO_TREE_YES))
     return(code)

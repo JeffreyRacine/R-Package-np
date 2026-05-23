@@ -663,8 +663,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     use.cat.profile.lc <- identical(reg.engine, "lc") &&
       !leave.one.out &&
       identical(bws$type, "fixed") &&
-      (isTRUE(getOption("np.categorical.compress", TRUE)) ||
-         isTRUE(getOption("np.tree"))) &&
+      npUseCategoricalCompress(ncon = bws$ncon,
+                               ncat = bws$nuno + bws$nord) &&
       !miss.z &&
       isTRUE(bws$ncon == 0L) &&
       isTRUE((bws$nuno + bws$nord) > 0L) &&

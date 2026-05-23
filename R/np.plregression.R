@@ -207,8 +207,8 @@ npplreg.call <-
     cat.profile.cache <- new.env(parent = emptyenv())
 
     reg_mean_cat_cached <- function(regbw, ytrain, zeval = NULL) {
-      if (!npTreeOrCategoricalCompress(ncon = regbw$ncon,
-                                       ncat = regbw$nuno + regbw$nord))
+      if (!npUseCategoricalCompress(ncon = regbw$ncon,
+                                    ncat = regbw$nuno + regbw$nord))
         return(NULL)
       if (!identical(regbw$type, "fixed"))
         return(NULL)
