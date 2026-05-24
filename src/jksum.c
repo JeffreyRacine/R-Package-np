@@ -21817,10 +21817,113 @@ cleanup_bounded_cvls_quad_general:
   return status;
 }
 
+typedef struct {
+  int ready;
+  int eval_start;
+  int block_rows;
+  int bw_rows;
+  double *vsfx;
+  double *lambdax;
+  double **matrix_bandwidth_x;
+  double **matrix_X_continuous_eval_block;
+} NPConditionalXBlockBwCtx;
+
+static void np_conditional_x_block_bw_ctx_clear(NPConditionalXBlockBwCtx *ctx){
+  if(ctx == NULL)
+    return;
+  if(ctx->vsfx != NULL) free(ctx->vsfx);
+  if(ctx->lambdax != NULL) free(ctx->lambdax);
+  if(ctx->matrix_bandwidth_x != NULL) free_tmat(ctx->matrix_bandwidth_x);
+  if(ctx->matrix_X_continuous_eval_block != NULL) free(ctx->matrix_X_continuous_eval_block);
+  memset(ctx, 0, sizeof(*ctx));
+}
+
+static int np_conditional_x_block_bw_ctx_prepare(double *vector_scale_factor,
+                                                 int eval_start,
+                                                 int block_rows,
+                                                 NPConditionalXBlockBwCtx *ctx){
+  const int num_train = num_obs_train_extern;
+  const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+  const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : block_rows;
+  int i;
+
+  if((ctx == NULL) || (vector_scale_factor == NULL))
+    return 1;
+  memset(ctx, 0, sizeof(*ctx));
+  if((BANDWIDTH_den_extern != BW_GEN_NN) ||
+     (num_train <= 0) ||
+     (num_reg_continuous_extern <= 0) ||
+     (eval_start < 0) ||
+     (block_rows <= 0) ||
+     ((eval_start + block_rows) > num_train))
+    return 1;
+
+  ctx->eval_start = eval_start;
+  ctx->block_rows = block_rows;
+  ctx->bw_rows = bw_rows;
+  ctx->vsfx = alloc_vecd(MAX(1, num_reg_tot));
+  ctx->lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
+  ctx->matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
+  ctx->matrix_X_continuous_eval_block = (double **)calloc((size_t)num_reg_continuous_extern, sizeof(double *));
+
+  if((ctx->vsfx == NULL) ||
+     (ctx->lambdax == NULL) ||
+     (ctx->matrix_bandwidth_x == NULL) ||
+     (ctx->matrix_X_continuous_eval_block == NULL))
+    goto fail_x_block_bw_ctx;
+
+  np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
+                        num_var_ordered_extern,
+                        num_var_continuous_extern,
+                        num_reg_unordered_extern,
+                        num_reg_ordered_extern,
+                        num_reg_continuous_extern,
+                        vector_scale_factor,
+                        NULL,
+                        NULL,
+                        ctx->vsfx,
+                        NULL,
+                        NULL,
+                        NULL, NULL, NULL,
+                        NULL, NULL, NULL);
+
+  for(i = 0; i < num_reg_continuous_extern; i++)
+    ctx->matrix_X_continuous_eval_block[i] = matrix_X_continuous_train_extern[i] + eval_start;
+
+  if(kernel_bandwidth_mean(KERNEL_reg_extern,
+                           BANDWIDTH_den_extern,
+                           num_train,
+                           block_rows,
+                           0,
+                           0,
+                           0,
+                           num_reg_continuous_extern,
+                           num_reg_unordered_extern,
+                           num_reg_ordered_extern,
+                           0,
+                           ctx->vsfx,
+                           NULL,
+                           NULL,
+                           matrix_X_continuous_train_extern,
+                           ctx->matrix_X_continuous_eval_block,
+                           NULL,
+                           ctx->matrix_bandwidth_x,
+                           ctx->lambdax) == 1)
+    goto fail_x_block_bw_ctx;
+
+  ctx->ready = 1;
+  return 0;
+
+fail_x_block_bw_ctx:
+  np_conditional_x_block_bw_ctx_clear(ctx);
+  return 1;
+}
+
 static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_factor,
                                                           int eval_start,
                                                           int block_rows,
                                                           int drop_eval_self,
+                                                          const NPConditionalXBlockBwCtx *bwctx,
                                                           double **rows_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
@@ -21835,6 +21938,9 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
   NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
+  const int use_bwctx = (bwctx != NULL) && bwctx->ready &&
+    (bwctx->eval_start == eval_start) &&
+    (bwctx->block_rows == block_rows);
 
   if((rows_out == NULL) || (vector_scale_factor == NULL))
     return 1;
@@ -21864,15 +21970,15 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
   lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
+  matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
+  if((!use_bwctx) && (num_reg_continuous_extern > 0))
+    matrix_X_continuous_eval_block = (double **)calloc((size_t)num_reg_continuous_extern, sizeof(double *));
   kw = alloc_vecd(MAX(1, num_train));
   mean_row = alloc_vecd(MAX(1, num_train));
-  matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
   matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
   if(num_reg_unordered_extern > 0) eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
   if(num_reg_ordered_extern > 0) eval_xord_one = alloc_matd(1, num_reg_ordered_extern);
   if(num_reg_continuous_extern > 0) eval_xcon_one = alloc_matd(1, num_reg_continuous_extern);
-  if(num_reg_continuous_extern > 0)
-    matrix_X_continuous_eval_block = (double **)calloc((size_t)num_reg_continuous_extern, sizeof(double *));
 
   kernel_cx = (int *)calloc((size_t)MAX(1, num_reg_continuous_extern), sizeof(int));
   kernel_ux = (int *)calloc((size_t)MAX(1, num_reg_unordered_extern), sizeof(int));
@@ -21885,53 +21991,66 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
      ((num_reg_unordered_extern > 0) && (eval_xuno_one == NULL)) ||
      ((num_reg_ordered_extern > 0) && (eval_xord_one == NULL)) ||
      ((num_reg_continuous_extern > 0) && (eval_xcon_one == NULL)) ||
-     ((num_reg_continuous_extern > 0) && (matrix_X_continuous_eval_block == NULL)) ||
+     ((!use_bwctx) && (num_reg_continuous_extern > 0) && (matrix_X_continuous_eval_block == NULL)) ||
      (kernel_cx == NULL) || (kernel_ux == NULL) || (kernel_ox == NULL) || (x_operator == NULL))
     goto cleanup_xweight_block;
 
-  np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
-                        num_var_ordered_extern,
-                        num_var_continuous_extern,
-                        num_reg_unordered_extern,
-                        num_reg_ordered_extern,
-                        num_reg_continuous_extern,
-                        vector_scale_factor,
-                        NULL,
-                        NULL,
-                        vsfx,
-                        NULL,
-                        NULL,
-                        NULL, NULL, NULL,
-                        NULL, NULL, NULL);
+  if(use_bwctx){
+    for(i = 0; i < num_reg_tot; i++)
+      vsfx[i] = bwctx->vsfx[i];
+    for(i = 0; i < (num_reg_unordered_extern + num_reg_ordered_extern); i++)
+      lambdax[i] = bwctx->lambdax[i];
+    for(l = 0; l < num_reg_continuous_extern; l++)
+      for(i = 0; i < bw_rows; i++)
+        matrix_bandwidth_x[l][i] = bwctx->matrix_bandwidth_x[l][i];
+  } else {
+    np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
+                          num_var_ordered_extern,
+                          num_var_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          num_reg_continuous_extern,
+                          vector_scale_factor,
+                          NULL,
+                          NULL,
+                          vsfx,
+                          NULL,
+                          NULL,
+                          NULL, NULL, NULL,
+                          NULL, NULL, NULL);
+  }
 
   for(i = 0; i < num_reg_continuous_extern; i++){
     kernel_cx[i] = KERNEL_reg_extern;
-    matrix_X_continuous_eval_block[i] = matrix_X_continuous_train_extern[i] + eval_start;
+    if(!use_bwctx)
+      matrix_X_continuous_eval_block[i] = matrix_X_continuous_train_extern[i] + eval_start;
   }
   for(i = 0; i < num_reg_unordered_extern; i++) kernel_ux[i] = KERNEL_reg_unordered_extern;
   for(i = 0; i < num_reg_ordered_extern; i++) kernel_ox[i] = KERNEL_reg_ordered_extern;
   for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
 
-  if(kernel_bandwidth_mean(KERNEL_reg_extern,
-                           BANDWIDTH_den_extern,
-                           num_train,
-                           block_rows,
-                           0,
-                           0,
-                           0,
-                           num_reg_continuous_extern,
-                           num_reg_unordered_extern,
-                           num_reg_ordered_extern,
-                           0,
-                           vsfx,
-                           NULL,
-                           NULL,
-                           matrix_X_continuous_train_extern,
-                           matrix_X_continuous_eval_block,
-                           NULL,
-                           matrix_bandwidth_x,
-                           lambdax) == 1)
-    goto cleanup_xweight_block;
+  if(!use_bwctx){
+    if(kernel_bandwidth_mean(KERNEL_reg_extern,
+                             BANDWIDTH_den_extern,
+                             num_train,
+                             block_rows,
+                             0,
+                             0,
+                             0,
+                             num_reg_continuous_extern,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             0,
+                             vsfx,
+                             NULL,
+                             NULL,
+                             matrix_X_continuous_train_extern,
+                             matrix_X_continuous_eval_block,
+                             NULL,
+                             matrix_bandwidth_x,
+                             lambdax) == 1)
+      goto cleanup_xweight_block;
+  }
 
   if(ll_mode == LL_LP){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
@@ -22094,7 +22213,7 @@ cleanup_xweight_block:
   if(eval_xuno_one != NULL) free_mat(eval_xuno_one, num_reg_unordered_extern);
   if(eval_xord_one != NULL) free_mat(eval_xord_one, num_reg_ordered_extern);
   if(eval_xcon_one != NULL) free_mat(eval_xcon_one, num_reg_continuous_extern);
-  if(matrix_X_continuous_eval_block != NULL) free(matrix_X_continuous_eval_block);
+  if((!use_bwctx) && (matrix_X_continuous_eval_block != NULL)) free(matrix_X_continuous_eval_block);
   if(kernel_cx != NULL) free(kernel_cx);
   if(kernel_ux != NULL) free(kernel_ux);
   if(kernel_ox != NULL) free(kernel_ox);
@@ -22110,6 +22229,7 @@ static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor
                                                         eval_start,
                                                         block_rows,
                                                         1,
+                                                        NULL,
                                                         rows_out);
 }
 
@@ -22121,6 +22241,7 @@ static int np_conditional_x_weight_block_full_stream_core(double *vector_scale_f
                                                         eval_start,
                                                         block_rows,
                                                         0,
+                                                        NULL,
                                                         rows_out);
 }
 
@@ -23186,6 +23307,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
   double **xblock = NULL, **xblock_full = NULL, **yblock = NULL, **yconvblock = NULL;
   double *quad_cross = NULL;
+  NPConditionalXBlockBwCtx xbwctx = {0};
   int i0, j0, ii, jj;
   int status = 1;
 
@@ -23242,10 +23364,21 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     double lin = 0.0;
     double quad = 0.0;
 
-    if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
-      goto cleanup_cvls_lp_block;
-    if(np_conditional_x_weight_block_full_stream_core(vector_scale_factor, i0, ib, xblock_full) != 0)
-      goto cleanup_cvls_lp_block;
+    if((BANDWIDTH_den_extern == BW_GEN_NN) &&
+       (num_reg_continuous_extern > 0)){
+      if(np_conditional_x_block_bw_ctx_prepare(vector_scale_factor, i0, ib, &xbwctx) != 0)
+        goto cleanup_cvls_lp_block;
+      if(np_conditional_x_weight_block_stream_core_impl(vector_scale_factor, i0, ib, 1, &xbwctx, xblock) != 0)
+        goto cleanup_cvls_lp_block;
+      if(np_conditional_x_weight_block_stream_core_impl(vector_scale_factor, i0, ib, 0, &xbwctx, xblock_full) != 0)
+        goto cleanup_cvls_lp_block;
+      np_conditional_x_block_bw_ctx_clear(&xbwctx);
+    } else {
+      if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
+        goto cleanup_cvls_lp_block;
+      if(np_conditional_x_weight_block_full_stream_core(vector_scale_factor, i0, ib, xblock_full) != 0)
+        goto cleanup_cvls_lp_block;
+    }
     if(np_conditional_y_block_stream_op_core(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0)
       goto cleanup_cvls_lp_block;
 
@@ -23277,6 +23410,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   status = 0;
 
 cleanup_cvls_lp_block:
+  np_conditional_x_block_bw_ctx_clear(&xbwctx);
   if(xblock != NULL) free_tmat(xblock);
   if(xblock_full != NULL) free_tmat(xblock_full);
   if(yblock != NULL) free_tmat(yblock);
