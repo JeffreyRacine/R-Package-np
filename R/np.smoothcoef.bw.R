@@ -1754,7 +1754,7 @@ npscoefbw.scbandwidth <-
 
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("automatic degree search with search.engine='nomad' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
-  setup <- .npregbw_nomad_bw_setup(xdat = eval.zdat, template = template)
+  setup <- .npregbw_nomad_bw_setup(xdat = eval.zdat, template = template, allow.large.nn = TRUE)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
   ndeg <- length(degree.search$start.degree)

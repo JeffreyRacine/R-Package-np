@@ -880,6 +880,7 @@ npindexbw.NULL <-
         strategy = "single_iteration",
         remin = isTRUE(opt.args$powell.remin)
       )
+      hot.opt.args$bwsolver <- NULL
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
         degree = degree,
