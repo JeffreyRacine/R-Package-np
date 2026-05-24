@@ -1629,6 +1629,14 @@ npRegressionHasExtendedNn <- function(bws) {
       return(TRUE)
   }
 
+  if (!is.null(bws$bw) && is.null(bws$icon) &&
+      !is.null(bws$ncon) && isTRUE(as.integer(bws$ncon)[1L] > 0L)) {
+    bw <- suppressWarnings(as.double(bws$bw))
+    ncon <- as.integer(bws$ncon)[1L]
+    if (length(bw) >= ncon && any(is.finite(bw[seq_len(ncon)]) & bw[seq_len(ncon)] > upper))
+      return(TRUE)
+  }
+
   if (!is.null(bws$xbw) && !is.null(bws$ixcon) && any(bws$ixcon)) {
     xbw <- suppressWarnings(as.double(bws$xbw))
     ixcon <- as.logical(bws$ixcon)
