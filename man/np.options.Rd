@@ -63,7 +63,7 @@
     the ordinary \eqn{n-1} neighbor-count limit for eligible
     generalized/adaptive nearest-neighbor routes. When \code{TRUE}, a
     nearest-neighbor search parameter above \eqn{n-1} scales the saturated
-    nearest-neighbor bandwidth. Default is \code{FALSE}.
+    nearest-neighbor bandwidth. Default is \code{TRUE}.
 
     \item \code{np.largeh.rel.tol} (numeric): relative tolerance used by the
     continuous large-\eqn{h} shortcut. When all standardized distances for a
@@ -110,7 +110,7 @@ old <- options(
   np.categorical.compress = TRUE,
   np.powell.cache = TRUE,
   np.largeh = TRUE,
-  np.extendednn = FALSE,
+  np.extendednn = TRUE,
   np.largelambda = TRUE,
   np.messages = FALSE,
   np.largeh.rel.tol = 1e-3,
