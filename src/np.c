@@ -580,20 +580,27 @@ static double *np_continuous_largenn_upper_alloc(
   const double hard_upper = (double)INT_MAX / 4.0;
   double *upper = NULL;
   double *nn_distance = NULL;
+  double **matrix_x_eval_eff = matrix_x_eval;
+  int num_obs_eval_eff = num_obs_eval;
   int i, j;
+
+  if ((num_obs_eval_eff < 1) || (matrix_x_eval_eff == NULL)) {
+    num_obs_eval_eff = num_obs_train;
+    matrix_x_eval_eff = matrix_x_train;
+  }
 
   if (!np_largenn_enabled_np() ||
       !((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)) ||
       num_obs_train < 2 ||
-      num_obs_eval < 1 ||
+      num_obs_eval_eff < 1 ||
       num_continuous <= 0 ||
       matrix_x_train == NULL ||
-      matrix_x_eval == NULL) {
+      matrix_x_eval_eff == NULL) {
     return NULL;
   }
 
   upper = alloc_vecd(num_continuous);
-  nn_distance = alloc_vecd(MAX(num_obs_train, num_obs_eval));
+  nn_distance = alloc_vecd(MAX(num_obs_train, num_obs_eval_eff));
 
   for (i = 0; i < num_continuous; i++) {
     double xmin = DBL_MAX, xmax = -DBL_MAX;
@@ -617,9 +624,9 @@ static double *np_continuous_largenn_upper_alloc(
       continue;
 
     if (bandwidth == BW_GEN_NN) {
-      if (compute_nn_distance_train_eval(num_obs_train, num_obs_eval, 0,
+      if (compute_nn_distance_train_eval(num_obs_train, num_obs_eval_eff, 0,
                                          matrix_x_train[i],
-                                         matrix_x_eval[i],
+                                         matrix_x_eval_eff[i],
                                          base_k,
                                          nn_distance) == 1) {
         continue;
@@ -633,7 +640,7 @@ static double *np_continuous_largenn_upper_alloc(
       }
     }
 
-    for (j = 0; j < ((bandwidth == BW_GEN_NN) ? num_obs_eval : num_obs_train); j++) {
+    for (j = 0; j < ((bandwidth == BW_GEN_NN) ? num_obs_eval_eff : num_obs_train); j++) {
       if (R_FINITE(nn_distance[j]) && nn_distance[j] > 0.0)
         base_h_min = MIN(base_h_min, nn_distance[j]);
     }
@@ -641,8 +648,8 @@ static double *np_continuous_largenn_upper_alloc(
     if (!(base_h_min > 0.0) || !R_FINITE(base_h_min))
       continue;
 
-    for (j = 0; j < num_obs_eval; j++) {
-      const double v = matrix_x_eval[i][j];
+    for (j = 0; j < num_obs_eval_eff; j++) {
+      const double v = matrix_x_eval_eff[i][j];
       if (R_FINITE(v)) {
         const double d = MAX(fabs(v - xmin), fabs(xmax - v));
         if (R_FINITE(d))
