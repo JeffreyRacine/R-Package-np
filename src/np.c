@@ -1364,9 +1364,20 @@ static void bwm_nn_cache_note_raw_eval(void)
 static int bwm_nn_cache_get(double *p, double *value, int **key_out, int *stack_key)
 {
   int *key = NULL;
+  int i;
 
   if (!bwm_nn_cache_active || bwm_nn_cache_key_len <= 0)
     return 0;
+
+  for (i = 0; i < bwm_nn_cache_key_len; i++) {
+    const double value_i = p[i + 1];
+    if (!R_FINITE(value_i) ||
+        (value_i < 1.0) ||
+        (value_i > ((double)INT_MAX / 2.0))) {
+      return 0;
+    }
+  }
+
   if (!bwm_nn_cache_make_key(p, &key, stack_key))
     return 0;
 
