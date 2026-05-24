@@ -387,10 +387,11 @@ typedef struct {
   double *ckerlb;
   double *ckerub;
   double *vector_scale_factor;
+  double *largenn_upper;
 } NPRegressionNomadShadowCtx;
 
 static NPRegressionNomadShadowCtx np_regression_nomad_shadow =
-  {0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL};
+  {0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL};
 
 typedef struct {
   int active;
@@ -2421,6 +2422,7 @@ static void np_regression_nomad_shadow_clear_internal(void)
   safe_free(np_regression_nomad_shadow.ckerlb);
   safe_free(np_regression_nomad_shadow.ckerub);
   safe_free(np_regression_nomad_shadow.vector_scale_factor);
+  safe_free(np_regression_nomad_shadow.largenn_upper);
   safe_free(bwm_kernel_unordered_vec);
 
   matrix_X_unordered_train_extern = NULL;
@@ -2448,6 +2450,8 @@ static void np_regression_nomad_shadow_clear_internal(void)
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   int_cker_bound_extern = 0;
+  vector_largenn_upper_extern = NULL;
+  int_largenn_upper_num_extern = 0;
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
@@ -2675,6 +2679,20 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
   for (j = 0; j < num_reg_continuous_extern; j++)
     for (i = 0; i < num_obs_train_extern; i++)
       matrix_X_continuous_train_extern[j][i] = rcon[j * num_obs_train_extern + i];
+
+  np_regression_nomad_shadow.largenn_upper =
+    np_continuous_largenn_upper_alloc(
+      BANDWIDTH_reg_extern,
+      KERNEL_reg_extern,
+      num_obs_train_extern,
+      num_obs_train_extern,
+      num_reg_continuous_extern,
+      1,
+      matrix_X_continuous_train_extern,
+      matrix_X_continuous_train_extern);
+  vector_largenn_upper_extern = np_regression_nomad_shadow.largenn_upper;
+  int_largenn_upper_num_extern =
+    (vector_largenn_upper_extern != NULL) ? num_reg_continuous_extern : 0;
 
   for (i = 0; i < num_obs_train_extern; i++)
     vector_Y_extern[i] = y[i];
