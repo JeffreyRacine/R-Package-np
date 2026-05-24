@@ -799,7 +799,7 @@ npplregbw.plbandwidth =
     ydat = ydat,
     yname = template$ynames
   )
-  child.setup <- lapply(child.templates, function(tb) .npregbw_nomad_bw_setup(xdat = zdat, template = tb))
+  child.setup <- lapply(child.templates, function(tb) .npregbw_nomad_bw_setup(xdat = zdat, template = tb, allow.large.nn = TRUE))
   child.point.length <- vapply(seq_along(child.templates), function(i) {
     length(.npregbw_nomad_bw_to_point(child.templates[[i]]$bw, template = child.templates[[i]], setup = child.setup[[i]]))
   }, integer(1L))
