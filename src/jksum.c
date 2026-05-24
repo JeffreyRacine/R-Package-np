@@ -6245,6 +6245,26 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 static double * kernel_weighted_sum_pkw_extern = NULL;
 static int kernel_weighted_sum_pkw_nvar_extern = 0;
 
+static int np_hot_loop_interrupt_stride(const int total)
+{
+  if(total <= 16)
+    return 1;
+  if(total <= 128)
+    return 8;
+  if(total <= 1024)
+    return 16;
+  return 32;
+}
+
+static inline void np_hot_loop_check_interrupt(const int pos,
+                                               const int total,
+                                               const int stride)
+{
+  if((pos == 0) || ((pos + 1) >= total) ||
+     ((stride > 0) && ((pos % stride) == 0)))
+    R_CheckUserInterrupt();
+}
+
 static int kernel_weighted_sum_np_ctx_ex(
 int * KERNEL_reg,
 int * KERNEL_unordered_reg,
@@ -7112,9 +7132,12 @@ const int keep_kw_owner_local){
                                              MAX(ncol_Y, 1), num_xt, symmetric);
   }
 
+  const int interrupt_total = (je >= js) ? (je - js + 1) : 0;
+  const int interrupt_stride = np_hot_loop_interrupt_stride(interrupt_total);
+
     /* do sums */
   for(j=js; j <= je; j++, ws = (ws==NULL ? NULL : ws+ws_step), p_ws=(p_ws == NULL ? NULL : p_ws+ws_step)){
-    R_CheckUserInterrupt();
+    np_hot_loop_check_interrupt(j - js, interrupt_total, interrupt_stride);
 
     dband = 1.0;
     const int jbw = (BANDWIDTH_reg != BW_FIXED) ? j:0;
@@ -19991,7 +20014,11 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
   if(drop_eval_self)
     ctx->kw[eval_pos] = 0.0;
 
-  if(ctx->ll_mode == LL_LC){
+  if((ctx->ll_mode == LL_LC) ||
+     ((BANDWIDTH_den_extern == BW_ADAP_NN) &&
+      (ctx->ll_mode == LL_LP) &&
+      np_glp_cv_cache.ready &&
+      (np_glp_cv_cache.nterms == 1))){
     double row_sum = 0.0;
     for(j = 0; j < num_train; j++)
       row_sum += ctx->kw[j];
@@ -24605,6 +24632,99 @@ cleanup_cvls_lp_stream:
   return status;
 }
 
+static int np_conditional_density_cvls_lp_adap_block_stream(double *vector_scale_factor,
+                                                            double *cv){
+  const int num_obs = num_obs_train_extern;
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
+  double **xblock = NULL, **xblock_full = NULL, **yblock = NULL, **yconvblock = NULL;
+  double *quad_cross = NULL;
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0}, yconvctx = {0};
+  int i0, j0, ii, jj;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
+    return 1;
+  if(BANDWIDTH_den_extern != BW_ADAP_NN)
+    return 1;
+  if(int_cyker_bound_extern != 0)
+    return 1;
+
+  xblock = alloc_tmatd(num_obs, block_size);
+  xblock_full = alloc_tmatd(num_obs, block_size);
+  yblock = alloc_tmatd(num_obs, block_size);
+  yconvblock = alloc_tmatd(num_obs, block_size);
+  quad_cross = alloc_vecd(block_size*block_size);
+  if((xblock == NULL) || (xblock_full == NULL) || (yblock == NULL) ||
+     (yconvblock == NULL) || (quad_cross == NULL))
+    goto cleanup_cvls_lp_adap_block;
+
+  if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
+    goto cleanup_cvls_lp_adap_block;
+  if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
+    goto cleanup_cvls_lp_adap_block;
+  if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_CONVOLUTION, &yconvctx) != 0)
+    goto cleanup_cvls_lp_adap_block;
+
+  *cv = 0.0;
+  for(i0 = 0; i0 < num_obs; i0 += block_size){
+    const int ib = MIN(block_size, num_obs - i0);
+    double lin = 0.0;
+    double quad = 0.0;
+
+    for(ii = 0; ii < ib; ii++){
+      const int i = i0 + ii;
+      if(np_conditional_xrow_from_ctx(&xctx, i, xblock[ii]) != 0)
+        goto cleanup_cvls_lp_adap_block;
+      if(np_conditional_xrow_full_from_ctx(&xctx, i, xblock_full[ii]) != 0)
+        goto cleanup_cvls_lp_adap_block;
+      if(np_conditional_yrow_from_ctx(&yctx, i, yblock[ii]) != 0)
+        goto cleanup_cvls_lp_adap_block;
+    }
+
+    for(ii = 0; ii < ib; ii++)
+      lin += np_blas_ddot_int(num_obs, xblock[ii], yblock[ii]);
+
+    for(j0 = 0; j0 < num_obs; j0 += block_size){
+      const int jb = MIN(block_size, num_obs - j0);
+
+      for(jj = 0; jj < jb; jj++){
+        const int j = j0 + jj;
+        if(np_conditional_yrow_from_ctx(&yconvctx, j, yconvblock[jj]) != 0)
+          goto cleanup_cvls_lp_adap_block;
+      }
+
+      np_blas_dgemm_tn_int(ib, jb, num_obs, xblock_full[0], yconvblock[0], quad_cross);
+      for(ii = 0; ii < ib; ii++){
+        double * const ai = xblock_full[ii];
+        for(jj = 0; jj < jb; jj++){
+          const double aij = ai[j0 + jj];
+          if(aij == 0.0)
+            continue;
+          quad += aij*quad_cross[ii + jj*ib];
+        }
+      }
+    }
+
+    *cv += quad - 2.0*lin;
+  }
+
+  *cv /= (double)num_obs;
+  status = 0;
+
+cleanup_cvls_lp_adap_block:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  np_conditional_yrow_ctx_clear(&yconvctx);
+  if(xblock != NULL) free_tmat(xblock);
+  if(xblock_full != NULL) free_tmat(xblock_full);
+  if(yblock != NULL) free_tmat(yblock);
+  if(yconvblock != NULL) free_tmat(yconvblock);
+  if(quad_cross != NULL) free(quad_cross);
+  np_glp_cv_clear_extern();
+  return status;
+}
+
 static int np_conditional_density_cvls_categorical_profile_stream(double *vector_scale_factor,
                                                                   double *cv);
 
@@ -24659,9 +24779,11 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     return 0;
   }
 
-  if((BANDWIDTH_den_extern == BW_ADAP_NN) ||
-     (((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
-      (BANDWIDTH_den_extern != BW_FIXED)))
+  if(BANDWIDTH_den_extern == BW_ADAP_NN)
+    return np_conditional_density_cvls_lp_adap_block_stream(vector_scale_factor, cv);
+
+  if(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
+     (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
 
   xblock = alloc_tmatd(num_obs, block_size);
@@ -24893,6 +25015,113 @@ cleanup_cdist_lp_stream:
   np_conditional_yrow_ctx_clear(&yintctx);
   if(xrow != NULL) free(xrow);
   if(yint != NULL) free(yint);
+  return status;
+}
+
+static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_scale_factor,
+                                                                 double *cv){
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
+  double **xblock = NULL, **yintblock = NULL;
+  double *fit_cross = NULL;
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yintctx = {0};
+  int i0, j0, ii, jj;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
+    return 1;
+  if(BANDWIDTH_den_extern != BW_ADAP_NN)
+    return 1;
+
+  xblock = alloc_tmatd(num_train, block_size);
+  yintblock = alloc_tmatd(num_train, block_size);
+  fit_cross = alloc_vecd(block_size*block_size);
+  if((xblock == NULL) || (yintblock == NULL) || (fit_cross == NULL))
+    goto cleanup_cdist_lp_adap_block;
+
+  if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
+    goto cleanup_cdist_lp_adap_block;
+  if(np_conditional_yrow_eval_ctx_prepare(vector_scale_factor,
+                                          OP_INTEGRAL,
+                                          matrix_Y_unordered_eval_extern,
+                                          matrix_Y_ordered_eval_extern,
+                                          matrix_Y_continuous_eval_extern,
+                                          num_eval,
+                                          &yintctx) != 0)
+    goto cleanup_cdist_lp_adap_block;
+
+  *cv = 0.0;
+  for(i0 = 0; i0 < num_train; i0 += block_size){
+    const int ib = MIN(block_size, num_train - i0);
+    double block_sum = 0.0;
+
+    for(ii = 0; ii < ib; ii++){
+      const int i = i0 + ii;
+      if(np_conditional_xrow_from_ctx(&xctx, i, xblock[ii]) != 0)
+        goto cleanup_cdist_lp_adap_block;
+    }
+
+    for(j0 = 0; j0 < num_eval; j0 += block_size){
+      const int jb = MIN(block_size, num_eval - j0);
+
+      for(jj = 0; jj < jb; jj++){
+        const int j = j0 + jj;
+        if(np_conditional_y_eval_from_ctx(&yintctx,
+                                          j,
+                                          matrix_Y_unordered_eval_extern,
+                                          matrix_Y_ordered_eval_extern,
+                                          matrix_Y_continuous_eval_extern,
+                                          num_eval,
+                                          cdfontrain_extern && (num_eval == num_train),
+                                          yintblock[jj]) != 0)
+          goto cleanup_cdist_lp_adap_block;
+      }
+
+      np_blas_dgemm_tn_int(ib, jb, num_train, xblock[0], yintblock[0], fit_cross);
+      for(ii = 0; ii < ib; ii++){
+        const int train_i = i0 + ii;
+
+        for(jj = 0; jj < jb; jj++){
+          const int eval_j = j0 + jj;
+          double fit;
+          int indy;
+
+          if(cdfontrain_extern && (train_i == eval_j))
+            continue;
+
+          fit = fit_cross[ii + jj*ib];
+          indy = np_conditional_indicator_row_core(train_i,
+                                                   eval_j,
+                                                   cdfontrain_extern,
+                                                   matrix_Y_ordered_train_extern,
+                                                   matrix_Y_continuous_train_extern,
+                                                   matrix_Y_ordered_eval_extern,
+                                                   matrix_Y_continuous_eval_extern,
+                                                   num_var_ordered_extern,
+                                                   num_var_continuous_extern);
+          {
+            const double tvd = ((double)indy) - fit;
+            block_sum += tvd*tvd;
+          }
+        }
+      }
+    }
+
+    *cv += block_sum;
+  }
+
+  *cv /= ((double)num_train*(double)MAX(1, num_eval));
+  status = 0;
+
+cleanup_cdist_lp_adap_block:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yintctx);
+  if(xblock != NULL) free_tmat(xblock);
+  if(yintblock != NULL) free_tmat(yintblock);
+  if(fit_cross != NULL) free(fit_cross);
+  np_glp_cv_clear_extern();
   return status;
 }
 
@@ -25733,9 +25962,11 @@ int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
     return 0;
   }
 
-  if((BANDWIDTH_den_extern == BW_ADAP_NN) ||
-     (((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
-      (BANDWIDTH_den_extern != BW_FIXED)))
+  if(BANDWIDTH_den_extern == BW_ADAP_NN)
+    return np_conditional_distribution_cvls_lp_adap_block_stream(vector_scale_factor, cv);
+
+  if(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
+     (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
 
   xblock = alloc_tmatd(num_train, block_size);
