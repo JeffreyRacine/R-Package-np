@@ -16725,6 +16725,7 @@ double *SIGN){
     MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
     MATRIX KWM2 = NULL, KWM_INV = NULL, IDEN = NULL;
     double **basis = NULL;
+    double **matrix_bandwidth_eval = NULL;
     double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
     double **Ycols = NULL, **Wcols = NULL;
     double *y2 = NULL, *out = NULL, *out2 = NULL;
@@ -16748,6 +16749,8 @@ double *SIGN){
     KWM_INV = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
     IDEN = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
     basis = alloc_matd(num_obs_train, glp_nterms);
+    if(BANDWIDTH_reg == BW_GEN_NN)
+      matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
     TCON = alloc_matd(1, num_reg_continuous);
     TUNO = alloc_matd(1, num_reg_unordered);
     TORD = alloc_matd(1, num_reg_ordered);
@@ -16766,6 +16769,7 @@ double *SIGN){
     if(!((KWM != NULL) && (XTKY != NULL) && (DELTA != NULL) &&
       (KWM2 != NULL) && (KWM_INV != NULL) && (IDEN != NULL) &&
       (basis != NULL) &&
+      ((BANDWIDTH_reg != BW_GEN_NN) || (num_reg_continuous == 0) || (matrix_bandwidth_eval != NULL)) &&
       ((num_reg_continuous == 0) || (TCON != NULL)) &&
       ((num_reg_unordered == 0) || (TUNO != NULL)) &&
       ((num_reg_ordered == 0) || (TORD != NULL)) &&
@@ -16812,8 +16816,11 @@ double *SIGN){
       double sk, ey, ey2, sigma2hat;
       int have_vcov = 0;
 
-      for(l = 0; l < num_reg_continuous; l++)
+      for(l = 0; l < num_reg_continuous; l++){
         TCON[l][0] = matrix_X_continuous_eval[l][j];
+        if(BANDWIDTH_reg == BW_GEN_NN)
+          matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j];
+      }
       for(l = 0; l < num_reg_unordered; l++)
         TUNO[l][0] = matrix_X_unordered_eval[l][j];
       for(l = 0; l < num_reg_ordered; l++)
@@ -16868,7 +16875,7 @@ double *SIGN){
                              vector_scale_factor,
                              1,
                              matrix_bandwidth,
-                             matrix_bandwidth,
+                             (BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth_eval : matrix_bandwidth,
                              lambda,
                              num_categories,
                              matrix_categorical_vals,
@@ -16971,7 +16978,7 @@ double *SIGN){
                              vector_scale_factor,
                              1,
                              matrix_bandwidth,
-                             matrix_bandwidth,
+                             (BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth_eval : matrix_bandwidth,
                              lambda,
                              num_categories,
                              matrix_categorical_vals,
@@ -17082,6 +17089,7 @@ double *SIGN){
     mat_free(KWM_INV);
     mat_free(IDEN);
     free_mat(basis, glp_nterms);
+    if(matrix_bandwidth_eval != NULL) free_tmat(matrix_bandwidth_eval);
     if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
     if((TUNO != NULL) && (num_reg_unordered > 0)) free_mat(TUNO, num_reg_unordered);
     if((TORD != NULL) && (num_reg_ordered > 0)) free_mat(TORD, num_reg_ordered);
