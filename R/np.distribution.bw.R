@@ -116,7 +116,7 @@ npudistbw.NULL <-
   setup <- .npregbw_nomad_bw_setup(
     xdat = dat,
     template = template,
-    allow.large.nn = TRUE,
+    allow.extended.nn = TRUE,
     evaldat = if (is.null(gdat)) dat else gdat
   )
   bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
@@ -306,7 +306,7 @@ npudistbw.dbandwidth <-
          !all(vapply(as.data.frame(dat[, bws$iuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'dat'", "in type"))
 
-    npValidateLargeNnContinuousBandwidth(bws, where = "npudistbw")
+    npValidateExtendedNnContinuousBandwidth(bws, where = "npudistbw")
 
     if(any(bws$iuno))
       stop("distribution bandwidth selection does not support unordered data types")

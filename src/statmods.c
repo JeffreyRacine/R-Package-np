@@ -31,8 +31,8 @@ extern int int_ROBUST;
 extern int int_nn_k_min_extern;
 extern int *vector_X_support_count_extern;
 extern int *vector_Y_support_count_extern;
-extern double *vector_largenn_upper_extern;
-extern int int_largenn_upper_num_extern;
+extern double *vector_extendednn_upper_extern;
+extern int int_extendednn_upper_num_extern;
 extern double nconfac_extern;
 extern double *vector_continuous_stddev_extern;
 
@@ -86,9 +86,9 @@ int np_fround(double x)
 #include <limits.h>
 #include <float.h>
 
-static int np_largenn_enabled_statmods(void)
+static int np_extendednn_enabled_statmods(void)
 {
-  const SEXP val = Rf_GetOption1(Rf_install("np.largenn"));
+  const SEXP val = Rf_GetOption1(Rf_install("np.extendednn"));
   const int flag = Rf_asLogical(val);
   return flag == TRUE;
 }
@@ -109,19 +109,19 @@ static int np_nn_scale_factor_is_valid(double value,
     return 0;
 
   if(rounded > upper)
-    return allow_extended && np_largenn_enabled_statmods();
+    return allow_extended && np_extendednn_enabled_statmods();
 
   return 1;
 }
 
-static double np_largenn_upper_for_reg(const int zero_index, const double fallback)
+static double np_extendednn_upper_for_reg(const int zero_index, const double fallback)
 {
-  if ((vector_largenn_upper_extern != NULL) &&
+  if ((vector_extendednn_upper_extern != NULL) &&
       (zero_index >= 0) &&
-      (zero_index < int_largenn_upper_num_extern) &&
-      isfinite(vector_largenn_upper_extern[zero_index]) &&
-      (vector_largenn_upper_extern[zero_index] >= fallback)) {
-    return vector_largenn_upper_extern[zero_index];
+      (zero_index < int_extendednn_upper_num_extern) &&
+      isfinite(vector_extendednn_upper_extern[zero_index]) &&
+      (vector_extendednn_upper_extern[zero_index] >= fallback)) {
+    return vector_extendednn_upper_extern[zero_index];
   }
 
   return fallback;
@@ -936,14 +936,14 @@ int initialize_nr_directions(int BANDWIDTH,
     for(i = 1; i <= num_reg_continuous; i++){
       const double bw_max =
         ((BANDWIDTH == BW_GEN_NN) || (BANDWIDTH == BW_ADAP_NN)) ?
-        np_largenn_upper_for_reg(i - 1, (double)(num_obs - 1)) :
+        np_extendednn_upper_for_reg(i - 1, (double)(num_obs - 1)) :
         (double)(np_support_count_x(i - 1, num_obs, matrix_x_continuous) - 1);
       matrix_y[i][i] = ceil(MIN(vector_scale_factor[i], bw_max - vector_scale_factor[i])*(random ? ran3(&seed): 1.0));
     }
     for(i = num_reg_continuous+1; i <= li; i++){
       const double bw_max =
         ((BANDWIDTH == BW_ADAP_NN) || (BANDWIDTH == BW_GEN_NN)) ?
-        np_largenn_upper_for_reg(i - 1, (double)(num_obs - 1)) :
+        np_extendednn_upper_for_reg(i - 1, (double)(num_obs - 1)) :
         (double)(np_support_count_y(i - num_reg_continuous - 1, num_obs, matrix_y_continuous) - 1);
       matrix_y[i][i] = ceil(MIN(vector_scale_factor[i], bw_max - vector_scale_factor[i])*(random ? ran3(&seed): 1.0));
     }
@@ -1063,7 +1063,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
         }
       } else {
         const double bw_kmax = ((BANDWIDTH == BW_GEN_NN) || (BANDWIDTH == BW_ADAP_NN)) ?
-          np_largenn_upper_for_reg(i, (double)(num_obs - 1)) :
+          np_extendednn_upper_for_reg(i, (double)(num_obs - 1)) :
           count_bw ? (double)(num_obs - 1) : (double)(np_support_count_x(i, num_obs, matrix_x_continuous) - 1);
         if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_kmax)){
           REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
@@ -1103,7 +1103,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
         }
       } else {
         const double bw_kmax = ((BANDWIDTH == BW_GEN_NN) || (BANDWIDTH == BW_ADAP_NN)) ?
-          np_largenn_upper_for_reg(l, (double)(num_obs - 1)) :
+          np_extendednn_upper_for_reg(l, (double)(num_obs - 1)) :
           count_bw ? (double)(num_obs - 1) : (double)(np_support_count_y(i, num_obs, matrix_y_continuous) - 1);
         if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_kmax)){
           REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
@@ -1782,11 +1782,11 @@ double *vector_scale_factor)
             if(!np_nn_scale_factor_is_valid(vector_scale_factor[i],
                                             MAX(1, int_nn_k_min_extern),
                                             (int)MIN((double)INT_MAX / 2.0,
-                                                     np_largenn_upper_for_reg(i - 1, (double)(num_obs - 1))),
+                                                     np_extendednn_upper_for_reg(i - 1, (double)(num_obs - 1))),
                                             ((BANDWIDTH == BW_GEN_NN) ||
                                              (BANDWIDTH == BW_ADAP_NN)) &&
                                             (num_var_continuous == 0) &&
-                                            (vector_largenn_upper_extern == NULL)))
+                                            (vector_extendednn_upper_extern == NULL)))
             {
                 return(1);
             }
@@ -1810,7 +1810,7 @@ double *vector_scale_factor)
             if(!np_nn_scale_factor_is_valid(vector_scale_factor[i],
                                             MAX(1, int_nn_k_min_extern),
                                             (int)MIN((double)INT_MAX / 2.0,
-                                                     np_largenn_upper_for_reg(i - 1, (double)(num_obs - 1))),
+                                                     np_extendednn_upper_for_reg(i - 1, (double)(num_obs - 1))),
                                             0))
             {
                 return(1);

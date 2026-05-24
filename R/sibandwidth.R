@@ -33,10 +33,10 @@
   }
 
   if (h > upper) {
-    if (!npLargeNnEnabled()) {
+    if (!npExtendedNnEnabled()) {
       stop(
         sprintf(
-          "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+          "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.extendednn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
           where
         ),
         call. = FALSE

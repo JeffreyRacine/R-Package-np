@@ -511,7 +511,7 @@ npcdensbw.conbandwidth <-
          !all(vapply(as.data.frame(xdat[, bws$ixuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
 
-    npValidateConditionalLargeNn(bws, where = "npcdensbw")
+    npValidateConditionalExtendedNn(bws, where = "npcdensbw")
 
     ## catch and destroy NA's
     goodrows <- seq_len(nrow(xdat))
@@ -1224,7 +1224,7 @@ npcdensbw.conbandwidth <-
     xdat = xdat,
     ydat = ydat,
     template = template,
-    allow.large.nn = TRUE
+    allow.extended.nn = TRUE
   )
   setup$nobs <- nrow(toFrame(xdat))
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
@@ -1372,7 +1372,7 @@ npcdensbw.conbandwidth <-
                                       ydat,
                                       template,
                                       bandwidth.scale.categorical = 1e4,
-                                      allow.large.nn = FALSE) {
+                                      allow.extended.nn = FALSE) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   xmat <- toMatrix(xdat)
@@ -1406,16 +1406,16 @@ npcdensbw.conbandwidth <-
     rep.int(1, length(x_ord_flat))
   )
 
-  cont_largenn_upper <- if (isTRUE(allow.large.nn)) {
+  cont_extendednn_upper <- if (isTRUE(allow.extended.nn)) {
     c(
-      npContinuousLargeNnNomadUpper(
+      npContinuousExtendedNnNomadUpper(
         traindat = ydat,
         evaldat = ydat,
         bwtype = template$type,
         ckertype = template$cykertype,
         cont.idx = which(template$iycon)
       ),
-      npContinuousLargeNnNomadUpper(
+      npContinuousExtendedNnNomadUpper(
         traindat = xdat,
         evaldat = xdat,
         bwtype = template$type,
@@ -1441,7 +1441,7 @@ npcdensbw.conbandwidth <-
     ncatfac = ncatfac,
     bandwidth.scale.categorical = bandwidth.scale.categorical,
     cat_upper = cat_upper,
-    cont_largenn_upper = cont_largenn_upper
+    cont_extendednn_upper = cont_extendednn_upper
   )
   .npAssertConditionalNomadSetup(setup, where = "npcdensbw")
   setup
@@ -1461,9 +1461,9 @@ npcdensbw.conbandwidth <-
       bws[setup$cont_flat] <- if (isTRUE(template$scaling)) cont_point else ext_bw
     } else {
       nn_bw <- round(cont_point)
-      nn_upper <- if (!is.null(setup$cont_largenn_upper) &&
-                      length(setup$cont_largenn_upper) == length(setup$cont_flat)) {
-        pmax(1, as.double(setup$cont_largenn_upper))
+      nn_upper <- if (!is.null(setup$cont_extendednn_upper) &&
+                      length(setup$cont_extendednn_upper) == length(setup$cont_flat)) {
+        pmax(1, as.double(setup$cont_extendednn_upper))
       } else if (!is.null(setup$nobs)) {
         rep.int(max(1L, as.integer(setup$nobs) - 1L), length(setup$cont_flat))
       } else {
@@ -1529,9 +1529,9 @@ npcdensbw.conbandwidth <-
       cont_bbin <- rep.int(0L, ncont)
     } else {
       nn_lower <- 1L
-      nn_upper <- if (!is.null(setup$cont_largenn_upper) &&
-                      length(setup$cont_largenn_upper) == ncont) {
-        pmax(nn_lower, as.double(setup$cont_largenn_upper))
+      nn_upper <- if (!is.null(setup$cont_extendednn_upper) &&
+                      length(setup$cont_extendednn_upper) == ncont) {
+        pmax(nn_lower, as.double(setup$cont_extendednn_upper))
       } else {
         rep.int(max(nn_lower, as.integer(setup$nobs) - 1L), ncont)
       }
@@ -1701,7 +1701,7 @@ npcdensbw.conbandwidth <-
     xdat = xdat,
     ydat = ydat,
     template = template,
-    allow.large.nn = TRUE
+    allow.extended.nn = TRUE
   )
   setup$nobs <- nrow(toFrame(xdat))
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)

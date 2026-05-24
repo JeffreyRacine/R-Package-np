@@ -470,7 +470,7 @@ nplsqregbw <-
     stop("nplsqregbw nomad=TRUE requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'",
          call. = FALSE)
 
-  setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template, allow.large.nn = TRUE)
+  setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template, allow.extended.nn = TRUE)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) {

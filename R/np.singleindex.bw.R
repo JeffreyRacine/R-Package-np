@@ -131,7 +131,7 @@ npindexbw.NULL <-
   hard.upper <- .Machine$integer.max / 2
   k <- .np_round_half_to_even(h)
   upper.ok <- (k <= upper) ||
-    (npLargeNnEnabled() && (k <= hard.upper) &&
+    (npExtendedNnEnabled() && (k <= hard.upper) &&
        (as.character(bwtype)[1L] %in% c("generalized_nn", "adaptive_nn")))
   list(ok = (k >= lower) && upper.ok, value = as.double(k))
 }
@@ -193,10 +193,10 @@ npindexbw.NULL <-
     }
     upper <- max(2L, as.integer(nobs) - 1L)
     if (!identical(bwtype, "fixed") && is.finite(h) && h > upper &&
-        !npLargeNnEnabled()) {
+        !npExtendedNnEnabled()) {
       stop(
         sprintf(
-          "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+          "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.extendednn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
           where
         ),
         call. = FALSE

@@ -1497,11 +1497,11 @@ npRegressionNnLowerBound <- function(bws) {
   2L
 }
 
-npLargeNnEnabled <- function() {
-  isTRUE(getOption("np.largenn", FALSE))
+npExtendedNnEnabled <- function() {
+  isTRUE(getOption("np.extendednn", FALSE))
 }
 
-npContinuousLargeNnNomadUpper <- function(traindat,
+npContinuousExtendedNnNomadUpper <- function(traindat,
                                           bwtype,
                                           ckertype,
                                           cont.idx,
@@ -1514,7 +1514,7 @@ npContinuousLargeNnNomadUpper <- function(traindat,
   fallback <- rep.int(as.double(base.k), ncon)
   bwtype <- as.character(bwtype)[1L]
 
-  if (!npLargeNnEnabled() ||
+  if (!npExtendedNnEnabled() ||
       ncon < 1L ||
       !(bwtype %in% c("generalized_nn", "adaptive_nn")) ||
       base.k < 1L) {
@@ -1577,7 +1577,7 @@ npContinuousLargeNnNomadUpper <- function(traindat,
   upper
 }
 
-npRegressionLargeNnNomadUpper <- function(xdat,
+npRegressionExtendedNnNomadUpper <- function(xdat,
                                           template,
                                           cont.idx,
                                           safety.margin = 1.5,
@@ -1585,7 +1585,7 @@ npRegressionLargeNnNomadUpper <- function(xdat,
   if (!inherits(template, "rbandwidth"))
     return(rep.int(as.double(as.integer(NROW(xdat)) - 1L), length(cont.idx)))
 
-  npContinuousLargeNnNomadUpper(
+  npContinuousExtendedNnNomadUpper(
     traindat = xdat,
     bwtype = template$type,
     ckertype = template$ckertype,
@@ -1596,10 +1596,24 @@ npRegressionLargeNnNomadUpper <- function(xdat,
 }
 
 npRegressionHasExtendedNn <- function(bws) {
+  if (is.null(bws))
+    return(FALSE)
+
+  if (!is.null(bws$reg.bws) && npRegressionHasExtendedNn(bws$reg.bws))
+    return(TRUE)
+
+  if (!is.null(bws$tau.bws) && is.list(bws$tau.bws)) {
+    if (any(vapply(bws$tau.bws, npRegressionHasExtendedNn, logical(1L))))
+      return(TRUE)
+  }
+
+  if (!is.null(bws$bw) && is.list(bws$bw) && !is.data.frame(bws$bw)) {
+    if (any(vapply(bws$bw, npRegressionHasExtendedNn, logical(1L))))
+      return(TRUE)
+  }
+
   if (is.null(bws$type) ||
       !(as.character(bws$type)[1L] %in% c("generalized_nn", "adaptive_nn")) ||
-      is.null(bws$icon) ||
-      !any(bws$icon) ||
       is.null(bws$nobs)) {
     return(FALSE)
   }
@@ -1608,11 +1622,31 @@ npRegressionHasExtendedNn <- function(bws) {
   if (!is.finite(upper) || upper < 1)
     return(FALSE)
 
-  bw <- as.double(bws$bw)
-  any(is.finite(bw[bws$icon]) & bw[bws$icon] > upper)
+  if (!is.null(bws$bw) && !is.null(bws$icon) && any(bws$icon)) {
+    bw <- suppressWarnings(as.double(bws$bw))
+    icon <- as.logical(bws$icon)
+    if (length(bw) >= length(icon) && any(is.finite(bw[icon]) & bw[icon] > upper))
+      return(TRUE)
+  }
+
+  if (!is.null(bws$xbw) && !is.null(bws$ixcon) && any(bws$ixcon)) {
+    xbw <- suppressWarnings(as.double(bws$xbw))
+    ixcon <- as.logical(bws$ixcon)
+    if (length(xbw) >= length(ixcon) && any(is.finite(xbw[ixcon]) & xbw[ixcon] > upper))
+      return(TRUE)
+  }
+
+  if (!is.null(bws$ybw) && !is.null(bws$iycon) && any(bws$iycon)) {
+    ybw <- suppressWarnings(as.double(bws$ybw))
+    iycon <- as.logical(bws$iycon)
+    if (length(ybw) >= length(iycon) && any(is.finite(ybw[iycon]) & ybw[iycon] > upper))
+      return(TRUE)
+  }
+
+  FALSE
 }
 
-npValidateLargeNnContinuousBandwidth <- function(bws,
+npValidateExtendedNnContinuousBandwidth <- function(bws,
                                                  where,
                                                  nobs = NULL) {
   if (is.null(bws$type) ||
@@ -1648,10 +1682,10 @@ npValidateLargeNnContinuousBandwidth <- function(bws,
     )
   }
 
-  if (!npLargeNnEnabled()) {
+  if (!npExtendedNnEnabled()) {
     stop(
       sprintf(
-        "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+        "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.extendednn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
         where
       ),
       call. = FALSE
@@ -1661,7 +1695,7 @@ npValidateLargeNnContinuousBandwidth <- function(bws,
   invisible(bws)
 }
 
-npValidateConditionalLargeNn <- function(bws,
+npValidateConditionalExtendedNn <- function(bws,
                                          where,
                                          nobs = NULL) {
   if (is.null(bws$type) ||
@@ -1704,10 +1738,10 @@ npValidateConditionalLargeNn <- function(bws,
     )
   }
 
-  if (!npLargeNnEnabled()) {
+  if (!npExtendedNnEnabled()) {
     stop(
       sprintf(
-        "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+        "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.extendednn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
         where
       ),
       call. = FALSE
@@ -1717,7 +1751,7 @@ npValidateConditionalLargeNn <- function(bws,
   invisible(bws)
 }
 
-npValidateRegressionLargeNn <- function(bws,
+npValidateRegressionExtendedNn <- function(bws,
                                         where,
                                         bandwidth.compute = FALSE) {
   if (!inherits(bws, "rbandwidth") ||
@@ -1751,10 +1785,10 @@ npValidateRegressionLargeNn <- function(bws,
     )
   }
 
-  if (!npLargeNnEnabled()) {
+  if (!npExtendedNnEnabled()) {
     stop(
       sprintf(
-        "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.largenn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
+        "%s: nearest-neighbor bandwidth exceeds n-1; set options(np.extendednn = TRUE) to allow extended generalized_nn/adaptive_nn bandwidths",
         where
       ),
       call. = FALSE
@@ -2388,7 +2422,7 @@ genBwSelStr <- function(x){
   pmethod.str <- if (is.null(x$pmethod)) "" else paste("\nBandwidth Selection Method:", x$pmethod)
   formula.str <- if (!identical(x$formula, NULL)) paste("\nFormula:", paste(deparse(x$formula), collapse = "\n")) else ""
   ptype.str <- if (is.null(x$ptype)) "" else paste("\nBandwidth Type: ", x$ptype, sep = "")
-  largenn.str <- if (npRegressionHasExtendedNn(x)) {
+  extendednn.str <- if (npRegressionHasExtendedNn(x)) {
     "\nExtended NN: K above n-1 scales the saturated nearest-neighbor bandwidth"
   } else {
     ""
@@ -2398,7 +2432,7 @@ genBwSelStr <- function(x){
         pmethod.str,
         formula.str,
         ptype.str,
-        largenn.str,
+        extendednn.str,
         fval.str,
         nfe.str,
         sep = "")
