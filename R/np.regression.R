@@ -331,7 +331,7 @@ npreg.rbandwidth <-
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
     npValidateRegressionNnLowerBound(bws, where = "npreg")
-    npValidateRegressionLargeNn(
+    npValidateRegressionExtendedNn(
       bws,
       where = "npreg",
       bandwidth.compute = FALSE

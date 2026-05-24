@@ -1106,7 +1106,7 @@ npscoefbw.NULL <-
 
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("automatic degree search with search.engine='nomad' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
-  setup <- .npregbw_nomad_bw_setup(xdat = eval.zdat, template = template, allow.large.nn = TRUE)
+  setup <- .npregbw_nomad_bw_setup(xdat = eval.zdat, template = template, allow.extended.nn = TRUE)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
   ndeg <- length(degree.search$start.degree)
@@ -1439,7 +1439,7 @@ npscoefbw.NULL <-
       return(NA_real_)
     k <- .np_round_half_to_even(h)
     if (k > upper &&
-        npLargeNnEnabled() &&
+        npExtendedNnEnabled() &&
         bwtype %in% c("generalized_nn", "adaptive_nn") &&
         k <= hard.upper) {
       return(as.double(k))
@@ -1537,7 +1537,7 @@ npscoefbw.NULL <-
       )
     ))
 
-  start <- if (npLargeNnEnabled() &&
+  start <- if (npExtendedNnEnabled() &&
                bwtype %in% c("generalized_nn", "adaptive_nn") &&
                is.finite(start.controls$scale.factor.init) &&
                start.controls$scale.factor.init > max(1L, as.integer(nobs) - 1L)) {

@@ -31,9 +31,9 @@ extern double nconfac_extern;
 extern double ncatfac_extern;
 extern double * vector_continuous_stddev_extern;
 
-static int np_largenn_enabled(void)
+static int np_extendednn_enabled(void)
 {
-	const SEXP val = Rf_GetOption1(Rf_install("np.largenn"));
+	const SEXP val = Rf_GetOption1(Rf_install("np.extendednn"));
 	const int flag = Rf_asLogical(val);
 	return flag == TRUE;
 }
@@ -66,7 +66,7 @@ double *distance_scale)
 
 	if(rounded_k > max_k)
 	{
-		if(!allow_extended || !np_largenn_enabled())
+		if(!allow_extended || !np_extendednn_enabled())
 		{
 			return(1);
 		}

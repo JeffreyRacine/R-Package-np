@@ -61,6 +61,14 @@
     while forcing continuous large-bandwidth objective rows through the
     ordinary kernel-summation machinery for diagnostic timing comparisons.
 
+    \item \code{np.extendednn} (logical): enables extended nearest-neighbor
+    bandwidth search and manually supplied nearest-neighbor bandwidths above
+    the ordinary \eqn{n-1} neighbor-count limit for eligible
+    generalized/adaptive nearest-neighbor routes. When \code{TRUE}, a
+    nearest-neighbor search parameter above \eqn{n-1} scales the saturated
+    nearest-neighbor bandwidth. Default is \code{FALSE}. This option is
+    synchronized to MPI workers in autodispatch sessions.
+
     \item \code{np.largeh.rel.tol} (numeric): relative tolerance used by the
     continuous large-\eqn{h} shortcut. When all standardized distances for a
     continuous predictor are sufficiently close to zero, the corresponding
@@ -115,6 +123,7 @@ old <- options(
   np.categorical.compress = TRUE,
   np.powell.cache = TRUE,
   np.largeh = TRUE,
+  np.extendednn = FALSE,
   np.largelambda = TRUE,
   np.messages = FALSE,
   np.largeh.rel.tol = 1e-3,

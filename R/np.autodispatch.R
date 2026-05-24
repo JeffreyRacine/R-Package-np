@@ -1,6 +1,6 @@
 .npRmpi_autodispatch_option_keys <- function() {
   c("np.messages", "np.tree", "np.categorical.compress", "np.largeh",
-    "np.powell.cache", "np.largelambda", "np.largenn", "np.largeh.rel.tol",
+    "np.powell.cache", "np.largelambda", "np.extendednn", "np.largeh.rel.tol",
     "np.disc.upper.rel.tol")
 }
 

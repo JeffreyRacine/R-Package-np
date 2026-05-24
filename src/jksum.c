@@ -9289,7 +9289,7 @@ static int np_reg_cv_all_large_gate(const int BANDWIDTH_reg,
   return 1;
 }
 
-static int np_largenn_mpi_lc_all_large_gate(const int BANDWIDTH_reg,
+static int np_extendednn_mpi_lc_all_large_gate(const int BANDWIDTH_reg,
                                             const int int_ll_cv,
                                             const int num_obs,
                                             const int num_reg_continuous,
@@ -9305,7 +9305,7 @@ static int np_largenn_mpi_lc_all_large_gate(const int BANDWIDTH_reg,
     (num_reg_unordered == 0) &&
     (num_reg_ordered == 0) &&
     np_largeh_enabled() &&
-    np_get_option_logical("np.largenn", 0);
+    np_get_option_logical("np.extendednn", 0);
   double *local_hmin = NULL, *global_hmin = NULL;
   int *cont_ok = NULL;
   double *cont_hmin = NULL, *cont_k0 = NULL;
@@ -9385,7 +9385,7 @@ finish:
 
 static inline double np_check_loss_value(const double residual, const double tau);
 
-static int np_largenn_lc_fast_objective(const int bwm,
+static int np_extendednn_lc_fast_objective(const int bwm,
                                         const int num_obs,
                                         const double * const vector_Y,
                                         double * const cv,
@@ -11361,7 +11361,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     
     return(DBL_MAX);
   }
-  if(np_largenn_mpi_lc_all_large_gate(BANDWIDTH_reg,
+  if(np_extendednn_mpi_lc_all_large_gate(BANDWIDTH_reg,
                                       int_ll_cv,
                                       num_obs,
                                       num_reg_continuous,
@@ -11370,7 +11370,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                       kernel_c,
                                       matrix_X_continuous,
                                       matrix_bandwidth)){
-    if(np_largenn_lc_fast_objective(bwm,
+    if(np_extendednn_lc_fast_objective(bwm,
                                     num_obs,
                                     vector_Y,
                                     &cv,

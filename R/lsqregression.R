@@ -375,6 +375,8 @@ lsqregression <-
     if (!identical(bws$formula, NULL))
       cat("\nFormula:", paste(deparse(bws$formula), collapse = "\n"))
     cat("\nBandwidth Type:", bws$ptype)
+    if (npRegressionHasExtendedNn(bws))
+      cat("\nExtended NN: K above n-1 scales the saturated nearest-neighbor bandwidth")
   } else {
     cat(genRegEstStr(x))
   }
