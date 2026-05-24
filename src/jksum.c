@@ -7733,7 +7733,8 @@ const int keep_kw_owner_local){
 
 #ifdef MPI2
   if((kw != NULL) && (kw_work != kw)){
-    memcpy(kw, kw_work, (size_t)num_obs_eval*(size_t)num_xt*sizeof(double));
+    const size_t kw_copy_rows = is_adaptive ? (size_t)num_obs_train : (size_t)num_obs_eval;
+    memcpy(kw, kw_work, kw_copy_rows*(size_t)num_xt*sizeof(double));
   }
 #endif
 
@@ -13590,7 +13591,7 @@ double * cv){
                               NULL, // no permutations
                               kwx,
                               &gate_ctx_local,
-                              1);
+                              0);
     
 #ifdef MPI2
     {
