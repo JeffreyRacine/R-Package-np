@@ -2665,6 +2665,9 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
       search.result <- eval(mc, envir = environment())
     } else {
+      opt.snapshot <- .npRmpi_autodispatch_option_snapshot()
+      opt.mc <- substitute(do.call("options", OPTS), list(OPTS = opt.snapshot))
+      .npRmpi_bcast_cmd_expr(opt.mc, comm = 1L, caller.execute = FALSE)
       search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
     }
     if (!is.null(search.result$num.feval.total))
