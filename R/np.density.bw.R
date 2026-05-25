@@ -132,7 +132,7 @@ npudensbw.NULL <-
   }
 
   identical(method, "cv.ml") &&
-    bwtype %in% c("generalized_nn", "adaptive_nn") &&
+    bwtype %in% c("fixed", "generalized_nn", "adaptive_nn") &&
     bwsolver %in% c("mads", "mads+powell")
 }
 
@@ -517,7 +517,11 @@ npRmpiNomadNativeSearchDensity <- function(prep,
       num.feval.guarded = as.numeric(native.best$native$best_num.feval.guarded[1L])
     )
     mads.num.feval.total <- native.num.feval.total
-    mads.num.feval.fast.total <- 0
+    mads.num.feval.fast.total <- if (identical(template$type, "fixed")) {
+      native.num.feval.fast.total
+    } else {
+      0
+    }
     payload.result <- build_payload(
       point = native.handoff.point,
       best_record = native.record,

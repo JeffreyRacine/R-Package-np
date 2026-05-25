@@ -5547,6 +5547,58 @@ typedef struct {
   double *best_point;
 } np_udens_native_search_context;
 
+static int np_udens_native_decode_eval_bw(const np_udens_native_search_context *context,
+                                          const double *raw_point,
+                                          double *eval_bw)
+{
+  int j, ncon, ncat, scaling;
+  double nconfac, ncatfac;
+  const double bandwidth_scale_categorical = 1.0e4;
+
+  if (context == NULL || raw_point == NULL || eval_bw == NULL ||
+      context->myopti == NULL || context->myoptd == NULL)
+    return 1;
+
+  if (context->myopti[BW_DENI] != BW_FIXED) {
+    for (j = 0; j < context->n; j++)
+      eval_bw[j] = raw_point[j];
+    return 0;
+  }
+
+  ncon = context->myopti[BW_NCONI];
+  ncat = context->myopti[BW_NUNOI] + context->myopti[BW_NORDI];
+  if (ncon < 0 || ncat < 0 || ncon + ncat != context->n)
+    return 1;
+
+  scaling = (context->myopti[BW_LSFI] == SF_NORMAL);
+  nconfac = context->myoptd[BW_NCONFD];
+  ncatfac = context->myoptd[BW_NCATFD];
+
+  for (j = 0; j < ncon; j++) {
+    if (scaling) {
+      eval_bw[j] = raw_point[j];
+    } else {
+      if (context->mysd == NULL)
+        return 1;
+      eval_bw[j] = raw_point[j] * context->mysd[j] * nconfac;
+    }
+  }
+
+  for (j = 0; j < ncat; j++) {
+    const int k = ncon + j;
+    const double ext_bw = raw_point[k] / bandwidth_scale_categorical;
+    if (scaling) {
+      if (ncatfac == 0.0)
+        return 1;
+      eval_bw[k] = ext_bw / ncatfac;
+    } else {
+      eval_bw[k] = ext_bw;
+    }
+  }
+
+  return 0;
+}
+
 static int np_udens_native_search_callback(int n,
                                            const double *x,
                                            int m,
@@ -5555,7 +5607,8 @@ static int np_udens_native_search_callback(int n,
 {
   np_udens_native_search_context *context =
     (np_udens_native_search_context *) user_data;
-  double *bw = NULL;
+  double *raw_point = NULL;
+  double *eval_bw = NULL;
   double eval_out[5];
   int j;
   int status;
@@ -5564,16 +5617,30 @@ static int np_udens_native_search_callback(int n,
       n != context->n)
     return 1;
 
-  bw = R_Calloc(context->n, double);
-  if (bw == NULL)
+  raw_point = R_Calloc(context->n, double);
+  eval_bw = R_Calloc(context->n, double);
+  if (raw_point == NULL || eval_bw == NULL) {
+    if (raw_point != NULL)
+      R_Free(raw_point);
+    if (eval_bw != NULL)
+      R_Free(eval_bw);
     return 1;
+  }
 
   for (j = 0; j < context->n; j++) {
-    bw[j] = (context->bbin[j] == 1) ? nearbyint(x[j]) : x[j];
-    if (context->lower != NULL && R_finite(context->lower[j]) && bw[j] < context->lower[j])
-      bw[j] = context->lower[j];
-    if (context->upper != NULL && R_finite(context->upper[j]) && bw[j] > context->upper[j])
-      bw[j] = context->upper[j];
+    raw_point[j] = (context->bbin[j] == 1) ? nearbyint(x[j]) : x[j];
+    if (context->lower != NULL && R_finite(context->lower[j]) && raw_point[j] < context->lower[j])
+      raw_point[j] = context->lower[j];
+    if (context->upper != NULL && R_finite(context->upper[j]) && raw_point[j] > context->upper[j])
+      raw_point[j] = context->upper[j];
+  }
+
+  status = np_udens_native_decode_eval_bw(context, raw_point, eval_bw);
+  if (status != 0) {
+    context->callback_failures++;
+    R_Free(raw_point);
+    R_Free(eval_bw);
+    return 1;
   }
 
   status = np_density_nomad_native_eval_once(context->myuno,
@@ -5582,7 +5649,7 @@ static int np_udens_native_search_callback(int n,
                                              context->mysd,
                                              context->myopti,
                                              context->myoptd,
-                                             bw,
+                                             eval_bw,
                                              context->penalty_mode,
                                              context->penalty_mult,
                                              context->ckerlb,
@@ -5590,7 +5657,8 @@ static int np_udens_native_search_callback(int n,
                                              eval_out);
   if (status != 0) {
     context->callback_failures++;
-    R_Free(bw);
+    R_Free(raw_point);
+    R_Free(eval_bw);
     return 1;
   }
 
@@ -5604,12 +5672,13 @@ static int np_udens_native_search_callback(int n,
       context->best_eval[j] = eval_out[j];
     if (context->best_point != NULL) {
       for (j = 0; j < context->n; j++)
-        context->best_point[j] = bw[j];
+        context->best_point[j] = raw_point[j];
     }
   }
 
   bb_outputs[0] = eval_out[0];
-  R_Free(bw);
+  R_Free(raw_point);
+  R_Free(eval_bw);
   return 0;
 }
 
