@@ -11,8 +11,12 @@
 
 #include <R.h>
 #include <R_ext/Arith.h>
+#include <R_ext/Memory.h>
+#include <R_ext/Rdynload.h>
 #include <Rinternals.h>
 #include <stdint.h>
+
+#include <crs_nomad_native.h>
 
 #ifdef MPI2
 #include "mpi.h"
@@ -436,7 +440,7 @@ static int np_mpi_comm1_all_ok(const int local_ok)
 {
 #ifdef MPI2
   int global_ok = local_ok ? 1 : 0;
-  if (comm[1] != MPI_COMM_NULL)
+  if (comm != NULL && comm[1] != MPI_COMM_NULL)
     MPI_Allreduce(MPI_IN_PLACE, &global_ok, 1, MPI_INT, MPI_MIN, comm[1]);
   return global_ok;
 #else
@@ -4000,37 +4004,44 @@ SEXP C_np_density_conditional_nomad_shadow_prepare(SEXP c_uno,
   return ScalarLogical(ok ? 1 : 0);
 }
 
-SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
+static int np_density_conditional_nomad_shadow_eval_native_raw(const double *rbw,
+                                                               const int *glp_degree,
+                                                               double out[4])
 {
-  SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   int i;
   double val, fast = 0.0, fast_before = 0.0, evals = 0.0, eval_before = 0.0;
   double guarded = 0.0, guarded_before = 0.0;
+  double *rbw_work = NULL;
+  int *degree_work = NULL;
 
   if (!np_conditional_density_nomad_shadow.active)
-    error("resident npcdens NOMAD shadow state is not active");
+    return 1;
+  if (rbw == NULL || glp_degree == NULL || out == NULL)
+    return 1;
 
-  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
-  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
-
-  if (XLENGTH(rbw_r) != np_conditional_density_nomad_shadow.num_all_var) {
-    UNPROTECT(2);
-    error("resident npcdens NOMAD shadow received bandwidth vector of unexpected length");
+  rbw_work = R_Calloc(np_conditional_density_nomad_shadow.num_all_var, double);
+  degree_work = R_Calloc(np_conditional_density_nomad_shadow.num_reg_continuous, int);
+  if (rbw_work == NULL || degree_work == NULL) {
+    if (rbw_work != NULL)
+      R_Free(rbw_work);
+    if (degree_work != NULL)
+      R_Free(degree_work);
+    return 1;
   }
-  if (XLENGTH(degree_i) != np_conditional_density_nomad_shadow.num_reg_continuous) {
-    UNPROTECT(2);
-    error("resident npcdens NOMAD shadow received degree vector of unexpected length");
-  }
+  for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
+    rbw_work[i] = rbw[i];
+  for (i = 0; i < np_conditional_density_nomad_shadow.num_reg_continuous; i++)
+    degree_work[i] = glp_degree[i];
 
 #ifdef MPI2
-  if (comm[1] != MPI_COMM_NULL) {
+  if (comm != NULL && comm[1] != MPI_COMM_NULL) {
     /* Keep collective CV evaluations on the rank-0 NOMAD candidate. */
-    MPI_Bcast(REAL(rbw_r),
+    MPI_Bcast(rbw_work,
               np_conditional_density_nomad_shadow.num_all_var,
               MPI_DOUBLE,
               0,
               comm[1]);
-    MPI_Bcast(INTEGER(degree_i),
+    MPI_Bcast(degree_work,
               np_conditional_density_nomad_shadow.num_reg_continuous,
               MPI_INT,
               0,
@@ -4038,22 +4049,22 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
   }
 #endif
 
-  if (!np_conditional_density_nomad_shadow_refresh_degree(INTEGER(degree_i))) {
+  if (!np_conditional_density_nomad_shadow_refresh_degree(degree_work)) {
     bwm_eval_count += 1.0;
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
     val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
-    PROTECT(out = allocVector(REALSXP, 4));
-    REAL(out)[0] = -val;
-    REAL(out)[1] = 1.0;
-    REAL(out)[2] = 0.0;
-    REAL(out)[3] = 0.0;
-    UNPROTECT(3);
-    return out;
+    out[0] = -val;
+    out[1] = 1.0;
+    out[2] = 0.0;
+    out[3] = 0.0;
+    R_Free(rbw_work);
+    R_Free(degree_work);
+    return 0;
   }
 
   for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
-    np_conditional_density_nomad_shadow.vector_scale_factor[i + 1] = REAL(rbw_r)[i];
+    np_conditional_density_nomad_shadow.vector_scale_factor[i + 1] = rbw_work[i];
 
   if (np_conditional_density_nomad_shadow.penalty_mode == 1) {
     bwm_penalty_mode = 0;
@@ -4082,12 +4093,394 @@ SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
       evals = 0.0;
   }
 
+  out[0] = -val;
+  out[1] = evals;
+  out[2] = fast;
+  out[3] = (guarded > 0.0) ? 1.0 : 0.0;
+  R_Free(rbw_work);
+  R_Free(degree_work);
+  return 0;
+}
+
+SEXP C_np_density_conditional_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
+{
+  SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
+  double eval_out[4];
+
+  if (!np_conditional_density_nomad_shadow.active)
+    error("resident npcdens NOMAD shadow state is not active");
+
+  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
+  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
+
+  if (XLENGTH(rbw_r) != np_conditional_density_nomad_shadow.num_all_var) {
+    UNPROTECT(2);
+    error("resident npcdens NOMAD shadow received bandwidth vector of unexpected length");
+  }
+  if (XLENGTH(degree_i) != np_conditional_density_nomad_shadow.num_reg_continuous) {
+    UNPROTECT(2);
+    error("resident npcdens NOMAD shadow received degree vector of unexpected length");
+  }
+
+  if (np_density_conditional_nomad_shadow_eval_native_raw(REAL(rbw_r),
+                                                          INTEGER(degree_i),
+                                                          eval_out) != 0) {
+    UNPROTECT(2);
+    error("resident npcdens NOMAD shadow native evaluator failed");
+  }
+
   PROTECT(out = allocVector(REALSXP, 4));
-  REAL(out)[0] = -val;
-  REAL(out)[1] = evals;
-  REAL(out)[2] = fast;
-  REAL(out)[3] = (guarded > 0.0) ? 1.0 : 0.0;
+  REAL(out)[0] = eval_out[0];
+  REAL(out)[1] = eval_out[1];
+  REAL(out)[2] = eval_out[2];
+  REAL(out)[3] = eval_out[3];
   UNPROTECT(3);
+  return out;
+}
+
+typedef struct {
+  int n;
+  int nbw_point;
+  int nbw_flat;
+  int ndegree;
+  const int *flat_from_point;
+  const double *point_upper;
+  int callback_calls;
+  int callback_failures;
+  double total_num_feval;
+  double total_fast;
+  double total_guarded;
+  double best_min_objective;
+  double best_objective;
+  double best_eval[4];
+  double *best_point;
+  double *best_flat_bw;
+  int *best_degree;
+} np_cdens_native_search_context;
+
+static int np_cdens_native_search_callback(int n,
+                                           const double *x,
+                                           int m,
+                                           double *bb_outputs,
+                                           void *user_data)
+{
+  np_cdens_native_search_context *context =
+    (np_cdens_native_search_context *) user_data;
+  double *flat_bw = NULL;
+  int *degree = NULL;
+  double eval_out[4];
+  double min_objective;
+  int j, status;
+
+  if (context == NULL || x == NULL || bb_outputs == NULL || m != 1 ||
+      n != context->n)
+    return 1;
+
+  flat_bw = R_Calloc(context->nbw_flat, double);
+  degree = R_Calloc(context->ndegree, int);
+  if (flat_bw == NULL || degree == NULL) {
+    if (flat_bw != NULL)
+      R_Free(flat_bw);
+    if (degree != NULL)
+      R_Free(degree);
+    return 1;
+  }
+
+  for (j = 0; j < context->nbw_flat; j++) {
+    const int idx = context->flat_from_point[j];
+    if (idx < 0 || idx >= context->nbw_point) {
+      R_Free(flat_bw);
+      R_Free(degree);
+      return 1;
+    }
+    flat_bw[j] = nearbyint(x[idx]);
+    if (context->point_upper != NULL &&
+        R_finite(context->point_upper[idx]) &&
+        flat_bw[j] > context->point_upper[idx])
+      flat_bw[j] = context->point_upper[idx];
+    if (flat_bw[j] < 1.0)
+      flat_bw[j] = 1.0;
+  }
+  for (j = 0; j < context->ndegree; j++)
+    degree[j] = (int) nearbyint(x[context->nbw_point + j]);
+
+  status = np_density_conditional_nomad_shadow_eval_native_raw(flat_bw, degree, eval_out);
+  if (status != 0) {
+    context->callback_failures++;
+    R_Free(flat_bw);
+    R_Free(degree);
+    return 1;
+  }
+
+  context->callback_calls++;
+  context->total_num_feval += eval_out[1];
+  context->total_fast += eval_out[2];
+  context->total_guarded += eval_out[3];
+  min_objective = -eval_out[0];
+  if (context->callback_calls == 1 || min_objective < context->best_min_objective) {
+    context->best_min_objective = min_objective;
+    context->best_objective = eval_out[0];
+    for (j = 0; j < 4; j++)
+      context->best_eval[j] = eval_out[j];
+    if (context->best_point != NULL) {
+      for (j = 0; j < context->n; j++)
+        context->best_point[j] = x[j];
+    }
+    if (context->best_flat_bw != NULL) {
+      for (j = 0; j < context->nbw_flat; j++)
+        context->best_flat_bw[j] = flat_bw[j];
+    }
+    if (context->best_degree != NULL) {
+      for (j = 0; j < context->ndegree; j++)
+        context->best_degree[j] = (int) nearbyint(x[context->nbw_point + j]);
+    }
+  }
+
+  R_Free(flat_bw);
+  R_Free(degree);
+  bb_outputs[0] = min_objective;
+  return 0;
+}
+
+SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
+                                                         SEXP bbin,
+                                                         SEXP lower,
+                                                         SEXP upper,
+                                                         SEXP flat_from_point,
+                                                         SEXP point_upper,
+                                                         SEXP max_eval,
+                                                         SEXP random_seed,
+                                                         SEXP option_names,
+                                                         SEXP option_values)
+{
+  SEXP x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue;
+  SEXP upper_r = R_NilValue, flat_i = R_NilValue, option_names_s = R_NilValue;
+  SEXP point_upper_r = R_NilValue, option_values_s = R_NilValue, out = R_NilValue;
+  SEXP names = R_NilValue, sol = R_NilValue, best = R_NilValue;
+  SEXP best_flat = R_NilValue, best_degree = R_NilValue, call = R_NilValue;
+  crs_nomad_native_solve_fn_v1 solve;
+  crs_nomad_native_problem_v1 problem;
+  crs_nomad_native_result_v1 result;
+  crs_nomad_native_option_v1 *native_options = NULL;
+  np_cdens_native_search_context context;
+  double *solution = NULL;
+  double *best_point = NULL;
+  double *best_flat_bw = NULL;
+  int *flat_map = NULL;
+  int *best_degree_i = NULL;
+  int n, i, status, budget, seed, n_options;
+
+  if (!np_conditional_density_nomad_shadow.active)
+    error("resident npcdens NOMAD shadow state is not active");
+
+  PROTECT(x0_r = coerceVector(x0, REALSXP));
+  PROTECT(bbin_i = coerceVector(bbin, INTSXP));
+  PROTECT(lower_r = coerceVector(lower, REALSXP));
+  PROTECT(upper_r = coerceVector(upper, REALSXP));
+  PROTECT(flat_i = coerceVector(flat_from_point, INTSXP));
+  PROTECT(point_upper_r = coerceVector(point_upper, REALSXP));
+  PROTECT(option_names_s = coerceVector(option_names, STRSXP));
+  PROTECT(option_values_s = coerceVector(option_values, STRSXP));
+
+  n = (int) XLENGTH(x0_r);
+  if (n <= 0 ||
+      XLENGTH(bbin_i) != n ||
+      XLENGTH(lower_r) != n ||
+      XLENGTH(upper_r) != n)
+  {
+    UNPROTECT(8);
+    error("native NOMAD search received inconsistent problem dimensions");
+  }
+  if (XLENGTH(flat_i) != np_conditional_density_nomad_shadow.num_all_var) {
+    UNPROTECT(8);
+    error("native NOMAD search received invalid bandwidth map length");
+  }
+  if (XLENGTH(point_upper_r) != (n - np_conditional_density_nomad_shadow.num_reg_continuous)) {
+    UNPROTECT(8);
+    error("native NOMAD search received invalid point upper-bound length");
+  }
+  budget = asInteger(max_eval);
+  seed = asInteger(random_seed);
+  if (budget < 0 || seed < 0) {
+    UNPROTECT(8);
+    error("native NOMAD search received invalid budget or seed");
+  }
+  if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
+    UNPROTECT(8);
+    error("native NOMAD search received inconsistent option name/value lengths");
+  }
+  if (XLENGTH(option_names_s) > INT_MAX) {
+    UNPROTECT(8);
+    error("native NOMAD search received too many options");
+  }
+  n_options = (int) XLENGTH(option_names_s);
+
+  PROTECT(call = lang2(install("loadNamespace"), mkString("crs")));
+  Rf_eval(call, R_GlobalEnv);
+  UNPROTECT(1);
+
+  solve = (crs_nomad_native_solve_fn_v1)
+    R_GetCCallable("crs", "crs_nomad_native_solve_v1");
+  if (solve == NULL) {
+    UNPROTECT(8);
+    error("failed to resolve crs native NOMAD callable");
+  }
+
+  solution = R_Calloc(n, double);
+  best_point = R_Calloc(n, double);
+  best_flat_bw = R_Calloc(np_conditional_density_nomad_shadow.num_all_var, double);
+  flat_map = R_Calloc(np_conditional_density_nomad_shadow.num_all_var, int);
+  best_degree_i = R_Calloc(np_conditional_density_nomad_shadow.num_reg_continuous, int);
+  if (solution == NULL || best_point == NULL || best_flat_bw == NULL ||
+      flat_map == NULL || best_degree_i == NULL) {
+    if (solution != NULL) R_Free(solution);
+    if (best_point != NULL) R_Free(best_point);
+    if (best_flat_bw != NULL) R_Free(best_flat_bw);
+    if (flat_map != NULL) R_Free(flat_map);
+    if (best_degree_i != NULL) R_Free(best_degree_i);
+    UNPROTECT(8);
+    error("failed to allocate native NOMAD search buffers");
+  }
+  if (n_options > 0) {
+    native_options = R_Calloc(n_options, crs_nomad_native_option_v1);
+    if (native_options == NULL) {
+      R_Free(solution);
+      R_Free(best_point);
+      R_Free(best_flat_bw);
+      R_Free(flat_map);
+      R_Free(best_degree_i);
+      UNPROTECT(8);
+      error("failed to allocate native NOMAD option buffers");
+    }
+    for (i = 0; i < n_options; i++) {
+      native_options[i].name = CHAR(STRING_ELT(option_names_s, i));
+      native_options[i].value = CHAR(STRING_ELT(option_values_s, i));
+    }
+  }
+  for (i = 0; i < n; i++) {
+    solution[i] = R_NaN;
+    best_point[i] = R_NaN;
+  }
+  for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
+    best_flat_bw[i] = R_NaN;
+  for (i = 0; i < np_conditional_density_nomad_shadow.num_reg_continuous; i++)
+    best_degree_i[i] = NA_INTEGER;
+  for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
+    flat_map[i] = INTEGER(flat_i)[i] - 1;
+
+  memset(&problem, 0, sizeof(problem));
+  memset(&result, 0, sizeof(result));
+  memset(&context, 0, sizeof(context));
+  for (i = 0; i < 4; i++)
+    context.best_eval[i] = R_NaN;
+
+  context.n = n;
+  context.nbw_point = n - np_conditional_density_nomad_shadow.num_reg_continuous;
+  context.nbw_flat = np_conditional_density_nomad_shadow.num_all_var;
+  context.ndegree = np_conditional_density_nomad_shadow.num_reg_continuous;
+  context.flat_from_point = flat_map;
+  context.point_upper = REAL(point_upper_r);
+  context.best_point = best_point;
+  context.best_flat_bw = best_flat_bw;
+  context.best_degree = best_degree_i;
+
+  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION;
+  problem.struct_size = sizeof(problem);
+  problem.n = n;
+  problem.m = 1;
+  problem.x0 = REAL(x0_r);
+  problem.bb_input_type = INTEGER(bbin_i);
+  problem.lower = REAL(lower_r);
+  problem.upper = REAL(upper_r);
+  problem.max_eval = budget;
+  problem.random_seed = (unsigned int) seed;
+  problem.quiet = 1;
+  problem.option_count = n_options;
+  problem.options = native_options;
+
+  result.api_version = CRS_NOMAD_NATIVE_API_VERSION;
+  result.struct_size = sizeof(result);
+  result.solution = solution;
+  result.solution_len = n;
+
+  status = solve(&problem,
+                 np_cdens_native_search_callback,
+                 &context,
+                 &result);
+
+  PROTECT(out = allocVector(VECSXP, 23));
+  PROTECT(names = allocVector(STRSXP, 23));
+  PROTECT(sol = allocVector(REALSXP, n));
+  PROTECT(best = allocVector(REALSXP, n));
+  PROTECT(best_flat = allocVector(REALSXP, np_conditional_density_nomad_shadow.num_all_var));
+  PROTECT(best_degree = allocVector(INTSXP, np_conditional_density_nomad_shadow.num_reg_continuous));
+  for (i = 0; i < n; i++) {
+    REAL(sol)[i] = solution[i];
+    REAL(best)[i] = best_point[i];
+  }
+  for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
+    REAL(best_flat)[i] = best_flat_bw[i];
+  for (i = 0; i < np_conditional_density_nomad_shadow.num_reg_continuous; i++)
+    INTEGER(best_degree)[i] = best_degree_i[i];
+
+  SET_VECTOR_ELT(out, 0, ScalarInteger(status));
+  SET_VECTOR_ELT(out, 1, ScalarInteger(result.status));
+  SET_VECTOR_ELT(out, 2, ScalarInteger(result.nomad_run_flag));
+  SET_VECTOR_ELT(out, 3, ScalarReal(context.best_objective));
+  SET_VECTOR_ELT(out, 4, sol);
+  SET_VECTOR_ELT(out, 5, best);
+  SET_VECTOR_ELT(out, 6, best_degree);
+  SET_VECTOR_ELT(out, 7, best_flat);
+  SET_VECTOR_ELT(out, 8, ScalarReal(context.best_eval[1]));
+  SET_VECTOR_ELT(out, 9, ScalarReal(context.best_eval[2]));
+  SET_VECTOR_ELT(out, 10, ScalarReal(context.best_eval[3]));
+  SET_VECTOR_ELT(out, 11, ScalarReal(context.total_num_feval));
+  SET_VECTOR_ELT(out, 12, ScalarReal(context.total_fast));
+  SET_VECTOR_ELT(out, 13, ScalarReal(context.total_guarded));
+  SET_VECTOR_ELT(out, 14, ScalarInteger(context.callback_calls));
+  SET_VECTOR_ELT(out, 15, ScalarInteger(context.callback_failures));
+  SET_VECTOR_ELT(out, 16, ScalarInteger(result.callback_evaluations));
+  SET_VECTOR_ELT(out, 17, ScalarInteger(result.blackbox_evaluations));
+  SET_VECTOR_ELT(out, 18, ScalarInteger(result.cache_hits));
+  SET_VECTOR_ELT(out, 19, ScalarInteger(result.cache_size));
+  SET_VECTOR_ELT(out, 20, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 21, mkString(result.message));
+  SET_VECTOR_ELT(out, 22, ScalarReal(result.objective));
+
+  SET_STRING_ELT(names, 0, mkChar("status"));
+  SET_STRING_ELT(names, 1, mkChar("result_status"));
+  SET_STRING_ELT(names, 2, mkChar("nomad_run_flag"));
+  SET_STRING_ELT(names, 3, mkChar("objective"));
+  SET_STRING_ELT(names, 4, mkChar("solution"));
+  SET_STRING_ELT(names, 5, mkChar("best_point"));
+  SET_STRING_ELT(names, 6, mkChar("best_degree"));
+  SET_STRING_ELT(names, 7, mkChar("best_flat_bandwidth"));
+  SET_STRING_ELT(names, 8, mkChar("best_num.feval"));
+  SET_STRING_ELT(names, 9, mkChar("best_num.feval.fast"));
+  SET_STRING_ELT(names, 10, mkChar("best_num.feval.guarded"));
+  SET_STRING_ELT(names, 11, mkChar("total_num.feval"));
+  SET_STRING_ELT(names, 12, mkChar("total_num.feval.fast"));
+  SET_STRING_ELT(names, 13, mkChar("total_num.feval.guarded"));
+  SET_STRING_ELT(names, 14, mkChar("compiled_callback_calls"));
+  SET_STRING_ELT(names, 15, mkChar("compiled_callback_failures"));
+  SET_STRING_ELT(names, 16, mkChar("crs_callback_evaluations"));
+  SET_STRING_ELT(names, 17, mkChar("blackbox_evaluations"));
+  SET_STRING_ELT(names, 18, mkChar("cache_hits"));
+  SET_STRING_ELT(names, 19, mkChar("cache_size"));
+  SET_STRING_ELT(names, 20, mkChar("iterations"));
+  SET_STRING_ELT(names, 21, mkChar("message"));
+  SET_STRING_ELT(names, 22, mkChar("official_objective"));
+  setAttrib(out, R_NamesSymbol, names);
+
+  R_Free(solution);
+  R_Free(best_point);
+  R_Free(best_flat_bw);
+  R_Free(flat_map);
+  R_Free(best_degree_i);
+  if (native_options != NULL)
+    R_Free(native_options);
+
+  UNPROTECT(13);
   return out;
 }
 
