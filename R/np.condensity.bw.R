@@ -1452,7 +1452,7 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   }
 
   identical(method, "cv.ml") &&
-    identical(bwtype, "adaptive_nn") &&
+    bwtype %in% c("generalized_nn", "adaptive_nn") &&
     engine %in% c("nomad", "nomad+powell")
 }
 
