@@ -132,7 +132,7 @@ npudensbw.NULL <-
   }
 
   identical(method, "cv.ml") &&
-    identical(bwtype, "adaptive_nn") &&
+    bwtype %in% c("generalized_nn", "adaptive_nn") &&
     bwsolver %in% c("mads", "mads+powell")
 }
 
