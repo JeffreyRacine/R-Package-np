@@ -4144,6 +4144,7 @@ typedef struct {
   int nbw_flat;
   int ndegree;
   const int *flat_from_point;
+  const double *flat_decode_scale;
   const double *point_upper;
   int callback_calls;
   int callback_failures;
@@ -4193,13 +4194,19 @@ static int np_cdens_native_search_callback(int n,
       R_Free(degree);
       return 1;
     }
-    flat_bw[j] = nearbyint(x[idx]);
-    if (context->point_upper != NULL &&
-        R_finite(context->point_upper[idx]) &&
-        flat_bw[j] > context->point_upper[idx])
-      flat_bw[j] = context->point_upper[idx];
-    if (flat_bw[j] < 1.0)
-      flat_bw[j] = 1.0;
+    if (BANDWIDTH_den_extern == BW_FIXED) {
+      flat_bw[j] = x[idx];
+      if (context->flat_decode_scale != NULL)
+        flat_bw[j] *= context->flat_decode_scale[j];
+    } else {
+      flat_bw[j] = nearbyint(x[idx]);
+      if (context->point_upper != NULL &&
+          R_finite(context->point_upper[idx]) &&
+          flat_bw[j] > context->point_upper[idx])
+        flat_bw[j] = context->point_upper[idx];
+      if (flat_bw[j] < 1.0)
+        flat_bw[j] = 1.0;
+    }
   }
   for (j = 0; j < context->ndegree; j++)
     degree[j] = (int) nearbyint(x[context->nbw_point + j]);
@@ -4247,6 +4254,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
                                                          SEXP lower,
                                                          SEXP upper,
                                                          SEXP flat_from_point,
+                                                         SEXP flat_decode_scale,
                                                          SEXP point_upper,
                                                          SEXP max_eval,
                                                          SEXP random_seed,
@@ -4254,8 +4262,9 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
                                                          SEXP option_values)
 {
   SEXP x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue;
-  SEXP upper_r = R_NilValue, flat_i = R_NilValue, option_names_s = R_NilValue;
+  SEXP upper_r = R_NilValue, flat_i = R_NilValue, decode_scale_r = R_NilValue;
   SEXP point_upper_r = R_NilValue, option_values_s = R_NilValue, out = R_NilValue;
+  SEXP option_names_s = R_NilValue;
   SEXP names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_flat = R_NilValue, best_degree = R_NilValue, call = R_NilValue;
   crs_nomad_native_solve_fn_v1 solve;
@@ -4278,6 +4287,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   PROTECT(lower_r = coerceVector(lower, REALSXP));
   PROTECT(upper_r = coerceVector(upper, REALSXP));
   PROTECT(flat_i = coerceVector(flat_from_point, INTSXP));
+  PROTECT(decode_scale_r = coerceVector(flat_decode_scale, REALSXP));
   PROTECT(point_upper_r = coerceVector(point_upper, REALSXP));
   PROTECT(option_names_s = coerceVector(option_names, STRSXP));
   PROTECT(option_values_s = coerceVector(option_values, STRSXP));
@@ -4288,29 +4298,33 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
       XLENGTH(lower_r) != n ||
       XLENGTH(upper_r) != n)
   {
-    UNPROTECT(8);
+    UNPROTECT(9);
     error("native NOMAD search received inconsistent problem dimensions");
   }
   if (XLENGTH(flat_i) != np_conditional_density_nomad_shadow.num_all_var) {
-    UNPROTECT(8);
+    UNPROTECT(9);
     error("native NOMAD search received invalid bandwidth map length");
   }
+  if (XLENGTH(decode_scale_r) != np_conditional_density_nomad_shadow.num_all_var) {
+    UNPROTECT(9);
+    error("native NOMAD search received invalid fixed decode scale length");
+  }
   if (XLENGTH(point_upper_r) != (n - np_conditional_density_nomad_shadow.num_reg_continuous)) {
-    UNPROTECT(8);
+    UNPROTECT(9);
     error("native NOMAD search received invalid point upper-bound length");
   }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
   if (budget < 0 || seed < 0) {
-    UNPROTECT(8);
+    UNPROTECT(9);
     error("native NOMAD search received invalid budget or seed");
   }
   if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
-    UNPROTECT(8);
+    UNPROTECT(9);
     error("native NOMAD search received inconsistent option name/value lengths");
   }
   if (XLENGTH(option_names_s) > INT_MAX) {
-    UNPROTECT(8);
+    UNPROTECT(9);
     error("native NOMAD search received too many options");
   }
   n_options = (int) XLENGTH(option_names_s);
@@ -4322,7 +4336,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   solve = (crs_nomad_native_solve_fn_v1)
     R_GetCCallable("crs", "crs_nomad_native_solve_v1");
   if (solve == NULL) {
-    UNPROTECT(8);
+    UNPROTECT(9);
     error("failed to resolve crs native NOMAD callable");
   }
 
@@ -4338,7 +4352,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
     if (best_flat_bw != NULL) R_Free(best_flat_bw);
     if (flat_map != NULL) R_Free(flat_map);
     if (best_degree_i != NULL) R_Free(best_degree_i);
-    UNPROTECT(8);
+    UNPROTECT(9);
     error("failed to allocate native NOMAD search buffers");
   }
   if (n_options > 0) {
@@ -4349,7 +4363,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
       R_Free(best_flat_bw);
       R_Free(flat_map);
       R_Free(best_degree_i);
-      UNPROTECT(8);
+      UNPROTECT(9);
       error("failed to allocate native NOMAD option buffers");
     }
     for (i = 0; i < n_options; i++) {
@@ -4379,6 +4393,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   context.nbw_flat = np_conditional_density_nomad_shadow.num_all_var;
   context.ndegree = np_conditional_density_nomad_shadow.num_reg_continuous;
   context.flat_from_point = flat_map;
+  context.flat_decode_scale = REAL(decode_scale_r);
   context.point_upper = REAL(point_upper_r);
   context.best_point = best_point;
   context.best_flat_bw = best_flat_bw;
@@ -4480,7 +4495,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   if (native_options != NULL)
     R_Free(native_options);
 
-  UNPROTECT(13);
+  UNPROTECT(15);
   return out;
 }
 

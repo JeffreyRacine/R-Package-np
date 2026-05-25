@@ -1411,7 +1411,8 @@ npRmpiNomadShadowNativeSearchConditionalDensity <- function(x0,
                                                             max.eval,
                                                             random.seed,
                                                             option.names,
-                                                            option.values) {
+                                                            option.values,
+                                                            flat.decode.scale = rep.int(1, length(flat.from.point))) {
   .Call(
     "C_np_density_conditional_nomad_shadow_native_search",
     x0,
@@ -1419,6 +1420,7 @@ npRmpiNomadShadowNativeSearchConditionalDensity <- function(x0,
     lb,
     ub,
     as.integer(flat.from.point),
+    as.double(flat.decode.scale),
     as.double(point.upper),
     as.integer(max.eval),
     as.integer(random.seed),
@@ -1452,7 +1454,7 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   }
 
   identical(method, "cv.ml") &&
-    bwtype %in% c("generalized_nn", "adaptive_nn") &&
+    bwtype %in% c("fixed", "generalized_nn", "adaptive_nn") &&
     engine %in% c("nomad", "nomad+powell")
 }
 
@@ -1479,6 +1481,32 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   if (anyNA(flat.from.point))
     stop("native npcdens NOMAD route could not map search point to evaluator bandwidth order", call. = FALSE)
   as.integer(flat.from.point)
+}
+
+.npcdensbw_nomad_shadow_native_decode_scale <- function(template, setup, flat.from.point) {
+  if (!identical(as.character(template$type)[1L], "fixed"))
+    return(rep.int(1, length(flat.from.point)))
+
+  ncont <- length(setup$cont_flat)
+  ncat <- length(setup$cat_flat)
+  point.scale <- numeric(ncont + ncat)
+
+  if (ncont > 0L) {
+    point.scale[seq_len(ncont)] <- if (isTRUE(template$scaling)) {
+      rep.int(1, ncont)
+    } else {
+      as.double(setup$cont_scale)
+    }
+  }
+
+  if (ncat > 0L) {
+    cat.scale <- 1 / as.double(setup$bandwidth.scale.categorical)
+    if (isTRUE(template$scaling))
+      cat.scale <- cat.scale / as.double(setup$ncatfac)
+    point.scale[ncont + seq_len(ncat)] <- rep.int(cat.scale, ncat)
+  }
+
+  as.double(point.scale[flat.from.point])
 }
 
 .npcdensbw_nomad_shadow_native_option_vectors <- function(opts) {
@@ -1835,8 +1863,15 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     )
     native.option.vectors <- .npcdensbw_nomad_shadow_native_option_vectors(native.nomad.opts)
     flat.from.point <- .npcdensbw_nomad_shadow_native_flat_map(template, setup)
-    native.cont.upper <- if (!is.null(setup$cont_extendednn_upper) &&
-                             length(setup$cont_extendednn_upper) == length(setup$cont_flat)) {
+    flat.decode.scale <- .npcdensbw_nomad_shadow_native_decode_scale(
+      template = template,
+      setup = setup,
+      flat.from.point = flat.from.point
+    )
+    native.cont.upper <- if (identical(as.character(template$type)[1L], "fixed")) {
+      rep.int(Inf, length(setup$cont_flat))
+    } else if (!is.null(setup$cont_extendednn_upper) &&
+               length(setup$cont_extendednn_upper) == length(setup$cont_flat)) {
       pmax(1, as.double(setup$cont_extendednn_upper))
     } else if (!is.null(setup$nobs)) {
       rep.int(max(1L, as.integer(setup$nobs) - 1L), length(setup$cont_flat))
@@ -1852,6 +1887,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       lb = as.double(lb),
       ub = as.double(ub),
       flat.from.point = flat.from.point,
+      flat.decode.scale = flat.decode.scale,
       point.upper = native.point.upper,
       max.eval = native.max.eval,
       random.seed = random.seed,
