@@ -1454,7 +1454,7 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   }
 
   (identical(method, "cv.ml") ||
-     (identical(method, "cv.ls") && bwtype %in% "fixed")) &&
+     (identical(method, "cv.ls") && bwtype %in% c("fixed", "generalized_nn"))) &&
     bwtype %in% c("fixed", "generalized_nn", "adaptive_nn") &&
     engine %in% c("nomad", "nomad+powell")
 }
@@ -1485,18 +1485,19 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
 }
 
 .npcdensbw_nomad_shadow_native_decode_scale <- function(template, setup, flat.from.point) {
-  if (!identical(as.character(template$type)[1L], "fixed"))
-    return(rep.int(1, length(flat.from.point)))
-
   ncont <- length(setup$cont_flat)
   ncat <- length(setup$cat_flat)
   point.scale <- numeric(ncont + ncat)
 
   if (ncont > 0L) {
-    point.scale[seq_len(ncont)] <- if (isTRUE(template$scaling)) {
-      rep.int(1, ncont)
+    point.scale[seq_len(ncont)] <- if (identical(as.character(template$type)[1L], "fixed")) {
+      if (isTRUE(template$scaling)) {
+        rep.int(1, ncont)
+      } else {
+        as.double(setup$cont_scale)
+      }
     } else {
-      as.double(setup$cont_scale)
+      rep.int(1, ncont)
     }
   }
 

@@ -4199,13 +4199,18 @@ static int np_cdens_native_search_callback(int n,
       if (context->flat_decode_scale != NULL)
         flat_bw[j] *= context->flat_decode_scale[j];
     } else {
-      flat_bw[j] = nearbyint(x[idx]);
-      if (context->point_upper != NULL &&
-          R_finite(context->point_upper[idx]) &&
-          flat_bw[j] > context->point_upper[idx])
-        flat_bw[j] = context->point_upper[idx];
-      if (flat_bw[j] < 1.0)
-        flat_bw[j] = 1.0;
+      if (context->flat_decode_scale != NULL &&
+          context->flat_decode_scale[j] != 1.0) {
+        flat_bw[j] = x[idx] * context->flat_decode_scale[j];
+      } else {
+        flat_bw[j] = nearbyint(x[idx]);
+        if (context->point_upper != NULL &&
+            R_finite(context->point_upper[idx]) &&
+            flat_bw[j] > context->point_upper[idx])
+          flat_bw[j] = context->point_upper[idx];
+        if (flat_bw[j] < 1.0)
+          flat_bw[j] = 1.0;
+      }
     }
   }
   for (j = 0; j < context->ndegree; j++)
