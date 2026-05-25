@@ -20,6 +20,70 @@ extern  int iNum_Processors;
 extern  int iSeed_my_rank;
 extern  MPI_Status status;
 extern MPI_Comm	*comm;
+
+static int mpi_gatherv_nn_distance_exact(int n, int stride, double *nn_distance)
+{
+    int r, local_start, local_end, local_count;
+    int *recvcounts;
+    int *displs;
+    int mpi_status;
+
+    if ((n < 1) || (stride < 1) || (nn_distance == NULL))
+        return 1;
+
+    recvcounts = (int *) malloc((size_t) iNum_Processors * sizeof(int));
+    displs = (int *) malloc((size_t) iNum_Processors * sizeof(int));
+
+    if ((recvcounts == NULL) || (displs == NULL)) {
+        if (recvcounts != NULL)
+            free(recvcounts);
+        if (displs != NULL)
+            free(displs);
+        return 1;
+    }
+
+    for (r = 0; r < iNum_Processors; r++) {
+        const int start = r * stride;
+        const int end = MIN(n, (r + 1) * stride);
+        recvcounts[r] = (start < n) ? MAX(0, end - start) : 0;
+        displs[r] = MIN(start, n);
+    }
+
+    local_start = my_rank * stride;
+    local_end = MIN(n, (my_rank + 1) * stride);
+    local_count = (local_start < n) ? MAX(0, local_end - local_start) : 0;
+
+    if (my_rank == 0) {
+        mpi_status = MPI_Gatherv(
+            MPI_IN_PLACE,
+            local_count,
+            MPI_DOUBLE,
+            nn_distance,
+            recvcounts,
+            displs,
+            MPI_DOUBLE,
+            0,
+            comm[1]
+        );
+    } else {
+        mpi_status = MPI_Gatherv(
+            nn_distance,
+            local_count,
+            MPI_DOUBLE,
+            NULL,
+            recvcounts,
+            displs,
+            MPI_DOUBLE,
+            0,
+            comm[1]
+        );
+    }
+
+    free(recvcounts);
+    free(displs);
+
+    return (mpi_status == MPI_SUCCESS) ? 0 : 1;
+}
 #endif
 
 /* This function generates the index for bootstrap samples of size n */
@@ -746,14 +810,11 @@ int int_k_nn, double *nn_distance)
 			return(1);
 		}
 
-    if(!suppress_parallel){
-      if(my_rank == 0){
-        MPI_Gather(MPI_IN_PLACE, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
-      } else {
-        MPI_Gather(nn_distance, stride, MPI_DOUBLE, NULL, stride, MPI_DOUBLE, 0, comm[1]);
-      }
-      MPI_Bcast(nn_distance, num_obs, MPI_DOUBLE, 0, comm[1]);
-    }
+	    if(!suppress_parallel){
+	      if (mpi_gatherv_nn_distance_exact(num_obs, stride, nn_distance) != 0)
+	        return(1);
+	      MPI_Bcast(nn_distance, num_obs, MPI_DOUBLE, 0, comm[1]);
+	    }
 #endif
 
     return(0);
@@ -838,14 +899,11 @@ int compute_nn_distance_train_eval(int num_obs_train,
 			return(1);
 		}
 
-    if(!suppress_parallel){
-      if(my_rank == 0){
-        MPI_Gather(MPI_IN_PLACE, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
-      } else {
-        MPI_Gather(nn_distance, stride, MPI_DOUBLE, NULL, stride, MPI_DOUBLE, 0, comm[1]);
-      }
-      MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-    }
+	    if(!suppress_parallel){
+	      if (mpi_gatherv_nn_distance_exact(num_obs_eval, stride, nn_distance) != 0)
+	        return(1);
+	      MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+	    }
 #endif
 
     return(0);
