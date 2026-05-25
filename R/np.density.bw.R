@@ -134,7 +134,7 @@ npudensbw.NULL <-
   ((identical(method, "cv.ml") &&
       bwtype %in% c("fixed", "generalized_nn", "adaptive_nn")) ||
      (identical(method, "cv.ls") &&
-      bwtype %in% c("fixed", "generalized_nn"))) &&
+      bwtype %in% c("fixed", "generalized_nn", "adaptive_nn"))) &&
     bwsolver %in% c("mads", "mads+powell")
 }
 
