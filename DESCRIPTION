@@ -3,7 +3,8 @@ Version: 0.70-3
 Date: 2026-05-15
 Depends: R (>= 3.5.0)
 Imports: boot, cubature, methods, quadprog, quantreg, stats
-Suggests: MASS, logspline, ks, testthat, withr, crs (>= 0.15-41), knitr, rmarkdown, rgl
+Suggests: MASS, logspline, ks, testthat, withr, crs (>= 0.15-44), knitr, rmarkdown, rgl
+LinkingTo: crs (>= 0.15-44)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 RoxygenNote: 0.0.0

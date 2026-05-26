@@ -11,6 +11,8 @@ extern SEXP C_np_dim_basis(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_density_nomad_native_fixed_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_density_nomad_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_shadow_cv_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_shadow_cv_distribution_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -46,6 +48,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_density",                   (DL_FUNC) &C_np_density,                   16},
     {"C_np_density_bw",                (DL_FUNC) &C_np_density_bw,                12},
     {"C_np_density_bw_eval",           (DL_FUNC) &C_np_density_bw_eval,           12},
+    {"C_np_density_nomad_native_fixed_eval",(DL_FUNC) &C_np_density_nomad_native_fixed_eval,11},
+    {"C_np_density_nomad_native_search",(DL_FUNC) &C_np_density_nomad_native_search,18},
     {"C_np_density_conditional",       (DL_FUNC) &C_np_density_conditional,       31},
     {"C_np_shadow_cv_density_conditional",(DL_FUNC) &C_np_shadow_cv_density_conditional,21},
     {"C_np_shadow_cv_distribution_conditional",(DL_FUNC) &C_np_shadow_cv_distribution_conditional,24},
