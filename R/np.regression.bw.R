@@ -109,8 +109,8 @@ npregbw.NULL <-
   }
 
   identical(bwtype, "fixed") &&
-    ((method %in% c("cv.ls", "cv.aic") && regtype %in% c("lc", "ll")) ||
-       (identical(method, "cv.ls") && identical(regtype, "lp"))) &&
+    method %in% c("cv.ls", "cv.aic") &&
+    regtype %in% c("lc", "ll", "lp") &&
     bwsolver %in% c("mads", "mads+powell")
 }
 
