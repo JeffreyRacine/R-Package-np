@@ -2355,6 +2355,7 @@ genTimingStr <- function(x){
   if (is.null(x$total.time) || is.na(x$total.time))
     return("")
 
+  x_bws <- if (is.list(x)) x[["bws", exact = TRUE]] else NULL
   nomad.time <- if (!is.null(x$nomad.time) && !is.na(x$nomad.time))
     as.double(x$nomad.time) else NA_real_
   powell.time <- if (!is.null(x$powell.time) && !is.na(x$powell.time))
@@ -2362,13 +2363,13 @@ genTimingStr <- function(x){
   fit.time <- if (!is.null(x$fit.time) && !is.na(x$fit.time))
     as.double(x$fit.time) else NA_real_
   if ((!is.finite(nomad.time) || !is.finite(powell.time)) &&
-      is.list(x$bws)) {
+      is.list(x_bws)) {
     if (!is.finite(nomad.time) &&
-        !is.null(x$bws$nomad.time) && !is.na(x$bws$nomad.time))
-      nomad.time <- as.double(x$bws$nomad.time)
+        !is.null(x_bws$nomad.time) && !is.na(x_bws$nomad.time))
+      nomad.time <- as.double(x_bws$nomad.time)
     if (!is.finite(powell.time) &&
-        !is.null(x$bws$powell.time) && !is.na(x$bws$powell.time))
-      powell.time <- as.double(x$bws$powell.time)
+        !is.null(x_bws$powell.time) && !is.na(x_bws$powell.time))
+      powell.time <- as.double(x_bws$powell.time)
   }
 
   .npRmpiTimingProfileRecord <- function() {
@@ -2376,9 +2377,9 @@ genTimingStr <- function(x){
 
     if (is.list(x) && is.list(x$timing.profile) && !is.null(x$timing.profile$where)) {
       rec <- x$timing.profile
-    } else if (is.list(x) && is.list(x$bws) && is.list(x$bws$timing.profile) &&
-               !is.null(x$bws$timing.profile$where)) {
-      rec <- x$bws$timing.profile
+    } else if (is.list(x_bws) && is.list(x_bws$timing.profile) &&
+               !is.null(x_bws$timing.profile$where)) {
+      rec <- x_bws$timing.profile
     }
 
     if (!is.list(rec) || is.null(rec$where))
@@ -2603,9 +2604,10 @@ genDenEstStr <- function(x){
 }
 
 genRegEstStr <- function(x){
-  regtype <- if (!is.null(x$regtype)) x$regtype else if (!is.null(x$bws)) x$bws$regtype else NULL
-  basis <- if (!is.null(x$basis)) x$basis else if (!is.null(x$bws)) x$bws$basis else NULL
-  bern <- if (!is.null(x$bernstein.basis)) x$bernstein.basis else if (!is.null(x$bws)) x$bws$bernstein.basis else NULL
+  x_bws <- if (is.list(x)) x[["bws", exact = TRUE]] else NULL
+  regtype <- if (!is.null(x$regtype)) x$regtype else if (!is.null(x_bws)) x_bws$regtype else NULL
+  basis <- if (!is.null(x$basis)) x$basis else if (!is.null(x_bws)) x_bws$basis else NULL
+  bern <- if (!is.null(x$bernstein.basis)) x$bernstein.basis else if (!is.null(x_bws)) x_bws$bernstein.basis else NULL
   est.label <- if (identical(regtype, "lp")) npFormatRegressionType(x) else x$pregtype
   basis.family <- if (identical(regtype, "lp")) npLpBasisFamilyLabel(basis) else NULL
   basis.rep <- if (identical(regtype, "lp")) npLpBasisRepresentationLabel(bern) else NULL
@@ -2642,18 +2644,19 @@ npLpBasisNcol <- function(basis = "glp", degree){
 }
 
 npFormatRegressionType <- function(x){
+  x_bws <- if (is.list(x)) x[["bws", exact = TRUE]] else NULL
   regtype <- if (!is.null(x$regtype)) {
     x$regtype
-  } else if (!is.null(x$bws) && !is.null(x$bws$regtype)) {
-    x$bws$regtype
+  } else if (!is.null(x_bws) && !is.null(x_bws$regtype)) {
+    x_bws$regtype
   } else {
     NULL
   }
 
   pregtype <- if (!is.null(x$pregtype)) {
     x$pregtype
-  } else if (!is.null(x$bws) && !is.null(x$bws$pregtype)) {
-    x$bws$pregtype
+  } else if (!is.null(x_bws) && !is.null(x_bws$pregtype)) {
+    x_bws$pregtype
   } else {
     NULL
   }
@@ -2663,8 +2666,8 @@ npFormatRegressionType <- function(x){
 
   degree <- if (!is.null(x$degree)) {
     x$degree
-  } else if (!is.null(x$bws) && !is.null(x$bws$degree)) {
-    x$bws$degree
+  } else if (!is.null(x_bws) && !is.null(x_bws$degree)) {
+    x_bws$degree
   } else {
     NULL
   }
@@ -2674,8 +2677,8 @@ npFormatRegressionType <- function(x){
 
   basis <- if (!is.null(x$basis)) {
     x$basis
-  } else if (!is.null(x$bws) && !is.null(x$bws$basis)) {
-    x$bws$basis
+  } else if (!is.null(x_bws) && !is.null(x_bws$basis)) {
+    x_bws$basis
   } else {
     "glp"
   }
