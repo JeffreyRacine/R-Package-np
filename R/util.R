@@ -2339,18 +2339,19 @@ npLpBasisNcol <- function(basis = "glp", degree){
 }
 
 npFormatRegressionType <- function(x){
+  xbws <- if (is.list(x)) x[["bws", exact = TRUE]] else NULL
   regtype <- if (!is.null(x$regtype)) {
     x$regtype
-  } else if (!is.null(x$bws) && !is.null(x$bws$regtype)) {
-    x$bws$regtype
+  } else if (!is.null(xbws) && !is.null(xbws$regtype)) {
+    xbws$regtype
   } else {
     NULL
   }
 
   pregtype <- if (!is.null(x$pregtype)) {
     x$pregtype
-  } else if (!is.null(x$bws) && !is.null(x$bws$pregtype)) {
-    x$bws$pregtype
+  } else if (!is.null(xbws) && !is.null(xbws$pregtype)) {
+    xbws$pregtype
   } else {
     NULL
   }
@@ -2360,8 +2361,8 @@ npFormatRegressionType <- function(x){
 
   degree <- if (!is.null(x$degree)) {
     x$degree
-  } else if (!is.null(x$bws) && !is.null(x$bws$degree)) {
-    x$bws$degree
+  } else if (!is.null(xbws) && !is.null(xbws$degree)) {
+    xbws$degree
   } else {
     NULL
   }
@@ -2371,8 +2372,8 @@ npFormatRegressionType <- function(x){
 
   basis <- if (!is.null(x$basis)) {
     x$basis
-  } else if (!is.null(x$bws) && !is.null(x$bws$basis)) {
-    x$bws$basis
+  } else if (!is.null(xbws) && !is.null(xbws$basis)) {
+    xbws$basis
   } else {
     "glp"
   }
