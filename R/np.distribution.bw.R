@@ -123,6 +123,232 @@ npudistbw.NULL <-
     tbw
   }
 
+.npudistbw_nomad_native_target <- function(template, bwsolver) {
+  method <- if (!is.null(template$method) && length(template$method)) {
+    as.character(template$method[1L])
+  } else {
+    "cv.cdf"
+  }
+  bwtype <- if (!is.null(template$type) && length(template$type)) {
+    as.character(template$type[1L])
+  } else {
+    ""
+  }
+
+  method %in% c("cv.cdf") &&
+    bwtype %in% c("fixed", "generalized_nn", "adaptive_nn") &&
+    bwsolver %in% c("mads", "mads+powell")
+}
+
+.npudistbw_nomad_native_require_crs <- function() {
+  if (!requireNamespace("crs", quietly = TRUE))
+    stop("native npudist NOMAD route requires crs >= 0.15-44", call. = FALSE)
+  if (utils::packageVersion("crs") < "0.15.44")
+    stop("native npudist NOMAD route requires crs >= 0.15-44", call. = FALSE)
+  invisible(TRUE)
+}
+
+.npudistbw_nomad_native_option_vectors <- .npudensbw_nomad_native_option_vectors
+
+.npudistbw_nomad_native_prepare_args <- function(dat,
+                                                 bws,
+                                                 gdat = NULL,
+                                                 invalid.penalty = c("baseline", "dbmax"),
+                                                 penalty.multiplier = 10,
+                                                 itmax = 10000L,
+                                                 ftol = 1.490116e-07,
+                                                 tol = 1.490116e-04,
+                                                 small = 1.490116e-05,
+                                                 lbc.dir = 0.5,
+                                                 cfac.dir = 2.5 * (3.0 - sqrt(5)),
+                                                 initc.dir = 1.0,
+                                                 lbd.dir = 0.1,
+                                                 hbd.dir = 1,
+                                                 dfac.dir = 0.25 * (3.0 - sqrt(5)),
+                                                 initd.dir = 1.0,
+                                                 scale.factor.init.lower = 0.1,
+                                                 scale.factor.init.upper = 2.0,
+                                                 scale.factor.init = 0.5,
+                                                 lbd.init = 0.1,
+                                                 hbd.init = 0.9,
+                                                 dfac.init = 0.375,
+                                                 scale.factor.search.lower = NULL,
+                                                 scale.init.categorical.sample = FALSE,
+                                                 transform.bounds = FALSE,
+                                                 do.full.integral = FALSE,
+                                                 ngrid = 100L,
+                                                 memfac = 500.0) {
+  invalid.penalty <- match.arg(invalid.penalty)
+  dat <- toFrame(dat)
+  dat.matrix <- toMatrix(dat)
+
+  duno <- dat.matrix[, bws$iuno, drop = FALSE]
+  dcon <- dat.matrix[, bws$icon, drop = FALSE]
+  dord <- dat.matrix[, bws$iord, drop = FALSE]
+  mysd <- EssDee(dcon)
+  nrow <- dim(dat.matrix)[1L]
+  nconfac <- nrow^(-1.0 / (2.0 * bws$ckerorder + bws$ncon))
+  ncatfac <- nrow^(-2.0 / (2.0 * bws$ckerorder + bws$ncon))
+  sfloor <- npResolveScaleFactorLowerBound(
+    if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
+  )
+  cont.start <- npContinuousSearchStartControls(
+    scale.factor.init.lower,
+    scale.factor.init.upper,
+    scale.factor.init,
+    sfloor,
+    where = "npudistbw"
+  )
+
+  if (!is.null(gdat)) {
+    gdat <- toFrame(gdat)
+    if (any(is.na(gdat)))
+      stop("na's not allowed to be present in cdf gdata")
+    gdat.matrix <- toMatrix(gdat)
+    guno <- gdat.matrix[, bws$iuno, drop = FALSE]
+    gord <- gdat.matrix[, bws$iord, drop = FALSE]
+    gcon <- gdat.matrix[, bws$icon, drop = FALSE]
+    cdf_on_train <- FALSE
+    nog <- nrow(gdat.matrix)
+  } else if (isTRUE(do.full.integral)) {
+    guno <- data.frame()
+    gord <- data.frame()
+    gcon <- data.frame()
+    cdf_on_train <- TRUE
+    nog <- 0L
+  } else {
+    nog <- as.integer(ngrid)
+    probs <- seq(0, 1, length.out = nog)
+    odat <- dat
+    ev <- odat[seq_len(nog), , drop = FALSE]
+    for (i in seq_len(ncol(ev)))
+      ev[, i] <- cast(uocquantile(odat[, i], probs), odat[, i])
+    ev <- toMatrix(ev)
+    guno <- ev[, bws$iuno, drop = FALSE]
+    gord <- ev[, bws$iord, drop = FALSE]
+    gcon <- ev[, bws$icon, drop = FALSE]
+    cdf_on_train <- FALSE
+  }
+
+  myopti <- list(
+    num_obs_train = nrow,
+    num_obs_eval = nog,
+    iMultistart = IMULTI_TRUE,
+    iNum_Multistart = 1L,
+    int_use_starting_values = USE_START_YES,
+    int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
+    BANDWIDTH_den_extern = switch(bws$type,
+      fixed = BW_FIXED,
+      generalized_nn = BW_GEN_NN,
+      adaptive_nn = BW_ADAP_NN),
+    itmax = itmax,
+    int_RESTART_FROM_MIN = RE_MIN_FALSE,
+    int_MINIMIZE_IO = IO_MIN_TRUE,
+    bwmethod = switch(bws$method,
+      cv.cdf = DBWM_CVLS),
+    ckerneval = switch(bws$ckertype,
+      gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
+      epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
+      uniform = CKER_UNI,
+      "truncated gaussian" = CKER_TGAUSS),
+    ukerneval = switch(bws$ukertype,
+      aitchisonaitken = UKER_AIT,
+      liracine = UKER_LR),
+    okerneval = switch(bws$okertype,
+      wangvanryzin = OKER_WANG,
+      liracine = OKER_NLR,
+      racineliyan = OKER_RLY),
+    cdf_on_train = cdf_on_train,
+    nuno = dim(duno)[2L],
+    nord = dim(dord)[2L],
+    ncon = dim(dcon)[2L],
+    int_do_tree = npDoTreeOrCategoricalCompress(
+      ncon = dim(dcon)[2L],
+      ncat = dim(duno)[2L] + dim(dord)[2L],
+      bws = bws),
+    scale.init.categorical.sample = scale.init.categorical.sample,
+    dfc.dir = 3L,
+    transform.bounds = transform.bounds
+  )
+
+  myoptd <- list(
+    ftol = ftol,
+    tol = tol,
+    small = small,
+    lbc.dir = lbc.dir,
+    cfac.dir = cfac.dir,
+    initc.dir = initc.dir,
+    lbd.dir = lbd.dir,
+    hbd.dir = hbd.dir,
+    dfac.dir = dfac.dir,
+    initd.dir = initd.dir,
+    lbc.init = cont.start$scale.factor.init.lower,
+    hbc.init = cont.start$scale.factor.init.upper,
+    cfac.init = cont.start$scale.factor.init,
+    lbd.init = lbd.init,
+    hbd.init = hbd.init,
+    dfac.init = dfac.init,
+    nconfac = nconfac,
+    ncatfac = ncatfac,
+    memfac = memfac,
+    scale.factor.lower.bound = sfloor
+  )
+
+  cker.bounds <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+  list(
+    duno = as.double(duno),
+    dord = as.double(dord),
+    dcon = as.double(dcon),
+    guno = as.double(guno),
+    gord = as.double(gord),
+    gcon = as.double(gcon),
+    mysd = as.double(mysd),
+    myopti = as.integer(myopti),
+    myoptd = as.double(myoptd),
+    penalty_mode = as.integer(if (invalid.penalty == "baseline") 1L else 0L),
+    penalty_multiplier = as.double(penalty.multiplier),
+    ckerlb = as.double(cker.bounds$lb),
+    ckerub = as.double(cker.bounds$ub)
+  )
+}
+
+npNomadNativeSearchDistribution <- function(prep,
+                                            x0,
+                                            bbin,
+                                            lb,
+                                            ub,
+                                            max.eval = 0L,
+                                            random.seed = 42L,
+                                            option.names = character(),
+                                            option.values = character()) {
+  native.call <- .np_nomad_capture_snomadr(.Call(
+    "C_np_distribution_nomad_native_search",
+    as.double(prep$duno),
+    as.double(prep$dord),
+    as.double(prep$dcon),
+    as.double(prep$guno),
+    as.double(prep$gord),
+    as.double(prep$gcon),
+    as.double(prep$mysd),
+    as.integer(prep$myopti),
+    as.double(prep$myoptd),
+    as.double(x0),
+    as.integer(bbin),
+    as.double(lb),
+    as.double(ub),
+    as.integer(max.eval),
+    as.integer(random.seed),
+    as.character(option.names),
+    as.character(option.values),
+    as.integer(prep$penalty_mode),
+    as.double(prep$penalty_multiplier),
+    as.double(prep$ckerlb),
+    as.double(prep$ckerub),
+    PACKAGE = "npRmpi"
+  ), capture.output = !isTRUE(getOption("np.messages")))
+  native.call$value
+}
+
 .npudistbw_run_mads <- function(dat,
                                 bws,
                                 gdat = NULL,
@@ -217,25 +443,186 @@ npudistbw.NULL <-
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
-  search.result <- .np_nomad_search(
-    engine = "nomad",
-    baseline_record = NULL,
-    start_degree = integer(0L),
-    x0 = x0,
-    bbin = bounds$bbin,
-    lb = bounds$lower,
-    ub = bounds$upper,
-    eval_fun = eval_fun,
-    build_payload = build_payload,
-    direction = "min",
-    objective_name = "fval",
-    nmulti = opt.value("nmulti", npDefaultNmulti(dim(toFrame(dat))[2L])),
-    nomad.inner.nmulti = opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L)),
-    random.seed = opt.value("random.seed", 42L),
-    handoff_before_build = identical(bwsolver, "mads+powell"),
-    remin = isTRUE(opt.args$nomad.remin),
-    nomad.opts = opt.value("nomad.opts", list())
-  )
+  if (.npudistbw_nomad_native_target(template, bwsolver)) {
+    .npudistbw_nomad_native_require_crs()
+    native.nmulti <- npValidateNmulti(opt.value("nmulti", npDefaultNmulti(dim(toFrame(dat))[2L])))
+    native.inner.nmulti <- npValidateNonNegativeInteger(
+      opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L)),
+      "nomad.nmulti"
+    )
+    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
+      stop("native npudist NOMAD route does not support inner NOMAD multistart without crs native ABI support", call. = FALSE)
+    if (isTRUE(opt.args$nomad.remin))
+      stop("native npudist NOMAD route does not support NOMAD remin", call. = FALSE)
+
+    native.random.seed <- opt.value("random.seed", 42L)
+    native.nomad.opts <- .np_nomad_default_opts(
+      native.random.seed,
+      opt.value("nomad.opts", list())
+    )
+    native.option.vectors <- .npudistbw_nomad_native_option_vectors(native.nomad.opts)
+    native.start.matrix <- .np_nomad_build_starts(
+      x0 = x0,
+      bbin = bounds$bbin,
+      lb = bounds$lower,
+      ub = bounds$upper,
+      nmulti = native.nmulti,
+      random.seed = native.random.seed,
+      degree_spec = NULL
+    )
+    native.prep <- .npudistbw_nomad_native_prepare_args(
+      dat = dat,
+      bws = bws,
+      gdat = gdat,
+      invalid.penalty = opt.value("invalid.penalty", "baseline"),
+      penalty.multiplier = opt.value("penalty.multiplier", 10),
+      itmax = opt.value("itmax", 10000L),
+      ftol = opt.value("ftol", 1.490116e-07),
+      tol = opt.value("tol", 1.490116e-04),
+      small = opt.value("small", 1.490116e-05),
+      scale.factor.search.lower = opt.value("scale.factor.search.lower", NULL),
+      do.full.integral = opt.value("do.full.integral", FALSE),
+      ngrid = opt.value("ngrid", 100L),
+      memfac = opt.value("memfac", 500.0)
+    )
+
+    native.results <- vector("list", nrow(native.start.matrix))
+    native.best.index <- NA_integer_
+    native.best.objective <- Inf
+    native.nomad.elapsed <- 0
+    native.num.feval.total <- 0
+    native.num.feval.fast.total <- 0
+    native.num.feval.guarded.total <- 0
+    for (i in seq_len(nrow(native.start.matrix))) {
+      native.start <- proc.time()[3L]
+      native.i <- npNomadNativeSearchDistribution(
+        prep = native.prep,
+        x0 = as.numeric(native.start.matrix[i, ]),
+        bbin = bounds$bbin,
+        lb = bounds$lower,
+        ub = bounds$upper,
+        max.eval = 0L,
+        random.seed = native.random.seed,
+        option.names = native.option.vectors$names,
+        option.values = native.option.vectors$values
+      )
+      native.elapsed <- proc.time()[3L] - native.start
+      native.nomad.elapsed <- native.nomad.elapsed + native.elapsed
+      if (!identical(as.integer(native.i$status[1L]), 0L) ||
+          !identical(as.integer(native.i$result_status[1L]), 0L)) {
+        stop(sprintf(
+          "native npudist NOMAD route failed (status=%s, result_status=%s): %s",
+          as.integer(native.i$status[1L]),
+          as.integer(native.i$result_status[1L]),
+          as.character(native.i$message[1L])
+        ), call. = FALSE)
+      }
+      official.objective.i <- as.numeric(native.i$official_objective[1L])
+      objective.i <- as.numeric(native.i$objective[1L])
+      native.results[[i]] <- list(
+        restart = i,
+        start = as.numeric(native.start.matrix[i, ]),
+        elapsed = native.elapsed,
+        status = "ok",
+        message = as.character(native.i$message[1L]),
+        objective = official.objective.i,
+        bbe = as.numeric(native.i$blackbox_evaluations[1L]),
+        iterations = as.numeric(native.i$iterations[1L]),
+        solution = as.numeric(native.i$solution),
+        best_point = as.numeric(native.i$best_point),
+        best_objective = objective.i,
+        native = native.i
+      )
+      native.num.feval.total <- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
+      native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
+      native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.i$total_num.feval.guarded[1L])
+      if (is.finite(objective.i) && objective.i < native.best.objective) {
+        native.best.objective <- objective.i
+        native.best.index <- i
+      }
+    }
+    if (!is.finite(native.best.index))
+      stop("native npudist NOMAD route did not return a finite solution", call. = FALSE)
+
+    native.best <- native.results[[native.best.index]]
+    native.handoff.point <- as.numeric(native.best$best_point)
+    if (any(!is.finite(native.handoff.point)))
+      stop("native npudist NOMAD route did not return a finite best point", call. = FALSE)
+    native.bw <- .npregbw_nomad_point_to_bw(native.handoff.point, template = template, setup = setup)
+    native.record <- list(
+      eval_id = as.integer(native.best$native$compiled_callback_calls[1L]),
+      degree = integer(0L),
+      objective = native.best.objective,
+      status = "ok",
+      cached = FALSE,
+      message = native.best$message,
+      elapsed = native.best$elapsed,
+      num.feval = as.numeric(native.best$native$best_num.feval[1L]),
+      num.feval.fast = as.numeric(native.best$native$best_num.feval.fast[1L]),
+      num.feval.guarded = as.numeric(native.best$native$best_num.feval.guarded[1L])
+    )
+    mads.num.feval.total <- native.num.feval.total
+    mads.num.feval.fast.total <- native.num.feval.fast.total
+    payload.result <- build_payload(
+      point = native.handoff.point,
+      best_record = native.record,
+      solution = native.best,
+      interrupted = FALSE
+    )
+    search.result <- list(
+      best = native.record,
+      best_point = native.handoff.point,
+      best_payload = payload.result$payload,
+      completed = TRUE,
+      method = "nomad",
+      restart.results = native.results,
+      best.restart = native.best.index,
+      nomad.time = native.nomad.elapsed,
+      powell.time = payload.result$powell.time,
+      optim.time = native.nomad.elapsed + as.numeric(payload.result$powell.time[1L]),
+      num.feval.total = native.num.feval.total,
+      num.feval.fast.total = native.num.feval.fast.total,
+      num.feval.guarded.total = native.num.feval.guarded.total,
+      native.diagnostics = list(
+        raw.point = native.handoff.point,
+        bandwidth = native.bw,
+        objective = native.best.objective,
+        official.solution = as.numeric(native.best$solution),
+        official.objective = as.numeric(native.best$objective[1L]),
+        compiled.callback.count = as.integer(native.best$native$compiled_callback_calls[1L]),
+        compiled.callback.failures = as.integer(native.best$native$compiled_callback_failures[1L]),
+        crs.callback.evaluations = as.integer(native.best$native$crs_callback_evaluations[1L]),
+        blackbox.evaluations = as.integer(native.best$native$blackbox_evaluations[1L]),
+        iterations = as.integer(native.best$native$iterations[1L])
+      )
+    )
+    if (isTRUE(getOption("np.developer.native.nomad.diagnostics", FALSE)) &&
+        !is.null(search.result$best_payload))
+      attr(search.result$best_payload, "native.nomad.diagnostics") <- search.result$native.diagnostics
+    if (!is.null(payload.result$objective) &&
+        .np_degree_better(payload.result$objective, search.result$best$objective, direction = "min"))
+      search.result$best$objective <- as.numeric(payload.result$objective[1L])
+  } else {
+    search.result <- .np_nomad_search(
+      engine = "nomad",
+      baseline_record = NULL,
+      start_degree = integer(0L),
+      x0 = x0,
+      bbin = bounds$bbin,
+      lb = bounds$lower,
+      ub = bounds$upper,
+      eval_fun = eval_fun,
+      build_payload = build_payload,
+      direction = "min",
+      objective_name = "fval",
+      nmulti = opt.value("nmulti", npDefaultNmulti(dim(toFrame(dat))[2L])),
+      nomad.inner.nmulti = opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L)),
+      random.seed = opt.value("random.seed", 42L),
+      handoff_before_build = identical(bwsolver, "mads+powell"),
+      remin = isTRUE(opt.args$nomad.remin),
+      nomad.opts = opt.value("nomad.opts", list())
+    )
+  }
   search.result$method <- bwsolver
   out <- search.result$best_payload
   out$bwsolver <- bwsolver
