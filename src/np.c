@@ -2969,47 +2969,70 @@ SEXP C_np_regression_nomad_shadow_prepare(SEXP runo,
   return ScalarLogical(ok ? 1 : 0);
 }
 
-SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
+static int np_regression_nomad_shadow_eval_native_raw(const double *rbw,
+                                                      const int *glp_degree,
+                                                      double out[3])
 {
-  SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
-  int i;
+  double *rbw_work = NULL;
+  int *degree_work = NULL;
+  int i, degree_ok, bw_ok;
   double val, fast = 0.0, fast_before = 0.0;
-  int degree_ok;
-  int bw_ok;
 
-  if (!np_regression_nomad_shadow.active)
-    error("resident npreg NOMAD shadow state is not active");
+  if (!np_regression_nomad_shadow.active || rbw == NULL ||
+      glp_degree == NULL || out == NULL)
+    return 1;
 
-  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
-  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
-
-  if (XLENGTH(rbw_r) != np_regression_nomad_shadow.num_var) {
-    UNPROTECT(2);
-    error("resident npreg NOMAD shadow received bandwidth vector of unexpected length");
-  }
-  if (XLENGTH(degree_i) != np_regression_nomad_shadow.num_reg_continuous) {
-    UNPROTECT(2);
-    error("resident npreg NOMAD shadow received degree vector of unexpected length");
+  rbw_work = R_Calloc(np_regression_nomad_shadow.num_var, double);
+  degree_work = R_Calloc(np_regression_nomad_shadow.num_reg_continuous, int);
+  if (rbw_work == NULL || degree_work == NULL) {
+    if (rbw_work != NULL)
+      R_Free(rbw_work);
+    if (degree_work != NULL)
+      R_Free(degree_work);
+    return 1;
   }
 
-  degree_ok = np_regression_nomad_shadow_refresh_degree(INTEGER(degree_i)) ? 1 : 0;
-  if (comm[1] != MPI_COMM_NULL)
+  for (i = 0; i < np_regression_nomad_shadow.num_var; i++)
+    rbw_work[i] = rbw[i];
+  for (i = 0; i < np_regression_nomad_shadow.num_reg_continuous; i++)
+    degree_work[i] = glp_degree[i];
+
+#ifdef MPI2
+  if (comm != NULL && comm[1] != MPI_COMM_NULL) {
+    MPI_Bcast(rbw_work,
+              np_regression_nomad_shadow.num_var,
+              MPI_DOUBLE,
+              0,
+              comm[1]);
+    MPI_Bcast(degree_work,
+              np_regression_nomad_shadow.num_reg_continuous,
+              MPI_INT,
+              0,
+              comm[1]);
+  }
+#endif
+
+  degree_ok = np_regression_nomad_shadow_refresh_degree(degree_work) ? 1 : 0;
+#ifdef MPI2
+  if (comm != NULL && comm[1] != MPI_COMM_NULL)
     MPI_Allreduce(MPI_IN_PLACE, &degree_ok, 1, MPI_INT, MPI_MIN, comm[1]);
+#endif
 
   if (!degree_ok) {
     bwm_eval_count += 1.0;
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
     val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
-    PROTECT(out = allocVector(REALSXP, 2));
-    REAL(out)[0] = val;
-    REAL(out)[1] = 0.0;
-    UNPROTECT(3);
-    return out;
+    out[0] = val;
+    out[1] = 1.0;
+    out[2] = 0.0;
+    R_Free(rbw_work);
+    R_Free(degree_work);
+    return 0;
   }
 
   for (i = 0; i < np_regression_nomad_shadow.num_var; i++)
-    np_regression_nomad_shadow.vector_scale_factor[i + 1] = REAL(rbw_r)[i];
+    np_regression_nomad_shadow.vector_scale_factor[i + 1] = rbw_work[i];
 
   bw_ok = np_bw_candidate_is_admissible(
     np_regression_nomad_shadow.num_var,
@@ -3029,19 +3052,22 @@ SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
     num_categories_extern,
     np_regression_nomad_shadow.vector_scale_factor
   ) ? 1 : 0;
-  if (comm[1] != MPI_COMM_NULL)
+#ifdef MPI2
+  if (comm != NULL && comm[1] != MPI_COMM_NULL)
     MPI_Allreduce(MPI_IN_PLACE, &bw_ok, 1, MPI_INT, MPI_MIN, comm[1]);
+#endif
 
   if (!bw_ok) {
     bwm_eval_count += 1.0;
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
     val = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
-    PROTECT(out = allocVector(REALSXP, 2));
-    REAL(out)[0] = val;
-    REAL(out)[1] = 0.0;
-    UNPROTECT(3);
-    return out;
+    out[0] = val;
+    out[1] = 1.0;
+    out[2] = 0.0;
+    R_Free(rbw_work);
+    R_Free(degree_work);
+    return 0;
   }
 
   fast_before = np_fastcv_alllarge_hits_get();
@@ -3049,15 +3075,385 @@ SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
   fast = np_fastcv_alllarge_hits_get() - fast_before;
   if (fast < 0.0)
     fast = 0.0;
-  if (comm[1] != MPI_COMM_NULL)
+#ifdef MPI2
+  if (comm != NULL && comm[1] != MPI_COMM_NULL) {
     MPI_Bcast(&val, 1, MPI_DOUBLE, 0, comm[1]);
-  if (comm[1] != MPI_COMM_NULL)
     MPI_Bcast(&fast, 1, MPI_DOUBLE, 0, comm[1]);
+  }
+#endif
+
+  out[0] = val;
+  out[1] = 1.0;
+  out[2] = fast;
+  R_Free(rbw_work);
+  R_Free(degree_work);
+  return 0;
+}
+
+SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
+{
+  SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
+  double eval_out[3];
+
+  if (!np_regression_nomad_shadow.active)
+    error("resident npreg NOMAD shadow state is not active");
+
+  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
+  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
+
+  if (XLENGTH(rbw_r) != np_regression_nomad_shadow.num_var) {
+    UNPROTECT(2);
+    error("resident npreg NOMAD shadow received bandwidth vector of unexpected length");
+  }
+  if (XLENGTH(degree_i) != np_regression_nomad_shadow.num_reg_continuous) {
+    UNPROTECT(2);
+    error("resident npreg NOMAD shadow received degree vector of unexpected length");
+  }
+
+  if (np_regression_nomad_shadow_eval_native_raw(REAL(rbw_r),
+                                                 INTEGER(degree_i),
+                                                 eval_out) != 0) {
+    UNPROTECT(2);
+    error("resident npreg NOMAD shadow native evaluator failed");
+  }
 
   PROTECT(out = allocVector(REALSXP, 2));
-  REAL(out)[0] = val;
-  REAL(out)[1] = fast;
+  REAL(out)[0] = eval_out[0];
+  REAL(out)[1] = eval_out[2];
   UNPROTECT(3);
+  return out;
+}
+
+typedef struct {
+  int n;
+  int callback_calls;
+  int callback_failures;
+  int *bbin;
+  double *lower;
+  double *upper;
+  double *decode_scale;
+  double *point_upper;
+  double total_num_feval;
+  double total_fast;
+  double best_objective;
+  double best_eval[3];
+  double *best_point;
+  double *best_bw;
+} np_regression_shadow_native_search_context;
+
+static int np_regression_shadow_native_decode_bw(
+    const np_regression_shadow_native_search_context *context,
+    const double *raw_point,
+    double *eval_bw)
+{
+  int j, bandwidth;
+
+  if (context == NULL || raw_point == NULL || eval_bw == NULL)
+    return 1;
+
+  bandwidth = BANDWIDTH_reg_extern;
+  for (j = 0; j < context->n; j++) {
+    if (bandwidth == BW_FIXED ||
+        (context->decode_scale != NULL && context->decode_scale[j] != 1.0)) {
+      eval_bw[j] = raw_point[j] *
+        ((context->decode_scale != NULL) ? context->decode_scale[j] : 1.0);
+    } else {
+      eval_bw[j] = nearbyint(raw_point[j]);
+      if (context->point_upper != NULL &&
+          R_finite(context->point_upper[j]) &&
+          eval_bw[j] > context->point_upper[j])
+        eval_bw[j] = context->point_upper[j];
+      if (eval_bw[j] < 1.0)
+        eval_bw[j] = 1.0;
+    }
+  }
+
+  return 0;
+}
+
+static int np_regression_shadow_native_search_callback(int n,
+                                                       const double *x,
+                                                       int m,
+                                                       double *bb_outputs,
+                                                       void *user_data)
+{
+  np_regression_shadow_native_search_context *context =
+    (np_regression_shadow_native_search_context *) user_data;
+  double *raw_point = NULL;
+  double *eval_bw = NULL;
+  double eval_out[3];
+  int j, status;
+
+  if (context == NULL || x == NULL || bb_outputs == NULL || m != 1 ||
+      n != context->n)
+    return 1;
+
+  raw_point = R_Calloc(context->n, double);
+  eval_bw = R_Calloc(context->n, double);
+  if (raw_point == NULL || eval_bw == NULL) {
+    if (raw_point != NULL)
+      R_Free(raw_point);
+    if (eval_bw != NULL)
+      R_Free(eval_bw);
+    return 1;
+  }
+
+  for (j = 0; j < context->n; j++) {
+    raw_point[j] = (context->bbin[j] == 1) ? nearbyint(x[j]) : x[j];
+    if (context->lower != NULL && R_finite(context->lower[j]) &&
+        raw_point[j] < context->lower[j])
+      raw_point[j] = context->lower[j];
+    if (context->upper != NULL && R_finite(context->upper[j]) &&
+        raw_point[j] > context->upper[j])
+      raw_point[j] = context->upper[j];
+  }
+
+  status = np_regression_shadow_native_decode_bw(context, raw_point, eval_bw);
+  if (status != 0) {
+    context->callback_failures++;
+    R_Free(raw_point);
+    R_Free(eval_bw);
+    return 1;
+  }
+
+  status = np_regression_nomad_shadow_eval_native_raw(
+    eval_bw,
+    np_regression_nomad_shadow.glp_degree,
+    eval_out);
+  if (status != 0) {
+    context->callback_failures++;
+    R_Free(raw_point);
+    R_Free(eval_bw);
+    return 1;
+  }
+
+  context->callback_calls++;
+  context->total_num_feval += eval_out[1];
+  context->total_fast += eval_out[2];
+  if (context->callback_calls == 1 || eval_out[0] < context->best_objective) {
+    context->best_objective = eval_out[0];
+    for (j = 0; j < 3; j++)
+      context->best_eval[j] = eval_out[j];
+    if (context->best_point != NULL)
+      for (j = 0; j < context->n; j++)
+        context->best_point[j] = raw_point[j];
+    if (context->best_bw != NULL)
+      for (j = 0; j < context->n; j++)
+        context->best_bw[j] = eval_bw[j];
+  }
+
+  bb_outputs[0] = eval_out[0];
+  R_Free(raw_point);
+  R_Free(eval_bw);
+  return 0;
+}
+
+SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
+                                                SEXP bbin,
+                                                SEXP lower,
+                                                SEXP upper,
+                                                SEXP decode_scale,
+                                                SEXP point_upper,
+                                                SEXP max_eval,
+                                                SEXP random_seed,
+                                                SEXP option_names,
+                                                SEXP option_values)
+{
+  SEXP x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue;
+  SEXP upper_r = R_NilValue, decode_scale_r = R_NilValue, point_upper_r = R_NilValue;
+  SEXP option_names_s = R_NilValue, option_values_s = R_NilValue;
+  SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
+  SEXP best_bw = R_NilValue, call = R_NilValue;
+  crs_nomad_native_solve_fn_v1 solve;
+  crs_nomad_native_problem_v1 problem;
+  crs_nomad_native_result_v1 result;
+  crs_nomad_native_option_v1 *native_options = NULL;
+  np_regression_shadow_native_search_context context;
+  double *solution = NULL, *best_point = NULL, *best_bw_d = NULL;
+  int n, i, status, budget, seed, n_options;
+
+  if (!np_regression_nomad_shadow.active)
+    error("resident npreg NOMAD shadow state is not active");
+
+  PROTECT(x0_r = coerceVector(x0, REALSXP));
+  PROTECT(bbin_i = coerceVector(bbin, INTSXP));
+  PROTECT(lower_r = coerceVector(lower, REALSXP));
+  PROTECT(upper_r = coerceVector(upper, REALSXP));
+  PROTECT(decode_scale_r = coerceVector(decode_scale, REALSXP));
+  PROTECT(point_upper_r = coerceVector(point_upper, REALSXP));
+  PROTECT(option_names_s = coerceVector(option_names, STRSXP));
+  PROTECT(option_values_s = coerceVector(option_values, STRSXP));
+
+  n = (int) XLENGTH(x0_r);
+  if (n <= 0 ||
+      XLENGTH(bbin_i) != n ||
+      XLENGTH(lower_r) != n ||
+      XLENGTH(upper_r) != n ||
+      XLENGTH(decode_scale_r) != n ||
+      XLENGTH(point_upper_r) != n ||
+      np_regression_nomad_shadow.num_var != n) {
+    UNPROTECT(8);
+    error("native npreg NOMAD search received inconsistent problem dimensions");
+  }
+  budget = asInteger(max_eval);
+  seed = asInteger(random_seed);
+  if (budget < 0 || seed < 0) {
+    UNPROTECT(8);
+    error("native npreg NOMAD search received invalid budget or seed");
+  }
+  if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
+    UNPROTECT(8);
+    error("native npreg NOMAD search received inconsistent option name/value lengths");
+  }
+  if (XLENGTH(option_names_s) > INT_MAX) {
+    UNPROTECT(8);
+    error("native npreg NOMAD search received too many options");
+  }
+  n_options = (int) XLENGTH(option_names_s);
+
+  PROTECT(call = lang2(install("loadNamespace"), mkString("crs")));
+  Rf_eval(call, R_GlobalEnv);
+  UNPROTECT(1);
+
+  solve = (crs_nomad_native_solve_fn_v1)
+    R_GetCCallable("crs", "crs_nomad_native_solve_v1");
+  if (solve == NULL) {
+    UNPROTECT(8);
+    error("failed to resolve crs native NOMAD callable");
+  }
+
+  solution = R_Calloc(n, double);
+  best_point = R_Calloc(n, double);
+  best_bw_d = R_Calloc(n, double);
+  if (solution == NULL || best_point == NULL || best_bw_d == NULL) {
+    if (solution != NULL) R_Free(solution);
+    if (best_point != NULL) R_Free(best_point);
+    if (best_bw_d != NULL) R_Free(best_bw_d);
+    UNPROTECT(8);
+    error("failed to allocate native npreg NOMAD buffers");
+  }
+  if (n_options > 0) {
+    native_options = R_Calloc(n_options, crs_nomad_native_option_v1);
+    if (native_options == NULL) {
+      R_Free(solution);
+      R_Free(best_point);
+      R_Free(best_bw_d);
+      UNPROTECT(8);
+      error("failed to allocate native npreg NOMAD option buffers");
+    }
+    for (i = 0; i < n_options; i++) {
+      native_options[i].name = CHAR(STRING_ELT(option_names_s, i));
+      native_options[i].value = CHAR(STRING_ELT(option_values_s, i));
+    }
+  }
+  for (i = 0; i < n; i++) {
+    solution[i] = R_NaN;
+    best_point[i] = R_NaN;
+    best_bw_d[i] = R_NaN;
+  }
+
+  memset(&problem, 0, sizeof(problem));
+  memset(&result, 0, sizeof(result));
+  memset(&context, 0, sizeof(context));
+  for (i = 0; i < 3; i++)
+    context.best_eval[i] = R_NaN;
+
+  context.n = n;
+  context.bbin = INTEGER(bbin_i);
+  context.lower = REAL(lower_r);
+  context.upper = REAL(upper_r);
+  context.decode_scale = REAL(decode_scale_r);
+  context.point_upper = REAL(point_upper_r);
+  context.best_point = best_point;
+  context.best_bw = best_bw_d;
+
+  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION;
+  problem.struct_size = sizeof(problem);
+  problem.n = n;
+  problem.m = 1;
+  problem.x0 = REAL(x0_r);
+  problem.bb_input_type = INTEGER(bbin_i);
+  problem.lower = REAL(lower_r);
+  problem.upper = REAL(upper_r);
+  problem.max_eval = budget;
+  problem.random_seed = (unsigned int) seed;
+  problem.quiet = 1;
+  problem.option_count = n_options;
+  problem.options = native_options;
+
+  result.api_version = CRS_NOMAD_NATIVE_API_VERSION;
+  result.struct_size = sizeof(result);
+  result.solution = solution;
+  result.solution_len = n;
+
+  status = solve(&problem,
+                 np_regression_shadow_native_search_callback,
+                 &context,
+                 &result);
+
+  PROTECT(out = allocVector(VECSXP, 21));
+  PROTECT(names = allocVector(STRSXP, 21));
+  PROTECT(sol = allocVector(REALSXP, n));
+  PROTECT(best = allocVector(REALSXP, n));
+  PROTECT(best_bw = allocVector(REALSXP, n));
+  for (i = 0; i < n; i++) {
+    REAL(sol)[i] = solution[i];
+    REAL(best)[i] = best_point[i];
+    REAL(best_bw)[i] = best_bw_d[i];
+  }
+
+  SET_VECTOR_ELT(out, 0, ScalarInteger(status));
+  SET_VECTOR_ELT(out, 1, ScalarInteger(result.status));
+  SET_VECTOR_ELT(out, 2, ScalarInteger(result.nomad_run_flag));
+  SET_VECTOR_ELT(out, 3, ScalarReal(context.best_objective));
+  SET_VECTOR_ELT(out, 4, ScalarReal(result.objective));
+  SET_VECTOR_ELT(out, 5, sol);
+  SET_VECTOR_ELT(out, 6, best);
+  SET_VECTOR_ELT(out, 7, best_bw);
+  SET_VECTOR_ELT(out, 8, ScalarReal(context.best_eval[0]));
+  SET_VECTOR_ELT(out, 9, ScalarReal(context.best_eval[1]));
+  SET_VECTOR_ELT(out, 10, ScalarReal(context.best_eval[2]));
+  SET_VECTOR_ELT(out, 11, ScalarReal(context.total_num_feval));
+  SET_VECTOR_ELT(out, 12, ScalarReal(context.total_fast));
+  SET_VECTOR_ELT(out, 13, ScalarInteger(context.callback_calls));
+  SET_VECTOR_ELT(out, 14, ScalarInteger(context.callback_failures));
+  SET_VECTOR_ELT(out, 15, ScalarInteger(result.callback_evaluations));
+  SET_VECTOR_ELT(out, 16, ScalarInteger(result.blackbox_evaluations));
+  SET_VECTOR_ELT(out, 17, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 18, mkString(result.message));
+  SET_VECTOR_ELT(out, 19, ScalarInteger(BANDWIDTH_reg_extern));
+  SET_VECTOR_ELT(out, 20, ScalarInteger(num_reg_continuous_extern));
+
+  SET_STRING_ELT(names, 0, mkChar("status"));
+  SET_STRING_ELT(names, 1, mkChar("result_status"));
+  SET_STRING_ELT(names, 2, mkChar("nomad_run_flag"));
+  SET_STRING_ELT(names, 3, mkChar("objective"));
+  SET_STRING_ELT(names, 4, mkChar("official_objective"));
+  SET_STRING_ELT(names, 5, mkChar("solution"));
+  SET_STRING_ELT(names, 6, mkChar("best_point"));
+  SET_STRING_ELT(names, 7, mkChar("best_bw"));
+  SET_STRING_ELT(names, 8, mkChar("best_fval"));
+  SET_STRING_ELT(names, 9, mkChar("best_num.feval"));
+  SET_STRING_ELT(names, 10, mkChar("best_num.feval.fast"));
+  SET_STRING_ELT(names, 11, mkChar("total_num.feval"));
+  SET_STRING_ELT(names, 12, mkChar("total_num.feval.fast"));
+  SET_STRING_ELT(names, 13, mkChar("compiled_callback_calls"));
+  SET_STRING_ELT(names, 14, mkChar("compiled_callback_failures"));
+  SET_STRING_ELT(names, 15, mkChar("crs_callback_evaluations"));
+  SET_STRING_ELT(names, 16, mkChar("blackbox_evaluations"));
+  SET_STRING_ELT(names, 17, mkChar("iterations"));
+  SET_STRING_ELT(names, 18, mkChar("message"));
+  SET_STRING_ELT(names, 19, mkChar("bandwidth_code"));
+  SET_STRING_ELT(names, 20, mkChar("ncon"));
+  setAttrib(out, R_NamesSymbol, names);
+
+  R_Free(solution);
+  R_Free(best_point);
+  R_Free(best_bw_d);
+  if (native_options != NULL)
+    R_Free(native_options);
+
+  UNPROTECT(13);
   return out;
 }
 

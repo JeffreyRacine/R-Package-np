@@ -162,6 +162,7 @@ npregbw.rbandwidth <-
            lbd.dir = 0.1,
            lbd.init = 0.1,
            nmulti,
+           nomad.opts = list(),
            penalty.multiplier = 10,
            powell.remin = TRUE,
            bwsolver = c("powell", "mads", "mads+powell"),
@@ -325,6 +326,7 @@ npregbw.rbandwidth <-
           invalid.penalty = invalid.penalty,
           penalty.multiplier = penalty.multiplier,
           transform.bounds = transform.bounds,
+          nomad.opts = nomad.opts,
           bandwidth.compute = TRUE,
           bwsolver = bwsolver
         )
@@ -1100,12 +1102,115 @@ npRmpiNomadShadowEvalRegression <- function(bw, degree) {
   )
 }
 
+npRmpiNomadShadowNativeSearchRegression <- function(x0,
+                                                    bbin,
+                                                    lb,
+                                                    ub,
+                                                    decode.scale,
+                                                    point.upper,
+                                                    max.eval = 0L,
+                                                    random.seed = 42L,
+                                                    option.names = character(),
+                                                    option.values = character()) {
+  .Call(
+    "C_np_regression_nomad_shadow_native_search",
+    as.double(x0),
+    as.integer(bbin),
+    as.double(lb),
+    as.double(ub),
+    as.double(decode.scale),
+    as.double(point.upper),
+    as.integer(max.eval),
+    as.integer(random.seed),
+    as.character(option.names),
+    as.character(option.values),
+    PACKAGE = "npRmpi"
+  )
+}
+
 npRmpiNomadShadowClearRegression <- function() {
   .Call("C_np_regression_nomad_shadow_clear", PACKAGE = "npRmpi")
 }
 
 .npregbw_nomad_shadow_template <- function(template) {
   template[c("bw", "icon", "iuno", "iord", "scaling")]
+}
+
+.npregbw_nomad_native_target <- function(template, bwsolver) {
+  method <- if (!is.null(template$method) && length(template$method)) {
+    as.character(template$method[1L])
+  } else {
+    "cv.ls"
+  }
+  bwtype <- if (!is.null(template$type) && length(template$type)) {
+    as.character(template$type[1L])
+  } else {
+    ""
+  }
+  regtype <- if (!is.null(template$regtype) && length(template$regtype)) {
+    as.character(template$regtype[1L])
+  } else {
+    "lc"
+  }
+
+  identical(bwtype, "fixed") &&
+    method %in% c("cv.ls", "cv.aic") &&
+    regtype %in% c("lc", "ll", "lp") &&
+    bwsolver %in% c("mads", "mads+powell")
+}
+
+.npregbw_nomad_native_require_crs <- function() {
+  if (!requireNamespace("crs", quietly = TRUE))
+    stop("native npreg NOMAD route requires crs >= 0.15-44", call. = FALSE)
+  if (utils::packageVersion("crs") < "0.15.44")
+    stop("native npreg NOMAD route requires crs >= 0.15-44", call. = FALSE)
+  invisible(TRUE)
+}
+
+.npregbw_nomad_native_option_vectors <- function(opts) {
+  if (is.null(opts) || !length(opts))
+    return(list(names = character(), values = character()))
+
+  option.names <- names(opts)
+  if (is.null(option.names) || any(!nzchar(option.names)))
+    stop("native npreg NOMAD route received unnamed NOMAD options", call. = FALSE)
+
+  option.values <- vapply(opts, function(value) {
+    if (is.logical(value)) {
+      if (isTRUE(value[1L])) "true" else "false"
+    } else if (length(value) > 1L) {
+      paste0("( ", paste(as.character(value), collapse = " "), " )")
+    } else {
+      as.character(value[1L])
+    }
+  }, character(1L))
+
+  list(names = as.character(option.names), values = option.values)
+}
+
+.npregbw_nomad_native_decode_scale <- function(template, setup) {
+  scale <- numeric(length(setup$cont_idx) + length(setup$cat_idx))
+  ncon <- length(setup$cont_idx)
+  ncat <- length(setup$cat_idx)
+
+  if (ncon > 0L) {
+    scale[seq_len(ncon)] <- if (identical(setup$type, "fixed")) {
+      if (isTRUE(template$scaling)) 1 else setup$cont_scale
+    } else {
+      1
+    }
+  }
+
+  if (ncat > 0L) {
+    cat.scale <- if (isTRUE(template$scaling)) {
+      1 / (setup$bandwidth.scale.categorical * setup$ncatfac)
+    } else {
+      1 / setup$bandwidth.scale.categorical
+    }
+    scale[ncon + seq_len(ncat)] <- cat.scale
+  }
+
+  as.double(scale)
 }
 
 npRmpiNomadEvalOnlyRegression <- function(runo,
@@ -1296,6 +1401,11 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
                                         penalty.multiplier = 10,
                                         comm = 1L,
                                         broadcast = TRUE) {
+  if (!is.null(start.bw) &&
+      (is.null(bws$bw) || length(bws$bw) != dim(toFrame(xdat))[2L])) {
+    bws$bw <- as.numeric(start.bw)
+  }
+
   prep <- .npregbw_nomad_shadow_prepare_args(
     xdat = xdat,
     ydat = ydat,
@@ -1515,6 +1625,207 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     }
 
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
+  }
+
+  if (.npregbw_nomad_native_target(template, bwsolver)) {
+    .npregbw_nomad_native_require_crs()
+    native.nmulti <- npValidateNmulti(mads.nmulti)
+    native.inner.nmulti <- npValidateNonNegativeInteger(mads.inner.nmulti, "nomad.nmulti")
+    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
+      stop("native npreg NOMAD route does not support inner NOMAD multistart without crs native ABI support", call. = FALSE)
+    if (isTRUE(opt.args$nomad.remin))
+      stop("native npreg NOMAD route does not support NOMAD remin", call. = FALSE)
+
+    native.nomad.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
+    native.option.vectors <- .npregbw_nomad_native_option_vectors(native.nomad.opts)
+    native.start.matrix <- .np_nomad_build_starts(
+      x0 = x0,
+      bbin = bounds$bbin,
+      lb = bounds$lower,
+      ub = bounds$upper,
+      nmulti = native.nmulti,
+      random.seed = random.seed,
+      degree_spec = NULL
+    )
+
+    start.bw <- .npregbw_nomad_point_to_bw(x0, template = template, setup = setup)
+    active.pool <- .npRmpi_has_active_slave_pool(comm = 1L) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))
+    called.from.bcast <- isTRUE(.npRmpi_autodispatch_called_from_bcast())
+    if (active.pool && !called.from.bcast) {
+      .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = TRUE)
+    }
+    shadow <- .npregbw_nomad_shadow_begin(
+      xdat = xdat,
+      ydat = ydat,
+      bws = template,
+      start.bw = start.bw,
+      invalid.penalty = opt.value("invalid.penalty", "baseline"),
+      penalty.multiplier = opt.value("penalty.multiplier", 10),
+      comm = 1L,
+      broadcast = active.pool && !called.from.bcast
+    )
+    on.exit(.npregbw_nomad_shadow_end(
+      shadow,
+      broadcast = active.pool && !called.from.bcast
+    ), add = TRUE)
+    native.decode.scale <- .npregbw_nomad_native_decode_scale(template, setup)
+    native.point.upper <- as.double(bounds$upper)
+    native.results <- vector("list", nrow(native.start.matrix))
+    native.best.index <- NA_integer_
+    native.best.objective <- Inf
+    native.nomad.elapsed <- 0
+    native.num.feval.total <- 0
+    native.num.feval.fast.total <- 0
+
+    for (i in seq_len(nrow(native.start.matrix))) {
+      native.start <- proc.time()[3L]
+      native.call <- substitute(
+        get("npRmpiNomadShadowNativeSearchRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
+          X0,
+          BBIN,
+          LB,
+          UB,
+          DECODE,
+          PUPPER,
+          MAXEVAL,
+          RSEED,
+          ONAMES,
+          OVALUES
+        ),
+        list(
+          X0 = as.numeric(native.start.matrix[i, ]),
+          BBIN = as.integer(bounds$bbin),
+          LB = as.double(bounds$lower),
+          UB = as.double(bounds$upper),
+          DECODE = as.double(native.decode.scale),
+          PUPPER = as.double(native.point.upper),
+          MAXEVAL = 0L,
+          RSEED = as.integer(random.seed),
+          ONAMES = as.character(native.option.vectors$names),
+          OVALUES = as.character(native.option.vectors$values)
+        )
+      )
+      native.i <- if (active.pool && !called.from.bcast) {
+        .npRmpi_bcast_cmd_expr(native.call, comm = 1L, caller.execute = TRUE)
+      } else {
+        eval(native.call, envir = environment())
+      }
+      native.elapsed <- proc.time()[3L] - native.start
+      native.nomad.elapsed <- native.nomad.elapsed + native.elapsed
+
+      if (!identical(as.integer(native.i$status[1L]), 0L) ||
+          !identical(as.integer(native.i$result_status[1L]), 0L)) {
+        stop(sprintf(
+          "native npreg NOMAD route failed (status=%s, result_status=%s): %s",
+          as.integer(native.i$status[1L]),
+          as.integer(native.i$result_status[1L]),
+          as.character(native.i$message[1L])
+        ), call. = FALSE)
+      }
+
+      objective.i <- as.numeric(native.i$objective[1L])
+      native.results[[i]] <- list(
+        restart = i,
+        start = as.numeric(native.start.matrix[i, ]),
+        elapsed = native.elapsed,
+        status = "ok",
+        message = as.character(native.i$message[1L]),
+        objective = objective.i,
+        bbe = as.numeric(native.i$blackbox_evaluations[1L]),
+        iterations = as.numeric(native.i$iterations[1L]),
+        solution = as.numeric(native.i$solution),
+        best_point = as.numeric(native.i$best_point),
+        best_bw = as.numeric(native.i$best_bw),
+        native = native.i
+      )
+      native.num.feval.total <- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
+      native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
+      if (is.finite(objective.i) && objective.i < native.best.objective) {
+        native.best.objective <- objective.i
+        native.best.index <- i
+      }
+    }
+
+    if (!is.finite(native.best.index))
+      stop("native npreg NOMAD route did not return a finite solution", call. = FALSE)
+
+    native.best <- native.results[[native.best.index]]
+    native.handoff.point <- as.numeric(native.best$best_point)
+    if (any(!is.finite(native.handoff.point)))
+      stop("native npreg NOMAD route did not return a finite best point", call. = FALSE)
+    native.bw <- .npregbw_nomad_point_to_bw(native.handoff.point, template = template, setup = setup)
+    if (!is.null(shadow) && isTRUE(shadow$active)) {
+      .npregbw_nomad_shadow_end(
+        shadow,
+        broadcast = active.pool && !called.from.bcast
+      )
+      shadow$active <- FALSE
+    }
+    native.record <- list(
+      eval_id = as.integer(native.best$native$compiled_callback_calls[1L]),
+      degree = integer(0L),
+      objective = native.best.objective,
+      status = "ok",
+      cached = FALSE,
+      message = native.best$message,
+      elapsed = native.best$elapsed,
+      num.feval = as.numeric(native.best$native$best_num.feval[1L]),
+      num.feval.fast = as.numeric(native.best$native$best_num.feval.fast[1L])
+    )
+    mads.num.feval.total <- native.num.feval.total
+    mads.num.feval.fast.total <- native.num.feval.fast.total
+    payload.result <- build_payload(
+      point = native.handoff.point,
+      best_record = native.record,
+      solution = native.best,
+      interrupted = FALSE
+    )
+    search.result <- list(
+      best = native.record,
+      best_point = native.handoff.point,
+      best_payload = payload.result$payload,
+      completed = TRUE,
+      method = bwsolver,
+      restart.results = native.results,
+      best.restart = native.best.index,
+      nomad.time = native.nomad.elapsed,
+      powell.time = payload.result$powell.time,
+      optim.time = native.nomad.elapsed + as.numeric(payload.result$powell.time[1L]),
+      num.feval.total = native.num.feval.total,
+      num.feval.fast.total = native.num.feval.fast.total,
+      native.diagnostics = list(
+        raw.point = native.handoff.point,
+        bandwidth = native.bw,
+        objective = native.best.objective,
+        compiled.callback.count = as.integer(native.best$native$compiled_callback_calls[1L]),
+        compiled.callback.failures = as.integer(native.best$native$compiled_callback_failures[1L]),
+        crs.callback.evaluations = as.integer(native.best$native$crs_callback_evaluations[1L]),
+        blackbox.evaluations = as.integer(native.best$native$blackbox_evaluations[1L]),
+        iterations = as.integer(native.best$native$iterations[1L])
+      )
+    )
+    if (isTRUE(getOption("np.developer.native.nomad.diagnostics", FALSE)) &&
+        !is.null(search.result$best_payload))
+      attr(search.result$best_payload, "native.nomad.diagnostics") <- search.result$native.diagnostics
+    if (!is.null(payload.result$objective) &&
+        .np_degree_better(payload.result$objective, search.result$best$objective, direction = "min"))
+      search.result$best$objective <- as.numeric(payload.result$objective[1L])
+
+    payload <- search.result$best_payload
+    payload$bwsolver <- bwsolver
+    payload$search.engine <- bwsolver
+    if (!is.null(search.result$nomad.time))
+      payload$nomad.time <- as.numeric(search.result$nomad.time[1L])
+    if (!is.null(search.result$powell.time))
+      payload$powell.time <- as.numeric(search.result$powell.time[1L])
+    if (!is.null(search.result$optim.time))
+      payload$optim.time <- as.numeric(search.result$optim.time[1L])
+    if (!is.null(search.result$restart.results))
+      payload$nomad.restarts <- search.result$restart.results
+    if (!is.null(search.result$best.restart))
+      payload$nomad.best.restart <- search.result$best.restart
+    return(.npRmpi_reconcile_nomad_bws_timing(payload))
   }
 
   search.result <- .np_nomad_search(
@@ -2403,6 +2714,7 @@ npregbw.default <-
            lbd.dir,
            lbd.init,
            nmulti,
+           nomad.opts = list(),
            okertype,
            penalty.multiplier = 10,
            regtype,
@@ -2537,6 +2849,7 @@ npregbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("nmulti", "nomad.remin", "powell.remin", "bwsolver", "itmax", "ftol", "tol",
+               "nomad.opts",
                "small",
                "lbc.dir", "dfc.dir", "cfac.dir","initc.dir",
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir",
