@@ -4038,6 +4038,483 @@ SEXP C_np_regression_bw_eval(SEXP runo,
                                    ckerlb, ckerub, 1);
 }
 
+static int np_regression_nomad_native_eval_once(double *runo,
+                                                double *rord,
+                                                double *rcon,
+                                                double *y,
+                                                double *mysd,
+                                                int *myopti,
+                                                double *myoptd,
+                                                const double *bw_in,
+                                                int penalty_mode,
+                                                double penalty_mult,
+                                                int *glp_degree,
+                                                int *glp_bernstein,
+                                                int *glp_basis,
+                                                double *ckerlb,
+                                                double *ckerub,
+                                                double out[5])
+{
+  int i;
+  const int num_var = myopti[RBW_NCONI] + myopti[RBW_NUNOI] + myopti[RBW_NORDI];
+  double *bw = NULL;
+  double fval[2] = {R_NaN, R_NaN};
+  double fval_history[1] = {R_NaN};
+  double eval_history[1] = {R_NaN};
+  double invalid_history[1] = {R_NaN};
+  double timing[1] = {R_NaN};
+  double fast[1] = {R_NaN};
+  int pmode = penalty_mode;
+  double pmult = penalty_mult;
+
+  if (num_var <= 0 || bw_in == NULL || out == NULL)
+    return 1;
+
+  bw = R_Calloc(num_var, double);
+  if (bw == NULL)
+    return 1;
+  for (i = 0; i < num_var; i++)
+    bw[i] = bw_in[i];
+
+  np_regression_bw_mode(runo,
+                        rord,
+                        rcon,
+                        y,
+                        mysd,
+                        myopti,
+                        myoptd,
+                        bw,
+                        fval,
+                        fval_history,
+                        eval_history,
+                        invalid_history,
+                        timing,
+                        fast,
+                        &pmode,
+                        &pmult,
+                        glp_degree,
+                        glp_bernstein,
+                        glp_basis,
+                        ckerlb,
+                        ckerub,
+                        1,
+                        0,
+                        NULL,
+                        0.5,
+                        0.5,
+                        DBL_EPSILON,
+                        1.0 - DBL_EPSILON,
+                        NULL);
+
+  out[0] = fval[0];
+  out[1] = fval[1];
+  out[2] = eval_history[0];
+  out[3] = fast[0];
+  out[4] = invalid_history[0];
+
+  R_Free(bw);
+  return 0;
+}
+
+typedef struct {
+  int n;
+  int callback_calls;
+  int callback_failures;
+  int *bbin;
+  double *lower;
+  double *upper;
+  double *runo;
+  double *rord;
+  double *rcon;
+  double *y;
+  double *mysd;
+  int *myopti;
+  double *myoptd;
+  int *glp_degree;
+  int glp_bernstein;
+  int glp_basis;
+  int penalty_mode;
+  double penalty_mult;
+  double *ckerlb;
+  double *ckerub;
+  double total_num_feval;
+  double total_fast;
+  double total_invalid;
+  double best_objective;
+  double best_eval[5];
+  double *best_point;
+} np_regression_native_search_context;
+
+static int np_regression_native_decode_eval_bw(const np_regression_native_search_context *context,
+                                               const double *raw_point,
+                                               double *eval_bw)
+{
+  int j, ncon, ncat, scaling, bandwidth;
+  double nconfac, ncatfac;
+  const double bandwidth_scale_categorical = 1.0e4;
+
+  if (context == NULL || raw_point == NULL || eval_bw == NULL ||
+      context->myopti == NULL || context->myoptd == NULL)
+    return 1;
+
+  bandwidth = context->myopti[RBW_REGI];
+  ncon = context->myopti[RBW_NCONI];
+  ncat = context->myopti[RBW_NUNOI] + context->myopti[RBW_NORDI];
+  if (ncon < 0 || ncat < 0 || ncon + ncat != context->n)
+    return 1;
+
+  scaling = (context->myopti[RBW_LSFI] == SF_NORMAL);
+  nconfac = context->myoptd[RBW_NCONFD];
+  ncatfac = context->myoptd[RBW_NCATFD];
+
+  for (j = 0; j < ncon; j++) {
+    if (bandwidth == BW_FIXED) {
+      if (scaling) {
+        eval_bw[j] = raw_point[j];
+      } else {
+        if (context->mysd == NULL)
+          return 1;
+        eval_bw[j] = raw_point[j] * context->mysd[j] * nconfac;
+      }
+    } else {
+      eval_bw[j] = raw_point[j];
+    }
+  }
+
+  for (j = 0; j < ncat; j++) {
+    const int k = ncon + j;
+    const double ext_bw = raw_point[k] / bandwidth_scale_categorical;
+    if (scaling) {
+      if (ncatfac == 0.0)
+        return 1;
+      eval_bw[k] = ext_bw / ncatfac;
+    } else {
+      eval_bw[k] = ext_bw;
+    }
+  }
+
+  return 0;
+}
+
+static int np_regression_native_search_callback(int n,
+                                                const double *x,
+                                                int m,
+                                                double *bb_outputs,
+                                                void *user_data)
+{
+  np_regression_native_search_context *context =
+    (np_regression_native_search_context *) user_data;
+  double *raw_point = NULL;
+  double *eval_bw = NULL;
+  double eval_out[5];
+  int j;
+  int status;
+
+  if (context == NULL || x == NULL || bb_outputs == NULL || m != 1 ||
+      n != context->n)
+    return 1;
+
+  raw_point = R_Calloc(context->n, double);
+  eval_bw = R_Calloc(context->n, double);
+  if (raw_point == NULL || eval_bw == NULL) {
+    if (raw_point != NULL)
+      R_Free(raw_point);
+    if (eval_bw != NULL)
+      R_Free(eval_bw);
+    return 1;
+  }
+
+  for (j = 0; j < context->n; j++) {
+    raw_point[j] = (context->bbin[j] == 1) ? nearbyint(x[j]) : x[j];
+    if (context->lower != NULL && R_finite(context->lower[j]) && raw_point[j] < context->lower[j])
+      raw_point[j] = context->lower[j];
+    if (context->upper != NULL && R_finite(context->upper[j]) && raw_point[j] > context->upper[j])
+      raw_point[j] = context->upper[j];
+  }
+
+  status = np_regression_native_decode_eval_bw(context, raw_point, eval_bw);
+  if (status != 0) {
+    context->callback_failures++;
+    R_Free(raw_point);
+    R_Free(eval_bw);
+    return 1;
+  }
+
+  status = np_regression_nomad_native_eval_once(context->runo,
+                                                context->rord,
+                                                context->rcon,
+                                                context->y,
+                                                context->mysd,
+                                                context->myopti,
+                                                context->myoptd,
+                                                eval_bw,
+                                                context->penalty_mode,
+                                                context->penalty_mult,
+                                                context->glp_degree,
+                                                &context->glp_bernstein,
+                                                &context->glp_basis,
+                                                context->ckerlb,
+                                                context->ckerub,
+                                                eval_out);
+  if (status != 0) {
+    context->callback_failures++;
+    R_Free(raw_point);
+    R_Free(eval_bw);
+    return 1;
+  }
+
+  context->callback_calls++;
+  context->total_num_feval += eval_out[2];
+  context->total_fast += eval_out[3];
+  context->total_invalid += eval_out[4];
+  if (context->callback_calls == 1 || eval_out[0] < context->best_objective) {
+    context->best_objective = eval_out[0];
+    for (j = 0; j < 5; j++)
+      context->best_eval[j] = eval_out[j];
+    if (context->best_point != NULL) {
+      for (j = 0; j < context->n; j++)
+        context->best_point[j] = raw_point[j];
+    }
+  }
+
+  bb_outputs[0] = eval_out[0];
+  R_Free(raw_point);
+  R_Free(eval_bw);
+  return 0;
+}
+
+SEXP C_np_regression_nomad_native_search(SEXP runo,
+                                         SEXP rord,
+                                         SEXP rcon,
+                                         SEXP y,
+                                         SEXP mysd,
+                                         SEXP myopti,
+                                         SEXP myoptd,
+                                         SEXP glp_degree,
+                                         SEXP glp_bernstein,
+                                         SEXP glp_basis,
+                                         SEXP x0,
+                                         SEXP bbin,
+                                         SEXP lower,
+                                         SEXP upper,
+                                         SEXP max_eval,
+                                         SEXP random_seed,
+                                         SEXP option_names,
+                                         SEXP option_values,
+                                         SEXP penalty_mode,
+                                         SEXP penalty_mult,
+                                         SEXP ckerlb,
+                                         SEXP ckerub)
+{
+  SEXP runo_r = R_NilValue, rord_r = R_NilValue, rcon_r = R_NilValue;
+  SEXP y_r = R_NilValue, mysd_r = R_NilValue, myopti_i = R_NilValue, myoptd_r = R_NilValue;
+  SEXP degree_i = R_NilValue, x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue;
+  SEXP upper_r = R_NilValue, option_names_s = R_NilValue, option_values_s = R_NilValue;
+  SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
+  SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
+  SEXP call = R_NilValue;
+  crs_nomad_native_solve_fn_v1 solve;
+  crs_nomad_native_problem_v1 problem;
+  crs_nomad_native_result_v1 result;
+  crs_nomad_native_option_v1 *native_options = NULL;
+  np_regression_native_search_context context;
+  double *solution = NULL;
+  double *best_point = NULL;
+  int n, i, status, budget, seed, n_options;
+
+  PROTECT(runo_r = coerceVector(runo, REALSXP));
+  PROTECT(rord_r = coerceVector(rord, REALSXP));
+  PROTECT(rcon_r = coerceVector(rcon, REALSXP));
+  PROTECT(y_r = coerceVector(y, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
+  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
+  PROTECT(x0_r = coerceVector(x0, REALSXP));
+  PROTECT(bbin_i = coerceVector(bbin, INTSXP));
+  PROTECT(lower_r = coerceVector(lower, REALSXP));
+  PROTECT(upper_r = coerceVector(upper, REALSXP));
+  PROTECT(option_names_s = coerceVector(option_names, STRSXP));
+  PROTECT(option_values_s = coerceVector(option_values, STRSXP));
+  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
+  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  n = (int) XLENGTH(x0_r);
+  if (n <= 0 ||
+      XLENGTH(bbin_i) != n ||
+      XLENGTH(lower_r) != n ||
+      XLENGTH(upper_r) != n) {
+    UNPROTECT(16);
+    error("native npreg NOMAD search received inconsistent problem dimensions");
+  }
+  if (XLENGTH(myoptd_r) <= RBW_SFLOORD) {
+    UNPROTECT(16);
+    error("native npreg NOMAD search received incomplete myoptd");
+  }
+  budget = asInteger(max_eval);
+  seed = asInteger(random_seed);
+  if (budget < 0 || seed < 0) {
+    UNPROTECT(16);
+    error("native npreg NOMAD search received invalid budget or seed");
+  }
+  if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
+    UNPROTECT(16);
+    error("native npreg NOMAD search received inconsistent option name/value lengths");
+  }
+  if (XLENGTH(option_names_s) > INT_MAX) {
+    UNPROTECT(16);
+    error("native npreg NOMAD search received too many options");
+  }
+  n_options = (int) XLENGTH(option_names_s);
+
+  PROTECT(call = lang2(install("loadNamespace"), mkString("crs")));
+  Rf_eval(call, R_GlobalEnv);
+  UNPROTECT(1);
+
+  solve = (crs_nomad_native_solve_fn_v1)
+    R_GetCCallable("crs", "crs_nomad_native_solve_v1");
+  if (solve == NULL) {
+    UNPROTECT(16);
+    error("failed to resolve crs native NOMAD callable");
+  }
+
+  solution = R_Calloc(n, double);
+  best_point = R_Calloc(n, double);
+  if (solution == NULL || best_point == NULL) {
+    if (solution != NULL) R_Free(solution);
+    if (best_point != NULL) R_Free(best_point);
+    UNPROTECT(16);
+    error("failed to allocate native npreg NOMAD buffers");
+  }
+  if (n_options > 0) {
+    native_options = R_Calloc(n_options, crs_nomad_native_option_v1);
+    if (native_options == NULL) {
+      R_Free(solution);
+      R_Free(best_point);
+      UNPROTECT(16);
+      error("failed to allocate native npreg NOMAD option buffers");
+    }
+    for (i = 0; i < n_options; i++) {
+      native_options[i].name = CHAR(STRING_ELT(option_names_s, i));
+      native_options[i].value = CHAR(STRING_ELT(option_values_s, i));
+    }
+  }
+  for (i = 0; i < n; i++) {
+    solution[i] = R_NaN;
+    best_point[i] = R_NaN;
+  }
+
+  memset(&problem, 0, sizeof(problem));
+  memset(&result, 0, sizeof(result));
+  memset(&context, 0, sizeof(context));
+  for (i = 0; i < 5; i++)
+    context.best_eval[i] = R_NaN;
+
+  context.n = n;
+  context.bbin = INTEGER(bbin_i);
+  context.lower = REAL(lower_r);
+  context.upper = REAL(upper_r);
+  context.runo = REAL(runo_r);
+  context.rord = REAL(rord_r);
+  context.rcon = REAL(rcon_r);
+  context.y = REAL(y_r);
+  context.mysd = REAL(mysd_r);
+  context.myopti = INTEGER(myopti_i);
+  context.myoptd = REAL(myoptd_r);
+  context.glp_degree = INTEGER(degree_i);
+  context.glp_bernstein = asInteger(glp_bernstein);
+  context.glp_basis = asInteger(glp_basis);
+  context.penalty_mode = asInteger(penalty_mode);
+  context.penalty_mult = asReal(penalty_mult);
+  context.ckerlb = REAL(ckerlb_r);
+  context.ckerub = REAL(ckerub_r);
+  context.best_point = best_point;
+
+  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION;
+  problem.struct_size = sizeof(problem);
+  problem.n = n;
+  problem.m = 1;
+  problem.x0 = REAL(x0_r);
+  problem.bb_input_type = INTEGER(bbin_i);
+  problem.lower = REAL(lower_r);
+  problem.upper = REAL(upper_r);
+  problem.max_eval = budget;
+  problem.random_seed = (unsigned int) seed;
+  problem.quiet = 1;
+  problem.option_count = n_options;
+  problem.options = native_options;
+
+  result.api_version = CRS_NOMAD_NATIVE_API_VERSION;
+  result.struct_size = sizeof(result);
+  result.solution = solution;
+  result.solution_len = n;
+
+  status = solve(&problem,
+                 np_regression_native_search_callback,
+                 &context,
+                 &result);
+
+  PROTECT(out = allocVector(VECSXP, 20));
+  PROTECT(names = allocVector(STRSXP, 20));
+  PROTECT(sol = allocVector(REALSXP, n));
+  PROTECT(best = allocVector(REALSXP, n));
+  for (i = 0; i < n; i++) {
+    REAL(sol)[i] = solution[i];
+    REAL(best)[i] = best_point[i];
+  }
+
+  SET_VECTOR_ELT(out, 0, ScalarInteger(status));
+  SET_VECTOR_ELT(out, 1, ScalarInteger(result.status));
+  SET_VECTOR_ELT(out, 2, ScalarInteger(result.nomad_run_flag));
+  SET_VECTOR_ELT(out, 3, ScalarReal(context.best_objective));
+  SET_VECTOR_ELT(out, 4, ScalarReal(result.objective));
+  SET_VECTOR_ELT(out, 5, sol);
+  SET_VECTOR_ELT(out, 6, best);
+  SET_VECTOR_ELT(out, 7, ScalarReal(context.best_eval[1]));
+  SET_VECTOR_ELT(out, 8, ScalarReal(context.best_eval[2]));
+  SET_VECTOR_ELT(out, 9, ScalarReal(context.best_eval[3]));
+  SET_VECTOR_ELT(out, 10, ScalarReal(context.best_eval[4]));
+  SET_VECTOR_ELT(out, 11, ScalarReal(context.total_num_feval));
+  SET_VECTOR_ELT(out, 12, ScalarReal(context.total_fast));
+  SET_VECTOR_ELT(out, 13, ScalarReal(context.total_invalid));
+  SET_VECTOR_ELT(out, 14, ScalarInteger(context.callback_calls));
+  SET_VECTOR_ELT(out, 15, ScalarInteger(context.callback_failures));
+  SET_VECTOR_ELT(out, 16, ScalarInteger(result.callback_evaluations));
+  SET_VECTOR_ELT(out, 17, ScalarInteger(result.blackbox_evaluations));
+  SET_VECTOR_ELT(out, 18, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 19, mkString(result.message));
+
+  SET_STRING_ELT(names, 0, mkChar("status"));
+  SET_STRING_ELT(names, 1, mkChar("result_status"));
+  SET_STRING_ELT(names, 2, mkChar("nomad_run_flag"));
+  SET_STRING_ELT(names, 3, mkChar("objective"));
+  SET_STRING_ELT(names, 4, mkChar("official_objective"));
+  SET_STRING_ELT(names, 5, mkChar("solution"));
+  SET_STRING_ELT(names, 6, mkChar("best_point"));
+  SET_STRING_ELT(names, 7, mkChar("best_fval"));
+  SET_STRING_ELT(names, 8, mkChar("best_num.feval"));
+  SET_STRING_ELT(names, 9, mkChar("best_num.feval.fast"));
+  SET_STRING_ELT(names, 10, mkChar("best_num.feval.invalid"));
+  SET_STRING_ELT(names, 11, mkChar("total_num.feval"));
+  SET_STRING_ELT(names, 12, mkChar("total_num.feval.fast"));
+  SET_STRING_ELT(names, 13, mkChar("total_num.feval.invalid"));
+  SET_STRING_ELT(names, 14, mkChar("compiled_callback_calls"));
+  SET_STRING_ELT(names, 15, mkChar("compiled_callback_failures"));
+  SET_STRING_ELT(names, 16, mkChar("crs_callback_evaluations"));
+  SET_STRING_ELT(names, 17, mkChar("blackbox_evaluations"));
+  SET_STRING_ELT(names, 18, mkChar("iterations"));
+  SET_STRING_ELT(names, 19, mkChar("message"));
+  setAttrib(out, R_NamesSymbol, names);
+
+  R_Free(solution);
+  R_Free(best_point);
+  if (native_options != NULL)
+    R_Free(native_options);
+
+  UNPROTECT(20);
+  return out;
+}
+
 static SEXP C_np_lsqregression_bw_common(SEXP runo,
                                          SEXP rord,
                                          SEXP rcon,
