@@ -108,7 +108,7 @@ npregbw.NULL <-
     "lc"
   }
 
-  bwtype %in% c("fixed", "generalized_nn") &&
+  bwtype %in% c("fixed", "generalized_nn", "adaptive_nn") &&
     method %in% c("cv.ls", "cv.aic") &&
     regtype %in% c("lc", "ll", "lp") &&
     bwsolver %in% c("mads", "mads+powell")
