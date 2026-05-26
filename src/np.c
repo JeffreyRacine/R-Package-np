@@ -4137,6 +4137,7 @@ typedef struct {
   double penalty_mult;
   double *ckerlb;
   double *ckerub;
+  double *decode_scale;
   double total_num_feval;
   double total_fast;
   double total_invalid;
@@ -4169,9 +4170,11 @@ static int np_regression_native_decode_eval_bw(const np_regression_native_search
 
   for (j = 0; j < ncon; j++) {
     if (bandwidth == BW_FIXED) {
-      if (scaling) {
+      if (context->decode_scale != NULL)
+        eval_bw[j] = raw_point[j] * context->decode_scale[j];
+      else if (scaling)
         eval_bw[j] = raw_point[j];
-      } else {
+      else {
         if (context->mysd == NULL)
           return 1;
         eval_bw[j] = raw_point[j] * context->mysd[j] * nconfac;
@@ -4184,7 +4187,9 @@ static int np_regression_native_decode_eval_bw(const np_regression_native_search
   for (j = 0; j < ncat; j++) {
     const int k = ncon + j;
     const double ext_bw = raw_point[k] / bandwidth_scale_categorical;
-    if (scaling) {
+    if (context->decode_scale != NULL) {
+      eval_bw[k] = raw_point[k] * context->decode_scale[k];
+    } else if (scaling) {
       if (ncatfac == 0.0)
         return 1;
       eval_bw[k] = ext_bw / ncatfac;
@@ -4304,13 +4309,14 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
                                          SEXP penalty_mode,
                                          SEXP penalty_mult,
                                          SEXP ckerlb,
-                                         SEXP ckerub)
+                                         SEXP ckerub,
+                                         SEXP decode_scale)
 {
   SEXP runo_r = R_NilValue, rord_r = R_NilValue, rcon_r = R_NilValue;
   SEXP y_r = R_NilValue, mysd_r = R_NilValue, myopti_i = R_NilValue, myoptd_r = R_NilValue;
   SEXP degree_i = R_NilValue, x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue;
   SEXP upper_r = R_NilValue, option_names_s = R_NilValue, option_values_s = R_NilValue;
-  SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
+  SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue, decode_scale_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP call = R_NilValue;
   crs_nomad_native_solve_fn_v1 solve;
@@ -4338,31 +4344,36 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   PROTECT(option_values_s = coerceVector(option_values, STRSXP));
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+  PROTECT(decode_scale_r = coerceVector(decode_scale, REALSXP));
 
   n = (int) XLENGTH(x0_r);
   if (n <= 0 ||
       XLENGTH(bbin_i) != n ||
       XLENGTH(lower_r) != n ||
       XLENGTH(upper_r) != n) {
-    UNPROTECT(16);
+    UNPROTECT(17);
     error("native npreg NOMAD search received inconsistent problem dimensions");
   }
+  if (XLENGTH(decode_scale_r) != n) {
+    UNPROTECT(17);
+    error("native npreg NOMAD search received inconsistent decode scale dimensions");
+  }
   if (XLENGTH(myoptd_r) <= RBW_SFLOORD) {
-    UNPROTECT(16);
+    UNPROTECT(17);
     error("native npreg NOMAD search received incomplete myoptd");
   }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
   if (budget < 0 || seed < 0) {
-    UNPROTECT(16);
+    UNPROTECT(17);
     error("native npreg NOMAD search received invalid budget or seed");
   }
   if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
-    UNPROTECT(16);
+    UNPROTECT(17);
     error("native npreg NOMAD search received inconsistent option name/value lengths");
   }
   if (XLENGTH(option_names_s) > INT_MAX) {
-    UNPROTECT(16);
+    UNPROTECT(17);
     error("native npreg NOMAD search received too many options");
   }
   n_options = (int) XLENGTH(option_names_s);
@@ -4374,7 +4385,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   solve = (crs_nomad_native_solve_fn_v1)
     R_GetCCallable("crs", "crs_nomad_native_solve_v1");
   if (solve == NULL) {
-    UNPROTECT(16);
+    UNPROTECT(17);
     error("failed to resolve crs native NOMAD callable");
   }
 
@@ -4383,7 +4394,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   if (solution == NULL || best_point == NULL) {
     if (solution != NULL) R_Free(solution);
     if (best_point != NULL) R_Free(best_point);
-    UNPROTECT(16);
+    UNPROTECT(17);
     error("failed to allocate native npreg NOMAD buffers");
   }
   if (n_options > 0) {
@@ -4391,7 +4402,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
-      UNPROTECT(16);
+      UNPROTECT(17);
       error("failed to allocate native npreg NOMAD option buffers");
     }
     for (i = 0; i < n_options; i++) {
@@ -4428,6 +4439,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   context.penalty_mult = asReal(penalty_mult);
   context.ckerlb = REAL(ckerlb_r);
   context.ckerub = REAL(ckerub_r);
+  context.decode_scale = REAL(decode_scale_r);
   context.best_point = best_point;
 
   problem.api_version = CRS_NOMAD_NATIVE_API_VERSION;
@@ -4511,7 +4523,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   if (native_options != NULL)
     R_Free(native_options);
 
-  UNPROTECT(20);
+  UNPROTECT(21);
   return out;
 }
 

@@ -110,7 +110,7 @@ npregbw.NULL <-
 
   identical(method, "cv.ls") &&
     identical(bwtype, "fixed") &&
-    identical(regtype, "lc") &&
+    regtype %in% c("lc", "ll") &&
     bwsolver %in% c("mads", "mads+powell")
 }
 
@@ -206,6 +206,8 @@ npregbw.NULL <-
   nrow <- dim(xmat)[1L]
   nconfac <- nrow^(-1.0 / (2.0 * bws$ckerorder + bws$ncon))
   ncatfac <- nrow^(-2.0 / (2.0 * bws$ckerorder + bws$ncon))
+  cont_scale <- mysd * nconfac
+  bandwidth.scale.categorical <- 1e4
 
   reg.spec <- npCanonicalConditionalRegSpec(
     regtype = bws$regtype,
@@ -282,6 +284,24 @@ npregbw.NULL <-
   )
 
   cker.bounds <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+  decode.scale <- numeric(length(bws$bw))
+  if (length(bws$icon) > 0L)
+    decode.scale[bws$icon] <- if (identical(bws$type, "fixed") && !isTRUE(bws$scaling)) cont_scale else 1
+  if (length(bws$iuno) > 0L && any(bws$iuno)) {
+    decode.scale[bws$iuno] <- if (isTRUE(bws$scaling)) {
+      1 / (bandwidth.scale.categorical * ncatfac)
+    } else {
+      1 / bandwidth.scale.categorical
+    }
+  }
+  if (length(bws$iord) > 0L && any(bws$iord)) {
+    decode.scale[bws$iord] <- if (isTRUE(bws$scaling)) {
+      1 / (bandwidth.scale.categorical * ncatfac)
+    } else {
+      1 / bandwidth.scale.categorical
+    }
+  }
+  decode.scale <- as.double(c(decode.scale[bws$icon], decode.scale[bws$iuno], decode.scale[bws$iord]))
   list(
     runo = as.double(runo),
     rord = as.double(rord),
@@ -296,7 +316,8 @@ npregbw.NULL <-
     penalty_mode = as.integer(if (invalid.penalty == "baseline") 1L else 0L),
     penalty_multiplier = as.double(penalty.multiplier),
     ckerlb = as.double(cker.bounds$lb),
-    ckerub = as.double(cker.bounds$ub)
+    ckerub = as.double(cker.bounds$ub),
+    decode_scale = decode.scale
   )
 }
 
@@ -333,6 +354,7 @@ npNomadNativeSearchRegression <- function(prep,
     as.double(prep$penalty_multiplier),
     as.double(prep$ckerlb),
     as.double(prep$ckerub),
+    as.double(prep$decode_scale),
     PACKAGE = "np"
   ), capture.output = !isTRUE(getOption("np.messages")))
   native.call$value
