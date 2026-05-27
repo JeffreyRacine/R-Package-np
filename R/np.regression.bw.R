@@ -386,8 +386,8 @@ npNomadNativeSearchRegression <- function(prep,
     as.double(prep$ckerub),
     as.double(prep$decode_scale),
     PACKAGE = "np"
-  ), capture.output = !isTRUE(getOption("np.messages")))
-  native.call$value
+  ), capture.output = TRUE)
+  .np_nomad_native_call_value(native.call)
 }
 
 npregbw.rbandwidth <- 
@@ -1930,6 +1930,12 @@ npregbw.rbandwidth <-
     native.num.feval.invalid.total <- 0
     native.callback.total <- 0L
     native.baseline.record <- NULL
+    native.progress <- .np_nomad_native_progress_begin(
+      nmulti = native.nmulti,
+      baseline_degree = degree.search$start.degree,
+      best_record = native.baseline.record
+    )
+    on.exit(.np_nomad_native_progress_abort(native.progress), add = TRUE)
 
     make_native_record <- function(native, objective, degree, elapsed) {
       list(
@@ -1946,6 +1952,18 @@ npregbw.rbandwidth <-
     }
 
     run_native_restart <- function(start, restart.index, remin = FALSE) {
+      native.restart.degree <- if (ndeg > 0L) {
+        as.integer(round(start[degree.idx]))
+      } else {
+        integer(0L)
+      }
+      .np_nomad_native_progress_restart(
+        handle = native.progress,
+        restart_index = restart.index,
+        degree = native.restart.degree,
+        best_record = native.baseline.record,
+        restart_durations = native.nomad.elapsed
+      )
       native.start <- proc.time()[3L]
       native <- npNomadNativeSearchRegression(
         prep = native.prep,
@@ -1978,11 +1996,6 @@ npregbw.rbandwidth <-
         as.integer(round(native$best_point[degree.idx]))
       }
       native.objective <- as.numeric(native$objective[1L])
-      native.restart.degree <- if (ndeg > 0L) {
-        as.integer(round(start[degree.idx]))
-      } else {
-        integer(0L)
-      }
       list(
         restart = as.integer(restart.index),
         remin = isTRUE(remin),
@@ -2072,6 +2085,11 @@ npregbw.rbandwidth <-
       best_record = native.record,
       solution = native.best,
       interrupted = FALSE
+    )
+    .np_nomad_native_progress_end(
+      handle = native.progress,
+      degree = native.record$degree,
+      best_record = native.record
     )
     search.result <- list(
       method = degree.search$engine,

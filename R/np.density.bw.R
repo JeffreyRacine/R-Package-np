@@ -317,8 +317,8 @@ npNomadNativeSearchDensity <- function(prep,
     as.double(prep$ckerlb),
     as.double(prep$ckerub),
     PACKAGE = "np"
-  ), capture.output = !isTRUE(getOption("np.messages")))
-  native.call$value
+  ), capture.output = TRUE)
+  .np_nomad_native_call_value(native.call)
 }
 
 .npudensbw_run_mads <- function(dat,

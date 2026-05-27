@@ -1405,6 +1405,35 @@
   .np_progress_show_now(state)
 }
 
+.np_nomad_progress_configure <- function(state,
+                                         nmulti,
+                                         baseline_degree,
+                                         best_record) {
+  if (is.null(state))
+    return(state)
+
+  state$label <- .np_degree_progress_label()
+  state$unknown_total_fields <- .np_nomad_progress_fields
+  state$nomad_nmulti <- npValidateNmulti(nmulti)
+  state$nomad_restart_index <- 1L
+  state$nomad_restart_durations <- numeric()
+  state$nomad_current_degree <- as.integer(baseline_degree)
+  state$nomad_best_record <- best_record
+  state$nomad_eval_id <- 0L
+  state$start_note <- if (state$nomad_nmulti > 1L) {
+    sprintf(
+      "%s %s (multistart 1/%s)",
+      state$pkg_prefix,
+      state$label,
+      format(state$nomad_nmulti)
+    )
+  } else {
+    sprintf("%s %s...", state$pkg_prefix, state$label)
+  }
+
+  .np_progress_show_now(state)
+}
+
 .np_nomad_baseline_note <- function(degree) {
   invisible(NULL)
 }
@@ -1614,6 +1643,112 @@
   list(progress_state = progress_state, seen = c(seen, lines))
 }
 
+.np_nomad_native_call_value <- function(native.call, seen = character()) {
+  progress_state <- .np_progress_runtime$bandwidth_state
+  if (!length(seen) && !is.null(progress_state$external_output_seen)) {
+    seen <- progress_state$external_output_seen
+  }
+  emitted <- .np_nomad_emit_external_output(
+    lines = native.call$output,
+    progress_state = progress_state,
+    seen = seen
+  )
+  if (!is.null(emitted$progress_state)) {
+    emitted$progress_state$external_output_seen <- emitted$seen
+  }
+  .np_progress_runtime$bandwidth_state <- emitted$progress_state
+  native.call$value
+}
+
+.np_nomad_native_progress_begin <- function(nmulti,
+                                            baseline_degree,
+                                            best_record) {
+  handle <- new.env(parent = emptyenv())
+  handle$old_state <- .np_progress_runtime$bandwidth_state
+  handle$closed <- FALSE
+  handle$state <- .np_nomad_progress_begin(
+    nmulti = nmulti,
+    baseline_degree = baseline_degree,
+    best_record = best_record
+  )
+  .np_progress_runtime$bandwidth_state <- handle$state
+  handle
+}
+
+.np_nomad_native_progress_state <- function(handle) {
+  if (is.null(handle) || isTRUE(handle$closed)) {
+    return(NULL)
+  }
+
+  state <- .np_progress_runtime$bandwidth_state
+  if (is.null(state)) {
+    state <- handle$state
+  }
+  state
+}
+
+.np_nomad_native_progress_restart <- function(handle,
+                                              restart_index,
+                                              degree,
+                                              best_record,
+                                              restart_durations = numeric()) {
+  state <- .np_nomad_native_progress_state(handle)
+  if (is.null(state)) {
+    return(invisible(NULL))
+  }
+
+  state$nomad_current_degree <- as.integer(degree)
+  state$nomad_best_record <- best_record
+  state$nomad_restart_index <- as.integer(restart_index)
+  state$nomad_restart_durations <- restart_durations
+  state <- .np_degree_progress_step(
+    state = state,
+    done = NULL,
+    detail = NULL,
+    force = TRUE
+  )
+  handle$state <- state
+  .np_progress_runtime$bandwidth_state <- state
+  invisible(NULL)
+}
+
+.np_nomad_native_progress_end <- function(handle,
+                                          degree,
+                                          best_record,
+                                          interrupted = FALSE) {
+  if (is.null(handle) || isTRUE(handle$closed)) {
+    return(invisible(NULL))
+  }
+
+  state <- .np_nomad_native_progress_state(handle)
+  if (!is.null(state)) {
+    state$nomad_current_degree <- as.integer(degree)
+    state$nomad_best_record <- best_record
+    state <- .np_degree_progress_end(
+      state = state,
+      detail = NULL,
+      interrupted = isTRUE(interrupted)
+    )
+  }
+  .np_progress_runtime$bandwidth_state <- handle$old_state
+  handle$closed <- TRUE
+  invisible(NULL)
+}
+
+.np_nomad_native_progress_abort <- function(handle, detail = NULL) {
+  if (is.null(handle) || isTRUE(handle$closed)) {
+    return(invisible(NULL))
+  }
+
+  state <- .np_nomad_native_progress_state(handle)
+  if (!is.null(state)) {
+    .np_progress_abort(state = state, detail = detail)
+  }
+  .np_progress_runtime$bandwidth_state <- handle$old_state
+  handle$closed <- TRUE
+  invisible(NULL)
+}
+
 .np_nomad_search <- function(engine = c("nomad", "nomad+powell"),
                              baseline_record,
                              start_degree = NULL,
@@ -1629,6 +1764,9 @@
                              nomad.inner.nmulti = 0L,
                              random.seed = 42L,
                              display.nomad.progress = FALSE,
+                             progress_state = NULL,
+                             manage_progress_lifecycle = is.null(progress_state),
+                             bind_bandwidth_runtime = FALSE,
                              handoff_before_build = FALSE,
                              remin = FALSE,
                              degree_spec = NULL,
@@ -1663,6 +1801,14 @@
   state$restart_eval_id <- 0L
   state$external_output_seen <- character()
   state$native.r.bridge <- isTRUE(native.r.bridge)
+
+  set_progress_state <- function(value) {
+    state$progress_state <- value
+    if (isTRUE(bind_bandwidth_runtime)) {
+      .np_progress_runtime$bandwidth_state <- value
+    }
+    invisible(value)
+  }
 
   nomad.nmulti <- npValidateNmulti(nmulti)
   nomad.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
@@ -1810,15 +1956,25 @@
     if (identical(direction, "min")) Inf else .Machine$double.xmax
   }
 
-  state$progress_state <- .np_nomad_progress_begin(
-    nmulti = nomad.nmulti,
-    baseline_degree = if (is.null(start_degree)) {
-      if (is.null(baseline_record)) integer(0) else baseline_record$degree
-    } else {
-      as.integer(start_degree)
-    },
-    best_record = state$best_record
-  )
+  baseline.degree <- if (is.null(start_degree)) {
+    if (is.null(baseline_record)) integer(0) else baseline_record$degree
+  } else {
+    as.integer(start_degree)
+  }
+  if (is.null(progress_state)) {
+    set_progress_state(.np_nomad_progress_begin(
+      nmulti = nomad.nmulti,
+      baseline_degree = baseline.degree,
+      best_record = state$best_record
+    ))
+  } else {
+    set_progress_state(.np_nomad_progress_configure(
+      state = progress_state,
+      nmulti = nomad.nmulti,
+      baseline_degree = baseline.degree,
+      best_record = state$best_record
+    ))
+  }
 
   run_nomad_solver <- function(start) {
     solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
@@ -2170,11 +2326,13 @@
   if (!is.null(state$progress_state)) {
     state$progress_state$nomad_current_degree <- state$best_record$degree
     state$progress_state$nomad_best_record <- state$best_record
-    state$progress_state <- .np_degree_progress_end(
-      state = state$progress_state,
-      detail = NULL,
-      interrupted = state$interrupted
-    )
+    if (isTRUE(manage_progress_lifecycle)) {
+      set_progress_state(.np_degree_progress_end(
+        state = state$progress_state,
+        detail = NULL,
+        interrupted = state$interrupted
+      ))
+    }
   }
 
   list(
