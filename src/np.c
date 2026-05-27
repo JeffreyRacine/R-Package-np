@@ -3300,10 +3300,12 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_bw = R_NilValue, best_degree = R_NilValue, first_degree = R_NilValue;
   SEXP call = R_NilValue;
-  crs_nomad_native_solve_fn_v2 solve;
-  crs_nomad_native_problem_v2 problem;
-  crs_nomad_native_result_v2 result;
-  crs_nomad_native_option_v1 *native_options = NULL;
+  crs_nomad_solve_fn solve;
+  crs_nomad_problem problem;
+  crs_nomad_result result;
+  crs_nomad_option *native_options = NULL;
+  int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
+  double crs_outputs[1];
   np_regression_shadow_native_search_context context;
   double *solution = NULL, *best_point = NULL, *best_bw_d = NULL;
   int *best_degree_i = NULL, *first_degree_i = NULL;
@@ -3357,11 +3359,11 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   Rf_eval(call, R_GlobalEnv);
   UNPROTECT(1);
 
-  solve = (crs_nomad_native_solve_fn_v2)
-    R_GetCCallable("crs", "crs_nomad_native_solve_v2");
+  solve = (crs_nomad_solve_fn)
+    R_GetCCallable("crs", "crs_nomad_solve");
   if (solve == NULL) {
     UNPROTECT(8);
-    error("failed to resolve crs native NOMAD v2 callable");
+    error("failed to resolve crs final native NOMAD callable");
   }
 
   solution = R_Calloc(n, double);
@@ -3382,7 +3384,7 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
     error("failed to allocate native npreg NOMAD buffers");
   }
   if (n_options > 0) {
-    native_options = R_Calloc(n_options, crs_nomad_native_option_v1);
+    native_options = R_Calloc(n_options, crs_nomad_option);
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
@@ -3428,12 +3430,14 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   context.best_degree = best_degree_i;
   context.first_degree = first_degree_i;
 
-  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  problem.api_version = CRS_NOMAD_API_VERSION;
   problem.struct_size = sizeof(problem);
   problem.n = n;
   problem.m = 1;
+  problem.callback_mode = CRS_NOMAD_CALLBACK_C;
   problem.x0 = REAL(x0_r);
   problem.bb_input_type = INTEGER(bbin_i);
+  problem.bb_output_type = bb_output_type;
   problem.lower = REAL(lower_r);
   problem.upper = REAL(upper_r);
   problem.max_eval = budget;
@@ -3444,10 +3448,12 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   problem.start_count = inner_count;
   problem.starts = NULL;
 
-  result.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  result.api_version = CRS_NOMAD_API_VERSION;
   result.struct_size = sizeof(result);
   result.solution = solution;
   result.solution_len = n;
+  result.outputs = crs_outputs;
+  result.outputs_len = 1;
 
   status = solve(&problem,
                  np_regression_shadow_native_search_callback,
@@ -4763,10 +4769,12 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   SEXP option_names_s = R_NilValue;
   SEXP names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_flat = R_NilValue, best_degree = R_NilValue, call = R_NilValue;
-  crs_nomad_native_solve_fn_v2 solve;
-  crs_nomad_native_problem_v2 problem;
-  crs_nomad_native_result_v2 result;
-  crs_nomad_native_option_v1 *native_options = NULL;
+  crs_nomad_solve_fn solve;
+  crs_nomad_problem problem;
+  crs_nomad_result result;
+  crs_nomad_option *native_options = NULL;
+  int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
+  double crs_outputs[1];
   np_cdens_native_search_context context;
   double *solution = NULL;
   double *best_point = NULL;
@@ -4830,11 +4838,11 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   Rf_eval(call, R_GlobalEnv);
   UNPROTECT(1);
 
-  solve = (crs_nomad_native_solve_fn_v2)
-    R_GetCCallable("crs", "crs_nomad_native_solve_v2");
+  solve = (crs_nomad_solve_fn)
+    R_GetCCallable("crs", "crs_nomad_solve");
   if (solve == NULL) {
     UNPROTECT(9);
-    error("failed to resolve crs native NOMAD v2 callable");
+    error("failed to resolve crs final native NOMAD callable");
   }
 
   solution = R_Calloc(n, double);
@@ -4853,7 +4861,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
     error("failed to allocate native NOMAD search buffers");
   }
   if (n_options > 0) {
-    native_options = R_Calloc(n_options, crs_nomad_native_option_v1);
+    native_options = R_Calloc(n_options, crs_nomad_option);
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
@@ -4896,12 +4904,14 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   context.best_flat_bw = best_flat_bw;
   context.best_degree = best_degree_i;
 
-  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  problem.api_version = CRS_NOMAD_API_VERSION;
   problem.struct_size = sizeof(problem);
   problem.n = n;
   problem.m = 1;
+  problem.callback_mode = CRS_NOMAD_CALLBACK_C;
   problem.x0 = REAL(x0_r);
   problem.bb_input_type = INTEGER(bbin_i);
+  problem.bb_output_type = bb_output_type;
   problem.lower = REAL(lower_r);
   problem.upper = REAL(upper_r);
   problem.max_eval = budget;
@@ -4912,10 +4922,12 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   problem.start_count = inner_count;
   problem.starts = NULL;
 
-  result.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  result.api_version = CRS_NOMAD_API_VERSION;
   result.struct_size = sizeof(result);
   result.solution = solution;
   result.solution_len = n;
+  result.outputs = crs_outputs;
+  result.outputs_len = 1;
 
   status = solve(&problem,
                  np_cdens_native_search_callback,
@@ -5017,10 +5029,12 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   SEXP option_names_s = R_NilValue;
   SEXP names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_flat = R_NilValue, best_degree = R_NilValue, call = R_NilValue;
-  crs_nomad_native_solve_fn_v2 solve;
-  crs_nomad_native_problem_v2 problem;
-  crs_nomad_native_result_v2 result;
-  crs_nomad_native_option_v1 *native_options = NULL;
+  crs_nomad_solve_fn solve;
+  crs_nomad_problem problem;
+  crs_nomad_result result;
+  crs_nomad_option *native_options = NULL;
+  int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
+  double crs_outputs[1];
   np_cdens_native_search_context context;
   double *solution = NULL;
   double *best_point = NULL;
@@ -5084,11 +5098,11 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   Rf_eval(call, R_GlobalEnv);
   UNPROTECT(1);
 
-  solve = (crs_nomad_native_solve_fn_v2)
-    R_GetCCallable("crs", "crs_nomad_native_solve_v2");
+  solve = (crs_nomad_solve_fn)
+    R_GetCCallable("crs", "crs_nomad_solve");
   if (solve == NULL) {
     UNPROTECT(9);
-    error("failed to resolve crs native NOMAD v2 callable");
+    error("failed to resolve crs final native NOMAD callable");
   }
 
   solution = R_Calloc(n, double);
@@ -5107,7 +5121,7 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
     error("failed to allocate native fixed-degree NOMAD search buffers");
   }
   if (n_options > 0) {
-    native_options = R_Calloc(n_options, crs_nomad_native_option_v1);
+    native_options = R_Calloc(n_options, crs_nomad_option);
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
@@ -5153,12 +5167,14 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   context.best_flat_bw = best_flat_bw;
   context.best_degree = best_degree_i;
 
-  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  problem.api_version = CRS_NOMAD_API_VERSION;
   problem.struct_size = sizeof(problem);
   problem.n = n;
   problem.m = 1;
+  problem.callback_mode = CRS_NOMAD_CALLBACK_C;
   problem.x0 = REAL(x0_r);
   problem.bb_input_type = INTEGER(bbin_i);
+  problem.bb_output_type = bb_output_type;
   problem.lower = REAL(lower_r);
   problem.upper = REAL(upper_r);
   problem.max_eval = budget;
@@ -5169,10 +5185,12 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   problem.start_count = inner_count;
   problem.starts = NULL;
 
-  result.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  result.api_version = CRS_NOMAD_API_VERSION;
   result.struct_size = sizeof(result);
   result.solution = solution;
   result.solution_len = n;
+  result.outputs = crs_outputs;
+  result.outputs_len = 1;
 
   status = solve(&problem,
                  np_cdens_native_search_callback,
@@ -6480,10 +6498,12 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP call = R_NilValue;
-  crs_nomad_native_solve_fn_v2 solve;
-  crs_nomad_native_problem_v2 problem;
-  crs_nomad_native_result_v2 result;
-  crs_nomad_native_option_v1 *native_options = NULL;
+  crs_nomad_solve_fn solve;
+  crs_nomad_problem problem;
+  crs_nomad_result result;
+  crs_nomad_option *native_options = NULL;
+  int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
+  double crs_outputs[1];
   np_udens_native_search_context context;
   double *solution = NULL;
   double *best_point = NULL;
@@ -6537,11 +6557,11 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   Rf_eval(call, R_GlobalEnv);
   UNPROTECT(1);
 
-  solve = (crs_nomad_native_solve_fn_v2)
-    R_GetCCallable("crs", "crs_nomad_native_solve_v2");
+  solve = (crs_nomad_solve_fn)
+    R_GetCCallable("crs", "crs_nomad_solve");
   if (solve == NULL) {
     UNPROTECT(14);
-    error("failed to resolve crs native NOMAD v2 callable");
+    error("failed to resolve crs final native NOMAD callable");
   }
 
   solution = R_Calloc(n, double);
@@ -6553,7 +6573,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
     error("failed to allocate native npudens NOMAD buffers");
   }
   if (n_options > 0) {
-    native_options = R_Calloc(n_options, crs_nomad_native_option_v1);
+    native_options = R_Calloc(n_options, crs_nomad_option);
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
@@ -6592,12 +6612,14 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   context.ckerub = REAL(ckerub_r);
   context.best_point = best_point;
 
-  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  problem.api_version = CRS_NOMAD_API_VERSION;
   problem.struct_size = sizeof(problem);
   problem.n = n;
   problem.m = 1;
+  problem.callback_mode = CRS_NOMAD_CALLBACK_C;
   problem.x0 = REAL(x0_r);
   problem.bb_input_type = INTEGER(bbin_i);
+  problem.bb_output_type = bb_output_type;
   problem.lower = REAL(lower_r);
   problem.upper = REAL(upper_r);
   problem.max_eval = budget;
@@ -6608,10 +6630,12 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   problem.start_count = inner_count;
   problem.starts = NULL;
 
-  result.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  result.api_version = CRS_NOMAD_API_VERSION;
   result.struct_size = sizeof(result);
   result.solution = solution;
   result.solution_len = n;
+  result.outputs = crs_outputs;
+  result.outputs_len = 1;
 
   status = solve(&problem,
                  np_udens_native_search_callback,
@@ -7085,10 +7109,12 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP call = R_NilValue;
-  crs_nomad_native_solve_fn_v2 solve;
-  crs_nomad_native_problem_v2 problem;
-  crs_nomad_native_result_v2 result;
-  crs_nomad_native_option_v1 *native_options = NULL;
+  crs_nomad_solve_fn solve;
+  crs_nomad_problem problem;
+  crs_nomad_result result;
+  crs_nomad_option *native_options = NULL;
+  int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
+  double crs_outputs[1];
   np_udist_native_search_context context;
   double *solution = NULL;
   double *best_point = NULL;
@@ -7146,11 +7172,11 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   Rf_eval(call, R_GlobalEnv);
   UNPROTECT(1);
 
-  solve = (crs_nomad_native_solve_fn_v2)
-    R_GetCCallable("crs", "crs_nomad_native_solve_v2");
+  solve = (crs_nomad_solve_fn)
+    R_GetCCallable("crs", "crs_nomad_solve");
   if (solve == NULL) {
     UNPROTECT(17);
-    error("failed to resolve crs native NOMAD v2 callable");
+    error("failed to resolve crs final native NOMAD callable");
   }
 
   solution = R_Calloc(n, double);
@@ -7162,7 +7188,7 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
     error("failed to allocate native npudist NOMAD buffers");
   }
   if (n_options > 0) {
-    native_options = R_Calloc(n_options, crs_nomad_native_option_v1);
+    native_options = R_Calloc(n_options, crs_nomad_option);
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
@@ -7204,12 +7230,14 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   context.ckerub = REAL(ckerub_r);
   context.best_point = best_point;
 
-  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  problem.api_version = CRS_NOMAD_API_VERSION;
   problem.struct_size = sizeof(problem);
   problem.n = n;
   problem.m = 1;
+  problem.callback_mode = CRS_NOMAD_CALLBACK_C;
   problem.x0 = REAL(x0_r);
   problem.bb_input_type = INTEGER(bbin_i);
+  problem.bb_output_type = bb_output_type;
   problem.lower = REAL(lower_r);
   problem.upper = REAL(upper_r);
   problem.max_eval = budget;
@@ -7220,10 +7248,12 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   problem.start_count = inner_count;
   problem.starts = NULL;
 
-  result.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  result.api_version = CRS_NOMAD_API_VERSION;
   result.struct_size = sizeof(result);
   result.solution = solution;
   result.solution_len = n;
+  result.outputs = crs_outputs;
+  result.outputs_len = 1;
 
   status = solve(&problem,
                  np_udist_native_search_callback,
@@ -8443,10 +8473,12 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   SEXP cxkerlb_r = R_NilValue, cxkerub_r = R_NilValue, cykerlb_r = R_NilValue, cykerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_degree = R_NilValue, first_degree = R_NilValue, call = R_NilValue;
-  crs_nomad_native_solve_fn_v2 solve;
-  crs_nomad_native_problem_v2 problem;
-  crs_nomad_native_result_v2 result;
-  crs_nomad_native_option_v1 *native_options = NULL;
+  crs_nomad_solve_fn solve;
+  crs_nomad_problem problem;
+  crs_nomad_result result;
+  crs_nomad_option *native_options = NULL;
+  int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
+  double crs_outputs[1];
   np_cdist_native_search_context context;
   double *solution = NULL, *best_point = NULL;
   int *best_degree_i = NULL, *first_degree_i = NULL;
@@ -8518,10 +8550,10 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   Rf_eval(call, R_GlobalEnv);
   UNPROTECT(1);
 
-  solve = (crs_nomad_native_solve_fn_v2) R_GetCCallable("crs", "crs_nomad_native_solve_v2");
+  solve = (crs_nomad_solve_fn) R_GetCCallable("crs", "crs_nomad_solve");
   if (solve == NULL) {
     UNPROTECT(23);
-    error("failed to resolve crs native NOMAD v2 callable");
+    error("failed to resolve crs final native NOMAD callable");
   }
 
   solution = R_Calloc(n, double);
@@ -8540,7 +8572,7 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
     error("failed to allocate native npcdist NOMAD buffers");
   }
   if (n_options > 0) {
-    native_options = R_Calloc(n_options, crs_nomad_native_option_v1);
+    native_options = R_Calloc(n_options, crs_nomad_option);
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
@@ -8603,12 +8635,14 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   context.best_degree = best_degree_i;
   context.first_degree = first_degree_i;
 
-  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  problem.api_version = CRS_NOMAD_API_VERSION;
   problem.struct_size = sizeof(problem);
   problem.n = n;
   problem.m = 1;
+  problem.callback_mode = CRS_NOMAD_CALLBACK_C;
   problem.x0 = REAL(x0_r);
   problem.bb_input_type = INTEGER(bbin_i);
+  problem.bb_output_type = bb_output_type;
   problem.lower = REAL(lower_r);
   problem.upper = REAL(upper_r);
   problem.max_eval = budget;
@@ -8619,10 +8653,12 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   problem.start_count = inner_count;
   problem.starts = NULL;
 
-  result.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
+  result.api_version = CRS_NOMAD_API_VERSION;
   result.struct_size = sizeof(result);
   result.solution = solution;
   result.solution_len = n;
+  result.outputs = crs_outputs;
+  result.outputs_len = 1;
 
   status = solve(&problem, np_cdist_native_search_callback, &context, &result);
 
