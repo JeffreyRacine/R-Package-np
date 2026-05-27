@@ -1288,6 +1288,7 @@ npNomadShadowFixedNativeSearchConditionalDensity <- function(x0,
                                                                  point.upper,
                                                                  max.eval,
                                                                  random.seed,
+                                                                 inner.start.count = 0L,
                                                                  option.names,
                                                                  option.values,
                                                                  flat.decode.scale = rep.int(1, length(flat.from.point))) {
@@ -1302,6 +1303,7 @@ npNomadShadowFixedNativeSearchConditionalDensity <- function(x0,
     as.double(point.upper),
     as.integer(max.eval),
     as.integer(random.seed),
+    as.integer(inner.start.count),
     as.character(option.names),
     as.character(option.values),
     PACKAGE = "np"
@@ -2270,8 +2272,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L)),
       "nomad.nmulti"
     )
-    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
-      stop("native npcdens fixed-degree NOMAD route does not support inner NOMAD multistart without crs native ABI support", call. = FALSE)
+    native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
 
     native.random.seed <- opt.value("random.seed", 42L)
     native.nomad.opts <- .np_nomad_default_opts(
@@ -2361,6 +2362,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
         point.upper = native.point.upper,
         max.eval = 0L,
         random.seed = native.random.seed,
+        inner.start.count = native.inner.nmulti,
         option.names = native.option.vectors$names,
         option.values = native.option.vectors$values
       )
@@ -3516,7 +3518,11 @@ npcdensbw.default <-
 
     search.mc.names <- names(mc)
     lp.dot.args <- list(...)
-    .np_degree_reject_unknown_dots(lp.dot.args, "npcdensbw")
+    .np_degree_reject_unknown_dots(
+      lp.dot.args,
+      "npcdensbw",
+      allowed = c("random.seed", "mads.nmulti", "nomad.nmulti")
+    )
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
     degree.min.value <- nomad.shortcut$values$degree.min
@@ -3554,8 +3560,9 @@ npcdensbw.default <-
       0L
     }
     if (nomad.inner.named &&
-        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
-      stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
+        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell"))) &&
+        !("bwsolver" %in% search.mc.names && npBwsolverUsesMads(bwsolver))) {
+      stop("nomad.nmulti is only supported for fixed-degree MADS searches or when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
     }
 
     if (!is.null(degree.search)) {
@@ -3629,7 +3636,8 @@ npcdensbw.default <-
                "scale.init.categorical.sample",
                "transform.bounds",
                "invalid.penalty",
-               "penalty.multiplier")
+               "penalty.multiplier",
+               "mads.nmulti", "nomad.nmulti")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
