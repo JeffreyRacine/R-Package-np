@@ -1153,10 +1153,7 @@ npRmpiNomadShadowClearRegression <- function() {
     "lc"
   }
 
-  (identical(bwtype, "fixed") ||
-     identical(bwtype, "adaptive_nn") ||
-     (identical(bwtype, "generalized_nn") &&
-        !(identical(method, "cv.aic") && identical(regtype, "lp")))) &&
+  bwtype %in% c("fixed", "generalized_nn", "adaptive_nn") &&
     method %in% c("cv.ls", "cv.aic") &&
     regtype %in% c("lc", "ll", "lp") &&
     bwsolver %in% c("mads", "mads+powell")
@@ -1340,8 +1337,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
 
   myopti <- list(
     num_obs_train = nrow,
-    iMultistart = IMULTI_FALSE,
-    iNum_Multistart = 0L,
+    iMultistart = IMULTI_TRUE,
+    iNum_Multistart = 1L,
     int_use_starting_values = USE_START_YES,
     int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
     BANDWIDTH_reg_extern = switch(bws$type,
@@ -1656,6 +1653,19 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     }
 
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
+  }
+
+  if (.npregbw_nomad_native_target(template, bwsolver) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    return(.npRmpi_with_local_regression(.npregbw_run_fixed_degree_mads(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bws,
+      reg.args = reg.args,
+      opt.args = opt.args,
+      yname = yname,
+      bwsolver = bwsolver
+    )))
   }
 
   if (.npregbw_nomad_native_target(template, bwsolver)) {
