@@ -1258,6 +1258,7 @@ npNomadShadowNativeSearchConditionalDensity <- function(x0,
                                                             point.upper,
                                                             max.eval,
                                                             random.seed,
+                                                            inner.start.count = 0L,
                                                             option.names,
                                                             option.values,
                                                             flat.decode.scale = rep.int(1, length(flat.from.point))) {
@@ -1272,6 +1273,7 @@ npNomadShadowNativeSearchConditionalDensity <- function(x0,
     as.double(point.upper),
     as.integer(max.eval),
     as.integer(random.seed),
+    as.integer(inner.start.count),
     as.character(option.names),
     as.character(option.values),
     PACKAGE = "np"
@@ -1735,8 +1737,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       nomad.inner.nmulti,
       "nomad.inner.nmulti"
     )
-    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
-      stop("native npcdens NOMAD route does not support inner NOMAD multistart without crs native ABI support", call. = FALSE)
+    native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
 
     native.max.eval <- 0L
     native.nomad.opts <- .np_nomad_default_opts(
@@ -1794,6 +1795,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
         point.upper = native.point.upper,
         max.eval = native.max.eval,
         random.seed = random.seed,
+        inner.start.count = native.inner.nmulti,
         option.names = native.option.vectors$names,
         option.values = native.option.vectors$values
       )
