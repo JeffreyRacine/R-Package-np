@@ -1608,8 +1608,16 @@ npRegressionHasExtendedNn <- function(bws) {
   }
 
   if (!is.null(bws$bw) && is.list(bws$bw) && !is.data.frame(bws$bw)) {
-    if (any(vapply(bws$bw, npRegressionHasExtendedNn, logical(1L))))
+    child.is.bw <- vapply(
+      bws$bw,
+      function(x) any(c("rbandwidth", "plbandwidth", "scbandwidth", "sibandwidth") %in% class(x)),
+      logical(1L)
+    )
+    if (any(child.is.bw) &&
+        any(vapply(bws$bw[child.is.bw], npRegressionHasExtendedNn, logical(1L))))
       return(TRUE)
+    if (any(child.is.bw))
+      return(FALSE)
   }
 
   if (is.null(bws$type) ||
@@ -1623,7 +1631,7 @@ npRegressionHasExtendedNn <- function(bws) {
     return(FALSE)
 
   if (!is.null(bws$bw) && !is.null(bws$icon) && any(bws$icon)) {
-    bw <- suppressWarnings(as.double(bws$bw))
+    bw <- suppressWarnings(as.double(unlist(bws$bw, use.names = FALSE)))
     icon <- as.logical(bws$icon)
     if (length(bw) >= length(icon) && any(is.finite(bw[icon]) & bw[icon] > upper))
       return(TRUE)
@@ -1631,7 +1639,7 @@ npRegressionHasExtendedNn <- function(bws) {
 
   if (!is.null(bws$bw) && is.null(bws$icon) &&
       !is.null(bws$ncon) && isTRUE(as.integer(bws$ncon)[1L] > 0L)) {
-    bw <- suppressWarnings(as.double(bws$bw))
+    bw <- suppressWarnings(as.double(unlist(bws$bw, use.names = FALSE)))
     ncon <- as.integer(bws$ncon)[1L]
     if (length(bw) >= ncon && any(is.finite(bw[seq_len(ncon)]) & bw[seq_len(ncon)] > upper))
       return(TRUE)
