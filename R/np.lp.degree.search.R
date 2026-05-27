@@ -1545,6 +1545,57 @@
   list(value = value, output = output)
 }
 
+.np_nomad_native_option_vectors <- function(opts) {
+  if (is.null(opts) || !length(opts))
+    return(list(names = character(), values = character()))
+
+  option.names <- names(opts)
+  if (is.null(option.names) || any(!nzchar(option.names)))
+    stop("native NOMAD route received unnamed NOMAD options", call. = FALSE)
+
+  option.values <- vapply(opts, function(value) {
+    if (is.logical(value)) {
+      if (isTRUE(value[1L])) "true" else "false"
+    } else if (length(value) > 1L) {
+      paste0("( ", paste(as.character(value), collapse = " "), " )")
+    } else {
+      as.character(value[1L])
+    }
+  }, character(1L))
+
+  list(names = as.character(option.names), values = option.values)
+}
+
+.np_nomad_native_r_callback_search <- function(eval.f,
+                                               x0,
+                                               bbin,
+                                               lb,
+                                               ub,
+                                               random.seed = 42L,
+                                               inner.start.count = 0L,
+                                               option.names = character(),
+                                               option.values = character(),
+                                               display.nomad.progress = FALSE) {
+  if (!is.function(eval.f))
+    stop("native NOMAD R callback route requires a function", call. = FALSE)
+
+  .np_nomad_capture_snomadr(.Call(
+    "C_np_nomad_r_callback_native_search",
+    eval.f,
+    environment(eval.f),
+    as.double(x0),
+    as.integer(bbin),
+    as.double(lb),
+    as.double(ub),
+    as.integer(random.seed),
+    as.integer(inner.start.count),
+    as.character(option.names),
+    as.character(option.values),
+    as.integer(if (isTRUE(display.nomad.progress)) 0L else 1L),
+    PACKAGE = "npRmpi"
+  ), capture.output = !isTRUE(display.nomad.progress))
+}
+
 .np_nomad_external_output_lines <- function(lines) {
   lines <- as.character(lines)
   lines <- trimws(lines)
@@ -1622,7 +1673,8 @@
                              handoff_before_build = FALSE,
                              remin = FALSE,
                              degree_spec = NULL,
-                             nomad.opts = list()) {
+                             nomad.opts = list(),
+                             native.r.bridge = FALSE) {
   engine <- match.arg(engine)
   direction <- match.arg(direction)
   .np_nomad_require_crs()
@@ -1651,6 +1703,7 @@
   state$restart_durations <- numeric()
   state$restart_eval_id <- 0L
   state$external_output_seen <- character()
+  state$native.r.bridge <- isTRUE(native.r.bridge)
 
   set_progress_state <- function(value) {
     state$progress_state <- value
@@ -1832,6 +1885,46 @@
     ))
   }
 
+  run_nomad_solver <- function(start) {
+    solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
+    start <- as.numeric(start)
+
+    if (isTRUE(state$native.r.bridge)) {
+      native.eval <- function(point) {
+        value <- as.numeric(wrapped_eval(point)[1L])
+        if (!is.finite(value)) .Machine$double.xmax else value
+      }
+      native.option.vectors <- .np_nomad_native_option_vectors(solver.opts)
+      return(.np_nomad_native_r_callback_search(
+        eval.f = native.eval,
+        x0 = start,
+        bbin = bbin,
+        lb = lb,
+        ub = ub,
+        random.seed = random.seed,
+        inner.start.count = nomad.inner.nmulti,
+        option.names = native.option.vectors$names,
+        option.values = native.option.vectors$values,
+        display.nomad.progress = display.nomad.progress
+      ))
+    }
+
+    .np_nomad_capture_snomadr(crs::snomadr(
+      eval.f = wrapped_eval,
+      n = length(x0),
+      bbin = as.integer(bbin),
+      bbout = 0L,
+      x0 = start,
+      lb = as.double(lb),
+      ub = as.double(ub),
+      nmulti = nomad.inner.nmulti,
+      random.seed = as.integer(random.seed),
+      opts = solver.opts,
+      display.nomad.progress = display.nomad.progress,
+      snomadr.environment = environment(wrapped_eval)
+    ), capture.output = !isTRUE(display.nomad.progress))
+  }
+
   restart_results <- vector("list", nomad.nmulti)
   best_solution <- NULL
   nomad.elapsed <- 0
@@ -1871,21 +1964,7 @@
     nomad.start <- proc.time()[3L]
     solution_i <- tryCatch(
       {
-        solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
-        nomad.call <- .np_nomad_capture_snomadr(crs::snomadr(
-          eval.f = wrapped_eval,
-          n = length(x0),
-          bbin = as.integer(bbin),
-          bbout = 0L,
-          x0 = as.numeric(start_matrix[i, ]),
-          lb = as.double(lb),
-          ub = as.double(ub),
-          nmulti = nomad.inner.nmulti,
-          random.seed = as.integer(random.seed),
-          opts = solver.opts,
-          display.nomad.progress = display.nomad.progress,
-          snomadr.environment = environment(wrapped_eval)
-        ), capture.output = !isTRUE(display.nomad.progress))
+        nomad.call <- run_nomad_solver(as.numeric(start_matrix[i, ]))
         emitted <- .np_nomad_emit_external_output(
           lines = nomad.call$output,
           progress_state = state$progress_state,
@@ -2014,21 +2093,7 @@
     nomad.start <- proc.time()[3L]
     solution_i <- tryCatch(
       {
-        solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
-        nomad.call <- .np_nomad_capture_snomadr(crs::snomadr(
-          eval.f = wrapped_eval,
-          n = length(x0),
-          bbin = as.integer(bbin),
-          bbout = 0L,
-          x0 = remin.start,
-          lb = as.double(lb),
-          ub = as.double(ub),
-          nmulti = nomad.inner.nmulti,
-          random.seed = as.integer(random.seed),
-          opts = solver.opts,
-          display.nomad.progress = display.nomad.progress,
-          snomadr.environment = environment(wrapped_eval)
-        ), capture.output = !isTRUE(display.nomad.progress))
+        nomad.call <- run_nomad_solver(remin.start)
         emitted <- .np_nomad_emit_external_output(
           lines = nomad.call$output,
           progress_state = state$progress_state,
@@ -2208,6 +2273,16 @@
     restart.bandwidth.starts = state$restart_bandwidth_starts,
     restart.start.info = state$restart_start_info,
     restart.results = state$restart_results,
-    trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name)
+    trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name),
+    native = isTRUE(state$native.r.bridge),
+    native.diagnostics = if (isTRUE(state$native.r.bridge)) {
+      list(
+        route_native = TRUE,
+        callback_mode = "R",
+        native_symbol = "C_np_nomad_r_callback_native_search"
+      )
+    } else {
+      NULL
+    }
   )
 }
