@@ -1110,6 +1110,7 @@ npRmpiNomadShadowNativeSearchRegression <- function(x0,
                                                     point.upper,
                                                     max.eval = 0L,
                                                     random.seed = 42L,
+                                                    inner.start.count = 0L,
                                                     option.names = character(),
                                                     option.values = character()) {
   .Call(
@@ -1122,6 +1123,7 @@ npRmpiNomadShadowNativeSearchRegression <- function(x0,
     as.double(point.upper),
     as.integer(max.eval),
     as.integer(random.seed),
+    as.integer(inner.start.count),
     as.character(option.names),
     as.character(option.values),
     PACKAGE = "npRmpi"
@@ -1672,8 +1674,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     .npregbw_nomad_native_require_crs()
     native.nmulti <- npValidateNmulti(mads.nmulti)
     native.inner.nmulti <- npValidateNonNegativeInteger(mads.inner.nmulti, "nomad.nmulti")
-    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
-      stop("native npreg NOMAD route does not support inner NOMAD multistart without crs native ABI support", call. = FALSE)
+    native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
     if (isTRUE(opt.args$nomad.remin))
       stop("native npreg NOMAD route does not support NOMAD remin", call. = FALSE)
 
@@ -1731,6 +1732,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
           PUPPER,
           MAXEVAL,
           RSEED,
+          INNERSTART,
           ONAMES,
           OVALUES
         ),
@@ -1743,6 +1745,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
           PUPPER = as.double(native.point.upper),
           MAXEVAL = as.integer(opt.value("itmax", 10000L)),
           RSEED = as.integer(random.seed),
+          INNERSTART = as.integer(native.inner.nmulti),
           ONAMES = as.character(native.option.vectors$names),
           OVALUES = as.character(native.option.vectors$values)
         )
@@ -2269,8 +2272,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     .npregbw_nomad_native_require_crs()
     native.nmulti <- npValidateNmulti(nomad.nmulti)
     native.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
-    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
-      stop("native npreg NOMAD degree-search route does not support inner NOMAD multistart without crs native ABI support", call. = FALSE)
+    native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
 
     native.nomad.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
     native.option.vectors <- .npregbw_nomad_native_option_vectors(native.nomad.opts)
@@ -2316,6 +2318,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
         point.upper = as.double(native.point.upper),
         max.eval = 0L,
         random.seed = as.integer(random.seed),
+        inner.start.count = native.inner.nmulti,
         option.names = native.option.vectors$names,
         option.values = native.option.vectors$values
       )

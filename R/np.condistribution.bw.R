@@ -1337,6 +1337,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
                                                        ub,
                                                        max.eval = 0L,
                                                        random.seed = 42L,
+                                                       inner.start.count = 0L,
                                                        option.names = character(),
                                                        option.values = character()) {
   native.call <- .np_nomad_capture_snomadr(.Call(
@@ -1359,6 +1360,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     as.double(ub),
     as.integer(max.eval),
     as.integer(random.seed),
+    as.integer(inner.start.count),
     as.character(option.names),
     as.character(option.values),
     as.integer(prep$penalty_mode),
@@ -1511,8 +1513,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L)),
       "nomad.nmulti"
     )
-    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
-      stop("native npcdist NOMAD route does not support inner NOMAD multistart without crs native ABI support", call. = FALSE)
+    native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
     if (isTRUE(opt.args$nomad.remin))
       stop("native npcdist NOMAD route does not support NOMAD remin", call. = FALSE)
 
@@ -1567,6 +1568,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         ub = bounds$upper,
         max.eval = 0L,
         random.seed = native.random.seed,
+        inner.start.count = native.inner.nmulti,
         option.names = native.option.vectors$names,
         option.values = native.option.vectors$values
       )
@@ -2033,7 +2035,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     .npcdistbw_nomad_native_require_crs()
     native.nmulti <- npValidateNmulti(nomad.nmulti)
     native.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
-    if (as.integer(native.inner.nmulti[1L]) <= 1L) {
+    native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
       native.nomad.opts <- .np_nomad_default_opts(
         random.seed,
         if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
@@ -2086,6 +2088,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
           ub = ub,
           max.eval = 0L,
           random.seed = random.seed,
+          inner.start.count = native.inner.nmulti,
           option.names = native.option.vectors$names,
           option.values = native.option.vectors$values
         )
@@ -2259,7 +2262,6 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
       search.result$num.feval.total <- as.numeric(native.num.feval.total)
       search.result$num.feval.fast.total <- as.numeric(native.num.feval.fast.total)
       return(search.result)
-    }
   }
 
   search.result <- .np_nomad_search(
@@ -3023,7 +3025,11 @@ npcdistbw.default <-
 
     search.mc.names <- names(mc)
     lp.dot.args <- list(...)
-    .np_degree_reject_unknown_dots(lp.dot.args, "npcdistbw")
+    .np_degree_reject_unknown_dots(
+      lp.dot.args,
+      "npcdistbw",
+      allowed = c("random.seed", "mads.nmulti", "nomad.nmulti")
+    )
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
@@ -3054,6 +3060,14 @@ npcdistbw.default <-
         "bwsolver" %in% search.mc.names &&
         npBwsolverUsesMads(bwsolver)) {
       stop("bwsolver is for fixed-degree bandwidth searches; use search.engine for automatic degree search")
+    }
+    mads.inner.named <- "mads.nmulti" %in% names(lp.dot.args)
+    if (mads.inner.named) {
+      npValidateNonNegativeInteger(lp.dot.args$mads.nmulti, "mads.nmulti")
+      if (!is.null(degree.search) ||
+          !("bwsolver" %in% search.mc.names && npBwsolverUsesMads(bwsolver))) {
+        stop("mads.nmulti is only supported for fixed-degree MADS searches")
+      }
     }
     nomad.inner <- .np_nomad_validate_inner_multistart(
       call_names = search.mc.names,
@@ -3150,6 +3164,8 @@ npcdistbw.default <-
       opt.args <- list()
     }
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
+    if ("mads.nmulti" %in% names(lp.dot.args))
+      opt.args$mads.nmulti <- lp.dot.args$mads.nmulti
     reg.args$scale.factor.search.lower <- scale.factor.search.lower
     opt.args$scale.factor.search.lower <- scale.factor.search.lower
 

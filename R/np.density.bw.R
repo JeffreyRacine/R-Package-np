@@ -297,6 +297,7 @@ npRmpiNomadNativeSearchDensity <- function(prep,
                                            ub,
                                            max.eval = 0L,
                                            random.seed = 42L,
+                                           inner.start.count = 0L,
                                            option.names = character(),
                                            option.values = character()) {
   native.call <- .np_nomad_capture_snomadr(.Call(
@@ -313,6 +314,7 @@ npRmpiNomadNativeSearchDensity <- function(prep,
     as.double(ub),
     as.integer(max.eval),
     as.integer(random.seed),
+    as.integer(inner.start.count),
     as.character(option.names),
     as.character(option.values),
     as.integer(prep$penalty_mode),
@@ -411,8 +413,7 @@ npRmpiNomadNativeSearchDensity <- function(prep,
       opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L)),
       "nomad.nmulti"
     )
-    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
-      stop("native npudens NOMAD route POC does not support inner NOMAD multistart", call. = FALSE)
+    native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
     if (isTRUE(opt.args$nomad.remin))
       stop("native npudens NOMAD route POC does not support NOMAD remin", call. = FALSE)
 
@@ -460,6 +461,7 @@ npRmpiNomadNativeSearchDensity <- function(prep,
         ub = bounds$upper,
         max.eval = 0L,
         random.seed = native.random.seed,
+        inner.start.count = native.inner.nmulti,
         option.names = native.option.vectors$names,
         option.values = native.option.vectors$values
       )
