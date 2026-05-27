@@ -1174,6 +1174,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
                                                        ub,
                                                        max.eval = 0L,
                                                        random.seed = 42L,
+                                                       inner.start.count = 0L,
                                                        option.names = character(),
                                                        option.values = character()) {
   native.call <- .np_nomad_capture_snomadr(.Call(
@@ -1196,6 +1197,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     as.double(ub),
     as.integer(max.eval),
     as.integer(random.seed),
+    as.integer(inner.start.count),
     as.character(option.names),
     as.character(option.values),
     as.integer(prep$penalty_mode),
@@ -1962,11 +1964,10 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   }
 
   degree.native.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
-  if (.npcdistbw_nomad_degree_native_target(template, degree.search) &&
-      as.integer(degree.native.inner.nmulti[1L]) <= 1L) {
+  if (.npcdistbw_nomad_degree_native_target(template, degree.search)) {
     .npcdistbw_nomad_native_require_crs()
     native.nmulti <- npValidateNmulti(nomad.nmulti)
-    native.inner.nmulti <- degree.native.inner.nmulti
+    native.inner.nmulti <- as.integer(degree.native.inner.nmulti[1L])
 
     native.nomad.opts <- .np_nomad_default_opts(
       random.seed,
@@ -2044,6 +2045,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         ub = ub,
         max.eval = 0L,
         random.seed = random.seed,
+        inner.start.count = native.inner.nmulti,
         option.names = native.option.vectors$names,
         option.values = native.option.vectors$values
       )
@@ -2572,7 +2574,11 @@ npcdistbw.default <-
 
     search.mc.names <- names(mc)
     lp.dot.args <- list(...)
-    .np_degree_reject_unknown_dots(lp.dot.args, "npcdistbw")
+    .np_degree_reject_unknown_dots(
+      lp.dot.args,
+      "npcdistbw",
+      allowed = c("random.seed", "mads.nmulti", "nomad.nmulti")
+    )
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
@@ -2611,8 +2617,9 @@ npcdistbw.default <-
       0L
     }
     if (nomad.inner.named &&
-        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
-      stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
+        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell"))) &&
+        !("bwsolver" %in% search.mc.names && npBwsolverUsesMads(bwsolver))) {
+      stop("nomad.nmulti is only supported for fixed-degree MADS searches or when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
     }
 
     if (!is.null(degree.search)) {
@@ -2673,7 +2680,8 @@ npcdistbw.default <-
                "scale.init.categorical.sample",
                "transform.bounds",
                "invalid.penalty",
-               "penalty.multiplier")
+               "penalty.multiplier",
+               "mads.nmulti", "nomad.nmulti")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
