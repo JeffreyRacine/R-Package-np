@@ -1350,8 +1350,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L)),
       "nomad.nmulti"
     )
-    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
-      stop("native npcdist NOMAD route does not support inner NOMAD multistart without crs native ABI support", call. = FALSE)
+    native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
     if (isTRUE(opt.args$nomad.remin))
       stop("native npcdist NOMAD route does not support NOMAD remin", call. = FALSE)
 
@@ -1406,6 +1405,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         ub = bounds$upper,
         max.eval = 0L,
         random.seed = native.random.seed,
+        inner.start.count = native.inner.nmulti,
         option.names = native.option.vectors$names,
         option.values = native.option.vectors$values
       )
@@ -2610,6 +2610,14 @@ npcdistbw.default <-
         npBwsolverUsesMads(bwsolver)) {
       stop("bwsolver is for fixed-degree bandwidth searches; use search.engine for automatic degree search")
     }
+    mads.inner.named <- "mads.nmulti" %in% names(lp.dot.args)
+    if (mads.inner.named) {
+      npValidateNonNegativeInteger(lp.dot.args$mads.nmulti, "mads.nmulti")
+      if (!is.null(degree.search) ||
+          !("bwsolver" %in% search.mc.names && npBwsolverUsesMads(bwsolver))) {
+        stop("mads.nmulti is only supported for fixed-degree MADS searches")
+      }
+    }
     nomad.inner.named <- "nomad.nmulti" %in% search.mc.names
     nomad.inner.nmulti <- if (nomad.inner.named) {
       npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti")
@@ -2692,6 +2700,8 @@ npcdistbw.default <-
       opt.args <- list()
     }
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
+    if ("mads.nmulti" %in% names(lp.dot.args))
+      opt.args$mads.nmulti <- lp.dot.args$mads.nmulti
     reg.args$scale.factor.search.lower <- scale.factor.search.lower
     opt.args$scale.factor.search.lower <- scale.factor.search.lower
 

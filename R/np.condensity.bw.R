@@ -3553,6 +3553,14 @@ npcdensbw.default <-
         npBwsolverUsesMads(bwsolver)) {
       stop("bwsolver is for fixed-degree bandwidth searches; use search.engine for automatic degree search")
     }
+    mads.inner.named <- "mads.nmulti" %in% names(lp.dot.args)
+    if (mads.inner.named) {
+      npValidateNonNegativeInteger(lp.dot.args$mads.nmulti, "mads.nmulti")
+      if (!is.null(degree.search) ||
+          !("bwsolver" %in% search.mc.names && npBwsolverUsesMads(bwsolver))) {
+        stop("mads.nmulti is only supported for fixed-degree MADS searches")
+      }
+    }
     nomad.inner.named <- "nomad.nmulti" %in% mc.names
     nomad.inner.nmulti <- if (nomad.inner.named) {
       npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti")
@@ -3648,6 +3656,8 @@ npcdensbw.default <-
       opt.args <- list()
     }
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
+    if ("mads.nmulti" %in% names(lp.dot.args))
+      opt.args$mads.nmulti <- lp.dot.args$mads.nmulti
 
     if (!is.null(degree.search)) {
       if (identical(degree.search$engine, "cell")) {
