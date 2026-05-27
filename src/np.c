@@ -69,6 +69,181 @@ int int_TREE_XY;
 int int_TREE_PROFILE_X;
 int int_nn_k_min_extern = 1;
 
+SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
+                                         SEXP eval_env,
+                                         SEXP x0,
+                                         SEXP bbin,
+                                         SEXP lower,
+                                         SEXP upper,
+                                         SEXP random_seed,
+                                         SEXP inner_start_count,
+                                         SEXP option_names,
+                                         SEXP option_values,
+                                         SEXP quiet)
+{
+  SEXP eval_fun = R_NilValue, eval_rho = R_NilValue;
+  SEXP x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue;
+  SEXP upper_r = R_NilValue, option_names_s = R_NilValue, option_values_s = R_NilValue;
+  SEXP call = R_NilValue, out = R_NilValue, names = R_NilValue, sol = R_NilValue;
+  crs_nomad_solve_fn solve;
+  crs_nomad_problem problem;
+  crs_nomad_result result;
+  crs_nomad_r_callback r_callback;
+  crs_nomad_option *native_options = NULL;
+  int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
+  double crs_outputs[1];
+  double *solution = NULL;
+  int nprotect = 0;
+  int n, i, status, seed, inner_count, n_options, quiet_flag;
+
+  PROTECT(eval_fun = eval_f); nprotect++;
+  eval_rho = (eval_env == R_NilValue || TYPEOF(eval_env) != ENVSXP) ?
+    R_GlobalEnv : eval_env;
+  PROTECT(eval_rho); nprotect++;
+  PROTECT(x0_r = coerceVector(x0, REALSXP)); nprotect++;
+  PROTECT(bbin_i = coerceVector(bbin, INTSXP)); nprotect++;
+  PROTECT(lower_r = coerceVector(lower, REALSXP)); nprotect++;
+  PROTECT(upper_r = coerceVector(upper, REALSXP)); nprotect++;
+  PROTECT(option_names_s = coerceVector(option_names, STRSXP)); nprotect++;
+  PROTECT(option_values_s = coerceVector(option_values, STRSXP)); nprotect++;
+
+  if (!Rf_isFunction(eval_fun)) {
+    UNPROTECT(nprotect);
+    error("native NOMAD R callback search received a non-function evaluator");
+  }
+
+  n = (int) XLENGTH(x0_r);
+  if (n <= 0 ||
+      XLENGTH(bbin_i) != n ||
+      XLENGTH(lower_r) != n ||
+      XLENGTH(upper_r) != n) {
+    UNPROTECT(nprotect);
+    error("native NOMAD R callback search received inconsistent problem dimensions");
+  }
+  seed = asInteger(random_seed);
+  inner_count = asInteger(inner_start_count);
+  quiet_flag = asInteger(quiet);
+  if (seed < 0 || inner_count < 0) {
+    UNPROTECT(nprotect);
+    error("native NOMAD R callback search received invalid seed or inner multistart count");
+  }
+  if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
+    UNPROTECT(nprotect);
+    error("native NOMAD R callback search received inconsistent option name/value lengths");
+  }
+  if (XLENGTH(option_names_s) > INT_MAX) {
+    UNPROTECT(nprotect);
+    error("native NOMAD R callback search received too many options");
+  }
+  n_options = (int) XLENGTH(option_names_s);
+
+  PROTECT(call = lang2(install("loadNamespace"), mkString("crs"))); nprotect++;
+  Rf_eval(call, R_GlobalEnv);
+  UNPROTECT(1); nprotect--;
+
+  solve = (crs_nomad_solve_fn)
+    R_GetCCallable("crs", "crs_nomad_solve");
+  if (solve == NULL) {
+    UNPROTECT(nprotect);
+    error("failed to resolve crs final native NOMAD callable");
+  }
+
+  solution = R_Calloc(n, double);
+  if (solution == NULL) {
+    UNPROTECT(nprotect);
+    error("failed to allocate native NOMAD R callback solution buffer");
+  }
+  if (n_options > 0) {
+    native_options = R_Calloc(n_options, crs_nomad_option);
+    if (native_options == NULL) {
+      R_Free(solution);
+      UNPROTECT(nprotect);
+      error("failed to allocate native NOMAD R callback option buffers");
+    }
+    for (i = 0; i < n_options; i++) {
+      native_options[i].name = CHAR(STRING_ELT(option_names_s, i));
+      native_options[i].value = CHAR(STRING_ELT(option_values_s, i));
+    }
+  }
+  for (i = 0; i < n; i++)
+    solution[i] = R_NaN;
+
+  memset(&problem, 0, sizeof(problem));
+  memset(&result, 0, sizeof(result));
+  memset(&r_callback, 0, sizeof(r_callback));
+
+  r_callback.eval_f = (void *) eval_fun;
+  r_callback.environment = (void *) eval_rho;
+
+  problem.api_version = CRS_NOMAD_API_VERSION;
+  problem.struct_size = sizeof(problem);
+  problem.callback_mode = CRS_NOMAD_CALLBACK_R;
+  problem.n = n;
+  problem.m = 1;
+  problem.x0 = REAL(x0_r);
+  problem.bb_input_type = INTEGER(bbin_i);
+  problem.bb_output_type = bb_output_type;
+  problem.lower = REAL(lower_r);
+  problem.upper = REAL(upper_r);
+  problem.max_eval = 0;
+  problem.random_seed = (unsigned int) seed;
+  problem.quiet = quiet_flag;
+  problem.option_count = n_options;
+  problem.options = native_options;
+  problem.start_count = inner_count;
+  problem.starts = NULL;
+  problem.read_nomad_opt_file = 0;
+
+  result.api_version = CRS_NOMAD_API_VERSION;
+  result.struct_size = sizeof(result);
+  result.solution = solution;
+  result.solution_len = n;
+  result.outputs = crs_outputs;
+  result.outputs_len = 1;
+
+  status = solve(&problem, NULL, &r_callback, &result);
+
+  PROTECT(out = allocVector(VECSXP, 12)); nprotect++;
+  PROTECT(names = allocVector(STRSXP, 12)); nprotect++;
+  PROTECT(sol = allocVector(REALSXP, n)); nprotect++;
+  for (i = 0; i < n; i++)
+    REAL(sol)[i] = solution[i];
+
+  SET_VECTOR_ELT(out, 0, sol);
+  SET_VECTOR_ELT(out, 1, ScalarReal(result.objective));
+  SET_VECTOR_ELT(out, 2, mkString((status == CRS_NOMAD_OK && result.status == CRS_NOMAD_OK) ? "ok" : "error"));
+  SET_VECTOR_ELT(out, 3, mkString(result.message));
+  SET_VECTOR_ELT(out, 4, ScalarInteger(result.blackbox_evaluations));
+  SET_VECTOR_ELT(out, 5, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 6, ScalarInteger(status));
+  SET_VECTOR_ELT(out, 7, ScalarInteger(result.status));
+  SET_VECTOR_ELT(out, 8, ScalarInteger(result.nomad_run_flag));
+  SET_VECTOR_ELT(out, 9, ScalarInteger(result.callback_evaluations));
+  SET_VECTOR_ELT(out, 10, ScalarInteger(result.cache_hits));
+  SET_VECTOR_ELT(out, 11, ScalarInteger(result.total_evaluations));
+
+  SET_STRING_ELT(names, 0, mkChar("solution"));
+  SET_STRING_ELT(names, 1, mkChar("objective"));
+  SET_STRING_ELT(names, 2, mkChar("status"));
+  SET_STRING_ELT(names, 3, mkChar("message"));
+  SET_STRING_ELT(names, 4, mkChar("bbe"));
+  SET_STRING_ELT(names, 5, mkChar("iterations"));
+  SET_STRING_ELT(names, 6, mkChar("native_status"));
+  SET_STRING_ELT(names, 7, mkChar("result_status"));
+  SET_STRING_ELT(names, 8, mkChar("nomad_run_flag"));
+  SET_STRING_ELT(names, 9, mkChar("callback_evaluations"));
+  SET_STRING_ELT(names, 10, mkChar("cache_hits"));
+  SET_STRING_ELT(names, 11, mkChar("total_evaluations"));
+  setAttrib(out, R_NamesSymbol, names);
+
+  R_Free(solution);
+  if (native_options != NULL)
+    R_Free(native_options);
+
+  UNPROTECT(nprotect);
+  return out;
+}
+
 /* Some externals for numerical routines */
 /* Some externals for numerical routines */
 

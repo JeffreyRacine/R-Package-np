@@ -1865,6 +1865,7 @@ npscoefbw.scbandwidth <-
         strategy = "single_iteration",
         remin = isTRUE(opt.args$powell.remin)
       )
+      hot.opt.args$bwsolver <- NULL
       powell.start <- proc.time()[3L]
       hot.payload <- .np_nomad_with_powell_progress(
         degree = degree,
@@ -1913,6 +1914,7 @@ npscoefbw.scbandwidth <-
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
     remin = isTRUE(opt.args$nomad.remin),
+    native.r.bridge = identical(template$type, "fixed"),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
@@ -2027,6 +2029,12 @@ npscoefbw.scbandwidth <-
     restart.results = search_result$restart.results,
     trace = search_result$trace
   )
+
+  if (isTRUE(search_result$native) &&
+      isTRUE(getOption("np.developer.native.nomad.diagnostics", FALSE)) &&
+      !is.null(search_result$native.diagnostics)) {
+    attr(bws, "native.nomad.diagnostics") <- search_result$native.diagnostics
+  }
 
   if (!is.null(search_result$nomad.time))
     bws$nomad.time <- as.numeric(search_result$nomad.time[1L])
