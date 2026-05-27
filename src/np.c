@@ -7468,6 +7468,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
                                       SEXP upper,
                                       SEXP max_eval,
                                       SEXP random_seed,
+                                      SEXP inner_start_count,
                                       SEXP option_names,
                                       SEXP option_values,
                                       SEXP penalty_mode,
@@ -7482,14 +7483,14 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP call = R_NilValue;
-  crs_nomad_native_solve_fn_v1 solve;
-  crs_nomad_native_problem_v1 problem;
-  crs_nomad_native_result_v1 result;
+  crs_nomad_native_solve_fn_v2 solve;
+  crs_nomad_native_problem_v2 problem;
+  crs_nomad_native_result_v2 result;
   crs_nomad_native_option_v1 *native_options = NULL;
   np_udens_native_search_context context;
   double *solution = NULL;
   double *best_point = NULL;
-  int n, i, status, budget, seed, n_options;
+  int n, i, status, budget, seed, inner_count, n_options;
 
   PROTECT(myuno_r = coerceVector(myuno, REALSXP));
   PROTECT(myord_r = coerceVector(myord, REALSXP));
@@ -7520,7 +7521,8 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
-  if (budget < 0 || seed < 0) {
+  inner_count = asInteger(inner_start_count);
+  if (budget < 0 || seed < 0 || inner_count < 0) {
     UNPROTECT(14);
     error("native npudens NOMAD search received invalid budget or seed");
   }
@@ -7538,11 +7540,11 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   Rf_eval(call, R_GlobalEnv);
   UNPROTECT(1);
 
-  solve = (crs_nomad_native_solve_fn_v1)
-    R_GetCCallable("crs", "crs_nomad_native_solve_v1");
+  solve = (crs_nomad_native_solve_fn_v2)
+    R_GetCCallable("crs", "crs_nomad_native_solve_v2");
   if (solve == NULL) {
     UNPROTECT(14);
-    error("failed to resolve crs native NOMAD callable");
+    error("failed to resolve crs native NOMAD v2 callable");
   }
 
   solution = R_Calloc(n, double);
@@ -7593,7 +7595,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   context.ckerub = REAL(ckerub_r);
   context.best_point = best_point;
 
-  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION;
+  problem.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
   problem.struct_size = sizeof(problem);
   problem.n = n;
   problem.m = 1;
@@ -7606,8 +7608,10 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   problem.quiet = 1;
   problem.option_count = n_options;
   problem.options = native_options;
+  problem.start_count = inner_count;
+  problem.starts = NULL;
 
-  result.api_version = CRS_NOMAD_NATIVE_API_VERSION;
+  result.api_version = CRS_NOMAD_NATIVE_API_VERSION_V2;
   result.struct_size = sizeof(result);
   result.solution = solution;
   result.solution_len = n;
