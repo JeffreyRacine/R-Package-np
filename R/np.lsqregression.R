@@ -623,6 +623,7 @@ nplsqregbw <-
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
     remin = isTRUE(opt.args$nomad.remin),
     nomad.opts = nomad.opts,
+    native.r.bridge = TRUE,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
