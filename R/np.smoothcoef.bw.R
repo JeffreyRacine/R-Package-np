@@ -1914,7 +1914,7 @@ npscoefbw.scbandwidth <-
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
     remin = isTRUE(opt.args$nomad.remin),
-    native.r.bridge = identical(template$type, "fixed"),
+    native.r.bridge = TRUE,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
