@@ -1133,7 +1133,7 @@ npRmpiNomadShadowClearRegression <- function() {
 }
 
 .npregbw_nomad_shadow_template <- function(template) {
-  template[c("bw", "icon", "iuno", "iord", "scaling")]
+  template[c("bw", "icon", "iuno", "iord", "scaling", "method", "type", "regtype")]
 }
 
 .npregbw_nomad_native_target <- function(template, bwsolver) {
@@ -1160,6 +1160,34 @@ npRmpiNomadShadowClearRegression <- function() {
     method %in% c("cv.ls", "cv.aic") &&
     regtype %in% c("lc", "ll", "lp") &&
     bwsolver %in% c("mads", "mads+powell")
+}
+
+.npregbw_nomad_degree_native_target <- function(template, degree.search) {
+  method <- if (!is.null(template$method) && length(template$method)) {
+    as.character(template$method[1L])
+  } else {
+    "cv.ls"
+  }
+  bwtype <- if (!is.null(template$type) && length(template$type)) {
+    as.character(template$type[1L])
+  } else {
+    ""
+  }
+  regtype <- if (!is.null(template$regtype) && length(template$regtype)) {
+    as.character(template$regtype[1L])
+  } else {
+    ""
+  }
+  engine <- if (!is.null(degree.search$engine) && length(degree.search$engine)) {
+    as.character(degree.search$engine[1L])
+  } else {
+    ""
+  }
+
+  bwtype %in% c("fixed", "generalized_nn", "adaptive_nn") &&
+    method %in% c("cv.ls", "cv.aic") &&
+    identical(regtype, "lp") &&
+    engine %in% c("nomad", "nomad+powell")
 }
 
 .npregbw_nomad_native_require_crs <- function() {
@@ -2148,7 +2176,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
                                               nomad.nmulti = 1L,
                                               nomad.inner.nmulti = 0L,
                                               random.seed = 42L,
-                                              remin = FALSE) {
+                                              remin = FALSE,
+                                              nomad.opts = list()) {
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   old.messages <- getOption("np.messages")
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -2224,6 +2253,233 @@ npRmpiNomadShadowSearchRegression <- function(template,
     "nomad"
   } else {
     degree.search$engine
+  }
+
+  if (.npregbw_nomad_degree_native_target(template, degree.search)) {
+    .npregbw_nomad_native_require_crs()
+    native.nmulti <- npValidateNmulti(nomad.nmulti)
+    native.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
+    if (!identical(as.integer(native.inner.nmulti[1L]), 0L))
+      stop("native npreg NOMAD degree-search route does not support inner NOMAD multistart without crs native ABI support", call. = FALSE)
+
+    native.nomad.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
+    native.option.vectors <- .npregbw_nomad_native_option_vectors(native.nomad.opts)
+    native.start.matrix <- .np_nomad_build_starts(
+      x0 = x0,
+      bbin = bbin,
+      lb = lb,
+      ub = ub,
+      nmulti = native.nmulti,
+      random.seed = random.seed,
+      degree_spec = list(
+        initial = degree.search$start.degree,
+        lower = degree.search$lower,
+        upper = degree.search$upper,
+        basis = degree.search$basis,
+        nobs = degree.search$nobs,
+        user_supplied = degree.search$start.user
+      )
+    )
+
+    nbw <- ncon + ncat
+    ndeg <- length(degree.search$start.degree)
+    degree.idx <- nbw + seq_len(ndeg)
+    native.decode.scale <- .npregbw_nomad_native_decode_scale(template, setup)
+    native.point.upper <- as.double(ub[seq_len(nbw)])
+    native.results <- vector("list", nrow(native.start.matrix))
+    native.best.index <- NA_integer_
+    native.best.objective <- Inf
+    native.nomad.elapsed <- 0
+    native.num.feval.total <- 0
+    native.num.feval.fast.total <- 0
+    native.callback.total <- 0L
+    native.baseline.record <- NULL
+
+    run_native_restart <- function(start, restart.index, remin = FALSE) {
+      native.start <- proc.time()[3L]
+      native <- npRmpiNomadShadowNativeSearchRegression(
+        x0 = as.numeric(start),
+        bbin = as.integer(bbin),
+        lb = as.double(lb),
+        ub = as.double(ub),
+        decode.scale = as.double(native.decode.scale),
+        point.upper = as.double(native.point.upper),
+        max.eval = 0L,
+        random.seed = as.integer(random.seed),
+        option.names = native.option.vectors$names,
+        option.values = native.option.vectors$values
+      )
+      native.elapsed <- proc.time()[3L] - native.start
+      if (!identical(as.integer(native$status[1L]), 0L) ||
+          !identical(as.integer(native$result_status[1L]), 0L)) {
+        stop(sprintf(
+          "native npreg NOMAD degree-search route failed (status=%s, result_status=%s): %s",
+          as.integer(native$status[1L]),
+          as.integer(native$result_status[1L]),
+          as.character(native$message[1L])
+        ), call. = FALSE)
+      }
+      if (is.null(native$best_point) || any(!is.finite(native$best_point)))
+        stop("native npreg NOMAD degree-search route did not return a finite best point", call. = FALSE)
+
+      native.degree <- if (!is.null(native$best_degree) && length(native$best_degree)) {
+        as.integer(native$best_degree)
+      } else {
+        as.integer(round(native$best_point[degree.idx]))
+      }
+      list(
+        restart = as.integer(restart.index),
+        remin = isTRUE(remin),
+        start = as.numeric(start),
+        degree.start = as.integer(round(start[degree.idx])),
+        elapsed = native.elapsed,
+        status = "ok",
+        message = as.character(native$message[1L]),
+        objective = as.numeric(native$objective[1L]),
+        bbe = as.numeric(native$blackbox_evaluations[1L]),
+        iterations = as.numeric(native$iterations[1L]),
+        solution = as.numeric(native$solution),
+        best_point = as.numeric(native$best_point),
+        best_degree = native.degree,
+        first_degree = if (!is.null(native$first_degree)) as.integer(native$first_degree) else integer(0L),
+        first_objective = as.numeric(native$first_objective[1L]),
+        native = native
+      )
+    }
+
+    for (i in seq_len(nrow(native.start.matrix))) {
+      native.i <- run_native_restart(
+        start = as.numeric(native.start.matrix[i, ]),
+        restart.index = i
+      )
+      native.results[[i]] <- native.i
+      native.nomad.elapsed <- native.nomad.elapsed + as.numeric(native.i$elapsed[1L])
+      native.num.feval.total <- native.num.feval.total + as.numeric(native.i$native$total_num.feval[1L])
+      native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$native$total_num.feval.fast[1L])
+      native.callback.total <- native.callback.total + as.integer(native.i$native$compiled_callback_calls[1L])
+      if (is.null(native.baseline.record) && length(native.i$first_degree)) {
+        native.baseline.record <- list(
+          eval_id = 1L,
+          degree = as.integer(native.i$first_degree),
+          objective = as.numeric(native.i$first_objective[1L]),
+          status = "ok",
+          cached = FALSE,
+          message = native.i$message,
+          elapsed = native.i$elapsed,
+          num.feval = NA_real_
+        )
+      }
+      if (is.finite(native.i$objective) &&
+          .np_degree_better(native.i$objective, native.best.objective, direction = "min")) {
+        native.best.objective <- native.i$objective
+        native.best.index <- i
+      }
+    }
+
+    if (!is.finite(native.best.index))
+      stop("native npreg NOMAD degree-search route did not return a finite solution", call. = FALSE)
+
+    if (isTRUE(remin)) {
+      remin.index <- length(native.results) + 1L
+      native.remin <- run_native_restart(
+        start = as.numeric(native.results[[native.best.index]]$best_point),
+        restart.index = remin.index,
+        remin = TRUE
+      )
+      native.results[[remin.index]] <- native.remin
+      native.nomad.elapsed <- native.nomad.elapsed + as.numeric(native.remin$elapsed[1L])
+      native.num.feval.total <- native.num.feval.total + as.numeric(native.remin$native$total_num.feval[1L])
+      native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.remin$native$total_num.feval.fast[1L])
+      native.callback.total <- native.callback.total + as.integer(native.remin$native$compiled_callback_calls[1L])
+      if (is.finite(native.remin$objective) &&
+          .np_degree_better(native.remin$objective, native.best.objective, direction = "min")) {
+        native.best.objective <- native.remin$objective
+        native.best.index <- remin.index
+      }
+    }
+
+    native.best <- native.results[[native.best.index]]
+    native.record <- list(
+      eval_id = as.integer(native.best$native$compiled_callback_calls[1L]),
+      degree = as.integer(native.best$best_degree),
+      objective = as.numeric(native.best$objective[1L]),
+      status = "ok",
+      cached = FALSE,
+      message = native.best$message,
+      elapsed = native.best$elapsed,
+      num.feval = as.numeric(native.best$native$best_num.feval[1L]),
+      num.feval.fast = as.numeric(native.best$native$best_num.feval.fast[1L])
+    )
+    if (is.null(native.baseline.record))
+      native.baseline.record <- native.record
+
+    search.result <- list(
+      method = degree.search$engine,
+      direction = "min",
+      verify = FALSE,
+      completed = TRUE,
+      certified = FALSE,
+      interrupted = FALSE,
+      baseline = native.baseline.record,
+      best = native.record,
+      best_payload = NULL,
+      best_point = as.numeric(native.best$best_point),
+      n.unique = as.integer(native.callback.total),
+      n.visits = as.integer(native.callback.total),
+      n.cached = 0L,
+      nomad.time = native.nomad.elapsed,
+      powell.time = NA_real_,
+      optim.time = native.nomad.elapsed,
+      grid.size = NA_integer_,
+      best.restart = native.best.index,
+      nomad.remin = isTRUE(remin),
+      nomad.remin.index = if (any(vapply(native.results, function(x) isTRUE(x$remin), logical(1)))) {
+        which(vapply(native.results, function(x) isTRUE(x$remin), logical(1)))[1L]
+      } else {
+        NA_integer_
+      },
+      nomad.remin.roundtrip = NULL,
+      restart.starts = lapply(seq_len(nrow(native.start.matrix)), function(i) as.numeric(native.start.matrix[i, ])),
+      restart.degree.starts = lapply(seq_len(nrow(native.start.matrix)), function(i) as.integer(native.start.matrix[i, degree.idx])),
+      restart.bandwidth.starts = lapply(seq_len(nrow(native.start.matrix)), function(i) as.numeric(native.start.matrix[i, seq_len(nbw)])),
+      restart.start.info = list(
+        basis = if (is.null(degree.search$basis)) "glp" else degree.search$basis,
+        dim_budget = .np_lp_nomad_dim_budget(degree.search$nobs),
+        proposal.upper = .np_lp_nomad_proposal_upper(
+          lower = degree.search$lower,
+          upper = degree.search$upper
+        ),
+        user_supplied_start = isTRUE(degree.search$start.user)
+      ),
+      restart.results = native.results,
+      trace = data.frame(
+        trace_id = seq_along(native.results),
+        eval_id = vapply(native.results, function(x) as.integer(x$native$compiled_callback_calls[1L]), integer(1L)),
+        degree = vapply(native.results, function(x) paste(as.integer(x$best_degree), collapse = ","), character(1L)),
+        fval = vapply(native.results, function(x) as.numeric(x$objective[1L]), numeric(1L)),
+        status = vapply(native.results, `[[`, character(1L), "status"),
+        cached = rep(FALSE, length(native.results)),
+        message = vapply(native.results, function(x) if (is.null(x$message)) "" else as.character(x$message[1L]), character(1L)),
+        elapsed = vapply(native.results, function(x) as.numeric(x$elapsed[1L]), numeric(1L)),
+        num.feval = vapply(native.results, function(x) as.numeric(x$native$best_num.feval[1L]), numeric(1L)),
+        stringsAsFactors = FALSE
+      ),
+      native.diagnostics = list(
+        raw.point = as.numeric(native.best$best_point),
+        degree = as.integer(native.best$best_degree),
+        objective = as.numeric(native.best$objective[1L]),
+        official.solution = as.numeric(native.best$solution),
+        official.objective = as.numeric(native.best$native$official_objective[1L]),
+        compiled.callback.count = as.integer(native.best$native$compiled_callback_calls[1L]),
+        compiled.callback.failures = as.integer(native.best$native$compiled_callback_failures[1L]),
+        crs.callback.evaluations = as.integer(native.best$native$crs_callback_evaluations[1L]),
+        blackbox.evaluations = as.integer(native.best$native$blackbox_evaluations[1L]),
+        iterations = as.integer(native.best$native$iterations[1L])
+      )
+    )
+    search.result$num.feval.total <- as.numeric(native.num.feval.total)
+    search.result$num.feval.fast.total <- as.numeric(native.num.feval.fast.total)
+    return(search.result)
   }
 
   search.result <- .np_nomad_search(
@@ -2417,25 +2673,27 @@ npRmpiNomadShadowSearchRegression <- function(template,
         LB,
         UB,
         NOMADNMULTI,
-        INNERNMULTI,
-        RSEED,
-        REMIN
-      ),
-      list(
-        TEMPLATE = shadow.template,
-        SETUP = setup,
+          INNERNMULTI,
+          RSEED,
+          REMIN,
+          NOMADOPTS
+        ),
+        list(
+          TEMPLATE = shadow.template,
+          SETUP = setup,
         PREP = prep,
         DEGREESEARCH = degree.search,
         X0 = x0,
         BBIN = bbin,
         LB = lb,
         UB = ub,
-        NOMADNMULTI = nomad.nmulti,
-        INNERNMULTI = nomad.inner.nmulti,
-        RSEED = random.seed,
-        REMIN = isTRUE(opt.args$nomad.remin)
+          NOMADNMULTI = nomad.nmulti,
+          INNERNMULTI = nomad.inner.nmulti,
+          RSEED = random.seed,
+          REMIN = isTRUE(opt.args$nomad.remin),
+          NOMADOPTS = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
+        )
       )
-    )
 
     if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
       search.result <- eval(mc, envir = environment())
@@ -2472,6 +2730,13 @@ npRmpiNomadShadowSearchRegression <- function(template,
       }
     } else {
       search.result$best_payload <- payload_result
+    }
+
+    if (isTRUE(getOption("np.developer.native.nomad.diagnostics", FALSE)) &&
+        !is.null(search.result$native.diagnostics) &&
+        !is.null(search.result$best_payload)) {
+      attr(search.result$best_payload, "native.nomad.diagnostics") <-
+        search.result$native.diagnostics
     }
 
     return(.npRmpi_reconcile_nomad_search_timing(search.result))
