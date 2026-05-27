@@ -1153,7 +1153,10 @@ npRmpiNomadShadowClearRegression <- function() {
     "lc"
   }
 
-  identical(bwtype, "fixed") &&
+  (identical(bwtype, "fixed") ||
+     identical(bwtype, "adaptive_nn") ||
+     (identical(bwtype, "generalized_nn") &&
+        !(identical(method, "cv.aic") && identical(regtype, "lp")))) &&
     method %in% c("cv.ls", "cv.aic") &&
     regtype %in% c("lc", "ll", "lp") &&
     bwsolver %in% c("mads", "mads+powell")
@@ -1700,7 +1703,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
           UB = as.double(bounds$upper),
           DECODE = as.double(native.decode.scale),
           PUPPER = as.double(native.point.upper),
-          MAXEVAL = 0L,
+          MAXEVAL = as.integer(opt.value("itmax", 10000L)),
           RSEED = as.integer(random.seed),
           ONAMES = as.character(native.option.vectors$names),
           OVALUES = as.character(native.option.vectors$values)
