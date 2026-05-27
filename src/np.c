@@ -8163,6 +8163,8 @@ static int np_distribution_conditional_nomad_native_eval_once(double *c_uno,
 
 typedef struct {
   int n;
+  int nbw;
+  int ndegree;
   int callback_calls;
   int callback_failures;
   int *bbin;
@@ -8195,7 +8197,10 @@ typedef struct {
   double total_guarded;
   double best_objective;
   double best_eval[5];
+  double first_eval[5];
   double *best_point;
+  int *best_degree;
+  int *first_degree;
 } np_cdist_native_search_context;
 
 static int np_cdist_native_decode_eval_bw(const np_cdist_native_search_context *context,
@@ -8218,7 +8223,7 @@ static int np_cdist_native_decode_eval_bw(const np_cdist_native_search_context *
   ncont = yncon + xncon;
   ncat = yncat + xncat;
   if (yncon < 0 || xncon < 0 || yncat < 0 || xncat < 0 ||
-      ncont + ncat != context->n)
+      ncont + ncat != context->nbw)
     return 1;
 
   scaling = (context->myopti[CDBW_LSFI] == SF_NORMAL);
@@ -8282,6 +8287,7 @@ static int np_cdist_native_search_callback(int n,
   np_cdist_native_search_context *context = (np_cdist_native_search_context *) user_data;
   double *raw_point = NULL;
   double *eval_bw = NULL;
+  int *degree_work = NULL;
   double eval_out[5];
   int j, status;
 
@@ -8289,10 +8295,14 @@ static int np_cdist_native_search_callback(int n,
     return 1;
 
   raw_point = R_Calloc(context->n, double);
-  eval_bw = R_Calloc(context->n, double);
-  if (raw_point == NULL || eval_bw == NULL) {
+  eval_bw = R_Calloc(context->nbw, double);
+  if (context->ndegree > 0)
+    degree_work = R_Calloc(context->ndegree, int);
+  if (raw_point == NULL || eval_bw == NULL ||
+      (context->ndegree > 0 && degree_work == NULL)) {
     if (raw_point != NULL) R_Free(raw_point);
     if (eval_bw != NULL) R_Free(eval_bw);
+    if (degree_work != NULL) R_Free(degree_work);
     return 1;
   }
 
@@ -8309,7 +8319,15 @@ static int np_cdist_native_search_callback(int n,
     context->callback_failures++;
     R_Free(raw_point);
     R_Free(eval_bw);
+    if (degree_work != NULL) R_Free(degree_work);
     return 1;
+  }
+
+  if (context->ndegree > 0) {
+    for (j = 0; j < context->ndegree; j++)
+      degree_work[j] = (int) nearbyint(raw_point[context->nbw + j]);
+  } else {
+    degree_work = context->degree;
   }
 
   status = np_distribution_conditional_nomad_native_eval_once(
@@ -8317,7 +8335,7 @@ static int np_cdist_native_search_callback(int n,
     context->u_uno, context->u_ord, context->u_con,
     context->cg_uno, context->cg_ord, context->cg_con,
     context->mysd, context->myopti, context->myoptd, eval_bw,
-    context->penalty_mode, context->penalty_mult, context->degree,
+    context->penalty_mode, context->penalty_mult, degree_work,
     context->bernstein, context->basis, context->regtype,
     context->cxkerlb, context->cxkerub, context->cykerlb, context->cykerub,
     eval_out);
@@ -8326,6 +8344,7 @@ static int np_cdist_native_search_callback(int n,
     context->callback_failures++;
     R_Free(raw_point);
     R_Free(eval_bw);
+    if (context->ndegree > 0 && degree_work != NULL) R_Free(degree_work);
     return 1;
   }
 
@@ -8333,6 +8352,14 @@ static int np_cdist_native_search_callback(int n,
   context->total_num_feval += eval_out[2];
   context->total_fast += eval_out[3];
   context->total_guarded += eval_out[4];
+  if (context->callback_calls == 1) {
+    for (j = 0; j < 5; j++)
+      context->first_eval[j] = eval_out[j];
+    if (context->first_degree != NULL && context->ndegree > 0) {
+      for (j = 0; j < context->ndegree; j++)
+        context->first_degree[j] = degree_work[j];
+    }
+  }
   if (context->callback_calls == 1 || eval_out[0] < context->best_objective) {
     context->best_objective = eval_out[0];
     for (j = 0; j < 5; j++)
@@ -8341,11 +8368,17 @@ static int np_cdist_native_search_callback(int n,
       for (j = 0; j < context->n; j++)
         context->best_point[j] = raw_point[j];
     }
+    if (context->best_degree != NULL && context->ndegree > 0) {
+      for (j = 0; j < context->ndegree; j++)
+        context->best_degree[j] = degree_work[j];
+    }
   }
 
   bb_outputs[0] = eval_out[0];
   R_Free(raw_point);
   R_Free(eval_bw);
+  if (context->ndegree > 0 && degree_work != NULL)
+    R_Free(degree_work);
   return 0;
 }
 
@@ -8387,14 +8420,16 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   SEXP x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue, upper_r = R_NilValue;
   SEXP option_names_s = R_NilValue, option_values_s = R_NilValue, degree_i = R_NilValue;
   SEXP cxkerlb_r = R_NilValue, cxkerub_r = R_NilValue, cykerlb_r = R_NilValue, cykerub_r = R_NilValue;
-  SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue, call = R_NilValue;
+  SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
+  SEXP best_degree = R_NilValue, first_degree = R_NilValue, call = R_NilValue;
   crs_nomad_native_solve_fn_v1 solve;
   crs_nomad_native_problem_v1 problem;
   crs_nomad_native_result_v1 result;
   crs_nomad_native_option_v1 *native_options = NULL;
   np_cdist_native_search_context context;
   double *solution = NULL, *best_point = NULL;
-  int n, i, status, budget, seed, n_options;
+  int *best_degree_i = NULL, *first_degree_i = NULL;
+  int n, nbw, ndegree, i, status, budget, seed, n_options;
 
   PROTECT(c_uno_r = coerceVector(c_uno, REALSXP));
   PROTECT(c_ord_r = coerceVector(c_ord, REALSXP));
@@ -8429,6 +8464,18 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
     UNPROTECT(23);
     error("native npcdist NOMAD search received incomplete myoptd");
   }
+  nbw = INTEGER(myopti_i)[CDBW_UNCONI] + INTEGER(myopti_i)[CDBW_CNCONI] +
+    INTEGER(myopti_i)[CDBW_CNUNOI] + INTEGER(myopti_i)[CDBW_CNORDI] +
+    INTEGER(myopti_i)[CDBW_UNUNOI] + INTEGER(myopti_i)[CDBW_UNORDI];
+  ndegree = n - nbw;
+  if (nbw <= 0 || ndegree < 0) {
+    UNPROTECT(23);
+    error("native npcdist NOMAD search received inconsistent bandwidth/degree dimensions");
+  }
+  if (ndegree > 0 && XLENGTH(degree_i) != ndegree) {
+    UNPROTECT(23);
+    error("native npcdist NOMAD search received inconsistent degree dimensions");
+  }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
   if (budget < 0 || seed < 0) {
@@ -8457,9 +8504,16 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
 
   solution = R_Calloc(n, double);
   best_point = R_Calloc(n, double);
-  if (solution == NULL || best_point == NULL) {
+  if (ndegree > 0) {
+    best_degree_i = R_Calloc(ndegree, int);
+    first_degree_i = R_Calloc(ndegree, int);
+  }
+  if (solution == NULL || best_point == NULL ||
+      (ndegree > 0 && (best_degree_i == NULL || first_degree_i == NULL))) {
     if (solution != NULL) R_Free(solution);
     if (best_point != NULL) R_Free(best_point);
+    if (best_degree_i != NULL) R_Free(best_degree_i);
+    if (first_degree_i != NULL) R_Free(first_degree_i);
     UNPROTECT(23);
     error("failed to allocate native npcdist NOMAD buffers");
   }
@@ -8468,6 +8522,8 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
+      if (best_degree_i != NULL) R_Free(best_degree_i);
+      if (first_degree_i != NULL) R_Free(first_degree_i);
       UNPROTECT(23);
       error("failed to allocate native npcdist NOMAD option buffers");
     }
@@ -8480,14 +8536,22 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
     solution[i] = R_NaN;
     best_point[i] = R_NaN;
   }
+  for (i = 0; i < ndegree; i++) {
+    best_degree_i[i] = NA_INTEGER;
+    first_degree_i[i] = NA_INTEGER;
+  }
 
   memset(&problem, 0, sizeof(problem));
   memset(&result, 0, sizeof(result));
   memset(&context, 0, sizeof(context));
   for (i = 0; i < 5; i++)
     context.best_eval[i] = R_NaN;
+  for (i = 0; i < 5; i++)
+    context.first_eval[i] = R_NaN;
 
   context.n = n;
+  context.nbw = nbw;
+  context.ndegree = ndegree;
   context.bbin = INTEGER(bbin_i);
   context.lower = REAL(lower_r);
   context.upper = REAL(upper_r);
@@ -8514,6 +8578,8 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   context.cykerlb = REAL(cykerlb_r);
   context.cykerub = REAL(cykerub_r);
   context.best_point = best_point;
+  context.best_degree = best_degree_i;
+  context.first_degree = first_degree_i;
 
   problem.api_version = CRS_NOMAD_NATIVE_API_VERSION;
   problem.struct_size = sizeof(problem);
@@ -8536,13 +8602,19 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
 
   status = solve(&problem, np_cdist_native_search_callback, &context, &result);
 
-  PROTECT(out = allocVector(VECSXP, 20));
-  PROTECT(names = allocVector(STRSXP, 20));
+  PROTECT(out = allocVector(VECSXP, 23));
+  PROTECT(names = allocVector(STRSXP, 23));
   PROTECT(sol = allocVector(REALSXP, n));
   PROTECT(best = allocVector(REALSXP, n));
+  PROTECT(best_degree = allocVector(INTSXP, ndegree));
+  PROTECT(first_degree = allocVector(INTSXP, ndegree));
   for (i = 0; i < n; i++) {
     REAL(sol)[i] = solution[i];
     REAL(best)[i] = best_point[i];
+  }
+  for (i = 0; i < ndegree; i++) {
+    INTEGER(best_degree)[i] = best_degree_i[i];
+    INTEGER(first_degree)[i] = first_degree_i[i];
   }
 
   SET_VECTOR_ELT(out, 0, ScalarInteger(status));
@@ -8565,6 +8637,9 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   SET_VECTOR_ELT(out, 17, ScalarInteger(result.blackbox_evaluations));
   SET_VECTOR_ELT(out, 18, ScalarInteger(result.iterations));
   SET_VECTOR_ELT(out, 19, mkString(result.message));
+  SET_VECTOR_ELT(out, 20, best_degree);
+  SET_VECTOR_ELT(out, 21, first_degree);
+  SET_VECTOR_ELT(out, 22, ScalarReal(context.first_eval[0]));
 
   SET_STRING_ELT(names, 0, mkChar("status"));
   SET_STRING_ELT(names, 1, mkChar("result_status"));
@@ -8586,14 +8661,21 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   SET_STRING_ELT(names, 17, mkChar("blackbox_evaluations"));
   SET_STRING_ELT(names, 18, mkChar("iterations"));
   SET_STRING_ELT(names, 19, mkChar("message"));
+  SET_STRING_ELT(names, 20, mkChar("best_degree"));
+  SET_STRING_ELT(names, 21, mkChar("first_degree"));
+  SET_STRING_ELT(names, 22, mkChar("first_objective"));
   setAttrib(out, R_NamesSymbol, names);
 
   R_Free(solution);
   R_Free(best_point);
+  if (best_degree_i != NULL)
+    R_Free(best_degree_i);
+  if (first_degree_i != NULL)
+    R_Free(first_degree_i);
   if (native_options != NULL)
     R_Free(native_options);
 
-  UNPROTECT(27);
+  UNPROTECT(29);
   return out;
 }
 
