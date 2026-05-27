@@ -1652,6 +1652,112 @@
   list(progress_state = progress_state, seen = c(seen, lines))
 }
 
+.np_nomad_native_call_value <- function(native.call, seen = character()) {
+  progress_state <- .np_progress_runtime$bandwidth_state
+  if (!length(seen) && !is.null(progress_state$external_output_seen)) {
+    seen <- progress_state$external_output_seen
+  }
+  emitted <- .np_nomad_emit_external_output(
+    lines = native.call$output,
+    progress_state = progress_state,
+    seen = seen
+  )
+  if (!is.null(emitted$progress_state)) {
+    emitted$progress_state$external_output_seen <- emitted$seen
+  }
+  .np_progress_runtime$bandwidth_state <- emitted$progress_state
+  native.call$value
+}
+
+.np_nomad_native_progress_begin <- function(nmulti,
+                                            baseline_degree,
+                                            best_record) {
+  handle <- new.env(parent = emptyenv())
+  handle$old_state <- .np_progress_runtime$bandwidth_state
+  handle$closed <- FALSE
+  handle$state <- .np_nomad_progress_begin(
+    nmulti = nmulti,
+    baseline_degree = baseline_degree,
+    best_record = best_record
+  )
+  .np_progress_runtime$bandwidth_state <- handle$state
+  handle
+}
+
+.np_nomad_native_progress_state <- function(handle) {
+  if (is.null(handle) || isTRUE(handle$closed)) {
+    return(NULL)
+  }
+
+  state <- .np_progress_runtime$bandwidth_state
+  if (is.null(state)) {
+    state <- handle$state
+  }
+  state
+}
+
+.np_nomad_native_progress_restart <- function(handle,
+                                              restart_index,
+                                              degree,
+                                              best_record,
+                                              restart_durations = numeric()) {
+  state <- .np_nomad_native_progress_state(handle)
+  if (is.null(state)) {
+    return(invisible(NULL))
+  }
+
+  state$nomad_current_degree <- as.integer(degree)
+  state$nomad_best_record <- best_record
+  state$nomad_restart_index <- as.integer(restart_index)
+  state$nomad_restart_durations <- restart_durations
+  state <- .np_degree_progress_step(
+    state = state,
+    done = NULL,
+    detail = NULL,
+    force = TRUE
+  )
+  handle$state <- state
+  .np_progress_runtime$bandwidth_state <- state
+  invisible(NULL)
+}
+
+.np_nomad_native_progress_end <- function(handle,
+                                          degree,
+                                          best_record,
+                                          interrupted = FALSE) {
+  if (is.null(handle) || isTRUE(handle$closed)) {
+    return(invisible(NULL))
+  }
+
+  state <- .np_nomad_native_progress_state(handle)
+  if (!is.null(state)) {
+    state$nomad_current_degree <- as.integer(degree)
+    state$nomad_best_record <- best_record
+    state <- .np_degree_progress_end(
+      state = state,
+      detail = NULL,
+      interrupted = isTRUE(interrupted)
+    )
+  }
+  .np_progress_runtime$bandwidth_state <- handle$old_state
+  handle$closed <- TRUE
+  invisible(NULL)
+}
+
+.np_nomad_native_progress_abort <- function(handle, detail = NULL) {
+  if (is.null(handle) || isTRUE(handle$closed)) {
+    return(invisible(NULL))
+  }
+
+  state <- .np_nomad_native_progress_state(handle)
+  if (!is.null(state)) {
+    .np_progress_abort(state = state, detail = detail)
+  }
+  .np_progress_runtime$bandwidth_state <- handle$old_state
+  handle$closed <- TRUE
+  invisible(NULL)
+}
+
 .np_nomad_search <- function(engine = c("nomad", "nomad+powell"),
                              baseline_record,
                              start_degree = NULL,

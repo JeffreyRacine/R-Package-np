@@ -1113,7 +1113,7 @@ npRmpiNomadShadowNativeSearchRegression <- function(x0,
                                                     inner.start.count = 0L,
                                                     option.names = character(),
                                                     option.values = character()) {
-  .Call(
+  native.call <- .np_nomad_capture_snomadr(.Call(
     "C_np_regression_nomad_shadow_native_search",
     as.double(x0),
     as.integer(bbin),
@@ -1127,7 +1127,8 @@ npRmpiNomadShadowNativeSearchRegression <- function(x0,
     as.character(option.names),
     as.character(option.values),
     PACKAGE = "npRmpi"
-  )
+  ), capture.output = TRUE)
+  .np_nomad_native_call_value(native.call)
 }
 
 npRmpiNomadShadowClearRegression <- function() {
@@ -2306,8 +2307,21 @@ npRmpiNomadShadowSearchRegression <- function(template,
     native.num.feval.fast.total <- 0
     native.callback.total <- 0L
     native.baseline.record <- NULL
+    native.progress <- .np_nomad_native_progress_begin(
+      nmulti = native.nmulti,
+      baseline_degree = degree.search$start.degree,
+      best_record = native.baseline.record
+    )
+    on.exit(.np_nomad_native_progress_abort(native.progress), add = TRUE)
 
     run_native_restart <- function(start, restart.index, remin = FALSE) {
+      native.restart.degree <- as.integer(round(start[degree.idx]))
+      .np_nomad_native_progress_restart(
+        handle = native.progress,
+        restart_index = restart.index,
+        degree = native.restart.degree,
+        best_record = native.baseline.record
+      )
       native.start <- proc.time()[3L]
       native <- npRmpiNomadShadowNativeSearchRegression(
         x0 = as.numeric(start),
@@ -2344,7 +2358,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
         restart = as.integer(restart.index),
         remin = isTRUE(remin),
         start = as.numeric(start),
-        degree.start = as.integer(round(start[degree.idx])),
+        degree.start = native.restart.degree,
         elapsed = native.elapsed,
         status = "ok",
         message = as.character(native$message[1L]),
@@ -2425,6 +2439,12 @@ npRmpiNomadShadowSearchRegression <- function(template,
     )
     if (is.null(native.baseline.record))
       native.baseline.record <- native.record
+
+    .np_nomad_native_progress_end(
+      handle = native.progress,
+      degree = native.record$degree,
+      best_record = native.record
+    )
 
     search.result <- list(
       method = degree.search$engine,

@@ -1414,7 +1414,7 @@ npRmpiNomadShadowNativeSearchConditionalDensity <- function(x0,
                                                             option.names,
                                                             option.values,
                                                             flat.decode.scale = rep.int(1, length(flat.from.point))) {
-  .Call(
+  native.call <- .np_nomad_capture_snomadr(.Call(
     "C_np_density_conditional_nomad_shadow_native_search",
     x0,
     as.integer(bbin),
@@ -1429,7 +1429,8 @@ npRmpiNomadShadowNativeSearchConditionalDensity <- function(x0,
     as.character(option.names),
     as.character(option.values),
     PACKAGE = "npRmpi"
-  )
+  ), capture.output = TRUE)
+  .np_nomad_native_call_value(native.call)
 }
 
 npRmpiNomadShadowFixedNativeSearchConditionalDensity <- function(x0,
@@ -1444,7 +1445,7 @@ npRmpiNomadShadowFixedNativeSearchConditionalDensity <- function(x0,
                                                                  option.names,
                                                                  option.values,
                                                                  flat.decode.scale = rep.int(1, length(flat.from.point))) {
-  .Call(
+  native.call <- .np_nomad_capture_snomadr(.Call(
     "C_np_density_conditional_nomad_shadow_fixed_native_search",
     x0,
     as.integer(bbin),
@@ -1459,7 +1460,8 @@ npRmpiNomadShadowFixedNativeSearchConditionalDensity <- function(x0,
     as.character(option.names),
     as.character(option.values),
     PACKAGE = "npRmpi"
-  )
+  ), capture.output = TRUE)
+  .np_nomad_native_call_value(native.call)
 }
 
 npRmpiNomadShadowClearConditionalDensity <- function() {
@@ -1952,8 +1954,25 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     native.best.index <- NA_integer_
     native.best.objective <- -Inf
     native.nomad.elapsed <- 0
+    native.progress <- .np_nomad_native_progress_begin(
+      nmulti = native.nmulti,
+      baseline_degree = degree.search$start.degree,
+      best_record = NULL
+    )
+    on.exit(.np_nomad_native_progress_abort(native.progress), add = TRUE)
 
     run_native_restart <- function(start, restart.index) {
+      native.restart.degree <- if (ndeg > 0L) {
+        as.integer(round(start[bwdim + seq_len(ndeg)]))
+      } else {
+        integer(0L)
+      }
+      .np_nomad_native_progress_restart(
+        handle = native.progress,
+        restart_index = restart.index,
+        degree = native.restart.degree,
+        best_record = NULL
+      )
       native.start <- proc.time()[3L]
       native <- npRmpiNomadShadowNativeSearchConditionalDensity(
         x0 = as.numeric(start),
@@ -1984,11 +2003,6 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
 
       native.degree <- as.integer(native$best_degree)
       native.objective <- as.numeric(native$objective[1L])
-      native.restart.degree <- if (ndeg > 0L) {
-        as.integer(round(start[bwdim + seq_len(ndeg)]))
-      } else {
-        integer(0L)
-      }
       list(
         restart = as.integer(restart.index),
         start = as.numeric(start),
@@ -2060,6 +2074,11 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       num.feval = as.numeric(native$best_num.feval[1L]),
       num.feval.fast = as.numeric(native$best_num.feval.fast[1L]),
       num.feval.guarded = as.numeric(native$best_num.feval.guarded[1L])
+    )
+    .np_nomad_native_progress_end(
+      handle = native.progress,
+      degree = native.record$degree,
+      best_record = native.record
     )
     search.result <- list(
       best = native.record,
@@ -3047,6 +3066,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       surface = "bandwidth"
     )
     active.state$unknown_total_fields <- .npcdensbw_powell_progress_fields
+    active.state$nomad_nmulti <- 1L
     active.state$nomad_current_degree <- as.integer(degree)
     active.state <- .np_progress_show_now(active.state)
     .np_progress_runtime$bandwidth_state <- active.state
