@@ -1262,7 +1262,7 @@ npNomadShadowNativeSearchConditionalDensity <- function(x0,
                                                             option.names,
                                                             option.values,
                                                             flat.decode.scale = rep.int(1, length(flat.from.point))) {
-  native.call <- .np_nomad_capture_snomadr(.Call(
+  native.call <- .np_nomad_capture_solver_output(.Call(
     "C_np_density_conditional_nomad_shadow_native_search",
     x0,
     as.integer(bbin),
@@ -1293,7 +1293,7 @@ npNomadShadowFixedNativeSearchConditionalDensity <- function(x0,
                                                                  option.names,
                                                                  option.values,
                                                                  flat.decode.scale = rep.int(1, length(flat.from.point))) {
-  native.call <- .np_nomad_capture_snomadr(.Call(
+  native.call <- .np_nomad_capture_solver_output(.Call(
     "C_np_density_conditional_nomad_shadow_fixed_native_search",
     x0,
     as.integer(bbin),
