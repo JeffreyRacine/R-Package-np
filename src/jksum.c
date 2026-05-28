@@ -7005,6 +7005,9 @@ const NP_GateOverrideCtx * const gate_override_ctx){
 
     /* do sums */
   for(j=js; j <= je; j++, ws = (ws==NULL ? NULL : ws+ws_step), p_ws=(p_ws == NULL ? NULL : p_ws+ws_step)){
+    if(((j - js) & 31) == 0)
+      np_progress_bandwidth_loop_step();
+
     np_hot_loop_check_interrupt(j - js, interrupt_total, interrupt_stride);
 
     dband = 1.0;
@@ -10232,6 +10235,9 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
       goto cleanup_lp_cv;
   } else {
   for(j = 0; j < num_obs - 1; j++){
+    if((j & 31) == 0)
+      np_progress_bandwidth_loop_step();
+
     const int eval_idx = use_tree ? ipt_lookup_extern_X[j] : j;
     const double yj = vector_Y[eval_idx];
     const int nsub = num_obs - j - 1;
@@ -10419,6 +10425,9 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
   result.traceH = 0.0;
 
   for(j = 0; j < num_obs; j++){
+    if((j & 31) == 0)
+      np_progress_bandwidth_loop_step();
+
     const int eval_idx = use_tree ? ipt_lookup_extern_X[j] : j;
     const double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
     const double * const tj = rhs + (size_t)j*(size_t)nterms;
@@ -11790,6 +11799,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
 
     for(j = 0; j < num_obs; j++){ // main loop
+      if((j & 31) == 0)
+        np_progress_bandwidth_loop_step();
+
       nepsilon = 0.0;
 
       for(l = 0; l < (nrc1); l++){

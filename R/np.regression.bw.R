@@ -1671,23 +1671,35 @@ npregbw.rbandwidth <-
 
 .npregbw_with_powell_refinement_progress <- function(degree, expr) {
   old.state <- .np_progress_runtime$bandwidth_state
-  active.state <- .np_progress_begin(
-    label = .np_nomad_powell_progress_label(),
-    domain = "general",
-    surface = "bandwidth"
-  )
+  reuse.active <- !is.null(old.state) &&
+    isTRUE(old.state$enabled) &&
+    isTRUE(old.state$visible)
+  active.state <- if (isTRUE(reuse.active)) {
+    old.state
+  } else {
+    .np_progress_begin(
+      label = .np_nomad_powell_progress_label(),
+      domain = "general",
+      surface = "bandwidth"
+    )
+  }
 
   on.exit({
-    current.state <- .np_progress_runtime$bandwidth_state
-    if (!is.null(current.state)) {
-      .np_progress_end(current.state)
+    if (!isTRUE(reuse.active)) {
+      current.state <- .np_progress_runtime$bandwidth_state
+      if (!is.null(current.state)) {
+        .np_progress_end(current.state)
+      }
     }
     .np_progress_runtime$bandwidth_state <- old.state
   }, add = TRUE)
 
+  active.state$label <- .np_nomad_powell_progress_label()
   active.state$unknown_total_fields <- .npregbw_powell_progress_fields
   active.state$nomad_nmulti <- 1L
   active.state$nomad_current_degree <- as.integer(degree)
+  active.state$started <- .np_progress_now()
+  active.state$last_done <- NULL
   active.state <- .np_progress_show_now(active.state)
   .np_progress_runtime$bandwidth_state <- active.state
 
