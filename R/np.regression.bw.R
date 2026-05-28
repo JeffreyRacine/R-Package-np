@@ -1424,6 +1424,9 @@ npregbw.rbandwidth <-
         compiled.callback.failures = as.integer(native.best$native$compiled_callback_failures[1L]),
         crs.callback.evaluations = as.integer(native.best$native$crs_callback_evaluations[1L]),
         blackbox.evaluations = as.integer(native.best$native$blackbox_evaluations[1L]),
+        cache.hits = as.integer(native.best$native$cache_hits[1L]),
+        cache.size = as.integer(native.best$native$cache_size[1L]),
+        total.evaluations = as.integer(native.best$native$total_evaluations[1L]),
         iterations = as.integer(native.best$native$iterations[1L])
       )
     )
@@ -2311,6 +2314,9 @@ npregbw.rbandwidth <-
         compiled.callback.failures = as.integer(native.best$native$compiled_callback_failures[1L]),
         crs.callback.evaluations = as.integer(native.best$native$crs_callback_evaluations[1L]),
         blackbox.evaluations = as.integer(native.best$native$blackbox_evaluations[1L]),
+        cache.hits = as.integer(native.best$native$cache_hits[1L]),
+        cache.size = as.integer(native.best$native$cache_size[1L]),
+        total.evaluations = as.integer(native.best$native$total_evaluations[1L]),
         iterations = as.integer(native.best$native$iterations[1L])
       )
     )

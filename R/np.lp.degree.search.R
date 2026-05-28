@@ -1282,6 +1282,20 @@
   list(names = as.character(option.names), values = option.values)
 }
 
+.np_native_nomad_field <- function(x, name, default = NA) {
+  if (!is.list(x) || is.null(names(x)) || !(name %in% names(x)))
+    return(default)
+  x[[name, exact = TRUE]]
+}
+
+.np_native_nomad_cache_diagnostics <- function(native) {
+  list(
+    cache.hits = as.integer(.np_native_nomad_field(native, "cache_hits", NA_integer_)[1L]),
+    cache.size = as.integer(.np_native_nomad_field(native, "cache_size", NA_integer_)[1L]),
+    total.evaluations = as.integer(.np_native_nomad_field(native, "total_evaluations", NA_integer_)[1L])
+  )
+}
+
 .np_nomad_native_r_callback_search <- function(eval.f,
                                                x0,
                                                bbin,
@@ -2401,11 +2415,13 @@
     trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name),
     native = isTRUE(state$native.r.bridge),
     native.diagnostics = if (isTRUE(state$native.r.bridge)) {
-      list(
+      c(list(
         route_native = TRUE,
         callback_mode = "R",
-        native_symbol = "C_np_nomad_r_callback_native_search"
-      )
+        native_symbol = "C_np_nomad_r_callback_native_search",
+        crs.callback.evaluations = as.integer(.np_native_nomad_field(best_solution, "callback_evaluations", NA_integer_)[1L]),
+        blackbox.evaluations = as.integer(.np_native_nomad_field(best_solution, "bbe", NA_integer_)[1L])
+      ), .np_native_nomad_cache_diagnostics(best_solution))
     } else {
       NULL
     }
