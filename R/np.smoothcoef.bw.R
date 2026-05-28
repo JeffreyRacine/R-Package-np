@@ -1893,33 +1893,54 @@ npscoefbw.scbandwidth <-
     r.nn.cache.surface <- identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE) &&
       isTRUE(bws$ncon > 0L) &&
       isTRUE((bws$nuno + bws$nord) == 0L)
-    r.nn.cache.eligible <- isTRUE(bandwidth.compute) &&
+    r.exact.cache.surface <- identical(bws$type, "fixed") &&
+      isTRUE(bws$ncon > 0L) &&
+      isTRUE((bws$nuno + bws$nord) == 0L)
+    r.objective.cache.kind <- if (isTRUE(r.nn.cache.surface)) {
+      "nn"
+    } else if (isTRUE(r.exact.cache.surface)) {
+      "exact"
+    } else {
+      "none"
+    }
+    r.objective.cache.surface <- !identical(r.objective.cache.kind, "none")
+    r.objective.cache.eligible <- isTRUE(bandwidth.compute) &&
       objective.cache.enabled &&
-      r.nn.cache.surface
-    r.nn.cache.stats <- list()
-    r.nn.cache.disabled <- NULL
+      r.objective.cache.surface
+    r.objective.cache.stats <- list()
+    r.objective.cache.disabled <- NULL
     if (isTRUE(bandwidth.compute) &&
-        r.nn.cache.surface &&
+        r.objective.cache.surface &&
         !objective.cache.enabled) {
-      r.nn.cache.disabled <- .np_r_nn_cache_new(FALSE)
+      r.objective.cache.disabled <- .np_r_nn_cache_new(FALSE)
     }
-    r_nn_cache_new <- function() {
-      if (!r.nn.cache.eligible && is.null(r.nn.cache.disabled))
+    r_objective_cache_new <- function() {
+      if (!r.objective.cache.eligible && is.null(r.objective.cache.disabled))
         return(NULL)
-      .np_r_nn_cache_new(r.nn.cache.eligible, key.length = bws$ncon)
+      key.length <- if (identical(r.objective.cache.kind, "nn")) bws$ncon else bws$ndim
+      .np_r_nn_cache_new(r.objective.cache.eligible, key.length = key.length)
     }
-    r_nn_cache_record <- function(cache) {
+    r_objective_cache_record <- function(cache) {
       st <- .np_r_nn_cache_stats(cache)
       if (!is.null(st))
-        r.nn.cache.stats[[length(r.nn.cache.stats) + 1L]] <<- st
+        r.objective.cache.stats[[length(r.objective.cache.stats) + 1L]] <<- st
       invisible(NULL)
     }
-    r_nn_cache_lookup <- function(cache, sbw) {
+    r_exact_cache_key <- function(x) {
+      paste(sprintf("%a", as.double(x)), collapse = "\r")
+    }
+    r_objective_cache_lookup <- function(cache, sbw) {
       if (!is.environment(cache) || !isTRUE(cache$enabled))
         return(list(hit = FALSE, token = NULL, value = NULL))
-      .np_r_nn_cache_get(cache, as.integer(sbw$bw[sbw$icon]))
+      if (identical(r.objective.cache.kind, "nn"))
+        return(.np_r_nn_cache_get(cache, as.integer(sbw$bw[sbw$icon])))
+      if (identical(r.objective.cache.kind, "exact")) {
+        token <- r_exact_cache_key(sbw$bw)
+        return(.np_r_nn_cache_get_token(cache, token))
+      }
+      list(hit = FALSE, token = NULL, value = NULL)
     }
-    r_nn_cache_store <- function(cache, token, value) {
+    r_objective_cache_store <- function(cache, token, value) {
       if (is.finite(value) && value < maxPenalty)
         .np_r_nn_cache_put(cache, token, value)
       invisible(NULL)
@@ -2342,7 +2363,7 @@ npscoefbw.scbandwidth <-
                 (!is.null(fixed.lower) && any(param < fixed.lower)) ||
                 ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
-            cache.hit <- r_nn_cache_lookup(overall.cache, sbw)
+            cache.hit <- r_objective_cache_lookup(overall.cache, sbw)
             if (isTRUE(cache.hit$hit)) {
               cv_progress_step()
               cv_state$fast_total <- cv_state$fast_total + 1L
@@ -2405,7 +2426,7 @@ npscoefbw.scbandwidth <-
 
             if (isTRUE(cv_state$objective_fast))
               cv_state$fast_total <- cv_state$fast_total + 1L
-            r_nn_cache_store(overall.cache, cache.hit$token, fv)
+            r_objective_cache_store(overall.cache, cache.hit$token, fv)
 
             return((if (is.finite(fv)) fv else maxPenalty))
 
@@ -2432,7 +2453,7 @@ npscoefbw.scbandwidth <-
                 (!is.null(fixed.lower) && any(param < fixed.lower)) ||
                 ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
-            cache.hit <- r_nn_cache_lookup(current.partial.cache, sbw)
+            cache.hit <- r_objective_cache_lookup(current.partial.cache, sbw)
             if (isTRUE(cache.hit$hit)) {
               cv_state$fast_total <- cv_state$fast_total + 1L
               partial_progress_step(fv = cache.hit$value)
@@ -2479,7 +2500,7 @@ npscoefbw.scbandwidth <-
 
             if (isTRUE(cv_state$objective_fast))
               cv_state$fast_total <- cv_state$fast_total + 1L
-            r_nn_cache_store(current.partial.cache, cache.hit$token, fv)
+            r_objective_cache_store(current.partial.cache, cache.hit$token, fv)
 
             partial_progress_step(fv = fv)
             return((if (is.finite(fv)) fv else maxPenalty))
@@ -2492,7 +2513,7 @@ npscoefbw.scbandwidth <-
           numimp <- 0
           value.overall <- numeric(nmulti)
           num.feval.overall <- 0
-          overall.cache <- r_nn_cache_new()
+          overall.cache <- r_objective_cache_new()
 
           x.scale <- sapply(seq_len(bws$ndim), function(i){
             if (dati$icon[i]){
@@ -2609,7 +2630,7 @@ npscoefbw.scbandwidth <-
 
             .np_progress_bandwidth_multistart_step(done = i, total = nmulti)
           }
-          r_nn_cache_record(overall.cache)
+          r_objective_cache_record(overall.cache)
 
           if (!have_best) {
             if (identical(bws$type, "fixed")) {
@@ -2672,7 +2693,7 @@ npscoefbw.scbandwidth <-
                   NULL
                 }
                 partial_progress_begin(iteration = i, partial.index = j)
-                current.partial.cache <- r_nn_cache_new()
+                current.partial.cache <- r_objective_cache_new()
 
                 ## minimise
                 suppressWarnings(optim.return <-
@@ -2682,7 +2703,7 @@ npscoefbw.scbandwidth <-
                 if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
                   num.feval.overall <- num.feval.overall + optim.return$counts[1]
                 partial_progress_finish(fv = optim.return$value)
-                r_nn_cache_record(current.partial.cache)
+                r_objective_cache_record(current.partial.cache)
                 current.partial.cache <- NULL
                 current.partial.profile <- NULL
 
@@ -2747,10 +2768,10 @@ npscoefbw.scbandwidth <-
           bws$ifval = best.overall
           bws$num.feval = num.feval.overall
           bws$num.feval.fast = cv_state$fast_total
-          if (length(r.nn.cache.stats)) {
-            bws$nn.cache <- .np_r_nn_cache_combine_stats(r.nn.cache.stats)
+          if (length(r.objective.cache.stats)) {
+            bws$nn.cache <- .np_r_nn_cache_combine_stats(r.objective.cache.stats)
           } else {
-            bws$nn.cache <- .np_r_nn_cache_stats(r.nn.cache.disabled)
+            bws$nn.cache <- .np_r_nn_cache_stats(r.objective.cache.disabled)
           }
           bws$numimp = numimp.overall
           bws$fval.vector = value.overall

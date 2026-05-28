@@ -13085,7 +13085,15 @@ plotFactor <- function(f, y, ...){
           gradients = gradients
         )
       } else {
-      fit.one.tau <- function(tau.i) {
+        cdf.cache <- .npqreg_selected_cdf_cache_new(
+          .npqreg_selected_cdf_cache_should_enable(tau = tau, exdat = txeval)
+        )
+        cdf.row.keys <- if (isTRUE(cdf.cache$enabled))
+          .npqreg_selected_cdf_cache_row_keys(txeval)
+        else NULL
+        on.exit(.npqreg_selected_cdf_cache_clear(cdf.cache), add = TRUE)
+
+        fit.one.tau <- function(tau.i) {
         yq <- .npqreg_invert_selected_cdf(
           bws = bws,
           xdat = xdat.df,
@@ -13094,7 +13102,9 @@ plotFactor <- function(f, y, ...){
           tau = tau.i,
           tol = tol,
           small = small,
-          itmax = itmax
+          itmax = itmax,
+          cdf.cache = cdf.cache,
+          cdf.row.keys = cdf.row.keys
         )
         if (!isTRUE(need.errors) && !isTRUE(gradients)) {
           return(list(
