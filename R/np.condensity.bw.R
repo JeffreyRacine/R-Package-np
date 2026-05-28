@@ -2128,6 +2128,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
         blackbox.evaluations = as.integer(native$blackbox_evaluations[1L]),
         cache.hits = as.integer(native$cache_hits[1L]),
         cache.size = as.integer(native$cache_size[1L]),
+        total.evaluations = as.integer(native$total_evaluations[1L]),
         iterations = as.integer(native$iterations[1L])
       )
     )
@@ -2782,6 +2783,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
         blackbox.evaluations = as.integer(native.best$native$blackbox_evaluations[1L]),
         cache.hits = as.integer(native.best$native$cache_hits[1L]),
         cache.size = as.integer(native.best$native$cache_size[1L]),
+        total.evaluations = as.integer(native.best$native$total_evaluations[1L]),
         iterations = as.integer(native.best$native$iterations[1L])
       )
     )

@@ -277,8 +277,8 @@ SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
 
   status = solve(&problem, NULL, &r_callback, &result);
 
-  PROTECT(out = allocVector(VECSXP, 12)); nprotect++;
-  PROTECT(names = allocVector(STRSXP, 12)); nprotect++;
+  PROTECT(out = allocVector(VECSXP, 13)); nprotect++;
+  PROTECT(names = allocVector(STRSXP, 13)); nprotect++;
   PROTECT(sol = allocVector(REALSXP, n)); nprotect++;
   for (i = 0; i < n; i++)
     REAL(sol)[i] = solution[i];
@@ -294,7 +294,8 @@ SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
   SET_VECTOR_ELT(out, 8, ScalarInteger(result.nomad_run_flag));
   SET_VECTOR_ELT(out, 9, ScalarInteger(result.callback_evaluations));
   SET_VECTOR_ELT(out, 10, ScalarInteger(result.cache_hits));
-  SET_VECTOR_ELT(out, 11, ScalarInteger(result.total_evaluations));
+  SET_VECTOR_ELT(out, 11, ScalarInteger(result.cache_size));
+  SET_VECTOR_ELT(out, 12, ScalarInteger(result.total_evaluations));
 
   SET_STRING_ELT(names, 0, mkChar("solution"));
   SET_STRING_ELT(names, 1, mkChar("objective"));
@@ -307,7 +308,8 @@ SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
   SET_STRING_ELT(names, 8, mkChar("nomad_run_flag"));
   SET_STRING_ELT(names, 9, mkChar("callback_evaluations"));
   SET_STRING_ELT(names, 10, mkChar("cache_hits"));
-  SET_STRING_ELT(names, 11, mkChar("total_evaluations"));
+  SET_STRING_ELT(names, 11, mkChar("cache_size"));
+  SET_STRING_ELT(names, 12, mkChar("total_evaluations"));
   setAttrib(out, R_NamesSymbol, names);
 
   R_Free(solution);
@@ -3931,8 +3933,8 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
                  &context,
                  &result);
 
-  PROTECT(out = allocVector(VECSXP, 24));
-  PROTECT(names = allocVector(STRSXP, 24));
+  PROTECT(out = allocVector(VECSXP, 27));
+  PROTECT(names = allocVector(STRSXP, 27));
   PROTECT(sol = allocVector(REALSXP, n));
   PROTECT(best = allocVector(REALSXP, n));
   PROTECT(best_bw = allocVector(REALSXP, nbw));
@@ -3966,13 +3968,16 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   SET_VECTOR_ELT(out, 14, ScalarInteger(context.callback_failures));
   SET_VECTOR_ELT(out, 15, ScalarInteger(result.callback_evaluations));
   SET_VECTOR_ELT(out, 16, ScalarInteger(result.blackbox_evaluations));
-  SET_VECTOR_ELT(out, 17, ScalarInteger(result.iterations));
-  SET_VECTOR_ELT(out, 18, mkString(result.message));
-  SET_VECTOR_ELT(out, 19, ScalarInteger(BANDWIDTH_reg_extern));
-  SET_VECTOR_ELT(out, 20, ScalarInteger(num_reg_continuous_extern));
-  SET_VECTOR_ELT(out, 21, best_degree);
-  SET_VECTOR_ELT(out, 22, first_degree);
-  SET_VECTOR_ELT(out, 23, ScalarReal(context.first_objective));
+  SET_VECTOR_ELT(out, 17, ScalarInteger(result.cache_hits));
+  SET_VECTOR_ELT(out, 18, ScalarInteger(result.cache_size));
+  SET_VECTOR_ELT(out, 19, ScalarInteger(result.total_evaluations));
+  SET_VECTOR_ELT(out, 20, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 21, mkString(result.message));
+  SET_VECTOR_ELT(out, 22, ScalarInteger(BANDWIDTH_reg_extern));
+  SET_VECTOR_ELT(out, 23, ScalarInteger(num_reg_continuous_extern));
+  SET_VECTOR_ELT(out, 24, best_degree);
+  SET_VECTOR_ELT(out, 25, first_degree);
+  SET_VECTOR_ELT(out, 26, ScalarReal(context.first_objective));
 
   SET_STRING_ELT(names, 0, mkChar("status"));
   SET_STRING_ELT(names, 1, mkChar("result_status"));
@@ -3991,13 +3996,16 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   SET_STRING_ELT(names, 14, mkChar("compiled_callback_failures"));
   SET_STRING_ELT(names, 15, mkChar("crs_callback_evaluations"));
   SET_STRING_ELT(names, 16, mkChar("blackbox_evaluations"));
-  SET_STRING_ELT(names, 17, mkChar("iterations"));
-  SET_STRING_ELT(names, 18, mkChar("message"));
-  SET_STRING_ELT(names, 19, mkChar("bandwidth_code"));
-  SET_STRING_ELT(names, 20, mkChar("ncon"));
-  SET_STRING_ELT(names, 21, mkChar("best_degree"));
-  SET_STRING_ELT(names, 22, mkChar("first_degree"));
-  SET_STRING_ELT(names, 23, mkChar("first_objective"));
+  SET_STRING_ELT(names, 17, mkChar("cache_hits"));
+  SET_STRING_ELT(names, 18, mkChar("cache_size"));
+  SET_STRING_ELT(names, 19, mkChar("total_evaluations"));
+  SET_STRING_ELT(names, 20, mkChar("iterations"));
+  SET_STRING_ELT(names, 21, mkChar("message"));
+  SET_STRING_ELT(names, 22, mkChar("bandwidth_code"));
+  SET_STRING_ELT(names, 23, mkChar("ncon"));
+  SET_STRING_ELT(names, 24, mkChar("best_degree"));
+  SET_STRING_ELT(names, 25, mkChar("first_degree"));
+  SET_STRING_ELT(names, 26, mkChar("first_objective"));
   setAttrib(out, R_NamesSymbol, names);
 
   R_Free(solution);
@@ -5405,8 +5413,8 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
                  &context,
                  &result);
 
-  PROTECT(out = allocVector(VECSXP, 23));
-  PROTECT(names = allocVector(STRSXP, 23));
+  PROTECT(out = allocVector(VECSXP, 24));
+  PROTECT(names = allocVector(STRSXP, 24));
   PROTECT(sol = allocVector(REALSXP, n));
   PROTECT(best = allocVector(REALSXP, n));
   PROTECT(best_flat = allocVector(REALSXP, np_conditional_density_nomad_shadow.num_all_var));
@@ -5440,9 +5448,10 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   SET_VECTOR_ELT(out, 17, ScalarInteger(result.blackbox_evaluations));
   SET_VECTOR_ELT(out, 18, ScalarInteger(result.cache_hits));
   SET_VECTOR_ELT(out, 19, ScalarInteger(result.cache_size));
-  SET_VECTOR_ELT(out, 20, ScalarInteger(result.iterations));
-  SET_VECTOR_ELT(out, 21, mkString(result.message));
-  SET_VECTOR_ELT(out, 22, ScalarReal(result.objective));
+  SET_VECTOR_ELT(out, 20, ScalarInteger(result.total_evaluations));
+  SET_VECTOR_ELT(out, 21, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 22, mkString(result.message));
+  SET_VECTOR_ELT(out, 23, ScalarReal(result.objective));
 
   SET_STRING_ELT(names, 0, mkChar("status"));
   SET_STRING_ELT(names, 1, mkChar("result_status"));
@@ -5464,9 +5473,10 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   SET_STRING_ELT(names, 17, mkChar("blackbox_evaluations"));
   SET_STRING_ELT(names, 18, mkChar("cache_hits"));
   SET_STRING_ELT(names, 19, mkChar("cache_size"));
-  SET_STRING_ELT(names, 20, mkChar("iterations"));
-  SET_STRING_ELT(names, 21, mkChar("message"));
-  SET_STRING_ELT(names, 22, mkChar("official_objective"));
+  SET_STRING_ELT(names, 20, mkChar("total_evaluations"));
+  SET_STRING_ELT(names, 21, mkChar("iterations"));
+  SET_STRING_ELT(names, 22, mkChar("message"));
+  SET_STRING_ELT(names, 23, mkChar("official_objective"));
   setAttrib(out, R_NamesSymbol, names);
 
   R_Free(solution);
@@ -5668,8 +5678,8 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
                  &context,
                  &result);
 
-  PROTECT(out = allocVector(VECSXP, 23));
-  PROTECT(names = allocVector(STRSXP, 23));
+  PROTECT(out = allocVector(VECSXP, 24));
+  PROTECT(names = allocVector(STRSXP, 24));
   PROTECT(sol = allocVector(REALSXP, n));
   PROTECT(best = allocVector(REALSXP, n));
   PROTECT(best_flat = allocVector(REALSXP, np_conditional_density_nomad_shadow.num_all_var));
@@ -5703,9 +5713,10 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   SET_VECTOR_ELT(out, 17, ScalarInteger(result.blackbox_evaluations));
   SET_VECTOR_ELT(out, 18, ScalarInteger(result.cache_hits));
   SET_VECTOR_ELT(out, 19, ScalarInteger(result.cache_size));
-  SET_VECTOR_ELT(out, 20, ScalarInteger(result.iterations));
-  SET_VECTOR_ELT(out, 21, mkString(result.message));
-  SET_VECTOR_ELT(out, 22, ScalarReal(result.objective));
+  SET_VECTOR_ELT(out, 20, ScalarInteger(result.total_evaluations));
+  SET_VECTOR_ELT(out, 21, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 22, mkString(result.message));
+  SET_VECTOR_ELT(out, 23, ScalarReal(result.objective));
 
   SET_STRING_ELT(names, 0, mkChar("status"));
   SET_STRING_ELT(names, 1, mkChar("result_status"));
@@ -5727,9 +5738,10 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   SET_STRING_ELT(names, 17, mkChar("blackbox_evaluations"));
   SET_STRING_ELT(names, 18, mkChar("cache_hits"));
   SET_STRING_ELT(names, 19, mkChar("cache_size"));
-  SET_STRING_ELT(names, 20, mkChar("iterations"));
-  SET_STRING_ELT(names, 21, mkChar("message"));
-  SET_STRING_ELT(names, 22, mkChar("official_objective"));
+  SET_STRING_ELT(names, 20, mkChar("total_evaluations"));
+  SET_STRING_ELT(names, 21, mkChar("iterations"));
+  SET_STRING_ELT(names, 22, mkChar("message"));
+  SET_STRING_ELT(names, 23, mkChar("official_objective"));
   setAttrib(out, R_NamesSymbol, names);
 
   R_Free(solution);
@@ -7113,8 +7125,8 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
                  &context,
                  &result);
 
-  PROTECT(out = allocVector(VECSXP, 20));
-  PROTECT(names = allocVector(STRSXP, 20));
+  PROTECT(out = allocVector(VECSXP, 23));
+  PROTECT(names = allocVector(STRSXP, 23));
   PROTECT(sol = allocVector(REALSXP, n));
   PROTECT(best = allocVector(REALSXP, n));
   for (i = 0; i < n; i++) {
@@ -7140,8 +7152,11 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   SET_VECTOR_ELT(out, 15, ScalarInteger(context.callback_failures));
   SET_VECTOR_ELT(out, 16, ScalarInteger(result.callback_evaluations));
   SET_VECTOR_ELT(out, 17, ScalarInteger(result.blackbox_evaluations));
-  SET_VECTOR_ELT(out, 18, ScalarInteger(result.iterations));
-  SET_VECTOR_ELT(out, 19, mkString(result.message));
+  SET_VECTOR_ELT(out, 18, ScalarInteger(result.cache_hits));
+  SET_VECTOR_ELT(out, 19, ScalarInteger(result.cache_size));
+  SET_VECTOR_ELT(out, 20, ScalarInteger(result.total_evaluations));
+  SET_VECTOR_ELT(out, 21, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 22, mkString(result.message));
 
   SET_STRING_ELT(names, 0, mkChar("status"));
   SET_STRING_ELT(names, 1, mkChar("result_status"));
@@ -7161,8 +7176,11 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   SET_STRING_ELT(names, 15, mkChar("compiled_callback_failures"));
   SET_STRING_ELT(names, 16, mkChar("crs_callback_evaluations"));
   SET_STRING_ELT(names, 17, mkChar("blackbox_evaluations"));
-  SET_STRING_ELT(names, 18, mkChar("iterations"));
-  SET_STRING_ELT(names, 19, mkChar("message"));
+  SET_STRING_ELT(names, 18, mkChar("cache_hits"));
+  SET_STRING_ELT(names, 19, mkChar("cache_size"));
+  SET_STRING_ELT(names, 20, mkChar("total_evaluations"));
+  SET_STRING_ELT(names, 21, mkChar("iterations"));
+  SET_STRING_ELT(names, 22, mkChar("message"));
   setAttrib(out, R_NamesSymbol, names);
 
   R_Free(solution);
@@ -7731,8 +7749,8 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
                  &context,
                  &result);
 
-  PROTECT(out = allocVector(VECSXP, 20));
-  PROTECT(names = allocVector(STRSXP, 20));
+  PROTECT(out = allocVector(VECSXP, 23));
+  PROTECT(names = allocVector(STRSXP, 23));
   PROTECT(sol = allocVector(REALSXP, n));
   PROTECT(best = allocVector(REALSXP, n));
   for (i = 0; i < n; i++) {
@@ -7758,9 +7776,12 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   SET_VECTOR_ELT(out, 15, ScalarInteger(context.callback_failures));
   SET_VECTOR_ELT(out, 16, ScalarInteger(result.callback_evaluations));
   SET_VECTOR_ELT(out, 17, ScalarInteger(result.blackbox_evaluations));
-  SET_VECTOR_ELT(out, 18, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 18, ScalarInteger(result.cache_hits));
+  SET_VECTOR_ELT(out, 19, ScalarInteger(result.cache_size));
+  SET_VECTOR_ELT(out, 20, ScalarInteger(result.total_evaluations));
+  SET_VECTOR_ELT(out, 21, ScalarInteger(result.iterations));
   result_message = result.message;
-  SET_VECTOR_ELT(out, 19, mkString(result_message));
+  SET_VECTOR_ELT(out, 22, mkString(result_message));
 
   SET_STRING_ELT(names, 0, mkChar("status"));
   SET_STRING_ELT(names, 1, mkChar("result_status"));
@@ -7780,8 +7801,11 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   SET_STRING_ELT(names, 15, mkChar("compiled_callback_failures"));
   SET_STRING_ELT(names, 16, mkChar("crs_callback_evaluations"));
   SET_STRING_ELT(names, 17, mkChar("blackbox_evaluations"));
-  SET_STRING_ELT(names, 18, mkChar("iterations"));
-  SET_STRING_ELT(names, 19, mkChar("message"));
+  SET_STRING_ELT(names, 18, mkChar("cache_hits"));
+  SET_STRING_ELT(names, 19, mkChar("cache_size"));
+  SET_STRING_ELT(names, 20, mkChar("total_evaluations"));
+  SET_STRING_ELT(names, 21, mkChar("iterations"));
+  SET_STRING_ELT(names, 22, mkChar("message"));
   setAttrib(out, R_NamesSymbol, names);
 
   R_Free(solution);
@@ -9133,8 +9157,8 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
 
   status = solve(&problem, np_cdist_native_search_callback, &context, &result);
 
-  PROTECT(out = allocVector(VECSXP, 23));
-  PROTECT(names = allocVector(STRSXP, 23));
+  PROTECT(out = allocVector(VECSXP, 26));
+  PROTECT(names = allocVector(STRSXP, 26));
   PROTECT(sol = allocVector(REALSXP, n));
   PROTECT(best = allocVector(REALSXP, n));
   PROTECT(best_degree = allocVector(INTSXP, ndegree));
@@ -9166,11 +9190,14 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   SET_VECTOR_ELT(out, 15, ScalarInteger(context.callback_failures));
   SET_VECTOR_ELT(out, 16, ScalarInteger(result.callback_evaluations));
   SET_VECTOR_ELT(out, 17, ScalarInteger(result.blackbox_evaluations));
-  SET_VECTOR_ELT(out, 18, ScalarInteger(result.iterations));
-  SET_VECTOR_ELT(out, 19, mkString(result.message));
-  SET_VECTOR_ELT(out, 20, best_degree);
-  SET_VECTOR_ELT(out, 21, first_degree);
-  SET_VECTOR_ELT(out, 22, ScalarReal(context.first_eval[0]));
+  SET_VECTOR_ELT(out, 18, ScalarInteger(result.cache_hits));
+  SET_VECTOR_ELT(out, 19, ScalarInteger(result.cache_size));
+  SET_VECTOR_ELT(out, 20, ScalarInteger(result.total_evaluations));
+  SET_VECTOR_ELT(out, 21, ScalarInteger(result.iterations));
+  SET_VECTOR_ELT(out, 22, mkString(result.message));
+  SET_VECTOR_ELT(out, 23, best_degree);
+  SET_VECTOR_ELT(out, 24, first_degree);
+  SET_VECTOR_ELT(out, 25, ScalarReal(context.first_eval[0]));
 
   SET_STRING_ELT(names, 0, mkChar("status"));
   SET_STRING_ELT(names, 1, mkChar("result_status"));
@@ -9190,11 +9217,14 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   SET_STRING_ELT(names, 15, mkChar("compiled_callback_failures"));
   SET_STRING_ELT(names, 16, mkChar("crs_callback_evaluations"));
   SET_STRING_ELT(names, 17, mkChar("blackbox_evaluations"));
-  SET_STRING_ELT(names, 18, mkChar("iterations"));
-  SET_STRING_ELT(names, 19, mkChar("message"));
-  SET_STRING_ELT(names, 20, mkChar("best_degree"));
-  SET_STRING_ELT(names, 21, mkChar("first_degree"));
-  SET_STRING_ELT(names, 22, mkChar("first_objective"));
+  SET_STRING_ELT(names, 18, mkChar("cache_hits"));
+  SET_STRING_ELT(names, 19, mkChar("cache_size"));
+  SET_STRING_ELT(names, 20, mkChar("total_evaluations"));
+  SET_STRING_ELT(names, 21, mkChar("iterations"));
+  SET_STRING_ELT(names, 22, mkChar("message"));
+  SET_STRING_ELT(names, 23, mkChar("best_degree"));
+  SET_STRING_ELT(names, 24, mkChar("first_degree"));
+  SET_STRING_ELT(names, 25, mkChar("first_objective"));
   setAttrib(out, R_NamesSymbol, names);
 
   R_Free(solution);
