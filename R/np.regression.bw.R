@@ -2130,6 +2130,9 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   old.state <- .np_progress_runtime$bandwidth_state
   worker_silent <- FALSE
   active.state <- NULL
+  reuse.active <- !is.null(old.state) &&
+    isTRUE(old.state$enabled) &&
+    isTRUE(old.state$visible)
 
   if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
     attach.size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) NA_integer_)
@@ -2140,22 +2143,31 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   }
 
   on.exit({
-    current.state <- .np_progress_runtime$bandwidth_state
-    if (!is.null(active.state) && !is.null(current.state)) {
-      .np_progress_end(current.state)
+    if (!isTRUE(reuse.active)) {
+      current.state <- .np_progress_runtime$bandwidth_state
+      if (!is.null(active.state) && !is.null(current.state)) {
+        .np_progress_end(current.state)
+      }
     }
     .np_progress_runtime$bandwidth_state <- old.state
   }, add = TRUE)
 
   if (!worker_silent) {
-    active.state <- .np_progress_begin(
-      label = .np_nomad_powell_progress_label(),
-      domain = "general",
-      surface = "bandwidth"
-    )
+    active.state <- if (isTRUE(reuse.active)) {
+      old.state
+    } else {
+      .np_progress_begin(
+        label = .np_nomad_powell_progress_label(),
+        domain = "general",
+        surface = "bandwidth"
+      )
+    }
+    active.state$label <- .np_nomad_powell_progress_label()
     active.state$unknown_total_fields <- .npregbw_powell_progress_fields
     active.state$nomad_nmulti <- 1L
     active.state$nomad_current_degree <- as.integer(degree)
+    active.state$started <- .np_progress_now()
+    active.state$last_done <- NULL
     active.state <- .np_progress_show_now(active.state)
     .np_progress_runtime$bandwidth_state <- active.state
   } else {

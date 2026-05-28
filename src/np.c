@@ -538,7 +538,9 @@ static double bwm_fast_eval_count = 0.0;
 static double bwm_guarded_eval_count = 0.0;
 static clock_t bwm_progress_started_clock = 0;
 static clock_t bwm_progress_last_signal_clock = 0;
+static time_t bwm_progress_last_signal_wall = 0;
 static int bwm_progress_last_signal_eval = 0;
+static int bwm_progress_eval_active = 0;
 static int bwm_nn_cache_active = 0;
 static int bwm_nn_cache_key_len = 0;
 static size_t bwm_nn_cache_capacity = 0;
@@ -1252,7 +1254,9 @@ static void bwm_reset_counters(void)
   bwm_guarded_eval_count = 0.0;
   bwm_progress_started_clock = clock();
   bwm_progress_last_signal_clock = bwm_progress_started_clock;
+  bwm_progress_last_signal_wall = time(NULL);
   bwm_progress_last_signal_eval = 0;
+  bwm_progress_eval_active = 0;
   bwm_nn_cache_hits_window = 0.0;
   np_fastcv_alllarge_hits_reset();
   np_guarded_cvml_hits_reset();
@@ -1599,9 +1603,12 @@ static void bwm_maybe_signal_activity(void)
 {
   const int current_eval = (int) bwm_eval_count;
   const clock_t now = clock();
+  const time_t wall_now = time(NULL);
   const double signal_after_sec = 0.5;
+  const double signal_after_wall_sec = 1.0;
   const int signal_every_evals = 64;
   double since_last = 0.0;
+  double wall_since_last = 0.0;
 
   if (current_eval < 1)
     return;
@@ -1609,13 +1616,26 @@ static void bwm_maybe_signal_activity(void)
   if ((bwm_progress_last_signal_clock > 0) && (now > bwm_progress_last_signal_clock))
     since_last = ((double) (now - bwm_progress_last_signal_clock)) / (double) CLOCKS_PER_SEC;
 
+  if (bwm_progress_last_signal_wall > 0 && wall_now >= bwm_progress_last_signal_wall)
+    wall_since_last = difftime(wall_now, bwm_progress_last_signal_wall);
+
   if ((current_eval - bwm_progress_last_signal_eval) < signal_every_evals &&
-      since_last < signal_after_sec)
+      since_last < signal_after_sec &&
+      wall_since_last < signal_after_wall_sec)
     return;
 
   np_progress_bandwidth_activity_step(current_eval);
   bwm_progress_last_signal_eval = current_eval;
   bwm_progress_last_signal_clock = now;
+  bwm_progress_last_signal_wall = wall_now;
+}
+
+void np_progress_bandwidth_loop_step(void)
+{
+  if (!bwm_progress_eval_active)
+    return;
+
+  bwm_maybe_signal_activity();
 }
 
 static inline void bwm_snapshot_fast_counters(void)
@@ -1881,7 +1901,9 @@ static double bwmfunc_wrapper(double *p)
   }
   if (!cache_hit) {
     guarded_before = np_guarded_cvml_hits_get();
+    bwm_progress_eval_active = 1;
     val = bwmfunc_raw(use_p);
+    bwm_progress_eval_active = 0;
     bwm_nn_cache_note_raw_eval();
     bwm_nn_cache_put(cache_key, cache_stack_key, val);
     if(np_guarded_cvml_hits_get() > guarded_before)

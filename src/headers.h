@@ -64,6 +64,7 @@ void np_progress_fit_set_offset(const int offset);
 void np_progress_fit_step(const int done);
 void np_progress_fit_loop_step(const int done, const int natural_total);
 int np_progress_fit_is_active(void);
+void np_progress_bandwidth_loop_step(void);
 
 double **alloc_matd(int nrows, int ncols);
 double **alloc_tmatd(int nrows, int ncols);
