@@ -2105,6 +2105,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       completed = TRUE,
       method = search.engine.used,
       restart.results = native.results,
+      restart.starts = lapply(seq_len(nrow(native.start.matrix)), function(i) as.numeric(native.start.matrix[i, ])),
       best.restart = native.best.index,
       nomad.time = native.nomad.elapsed,
       powell.time = NA_real_,
@@ -2347,11 +2348,12 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   setup$nobs <- nrow(toFrame(xdat))
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   bounds <- .npcdensbw_nomad_bw_bounds(template = template, setup = setup)
+  point.start <- {
+    raw <- c(template$ybw, template$xbw)
+    if (all(raw == 0)) NULL else .npcdensbw_nomad_bw_to_point(raw, template = template, setup = setup)
+  }
   x0 <- .npcdensbw_nomad_complete_bw_start_point(
-    point = {
-      raw <- c(template$ybw, template$xbw)
-      if (all(raw == 0)) NULL else .npcdensbw_nomad_bw_to_point(raw, template = template, setup = setup)
-    },
+    point = point.start,
     bounds = bounds,
     template = template
   )
@@ -2463,6 +2465,15 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     opt.value = opt.value,
     where = "npcdensbw"
   )
+  if (is.null(point.start)) {
+    x0 <- .npcdensbw_nomad_complete_bw_start_point(
+      point = NULL,
+      bounds = bounds,
+      template = template,
+      initial = native.start.bounds$initial,
+      where = "npcdensbw"
+    )
+  }
 
   if (.npcdensbw_fixed_native_target(template, reg.args, bwsolver)) {
     .npcdensbw_nomad_shadow_native_require_crs()
@@ -2748,6 +2759,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       completed = TRUE,
       method = "nomad",
       restart.results = native.results,
+      restart.starts = lapply(seq_len(nrow(native.start.matrix)), function(i) as.numeric(native.start.matrix[i, ])),
       best.restart = native.best.index,
       nomad.time = native.nomad.elapsed,
       powell.time = payload.result$powell.time,
@@ -2999,7 +3011,18 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
   )
 }
 
-.npcdensbw_nomad_complete_bw_start_point <- function(point, bounds, template) {
+.npcdensbw_nomad_complete_bw_start_point <- function(point,
+                                                     bounds,
+                                                     template,
+                                                     initial = NULL,
+                                                     where = "npcdensbw") {
+  point <- .np_nomad_explicit_or_initial_start(
+    point = point,
+    initial = initial,
+    n = length(bounds$lower),
+    where = where
+  )
+
   if (identical(as.character(template$type)[1L], "fixed")) {
     return(.np_nomad_complete_start_point(
       point = point,
@@ -3186,15 +3209,18 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     opt.value = opt.value.local,
     where = "npcdensbw"
   )
+  point.start <- {
+    raw <- c(template$ybw, template$xbw)
+    if (all(raw == 0)) NULL else .npcdensbw_nomad_bw_to_point(raw, template = template, setup = setup)
+  }
 
   x0 <- c(
     .npcdensbw_nomad_complete_bw_start_point(
-      point = {
-        raw <- c(template$ybw, template$xbw)
-        if (all(raw == 0)) NULL else .npcdensbw_nomad_bw_to_point(raw, template = template, setup = setup)
-      },
+      point = point.start,
       bounds = bw_bounds,
-      template = template
+      template = template,
+      initial = bw_start_bounds$initial,
+      where = "npcdensbw"
     ),
     as.integer(degree.search$start.degree)
   )

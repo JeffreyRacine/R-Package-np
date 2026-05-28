@@ -1127,7 +1127,9 @@ npscoefbw.NULL <-
     .npregbw_nomad_complete_bw_start_point(
       point = if (all(template$bw == 0)) NULL else .npregbw_nomad_bw_to_point(template$bw, template = template, setup = setup),
       bounds = bw_bounds,
-      setup = setup
+      setup = setup,
+      initial = bw_start_bounds$initial,
+      where = "npscoefbw"
     ),
     as.integer(degree.search$start.degree)
   )
