@@ -3219,7 +3219,10 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
     return(NULL)
   x <- as.numeric(x)
   nms <- c("enabled", "key.length", "visits", "unique", "repeats",
-           "raw.evals", "hits", "allocation.failed")
+           "raw.evals", "hits", "allocation.failed",
+           "objective.enabled", "objective.key.length", "objective.visits",
+           "objective.unique", "objective.repeats", "objective.raw.evals",
+           "objective.hits", "objective.allocation.failed")
   names(x) <- nms[seq_along(x)]
   x
 }
@@ -3295,7 +3298,10 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
   if (!length(stats))
     return(NULL)
   nms <- c("enabled", "key.length", "visits", "unique", "repeats",
-           "raw.evals", "hits", "allocation.failed")
+           "raw.evals", "hits", "allocation.failed",
+           "objective.enabled", "objective.key.length", "objective.visits",
+           "objective.unique", "objective.repeats", "objective.raw.evals",
+           "objective.hits", "objective.allocation.failed")
   mat <- do.call(rbind, lapply(stats, function(x) {
     x <- as.numeric(x)
     names(x) <- nms[seq_along(x)]
@@ -3303,6 +3309,18 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
   }))
   out <- colSums(mat, na.rm = TRUE)
   out["enabled"] <- as.numeric(any(mat[, "enabled"] > 0))
-  out["key.length"] <- max(mat[, "key.length"], na.rm = TRUE)
+  out["key.length"] <- if (all(is.na(mat[, "key.length"]))) {
+    0
+  } else {
+    max(mat[, "key.length"], na.rm = TRUE)
+  }
+  if ("objective.enabled" %in% names(out))
+    out["objective.enabled"] <- as.numeric(any(mat[, "objective.enabled"] > 0, na.rm = TRUE))
+  if ("objective.key.length" %in% names(out))
+    out["objective.key.length"] <- if (all(is.na(mat[, "objective.key.length"]))) {
+      0
+    } else {
+      max(mat[, "objective.key.length"], na.rm = TRUE)
+    }
   out
 }

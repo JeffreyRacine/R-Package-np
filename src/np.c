@@ -337,6 +337,20 @@ static double bwm_nn_cache_raw_evals = 0.0;
 static double bwm_nn_cache_hits = 0.0;
 static double bwm_nn_cache_hits_window = 0.0;
 static int bwm_nn_cache_alloc_failed = 0;
+static int bwm_objective_cache_active = 0;
+static int bwm_objective_cache_key_len = 0;
+static size_t bwm_objective_cache_capacity = 0;
+static size_t bwm_objective_cache_size = 0;
+static double *bwm_objective_cache_keys = NULL;
+static double *bwm_objective_cache_values = NULL;
+static unsigned char *bwm_objective_cache_used = NULL;
+static double bwm_objective_cache_visits = 0.0;
+static double bwm_objective_cache_unique = 0.0;
+static double bwm_objective_cache_repeats = 0.0;
+static double bwm_objective_cache_raw_evals = 0.0;
+static double bwm_objective_cache_hits = 0.0;
+static double bwm_objective_cache_hits_window = 0.0;
+static int bwm_objective_cache_alloc_failed = 0;
 
 typedef struct {
   int active;
@@ -697,6 +711,7 @@ static double *bwm_transform_buf = NULL;
 static int bwm_transform_buf_len = 0;
 
 static void bwm_nn_cache_free(void);
+static void bwm_objective_cache_free(void);
 
 static void bwm_reserve_transform_buf(int needed_len)
 {
@@ -719,6 +734,7 @@ void np_release_static_buffers(int *unused)
   }
   bwm_transform_buf_len = 0;
   bwm_nn_cache_free();
+  bwm_objective_cache_free();
 }
 static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;
@@ -1239,6 +1255,7 @@ static void bwm_reset_counters(void)
   bwm_progress_last_signal_eval = 0;
   bwm_progress_eval_active = 0;
   bwm_nn_cache_hits_window = 0.0;
+  bwm_objective_cache_hits_window = 0.0;
   np_fastcv_alllarge_hits_reset();
   np_guarded_cvml_hits_reset();
 }
@@ -1266,30 +1283,38 @@ static void bwm_nn_cache_reset_stats(void)
   bwm_nn_cache_alloc_failed = 0;
 }
 
-static int bwm_nn_cache_env_enabled(void)
+static void bwm_objective_cache_free(void)
 {
-  const char *flag = getenv("NP_NN_POWELL_CACHE_INSTRUMENT");
-  if (flag == NULL || flag[0] == '\0')
-    return 1;
-  if ((strcmp(flag, "0") == 0) ||
-      (strcmp(flag, "false") == 0) ||
-      (strcmp(flag, "FALSE") == 0) ||
-      (strcmp(flag, "off") == 0) ||
-      (strcmp(flag, "OFF") == 0) ||
-      (strcmp(flag, "no") == 0) ||
-      (strcmp(flag, "NO") == 0))
-    return 0;
-  return 1;
+  safe_free(bwm_objective_cache_keys);
+  safe_free(bwm_objective_cache_values);
+  safe_free(bwm_objective_cache_used);
+  bwm_objective_cache_keys = NULL;
+  bwm_objective_cache_values = NULL;
+  bwm_objective_cache_used = NULL;
+  bwm_objective_cache_capacity = 0;
+  bwm_objective_cache_size = 0;
 }
 
-static int bwm_nn_cache_user_enabled(void)
+static void bwm_objective_cache_reset_stats(void)
 {
-  SEXP opt = Rf_GetOption1(Rf_install("np.powell.cache"));
-  if (opt != R_NilValue) {
-    int enabled = asLogical(opt);
-    return enabled == TRUE;
+  bwm_objective_cache_visits = 0.0;
+  bwm_objective_cache_unique = 0.0;
+  bwm_objective_cache_repeats = 0.0;
+  bwm_objective_cache_raw_evals = 0.0;
+  bwm_objective_cache_hits = 0.0;
+  bwm_objective_cache_hits_window = 0.0;
+  bwm_objective_cache_alloc_failed = 0;
+}
+
+static int bwm_objective_cache_user_enabled(void)
+{
+  SEXP opt = Rf_GetOption1(Rf_install("np.objective.cache"));
+  if (opt == R_NilValue)
+    return 1;
+  if (TYPEOF(opt) != LGLSXP || XLENGTH(opt) != 1 || LOGICAL(opt)[0] == NA_LOGICAL) {
+    error("option 'np.objective.cache' must be TRUE or FALSE");
   }
-  return bwm_nn_cache_env_enabled();
+  return LOGICAL(opt)[0] == TRUE;
 }
 
 static uint64_t bwm_nn_cache_hash_key(const int *key, int key_len)
@@ -1435,6 +1460,148 @@ static int bwm_nn_cache_insert(const int *key, double value)
   return 0;
 }
 
+static uint64_t bwm_objective_cache_hash_key(const double *key, int key_len)
+{
+  int i;
+  uint64_t h = UINT64_C(1469598103934665603);
+  for (i = 0; i < key_len; i++) {
+    const unsigned char *bytes = (const unsigned char *)(const void *)&key[i];
+    size_t j;
+    for (j = 0; j < sizeof(double); j++) {
+      h ^= (uint64_t)bytes[j];
+      h *= UINT64_C(1099511628211);
+    }
+  }
+  return h;
+}
+
+static int bwm_objective_cache_key_equal(const double *stored,
+                                         const double *key,
+                                         int key_len)
+{
+  return memcmp(stored, key, (size_t)key_len * sizeof(double)) == 0;
+}
+
+static int bwm_objective_cache_alloc_table(size_t capacity)
+{
+  size_t nkey;
+  if (bwm_objective_cache_key_len <= 0)
+    return 0;
+  nkey = capacity * (size_t)bwm_objective_cache_key_len;
+  bwm_objective_cache_keys = (double *)calloc(nkey, sizeof(double));
+  bwm_objective_cache_values = (double *)calloc(capacity, sizeof(double));
+  bwm_objective_cache_used = (unsigned char *)calloc(capacity, sizeof(unsigned char));
+  if ((bwm_objective_cache_keys == NULL) ||
+      (bwm_objective_cache_values == NULL) ||
+      (bwm_objective_cache_used == NULL)) {
+    bwm_objective_cache_free();
+    bwm_objective_cache_alloc_failed = 1;
+    bwm_objective_cache_active = 0;
+    return 0;
+  }
+  bwm_objective_cache_capacity = capacity;
+  bwm_objective_cache_size = 0;
+  return 1;
+}
+
+static int bwm_objective_cache_rehash(size_t new_capacity)
+{
+  double *old_keys = bwm_objective_cache_keys;
+  double *old_values = bwm_objective_cache_values;
+  unsigned char *old_used = bwm_objective_cache_used;
+  size_t old_capacity = bwm_objective_cache_capacity;
+  size_t i;
+
+  bwm_objective_cache_keys = NULL;
+  bwm_objective_cache_values = NULL;
+  bwm_objective_cache_used = NULL;
+  bwm_objective_cache_capacity = 0;
+  bwm_objective_cache_size = 0;
+  if (!bwm_objective_cache_alloc_table(new_capacity)) {
+    safe_free(old_keys);
+    safe_free(old_values);
+    safe_free(old_used);
+    return 0;
+  }
+
+  for (i = 0; i < old_capacity; i++) {
+    if (old_used[i]) {
+      const double *key = old_keys + i * (size_t)bwm_objective_cache_key_len;
+      uint64_t h = bwm_objective_cache_hash_key(key, bwm_objective_cache_key_len);
+      size_t slot = (size_t)(h & (uint64_t)(bwm_objective_cache_capacity - 1));
+      while (bwm_objective_cache_used[slot])
+        slot = (slot + 1) & (bwm_objective_cache_capacity - 1);
+      memcpy(bwm_objective_cache_keys + slot * (size_t)bwm_objective_cache_key_len,
+             key,
+             (size_t)bwm_objective_cache_key_len * sizeof(double));
+      bwm_objective_cache_values[slot] = old_values[i];
+      bwm_objective_cache_used[slot] = 1;
+      bwm_objective_cache_size++;
+    }
+  }
+
+  safe_free(old_keys);
+  safe_free(old_values);
+  safe_free(old_used);
+  return 1;
+}
+
+static int bwm_objective_cache_lookup(const double *key, double *value)
+{
+  uint64_t h;
+  size_t slot;
+
+  if (!bwm_objective_cache_active || bwm_objective_cache_capacity == 0)
+    return 0;
+
+  h = bwm_objective_cache_hash_key(key, bwm_objective_cache_key_len);
+  slot = (size_t)(h & (uint64_t)(bwm_objective_cache_capacity - 1));
+  while (bwm_objective_cache_used[slot]) {
+    double *stored = bwm_objective_cache_keys + slot * (size_t)bwm_objective_cache_key_len;
+    if (bwm_objective_cache_key_equal(stored, key, bwm_objective_cache_key_len)) {
+      if (value != NULL)
+        value[0] = bwm_objective_cache_values[slot];
+      return 1;
+    }
+    slot = (slot + 1) & (bwm_objective_cache_capacity - 1);
+  }
+
+  return 0;
+}
+
+static int bwm_objective_cache_insert(const double *key, double value)
+{
+  uint64_t h;
+  size_t slot;
+
+  if (!bwm_objective_cache_active || bwm_objective_cache_capacity == 0)
+    return 0;
+
+  if ((bwm_objective_cache_size + 1) * 10 >= bwm_objective_cache_capacity * 7) {
+    if (!bwm_objective_cache_rehash(bwm_objective_cache_capacity * 2))
+      return 0;
+  }
+
+  h = bwm_objective_cache_hash_key(key, bwm_objective_cache_key_len);
+  slot = (size_t)(h & (uint64_t)(bwm_objective_cache_capacity - 1));
+  while (bwm_objective_cache_used[slot]) {
+    double *stored = bwm_objective_cache_keys + slot * (size_t)bwm_objective_cache_key_len;
+    if (bwm_objective_cache_key_equal(stored, key, bwm_objective_cache_key_len)) {
+      bwm_objective_cache_values[slot] = value;
+      return 1;
+    }
+    slot = (slot + 1) & (bwm_objective_cache_capacity - 1);
+  }
+
+  memcpy(bwm_objective_cache_keys + slot * (size_t)bwm_objective_cache_key_len,
+         key,
+         (size_t)bwm_objective_cache_key_len * sizeof(double));
+  bwm_objective_cache_values[slot] = value;
+  bwm_objective_cache_used[slot] = 1;
+  bwm_objective_cache_size++;
+  return 0;
+}
+
 static void bwm_nn_cache_configure_for_powell(
   int bandwidth,
   int eval_only,
@@ -1443,12 +1610,31 @@ static void bwm_nn_cache_configure_for_powell(
   int num_unordered,
   int num_ordered)
 {
+  int objective_cache_enabled;
+  int objective_key_len;
+
   bwm_nn_cache_free();
   bwm_nn_cache_reset_stats();
   bwm_nn_cache_active = 0;
   bwm_nn_cache_key_len = 0;
+  bwm_objective_cache_free();
+  bwm_objective_cache_reset_stats();
+  bwm_objective_cache_active = 0;
+  bwm_objective_cache_key_len = 0;
 
-  if (!bwm_nn_cache_user_enabled())
+  objective_cache_enabled = bwm_objective_cache_user_enabled();
+
+  if (!eval_only && objective_cache_enabled) {
+    objective_key_len = num_continuous + num_unordered + num_ordered + extra_params;
+    if (objective_key_len > 0) {
+      bwm_objective_cache_key_len = objective_key_len;
+      bwm_objective_cache_active = 1;
+      if (!bwm_objective_cache_alloc_table(2048))
+        bwm_objective_cache_key_len = 0;
+    }
+  }
+
+  if (!objective_cache_enabled)
     return;
   if (eval_only || extra_params != 0)
     return;
@@ -1539,6 +1725,52 @@ static void bwm_nn_cache_put(int *key, int *stack_key, double value)
     bwm_nn_cache_free_key(key, stack_key);
 }
 
+static void bwm_objective_cache_note_raw_eval(void)
+{
+  if (bwm_objective_cache_active)
+    bwm_objective_cache_raw_evals += 1.0;
+}
+
+static int bwm_objective_cache_get(const double *p, double *value)
+{
+  int i;
+
+  if (!bwm_objective_cache_active || bwm_objective_cache_key_len <= 0)
+    return 0;
+
+  for (i = 0; i < bwm_objective_cache_key_len; i++) {
+    if (!R_FINITE(p[i + 1]))
+      return 0;
+  }
+
+  bwm_objective_cache_visits += 1.0;
+  if (bwm_objective_cache_lookup(p + 1, value)) {
+    bwm_objective_cache_repeats += 1.0;
+    bwm_objective_cache_hits += 1.0;
+    bwm_objective_cache_hits_window += 1.0;
+    return 1;
+  }
+
+  bwm_objective_cache_unique += 1.0;
+  return 0;
+}
+
+static void bwm_objective_cache_put(const double *p, double value)
+{
+  int i;
+
+  if (!bwm_objective_cache_active || bwm_objective_cache_key_len <= 0)
+    return;
+  if (!R_FINITE(value))
+    return;
+  for (i = 0; i < bwm_objective_cache_key_len; i++) {
+    if (!R_FINITE(p[i + 1]))
+      return;
+  }
+
+  bwm_objective_cache_insert(p + 1, value);
+}
+
 static void bwm_nn_cache_write_stats(double *out)
 {
   out[0] = bwm_nn_cache_active ? 1.0 : 0.0;
@@ -1549,6 +1781,14 @@ static void bwm_nn_cache_write_stats(double *out)
   out[5] = bwm_nn_cache_raw_evals;
   out[6] = bwm_nn_cache_hits;
   out[7] = bwm_nn_cache_alloc_failed ? 1.0 : 0.0;
+  out[8] = bwm_objective_cache_active ? 1.0 : 0.0;
+  out[9] = (double)bwm_objective_cache_key_len;
+  out[10] = bwm_objective_cache_visits;
+  out[11] = bwm_objective_cache_unique;
+  out[12] = bwm_objective_cache_repeats;
+  out[13] = bwm_objective_cache_raw_evals;
+  out[14] = bwm_objective_cache_hits;
+  out[15] = bwm_objective_cache_alloc_failed ? 1.0 : 0.0;
 }
 
 static void bwm_maybe_signal_activity(void)
@@ -1592,7 +1832,8 @@ void np_progress_bandwidth_loop_step(void)
 
 static inline void bwm_snapshot_fast_counters(void)
 {
-  bwm_fast_eval_count = np_fastcv_alllarge_hits_get() + bwm_nn_cache_hits_window;
+  bwm_fast_eval_count = np_fastcv_alllarge_hits_get() +
+    bwm_nn_cache_hits_window + bwm_objective_cache_hits_window;
 }
 
 static double bwm_sigmoid(double x)
@@ -1823,6 +2064,7 @@ static double bwmfunc_wrapper(double *p)
   int cache_stack_key[16];
   int *cache_key = NULL;
   int cache_hit = 0;
+  int objective_cache_hit = 0;
 
   bwm_eval_count += 1.0;
   if (!bwm_active_floor_candidate_ok(p)) {
@@ -1844,12 +2086,22 @@ static double bwmfunc_wrapper(double *p)
 
   cache_hit = bwm_nn_cache_get(use_p, &val, &cache_key, cache_stack_key);
   if (!cache_hit) {
+    objective_cache_hit = bwm_objective_cache_get(p, &val);
+    if (objective_cache_hit) {
+      cache_hit = 1;
+      bwm_nn_cache_put(cache_key, cache_stack_key, val);
+      cache_key = NULL;
+    }
+  }
+  if (!cache_hit) {
     guarded_before = np_guarded_cvml_hits_get();
     bwm_progress_eval_active = 1;
     val = bwmfunc_raw(use_p);
     bwm_progress_eval_active = 0;
     bwm_nn_cache_note_raw_eval();
+    bwm_objective_cache_note_raw_eval();
     bwm_nn_cache_put(cache_key, cache_stack_key, val);
+    bwm_objective_cache_put(p, val);
     if(np_guarded_cvml_hits_get() > guarded_before)
       bwm_guarded_eval_count += 1.0;
   }
@@ -4437,7 +4689,7 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
-  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 16));
 
   memcpy(REAL(out_bw), REAL(rbw_r), (size_t)XLENGTH(rbw_r) * sizeof(double));
 
@@ -5193,7 +5445,7 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
-  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 16));
 
   memcpy(REAL(out_bw), REAL(rbw_r), (size_t)XLENGTH(rbw_r) * sizeof(double));
 
@@ -7318,7 +7570,7 @@ static SEXP C_np_density_bw_common(SEXP myuno,
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
   PROTECT(out_guarded = allocVector(REALSXP, 1));
-  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 16));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_density_bw(REAL(myuno_r), REAL(myord_r), REAL(mycon_r),
@@ -7970,7 +8222,7 @@ static SEXP C_np_distribution_bw_common(SEXP myuno,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
-  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 16));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_distribution_bw(REAL(myuno_r), REAL(myord_r), REAL(mycon_r),
@@ -8604,7 +8856,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
   PROTECT(out_guarded = allocVector(REALSXP, 1));
-  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 16));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_density_conditional_bw(REAL(c_uno_r), REAL(c_ord_r), REAL(c_con_r),
@@ -8722,7 +8974,7 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
-  PROTECT(out_nn_cache = allocVector(REALSXP, 8));
+  PROTECT(out_nn_cache = allocVector(REALSXP, 16));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_distribution_conditional_bw(REAL(c_uno_r), REAL(c_ord_r), REAL(c_con_r),
@@ -10442,6 +10694,7 @@ cleanup_np_density_bw:
   /* Free data objects */
   bwm_clear_floor_context();
   bwm_nn_cache_free();
+  bwm_objective_cache_free();
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
@@ -11293,6 +11546,7 @@ cleanup_np_distribution_bw:
   int_extendednn_upper_num_extern = 0;
   bwm_clear_floor_context();
   bwm_nn_cache_free();
+  bwm_objective_cache_free();
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
@@ -12462,6 +12716,7 @@ cleanup_np_density_conditional_bw:
   np_bounded_cvls_conditional_quad_context_clear_extern();
   bwm_clear_floor_context();
   bwm_nn_cache_free();
+  bwm_objective_cache_free();
   safe_free(vector_extendednn_upper_extern);
   vector_extendednn_upper_extern = NULL;
   int_extendednn_upper_num_extern = 0;
@@ -13609,6 +13864,7 @@ cleanup_np_distribution_conditional_bw:
   /* Free data objects */
   bwm_clear_floor_context();
   bwm_nn_cache_free();
+  bwm_objective_cache_free();
   safe_free(vector_extendednn_upper_extern);
   vector_extendednn_upper_extern = NULL;
   int_extendednn_upper_num_extern = 0;
@@ -15622,6 +15878,7 @@ cleanup_np_regression_bw_mode:
   /* Free data objects */
   bwm_clear_floor_context();
   bwm_nn_cache_free();
+  bwm_objective_cache_free();
   safe_free(vector_extendednn_upper_extern);
   vector_extendednn_upper_extern = NULL;
   int_extendednn_upper_num_extern = 0;

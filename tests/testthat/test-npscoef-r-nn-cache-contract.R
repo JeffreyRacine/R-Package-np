@@ -1,5 +1,5 @@
-test_that("np.powell.cache controls npscoef continuous NN R optimizer caching", {
-  old <- options(np.messages = FALSE, np.powell.cache = TRUE)
+test_that("np.objective.cache controls npscoef continuous NN R optimizer caching", {
+  old <- options(np.messages = FALSE, np.objective.cache = TRUE)
   on.exit(options(old), add = TRUE)
 
   run_bw <- function(bwtype, cache) {
@@ -10,7 +10,7 @@ test_that("np.powell.cache controls npscoef continuous NN R optimizer caching", 
     x <- rnorm(n)
     y <- 1 + (0.5 + sin(2 * pi * z1)) * x +
       0.25 * cos(2 * pi * z2) + rnorm(n, sd = 0.2)
-    options(np.powell.cache = cache)
+    options(np.objective.cache = cache)
     np::npscoefbw(
       xdat = data.frame(x = x),
       ydat = y,
@@ -45,7 +45,7 @@ test_that("np.powell.cache controls npscoef continuous NN R optimizer caching", 
 })
 
 test_that("npscoef R NN cache leaves fixed bandwidth searches unmarked", {
-  old <- options(np.messages = FALSE, np.powell.cache = TRUE)
+  old <- options(np.messages = FALSE, np.objective.cache = TRUE)
   on.exit(options(old), add = TRUE)
 
   set.seed(20260524)

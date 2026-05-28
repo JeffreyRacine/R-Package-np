@@ -44,13 +44,20 @@
     force the historical dense categorical route for debugging or timing
     comparisons.
 
-    \item \code{np.powell.cache} (logical): enables exact caching of repeated
-    integer nearest-neighbor candidates in Powell bandwidth searches for
-    eligible continuous-only generalized/adaptive nearest-neighbor routes.
-    Default is \code{TRUE}. Set \code{options(np.powell.cache = FALSE)} to
-    force every repeated Powell candidate through the objective evaluator for
-    diagnostic timing comparisons. MADS/NOMAD solver caching is separate and
-    is not controlled by this option.
+    \item \code{np.objective.cache} (logical): enables package-side objective
+    caching for repeated Powell bandwidth-search candidates. For all Powell
+    routes using the shared C optimizer wrapper, exact repeated raw candidate
+    vectors within one bandwidth solve reuse the previous objective value,
+    including repeated candidates reached by later Powell restarts. For
+    eligible continuous-only generalized/adaptive nearest-neighbor routes,
+    this also enables the existing integer nearest-neighbor objective cache.
+    Mixed continuous/categorical rows use only the exact full-candidate cache,
+    so categorical smoothing parameters remain part of the cache key. Default
+    is \code{TRUE}. Set \code{options(np.objective.cache = FALSE)} to force
+    repeated Powell candidates through the objective evaluator for diagnostic
+    timing comparisons. MADS/NOMAD solver caching is separate and is not
+    controlled by this option, and the saturated extended-NN distance cache is
+    governed by \code{np.extendednn}.
 
     \item \code{np.largeh} (logical): enables continuous large-\eqn{h}
     shortcut evaluations. Default is \code{TRUE}. Set
@@ -108,7 +115,7 @@
 old <- options(
   np.tree = "auto",
   np.categorical.compress = TRUE,
-  np.powell.cache = TRUE,
+  np.objective.cache = TRUE,
   np.largeh = TRUE,
   np.extendednn = TRUE,
   np.largelambda = TRUE,

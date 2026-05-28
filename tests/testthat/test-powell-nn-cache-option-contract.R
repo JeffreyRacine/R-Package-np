@@ -1,12 +1,12 @@
-test_that("np.powell.cache controls continuous NN Powell caching", {
-  old <- options(np.messages = FALSE, np.tree = FALSE)
+test_that("np.objective.cache controls continuous NN Powell caching", {
+  old <- options(np.messages = FALSE, np.tree = FALSE, np.objective.cache = TRUE)
   on.exit(options(old), add = TRUE)
 
   run_bw <- function(cache) {
     set.seed(42)
     dat <- data.frame(x1 = runif(80), x2 = runif(80))
     dat$y <- dat$x1 + dat$x2 + rnorm(80)
-    options(np.powell.cache = cache)
+    options(np.objective.cache = cache)
     np::npregbw(
       y ~ x1 + x2,
       data = dat,
@@ -31,7 +31,7 @@ test_that("np.powell.cache controls continuous NN Powell caching", {
   expect_equal(unname(uncached$nn.cache[["hits"]]), 0)
 })
 
-test_that("np.powell.cache default preserves legacy environment off switch", {
+test_that("np.objective.cache default ignores legacy environment off switch", {
   old <- Sys.getenv("NP_NN_POWELL_CACHE_INSTRUMENT", unset = NA_character_)
   on.exit({
     if (is.na(old)) {
@@ -42,8 +42,8 @@ test_that("np.powell.cache default preserves legacy environment off switch", {
   }, add = TRUE)
 
   Sys.setenv(NP_NN_POWELL_CACHE_INSTRUMENT = "off")
-  expect_false(np:::.np_powell_cache_default())
+  expect_true(np:::npObjectiveCacheEnabled())
 
   Sys.setenv(NP_NN_POWELL_CACHE_INSTRUMENT = "on")
-  expect_true(np:::.np_powell_cache_default())
+  expect_true(np:::npObjectiveCacheEnabled())
 })

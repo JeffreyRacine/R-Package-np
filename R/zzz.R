@@ -21,8 +21,8 @@
     options(np.tree = "auto")
   if (is.null(getOption("np.categorical.compress")))
     options(np.categorical.compress = TRUE)
-  if (is.null(getOption("np.powell.cache")))
-    options(np.powell.cache = .np_powell_cache_default())
+  if (is.null(getOption("np.objective.cache")))
+    options(np.objective.cache = TRUE)
   if (is.null(getOption("np.largeh")))
     options(np.largeh = TRUE)
   if (is.null(getOption("np.largelambda")))
@@ -35,17 +35,18 @@
     options(np.disc.upper.rel.tol = 1e-2)
 }
 
-.np_powell_cache_default <- function() {
-  flag <- Sys.getenv("NP_NN_POWELL_CACHE_INSTRUMENT", unset = "")
-  if (!nzchar(flag))
-    return(TRUE)
-  !(flag %in% c("0", "false", "FALSE", "off", "OFF", "no", "NO"))
-}
-
 npCountVars <- function(x) {
   if (is.null(x) || !length(x))
     return(0L)
   sum(as.integer(x), na.rm = TRUE)
+}
+
+npObjectiveCacheEnabled <- function(value = getOption("np.objective.cache", TRUE)) {
+  if (isTRUE(value))
+    return(TRUE)
+  if (identical(value, FALSE))
+    return(FALSE)
+  stop("option 'np.objective.cache' must be TRUE or FALSE", call. = FALSE)
 }
 
 npTreeMode <- function(value = getOption("np.tree", "auto")) {

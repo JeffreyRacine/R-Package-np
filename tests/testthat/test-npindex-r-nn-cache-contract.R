@@ -1,5 +1,5 @@
-test_that("np.powell.cache controls npindex continuous NN R optimizer caching", {
-  old <- options(np.messages = FALSE, np.powell.cache = TRUE)
+test_that("np.objective.cache controls npindex continuous NN R optimizer caching", {
+  old <- options(np.messages = FALSE, np.objective.cache = TRUE)
   on.exit(options(old), add = TRUE)
 
   run_bw <- function(method, bwtype, cache) {
@@ -13,7 +13,7 @@ test_that("np.powell.cache controls npindex continuous NN R optimizer caching", 
     } else {
       eta + rnorm(n, sd = 0.25)
     }
-    options(np.powell.cache = cache)
+    options(np.objective.cache = cache)
     np::npindexbw(
       xdat = xdat,
       ydat = ydat,
@@ -50,7 +50,7 @@ test_that("np.powell.cache controls npindex continuous NN R optimizer caching", 
 })
 
 test_that("npindex R NN cache leaves fixed bandwidth searches unmarked", {
-  old <- options(np.messages = FALSE, np.powell.cache = TRUE)
+  old <- options(np.messages = FALSE, np.objective.cache = TRUE)
   on.exit(options(old), add = TRUE)
 
   set.seed(20260524)

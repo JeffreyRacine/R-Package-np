@@ -1491,10 +1491,11 @@ npindexbw.sibandwidth <-
           xmat <- xdat
           wmat <- cbind(ydat, 1.0)
           bandwidth_eval_count <- 0L
+          objective.cache.enabled <- npObjectiveCacheEnabled()
           r.nn.cache.surface <- !isTRUE(only.optimize.beta) &&
             identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
           r.nn.cache.eligible <- r.nn.cache.surface &&
-            isTRUE(getOption("np.powell.cache", TRUE))
+            objective.cache.enabled
           r.nn.cache <- if (r.nn.cache.surface) {
             .np_r_nn_cache_new(r.nn.cache.eligible, key.length = length(beta.idx) + 1L)
           } else {
