@@ -1531,7 +1531,7 @@
   value
 }
 
-.np_nomad_capture_snomadr <- function(expr, capture.output = TRUE) {
+.np_nomad_capture_solver_output <- function(expr, capture.output = TRUE) {
   if (!isTRUE(capture.output)) {
     return(list(value = force(expr), output = character()))
   }
@@ -1579,7 +1579,7 @@
   if (!is.function(eval.f))
     stop("native NOMAD R callback route requires a function", call. = FALSE)
 
-  .np_nomad_capture_snomadr(.Call(
+  .np_nomad_capture_solver_output(.Call(
     "C_np_nomad_r_callback_native_search",
     eval.f,
     environment(eval.f),
@@ -2015,7 +2015,7 @@
       ))
     }
 
-    stop("legacy crs::snomadr fallback is retired for npRmpi NOMAD routes; this route must use the native crs C API or fail earlier as unsupported",
+    stop("legacy R-level NOMAD fallback is retired for npRmpi NOMAD routes; this route must use the native crs C API or fail earlier as unsupported",
          call. = FALSE)
   }
 

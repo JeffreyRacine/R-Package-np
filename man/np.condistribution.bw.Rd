@@ -590,7 +590,7 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     This shortcut does not change the meaning of \code{nmulti} or
     \code{nomad.nmulti}: \code{nmulti} remains the outer restart count,
     while \code{nomad.nmulti} controls inner
-    \code{crs::snomadr()} multistarts within each outer restart.
+    native \pkg{crs} NOMAD API multistarts within each outer restart.
     Returned bandwidth objects retain this normalized preset metadata in
     \code{bw$nomad.shortcut} for a returned object \code{bw}; when
     available, \code{nomad.time} and \code{powell.time} record the
@@ -599,7 +599,7 @@ These arguments control the optional NOMAD direct-search route for local-polynom
 
   \item{nomad.nmulti}{
     non-negative integer controlling the inner
-    \code{crs::snomadr()} multistart count used within each outer
+    the native \pkg{crs} NOMAD C API multistart count used within each outer
     NOMAD restart when \code{regtype="lp"} and automatic degree search
     uses \code{search.engine="nomad"} or \code{"nomad+powell"}.
     Defaults to \code{0L}, which preserves the current one-start-per-
@@ -623,7 +623,7 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
     performs direct joint search over the \code{xdat}-side continuous
     bandwidth coordinates and degree vector using
-    \code{crs::snomadr()}, then applies one Powell hot start from the
+    the native \pkg{crs} NOMAD C API, then applies one Powell hot start from the
     NOMAD solution. \code{"nomad"} omits the Powell refinement.
     \code{"cell"} profiles the criterion over the admissible degree
     grid using repeated fixed-degree bandwidth solves. NOMAD-based
@@ -678,7 +678,7 @@ These controls set optimizer tolerances, restart behavior, invalid-candidate pen
   \item{bwsolver}{
     bandwidth optimizer for fixed-degree searches. The default
     \code{"powell"} preserves the historical Powell route. \code{"mads"}
-    uses \code{crs::snomadr()} over the bandwidth coordinates, and
+    uses the native \pkg{crs} NOMAD C API over the bandwidth coordinates, and
     \code{"mads+powell"} applies one Powell hot start from the MADS
     solution. Use \code{search.engine} rather than \code{bwsolver} for
     automatic degree search.
@@ -834,7 +834,7 @@ or standard-deviation factors.
   admissible degree grid using cached coordinate-wise or exhaustive
   search. With \code{search.engine="nomad"} or
   \code{"nomad+powell"}, the criterion is optimized directly over the
-  joint degree/bandwidth space using \code{crs::snomadr()};
+  joint degree/bandwidth space using the native \pkg{crs} NOMAD C API;
   \code{"nomad+powell"} then performs one Powell hot start from the
   NOMAD solution and keeps the better of the direct NOMAD and polished
   answers. This polynomial-adaptive joint-search route is motivated by

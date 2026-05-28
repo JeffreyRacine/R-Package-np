@@ -1113,7 +1113,7 @@ npRmpiNomadShadowNativeSearchRegression <- function(x0,
                                                     inner.start.count = 0L,
                                                     option.names = character(),
                                                     option.values = character()) {
-  native.call <- .np_nomad_capture_snomadr(.Call(
+  native.call <- .np_nomad_capture_solver_output(.Call(
     "C_np_regression_nomad_shadow_native_search",
     as.double(x0),
     as.integer(bbin),

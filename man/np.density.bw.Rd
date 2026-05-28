@@ -384,7 +384,7 @@ These controls set optimizer tolerances, restart behavior, invalid-candidate pen
   \item{bwsolver}{
     bandwidth optimizer for fixed-degree searches. The default
     \code{"powell"} preserves the historical Powell route. \code{"mads"}
-    uses \code{crs::snomadr()} over the bandwidth coordinates, and
+    uses the native \pkg{crs} NOMAD C API over the bandwidth coordinates, and
     \code{"mads+powell"} applies one Powell hot start from the MADS
     solution.
   }

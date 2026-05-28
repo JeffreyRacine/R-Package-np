@@ -81,6 +81,34 @@ nplsqregbw <-
   paste0("tau=", format(tau, trim = TRUE, scientific = FALSE))
 }
 
+.nplsqreg_attach_native_diagnostics <- function(obj, diagnostics) {
+  if (!is.null(diagnostics))
+    attr(obj, "native.nomad.diagnostics") <- diagnostics
+  obj
+}
+
+.nplsqreg_native_diagnostics_from_search <- function(search.result) {
+  if (!isTRUE(getOption("np.developer.native.nomad.diagnostics", FALSE)) ||
+      is.null(search.result) ||
+      is.null(search.result$native.diagnostics))
+    return(NULL)
+  search.result$native.diagnostics
+}
+
+.nplsqreg_collect_native_diagnostics <- function(objects, labels) {
+  child <- lapply(objects, function(z) attr(z, "native.nomad.diagnostics", exact = TRUE))
+  names(child) <- labels
+  keep <- vapply(child, is.list, logical(1L))
+  if (!any(keep))
+    return(NULL)
+  child <- child[keep]
+  list(
+    route_native = all(vapply(child, function(z) isTRUE(z$route_native), logical(1L))),
+    source = "nplsqreg-tau-composition",
+    children = child
+  )
+}
+
 .nplsqreg_validate_tau_search <- function(tau.search) {
   match.arg(tau.search, c("full", "refined"))
 }
@@ -737,6 +765,10 @@ nplsqregbw <-
   out$fit.time <- NA_real_
   out$call <- call
   class(out) <- "lsqregressionbandwidth"
+  out <- .nplsqreg_attach_native_diagnostics(
+    out,
+    .nplsqreg_collect_native_diagnostics(bw.list, labels)
+  )
   out
 }
 
@@ -794,6 +826,10 @@ nplsqregbw <-
   out$total.time <- .nplsqreg_sum_times(optim.time, fit.time)
   out$call <- call
   class(out) <- "lsqregression"
+  out <- .nplsqreg_attach_native_diagnostics(
+    out,
+    attr(bws, "native.nomad.diagnostics", exact = TRUE)
+  )
   out
 }
 
@@ -1145,6 +1181,10 @@ nplsqregbw.default <-
       scale.fit = scale.fit,
       formula = NULL,
       call = match.call(expand.dots = FALSE))
+    out <- .nplsqreg_attach_native_diagnostics(
+      out,
+      .nplsqreg_native_diagnostics_from_search(search.result)
+    )
     environment(out$call) <- parent.frame()
     out
   }
@@ -1361,6 +1401,10 @@ nplsqreg.default <-
       residuals = residuals,
       resid = resid.out,
       call = match.call(expand.dots = FALSE))
+    out <- .nplsqreg_attach_native_diagnostics(
+      out,
+      attr(bws, "native.nomad.diagnostics", exact = TRUE)
+    )
     environment(out$call) <- parent.frame()
     out
   }

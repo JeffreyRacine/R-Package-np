@@ -300,7 +300,7 @@ npRmpiNomadNativeSearchDensity <- function(prep,
                                            inner.start.count = 0L,
                                            option.names = character(),
                                            option.values = character()) {
-  native.call <- .np_nomad_capture_snomadr(.Call(
+  native.call <- .np_nomad_capture_solver_output(.Call(
     "C_np_density_nomad_native_search",
     as.double(prep$duno),
     as.double(prep$dord),
