@@ -364,17 +364,13 @@ npindexbw.NULL <-
 }
 
 .npindexbw_fast_eligible <- function(h, bws, eval.index) {
-  if (!isTRUE(getOption("np.largeh", TRUE)))
+  if (!npLogicalOption("np.largeh", TRUE))
     return(FALSE)
 
   if (!identical(bws$type, "fixed"))
     return(FALSE)
 
-  fast_largeh_tol <- getOption("np.largeh.rel.tol", 1e-3)
-  if (!is.numeric(fast_largeh_tol) || length(fast_largeh_tol) != 1L ||
-      is.na(fast_largeh_tol) || !is.finite(fast_largeh_tol) ||
-      fast_largeh_tol <= 0 || fast_largeh_tol >= 0.1)
-    fast_largeh_tol <- 1e-3
+  fast_largeh_tol <- npLargehRelTol()
 
   cont_utol <- switch(
     bws$ckertype,

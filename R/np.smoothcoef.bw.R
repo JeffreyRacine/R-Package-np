@@ -523,17 +523,8 @@ npscoefbw.scbandwidth <-
       scbw
     }
 
-    fast_largeh_tol <- getOption("np.largeh.rel.tol", 1e-3)
-    if (!is.numeric(fast_largeh_tol) || length(fast_largeh_tol) != 1L ||
-        is.na(fast_largeh_tol) || !is.finite(fast_largeh_tol) ||
-        fast_largeh_tol <= 0 || fast_largeh_tol >= 0.1)
-      fast_largeh_tol <- 1e-3
-
-    fast_disc_tol <- getOption("np.disc.upper.rel.tol", 1e-2)
-    if (!is.numeric(fast_disc_tol) || length(fast_disc_tol) != 1L ||
-        is.na(fast_disc_tol) || !is.finite(fast_disc_tol) ||
-        fast_disc_tol <= 0 || fast_disc_tol >= 0.5)
-      fast_disc_tol <- 1e-2
+    fast_largeh_tol <- npLargehRelTol()
+    fast_disc_tol <- npDiscUpperRelTol()
 
     cont_utol <- switch(
       bws$ckertype,
@@ -1575,23 +1566,14 @@ npscoefbw.scbandwidth <-
   tdati <- if (is.null(sbw$zdati)) sbw$xdati else sbw$zdati
   eval.zdat <- toFrame(eval.zdat)
 
-  if (any(tdati$icon) && !isTRUE(getOption("np.largeh", TRUE)))
+  if (any(tdati$icon) && !npLogicalOption("np.largeh", TRUE))
     return(FALSE)
   if ((any(tdati$iuno) || any(tdati$iord)) &&
-      !isTRUE(getOption("np.largelambda", TRUE)))
+      !npLogicalOption("np.largelambda", TRUE))
     return(FALSE)
 
-  fast_largeh_tol <- getOption("np.largeh.rel.tol", 1e-3)
-  if (!is.numeric(fast_largeh_tol) || length(fast_largeh_tol) != 1L ||
-      is.na(fast_largeh_tol) || !is.finite(fast_largeh_tol) ||
-      fast_largeh_tol <= 0 || fast_largeh_tol >= 0.1)
-    fast_largeh_tol <- 1e-3
-
-  fast_disc_tol <- getOption("np.disc.upper.rel.tol", 1e-2)
-  if (!is.numeric(fast_disc_tol) || length(fast_disc_tol) != 1L ||
-      is.na(fast_disc_tol) || !is.finite(fast_disc_tol) ||
-      fast_disc_tol <= 0 || fast_disc_tol >= 0.5)
-    fast_disc_tol <- 1e-2
+  fast_largeh_tol <- npLargehRelTol()
+  fast_disc_tol <- npDiscUpperRelTol()
 
   cont_utol <- switch(
     sbw$ckertype,

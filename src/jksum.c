@@ -2364,15 +2364,13 @@ static inline double np_get_option_double(const char * const name, const double 
   if(val == R_NilValue)
     return fallback;
 
-  if(TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
+  if(TYPEOF(val) == REALSXP && XLENGTH(val) == 1 && isfinite(REAL(val)[0]))
     return REAL(val)[0];
 
-  if(TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
+  if(TYPEOF(val) == INTSXP && XLENGTH(val) == 1 && INTEGER(val)[0] != NA_INTEGER)
     return (double)INTEGER(val)[0];
 
-  if(TYPEOF(val) == LGLSXP && XLENGTH(val) > 0)
-    return (double)LOGICAL(val)[0];
-
+  error("option '%s' must be a finite numeric scalar", name);
   return fallback;
 }
 
@@ -2383,15 +2381,10 @@ static inline int np_get_option_logical(const char * const name, const int fallb
   if(val == R_NilValue)
     return fallback;
 
-  if(TYPEOF(val) == LGLSXP && XLENGTH(val) > 0)
-    return (LOGICAL(val)[0] == NA_LOGICAL) ? fallback : (LOGICAL(val)[0] != 0);
+  if(TYPEOF(val) == LGLSXP && XLENGTH(val) == 1 && LOGICAL(val)[0] != NA_LOGICAL)
+    return LOGICAL(val)[0] != 0;
 
-  if(TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
-    return (INTEGER(val)[0] == NA_INTEGER) ? fallback : (INTEGER(val)[0] != 0);
-
-  if(TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
-    return isfinite(REAL(val)[0]) ? (REAL(val)[0] != 0.0) : fallback;
-
+  error("option '%s' must be TRUE or FALSE", name);
   return fallback;
 }
 
@@ -2673,16 +2666,7 @@ static inline void np_refresh_runtime_tolerances(void){
   if(isfinite(largeh_optv) && largeh_optv > 0.0 && largeh_optv < 0.1) {
     np_largeh_rel_tol_cache = largeh_optv;
   } else {
-    np_largeh_rel_tol_cache = largeh_dflt;
-    /* fallback for legacy/developer workflows */
-    {
-      const char *rt_env = getenv("NP_LARGEH_REL_TOL");
-      if(rt_env != NULL && rt_env[0] != '\0'){
-        const double v = atof(rt_env);
-        if(isfinite(v) && v > 0.0 && v < 0.1)
-          np_largeh_rel_tol_cache = v;
-      }
-    }
+    error("option 'np.largeh.rel.tol' must be a finite numeric scalar in (0, 0.1)");
   }
 
   {
@@ -2691,16 +2675,7 @@ static inline void np_refresh_runtime_tolerances(void){
     if(isfinite(disc_optv) && disc_optv > 0.0 && disc_optv < 0.5) {
       np_disc_rel_tol_cache = disc_optv;
     } else {
-      np_disc_rel_tol_cache = disc_dflt;
-      /* fallback for legacy/developer workflows */
-      {
-        const char *rt_env = getenv("NP_DISC_UPPER_REL_TOL");
-        if(rt_env != NULL && rt_env[0] != '\0'){
-          const double v = atof(rt_env);
-          if(isfinite(v) && v > 0.0 && v < 0.5)
-            np_disc_rel_tol_cache = v;
-        }
-      }
+      error("option 'np.disc.upper.rel.tol' must be a finite numeric scalar in (0, 0.5)");
     }
   }
 
