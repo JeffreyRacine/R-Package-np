@@ -2124,7 +2124,8 @@ npregbw.rbandwidth <-
         restart_index = restart.index,
         degree = native.restart.degree,
         best_record = native.baseline.record,
-        restart_durations = native.nomad.elapsed
+        restart_durations = native.nomad.elapsed,
+        eval_offset = native.callback.total
       )
       native.start <- proc.time()[3L]
       native <- npNomadNativeSearchRegression(

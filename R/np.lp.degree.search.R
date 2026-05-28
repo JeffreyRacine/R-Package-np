@@ -1700,6 +1700,8 @@
     baseline_degree = baseline_degree,
     best_record = best_record
   )
+  handle$state$nomad_native_progress <- TRUE
+  handle$state$nomad_eval_offset <- 0L
   .np_progress_runtime$bandwidth_state <- handle$state
   handle
 }
@@ -1716,11 +1718,58 @@
   state
 }
 
+.np_progress_nomad_native_step_from_c <- function(iteration,
+                                                  current.degree,
+                                                  best.degree = integer(),
+                                                  best.objective = NA_real_) {
+  state <- .np_progress_runtime$bandwidth_state
+  if (is.null(state) || !isTRUE(state$nomad_native_progress)) {
+    return(invisible(FALSE))
+  }
+
+  iteration <- suppressWarnings(as.integer(iteration)[1L])
+  if (is.na(iteration) || iteration < 1L) {
+    return(invisible(FALSE))
+  }
+
+  current.degree <- as.integer(current.degree)
+  if (length(current.degree) && !anyNA(current.degree)) {
+    state$nomad_current_degree <- current.degree
+  }
+
+  eval.offset <- suppressWarnings(as.integer(state$nomad_eval_offset)[1L])
+  if (is.na(eval.offset) || eval.offset < 0L) {
+    eval.offset <- 0L
+  }
+  state$nomad_eval_id <- eval.offset + iteration
+
+  best.degree <- as.integer(best.degree)
+  if (length(best.degree) && !anyNA(best.degree)) {
+    best.objective <- suppressWarnings(as.numeric(best.objective)[1L])
+    state$nomad_best_record <- list(
+      eval_id = state$nomad_eval_id,
+      degree = best.degree,
+      objective = best.objective,
+      status = "ok",
+      cached = FALSE
+    )
+  }
+
+  state <- .np_degree_progress_step(
+    state = state,
+    done = iteration,
+    detail = NULL
+  )
+  .np_progress_runtime$bandwidth_state <- state
+  invisible(TRUE)
+}
+
 .np_nomad_native_progress_restart <- function(handle,
                                               restart_index,
                                               degree,
                                               best_record,
-                                              restart_durations = numeric()) {
+                                              restart_durations = numeric(),
+                                              eval_offset = 0L) {
   state <- .np_nomad_native_progress_state(handle)
   if (is.null(state)) {
     return(invisible(NULL))
@@ -1730,6 +1779,13 @@
   state$nomad_best_record <- best_record
   state$nomad_restart_index <- as.integer(restart_index)
   state$nomad_restart_durations <- restart_durations
+  eval_offset <- suppressWarnings(as.integer(eval_offset)[1L])
+  if (is.na(eval_offset) || eval_offset < 0L) {
+    eval_offset <- 0L
+  }
+  state$nomad_eval_offset <- eval_offset
+  state$nomad_eval_id <- state$nomad_eval_offset
+  state$last_done <- NULL
   state <- .np_degree_progress_step(
     state = state,
     done = NULL,

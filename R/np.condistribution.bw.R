@@ -2107,7 +2107,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         handle = native.progress,
         restart_index = restart.index,
         degree = native.restart.degree,
-        best_record = native.baseline.record
+        best_record = native.baseline.record,
+        eval_offset = native.callback.total
       )
       native.start <- proc.time()[3L]
       native <- npNomadNativeSearchConditionalDistribution(

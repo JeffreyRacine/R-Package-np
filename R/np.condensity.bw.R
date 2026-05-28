@@ -1807,6 +1807,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
     native.best.index <- NA_integer_
     native.best.objective <- -Inf
     native.nomad.elapsed <- 0
+    native.callback.total <- 0L
     native.progress <- .np_nomad_native_progress_begin(
       nmulti = native.nmulti,
       baseline_degree = degree.search$start.degree,
@@ -1824,7 +1825,8 @@ npNomadShadowSearchConditionalDensity <- function(template,
         handle = native.progress,
         restart_index = restart.index,
         degree = native.restart.degree,
-        best_record = NULL
+        best_record = NULL,
+        eval_offset = native.callback.total
       )
       native.start <- proc.time()[3L]
       native <- npNomadShadowNativeSearchConditionalDensity(
@@ -1884,6 +1886,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       nomad.num.feval.total <- nomad.num.feval.total + as.numeric(native.i$native$total_num.feval[1L])
       nomad.num.feval.fast.total <- nomad.num.feval.fast.total + as.numeric(native.i$native$total_num.feval.fast[1L])
       nomad.num.feval.guarded.total <- nomad.num.feval.guarded.total + as.numeric(native.i$native$total_num.feval.guarded[1L])
+      native.callback.total <- native.callback.total + as.integer(native.i$native$compiled_callback_calls[1L])
       if (is.finite(native.i$objective) &&
           .np_degree_better(native.i$objective, native.best.objective, direction = "max")) {
         native.best.objective <- native.i$objective
@@ -1905,6 +1908,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       nomad.num.feval.total <- nomad.num.feval.total + as.numeric(native.remin$native$total_num.feval[1L])
       nomad.num.feval.fast.total <- nomad.num.feval.fast.total + as.numeric(native.remin$native$total_num.feval.fast[1L])
       nomad.num.feval.guarded.total <- nomad.num.feval.guarded.total + as.numeric(native.remin$native$total_num.feval.guarded[1L])
+      native.callback.total <- native.callback.total + as.integer(native.remin$native$compiled_callback_calls[1L])
       if (is.finite(native.remin$objective) &&
           .np_degree_better(native.remin$objective, native.best.objective, direction = "max")) {
         native.best.objective <- native.remin$objective
