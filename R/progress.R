@@ -1787,6 +1787,10 @@
 .np_progress_bandwidth_activity_step <- function(done = NULL) {
   state <- .np_progress_runtime$bandwidth_state
 
+  if (isTRUE(state$nomad_native_progress)) {
+    return(invisible(NULL))
+  }
+
   if (.np_progress_bandwidth_enhanced_state(state)) {
     if (!is.null(done)) {
       done <- suppressWarnings(as.integer(done)[1L])

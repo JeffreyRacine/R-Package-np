@@ -85,6 +85,7 @@ static int fit_progress_total = 0;
 static int fit_progress_offset = 0;
 static clock_t fit_progress_last_signal_clock = 0;
 static int fit_progress_last_signal_eval = 0;
+static int nomad_degree_progress_active = 0;
 
 static void np_progress_signal(const char *event, const char *surface, const int current, const int total)
 {
@@ -120,6 +121,90 @@ static void np_progress_signal(const char *event, const char *surface, const int
   PROTECT(call = Rf_lang5(fn, event_s, surface_s, current_s, total_s));
   R_tryEval(call, ns, &err);
   UNPROTECT(7);
+}
+
+static int np_nomad_degree_progress_due(const int current_eval,
+                                        int *last_eval,
+                                        clock_t *last_clock,
+                                        time_t *last_wall)
+{
+  const clock_t now = clock();
+  const time_t wall_now = time(NULL);
+  const double signal_after_sec = 0.5;
+  const double signal_after_wall_sec = 1.0;
+  const int signal_every_evals = 64;
+  double since_last = 0.0;
+  double wall_since_last = 0.0;
+
+  if (current_eval < 1 || last_eval == NULL || last_clock == NULL || last_wall == NULL)
+    return 0;
+
+  if (current_eval == 1)
+    return 1;
+
+  if ((*last_clock > 0) && (now > *last_clock))
+    since_last = ((double) (now - *last_clock)) / (double) CLOCKS_PER_SEC;
+
+  if (*last_wall > 0 && wall_now >= *last_wall)
+    wall_since_last = difftime(wall_now, *last_wall);
+
+  if ((current_eval - *last_eval) < signal_every_evals &&
+      since_last < signal_after_sec &&
+      wall_since_last < signal_after_wall_sec)
+    return 0;
+
+  return 1;
+}
+
+static void np_progress_nomad_degree_step(const int current_eval,
+                                          const int *current_degree,
+                                          const int current_degree_len,
+                                          const int *best_degree,
+                                          const int best_degree_len,
+                                          const double best_objective,
+                                          int *last_eval,
+                                          clock_t *last_clock,
+                                          time_t *last_wall)
+{
+  SEXP ns = R_NilValue;
+  SEXP fn = R_NilValue;
+  SEXP iter_s = R_NilValue;
+  SEXP current_degree_s = R_NilValue;
+  SEXP best_degree_s = R_NilValue;
+  SEXP best_objective_s = R_NilValue;
+  SEXP call = R_NilValue;
+  int i, err = 0;
+
+  if (!np_nomad_degree_progress_due(current_eval, last_eval, last_clock, last_wall))
+    return;
+
+  PROTECT(ns = R_FindNamespace(Rf_ScalarString(Rf_mkChar("npRmpi"))));
+  if (ns == R_NilValue) {
+    UNPROTECT(1);
+    return;
+  }
+
+  if (!R_existsVarInFrame(ns, Rf_install(".np_progress_nomad_native_step_from_c"))) {
+    UNPROTECT(1);
+    return;
+  }
+
+  PROTECT(fn = Rf_findFun(Rf_install(".np_progress_nomad_native_step_from_c"), ns));
+  PROTECT(iter_s = Rf_ScalarInteger(current_eval));
+  PROTECT(current_degree_s = allocVector(INTSXP, current_degree_len > 0 ? current_degree_len : 0));
+  for (i = 0; i < current_degree_len; i++)
+    INTEGER(current_degree_s)[i] = current_degree == NULL ? NA_INTEGER : current_degree[i];
+  PROTECT(best_degree_s = allocVector(INTSXP, best_degree_len > 0 ? best_degree_len : 0));
+  for (i = 0; i < best_degree_len; i++)
+    INTEGER(best_degree_s)[i] = best_degree == NULL ? NA_INTEGER : best_degree[i];
+  PROTECT(best_objective_s = Rf_ScalarReal(best_objective));
+  PROTECT(call = Rf_lang5(fn, iter_s, current_degree_s, best_degree_s, best_objective_s));
+  R_tryEval(call, ns, &err);
+  UNPROTECT(7);
+
+  *last_eval = current_eval;
+  *last_clock = clock();
+  *last_wall = time(NULL);
 }
 
 SEXP C_np_progress_signal(SEXP event, SEXP surface, SEXP current, SEXP total)
@@ -1871,6 +1956,9 @@ static void bwm_maybe_signal_activity(void)
   if (current_eval < 1)
     return;
 
+  if (nomad_degree_progress_active)
+    return;
+
   if ((bwm_progress_last_signal_clock > 0) && (now > bwm_progress_last_signal_clock))
     since_last = ((double) (now - bwm_progress_last_signal_clock)) / (double) CLOCKS_PER_SEC;
 
@@ -3617,6 +3705,9 @@ typedef struct {
   int *best_degree;
   int *first_degree;
   double first_objective;
+  int progress_last_signal_eval;
+  clock_t progress_last_signal_clock;
+  time_t progress_last_signal_wall;
 } np_regression_shadow_native_search_context;
 
 static int np_regression_shadow_native_decode_bw(
@@ -3746,6 +3837,16 @@ static int np_regression_shadow_native_search_callback(int n,
       for (j = 0; j < context->ndegree; j++)
         context->best_degree[j] = degree_work[j];
   }
+  if (context->ndegree > 0)
+    np_progress_nomad_degree_step(context->callback_calls,
+                                  degree_work,
+                                  context->ndegree,
+                                  context->best_degree,
+                                  context->ndegree,
+                                  context->best_objective,
+                                  &context->progress_last_signal_eval,
+                                  &context->progress_last_signal_clock,
+                                  &context->progress_last_signal_wall);
 
   bb_outputs[0] = eval_out[0];
   R_Free(raw_point);
@@ -3928,10 +4029,12 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   result.outputs = crs_outputs;
   result.outputs_len = 1;
 
+  nomad_degree_progress_active = (context.ndegree > 0);
   status = solve(&problem,
                  np_regression_shadow_native_search_callback,
                  &context,
                  &result);
+  nomad_degree_progress_active = 0;
 
   PROTECT(out = allocVector(VECSXP, 27));
   PROTECT(names = allocVector(STRSXP, 27));
@@ -5120,6 +5223,9 @@ typedef struct {
   double *best_point;
   double *best_flat_bw;
   int *best_degree;
+  int progress_last_signal_eval;
+  clock_t progress_last_signal_clock;
+  time_t progress_last_signal_wall;
 } np_cdens_native_search_context;
 
 static int np_cdens_native_search_callback(int n,
@@ -5222,6 +5328,16 @@ static int np_cdens_native_search_callback(int n,
         context->best_degree[j] = degree[j];
     }
   }
+  if (context->ndegree > 0)
+    np_progress_nomad_degree_step(context->callback_calls,
+                                  degree,
+                                  degree_len,
+                                  context->best_degree,
+                                  degree_len,
+                                  context->best_objective,
+                                  &context->progress_last_signal_eval,
+                                  &context->progress_last_signal_clock,
+                                  &context->progress_last_signal_wall);
 
   R_Free(flat_bw);
   R_Free(degree);
@@ -5408,10 +5524,12 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   result.outputs = crs_outputs;
   result.outputs_len = 1;
 
+  nomad_degree_progress_active = (context.ndegree > 0);
   status = solve(&problem,
                  np_cdens_native_search_callback,
                  &context,
                  &result);
+  nomad_degree_progress_active = 0;
 
   PROTECT(out = allocVector(VECSXP, 24));
   PROTECT(names = allocVector(STRSXP, 24));
@@ -5673,10 +5791,12 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   result.outputs = crs_outputs;
   result.outputs_len = 1;
 
+  nomad_degree_progress_active = (context.ndegree > 0);
   status = solve(&problem,
                  np_cdens_native_search_callback,
                  &context,
                  &result);
+  nomad_degree_progress_active = 0;
 
   PROTECT(out = allocVector(VECSXP, 24));
   PROTECT(names = allocVector(STRSXP, 24));
@@ -8746,6 +8866,9 @@ typedef struct {
   double *best_point;
   int *best_degree;
   int *first_degree;
+  int progress_last_signal_eval;
+  clock_t progress_last_signal_clock;
+  time_t progress_last_signal_wall;
 } np_cdist_native_search_context;
 
 static int np_cdist_native_decode_eval_bw(const np_cdist_native_search_context *context,
@@ -8918,6 +9041,16 @@ static int np_cdist_native_search_callback(int n,
         context->best_degree[j] = degree_work[j];
     }
   }
+  if (context->ndegree > 0)
+    np_progress_nomad_degree_step(context->callback_calls,
+                                  degree_work,
+                                  context->ndegree,
+                                  context->best_degree,
+                                  context->ndegree,
+                                  context->best_objective,
+                                  &context->progress_last_signal_eval,
+                                  &context->progress_last_signal_clock,
+                                  &context->progress_last_signal_wall);
 
   bb_outputs[0] = eval_out[0];
   R_Free(raw_point);
@@ -9155,7 +9288,9 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   result.outputs = crs_outputs;
   result.outputs_len = 1;
 
+  nomad_degree_progress_active = (context.ndegree > 0);
   status = solve(&problem, np_cdist_native_search_callback, &context, &result);
+  nomad_degree_progress_active = 0;
 
   PROTECT(out = allocVector(VECSXP, 26));
   PROTECT(names = allocVector(STRSXP, 26));
