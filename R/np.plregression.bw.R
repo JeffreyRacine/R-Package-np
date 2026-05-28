@@ -1094,6 +1094,8 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
                                          bbin,
                                          lb,
                                          ub,
+                                         start.lower = NULL,
+                                         start.upper = NULL,
                                          nomad.nmulti = 1L,
                                          nomad.inner.nmulti = 0L,
                                          random.seed = 42L,
@@ -1185,6 +1187,8 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     remin = isTRUE(remin),
+    start.lower = start.lower,
+    start.upper = start.upper,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
@@ -1215,6 +1219,8 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
                                            bbin,
                                            lb,
                                            ub,
+                                           start.lower = NULL,
+                                           start.upper = NULL,
                                            nomad.nmulti = 1L,
                                            nomad.inner.nmulti = 0L,
                                            random.seed = 42L,
@@ -1252,6 +1258,8 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
       bbin = bbin,
       lb = lb,
       ub = ub,
+      start.lower = start.lower,
+      start.upper = start.upper,
       nomad.nmulti = nomad.nmulti,
       nomad.inner.nmulti = nomad.inner.nmulti,
       random.seed = random.seed,
@@ -1689,6 +1697,8 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
       nomad.inner.nmulti = nomad.inner.nmulti,
       random.seed = random.seed,
       remin = isTRUE(remin),
+      start.lower = start.lower,
+      start.upper = start.upper,
       degree_spec = list(
         initial = degree.search$start.degree,
         lower = degree.search$lower,
@@ -1751,9 +1761,22 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
   child.bounds <- lapply(seq_along(child.templates), function(i) {
     .npregbw_nomad_bw_bounds(template = child.templates[[i]], setup = child.setup[[i]])
   })
+  opt.value <- function(name, default) {
+    if (is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
+  child.start.bounds <- lapply(seq_along(child.templates), function(i) {
+    .np_nomad_bw_restart_start_bounds(
+      bounds = child.bounds[[i]],
+      setup = child.setup[[i]],
+      opt.value = opt.value,
+      where = "npplregbw"
+    )
+  })
   child.lower <- unlist(lapply(child.bounds, `[[`, "lower"), use.names = FALSE)
   child.upper <- unlist(lapply(child.bounds, `[[`, "upper"), use.names = FALSE)
   child.bbin <- unlist(lapply(child.bounds, `[[`, "bbin"), use.names = FALSE)
+  child.start.lower <- unlist(lapply(child.start.bounds, `[[`, "lower"), use.names = FALSE)
+  child.start.upper <- unlist(lapply(child.start.bounds, `[[`, "upper"), use.names = FALSE)
   child.start <- unlist(lapply(seq_along(child.templates), function(i) {
     raw <- child.templates[[i]]$bw
     point.start <- if (all(raw == 0)) NULL else .npregbw_nomad_bw_to_point(raw, template = child.templates[[i]], setup = child.setup[[i]])
@@ -1952,6 +1975,8 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
         BBIN,
         LB,
         UB,
+        STARTLOWER,
+        STARTUPPER,
         NOMADNMULTI,
         INNERNMULTI,
         RSEED,
@@ -1968,6 +1993,8 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
         BBIN = bbin,
         LB = lb,
         UB = ub,
+        STARTLOWER = c(child.start.lower, degree.search$lower),
+        STARTUPPER = c(child.start.upper, degree.search$upper),
         NOMADNMULTI = nomad.nmulti,
         INNERNMULTI = nomad.inner.nmulti,
         RSEED = random.seed,
@@ -2042,6 +2069,8 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     remin = isTRUE(opt.args$nomad.remin),
+    start.lower = c(child.start.lower, degree.search$lower),
+    start.upper = c(child.start.upper, degree.search$upper),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,

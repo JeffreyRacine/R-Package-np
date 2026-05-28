@@ -1506,6 +1506,13 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
+  native.start.bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = bounds,
+    setup = setup,
+    opt.value = opt.value,
+    where = "npcdistbw"
+  )
+
   if (.npcdistbw_nomad_native_target(template, bwsolver)) {
     .npcdistbw_nomad_native_require_crs()
     native.nmulti <- npValidateNmulti(opt.value("nmulti", npDefaultNmulti(dim(ydat)[2L] + dim(xdat)[2L])))
@@ -1530,7 +1537,9 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       ub = bounds$upper,
       nmulti = native.nmulti,
       random.seed = native.random.seed,
-      degree_spec = NULL
+      degree_spec = NULL,
+      start.lower = native.start.bounds$lower,
+      start.upper = native.start.bounds$upper
     )
     native.prep <- .npcdistbw_nomad_native_prepare_args(
       xdat = xdat,
@@ -1694,7 +1703,9 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       random.seed = opt.value("random.seed", 42L),
       handoff_before_build = identical(bwsolver, "mads+powell"),
       remin = isTRUE(opt.args$nomad.remin),
-      nomad.opts = opt.value("nomad.opts", list())
+      nomad.opts = opt.value("nomad.opts", list()),
+      start.lower = native.start.bounds$lower,
+      start.upper = native.start.bounds$upper
     )
   }
   search.result$method <- bwsolver
@@ -1769,6 +1780,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   }
 
   setup <- list(
+    type = template$type,
     cont_flat = c(y_cont_flat, x_cont_flat),
     cont_scale = .npConditionalNomadContScale(
       ycon = ycon,
@@ -2030,6 +2042,22 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
   } else {
     degree.search$engine
   }
+  opt.value.local <- function(name, default) {
+    if (is.null(opt.args) || is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
+  native.bw.bounds <- list(
+    lower = lb[seq_len(bwdim)],
+    upper = ub[seq_len(bwdim)],
+    bbin = bbin[seq_len(bwdim)],
+    ncon = length(setup$cont_flat),
+    ncat = length(setup$cat_flat)
+  )
+  native.start.bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = native.bw.bounds,
+    setup = setup,
+    opt.value = opt.value.local,
+    where = "npcdistbw"
+  )
 
   if (.npcdistbw_nomad_degree_native_target(template, degree.search)) {
     .npcdistbw_nomad_native_require_crs()
@@ -2048,6 +2076,8 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
         ub = ub,
         nmulti = native.nmulti,
         random.seed = random.seed,
+        start.lower = c(native.start.bounds$lower, degree.search$lower),
+        start.upper = c(native.start.bounds$upper, degree.search$upper),
         degree_spec = list(
           initial = degree.search$start.degree,
           lower = degree.search$lower,
@@ -2309,6 +2339,8 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     bind_bandwidth_runtime = !is.null(external.progress),
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
     remin = isTRUE(opt.args$nomad.remin),
+    start.lower = c(native.start.bounds$lower, degree.search$lower),
+    start.upper = c(native.start.bounds$upper, degree.search$upper),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
@@ -2370,6 +2402,15 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
   ndeg <- length(degree.search$start.degree)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
   bw_bounds <- .npcdistbw_nomad_bw_bounds(template = template, setup = setup)
+  opt.value.local <- function(name, default) {
+    if (is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
+  bw_start_bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = bw_bounds,
+    setup = setup,
+    opt.value = opt.value.local,
+    where = "npcdistbw"
+  )
 
   x0 <- c(
     .npcdistbw_nomad_complete_bw_start_point(
@@ -2530,6 +2571,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     search.template <- template
     search.setup <- list(
+      type = setup$type,
       cont_flat = setup$cont_flat,
       cont_scale = setup$cont_scale,
       cat_flat = setup$cat_flat,
@@ -2713,6 +2755,8 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     remin = isTRUE(opt.args$nomad.remin),
+    start.lower = c(bw_start_bounds$lower, degree.search$lower),
+    start.upper = c(bw_start_bounds$upper, degree.search$upper),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,

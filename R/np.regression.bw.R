@@ -1658,6 +1658,13 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
+  native.start.bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = bounds,
+    setup = setup,
+    opt.value = opt.value,
+    where = "npregbw"
+  )
+
   if (.npregbw_nomad_native_target(template, bwsolver) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     return(.npRmpi_with_local_regression(.npregbw_run_fixed_degree_mads(
@@ -1688,7 +1695,9 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       ub = bounds$upper,
       nmulti = native.nmulti,
       random.seed = random.seed,
-      degree_spec = NULL
+      degree_spec = NULL,
+      start.lower = native.start.bounds$lower,
+      start.upper = native.start.bounds$upper
     )
 
     start.bw <- .npregbw_nomad_point_to_bw(x0, template = template, setup = setup)
@@ -1890,7 +1899,9 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     random.seed = random.seed,
     handoff_before_build = identical(bwsolver, "mads+powell"),
     remin = isTRUE(opt.args$nomad.remin),
-    nomad.opts = nomad.opts
+    nomad.opts = nomad.opts,
+    start.lower = native.start.bounds$lower,
+    start.upper = native.start.bounds$upper
   )
   search.result$method <- bwsolver
   payload <- search.result$best_payload
@@ -2004,6 +2015,79 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     ncon = ncon,
     ncat = ncat
   )
+}
+
+.np_nomad_bw_restart_start_bounds <- function(bounds,
+                                             setup,
+                                             opt.value,
+                                             where = "NOMAD bandwidth search") {
+  start.lower <- as.numeric(bounds$lower)
+  start.upper <- as.numeric(bounds$upper)
+  n <- length(start.lower)
+  if (length(start.upper) != n)
+    stop(sprintf("%s: search bounds must have matching lengths", where), call. = FALSE)
+
+  ncon <- if (!is.null(bounds$ncon)) {
+    as.integer(bounds$ncon[1L])
+  } else if (!is.null(setup$cont_idx)) {
+    length(setup$cont_idx)
+  } else if (!is.null(setup$cont_flat)) {
+    length(setup$cont_flat)
+  } else {
+    0L
+  }
+  ncat <- if (!is.null(bounds$ncat)) {
+    as.integer(bounds$ncat[1L])
+  } else if (!is.null(setup$cat_idx)) {
+    length(setup$cat_idx)
+  } else if (!is.null(setup$cat_flat)) {
+    length(setup$cat_flat)
+  } else {
+    max(0L, n - ncon)
+  }
+
+  type <- if (!is.null(setup$type)) as.character(setup$type[1L]) else ""
+  if (ncon > 0L && identical(type, "fixed")) {
+    cont.idx <- seq_len(ncon)
+    search.lower <- max(as.numeric(bounds$lower[cont.idx]), na.rm = TRUE)
+    cont.start <- npContinuousSearchStartControls(
+      opt.value("scale.factor.init.lower", 0.1),
+      opt.value("scale.factor.init.upper", 2.0),
+      opt.value("scale.factor.init", 0.5),
+      search.lower,
+      where = where
+    )
+    start.lower[cont.idx] <- cont.start$scale.factor.init.lower
+    start.upper[cont.idx] <- cont.start$scale.factor.init.upper
+  }
+
+  if (ncat > 0L) {
+    cat.idx <- ncon + seq_len(ncat)
+    lbd.init <- npValidatePositiveFiniteNumeric(opt.value("lbd.init", 0.1), "lbd.init")
+    hbd.init <- npValidatePositiveFiniteNumeric(opt.value("hbd.init", 0.9), "hbd.init")
+    if (hbd.init < lbd.init)
+      stop(sprintf("%s: 'hbd.init' must be greater than or equal to 'lbd.init'", where),
+           call. = FALSE)
+    cat.scale <- if (!is.null(setup$bandwidth.scale.categorical)) {
+      as.double(setup$bandwidth.scale.categorical[1L])
+    } else {
+      1e4
+    }
+    start.lower[cat.idx] <- as.double(lbd.init) * cat.scale
+    start.upper[cat.idx] <- as.double(hbd.init) * cat.scale
+  }
+
+  finite.lower <- is.finite(start.lower) & is.finite(bounds$lower)
+  finite.upper <- is.finite(start.upper) & is.finite(bounds$upper)
+  start.lower[finite.lower] <- pmax(start.lower[finite.lower], bounds$lower[finite.lower])
+  start.upper[finite.upper] <- pmin(start.upper[finite.upper], bounds$upper[finite.upper])
+
+  both.finite <- is.finite(start.lower) & is.finite(start.upper)
+  inverted <- both.finite & start.upper < start.lower
+  if (any(inverted))
+    start.upper[inverted] <- start.lower[inverted]
+
+  list(lower = start.lower, upper = start.upper)
 }
 
 .npregbw_nomad_complete_bw_start_point <- function(point, bounds, setup) {
@@ -2199,6 +2283,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
                                               bbin,
                                               lb,
                                               ub,
+                                              start.lower = NULL,
+                                              start.upper = NULL,
                                               nomad.nmulti = 1L,
                                               nomad.inner.nmulti = 0L,
                                               random.seed = 42L,
@@ -2296,6 +2382,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
       ub = ub,
       nmulti = native.nmulti,
       random.seed = random.seed,
+      start.lower = start.lower,
+      start.upper = start.upper,
       degree_spec = list(
         initial = degree.search$start.degree,
         lower = degree.search$lower,
@@ -2550,6 +2638,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
     remin = isTRUE(remin),
+    start.lower = start.lower,
+    start.upper = start.upper,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
@@ -2601,9 +2691,18 @@ npRmpiNomadShadowSearchRegression <- function(template,
   setup <- .npregbw_nomad_bw_setup(xdat = xdat, template = template, allow.extended.nn = TRUE)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
+  opt.value <- function(name, default) {
+    if (is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
 
   bw_bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
+  bw_start_bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = bw_bounds,
+    setup = setup,
+    opt.value = opt.value,
+    where = "npregbw"
+  )
 
   point.start <- if (all(template$bw == 0)) {
     NULL
@@ -2717,6 +2816,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
         BBIN,
         LB,
         UB,
+        STARTLOWER,
+        STARTUPPER,
         NOMADNMULTI,
           INNERNMULTI,
           RSEED,
@@ -2732,6 +2833,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
         BBIN = bbin,
         LB = lb,
         UB = ub,
+        STARTLOWER = c(bw_start_bounds$lower, degree.search$lower),
+        STARTUPPER = c(bw_start_bounds$upper, degree.search$upper),
           NOMADNMULTI = nomad.nmulti,
           INNERNMULTI = nomad.inner.nmulti,
           RSEED = random.seed,
@@ -2856,6 +2959,8 @@ npRmpiNomadShadowSearchRegression <- function(template,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
     remin = isTRUE(opt.args$nomad.remin),
+    start.lower = c(bw_start_bounds$lower, degree.search$lower),
+    start.upper = c(bw_start_bounds$upper, degree.search$upper),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,

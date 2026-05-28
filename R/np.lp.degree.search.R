@@ -1139,21 +1139,36 @@
                                    ub,
                                    nmulti = 1L,
                                    random.seed = 42L,
-                                   degree_spec = NULL) {
+                                   degree_spec = NULL,
+                                   start.lower = NULL,
+                                   start.upper = NULL) {
   n <- length(lb)
   if (length(ub) != n || length(bbin) != n)
     stop("NOMAD start construction requires matching lengths for x0/bbin/lb/ub")
 
   nstart <- npValidateNmulti(nmulti)
   starts <- matrix(0, nrow = nstart, ncol = n)
+  normalize.start.bound <- function(value, fallback, name) {
+    if (is.null(value))
+      return(as.numeric(fallback))
+    value <- as.numeric(value)
+    if (length(value) == 1L)
+      value <- rep.int(value, n)
+    if (length(value) != n)
+      stop(sprintf("NOMAD start construction requires '%s' to have length 1 or %d", name, n),
+           call. = FALSE)
+    value
+  }
+  start.lower <- normalize.start.bound(start.lower, lb, "start.lower")
+  start.upper <- normalize.start.bound(start.upper, ub, "start.upper")
 
   seed.state <- .np_seed_enter(random.seed)
   on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
 
   for (j in seq_len(nstart)) {
     for (i in seq_len(n)) {
-      lo <- if (is.finite(lb[i])) lb[i] else -1
-      hi <- if (is.finite(ub[i])) ub[i] else 1
+      lo <- if (is.finite(start.lower[i])) start.lower[i] else if (is.finite(lb[i])) lb[i] else -1
+      hi <- if (is.finite(start.upper[i])) start.upper[i] else if (is.finite(ub[i])) ub[i] else 1
       if (hi < lo) {
         tmp <- lo
         lo <- hi
@@ -1779,6 +1794,8 @@
                              handoff_before_build = FALSE,
                              remin = FALSE,
                              degree_spec = NULL,
+                             start.lower = NULL,
+                             start.upper = NULL,
                              nomad.opts = list(),
                              native.r.bridge = FALSE) {
   engine <- match.arg(engine)
@@ -1829,7 +1846,9 @@
     ub = ub,
     nmulti = nomad.nmulti,
     random.seed = random.seed,
-    degree_spec = degree_spec
+    degree_spec = degree_spec,
+    start.lower = start.lower,
+    start.upper = start.upper
   )
   state$restart_starts <- lapply(
     seq_len(nrow(start_matrix)),

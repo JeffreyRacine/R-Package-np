@@ -445,6 +445,13 @@ npNomadNativeSearchDistribution <- function(prep,
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
+  native.start.bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = bounds,
+    setup = setup,
+    opt.value = opt.value,
+    where = "npudistbw"
+  )
+
   if (.npudistbw_nomad_native_target(template, bwsolver)) {
     .npudistbw_nomad_native_require_crs()
     native.nmulti <- npValidateNmulti(opt.value("nmulti", npDefaultNmulti(dim(toFrame(dat))[2L])))
@@ -469,7 +476,9 @@ npNomadNativeSearchDistribution <- function(prep,
       ub = bounds$upper,
       nmulti = native.nmulti,
       random.seed = native.random.seed,
-      degree_spec = NULL
+      degree_spec = NULL,
+      start.lower = native.start.bounds$lower,
+      start.upper = native.start.bounds$upper
     )
     native.prep <- .npudistbw_nomad_native_prepare_args(
       dat = dat,
@@ -622,7 +631,9 @@ npNomadNativeSearchDistribution <- function(prep,
       random.seed = opt.value("random.seed", 42L),
       handoff_before_build = identical(bwsolver, "mads+powell"),
       remin = isTRUE(opt.args$nomad.remin),
-      nomad.opts = opt.value("nomad.opts", list())
+      nomad.opts = opt.value("nomad.opts", list()),
+      start.lower = native.start.bounds$lower,
+      start.upper = native.start.bounds$upper
     )
   }
   search.result$method <- bwsolver

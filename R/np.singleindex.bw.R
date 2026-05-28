@@ -1287,6 +1287,8 @@ npindexbw.NULL <-
     random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
     remin = isTRUE(opt.args$nomad.remin),
     native.r.bridge = TRUE,
+    start.lower = lb,
+    start.upper = ub,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,

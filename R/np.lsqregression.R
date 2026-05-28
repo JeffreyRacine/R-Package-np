@@ -563,7 +563,16 @@ nplsqregbw <-
   } else {
     npValidateNmulti(opt.args$nmulti[1L])
   }
+  opt.value <- function(name, default) {
+    if (is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
   bw.bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
+  bw.start.bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = bw.bounds,
+    setup = setup,
+    opt.value = opt.value,
+    where = "nplsqregbw"
+  )
   point.start <- if (all(template$bw == 0)) {
     NULL
   } else {
@@ -709,6 +718,8 @@ nplsqregbw <-
     remin = isTRUE(opt.args$nomad.remin),
     nomad.opts = nomad.opts,
     native.r.bridge = TRUE,
+    start.lower = c(bw.start.bounds$lower, delta.bounds[1L], degree.search$lower),
+    start.upper = c(bw.start.bounds$upper, delta.bounds[2L], degree.search$upper),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
