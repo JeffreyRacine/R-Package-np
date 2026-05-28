@@ -788,13 +788,10 @@ static int np_get_option_logical_np(const char * const name, const int fallback)
 
   if (val == R_NilValue)
     return fallback;
-  if (TYPEOF(val) == LGLSXP && XLENGTH(val) > 0)
-    return (LOGICAL(val)[0] == NA_LOGICAL) ? fallback : (LOGICAL(val)[0] != 0);
-  if (TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
-    return (INTEGER(val)[0] == NA_INTEGER) ? fallback : (INTEGER(val)[0] != 0);
-  if (TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
-    return R_FINITE(REAL(val)[0]) ? (REAL(val)[0] != 0.0) : fallback;
+  if (TYPEOF(val) == LGLSXP && XLENGTH(val) == 1 && LOGICAL(val)[0] != NA_LOGICAL)
+    return LOGICAL(val)[0] != 0;
 
+  error("option '%s' must be TRUE or FALSE", name);
   return fallback;
 }
 
@@ -804,13 +801,12 @@ static double np_get_option_double_np(const char * const name, const double fall
 
   if (val == R_NilValue)
     return fallback;
-  if (TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
+  if (TYPEOF(val) == REALSXP && XLENGTH(val) == 1 && R_FINITE(REAL(val)[0]))
     return REAL(val)[0];
-  if (TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
+  if (TYPEOF(val) == INTSXP && XLENGTH(val) == 1 && INTEGER(val)[0] != NA_INTEGER)
     return (double)INTEGER(val)[0];
-  if (TYPEOF(val) == LGLSXP && XLENGTH(val) > 0)
-    return (double)LOGICAL(val)[0];
 
+  error("option '%s' must be a finite numeric scalar", name);
   return fallback;
 }
 
@@ -849,8 +845,9 @@ static double *np_continuous_extendednn_upper_alloc(
   const int base_k = num_obs_train - 1;
   const double rel_tol_default = 1e-3;
   const double rel_tol_opt = np_get_option_double_np("np.largeh.rel.tol", rel_tol_default);
-  const double rel_tol =
-    (R_FINITE(rel_tol_opt) && rel_tol_opt > 0.0 && rel_tol_opt < 0.1) ? rel_tol_opt : rel_tol_default;
+  if (!(rel_tol_opt > 0.0 && rel_tol_opt < 0.1))
+    error("option 'np.largeh.rel.tol' must be a finite numeric scalar in (0, 0.1)");
+  const double rel_tol = rel_tol_opt;
   const double safety_margin = 1.5;
   const double hard_upper = (double)INT_MAX / 4.0;
   double *upper = NULL;

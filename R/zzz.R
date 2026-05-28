@@ -303,6 +303,35 @@ npObjectiveCacheEnabled <- function(value = getOption("np.objective.cache", TRUE
   stop("option 'np.objective.cache' must be TRUE or FALSE", call. = FALSE)
 }
 
+npLogicalOption <- function(name, default = TRUE) {
+  value <- getOption(name, default)
+  if (isTRUE(value))
+    return(TRUE)
+  if (identical(value, FALSE))
+    return(FALSE)
+  stop(sprintf("option '%s' must be TRUE or FALSE", name), call. = FALSE)
+}
+
+npFastpathTolerance <- function(name, default, lower, upper) {
+  value <- getOption(name, default)
+  if (is.numeric(value) && length(value) == 1L && !is.na(value) &&
+      is.finite(value) && value > lower && value < upper)
+    return(as.double(value))
+  stop(
+    sprintf("option '%s' must be a finite numeric scalar in (%s, %s)",
+            name, format(lower), format(upper)),
+    call. = FALSE
+  )
+}
+
+npLargehRelTol <- function() {
+  npFastpathTolerance("np.largeh.rel.tol", 1e-3, 0, 0.1)
+}
+
+npDiscUpperRelTol <- function() {
+  npFastpathTolerance("np.disc.upper.rel.tol", 1e-2, 0, 0.5)
+}
+
 npTreeMode <- function(value = getOption("np.tree", "auto")) {
   if (isTRUE(value))
     return("on")

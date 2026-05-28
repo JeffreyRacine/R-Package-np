@@ -1687,7 +1687,7 @@ npRegressionNnLowerBound <- function(bws) {
 }
 
 npExtendedNnEnabled <- function() {
-  isTRUE(getOption("np.extendednn", FALSE))
+  npLogicalOption("np.extendednn", FALSE)
 }
 
 npContinuousExtendedNnNomadUpper <- function(traindat,
@@ -1710,9 +1710,7 @@ npContinuousExtendedNnNomadUpper <- function(traindat,
     return(fallback)
   }
 
-  rel.tol <- getOption("np.largeh.rel.tol", 1e-3)
-  if (!is.finite(rel.tol) || rel.tol <= 0 || rel.tol >= 0.1)
-    rel.tol <- 1e-3
+  rel.tol <- npLargehRelTol()
 
   kern <- as.character(ckertype)[1L]
   utol <- switch(kern,
