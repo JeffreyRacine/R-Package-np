@@ -5,12 +5,15 @@
   kernels (`"epanechnikov"` and `"uniform"`); `np.tree = TRUE` remains the
   explicit force-on override and `np.tree = FALSE` remains the force-off
   diagnostic path.
-- Powell bandwidth searches for eligible continuous-only generalized/adaptive
-  nearest-neighbor routes now expose their exact repeated-integer-candidate
-  cache through `options(np.powell.cache = TRUE/FALSE)`. The cache remains
-  enabled by default and is synchronized to MPI workers in autodispatch
-  sessions; disabling it is intended for diagnostic timing and teaching
-  comparisons.
+- Powell bandwidth searches now expose package-side repeated-candidate
+  objective caching through `options(np.objective.cache = TRUE/FALSE)`. The
+  cache remains enabled by default and is scoped to one bandwidth solve, so it
+  can reuse exact candidates across Powell restarts without carrying state
+  across datasets or later calls. Continuous-only generalized/adaptive
+  nearest-neighbor routes also retain their integer nearest-neighbor objective
+  cache under the same switch. The option is synchronized to MPI workers in
+  autodispatch sessions; NOMAD solver caching and extended-NN distance reuse
+  remain separate mechanisms.
 - Continuous large-bandwidth shortcut evaluations can now be disabled with
   `options(np.largeh = FALSE)`, and discrete near-upper-bandwidth shortcut
   evaluations can now be disabled with `options(np.largelambda = FALSE)`.

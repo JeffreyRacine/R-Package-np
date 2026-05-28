@@ -1,8 +1,8 @@
-test_that("np.powell.cache is included in MPI option sync", {
-  expect_true("np.powell.cache" %in% npRmpi:::.npRmpi_autodispatch_option_keys())
+test_that("np.objective.cache is included in MPI option sync", {
+  expect_true("np.objective.cache" %in% npRmpi:::.npRmpi_autodispatch_option_keys())
 })
 
-test_that("np.powell.cache default preserves legacy environment off switch", {
+test_that("np.objective.cache default ignores legacy environment off switch", {
   old <- Sys.getenv("NP_NN_POWELL_CACHE_INSTRUMENT", unset = NA_character_)
   on.exit({
     if (is.na(old)) {
@@ -13,13 +13,13 @@ test_that("np.powell.cache default preserves legacy environment off switch", {
   }, add = TRUE)
 
   Sys.setenv(NP_NN_POWELL_CACHE_INSTRUMENT = "off")
-  expect_false(npRmpi:::.np_powell_cache_default())
+  expect_true(npRmpi:::npObjectiveCacheEnabled())
 
   Sys.setenv(NP_NN_POWELL_CACHE_INSTRUMENT = "on")
-  expect_true(npRmpi:::.np_powell_cache_default())
+  expect_true(npRmpi:::npObjectiveCacheEnabled())
 })
 
-test_that("np.powell.cache controls continuous NN Powell caching under MPI", {
+test_that("np.objective.cache controls continuous NN Powell caching under MPI", {
   env <- npRmpi_subprocess_env("NP_RMPI_NO_REUSE_SLAVES=1")
   skip_if(is.null(env))
 
@@ -31,7 +31,7 @@ test_that("np.powell.cache controls continuous NN Powell caching under MPI", {
       "  set.seed(42)",
       "  dat <- data.frame(x1 = runif(80), x2 = runif(80))",
       "  dat$y <- dat$x1 + dat$x2 + rnorm(80)",
-      "  old <- options(np.messages = FALSE, np.tree = FALSE, np.powell.cache = cache)",
+      "  old <- options(np.messages = FALSE, np.tree = FALSE, np.objective.cache = cache)",
       "  on.exit(options(old), add = TRUE)",
       "  npregbw(y ~ x1 + x2, data = dat, bwmethod = 'cv.ls', bwtype = 'generalized_nn', regtype = 'lc', nmulti = 1)",
       "}",
@@ -52,7 +52,7 @@ test_that("np.powell.cache controls continuous NN Powell caching under MPI", {
   expect_equal(out$status, 0L, info = paste(out$output, collapse = "\n"))
 })
 
-test_that("np.powell.cache controls npscoef continuous NN R optimizer caching under MPI", {
+test_that("np.objective.cache controls npscoef continuous NN R optimizer caching under MPI", {
   env <- npRmpi_subprocess_env("NP_RMPI_NO_REUSE_SLAVES=1")
   skip_if(is.null(env))
 
@@ -67,7 +67,7 @@ test_that("np.powell.cache controls npscoef continuous NN R optimizer caching un
       "  z2 <- runif(n)",
       "  x <- rnorm(n)",
       "  y <- 1 + (0.5 + sin(2 * pi * z1)) * x + 0.25 * cos(2 * pi * z2) + rnorm(n, sd = 0.2)",
-      "  old <- options(np.messages = FALSE, np.powell.cache = cache)",
+      "  old <- options(np.messages = FALSE, np.objective.cache = cache)",
       "  on.exit(options(old), add = TRUE)",
       "  npscoefbw(xdat = data.frame(x = x), ydat = y, zdat = data.frame(z1 = z1, z2 = z2), regtype = 'lc', bwtype = bwtype, ckertype = 'epanechnikov', nmulti = 1L, optim.maxit = 35L, optim.maxattempts = 1L)",
       "}",
@@ -92,7 +92,7 @@ test_that("np.powell.cache controls npscoef continuous NN R optimizer caching un
   expect_equal(out$status, 0L, info = paste(out$output, collapse = "\n"))
 })
 
-test_that("np.powell.cache controls npindex continuous NN R optimizer caching under MPI", {
+test_that("np.objective.cache controls npindex continuous NN R optimizer caching under MPI", {
   env <- npRmpi_subprocess_env("NP_RMPI_NO_REUSE_SLAVES=1")
   skip_if(is.null(env))
 
@@ -106,7 +106,7 @@ test_that("np.powell.cache controls npindex continuous NN R optimizer caching un
       "  xdat <- data.frame(x1 = runif(n), x2 = runif(n))",
       "  eta <- (xdat$x1 + xdat$x2) / 2",
       "  ydat <- if (identical(method, 'kleinspady')) as.integer(runif(n) < plogis(2 * eta - 1)) else eta + rnorm(n, sd = 0.25)",
-      "  old <- options(np.messages = FALSE, np.powell.cache = cache)",
+      "  old <- options(np.messages = FALSE, np.objective.cache = cache)",
       "  on.exit(options(old), add = TRUE)",
       "  npindexbw(xdat = xdat, ydat = ydat, method = method, regtype = 'lc', bwtype = bwtype, nmulti = 1L, optim.maxit = 35L, optim.maxattempts = 1L)",
       "}",

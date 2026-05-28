@@ -1907,17 +1907,18 @@ npscoefbw.scbandwidth <-
     npscoef_fast_eligible <- function(sbw) {
       .npscoefbw_fast_eligible(sbw = sbw, eval.zdat = zdat.df)
     }
+    objective.cache.enabled <- npObjectiveCacheEnabled()
     r.nn.cache.surface <- identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE) &&
       isTRUE(bws$ncon > 0L) &&
       isTRUE((bws$nuno + bws$nord) == 0L)
     r.nn.cache.eligible <- isTRUE(bandwidth.compute) &&
-      isTRUE(getOption("np.powell.cache", TRUE)) &&
+      objective.cache.enabled &&
       r.nn.cache.surface
     r.nn.cache.stats <- list()
     r.nn.cache.disabled <- NULL
     if (isTRUE(bandwidth.compute) &&
         r.nn.cache.surface &&
-        !isTRUE(getOption("np.powell.cache", TRUE))) {
+        !objective.cache.enabled) {
       r.nn.cache.disabled <- .np_r_nn_cache_new(FALSE)
     }
     r_nn_cache_new <- function() {
