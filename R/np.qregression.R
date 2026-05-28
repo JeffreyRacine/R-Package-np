@@ -184,6 +184,122 @@ npqreg <-
   )$condist)
 }
 
+.npqreg_selected_cdf_cache_atom <- function(x) {
+  if (inherits(x, "factor"))
+    return(paste0("f:", as.integer(x)))
+  if (inherits(x, "Date") || inherits(x, "POSIXt"))
+    return(paste0("t:", sprintf("%a", as.double(x))))
+  if (is.numeric(x) || is.integer(x) || is.logical(x))
+    return(paste0("n:", sprintf("%a", as.double(x))))
+  paste0("c:", as.character(x))
+}
+
+.npqreg_selected_cdf_cache_row_key <- function(exdat, i) {
+  row <- exdat[i, , drop = FALSE]
+  parts <- vapply(row, function(x) .npqreg_selected_cdf_cache_atom(x[[1L]]), character(1L))
+  paste(parts, collapse = "\r")
+}
+
+.npqreg_selected_cdf_cache_row_keys <- function(exdat) {
+  exdat <- as.data.frame(exdat)
+  if (!nrow(exdat))
+    return(character(0L))
+  vapply(seq_len(nrow(exdat)), function(i) .npqreg_selected_cdf_cache_row_key(exdat, i), character(1L))
+}
+
+.npqreg_selected_cdf_cache_key <- function(row.key, ycand) {
+  paste(c(row.key, paste0("y:", sprintf("%a", as.double(ycand)))), collapse = "\r")
+}
+
+.npqreg_selected_cdf_cache_new <- function(enabled) {
+  cache <- new.env(parent = emptyenv(), hash = FALSE)
+  cache$enabled <- isTRUE(enabled)
+  cache$store <- new.env(parent = emptyenv(), hash = TRUE)
+  cache$visits <- 0L
+  cache$hits <- 0L
+  cache$misses <- 0L
+  cache$unique <- 0L
+  cache
+}
+
+.npqreg_selected_cdf_cache_clear <- function(cache) {
+  if (is.environment(cache)) {
+    cache$enabled <- FALSE
+    cache$store <- new.env(parent = emptyenv(), hash = TRUE)
+  }
+  invisible(NULL)
+}
+
+.npqreg_selected_cdf_cache_should_enable <- function(tau, exdat) {
+  isTRUE(npObjectiveCacheEnabled()) &&
+    (length(tau) > 1L || anyDuplicated(as.data.frame(exdat)) > 0L)
+}
+
+.npqreg_selected_cdf_values_cached <- function(bws,
+                                               xdat,
+                                               ydat,
+                                               exdat,
+                                               ycand,
+                                               cdf.cache = NULL,
+                                               row.keys = NULL) {
+  if (!is.environment(cdf.cache) || !isTRUE(cdf.cache$enabled))
+    return(.npqreg_selected_cdf_values(bws, xdat, ydat, exdat, ycand))
+
+  exdat <- toFrame(exdat)
+  n.eval <- nrow(exdat)
+  ycand <- as.double(ycand)
+  if (length(ycand) == 1L && n.eval > 1L)
+    ycand <- rep.int(ycand, n.eval)
+  if (length(ycand) != n.eval)
+    return(.npqreg_selected_cdf_values(bws, xdat, ydat, exdat, ycand))
+  if (is.null(row.keys) || length(row.keys) != n.eval)
+    row.keys <- .npqreg_selected_cdf_cache_row_keys(exdat)
+
+  out <- rep.int(NA_real_, n.eval)
+  keys <- character(n.eval)
+  miss.first <- integer(0L)
+  miss.keys <- character(0L)
+  miss.map <- new.env(parent = emptyenv(), hash = TRUE)
+
+  for (i in seq_len(n.eval)) {
+    key <- .npqreg_selected_cdf_cache_key(row.keys[[i]], ycand[[i]])
+    keys[[i]] <- key
+    cdf.cache$visits <- cdf.cache$visits + 1L
+    if (exists(key, envir = cdf.cache$store, inherits = FALSE)) {
+      cdf.cache$hits <- cdf.cache$hits + 1L
+      out[[i]] <- get(key, envir = cdf.cache$store, inherits = FALSE)
+    } else {
+      cdf.cache$misses <- cdf.cache$misses + 1L
+      if (!exists(key, envir = miss.map, inherits = FALSE)) {
+        assign(key, length(miss.first) + 1L, envir = miss.map)
+        miss.first <- c(miss.first, i)
+        miss.keys <- c(miss.keys, key)
+      }
+    }
+  }
+
+  if (length(miss.first)) {
+    values <- .npqreg_selected_cdf_values(
+      bws = bws,
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat[miss.first, , drop = FALSE],
+      ycand = ycand[miss.first]
+    )
+    for (j in seq_along(miss.first)) {
+      assign(miss.keys[[j]], values[[j]], envir = cdf.cache$store)
+      cdf.cache$unique <- cdf.cache$unique + 1L
+    }
+  }
+
+  missing.out <- which(!is.finite(out) & is.na(out))
+  if (length(missing.out)) {
+    for (i in missing.out)
+      out[[i]] <- get(keys[[i]], envir = cdf.cache$store, inherits = FALSE)
+  }
+  out
+}
+
 .npqreg_assert_selected_cdf_metadata <- function(bws) {
   reg.engine <- if (is.null(bws$regtype.engine)) {
     if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
@@ -205,7 +321,9 @@ npqreg <-
                                         tau,
                                         tol,
                                         small,
-                                        itmax) {
+                                        itmax,
+                                        cdf.cache = NULL,
+                                        cdf.row.keys = NULL) {
   .npqreg_assert_selected_cdf_metadata(bws)
 
   xdat <- toFrame(xdat)
@@ -227,8 +345,10 @@ npqreg <-
   lo <- rep.int(y.min, n.eval)
   hi <- rep.int(y.max, n.eval)
 
-  flo <- .npqreg_selected_cdf_values(bws, xdat, ydat, exdat, lo)
-  fhi <- .npqreg_selected_cdf_values(bws, xdat, ydat, exdat, hi)
+  flo <- .npqreg_selected_cdf_values_cached(bws, xdat, ydat, exdat, lo, cdf.cache = cdf.cache,
+                                            row.keys = cdf.row.keys)
+  fhi <- .npqreg_selected_cdf_values_cached(bws, xdat, ydat, exdat, hi, cdf.cache = cdf.cache,
+                                            row.keys = cdf.row.keys)
   if (any(!is.finite(flo)) || any(!is.finite(fhi)))
     stop("npqreg selected-CDF inversion encountered non-finite bracket values")
 
@@ -241,12 +361,14 @@ npqreg <-
   while (any(active) && iter < maxiter) {
     iter <- iter + 1L
     mid <- (lo[active] + hi[active]) / 2.0
-    fmid <- .npqreg_selected_cdf_values(
+    fmid <- .npqreg_selected_cdf_values_cached(
       bws = bws,
       xdat = xdat,
       ydat = ydat,
       exdat = exdat[active, , drop = FALSE],
-      ycand = mid
+      ycand = mid,
+      cdf.cache = cdf.cache,
+      row.keys = if (is.null(cdf.row.keys)) NULL else cdf.row.keys[active]
     )
     if (any(!is.finite(fmid)))
       stop("npqreg selected-CDF inversion encountered non-finite refinement values")
@@ -437,6 +559,14 @@ npqreg.condbandwidth <-
     if (!no.ex)
       exdat.df <- exdat
 
+    cdf.cache <- .npqreg_selected_cdf_cache_new(
+      .npqreg_selected_cdf_cache_should_enable(tau = tau, exdat = txeval)
+    )
+    cdf.row.keys <- if (isTRUE(cdf.cache$enabled))
+      .npqreg_selected_cdf_cache_row_keys(txeval)
+    else NULL
+    on.exit(.npqreg_selected_cdf_cache_clear(cdf.cache), add = TRUE)
+
     fit_one_tau <- function(tau_i) {
       yq <- .npqreg_invert_selected_cdf(
         bws = bws,
@@ -446,7 +576,9 @@ npqreg.condbandwidth <-
         tau = tau_i,
         tol = tol,
         small = small,
-        itmax = itmax
+        itmax = itmax,
+        cdf.cache = cdf.cache,
+        cdf.row.keys = cdf.row.keys
       )
       qdelta <- .npqreg_quantile_delta_from_conditional(
         bws = bws,
