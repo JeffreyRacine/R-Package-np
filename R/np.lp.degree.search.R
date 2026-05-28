@@ -2000,20 +2000,8 @@
       ))
     }
 
-    .np_nomad_capture_snomadr(crs::snomadr(
-      eval.f = wrapped_eval,
-      n = length(x0),
-      bbin = as.integer(bbin),
-      bbout = 0L,
-      x0 = start,
-      lb = as.double(lb),
-      ub = as.double(ub),
-      nmulti = nomad.inner.nmulti,
-      random.seed = as.integer(random.seed),
-      opts = solver.opts,
-      display.nomad.progress = display.nomad.progress,
-      snomadr.environment = environment(wrapped_eval)
-    ), capture.output = !isTRUE(display.nomad.progress))
+    stop("legacy crs::snomadr fallback is retired for np NOMAD routes; this route must use the native crs C API or fail earlier as unsupported",
+         call. = FALSE)
   }
 
   restart_results <- vector("list", nomad.nmulti)
