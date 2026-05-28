@@ -2316,6 +2316,12 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     search.result$best_payload <- NULL
   if (is.null(search.result$powell.time))
     search.result$powell.time <- NA_real_
+  if (is.null(search.result$optim.time) ||
+      !is.finite(as.numeric(search.result$optim.time[1L]))) {
+    timing.parts <- as.numeric(c(search.result$nomad.time, search.result$powell.time))
+    timing.parts <- timing.parts[is.finite(timing.parts)]
+    search.result$optim.time <- if (length(timing.parts)) sum(timing.parts) else NA_real_
+  }
   search.result$num.feval.total <- as.numeric(nomad.num.feval.total)
   search.result$num.feval.fast.total <- as.numeric(nomad.num.feval.fast.total)
   search.result$num.feval.guarded.total <- as.numeric(nomad.num.feval.guarded.total)
