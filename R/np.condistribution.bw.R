@@ -247,6 +247,8 @@ npcdistbw.condbandwidth <-
           bandwidth.compute = TRUE,
           gydat = gydat,
           nmulti = nmulti,
+          mads.nmulti = list(...)$mads.nmulti,
+          nomad.nmulti = list(...)$nomad.nmulti,
           nomad.remin = FALSE,
           powell.remin = powell.remin,
           itmax = itmax,
@@ -273,7 +275,8 @@ npcdistbw.condbandwidth <-
           scale.init.categorical.sample = scale.init.categorical.sample,
           transform.bounds = transform.bounds,
           invalid.penalty = invalid.penalty,
-          penalty.multiplier = penalty.multiplier
+          penalty.multiplier = penalty.multiplier,
+          nomad.opts = list(...)$nomad.opts
         ),
         bwsolver = bwsolver
       ))
@@ -1806,9 +1809,12 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
                                     opt.args,
                                     degree.search,
                                     nomad.inner.nmulti = 0L,
-                                    random.seed = 42L) {
+                                    random.seed = 42L,
+                                    nomad.opts = list()) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
+  if (is.null(opt.args$nomad.opts) && length(nomad.opts))
+    opt.args$nomad.opts <- nomad.opts
 
   template.reg.args <- reg.args
   template.reg.args$regtype <- "lp"
@@ -2316,6 +2322,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     remin = isTRUE(opt.args$nomad.remin),
+    nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     start.lower = c(bw_start_bounds$lower, degree.search$lower),
     start.upper = c(bw_start_bounds$upper, degree.search$upper),
     degree_spec = list(
@@ -2643,7 +2650,7 @@ npcdistbw.default <-
     .np_degree_reject_unknown_dots(
       lp.dot.args,
       "npcdistbw",
-      allowed = c("random.seed", "mads.nmulti", "nomad.nmulti")
+      allowed = c("random.seed", "mads.nmulti", "nomad.nmulti", "nomad.opts")
     )
     random.seed.value <- .np_degree_extract_random_seed(lp.dot.args)
     search.engine.value <- if (!is.null(nomad.shortcut$values$search.engine)) nomad.shortcut$values$search.engine else "nomad+powell"
@@ -2755,7 +2762,7 @@ npcdistbw.default <-
                "transform.bounds",
                "invalid.penalty",
                "penalty.multiplier",
-               "mads.nmulti", "nomad.nmulti")
+               "mads.nmulti", "nomad.nmulti", "nomad.opts")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
@@ -2768,6 +2775,8 @@ npcdistbw.default <-
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
     if ("mads.nmulti" %in% names(lp.dot.args))
       opt.args$mads.nmulti <- lp.dot.args$mads.nmulti
+    if ("nomad.opts" %in% names(lp.dot.args))
+      opt.args$nomad.opts <- lp.dot.args$nomad.opts
     reg.args$scale.factor.search.lower <- scale.factor.search.lower
     opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
@@ -2818,7 +2827,8 @@ npcdistbw.default <-
           opt.args = opt.args,
           degree.search = degree.search,
           nomad.inner.nmulti = nomad.inner.nmulti,
-          random.seed = random.seed.value
+          random.seed = random.seed.value,
+          nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
         )
       }
       tbw <- .npcdistbw_attach_degree_search(

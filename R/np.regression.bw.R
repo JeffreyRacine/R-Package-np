@@ -573,7 +573,8 @@ npregbw.rbandwidth <-
           penalty.multiplier = penalty.multiplier,
           transform.bounds = transform.bounds,
           bandwidth.compute = TRUE,
-          bwsolver = bwsolver
+          bwsolver = bwsolver,
+          nomad.opts = list(...)$nomad.opts
         )
         return(.npregbw_run_fixed_degree_mads(
           xdat = xdat.frame,
@@ -2637,6 +2638,7 @@ npregbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("nmulti", "nomad.remin", "powell.remin", "bwsolver", "itmax", "ftol", "tol",
+               "nomad.opts",
                "small",
                "lbc.dir", "dfc.dir", "cfac.dir","initc.dir", 
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
@@ -2659,6 +2661,8 @@ npregbw.default <-
 
     reg.args <- bw.args[setdiff(names(bw.args), c("bw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
+    if ("nomad.opts" %in% names(lp.dot.args))
+      opt.args$nomad.opts <- lp.dot.args$nomad.opts
     reg.args$scale.factor.search.lower <- scale.factor.search.lower
     opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
@@ -2760,7 +2764,8 @@ npregbw.default <-
           yname = yname,
           degree.search = degree.search,
           nomad.inner.nmulti = nomad.inner.nmulti,
-          random.seed = random.seed.value
+          random.seed = random.seed.value,
+          nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
         )
       }
       tbw <- .npregbw_attach_degree_search(

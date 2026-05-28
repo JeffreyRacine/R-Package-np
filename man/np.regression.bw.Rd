@@ -778,7 +778,12 @@ or standard-deviation factors.
   package-level outer restart count while \code{nomad.nmulti}
   controls the inner native \pkg{crs} NOMAD API multistart count used within
   each outer restart. The default \code{nomad.nmulti=0L} preserves the
-  current single-start inner NOMAD behavior.
+  current single-start inner NOMAD behavior. Advanced native NOMAD
+  parameters may be supplied through \code{nomad.opts} in \code{...};
+  invalid or unsupported parameters are rejected by NOMAD rather than
+  silently ignored. Routes that evaluate R callbacks require serial
+  callback evaluation and reject parallel callback settings such as
+  \code{NB_THREADS_PARALLEL_EVAL > 1}.
 
   The use of compactly supported kernels or the occurrence of small
   bandwidths during cross-validation can lead to numerical problems for

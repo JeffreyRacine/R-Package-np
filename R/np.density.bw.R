@@ -739,7 +739,8 @@ npudensbw.bandwidth <-
           dfac.init = dfac.init,
           scale.init.categorical.sample = scale.init.categorical.sample,
           transform.bounds = transform.bounds,
-          scale.factor.search.lower = scale.factor.search.lower
+          scale.factor.search.lower = scale.factor.search.lower,
+          nomad.opts = list(...)$nomad.opts
         ),
         bwsolver = bwsolver
       ))
@@ -993,6 +994,8 @@ npudensbw.default <-
 
     ## next grab dummies for actual bandwidth selection and perform call
 
+    dots <- list(...)
+    dot.names <- names(dots)
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bandwidth.compute", "nmulti", "powell.remin", "bwsolver", "itmax", "ftol", "tol",
                "small",
@@ -1004,7 +1007,7 @@ npudensbw.default <-
                "scale.factor.search.lower",
                "invalid.penalty",
                "penalty.multiplier",
-               "mads.nmulti", "nomad.nmulti", "nomad.remin")
+               "mads.nmulti", "nomad.nmulti", "nomad.remin", "nomad.opts")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
@@ -1012,6 +1015,10 @@ npudensbw.default <-
     if (any.m) {
       nms <- mc.names[m]
       bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+    }
+    dotted.arg.names <- intersect(margs, dot.names)
+    if (length(dotted.arg.names)) {
+      bwsel.args[dotted.arg.names] <- dots[dotted.arg.names]
     }
     tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting density bandwidth",

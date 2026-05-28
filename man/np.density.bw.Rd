@@ -385,7 +385,9 @@ These controls set optimizer tolerances, restart behavior, invalid-candidate pen
     \code{"powell"} preserves the historical Powell route. \code{"mads"}
     uses the native \pkg{crs} NOMAD C API over the bandwidth coordinates, and
     \code{"mads+powell"} applies one Powell hot start from the MADS
-    solution.
+    solution. Advanced native NOMAD parameters may be supplied through
+    \code{nomad.opts} in \code{...}; invalid or unsupported parameters are
+    rejected by NOMAD rather than silently ignored.
   }
 
   \item{small}{

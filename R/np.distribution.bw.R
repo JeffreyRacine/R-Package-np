@@ -819,7 +819,8 @@ npudistbw.dbandwidth <-
           scale.factor.search.lower = scale.factor.search.lower,
           do.full.integral = do.full.integral,
           ngrid = ngrid,
-          memfac = memfac
+          memfac = memfac,
+          nomad.opts = list(...)$nomad.opts
         ),
         bwsolver = bwsolver
       ))
@@ -1071,6 +1072,8 @@ npudistbw.default <-
 
     ## next grab dummies for actual bandwidth selection and perform call
 
+    dots <- list(...)
+    dot.names <- names(dots)
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("gdat","bandwidth.compute", "nmulti", "powell.remin", "bwsolver", "itmax",
                "do.full.integral", "ngrid", "ftol", "tol",
@@ -1082,7 +1085,7 @@ npudistbw.default <-
                "transform.bounds",
                "invalid.penalty",
                "penalty.multiplier",
-               "mads.nmulti", "nomad.nmulti", "nomad.remin")
+               "mads.nmulti", "nomad.nmulti", "nomad.remin", "nomad.opts")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
@@ -1090,6 +1093,10 @@ npudistbw.default <-
     if (any.m) {
       nms <- mc.names[m]
       bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+    }
+    dotted.arg.names <- intersect(margs, dot.names)
+    if (length(dotted.arg.names)) {
+      bwsel.args[dotted.arg.names] <- dots[dotted.arg.names]
     }
     tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting distribution bandwidth",

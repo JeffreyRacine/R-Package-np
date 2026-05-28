@@ -268,7 +268,12 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     Defaults to \code{0L}, which preserves the current one-start-per-
     restart behavior. This does not replace \code{nmulti}:
     \code{nmulti} controls outer restarts, while \code{nomad.nmulti}
-    controls inner NOMAD multistarts within each outer restart.
+    controls inner NOMAD multistarts within each outer restart. Advanced
+    native NOMAD parameters may be supplied as \code{nomad.opts} through
+    \code{...}; invalid or unsupported parameters are rejected by NOMAD
+    rather than silently ignored. Routes that evaluate R callbacks require
+    serial callback evaluation and reject parallel callback settings such as
+    \code{NB_THREADS_PARALLEL_EVAL > 1}.
   }
 
   \item{nomad.remin}{
