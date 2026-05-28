@@ -1001,9 +1001,12 @@ npindexbw.NULL <-
                                     reg.args,
                                     opt.args,
                                     degree.search,
-                                    nomad.inner.nmulti = 0L) {
+                                    nomad.inner.nmulti = 0L,
+                                    nomad.opts = list()) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
+  if (is.null(opt.args$nomad.opts) && length(nomad.opts))
+    opt.args$nomad.opts <- nomad.opts
 
   template.reg.args <- reg.args
   template.reg.args$regtype <- "lp"
@@ -1286,6 +1289,7 @@ npindexbw.NULL <-
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
     remin = isTRUE(opt.args$nomad.remin),
+    nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     native.r.bridge = TRUE,
     start.lower = lb,
     start.upper = ub,
@@ -1669,6 +1673,7 @@ npindexbw.default <-
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
     margs <- c("nmulti", "nomad.remin", "powell.remin", "random.seed", "optim.method", "optim.maxattempts",
+               "nomad.opts",
                "optim.reltol", "optim.abstol", "optim.maxit", "only.optimize.beta",
                "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
                "scale.factor.search.lower")
@@ -1697,6 +1702,8 @@ npindexbw.default <-
         list(bandwidth.compute = bandwidth.compute),
         bwsel.args[setdiff(names(bwsel.args), c("xdat", "ydat", "bws"))]
       )
+      if ("nomad.opts" %in% names(dots))
+        opt.args$nomad.opts <- dots$nomad.opts
       opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
       if (identical(degree.search$engine, "cell")) {
@@ -1745,7 +1752,8 @@ npindexbw.default <-
           reg.args = reg.args,
           opt.args = utils::modifyList(opt.args, list(random.seed = random.seed.value)),
           degree.search = degree.search,
-          nomad.inner.nmulti = nomad.inner.nmulti
+          nomad.inner.nmulti = nomad.inner.nmulti,
+          nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
         )
       }
       tbw <- .npindexbw_attach_degree_search(

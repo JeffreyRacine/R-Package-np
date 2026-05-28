@@ -1066,9 +1066,12 @@ npscoefbw.NULL <-
                                     reg.args,
                                     opt.args,
                                     degree.search,
-                                    nomad.inner.nmulti = 0L) {
+                                    nomad.inner.nmulti = 0L,
+                                    nomad.opts = list()) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
+  if (is.null(opt.args$nomad.opts) && length(nomad.opts))
+    opt.args$nomad.opts <- nomad.opts
 
   if (!identical(opt.args$bandwidth.compute, TRUE))
     stop("automatic degree search with search.engine='nomad' requires bandwidth.compute=TRUE")
@@ -1311,6 +1314,7 @@ npscoefbw.NULL <-
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
     remin = isTRUE(opt.args$nomad.remin),
+    nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     native.r.bridge = TRUE,
     start.lower = c(bw_start_bounds$lower, degree.search$lower),
     start.upper = c(bw_start_bounds$upper, degree.search$upper),
@@ -3043,6 +3047,7 @@ npscoefbw.default <-
                "nomad.remin",
                "powell.remin",
                "random.seed",
+               "nomad.opts",
                "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
                "lbd.init", "hbd.init", "dfac.init",
                "scale.factor.search.lower",
@@ -3063,6 +3068,8 @@ npscoefbw.default <-
       opt.args <- list()
     }
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
+    if ("nomad.opts" %in% names(dots))
+      opt.args$nomad.opts <- dots$nomad.opts
     reg.args$scale.factor.search.lower <- scale.factor.search.lower
     opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
@@ -3110,7 +3117,8 @@ npscoefbw.default <-
           reg.args = reg.args,
           opt.args = opt.args,
           degree.search = degree.search,
-          nomad.inner.nmulti = nomad.inner.nmulti
+          nomad.inner.nmulti = nomad.inner.nmulti,
+          nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
         )
       }
       tbw <- .npscoefbw_attach_degree_search(

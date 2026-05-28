@@ -749,7 +749,8 @@ npudensbw.bandwidth <-
           dfac.init = dfac.init,
           scale.init.categorical.sample = scale.init.categorical.sample,
           transform.bounds = transform.bounds,
-          scale.factor.search.lower = scale.factor.search.lower
+          scale.factor.search.lower = scale.factor.search.lower,
+          nomad.opts = list(...)$nomad.opts
         ),
         bwsolver = bwsolver
       ))
@@ -1020,7 +1021,7 @@ npudensbw.default <-
                "scale.factor.search.lower",
                "invalid.penalty",
                "penalty.multiplier",
-               "mads.nmulti", "nomad.nmulti", "nomad.remin")
+               "mads.nmulti", "nomad.nmulti", "nomad.remin", "nomad.opts")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 

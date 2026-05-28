@@ -2020,7 +2020,7 @@
         if (!is.finite(value)) .Machine$double.xmax else value
       }
       native.option.vectors <- .np_nomad_native_option_vectors(solver.opts)
-      return(.np_nomad_native_r_callback_search(
+      native.call <- .np_nomad_native_r_callback_search(
         eval.f = native.eval,
         x0 = start,
         bbin = bbin,
@@ -2031,7 +2031,36 @@
         option.names = native.option.vectors$names,
         option.values = native.option.vectors$values,
         display.nomad.progress = display.nomad.progress
-      ))
+      )
+      native.value <- native.call$value
+      native.status.raw <- if (!is.null(native.value$status)) native.value$status[1L] else 0L
+      native.status.integer <- suppressWarnings(as.integer(native.status.raw))
+      native.status.failed <- if (!is.na(native.status.integer)) {
+        !identical(native.status.integer, 0L)
+      } else {
+        !(tolower(as.character(native.status.raw)) %in% c("", "ok", "success"))
+      }
+      native.result.status <- if (!is.null(native.value$result_status)) {
+        suppressWarnings(as.integer(native.value$result_status[1L]))
+      } else {
+        0L
+      }
+      native.result.failed <- !is.na(native.result.status) && !identical(native.result.status, 0L)
+      if (native.status.failed || native.result.failed) {
+        native.message <- if (!is.null(native.value$message) &&
+                              nzchar(as.character(native.value$message[1L]))) {
+          as.character(native.value$message[1L])
+        } else {
+          "NOMAD rejected the supplied parameters"
+        }
+        stop(sprintf(
+          "native NOMAD R-callback route failed (status=%s, result_status=%s): %s",
+          as.character(native.status.raw),
+          native.result.status,
+          native.message
+        ), call. = FALSE)
+      }
+      return(native.call)
     }
 
     stop("legacy R-level NOMAD fallback is retired for npRmpi NOMAD routes; this route must use the native crs C API or fail earlier as unsupported",

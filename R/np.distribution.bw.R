@@ -851,7 +851,8 @@ npudistbw.dbandwidth <-
           scale.factor.search.lower = scale.factor.search.lower,
           do.full.integral = do.full.integral,
           ngrid = ngrid,
-          memfac = memfac
+          memfac = memfac,
+          nomad.opts = list(...)$nomad.opts
         ),
         bwsolver = bwsolver
       ))
@@ -1118,7 +1119,7 @@ npudistbw.default <-
                "transform.bounds",
                "invalid.penalty",
                "penalty.multiplier",
-               "mads.nmulti", "nomad.nmulti", "nomad.remin")
+               "mads.nmulti", "nomad.nmulti", "nomad.remin", "nomad.opts")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 

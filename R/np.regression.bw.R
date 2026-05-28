@@ -2719,9 +2719,12 @@ npRmpiNomadShadowSearchRegression <- function(template,
                                   yname,
                                   degree.search,
                                   nomad.inner.nmulti = 0L,
-                                  random.seed = 42L) {
+                                  random.seed = 42L,
+                                  nomad.opts = list()) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
+  if (is.null(opt.args$nomad.opts) && length(nomad.opts))
+    opt.args$nomad.opts <- nomad.opts
 
   template.reg.args <- reg.args
   template.reg.args$regtype <- "lp"
@@ -3012,6 +3015,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
     remin = isTRUE(opt.args$nomad.remin),
+    nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     start.lower = c(bw_start_bounds$lower, degree.search$lower),
     start.upper = c(bw_start_bounds$upper, degree.search$upper),
     degree_spec = list(
@@ -3431,7 +3435,8 @@ npregbw.default <-
           yname = yname,
           degree.search = degree.search,
           nomad.inner.nmulti = nomad.inner.nmulti,
-          random.seed = random.seed.value
+          random.seed = random.seed.value,
+          nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
         )
       }
       tbw <- .npregbw_attach_degree_search(
