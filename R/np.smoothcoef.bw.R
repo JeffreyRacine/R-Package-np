@@ -1761,6 +1761,15 @@ npscoefbw.scbandwidth <-
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(NCOL(eval.zdat)) else npValidateNmulti(opt.args$nmulti[1L])
 
   bw_bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
+  opt.value <- function(name, default) {
+    if (is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
+  bw_start_bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = bw_bounds,
+    setup = setup,
+    opt.value = opt.value,
+    where = "npscoefbw"
+  )
 
   x0 <- c(
     .npregbw_nomad_complete_bw_start_point(
@@ -1915,6 +1924,8 @@ npscoefbw.scbandwidth <-
     random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
     remin = isTRUE(opt.args$nomad.remin),
     native.r.bridge = TRUE,
+    start.lower = c(bw_start_bounds$lower, degree.search$lower),
+    start.upper = c(bw_start_bounds$upper, degree.search$upper),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,

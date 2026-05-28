@@ -1733,6 +1733,22 @@ npNomadShadowSearchConditionalDensity <- function(template,
   } else {
     degree.search$engine
   }
+  opt.value.local <- function(name, default) {
+    if (is.null(opt.args) || is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
+  native.bw.bounds <- list(
+    lower = lb[seq_len(bwdim)],
+    upper = ub[seq_len(bwdim)],
+    bbin = bbin[seq_len(bwdim)],
+    ncon = length(setup$cont_flat),
+    ncat = length(setup$cat_flat)
+  )
+  native.start.bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = native.bw.bounds,
+    setup = setup,
+    opt.value = opt.value.local,
+    where = "npcdensbw"
+  )
 
   if (.npcdensbw_nomad_shadow_native_target(template, reg.args, degree.search)) {
     .npcdensbw_nomad_shadow_native_require_crs()
@@ -1773,6 +1789,8 @@ npNomadShadowSearchConditionalDensity <- function(template,
       ub = ub,
       nmulti = native.nmulti,
       random.seed = random.seed,
+      start.lower = c(native.start.bounds$lower, degree.search$lower),
+      start.upper = c(native.start.bounds$upper, degree.search$upper),
       degree_spec = list(
         initial = degree.search$start.degree,
         lower = degree.search$lower,
@@ -1968,6 +1986,8 @@ npNomadShadowSearchConditionalDensity <- function(template,
       bind_bandwidth_runtime = !is.null(external.progress),
       handoff_before_build = identical(degree.search$engine, "nomad+powell"),
       remin = isTRUE(remin),
+      start.lower = c(native.start.bounds$lower, degree.search$lower),
+      start.upper = c(native.start.bounds$upper, degree.search$upper),
       degree_spec = list(
         initial = degree.search$start.degree,
         lower = degree.search$lower,
@@ -2282,6 +2302,13 @@ npNomadShadowSearchConditionalDensity <- function(template,
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
+  native.start.bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = bounds,
+    setup = setup,
+    opt.value = opt.value,
+    where = "npcdensbw"
+  )
+
   if (.npcdensbw_fixed_native_target(template, reg.args, bwsolver)) {
     .npcdensbw_nomad_shadow_native_require_crs()
     native.nmulti <- npValidateNmulti(
@@ -2323,7 +2350,9 @@ npNomadShadowSearchConditionalDensity <- function(template,
       ub = bounds$upper,
       nmulti = native.nmulti,
       random.seed = native.random.seed,
-      degree_spec = NULL
+      degree_spec = NULL,
+      start.lower = native.start.bounds$lower,
+      start.upper = native.start.bounds$upper
     )
     start.bw <- .npcdensbw_nomad_point_to_bw(x0[seq_len(bwdim)], template = template, setup = setup)
     native.prep <- .npcdensbw_nomad_shadow_prepare_args(
@@ -2527,7 +2556,9 @@ npNomadShadowSearchConditionalDensity <- function(template,
       random.seed = opt.value("random.seed", 42L),
       handoff_before_build = identical(bwsolver, "mads+powell"),
       remin = isTRUE(opt.args$nomad.remin),
-      nomad.opts = opt.value("nomad.opts", list())
+      nomad.opts = opt.value("nomad.opts", list()),
+      start.lower = native.start.bounds$lower,
+      start.upper = native.start.bounds$upper
     )
   }
   search.result$method <- bwsolver
@@ -2600,6 +2631,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
   }
 
   setup <- list(
+    type = template$type,
     cont_flat = c(y_cont_flat, x_cont_flat),
     cont_scale = .npConditionalNomadContScale(
       ycon = ycon,
@@ -2894,6 +2926,15 @@ npNomadShadowSearchConditionalDensity <- function(template,
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
   objective.direction <- "max"
   bw_bounds <- .npcdensbw_nomad_bw_bounds(template = template, setup = setup)
+  opt.value.local <- function(name, default) {
+    if (is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
+  bw_start_bounds <- .np_nomad_bw_restart_start_bounds(
+    bounds = bw_bounds,
+    setup = setup,
+    opt.value = opt.value.local,
+    where = "npcdensbw"
+  )
 
   x0 <- c(
     .npcdensbw_nomad_complete_bw_start_point(
@@ -3111,6 +3152,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       ixord = template$ixord
     )
     search.setup <- list(
+      type = template$type,
       cont_flat = setup$cont_flat,
       cont_scale = setup$cont_scale,
       cat_flat = setup$cat_flat,
@@ -3172,6 +3214,8 @@ npNomadShadowSearchConditionalDensity <- function(template,
     random.seed = random.seed,
     handoff_before_build = identical(degree.search$engine, "nomad+powell"),
     remin = isTRUE(opt.args$nomad.remin),
+    start.lower = c(bw_start_bounds$lower, degree.search$lower),
+    start.upper = c(bw_start_bounds$upper, degree.search$upper),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,

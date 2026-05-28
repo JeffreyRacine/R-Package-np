@@ -799,9 +799,22 @@ npplregbw.plbandwidth =
   child.bounds <- lapply(seq_along(child.templates), function(i) {
     .npregbw_nomad_bw_bounds(template = child.templates[[i]], setup = child.setup[[i]])
   })
+  opt.value <- function(name, default) {
+    if (is.null(opt.args[[name]])) default else opt.args[[name]]
+  }
+  child.start.bounds <- lapply(seq_along(child.templates), function(i) {
+    .np_nomad_bw_restart_start_bounds(
+      bounds = child.bounds[[i]],
+      setup = child.setup[[i]],
+      opt.value = opt.value,
+      where = "npplregbw"
+    )
+  })
   child.lower <- unlist(lapply(child.bounds, `[[`, "lower"), use.names = FALSE)
   child.upper <- unlist(lapply(child.bounds, `[[`, "upper"), use.names = FALSE)
   child.bbin <- unlist(lapply(child.bounds, `[[`, "bbin"), use.names = FALSE)
+  child.start.lower <- unlist(lapply(child.start.bounds, `[[`, "lower"), use.names = FALSE)
+  child.start.upper <- unlist(lapply(child.start.bounds, `[[`, "upper"), use.names = FALSE)
   child.start <- unlist(lapply(seq_along(child.templates), function(i) {
     raw <- child.templates[[i]]$bw
     point.start <- if (all(raw == 0)) NULL else .npregbw_nomad_bw_to_point(raw, template = child.templates[[i]], setup = child.setup[[i]])
@@ -1024,6 +1037,8 @@ npplregbw.plbandwidth =
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     remin = isTRUE(opt.args$nomad.remin),
+    start.lower = c(child.start.lower, degree.search$lower),
+    start.upper = c(child.start.upper, degree.search$upper),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
