@@ -550,13 +550,14 @@ npplregbw.plbandwidth =
   )
   optimizer.arg.names <- c(
     "ftol", "itmax", "nmulti", "nomad.remin", "powell.remin", "small", "tol",
-    "scale.factor.search.lower"
+    "scale.factor.search.lower",
+    "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
+    "lbd.init", "hbd.init", "dfac.init",
+    "scale.init.categorical.sample", "transform.bounds", "nomad.opts"
   )
-  child.args <- c(
-    list(
-      xdat = zdat,
-      ydat = response,
-      bws = bw.start,
+  child.base.args <- list(
+    xdat = zdat,
+    ydat = response,
       bandwidth.compute = TRUE,
       regtype = "lp",
       nomad = TRUE,
@@ -571,7 +572,12 @@ npplregbw.plbandwidth =
       degree.verify = degree.search$verify,
       nomad.nmulti = nomad.inner.nmulti,
       random.seed = random.seed
-    ),
+  )
+  if (!all(as.numeric(bw.start) == 0)) {
+    child.base.args$bws <- bw.start
+  }
+  child.args <- c(
+    child.base.args,
     reg.args[intersect(names(reg.args), kernel.arg.names)],
     opt.args[intersect(names(opt.args), optimizer.arg.names)]
   )
@@ -817,11 +823,14 @@ npplregbw.plbandwidth =
   child.start.upper <- unlist(lapply(child.start.bounds, `[[`, "upper"), use.names = FALSE)
   child.start <- unlist(lapply(seq_along(child.templates), function(i) {
     raw <- child.templates[[i]]$bw
-    point.start <- if (all(raw == 0)) NULL else .npregbw_nomad_bw_to_point(raw, template = child.templates[[i]], setup = child.setup[[i]])
+    explicit.start <- !all(as.numeric(bws[i, ]) == 0)
+    point.start <- if (!explicit.start || all(raw == 0)) NULL else .npregbw_nomad_bw_to_point(raw, template = child.templates[[i]], setup = child.setup[[i]])
     .npregbw_nomad_complete_bw_start_point(
       point = point.start,
       bounds = child.bounds[[i]],
-      setup = child.setup[[i]]
+      setup = child.setup[[i]],
+      initial = child.start.bounds[[i]]$initial,
+      where = "npplregbw"
     )
   }), use.names = FALSE)
   bwdim <- length(child.start)
@@ -1229,6 +1238,9 @@ npplregbw.default =
                "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
                "scale.factor.search.lower",
+               "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
+               "lbd.init", "hbd.init", "dfac.init",
+               "scale.init.categorical.sample", "transform.bounds", "nomad.opts",
                "ftol", "itmax", "nmulti", "nomad.remin", "powell.remin", "small", "tol")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
@@ -1244,6 +1256,15 @@ npplregbw.default =
       if (any.m) {
         nms <- mc.names[m]
         opt.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+      }
+      dotted.opt.names <- intersect(
+        c("scale.factor.init.lower", "scale.factor.init.upper",
+          "scale.factor.init", "lbd.init", "hbd.init", "dfac.init",
+          "scale.init.categorical.sample", "transform.bounds", "nomad.opts"),
+        dot.names
+      )
+      if (length(dotted.opt.names)) {
+        opt.args[dotted.opt.names] <- dots[dotted.opt.names]
       }
       opt.args$scale.factor.search.lower <- scale.factor.search.lower
 

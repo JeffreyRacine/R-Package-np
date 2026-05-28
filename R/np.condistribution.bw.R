@@ -1246,11 +1246,12 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   setup$nobs <- nrow(toFrame(xdat))
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   bounds <- .npcdistbw_nomad_bw_bounds(template = template, setup = setup)
+  point.start <- {
+    raw <- c(template$ybw, template$xbw)
+    if (all(raw == 0)) NULL else .npcdistbw_nomad_bw_to_point(raw, template = template, setup = setup)
+  }
   x0 <- .npcdistbw_nomad_complete_bw_start_point(
-    point = {
-      raw <- c(template$ybw, template$xbw)
-      if (all(raw == 0)) NULL else .npcdistbw_nomad_bw_to_point(raw, template = template, setup = setup)
-    },
+    point = point.start,
     bounds = bounds,
     template = template
   )
@@ -1349,6 +1350,15 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     opt.value = opt.value,
     where = "npcdistbw"
   )
+  if (is.null(point.start)) {
+    x0 <- .npcdistbw_nomad_complete_bw_start_point(
+      point = NULL,
+      bounds = bounds,
+      template = template,
+      initial = native.start.bounds$initial,
+      where = "npcdistbw"
+    )
+  }
 
   if (.npcdistbw_nomad_native_target(template, bwsolver)) {
     .npcdistbw_nomad_native_require_crs()
@@ -1733,7 +1743,18 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   )
 }
 
-.npcdistbw_nomad_complete_bw_start_point <- function(point, bounds, template) {
+.npcdistbw_nomad_complete_bw_start_point <- function(point,
+                                                     bounds,
+                                                     template,
+                                                     initial = NULL,
+                                                     where = "npcdistbw") {
+  point <- .np_nomad_explicit_or_initial_start(
+    point = point,
+    initial = initial,
+    n = length(bounds$lower),
+    where = where
+  )
+
   if (identical(as.character(template$type)[1L], "fixed")) {
     return(.np_nomad_complete_start_point(
       point = point,
@@ -1830,15 +1851,18 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     opt.value = opt.value.local,
     where = "npcdistbw"
   )
+  point.start <- {
+    raw <- c(template$ybw, template$xbw)
+    if (all(raw == 0)) NULL else .npcdistbw_nomad_bw_to_point(raw, template = template, setup = setup)
+  }
 
   x0 <- c(
     .npcdistbw_nomad_complete_bw_start_point(
-      point = {
-        raw <- c(template$ybw, template$xbw)
-        if (all(raw == 0)) NULL else .npcdistbw_nomad_bw_to_point(raw, template = template, setup = setup)
-      },
+      point = point.start,
       bounds = bw_bounds,
-      template = template
+      template = template,
+      initial = bw_start_bounds$initial,
+      where = "npcdistbw"
     ),
     as.integer(degree.search$start.degree)
   )

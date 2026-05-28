@@ -1269,6 +1269,15 @@ npregbw.rbandwidth <-
     opt.value = opt.value,
     where = "npregbw"
   )
+  if (is.null(point.start)) {
+    x0 <- .npregbw_nomad_complete_bw_start_point(
+      point = NULL,
+      bounds = bounds,
+      setup = setup,
+      initial = native.start.bounds$initial,
+      where = "npregbw"
+    )
+  }
 
   if (.npregbw_nomad_native_target(template, bwsolver)) {
     .npregbw_nomad_native_require_crs()
@@ -1566,6 +1575,7 @@ npregbw.rbandwidth <-
                                              where = "NOMAD bandwidth search") {
   start.lower <- as.numeric(bounds$lower)
   start.upper <- as.numeric(bounds$upper)
+  start.initial <- rep(NA_real_, length(start.lower))
   n <- length(start.lower)
   if (length(start.upper) != n)
     stop(sprintf("%s: search bounds must have matching lengths", where), call. = FALSE)
@@ -1602,12 +1612,14 @@ npregbw.rbandwidth <-
     )
     start.lower[cont.idx] <- cont.start$scale.factor.init.lower
     start.upper[cont.idx] <- cont.start$scale.factor.init.upper
+    start.initial[cont.idx] <- cont.start$scale.factor.init
   }
 
   if (ncat > 0L) {
     cat.idx <- ncon + seq_len(ncat)
     lbd.init <- npValidatePositiveFiniteNumeric(opt.value("lbd.init", 0.1), "lbd.init")
     hbd.init <- npValidatePositiveFiniteNumeric(opt.value("hbd.init", 0.9), "hbd.init")
+    dfac.init <- npValidatePositiveFiniteNumeric(opt.value("dfac.init", 0.375), "dfac.init")
     if (hbd.init < lbd.init)
       stop(sprintf("%s: 'hbd.init' must be greater than or equal to 'lbd.init'", where),
            call. = FALSE)
@@ -1618,6 +1630,7 @@ npregbw.rbandwidth <-
     }
     start.lower[cat.idx] <- as.double(lbd.init) * cat.scale
     start.upper[cat.idx] <- as.double(hbd.init) * cat.scale
+    start.initial[cat.idx] <- as.double(dfac.init) * cat.scale
   }
 
   finite.lower <- is.finite(start.lower) & is.finite(bounds$lower)
@@ -1627,13 +1640,49 @@ npregbw.rbandwidth <-
 
   both.finite <- is.finite(start.lower) & is.finite(start.upper)
   inverted <- both.finite & start.upper < start.lower
-  if (any(inverted))
-    start.upper[inverted] <- start.lower[inverted]
+  if (any(inverted)) {
+    stop(sprintf(
+      "%s: effective NOMAD random-start interval is empty after applying search bounds",
+      where
+    ), call. = FALSE)
+  }
 
-  list(lower = start.lower, upper = start.upper)
+  finite.initial <- is.finite(start.initial)
+  start.initial[finite.initial] <- pmax(bounds$lower[finite.initial],
+                                        pmin(bounds$upper[finite.initial],
+                                             start.initial[finite.initial]))
+
+  list(lower = start.lower, upper = start.upper, initial = start.initial)
 }
 
-.npregbw_nomad_complete_bw_start_point <- function(point, bounds, setup) {
+.np_nomad_explicit_or_initial_start <- function(point,
+                                                initial,
+                                                n,
+                                                where = "NOMAD start") {
+  if (!is.null(point))
+    return(point)
+  if (is.null(initial))
+    return(NULL)
+
+  initial <- as.numeric(initial)
+  if (length(initial) != n)
+    stop(sprintf("%s: initial start vector must have length %d", where, n),
+         call. = FALSE)
+  initial
+}
+
+.npregbw_nomad_complete_bw_start_point <- function(point,
+                                                   bounds,
+                                                   setup,
+                                                   initial = NULL,
+                                                   where = "npregbw") {
+  point <- .np_nomad_explicit_or_initial_start(
+    point = point,
+    initial = initial,
+    n = length(bounds$lower),
+    where = where
+  )
+
   if (identical(setup$type, "fixed")) {
     return(.np_nomad_complete_start_point(
       point = point,
@@ -1857,7 +1906,9 @@ npregbw.rbandwidth <-
     .npregbw_nomad_complete_bw_start_point(
       point = point.start,
       bounds = bw_bounds,
-      setup = setup
+      setup = setup,
+      initial = bw_start_bounds$initial,
+      where = "npregbw"
     ),
     as.integer(degree.search$start.degree)
   )

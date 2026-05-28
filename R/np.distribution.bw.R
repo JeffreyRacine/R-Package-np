@@ -431,6 +431,15 @@ npNomadNativeSearchDistribution <- function(prep,
     opt.value = opt.value,
     where = "npudistbw"
   )
+  if (is.null(point.start)) {
+    x0 <- .npregbw_nomad_complete_bw_start_point(
+      point = NULL,
+      bounds = bounds,
+      setup = setup,
+      initial = native.start.bounds$initial,
+      where = "npudistbw"
+    )
+  }
 
   if (.npudistbw_nomad_native_target(template, bwsolver)) {
     .npudistbw_nomad_native_require_crs()
@@ -470,6 +479,12 @@ npNomadNativeSearchDistribution <- function(prep,
       ftol = opt.value("ftol", 1.490116e-07),
       tol = opt.value("tol", 1.490116e-04),
       small = opt.value("small", 1.490116e-05),
+      scale.factor.init.lower = opt.value("scale.factor.init.lower", 0.1),
+      scale.factor.init.upper = opt.value("scale.factor.init.upper", 2.0),
+      scale.factor.init = opt.value("scale.factor.init", 0.5),
+      lbd.init = opt.value("lbd.init", 0.1),
+      hbd.init = opt.value("hbd.init", 0.9),
+      dfac.init = opt.value("dfac.init", 0.375),
       scale.factor.search.lower = opt.value("scale.factor.search.lower", NULL),
       do.full.integral = opt.value("do.full.integral", FALSE),
       ngrid = opt.value("ngrid", 100L),
@@ -793,6 +808,14 @@ npudistbw.dbandwidth <-
           small = small,
           invalid.penalty = invalid.penalty,
           penalty.multiplier = penalty.multiplier,
+          scale.factor.init.lower = scale.factor.init.lower,
+          scale.factor.init.upper = scale.factor.init.upper,
+          scale.factor.init = scale.factor.init,
+          lbd.init = lbd.init,
+          hbd.init = hbd.init,
+          dfac.init = dfac.init,
+          scale.init.categorical.sample = scale.init.categorical.sample,
+          transform.bounds = transform.bounds,
           scale.factor.search.lower = scale.factor.search.lower,
           do.full.integral = do.full.integral,
           ngrid = ngrid,
