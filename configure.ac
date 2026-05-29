@@ -98,65 +98,65 @@ if test -z "$MPI_ROOT" ; then
   for d in /opt/lib /usr/lib /usr /usr/lib/x86_64-linux-gnu/openmpi \
           /usr/local/lib /usr/local /usr/lib64/mpi/gcc/openmpi; do
     if test -f $d/include/mpi.h && test -d $d/lib/openmpi; then
-      echo "I am here $d and it is OpenMPI"
+      AC_MSG_NOTICE([found OpenMPI MPI root: $d])
       MPI_ROOT=$d
       MPITYPE="OPENMPI"
       break
     elif test -f $d/include/openmpi/mpi.h && test -d $d/lib/openmpi; then
-      echo "I am here $d and it is OpenMPI"
+      AC_MSG_NOTICE([found OpenMPI MPI root: $d])
       MPI_ROOT=$d
       MPITYPE="OPENMPI"
       MPI_INCLUDE_PATH=$d/include/openmpi
       break
     elif test -f $d/include/openmpi/mpi.h && test -d $d/lib64/openmpi; then
-      echo "I am here $d and it is OpenMPI"
+      AC_MSG_NOTICE([found OpenMPI MPI root: $d])
       MPI_ROOT=$d
       MPITYPE="OPENMPI"
       MPI_INCLUDE_PATH=$d/include/openmpi
       break
     elif test -f $d/openmpi/include/mpi.h && test -d $d/openmpi/lib; then
-      echo "I am here $d/openmpi and it is OpenMPI"
+      AC_MSG_NOTICE([found OpenMPI MPI root: $d/openmpi])
       MPI_ROOT=$d/openmpi
       MPITYPE="OPENMPI"
       MPI_INCLUDE_PATH=$d/include/openmpi
       break
     elif test -f $d/include/mpi.h && test -d $d/lib64; then
-      echo "I am here $d and it is OpenMPI"
+      AC_MSG_NOTICE([found OpenMPI MPI root: $d])
       MPI_ROOT=$d
       MPITYPE="OPENMPI"
       MPI_INCLUDE_PATH=$d/include
       break
    elif test -f $d/lam/include/mpi.h && test -f $d/lam/lib/libmpi.so; then
-      echo "I am here $d/lam and it is LAM"
+      AC_MSG_NOTICE([found LAM MPI root: $d/lam])
       MPI_ROOT=$d/lam
       MPITYPE="LAM"
       MPI_INCLUDE_PATH=$d/include/lam
       break
    elif test -f $d/include/lam/mpi.h && test -f $d/lib/lam/libmpi.so; then
-      echo "I am here $d and it is LAM"
+      AC_MSG_NOTICE([found LAM MPI root: $d])
       MPI_ROOT=$d
       MPITYPE="LAM"
       MPI_INCLUDE_PATH=$d/include/lam
       break
     elif test -f $d/include/lam/mpi.h && test -f $d/lib64/lam/libmpi.so; then
-      echo "I am here $d and it is LAM"
+      AC_MSG_NOTICE([found LAM MPI root: $d])
       MPI_ROOT=$d
       MPITYPE="LAM"
       MPI_INCLUDE_PATH=$d/include/lam
       break
     elif test -f $d/mpich/include/mpi.h; then
-      echo "I am here $d/mpich and it is MPICH"
+      AC_MSG_NOTICE([found MPICH MPI root: $d/mpich])
       MPI_ROOT=$d/mpich
       MPITYPE="MPICH"
       MPI_INCLUDE_PATH=$d/mpich/include
       break
     elif test -f $d/mpi/include/mpi.h; then
-      echo "I am here $d/mpi"
+      AC_MSG_NOTICE([found MPI root: $d/mpi])
       MPI_ROOT=$d/mpi
       MPI_INCLUDE_PATH=$d/mpi/include
       break
     elif test -f $d/include/mpi.h; then
-      echo "I am here $d"
+      AC_MSG_NOTICE([found MPI root: $d])
       MPI_ROOT=$d
       break
     fi

@@ -36,10 +36,6 @@
 ^issue_notes
 ^archive$
 ^archive/
-^man/dontrun
-^man/run
-^man/sed_dontrun\.scr
-^man/sed_run\.scr
 ^npRmpi_.*\\.tar\\.gz$
 ^OPTIMIZATION\.md
 ^WORKTREES\.md

@@ -1,3 +1,0 @@
-s/\\dontrun{/% \\dontrun{/g
-s/} % enddontrun/% } % enddontrun/g
-

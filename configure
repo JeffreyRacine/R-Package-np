@@ -3478,65 +3478,76 @@ if test -z "$MPI_ROOT" ; then
   for d in /opt/lib /usr/lib /usr /usr/lib/x86_64-linux-gnu/openmpi \
           /usr/local/lib /usr/local /usr/lib64/mpi/gcc/openmpi; do
     if test -f $d/include/mpi.h && test -d $d/lib/openmpi; then
-      echo "I am here $d and it is OpenMPI"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found OpenMPI MPI root: $d" >&5
+printf "%s\n" "$as_me: found OpenMPI MPI root: $d" >&6;}
       MPI_ROOT=$d
       MPITYPE="OPENMPI"
       break
     elif test -f $d/include/openmpi/mpi.h && test -d $d/lib/openmpi; then
-      echo "I am here $d and it is OpenMPI"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found OpenMPI MPI root: $d" >&5
+printf "%s\n" "$as_me: found OpenMPI MPI root: $d" >&6;}
       MPI_ROOT=$d
       MPITYPE="OPENMPI"
       MPI_INCLUDE_PATH=$d/include/openmpi
       break
     elif test -f $d/include/openmpi/mpi.h && test -d $d/lib64/openmpi; then
-      echo "I am here $d and it is OpenMPI"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found OpenMPI MPI root: $d" >&5
+printf "%s\n" "$as_me: found OpenMPI MPI root: $d" >&6;}
       MPI_ROOT=$d
       MPITYPE="OPENMPI"
       MPI_INCLUDE_PATH=$d/include/openmpi
       break
     elif test -f $d/openmpi/include/mpi.h && test -d $d/openmpi/lib; then
-      echo "I am here $d/openmpi and it is OpenMPI"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found OpenMPI MPI root: $d/openmpi" >&5
+printf "%s\n" "$as_me: found OpenMPI MPI root: $d/openmpi" >&6;}
       MPI_ROOT=$d/openmpi
       MPITYPE="OPENMPI"
       MPI_INCLUDE_PATH=$d/include/openmpi
       break
     elif test -f $d/include/mpi.h && test -d $d/lib64; then
-      echo "I am here $d and it is OpenMPI"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found OpenMPI MPI root: $d" >&5
+printf "%s\n" "$as_me: found OpenMPI MPI root: $d" >&6;}
       MPI_ROOT=$d
       MPITYPE="OPENMPI"
       MPI_INCLUDE_PATH=$d/include
       break
    elif test -f $d/lam/include/mpi.h && test -f $d/lam/lib/libmpi.so; then
-      echo "I am here $d/lam and it is LAM"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found LAM MPI root: $d/lam" >&5
+printf "%s\n" "$as_me: found LAM MPI root: $d/lam" >&6;}
       MPI_ROOT=$d/lam
       MPITYPE="LAM"
       MPI_INCLUDE_PATH=$d/include/lam
       break
    elif test -f $d/include/lam/mpi.h && test -f $d/lib/lam/libmpi.so; then
-      echo "I am here $d and it is LAM"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found LAM MPI root: $d" >&5
+printf "%s\n" "$as_me: found LAM MPI root: $d" >&6;}
       MPI_ROOT=$d
       MPITYPE="LAM"
       MPI_INCLUDE_PATH=$d/include/lam
       break
     elif test -f $d/include/lam/mpi.h && test -f $d/lib64/lam/libmpi.so; then
-      echo "I am here $d and it is LAM"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found LAM MPI root: $d" >&5
+printf "%s\n" "$as_me: found LAM MPI root: $d" >&6;}
       MPI_ROOT=$d
       MPITYPE="LAM"
       MPI_INCLUDE_PATH=$d/include/lam
       break
     elif test -f $d/mpich/include/mpi.h; then
-      echo "I am here $d/mpich and it is MPICH"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found MPICH MPI root: $d/mpich" >&5
+printf "%s\n" "$as_me: found MPICH MPI root: $d/mpich" >&6;}
       MPI_ROOT=$d/mpich
       MPITYPE="MPICH"
       MPI_INCLUDE_PATH=$d/mpich/include
       break
     elif test -f $d/mpi/include/mpi.h; then
-      echo "I am here $d/mpi"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found MPI root: $d/mpi" >&5
+printf "%s\n" "$as_me: found MPI root: $d/mpi" >&6;}
       MPI_ROOT=$d/mpi
       MPI_INCLUDE_PATH=$d/mpi/include
       break
     elif test -f $d/include/mpi.h; then
-      echo "I am here $d"
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: found MPI root: $d" >&5
+printf "%s\n" "$as_me: found MPI root: $d" >&6;}
       MPI_ROOT=$d
       break
     fi
@@ -5277,5 +5288,4 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 printf "%s\n" "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-
 
