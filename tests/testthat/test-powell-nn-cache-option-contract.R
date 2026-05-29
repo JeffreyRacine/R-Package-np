@@ -19,6 +19,36 @@ test_that("np.objective.cache default ignores legacy environment off switch", {
   expect_true(npRmpi:::npObjectiveCacheEnabled())
 })
 
+test_that("NN objective cache rejects non-finite values", {
+  cache <- npRmpi:::.np_r_nn_cache_new(TRUE, key.length = 1L)
+
+  miss <- npRmpi:::.np_r_nn_cache_get(cache, 1L)
+  expect_false(npRmpi:::.np_r_nn_cache_put(cache, miss$token, Inf))
+  expect_false(npRmpi:::.np_r_nn_cache_get(cache, 1L)$hit)
+
+  miss <- npRmpi:::.np_r_nn_cache_get(cache, 1L)
+  expect_false(npRmpi:::.np_r_nn_cache_put(cache, miss$token, NaN))
+  expect_false(npRmpi:::.np_r_nn_cache_get(cache, 1L)$hit)
+
+  miss <- npRmpi:::.np_r_nn_cache_get(cache, 1L)
+  expect_false(npRmpi:::.np_r_nn_cache_put(cache, miss$token, numeric()))
+  expect_false(npRmpi:::.np_r_nn_cache_get(cache, 1L)$hit)
+
+  miss <- npRmpi:::.np_r_nn_cache_get(cache, 1L)
+  expect_true(npRmpi:::.np_r_nn_cache_put(cache, miss$token, 3.25))
+  hit <- npRmpi:::.np_r_nn_cache_get(cache, 1L)
+  expect_true(hit$hit)
+  expect_equal(hit$value, 3.25)
+})
+
+test_that("C NN objective cache guards non-finite values before insertion", {
+  path <- testthat::test_path("..", "..", "src", "np.c")
+  skip_if_not(file.exists(path), "package source file unavailable")
+  text <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  expect_match(text, "static void bwm_nn_cache_put")
+  expect_match(text, "R_FINITE\\(value\\)")
+})
+
 test_that("np.objective.cache controls continuous NN Powell caching under MPI", {
   env <- npRmpi_subprocess_env("NP_RMPI_NO_REUSE_SLAVES=1")
   skip_if(is.null(env))

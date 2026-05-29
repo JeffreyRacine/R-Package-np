@@ -3592,7 +3592,9 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
 .np_r_nn_cache_put <- function(cache, token, value) {
   if (!is.environment(cache) || !isTRUE(cache$enabled) || is.null(token))
     return(invisible(FALSE))
-  assign(token, value, envir = cache$store)
+  if (!is.numeric(value) || length(value) != 1L || !is.finite(value))
+    return(invisible(FALSE))
+  assign(token, as.numeric(value), envir = cache$store)
   cache$raw.evals <- cache$raw.evals + 1
   invisible(TRUE)
 }

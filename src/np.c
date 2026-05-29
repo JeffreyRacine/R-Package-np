@@ -1863,7 +1863,7 @@ static int bwm_nn_cache_get(double *p, double *value, int **key_out, int *stack_
 
 static void bwm_nn_cache_put(int *key, int *stack_key, double value)
 {
-  if (key != NULL)
+  if ((key != NULL) && R_FINITE(value))
     bwm_nn_cache_insert(key, value);
   if (key != NULL)
     bwm_nn_cache_free_key(key, stack_key);
