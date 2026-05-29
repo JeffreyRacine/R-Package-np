@@ -6400,7 +6400,7 @@ const int keep_kw_owner_local){
   }
 
   // root node
-  nls.node = (int *)malloc(sizeof(int));
+  nls.node = (int *)np_jksum_malloc_array_or_die(1, sizeof(int), "kernel weighted sum nls.node");
   nls.node[0] = 0;
   nls.nalloc = nls.n = 1;
 
@@ -26439,24 +26439,24 @@ double *cv){
   if(rho == NULL)
     error("failed to allocate rho");
 
-  operator = (int *)malloc(sizeof(int)*num_reg);
+  operator = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg), sizeof(int), "density categorical operator");
 
   for(i = 0; i < num_reg; i++)
     operator[i] = OP_NORMAL;
 
   int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
-  kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous);
+  kernel_c = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg_continuous), sizeof(int), "density categorical kernel_c");
 
   for(i = 0; i < num_reg_continuous; i++)
     kernel_c[i] = KERNEL_den;
 
-  kernel_u = (int *)malloc(sizeof(int)*num_reg_unordered);
+  kernel_u = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg_unordered), sizeof(int), "density categorical kernel_u");
 
   for(i = 0; i < num_reg_unordered; i++)
     kernel_u[i] = KERNEL_unordered_den;
 
-  kernel_o = (int *)malloc(sizeof(int)*num_reg_ordered);
+  kernel_o = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg_ordered), sizeof(int), "density categorical kernel_o");
 
   for(i = 0; i < num_reg_ordered; i++)
     kernel_o[i] = KERNEL_ordered_den;
@@ -27210,24 +27210,24 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
 	const double log_DBL_MIN = log(DBL_MIN);
 
-  operator = (int *)malloc(sizeof(int)*num_reg);
+  operator = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg), sizeof(int), "density distribution categorical operator");
 
   for(i = 0; i < num_reg; i++)
     operator[i] = dop;
 
   int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
-  kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous);
+  kernel_c = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg_continuous), sizeof(int), "density distribution categorical kernel_c");
 
   for(i = 0; i < num_reg_continuous; i++)
     kernel_c[i] = KERNEL_den;
 
-  kernel_u = (int *)malloc(sizeof(int)*num_reg_unordered);
+  kernel_u = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg_unordered), sizeof(int), "density distribution categorical kernel_u");
 
   for(i = 0; i < num_reg_unordered; i++)
     kernel_u[i] = KERNEL_unordered_den;
 
-  kernel_o = (int *)malloc(sizeof(int)*num_reg_ordered);
+  kernel_o = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg_ordered), sizeof(int), "density distribution categorical kernel_o");
 
   for(i = 0; i < num_reg_ordered; i++)
     kernel_o[i] = KERNEL_ordered_den;
@@ -27608,7 +27608,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   if(rhon == NULL)
     error("failed to allocate rhon");
 
-  operator = (int *)malloc(sizeof(int)*num_all_var);
+  operator = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_all_var), sizeof(int), "conditional density categorical operator");
 
   for(i = 0; i < num_all_var; i++)
     operator[i] = OP_NORMAL;
@@ -27618,24 +27618,24 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   int * kernel_cxy = NULL, * kernel_uxy = NULL, * kernel_oxy = NULL;
 
   // x data
-  kernel_cx = (int *)malloc(sizeof(int)*num_reg_continuous);
+  kernel_cx = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg_continuous), sizeof(int), "conditional density categorical kernel_cx");
 
   for(i = 0; i < num_reg_continuous; i++)
     kernel_cx[i] = KERNEL_reg;
 
-  kernel_ux = (int *)malloc(sizeof(int)*num_reg_unordered);
+  kernel_ux = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg_unordered), sizeof(int), "conditional density categorical kernel_ux");
 
   for(i = 0; i < num_reg_unordered; i++)
     kernel_ux[i] = KERNEL_unordered_reg;
 
-  kernel_ox = (int *)malloc(sizeof(int)*num_reg_ordered);
+  kernel_ox = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg_ordered), sizeof(int), "conditional density categorical kernel_ox");
 
   for(i = 0; i < num_reg_ordered; i++)
     kernel_ox[i] = KERNEL_ordered_reg;
 
   
   // xy data
-  kernel_cxy = (int *)malloc(sizeof(int)*num_cvar);
+  kernel_cxy = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_cvar), sizeof(int), "conditional density categorical kernel_cxy");
 
   for(i = 0; i < num_reg_continuous; i++)
     kernel_cxy[i] = KERNEL_reg;
@@ -27643,7 +27643,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   for(i = num_reg_continuous; i < num_cvar; i++)
     kernel_cxy[i] = KERNEL_den;
 
-  kernel_uxy = (int *)malloc(sizeof(int)*num_uvar);
+  kernel_uxy = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_uvar), sizeof(int), "conditional density categorical kernel_uxy");
 
   for(i = 0; i < num_reg_unordered; i++)
     kernel_uxy[i] = KERNEL_unordered_reg;
@@ -27651,7 +27651,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   for(i = num_reg_unordered; i < num_uvar; i++)
     kernel_uxy[i] = KERNEL_unordered_den;
 
-  kernel_oxy = (int *)malloc(sizeof(int)*num_ovar);
+  kernel_oxy = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_ovar), sizeof(int), "conditional density categorical kernel_oxy");
 
   for(i = 0; i < num_reg_ordered; i++)
     kernel_oxy[i] = KERNEL_ordered_reg;
@@ -28942,7 +28942,7 @@ double * log_likelihood
     icX[i] = i;
 
   // nodes for pts
-  nls.node = (int *)malloc(sizeof(int));
+  nls.node = (int *)np_jksum_malloc_array_or_die(1, sizeof(int), "conditional density distribution categorical nls.node");
   nls.nalloc = 1;
 
   nls.node[0] = 0;
