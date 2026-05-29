@@ -926,9 +926,15 @@ npregiv <- function(y,
 
     W <- W.lp(xdat=xdat,
                      degree=degree)
+    objective.cache.enabled <- npObjectiveCacheEnabled() && !isTRUE(debug)
+    lscv.cache <- .np_objective_exact_cache_new(objective.cache.enabled)
+    aicc.cache <- .np_objective_exact_cache_new(objective.cache.enabled)
 
     sum.lscv <- function(bw.gamma,...) {
       .np_progress_iv_activity_step()
+      cache.hit <- .np_objective_exact_cache_get(lscv.cache, bw.gamma)
+      if (isTRUE(cache.hit$hit))
+        return(cache.hit$value)
 
       ## Note - we set the kernel for unordered and ordered regressors
       ## to the liracine kernel (0<=lambda<=1) and test for proper
@@ -941,11 +947,15 @@ npregiv <- function(y,
       }
 
       if(debug) write(c(lscv,bw.gamma),file=debug.file.optim,ncolumns=(num.bw+1),append=TRUE)
+      .np_objective_exact_cache_put(lscv.cache, cache.hit$token, lscv)
       return(lscv)
     }
 
     sum.aicc <- function(bw.gamma,...) {
       .np_progress_iv_activity_step()
+      cache.hit <- .np_objective_exact_cache_get(aicc.cache, bw.gamma)
+      if (isTRUE(cache.hit$hit))
+        return(cache.hit$value)
 
       ## Note - we set the kernel for unordered and ordered regressors
       ## to the liracine kernel (0<=lambda<=1) and test for proper
@@ -958,6 +968,7 @@ npregiv <- function(y,
       }
 
       if(debug) write(c(aicc,bw.gamma),file=debug.file.optim,ncolumns=(num.bw+1),append=TRUE)
+      .np_objective_exact_cache_put(aicc.cache, cache.hit$token, aicc)
       return(aicc)
     }
 
@@ -1247,7 +1258,16 @@ npregiv <- function(y,
 
     if(is.null(alpha)&&is.null(bw)) {
       iv_set_stage("alpha")
-      alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+      alpha.cache <- .np_objective_exact_cache_new(npObjectiveCacheEnabled())
+      alpha.objective <- function(alpha, ...) {
+          cache.hit <- .np_objective_exact_cache_get(alpha.cache, alpha)
+          if (isTRUE(cache.hit$hit))
+              return(cache.hit$value)
+          value <- ittik(alpha, ...)
+          .np_objective_exact_cache_put(alpha.cache, cache.hit$token, value)
+          value
+      }
+      alpha <- optimize(alpha.objective, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     }
 
     ## Finally, we conduct regularized Tikhonov regression using this
@@ -1357,7 +1377,16 @@ npregiv <- function(y,
 
           if(is.null(alpha.iter)&&is.null(bw)) {
               iv_set_stage("alpha", iteration = iter.label)
-              alpha.iter <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.phi.w.z, r = E.y.w)$minimum
+              alpha.iter.cache <- .np_objective_exact_cache_new(npObjectiveCacheEnabled())
+              alpha.iter.objective <- function(alpha, ...) {
+                  cache.hit <- .np_objective_exact_cache_get(alpha.iter.cache, alpha)
+                  if (isTRUE(cache.hit$hit))
+                      return(cache.hit$value)
+                  value <- ittik(alpha, ...)
+                  .np_objective_exact_cache_put(alpha.iter.cache, cache.hit$token, value)
+                  value
+              }
+              alpha.iter <- optimize(alpha.iter.objective, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.phi.w.z, r = E.y.w)$minimum
           }
       }
 

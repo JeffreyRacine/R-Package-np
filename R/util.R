@@ -3322,3 +3322,60 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
     }
   out
 }
+
+.np_objective_exact_cache_key <- function(x) {
+  paste(sprintf("%a", as.double(x)), collapse = "\r")
+}
+
+.np_objective_exact_cache_new <- function(enabled) {
+  cache <- new.env(parent = emptyenv(), hash = FALSE)
+  cache$enabled <- isTRUE(enabled)
+  cache$store <- new.env(parent = emptyenv(), hash = TRUE)
+  cache$visits <- 0
+  cache$unique <- 0
+  cache$repeats <- 0
+  cache$raw.evals <- 0
+  cache$hits <- 0
+  cache
+}
+
+.np_objective_exact_cache_get <- function(cache, x) {
+  if (!is.environment(cache) || !isTRUE(cache$enabled))
+    return(list(hit = FALSE, token = NULL, value = NULL))
+  token <- .np_objective_exact_cache_key(x)
+  cache$visits <- cache$visits + 1
+  if (exists(token, envir = cache$store, inherits = FALSE)) {
+    cache$repeats <- cache$repeats + 1
+    cache$hits <- cache$hits + 1
+    return(list(
+      hit = TRUE,
+      token = token,
+      value = get(token, envir = cache$store, inherits = FALSE)
+    ))
+  }
+  cache$unique <- cache$unique + 1
+  list(hit = FALSE, token = token, value = NULL)
+}
+
+.np_objective_exact_cache_put <- function(cache, token, value) {
+  if (!is.environment(cache) || !isTRUE(cache$enabled) || is.null(token))
+    return(invisible(FALSE))
+  if (!is.numeric(value) || length(value) != 1L || !is.finite(value))
+    return(invisible(FALSE))
+  assign(token, as.numeric(value), envir = cache$store)
+  cache$raw.evals <- cache$raw.evals + 1
+  invisible(TRUE)
+}
+
+.np_objective_exact_cache_stats <- function(cache) {
+  if (!is.environment(cache))
+    return(NULL)
+  c(
+    enabled = if (isTRUE(cache$enabled)) 1 else 0,
+    visits = cache$visits,
+    unique = cache$unique,
+    repeats = cache$repeats,
+    raw.evals = cache$raw.evals,
+    hits = cache$hits
+  )
+}
