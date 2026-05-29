@@ -13600,7 +13600,7 @@ double * cv){
                               NULL, // no permutations
                               kwx,
                               &gate_ctx_local,
-                              0);
+                              1);
     
 #ifdef MPI2
     {
