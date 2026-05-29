@@ -134,9 +134,13 @@ print.conmode <- function(x, ...){
       " in ", x$xndim + x$yndim, " variable(s)",
       "\n(", x$yndim, " dependent variable(s), and ", x$xndim, " explanatory variable(s))\n\n",
       sep="")
-  print(matrix(x$ybw,ncol=x$yndim,dimnames=list(paste("Dep. Var. ",x$pscaling,":",sep=""),x$ynames)))
+  printSearchParameterSummary(x$ybw, x$ynames, x$bws, vari = "y",
+                              role = "Dependent",
+                              fallback.label = paste("Dep. Var. ", x$pscaling, ":", sep = ""))
 
-  print(matrix(x$xbw,ncol=x$xndim,dimnames=list(paste("Exp. Var. ",x$pscaling,":",sep=""),x$xnames)))
+  printSearchParameterSummary(x$xbw, x$xnames, x$bws, vari = "x",
+                              role = "Explanatory",
+                              fallback.label = paste("Exp. Var. ", x$pscaling, ":", sep = ""))
 
   cat(genBwSelStr(x$bws))
 
@@ -279,9 +283,13 @@ summary.conmode <- function(object, ...){
       sep="")
 
   cat(genOmitStr(object))
-  print(matrix(object$ybw,ncol=object$yndim,dimnames=list(paste("Dep. Var. ",object$pscaling,":",sep=""),object$ynames)))
+  printSearchParameterSummary(object$ybw, object$ynames, object$bws, vari = "y",
+                              role = "Dependent",
+                              fallback.label = paste("Dep. Var. ", object$pscaling, ":", sep = ""))
 
-  print(matrix(object$xbw,ncol=object$xndim,dimnames=list(paste("Exp. Var. ",object$pscaling,":",sep=""),object$xnames)))
+  printSearchParameterSummary(object$xbw, object$xnames, object$bws, vari = "x",
+                              role = "Explanatory",
+                              fallback.label = paste("Exp. Var. ", object$pscaling, ":", sep = ""))
 
   cat(genBwSelStr(object$bws))
   cat('\n')
