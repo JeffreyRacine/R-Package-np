@@ -31,6 +31,36 @@ test_that("np.objective.cache controls continuous NN Powell caching", {
   expect_equal(unname(uncached$nn.cache[["hits"]]), 0)
 })
 
+test_that("NN objective cache rejects non-finite values", {
+  cache <- np:::.np_r_nn_cache_new(TRUE, key.length = 1L)
+
+  miss <- np:::.np_r_nn_cache_get(cache, 1L)
+  expect_false(np:::.np_r_nn_cache_put(cache, miss$token, Inf))
+  expect_false(np:::.np_r_nn_cache_get(cache, 1L)$hit)
+
+  miss <- np:::.np_r_nn_cache_get(cache, 1L)
+  expect_false(np:::.np_r_nn_cache_put(cache, miss$token, NaN))
+  expect_false(np:::.np_r_nn_cache_get(cache, 1L)$hit)
+
+  miss <- np:::.np_r_nn_cache_get(cache, 1L)
+  expect_false(np:::.np_r_nn_cache_put(cache, miss$token, numeric()))
+  expect_false(np:::.np_r_nn_cache_get(cache, 1L)$hit)
+
+  miss <- np:::.np_r_nn_cache_get(cache, 1L)
+  expect_true(np:::.np_r_nn_cache_put(cache, miss$token, 3.25))
+  hit <- np:::.np_r_nn_cache_get(cache, 1L)
+  expect_true(hit$hit)
+  expect_equal(hit$value, 3.25)
+})
+
+test_that("C NN objective cache guards non-finite values before insertion", {
+  path <- testthat::test_path("..", "..", "src", "np.c")
+  skip_if_not(file.exists(path), "package source file unavailable")
+  text <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  expect_match(text, "static void bwm_nn_cache_put")
+  expect_match(text, "R_FINITE\\(value\\)")
+})
+
 test_that("np.objective.cache default ignores legacy environment off switch", {
   old <- Sys.getenv("NP_NN_POWELL_CACHE_INSTRUMENT", unset = NA_character_)
   on.exit({
