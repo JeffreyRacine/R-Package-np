@@ -4,6 +4,123 @@
 ## Asymmetry for Discrete and Continuous Processes," Econometric
 ## Reviews, Volume 28, pp 246-261.
 
+.npRmpi_sym_collective_context <- function() {
+  isTRUE(.npRmpi_autodispatch_called_from_bcast())
+}
+
+.npRmpi_sym_tsboot_index_plan <- function(tseries.idx,
+                                          R,
+                                          n.sim,
+                                          l,
+                                          sim) {
+  plan <- tsboot(
+    tseries = tseries.idx,
+    statistic = function(ii) as.integer(ii),
+    R = R,
+    n.sim = n.sim,
+    l = l,
+    sim = sim,
+    orig.t = FALSE
+  )$t
+
+  matrix(as.integer(plan), nrow = R, ncol = n.sim)
+}
+
+.npRmpi_sym_numeric_chunks <- function(gathered, size) {
+  size <- as.integer(size)[1L]
+  if (is.na(size) || size < 1L)
+    stop("invalid MPI gather size")
+
+  if (is.matrix(gathered)) {
+    if (!identical(ncol(gathered), size))
+      stop("npsymtest MPI gather returned malformed matrix output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.array(gathered)) {
+    dims <- dim(gathered)
+    if (length(dims) < 2L || !identical(dims[[length(dims)]], size))
+      stop("npsymtest MPI gather returned malformed array output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.list(gathered)) {
+    if (!identical(length(gathered), size))
+      stop("npsymtest MPI gather returned malformed list output", call. = FALSE)
+    return(gathered)
+  }
+
+  chunks <- as.list(gathered)
+  if (!identical(length(chunks), size))
+    stop("npsymtest MPI gather returned malformed atomic output", call. = FALSE)
+  chunks
+}
+
+.npRmpi_sym_collective_bootstrap <- function(plan,
+                                             boot.eval,
+                                             progress = NULL,
+                                             method,
+                                             comm = 1L) {
+  boot.num <- nrow(plan)
+  size <- mpi.comm.size(comm)
+  rank <- mpi.comm.rank(comm)
+
+  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  .npRmpi_bootstrap_transport_trace(
+    what = "npsymtest",
+    event = "fanout.collective.start",
+    fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx), method = method)
+  )
+
+  local.Srho <- numeric(length(local.idx))
+
+  for (jj in seq_along(local.idx)) {
+    ii <- local.idx[[jj]]
+    local.Srho[[jj]] <- .npRmpi_with_local_regression(
+      boot.eval(plan[ii, ])
+    )
+  }
+
+  invisible(gc(FALSE))
+
+  payload <- c(as.numeric(local.idx), local.Srho)
+  gathered <- mpi.gather.Robj(payload, root = 0L, comm = comm)
+
+  if (rank == 0L) {
+    chunks <- .npRmpi_sym_numeric_chunks(gathered, size = size)
+    resampled.stat <- numeric(boot.num)
+
+    for (rr in seq_len(size)) {
+      vals <- as.numeric(chunks[[rr]])
+      if (!length(vals))
+        next
+      if ((length(vals) %% 2L) != 0L)
+        stop("npsymtest MPI gather returned malformed bootstrap chunk", call. = FALSE)
+      n.local <- length(vals) / 2L
+      idx <- as.integer(vals[seq_len(n.local)])
+      resampled.stat[idx] <- vals[n.local + seq_len(n.local)]
+    }
+    resampled.stat <- matrix(resampled.stat, ncol = 1L)
+
+    if (!is.null(progress))
+      progress <- .np_progress_step(progress, done = boot.num)
+    .npRmpi_bootstrap_transport_trace(
+      what = "npsymtest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num, method = method)
+    )
+    mpi.bcast.Robj(resampled.stat, rank = 0L, comm = comm)
+    resampled.stat
+  } else {
+    .npRmpi_bootstrap_transport_trace(
+      what = "npsymtest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num, method = method)
+    )
+    mpi.bcast.Robj(rank = 0L, comm = comm)
+  }
+}
+
 npsymtest <- function(data = NULL,
                       method = c("integration","summation"),
                       boot.num = 399,
@@ -157,9 +274,7 @@ npsymtest <- function(data = NULL,
   ## corresponding to all observations in the sample (1,2,...) that
   ## get permuted/rearranged to define resampled data.
 
-	boot.fun <- function(ii,data.null,bw) {
-    boot.state$counter <- boot.state$counter + 1L
-    boot.state$progress <- .np_progress_step(boot.state$progress, done = boot.state$counter)
+  boot.eval <- function(ii) {
     null.sample1 <- data.null[ii]
     if(is.numeric(data.null)) {
       null.sample2 <- -(null.sample1-mean(null.sample1))+mean(null.sample1)
@@ -181,10 +296,17 @@ npsymtest <- function(data = NULL,
     return(Srho.sym(null.sample1,null.sample2,bw,method=method))
 	}
 
+	boot.fun <- function(ii,data.null,bw) {
+    boot.state$counter <- boot.state$counter + 1L
+    boot.state$progress <- .np_progress_step(boot.state$progress, done = boot.state$counter)
+    boot.eval(ii)
+	}
+
   ## Need to bootstrap integers for data.null to accommodate both
   ## numeric and factor/ordered.
 
   tseries.idx <- seq_len(2L * length(data))
+  collective.bootstrap <- .npRmpi_sym_collective_context()
 
   if(boot.method == "iid")  {
 
@@ -194,14 +316,32 @@ npsymtest <- function(data = NULL,
     ## bootstrap with a block length of 1 which is presumed to
     ## generate an iid bootstrap.
 
-    resampled.stat <- tsboot(tseries = tseries.idx,
-                             statistic = boot.fun,
-                             R = boot.num,
-                             n.sim = length(data),
-                             l = 1,
-                             sim = "fixed",
-                             data.null = data.null,
-                             bw = bw)$t
+    if (collective.bootstrap) {
+      plan <- .npRmpi_sym_tsboot_index_plan(
+        tseries.idx = tseries.idx,
+        R = boot.num,
+        n.sim = length(data),
+        l = 1,
+        sim = "fixed"
+      )
+      post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+      resampled.stat <- .npRmpi_sym_collective_bootstrap(
+        plan = plan,
+        boot.eval = boot.eval,
+        progress = boot.state$progress,
+        method = "iid"
+      )
+      assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+    } else {
+      resampled.stat <- tsboot(tseries = tseries.idx,
+                               statistic = boot.fun,
+                               R = boot.num,
+                               n.sim = length(data),
+                               l = 1,
+                               sim = "fixed",
+                               data.null = data.null,
+                               bw = bw)$t
+    }
 
   } else {
 
@@ -212,14 +352,32 @@ npsymtest <- function(data = NULL,
       boot.blocklen <- b.star(as.numeric(data.matrix(data)),round=TRUE)[1,1]
     }
 
-    resampled.stat <- tsboot(tseries = tseries.idx,
-                             statistic = boot.fun,
-                             R = boot.num,
-                             n.sim = length(data),
-                             l = boot.blocklen,
-                             sim = "geom",
-                             data.null = data.null,
-                             bw = bw)$t
+    if (collective.bootstrap) {
+      plan <- .npRmpi_sym_tsboot_index_plan(
+        tseries.idx = tseries.idx,
+        R = boot.num,
+        n.sim = length(data),
+        l = boot.blocklen,
+        sim = "geom"
+      )
+      post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+      resampled.stat <- .npRmpi_sym_collective_bootstrap(
+        plan = plan,
+        boot.eval = boot.eval,
+        progress = boot.state$progress,
+        method = "geom"
+      )
+      assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+    } else {
+      resampled.stat <- tsboot(tseries = tseries.idx,
+                               statistic = boot.fun,
+                               R = boot.num,
+                               n.sim = length(data),
+                               l = boot.blocklen,
+                               sim = "geom",
+                               data.null = data.null,
+                               bw = bw)$t
+    }
 
   }
 
