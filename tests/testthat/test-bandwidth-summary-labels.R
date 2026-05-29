@@ -42,6 +42,55 @@ make_regression_summary_label_fixture <- function(type) {
   )
 }
 
+make_conditional_polynomial_label_fixture <- function(kind) {
+  untangle <- getFromNamespace("untangle", "np")
+  ctor <- getFromNamespace(
+    switch(kind,
+           density = "conbandwidth",
+           distribution = "condbandwidth"),
+    "np"
+  )
+
+  xdat <- data.frame(x = c(0.1, 0.4, 0.9, 1.2, 1.7))
+  ydat <- data.frame(y = c(0.2, 0.3, 0.8, 1.1, 1.5))
+  xdati <- untangle(xdat)
+  ydati <- untangle(ydat)
+
+  ctor(
+    xbw = 0.5,
+    ybw = 0.4,
+    bwmethod = "manual",
+    bwtype = "fixed",
+    nobs = nrow(xdat),
+    xdati = xdati,
+    ydati = ydati,
+    xnames = names(xdat),
+    ynames = names(ydat),
+    sfactor = list(x = 2.8, y = 2.6),
+    bandwidth = list(x = 0.5, y = 0.4),
+    nconfac = 0.75,
+    ncatfac = 0.5,
+    sdev = c(xcon = stats::sd(xdat$x), ycon = stats::sd(ydat$y)),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    pregtype = "Local-Polynomial",
+    basis = "glp",
+    degree = 2L
+  )
+}
+
+make_quantile_polynomial_label_fixture <- function() {
+  qregression <- getFromNamespace("qregression", "np")
+  qregression(
+    bws = make_conditional_polynomial_label_fixture("distribution"),
+    xeval = matrix(seq_len(5), ncol = 1L),
+    tau = 0.5,
+    quantile = rep(0.5, 5),
+    ntrain = 5L,
+    trainiseval = TRUE
+  )
+}
+
 test_that("fixed mixed-data bandwidth summaries label continuous scale factors correctly", {
   set.seed(123)
   n <- 40L
@@ -72,7 +121,23 @@ test_that("regression summaries distinguish nearest-neighbor selectors from fixe
   adaptive <- paste(capture.output(summary(make_regression_summary_label_fixture("adaptive_nn"))), collapse = "\n")
   generalized <- paste(capture.output(summary(make_regression_summary_label_fixture("generalized_nn"))), collapse = "\n")
 
+  expect_match(fixed, "Kernel Regression Estimator:\\s+Local-Constant")
   expect_match(fixed, "Bandwidth\\(s\\):\\s+2")
   expect_match(adaptive, "Bandwidth Nearest Neighbor\\(s\\):\\s+2")
   expect_match(generalized, "Bandwidth Nearest Neighbor\\(s\\):\\s+2")
+})
+
+test_that("density and distribution bandwidth summaries label polynomial type", {
+  regression <- paste(capture.output(summary(make_regression_summary_label_fixture("fixed")$bws)), collapse = "\n")
+  condensity <- paste(capture.output(summary(make_conditional_polynomial_label_fixture("density"))), collapse = "\n")
+  condist <- paste(capture.output(summary(make_conditional_polynomial_label_fixture("distribution"))), collapse = "\n")
+  quantile <- paste(capture.output(summary(make_quantile_polynomial_label_fixture())), collapse = "\n")
+
+  expect_true(grepl("Regression Type: Local-Constant", regression, fixed = TRUE))
+  expect_true(grepl("Polynomial Type: Local-Polynomial", condensity, fixed = TRUE))
+  expect_true(grepl("Polynomial Type: Local-Polynomial", condist, fixed = TRUE))
+  expect_true(grepl("Polynomial Type: Local-Polynomial", quantile, fixed = TRUE))
+  expect_false(grepl("Regression Type:", condensity, fixed = TRUE))
+  expect_false(grepl("Regression Type:", condist, fixed = TRUE))
+  expect_false(grepl("Kernel Regression Estimator:", quantile, fixed = TRUE))
 })

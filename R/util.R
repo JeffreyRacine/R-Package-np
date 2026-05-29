@@ -2306,13 +2306,18 @@ genDenEstStr <- function(x){
 }
 
 genRegEstStr <- function(x){
-  regtype <- if (!is.null(x$regtype)) x$regtype else if (!is.null(x$bws)) x$bws$regtype else NULL
-  basis <- if (!is.null(x$basis)) x$basis else if (!is.null(x$bws)) x$bws$basis else NULL
-  bern <- if (!is.null(x$bernstein.basis)) x$bernstein.basis else if (!is.null(x$bws)) x$bws$bernstein.basis else NULL
+  x_bws <- if (is.list(x)) x[["bws", exact = TRUE]] else NULL
+  regtype <- if (!is.null(x$regtype)) x$regtype else if (!is.null(x_bws)) x_bws$regtype else NULL
+  basis <- if (!is.null(x$basis)) x$basis else if (!is.null(x_bws)) x_bws$basis else NULL
+  bern <- if (!is.null(x$bernstein.basis)) x$bernstein.basis else if (!is.null(x_bws)) x_bws$bernstein.basis else NULL
   est.label <- if (identical(regtype, "lp")) npFormatRegressionType(x) else x$pregtype
   basis.family <- if (identical(regtype, "lp")) npLpBasisFamilyLabel(basis) else NULL
   basis.rep <- if (identical(regtype, "lp")) npLpBasisRepresentationLabel(bern) else NULL
-  est.label.str <- if (is.null(est.label)) "" else paste("\nKernel Regression Estimator:", est.label)
+  est.prefix <- if (!is.null(x_bws) && npUsesPolynomialSummaryLabel(x_bws))
+    "Polynomial Type"
+  else
+    "Kernel Regression Estimator"
+  est.label.str <- if (is.null(est.label)) "" else paste("\n", est.prefix, ": ", est.label, sep = "")
   basis.family.str <- if (is.null(basis.family)) "" else paste("\nLP Basis Family:", basis.family)
   basis.rep.str <- if (is.null(basis.rep)) "" else paste("\nLP Basis Representation:", basis.rep)
   ptype.str <- if (is.null(x$ptype)) "" else paste("\nBandwidth Type:", x$ptype)
@@ -2403,6 +2408,18 @@ npBandwidthSummaryLabel <- function(bwtype, bwscaling = FALSE){
   "Bandwidth Nearest Neighbor(s)"
 }
 
+npPolynomialSummaryLabel <- function(x){
+  if (npUsesPolynomialSummaryLabel(x))
+    "Polynomial Type"
+  else
+    "Regression Type"
+}
+
+npUsesPolynomialSummaryLabel <- function(x){
+  density.classes <- c("bandwidth", "dbandwidth", "conbandwidth", "condbandwidth")
+  any(class(x) %in% density.classes)
+}
+
 
 ## bandwidth-related report generating functions
 genBwSelStr <- function(x){
@@ -2433,7 +2450,7 @@ genBwSelStr <- function(x){
 
   pregtype <- npFormatRegressionType(x)
 
-  pregtype.str <- if (is.null(pregtype)) "" else paste("\nRegression Type:", pregtype)
+  pregtype.str <- if (is.null(pregtype)) "" else paste("\n", npPolynomialSummaryLabel(x), ": ", pregtype, sep = "")
   pmethod.str <- if (is.null(x$pmethod)) "" else paste("\nBandwidth Selection Method:", x$pmethod)
   formula.str <- if (!identical(x$formula, NULL)) paste("\nFormula:", paste(deparse(x$formula), collapse = "\n")) else ""
   ptype.str <- if (is.null(x$ptype)) "" else paste("\nBandwidth Type: ", x$ptype, sep = "")
