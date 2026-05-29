@@ -17,6 +17,7 @@
 
 #include "Rmpi.h"
 #include <R_ext/Memory.h>
+#include <limits.h>
 
 #ifndef Calloc
 #define Calloc(n, type) ((type *) R_Calloc((n), type))
@@ -100,6 +101,22 @@ static int rmpi_require_count(SEXP sexp_count, int maxsize, const char *label)
 		error("%s=%d is out of range [0,%d]", label, count, maxsize);
 
 	return count;
+}
+
+static int rmpi_string_nchar(SEXP sexp_data, const char *label)
+{
+	R_xlen_t slen;
+
+	if (TYPEOF(sexp_data) != STRSXP || XLENGTH(sexp_data) < 1)
+		error("%s must be a non-empty character vector", label);
+	if (STRING_ELT(sexp_data, 0) == NA_STRING)
+		error("%s must not contain NA as its first element", label);
+
+	slen = LENGTH(STRING_ELT(sexp_data, 0));
+	if (slen > INT_MAX)
+		error("%s is too long for MPI character transfer", label);
+
+	return (int) slen;
 }
 
 SEXP mpidist(void){
@@ -609,14 +626,15 @@ SEXP mpi_bcast(SEXP sexp_data,
 		break;
 	case 3:
         	MPI_Comm_rank(comm[commn], &root);
-		slen=LENGTH(STRING_ELT (sexp_data,0)); 
+		slen = (rank == root) ? rmpi_string_nchar(sexp_data, "mpi_bcast character data") : 0;
+		mpi_errhandler(MPI_Bcast(&slen, 1, MPI_INT, rank, comm[commn]));
 		if (rank==root) 
-			MPI_Bcast(CHAR2 (STRING_ELT (sexp_data,0)), slen, 
-				MPI_CHAR, rank, comm[commn]);
+			mpi_errhandler(MPI_Bcast(CHAR2 (STRING_ELT (sexp_data,0)), slen,
+				MPI_CHAR, rank, comm[commn]));
 		else {
                 	PROTECT (sexp_data2  = allocVector (STRSXP, 1));
 	               	rdata = (char *)Calloc((size_t)slen + 1, char);
-                       	MPI_Bcast(rdata, slen, MPI_CHAR, rank, comm[commn]);
+			mpi_errhandler(MPI_Bcast(rdata, slen, MPI_CHAR, rank, comm[commn]));
 			SET_STRING_ELT(sexp_data2, 0, mkChar(rdata));
 			UNPROTECT(1);
 			Free(rdata);
@@ -668,8 +686,8 @@ SEXP mpi_send(SEXP sexp_data,
 		mpi_errhandler(MPI_Send(REAL(sexp_data), len, MPI_DOUBLE, dest, tag, comm[commn]));
 		break;
 	case 3:
-		slen=LENGTH(STRING_ELT(sexp_data,0));
-		MPI_Send(CHAR2(STRING_ELT(sexp_data,0)),slen, MPI_CHAR, dest, tag, comm[commn]); 
+		slen = rmpi_string_nchar(sexp_data, "mpi_send character data");
+		mpi_errhandler(MPI_Send(CHAR2(STRING_ELT(sexp_data,0)),slen, MPI_CHAR, dest, tag, comm[commn]));
 		break;
         case 4:
                 mpi_errhandler(MPI_Send(RAW(sexp_data),len, MPI_BYTE, dest, tag, comm[commn]));
@@ -703,10 +721,15 @@ SEXP mpi_recv(SEXP sexp_data,
 			&status[statusn]));
 		break;
 	case 3:
-		slen=LENGTH(STRING_ELT(sexp_data,0));
+		mpi_errhandler(MPI_Probe(source, tag, comm[commn], &status[statusn]));
+		mpi_errhandler(MPI_Get_count(&status[statusn], MPI_CHAR, &slen));
+		if (slen < 0)
+			error("mpi_recv: incoming character message length is unavailable");
                 PROTECT (sexp_data2  = allocVector (STRSXP, 1));
                 rdata = (char *)Calloc((size_t)slen + 1, char);
-		MPI_Recv(rdata, slen,MPI_CHAR,source,tag, comm[commn],&status[statusn]);
+		mpi_errhandler(MPI_Recv(rdata, slen, MPI_CHAR,
+			status[statusn].MPI_SOURCE, status[statusn].MPI_TAG,
+			comm[commn],&status[statusn]));
                 SET_STRING_ELT(sexp_data2, 0, mkChar(rdata));
                 UNPROTECT(1);
 		Free(rdata);
@@ -1130,6 +1153,32 @@ SEXP mpi_sendrecv(SEXP sexp_senddata,
     int commn=rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator"),statusn=rmpi_require_index(sexp_status, STATUS_MAXSIZE, "status");
     char *rdata;
     SEXP sexp_recvdata2 = NULL;
+
+    if (recvtype == 3 && sendtype != 3)
+        error("mpi_sendrecv: character recv type requires character send type; use serialized raw-object helpers for mixed transfers");
+
+    if (sendtype == 3 && recvtype == 3) {
+        int recv_source, recv_tag;
+
+        slen = rmpi_string_nchar(sexp_senddata, "mpi_sendrecv character send data");
+        rlen = 0;
+        mpi_errhandler(MPI_Sendrecv(&slen, 1, MPI_INT, dest, sendtag,
+            &rlen, 1, MPI_INT, source, recvtag, comm[commn], &status[statusn]));
+        if (rlen < 0)
+            error("mpi_sendrecv: incoming character message length is unavailable");
+        recv_source = status[statusn].MPI_SOURCE;
+        recv_tag = status[statusn].MPI_TAG;
+
+        PROTECT(sexp_recvdata2 = allocVector(STRSXP, 1));
+        rdata = (char *)Calloc((size_t)rlen + 1, char);
+        mpi_errhandler(MPI_Sendrecv(CHAR2(STRING_ELT(sexp_senddata,0)), slen,
+            MPI_CHAR, dest, sendtag, rdata, rlen, MPI_CHAR,
+            recv_source, recv_tag, comm[commn], &status[statusn]));
+        SET_STRING_ELT(sexp_recvdata2, 0, mkChar(rdata));
+        UNPROTECT(1);
+        Free(rdata);
+        return sexp_recvdata2;
+    }
 
     switch(sendtype){
         case 1:

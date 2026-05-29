@@ -163,6 +163,64 @@ test_that("supported string sendrecv and broadcast routes stay green in session 
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("string wrappers do not truncate to hostile receiver placeholders in session subprocess", {
+  env <- wrapper_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for wrapper contract")
+
+  out.dir <- tempfile("npRmpi-wrapper-session-string-hostile-")
+  dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+  on.exit(unlink(out.dir, recursive = TRUE, force = TRUE), add = TRUE)
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = wrapper_session_lines(c(
+      "mpi.bcast.cmd({",
+      sprintf("  out_dir <- %s", deparse(out.dir)),
+      "  ns <- asNamespace('npRmpi')",
+      "  rank <- mpi.comm.rank(1L)",
+      "  out <- mpi.bcast(if (rank == 0L) 'abcdef' else '', type = 3L, rank = 0L, comm = 1L)",
+      "  writeLines(out, file.path(out_dir, paste0('bcast_rank', rank, '.txt')))",
+      "}, caller.execute = TRUE, comm = 1L)",
+      "mpi.bcast.cmd({",
+      sprintf("  out_dir <- %s", deparse(out.dir)),
+      "  ns <- asNamespace('npRmpi')",
+      "  mpi_send <- get('mpi.send', envir = ns, inherits = FALSE)",
+      "  mpi_recv <- get('mpi.recv', envir = ns, inherits = FALSE)",
+      "  rank <- mpi.comm.rank(1L)",
+      "  if (rank == 0L) {",
+      "    mpi_send('abcdef', type = 3L, dest = 1L, tag = 51L, comm = 1L)",
+      "  } else {",
+      "    out <- mpi_recv('', type = 3L, source = 0L, tag = 51L, comm = 1L, status = 0L)",
+      "    writeLines(out, file.path(out_dir, 'recv_rank1.txt'))",
+      "  }",
+      "}, caller.execute = TRUE, comm = 1L)",
+      "mpi.bcast.cmd({",
+      sprintf("  out_dir <- %s", deparse(out.dir)),
+      "  ns <- asNamespace('npRmpi')",
+      "  mpi_sendrecv <- get('mpi.sendrecv', envir = ns, inherits = FALSE)",
+      "  rank <- mpi.comm.rank(1L)",
+      "  out <- if (rank == 0L) {",
+      "    mpi_sendrecv('abcdef', sendtype = 3L, dest = 1L, sendtag = 61L, recvdata = '', recvtype = 3L, source = 1L, recvtag = 61L, comm = 1L, status = 0L)",
+      "  } else {",
+      "    mpi_sendrecv('uvwxyz', sendtype = 3L, dest = 0L, sendtag = 61L, recvdata = '', recvtype = 3L, source = 0L, recvtag = 61L, comm = 1L, status = 0L)",
+      "  }",
+      "  writeLines(out, file.path(out_dir, paste0('sendrecv_rank', rank, '.txt')))",
+      "}, caller.execute = TRUE, comm = 1L)",
+      "cat('WRAPPER_SESSION_STRING_HOSTILE_OK\\n')"
+    )),
+    timeout = 45L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("WRAPPER_SESSION_STRING_HOSTILE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_equal(readLines(file.path(out.dir, "bcast_rank0.txt"), warn = FALSE), "abcdef")
+  expect_equal(readLines(file.path(out.dir, "bcast_rank1.txt"), warn = FALSE), "abcdef")
+  expect_equal(readLines(file.path(out.dir, "recv_rank1.txt"), warn = FALSE), "abcdef")
+  expect_equal(readLines(file.path(out.dir, "sendrecv_rank0.txt"), warn = FALSE), "uvwxyz")
+  expect_equal(readLines(file.path(out.dir, "sendrecv_rank1.txt"), warn = FALSE), "abcdef")
+})
+
 test_that("wrapper attach smoke stays green under mpiexec when enabled", {
   skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
               "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode wrapper smoke")
@@ -314,13 +372,13 @@ test_that("supported string send/recv and bcast stay green under profile mpiexec
     "    if (rank == 0L) {",
     "      mpi_send('abc', type = 3L, dest = 1L, tag = 11L, comm = 0L)",
     "    } else {",
-    "      out <- mpi_recv(string(4), type = 3L, source = 0L, tag = 11L, comm = 0L, status = 0L)",
+    "      out <- mpi_recv('', type = 3L, source = 0L, tag = 11L, comm = 0L, status = 0L)",
     sprintf("      writeLines(out, %s)", deparse(recv.path)),
     "    }",
     "  }, caller.execute = TRUE)",
     "  mpi.bcast.cmd({",
     "    rank <- mpi.comm.rank(0L)",
-    "    out <- mpi.bcast(if (rank == 0L) 'abc' else string(4), type = 3L, rank = 0L, comm = 0L)",
+    "    out <- mpi.bcast(if (rank == 0L) 'abc' else '', type = 3L, rank = 0L, comm = 0L)",
     "    if (rank == 0L) {",
     sprintf("      writeLines(out, %s)", deparse(bcast0.path)),
     "    } else {",
