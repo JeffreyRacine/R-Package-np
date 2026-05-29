@@ -44,26 +44,26 @@ typedef struct {
 	uint64_t train_hash;
 	uint64_t eval_hash;
 	double *distance;
-} np_nn_saturated_cache_entry;
+} np_nn_distance_cache_entry;
 
-static np_nn_saturated_cache_entry *np_nn_saturated_cache = NULL;
-static int np_nn_saturated_cache_size = 0;
-static int np_nn_saturated_cache_capacity = 0;
+static np_nn_distance_cache_entry *np_nn_distance_cache = NULL;
+static int np_nn_distance_cache_size = 0;
+static int np_nn_distance_cache_capacity = 0;
 
-static void np_nn_saturated_cache_clear(void)
+static void np_nn_distance_cache_clear(void)
 {
 	int i;
-	for(i=0; i < np_nn_saturated_cache_size; i++)
+	for(i=0; i < np_nn_distance_cache_size; i++)
 	{
-		safe_free(np_nn_saturated_cache[i].distance);
+		safe_free(np_nn_distance_cache[i].distance);
 	}
-	safe_free(np_nn_saturated_cache);
-	np_nn_saturated_cache = NULL;
-	np_nn_saturated_cache_size = 0;
-	np_nn_saturated_cache_capacity = 0;
+	safe_free(np_nn_distance_cache);
+	np_nn_distance_cache = NULL;
+	np_nn_distance_cache_size = 0;
+	np_nn_distance_cache_capacity = 0;
 }
 
-static int np_nn_saturated_cache_entry_matches(const np_nn_saturated_cache_entry *entry,
+static int np_nn_distance_cache_entry_matches(const np_nn_distance_cache_entry *entry,
 const int num_obs_train,
 const int num_obs_eval,
 const int suppress_parallel,
@@ -86,7 +86,7 @@ const uint64_t eval_hash)
 		(entry->distance != NULL);
 }
 
-static uint64_t np_nn_saturated_hash_vector(const double *x, const int n)
+static uint64_t np_nn_distance_hash_vector(const double *x, const int n)
 {
 	int i;
 	uint64_t h = UINT64_C(1469598103934665603);
@@ -108,7 +108,7 @@ static uint64_t np_nn_saturated_hash_vector(const double *x, const int n)
 	return(h);
 }
 
-static int np_nn_saturated_cache_find(const int num_obs_train,
+static int np_nn_distance_cache_find(const int num_obs_train,
 const int num_obs_eval,
 const int suppress_parallel,
 const double *train,
@@ -118,9 +118,9 @@ const uint64_t train_hash,
 const uint64_t eval_hash)
 {
 	int i;
-	for(i=0; i < np_nn_saturated_cache_size; i++)
+	for(i=0; i < np_nn_distance_cache_size; i++)
 	{
-		if(np_nn_saturated_cache_entry_matches(&np_nn_saturated_cache[i],
+		if(np_nn_distance_cache_entry_matches(&np_nn_distance_cache[i],
 		                                       num_obs_train,
 		                                       num_obs_eval,
 		                                       suppress_parallel,
@@ -136,7 +136,7 @@ const uint64_t eval_hash)
 	return(-1);
 }
 
-static np_nn_saturated_cache_entry *np_nn_saturated_cache_add(const int num_obs_train,
+static np_nn_distance_cache_entry *np_nn_distance_cache_add(const int num_obs_train,
 const int num_obs_eval,
 const int suppress_parallel,
 const double *train,
@@ -146,8 +146,8 @@ const uint64_t train_hash,
 const uint64_t eval_hash,
 const double *distance)
 {
-	np_nn_saturated_cache_entry *tmp;
-	np_nn_saturated_cache_entry *entry;
+	np_nn_distance_cache_entry *tmp;
+	np_nn_distance_cache_entry *entry;
 	double *copy;
 
 	if((num_obs_eval < 1) || (distance == NULL))
@@ -155,26 +155,26 @@ const double *distance)
 		return(NULL);
 	}
 
-	if(np_nn_saturated_cache_size >= 64)
+	if(np_nn_distance_cache_size >= 64)
 	{
-		np_nn_saturated_cache_clear();
+		np_nn_distance_cache_clear();
 	}
 
-	if(np_nn_saturated_cache_size >= np_nn_saturated_cache_capacity)
+	if(np_nn_distance_cache_size >= np_nn_distance_cache_capacity)
 	{
-		const int new_capacity = (np_nn_saturated_cache_capacity == 0) ? 8 : 2*np_nn_saturated_cache_capacity;
-		tmp = (np_nn_saturated_cache_entry *)realloc(np_nn_saturated_cache,
-		                                             (size_t)new_capacity * sizeof(np_nn_saturated_cache_entry));
+		const int new_capacity = (np_nn_distance_cache_capacity == 0) ? 8 : 2*np_nn_distance_cache_capacity;
+		tmp = (np_nn_distance_cache_entry *)realloc(np_nn_distance_cache,
+		                                             (size_t)new_capacity * sizeof(np_nn_distance_cache_entry));
 		if(tmp == NULL)
 		{
-			np_nn_saturated_cache_clear();
+			np_nn_distance_cache_clear();
 			return(NULL);
 		}
-		np_nn_saturated_cache = tmp;
-		memset(np_nn_saturated_cache + np_nn_saturated_cache_capacity,
+		np_nn_distance_cache = tmp;
+		memset(np_nn_distance_cache + np_nn_distance_cache_capacity,
 		       0,
-		       (size_t)(new_capacity - np_nn_saturated_cache_capacity) * sizeof(np_nn_saturated_cache_entry));
-		np_nn_saturated_cache_capacity = new_capacity;
+		       (size_t)(new_capacity - np_nn_distance_cache_capacity) * sizeof(np_nn_distance_cache_entry));
+		np_nn_distance_cache_capacity = new_capacity;
 	}
 
 	copy = (double *)malloc((size_t)num_obs_eval * sizeof(double));
@@ -184,7 +184,7 @@ const double *distance)
 	}
 	memcpy(copy, distance, (size_t)num_obs_eval * sizeof(double));
 
-	entry = &np_nn_saturated_cache[np_nn_saturated_cache_size++];
+	entry = &np_nn_distance_cache[np_nn_distance_cache_size++];
 	entry->valid = 1;
 	entry->num_obs_train = num_obs_train;
 	entry->num_obs_eval = num_obs_eval;
@@ -221,9 +221,9 @@ double *nn_distance)
 		                                      nn_distance));
 	}
 
-	train_hash = np_nn_saturated_hash_vector(vector_data_train, num_obs_train);
-	eval_hash = np_nn_saturated_hash_vector(vector_data_eval, num_obs_eval);
-	idx = np_nn_saturated_cache_find(num_obs_train,
+	train_hash = np_nn_distance_hash_vector(vector_data_train, num_obs_train);
+	eval_hash = np_nn_distance_hash_vector(vector_data_eval, num_obs_eval);
+	idx = np_nn_distance_cache_find(num_obs_train,
 	                                 num_obs_eval,
 	                                 suppress_parallel,
 	                                 vector_data_train,
@@ -234,7 +234,7 @@ double *nn_distance)
 	if(idx >= 0)
 	{
 		memcpy(nn_distance,
-		       np_nn_saturated_cache[idx].distance,
+		       np_nn_distance_cache[idx].distance,
 		       (size_t)num_obs_eval * sizeof(double));
 		return(0);
 	}
@@ -250,7 +250,7 @@ double *nn_distance)
 		return(1);
 	}
 
-	np_nn_saturated_cache_add(num_obs_train,
+	np_nn_distance_cache_add(num_obs_train,
 	                          num_obs_eval,
 	                          suppress_parallel,
 	                          vector_data_train,
@@ -259,6 +259,62 @@ double *nn_distance)
 	                          train_hash,
 	                          eval_hash,
 	                          nn_distance);
+	return(0);
+}
+
+static int np_compute_nn_distance_cached(const int num_obs,
+const int suppress_parallel,
+double *vector_data,
+const int lookup_k,
+const int use_cache,
+double *nn_distance)
+{
+	int idx;
+	uint64_t train_hash = 0;
+	if(!use_cache)
+	{
+		return(compute_nn_distance(num_obs,
+		                           suppress_parallel,
+		                           vector_data,
+		                           lookup_k,
+		                           nn_distance));
+	}
+
+	train_hash = np_nn_distance_hash_vector(vector_data, num_obs);
+	idx = np_nn_distance_cache_find(num_obs,
+	                                num_obs,
+	                                suppress_parallel,
+	                                vector_data,
+	                                NULL,
+	                                lookup_k,
+	                                train_hash,
+	                                UINT64_C(0));
+	if(idx >= 0)
+	{
+		memcpy(nn_distance,
+		       np_nn_distance_cache[idx].distance,
+		       (size_t)num_obs * sizeof(double));
+		return(0);
+	}
+
+	if(compute_nn_distance(num_obs,
+	                       suppress_parallel,
+	                       vector_data,
+	                       lookup_k,
+	                       nn_distance)==1)
+	{
+		return(1);
+	}
+
+	np_nn_distance_cache_add(num_obs,
+	                         num_obs,
+	                         suppress_parallel,
+	                         vector_data,
+	                         NULL,
+	                         lookup_k,
+	                         train_hash,
+	                         UINT64_C(0),
+	                         nn_distance);
 	return(0);
 }
 
@@ -627,7 +683,7 @@ double **matrix_bandwidth_deriv)
 				return(1);
 			}
 
-			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, 0,matrix_X_train[i], matrix_X_eval[i], int_nn_k, nn_extended, nn_distance)==1)
+			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, 0,matrix_X_train[i], matrix_X_eval[i], int_nn_k, 1, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -658,7 +714,7 @@ double **matrix_bandwidth_deriv)
 				return(1);
 			}
 
-			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, 0, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, nn_extended, nn_distance)==1)
+			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, 0, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, 1, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -692,7 +748,7 @@ double **matrix_bandwidth_deriv)
 				return(1);
 			}
 
-			if(compute_nn_distance(num_obs_train, 0, matrix_X_train[i], int_nn_k, nn_distance)==1)
+			if(np_compute_nn_distance_cached(num_obs_train, 0, matrix_X_train[i], int_nn_k, 1, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -722,7 +778,7 @@ double **matrix_bandwidth_deriv)
 				return(1);
 			}
 
-			if(compute_nn_distance(num_obs_train, 0, matrix_Y_train[i], int_nn_k, nn_distance)==1)
+			if(np_compute_nn_distance_cached(num_obs_train, 0, matrix_Y_train[i], int_nn_k, 1, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -1016,7 +1072,7 @@ fact constant. */
 				return(1);
 			}
 
-			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, suppress_parallel, matrix_X_train[i], matrix_X_eval[i], int_nn_k, nn_extended, nn_distance)==1)
+			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, suppress_parallel, matrix_X_train[i], matrix_X_eval[i], int_nn_k, 1, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -1045,7 +1101,7 @@ fact constant. */
 				return(1);
 			}
 
-			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, suppress_parallel, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, nn_extended, nn_distance)==1)
+			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, suppress_parallel, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, 1, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -1079,7 +1135,7 @@ fact constant. */
 				return(1);
 			}
 
-			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_X_train[i], int_nn_k, nn_distance)==1)
+			if(np_compute_nn_distance_cached(num_obs_train, suppress_parallel, matrix_X_train[i], int_nn_k, 1, nn_distance)==1)
 			{
 				return(1);
 			}
@@ -1107,7 +1163,7 @@ fact constant. */
 				return(1);
 			}
 
-			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_Y_train[i], int_nn_k, nn_distance)==1)
+			if(np_compute_nn_distance_cached(num_obs_train, suppress_parallel, matrix_Y_train[i], int_nn_k, 1, nn_distance)==1)
 			{
 				return(1);
 			}
