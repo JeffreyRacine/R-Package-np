@@ -247,7 +247,7 @@ npdeptest <- function(data.x = NULL,
 
     progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
-    if (.npRmpi_dept_collective_context() && identical(method, "summation")) {
+    if (.npRmpi_dept_collective_context()) {
       plan <- .npRmpi_dept_bootstrap_index_plan(length(data.x), boot.num)
       post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
       Srho.vec.boot <- .npRmpi_dept_collective_bootstrap(
