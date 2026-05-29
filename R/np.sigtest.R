@@ -589,6 +589,7 @@ npsigtest.rbandwidth <- function(bws,
         b = b,
         p.a = P.a
       )
+      post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
 
       joint.eval <- function(task.idx, seed.plan) {
         out <- numeric(length(task.idx))
@@ -638,28 +639,31 @@ npsigtest.rbandwidth <- function(bws,
         out
       }
 
+      joint.bindings <- list(
+        boot.method = boot.method,
+        xdat = xdat,
+        ydat = ydat,
+        bws = bws,
+        index = index,
+        pivot = pivot,
+        num.obs = num.obs,
+        draw.wild.mult = draw.wild.mult,
+        a = a,
+        b = b,
+        P.a = P.a,
+        extra.args = extra.args
+      )
+      if (boot.method != "pairwise")
+        joint.bindings <- c(joint.bindings, list(mhat.xi = mhat.xi, ei = ei))
+
       In.vec <- .npRmpi_npsig_parallel_boot_values(
         boot.seeds = boot.seeds,
         worker = joint.eval,
-        required.bindings = list(
-          boot.method = boot.method,
-          mhat.xi = mhat.xi,
-          ei = ei,
-          xdat = xdat,
-          ydat = ydat,
-          bws = bws,
-          index = index,
-          pivot = pivot,
-          num.obs = num.obs,
-          draw.wild.mult = draw.wild.mult,
-          a = a,
-          b = b,
-          P.a = P.a,
-          extra.args = extra.args
-        ),
+        required.bindings = joint.bindings,
         what = "npsigtest",
         profile.where = "npsigtest:joint"
       )
+      assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
     }
 
     progress <- .np_progress_end(progress)
@@ -831,6 +835,7 @@ npsigtest.rbandwidth <- function(bws,
           b = b,
           p.a = P.a
         )
+        post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
 
         indiv.eval <- function(task.idx, seed.plan) {
           out <- numeric(length(task.idx))
@@ -879,28 +884,31 @@ npsigtest.rbandwidth <- function(bws,
           out
         }
 
+        indiv.bindings <- list(
+          boot.method = boot.method,
+          xdat = xdat,
+          ydat = ydat,
+          bws = bws,
+          i = i,
+          pivot = pivot,
+          num.obs = num.obs,
+          draw.wild.mult = draw.wild.mult,
+          a = a,
+          b = b,
+          P.a = P.a,
+          extra.args = extra.args
+        )
+        if (boot.method != "pairwise")
+          indiv.bindings <- c(indiv.bindings, list(mhat.xi = mhat.xi, ei = ei))
+
         In.vec <- .npRmpi_npsig_parallel_boot_values(
           boot.seeds = boot.seeds,
           worker = indiv.eval,
-          required.bindings = list(
-            boot.method = boot.method,
-            mhat.xi = mhat.xi,
-            ei = ei,
-            xdat = xdat,
-            ydat = ydat,
-            bws = bws,
-            i = i,
-            pivot = pivot,
-            num.obs = num.obs,
-            draw.wild.mult = draw.wild.mult,
-            a = a,
-            b = b,
-            P.a = P.a,
-            extra.args = extra.args
-          ),
+          required.bindings = indiv.bindings,
           what = "npsigtest",
           profile.where = "npsigtest:indiv"
         )
+        assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
       }
 
       progress <- .np_progress_end(progress)
