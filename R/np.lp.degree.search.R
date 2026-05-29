@@ -1261,9 +1261,86 @@
   utils::modifyList(base, if (is.null(nomad.opts)) list() else nomad.opts)
 }
 
+.np_nomad_native_false_option <- function(value) {
+  if (is.logical(value))
+    return(length(value) >= 1L && !is.na(value[1L]) && !isTRUE(value[1L]))
+  token <- tolower(trimws(as.character(value[1L])))
+  token %in% c("false", "f", "no", "n", "0")
+}
+
+.np_nomad_native_reject_unsupported_options <- function(opts, route) {
+  if (is.null(opts) || !length(opts))
+    return(invisible(TRUE))
+  option.names <- names(opts)
+  if (is.null(option.names))
+    return(invisible(TRUE))
+  idx <- which(toupper(trimws(option.names)) == "EVAL_USE_CACHE")
+  if (length(idx) && any(vapply(opts[idx], .np_nomad_native_false_option, logical(1)))) {
+    stop(sprintf(
+      "%s requires EVAL_USE_CACHE = TRUE; cache-off native solves are not supported",
+      route
+    ), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+.np_nomad_native_route_uses_solver <- function(nomad = FALSE,
+                                               degree.select = NULL,
+                                               search.engine = NULL,
+                                               bwsolver = NULL) {
+  match_one <- function(value, choices, default) {
+    if (is.null(value))
+      return(default)
+    out <- tryCatch(match.arg(value, choices), error = function(e) NULL)
+    if (is.null(out) || !length(out))
+      return(default)
+    as.character(out[1L])
+  }
+
+  degree.value <- match_one(degree.select, c("manual", "coordinate", "exhaustive"), "manual")
+  engine.value <- match_one(search.engine, c("nomad+powell", "cell", "nomad"), "nomad+powell")
+  solver.value <- match_one(bwsolver, c("powell", "mads", "mads+powell"), "powell")
+
+  isTRUE(nomad) ||
+    (!identical(degree.value, "manual") && engine.value %in% c("nomad", "nomad+powell")) ||
+    solver.value %in% c("mads", "mads+powell")
+}
+
+.np_nomad_native_reject_unsupported_options_for_route <- function(opts,
+                                                                  route,
+                                                                  nomad = FALSE,
+                                                                  degree.select = NULL,
+                                                                  search.engine = NULL,
+                                                                  bwsolver = NULL) {
+  if (.np_nomad_native_route_uses_solver(
+    nomad = nomad,
+    degree.select = degree.select,
+    search.engine = search.engine,
+    bwsolver = bwsolver
+  )) {
+    .np_nomad_native_reject_unsupported_options(opts, route)
+  }
+  invisible(TRUE)
+}
+
+.np_nomad_native_reject_unsupported_options_from_dots <- function(dots, route) {
+  if (is.null(dots) || !length(dots) || !("nomad.opts" %in% names(dots)))
+    return(invisible(TRUE))
+  .np_nomad_native_reject_unsupported_options_for_route(
+    opts = dots$nomad.opts,
+    route = route,
+    nomad = if ("nomad" %in% names(dots)) dots$nomad else FALSE,
+    degree.select = if ("degree.select" %in% names(dots)) dots$degree.select else NULL,
+    search.engine = if ("search.engine" %in% names(dots)) dots$search.engine else NULL,
+    bwsolver = if ("bwsolver" %in% names(dots)) dots$bwsolver else NULL
+  )
+}
+
 .np_nomad_native_option_vectors <- function(opts) {
   if (is.null(opts) || !length(opts))
     return(list(names = character(), values = character()))
+
+  .np_nomad_native_reject_unsupported_options(opts, "native NOMAD route")
 
   option.names <- names(opts)
   if (is.null(option.names) || any(!nzchar(option.names)))

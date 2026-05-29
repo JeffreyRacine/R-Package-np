@@ -162,6 +162,7 @@ npcdistbw.condbandwidth <-
            transform.bounds = FALSE,
            ...){
 
+    dot.args <- list(...)
     elapsed.start <- proc.time()[3]
 
     ydat = toFrame(ydat)
@@ -247,8 +248,8 @@ npcdistbw.condbandwidth <-
           bandwidth.compute = TRUE,
           gydat = gydat,
           nmulti = nmulti,
-          mads.nmulti = list(...)$mads.nmulti,
-          nomad.nmulti = list(...)$nomad.nmulti,
+          mads.nmulti = dot.args$mads.nmulti,
+          nomad.nmulti = dot.args$nomad.nmulti,
           nomad.remin = FALSE,
           powell.remin = powell.remin,
           itmax = itmax,
@@ -276,7 +277,7 @@ npcdistbw.condbandwidth <-
           transform.bounds = transform.bounds,
           invalid.penalty = invalid.penalty,
           penalty.multiplier = penalty.multiplier,
-          nomad.opts = list(...)$nomad.opts
+          nomad.opts = dot.args$nomad.opts
         ),
         bwsolver = bwsolver
       ))
@@ -961,6 +962,8 @@ npcdistbw.condbandwidth <-
 .npcdistbw_nomad_native_option_vectors <- function(opts) {
   if (is.null(opts) || !length(opts))
     return(list(names = character(), values = character()))
+
+  .np_nomad_native_reject_unsupported_options(opts, "native npcdist NOMAD route")
 
   option.names <- names(opts)
   if (is.null(option.names) || any(!nzchar(option.names)))
@@ -2453,6 +2456,11 @@ npcdistbw.NULL <-
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
            bws, ...){
+    dots <- list(...)
+    .np_nomad_native_reject_unsupported_options_from_dots(
+      dots,
+      "native npcdist NOMAD route"
+    )
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
@@ -2464,7 +2472,7 @@ npcdistbw.NULL <-
     
     bws = double(ncol(ydat)+ncol(xdat))
 
-    tbw <- npcdistbw.default(xdat = xdat, ydat = ydat, bws = bws, ...)
+    tbw <- do.call(npcdistbw.default, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)

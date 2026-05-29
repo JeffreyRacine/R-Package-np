@@ -82,6 +82,11 @@ npudistbw.NULL <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, ...){
 
+    dots <- list(...)
+    .np_nomad_native_reject_unsupported_options_from_dots(
+      dots,
+      "native npudist NOMAD route"
+    )
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
       t.names <- deparse(substitute(dat))
@@ -93,7 +98,7 @@ npudistbw.NULL <-
 
     bws = double(dim(dat)[2])
 
-    tbw <- npudistbw.default(dat = dat, bws = bws, ...)
+    tbw <- do.call(npudistbw.default, c(list(dat = dat, bws = bws), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
@@ -681,6 +686,7 @@ npudistbw.dbandwidth <-
            eval.only = FALSE,
            ...){
 
+    dot.args <- list(...)
     elapsed.start <- proc.time()[3]
 
     dat = toFrame(dat)
@@ -800,9 +806,9 @@ npudistbw.dbandwidth <-
         gdat = gdat,
         opt.args = list(
           nmulti = nmulti,
-          mads.nmulti = list(...)$mads.nmulti,
-          nomad.nmulti = list(...)$nomad.nmulti,
-          nomad.remin = if (is.null(list(...)$nomad.remin)) FALSE else list(...)$nomad.remin,
+          mads.nmulti = dot.args$mads.nmulti,
+          nomad.nmulti = dot.args$nomad.nmulti,
+          nomad.remin = if (is.null(dot.args$nomad.remin)) FALSE else dot.args$nomad.remin,
           powell.remin = remin,
           bwsolver = bwsolver,
           itmax = itmax,
@@ -823,7 +829,7 @@ npudistbw.dbandwidth <-
           do.full.integral = do.full.integral,
           ngrid = ngrid,
           memfac = memfac,
-          nomad.opts = list(...)$nomad.opts
+          nomad.opts = dot.args$nomad.opts
         ),
         bwsolver = bwsolver
       ))

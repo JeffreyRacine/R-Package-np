@@ -64,6 +64,11 @@ npudensbw.NULL <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, ...){
 
+    dots <- list(...)
+    .np_nomad_native_reject_unsupported_options_from_dots(
+      dots,
+      "native npudens NOMAD route"
+    )
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
       t.names <- deparse(substitute(dat))
@@ -75,7 +80,7 @@ npudensbw.NULL <-
 
     bws = double(dim(dat)[2])
 
-    tbw <- npudensbw.default(dat = dat, bws = bws, ...)
+    tbw <- do.call(npudensbw.default, c(list(dat = dat, bws = bws), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
@@ -144,6 +149,8 @@ npudensbw.NULL <-
 .npudensbw_nomad_native_option_vectors <- function(opts) {
   if (is.null(opts) || !length(opts))
     return(list(names = character(), values = character()))
+
+  .np_nomad_native_reject_unsupported_options(opts, "native npudens NOMAD route")
 
   option.names <- names(opts)
   if (is.null(option.names) || any(!nzchar(option.names)))
@@ -653,6 +660,7 @@ npudensbw.bandwidth <-
            eval.only = FALSE,
            ...){
 
+    dot.args <- list(...)
     elapsed.start <- proc.time()[3]
 
     dat = toFrame(dat)
@@ -723,9 +731,9 @@ npudensbw.bandwidth <-
         bws = bws,
         opt.args = list(
           nmulti = nmulti,
-          mads.nmulti = list(...)$mads.nmulti,
-          nomad.nmulti = list(...)$nomad.nmulti,
-          nomad.remin = if (is.null(list(...)$nomad.remin)) FALSE else list(...)$nomad.remin,
+          mads.nmulti = dot.args$mads.nmulti,
+          nomad.nmulti = dot.args$nomad.nmulti,
+          nomad.remin = if (is.null(dot.args$nomad.remin)) FALSE else dot.args$nomad.remin,
           powell.remin = remin,
           bwsolver = bwsolver,
           itmax = itmax,
@@ -743,7 +751,7 @@ npudensbw.bandwidth <-
           scale.init.categorical.sample = scale.init.categorical.sample,
           transform.bounds = transform.bounds,
           scale.factor.search.lower = scale.factor.search.lower,
-          nomad.opts = list(...)$nomad.opts
+          nomad.opts = dot.args$nomad.opts
         ),
         bwsolver = bwsolver
       ))

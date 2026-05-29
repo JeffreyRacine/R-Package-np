@@ -72,12 +72,18 @@ npregbw.NULL <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            bws, ...){
+    dots <- list(...)
+    .np_nomad_native_reject_unsupported_options_from_dots(
+      dots,
+      "native npreg NOMAD route"
+    )
 
     xdat <- toFrame(xdat)
 
     bws = double(dim(xdat)[2])
     
-    tbw <- npregbw.default(xdat = xdat, ydat = ydat, bws = bws, ...)
+    tbw <- do.call(npregbw.default,
+                   c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
@@ -153,6 +159,8 @@ npregbw.NULL <-
 .npregbw_nomad_native_option_vectors <- function(opts) {
   if (is.null(opts) || !length(opts))
     return(list(names = character(), values = character()))
+
+  .np_nomad_native_reject_unsupported_options(opts, "native npreg NOMAD route")
 
   option.names <- names(opts)
   if (is.null(option.names) || any(!nzchar(option.names)))
@@ -422,6 +430,13 @@ npregbw.rbandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            ...){
+    dots <- list(...)
+    if ("nomad.opts" %in% names(dots))
+      .np_nomad_native_reject_unsupported_options_for_route(
+        opts = dots$nomad.opts,
+        route = "native npreg NOMAD route",
+        bwsolver = bwsolver
+      )
     elapsed.start <- proc.time()[3]
 
     xdat <- toFrame(xdat)
@@ -574,7 +589,7 @@ npregbw.rbandwidth <-
           transform.bounds = transform.bounds,
           bandwidth.compute = TRUE,
           bwsolver = bwsolver,
-          nomad.opts = list(...)$nomad.opts
+          nomad.opts = dots$nomad.opts
         )
         return(.npregbw_run_fixed_degree_mads(
           xdat = xdat.frame,
@@ -2550,6 +2565,15 @@ npregbw.default <-
     xdat <- toFrame(xdat)
     yname <- deparse(substitute(ydat))
     lp.dot.args <- list(...)
+    if ("nomad.opts" %in% names(lp.dot.args))
+      .np_nomad_native_reject_unsupported_options_for_route(
+        opts = lp.dot.args$nomad.opts,
+        route = "native npreg NOMAD route",
+        nomad = nomad,
+        degree.select = degree.select,
+        search.engine = search.engine,
+        bwsolver = bwsolver
+      )
     if ("remin" %in% names(lp.dot.args)) {
       legacy.remin <- npValidateScalarLogical(lp.dot.args$remin, "remin")
       warning("npregbw: argument 'remin' is deprecated; use 'powell.remin' and 'nomad.remin'",
