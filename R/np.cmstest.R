@@ -1,3 +1,124 @@
+.npRmpi_cms_collective_context <- function() {
+  isTRUE(.npRmpi_autodispatch_called_from_bcast())
+}
+
+.npRmpi_cms_iid_index_plan <- function(n, boot.num) {
+  index <- matrix(NA_integer_, nrow = boot.num, ncol = n)
+
+  for (b in seq_len(boot.num))
+    index[b, ] <- sample.int(n, replace = TRUE)
+
+  index
+}
+
+.npRmpi_cms_numeric_chunks <- function(gathered, size) {
+  size <- as.integer(size)[1L]
+  if (is.na(size) || size < 1L)
+    stop("invalid MPI gather size")
+
+  if (is.matrix(gathered)) {
+    if (!identical(ncol(gathered), size))
+      stop("npcmstest MPI gather returned malformed matrix output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.array(gathered)) {
+    dims <- dim(gathered)
+    if (length(dims) < 2L || !identical(dims[[length(dims)]], size))
+      stop("npcmstest MPI gather returned malformed array output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.list(gathered)) {
+    if (!identical(length(gathered), size))
+      stop("npcmstest MPI gather returned malformed list output", call. = FALSE)
+    return(gathered)
+  }
+
+  chunks <- as.list(gathered)
+  if (!identical(length(chunks), size))
+    stop("npcmstest MPI gather returned malformed atomic output", call. = FALSE)
+  chunks
+}
+
+.npRmpi_cms_collective_iid_bootstrap <- function(plan,
+                                                 model.resid,
+                                                 yhat,
+                                                 model,
+                                                 xdat,
+                                                 bw,
+                                                 pivot,
+                                                 Jn,
+                                                 In,
+                                                 progress = NULL,
+                                                 comm = 1L) {
+  boot.num <- nrow(plan)
+  size <- mpi.comm.size(comm)
+  rank <- mpi.comm.rank(comm)
+
+  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  .npRmpi_bootstrap_transport_trace(
+    what = "npcmstest",
+    event = "fanout.collective.start",
+    fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx), method = "iid")
+  )
+
+  local.Sn <- numeric(length(local.idx))
+
+  for (jj in seq_along(local.idx)) {
+    ii <- local.idx[[jj]]
+    y.star <- yhat + model.resid[plan[ii, ]]
+    resid <-
+      if(is.null(model$family)) {
+        residuals(glm(y.star~ model$x - 1), type = "response")
+      } else {
+        residuals(glm(y.star~ model$x - 1,family=model$family), type = "response")
+      }
+
+    local.Sn[[jj]] <- .npRmpi_with_local_regression(
+      if (pivot) Jn(xdat, resid, bw) else In(xdat, resid, bw)
+    )
+  }
+
+  invisible(gc(FALSE))
+
+  payload <- c(as.numeric(local.idx), local.Sn)
+  gathered <- mpi.gather.Robj(payload, root = 0L, comm = comm)
+
+  if (rank == 0L) {
+    chunks <- .npRmpi_cms_numeric_chunks(gathered, size = size)
+    Sn.bootstrap <- numeric(boot.num)
+
+    for (rr in seq_len(size)) {
+      vals <- as.numeric(chunks[[rr]])
+      if (!length(vals))
+        next
+      if ((length(vals) %% 2L) != 0L)
+        stop("npcmstest MPI gather returned malformed bootstrap chunk", call. = FALSE)
+      n.local <- length(vals) / 2L
+      idx <- as.integer(vals[seq_len(n.local)])
+      Sn.bootstrap[idx] <- vals[n.local + seq_len(n.local)]
+    }
+
+    if (!is.null(progress))
+      progress <- .np_progress_step(progress, done = boot.num)
+    .npRmpi_bootstrap_transport_trace(
+      what = "npcmstest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num, method = "iid")
+    )
+    mpi.bcast.Robj(Sn.bootstrap, rank = 0L, comm = comm)
+    Sn.bootstrap
+  } else {
+    .npRmpi_bootstrap_transport_trace(
+      what = "npcmstest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num, method = "iid")
+    )
+    mpi.bcast.Robj(rank = 0L, comm = comm)
+  }
+}
+
 npcmstest <- function(formula,
                       data = NULL,
                       subset,
@@ -224,18 +345,36 @@ npcmstest <- function(formula,
   }
 
   if(distribution == "bootstrap"){
-    Sn.bootstrap <- numeric(boot.num)
     progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
-    for (ii in seq_len(boot.num)) {
-       if(boot.method == "iid"){
-        Sn.bootstrap[ii] <- boot.iid(model.resid)
-      } else if(boot.method == "wild"){
-        Sn.bootstrap[ii] <- boot.wild(model.resid)
-      } else if(boot.method == "wild-rademacher"){
-        Sn.bootstrap[ii] <- boot.wild.rademacher(model.resid)
+    if (.npRmpi_cms_collective_context() && identical(boot.method, "iid")) {
+      plan <- .npRmpi_cms_iid_index_plan(length(model.resid), boot.num)
+      post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+      Sn.bootstrap <- .npRmpi_cms_collective_iid_bootstrap(
+        plan = plan,
+        model.resid = model.resid,
+        yhat = yhat,
+        model = model,
+        xdat = xdat,
+        bw = bw,
+        pivot = pivot,
+        Jn = Jn,
+        In = In,
+        progress = progress
+      )
+      assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+    } else {
+      Sn.bootstrap <- numeric(boot.num)
+      for (ii in seq_len(boot.num)) {
+        if(boot.method == "iid"){
+          Sn.bootstrap[ii] <- boot.iid(model.resid)
+        } else if(boot.method == "wild"){
+          Sn.bootstrap[ii] <- boot.wild(model.resid)
+        } else if(boot.method == "wild-rademacher"){
+          Sn.bootstrap[ii] <- boot.wild.rademacher(model.resid)
+        }
+        progress <- .np_progress_step(progress, done = ii)
       }
-      progress <- .np_progress_step(progress, done = ii)
     }
     progress <- .np_progress_end(progress)
     Sn.bootstrap <- sort(Sn.bootstrap)
