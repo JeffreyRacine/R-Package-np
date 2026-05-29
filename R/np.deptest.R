@@ -3,6 +3,119 @@
 ## of Stock Market Returns," Journal of Econometrics, March, Volume
 ## 107, Issue 2, pp 291-312.
 
+.npRmpi_dept_collective_context <- function() {
+  isTRUE(.npRmpi_autodispatch_called_from_bcast())
+}
+
+.npRmpi_dept_bootstrap_index_plan <- function(n, boot.num) {
+  index <- matrix(NA_integer_, nrow = boot.num, ncol = n)
+
+  for (b in seq_len(boot.num))
+    index[b, ] <- sample.int(n, replace = TRUE)
+
+  index
+}
+
+.npRmpi_dept_numeric_chunks <- function(gathered, size) {
+  size <- as.integer(size)[1L]
+  if (is.na(size) || size < 1L)
+    stop("invalid MPI gather size")
+
+  if (is.matrix(gathered)) {
+    if (!identical(ncol(gathered), size))
+      stop("npdeptest MPI gather returned malformed matrix output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.array(gathered)) {
+    dims <- dim(gathered)
+    if (length(dims) < 2L || !identical(dims[[length(dims)]], size))
+      stop("npdeptest MPI gather returned malformed array output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.list(gathered)) {
+    if (!identical(length(gathered), size))
+      stop("npdeptest MPI gather returned malformed list output", call. = FALSE)
+    return(gathered)
+  }
+
+  chunks <- as.list(gathered)
+  if (!identical(length(chunks), size))
+    stop("npdeptest MPI gather returned malformed atomic output", call. = FALSE)
+  chunks
+}
+
+.npRmpi_dept_collective_bootstrap <- function(plan,
+                                              data.x,
+                                              data.y,
+                                              bw.data.x,
+                                              bw.data.y,
+                                              bw.joint,
+                                              Srho.bivar,
+                                              method,
+                                              progress = NULL,
+                                              comm = 1L) {
+  boot.num <- nrow(plan)
+  size <- mpi.comm.size(comm)
+  rank <- mpi.comm.rank(comm)
+
+  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  .npRmpi_bootstrap_transport_trace(
+    what = "npdeptest",
+    event = "fanout.collective.start",
+    fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx))
+  )
+
+  local.Srho <- numeric(length(local.idx))
+
+  for (jj in seq_along(local.idx)) {
+    b <- local.idx[[jj]]
+    data.x.boot <- data.x[plan[b, ]]
+    local.Srho[[jj]] <- .npRmpi_with_local_regression(
+      Srho.bivar(data.x.boot, data.y, bw.data.x, bw.data.y, bw.joint, method = method)
+    )
+  }
+
+  invisible(gc(FALSE))
+
+  payload <- c(as.numeric(local.idx), local.Srho)
+  gathered <- mpi.gather.Robj(payload, root = 0L, comm = comm)
+
+  if (rank == 0L) {
+    chunks <- .npRmpi_dept_numeric_chunks(gathered, size = size)
+    Srho.vec.boot <- numeric(boot.num)
+
+    for (rr in seq_len(size)) {
+      vals <- as.numeric(chunks[[rr]])
+      if (!length(vals))
+        next
+      if ((length(vals) %% 2L) != 0L)
+        stop("npdeptest MPI gather returned malformed bootstrap chunk", call. = FALSE)
+      n.local <- length(vals) / 2L
+      idx <- as.integer(vals[seq_len(n.local)])
+      Srho.vec.boot[idx] <- vals[n.local + seq_len(n.local)]
+    }
+
+    if (!is.null(progress))
+      progress <- .np_progress_step(progress, done = boot.num)
+    .npRmpi_bootstrap_transport_trace(
+      what = "npdeptest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num)
+    )
+    mpi.bcast.Robj(Srho.vec.boot, rank = 0L, comm = comm)
+    Srho.vec.boot
+  } else {
+    .npRmpi_bootstrap_transport_trace(
+      what = "npdeptest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num)
+    )
+    mpi.bcast.Robj(rank = 0L, comm = comm)
+  }
+}
+
 npdeptest <- function(data.x = NULL,
                       data.y = NULL,
                       method=c("integration","summation"),
@@ -132,17 +245,33 @@ npdeptest <- function(data.x = NULL,
 
   if(bootstrap) {
 
-    Srho.vec.boot <- numeric()
     progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
-    for (b in seq_len(boot.num)) {
-      ## Break systematic relationship between x and y (null)
-      
-      data.x.boot <- data.x[sample.int(length(data.x), replace = TRUE)]
-      
-      Srho.vec.boot[b] <- Srho.bivar(data.x.boot,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
-      progress <- .np_progress_step(progress, done = b)
+    if (.npRmpi_dept_collective_context() && identical(method, "summation")) {
+      plan <- .npRmpi_dept_bootstrap_index_plan(length(data.x), boot.num)
+      post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+      Srho.vec.boot <- .npRmpi_dept_collective_bootstrap(
+        plan = plan,
+        data.x = data.x,
+        data.y = data.y,
+        bw.data.x = bw.data.x,
+        bw.data.y = bw.data.y,
+        bw.joint = bw.joint,
+        Srho.bivar = Srho.bivar,
+        method = method,
+        progress = progress
+      )
+      assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+    } else {
+      Srho.vec.boot <- numeric()
+      for (b in seq_len(boot.num)) {
+        ## Break systematic relationship between x and y (null)
 
+        data.x.boot <- data.x[sample.int(length(data.x), replace = TRUE)]
+
+        Srho.vec.boot[b] <- Srho.bivar(data.x.boot,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
+        progress <- .np_progress_step(progress, done = b)
+      }
     }
 
     progress <- .np_progress_end(progress)
