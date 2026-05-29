@@ -1,6 +1,7 @@
 test_that("compute sources no longer own MPI finalization", {
   files <- c(
     testthat::test_path("..", "..", "src", "jksum.c"),
+    testthat::test_path("..", "..", "src", "kernelb.c"),
     testthat::test_path("..", "..", "src", "kernele.c"),
     testthat::test_path("..", "..", "src", "statmods.c")
   )

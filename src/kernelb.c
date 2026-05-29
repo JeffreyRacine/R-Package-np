@@ -172,10 +172,6 @@ double **matrix_bandwidth_deriv)
 
 			if(vec_sdev_x[i] <= DBL_MIN)
 			{
-#ifdef MPI2
-				/* Since we are exiting and this will terminate the program, clean up */
-				MPI_Finalize();
-#endif
 				error("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
 			}
 
@@ -188,10 +184,6 @@ double **matrix_bandwidth_deriv)
 
 			if(vec_sdev_y[i] <= DBL_MIN)
 			{
-#ifdef MPI2
-				/* Since we are exiting and this will terminate the program, clean up */
-				MPI_Finalize();
-#endif
 				error("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
 			}
 
@@ -656,10 +648,6 @@ fact constant. */
 
 			if(vec_sdev_x[i] <= DBL_MIN)
 			{
-#ifdef MPI2
-				/* Since we are exiting and this will terminate the program, clean up */
-				MPI_Finalize();
-#endif
 				error("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
 			}
 
@@ -673,10 +661,6 @@ fact constant. */
 
 			if(vec_sdev_y[i] <= DBL_MIN)
 			{
-#ifdef MPI2
-				/* Since we are exiting and this will terminate the program, clean up */
-				MPI_Finalize();
-#endif
 				error("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
 			}
 
