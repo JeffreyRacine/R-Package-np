@@ -2424,7 +2424,35 @@ npBandwidthSummaryLabel <- function(bwtype, bwscaling = FALSE){
 }
 
 .np_search_param_format <- function(x) {
-  format(sapply(x, format), trim = TRUE)
+  trimws(format(sapply(x, format), trim = TRUE), which = "both")
+}
+
+.np_text_lpad <- function(x, width) {
+  x <- as.character(x)
+  paste0(blank(pmax(0L, width - nchar(x))), x)
+}
+
+.np_text_rpad <- function(x, width) {
+  x <- as.character(x)
+  paste0(x, blank(pmax(0L, width - nchar(x))))
+}
+
+.np_search_param_table_lines <- function(mat) {
+  mat <- as.matrix(mat)
+  col.widths <- vapply(seq_len(ncol(mat)), function(j) {
+    max(nchar(c(colnames(mat)[j], mat[, j])), na.rm = TRUE)
+  }, numeric(1L))
+  row.labels <- rownames(mat)
+  row.width <- max(nchar(row.labels), na.rm = TRUE)
+
+  out <- paste0(blank(row.width), " ",
+                paste(.np_text_lpad(colnames(mat), col.widths),
+                      collapse = "  "))
+  rows <- vapply(seq_len(nrow(mat)), function(i) {
+    paste0(.np_text_rpad(row.labels[i], row.width), " ",
+           paste(.np_text_lpad(mat[i, ], col.widths), collapse = "  "))
+  }, character(1L))
+  c(out, rows)
 }
 
 .np_search_param_table_fits <- function(out, width = getOption("width", 80L)) {
@@ -2509,7 +2537,7 @@ printSearchParameterSummary <- function(values,
   } else {
     paste0(role, " Search Parameter(s):")
   }
-  out <- capture.output(print(mat, quote = FALSE, right = TRUE))
+  out <- .np_search_param_table_lines(mat)
   if (.np_search_param_table_fits(out)) {
     cat(title, "\n", paste(out, collapse = "\n"), "\n", sep = "")
     return(invisible(NULL))
@@ -2633,20 +2661,17 @@ genBwScaleStrs <- function(x){
     }
   }
 
-  maxValueNameLen <- max(nchar(unlist(valueText)))
-  valueText <- lapply(seq_along(valueText), function(i){
-    paste(blank(maxValueNameLen - nchar(valueText[[i]])), valueText[[i]], sep="")
-  })
-
-  maxNameLen <- max(nchar(unlist(sumText)))
   print.sumText <- lapply(seq_along(sumText), function(i) {
     nzchar(sumText[[i]]) &&
       !(isTRUE(flat_icon[[i]]) && !identical(x$type, "fixed") && !is.finite(nn.sample.max))
   })
 
-  sumText <- lapply(seq_along(sumText), function(i){
-    paste(blank(maxNameLen - nchar(sumText[[i]])), sumText[[i]], sep="")
-  })
+  bandwidth.display <- trimws(npFormat(flat_bandwidth), which = "both")
+  sum.display <- trimws(npFormat(flat_sum_display), which = "both")
+  value.label.width <- max(nchar(unlist(valueText)), na.rm = TRUE)
+  sum.label.width <- max(nchar(unlist(sumText)), na.rm = TRUE)
+  value.width <- max(nchar(bandwidth.display), na.rm = TRUE)
+  sum.width <- max(nchar(sum.display), na.rm = TRUE)
 
   t.nchar <- lapply(flat_varnames, nchar)
                     
@@ -2663,15 +2688,21 @@ genBwScaleStrs <- function(x){
   return(sapply(seq_along(t.nchar), function(j){
     sum.str <- ""
     if (isTRUE(print.sumText[[j]]))
-      sum.str <- paste(sumText[[j]], " ", npFormat(flat_sum_display[[j]]), sep = "")
+      sum.str <- paste(.np_text_rpad(sumText[[j]], sum.label.width),
+                       .np_text_lpad(sum.display[[j]], sum.width),
+                       sep = " ")
     if (isTRUE(flat_icon[[j]]) &&
         !identical(x$type, "fixed") &&
         is.finite(nn.sample.max) &&
         is.finite(flat_bandwidth[[j]]) &&
         flat_bandwidth[[j]] > nn.sample.max)
       sum.str <- paste(sum.str, " Extended: yes", sep = "")
-    paste(vatText[[j]], " ", valueText[[j]], " ", npFormat(flat_bandwidth[[j]]), " ",
-          sum.str, sep = "", collapse = "")
+    value.str <- paste(.np_text_rpad(valueText[[j]], value.label.width),
+                       .np_text_lpad(bandwidth.display[[j]], value.width),
+                       sep = " ")
+    paste(vatText[[j]], " ", value.str,
+          if (nzchar(sum.str)) paste0("  ", sum.str) else "",
+          sep = "", collapse = "")
   }))
 }
 
