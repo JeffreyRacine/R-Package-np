@@ -311,7 +311,7 @@ npsdeptest <- function(data = NULL,
 
     progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
-    if (.npRmpi_sdept_collective_context() && identical(method, "summation")) {
+    if (.npRmpi_sdept_collective_context()) {
       plan <- .npRmpi_sdept_bootstrap_index_plan(length(data), boot.num)
       post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
       boot.out <- .npRmpi_sdept_collective_bootstrap(
