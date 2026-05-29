@@ -263,6 +263,16 @@ npuniden.boundary <- function(X=NULL,
             if (is.finite(cv.ls)) cv.ls else sqrt(sqrt(.Machine$double.xmax))
         }
     }
+    cv.cache <- .np_objective_exact_cache_new(npObjectiveCacheEnabled())
+    cv.function.uncached <- cv.function
+    cv.function <- function(h,X,a=0,b=1) {
+        cache.hit <- .np_objective_exact_cache_get(cv.cache, h)
+        if (isTRUE(cache.hit$hit))
+            return(cache.hit$value)
+        value <- cv.function.uncached(h,X,a,b)
+        .np_objective_exact_cache_put(cv.cache, cache.hit$token, value)
+        value
+    }
     ## Grid search and then numeric optimization search (no
     ## multistarting, but sound starting point always used for
     ## subsequent refinement by optim)
