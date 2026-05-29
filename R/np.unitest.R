@@ -279,7 +279,7 @@ npunitest <- function(data.x = NULL,
     
     progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
-    if (.npRmpi_unit_collective_context() && identical(method, "summation")) {
+    if (.npRmpi_unit_collective_context()) {
       plan <- .npRmpi_unit_bootstrap_index_plan(
         pool.n = length(data.null),
         n.x = length(data.x),
