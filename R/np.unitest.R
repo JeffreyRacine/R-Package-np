@@ -3,6 +3,124 @@
 ## "Entropy and Predictability of Stock Market Returns," Journal of
 ## Econometrics, March, Volume 107, Issue 2, pp 291-312.
 
+.npRmpi_unit_collective_context <- function() {
+  isTRUE(.npRmpi_autodispatch_called_from_bcast())
+}
+
+.npRmpi_unit_bootstrap_index_plan <- function(pool.n, n.x, n.y, boot.num) {
+  x.index <- matrix(NA_integer_, nrow = boot.num, ncol = n.x)
+  y.index <- matrix(NA_integer_, nrow = boot.num, ncol = n.y)
+
+  for (b in seq_len(boot.num)) {
+    x.index[b, ] <- sample.int(pool.n, size = n.x, replace = TRUE)
+    y.index[b, ] <- sample.int(pool.n, size = n.y, replace = TRUE)
+  }
+
+  list(x = x.index, y = y.index)
+}
+
+.npRmpi_unit_numeric_chunks <- function(gathered, size) {
+  size <- as.integer(size)[1L]
+  if (is.na(size) || size < 1L)
+    stop("invalid MPI gather size")
+
+  if (is.matrix(gathered)) {
+    if (!identical(ncol(gathered), size))
+      stop("npunitest MPI gather returned malformed matrix output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.array(gathered)) {
+    dims <- dim(gathered)
+    if (length(dims) < 2L || !identical(dims[[length(dims)]], size))
+      stop("npunitest MPI gather returned malformed array output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.list(gathered)) {
+    if (!identical(length(gathered), size))
+      stop("npunitest MPI gather returned malformed list output", call. = FALSE)
+    return(gathered)
+  }
+
+  chunks <- as.list(gathered)
+  if (!identical(length(chunks), size))
+    stop("npunitest MPI gather returned malformed atomic output", call. = FALSE)
+  chunks
+}
+
+.npRmpi_unit_collective_bootstrap <- function(plan,
+                                              data.null,
+                                              bw.x,
+                                              bw.y,
+                                              Srho.univar,
+                                              method,
+                                              progress = NULL,
+                                              comm = 1L) {
+  boot.num <- nrow(plan$x)
+  if (!identical(nrow(plan$y), boot.num))
+    stop("npunitest bootstrap index plan is malformed", call. = FALSE)
+
+  size <- mpi.comm.size(comm)
+  rank <- mpi.comm.rank(comm)
+
+  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  .npRmpi_bootstrap_transport_trace(
+    what = "npunitest",
+    event = "fanout.collective.start",
+    fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx))
+  )
+
+  local.Srho <- numeric(length(local.idx))
+
+  for (jj in seq_along(local.idx)) {
+    b <- local.idx[[jj]]
+    data.null.x <- data.null[plan$x[b, ]]
+    data.null.y <- data.null[plan$y[b, ]]
+    local.Srho[[jj]] <- .npRmpi_with_local_regression(
+      Srho.univar(data.null.x, data.null.y, bw.x, bw.y, method = method)
+    )
+  }
+
+  invisible(gc(FALSE))
+
+  payload <- c(as.numeric(local.idx), local.Srho)
+  gathered <- mpi.gather.Robj(payload, root = 0L, comm = comm)
+
+  if (rank == 0L) {
+    chunks <- .npRmpi_unit_numeric_chunks(gathered, size = size)
+    resampled.stat <- numeric(boot.num)
+
+    for (rr in seq_len(size)) {
+      vals <- as.numeric(chunks[[rr]])
+      if (!length(vals))
+        next
+      if ((length(vals) %% 2L) != 0L)
+        stop("npunitest MPI gather returned malformed bootstrap chunk", call. = FALSE)
+      n.local <- length(vals) / 2L
+      idx <- as.integer(vals[seq_len(n.local)])
+      resampled.stat[idx] <- vals[n.local + seq_len(n.local)]
+    }
+
+    if (!is.null(progress))
+      progress <- .np_progress_step(progress, done = boot.num)
+    .npRmpi_bootstrap_transport_trace(
+      what = "npunitest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num)
+    )
+    mpi.bcast.Robj(resampled.stat, rank = 0L, comm = comm)
+    resampled.stat
+  } else {
+    .npRmpi_bootstrap_transport_trace(
+      what = "npunitest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num)
+    )
+    mpi.bcast.Robj(rank = 0L, comm = comm)
+  }
+}
+
 npunitest <- function(data.x = NULL,
                       data.y = NULL,
                       method = c("integration","summation"),
@@ -159,22 +277,41 @@ npunitest <- function(data.x = NULL,
       
     }
     
-    resampled.stat <- numeric(boot.num)
     progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
-    for (b in seq_len(boot.num)) {
-      progress <- .np_progress_step(progress, done = b)
+    if (.npRmpi_unit_collective_context() && identical(method, "summation")) {
+      plan <- .npRmpi_unit_bootstrap_index_plan(
+        pool.n = length(data.null),
+        n.x = length(data.x),
+        n.y = length(data.y),
+        boot.num = boot.num
+      )
+      post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+      resampled.stat <- .npRmpi_unit_collective_bootstrap(
+        plan = plan,
+        data.null = data.null,
+        bw.x = bw.x,
+        bw.y = bw.y,
+        Srho.univar = Srho.univar,
+        method = method,
+        progress = progress
+      )
+      assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+    } else {
+      resampled.stat <- numeric(boot.num)
+      for (b in seq_len(boot.num)) {
+        progress <- .np_progress_step(progress, done = b)
 
-      ## Need to think this through... is the null one density? If so
-      ## resample from that density for both x and y?
-      
-      ## Conduct simple iid bootstrap resamples
-      
-      data.null.x <- data.null[sample.int(length(data.null), size = length(data.x), replace = TRUE)]
-      data.null.y <- data.null[sample.int(length(data.null), size = length(data.y), replace = TRUE)]
+        ## Need to think this through... is the null one density? If so
+        ## resample from that density for both x and y?
 
-      resampled.stat[b] <- Srho.univar(data.null.x,data.null.y,bw.x,bw.y,method=method)
+        ## Conduct simple iid bootstrap resamples
 
+        data.null.x <- data.null[sample.int(length(data.null), size = length(data.x), replace = TRUE)]
+        data.null.y <- data.null[sample.int(length(data.null), size = length(data.y), replace = TRUE)]
+
+        resampled.stat[b] <- Srho.univar(data.null.x,data.null.y,bw.x,bw.y,method=method)
+      }
     }
 
     progress <- .np_progress_end(progress)
