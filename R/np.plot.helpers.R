@@ -1061,6 +1061,7 @@
     advance(tasks[[i]])
   }
 
+  attr(tasks, "rng_final_state") <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
   tasks
 }
 
@@ -1310,6 +1311,12 @@
                                          master_local_chunk = TRUE,
                                          required.bindings = NULL,
                                          ...) {
+  rng.final.state <- attr(tasks, "rng_final_state", exact = TRUE)
+  if (!is.null(rng.final.state)) {
+    on.exit({
+      assign(".Random.seed", as.integer(rng.final.state), envir = .GlobalEnv)
+    }, add = TRUE)
+  }
   total.boot <- sum(vapply(tasks, function(tt) as.integer(tt$bsz), integer(1)))
   progress.label <- if (is.null(progress.label)) {
     sprintf("Plot bootstrap %s", what)
@@ -12758,7 +12765,6 @@ plotFactor <- function(f, y, ...){
     chunk.size = chunk.size,
     what = "conditional-gradient"
   )
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   counts.mat <- if (!is.null(counts)) {
     .np_inid_counts_matrix(n = n, B = B, counts = counts)
   } else {
@@ -12772,13 +12778,15 @@ plotFactor <- function(f, y, ...){
     "random"
   }
   prob <- rep.int(1 / n, n)
-  if (identical(counts.mode, "random")) {
-    tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+  tasks <- if (identical(counts.mode, "random")) {
+    .npRmpi_bootstrap_rmultinom_tasks(
       B = B,
       chunk.size = chunk.size,
       size = n,
       prob = prob
     )
+  } else {
+    .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size, with.seeds = FALSE)
   }
 
   worker <- function(task) {
@@ -12911,7 +12919,6 @@ plotFactor <- function(f, y, ...){
     chunk.size = chunk.size,
     what = "quantile-level"
   )
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   counts.mat <- if (!is.null(counts)) {
     .np_inid_counts_matrix(n = n, B = B, counts = counts)
   } else {
@@ -12925,13 +12932,15 @@ plotFactor <- function(f, y, ...){
     "random"
   }
   prob <- rep.int(1 / n, n)
-  if (identical(counts.mode, "random")) {
-    tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+  tasks <- if (identical(counts.mode, "random")) {
+    .npRmpi_bootstrap_rmultinom_tasks(
       B = B,
       chunk.size = chunk.size,
       size = n,
       prob = prob
     )
+  } else {
+    .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size, with.seeds = FALSE)
   }
 
   worker <- function(task) {
@@ -13061,7 +13070,6 @@ plotFactor <- function(f, y, ...){
     chunk.size = chunk.size,
     what = "quantile-gradient"
   )
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   counts.mat <- if (!is.null(counts)) {
     .np_inid_counts_matrix(n = n, B = B, counts = counts)
   } else {
@@ -13075,13 +13083,15 @@ plotFactor <- function(f, y, ...){
     "random"
   }
   prob <- rep.int(1 / n, n)
-  if (identical(counts.mode, "random")) {
-    tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+  tasks <- if (identical(counts.mode, "random")) {
+    .npRmpi_bootstrap_rmultinom_tasks(
       B = B,
       chunk.size = chunk.size,
       size = n,
       prob = prob
     )
+  } else {
+    .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size, with.seeds = FALSE)
   }
 
   worker <- function(task) {
