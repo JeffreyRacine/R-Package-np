@@ -1867,7 +1867,7 @@
                              start.lower = NULL,
                              start.upper = NULL,
                              nomad.opts = list(),
-                             native.r.bridge = FALSE) {
+                             native.r.bridge = TRUE) {
   engine <- match.arg(engine)
   direction <- match.arg(direction)
   .np_nomad_require_crs()
