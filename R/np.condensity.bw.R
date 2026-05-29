@@ -331,6 +331,7 @@ npcdensbw.conbandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            ...){
+    dot.args <- list(...)
     elapsed.start <- proc.time()[3]
     ydat = toFrame(ydat)
     xdat = toFrame(xdat)
@@ -464,8 +465,8 @@ npcdensbw.conbandwidth <-
         opt.args = list(
           bandwidth.compute = TRUE,
           nmulti = nmulti,
-          mads.nmulti = list(...)$mads.nmulti,
-          nomad.nmulti = list(...)$nomad.nmulti,
+          mads.nmulti = dot.args$mads.nmulti,
+          nomad.nmulti = dot.args$nomad.nmulti,
           nomad.remin = FALSE,
           powell.remin = powell.remin,
           itmax = itmax,
@@ -491,7 +492,7 @@ npcdensbw.conbandwidth <-
           transform.bounds = transform.bounds,
           invalid.penalty = invalid.penalty,
           penalty.multiplier = penalty.multiplier,
-          nomad.opts = list(...)$nomad.opts
+          nomad.opts = dot.args$nomad.opts
         ),
         bwsolver = bwsolver
       ))
@@ -539,7 +540,9 @@ npcdensbw.conbandwidth <-
       identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
     if (.npRmpi_autodispatch_active() &&
         !keep_local_shadow_nn)
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+        parent.frame()))
 
     xdat = xdat[goodrows,,drop = FALSE]
     ydat = ydat[goodrows,,drop = FALSE]
@@ -1570,6 +1573,8 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
 .npcdensbw_nomad_shadow_native_option_vectors <- function(opts) {
   if (is.null(opts) || !length(opts))
     return(list(names = character(), values = character()))
+
+  .np_nomad_native_reject_unsupported_options(opts, "native npcdens NOMAD route")
 
   option.names <- names(opts)
   if (is.null(option.names) || any(!nzchar(option.names)))
@@ -3718,6 +3723,11 @@ npcdensbw.NULL <-
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
            bws, ...){
+    dots <- list(...)
+    .np_nomad_native_reject_unsupported_options_from_dots(
+      dots,
+      "native npcdens NOMAD route"
+    )
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
 
@@ -3728,7 +3738,7 @@ npcdensbw.NULL <-
 
     bws = double(ncol(ydat)+ncol(xdat))
 
-    tbw <- npcdensbw.default(xdat = xdat, ydat = ydat, bws = bws, ...)
+    tbw <- do.call(npcdensbw.default, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
@@ -4086,7 +4096,9 @@ npcdensbw.default <-
         identical(tbw$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
       if (.npRmpi_autodispatch_active() &&
           !keep_local_shadow_nn)
-        return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+        return(.npRmpi_autodispatch_call(
+          .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+          parent.frame()))
     }
     ## next grab dummies for actual bandwidth selection and perform call
 

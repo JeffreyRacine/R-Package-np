@@ -73,7 +73,6 @@ npregbw.NULL <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            bws, ...){
-    .npRmpi_require_active_slave_pool(where = "npregbw()")
     mc <- match.call(expand.dots = FALSE)
     dots <- list(...)
     legacy.remin <- "remin" %in% names(dots)
@@ -87,6 +86,11 @@ npregbw.NULL <-
         dots$nomad.remin <- legacy.remin.value
       dots$remin <- NULL
     }
+    .np_nomad_native_reject_unsupported_options_from_dots(
+      dots,
+      "native npreg NOMAD route"
+    )
+    .npRmpi_require_active_slave_pool(where = "npregbw()")
     dot.names <- names(dots)
     degree.select.value <- if ("degree.select" %in% dot.names) {
       match.arg(as.character(dots$degree.select[[1L]]), c("manual", "coordinate", "exhaustive"))
@@ -172,6 +176,11 @@ npregbw.rbandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            ...){
+    .np_nomad_native_reject_unsupported_options_for_route(
+      opts = nomad.opts,
+      route = "native npreg NOMAD route",
+      bwsolver = bwsolver
+    )
     elapsed.start <- proc.time()[3]
     xdat <- toFrame(xdat)
 
@@ -1201,6 +1210,8 @@ npRmpiNomadShadowClearRegression <- function() {
 .npregbw_nomad_native_option_vectors <- function(opts) {
   if (is.null(opts) || !length(opts))
     return(list(names = character(), values = character()))
+
+  .np_nomad_native_reject_unsupported_options(opts, "native npreg NOMAD route")
 
   option.names <- names(opts)
   if (is.null(option.names) || any(!nzchar(option.names)))
@@ -3210,6 +3221,14 @@ npregbw.default <-
            transform.bounds = FALSE,
            ukertype,
            ...){
+    .np_nomad_native_reject_unsupported_options_for_route(
+      opts = nomad.opts,
+      route = "native npreg NOMAD route",
+      nomad = nomad,
+      degree.select = degree.select,
+      search.engine = search.engine,
+      bwsolver = bwsolver
+    )
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     lp.dot.args <- list(...)
     if ("remin" %in% names(lp.dot.args)) {

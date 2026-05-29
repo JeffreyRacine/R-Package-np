@@ -92,6 +92,10 @@ npudistbw.NULL <-
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
     dots <- list(...)
+    .np_nomad_native_reject_unsupported_options_from_dots(
+      dots,
+      "native npudist NOMAD route"
+    )
     if (.npRmpi_npudistbw_bounded_adaptive_requested(
       bwtype = dots$bwtype,
       ckerbound = if (is.null(dots$ckerbound)) "none" else dots$ckerbound,
@@ -100,7 +104,9 @@ npudistbw.NULL <-
       stop("bounded adaptive_nn remains unsupported for npudistbw() in npRmpi",
            call. = FALSE)
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+        parent.frame()))
 
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
@@ -113,7 +119,7 @@ npudistbw.NULL <-
 
     bws = double(dim(dat)[2])
 
-    tbw <- npudistbw.default(dat = dat, bws = bws, ...)
+    tbw <- do.call(npudistbw.default, c(list(dat = dat, bws = bws), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
@@ -701,6 +707,7 @@ npudistbw.dbandwidth <-
            transform.bounds = FALSE,
            eval.only = FALSE,
            ...){
+    dot.args <- list(...)
     elapsed.start <- proc.time()[3]
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     bwsolver <- npValidateBwsolver(bwsolver)
@@ -731,7 +738,9 @@ npudistbw.dbandwidth <-
       stop("bounded adaptive_nn remains unsupported for npudistbw() in npRmpi",
            call. = FALSE)
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+        parent.frame()))
 
     dat = toFrame(dat)
 
@@ -832,9 +841,9 @@ npudistbw.dbandwidth <-
         gdat = gdat,
         opt.args = list(
           nmulti = nmulti,
-          mads.nmulti = list(...)$mads.nmulti,
-          nomad.nmulti = list(...)$nomad.nmulti,
-          nomad.remin = if (is.null(list(...)$nomad.remin)) FALSE else list(...)$nomad.remin,
+          mads.nmulti = dot.args$mads.nmulti,
+          nomad.nmulti = dot.args$nomad.nmulti,
+          nomad.remin = if (is.null(dot.args$nomad.remin)) FALSE else dot.args$nomad.remin,
           powell.remin = remin,
           bwsolver = bwsolver,
           itmax = itmax,
@@ -855,7 +864,7 @@ npudistbw.dbandwidth <-
           do.full.integral = do.full.integral,
           ngrid = ngrid,
           memfac = memfac,
-          nomad.opts = list(...)$nomad.opts
+          nomad.opts = dot.args$nomad.opts
         ),
         bwsolver = bwsolver
       ))
@@ -1074,7 +1083,9 @@ npudistbw.default <-
            ...){
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+        parent.frame()))
 
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
