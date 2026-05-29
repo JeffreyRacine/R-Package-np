@@ -2405,7 +2405,130 @@ npBandwidthSummaryLabel <- function(bwtype, bwscaling = FALSE){
   if (identical(bwtype, "fixed"))
     return("Bandwidth(s)")
 
-  "Bandwidth Nearest Neighbor(s)"
+  "NN Index(s)"
+}
+
+.np_search_param_type <- function(bwtype, is.continuous) {
+  if (isTRUE(is.continuous)) {
+    if (identical(as.character(bwtype)[1L], "fixed")) "Bandwidth" else "NN Index"
+  } else {
+    "Lambda"
+  }
+}
+
+.np_nn_sample_max <- function(bws) {
+  if (is.null(bws) || is.null(bws$nobs))
+    return(NA_real_)
+  out <- suppressWarnings(as.double(as.integer(bws$nobs)[1L] - 1L))
+  if (is.finite(out) && out >= 1) out else NA_real_
+}
+
+.np_search_param_format <- function(x) {
+  format(sapply(x, format), trim = TRUE)
+}
+
+.np_search_param_table_fits <- function(out, width = getOption("width", 80L)) {
+  if (!length(out))
+    return(TRUE)
+  max(nchar(out), na.rm = TRUE) <= width
+}
+
+printSearchParameterSummary <- function(values,
+                                        varnames,
+                                        bws,
+                                        vari = "x",
+                                        role = NULL,
+                                        fallback.label = NULL,
+                                        digits = NULL) {
+  if (is.null(bws) || is.null(values) || is.null(varnames)) {
+    print(matrix(values, ncol = length(values),
+                 dimnames = list(fallback.label, varnames)))
+    return(invisible(NULL))
+  }
+
+  dat <- if (!is.null(bws$dati) && !is.null(bws$dati[[vari]])) {
+    bws$dati[[vari]]
+  } else if (identical(vari, "x") && !is.null(bws$xdati)) {
+    bws$xdati
+  } else if (identical(vari, "y") && !is.null(bws$ydati)) {
+    bws$ydati
+  } else {
+    NULL
+  }
+
+  if (is.null(dat) || is.null(dat$icon) || length(dat$icon) != length(values)) {
+    print(matrix(values, ncol = length(values),
+                 dimnames = list(fallback.label, varnames)))
+    return(invisible(NULL))
+  }
+
+  values <- as.double(values)
+  varnames <- as.character(varnames)
+  is.cont <- as.logical(dat$icon)
+  types <- vapply(is.cont, function(z) .np_search_param_type(bws$type, z), character(1L))
+
+  # Preserve the compact historical display when all entries are plain
+  # continuous fixed bandwidths.
+  if (all(types == "Bandwidth")) {
+    print(matrix(values, ncol = length(values),
+                 dimnames = list(fallback.label, varnames)))
+    return(invisible(NULL))
+  }
+
+  max.values <- rep(NA_real_, length(values))
+  sample.max <- .np_nn_sample_max(bws)
+  nn.idx <- which(types == "NN Index")
+  if (length(nn.idx) && is.finite(sample.max))
+    max.values[nn.idx] <- sample.max
+
+  sum.num <- if (!is.null(bws$sumNum) && !is.null(bws$sumNum[[vari]])) {
+    suppressWarnings(as.double(bws$sumNum[[vari]]))
+  } else {
+    rep(NA_real_, length(values))
+  }
+  if (length(sum.num) == length(values)) {
+    lambda.idx <- which(types == "Lambda")
+    max.values[lambda.idx] <- sum.num[lambda.idx]
+  }
+
+  value.chr <- .np_search_param_format(values)
+  max.chr <- ifelse(is.finite(max.values), .np_search_param_format(max.values), "--")
+  extended <- rep(FALSE, length(values))
+  if (length(nn.idx) && is.finite(sample.max))
+    extended[nn.idx] <- is.finite(values[nn.idx]) & values[nn.idx] > sample.max
+
+  mat <- rbind(Type = types, Value = value.chr)
+  if (any(is.finite(max.values)))
+    mat <- rbind(mat, Max = max.chr)
+  if (any(extended))
+    mat <- rbind(mat, Extended = ifelse(extended, "yes", "--"))
+  colnames(mat) <- varnames
+
+  title <- if (is.null(role) || !nzchar(role)) {
+    "Search Parameter(s):"
+  } else {
+    paste0(role, " Search Parameter(s):")
+  }
+  out <- capture.output(print(mat, quote = FALSE, right = TRUE))
+  if (.np_search_param_table_fits(out)) {
+    cat(title, "\n", paste(out, collapse = "\n"), "\n", sep = "")
+    return(invisible(NULL))
+  }
+
+  cat(title)
+  for (i in seq_along(values)) {
+    pieces <- c(
+      paste0("Type: ", types[i]),
+      paste0("Value: ", value.chr[i])
+    )
+    if (is.finite(max.values[i]))
+      pieces <- c(pieces, paste0("Max: ", max.chr[i]))
+    if (isTRUE(extended[i]))
+      pieces <- c(pieces, "Extended: yes")
+    cat("\n", varnames[i], " ", paste(pieces, collapse = " "), sep = "")
+  }
+  cat("\n")
+  invisible(NULL)
 }
 
 npPolynomialSummaryLabel <- function(x){
@@ -2487,14 +2610,39 @@ genBwScaleStrs <- function(x){
 
   sumText <- lapply(seq_along(flat_varnames), function(i) {
     if (isTRUE(flat_icon[[i]])) {
-      if (x$type == "fixed") "Scale Factor:" else ""
+      if (x$type == "fixed") "Scale Factor:" else "NN Max:"
     } else {
       "Lambda Max:"
     }
   })
 
+  valueText <- lapply(seq_along(flat_varnames), function(i) {
+    if (isTRUE(flat_icon[[i]])) {
+      if (x$type == "fixed") "Bandwidth:" else "NN Index:"
+    } else {
+      "Lambda:"
+    }
+  })
+
+  nn.sample.max <- .np_nn_sample_max(x)
+  flat_sum_display <- flat_sum
+  if (!identical(x$type, "fixed") && is.finite(nn.sample.max)) {
+    for (i in seq_along(flat_sum_display)) {
+      if (isTRUE(flat_icon[[i]]))
+        flat_sum_display[[i]] <- nn.sample.max
+    }
+  }
+
+  maxValueNameLen <- max(nchar(unlist(valueText)))
+  valueText <- lapply(seq_along(valueText), function(i){
+    paste(blank(maxValueNameLen - nchar(valueText[[i]])), valueText[[i]], sep="")
+  })
+
   maxNameLen <- max(nchar(unlist(sumText)))
-  print.sumText <- lapply(sumText, '!=', "")
+  print.sumText <- lapply(seq_along(sumText), function(i) {
+    nzchar(sumText[[i]]) &&
+      !(isTRUE(flat_icon[[i]]) && !identical(x$type, "fixed") && !is.finite(nn.sample.max))
+  })
 
   sumText <- lapply(seq_along(sumText), function(i){
     paste(blank(maxNameLen - nchar(sumText[[i]])), sumText[[i]], sep="")
@@ -2515,8 +2663,14 @@ genBwScaleStrs <- function(x){
   return(sapply(seq_along(t.nchar), function(j){
     sum.str <- ""
     if (isTRUE(print.sumText[[j]]))
-      sum.str <- paste(sumText[[j]], " ", npFormat(flat_sum[[j]]), sep = "")
-    paste(vatText[[j]], " Bandwidth: ", npFormat(flat_bandwidth[[j]]), " ",
+      sum.str <- paste(sumText[[j]], " ", npFormat(flat_sum_display[[j]]), sep = "")
+    if (isTRUE(flat_icon[[j]]) &&
+        !identical(x$type, "fixed") &&
+        is.finite(nn.sample.max) &&
+        is.finite(flat_bandwidth[[j]]) &&
+        flat_bandwidth[[j]] > nn.sample.max)
+      sum.str <- paste(sum.str, " Extended: yes", sep = "")
+    paste(vatText[[j]], " ", valueText[[j]], " ", npFormat(flat_bandwidth[[j]]), " ",
           sum.str, sep = "", collapse = "")
   }))
 }

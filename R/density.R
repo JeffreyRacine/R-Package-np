@@ -50,7 +50,9 @@ print.npdensity <- function(x, digits=NULL, ...){
                                       " evaluation points,", sep=""),
       " in ",x$ndim," variable(s)\n",sep="")
 
-  print(matrix(x$bw,ncol=x$ndim,dimnames=list(paste(x$pscaling,":",sep=""),x$xnames)))
+  printSearchParameterSummary(x$bw, x$xnames, x$bws, vari = "x",
+                              fallback.label = paste(x$pscaling, ":", sep = ""),
+                              digits = digits)
 
   cat(genDenEstStr(x))
   
@@ -96,7 +98,8 @@ summary.npdensity <- function(object, ...) {
 
   cat(genOmitStr(object))
 
-  print(matrix(object$bw,ncol=object$ndim,dimnames=list(paste(object$pscaling,":",sep=""),object$xnames)))
+  printSearchParameterSummary(object$bw, object$xnames, object$bws, vari = "x",
+                              fallback.label = paste(object$pscaling, ":", sep = ""))
 
   cat(genDenEstStr(object))
 
