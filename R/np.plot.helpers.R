@@ -1028,7 +1028,7 @@
   TRUE
 }
 
-.npRmpi_bootstrap_chunk_tasks <- function(B, chunk.size) {
+.npRmpi_bootstrap_chunk_tasks <- function(B, chunk.size, with.seeds = TRUE) {
   B <- as.integer(B)
   chunk.size <- as.integer(chunk.size)
   if (B < 1L || chunk.size < 1L)
@@ -1036,7 +1036,8 @@
 
   starts <- seq.int(1L, B, by = chunk.size)
   lens <- pmin(chunk.size, B - starts + 1L)
-  seeds <- sample.int(.Machine$integer.max, length(starts))
+  with.seeds <- isTRUE(with.seeds)
+  seeds <- if (with.seeds) sample.int(.Machine$integer.max, length(starts)) else rep.int(NA_integer_, length(starts))
 
   lapply(seq_along(starts), function(i) {
     list(
@@ -1045,6 +1046,77 @@
       seed = as.integer(seeds[i])
     )
   })
+}
+
+.npRmpi_bootstrap_attach_rng_stream <- function(tasks, advance) {
+  if (!is.list(tasks) || !length(tasks))
+    return(tasks)
+  if (!is.function(advance))
+    stop("advance must be a function")
+  if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+    sample.int(1L, 0L)
+
+  for (i in seq_along(tasks)) {
+    tasks[[i]]$rng_state <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    advance(tasks[[i]])
+  }
+
+  tasks
+}
+
+.npRmpi_bootstrap_use_task_rng <- function(task) {
+  if (!is.null(task$rng_state)) {
+    assign(".Random.seed", as.integer(task$rng_state), envir = .GlobalEnv)
+  } else {
+    set.seed(as.integer(task$seed))
+  }
+  invisible(TRUE)
+}
+
+.npRmpi_bootstrap_task_rmultinom <- function(task, n, prob, size = n) {
+  .npRmpi_bootstrap_use_task_rng(task)
+  stats::rmultinom(n = as.integer(task$bsz),
+                   size = as.integer(size),
+                   prob = prob)
+}
+
+.npRmpi_bootstrap_rmultinom_tasks <- function(B, chunk.size, size, prob) {
+  tasks <- .npRmpi_bootstrap_chunk_tasks(
+    B = B,
+    chunk.size = chunk.size,
+    with.seeds = FALSE
+  )
+  .npRmpi_bootstrap_attach_rng_stream(
+    tasks,
+    function(task) {
+      invisible(stats::rmultinom(
+        n = as.integer(task$bsz),
+        size = as.integer(size),
+        prob = prob
+      ))
+    }
+  )
+}
+
+.npRmpi_bootstrap_task_runif_matrix <- function(task, n) {
+  .npRmpi_bootstrap_use_task_rng(task)
+  matrix(stats::runif(as.integer(n) * as.integer(task$bsz)),
+         nrow = as.integer(n),
+         ncol = as.integer(task$bsz))
+}
+
+.npRmpi_bootstrap_runif_tasks <- function(B, chunk.size, n) {
+  tasks <- .npRmpi_bootstrap_chunk_tasks(
+    B = B,
+    chunk.size = chunk.size,
+    with.seeds = FALSE
+  )
+  .npRmpi_bootstrap_attach_rng_stream(
+    tasks,
+    function(task) {
+      invisible(stats::runif(as.integer(n) * as.integer(task$bsz)))
+    }
+  )
 }
 
 .npRmpi_bootstrap_collect_chunks <- function(parts, tasks, ncol.out, what = "bootstrap") {
@@ -1708,7 +1780,7 @@
     chunk.size = chunk.size,
     what = "wild"
   )
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  tasks <- .npRmpi_bootstrap_runif_tasks(B = B, chunk.size = chunk.size, n = n)
   if (!length(tasks))
     .npRmpi_bootstrap_fail_or_fallback(
       msg = "wild fan-out produced no tasks",
@@ -1726,9 +1798,8 @@
 
   worker <- function(task, n, p, H.vec, fit.mean, residuals, wild.method) {
     H <- matrix(as.double(H.vec), nrow = p, ncol = n)
-    set.seed(as.integer(task$seed))
     bsz <- as.integer(task$bsz)
-    u <- matrix(stats::runif(n * bsz), nrow = n, ncol = bsz)
+    u <- .npRmpi_bootstrap_task_runif_matrix(task = task, n = n)
     if (identical(wild.method, "mammen")) {
       a <- (1 - sqrt(5)) / 2
       p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
@@ -1970,13 +2041,17 @@
     chunk.size = chunk.size,
     what = "inid-lc"
   )
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   prob <- rep.int(1 / n, n)
+  tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+    B = B,
+    chunk.size = chunk.size,
+    size = n,
+    prob = prob
+  )
 
   worker <- function(task) {
-    set.seed(as.integer(task$seed))
     bsz <- as.integer(task$bsz)
-    counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+    counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
     den <- crossprod(counts.chunk, W)
     num <- crossprod(counts.chunk, Wy)
     num / pmax(den, .Machine$double.eps)
@@ -2302,14 +2377,14 @@
           chunk.size = chunk.size,
           what = "inid-index-localpoly"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+        B = B,
+        chunk.size = chunk.size,
+        size = n,
+        prob = prob
+      )
       worker <- function(task) {
-        set.seed(as.integer(task$seed))
-        counts.chunk <- stats::rmultinom(
-          n = as.integer(task$bsz),
-          size = n,
-          prob = prob
-        )
+        counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
         compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
@@ -2572,14 +2647,14 @@
           chunk.size = chunk.size,
           what = "inid-index-exact"
         )
-        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+          B = B,
+          chunk.size = chunk.size,
+          size = n,
+          prob = prob
+        )
         worker <- function(task) {
-          set.seed(as.integer(task$seed))
-          compute_chunk(stats::rmultinom(
-            n = as.integer(task$bsz),
-            size = n,
-            prob = prob
-          ))
+          compute_chunk(.npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob))
         }
         tmat <- .npRmpi_bootstrap_run_fanout(
           tasks = tasks,
@@ -3695,11 +3770,15 @@
           chunk.size = chunk.size,
           what = "inid-regression-exact"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+        B = B,
+        chunk.size = chunk.size,
+        size = n,
+        prob = prob
+      )
       worker <- function(task) {
-        set.seed(as.integer(task$seed))
         bsz <- as.integer(task$bsz)
-        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
         compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
@@ -4011,11 +4090,15 @@
           chunk.size = chunk.size,
           what = what.base
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+        B = B,
+        chunk.size = chunk.size,
+        size = n,
+        prob = prob
+      )
       worker <- function(task) {
-        set.seed(as.integer(task$seed))
         bsz <- as.integer(task$bsz)
-        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
         compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
@@ -4930,14 +5013,14 @@
           chunk.size = chunk.size,
           what = "inid-scoef-localpoly"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+        B = B,
+        chunk.size = chunk.size,
+        size = n,
+        prob = prob
+      )
       worker <- function(task) {
-        set.seed(as.integer(task$seed))
-        counts.chunk <- stats::rmultinom(
-          n = as.integer(task$bsz),
-          size = n,
-          prob = prob
-        )
+        counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
         compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
@@ -5136,14 +5219,14 @@
           chunk.size = chunk.size,
           what = "inid-scoef-exact"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+        B = B,
+        chunk.size = chunk.size,
+        size = n,
+        prob = prob
+      )
       worker <- function(task) {
-        set.seed(as.integer(task$seed))
-        counts.chunk <- stats::rmultinom(
-          n = as.integer(task$bsz),
-          size = n,
-          prob = prob
-        )
+        counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
         compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
@@ -5841,7 +5924,6 @@
   workers <- .npRmpi_bootstrap_worker_count(comm = 1L)
   nslots <- max(1L, workers + 1L)
   chunk.size <- max(1L, as.integer(ceiling(B / nslots)))
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   prob.local <- rep.int(1 / n, n)
   has.counts.mat.local <- !is.null(counts.mat)
   counts.mat.local <- if (is.null(counts.mat)) {
@@ -5854,6 +5936,11 @@
     function(start, stop) stop("counts.drawer is not available")
   } else {
     counts.drawer
+  }
+  tasks <- if (!isTRUE(has.counts.mat.local) && !isTRUE(has.counts.drawer.local)) {
+    .npRmpi_bootstrap_rmultinom_tasks(B = B, chunk.size = chunk.size, size = n, prob = prob.local)
+  } else {
+    .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   }
 
   worker <- function(task) {
@@ -5869,8 +5956,7 @@
         counts = counts.drawer.local(start, stopi)
       )
     } else {
-      set.seed(as.integer(task$seed))
-      stats::rmultinom(n = bsz, size = n, prob = prob.local)
+      .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob.local)
     }
     .np_inid_boot_from_plreg_state_chunk(
       counts.chunk = counts.chunk,
@@ -6011,7 +6097,6 @@
   workers <- .npRmpi_bootstrap_worker_count(comm = 1L)
   nslots <- max(1L, workers + 1L)
   chunk.size <- max(1L, as.integer(ceiling(B / nslots)))
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   prob.local <- rep.int(1 / n, n)
   has.counts.mat.local <- !is.null(counts.mat)
   counts.mat.local <- if (is.null(counts.mat)) {
@@ -6024,6 +6109,11 @@
     function(start, stop) stop("counts.drawer is not available")
   } else {
     counts.drawer
+  }
+  tasks <- if (!isTRUE(has.counts.mat.local) && !isTRUE(has.counts.drawer.local)) {
+    .npRmpi_bootstrap_rmultinom_tasks(B = B, chunk.size = chunk.size, size = n, prob = prob.local)
+  } else {
+    .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   }
 
   worker <- function(task) {
@@ -6039,8 +6129,7 @@
         counts = counts.drawer.local(start, stopi)
       )
     } else {
-      set.seed(as.integer(task$seed))
-      stats::rmultinom(n = bsz, size = n, prob = prob.local)
+      .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob.local)
     }
     .np_inid_boot_from_plreg_lc_fixed_chunk(
       counts.chunk = counts.chunk,
@@ -7142,11 +7231,15 @@
           chunk.size = chunk.size,
           what = "inid-ksum-unconditional-exact"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+        B = B,
+        chunk.size = chunk.size,
+        size = n,
+        prob = prob
+      )
       worker <- function(task) {
-        set.seed(as.integer(task$seed))
         bsz <- as.integer(task$bsz)
-        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
           active.sample <- .np_active_boot_sample(
@@ -7294,11 +7387,19 @@
         chunk.size = chunk.size,
         what = what.base
       )) {
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+      B = B,
+      chunk.size = chunk.size,
+      size = n.local,
+      prob = prob.local
+    )
     worker <- function(task) {
-      set.seed(as.integer(task$seed))
       bsz <- as.integer(task$bsz)
-      counts.chunk <- stats::rmultinom(n = bsz, size = n.local, prob = prob.local)
+      counts.chunk <- .npRmpi_bootstrap_task_rmultinom(
+        task = task,
+        n = n.local,
+        prob = prob.local
+      )
       crossprod(counts.chunk, HT.local)
     }
     tmat <- .npRmpi_bootstrap_run_fanout(
@@ -7546,11 +7647,19 @@
           chunk.size = chunk.size,
           what = "inid-ksum-unconditional"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+        B = B,
+        chunk.size = chunk.size,
+        size = n.local,
+        prob = prob.local
+      )
       worker <- function(task) {
-        set.seed(as.integer(task$seed))
         bsz <- as.integer(task$bsz)
-        counts.chunk <- stats::rmultinom(n = bsz, size = n.local, prob = prob.local)
+        counts.chunk <- .npRmpi_bootstrap_task_rmultinom(
+          task = task,
+          n = n.local,
+          prob = prob.local
+        )
         crossprod(counts.chunk, kw.local) / n.local
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
@@ -7670,11 +7779,19 @@
         chunk.size = chunk.size,
         what = "inid-ksum-unconditional"
       )) {
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+      B = B,
+      chunk.size = chunk.size,
+      size = n.local,
+      prob = prob.local
+    )
     worker <- function(task) {
-      set.seed(as.integer(task$seed))
       bsz <- as.integer(task$bsz)
-      counts.chunk <- stats::rmultinom(n = bsz, size = n.local, prob = prob.local)
+      counts.chunk <- .npRmpi_bootstrap_task_rmultinom(
+        task = task,
+        n = n.local,
+        prob = prob.local
+      )
       t(K.local %*% counts.chunk)
     }
     tmat <- .npRmpi_bootstrap_run_fanout(
@@ -7840,14 +7957,14 @@
           chunk.size = chunk.size,
           what = "inid-hat-frozen-conditional"
         )
-        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+          B = B,
+          chunk.size = chunk.size,
+          size = n,
+          prob = prob
+        )
         worker <- function(task) {
-          set.seed(as.integer(task$seed))
-          compute_chunk(stats::rmultinom(
-            n = as.integer(task$bsz),
-            size = n,
-            prob = prob
-          ))
+          compute_chunk(.npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob))
         }
         tmat <- .npRmpi_bootstrap_run_fanout(
           tasks = tasks,
@@ -8799,13 +8916,30 @@
       comm = 1L,
       include.master = TRUE
     )
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
     counts.mode <- if (!is.null(counts.mat)) {
       "matrix"
     } else if (!is.null(counts.drawer)) {
       "drawer"
     } else {
       "random"
+    }
+    tasks <- .npRmpi_bootstrap_chunk_tasks(
+      B = B,
+      chunk.size = chunk.size,
+      with.seeds = !identical(counts.mode, "random")
+    )
+    if (identical(counts.mode, "random")) {
+      prob.local <- rep.int(1 / state$n, state$n)
+      tasks <- .npRmpi_bootstrap_attach_rng_stream(
+        tasks,
+        function(task) {
+          invisible(stats::rmultinom(
+            n = as.integer(task$bsz),
+            size = state$n,
+            prob = prob.local
+          ))
+        }
+      )
     }
 
     worker <- function(task) {
@@ -8820,8 +8954,11 @@
           counts = counts.drawer(start, stopi)
         )
       } else {
-        set.seed(as.integer(task$seed))
-        .np_inid_counts_matrix(n = state$n, B = as.integer(task$bsz))
+        .npRmpi_bootstrap_task_rmultinom(
+          task = task,
+          n = state$n,
+          prob = rep.int(1 / state$n, state$n)
+        )
       }
 
       .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk(
@@ -8846,6 +8983,8 @@
           feat.list = feat.list,
           counts.mode = counts.mode,
           .np_inid_counts_matrix = .np_inid_counts_matrix,
+          .npRmpi_bootstrap_task_rmultinom = .npRmpi_bootstrap_task_rmultinom,
+          .npRmpi_bootstrap_use_task_rng = .npRmpi_bootstrap_use_task_rng,
           .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk =
             .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk,
           .np_inid_boot_from_conditional_localpoly_fixed_chunk =
@@ -9076,10 +9215,15 @@
       return(out)
   } else {
     prob <- rep.int(1 / n, n)
+    tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+      B = B,
+      chunk.size = chunk.size,
+      size = n,
+      prob = prob
+    )
     worker <- function(task) {
-      set.seed(as.integer(task$seed))
       eval_counts_chunk(
-        stats::rmultinom(n = as.integer(task$bsz), size = n, prob = prob)
+        .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
       )
     }
     out <- run_adaptive_fanout(
@@ -9512,11 +9656,15 @@
           chunk.size = chunk.size,
           what = "inid-ksum-conditional-exact"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+        B = B,
+        chunk.size = chunk.size,
+        size = n,
+        prob = prob
+      )
       worker <- function(task) {
-        set.seed(as.integer(task$seed))
         bsz <- as.integer(task$bsz)
-        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
           active.sample <- if (use.matrix.fast) {
@@ -9819,16 +9967,36 @@
       chunk.size = chunk.size,
       what = "inid-ksum-conditional-fixed-lc"
     )
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    tasks <- .npRmpi_bootstrap_chunk_tasks(
+      B = B,
+      chunk.size = chunk.size,
+      with.seeds = !is.null(counts.drawer)
+    )
     counts.mode <- if (!is.null(counts.drawer)) "drawer" else "random"
+    if (identical(counts.mode, "random")) {
+      prob.local <- rep.int(1 / n, n)
+      tasks <- .npRmpi_bootstrap_attach_rng_stream(
+        tasks,
+        function(task) {
+          invisible(stats::rmultinom(
+            n = as.integer(task$bsz),
+            size = n,
+            prob = prob.local
+          ))
+        }
+      )
+    }
     worker <- function(task) {
       start <- as.integer(task$start)
       stopi <- start + as.integer(task$bsz) - 1L
       counts.chunk <- if (identical(counts.mode, "drawer")) {
         .np_inid_counts_matrix(n = n, B = as.integer(task$bsz), counts = counts.drawer(start, stopi))
       } else {
-        set.seed(as.integer(task$seed))
-        stats::rmultinom(n = as.integer(task$bsz), size = n, prob = rep.int(1 / n, n))
+        .npRmpi_bootstrap_task_rmultinom(
+          task = task,
+          n = n,
+          prob = rep.int(1 / n, n)
+        )
       }
       .np_inid_boot_from_ksum_conditional_fixed_lc_chunk(
         ops = ops,
@@ -9851,6 +10019,8 @@
             n = n,
             counts.mode = counts.mode,
             .np_inid_counts_matrix = .np_inid_counts_matrix,
+            .npRmpi_bootstrap_task_rmultinom = .npRmpi_bootstrap_task_rmultinom,
+            .npRmpi_bootstrap_use_task_rng = .npRmpi_bootstrap_use_task_rng,
             .np_inid_boot_from_ksum_conditional_fixed_lc_chunk =
               .np_inid_boot_from_ksum_conditional_fixed_lc_chunk
           ),
@@ -12601,6 +12771,15 @@ plotFactor <- function(f, y, ...){
   } else {
     "random"
   }
+  prob <- rep.int(1 / n, n)
+  if (identical(counts.mode, "random")) {
+    tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+      B = B,
+      chunk.size = chunk.size,
+      size = n,
+      prob = prob
+    )
+  }
 
   worker <- function(task) {
     start <- as.integer(task$start)
@@ -12614,8 +12793,7 @@ plotFactor <- function(f, y, ...){
         counts = counts.drawer(start, stopi)
       )
     } else {
-      set.seed(as.integer(task$seed))
-      stats::rmultinom(n = as.integer(task$bsz), size = n, prob = rep.int(1 / n, n))
+      .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
     }
 
     .npRmpi_with_local_bootstrap(
@@ -12656,6 +12834,7 @@ plotFactor <- function(f, y, ...){
           gradient.index = gradient.index,
           gradient.order = gradient.order,
           n = n,
+          prob = prob,
           counts.mode = counts.mode,
           .np_inid_boot_from_conditional_gradient_local =
             .np_inid_boot_from_conditional_gradient_local,
@@ -12745,6 +12924,15 @@ plotFactor <- function(f, y, ...){
   } else {
     "random"
   }
+  prob <- rep.int(1 / n, n)
+  if (identical(counts.mode, "random")) {
+    tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+      B = B,
+      chunk.size = chunk.size,
+      size = n,
+      prob = prob
+    )
+  }
 
   worker <- function(task) {
     start <- as.integer(task$start)
@@ -12758,8 +12946,7 @@ plotFactor <- function(f, y, ...){
         counts = counts.drawer(start, stopi)
       )
     } else {
-      set.seed(as.integer(task$seed))
-      stats::rmultinom(n = as.integer(task$bsz), size = n, prob = rep.int(1 / n, n))
+      .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
     }
 
     .npRmpi_with_local_bootstrap(
@@ -12794,6 +12981,7 @@ plotFactor <- function(f, y, ...){
           bws = bws,
           tau = tau,
           n = n,
+          prob = prob,
           counts.mode = counts.mode,
           .np_inid_boot_from_quantile_level_local =
             .np_inid_boot_from_quantile_level_local,
@@ -12886,6 +13074,15 @@ plotFactor <- function(f, y, ...){
   } else {
     "random"
   }
+  prob <- rep.int(1 / n, n)
+  if (identical(counts.mode, "random")) {
+    tasks <- .npRmpi_bootstrap_rmultinom_tasks(
+      B = B,
+      chunk.size = chunk.size,
+      size = n,
+      prob = prob
+    )
+  }
 
   worker <- function(task) {
     start <- as.integer(task$start)
@@ -12899,8 +13096,7 @@ plotFactor <- function(f, y, ...){
         counts = counts.drawer(start, stopi)
       )
     } else {
-      set.seed(as.integer(task$seed))
-      stats::rmultinom(n = as.integer(task$bsz), size = n, prob = rep.int(1 / n, n))
+      .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
     }
 
     .npRmpi_with_local_bootstrap(
@@ -12937,6 +13133,7 @@ plotFactor <- function(f, y, ...){
           tau = tau,
           gradient.index = gradient.index,
           n = n,
+          prob = prob,
           counts.mode = counts.mode,
           .np_inid_boot_from_quantile_gradient_local =
             .np_inid_boot_from_quantile_gradient_local,
