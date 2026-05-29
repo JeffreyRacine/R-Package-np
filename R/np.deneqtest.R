@@ -4,6 +4,127 @@
 ## Categorical and Continuous Data," Journal of Econometrics, Volume
 ## 148, pp 186-200.
 
+.npRmpi_deneq_collective_context <- function() {
+  isTRUE(.npRmpi_autodispatch_called_from_bcast())
+}
+
+.npRmpi_deneq_bootstrap_index_plan <- function(pool.n, n1, n2, boot.num) {
+  x.index <- matrix(NA_integer_, nrow = boot.num, ncol = n1)
+  y.index <- matrix(NA_integer_, nrow = boot.num, ncol = n2)
+
+  for (i in seq_len(boot.num)) {
+    x.index[i, ] <- sample.int(pool.n, size = n1, replace = TRUE)
+    y.index[i, ] <- sample.int(pool.n, size = n2, replace = TRUE)
+  }
+
+  list(x = x.index, y = y.index)
+}
+
+.npRmpi_deneq_numeric_chunks <- function(gathered, size) {
+  size <- as.integer(size)[1L]
+  if (is.na(size) || size < 1L)
+    stop("invalid MPI gather size")
+
+  if (is.matrix(gathered)) {
+    if (!identical(ncol(gathered), size))
+      stop("npdeneqtest MPI gather returned malformed matrix output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.array(gathered)) {
+    dims <- dim(gathered)
+    if (length(dims) < 2L || !identical(dims[[length(dims)]], size))
+      stop("npdeneqtest MPI gather returned malformed array output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.list(gathered)) {
+    if (!identical(length(gathered), size))
+      stop("npdeneqtest MPI gather returned malformed list output", call. = FALSE)
+    return(gathered)
+  }
+
+  chunks <- as.list(gathered)
+  if (!identical(length(chunks), size))
+    stop("npdeneqtest MPI gather returned malformed atomic output", call. = FALSE)
+  chunks
+}
+
+.npRmpi_deneq_collective_bootstrap <- function(plan,
+                                               z,
+                                               bw.x,
+                                               bw.y,
+                                               teststat,
+                                               progress = NULL,
+                                               comm = 1L) {
+  boot.num <- nrow(plan$x)
+  if (!identical(nrow(plan$y), boot.num))
+    stop("npdeneqtest bootstrap index plan is malformed", call. = FALSE)
+
+  size <- mpi.comm.size(comm)
+  rank <- mpi.comm.rank(comm)
+
+  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  .npRmpi_bootstrap_transport_trace(
+    what = "npdeneqtest",
+    event = "fanout.collective.start",
+    fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx))
+  )
+
+  local.Tn <- numeric(length(local.idx))
+  local.In <- numeric(length(local.idx))
+
+  for (jj in seq_along(local.idx)) {
+    i <- local.idx[[jj]]
+    x.bootstrap <- data.frame(z[plan$x[i, ], , drop = FALSE])
+    y.bootstrap <- data.frame(z[plan$y[i, ], , drop = FALSE])
+    output.boot <- .npRmpi_with_local_regression(
+      teststat(x.bootstrap, y.bootstrap, bw.x, bw.y)
+    )
+    local.Tn[[jj]] <- output.boot$Tn
+    local.In[[jj]] <- output.boot$In
+  }
+
+  payload <- c(as.numeric(local.idx), local.Tn, local.In)
+  gathered <- mpi.gather.Robj(payload, root = 0L, comm = comm)
+
+  if (rank == 0L) {
+    chunks <- .npRmpi_deneq_numeric_chunks(gathered, size = size)
+    Tn.vector <- numeric(boot.num)
+    In.vector <- numeric(boot.num)
+
+    for (rr in seq_len(size)) {
+      vals <- as.numeric(chunks[[rr]])
+      if (!length(vals))
+        next
+      if ((length(vals) %% 3L) != 0L)
+        stop("npdeneqtest MPI gather returned malformed bootstrap chunk", call. = FALSE)
+      n.local <- length(vals) / 3L
+      idx <- as.integer(vals[seq_len(n.local)])
+      Tn.vector[idx] <- vals[n.local + seq_len(n.local)]
+      In.vector[idx] <- vals[2L * n.local + seq_len(n.local)]
+    }
+
+    out <- list(Tn = Tn.vector, In = In.vector)
+    if (!is.null(progress))
+      progress <- .np_progress_step(progress, done = boot.num)
+    .npRmpi_bootstrap_transport_trace(
+      what = "npdeneqtest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num)
+    )
+    mpi.bcast.Robj(out, rank = 0L, comm = comm)
+    out
+  } else {
+    .npRmpi_bootstrap_transport_trace(
+      what = "npdeneqtest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num)
+    )
+    mpi.bcast.Robj(rank = 0L, comm = comm)
+  }
+}
+
 npdeneqtest <- function(x = NULL,
                         y = NULL,
                         bw.x = NULL,
@@ -120,18 +241,44 @@ npdeneqtest <- function(x = NULL,
 
   progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
-  for (i in seq_len(boot.num)) {
-    output.boot <- teststat.boot(x,y,bw.x,bw.y)
-    Tn.vector[i] <- output.boot$Tn
-    In.vector[i] <- output.boot$In
-    progress <- .np_progress_step(progress, done = i)
+  if (.npRmpi_deneq_collective_context()) {
+    z <- data.frame(rbind(x, y))
+    plan <- .npRmpi_deneq_bootstrap_index_plan(
+      pool.n = nrow(z),
+      n1 = nrow(x),
+      n2 = nrow(y),
+      boot.num = boot.num
+    )
+    post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    boot.out <- .npRmpi_deneq_collective_bootstrap(
+      plan = plan,
+      z = z,
+      bw.x = bw.x,
+      bw.y = bw.y,
+      teststat = teststat,
+      progress = progress
+    )
+    Tn.vector <- boot.out$Tn
+    In.vector <- boot.out$In
+    assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+  } else {
+    for (i in seq_len(boot.num)) {
+      output.boot <- teststat.boot(x,y,bw.x,bw.y)
+      Tn.vector[i] <- output.boot$Tn
+      In.vector[i] <- output.boot$In
+      progress <- .np_progress_step(progress, done = i)
+    }
   }
 
   progress <- .np_progress_end(progress)
 
   ## Compute the test statistic
   
-  output <- teststat(x,y,bw.x,bw.y)
+  output <- if (.npRmpi_deneq_collective_context()) {
+    .npRmpi_with_local_regression(teststat(x, y, bw.x, bw.y))
+  } else {
+    teststat(x,y,bw.x,bw.y)
+  }
   
   ## Compute empirical P-values - the number of resampled statistics
   ## more extreme than the original statistic
