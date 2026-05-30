@@ -1804,6 +1804,23 @@
   state
 }
 
+.np_nomad_progress_best_record <- function(incumbent,
+                                           candidate,
+                                           direction = c("min", "max")) {
+  direction <- match.arg(direction)
+  if (is.null(candidate))
+    return(incumbent)
+  if (is.null(incumbent))
+    return(candidate)
+
+  candidate.objective <- suppressWarnings(as.numeric(candidate$objective)[1L])
+  incumbent.objective <- suppressWarnings(as.numeric(incumbent$objective)[1L])
+  if (.np_degree_better(candidate.objective, incumbent.objective, direction = direction))
+    return(candidate)
+
+  incumbent
+}
+
 .np_progress_nomad_native_step_from_c <- function(iteration,
                                                   current.degree,
                                                   best.degree = integer(),
@@ -1832,12 +1849,17 @@
   best.degree <- as.integer(best.degree)
   if (length(best.degree) && !anyNA(best.degree)) {
     best.objective <- suppressWarnings(as.numeric(best.objective)[1L])
-    state$nomad_best_record <- list(
+    c_best_record <- list(
       eval_id = state$nomad_eval_id,
       degree = best.degree,
       objective = best.objective,
       status = "ok",
       cached = FALSE
+    )
+    state$nomad_best_record <- .np_nomad_progress_best_record(
+      incumbent = state$nomad_best_record,
+      candidate = c_best_record,
+      direction = "min"
     )
   }
 
@@ -1862,7 +1884,11 @@
   }
 
   state$nomad_current_degree <- as.integer(degree)
-  state$nomad_best_record <- best_record
+  state$nomad_best_record <- .np_nomad_progress_best_record(
+    incumbent = state$nomad_best_record,
+    candidate = best_record,
+    direction = "min"
+  )
   state$nomad_restart_index <- as.integer(restart_index)
   state$nomad_restart_durations <- restart_durations
   eval_offset <- suppressWarnings(as.integer(eval_offset)[1L])
@@ -1894,7 +1920,11 @@
   state <- .np_nomad_native_progress_state(handle)
   if (!is.null(state)) {
     state$nomad_current_degree <- as.integer(degree)
-    state$nomad_best_record <- best_record
+    state$nomad_best_record <- .np_nomad_progress_best_record(
+      incumbent = state$nomad_best_record,
+      candidate = best_record,
+      direction = "min"
+    )
     state <- .np_degree_progress_end(
       state = state,
       detail = NULL,
