@@ -1546,45 +1546,15 @@ npregbw.rbandwidth <-
 }
 
 .npregbw_nomad_bw_bounds <- function(template, setup) {
-  ncon <- length(setup$cont_idx)
-  ncat <- length(setup$cat_idx)
-
-  if (ncon > 0L) {
-    if (identical(setup$type, "fixed")) {
-      cont_lower <- npGetScaleFactorSearchLower(
-        template,
-        argname = "template$scale.factor.search.lower"
-      )
-      cont_lower <- rep.int(cont_lower, ncon)
-      cont_upper <- rep.int(1e6, ncon)
-      cont_bbin <- rep.int(0L, ncon)
-    } else {
-      nn_lower <- npRegressionNnLowerBound(template)
-      nn_upper <- if (!is.null(setup$cont_extendednn_upper) &&
-                      length(setup$cont_extendednn_upper) == ncon) {
-        pmax(nn_lower, as.double(setup$cont_extendednn_upper))
-      } else {
-        rep.int(max(nn_lower, as.integer(setup$nobs) - 1L), ncon)
-      }
-      cont_lower <- rep.int(nn_lower, ncon)
-      cont_upper <- nn_upper
-      cont_bbin <- rep.int(1L, ncon)
-    }
-  } else {
-    cont_lower <- cont_upper <- numeric(0L)
-    cont_bbin <- integer(0L)
-  }
-
-  cat_lower <- rep.int(0, ncat)
-  cat_upper <- setup$cat_upper * setup$bandwidth.scale.categorical
-  cat_bbin <- rep.int(0L, ncat)
-
-  list(
-    lower = c(cont_lower, cat_lower),
-    upper = c(cont_upper, cat_upper),
-    bbin = c(cont_bbin, cat_bbin),
-    ncon = ncon,
-    ncat = ncat
+  .np_nomad_bw_bounds(
+    template = template,
+    setup = setup,
+    fixed.lower = npGetScaleFactorSearchLower(
+      template,
+      argname = "template$scale.factor.search.lower"
+    ),
+    nn.lower = npRegressionNnLowerBound(template),
+    where = "npregbw"
   )
 }
 
@@ -1695,104 +1665,28 @@ npregbw.rbandwidth <-
                                                    setup,
                                                    initial = NULL,
                                                    where = "npregbw") {
-  point <- .np_nomad_explicit_or_initial_start(
+  .np_nomad_bw_complete_start_point(
     point = point,
+    bounds = bounds,
+    template = list(type = setup$type),
+    setup = setup,
     initial = initial,
-    n = length(bounds$lower),
     where = where
-  )
-
-  if (identical(setup$type, "fixed")) {
-    return(.np_nomad_complete_start_point(
-      point = point,
-      lower = bounds$lower,
-      upper = bounds$upper,
-      ncont = bounds$ncon
-    ))
-  }
-
-  n <- length(bounds$lower)
-  out <- rep(NA_real_, n)
-
-  if (!is.null(point)) {
-    point <- as.numeric(point)
-    if (length(point) == n)
-      out <- point
-  }
-
-  ncon <- bounds$ncon
-  if (ncon > 0L) {
-    cont.idx <- seq_len(ncon)
-    cont.default <- sqrt(bounds$upper[cont.idx])
-    cont.default <- pmax(bounds$lower[cont.idx], pmin(bounds$upper[cont.idx], cont.default))
-    bad <- !is.finite(out[cont.idx]) | out[cont.idx] <= 0 |
-      out[cont.idx] < bounds$lower[cont.idx] | out[cont.idx] > bounds$upper[cont.idx]
-    out[cont.idx][bad] <- cont.default[bad]
-  }
-
-  if (bounds$ncat > 0L) {
-    cat.idx <- ncon + seq_len(bounds$ncat)
-    cat.default <- pmax(bounds$lower[cat.idx], pmin(bounds$upper[cat.idx], 0.5 * bounds$upper[cat.idx]))
-    bad <- !is.finite(out[cat.idx]) |
-      out[cat.idx] < bounds$lower[cat.idx] | out[cat.idx] > bounds$upper[cat.idx]
-    out[cat.idx][bad] <- cat.default[bad]
-  }
-
-  vapply(
-    seq_len(n),
-    function(i) .np_nomad_coerce_start_value(out[i], type = bounds$bbin[i], lb = bounds$lower[i], ub = bounds$upper[i]),
-    numeric(1L)
   )
 }
 
 .npregbw_nomad_point_to_bw <- function(point, template, setup) {
-  point <- as.numeric(point)
-  bws <- numeric(length(template$bw))
-  ncon <- length(setup$cont_idx)
-  ncat <- length(setup$cat_idx)
-
-  if (ncon > 0L) {
-    cont_point <- point[seq_len(ncon)]
-    if (identical(setup$type, "fixed")) {
-      ext_bw <- cont_point * setup$cont_scale
-      bws[setup$cont_idx] <- if (isTRUE(template$scaling)) cont_point else ext_bw
-    } else {
-      bws[setup$cont_idx] <- round(cont_point)
-    }
-  }
-
-  if (ncat > 0L) {
-    lambda_scaled <- point[ncon + seq_len(ncat)]
-    ext_bw <- lambda_scaled / setup$bandwidth.scale.categorical
-    bws[setup$cat_idx] <- if (isTRUE(template$scaling)) ext_bw / setup$ncatfac else ext_bw
-  }
-
-  bws
+  .np_nomad_bw_point_to_storage(
+    point = point,
+    template = template,
+    setup = setup,
+    storage.length = length(template$bw),
+    clamp.nn = FALSE
+  )
 }
 
 .npregbw_nomad_bw_to_point <- function(bws, template, setup) {
-  point <- numeric(length(setup$cont_idx) + length(setup$cat_idx))
-
-  if (length(setup$cont_idx) > 0L) {
-    raw <- bws[setup$cont_idx]
-    point[seq_along(setup$cont_idx)] <- if (identical(setup$type, "fixed")) {
-      if (isTRUE(template$scaling)) {
-        raw
-      } else {
-        raw / setup$cont_scale
-      }
-    } else {
-      round(raw)
-    }
-  }
-
-  if (length(setup$cat_idx) > 0L) {
-    raw <- bws[setup$cat_idx]
-    ext_bw <- if (isTRUE(template$scaling)) raw * setup$ncatfac else raw
-    point[length(setup$cont_idx) + seq_along(setup$cat_idx)] <- ext_bw * setup$bandwidth.scale.categorical
-  }
-
-  point
+  .np_nomad_bw_storage_to_point(bws = bws, template = template, setup = setup)
 }
 
 .npregbw_powell_progress_fields <- function(state,
