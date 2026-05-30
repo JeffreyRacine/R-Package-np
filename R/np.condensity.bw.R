@@ -2923,64 +2923,18 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
 
 .npcdensbw_nomad_point_to_bw <- function(point, template, setup) {
   .npAssertConditionalNomadSetup(setup, where = "npcdensbw")
-  point <- as.numeric(point)
-  ncont <- length(setup$cont_flat)
-  ncat <- length(setup$cat_flat)
-  bws <- numeric(length(template$ybw) + length(template$xbw))
-
-  if (ncont > 0L) {
-    cont_point <- point[seq_len(ncont)]
-    if (identical(as.character(template$type)[1L], "fixed")) {
-      ext_bw <- cont_point * setup$cont_scale
-      bws[setup$cont_flat] <- if (isTRUE(template$scaling)) cont_point else ext_bw
-    } else {
-      nn_bw <- round(cont_point)
-      nn_upper <- if (!is.null(setup$cont_extendednn_upper) &&
-                      length(setup$cont_extendednn_upper) == length(setup$cont_flat)) {
-        pmax(1, as.double(setup$cont_extendednn_upper))
-      } else if (!is.null(setup$nobs)) {
-        rep.int(max(1L, as.integer(setup$nobs) - 1L), length(setup$cont_flat))
-      } else {
-        rep.int(Inf, length(setup$cont_flat))
-      }
-      nn_bw[!is.finite(nn_bw)] <- 1
-      bws[setup$cont_flat] <- pmax(1, pmin(nn_upper, nn_bw))
-    }
-  }
-
-  if (ncat > 0L) {
-    lambda_scaled <- point[ncont + seq_len(ncat)]
-    ext_bw <- lambda_scaled / setup$bandwidth.scale.categorical
-    bws[setup$cat_flat] <- if (isTRUE(template$scaling)) ext_bw / setup$ncatfac else ext_bw
-  }
-
-  bws
+  .np_nomad_bw_point_to_storage(
+    point = point,
+    template = template,
+    setup = setup,
+    storage.length = length(template$ybw) + length(template$xbw),
+    clamp.nn = TRUE
+  )
 }
 
 .npcdensbw_nomad_bw_to_point <- function(bws, template, setup) {
   .npAssertConditionalNomadSetup(setup, where = "npcdensbw")
-  point <- numeric(length(setup$cont_flat) + length(setup$cat_flat))
-
-  if (length(setup$cont_flat) > 0L) {
-    raw <- bws[setup$cont_flat]
-    point[seq_along(setup$cont_flat)] <- if (identical(as.character(template$type)[1L], "fixed")) {
-      if (isTRUE(template$scaling)) {
-        raw
-      } else {
-        raw / setup$cont_scale
-      }
-    } else {
-      round(raw)
-    }
-  }
-
-  if (length(setup$cat_flat) > 0L) {
-    raw <- bws[setup$cat_flat]
-    ext_bw <- if (isTRUE(template$scaling)) raw * setup$ncatfac else raw
-    point[length(setup$cont_flat) + seq_along(setup$cat_flat)] <- ext_bw * setup$bandwidth.scale.categorical
-  }
-
-  point
+  .np_nomad_bw_storage_to_point(bws = bws, template = template, setup = setup)
 }
 
 .npcdensbw_nomad_continuous_lower_bound <- function(template) {
@@ -2993,41 +2947,12 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
 
 .npcdensbw_nomad_bw_bounds <- function(template, setup) {
   .npAssertConditionalNomadSetup(setup, where = "npcdensbw")
-  ncont <- length(setup$cont_flat)
-  ncat <- length(setup$cat_flat)
-
-  if (ncont > 0L) {
-    if (identical(as.character(template$type)[1L], "fixed")) {
-      cont_lower <- rep.int(.npcdensbw_nomad_continuous_lower_bound(template), ncont)
-      cont_upper <- rep.int(1e6, ncont)
-      cont_bbin <- rep.int(0L, ncont)
-    } else {
-      nn_lower <- 1L
-      nn_upper <- if (!is.null(setup$cont_extendednn_upper) &&
-                      length(setup$cont_extendednn_upper) == ncont) {
-        pmax(nn_lower, as.double(setup$cont_extendednn_upper))
-      } else {
-        rep.int(max(nn_lower, as.integer(setup$nobs) - 1L), ncont)
-      }
-      cont_lower <- rep.int(nn_lower, ncont)
-      cont_upper <- nn_upper
-      cont_bbin <- rep.int(1L, ncont)
-    }
-  } else {
-    cont_lower <- cont_upper <- numeric(0L)
-    cont_bbin <- integer(0L)
-  }
-
-  cat_lower <- rep.int(0, ncat)
-  cat_upper <- setup$cat_upper * setup$bandwidth.scale.categorical
-  cat_bbin <- rep.int(0L, ncat)
-
-  list(
-    lower = c(cont_lower, cat_lower),
-    upper = c(cont_upper, cat_upper),
-    bbin = c(cont_bbin, cat_bbin),
-    ncont = ncont,
-    ncat = ncat
+  .np_nomad_bw_bounds(
+    template = template,
+    setup = setup,
+    fixed.lower = .npcdensbw_nomad_continuous_lower_bound(template),
+    nn.lower = 1L,
+    where = "npcdensbw"
   )
 }
 
@@ -3036,54 +2961,13 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
                                                      template,
                                                      initial = NULL,
                                                      where = "npcdensbw") {
-  point <- .np_nomad_explicit_or_initial_start(
+  .np_nomad_bw_complete_start_point(
     point = point,
+    bounds = bounds,
+    template = template,
+    setup = NULL,
     initial = initial,
-    n = length(bounds$lower),
     where = where
-  )
-
-  if (identical(as.character(template$type)[1L], "fixed")) {
-    return(.np_nomad_complete_start_point(
-      point = point,
-      lower = bounds$lower,
-      upper = bounds$upper,
-      ncont = bounds$ncont
-    ))
-  }
-
-  n <- length(bounds$lower)
-  out <- rep(NA_real_, n)
-
-  if (!is.null(point)) {
-    point <- as.numeric(point)
-    if (length(point) == n)
-      out <- point
-  }
-
-  if (bounds$ncont > 0L) {
-    cont.idx <- seq_len(bounds$ncont)
-    cont.default <- sqrt(bounds$upper[cont.idx])
-    cont.default <- pmax(bounds$lower[cont.idx], pmin(bounds$upper[cont.idx], cont.default))
-    bad <- !is.finite(out[cont.idx]) |
-      out[cont.idx] < bounds$lower[cont.idx] |
-      out[cont.idx] > bounds$upper[cont.idx]
-    out[cont.idx][bad] <- cont.default[bad]
-  }
-
-  if (bounds$ncat > 0L) {
-    cat.idx <- bounds$ncont + seq_len(bounds$ncat)
-    cat.default <- pmax(bounds$lower[cat.idx], pmin(bounds$upper[cat.idx], 0.5 * bounds$upper[cat.idx]))
-    bad <- !is.finite(out[cat.idx]) |
-      out[cat.idx] < bounds$lower[cat.idx] |
-      out[cat.idx] > bounds$upper[cat.idx]
-    out[cat.idx][bad] <- cat.default[bad]
-  }
-
-  vapply(
-    seq_len(n),
-    function(i) .np_nomad_coerce_start_value(out[i], type = bounds$bbin[i], lb = bounds$lower[i], ub = bounds$upper[i]),
-    numeric(1L)
   )
 }
 
