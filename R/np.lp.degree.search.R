@@ -1272,7 +1272,7 @@
 
 .np_nomad_native_false_option <- function(value) {
   if (is.logical(value))
-    return(length(value) >= 1L && !is.na(value[1L]) && !isTRUE(value[1L]))
+    return(length(value) >= 1L && !isTRUE(value[1L]))
   token <- tolower(trimws(as.character(value[1L])))
   token %in% c("false", "f", "no", "n", "0")
 }

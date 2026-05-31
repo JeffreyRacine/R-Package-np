@@ -1,4 +1,5 @@
 native_cache_off_opts <- list(EVAL_USE_CACHE = FALSE, MAX_BB_EVAL = 1)
+native_cache_unknown_opts <- list(EVAL_USE_CACHE = NA, MAX_BB_EVAL = 1)
 
 test_that("native NOMAD option builders reject cache-off solves before solver entry", {
   builders <- list(
@@ -12,6 +13,11 @@ test_that("native NOMAD option builders reject cache-off solves before solver en
   for (builder in builders) {
     expect_error(
       builder(native_cache_off_opts),
+      "requires EVAL_USE_CACHE = TRUE",
+      fixed = TRUE
+    )
+    expect_error(
+      builder(native_cache_unknown_opts),
       "requires EVAL_USE_CACHE = TRUE",
       fixed = TRUE
     )
