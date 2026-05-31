@@ -20,6 +20,9 @@
 - The shipped `npplreg` attach-mode demo now explicitly finalizes the master
   rank after successful attach shutdown, hardening release-sentinel teardown
   without changing estimator or runtime defaults.
+- MPI auto-dispatch for `nplsqreg()` now materializes named method-level
+  `...` arguments before worker fanout, preserving user-supplied `scale` and
+  option values that arrive through S3 `..n` placeholders.
 - `options(np.tree = "auto")` is now the default tree mode. In auto mode,
   continuous kd-tree routes are enabled only for bounded-support continuous
   kernels (`"epanechnikov"` and `"uniform"`); `np.tree = TRUE` remains the
