@@ -1010,54 +1010,23 @@
   pmax(lower, pmin(upper, out))
 }
 
-.np_lp_nomad_dim_budget <- function(nobs) {
-  nobs <- as.integer(nobs[1L])
-  if (!is.finite(nobs) || is.na(nobs) || nobs <= 1L)
-    return(1L)
-  max(1L, as.integer(floor(0.25 * (nobs - 1L))))
-}
-
-.np_lp_nomad_proposal_upper <- function(lower, upper) {
-  q <- length(lower)
-  if (!q)
-    return(integer(0))
-
-  lower <- as.integer(lower)
-  upper <- as.integer(upper)
-  as.integer(pmin(
-    upper,
-    pmax(lower + 1L, ceiling(upper / max(1L, q)))
-  ))
-}
-
-.np_lp_nomad_reduce_degree_start <- function(degree,
-                                             lower,
-                                             basis = c("glp", "additive", "tensor"),
-                                             dim_budget = Inf) {
-  basis <- match.arg(basis)
-  out <- as.integer(degree)
-  lower <- as.integer(lower)
-
-  if (!is.finite(dim_budget))
-    return(out)
-
-  repeat {
-    current.dim <- tryCatch(
-      dim_basis(basis = basis, degree = out),
-      error = function(e) Inf
+.np_lp_nomad_degree_start_policy <- function(value = getOption("np.nomad.degree.start.policy", "low_first_full_random")) {
+  value <- as.character(value)[1L]
+  choices <- c(
+    "low_first_full_random",
+    "mid_first_full_random",
+    "anchor_then_random",
+    "spread_then_random",
+    "random_full_only"
+  )
+  if (is.na(value) || !nzchar(value) || !(value %in% choices)) {
+    stop(
+      "option 'np.nomad.degree.start.policy' must be one of: ",
+      paste(choices, collapse = ", "),
+      call. = FALSE
     )
-    if (is.finite(current.dim) && current.dim <= dim_budget)
-      break
-
-    idx <- which(out > lower)
-    if (!length(idx))
-      break
-
-    drop.idx <- idx[which.max(out[idx])][1L]
-    out[drop.idx] <- out[drop.idx] - 1L
   }
-
-  out
+  value
 }
 
 .np_lp_nomad_build_degree_starts <- function(initial,
@@ -1074,62 +1043,102 @@
   upper <- as.integer(upper)
   q <- length(lower)
   nstart <- npValidateNmulti(nmulti)
+  policy <- .np_lp_nomad_degree_start_policy()
 
   if (!q)
     return(matrix(integer(0), nrow = nstart, ncol = 0L))
+  if (any(upper < lower))
+    stop("invalid degree bounds in NOMAD degree-start policy", call. = FALSE)
 
-  starts <- matrix(0L, nrow = nstart, ncol = q)
-  dim_budget <- .np_lp_nomad_dim_budget(nobs)
-  proposal.upper <- .np_lp_nomad_proposal_upper(lower, upper)
+  starts <- matrix(NA_integer_, nrow = nstart, ncol = q)
+  midpoint <- as.integer(round((lower + upper) / 2))
+
+  draw_full <- function(nrow) {
+    if (nrow <= 0L)
+      return(matrix(integer(0), nrow = 0L, ncol = q))
+    t(vapply(seq_len(nrow), function(j) {
+      vapply(seq_len(q), function(i) {
+        sample.int(upper[i] - lower[i] + 1L, 1L) + lower[i] - 1L
+      }, integer(1L))
+    }, integer(q)))
+  }
+
+  add_unique <- function(pool, row) {
+    row <- as.integer(row)
+    if (!nrow(pool))
+      return(matrix(row, nrow = 1L))
+    key <- paste(row, collapse = ",")
+    keys <- apply(pool, 1L, paste, collapse = ",")
+    if (key %in% keys)
+      pool
+    else
+      rbind(pool, row)
+  }
+
+  anchor_pool <- function() {
+    if (nstart <= 1L)
+      return(matrix(lower, nrow = 1L))
+    if (nstart == 2L)
+      return(rbind(lower, upper))
+    rbind(lower, midpoint, upper)
+  }
+
+  spread_pool <- function() {
+    pool <- matrix(integer(0), nrow = 0L, ncol = q)
+    pool <- add_unique(pool, lower)
+    pool <- add_unique(pool, midpoint)
+    pool <- add_unique(pool, upper)
+    if (q > 1L) {
+      level.mat <- rbind(lower, midpoint, upper)
+      base.pattern <- c(3L, 2L, 1L)
+      for (j in seq_len(max(q, 3L))) {
+        idx <- base.pattern[((seq_len(q) + j - 2L) %% 3L) + 1L]
+        row <- vapply(seq_len(q), function(i) level.mat[idx[i], i], integer(1L))
+        pool <- add_unique(pool, row)
+      }
+    }
+    pool
+  }
 
   initial <- as.integer(pmax(lower, pmin(upper, initial)))
-  if (!isTRUE(user_supplied))
-    initial <- .np_lp_nomad_reduce_degree_start(
-      degree = initial,
-      lower = lower,
-      basis = basis,
-      dim_budget = dim_budget
-    )
-  starts[1L, ] <- initial
-
-  if (nstart <= 1L)
-    return(starts)
 
   seed.state <- .np_seed_enter(random.seed)
   on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
 
-  max.tries <- max(1L, as.integer(max.tries[1L]))
-  for (j in 2:nstart) {
-    accepted <- FALSE
-    fallback <- starts[1L, ]
-    for (k in seq_len(max.tries)) {
-      candidate <- vapply(
-        seq_len(q),
-        function(i) sample.int(proposal.upper[i] - lower[i] + 1L, 1L) + lower[i] - 1L,
-        integer(1L)
-      )
-      fallback <- candidate
-      candidate.dim <- tryCatch(
-        dim_basis(basis = basis, degree = candidate),
-        error = function(e) Inf
-      )
-      if (is.finite(candidate.dim) && candidate.dim <= dim_budget) {
-        starts[j, ] <- as.integer(candidate)
-        accepted <- TRUE
-        break
-      }
-    }
-
-    if (!accepted) {
-      starts[j, ] <- .np_lp_nomad_reduce_degree_start(
-        degree = fallback,
-        lower = lower,
-        basis = basis,
-        dim_budget = dim_budget
-      )
-    }
+  if (isTRUE(user_supplied)) {
+    starts[1L, ] <- initial
+    fill.from <- 2L
+  } else if (identical(policy, "low_first_full_random")) {
+    starts[1L, ] <- lower
+    fill.from <- 2L
+  } else if (identical(policy, "mid_first_full_random")) {
+    starts[1L, ] <- midpoint
+    fill.from <- 2L
+  } else if (identical(policy, "anchor_then_random")) {
+    anchors <- anchor_pool()
+    take <- min(nstart, nrow(anchors))
+    starts[seq_len(take), ] <- anchors[seq_len(take), , drop = FALSE]
+    fill.from <- take + 1L
+  } else if (identical(policy, "spread_then_random")) {
+    pool <- if (nstart <= 2L) anchor_pool() else spread_pool()
+    take <- min(nstart, nrow(pool))
+    starts[seq_len(take), ] <- pool[seq_len(take), , drop = FALSE]
+    fill.from <- take + 1L
+  } else if (identical(policy, "random_full_only")) {
+    fill.from <- 1L
+  } else {
+    stop(sprintf("unknown np.nomad.degree.start.policy: %s", policy), call. = FALSE)
   }
 
+  if (fill.from <= nstart)
+    starts[fill.from:nstart, ] <- draw_full(nstart - fill.from + 1L)
+
+  if (any(is.na(starts)) ||
+      any(t(t(starts) < lower)) ||
+      any(t(t(starts) > upper)))
+    stop("generated NOMAD degree start outside bounds", call. = FALSE)
+
+  storage.mode(starts) <- "integer"
   starts
 }
 
@@ -2048,11 +2057,9 @@
     }
     state$restart_start_info <- list(
       basis = if (is.null(degree_spec$basis)) "glp" else degree_spec$basis,
-      dim_budget = .np_lp_nomad_dim_budget(degree_spec$nobs),
-      proposal.upper = .np_lp_nomad_proposal_upper(
-        lower = degree_spec$lower,
-        upper = degree_spec$upper
-      ),
+      degree.start.policy = .np_lp_nomad_degree_start_policy(),
+      lower = as.integer(degree_spec$lower),
+      upper = as.integer(degree_spec$upper),
       user_supplied_start = isTRUE(degree_spec$user_supplied)
     )
   } else {

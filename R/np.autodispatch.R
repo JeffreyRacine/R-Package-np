@@ -1,7 +1,7 @@
 .npRmpi_autodispatch_option_keys <- function() {
   c("np.messages", "np.tree", "np.categorical.compress", "np.largeh",
     "np.objective.cache", "np.largelambda", "np.extendednn", "np.largeh.rel.tol",
-    "np.disc.upper.rel.tol")
+    "np.disc.upper.rel.tol", "np.nomad.degree.start.policy")
 }
 
 .npRmpi_autodispatch_option_snapshot <- function(keys = .npRmpi_autodispatch_option_keys()) {

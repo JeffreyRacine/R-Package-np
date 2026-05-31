@@ -62,6 +62,17 @@
     controlled by this option, and the saturated extended-NN distance cache is
     governed by \code{np.extendednn}.
 
+    \item \code{np.nomad.degree.start.policy} (character): controls automatic
+    polynomial-degree starting values for NOMAD local-polynomial searches when
+    \code{degree.start} is not supplied. The default,
+    \code{"low_first_full_random"}, uses \code{degree.min} for the first start
+    and draws later starts over the full user-specified
+    \code{degree.min}/\code{degree.max} range. Other accepted values are
+    \code{"mid_first_full_random"}, \code{"anchor_then_random"},
+    \code{"spread_then_random"}, and \code{"random_full_only"}. Explicit
+    \code{degree.start} values remain the first start. The active option value
+    is synchronized to MPI workers in autodispatch sessions.
+
     \item \code{np.largeh} (logical): enables continuous large-\eqn{h}
     shortcut evaluations. Default is \code{TRUE}. Set
     \code{options(np.largeh = FALSE)} to keep tree/dense routing unchanged
