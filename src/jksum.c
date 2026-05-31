@@ -8618,6 +8618,32 @@ void np_glp_cv_clear_extern(void){
   np_glp_cv_cache_clear();
 }
 
+int np_glp_cv_degree_admissible_extern(const int num_obs,
+                                       const int ncon,
+                                       const int *degree,
+                                       const int basis_mode)
+{
+  int j, nterms = 0;
+  int *terms = NULL;
+
+  if(ncon <= 0)
+    return 1;
+  if((num_obs <= 0) || (degree == NULL))
+    return 0;
+
+  for(j = 0; j < ncon; j++)
+    if(degree[j] < 0)
+      return 0;
+
+  if(!np_glp_build_terms(ncon, degree, basis_mode, &terms, &nterms))
+    return 0;
+
+  if(terms != NULL)
+    free(terms);
+
+  return ((nterms > 0) && (nterms < num_obs));
+}
+
 
 typedef struct {
   int ready;
