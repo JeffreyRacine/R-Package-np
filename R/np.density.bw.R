@@ -821,8 +821,22 @@ npudensbw.bandwidth <-
       .npudensbw_assert_bounded_cvls_supported(tbw, where = "npudensbw()")
 
       if (bws$method != "normal-reference"){
-        myout <-
-          .Call(if (isTRUE(eval.only)) "C_np_density_bw_eval" else "C_np_density_bw",
+        if (isTRUE(eval.only)) {
+          myout <-
+            .Call("C_np_density_bw_eval",
+                  as.double(duno), as.double(dord), as.double(dcon),
+                  as.double(mysd),
+                  as.integer(myopti), as.double(myoptd),
+                  as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+                  as.integer(nmulti),
+                  as.integer(penalty_mode),
+                  as.double(penalty.multiplier),
+                  as.double(cker.bounds.c$lb),
+                  as.double(cker.bounds.c$ub),
+                  PACKAGE="np")
+        } else {
+          myout <-
+            .Call("C_np_density_bw",
                 as.double(duno), as.double(dord), as.double(dcon),
                 as.double(mysd),
                 as.integer(myopti), as.double(myoptd),
@@ -833,6 +847,7 @@ npudensbw.bandwidth <-
                 as.double(cker.bounds.c$lb),
                 as.double(cker.bounds.c$ub),
                 PACKAGE="np")
+        }
         total.time <- proc.time()[3] - elapsed.start
       } else {
         nbw = double(ncol)
