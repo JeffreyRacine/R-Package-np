@@ -1,5 +1,22 @@
 # np 0.70-3
 
+- Added `nplsqreg()`/`nplsqregbw()` as a location-scale quantile-regression
+  front end with formula/data and bandwidth-object workflows, scalar/vector
+  `tau`, prediction, residual extraction, summaries, and plot routes built on
+  the shared quantile plotting engine.
+- Supported MADS/NOMAD-backed bandwidth-search routes now use the final native
+  `crs` NOMAD C API rather than the retired legacy `snomadr()` fallback.
+  This covers the promoted regression, density, distribution, conditional
+  density, conditional distribution, smooth-coefficient, single-index,
+  partially linear, and location-scale quantile search surfaces where those
+  routes support native NOMAD/MADS. The runtime dependency on `crs`
+  is now declared in `Imports`, while `LinkingTo` remains for the native
+  header.
+- Native NOMAD routes now preserve progress best-record reporting, expose
+  cache/evaluation diagnostics, honor explicit start and option controls, and
+  reject unsupported or indeterminate cache-off settings before solver entry.
+  Inadmissible GLP degree candidates are guarded before expensive evaluator
+  work.
 - `options(np.tree = "auto")` is now the default tree mode. In auto mode,
   continuous kd-tree routes are enabled only for bounded-support continuous
   kernels (`"epanechnikov"` and `"uniform"`); `np.tree = TRUE` remains the
