@@ -933,8 +933,22 @@ npudistbw.dbandwidth <-
       cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
       if (bws$method != "normal-reference"){
-        myout <-
-          .Call(if (isTRUE(eval.only)) "C_np_distribution_bw_eval" else "C_np_distribution_bw",
+        if (isTRUE(eval.only)) {
+          myout <-
+            .Call("C_np_distribution_bw_eval",
+                  as.double(duno), as.double(dord), as.double(dcon),
+                  as.double(guno), as.double(gord), as.double(gcon), as.double(mysd),
+                  as.integer(myopti), as.double(myoptd),
+                  as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+                  as.integer(nmulti),
+                  as.integer(penalty_mode),
+                  as.double(penalty.multiplier),
+                  as.double(cker.bounds.c$lb),
+                  as.double(cker.bounds.c$ub),
+                  PACKAGE="npRmpi")
+        } else {
+          myout <-
+            .Call("C_np_distribution_bw",
                 as.double(duno), as.double(dord), as.double(dcon),
                 as.double(guno), as.double(gord), as.double(gcon), as.double(mysd),
                 as.integer(myopti), as.double(myoptd),
@@ -945,6 +959,7 @@ npudistbw.dbandwidth <-
                 as.double(cker.bounds.c$lb),
                 as.double(cker.bounds.c$ub),
                 PACKAGE="npRmpi")
+        }
         total.time <- proc.time()[3] - elapsed.start
       } else {
         nbw = double(ncol)
