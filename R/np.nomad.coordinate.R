@@ -122,6 +122,56 @@
   )
 }
 
+.np_nomad_coordinate_roles <- function(bounds, degree.search = NULL) {
+  table <- attr(bounds, "nomad.coordinate.table", exact = TRUE)
+  roles <- if (!is.null(table) && "class" %in% names(table)) {
+    as.character(table$class)
+  } else {
+    ncont <- .np_nomad_bw_ncont(bounds)
+    ncat <- .np_nomad_bw_ncat(bounds)
+    c(
+      if (ncont > 0L) {
+        ifelse(as.integer(bounds$bbin[seq_len(ncont)]) == 1L,
+               "continuous_nn_index",
+               "continuous_fixed_scale")
+      } else {
+        character(0L)
+      },
+      rep.int("categorical_lambda", ncat)
+    )
+  }
+  if (!is.null(degree.search)) {
+    roles <- c(roles, rep.int("degree", length(degree.search$lower)))
+  }
+  roles
+}
+
+.np_nomad_apply_source_geometry <- function(opts,
+                                            user.opts = list(),
+                                            roles) {
+  roles <- as.character(roles)
+  n <- length(roles)
+  if (!n)
+    return(opts)
+  if (anyNA(roles))
+    stop("NOMAD coordinate geometry requires complete coordinate role metadata",
+         call. = FALSE)
+
+  generated <- list(
+    INITIAL_MESH_SIZE = rep.int(1, n),
+    MIN_MESH_SIZE = ifelse(roles %in% "continuous_fixed_scale",
+                           sqrt(.Machine$double.eps), 1)
+  )
+
+  user.names <- names(user.opts)
+  if (is.null(user.names))
+    user.names <- character()
+  keep <- setdiff(names(generated), user.names)
+  if (length(keep))
+    opts[keep] <- generated[keep]
+  opts
+}
+
 .np_nomad_bw_bounds <- function(template,
                                 setup,
                                 fixed.lower,
@@ -327,4 +377,3 @@
     return(identical(as.numeric(x), as.numeric(y)))
   isTRUE(all.equal(as.numeric(x), as.numeric(y), tolerance = tolerance, check.attributes = FALSE))
 }
-

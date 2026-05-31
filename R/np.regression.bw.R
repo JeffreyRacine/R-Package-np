@@ -2333,6 +2333,18 @@ npRmpiNomadShadowSearchRegression <- function(template,
     native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
 
     native.nomad.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
+    shadow.bw.bounds <- list(
+      lower = lb[seq_len(ncon + ncat)],
+      upper = ub[seq_len(ncon + ncat)],
+      bbin = bbin[seq_len(ncon + ncat)],
+      ncont = ncon,
+      ncat = ncat
+    )
+    native.nomad.opts <- .np_nomad_apply_source_geometry(
+      native.nomad.opts,
+      user.opts = nomad.opts,
+      roles = .np_nomad_coordinate_roles(shadow.bw.bounds, degree.search)
+    )
     native.option.vectors <- .npregbw_nomad_native_option_vectors(native.nomad.opts)
     native.start.matrix <- .np_nomad_build_starts(
       x0 = x0,
