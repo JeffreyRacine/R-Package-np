@@ -2199,11 +2199,9 @@ npregbw.rbandwidth <-
       restart.bandwidth.starts = lapply(seq_len(nrow(native.start.matrix)), function(i) as.numeric(native.start.matrix[i, seq_len(degree.idx[1L] - 1L)])),
       restart.start.info = list(
         basis = if (is.null(degree.search$basis)) "glp" else degree.search$basis,
-        dim_budget = .np_lp_nomad_dim_budget(degree.search$nobs),
-        proposal.upper = .np_lp_nomad_proposal_upper(
-          lower = degree.search$lower,
-          upper = degree.search$upper
-        ),
+        degree.start.policy = .np_lp_nomad_degree_start_policy(),
+        lower = as.integer(degree.search$lower),
+        upper = as.integer(degree.search$upper),
         user_supplied_start = isTRUE(degree.search$start.user)
       ),
       restart.results = native.results,

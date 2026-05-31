@@ -29,6 +29,8 @@
     options(np.largelambda = TRUE)
   if (is.null(getOption("np.extendednn")))
     options(np.extendednn = TRUE)
+  if (is.null(getOption("np.nomad.degree.start.policy")))
+    options(np.nomad.degree.start.policy = "low_first_full_random")
   if (is.null(getOption("np.largeh.rel.tol")))
     options(np.largeh.rel.tol = 1e-3)
   if (is.null(getOption("np.disc.upper.rel.tol")))
