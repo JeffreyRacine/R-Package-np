@@ -70,7 +70,7 @@ npcopula(bws, \dots)
      zlab = NULL,
      main = NULL,
      col = NULL,
-     border = "black",
+     border = .np_plot_color("surface_border"),
      zlim = NULL,
      \dots)
 }

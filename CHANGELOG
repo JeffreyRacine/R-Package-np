@@ -1,4 +1,36 @@
-Changes from Version 0.70-2 to 0.70-3 [XX-XX-XXXX]
+Changes from Version 0.70-2 to 0.70-3 [01-Jun-2026]
+
+* Added MPI-aware `nplsqreg()` and `nplsqregbw()` support for location-scale
+  quantile regression, including formula/data and bandwidth-object workflows,
+  scalar/vector `tau`, prediction, residual extraction, summaries, and plot
+  routes built on the shared quantile plotting engine.
+
+* Promoted supported MPI MADS/NOMAD-backed bandwidth-search routes to the
+  final native `crs` NOMAD C API and retired the legacy `snomadr()` fallback.
+  The promoted native routes cover regression, density, distribution,
+  conditional density, conditional distribution, smooth-coefficient,
+  single-index, partially linear, and location-scale quantile surfaces where
+  those families support native NOMAD/MADS search.
+
+* Declared `crs (>= 0.15-44)` in `Imports` because the native NOMAD routes
+  resolve the `crs_nomad_solve` runtime callable; `LinkingTo` remains for the
+  package-author native header.
+
+* Hardened native NOMAD controls and diagnostics in serial-equivalent and
+  MPI-dispatched routes: explicit option and start controls are honored,
+  cache/evaluation diagnostics are retained, progress best-record reporting is
+  preserved, unsupported or indeterminate cache-off settings fail before solver
+  entry, and inadmissible GLP degree candidates are guarded before expensive
+  evaluator work.
+
+* Extended MPI fanout coverage for computationally heavy bootstrap workloads
+  in specification, dependence, distribution-equality, quantile, and symmetry
+  tests, and restored serial-equivalent final RNG state after MPI
+  plot-bootstrap fanout.
+
+* Hardened the shipped `npplreg` attach-mode demo teardown by explicitly
+  finalizing the master rank after successful attach shutdown, without changing
+  estimator behavior or runtime defaults.
 
 * Improved the hot symmetric weighted-sum loop used by local-polynomial
   regression cross-validation. Fixed-bandwidth `npregbw(..., regtype = "lp",

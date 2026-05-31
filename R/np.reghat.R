@@ -356,6 +356,7 @@ npreghat <-
   ntrain <- nrow(txdat)
   neval <- nrow(eval.data)
   want.grad <- length(s) > 0L && any(s > 0L)
+  tree.enabled <- npUseContinuousTree(ncon = bws$ncon, bws = bws)
 
   if (identical(bws$type, "generalized_nn") &&
       any(degree > 1L) &&

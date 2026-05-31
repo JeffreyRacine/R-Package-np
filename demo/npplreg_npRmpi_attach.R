@@ -12,4 +12,5 @@ if (mpi.comm.rank(0L) == 0L) {
   npplreg_demo_source_utils()
   npplreg_demo_run_matrix("attach")
   npRmpi.quit(mode = "attach", comm = 1)
+  mpi.quit()
 }

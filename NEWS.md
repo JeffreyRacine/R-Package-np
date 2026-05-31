@@ -1,5 +1,25 @@
 # npRmpi 0.70-3
 
+- Added MPI-aware `nplsqreg()`/`nplsqregbw()` support for location-scale
+  quantile regression, including formula/data and bandwidth-object workflows,
+  scalar/vector `tau`, prediction, residual extraction, summaries, and plot
+  routes built on the shared quantile plotting engine.
+- Supported MPI MADS/NOMAD-backed bandwidth-search routes now use the final
+  native `crs` NOMAD C API rather than the retired legacy `snomadr()`
+  fallback. The runtime dependency on `crs` is now declared in `Imports`,
+  while `LinkingTo` remains for the native header.
+- Native NOMAD routes now preserve progress best-record reporting, expose
+  cache/evaluation diagnostics, honor explicit start and option controls, and
+  reject unsupported or indeterminate cache-off settings before solver entry.
+  Inadmissible GLP degree candidates are guarded before expensive evaluator
+  work in serial-equivalent and MPI-dispatched routes.
+- MPI fanout coverage has been extended for computationally heavy bootstrap
+  workloads in specification, dependence, distribution-equality, quantile, and
+  symmetry tests, and plot-bootstrap RNG streams now restore the
+  serial-equivalent final state after MPI fanout.
+- The shipped `npplreg` attach-mode demo now explicitly finalizes the master
+  rank after successful attach shutdown, hardening release-sentinel teardown
+  without changing estimator or runtime defaults.
 - `options(np.tree = "auto")` is now the default tree mode. In auto mode,
   continuous kd-tree routes are enabled only for bounded-support continuous
   kernels (`"epanechnikov"` and `"uniform"`); `np.tree = TRUE` remains the

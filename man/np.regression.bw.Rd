@@ -68,6 +68,7 @@ npregbw(\dots)
         lbd.dir,
         lbd.init,
         nmulti,
+        nomad.opts = list(),
         okertype,
         penalty.multiplier = 10,
         regtype,
@@ -104,6 +105,7 @@ npregbw(\dots)
         lbd.dir = 0.1,
         lbd.init = 0.1,
         nmulti,
+        nomad.opts = list(),
         penalty.multiplier = 10,
         powell.remin = TRUE,
         bwsolver = c("powell", "mads", "mads+powell"),
@@ -458,6 +460,12 @@ These controls set numerical search starts, kernel choices, and support bounds.
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
     points. Defaults to \code{min(2,ncol(xdat))}.
+  }
+
+  \item{nomad.opts}{
+    optional named list of native NOMAD parameters forwarded to the
+    \pkg{crs} NOMAD C API for MADS/NOMAD-backed bandwidth searches.
+    Unsupported cache-off callback settings are rejected before solver entry.
   }
 
   \item{okertype}{
