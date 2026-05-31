@@ -2174,6 +2174,11 @@
 
   run_nomad_solver <- function(start) {
     solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
+    solver.opts <- .np_nomad_apply_source_geometry(
+      solver.opts,
+      user.opts = nomad.opts,
+      roles = rep.int("degree", length(start))
+    )
     start <- as.numeric(start)
 
     if (isTRUE(state$native.r.bridge)) {

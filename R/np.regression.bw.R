@@ -1956,6 +1956,11 @@ npregbw.rbandwidth <-
     native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
 
     native.nomad.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
+    native.nomad.opts <- .np_nomad_apply_source_geometry(
+      native.nomad.opts,
+      user.opts = nomad.opts,
+      roles = .np_nomad_coordinate_roles(bw_bounds, degree.search)
+    )
     native.option.vectors <- .npregbw_nomad_native_option_vectors(native.nomad.opts)
     native.start.matrix <- .np_nomad_build_starts(
       x0 = x0,
