@@ -462,6 +462,11 @@ npNomadNativeSearchDistribution <- function(prep,
       native.random.seed,
       opt.value("nomad.opts", list())
     )
+    native.nomad.opts <- .np_nomad_apply_source_geometry(
+      native.nomad.opts,
+      user.opts = opt.value("nomad.opts", list()),
+      roles = .np_nomad_coordinate_roles(bounds)
+    )
     native.option.vectors <- .npudistbw_nomad_native_option_vectors(native.nomad.opts)
     native.start.matrix <- .np_nomad_build_starts(
       x0 = x0,
