@@ -3064,6 +3064,13 @@ static int np_regression_nomad_shadow_refresh_degree(const int *degree)
   if (degree == NULL || np_regression_nomad_shadow.glp_degree == NULL)
     return 0;
 
+  if ((int_ll_extern == LL_LP) &&
+      (!np_glp_cv_degree_admissible_extern(num_obs_train_extern,
+                                           num_reg_continuous_extern,
+                                           degree,
+                                           int_glp_basis_extern)))
+    return 0;
+
   for (i = 0; i < np_regression_nomad_shadow.num_reg_continuous; i++) {
     if (np_regression_nomad_shadow.glp_degree[i] != degree[i]) {
       changed = 1;
@@ -4332,6 +4339,12 @@ static int np_conditional_density_nomad_shadow_refresh_degree(const int *degree)
   if (int_ll_extern != LL_LP || np_conditional_density_nomad_shadow.num_reg_continuous <= 0)
     return 1;
   if (degree == NULL || np_conditional_density_nomad_shadow.glp_degree == NULL)
+    return 0;
+
+  if (!np_glp_cv_degree_admissible_extern(num_obs_train_extern,
+                                          num_reg_continuous_extern,
+                                          degree,
+                                          int_glp_basis_extern))
     return 0;
 
   for (i = 0; i < np_conditional_density_nomad_shadow.num_reg_continuous; i++) {
@@ -8998,22 +9011,34 @@ static int np_cdist_native_search_callback(int n,
     degree_work = context->degree;
   }
 
-  status = np_distribution_conditional_nomad_native_eval_once(
-    context->c_uno, context->c_ord, context->c_con,
-    context->u_uno, context->u_ord, context->u_con,
-    context->cg_uno, context->cg_ord, context->cg_con,
-    context->mysd, context->myopti, context->myoptd, eval_bw,
-    context->penalty_mode, context->penalty_mult, degree_work,
-    context->bernstein, context->basis, context->regtype,
-    context->cxkerlb, context->cxkerub, context->cykerlb, context->cykerub,
-    eval_out);
+  if (context->regtype == LL_LP &&
+      !np_glp_cv_degree_admissible_extern(context->myopti[CDBW_NOBSI],
+                                          context->ndegree,
+                                          degree_work,
+                                          context->basis)) {
+    eval_out[0] = DBL_MAX;
+    eval_out[1] = DBL_MAX;
+    eval_out[2] = 1.0;
+    eval_out[3] = 0.0;
+    eval_out[4] = 1.0;
+  } else {
+    status = np_distribution_conditional_nomad_native_eval_once(
+      context->c_uno, context->c_ord, context->c_con,
+      context->u_uno, context->u_ord, context->u_con,
+      context->cg_uno, context->cg_ord, context->cg_con,
+      context->mysd, context->myopti, context->myoptd, eval_bw,
+      context->penalty_mode, context->penalty_mult, degree_work,
+      context->bernstein, context->basis, context->regtype,
+      context->cxkerlb, context->cxkerub, context->cykerlb, context->cykerub,
+      eval_out);
 
-  if (status != 0) {
-    context->callback_failures++;
-    R_Free(raw_point);
-    R_Free(eval_bw);
-    if (context->ndegree > 0 && degree_work != NULL) R_Free(degree_work);
-    return 1;
+    if (status != 0) {
+      context->callback_failures++;
+      R_Free(raw_point);
+      R_Free(eval_bw);
+      if (context->ndegree > 0 && degree_work != NULL) R_Free(degree_work);
+      return 1;
+    }
   }
 
   context->callback_calls++;

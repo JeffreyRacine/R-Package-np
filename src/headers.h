@@ -181,6 +181,7 @@ int kernel_estimate_regression_categorical_leave_one_out(int int_ll, int KERNEL_
 double np_kernel_estimate_regression_categorical_ls_aic(int int_ll, int bwm, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_reg, int num_obs, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *vector_Y, double *vector_scale_factor, int *num_categories);
 int np_glp_cv_prepare_extern(const int int_ll, const int num_obs, const int ncon, double **matrix_X_continuous_train);
 void np_glp_cv_clear_extern(void);
+int np_glp_cv_degree_admissible_extern(const int num_obs, const int ncon, const int *degree, const int basis_mode);
 void np_reg_cv_core_clear_extern(void);
 int np_shadow_cv_con_density_ml(double *vector_scale_factor, double *cv);
 int np_shadow_cv_con_density_ls(double *vector_scale_factor, double *cv);
