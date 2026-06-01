@@ -106,6 +106,10 @@ npindexbw.NULL <-
     } else {
       "nomad+powell"
     }
+    ichimura.lp.nomad.degree.search <- isTRUE(automatic.degree.search) &&
+      identical(method.value, "ichimura") &&
+      identical(regtype.value, "lp") &&
+      search.engine.value %in% c("nomad", "nomad+powell")
     .np_nomad_validate_inner_multistart(
       call_names = names(mc),
       dot.args = dots,
@@ -116,6 +120,7 @@ npindexbw.NULL <-
     if (.npRmpi_autodispatch_active() &&
         (!isTRUE(automatic.degree.search) ||
            isTRUE(collective.degree.search) ||
+           isTRUE(ichimura.lp.nomad.degree.search) ||
            .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
       return(.npRmpi_autodispatch_call(mc, parent.frame()))
 
@@ -493,7 +498,8 @@ npindexbw.NULL <-
                                                   h,
                                                   bws,
                                                   spec,
-                                                  invalid.penalty) {
+                                                  invalid.penalty,
+                                                  localize = TRUE) {
   leaf <- .npindexbw_build_lp_regression_leaf(
     index = index,
     ydat = ydat,
@@ -503,16 +509,13 @@ npindexbw.NULL <-
   )
 
   out <- tryCatch(
-    ## This objective is evaluated inside each rank's optimizer loop under
-    ## autodispatch. Keep the inner regression evaluator local so independent
-    ## optimizer paths cannot enter nested MPI collectives in different orders.
     .npregbw_eval_only(
       xdat = leaf$xdat,
       ydat = ydat,
       bws = leaf$bws,
       invalid.penalty = "baseline",
       penalty.multiplier = 10,
-      localize = TRUE
+      localize = localize
     ),
     error = function(e) NULL
   )
@@ -524,6 +527,131 @@ npindexbw.NULL <-
     objective = as.numeric(out$objective[1L]),
     num.feval.fast = as.numeric(out$num.feval.fast[1L])
   )
+}
+
+.npindexbw_ichimura_lp_service_context <- function(bws,
+                                                   spec,
+                                                   bandwidth.compute = TRUE,
+                                                   comm = 1L,
+                                                   service_id = "npindex_ichimura_lp") {
+  rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) 0L)
+  size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) 1L)
+  if (!is.finite(rank)) rank <- 0L
+  if (!is.finite(size) || size < 1L) size <- 1L
+
+  in.context <- isTRUE(.npRmpi_autodispatch_in_context()) ||
+    isTRUE(.npRmpi_manual_bcast_in_context()) ||
+    isTRUE(.npRmpi_autodispatch_called_from_bcast())
+  pool.ok <- if (isTRUE(in.context)) {
+    size > 1L
+  } else {
+    isTRUE(.npRmpi_has_active_slave_pool(comm = comm))
+  }
+
+  active <- isTRUE(bandwidth.compute) &&
+    identical(as.character(bws$method[1L]), "ichimura") &&
+    !identical(as.character(spec$regtype.engine[1L]), "lc") &&
+    isTRUE(pool.ok) &&
+    !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+    isTRUE(in.context)
+
+  list(
+    active = isTRUE(active) && size > 1L,
+    root = identical(rank, 0L),
+    rank = rank,
+    size = size,
+    comm = as.integer(comm),
+    service_id = as.character(service_id)[1L]
+  )
+}
+
+.npindexbw_ichimura_lp_service_worker_loop <- function(xmat,
+                                                       ydat,
+                                                       bws,
+                                                       spec,
+                                                       ctx) {
+  repeat {
+    task <- mpi.bcast.Robj(rank = 0L, comm = ctx$comm)
+    if (!is.list(task) || is.null(task$kind))
+      stop("malformed npindex Ichimura LP service task", call. = FALSE)
+
+    task.service <- if (is.null(task$service_id)) ctx$service_id else as.character(task$service_id)[1L]
+
+    if (identical(task$kind, "eval")) {
+      task.spec <- if (is.null(task$spec)) spec else task$spec
+      .npindexbw_eval_objective(
+        param = as.numeric(task$param),
+        xmat = xmat,
+        ydat = ydat,
+        bws = bws,
+        spec = task.spec,
+        localize = FALSE
+      )
+      next
+    }
+
+    if (!identical(task.service, ctx$service_id))
+      next
+
+    if (identical(task$kind, "result"))
+      return(task$value)
+    if (identical(task$kind, "error"))
+      stop(as.character(task$message)[1L], call. = FALSE)
+    if (identical(task$kind, "stop"))
+      return(invisible(NULL))
+
+    stop("unknown npindex Ichimura LP service task", call. = FALSE)
+  }
+}
+
+.npindexbw_ichimura_lp_service_eval <- function(param,
+                                                xmat,
+                                                ydat,
+                                                bws,
+                                                spec,
+                                                ctx,
+                                                eval_id = NA_integer_) {
+  mpi.bcast.Robj(
+    list(
+      kind = "eval",
+      service_id = ctx$service_id,
+      eval_id = eval_id,
+      param = as.numeric(param),
+      spec = spec
+    ),
+    rank = 0L,
+    comm = ctx$comm
+  )
+
+  .npindexbw_eval_objective(
+    param = as.numeric(param),
+    xmat = xmat,
+    ydat = ydat,
+    bws = bws,
+    spec = spec,
+    localize = FALSE
+  )
+}
+
+.npindexbw_ichimura_lp_service_result <- function(value, ctx) {
+  mpi.bcast.Robj(
+    list(kind = "result", service_id = ctx$service_id, value = value),
+    rank = 0L,
+    comm = ctx$comm
+  )
+  value
+}
+
+.npindexbw_ichimura_lp_service_error <- function(message, ctx) {
+  try(
+    mpi.bcast.Robj(
+      list(kind = "error", service_id = ctx$service_id, message = as.character(message)[1L]),
+      rank = 0L,
+      comm = ctx$comm
+    ),
+    silent = TRUE
+  )
+  invisible(NULL)
 }
 
 .npindex_lp_loo_fit_block <- function(idx,
@@ -859,7 +987,8 @@ npindexbw.NULL <-
                                       xmat,
                                       ydat,
                                       bws,
-                                      spec) {
+                                      spec,
+                                      localize = TRUE) {
   p <- ncol(xmat)
   beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
   beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
@@ -888,7 +1017,8 @@ npindexbw.NULL <-
       h = h,
       bws = bws,
       spec = spec,
-      invalid.penalty = invalid.penalty
+      invalid.penalty = invalid.penalty,
+      localize = localize
     ))
   }
 
@@ -1114,6 +1244,30 @@ npindexbw.NULL <-
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
+  service.spec <- template.reg.args
+  service.ctx <- .npindexbw_ichimura_lp_service_context(
+    bws = baseline.bws,
+    spec = service.spec,
+    bandwidth.compute = TRUE,
+    comm = 1L,
+    service_id = "npindex_ichimura_lp_nomad"
+  )
+  if (isTRUE(service.ctx$active) && !isTRUE(service.ctx$root))
+    return(.npindexbw_ichimura_lp_service_worker_loop(
+      xmat = x.clean,
+      ydat = y.clean,
+      bws = baseline.bws,
+      spec = service.spec,
+      ctx = service.ctx
+    ))
+  service.eval.counter <- 0L
+  service.done <- FALSE
+  if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
+    on.exit({
+      if (!isTRUE(service.done))
+        .npindexbw_ichimura_lp_service_error("npindex Ichimura LP NOMAD service stopped before returning a result", service.ctx)
+    }, add = TRUE)
+  }
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -1167,13 +1321,26 @@ npindexbw.NULL <-
     eval.spec$degree.engine <- degree
     eval.spec$bernstein.basis.engine <- degree.search$bernstein.basis
     eval.spec$basis.engine <- reg.args$basis.engine
-    objective <- .npindexbw_eval_objective(
-      param = point_to_param(point),
-      xmat = x.clean,
-      ydat = y.clean,
-      bws = baseline.bws,
-      spec = eval.spec
-    )
+    service.eval.counter <<- service.eval.counter + 1L
+    objective <- if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
+      .npindexbw_ichimura_lp_service_eval(
+        param = point_to_param(point),
+        xmat = x.clean,
+        ydat = y.clean,
+        bws = baseline.bws,
+        spec = eval.spec,
+        ctx = service.ctx,
+        eval_id = service.eval.counter
+      )
+    } else {
+      .npindexbw_eval_objective(
+        param = point_to_param(point),
+        xmat = x.clean,
+        ydat = y.clean,
+        bws = baseline.bws,
+        spec = eval.spec
+      )
+    }
     nomad.num.feval.total <<- nomad.num.feval.total + 1L
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(objective$num.feval.fast[1L])
     list(
@@ -1318,6 +1485,11 @@ npindexbw.NULL <-
         rec
       })
     }
+  }
+
+  if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
+    service.done <- TRUE
+    return(.npindexbw_ichimura_lp_service_result(search.result, service.ctx))
   }
 
   search.result
@@ -1494,9 +1666,27 @@ npindexbw.default <-
     }
     collective.degree.search <- isTRUE(automatic.degree.search) &&
       identical(method.value, "kleinspady")
+    nomad.requested <- isTRUE(npValidateScalarLogical(nomad, "nomad"))
+    regtype.value <- if ("regtype" %in% search.mc.names) {
+      match.arg(regtype, c("lc", "ll", "lp"))
+    } else if (isTRUE(nomad.requested)) {
+      "lp"
+    } else {
+      "lc"
+    }
+    search.engine.value <- if ("search.engine" %in% search.mc.names) {
+      match.arg(search.engine, c("nomad+powell", "cell", "nomad"))
+    } else {
+      "nomad+powell"
+    }
+    ichimura.lp.nomad.degree.search <- isTRUE(automatic.degree.search) &&
+      identical(method.value, "ichimura") &&
+      identical(regtype.value, "lp") &&
+      search.engine.value %in% c("nomad", "nomad+powell")
     if (.npRmpi_autodispatch_active() &&
         (!isTRUE(automatic.degree.search) ||
            isTRUE(collective.degree.search) ||
+           isTRUE(ichimura.lp.nomad.degree.search) ||
            .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
       return(.npRmpi_autodispatch_call(mc, parent.frame()))
 
@@ -1862,6 +2052,29 @@ npindexbw.sibandwidth <-
     beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
     nobs <- nrow(xdat)
     spec <- .npindex_resolve_spec(bws, where = "npindexbw")
+    service.ctx <- .npindexbw_ichimura_lp_service_context(
+      bws = bws,
+      spec = spec,
+      bandwidth.compute = bandwidth.compute,
+      comm = 1L,
+      service_id = "npindex_ichimura_lp_fixed"
+    )
+    if (isTRUE(service.ctx$active) && !isTRUE(service.ctx$root))
+      return(.npindexbw_ichimura_lp_service_worker_loop(
+        xmat = xdat,
+        ydat = ydat,
+        bws = bws,
+        spec = spec,
+        ctx = service.ctx
+      ))
+    service.eval.counter <- 0L
+    service.done <- FALSE
+    if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
+      on.exit({
+        if (!isTRUE(service.done))
+          .npindexbw_ichimura_lp_service_error("npindex Ichimura LP fixed-degree service stopped before returning a result", service.ctx)
+      }, add = TRUE)
+    }
 
     total.time <-
       system.time({
@@ -1959,14 +2172,27 @@ npindexbw.sibandwidth <-
                 )$ksum
                 tww[1,2,]/NZD(tww[2,2,])
               } else {
-                objective <- .npindexbw_eval_ichimura_lp_via_npreg(
-                  index = index,
-                  ydat = ydat,
-                  h = h,
-                  bws = bws,
-                  spec = spec,
-                  invalid.penalty = ichimuraMaxPenalty
-                )
+                service.eval.counter <<- service.eval.counter + 1L
+                objective <- if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
+                  .npindexbw_ichimura_lp_service_eval(
+                    param = c(beta, h),
+                    xmat = xmat,
+                    ydat = ydat,
+                    bws = bws,
+                    spec = spec,
+                    ctx = service.ctx,
+                    eval_id = service.eval.counter
+                  )
+                } else {
+                  .npindexbw_eval_ichimura_lp_via_npreg(
+                    index = index,
+                    ydat = ydat,
+                    h = h,
+                    bws = bws,
+                    spec = spec,
+                    invalid.penalty = ichimuraMaxPenalty
+                  )
+                }
                 num.feval.fast.overall <<- num.feval.fast.overall +
                   as.numeric(objective$num.feval.fast[1L])
                 return(as.numeric(objective$objective[1L]))
@@ -2331,6 +2557,11 @@ npindexbw.sibandwidth <-
                        total.time = total.time)
     bws$nn.cache <- nn.cache
     bws <- npSetScaleFactorSearchLower(bws, scale.factor.search.lower)
+
+    if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
+      service.done <- TRUE
+      return(.npindexbw_ichimura_lp_service_result(bws, service.ctx))
+    }
 
     bws
 

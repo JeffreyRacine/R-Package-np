@@ -13,6 +13,12 @@
   reject unsupported or indeterminate cache-off settings before solver entry.
   Inadmissible GLP degree candidates are guarded before expensive evaluator
   work in serial-equivalent and MPI-dispatched routes.
+- `npindexbw(..., method = "ichimura", regtype = c("ll", "lp"))` now reuses
+  the established local-polynomial regression objective evaluator, and MPI
+  autodispatch uses a rank-0-driven objective service for the fixed-degree and
+  NOMAD degree-search Ichimura local-polynomial routes. Focused sentinel runs
+  preserved payloads while restoring useful scaling for the formerly flat
+  local-linear and local-polynomial single-index rows.
 - MPI fanout coverage has been extended for computationally heavy bootstrap
   workloads in specification, dependence, distribution-equality, quantile, and
   symmetry tests, and plot-bootstrap RNG streams now restore the

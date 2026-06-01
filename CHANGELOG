@@ -23,6 +23,13 @@ Changes from Version 0.70-2 to 0.70-3 [01-Jun-2026]
   entry, and inadmissible GLP degree candidates are guarded before expensive
   evaluator work.
 
+* Improved `npindexbw(..., method = "ichimura", regtype = c("ll", "lp"))`
+  objective evaluation by reusing the established local-polynomial regression
+  evaluator, and added a rank-0-driven MPI objective service for the
+  fixed-degree and NOMAD degree-search Ichimura local-polynomial routes.
+  Focused sentinel runs preserved payloads while restoring useful scaling for
+  formerly flat local-linear and local-polynomial single-index rows.
+
 * Extended MPI fanout coverage for computationally heavy bootstrap workloads
   in specification, dependence, distribution-equality, quantile, and symmetry
   tests, and restored serial-equivalent final RNG state after MPI
