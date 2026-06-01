@@ -1791,6 +1791,7 @@ npscoefbw.scbandwidth <-
   lb <- c(bw_bounds$lower, degree.search$lower)
   ub <- c(bw_bounds$upper, degree.search$upper)
   bbin <- c(bw_bounds$bbin, rep.int(1L, ndeg))
+  coordinate.roles <- .np_nomad_coordinate_roles(bw_bounds, degree.search)
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
@@ -1936,6 +1937,7 @@ npscoefbw.scbandwidth <-
     native.r.bridge = TRUE,
     start.lower = c(bw_start_bounds$lower, degree.search$lower),
     start.upper = c(bw_start_bounds$upper, degree.search$upper),
+    coordinate.roles = coordinate.roles,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,

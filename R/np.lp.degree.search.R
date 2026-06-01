@@ -1973,6 +1973,7 @@
                              degree_spec = NULL,
                              start.lower = NULL,
                              start.upper = NULL,
+                             coordinate.roles = NULL,
                              nomad.opts = list(),
                              native.r.bridge = FALSE) {
   engine <- match.arg(engine)
@@ -2026,6 +2027,11 @@
     degree_spec = degree_spec,
     start.lower = start.lower,
     start.upper = start.upper
+  )
+  coordinate.roles <- .np_nomad_validate_coordinate_roles(
+    coordinate.roles,
+    ncol(start_matrix),
+    where = ".np_nomad_search"
   )
   state$restart_starts <- lapply(
     seq_len(nrow(start_matrix)),
@@ -2181,11 +2187,13 @@
 
   run_nomad_solver <- function(start) {
     solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
-    solver.opts <- .np_nomad_apply_source_geometry(
-      solver.opts,
-      user.opts = nomad.opts,
-      roles = rep.int("degree", length(start))
-    )
+    if (!is.null(coordinate.roles)) {
+      solver.opts <- .np_nomad_apply_source_geometry(
+        solver.opts,
+        user.opts = nomad.opts,
+        roles = coordinate.roles
+      )
+    }
     start <- as.numeric(start)
 
     if (isTRUE(state$native.r.bridge)) {

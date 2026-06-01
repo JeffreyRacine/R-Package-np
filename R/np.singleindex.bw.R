@@ -824,6 +824,11 @@ npindexbw.NULL <-
     h.upper.raw
   }
   h.integer <- !identical(baseline.bws$type, "fixed")
+  coordinate.roles <- c(
+    rep.int("continuous_real", length(beta.lower)),
+    if (isTRUE(h.integer)) "continuous_nn_index" else "continuous_fixed_scale",
+    rep.int("degree", length(degree.search$lower))
+  )
 
   x0 <- if (fixed.nomad) {
     as.numeric(fixed.setup$start_matrix.point[1L, ])
@@ -1011,6 +1016,7 @@ npindexbw.NULL <-
     native.r.bridge = TRUE,
     start.lower = lb,
     start.upper = ub,
+    coordinate.roles = coordinate.roles,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,

@@ -819,6 +819,8 @@ npplregbw.plbandwidth =
   child.lower <- unlist(lapply(child.bounds, `[[`, "lower"), use.names = FALSE)
   child.upper <- unlist(lapply(child.bounds, `[[`, "upper"), use.names = FALSE)
   child.bbin <- unlist(lapply(child.bounds, `[[`, "bbin"), use.names = FALSE)
+  child.coordinate.roles <- unlist(lapply(child.bounds, .np_nomad_coordinate_roles),
+                                   use.names = FALSE)
   child.start.lower <- unlist(lapply(child.start.bounds, `[[`, "lower"), use.names = FALSE)
   child.start.upper <- unlist(lapply(child.start.bounds, `[[`, "upper"), use.names = FALSE)
   child.start <- unlist(lapply(seq_along(child.templates), function(i) {
@@ -841,6 +843,7 @@ npplregbw.plbandwidth =
   lb <- c(child.lower, degree.search$lower)
   ub <- c(child.upper, degree.search$upper)
   bbin <- c(child.bbin, rep.int(1L, ndeg))
+  coordinate.roles <- c(child.coordinate.roles, rep.int("degree", ndeg))
   baseline.record <- NULL
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
@@ -1048,6 +1051,7 @@ npplregbw.plbandwidth =
     remin = isTRUE(opt.args$nomad.remin),
     start.lower = c(child.start.lower, degree.search$lower),
     start.upper = c(child.start.upper, degree.search$upper),
+    coordinate.roles = coordinate.roles,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
