@@ -146,20 +146,52 @@
   roles
 }
 
+.np_nomad_known_coordinate_roles <- function() {
+  c("continuous_fixed_scale", "continuous_real", "continuous_nn_index",
+    "categorical_lambda", "degree")
+}
+
+.np_nomad_validate_coordinate_roles <- function(roles,
+                                                n,
+                                                where = "NOMAD coordinate geometry") {
+  if (is.null(roles))
+    return(NULL)
+
+  roles <- as.character(roles)
+  n <- as.integer(n)[1L]
+  if (length(roles) != n) {
+    stop(sprintf("%s requires %d coordinate role(s), got %d",
+                 where, n, length(roles)),
+         call. = FALSE)
+  }
+  if (anyNA(roles)) {
+    stop(sprintf("%s requires complete coordinate role metadata", where),
+         call. = FALSE)
+  }
+  unknown <- setdiff(unique(roles), .np_nomad_known_coordinate_roles())
+  if (length(unknown)) {
+    stop(sprintf("%s has unknown coordinate role(s): %s",
+                 where, paste(unknown, collapse = ", ")),
+         call. = FALSE)
+  }
+  roles
+}
+
 .np_nomad_apply_source_geometry <- function(opts,
                                             user.opts = list(),
                                             roles) {
-  roles <- as.character(roles)
+  roles <- .np_nomad_validate_coordinate_roles(
+    roles,
+    length(roles),
+    where = "NOMAD source geometry"
+  )
   n <- length(roles)
   if (!n)
     return(opts)
-  if (anyNA(roles))
-    stop("NOMAD coordinate geometry requires complete coordinate role metadata",
-         call. = FALSE)
 
   generated <- list(
     INITIAL_MESH_SIZE = rep.int(1, n),
-    MIN_MESH_SIZE = ifelse(roles %in% "continuous_fixed_scale",
+    MIN_MESH_SIZE = ifelse(roles %in% c("continuous_fixed_scale", "continuous_real"),
                            sqrt(.Machine$double.eps), 1)
   )
 

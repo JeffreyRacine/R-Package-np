@@ -587,6 +587,11 @@ nplsqregbw <-
   lb <- c(bw.bounds$lower, delta.bounds[1L], degree.search$lower)
   ub <- c(bw.bounds$upper, delta.bounds[2L], degree.search$upper)
   bbin <- c(bw.bounds$bbin, 0L, rep.int(1L, ncon))
+  coordinate.roles <- c(
+    .np_nomad_coordinate_roles(bw.bounds),
+    "continuous_real",
+    rep.int("degree", length(degree.search$lower))
+  )
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
 
@@ -720,6 +725,7 @@ nplsqregbw <-
     native.r.bridge = TRUE,
     start.lower = c(bw.start.bounds$lower, delta.bounds[1L], degree.search$lower),
     start.upper = c(bw.start.bounds$upper, delta.bounds[2L], degree.search$upper),
+    coordinate.roles = coordinate.roles,
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
