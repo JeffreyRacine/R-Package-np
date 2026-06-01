@@ -22,6 +22,13 @@ Changes from Version 0.70-2 to 0.70-3 [01-Jun-2026]
   settings fail before solver entry, and inadmissible GLP degree candidates
   are guarded before expensive evaluator work.
 
+* Improved `npindexbw(..., method = "ichimura", regtype = c("ll", "lp"))`
+  objective evaluation by reusing the established local-polynomial regression
+  evaluator for fixed-degree and NOMAD degree-search routes. Focused sentinel
+  runs preserved selected objective payloads while materially reducing runtime
+  for local-linear and local-polynomial Ichimura single-index bandwidth
+  searches.
+
 * Improved the hot symmetric weighted-sum loop used by local-polynomial
   regression cross-validation. Fixed-bandwidth `npregbw(..., regtype = "lp",
   bwmethod = "cv.ls")` objective probes showed large reductions in

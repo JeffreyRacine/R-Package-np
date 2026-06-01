@@ -392,6 +392,75 @@ npindexbw.NULL <-
   h >= (diff(range(vals)) / cont_utol)
 }
 
+.npindexbw_build_lp_regression_leaf <- function(index,
+                                                ydat,
+                                                h,
+                                                bws,
+                                                spec) {
+  index.df <- data.frame(index = as.double(index))
+  reg.args <- list(
+    regtype = "lp",
+    basis = as.character(spec$basis.engine),
+    degree = as.integer(spec$degree.engine),
+    bernstein.basis = isTRUE(spec$bernstein.basis.engine),
+    bwmethod = "cv.ls",
+    bwtype = bws$type,
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    ckerbound = bws$ckerbound,
+    ckerlb = bws$ckerlb,
+    ckerub = bws$ckerub,
+    ukertype = if (is.null(bws$ukertype)) "aitchisonaitken" else bws$ukertype,
+    okertype = if (is.null(bws$okertype)) "liracine" else bws$okertype
+  )
+
+  list(
+    xdat = index.df,
+    bws = .npregbw_build_rbandwidth(
+      xdat = index.df,
+      ydat = ydat,
+      bws = c(h),
+      bandwidth.compute = FALSE,
+      reg.args = reg.args,
+      yname = if (is.null(bws$ynames)) "y" else as.character(bws$ynames[1L])
+    )
+  )
+}
+
+.npindexbw_eval_ichimura_lp_via_npreg <- function(index,
+                                                  ydat,
+                                                  h,
+                                                  bws,
+                                                  spec,
+                                                  invalid.penalty) {
+  leaf <- .npindexbw_build_lp_regression_leaf(
+    index = index,
+    ydat = ydat,
+    h = h,
+    bws = bws,
+    spec = spec
+  )
+
+  out <- tryCatch(
+    .npregbw_eval_only(
+      xdat = leaf$xdat,
+      ydat = ydat,
+      bws = leaf$bws,
+      invalid.penalty = "baseline",
+      penalty.multiplier = 10
+    ),
+    error = function(e) NULL
+  )
+
+  if (is.null(out) || !is.finite(out$objective[1L]))
+    return(list(objective = as.numeric(invalid.penalty), num.feval.fast = 0L))
+
+  list(
+    objective = as.numeric(out$objective[1L]),
+    num.feval.fast = as.numeric(out$num.feval.fast[1L])
+  )
+}
+
 .npindex_lp_loo_fit <- function(index,
                                 ydat,
                                 h,
@@ -564,6 +633,18 @@ npindexbw.NULL <-
 
   index <- xmat %*% c(1, beta)
   wmat <- cbind(ydat, 1.0)
+
+  if (!identical(spec$regtype.engine, "lc") &&
+      identical(bws$method, "ichimura")) {
+    return(.npindexbw_eval_ichimura_lp_via_npreg(
+      index = index,
+      ydat = ydat,
+      h = h,
+      bws = bws,
+      spec = spec,
+      invalid.penalty = invalid.penalty
+    ))
+  }
 
   fit.loo <- if (identical(spec$regtype.engine, "lc")) {
     tww <- tryCatch(
@@ -1577,27 +1658,17 @@ npindexbw.sibandwidth <-
                   return(rep.int(NA_real_, length(ydat)))
                 tww[1,2,]/NZD(tww[2,2,])
               } else {
-                ok.design <- tryCatch({
-                  npCheckRegressionDesignCondition(
-                    reg.code = REGTYPE_LP,
-                    xcon = data.frame(index = index),
-                    basis = spec$basis.engine,
-                    degree = spec$degree.engine,
-                    bernstein.basis = spec$bernstein.basis.engine,
-                    where = "npindexbw"
-                  )
-                  TRUE
-                }, error = function(e) FALSE)
-                if (!ok.design)
-                  return(ichimuraMaxPenalty)
-
-                .npindex_lp_loo_fit(
+                objective <- .npindexbw_eval_ichimura_lp_via_npreg(
                   index = index,
                   ydat = ydat,
                   h = h,
                   bws = bws,
-                  spec = spec
+                  spec = spec,
+                  invalid.penalty = ichimuraMaxPenalty
                 )
+                num.feval.fast.overall <<- num.feval.fast.overall +
+                  as.numeric(objective$num.feval.fast[1L])
+                return(as.numeric(objective$objective[1L]))
               }
 
               if (any(!is.finite(fit.loo)))

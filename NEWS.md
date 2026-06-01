@@ -17,6 +17,11 @@
   reject unsupported or indeterminate cache-off settings before solver entry.
   Inadmissible GLP degree candidates are guarded before expensive evaluator
   work.
+- `npindexbw(..., method = "ichimura", regtype = c("ll", "lp"))` now reuses
+  the established local-polynomial regression objective evaluator for
+  fixed-degree and NOMAD degree-search routes. Focused sentinel runs preserved
+  selected objective payloads while materially reducing runtime for
+  local-linear and local-polynomial Ichimura single-index bandwidth searches.
 - `options(np.tree = "auto")` is now the default tree mode. In auto mode,
   continuous kd-tree routes are enabled only for bounded-support continuous
   kernels (`"epanechnikov"` and `"uniform"`); `np.tree = TRUE` remains the
