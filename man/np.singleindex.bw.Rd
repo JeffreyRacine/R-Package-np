@@ -212,7 +212,9 @@ These arguments control automatic local-polynomial degree search.
     search over bandwidth and degree coordinates, then verifies the result
     over the requested degree grid using repeated fixed-degree solves. The
     default is \code{FALSE} because certification can be substantially
-    slower than the heuristic search.
+    slower than the heuristic search. Set \code{degree.verify=TRUE} when
+    degree-selection certification or sensitivity checking is more important
+    than runtime.
   }
 
 
