@@ -1227,7 +1227,7 @@ npindexbw.NULL <-
     h.lower.raw
   }
   h.upper <- if (fixed.nomad) {
-    h.start.controls$scale.factor.init.upper
+    h.upper.raw / fixed.setup$h.scale
   } else {
     h.upper.raw
   }
@@ -1245,6 +1245,17 @@ npindexbw.NULL <-
   }
   lb <- c(beta.lower, h.lower, degree.search$lower)
   ub <- c(beta.upper, h.upper, degree.search$upper)
+  start.lb <- lb
+  start.ub <- ub
+  if (fixed.nomad) {
+    h.idx <- length(beta.start) + 1L
+    start.lb[h.idx] <- max(start.lb[h.idx], h.start.controls$scale.factor.init.lower)
+    start.ub[h.idx] <- min(start.ub[h.idx], h.start.controls$scale.factor.init.upper)
+    if (start.ub[h.idx] < start.lb[h.idx]) {
+      stop("npindexbw: effective NOMAD fixed-bandwidth random-start interval is empty after applying search bounds",
+           call. = FALSE)
+    }
+  }
   bbin <- c(rep.int(0L, length(beta.start)), if (isTRUE(h.integer)) 1L else 0L, 1L)
   baseline.record <- NULL
   nomad.num.feval.total <- 0
@@ -1459,8 +1470,8 @@ npindexbw.NULL <-
     remin = isTRUE(opt.args$nomad.remin),
     nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     native.r.bridge = TRUE,
-    start.lower = lb,
-    start.upper = ub,
+    start.lower = start.lb,
+    start.upper = start.ub,
     coordinate.roles = coordinate.roles,
     degree_spec = list(
       initial = degree.search$start.degree,

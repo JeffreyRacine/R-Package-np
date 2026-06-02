@@ -2343,7 +2343,9 @@ npRmpiNomadShadowSearchRegression <- function(template,
     native.nomad.opts <- .np_nomad_apply_source_geometry(
       native.nomad.opts,
       user.opts = nomad.opts,
-      roles = .np_nomad_coordinate_roles(shadow.bw.bounds, degree.search)
+      roles = .np_nomad_coordinate_roles(shadow.bw.bounds, degree.search),
+      expected.length = length(lb),
+      where = "npregbw native NOMAD degree source geometry"
     )
     native.option.vectors <- .npregbw_nomad_native_option_vectors(native.nomad.opts)
     native.start.matrix <- .np_nomad_build_starts(

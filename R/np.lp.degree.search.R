@@ -2206,7 +2206,9 @@
       solver.opts <- .np_nomad_apply_source_geometry(
         solver.opts,
         user.opts = nomad.opts,
-        roles = coordinate.roles
+        roles = coordinate.roles,
+        expected.length = length(start),
+        where = ".np_nomad_search source geometry"
       )
     }
     start <- as.numeric(start)
