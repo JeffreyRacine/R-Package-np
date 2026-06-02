@@ -546,12 +546,12 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   if (!is.null(dots$plot.data.overlay) &&
-      !any(c("rbandwidth", "plbandwidth", "scbandwidth") %in% cls) &&
+      !any(c("rbandwidth", "plbandwidth", "scbandwidth", "sibandwidth") %in% cls) &&
       !("condbandwidth" %in% cls && isTRUE(dots$quantreg))) {
     dots$plot.data.overlay <- .np_plot_match_flag(dots$plot.data.overlay,
                                                   "plot.data.overlay")
     if (isTRUE(dots$plot.data.overlay)) {
-      stop("plot.data.overlay=TRUE is available only for regression, quantile regression, partially linear, and smooth coefficient plot surfaces.",
+      stop("plot.data.overlay=TRUE is available only for regression, quantile regression, single-index, partially linear, and smooth coefficient plot surfaces.",
            call. = FALSE)
     }
     dots$plot.data.overlay <- NULL
