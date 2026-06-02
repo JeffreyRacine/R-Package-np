@@ -1543,9 +1543,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       stop("native npcdist NOMAD route does not support NOMAD remin", call. = FALSE)
 
     native.random.seed <- opt.value("random.seed", 42L)
-    native.nomad.opts <- .np_nomad_default_opts(
-      native.random.seed,
-      opt.value("nomad.opts", list())
+    native.nomad.opts <- .np_nomad_prepare_solver_opts(
+      random.seed = native.random.seed,
+      nomad.opts = opt.value("nomad.opts", list()),
+      geometry.policy = "user-only",
+      where = "npcdistbw native NOMAD source geometry"
     )
     native.option.vectors <- .npcdistbw_nomad_native_option_vectors(native.nomad.opts)
     native.start.matrix <- .np_nomad_build_starts(
@@ -1980,9 +1982,11 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     native.nmulti <- npValidateNmulti(nomad.nmulti)
     native.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
     native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
-      native.nomad.opts <- .np_nomad_default_opts(
-        random.seed,
-        if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
+      native.nomad.opts <- .np_nomad_prepare_solver_opts(
+        random.seed = random.seed,
+        nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
+        geometry.policy = "user-only",
+        where = "npcdistbw native NOMAD degree source geometry"
       )
       native.option.vectors <- .npcdistbw_nomad_native_option_vectors(native.nomad.opts)
       native.start.matrix <- .np_nomad_build_starts(

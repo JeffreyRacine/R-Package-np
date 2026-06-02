@@ -1270,6 +1270,27 @@
   utils::modifyList(base, if (is.null(nomad.opts)) list() else nomad.opts)
 }
 
+.np_nomad_prepare_solver_opts <- function(random.seed,
+                                          nomad.opts = list(),
+                                          coordinate.roles = NULL,
+                                          expected.length = NULL,
+                                          geometry.policy = c("user-only",
+                                                              "generate-central"),
+                                          where = "NOMAD source geometry") {
+  geometry.policy <- match.arg(geometry.policy)
+  opts <- .np_nomad_default_opts(random.seed, nomad.opts)
+  if (!identical(geometry.policy, "generate-central"))
+    return(opts)
+
+  .np_nomad_apply_source_geometry(
+    opts,
+    user.opts = nomad.opts,
+    roles = coordinate.roles,
+    expected.length = expected.length,
+    where = where
+  )
+}
+
 .np_nomad_native_false_option <- function(value) {
   if (is.logical(value))
     return(length(value) >= 1L && !isTRUE(value[1L]))
@@ -2201,16 +2222,14 @@
   }
 
   run_nomad_solver <- function(start) {
-    solver.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
-    if (!is.null(coordinate.roles)) {
-      solver.opts <- .np_nomad_apply_source_geometry(
-        solver.opts,
-        user.opts = nomad.opts,
-        roles = coordinate.roles,
-        expected.length = length(start),
-        where = ".np_nomad_search source geometry"
-      )
-    }
+    solver.opts <- .np_nomad_prepare_solver_opts(
+      random.seed = random.seed,
+      nomad.opts = nomad.opts,
+      coordinate.roles = coordinate.roles,
+      expected.length = length(start),
+      geometry.policy = if (is.null(coordinate.roles)) "user-only" else "generate-central",
+      where = ".np_nomad_search source geometry"
+    )
     start <- as.numeric(start)
 
     if (isTRUE(state$native.r.bridge)) {
