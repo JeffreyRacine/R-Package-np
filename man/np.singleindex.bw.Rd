@@ -204,10 +204,15 @@ These arguments control automatic local-polynomial degree search.
   }
 
   \item{degree.verify}{
-    logical value indicating whether a coordinate-search solution should
-    be exhaustively verified over the admissible degree grid after the
-    heuristic phase completes. Available only for
-    \code{search.engine="cell"}.
+    logical value indicating whether an automatic degree-search solution
+    should be exhaustively certified over the admissible degree grid after
+    the heuristic phase completes. With \code{search.engine="cell"}, this
+    verifies a coordinate-search solution using repeated fixed-degree
+    solves. With NOMAD-based search engines, this first runs the joint NOMAD
+    search over bandwidth and degree coordinates, then verifies the result
+    over the requested degree grid using repeated fixed-degree solves. The
+    default is \code{FALSE} because certification can be substantially
+    slower than the heuristic search.
   }
 
 
@@ -346,9 +351,13 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     degree using the native \pkg{crs} NOMAD C API, then applies one Powell hot
     start from the NOMAD solution. \code{"nomad"} omits the Powell
     refinement. \code{"cell"} profiles the criterion over the
-    admissible degree grid using repeated fixed-degree solves.
-    NOMAD-based search currently requires \code{degree.verify=FALSE}
-    and the suggested package \pkg{crs} to be installed.
+    admissible degree grid using repeated fixed-degree solves. Direct
+    exhaustive degree-grid search is available with
+    \code{degree.select="exhaustive"} and \code{search.engine="cell"}.
+    NOMAD-based search is intended to avoid exhaustive degree enumeration;
+    users who want post-search certification over the requested degree grid
+    can set \code{degree.verify=TRUE}. NOMAD-based search requires the
+    suggested package \pkg{crs} to be installed.
   }
 
 \subsection{Numerical Search Controls}{
