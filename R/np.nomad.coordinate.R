@@ -179,13 +179,34 @@
 
 .np_nomad_apply_source_geometry <- function(opts,
                                             user.opts = list(),
-                                            roles) {
+                                            roles,
+                                            expected.length,
+                                            where = "NOMAD source geometry") {
+  where <- as.character(where)[1L]
+  if (is.na(where) || !nzchar(where))
+    where <- "NOMAD source geometry"
+  if (missing(expected.length)) {
+    stop(sprintf("%s requires an expected coordinate length", where),
+         call. = FALSE)
+  }
+  expected.length <- suppressWarnings(as.numeric(expected.length)[1L])
+  if (!is.finite(expected.length) ||
+      expected.length < 0 ||
+      expected.length != floor(expected.length)) {
+    stop(sprintf("%s requires a non-negative integer coordinate length", where),
+         call. = FALSE)
+  }
+  expected.length <- as.integer(expected.length)
+  if (is.null(roles)) {
+    stop(sprintf("%s requires coordinate role metadata", where),
+         call. = FALSE)
+  }
   roles <- .np_nomad_validate_coordinate_roles(
     roles,
-    length(roles),
-    where = "NOMAD source geometry"
+    expected.length,
+    where = where
   )
-  n <- length(roles)
+  n <- expected.length
   if (!n)
     return(opts)
 
