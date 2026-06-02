@@ -250,6 +250,49 @@ npindexbw.NULL <-
   out
 }
 
+.npindex_index_from_beta_tail <- function(xmat, beta.tail) {
+  xmat <- toMatrix(xmat)
+  beta.tail <- as.double(beta.tail)
+  beta <- c(1, beta.tail)
+  if (length(beta) != ncol(xmat))
+    stop("npindexbw: beta/index geometry length mismatch", call. = FALSE)
+  index <- as.double(xmat %*% beta)
+  index[!is.finite(index)] <- 0
+  index
+}
+
+.npindex_beta_coordinate_setup <- function(xmat) {
+  xmat <- toMatrix(xmat)
+  p <- ncol(xmat)
+  if (p <= 1L) {
+    factor <- numeric(0)
+  } else {
+    scales <- apply(xmat, 2L, stats::sd)
+    scales <- as.double(scales)
+    scales[!is.finite(scales) | scales <= 0] <- 1
+    anchor <- scales[1L]
+    if (!is.finite(anchor) || anchor <= 0)
+      anchor <- 1
+    factor <- scales[-1L] / anchor
+    factor[!is.finite(factor) | factor <= 0] <- 1
+  }
+  list(
+    factor = factor,
+    to_search = function(beta.tail) {
+      beta.tail <- as.double(beta.tail)
+      if (!length(beta.tail))
+        return(numeric(0))
+      beta.tail * factor
+    },
+    to_public = function(beta.search) {
+      beta.search <- as.double(beta.search)
+      if (!length(beta.search))
+        return(numeric(0))
+      beta.search / factor
+    }
+  )
+}
+
 .npindex_finalize_bandwidth <- function(h,
                                         bwtype,
                                         nobs,
@@ -317,9 +360,6 @@ npindexbw.NULL <-
   degree.col <- h.col + 1L
 
   ols.fit <- lm(ydat ~ xmat, x = TRUE)
-  fit.proxy <- as.double(fitted(ols.fit))
-  fit.proxy[!is.finite(fit.proxy)] <- mean(ydat[is.finite(ydat)])
-  fit.proxy[!is.finite(fit.proxy)] <- 0
 
   ols.beta <- if (length(beta.free)) {
     .npindex_ols_beta_tail(ols.fit)
@@ -337,6 +377,7 @@ npindexbw.NULL <-
   }
   if (length(beta.start.raw))
     beta.start.raw[!is.finite(beta.start.raw)] <- 0
+  fit.proxy <- .npindex_index_from_beta_tail(xmat, beta.start.raw)
 
   if (isTRUE(all.equal(as.double(baseline.bws$bw[1L]), 0))) {
     h.start.raw <- .npindex_default_start_bandwidth(
@@ -1143,8 +1184,6 @@ npindexbw.NULL <-
                                     degree.search,
                                     nomad.inner.nmulti = 0L,
                                     nomad.opts = list()) {
-  if (isTRUE(degree.search$verify))
-    stop("automatic degree search with search.engine='nomad' does not support degree.verify")
   if (is.null(opt.args$nomad.opts) && length(nomad.opts))
     opt.args$nomad.opts <- nomad.opts
 
@@ -1177,6 +1216,7 @@ npindexbw.NULL <-
     y.clean <- as.double(y.clean)
 
   p <- ncol(x.clean)
+  beta.coord <- .npindex_beta_coordinate_setup(x.clean)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else npValidateNmulti(opt.args$nmulti[1L])
   scale.factor.search.lower <- npResolveScaleFactorLowerBound(opt.args$scale.factor.search.lower)
   h.start.controls <- .npindexbw_h_start_controls(
@@ -1206,6 +1246,7 @@ npindexbw.NULL <-
   } else {
     if (length(beta.free)) as.double(baseline.bws$beta[beta.free + 1L]) else numeric(0)
   }
+  beta.search.start <- beta.coord$to_search(beta.start)
   h.start.raw <- if (fixed.nomad) {
     as.double(fixed.setup$start_matrix.raw[1L, fixed.setup$h.col])
   } else {
@@ -1213,18 +1254,18 @@ npindexbw.NULL <-
   }
   beta.lower <- if (length(beta.start)) {
     if (fixed.nomad) {
-      pmin(0.5 * fixed.setup$ols.beta, 1.5 * fixed.setup$ols.beta)
+      beta.coord$to_search(pmin(0.5 * fixed.setup$ols.beta, 1.5 * fixed.setup$ols.beta))
     } else {
-      -pmax(10, 10 * abs(beta.start))
+      beta.coord$to_search(-pmax(10, 10 * abs(beta.start)))
     }
   } else {
     numeric(0)
   }
   beta.upper <- if (length(beta.start)) {
     if (fixed.nomad) {
-      pmax(0.5 * fixed.setup$ols.beta, 1.5 * fixed.setup$ols.beta)
+      beta.coord$to_search(pmax(0.5 * fixed.setup$ols.beta, 1.5 * fixed.setup$ols.beta))
     } else {
-      pmax(10, 10 * abs(beta.start))
+      beta.coord$to_search(pmax(10, 10 * abs(beta.start)))
     }
   } else {
     numeric(0)
@@ -1253,9 +1294,12 @@ npindexbw.NULL <-
   )
 
   x0 <- if (fixed.nomad) {
-    as.numeric(fixed.setup$start_matrix.point[1L, ])
+    start <- as.numeric(fixed.setup$start_matrix.point[1L, ])
+    if (length(beta.free))
+      start[seq_along(beta.free)] <- beta.coord$to_search(start[seq_along(beta.free)])
+    start
   } else {
-    c(beta.start, h.start.raw, as.integer(degree.search$start.degree))
+    c(beta.search.start, h.start.raw, as.integer(degree.search$start.degree))
   }
   lb <- c(beta.lower, h.lower, degree.search$lower)
   ub <- c(beta.upper, h.upper, degree.search$upper)
@@ -1308,6 +1352,8 @@ npindexbw.NULL <-
 
   point_to_public <- function(point) {
     point <- as.numeric(point)
+    if (length(beta.free))
+      point[seq_along(beta.free)] <- beta.coord$to_public(point[seq_along(beta.free)])
     if (length(point) >= (length(beta.free) + 1L))
       point[length(beta.free) + 1L] <- point_h_to_raw(point[length(beta.free) + 1L])
     point
@@ -1315,13 +1361,15 @@ npindexbw.NULL <-
 
   bandwidth_point_to_public <- function(point) {
     point <- as.numeric(point)
+    if (length(beta.free))
+      point[seq_along(beta.free)] <- beta.coord$to_public(point[seq_along(beta.free)])
     if (length(point))
       point[length(point)] <- point_h_to_raw(point[length(point)])
     point
   }
 
   point_to_param <- function(point) {
-    beta.tail <- if (length(beta.free)) as.double(point[seq_along(beta.free)]) else numeric(0)
+    beta.tail <- if (length(beta.free)) beta.coord$to_public(point[seq_along(beta.free)]) else numeric(0)
     h <- point_h_to_raw(point[length(beta.free) + 1L])
     h <- .npindex_finalize_bandwidth(
       h = h,
@@ -1496,6 +1544,82 @@ npindexbw.NULL <-
       user_supplied = degree.search$start.user
     )
   )
+
+  if (isTRUE(degree.search$verify)) {
+    verify.started <- proc.time()[3L]
+    verify.records <- list()
+    verify.best <- search.result$best
+    verify.best.payload <- search.result$best_payload
+    verify.eval.id <- 0L
+
+    visit_degree <- function(degree.vec) {
+      verify.eval.id <<- verify.eval.id + 1L
+      verify.reg.args <- reg.args
+      verify.reg.args$regtype <- "lp"
+      verify.reg.args$degree <- as.integer(degree.vec)
+      verify.reg.args$bernstein.basis <- degree.search$bernstein.basis
+      verify.reg.args$regtype.engine <- "lp"
+      verify.reg.args$degree.engine <- as.integer(degree.vec)
+      verify.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
+
+      started <- proc.time()[3L]
+      payload <- tryCatch(
+        .npindexbw_run_fixed_degree(
+          xdat = xdat,
+          ydat = ydat,
+          bws = bws,
+          template = template,
+          reg.args = verify.reg.args,
+          opt.args = opt.args
+        ),
+        error = function(e) e
+      )
+      status <- if (inherits(payload, "error")) "error" else "ok"
+      objective <- if (identical(status, "ok")) as.numeric(payload$fval[1L]) else NA_real_
+      rec <- list(
+        eval_id = verify.eval.id,
+        degree = as.integer(degree.vec),
+        objective = objective,
+        status = status,
+        cached = FALSE,
+        message = if (inherits(payload, "error")) conditionMessage(payload) else NULL,
+        elapsed = proc.time()[3L] - started,
+        num.feval = if (identical(status, "ok") && !is.null(payload$num.feval)) {
+          as.numeric(payload$num.feval[1L])
+        } else {
+          NA_real_
+        },
+        phase = "verify"
+      )
+      verify.records[[length(verify.records) + 1L]] <<- rec
+      if (identical(status, "ok") &&
+          (is.null(verify.best) ||
+           .np_degree_better(objective, verify.best$objective, direction = "min"))) {
+        verify.best <<- rec
+        verify.best.payload <<- payload
+      }
+      TRUE
+    }
+
+    .np_degree_check_grid_budget(
+      candidates = degree.search$candidates,
+      method = "coordinate",
+      verify = TRUE
+    )
+    .np_degree_iterate_grid(degree.search$candidates, visit_degree)
+    verify.elapsed <- proc.time()[3L] - verify.started
+
+    search.result$verify <- TRUE
+    search.result$certified <- TRUE
+    search.result$verify.time <- verify.elapsed
+    search.result$verify.results <- verify.records
+    search.result$best <- verify.best
+    search.result$best_payload <- verify.best.payload
+    search.result$n.unique <- as.numeric(search.result$n.unique) + verify.eval.id
+    search.result$n.visits <- as.numeric(search.result$n.visits) + verify.eval.id
+    search.result$grid.size <- .np_degree_grid_size(degree.search$candidates)
+    search.result$optim.time <- sum(c(search.result$optim.time, verify.elapsed), na.rm = TRUE)
+  }
 
   if (fixed.nomad) {
     if (!is.null(search.result$restart.starts)) {
@@ -1784,9 +1908,6 @@ npindexbw.default <-
           !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
               c("nomad", "nomad+powell")))
         stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
-      if ("degree.verify" %in% mc.names &&
-          isTRUE(npValidateScalarLogical(nomad.shortcut$values$degree.verify, "degree.verify")))
-        stop("nomad=TRUE currently requires degree.verify=FALSE")
     }
 
     random.seed.value <- if ("random.seed" %in% mc.names) {
@@ -2114,6 +2235,7 @@ npindexbw.sibandwidth <-
 
           ## Invariant objects used by objective evaluations.
           xmat <- xdat
+          beta.coord <- .npindex_beta_coordinate_setup(xmat)
           wmat <- cbind(ydat, 1.0)
           bandwidth_eval_count <- 0L
           objective.cache.enabled <- npObjectiveCacheEnabled()
@@ -2396,6 +2518,16 @@ npindexbw.sibandwidth <-
             optim.fn <- if(only.optimize.beta) kleinspady.nobw else  kleinspady
             optim.control <- list(reltol=optim.reltol,maxit=optim.maxit)
           }
+          optim.fn.search <- if (only.optimize.beta) {
+            function(param, h) optim.fn(beta.coord$to_public(param), h)
+          } else {
+            function(param) {
+              param <- as.double(param)
+              if (length(beta.idx))
+                param[beta.idx] <- beta.coord$to_public(param[beta.idx])
+              optim.fn(param)
+            }
+          }
 
           for (i in seq_len(nmulti)) {
             ## We use the nlm command to minimize the objective function using
@@ -2407,12 +2539,6 @@ npindexbw.sibandwidth <-
               ## Initial values taken from OLS fit with a constant used for
               ## multistart 1
               ols.fit <- lm(ydat~xdat,x=TRUE)
-              fit <- fitted(ols.fit)
-              fixed.h.lower <- if (identical(bws$type, "fixed")) {
-                h.start.controls$scale.factor.search.lower * .npindex_start_bandwidth_scale(fit = fit, nobs = nobs)
-              } else {
-                NULL
-              }
 
               if (p != 1L){
                 if (setequal(bws$beta[2:p], c(0)))
@@ -2420,6 +2546,12 @@ npindexbw.sibandwidth <-
                 else
                   beta = bws$beta[2:p]
               } else { beta = numeric(0) }
+              fit <- .npindex_index_from_beta_tail(xmat, beta)
+              fixed.h.lower <- if (identical(bws$type, "fixed")) {
+                h.start.controls$scale.factor.search.lower * .npindex_start_bandwidth_scale(fit = fit, nobs = nobs)
+              } else {
+                NULL
+              }
 
               if (bws$bw == 0)
                 h <- .npindex_default_start_bandwidth(
@@ -2459,11 +2591,12 @@ npindexbw.sibandwidth <-
                 )
             }
 
-            optim.parm <- if(only.optimize.beta) beta else c(beta,h)
+            beta.search <- beta.coord$to_search(beta)
+            optim.parm <- if(only.optimize.beta) beta.search else c(beta.search,h)
 
             optim.base.args <- list(
               par = optim.parm,
-              fn = optim.fn,
+              fn = optim.fn.search,
               gr = NULL,
               method = optim.method,
               control = optim.control
@@ -2501,7 +2634,8 @@ npindexbw.sibandwidth <-
                   optim.control$abstol <-  10.0*optim.control$abstol
               }
 
-              optim.parm <- if(only.optimize.beta) beta else c(beta,h)
+              beta.search <- beta.coord$to_search(beta)
+              optim.parm <- if(only.optimize.beta) beta.search else c(beta.search,h)
               optim.base.args$par <- optim.parm
               optim.base.args$control <- optim.control
               if (!only.optimize.beta && ("h" %in% names(optim.base.args))) {
@@ -2520,7 +2654,14 @@ npindexbw.sibandwidth <-
 
             fval.value[i] <- optim.return$value
             if(optim.return$value < fval.min) {
-              param <- if(only.optimize.beta) c(optim.return$par,h) else optim.return$par
+              param <- if(only.optimize.beta) {
+                c(beta.coord$to_public(optim.return$par), h)
+              } else {
+                out <- as.double(optim.return$par)
+                if (length(beta.idx))
+                  out[beta.idx] <- beta.coord$to_public(out[beta.idx])
+                out
+              }
               fval.min <- optim.return$value
               numimp <- numimp + 1
               best <- i
