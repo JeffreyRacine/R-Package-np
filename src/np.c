@@ -15248,6 +15248,9 @@ void np_density(double * tuno, double * tord, double * tcon,
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
+  np_clear_estimator_extern_aliases();
+  num_obs_train_extern = 0;
+  num_obs_eval_extern = 0;
 
   return;
 }
@@ -17265,6 +17268,10 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
+  np_reset_y_side_extern();
+  np_clear_estimator_extern_aliases();
+  num_obs_train_extern = 0;
+  num_obs_eval_extern = 0;
 
   return;
 }
