@@ -274,12 +274,7 @@ npindexbw.NULL <-
                                            h.start.raw,
                                            nobs,
                                            start.controls = .npindexbw_h_start_controls()) {
-  scale <- .npindex_default_start_bandwidth(
-    fit = fit,
-    bwtype = "fixed",
-    nobs = nobs,
-    start.controls = start.controls
-  )
+  scale <- .npindex_start_bandwidth_scale(fit = fit, nobs = nobs)
   if (!is.finite(scale) || scale <= 0) {
     scale <- max(
       if (is.finite(h.start.raw)) abs(as.double(h.start.raw)) else 0,
