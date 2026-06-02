@@ -188,8 +188,8 @@ Named options passed via \code{\dots} include:
     \describe{
       \item{\code{data_overlay}}{
         logical; when \code{TRUE}, overlay raw data on regression,
-        quantile-regression, partially linear, and smooth coefficient
-        plot surfaces and expand plot limits to include the data. For
+        quantile-regression, single-index, partially linear, and smooth
+        coefficient plot surfaces and expand plot limits to include the data. For
         \code{npqreg} level plots the data layer is drawn first by
         default, so quantile curves are overlaid on top; ordered and
         factor conditioning variables use the natural boxplot-style
