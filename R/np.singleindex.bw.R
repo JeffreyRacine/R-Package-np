@@ -231,6 +231,25 @@ npindexbw.NULL <-
   runif(1, min = 2, max = max(2L, upper))
 }
 
+.npindex_ols_beta_tail <- function(ols.fit) {
+  slopes <- as.double(coef(ols.fit)[-1L])
+  if (length(slopes) <= 1L)
+    return(numeric(0))
+
+  anchor <- slopes[1L]
+  tail <- slopes[-1L]
+  finite.slopes <- slopes[is.finite(slopes)]
+  scale <- if (length(finite.slopes)) max(1, max(abs(finite.slopes))) else 1
+  if (!is.finite(anchor) || abs(anchor) <= sqrt(.Machine$double.eps) * scale) {
+    tail[!is.finite(tail)] <- 0
+    return(tail)
+  }
+
+  out <- tail / anchor
+  out[!is.finite(out)] <- 0
+  out
+}
+
 .npindex_finalize_bandwidth <- function(h,
                                         bwtype,
                                         nobs,
@@ -303,7 +322,7 @@ npindexbw.NULL <-
   fit.proxy[!is.finite(fit.proxy)] <- 0
 
   ols.beta <- if (length(beta.free)) {
-    as.double(coef(ols.fit)[3:ncol(ols.fit$x)])
+    .npindex_ols_beta_tail(ols.fit)
   } else {
     numeric(0)
   }
@@ -2397,7 +2416,7 @@ npindexbw.sibandwidth <-
 
               if (p != 1L){
                 if (setequal(bws$beta[2:p], c(0)))
-                  beta <- coef(ols.fit)[3:ncol(ols.fit$x)]
+                  beta <- .npindex_ols_beta_tail(ols.fit)
                 else
                   beta = bws$beta[2:p]
               } else { beta = numeric(0) }
@@ -2428,8 +2447,9 @@ npindexbw.sibandwidth <-
             } else {
               ## Random initialization used for remaining multistarts
 
-              beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
-              beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
+              ols.beta <- .npindex_ols_beta_tail(ols.fit)
+              beta.length <- length(ols.beta)
+              beta <- runif(beta.length,min=0.5,max=1.5)*ols.beta
               if (!only.optimize.beta)
                 h <- .npindex_random_start_bandwidth(
                   fit = fit,
@@ -2457,8 +2477,9 @@ npindexbw.sibandwidth <-
             attempts <- 0
             while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
               attempts <- attempts + 1
-              beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
-              beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
+              ols.beta <- .npindex_ols_beta_tail(ols.fit)
+              beta.length <- length(ols.beta)
+              beta <- runif(beta.length,min=0.5,max=1.5)*ols.beta
               if(!only.optimize.beta)
                 h <- .npindex_random_start_bandwidth(
                   fit = fit,
