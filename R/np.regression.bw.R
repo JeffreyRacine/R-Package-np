@@ -1303,7 +1303,12 @@ npregbw.rbandwidth <-
     if (isTRUE(opt.args$nomad.remin))
       stop("native npreg NOMAD route does not support NOMAD remin", call. = FALSE)
 
-    native.nomad.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
+    native.nomad.opts <- .np_nomad_prepare_solver_opts(
+      random.seed = random.seed,
+      nomad.opts = nomad.opts,
+      geometry.policy = "user-only",
+      where = "npregbw native NOMAD source geometry"
+    )
     native.option.vectors <- .npregbw_nomad_native_option_vectors(native.nomad.opts)
     native.start.matrix <- .np_nomad_build_starts(
       x0 = x0,
@@ -1955,12 +1960,12 @@ npregbw.rbandwidth <-
     native.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
     native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
 
-    native.nomad.opts <- .np_nomad_default_opts(random.seed, nomad.opts)
-    native.nomad.opts <- .np_nomad_apply_source_geometry(
-      native.nomad.opts,
-      user.opts = nomad.opts,
-      roles = .np_nomad_coordinate_roles(bw_bounds, degree.search),
+    native.nomad.opts <- .np_nomad_prepare_solver_opts(
+      random.seed = random.seed,
+      nomad.opts = nomad.opts,
+      coordinate.roles = .np_nomad_coordinate_roles(bw_bounds, degree.search),
       expected.length = length(lb),
+      geometry.policy = "generate-central",
       where = "npregbw native NOMAD degree source geometry"
     )
     native.option.vectors <- .npregbw_nomad_native_option_vectors(native.nomad.opts)

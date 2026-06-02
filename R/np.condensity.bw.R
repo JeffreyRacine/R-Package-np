@@ -1766,9 +1766,11 @@ npNomadShadowSearchConditionalDensity <- function(template,
     native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
 
     native.max.eval <- 0L
-    native.nomad.opts <- .np_nomad_default_opts(
-      random.seed,
-      if (!is.null(opt.args$nomad.opts)) opt.args$nomad.opts else list()
+    native.nomad.opts <- .np_nomad_prepare_solver_opts(
+      random.seed = random.seed,
+      nomad.opts = if (!is.null(opt.args$nomad.opts)) opt.args$nomad.opts else list(),
+      geometry.policy = "user-only",
+      where = "npcdensbw native NOMAD degree source geometry"
     )
     native.option.vectors <- .npcdensbw_nomad_shadow_native_option_vectors(native.nomad.opts)
     flat.from.point <- .npcdensbw_nomad_shadow_native_flat_map(template, setup)
@@ -2348,9 +2350,11 @@ npNomadShadowSearchConditionalDensity <- function(template,
     native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
 
     native.random.seed <- opt.value("random.seed", 42L)
-    native.nomad.opts <- .np_nomad_default_opts(
-      native.random.seed,
-      opt.value("nomad.opts", list())
+    native.nomad.opts <- .np_nomad_prepare_solver_opts(
+      random.seed = native.random.seed,
+      nomad.opts = opt.value("nomad.opts", list()),
+      geometry.policy = "user-only",
+      where = "npcdensbw native NOMAD source geometry"
     )
     native.option.vectors <- .npcdensbw_nomad_shadow_native_option_vectors(native.nomad.opts)
     flat.from.point <- .npcdensbw_nomad_shadow_native_flat_map(template, setup)

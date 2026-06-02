@@ -458,15 +458,12 @@ npNomadNativeSearchDistribution <- function(prep,
       stop("native npudist NOMAD route does not support NOMAD remin", call. = FALSE)
 
     native.random.seed <- opt.value("random.seed", 42L)
-    native.nomad.opts <- .np_nomad_default_opts(
-      native.random.seed,
-      opt.value("nomad.opts", list())
-    )
-    native.nomad.opts <- .np_nomad_apply_source_geometry(
-      native.nomad.opts,
-      user.opts = opt.value("nomad.opts", list()),
-      roles = .np_nomad_coordinate_roles(bounds),
+    native.nomad.opts <- .np_nomad_prepare_solver_opts(
+      random.seed = native.random.seed,
+      nomad.opts = opt.value("nomad.opts", list()),
+      coordinate.roles = .np_nomad_coordinate_roles(bounds),
       expected.length = length(bounds$lower),
+      geometry.policy = "generate-central",
       where = "npudistbw native NOMAD source geometry"
     )
     native.option.vectors <- .npudistbw_nomad_native_option_vectors(native.nomad.opts)
