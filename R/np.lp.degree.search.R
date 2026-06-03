@@ -43,8 +43,17 @@
   .np_warn_high_glp_degree(upper, argname = "degree.max")
 
   candidates <- lapply(seq_len(ncon), function(j) seq.int(lower[j], upper[j]))
+  grid.size <- .np_degree_grid_size(candidates)
+  singleton <- identical(as.integer(grid.size), 1L)
 
-  list(lower = lower, upper = upper, candidates = candidates)
+  list(
+    lower = lower,
+    upper = upper,
+    candidates = candidates,
+    grid.size = grid.size,
+    singleton = singleton,
+    fixed.degree = if (singleton) vapply(candidates, `[`, integer(1L), 1L) else NULL
+  )
 }
 
 .np_degree_search_engine_controls <- function(search.engine) {
@@ -103,6 +112,67 @@
 
 .np_degree_grid_size <- function(candidates) {
   prod(vapply(candidates, length, integer(1)))
+}
+
+.np_degree_singleton_search_result <- function(degree.search,
+                                               eval_result,
+                                               direction = c("min", "max"),
+                                               objective_name = "objective") {
+  direction <- match.arg(direction)
+  fixed.degree <- as.integer(degree.search$fixed.degree)
+  objective <- as.numeric(eval_result$objective[1L])
+  num.feval <- if (is.null(eval_result$num.feval)) NA_real_ else as.numeric(eval_result$num.feval[1L])
+  rec <- list(
+    degree = fixed.degree,
+    objective = objective,
+    status = "ok",
+    cached = FALSE,
+    message = "singleton degree grid; fixed-degree bandwidth search",
+    elapsed = NA_real_,
+    num.feval = num.feval
+  )
+  trace <- data.frame(
+    trace_id = 1L,
+    eval_id = 1L,
+    degree = paste(fixed.degree, collapse = ","),
+    objective = objective,
+    status = "ok",
+    cached = FALSE,
+    message = rec$message,
+    elapsed = NA_real_,
+    num.feval = num.feval,
+    stringsAsFactors = FALSE
+  )
+  if (!identical(objective_name, "objective"))
+    names(trace)[names(trace) == "objective"] <- objective_name
+
+  list(
+    method = degree.search$engine,
+    direction = direction,
+    verify = FALSE,
+    completed = TRUE,
+    certified = TRUE,
+    interrupted = FALSE,
+    singleton = TRUE,
+    fixed.degree = fixed.degree,
+    baseline = rec,
+    best = rec,
+    best_payload = eval_result$payload,
+    nomad.time = NA_real_,
+    powell.time = if (!is.null(eval_result$payload$powell.time)) as.numeric(eval_result$payload$powell.time[1L]) else NA_real_,
+    optim.time = if (!is.null(eval_result$payload$total.time)) as.numeric(eval_result$payload$total.time[1L]) else NA_real_,
+    n.unique = 1L,
+    n.visits = 1L,
+    n.cached = 0L,
+    grid.size = 1L,
+    best.restart = NA_integer_,
+    restart.starts = NULL,
+    restart.degree.starts = fixed.degree,
+    restart.bandwidth.starts = NULL,
+    restart.start.info = NULL,
+    restart.results = NULL,
+    trace = trace
+  )
 }
 
 .np_degree_format_degree <- function(degree) {

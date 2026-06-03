@@ -1128,20 +1128,58 @@ nplsqregbw.default <-
         bernstein.basis = if (is.null(dots$bernstein.basis)) TRUE else dots$bernstein.basis,
         bernstein.named = !is.null(dots$bernstein.basis)
       )
-      search.result <- .nplsqreg_nomad_search(
-        xdat = xdat,
-        ydat = ydat,
-        scale = scale,
-        tau = tau,
-        template = start.bws,
-        delta = delta,
-        delta.bounds = delta.bounds,
-        opt.args = opt.args,
-        degree.search = degree.search,
-        nomad.inner.nmulti = if (is.null(dots$nomad.nmulti)) 0L else dots$nomad.nmulti,
-        random.seed = if (is.null(dots$random.seed)) 42L else dots$random.seed,
-        nomad.opts = if (is.null(dots$nomad.opts)) list() else dots$nomad.opts
-      )
+      if (isTRUE(degree.search$singleton)) {
+        fixed.reg.dots <- reg.dots
+        fixed.reg.dots$regtype <- "lp"
+        fixed.reg.dots$degree <- as.integer(degree.search$fixed.degree)
+        fixed.reg.dots$bernstein.basis <- degree.search$bernstein.basis
+        fixed.bws <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat),
+                                        fixed.reg.dots))
+        fixed.bws$regtype <- "lp"
+        fixed.bws$degree <- as.integer(degree.search$fixed.degree)
+        fixed.bws$bernstein.basis <- degree.search$bernstein.basis
+        fixed.core <- .nplsqreg_call_fixed_degree_core(
+          xdat = xdat,
+          ydat = ydat,
+          scale = scale,
+          tau = tau,
+          bws = fixed.bws,
+          delta = delta,
+          delta.bounds = delta.bounds,
+          opt.args = opt.args,
+          bandwidth.compute = bandwidth.compute
+        )
+        fixed.core$bws <- fixed.bws
+        fixed.core$bws$bw <- fixed.core$bw
+        fixed.core$bws$degree <- as.integer(degree.search$fixed.degree)
+        fixed.core$bws$regtype <- "lp"
+        fixed.core$bws$bernstein.basis <- degree.search$bernstein.basis
+        search.result <- .np_degree_singleton_search_result(
+          degree.search = degree.search,
+          eval_result = list(
+            objective = as.numeric(fixed.core$objective[1L]),
+            payload = fixed.core,
+            num.feval = if (!is.null(fixed.core$num.feval)) as.numeric(fixed.core$num.feval[1L]) else NA_real_
+          ),
+          direction = "min",
+          objective_name = "fval"
+        )
+      } else {
+        search.result <- .nplsqreg_nomad_search(
+          xdat = xdat,
+          ydat = ydat,
+          scale = scale,
+          tau = tau,
+          template = start.bws,
+          delta = delta,
+          delta.bounds = delta.bounds,
+          opt.args = opt.args,
+          degree.search = degree.search,
+          nomad.inner.nmulti = if (is.null(dots$nomad.nmulti)) 0L else dots$nomad.nmulti,
+          random.seed = if (is.null(dots$random.seed)) 42L else dots$random.seed,
+          nomad.opts = if (is.null(dots$nomad.opts)) list() else dots$nomad.opts
+        )
+      }
       core <- search.result$best_payload
       start.bws <- core$bws
     } else {

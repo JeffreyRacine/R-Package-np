@@ -274,16 +274,24 @@ npcdist.condbandwidth <-
       gradient.order = gradient.order,
       where = "npcdist"
     )
+    lp.degree0.lc.gradient <- isTRUE(gradients) &&
+      npGlpDegree0FirstDerivativeLcOk(
+        regtype.engine = reg.engine,
+        degree.engine = degree.engine,
+        gradient.order = glp.gradient.order,
+        ncon = bws$xncon
+      )
     if (isTRUE(gradients) &&
         identical(reg.engine, "lp") &&
         (bws$xncon > 0L) &&
+        !lp.degree0.lc.gradient &&
         all(degree.engine == 0L)) {
       stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
     }
 
     reg.c <- npRegtypeToC(
-      regtype = if (identical(reg.engine, "lp")) "lp" else "lc",
-      degree = degree.engine,
+      regtype = if (identical(reg.engine, "lp") && !lp.degree0.lc.gradient) "lp" else "lc",
+      degree = if (lp.degree0.lc.gradient) rep.int(0L, bws$xncon) else degree.engine,
       ncon = bws$xncon,
       context = "npcdist"
     )
@@ -384,7 +392,7 @@ npcdist.condbandwidth <-
       myout$congerr = matrix(data=myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
       myout$congerr = myout$congerr[, rorder, drop = FALSE]
 
-      if (identical(reg.engine, "lp") && bws$xncon > 0L) {
+      if (identical(reg.engine, "lp") && bws$xncon > 0L && !lp.degree0.lc.gradient) {
         cont.idx <- which(bws$ixcon)
         invalid.order <- glp.gradient.order > degree.engine
         if (any(invalid.order)) {

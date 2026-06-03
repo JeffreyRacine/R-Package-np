@@ -3884,7 +3884,13 @@
         gradient.order = gradient.order,
         ncon = ncon
       )
-      if (gradient.order[cpos] > degree[cpos]) {
+      if (gradient.order[cpos] > degree[cpos] &&
+          !npGlpDegree0FirstDerivativeLcOk(
+            regtype.engine = regtype,
+            degree.engine = degree,
+            gradient.order = gradient.order,
+            ncon = ncon
+          )) {
         return(list(
           t = matrix(NA_real_, nrow = B, ncol = neval),
           t0 = rep(NA_real_, neval)
@@ -10361,10 +10367,17 @@ plotFactor <- function(f, y, ...){
     gradient.order = gradient.order,
     where = "plot conditional"
   )
+  lp.degree0.lc.gradient <- isTRUE(gradients) &&
+    npGlpDegree0FirstDerivativeLcOk(
+      regtype.engine = reg.engine,
+      degree.engine = degree.engine,
+      gradient.order = glp.gradient.order,
+      ncon = bws$xncon
+    )
 
   reg.c <- npRegtypeToC(
-    regtype = if (identical(reg.engine, "lp")) "lp" else "lc",
-    degree = degree.engine,
+    regtype = if (identical(reg.engine, "lp") && !lp.degree0.lc.gradient) "lp" else "lc",
+    degree = if (lp.degree0.lc.gradient) rep.int(0L, bws$xncon) else degree.engine,
     ncon = bws$xncon,
     context = if (isTRUE(cdf)) "npcdist" else "npcdens"
   )
@@ -10476,7 +10489,7 @@ plotFactor <- function(f, y, ...){
     myout$congerr <- matrix(data = myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
     myout$congerr <- myout$congerr[, rorder, drop = FALSE]
 
-    if (identical(reg.engine, "lp") && bws$xncon > 0L) {
+    if (identical(reg.engine, "lp") && bws$xncon > 0L && !lp.degree0.lc.gradient) {
       cont.idx <- which(bws$ixcon)
       invalid.order <- glp.gradient.order > degree.engine
       if (any(invalid.order)) {

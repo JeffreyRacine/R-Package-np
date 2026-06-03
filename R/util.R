@@ -760,6 +760,18 @@ npValidateGlpGradientOrder <- function(regtype,
   as.integer(gradient.order)
 }
 
+npGlpDegree0FirstDerivativeLcOk <- function(regtype.engine,
+                                            degree.engine,
+                                            gradient.order,
+                                            ncon) {
+  identical(regtype.engine, "lp") &&
+    ncon > 0L &&
+    length(degree.engine) == ncon &&
+    all(degree.engine == 0L) &&
+    length(gradient.order) == ncon &&
+    all(gradient.order == 1L)
+}
+
 npConditionalRegEngineSpec <- function(bws, where = "conditional estimator") {
   reg.engine <- if (is.null(bws$regtype.engine)) {
     if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)

@@ -2762,6 +2762,9 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     candidates = bounds$candidates,
     lower = bounds$lower,
     upper = bounds$upper,
+    grid.size = bounds$grid.size,
+    singleton = bounds$singleton,
+    fixed.degree = bounds$fixed.degree,
     baseline.degree = baseline.degree,
     start.degree = start.degree,
     start.user = !is.null(degree.start),
@@ -2792,6 +2795,8 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     n.visits = search_result$n.visits,
     n.cached = search_result$n.cached,
     grid.size = search_result$grid.size,
+    singleton = isTRUE(search_result$singleton),
+    fixed.degree = search_result$fixed.degree,
     best.restart = search_result$best.restart,
     restart.starts = search_result$restart.starts,
     restart.degree.starts = search_result$restart.degree.starts,
@@ -3180,30 +3185,37 @@ npcdistbw.default <-
     opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
     if (!is.null(degree.search)) {
-      if (identical(degree.search$engine, "cell")) {
-        eval_fun <- function(degree.vec) {
-          cell.reg.args <- reg.args
-          cell.reg.args$regtype <- "lp"
-          cell.reg.args$pregtype <- "Local-Polynomial"
-          cell.reg.args$degree <- as.integer(degree.vec)
-          cell.reg.args$bernstein.basis <- degree.search$bernstein.basis
-          cell.reg.args$regtype.engine <- "lp"
-          cell.reg.args$degree.engine <- as.integer(degree.vec)
-          cell.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
-          cell.bws <- .npcdistbw_run_fixed_degree(
-            xdat = xdat,
-            ydat = ydat,
-            bws = bws,
-            reg.args = cell.reg.args,
-            opt.args = opt.args
-          )
-          list(
-            objective = as.numeric(cell.bws$fval[1L]),
-            payload = cell.bws,
-            num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_
-          )
-        }
+      eval_fun <- function(degree.vec) {
+        cell.reg.args <- reg.args
+        cell.reg.args$regtype <- "lp"
+        cell.reg.args$pregtype <- "Local-Polynomial"
+        cell.reg.args$degree <- as.integer(degree.vec)
+        cell.reg.args$bernstein.basis <- degree.search$bernstein.basis
+        cell.reg.args$regtype.engine <- "lp"
+        cell.reg.args$degree.engine <- as.integer(degree.vec)
+        cell.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
+        cell.bws <- .npcdistbw_run_fixed_degree(
+          xdat = xdat,
+          ydat = ydat,
+          bws = bws,
+          reg.args = cell.reg.args,
+          opt.args = opt.args
+        )
+        list(
+          objective = as.numeric(cell.bws$fval[1L]),
+          payload = cell.bws,
+          num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_
+        )
+      }
 
+      if (isTRUE(degree.search$singleton)) {
+        search.result <- .np_degree_singleton_search_result(
+          degree.search = degree.search,
+          eval_result = eval_fun(degree.search$fixed.degree),
+          direction = "min",
+          objective_name = "fval"
+        )
+      } else if (identical(degree.search$engine, "cell")) {
         search.result <- .np_degree_search(
           method = degree.search$method,
           candidates = degree.search$candidates,
