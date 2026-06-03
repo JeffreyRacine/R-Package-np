@@ -355,7 +355,7 @@ test_that("npplreg, npindex, and npscoef bounded generalized_nn are available", 
       x = list(ckertype = "gaussian", pckertype = "Second-Order Gaussian (bounded/range)",
         ukertype = "aitchisonaitken", pukertype = "Aitchison and Aitken",
         okertype = "liracine", pokertype = "Li and Racine (normalized)")),
-    call = npudistbw.NULL(dat = dat, ... = pairlist(bwtype = "adaptive_nn", bwmethod = "cv.cdf", ckerbound = "range", nmulti = 1))), class = "dbandwidth")
+    call = quote(npudistbw.NULL(dat = dat, ... = pairlist(bwtype = "adaptive_nn", bwmethod = "cv.cdf", ckerbound = "range", nmulti = 1)))), class = "dbandwidth")
   list(dat = dat, bw = bw)
 }
 
@@ -438,7 +438,7 @@ test_that("npplreg, npindex, and npscoef bounded generalized_nn are available", 
         pckertype = "Second-Order Gaussian (bounded/range)",
         ukertype = "aitchisonaitken", pukertype = "Aitchison and Aitken",
         okertype = "liracine", pokertype = "Li and Racine (normalized)")),
-    call = npcdistbw.NULL(xdat = x, ydat = y, ... = pairlist(bwtype = "adaptive_nn", bwmethod = "cv.ls", cxkerbound = "range", cykerbound = "range", nmulti = 1))), class = "condbandwidth")
+    call = quote(npcdistbw.NULL(xdat = x, ydat = y, ... = pairlist(bwtype = "adaptive_nn", bwmethod = "cv.ls", cxkerbound = "range", cykerbound = "range", nmulti = 1)))), class = "condbandwidth")
   list(x = x, y = y, bw = bw)
 }
 
@@ -456,7 +456,7 @@ test_that("bounded adaptive_nn fit-only remains available for distribution route
   expect_true(all(is.finite(as.numeric(fit.cdist$condist))))
 })
 
-test_that("deferred bounded public families remain blocked", {
+test_that("bounded adaptive_nn distribution selectors are available", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -466,42 +466,34 @@ test_that("deferred bounded public families remain blocked", {
   xy <- data.frame(x = x)
   yy <- data.frame(y = y)
 
-  expect_error(
-    npudistbw(
-      dat = xy,
-      bwmethod = "cv.cdf",
-      bwtype = "adaptive_nn",
-      ckerbound = "range",
-      nmulti = 1
-    ),
-    "bounded adaptive_nn remains unsupported for npudistbw\\(\\) in npRmpi"
+  bw.ud <- npudistbw(
+    dat = xy,
+    bwmethod = "cv.cdf",
+    bwtype = "adaptive_nn",
+    ckerbound = "range",
+    nmulti = 1
   )
+  fit.ud <- npudist(bws = bw.ud, tdat = xy)
 
-  expect_error(
-    npcdistbw(
-      xdat = xy,
-      ydat = yy,
-      bwmethod = "cv.ls",
-      bwtype = "adaptive_nn",
-      cxkerbound = "range",
-      cykerbound = "range",
-      nmulti = 1
-    ),
-    "bounded adaptive_nn remains unsupported for npcdistbw\\(\\) in npRmpi"
+  bw.cdist <- npcdistbw(
+    xdat = xy,
+    ydat = yy,
+    bwmethod = "cv.ls",
+    bwtype = "adaptive_nn",
+    cxkerbound = "range",
+    cykerbound = "range",
+    nmulti = 1
   )
+  fit.cdist <- npcdist(bws = bw.cdist, txdat = xy, tydat = yy)
 
-  expect_error(
-    npplregbw(
-      xdat = xy,
-      ydat = y,
-      zdat = xy,
-      bwmethod = "cv.ls",
-      bwtype = "generalized_nn",
-      ckerbound = "range",
-      nmulti = 1
-    ),
-    "finite continuous kernel bounds require bwtype = \"fixed\""
-  )
+  expect_true(all(is.finite(as.numeric(bw.ud$bw))))
+  expect_true(is.finite(bw.ud$fval))
+  expect_true(all(is.finite(as.numeric(fit.ud$dist))))
+
+  expect_true(all(is.finite(as.numeric(bw.cdist$xbw))))
+  expect_true(all(is.finite(as.numeric(bw.cdist$ybw))))
+  expect_true(is.finite(bw.cdist$fval))
+  expect_true(all(is.finite(as.numeric(fit.cdist$condist))))
 })
 
 test_that("evaluation support violations are caught before native execution", {

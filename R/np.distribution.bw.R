@@ -8,16 +8,6 @@ npudistbw <- function(...){
   UseMethod("npudistbw", target)
 }
 
-.npRmpi_npudistbw_bounded_adaptive_requested <- function(bwtype = NULL,
-                                                         ckerbound = "none",
-                                                         bandwidth.compute = TRUE) {
-  bwtype.ch <- tolower(as.character(bwtype)[1L])
-  ckerbound.ch <- tolower(as.character(ckerbound)[1L])
-  isTRUE(bandwidth.compute) &&
-    identical(bwtype.ch, "adaptive_nn") &&
-    !identical(ckerbound.ch, "none")
-}
-
 npudistbw.formula <-
   function(formula, data, subset, na.action, call, gdata = NULL, ...){
     formula.terms <- terms(formula)
@@ -96,13 +86,6 @@ npudistbw.NULL <-
       dots,
       "native npudist NOMAD route"
     )
-    if (.npRmpi_npudistbw_bounded_adaptive_requested(
-      bwtype = dots$bwtype,
-      ckerbound = if (is.null(dots$ckerbound)) "none" else dots$ckerbound,
-      bandwidth.compute = if (is.null(dots$bandwidth.compute)) TRUE else dots$bandwidth.compute
-    ))
-      stop("bounded adaptive_nn remains unsupported for npudistbw() in npRmpi",
-           call. = FALSE)
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
@@ -734,13 +717,6 @@ npudistbw.dbandwidth <-
     if (!missing(nmulti))
       nmulti <- npValidateNmulti(nmulti)
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
-    if (.npRmpi_npudistbw_bounded_adaptive_requested(
-      bwtype = bws$type,
-      ckerbound = bws$ckerbound,
-      bandwidth.compute = bandwidth.compute
-    ))
-      stop("bounded adaptive_nn remains unsupported for npudistbw() in npRmpi",
-           call. = FALSE)
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
