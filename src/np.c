@@ -14918,6 +14918,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   vector_ckerub_extern = NULL;
   safe_free(cxylb);
   safe_free(cxyub);
+  np_clear_estimator_extern_aliases();
+  num_obs_train_extern = 0;
+  num_obs_eval_extern = 0;
 
   return;
 }
