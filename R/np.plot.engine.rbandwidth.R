@@ -185,9 +185,15 @@
       go <- npValidateGlpGradientOrder(regtype = bws$regtype,
                                        gradient.order = gradient.order,
                                        ncon = bws$ncon)
-      if (length(go))
-        plot.gradient.order.label[which(bws$icon)] <- go
-      if (any(go > bws$degree))
+    if (length(go))
+      plot.gradient.order.label[which(bws$icon)] <- go
+      if (any(go > bws$degree) &&
+          !npGlpDegree0FirstDerivativeLcOk(
+            regtype.engine = bws$regtype,
+            degree.engine = bws$degree,
+            gradient.order = go,
+            ncon = bws$ncon
+          ))
         .np_warning("some requested glp derivatives exceed polynomial degree; plotting NA for those components")
     }
 

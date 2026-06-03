@@ -251,15 +251,23 @@ npreg.rbandwidth <-
     } else {
       NULL
     }
+    lp.degree0.lc.gradient <- isTRUE(gradients) &&
+      npGlpDegree0FirstDerivativeLcOk(
+        regtype.engine = reg.spec$regtype.engine,
+        degree.engine = reg.spec$degree.engine,
+        gradient.order = glp.gradient.order,
+        ncon = bws$ncon
+      )
     if (isTRUE(gradients) &&
         identical(reg.spec$regtype.engine, "lp") &&
         (bws$ncon > 0L) &&
+        !lp.degree0.lc.gradient &&
         all(reg.spec$degree.engine == 0L)) {
       stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
     }
 
-    reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
-                          degree = reg.spec$degree.engine,
+    reg.c <- npRegtypeToC(regtype = if (lp.degree0.lc.gradient) "lc" else reg.spec$regtype.engine,
+                          degree = if (lp.degree0.lc.gradient) rep.int(0L, bws$ncon) else reg.spec$degree.engine,
                           ncon = bws$ncon,
                           context = "npreg")
     degree.c <- if (bws$ncon > 0) {
@@ -495,7 +503,7 @@ npreg.rbandwidth <-
       myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE) 
       myout$gerr = as.matrix(myout$gerr[,rorder])
 
-      if (identical(bws$regtype, "lp")) {
+      if (identical(bws$regtype, "lp") && !lp.degree0.lc.gradient) {
         cont.idx <- which(bws$icon)
         if (length(cont.idx)) {
           invalid.order <- glp.gradient.order > bws$degree
