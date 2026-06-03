@@ -2947,6 +2947,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     start.lower = c(bw_start_bounds$lower, degree.search$lower),
     start.upper = c(bw_start_bounds$upper, degree.search$upper),
+    coordinate.roles = .np_nomad_coordinate_roles(bw_bounds, degree.search),
     degree_spec = list(
       initial = degree.search$start.degree,
       lower = degree.search$lower,
