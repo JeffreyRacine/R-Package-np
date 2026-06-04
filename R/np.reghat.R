@@ -75,6 +75,40 @@ npreghat <-
   as.integer(s)
 }
 
+.npreghat_native_apply_candidate <- function(bws, output, y, regtype, degree,
+                                             basis, bernstein.basis, s,
+                                             leave.one.out) {
+  identical(output, "apply") &&
+    !is.null(y) &&
+    is.matrix(y) &&
+    ncol(y) > 1L &&
+    !isTRUE(leave.one.out) &&
+    length(s) > 0L &&
+    !any(s > 0L) &&
+    identical(regtype, "lp") &&
+    identical(as.character(bws$type), "fixed") &&
+    length(degree) == as.integer(bws$ncon) &&
+    all(as.integer(degree) == 1L) &&
+    identical(basis, "glp") &&
+    !isTRUE(bernstein.basis) &&
+    isTRUE(any(bws$icon)) &&
+    !isTRUE(any(bws$iord)) &&
+    !isTRUE(any(bws$iuno))
+}
+
+.npreghat_native_apply_strategy <- function(ntrain, neval, nrhs) {
+  h.mb <- as.numeric(ntrain) * as.numeric(neval) * 8.0 / 1024^2
+  threshold.mb <- getOption("np.npreghat.apply.memory.threshold.mb", 64.0)
+  threshold.mb <- suppressWarnings(as.numeric(threshold.mb)[1L])
+  if (!is.finite(threshold.mb))
+    return("matrix")
+  if (is.na(threshold.mb))
+    threshold.mb <- 64.0
+  if (h.mb < threshold.mb)
+    return("matrix")
+  "direct"
+}
+
 .npreghat_solve_eval <- function(W, w.eval, k, ridge.base) {
   XtWX <- crossprod(W, W * k)
   p <- nrow(XtWX)
@@ -577,6 +611,131 @@ npreghat <-
   }
 
   H
+}
+
+.npreghat_exact_lp_apply_from_regression_core <- function(bws,
+                                                          txdat,
+                                                          y,
+                                                          exdat = NULL,
+                                                          basis = "glp",
+                                                          degree = integer(0),
+                                                          bernstein.basis = FALSE,
+                                                          s = NULL) {
+  no.ex <- is.null(exdat)
+
+  txdat <- toFrame(txdat)
+  if (!no.ex) {
+    exdat <- toFrame(exdat)
+    if (!(txdat %~% exdat))
+      stop("'txdat' and 'exdat' are not similar data frames!")
+  }
+
+  if (length(bws$bw) != length(txdat))
+    stop("length of bandwidth vector does not match number of columns of 'txdat'")
+
+  if ((any(bws$icon) &&
+       !all(vapply(txdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
+      (any(bws$iord) &&
+       !all(vapply(txdat[, bws$iord, drop = FALSE], inherits, logical(1), "ordered"))) ||
+      (any(bws$iuno) &&
+       !all(vapply(txdat[, bws$iuno, drop = FALSE], inherits, logical(1), "factor")))) {
+    stop("supplied bandwidths do not match 'txdat' in type")
+  }
+
+  txdat <- adjustLevels(txdat, bws$xdati)
+  if (!no.ex) {
+    exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+    npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+  }
+
+  txmat <- toMatrix(txdat)
+  tuno <- txmat[, bws$iuno, drop = FALSE]
+  tcon <- txmat[, bws$icon, drop = FALSE]
+  tord <- txmat[, bws$iord, drop = FALSE]
+  reg.c <- npRegtypeToC(regtype = "lp",
+                        degree = degree,
+                        ncon = bws$ncon,
+                        context = ".npreghat_exact_lp_apply_from_regression_core")
+
+  npCheckRegressionDesignCondition(reg.code = reg.c$code,
+                                   xcon = tcon,
+                                   basis = basis,
+                                   degree = degree,
+                                   bernstein.basis = bernstein.basis,
+                                   where = ".npreghat_exact_lp_apply_from_regression_core")
+
+  if (!no.ex) {
+    exmat <- toMatrix(exdat)
+    euno <- exmat[, bws$iuno, drop = FALSE]
+    econ <- exmat[, bws$icon, drop = FALSE]
+    eord <- exmat[, bws$iord, drop = FALSE]
+  } else {
+    euno <- tuno
+    econ <- tcon
+    eord <- tord
+  }
+
+  tuno <- if (bws$nuno > 0L) as.matrix(tuno) else matrix(double(), nrow = nrow(txdat), ncol = 0L)
+  tcon <- if (bws$ncon > 0L) as.matrix(tcon) else matrix(double(), nrow = nrow(txdat), ncol = 0L)
+  tord <- if (bws$nord > 0L) as.matrix(tord) else matrix(double(), nrow = nrow(txdat), ncol = 0L)
+  euno <- if (bws$nuno > 0L) as.matrix(euno) else matrix(double(), nrow = if (no.ex) nrow(txdat) else nrow(exdat), ncol = 0L)
+  econ <- if (bws$ncon > 0L) as.matrix(econ) else matrix(double(), nrow = if (no.ex) nrow(txdat) else nrow(exdat), ncol = 0L)
+  eord <- if (bws$nord > 0L) as.matrix(eord) else matrix(double(), nrow = if (no.ex) nrow(txdat) else nrow(exdat), ncol = 0L)
+
+  bwtype.c <- switch(bws$type,
+    fixed = BW_FIXED,
+    generalized_nn = BW_GEN_NN,
+    adaptive_nn = BW_ADAP_NN
+  )
+  kernel.x.c <- switch(bws$ckertype,
+    gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
+    epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
+    uniform = CKER_UNI,
+    "truncated gaussian" = CKER_TGAUSS
+  )
+  kernel.xu.c <- switch(bws$ukertype,
+    aitchisonaitken = UKER_AIT,
+    liracine = UKER_LR
+  )
+  kernel.xo.c <- switch(bws$okertype,
+    wangvanryzin = OKER_WANG,
+    liracine = OKER_LR,
+    racineliyan = OKER_RLY
+  )
+
+  bw.vec <- as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord]))
+  tree.flag <- identical(
+    .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    DO_TREE_YES
+  )
+  grad.vec <- if (length(s) && any(s > 0L)) as.integer(s) else integer(0L)
+  on.exit(
+    tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "npRmpi"),
+             error = function(e) NULL),
+    add = TRUE
+  )
+
+  .Call(
+    "C_np_regression_lp_apply_conditional",
+    tuno,
+    tord,
+    tcon,
+    euno,
+    eord,
+    econ,
+    y,
+    bw.vec,
+    as.integer(bwtype.c),
+    as.integer(kernel.x.c),
+    as.integer(kernel.xu.c),
+    as.integer(kernel.xo.c),
+    as.logical(tree.flag),
+    as.integer(degree),
+    grad.vec,
+    as.integer(isTRUE(bernstein.basis)),
+    as.integer(npLpBasisCode(basis)),
+    PACKAGE = "npRmpi"
+  )
 }
 
 .np_kernel_weights_direct <- function(bws,
@@ -1399,6 +1558,39 @@ npreghat.rbandwidth <-
         lc.derivative.exact.route ||
         FALSE
       )
+
+    if (.npreghat_native_apply_candidate(
+      bws = bws,
+      output = output,
+      y = y,
+      regtype = regtype,
+      degree = reg.spec$degree.engine,
+      basis = reg.spec$basis.engine,
+      bernstein.basis = reg.spec$bernstein.basis.engine,
+      s = s,
+      leave.one.out = leave.one.out
+    )) {
+      apply.strategy <- .npreghat_native_apply_strategy(
+        ntrain = nrow(txdat),
+        neval = if (no.ex) nrow(txdat) else nrow(exdat),
+        nrhs = ncol(y)
+      )
+      if (identical(apply.strategy, "direct")) {
+        out <- .npRmpi_with_local_regression(.npreghat_exact_lp_apply_from_regression_core(
+          bws = bws,
+          txdat = txdat,
+          y = y,
+          exdat = if (no.ex) NULL else exdat,
+          basis = reg.spec$basis.engine,
+          degree = reg.spec$degree.engine,
+          bernstein.basis = reg.spec$bernstein.basis.engine,
+          s = s
+        ))
+        if (ncol(out) == 1L)
+          return(as.vector(out))
+        return(out)
+      }
+    }
 
     if (direct.apply) {
       direct.args <- list(
