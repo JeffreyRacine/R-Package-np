@@ -70,6 +70,17 @@ int int_TREE_XY;
 int int_TREE_PROFILE_X;
 int int_nn_k_min_extern = 1;
 
+static int np_int_product_overflows(int a, int b)
+{
+  return (a < 0) || (b < 0) || ((a > 0) && (b > INT_MAX / a));
+}
+
+static int np_int_product3_overflows(int a, int b, int c)
+{
+  return np_int_product_overflows(a, b) ||
+    np_int_product_overflows(a * b, c);
+}
+
 static int np_mpi_local_regression_mode = 0;
 #ifdef MPI2
 static int np_mpi_local_regression_saved_rank = 0;
@@ -2955,6 +2966,8 @@ static void np_clear_estimator_extern_aliases(void)
   num_categories_extern_Y = NULL;
   num_categories_extern_XY = NULL;
   vector_continuous_stddev_extern = NULL;
+  vector_extendednn_upper_extern = NULL;
+  int_extendednn_upper_num_extern = 0;
   ipt_extern_X = NULL;
   ipt_extern_Y = NULL;
   ipt_extern_XY = NULL;
@@ -9622,7 +9635,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   double **matrix_y;
 
-  double *vector_continuous_stddev;
+  double *vector_continuous_stddev = NULL;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
   double *vector_scale_factor_startbest;
 
@@ -9763,8 +9776,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       matrix_X_continuous_train_extern[j][i]=mycon[j*num_obs_train_extern+i];
 
   ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt != NULL))
-    error("!(ipt != NULL)");
+  if(!(ipt != NULL)){
+    bw_error_msg = "!(ipt != NULL)";
+    goto cleanup_np_density_bw;
+  }
 
   for(i = 0; i < num_obs_train_extern; i++){
     ipt[i] = i;
@@ -9917,14 +9932,16 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     case BWM_CVLS : bwmfunc = cv_func_density_categorical_ls; break;
       //case BWM_CVML_NP : bwmfunc = cv_func_np_density_categorical_ml; break;
     default : REprintf("np.c: invalid bandwidth selection method.");
-      error("np.c: invalid bandwidth selection method."); break;
+      bw_error_msg = "np.c: invalid bandwidth selection method.";
+      goto cleanup_np_density_bw;
     }
   } else {
     switch(myopti[BW_MI]){
     case BWM_CVML : bwmfunc = np_cv_func_density_categorical_ml; break;
     case BWM_CVLS : bwmfunc = np_cv_func_density_categorical_ls; break;
     default : REprintf("np.c: invalid bandwidth selection method.");
-      error("np.c: invalid bandwidth selection method."); break;
+      bw_error_msg = "np.c: invalid bandwidth selection method.";
+      goto cleanup_np_density_bw;
     }
 
   }
@@ -10435,7 +10452,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   double **matrix_y;
 
-  double *vector_continuous_stddev;
+  double *vector_continuous_stddev = NULL;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
   double *vector_scale_factor_startbest;
 
@@ -10569,8 +10586,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   // nb check vals
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
-  if(num_reg_unordered_extern > 0)
-    error("np.c: distribution bw selection only works on ordered and continuous data."); 
+  if(num_reg_unordered_extern > 0){
+    bw_error_msg = "np.c: distribution bw selection only works on ordered and continuous data.";
+    goto cleanup_np_distribution_bw;
+  }
 
   if (int_use_starting_values)
     for( i=0;i<num_var; i++ )
@@ -10608,8 +10627,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   }
 
   ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt != NULL))
-    error("!(ipt != NULL)");
+  if(!(ipt != NULL)){
+    bw_error_msg = "!(ipt != NULL)";
+    goto cleanup_np_distribution_bw;
+  }
 
   for(i = 0; i < num_obs_train_extern; i++){
     ipt[i] = i;
@@ -10617,8 +10638,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   if(!cdfontrain) {
     ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
-    if(!(ipe != NULL))
-      error("!(ipe != NULL)");
+    if(!(ipe != NULL)){
+      bw_error_msg = "!(ipe != NULL)";
+      goto cleanup_np_distribution_bw;
+    }
 
     for(i = 0; i < num_obs_eval_extern; i++){
       ipe[i] = i;
@@ -10788,7 +10811,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   switch(myopti[DBW_MI]){
   case DBWM_CVLS : bwmfunc = cv_func_distribution_categorical_ls; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
-    error("np.c: invalid bandwidth selection method."); break;
+    bw_error_msg = "np.c: invalid bandwidth selection method.";
+    goto cleanup_np_distribution_bw;
   }
 
   if (bwm_use_transform)
@@ -11296,7 +11320,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   double **matrix_y = NULL;
 
-  double *vector_continuous_stddev;
+  double *vector_continuous_stddev = NULL;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
   double *vector_scale_factor_startbest;
   double *cxylb = NULL, *cxyub = NULL;
@@ -11573,13 +11597,15 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   // we use 3 trees for cpdf ls, and 2 for cpdf ml
 
   ipt_X = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt_X != NULL))
-    error("!(ipt_X != NULL)");
+  if(!(ipt_X != NULL)){
+    bw_error_msg = "!(ipt_X != NULL)";
+    goto cleanup_np_density_conditional_bw;
+  }
 
   ipt_lookup_X = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt_lookup_X != NULL)){
-    safe_free(ipt_X);
-    error("!(ipt_lookup_X != NULL)");
+    bw_error_msg = "!(ipt_lookup_X != NULL)";
+    goto cleanup_np_density_conditional_bw;
   }
 
   for(i = 0; i < num_obs_train_extern; i++){
@@ -11592,17 +11618,14 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if(need_y_side){
     ipt_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
     if(!(ipt_Y != NULL)){
-      safe_free(ipt_X);
-      safe_free(ipt_lookup_X);
-      error("!(ipt_Y != NULL)");
+      bw_error_msg = "!(ipt_Y != NULL)";
+      goto cleanup_np_density_conditional_bw;
     }
 
     ipt_lookup_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
     if(!(ipt_lookup_Y != NULL)){
-      safe_free(ipt_X);
-      safe_free(ipt_lookup_X);
-      safe_free(ipt_Y);
-      error("!(ipt_lookup_Y != NULL)");
+      bw_error_msg = "!(ipt_lookup_Y != NULL)";
+      goto cleanup_np_density_conditional_bw;
     }
 
     for(i = 0; i < num_obs_train_extern; i++){
@@ -11619,25 +11642,14 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   ipt_XY = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt_XY != NULL)){
-    safe_free(ipt_X);
-    safe_free(ipt_lookup_X);
-    if(need_y_side){
-      safe_free(ipt_Y);
-      safe_free(ipt_lookup_Y);
-    }
-    error("!(ipt_XY != NULL)");
+    bw_error_msg = "!(ipt_XY != NULL)";
+    goto cleanup_np_density_conditional_bw;
   }
 
   ipt_lookup_XY = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt_lookup_XY != NULL)){
-    safe_free(ipt_X);
-    safe_free(ipt_lookup_X);
-    if(need_y_side){
-      safe_free(ipt_Y);
-      safe_free(ipt_lookup_Y);
-    }
-    safe_free(ipt_XY);
-    error("!(ipt_lookup_XY != NULL)");
+    bw_error_msg = "!(ipt_lookup_XY != NULL)";
+    goto cleanup_np_density_conditional_bw;
   }
 
   for(i = 0; i < num_obs_train_extern; i++){
@@ -11918,14 +11930,16 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     case CBWM_NPLS : bwmfunc = np_cv_func_con_density_categorical_ls;break;
     case CBWM_CCDF : bwmfunc = cv_func_con_distribution_categorical_ccdf; break;
     default : REprintf("np.c: invalid bandwidth selection method.");
-      error("np.c: invalid bandwidth selection method."); break;
+      bw_error_msg = "np.c: invalid bandwidth selection method.";
+      goto cleanup_np_density_conditional_bw;
     }
   } else {
     switch(ibwmfunc){
     case CBWM_CVML : bwmfunc = np_cv_func_con_density_categorical_ml; break;
     case CBWM_CVLS : bwmfunc = np_cv_func_con_density_categorical_ls_npksum; break;
     default : REprintf("np.c: invalid bandwidth selection method.");
-      error("np.c: invalid bandwidth selection method."); break;
+      bw_error_msg = "np.c: invalid bandwidth selection method.";
+      goto cleanup_np_density_conditional_bw;
     }
   }
 
@@ -12517,7 +12531,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   double **matrix_y;
 
-  double *vector_continuous_stddev;
+  double *vector_continuous_stddev = NULL;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
   double *vector_scale_factor_startbest;
   double *cxylb = NULL, *cxyub = NULL;
@@ -12780,13 +12794,15 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   // we need 3 trees to accelerate cg_concdf :)
 
   ipt_X = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt_X != NULL))
-    error("!(ipt_X != NULL)");
+  if(!(ipt_X != NULL)){
+    bw_error_msg = "!(ipt_X != NULL)";
+    goto cleanup_np_distribution_conditional_bw;
+  }
 
   ipt_lookup_X = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt_lookup_X != NULL)){
-    safe_free(ipt_X);
-    error("!(ipt_lookup_X != NULL)");
+    bw_error_msg = "!(ipt_lookup_X != NULL)";
+    goto cleanup_np_distribution_conditional_bw;
   }
 
   for(i = 0; i < num_obs_train_extern; i++){
@@ -12799,17 +12815,14 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   ipt_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt_Y != NULL)){
-    safe_free(ipt_X);
-    safe_free(ipt_lookup_X);
-    error("!(ipt_Y != NULL)");
+    bw_error_msg = "!(ipt_Y != NULL)";
+    goto cleanup_np_distribution_conditional_bw;
   }
 
   ipt_lookup_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt_lookup_Y != NULL)){
-    safe_free(ipt_X);
-    safe_free(ipt_lookup_X);
-    safe_free(ipt_Y);
-    error("!(ipt_lookup_Y != NULL)");
+    bw_error_msg = "!(ipt_lookup_Y != NULL)";
+    goto cleanup_np_distribution_conditional_bw;
   }
 
   for(i = 0; i < num_obs_train_extern; i++){
@@ -12823,21 +12836,14 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   ipt_XY = (int *)malloc(num_obs_alt*sizeof(int));
   if(!(ipt_XY != NULL)){
-    safe_free(ipt_X);
-    safe_free(ipt_lookup_X);
-    safe_free(ipt_Y);
-    safe_free(ipt_lookup_Y);
-    error("!(ipt_XY != NULL)");
+    bw_error_msg = "!(ipt_XY != NULL)";
+    goto cleanup_np_distribution_conditional_bw;
   }
 
   ipt_lookup_XY = (int *)malloc(num_obs_alt*sizeof(int));
   if(!(ipt_lookup_XY != NULL)){
-    safe_free(ipt_X);
-    safe_free(ipt_lookup_X);
-    safe_free(ipt_Y);
-    safe_free(ipt_lookup_Y);
-    safe_free(ipt_XY);
-    error("!(ipt_lookup_XY != NULL)");
+    bw_error_msg = "!(ipt_lookup_XY != NULL)";
+    goto cleanup_np_distribution_conditional_bw;
   }
 
   for(i = 0; i < num_obs_alt; i++){
@@ -13101,7 +13107,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   switch(ibwmfunc){
   case CDBWM_CVLS : bwmfunc = cv_func_con_distribution_categorical_ls; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
-    error("np.c: invalid bandwidth selection method."); break;
+    bw_error_msg = "np.c: invalid bandwidth selection method.";
+    goto cleanup_np_distribution_conditional_bw;
   }
 
   if (bwm_use_transform)
@@ -14838,7 +14845,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   double **matrix_y;
 
-  double *vector_continuous_stddev;
+  double *vector_continuous_stddev = NULL;
   double *vector_scale_factor, *vector_scale_factor_multistart, *vsfh;
   double *vector_scale_factor_startbest;
 
@@ -15054,8 +15061,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   // initialize permutation arrays
   ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt != NULL))
-    error("!(ipt != NULL)");
+  if(!(ipt != NULL)){
+    bw_error_msg = "!(ipt != NULL)";
+    goto cleanup_np_regression_bw_mode;
+  }
 
   for(i = 0; i < num_obs_train_extern; i++){
     ipt[i] = i;
@@ -15067,9 +15076,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   if(int_TREE_X == NP_TREE_TRUE){
     ipt_lookup = (int *)malloc(num_obs_train_extern*sizeof(int));
     if(!(ipt_lookup != NULL)){
-      safe_free(ipt);
-      ipt = NULL;
-      error("!(ipt_lookup != NULL)");
+      bw_error_msg = "!(ipt_lookup != NULL)";
+      goto cleanup_np_regression_bw_mode;
     }
 
     build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
@@ -15124,7 +15132,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                 num_obs_train_extern,
                                 num_reg_continuous_extern,
                                 matrix_X_continuous_train_extern))){
-    error("failed to prepare LP CV basis cache");
+    bw_error_msg = "failed to prepare LP CV basis cache";
+    goto cleanup_np_regression_bw_mode;
   }
 
   vector_extendednn_upper_extern = (!eval_only) ?
@@ -15237,7 +15246,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   case RBWM_CVLS : bwmfunc = cv_func_regression_categorical_ls; break;
   case RBWM_CVCHECK : bwmfunc = cv_func_lsqregression_categorical_check; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
-    error("np.c: invalid bandwidth selection method.");break;
+    bw_error_msg = "np.c: invalid bandwidth selection method.";
+    goto cleanup_np_regression_bw_mode;
   }
 
   spinner(0);
@@ -16370,6 +16380,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     ksum = weighted_sum;
     ksum_is_output = 1;
   } else {
+    if(np_int_product_overflows(num_obs_eval_alloc, sum_element_length))
+      error("C_np_kernelsum: requested kernel-sum buffer is too large");
     ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length);
   }
 
@@ -16379,6 +16391,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
       p_ksum = weighted_p_sum;
       pksum_is_output = 1;
     } else {
+      if(np_int_product3_overflows(num_obs_eval_alloc, sum_element_length, p_nvar))
+        error("C_np_kernelsum: requested derivative kernel-sum buffer is too large");
       p_ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length*p_nvar);
     }
   }
@@ -16616,11 +16630,15 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
       kw = kernel_weights;
       kw_is_output = 1;
     } else {
+      if(np_int_product_overflows(num_obs_train_extern, num_obs_eval_extern))
+        error("C_np_kernelsum: requested kernel-weight buffer is too large");
       kw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern);
     }
   }
 
   if(return_kernel_weights && (p_nvar > 0)){
+    if(np_int_product3_overflows(num_obs_train_extern, num_obs_eval_extern, p_nvar))
+      error("C_np_kernelsum: requested derivative kernel-weight buffer is too large");
     pkw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern*p_nvar);
   }
   

@@ -1,3 +1,18 @@
+Changes from Version 0.70-3 to 0.70-4 [XX-XXX-XXXX]
+
+* Hardened proactive C cleanup paths by aligning LAPACK helper out-of-memory
+  cleanup with the serial package, clearing extended nearest-neighbor alias
+  state in the shared estimator cleanup helper, routing selected
+  bandwidth-constructor allocation and unsupported-method failures through
+  existing cleanup labels, and guarding large `np_kernelsum()` allocation-size
+  products before calling the legacy `alloc_vecd(int)` allocator.
+
+* Reassessed serial nearest-neighbor distance-cache promotion for MPI routes.
+  Scratch candidates did not produce stable material speedups without adding
+  unacceptable MPI cache-invalidation risk, so the current MPI implementation
+  was retained and the cache work was recorded as a future design item rather
+  than promoted in this hardening tranche.
+
 Changes from Version 0.70-2 to 0.70-3 [01-Jun-2026]
 
 * Added MPI-aware `nplsqreg()` and `nplsqregbw()` support for location-scale
