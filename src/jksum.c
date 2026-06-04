@@ -5032,6 +5032,7 @@ void np_p_ckernelv(const int KERNEL,
 static double *np_accel_gauss_tmp = NULL;
 static double *np_accel_gauss_arg = NULL;
 static double *np_accel_gauss_work = NULL;
+static double *np_accel_gauss_val = NULL;
 static int np_accel_gauss_capacity = 0;
 static void *np_accel_gauss_handle = NULL;
 static int np_accel_gauss_available_cache = -1;
@@ -5091,6 +5092,7 @@ static int np_accel_gauss_scratch_ensure(const int n)
   double *tmp = NULL;
   double *arg = NULL;
   double *work = NULL;
+  double *val = NULL;
 
   if(n <= np_accel_gauss_capacity)
     return 1;
@@ -5110,6 +5112,11 @@ static int np_accel_gauss_scratch_ensure(const int n)
     return 0;
   np_accel_gauss_work = work;
 
+  val = (double *)realloc(np_accel_gauss_val, (size_t)n*sizeof(double));
+  if(val == NULL)
+    return 0;
+  np_accel_gauss_val = val;
+
   np_accel_gauss_capacity = n;
   return 1;
 }
@@ -5122,13 +5129,15 @@ static int np_accel_gauss_has_zero_weight(const double * const w, const int n)
   return 0;
 }
 
-static void np_accel_gauss2_vector(const double * const xt,
-                                   const int n,
-                                   const double x,
-                                   const double zscale,
-                                   const double coef,
-                                   double * const out)
+static void np_accel_gauss_vector(const int KERNEL,
+                                  const double * const xt,
+                                  const int n,
+                                  const double x,
+                                  const double zscale,
+                                  const double coef,
+                                  double * const out)
 {
+  const double one = 1.0;
   const double minus_one = -1.0;
   const double minus_half = -0.5;
   const double zero = 0.0;
@@ -5143,6 +5152,51 @@ static void np_accel_gauss2_vector(const double * const xt,
   np_accel_vsmsaD(np_accel_gauss_tmp, 1, &minus_half, &zero,
                   np_accel_gauss_arg, 1, (np_vDSP_Length)n);
   np_accel_vvexp(out, np_accel_gauss_arg, &ni);
+
+  switch(KERNEL) {
+    case 1: {
+      const double c0 = 1.5;
+      np_accel_vsmsaD(np_accel_gauss_tmp, 1, &minus_half, &c0,
+                      np_accel_gauss_work, 1, (np_vDSP_Length)n);
+      np_accel_vmulD(out, 1, np_accel_gauss_work, 1,
+                     out, 1, (np_vDSP_Length)n);
+      break;
+    }
+    case 2: {
+      const double c2 = 0.125;
+      const double c1 = -1.25;
+      const double c0 = 1.875;
+      np_accel_vsmsaD(np_accel_gauss_tmp, 1, &c2, &c1,
+                      np_accel_gauss_work, 1, (np_vDSP_Length)n);
+      np_accel_vmulD(np_accel_gauss_work, 1, np_accel_gauss_tmp, 1,
+                     np_accel_gauss_work, 1, (np_vDSP_Length)n);
+      np_accel_vsmsaD(np_accel_gauss_work, 1, &one, &c0,
+                      np_accel_gauss_work, 1, (np_vDSP_Length)n);
+      np_accel_vmulD(out, 1, np_accel_gauss_work, 1,
+                     out, 1, (np_vDSP_Length)n);
+      break;
+    }
+    case 3: {
+      const double c3 = -0.02083333333;
+      const double c2 = 0.4375;
+      const double c1 = -2.1875;
+      const double c0 = 2.1875;
+      np_accel_vsmsaD(np_accel_gauss_tmp, 1, &c3, &c2,
+                      np_accel_gauss_work, 1, (np_vDSP_Length)n);
+      np_accel_vmulD(np_accel_gauss_work, 1, np_accel_gauss_tmp, 1,
+                     np_accel_gauss_work, 1, (np_vDSP_Length)n);
+      np_accel_vsmsaD(np_accel_gauss_work, 1, &one, &c1,
+                      np_accel_gauss_work, 1, (np_vDSP_Length)n);
+      np_accel_vmulD(np_accel_gauss_work, 1, np_accel_gauss_tmp, 1,
+                     np_accel_gauss_work, 1, (np_vDSP_Length)n);
+      np_accel_vsmsaD(np_accel_gauss_work, 1, &one, &c0,
+                      np_accel_gauss_work, 1, (np_vDSP_Length)n);
+      np_accel_vmulD(out, 1, np_accel_gauss_work, 1,
+                     out, 1, (np_vDSP_Length)n);
+      break;
+    }
+  }
+
   np_accel_vsmulD(out, 1, &coef, out, 1, (np_vDSP_Length)n);
 }
 #endif
@@ -5153,9 +5207,11 @@ void np_accel_gauss_release_buffers(void)
   free(np_accel_gauss_tmp);
   free(np_accel_gauss_arg);
   free(np_accel_gauss_work);
+  free(np_accel_gauss_val);
   np_accel_gauss_tmp = NULL;
   np_accel_gauss_arg = NULL;
   np_accel_gauss_work = NULL;
+  np_accel_gauss_val = NULL;
   np_accel_gauss_capacity = 0;
   if(np_accel_gauss_handle != NULL)
     dlclose(np_accel_gauss_handle);
@@ -5199,19 +5255,20 @@ void np_ckernelv(const int KERNEL,
 
 #if NP_ACCEL_GAUSS_COMPILED
   if(np_mseries_accelerate_enabled_cache &&
-     KERNEL == 0 &&
+     KERNEL >= 0 &&
+     KERNEL <= 3 &&
      xl == NULL &&
      num_xt >= 256 &&
      np_accel_gauss_resolve() &&
      np_accel_gauss_scratch_ensure(num_xt)) {
     const double coef = invnorm*ONE_OVER_SQRT_TWO_PI;
     if(!bin_do_xw) {
-      np_accel_gauss2_vector(xt, num_xt, x, zscale, coef, result);
+      np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, result);
       return;
     }
     if(!np_accel_gauss_has_zero_weight(xw, num_xt)) {
-      np_accel_gauss2_vector(xt, num_xt, x, zscale, coef, np_accel_gauss_work);
-      np_accel_vmulD(np_accel_gauss_work, 1, xw, 1, result, 1, (np_vDSP_Length)num_xt);
+      np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, np_accel_gauss_val);
+      np_accel_vmulD(np_accel_gauss_val, 1, xw, 1, result, 1, (np_vDSP_Length)num_xt);
       return;
     }
   }
