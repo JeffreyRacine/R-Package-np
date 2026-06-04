@@ -29,6 +29,8 @@
     options(np.largelambda = TRUE)
   if (is.null(getOption("np.extendednn")))
     options(np.extendednn = TRUE)
+  if (is.null(getOption("np.macMseries.accelerate")))
+    options(np.macMseries.accelerate = "auto")
   if (is.null(getOption("np.nomad.degree.start.policy")))
     options(np.nomad.degree.start.policy = "low_first_full_random")
   if (is.null(getOption("np.largeh.rel.tol")))
@@ -89,6 +91,17 @@ npTreeMode <- function(value = getOption("np.tree", "auto")) {
       identical(unname(tolower(value)), "auto"))
     return("auto")
   stop("option 'np.tree' must be TRUE, FALSE, or \"auto\"", call. = FALSE)
+}
+
+npMacMseriesAccelerateMode <- function(value = getOption("np.macMseries.accelerate", "auto")) {
+  if (isTRUE(value))
+    return("on")
+  if (identical(value, FALSE))
+    return("off")
+  if (is.character(value) && length(value) == 1L &&
+      identical(unname(tolower(value)), "auto"))
+    return("auto")
+  stop("option 'np.macMseries.accelerate' must be TRUE, FALSE, or \"auto\"", call. = FALSE)
 }
 
 npTreeContinuousKernelTypes <- function(bws = NULL, ckertype = NULL) {

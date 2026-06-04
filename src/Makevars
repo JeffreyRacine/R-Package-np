@@ -1,4 +1,0 @@
-# -*- Makefile -*-
-
-# linalg.c and jksum.c call LAPACK/BLAS entry points.
-PKG_LIBS = $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)

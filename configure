@@ -1,0 +1,24 @@
+#!/bin/sh
+
+np_accelerate_cppflags=""
+np_accelerate_libs=""
+
+case "`uname -s 2>/dev/null`" in
+  Darwin)
+    case "`uname -m 2>/dev/null`" in
+      arm64)
+        if test -d /System/Library/Frameworks/Accelerate.framework; then
+          np_accelerate_cppflags="-DNP_USE_ACCELERATE_GAUSS=1"
+          np_accelerate_libs="-framework Accelerate"
+        fi
+        ;;
+    esac
+    ;;
+esac
+
+sed \
+  -e "s|@NP_ACCELERATE_CPPFLAGS@|$np_accelerate_cppflags|g" \
+  -e "s|@NP_ACCELERATE_LIBS@|$np_accelerate_libs|g" \
+  src/Makevars.in > src/Makevars
+
+exit 0
