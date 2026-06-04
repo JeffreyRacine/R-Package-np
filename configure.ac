@@ -292,6 +292,19 @@ else
 	PKG_CPPFLAGS="-I${MPI_INCLUDE_PATH} ${MPI_INCL2} ${MPI_DEFS} -D${MPITYPE}"
 fi
 
+NP_ACCELERATE_CPPFLAGS=""
+case "`uname -s 2>/dev/null`" in
+  Darwin)
+    case "`uname -m 2>/dev/null`" in
+      arm64)
+        if test -d /System/Library/Frameworks/Accelerate.framework; then
+          NP_ACCELERATE_CPPFLAGS="-DNP_USE_ACCELERATE_GAUSS=1"
+        fi
+        ;;
+    esac
+    ;;
+esac
+
 case "$MPITYPE" in
   OPENMPI)
     if test "$MPI_ROOT" = "NONEED"; then
@@ -322,6 +335,7 @@ esac
 
 AC_SUBST(PKG_CPPFLAGS)
 AC_SUBST(PKG_LIBS)
+AC_SUBST(NP_ACCELERATE_CPPFLAGS)
 
 AC_CONFIG_FILES([src/Makevars])
 AC_OUTPUT

@@ -287,6 +287,8 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
       if (isTRUE(.npRmpi_bcast_cmd_is_plot_call(scmd))) {
           stop("plot(...) inside mpi.bcast.cmd(...) is unsupported in canonical SPMD mode; call plot(...) directly from master with npRmpi.autodispatch=TRUE", call. = FALSE)
       }
+      if (!isTRUE(getOption("npRmpi.runtime.option.sync.active", FALSE)))
+          .npRmpi_sync_runtime_options_to_slaves(comm = comm)
       if(caller.execute) tcmd <- substitute(cmd)
         #cmd <- deparse(substitute(cmd), width.cutoff=500)
 		#cmd <- serialize(cmd, NULL)

@@ -10,6 +10,10 @@
 #include <string.h>
 #include <time.h>
 
+#if defined(NP_USE_ACCELERATE_GAUSS) && defined(__APPLE__) && defined(__arm64__)
+#include <dlfcn.h>
+#endif
+
 #include <R.h>
 #include <R_ext/Applic.h>
 #include <R_ext/BLAS.h>
@@ -28,6 +32,29 @@
 #include <assert.h>
 
 #include <inttypes.h>
+
+#if defined(NP_USE_ACCELERATE_GAUSS) && defined(__APPLE__) && defined(__arm64__)
+#define NP_ACCEL_GAUSS_COMPILED 1
+typedef long np_vDSP_Stride;
+typedef unsigned long np_vDSP_Length;
+typedef void (*np_vDSP_vsmsaD_fn)(const double *, np_vDSP_Stride,
+                                  const double *, const double *,
+                                  double *, np_vDSP_Stride,
+                                  np_vDSP_Length);
+typedef void (*np_vDSP_vsqD_fn)(const double *, np_vDSP_Stride,
+                                double *, np_vDSP_Stride,
+                                np_vDSP_Length);
+typedef void (*np_vDSP_vsmulD_fn)(const double *, np_vDSP_Stride,
+                                  const double *, double *,
+                                  np_vDSP_Stride, np_vDSP_Length);
+typedef void (*np_vDSP_vmulD_fn)(const double *, np_vDSP_Stride,
+                                 const double *, np_vDSP_Stride,
+                                 double *, np_vDSP_Stride,
+                                 np_vDSP_Length);
+typedef void (*np_vvexp_fn)(double *, const double *, const int *);
+#else
+#define NP_ACCEL_GAUSS_COMPILED 0
+#endif
 #ifdef MPI2
 
 #include "mpi.h"
@@ -2343,6 +2370,7 @@ static uint64_t np_guarded_cvml_hits = 0;
 static int np_runtime_tol_cache_ready = 0;
 static int np_largeh_enabled_cache = 1;
 static int np_largelambda_enabled_cache = 1;
+static int np_mseries_accelerate_enabled_cache = 0;
 static double np_largeh_rel_tol_cache = 1e-3;
 static double np_disc_rel_tol_cache = 1e-2;
 /*
@@ -2527,6 +2555,45 @@ static inline int np_get_option_logical(const char * const name, const int fallb
 
   error("option '%s' must be TRUE or FALSE", name);
   return fallback;
+}
+
+static int np_option_string_is_auto(const char * const s)
+{
+  return (s != NULL) &&
+    (s[0] == 'a' || s[0] == 'A') &&
+    (s[1] == 'u' || s[1] == 'U') &&
+    (s[2] == 't' || s[2] == 'T') &&
+    (s[3] == 'o' || s[3] == 'O') &&
+    (s[4] == '\0');
+}
+
+static int np_get_option_auto_logical(const char * const name, const int auto_value)
+{
+  const SEXP sym = Rf_install(name);
+  const SEXP val = Rf_GetOption1(sym);
+
+  if(val == R_NilValue)
+    return auto_value;
+
+  if(TYPEOF(val) == LGLSXP && XLENGTH(val) == 1 && LOGICAL(val)[0] != NA_LOGICAL)
+    return LOGICAL(val)[0] != 0;
+
+  if(TYPEOF(val) == STRSXP && XLENGTH(val) == 1) {
+    const char *s = CHAR(STRING_ELT(val, 0));
+    if(np_option_string_is_auto(s))
+      return auto_value;
+  }
+
+  error("option '%s' must be TRUE, FALSE, or \"auto\"", name);
+  return auto_value;
+}
+
+static inline void np_refresh_mseries_accelerate_option(void)
+{
+  np_mseries_accelerate_enabled_cache =
+    NP_ACCEL_GAUSS_COMPILED ?
+    np_get_option_auto_logical("np.macMseries.accelerate", 1) :
+    0;
 }
 
 static inline void np_refresh_runtime_tolerances(void);
@@ -2804,6 +2871,7 @@ static inline void np_refresh_runtime_tolerances(void){
   const double largeh_optv = np_get_option_double("np.largeh.rel.tol", largeh_dflt);
   np_largeh_enabled_cache = np_get_option_logical("np.largeh", 1);
   np_largelambda_enabled_cache = np_get_option_logical("np.largelambda", 1);
+  np_refresh_mseries_accelerate_option();
   if(isfinite(largeh_optv) && largeh_optv > 0.0 && largeh_optv < 0.1) {
     np_largeh_rel_tol_cache = largeh_optv;
   } else {
@@ -4960,6 +5028,147 @@ void np_p_ckernelv(const int KERNEL,
     free(kbuf);
 }
 
+#if NP_ACCEL_GAUSS_COMPILED
+static double *np_accel_gauss_tmp = NULL;
+static double *np_accel_gauss_arg = NULL;
+static double *np_accel_gauss_work = NULL;
+static int np_accel_gauss_capacity = 0;
+static void *np_accel_gauss_handle = NULL;
+static int np_accel_gauss_available_cache = -1;
+static np_vDSP_vsmsaD_fn np_accel_vsmsaD = NULL;
+static np_vDSP_vsqD_fn np_accel_vsqD = NULL;
+static np_vDSP_vsmulD_fn np_accel_vsmulD = NULL;
+static np_vDSP_vmulD_fn np_accel_vmulD = NULL;
+static np_vvexp_fn np_accel_vvexp = NULL;
+
+static int np_accel_gauss_resolve(void)
+{
+  if(np_accel_gauss_available_cache >= 0)
+    return np_accel_gauss_available_cache;
+
+  np_accel_gauss_handle =
+    dlopen("/System/Library/Frameworks/Accelerate.framework/Accelerate",
+           RTLD_LAZY | RTLD_LOCAL);
+
+  if(np_accel_gauss_handle == NULL) {
+    np_accel_gauss_available_cache = 0;
+    return 0;
+  }
+
+  np_accel_vsmsaD =
+    (np_vDSP_vsmsaD_fn)dlsym(np_accel_gauss_handle, "vDSP_vsmsaD");
+  np_accel_vsqD =
+    (np_vDSP_vsqD_fn)dlsym(np_accel_gauss_handle, "vDSP_vsqD");
+  np_accel_vsmulD =
+    (np_vDSP_vsmulD_fn)dlsym(np_accel_gauss_handle, "vDSP_vsmulD");
+  np_accel_vmulD =
+    (np_vDSP_vmulD_fn)dlsym(np_accel_gauss_handle, "vDSP_vmulD");
+  np_accel_vvexp =
+    (np_vvexp_fn)dlsym(np_accel_gauss_handle, "vvexp");
+
+  if(np_accel_vsmsaD == NULL ||
+     np_accel_vsqD == NULL ||
+     np_accel_vsmulD == NULL ||
+     np_accel_vmulD == NULL ||
+     np_accel_vvexp == NULL) {
+    dlclose(np_accel_gauss_handle);
+    np_accel_gauss_handle = NULL;
+    np_accel_vsmsaD = NULL;
+    np_accel_vsqD = NULL;
+    np_accel_vsmulD = NULL;
+    np_accel_vmulD = NULL;
+    np_accel_vvexp = NULL;
+    np_accel_gauss_available_cache = 0;
+    return 0;
+  }
+
+  np_accel_gauss_available_cache = 1;
+  return 1;
+}
+
+static int np_accel_gauss_scratch_ensure(const int n)
+{
+  double *tmp = NULL;
+  double *arg = NULL;
+  double *work = NULL;
+
+  if(n <= np_accel_gauss_capacity)
+    return 1;
+
+  tmp = (double *)realloc(np_accel_gauss_tmp, (size_t)n*sizeof(double));
+  if(tmp == NULL)
+    return 0;
+  np_accel_gauss_tmp = tmp;
+
+  arg = (double *)realloc(np_accel_gauss_arg, (size_t)n*sizeof(double));
+  if(arg == NULL)
+    return 0;
+  np_accel_gauss_arg = arg;
+
+  work = (double *)realloc(np_accel_gauss_work, (size_t)n*sizeof(double));
+  if(work == NULL)
+    return 0;
+  np_accel_gauss_work = work;
+
+  np_accel_gauss_capacity = n;
+  return 1;
+}
+
+static int np_accel_gauss_has_zero_weight(const double * const w, const int n)
+{
+  for(int i = 0; i < n; i++)
+    if(w[i] == 0.0)
+      return 1;
+  return 0;
+}
+
+static void np_accel_gauss2_vector(const double * const xt,
+                                   const int n,
+                                   const double x,
+                                   const double zscale,
+                                   const double coef,
+                                   double * const out)
+{
+  const double minus_one = -1.0;
+  const double minus_half = -0.5;
+  const double zero = 0.0;
+  const int ni = n;
+
+  np_accel_vsmsaD(xt, 1, &minus_one, &x,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+  np_accel_vsmulD(np_accel_gauss_tmp, 1, &zscale,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+  np_accel_vsqD(np_accel_gauss_tmp, 1,
+                np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+  np_accel_vsmsaD(np_accel_gauss_tmp, 1, &minus_half, &zero,
+                  np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+  np_accel_vvexp(out, np_accel_gauss_arg, &ni);
+  np_accel_vsmulD(out, 1, &coef, out, 1, (np_vDSP_Length)n);
+}
+#endif
+
+void np_accel_gauss_release_buffers(void)
+{
+#if NP_ACCEL_GAUSS_COMPILED
+  free(np_accel_gauss_tmp);
+  free(np_accel_gauss_arg);
+  free(np_accel_gauss_work);
+  np_accel_gauss_tmp = NULL;
+  np_accel_gauss_arg = NULL;
+  np_accel_gauss_work = NULL;
+  np_accel_gauss_capacity = 0;
+  if(np_accel_gauss_handle != NULL)
+    dlclose(np_accel_gauss_handle);
+  np_accel_gauss_handle = NULL;
+  np_accel_gauss_available_cache = -1;
+  np_accel_vsmsaD = NULL;
+  np_accel_vsqD = NULL;
+  np_accel_vsmulD = NULL;
+  np_accel_vmulD = NULL;
+  np_accel_vvexp = NULL;
+#endif
+}
+
 void np_ckernelv(const int KERNEL, 
                  const double * const xt, const int num_xt, 
                  const int do_xw,
@@ -4987,6 +5196,26 @@ void np_ckernelv(const int KERNEL,
     np_ckernelv_mul_const(np_cont_largeh_k0(KERNEL)*invnorm, num_xt, do_xw, result, xl);
     return;
   }
+
+#if NP_ACCEL_GAUSS_COMPILED
+  if(np_mseries_accelerate_enabled_cache &&
+     KERNEL == 0 &&
+     xl == NULL &&
+     num_xt >= 256 &&
+     np_accel_gauss_resolve() &&
+     np_accel_gauss_scratch_ensure(num_xt)) {
+    const double coef = invnorm*ONE_OVER_SQRT_TWO_PI;
+    if(!bin_do_xw) {
+      np_accel_gauss2_vector(xt, num_xt, x, zscale, coef, result);
+      return;
+    }
+    if(!np_accel_gauss_has_zero_weight(xw, num_xt)) {
+      np_accel_gauss2_vector(xt, num_xt, x, zscale, coef, np_accel_gauss_work);
+      np_accel_vmulD(np_accel_gauss_work, 1, xw, 1, result, 1, (np_vDSP_Length)num_xt);
+      return;
+    }
+  }
+#endif
 
   /*
     Hot path: avoid indirect function-pointer calls and avoid branching on
@@ -6329,6 +6558,7 @@ const int keep_kw_owner_local){
 
   if(!np_runtime_tol_cache_ready)
     np_refresh_runtime_tolerances();
+  np_refresh_mseries_accelerate_option();
 
   if(no_bpso){
     bpso = (int *)malloc((num_reg_unordered + num_reg_ordered + num_reg_continuous)*sizeof(int));

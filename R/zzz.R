@@ -169,6 +169,8 @@
       options(np.largelambda = TRUE)
     if (is.null(getOption("np.extendednn")))
       options(np.extendednn = TRUE)
+    if (is.null(getOption("np.macMseries.accelerate")))
+      options(np.macMseries.accelerate = "auto")
     if (is.null(getOption("np.nomad.degree.start.policy")))
       options(np.nomad.degree.start.policy = "low_first_full_random")
     if (is.null(getOption("np.largeh.rel.tol")))
@@ -246,6 +248,8 @@
     options(np.largelambda = TRUE)
   if (is.null(getOption("np.extendednn")))
     options(np.extendednn = TRUE)
+  if (is.null(getOption("np.macMseries.accelerate")))
+    options(np.macMseries.accelerate = "auto")
   if (is.null(getOption("np.nomad.degree.start.policy")))
     options(np.nomad.degree.start.policy = "low_first_full_random")
   if (is.null(getOption("np.largeh.rel.tol")))
@@ -345,6 +349,51 @@ npTreeMode <- function(value = getOption("np.tree", "auto")) {
       identical(unname(tolower(value)), "auto"))
     return("auto")
   stop("option 'np.tree' must be TRUE, FALSE, or \"auto\"", call. = FALSE)
+}
+
+npMacMseriesAccelerateMode <- function(value = getOption("np.macMseries.accelerate", "auto")) {
+  if (isTRUE(value))
+    return("on")
+  if (identical(value, FALSE))
+    return("off")
+  if (is.character(value) && length(value) == 1L &&
+      identical(unname(tolower(value)), "auto"))
+    return("auto")
+  stop("option 'np.macMseries.accelerate' must be TRUE, FALSE, or \"auto\"", call. = FALSE)
+}
+
+.npMacMseriesAccelerateOptionValue <- function(value = getOption("np.macMseries.accelerate", "auto")) {
+  mode <- npMacMseriesAccelerateMode(value)
+  switch(mode,
+         on = TRUE,
+         off = FALSE,
+         auto = "auto")
+}
+
+.npRmpi_sync_runtime_options_to_slaves <- function(comm = 1L, force = FALSE) {
+  if (isTRUE(getOption("npRmpi.runtime.option.sync.active", FALSE)))
+    return(invisible(FALSE))
+
+  rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) NA_integer_)
+  size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) NA_integer_)
+  if (is.na(rank) || is.na(size) || rank != 0L || size < 2L)
+    return(invisible(FALSE))
+
+  accel <- .npMacMseriesAccelerateOptionValue()
+  last <- getOption("npRmpi.macMseries.accelerate.last.synced", NULL)
+  if (!isTRUE(force) && identical(accel, last))
+    return(invisible(FALSE))
+
+  old <- getOption("npRmpi.runtime.option.sync.active", FALSE)
+  options(npRmpi.runtime.option.sync.active = TRUE)
+  on.exit(options(npRmpi.runtime.option.sync.active = old), add = TRUE)
+
+  mpi.bcast.cmd(options,
+                np.macMseries.accelerate = accel,
+                rank = 0L,
+                comm = comm)
+  options(npRmpi.macMseries.accelerate.last.synced = accel)
+  invisible(TRUE)
 }
 
 npTreeContinuousKernelTypes <- function(bws = NULL, ckertype = NULL) {

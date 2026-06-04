@@ -642,6 +642,7 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 PKG_LIBS
 PKG_CPPFLAGS
+NP_ACCELERATE_CPPFLAGS
 PRTED
 ORTED
 PKG_CONFIG
@@ -4105,6 +4106,19 @@ else
 	PKG_CPPFLAGS="-I${MPI_INCLUDE_PATH} ${MPI_INCL2} ${MPI_DEFS} -D${MPITYPE}"
 fi
 
+NP_ACCELERATE_CPPFLAGS=""
+case "`uname -s 2>/dev/null`" in
+  Darwin)
+    case "`uname -m 2>/dev/null`" in
+      arm64)
+        if test -d /System/Library/Frameworks/Accelerate.framework; then
+          NP_ACCELERATE_CPPFLAGS="-DNP_USE_ACCELERATE_GAUSS=1"
+        fi
+        ;;
+    esac
+    ;;
+esac
+
 case "$MPITYPE" in
   OPENMPI)
     if test "$MPI_ROOT" = "NONEED"; then
@@ -5288,4 +5302,3 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 printf "%s\n" "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-

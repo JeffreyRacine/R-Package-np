@@ -158,6 +158,7 @@ mpi.spawn.Rslaves <-
         mpi.comm.disconnect(intercomm)
 		mpi.bcast(nonblock,type=1, rank=0, comm=comm)
 		mpi.bcast(sleep,type=2, rank=0, comm=comm)
+        .npRmpi_sync_runtime_options_to_slaves(comm=comm, force=TRUE)
         if (!quiet) mpi.hostinfo(comm)
     }
     else
