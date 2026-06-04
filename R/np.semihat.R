@@ -918,6 +918,13 @@
   out
 }
 
+.npscoef_hat_apply_chunk <- function(H.chunk, yy) {
+  ans <- crossprod(H.chunk, yy)
+  if (!is.matrix(ans))
+    ans <- matrix(ans, ncol = ncol(yy))
+  ans
+}
+
 .npscoef_weight_matrix <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
   state <- .npscoef_effective_weight_state(
     bws = bws,
@@ -1429,18 +1436,34 @@ npscoefhat <-
           idx <- seq.int(start, stopi)
           kw.chunk <- .npscoef_effective_weight_chunk(state = state, eval.indices = idx)
 
-          for (jj in seq_along(idx)) {
-            ii <- idx[[jj]]
-            solve.out <- .npreghat_solve_eval(
-              W = W.train,
-              w.eval = W.eval[ii, ],
-              k = kw.chunk[, jj],
-              ridge.base = ridge
-            )
-            if (is.null(solve.out))
-              stop(sprintf("failed to solve local hat system at evaluation row %d", ii))
-            h.row <- kw.chunk[, jj] * drop(W.train %*% solve.out$v)
-            out[ii, ] <- drop(crossprod(h.row, yy))
+          if (ncol(yy) > 1L) {
+            for (jj in seq_along(idx)) {
+              ii <- idx[[jj]]
+              solve.out <- .npreghat_solve_eval(
+                W = W.train,
+                w.eval = W.eval[ii, ],
+                k = kw.chunk[, jj],
+                ridge.base = ridge
+              )
+              if (is.null(solve.out))
+                stop(sprintf("failed to solve local hat system at evaluation row %d", ii))
+              kw.chunk[, jj] <- kw.chunk[, jj] * drop(W.train %*% solve.out$v)
+            }
+            out[idx, ] <- .npscoef_hat_apply_chunk(H.chunk = kw.chunk, yy = yy)
+          } else {
+            for (jj in seq_along(idx)) {
+              ii <- idx[[jj]]
+              solve.out <- .npreghat_solve_eval(
+                W = W.train,
+                w.eval = W.eval[ii, ],
+                k = kw.chunk[, jj],
+                ridge.base = ridge
+              )
+              if (is.null(solve.out))
+                stop(sprintf("failed to solve local hat system at evaluation row %d", ii))
+              h.row <- kw.chunk[, jj] * drop(W.train %*% solve.out$v)
+              out[ii, ] <- drop(crossprod(h.row, yy))
+            }
           }
         }
       } else {
@@ -1471,18 +1494,34 @@ npscoefhat <-
               kw.chunk[idx[[jj]], jj] <- 0.0
           }
 
-          for (jj in seq_along(idx)) {
-            ii <- idx[[jj]]
-            solve.out <- .npreghat_solve_eval(
-              W = tensor.train,
-              w.eval = tensor.eval[ii, ],
-              k = kw.chunk[, jj],
-              ridge.base = ridge
-            )
-            if (is.null(solve.out))
-              stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", ii))
-            h.row <- kw.chunk[, jj] * drop(tensor.train %*% solve.out$v)
-            out[ii, ] <- drop(crossprod(h.row, yy))
+          if (ncol(yy) > 1L) {
+            for (jj in seq_along(idx)) {
+              ii <- idx[[jj]]
+              solve.out <- .npreghat_solve_eval(
+                W = tensor.train,
+                w.eval = tensor.eval[ii, ],
+                k = kw.chunk[, jj],
+                ridge.base = ridge
+              )
+              if (is.null(solve.out))
+                stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", ii))
+              kw.chunk[, jj] <- kw.chunk[, jj] * drop(tensor.train %*% solve.out$v)
+            }
+            out[idx, ] <- .npscoef_hat_apply_chunk(H.chunk = kw.chunk, yy = yy)
+          } else {
+            for (jj in seq_along(idx)) {
+              ii <- idx[[jj]]
+              solve.out <- .npreghat_solve_eval(
+                W = tensor.train,
+                w.eval = tensor.eval[ii, ],
+                k = kw.chunk[, jj],
+                ridge.base = ridge
+              )
+              if (is.null(solve.out))
+                stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", ii))
+              h.row <- kw.chunk[, jj] * drop(tensor.train %*% solve.out$v)
+              out[ii, ] <- drop(crossprod(h.row, yy))
+            }
           }
         }
       }
