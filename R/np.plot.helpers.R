@@ -747,6 +747,27 @@
   match.arg(wild, c("mammen", "rademacher"))
 }
 
+.np_plot_wild_apply_operator_enabled <- function(ntrain, neval, bwtype = "fixed") {
+  if (!identical(as.character(bwtype)[1L], "fixed"))
+    return(FALSE)
+  threshold <- getOption("np.plot.wild.apply.operator.threshold.bytes",
+                         128 * 1024^2)
+  threshold <- suppressWarnings(as.numeric(threshold)[1L])
+  if (!is.finite(threshold) || is.na(threshold) || threshold < 0)
+    threshold <- 128 * 1024^2
+  as.double(ntrain) * as.double(neval) * 8.0 >= threshold
+}
+
+.np_plot_wild_hat_block_rows <- function(ntrain, neval) {
+  target <- getOption("np.plot.wild.hat.block.bytes", 4 * 1024^2)
+  target <- suppressWarnings(as.numeric(target)[1L])
+  if (!is.finite(target) || is.na(target) || target <= 0)
+    target <- 4 * 1024^2
+  rows <- as.integer(floor(target / (8 * max(1L, as.integer(ntrain)))))
+  rows <- max(1L, min(as.integer(neval), rows))
+  rows
+}
+
 .np_plot_boot_from_hat_wild <- function(H,
                                         ydat,
                                         fit.mean,
@@ -765,6 +786,55 @@
     ),
     t0 = as.vector(H %*% as.double(ydat))
   )
+}
+
+.np_plot_boot_from_hat_blocks_wild <- function(hat.block.fun,
+                                               neval,
+                                               ntrain,
+                                               ydat,
+                                               fit.mean,
+                                               B,
+                                               wild,
+                                               progress.label = "Plot bootstrap wild") {
+  fit.mean <- as.vector(fit.mean)
+  neval <- as.integer(neval)
+  ntrain <- as.integer(ntrain)
+  B <- as.integer(B)
+  if (B < 1L)
+    stop("B must be a positive integer")
+  if (neval < 1L || ntrain < 1L)
+    stop("invalid wild bootstrap block dimensions")
+
+  fit.mean <- as.double(fit.mean)
+  residuals <- as.double(ydat - fit.mean)
+  wild <- .np_plot_normalize_wild(wild)
+  draw.fun <- if (identical(wild, "mammen")) .np_mammen_draws else .np_rademacher_draws
+  draws <- draw.fun(n = ntrain, B = B)
+  ystar <- residuals * draws
+  ystar <- ystar + fit.mean
+
+  t0 <- numeric(neval)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  block.rows <- .np_plot_wild_hat_block_rows(ntrain = ntrain, neval = neval)
+  nblocks <- as.integer(ceiling(neval / block.rows))
+  progress <- .np_plot_bootstrap_progress_begin(total = nblocks, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  done <- 0L
+  start <- 1L
+  while (start <= neval) {
+    stopi <- min(neval, start + block.rows - 1L)
+    H <- hat.block.fun(start, stopi)
+    t0[start:stopi] <- as.vector(H %*% as.double(ydat))
+    tmat[, start:stopi] <- t(H %*% ystar)
+    done <- done + 1L
+    progress <- .np_plot_progress_tick(state = progress, done = done)
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
 }
 
 .np_plot_boot_from_hat_wild_factor_effects <- function(H,
@@ -9048,32 +9118,62 @@ compute.bootstrap.errors.rbandwidth =
           s.vec[cpos] <- gorder[cpos]
         }
 
-        H <- suppressWarnings(npreghat(
-          bws = bws,
-          txdat = xdat,
-          exdat = exdat,
-          s = s.vec,
-          output = "matrix"
-        ))
+        use.blocks <- .np_plot_wild_apply_operator_enabled(ntrain = nrow(xdat),
+                                                           neval = nrow(exdat),
+                                                           bwtype = bws$type)
+        if (use.blocks) {
+          hat.block.fun <- function(start, stopi) {
+            suppressWarnings(npreghat(
+              bws = bws,
+              txdat = xdat,
+              exdat = exdat[start:stopi, , drop = FALSE],
+              s = s.vec,
+              output = "matrix"
+            ))
+          }
 
-        boot.out <- if (gradients && xi.factor) {
-          .np_plot_boot_from_hat_wild_factor_effects(
-            H = H,
+          boot.out <- .np_plot_boot_from_hat_blocks_wild(
+            hat.block.fun = hat.block.fun,
+            neval = nrow(exdat),
+            ntrain = nrow(xdat),
             ydat = ydat,
             fit.mean = fit.mean,
             B = plot.errors.boot.num,
             wild = plot.errors.boot.wild,
             progress.label = progress.label
           )
+          if (gradients && xi.factor && ncol(boot.out$t) >= 1L) {
+            boot.out$t <- sweep(boot.out$t, 1L, boot.out$t[, 1L], "-", check.margin = FALSE)
+            boot.out$t0 <- boot.out$t0 - boot.out$t0[1L]
+          }
         } else {
-          .np_plot_boot_from_hat_wild(
-            H = H,
-            ydat = ydat,
-            fit.mean = fit.mean,
-            B = plot.errors.boot.num,
-            wild = plot.errors.boot.wild,
-            progress.label = progress.label
-          )
+          H <- suppressWarnings(npreghat(
+            bws = bws,
+            txdat = xdat,
+            exdat = exdat,
+            s = s.vec,
+            output = "matrix"
+          ))
+
+          boot.out <- if (gradients && xi.factor) {
+            .np_plot_boot_from_hat_wild_factor_effects(
+              H = H,
+              ydat = ydat,
+              fit.mean = fit.mean,
+              B = plot.errors.boot.num,
+              wild = plot.errors.boot.wild,
+              progress.label = progress.label
+            )
+          } else {
+            .np_plot_boot_from_hat_wild(
+              H = H,
+              ydat = ydat,
+              fit.mean = fit.mean,
+              B = plot.errors.boot.num,
+              wild = plot.errors.boot.wild,
+              progress.label = progress.label
+            )
+          }
         }
       }
     }
