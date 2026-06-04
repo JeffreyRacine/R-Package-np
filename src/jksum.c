@@ -18938,6 +18938,81 @@ static int np_conditional_xrow_full_from_ctx(NPConditionalXRowCtx *ctx,
   return np_conditional_xrow_from_ctx_impl(ctx, eval_idx, 0, row_out);
 }
 
+static int np_conditional_x_weight_block_full_stream_core(double *vector_scale_factor,
+                                                          int eval_start,
+                                                          int block_rows,
+                                                          double **rows_out);
+
+static int np_regression_lp_apply_hatblock_matrix(double *vector_scale_factor,
+                                                  double **rhs_cols,
+                                                  int n_rhs,
+                                                  double *fitted_out,
+                                                  int block_size){
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  double *rows_data = NULL;
+  double **rows_out = NULL;
+  int start, i;
+  int status = 1;
+
+  if((vector_scale_factor == NULL) || (rhs_cols == NULL) ||
+     (rhs_cols[0] == NULL) || (fitted_out == NULL))
+    return 1;
+  if((num_train <= 0) || (num_eval <= 0) || (num_train != num_eval) ||
+     (n_rhs <= 0))
+    return 1;
+
+  block_size = MAX(1, MIN(block_size, num_eval));
+  rows_data = (double *)malloc((size_t)block_size*(size_t)num_train*sizeof(double));
+  rows_out = (double **)malloc((size_t)block_size*sizeof(double *));
+  if((rows_data == NULL) || (rows_out == NULL))
+    goto cleanup_hatblock_apply;
+
+  for(i = 0; i < block_size; i++)
+    rows_out[i] = rows_data + (size_t)i*(size_t)num_train;
+
+  for(start = 0; start < num_eval; start += block_size){
+    const int block_rows = MIN(block_size, num_eval - start);
+    const char transa = 'T';
+    const char transb = 'N';
+    const double alpha = 1.0;
+    const double beta = 0.0;
+    const int m = block_rows;
+    const int n = n_rhs;
+    const int k = num_train;
+    const int lda = num_train;
+    const int ldb = num_train;
+    const int ldc = num_eval;
+
+    if(np_conditional_x_weight_block_full_stream_core(vector_scale_factor,
+                                                      start,
+                                                      block_rows,
+                                                      rows_out) != 0)
+      goto cleanup_hatblock_apply;
+
+    F77_CALL(dgemm)(&transa,
+                    &transb,
+                    &m,
+                    &n,
+                    &k,
+                    &alpha,
+                    rows_data,
+                    &lda,
+                    rhs_cols[0],
+                    &ldb,
+                    &beta,
+                    fitted_out + start,
+                    &ldc FCONE FCONE);
+  }
+
+  status = 0;
+
+cleanup_hatblock_apply:
+  if(rows_data != NULL) free(rows_data);
+  if(rows_out != NULL) free(rows_out);
+  return status;
+}
+
 int np_regression_lp_apply_matrix(double *vector_scale_factor,
                                   double **rhs_cols,
                                   int n_rhs,
@@ -19059,6 +19134,19 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
 
   if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL) || (np_glp_cv_cache.terms == NULL))
     goto cleanup_lp_apply;
+
+  if((target_deriv < 0) &&
+     (num_eval == num_train) &&
+     (n_rhs > 16) &&
+     (BANDWIDTH_den_extern == BW_FIXED) &&
+     (np_regression_lp_apply_hatblock_matrix(vector_scale_factor,
+                                             rhs_cols,
+                                             n_rhs,
+                                             fitted_out,
+                                             256) == 0)){
+    status = 0;
+    goto cleanup_lp_apply;
+  }
 
   KWM = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
   XTKY = mat_creat(np_glp_cv_cache.nterms, n_rhs, UNDEFINED);
