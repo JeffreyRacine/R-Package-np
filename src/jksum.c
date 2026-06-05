@@ -43,6 +43,10 @@ extern void vDSP_vsmulD(const double *, np_vDSP_Stride, const double *,
 extern void vDSP_vmulD(const double *, np_vDSP_Stride, const double *,
                        np_vDSP_Stride, double *, np_vDSP_Stride,
                        np_vDSP_Length);
+extern void vDSP_sveD(const double *, np_vDSP_Stride, double *,
+                      np_vDSP_Length);
+extern void vDSP_dotprD(const double *, np_vDSP_Stride, const double *,
+                        np_vDSP_Stride, double *, np_vDSP_Length);
 extern void vvexp(double *, const double *, const int *);
 #else
 #define NP_ACCEL_GAUSS_COMPILED 0
@@ -5028,6 +5032,59 @@ static void np_accel_gauss_vector(const int KERNEL,
 }
 #endif
 
+static int np_outer_weighted_sum_accel_try(
+  double * const * const pmat_A,
+  const int have_A,
+  double * const * const pmat_B,
+  const int have_B,
+  const double * const weights,
+  const int num_weights,
+  const double db,
+  double * const result)
+{
+#if NP_ACCEL_GAUSS_COMPILED
+  double acc = 0.0;
+
+  if(!np_mseries_accelerate_enabled_cache ||
+     pmat_A == NULL ||
+     pmat_B == NULL ||
+     weights == NULL ||
+     result == NULL ||
+     num_weights < 256)
+    return 0;
+
+  if(!have_A && !have_B) {
+    vDSP_sveD(weights, 1, &acc, (np_vDSP_Length)num_weights);
+  } else if(have_A && !have_B) {
+    vDSP_dotprD(pmat_A[0], 1, weights, 1, &acc,
+                (np_vDSP_Length)num_weights);
+  } else if(!have_A && have_B) {
+    vDSP_dotprD(pmat_B[0], 1, weights, 1, &acc,
+                (np_vDSP_Length)num_weights);
+  } else {
+    if(!np_accel_gauss_scratch_ensure(num_weights))
+      return 0;
+    vDSP_vmulD(pmat_A[0], 1, pmat_B[0], 1, np_accel_gauss_tmp, 1,
+               (np_vDSP_Length)num_weights);
+    vDSP_dotprD(np_accel_gauss_tmp, 1, weights, 1, &acc,
+                (np_vDSP_Length)num_weights);
+  }
+
+  result[0] += acc/db;
+  return 1;
+#else
+  (void)pmat_A;
+  (void)have_A;
+  (void)pmat_B;
+  (void)have_B;
+  (void)weights;
+  (void)num_weights;
+  (void)db;
+  (void)result;
+  return 0;
+#endif
+}
+
 void np_accel_gauss_release_buffers(void)
 {
 #if NP_ACCEL_GAUSS_COMPILED
@@ -6019,14 +6076,26 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
   if(scalar_sum_fast){
     if(xl == NULL){
       if(!parallel_sum){
-        double acc = 0.0;
+        if(!do_leave_one_out &&
+           !gather_scatter &&
+           np_outer_weighted_sum_accel_try(pmat_A, have_A, pmat_B, have_B,
+                                           weights, num_weights, db, result)){
+          if(do_leave_one_out)
+            weights[which_k] = temp;
 
-        for(k = 0; k < num_weights; k++){
-          if(weights[k] == 0.0) continue;
-          acc += pmat_A[0][k*have_A]*pmat_B[0][k*have_B]*weights[k]/db;
+          return;
         }
 
-        result[0] += acc;
+        {
+          double acc = 0.0;
+
+          for(k = 0; k < num_weights; k++){
+            if(weights[k] == 0.0) continue;
+            acc += pmat_A[0][k*have_A]*pmat_B[0][k*have_B]*weights[k]/db;
+          }
+
+          result[0] += acc;
+        }
       } else {
         l = which_l;
         for(k = 0; k < num_weights; k++){
