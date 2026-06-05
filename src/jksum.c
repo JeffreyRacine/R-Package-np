@@ -5359,6 +5359,65 @@ static int np_outer_weighted_sum_accel_thin_try(
 #endif
 }
 
+static int np_outer_weighted_sum_accel_smallmat_try(
+  double * const * const pmat_A,
+  const int have_A,
+  const int max_A,
+  double * const * const pmat_B,
+  const int have_B,
+  const int max_B,
+  const double * const weights,
+  const int num_weights,
+  const double db,
+  double * const result)
+{
+#if NP_ACCEL_GAUSS_COMPILED
+  const int max_AB = max_A*max_B;
+  double acc = 0.0;
+
+  if(!np_mseries_accelerate_enabled_cache ||
+     pmat_A == NULL ||
+     pmat_B == NULL ||
+     weights == NULL ||
+     result == NULL ||
+     !have_A ||
+     !have_B ||
+     max_A <= 1 ||
+     max_B <= 1 ||
+     max_AB >= 16 ||
+     num_weights < 256 ||
+     !np_accel_gauss_resolve())
+    return 0;
+
+  if(!np_accel_gauss_scratch_ensure(num_weights))
+    return 0;
+
+  for(int i = 0; i < max_B; i++) {
+    np_accel_vmulD(pmat_B[i], 1, weights, 1, np_accel_gauss_tmp, 1,
+                   (np_vDSP_Length)num_weights);
+    for(int j = 0; j < max_A; j++) {
+      np_accel_dotprD(pmat_A[j], 1, np_accel_gauss_tmp, 1, &acc,
+                      (np_vDSP_Length)num_weights);
+      result[j*max_B+i] += acc/db;
+    }
+  }
+
+  return 1;
+#else
+  (void)pmat_A;
+  (void)have_A;
+  (void)max_A;
+  (void)pmat_B;
+  (void)have_B;
+  (void)max_B;
+  (void)weights;
+  (void)num_weights;
+  (void)db;
+  (void)result;
+  return 0;
+#endif
+}
+
 void np_accel_gauss_release_buffers(void)
 {
 #if NP_ACCEL_GAUSS_COMPILED
@@ -6370,6 +6429,22 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
      np_outer_weighted_sum_accel_thin_try(pmat_A, have_A, max_A,
                                           pmat_B, have_B, max_B,
                                           weights, num_weights, db, result)){
+    return;
+  }
+
+  if(!have_sgn &&
+     !symmetric &&
+     (kpow == 1) &&
+     (xl == NULL) &&
+     !parallel_sum &&
+     !do_leave_one_out &&
+     !gather_scatter &&
+     (max_A > 1) &&
+     (max_B > 1) &&
+     (max_A*max_B < 16) &&
+     np_outer_weighted_sum_accel_smallmat_try(pmat_A, have_A, max_A,
+                                              pmat_B, have_B, max_B,
+                                              weights, num_weights, db, result)){
     return;
   }
 
