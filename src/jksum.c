@@ -5043,6 +5043,45 @@ void np_accel_gauss_release_buffers(void)
 #endif
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+#define NP_NOINLINE __attribute__((noinline))
+#else
+#define NP_NOINLINE
+#endif
+
+static int NP_NOINLINE np_ckernelv_accel_try(const int KERNEL,
+                                             const double * const xt,
+                                             const int num_xt,
+                                             const int bin_do_xw,
+                                             const double x,
+                                             const double zscale,
+                                             const double invnorm,
+                                             double * const xw,
+                                             double * const result,
+                                             const XL * const xl)
+{
+#if NP_ACCEL_GAUSS_COMPILED
+  if(np_mseries_accelerate_enabled_cache &&
+     KERNEL >= 0 &&
+     KERNEL <= 3 &&
+     xl == NULL &&
+     num_xt >= 256 &&
+     np_accel_gauss_scratch_ensure(num_xt)) {
+    const double coef = invnorm*ONE_OVER_SQRT_TWO_PI;
+    if(!bin_do_xw) {
+      np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, result);
+      return 1;
+    }
+    if(!np_accel_gauss_has_zero_weight(xw, num_xt)) {
+      np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, np_accel_gauss_val);
+      vDSP_vmulD(np_accel_gauss_val, 1, xw, 1, result, 1, (np_vDSP_Length)num_xt);
+      return 1;
+    }
+  }
+#endif
+  return 0;
+}
+
 void np_ckernelv(const int KERNEL, 
                  const double * const xt, const int num_xt, 
                  const int do_xw,
@@ -5071,25 +5110,9 @@ void np_ckernelv(const int KERNEL,
     return;
   }
 
-#if NP_ACCEL_GAUSS_COMPILED
-  if(np_mseries_accelerate_enabled_cache &&
-     KERNEL >= 0 &&
-     KERNEL <= 3 &&
-     xl == NULL &&
-     num_xt >= 256 &&
-     np_accel_gauss_scratch_ensure(num_xt)) {
-    const double coef = invnorm*ONE_OVER_SQRT_TWO_PI;
-    if(!bin_do_xw) {
-      np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, result);
-      return;
-    }
-    if(!np_accel_gauss_has_zero_weight(xw, num_xt)) {
-      np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, np_accel_gauss_val);
-      vDSP_vmulD(np_accel_gauss_val, 1, xw, 1, result, 1, (np_vDSP_Length)num_xt);
-      return;
-    }
-  }
-#endif
+  if(np_ckernelv_accel_try(KERNEL, xt, num_xt, bin_do_xw, x, zscale,
+                           invnorm, xw, result, xl))
+    return;
 
   /*
     Hot path: avoid indirect function-pointer calls and avoid branching on
