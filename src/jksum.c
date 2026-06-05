@@ -51,6 +51,11 @@ typedef void (*np_vDSP_vmulD_fn)(const double *, np_vDSP_Stride,
                                  const double *, np_vDSP_Stride,
                                  double *, np_vDSP_Stride,
                                  np_vDSP_Length);
+typedef void (*np_vDSP_sveD_fn)(const double *, np_vDSP_Stride, double *,
+                                np_vDSP_Length);
+typedef void (*np_vDSP_dotprD_fn)(const double *, np_vDSP_Stride,
+                                  const double *, np_vDSP_Stride,
+                                  double *, np_vDSP_Length);
 typedef void (*np_vvexp_fn)(double *, const double *, const int *);
 #else
 #define NP_ACCEL_GAUSS_COMPILED 0
@@ -5040,6 +5045,8 @@ static np_vDSP_vsmsaD_fn np_accel_vsmsaD = NULL;
 static np_vDSP_vsqD_fn np_accel_vsqD = NULL;
 static np_vDSP_vsmulD_fn np_accel_vsmulD = NULL;
 static np_vDSP_vmulD_fn np_accel_vmulD = NULL;
+static np_vDSP_sveD_fn np_accel_sveD = NULL;
+static np_vDSP_dotprD_fn np_accel_dotprD = NULL;
 static np_vvexp_fn np_accel_vvexp = NULL;
 
 static int np_accel_gauss_resolve(void)
@@ -5064,6 +5071,10 @@ static int np_accel_gauss_resolve(void)
     (np_vDSP_vsmulD_fn)dlsym(np_accel_gauss_handle, "vDSP_vsmulD");
   np_accel_vmulD =
     (np_vDSP_vmulD_fn)dlsym(np_accel_gauss_handle, "vDSP_vmulD");
+  np_accel_sveD =
+    (np_vDSP_sveD_fn)dlsym(np_accel_gauss_handle, "vDSP_sveD");
+  np_accel_dotprD =
+    (np_vDSP_dotprD_fn)dlsym(np_accel_gauss_handle, "vDSP_dotprD");
   np_accel_vvexp =
     (np_vvexp_fn)dlsym(np_accel_gauss_handle, "vvexp");
 
@@ -5071,6 +5082,8 @@ static int np_accel_gauss_resolve(void)
      np_accel_vsqD == NULL ||
      np_accel_vsmulD == NULL ||
      np_accel_vmulD == NULL ||
+     np_accel_sveD == NULL ||
+     np_accel_dotprD == NULL ||
      np_accel_vvexp == NULL) {
     dlclose(np_accel_gauss_handle);
     np_accel_gauss_handle = NULL;
@@ -5078,6 +5091,8 @@ static int np_accel_gauss_resolve(void)
     np_accel_vsqD = NULL;
     np_accel_vsmulD = NULL;
     np_accel_vmulD = NULL;
+    np_accel_sveD = NULL;
+    np_accel_dotprD = NULL;
     np_accel_vvexp = NULL;
     np_accel_gauss_available_cache = 0;
     return 0;
@@ -5201,6 +5216,60 @@ static void np_accel_gauss_vector(const int KERNEL,
 }
 #endif
 
+static int np_outer_weighted_sum_accel_try(
+  double * const * const pmat_A,
+  const int have_A,
+  double * const * const pmat_B,
+  const int have_B,
+  const double * const weights,
+  const int num_weights,
+  const double db,
+  double * const result)
+{
+#if NP_ACCEL_GAUSS_COMPILED
+  double acc = 0.0;
+
+  if(!np_mseries_accelerate_enabled_cache ||
+     pmat_A == NULL ||
+     pmat_B == NULL ||
+     weights == NULL ||
+     result == NULL ||
+     num_weights < 256 ||
+     !np_accel_gauss_resolve())
+    return 0;
+
+  if(!have_A && !have_B) {
+    np_accel_sveD(weights, 1, &acc, (np_vDSP_Length)num_weights);
+  } else if(have_A && !have_B) {
+    np_accel_dotprD(pmat_A[0], 1, weights, 1, &acc,
+                    (np_vDSP_Length)num_weights);
+  } else if(!have_A && have_B) {
+    np_accel_dotprD(pmat_B[0], 1, weights, 1, &acc,
+                    (np_vDSP_Length)num_weights);
+  } else {
+    if(!np_accel_gauss_scratch_ensure(num_weights))
+      return 0;
+    np_accel_vmulD(pmat_A[0], 1, pmat_B[0], 1, np_accel_gauss_tmp, 1,
+                   (np_vDSP_Length)num_weights);
+    np_accel_dotprD(np_accel_gauss_tmp, 1, weights, 1, &acc,
+                    (np_vDSP_Length)num_weights);
+  }
+
+  result[0] += acc/db;
+  return 1;
+#else
+  (void)pmat_A;
+  (void)have_A;
+  (void)pmat_B;
+  (void)have_B;
+  (void)weights;
+  (void)num_weights;
+  (void)db;
+  (void)result;
+  return 0;
+#endif
+}
+
 void np_accel_gauss_release_buffers(void)
 {
 #if NP_ACCEL_GAUSS_COMPILED
@@ -5221,6 +5290,8 @@ void np_accel_gauss_release_buffers(void)
   np_accel_vsqD = NULL;
   np_accel_vsmulD = NULL;
   np_accel_vmulD = NULL;
+  np_accel_sveD = NULL;
+  np_accel_dotprD = NULL;
   np_accel_vvexp = NULL;
 #endif
 }
@@ -6202,14 +6273,26 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
   if(scalar_sum_fast){
     if(xl == NULL){
       if(!parallel_sum){
-        double acc = 0.0;
+        if(!do_leave_one_out &&
+           !gather_scatter &&
+           np_outer_weighted_sum_accel_try(pmat_A, have_A, pmat_B, have_B,
+                                           weights, num_weights, db, result)){
+          if(do_leave_one_out)
+            weights[which_k] = temp;
 
-        for(k = 0; k < num_weights; k++){
-          if(weights[k] == 0.0) continue;
-          acc += pmat_A[0][k*have_A]*pmat_B[0][k*have_B]*weights[k]/db;
+          return;
         }
 
-        result[0] += acc;
+        {
+          double acc = 0.0;
+
+          for(k = 0; k < num_weights; k++){
+            if(weights[k] == 0.0) continue;
+            acc += pmat_A[0][k*have_A]*pmat_B[0][k*have_B]*weights[k]/db;
+          }
+
+          result[0] += acc;
+        }
       } else {
         l = which_l;
         for(k = 0; k < num_weights; k++){
