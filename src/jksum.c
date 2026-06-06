@@ -4755,6 +4755,28 @@ double cksup[OP_NCFUN][2] = { {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MA
 /* xt = training data */
 /* xw = x weights */
 
+#if NP_ACCEL_GAUSS_COMPILED
+static int np_p_ckernelv_accel_gauss2_deriv_try(const int KERNEL,
+                                                const int P_KERNEL,
+                                                const int P_IDX,
+                                                const int P_NIDX,
+                                                const double * const xt,
+                                                const int num_xt,
+                                                const int bin_do_xw,
+                                                const double x,
+                                                const double zscale,
+                                                double * const xw,
+                                                double * const result,
+                                                double * const p_result,
+                                                const XL * const xl,
+                                                const XL * const p_xl,
+                                                const int do_perm,
+                                                const int do_score,
+                                                double * const kbuf,
+                                                const double invnorm,
+                                                const double p_invnorm);
+#endif
+
 void np_p_ckernelv(const int KERNEL, 
                    const int P_KERNEL,
                    const int P_IDX,
@@ -4852,6 +4874,33 @@ void np_p_ckernelv(const int KERNEL,
       free(kbuf);
     return;
   }
+
+#if NP_ACCEL_GAUSS_COMPILED
+  if(np_mseries_accelerate_enabled_cache &&
+     np_p_ckernelv_accel_gauss2_deriv_try(KERNEL,
+                                          P_KERNEL,
+                                          P_IDX,
+                                          P_NIDX,
+                                          xt,
+                                          num_xt,
+                                          bin_do_xw,
+                                          x,
+                                          zscale,
+                                          xw,
+                                          result,
+                                          p_result,
+                                          xl,
+                                          p_xl,
+                                          do_perm,
+                                          do_score,
+                                          kbuf,
+                                          invnorm,
+                                          p_invnorm)) {
+    if(own_kbuf)
+      free(kbuf);
+    return;
+  }
+#endif
 
   if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
@@ -4960,6 +5009,13 @@ static int np_accel_gauss_has_zero_weight(const double * const w, const int n)
   return 0;
 }
 
+static void np_accel_copy_vector(const double * const src,
+                                 double * const dst,
+                                 const int n)
+{
+  memcpy(dst, src, (size_t)n*sizeof(double));
+}
+
 static void np_accel_gauss_vector(const int KERNEL,
                                   const double * const xt,
                                   const int n,
@@ -5029,6 +5085,98 @@ static void np_accel_gauss_vector(const int KERNEL,
   }
 
   vDSP_vsmulD(out, 1, &coef, out, 1, (np_vDSP_Length)n);
+}
+
+static int np_p_ckernelv_accel_gauss2_deriv_try(const int KERNEL,
+                                                const int P_KERNEL,
+                                                const int P_IDX,
+                                                const int P_NIDX,
+                                                const double * const xt,
+                                                const int num_xt,
+                                                const int bin_do_xw,
+                                                const double x,
+                                                const double zscale,
+                                                double * const xw,
+                                                double * const result,
+                                                double * const p_result,
+                                                const XL * const xl,
+                                                const XL * const p_xl,
+                                                const int do_perm,
+                                                const int do_score,
+                                                double * const kbuf,
+                                                const double invnorm,
+                                                const double p_invnorm)
+{
+  const double minus_one = -1.0;
+  const double minus_half = -0.5;
+  const double zero = 0.0;
+  const int ni = num_xt;
+
+  if(KERNEL != 0 ||
+     P_KERNEL != 20 ||
+     xl != NULL ||
+     p_xl != NULL ||
+     p_result == NULL ||
+     kbuf == NULL ||
+     num_xt < 256 ||
+     !np_accel_gauss_scratch_ensure(num_xt))
+    return 0;
+
+  vDSP_vsmsaD(xt, 1, &minus_one, &x,
+              np_accel_gauss_tmp, 1, (np_vDSP_Length)num_xt);
+  vDSP_vsmulD(np_accel_gauss_tmp, 1, &zscale,
+              np_accel_gauss_arg, 1, (np_vDSP_Length)num_xt);
+  vDSP_vsqD(np_accel_gauss_arg, 1,
+            np_accel_gauss_work, 1, (np_vDSP_Length)num_xt);
+  vDSP_vsmsaD(np_accel_gauss_work, 1, &minus_half, &zero,
+              np_accel_gauss_val, 1, (np_vDSP_Length)num_xt);
+  vvexp(np_accel_gauss_val, np_accel_gauss_val, &ni);
+
+  {
+    const double base_scale = invnorm*ONE_OVER_SQRT_TWO_PI;
+    vDSP_vsmulD(np_accel_gauss_val, 1, &base_scale,
+                kbuf, 1, (np_vDSP_Length)num_xt);
+  }
+
+  if(bin_do_xw)
+    vDSP_vmulD(kbuf, 1, xw, 1, result, 1, (np_vDSP_Length)num_xt);
+  else
+    np_accel_copy_vector(kbuf, result, num_xt);
+
+  if(do_perm) {
+    const int poff = P_IDX*num_xt;
+    if(do_score) {
+      const double p_scale = p_invnorm*ONE_OVER_SQRT_TWO_PI;
+      vDSP_vmulD(np_accel_gauss_work, 1, np_accel_gauss_val, 1,
+                 np_accel_gauss_tmp, 1, (np_vDSP_Length)num_xt);
+      vDSP_vsmulD(np_accel_gauss_tmp, 1, &p_scale,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)num_xt);
+    } else {
+      const double p_scale = -p_invnorm*ONE_OVER_SQRT_TWO_PI;
+      vDSP_vmulD(np_accel_gauss_arg, 1, np_accel_gauss_val, 1,
+                 np_accel_gauss_tmp, 1, (np_vDSP_Length)num_xt);
+      vDSP_vsmulD(np_accel_gauss_tmp, 1, &p_scale,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)num_xt);
+    }
+
+    if(bin_do_xw)
+      vDSP_vmulD(np_accel_gauss_tmp, 1, p_result + poff, 1,
+                 p_result + poff, 1, (np_vDSP_Length)num_xt);
+    else
+      np_accel_copy_vector(np_accel_gauss_tmp, p_result + poff, num_xt);
+  }
+
+  for(int l = 0; l < P_NIDX; l++) {
+    if((l == P_IDX) && do_perm)
+      continue;
+    if(bin_do_xw)
+      vDSP_vmulD(kbuf, 1, p_result + l*num_xt, 1,
+                 p_result + l*num_xt, 1, (np_vDSP_Length)num_xt);
+    else
+      np_accel_copy_vector(kbuf, p_result + l*num_xt, num_xt);
+  }
+
+  return 1;
 }
 #endif
 
