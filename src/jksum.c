@@ -6450,6 +6450,39 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     }
   }
 
+  if(use_wpow &&
+     !have_sgn &&
+     !symmetric &&
+     (xl == NULL) &&
+     !parallel_sum &&
+     !gather_scatter){
+    int accel_ok = 0;
+
+    if((max_A == 1) && (max_B == 1)){
+      accel_ok = np_outer_weighted_sum_accel_try(pmat_A, have_A,
+                                                 pmat_B, have_B,
+                                                 wbuf, num_weights,
+                                                 unit_weight, result);
+    } else if((max_A == 1) || (max_B == 1)){
+      accel_ok = np_outer_weighted_sum_accel_thin_try(pmat_A, have_A, max_A,
+                                                      pmat_B, have_B, max_B,
+                                                      wbuf, num_weights,
+                                                      unit_weight, result);
+    } else if((max_A > 1) && (max_B > 1) && (max_A*max_B < 16)){
+      accel_ok = np_outer_weighted_sum_accel_smallmat_try(pmat_A, have_A, max_A,
+                                                          pmat_B, have_B, max_B,
+                                                          wbuf, num_weights,
+                                                          unit_weight, result);
+    }
+
+    if(accel_ok){
+      if(do_leave_one_out)
+        weights[which_k] = temp;
+      safe_free(wbuf);
+      return;
+    }
+  }
+
   if(!have_sgn &&
      !symmetric &&
      (kpow == 1) &&
