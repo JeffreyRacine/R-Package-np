@@ -399,6 +399,12 @@ static void np_blas_dgemm_tn_int(const int m,
                   FCONE FCONE);
 }
 
+#define NP_FAST_REDUCTION_STAGE_MAX 64
+
+static int np_fast_reduction_finite(const double x){
+  return isfinite(x);
+}
+
 static int np_outer_weighted_sum_blas_eligible(const int max_A,
                                                const int max_B,
                                                const int num_weights,
@@ -449,12 +455,18 @@ static int np_outer_weighted_sum_blas_scalar_unit_try(double * const * const pma
     return 0;
 
   if(have_A && !have_B){
-    result[0] += np_blas_ddot_int(num_weights, pmat_A[0], weights)/db;
+    const double contrib = np_blas_ddot_int(num_weights, pmat_A[0], weights)/db;
+    if(!np_fast_reduction_finite(contrib))
+      return 0;
+    result[0] += contrib;
     return 1;
   }
 
   if(!have_A && have_B){
-    result[0] += np_blas_ddot_int(num_weights, pmat_B[0], weights)/db;
+    const double contrib = np_blas_ddot_int(num_weights, pmat_B[0], weights)/db;
+    if(!np_fast_reduction_finite(contrib))
+      return 0;
+    result[0] += contrib;
     return 1;
   }
 
@@ -475,15 +487,31 @@ static int np_outer_weighted_sum_blas_thin_unit_try(double * const * const pmat_
      (weights == NULL) || (result == NULL))
     return 0;
 
+  if((max_A > NP_FAST_REDUCTION_STAGE_MAX) ||
+     (max_B > NP_FAST_REDUCTION_STAGE_MAX))
+    return 0;
+
   if((max_A > 1) && (max_B == 1) && !have_B){
+    double staged[NP_FAST_REDUCTION_STAGE_MAX];
     for(int j = 0; j < max_A; j++)
-      result[j] += np_blas_ddot_int(num_weights, pmat_A[j], weights)/db;
+      staged[j] = np_blas_ddot_int(num_weights, pmat_A[j], weights)/db;
+    for(int j = 0; j < max_A; j++)
+      if(!np_fast_reduction_finite(staged[j]))
+        return 0;
+    for(int j = 0; j < max_A; j++)
+      result[j] += staged[j];
     return 1;
   }
 
   if((max_A == 1) && (max_B > 1) && !have_A){
+    double staged[NP_FAST_REDUCTION_STAGE_MAX];
     for(int i = 0; i < max_B; i++)
-      result[i] += np_blas_ddot_int(num_weights, pmat_B[i], weights)/db;
+      staged[i] = np_blas_ddot_int(num_weights, pmat_B[i], weights)/db;
+    for(int i = 0; i < max_B; i++)
+      if(!np_fast_reduction_finite(staged[i]))
+        return 0;
+    for(int i = 0; i < max_B; i++)
+      result[i] += staged[i];
     return 1;
   }
 
@@ -572,6 +600,15 @@ static int np_outer_weighted_sum_blas(double * const * const pmat_A,
   }
 
   np_blas_dgemm_tn_int(max_A, max_B, num_weights, Ause, Bpack, C);
+
+  for(size_t i = 0; i < nC; i++){
+    if(!np_fast_reduction_finite(C[i])){
+      free(Apack);
+      free(Bpack);
+      free(C);
+      return 0;
+    }
+  }
 
   if(!symmetric){
     for(int j = 0; j < max_A; j++)
@@ -5488,7 +5525,10 @@ static int np_outer_weighted_sum_accel_try(
                     (np_vDSP_Length)num_weights);
   }
 
-  result[0] += acc/db;
+  const double contrib = acc/db;
+  if(!np_fast_reduction_finite(contrib))
+    return 0;
+  result[0] += contrib;
   return 1;
 #else
   (void)pmat_A;
@@ -5518,6 +5558,7 @@ static int np_outer_weighted_sum_accel_thin_try(
 #if NP_ACCEL_GAUSS_COMPILED
   const int max_AB = max_A*max_B;
   double acc = 0.0;
+  double staged[NP_FAST_REDUCTION_STAGE_MAX];
 
   if(!np_mseries_accelerate_enabled_cache ||
      pmat_A == NULL ||
@@ -5527,6 +5568,7 @@ static int np_outer_weighted_sum_accel_thin_try(
      num_weights < 256 ||
      max_A < 1 ||
      max_B < 1 ||
+     max_AB > NP_FAST_REDUCTION_STAGE_MAX ||
      max_AB < 2 ||
      (max_A > 1 && max_B > 1) ||
      !np_accel_gauss_resolve())
@@ -5537,8 +5579,13 @@ static int np_outer_weighted_sum_accel_thin_try(
       for(int j = 0; j < max_A; j++) {
         np_accel_dotprD(pmat_A[j], 1, weights, 1, &acc,
                         (np_vDSP_Length)num_weights);
-        result[j] += acc/db;
+        staged[j] = acc/db;
       }
+      for(int j = 0; j < max_A; j++)
+        if(!np_fast_reduction_finite(staged[j]))
+          return 0;
+      for(int j = 0; j < max_A; j++)
+        result[j] += staged[j];
     } else {
       if(!np_accel_gauss_scratch_ensure(num_weights))
         return 0;
@@ -5548,12 +5595,20 @@ static int np_outer_weighted_sum_accel_thin_try(
         for(int j = 0; j < max_A; j++) {
           np_accel_dotprD(pmat_A[j], 1, np_accel_gauss_tmp, 1, &acc,
                           (np_vDSP_Length)num_weights);
-          result[j] += acc/db;
+          staged[j] = acc/db;
         }
+        for(int j = 0; j < max_A; j++)
+          if(!np_fast_reduction_finite(staged[j]))
+            return 0;
+        for(int j = 0; j < max_A; j++)
+          result[j] += staged[j];
       } else {
         np_accel_sveD(np_accel_gauss_tmp, 1, &acc,
                       (np_vDSP_Length)num_weights);
-        result[0] += acc/db;
+        staged[0] = acc/db;
+        if(!np_fast_reduction_finite(staged[0]))
+          return 0;
+        result[0] += staged[0];
       }
     }
   } else {
@@ -5561,8 +5616,13 @@ static int np_outer_weighted_sum_accel_thin_try(
       for(int i = 0; i < max_B; i++) {
         np_accel_dotprD(pmat_B[i], 1, weights, 1, &acc,
                         (np_vDSP_Length)num_weights);
-        result[i] += acc/db;
+        staged[i] = acc/db;
       }
+      for(int i = 0; i < max_B; i++)
+        if(!np_fast_reduction_finite(staged[i]))
+          return 0;
+      for(int i = 0; i < max_B; i++)
+        result[i] += staged[i];
     } else {
       if(!np_accel_gauss_scratch_ensure(num_weights))
         return 0;
@@ -5571,8 +5631,13 @@ static int np_outer_weighted_sum_accel_thin_try(
       for(int i = 0; i < max_B; i++) {
         np_accel_dotprD(pmat_B[i], 1, np_accel_gauss_tmp, 1, &acc,
                         (np_vDSP_Length)num_weights);
-        result[i] += acc/db;
+        staged[i] = acc/db;
       }
+      for(int i = 0; i < max_B; i++)
+        if(!np_fast_reduction_finite(staged[i]))
+          return 0;
+      for(int i = 0; i < max_B; i++)
+        result[i] += staged[i];
     }
   }
 
@@ -5607,6 +5672,7 @@ static int np_outer_weighted_sum_accel_smallmat_try(
 #if NP_ACCEL_GAUSS_COMPILED
   const int max_AB = max_A*max_B;
   double acc = 0.0;
+  double staged[16];
 
   if(!np_mseries_accelerate_enabled_cache ||
      pmat_A == NULL ||
@@ -5631,9 +5697,17 @@ static int np_outer_weighted_sum_accel_smallmat_try(
     for(int j = 0; j < max_A; j++) {
       np_accel_dotprD(pmat_A[j], 1, np_accel_gauss_tmp, 1, &acc,
                       (np_vDSP_Length)num_weights);
-      result[j*max_B+i] += acc/db;
+      staged[j*max_B+i] = acc/db;
     }
   }
+
+  for(int i = 0; i < max_AB; i++)
+    if(!np_fast_reduction_finite(staged[i]))
+      return 0;
+
+  for(int i = 0; i < max_B; i++)
+    for(int j = 0; j < max_A; j++)
+      result[j*max_B+i] += staged[j*max_B+i];
 
   return 1;
 #else
