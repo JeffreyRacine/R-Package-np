@@ -345,6 +345,30 @@ static double np_blas_ddot_int(const int n, const double *x, const double *y){
   return F77_CALL(ddot)(&n, x, &inc, y, &inc);
 }
 
+static double np_blas_ddot_i64_stride(const int64_t n,
+                                      const double *x,
+                                      const int64_t incx,
+                                      const double *y,
+                                      const int64_t incy){
+  if((n <= 0) || (x == NULL) || (y == NULL) || (incx <= 0) || (incy <= 0))
+    return 0.0;
+  if((n <= INT_MAX) && (incx <= INT_MAX) && (incy <= INT_MAX)){
+    const int ni = (int)n;
+    const int ixi = (int)incx;
+    const int iyi = (int)incy;
+    return F77_CALL(ddot)(&ni, x, &ixi, y, &iyi);
+  }
+
+  double acc = 0.0;
+  for(int64_t i = 0; i < n; i++)
+    acc += x[i*incx]*y[i*incy];
+  return acc;
+}
+
+static double np_blas_ddot_i64(const int64_t n, const double *x, const double *y){
+  return np_blas_ddot_i64_stride(n, x, 1, y, 1);
+}
+
 static void np_blas_dgemm_tn_int(const int m,
                                  const int n,
                                  const int k,
@@ -15349,8 +15373,9 @@ double *cv){
               if(BANDWIDTH_den != BW_ADAP_NN){
                 // leave-one-out joint density
 
-                for(l = 0; l < num_obs_train; l++)
-                  xyj += kwy[jo*num_obs_train+l]*kwx[io*num_obs_train+l];
+                xyj = np_blas_ddot_i64(num_obs_train,
+                                        kwy + jo*num_obs_train,
+                                        kwx + io*num_obs_train);
                 xyj -= kwy[jo*num_obs_train+i]*kwx[io*num_obs_train+i];
 
                 const double tvd = (indy - xyj/(mean[io] - kwx[io*num_obs_train+i] + DBL_MIN));
@@ -15358,8 +15383,11 @@ double *cv){
               } else {
                 // leave-one-out joint density
 
-                for(l = 0; l < num_obs_train; l++)
-                  xyj += kwy[l*dwy+jo]*kwx[l*dwx+io];
+                xyj = np_blas_ddot_i64_stride(num_obs_train,
+                                               kwy + jo,
+                                               dwy,
+                                               kwx + io,
+                                               dwx);
                 xyj -= kwy[i*dwy+jo]*kwx[i*dwx+io];
 
                 const double tvd = (indy - xyj/(mean[io] - kwx[i*dwx + io] + DBL_MIN));
@@ -25832,7 +25860,7 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
   double *xrow = NULL, *yint = NULL;
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yintctx = {0};
-  int i, j, l;
+  int i, j;
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
@@ -25915,8 +25943,7 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
       if(cdfontrain_extern && (i == j))
         continue;
 
-      for(l = 0; l < num_train; l++)
-        fit += xrow[l]*yint[l];
+      fit = np_blas_ddot_int(num_train, xrow, yint);
 
       {
         const double tvd = ((double)indy) - fit;
