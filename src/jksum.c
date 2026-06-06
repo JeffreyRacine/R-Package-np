@@ -5522,6 +5522,35 @@ void np_convol_ckernelv(const int KERNEL,
     const double expo = -0.5/h2;
     const double hy_power = ipow(hy, power);
 
+#if NP_ACCEL_GAUSS_COMPILED
+    if(np_mseries_accelerate_enabled_cache &&
+       num_xt >= 256 &&
+       np_accel_gauss_scratch_ensure(num_xt) &&
+       (!bin_do_xw || !np_accel_gauss_has_zero_weight(xw, num_xt))) {
+      const double minus_one = -1.0;
+      const double scale = coef/(sqrt_h2*hy_power);
+      const int ni = num_xt;
+
+      vDSP_vsmsaD(xt, 1, &minus_one, &x,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)num_xt);
+      vDSP_vsqD(np_accel_gauss_tmp, 1,
+                np_accel_gauss_tmp, 1, (np_vDSP_Length)num_xt);
+      vDSP_vsmulD(np_accel_gauss_tmp, 1, &expo,
+                  np_accel_gauss_arg, 1, (np_vDSP_Length)num_xt);
+      if(!bin_do_xw) {
+        vvexp(result, np_accel_gauss_arg, &ni);
+        vDSP_vsmulD(result, 1, &scale, result, 1, (np_vDSP_Length)num_xt);
+      } else {
+        vvexp(np_accel_gauss_val, np_accel_gauss_arg, &ni);
+        vDSP_vsmulD(np_accel_gauss_val, 1, &scale,
+                    np_accel_gauss_val, 1, (np_vDSP_Length)num_xt);
+        vDSP_vmulD(np_accel_gauss_val, 1, xw, 1,
+                   result, 1, (np_vDSP_Length)num_xt);
+      }
+      return;
+    }
+#endif
+
     for(i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
       double kval;
       const double d = x - xt[i];
