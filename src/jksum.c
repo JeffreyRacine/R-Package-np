@@ -261,8 +261,14 @@ static int np_outer_weighted_sum_blas_eligible(const int max_A,
                                                size_t * const nA_out,
                                                size_t * const nB_out,
                                                size_t * const nC_out){
-  if((num_weights < 64) || (max_A <= 1) || (max_B <= 1) ||
-     ((size_t)max_A*(size_t)max_B < 16))
+  const size_t nprod = (size_t)max_A*(size_t)max_B;
+
+  if((num_weights < 64) || (max_A <= 1) || (max_B <= 1))
+    return 0;
+
+  if((nprod < 16) &&
+     (((nprod < 9) && (num_weights < 8192)) ||
+      ((nprod >= 9) && (num_weights < 512))))
     return 0;
 
   if(symmetric && (max_A != max_B))
@@ -283,6 +289,60 @@ static int np_outer_weighted_sum_blas_eligible(const int max_A,
   if(nC_out != NULL) *nC_out = nC;
 
   return 1;
+}
+
+static int np_outer_weighted_sum_blas_scalar_unit_try(double * const * const pmat_A,
+                                                      const int have_A,
+                                                      double * const * const pmat_B,
+                                                      const int have_B,
+                                                      const double * const weights,
+                                                      const int num_weights,
+                                                      const double db,
+                                                      double * const result){
+  if((num_weights < 512) || (pmat_A == NULL) || (pmat_B == NULL) ||
+     (weights == NULL) || (result == NULL))
+    return 0;
+
+  if(have_A && !have_B){
+    result[0] += np_blas_ddot_int(num_weights, pmat_A[0], weights)/db;
+    return 1;
+  }
+
+  if(!have_A && have_B){
+    result[0] += np_blas_ddot_int(num_weights, pmat_B[0], weights)/db;
+    return 1;
+  }
+
+  return 0;
+}
+
+static int np_outer_weighted_sum_blas_thin_unit_try(double * const * const pmat_A,
+                                                    const int have_A,
+                                                    const int max_A,
+                                                    double * const * const pmat_B,
+                                                    const int have_B,
+                                                    const int max_B,
+                                                    const double * const weights,
+                                                    const int num_weights,
+                                                    const double db,
+                                                    double * const result){
+  if((num_weights < 512) || (pmat_A == NULL) || (pmat_B == NULL) ||
+     (weights == NULL) || (result == NULL))
+    return 0;
+
+  if((max_A > 1) && (max_B == 1) && !have_B){
+    for(int j = 0; j < max_A; j++)
+      result[j] += np_blas_ddot_int(num_weights, pmat_A[j], weights)/db;
+    return 1;
+  }
+
+  if((max_A == 1) && (max_B > 1) && !have_A){
+    for(int i = 0; i < max_B; i++)
+      result[i] += np_blas_ddot_int(num_weights, pmat_B[i], weights)/db;
+    return 1;
+  }
+
+  return 0;
 }
 
 static double *np_outer_weighted_sum_pack_A(double * const * const pmat_A,
@@ -6513,6 +6573,37 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
                                               pmat_B, have_B, max_B,
                                               weights, num_weights, db, result)){
     return;
+  }
+
+  if(!have_sgn &&
+     !symmetric &&
+     (xl == NULL) &&
+     !parallel_sum &&
+     !gather_scatter){
+    const double * const bw = use_wpow ? wbuf : weights;
+    const double bdb = use_wpow ? unit_weight : db;
+    int blas_ok = 0;
+
+    if((max_A == 1) && (max_B == 1)){
+      blas_ok = np_outer_weighted_sum_blas_scalar_unit_try(pmat_A, have_A,
+                                                           pmat_B, have_B,
+                                                           bw, num_weights,
+                                                           bdb, result);
+    } else if((max_A == 1) || (max_B == 1)){
+      blas_ok = np_outer_weighted_sum_blas_thin_unit_try(pmat_A, have_A, max_A,
+                                                         pmat_B, have_B, max_B,
+                                                         bw, num_weights,
+                                                         bdb, result);
+    }
+
+    if(blas_ok){
+      if(do_leave_one_out)
+        weights[which_k] = temp;
+
+      safe_free(wbuf);
+
+      return;
+    }
   }
 
   if(scalar_sum_fast){
