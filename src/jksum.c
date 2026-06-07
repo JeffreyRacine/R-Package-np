@@ -56,7 +56,13 @@ typedef void (*np_vDSP_sveD_fn)(const double *, np_vDSP_Stride, double *,
 typedef void (*np_vDSP_dotprD_fn)(const double *, np_vDSP_Stride,
                                   const double *, np_vDSP_Stride,
                                   double *, np_vDSP_Length);
+typedef void (*np_vDSP_vaddD_fn)(const double *, np_vDSP_Stride,
+                                 const double *, np_vDSP_Stride,
+                                 double *, np_vDSP_Stride,
+                                 np_vDSP_Length);
 typedef void (*np_vvexp_fn)(double *, const double *, const int *);
+typedef void (*np_vvfabs_fn)(double *, const double *, const int *);
+typedef void (*np_vvrec_fn)(double *, const double *, const int *);
 #else
 #define NP_ACCEL_GAUSS_COMPILED 0
 #endif
@@ -5208,6 +5214,7 @@ static double *np_accel_gauss_tmp = NULL;
 static double *np_accel_gauss_arg = NULL;
 static double *np_accel_gauss_work = NULL;
 static double *np_accel_gauss_val = NULL;
+static double *np_accel_gauss_poly = NULL;
 static int np_accel_gauss_capacity = 0;
 static void *np_accel_gauss_handle = NULL;
 static int np_accel_gauss_available_cache = -1;
@@ -5217,7 +5224,10 @@ static np_vDSP_vsmulD_fn np_accel_vsmulD = NULL;
 static np_vDSP_vmulD_fn np_accel_vmulD = NULL;
 static np_vDSP_sveD_fn np_accel_sveD = NULL;
 static np_vDSP_dotprD_fn np_accel_dotprD = NULL;
+static np_vDSP_vaddD_fn np_accel_vaddD = NULL;
 static np_vvexp_fn np_accel_vvexp = NULL;
+static np_vvfabs_fn np_accel_vvfabs = NULL;
+static np_vvrec_fn np_accel_vvrec = NULL;
 
 static int np_accel_gauss_resolve(void)
 {
@@ -5245,8 +5255,14 @@ static int np_accel_gauss_resolve(void)
     (np_vDSP_sveD_fn)dlsym(np_accel_gauss_handle, "vDSP_sveD");
   np_accel_dotprD =
     (np_vDSP_dotprD_fn)dlsym(np_accel_gauss_handle, "vDSP_dotprD");
+  np_accel_vaddD =
+    (np_vDSP_vaddD_fn)dlsym(np_accel_gauss_handle, "vDSP_vaddD");
   np_accel_vvexp =
     (np_vvexp_fn)dlsym(np_accel_gauss_handle, "vvexp");
+  np_accel_vvfabs =
+    (np_vvfabs_fn)dlsym(np_accel_gauss_handle, "vvfabs");
+  np_accel_vvrec =
+    (np_vvrec_fn)dlsym(np_accel_gauss_handle, "vvrec");
 
   if(np_accel_vsmsaD == NULL ||
      np_accel_vsqD == NULL ||
@@ -5254,7 +5270,10 @@ static int np_accel_gauss_resolve(void)
      np_accel_vmulD == NULL ||
      np_accel_sveD == NULL ||
      np_accel_dotprD == NULL ||
-     np_accel_vvexp == NULL) {
+     np_accel_vaddD == NULL ||
+     np_accel_vvexp == NULL ||
+     np_accel_vvfabs == NULL ||
+     np_accel_vvrec == NULL) {
     dlclose(np_accel_gauss_handle);
     np_accel_gauss_handle = NULL;
     np_accel_vsmsaD = NULL;
@@ -5263,7 +5282,10 @@ static int np_accel_gauss_resolve(void)
     np_accel_vmulD = NULL;
     np_accel_sveD = NULL;
     np_accel_dotprD = NULL;
+    np_accel_vaddD = NULL;
     np_accel_vvexp = NULL;
+    np_accel_vvfabs = NULL;
+    np_accel_vvrec = NULL;
     np_accel_gauss_available_cache = 0;
     return 0;
   }
@@ -5278,6 +5300,7 @@ static int np_accel_gauss_scratch_ensure(const int n)
   double *arg = NULL;
   double *work = NULL;
   double *val = NULL;
+  double *poly = NULL;
 
   if(n <= np_accel_gauss_capacity)
     return 1;
@@ -5301,6 +5324,11 @@ static int np_accel_gauss_scratch_ensure(const int n)
   if(val == NULL)
     return 0;
   np_accel_gauss_val = val;
+
+  poly = (double *)realloc(np_accel_gauss_poly, (size_t)n*sizeof(double));
+  if(poly == NULL)
+    return 0;
+  np_accel_gauss_poly = poly;
 
   np_accel_gauss_capacity = n;
   return 1;
@@ -5390,6 +5418,111 @@ static void np_accel_gauss_vector(const int KERNEL,
   }
 
   np_accel_vsmulD(out, 1, &coef, out, 1, (np_vDSP_Length)n);
+}
+
+static void np_accel_erfun_np_vector(const double * const in,
+                                     const int n,
+                                     double * const out,
+                                     double * const absbuf,
+                                     double * const tbuf,
+                                     double * const polybuf,
+                                     double * const argbuf)
+{
+  const double half = 0.5;
+  const double one = 1.0;
+  const double minus_one = -1.0;
+  const double c_arg = -1.26551223;
+  const int ni = n;
+
+  np_accel_vvfabs(absbuf, in, &ni);
+  np_accel_vsmsaD(absbuf, 1, &half, &one,
+                  tbuf, 1, (np_vDSP_Length)n);
+  np_accel_vvrec(tbuf, tbuf, &ni);
+
+  {
+    const double c8 = 0.17087277;
+    const double c7 = -0.82215223;
+    const double c6 = 1.48851587;
+    const double c5 = -1.13520398;
+    const double c4 = 0.27886807;
+    const double c3 = -0.18628806;
+    const double c2 = 0.09678418;
+    const double c1 = 0.37409196;
+    const double c0 = 1.00002368;
+
+    np_accel_vsmsaD(tbuf, 1, &c8, &c7,
+                    polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vmulD(polybuf, 1, tbuf, 1,
+                   polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vsmsaD(polybuf, 1, &one, &c6,
+                    polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vmulD(polybuf, 1, tbuf, 1,
+                   polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vsmsaD(polybuf, 1, &one, &c5,
+                    polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vmulD(polybuf, 1, tbuf, 1,
+                   polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vsmsaD(polybuf, 1, &one, &c4,
+                    polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vmulD(polybuf, 1, tbuf, 1,
+                   polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vsmsaD(polybuf, 1, &one, &c3,
+                    polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vmulD(polybuf, 1, tbuf, 1,
+                   polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vsmsaD(polybuf, 1, &one, &c2,
+                    polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vmulD(polybuf, 1, tbuf, 1,
+                   polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vsmsaD(polybuf, 1, &one, &c1,
+                    polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vmulD(polybuf, 1, tbuf, 1,
+                   polybuf, 1, (np_vDSP_Length)n);
+    np_accel_vsmsaD(polybuf, 1, &one, &c0,
+                    polybuf, 1, (np_vDSP_Length)n);
+  }
+
+  np_accel_vsqD(absbuf, 1, argbuf, 1, (np_vDSP_Length)n);
+  np_accel_vsmsaD(argbuf, 1, &minus_one, &c_arg,
+                  argbuf, 1, (np_vDSP_Length)n);
+  np_accel_vmulD(polybuf, 1, tbuf, 1,
+                 polybuf, 1, (np_vDSP_Length)n);
+  np_accel_vaddD(argbuf, 1, polybuf, 1,
+                 argbuf, 1, (np_vDSP_Length)n);
+  np_accel_vvexp(out, argbuf, &ni);
+  np_accel_vmulD(out, 1, tbuf, 1,
+                 out, 1, (np_vDSP_Length)n);
+
+  for(int i = 0; i < n; i++)
+    out[i] = (in[i] >= 0.0) ? (1.0 - out[i]) : (out[i] - 1.0);
+}
+
+static void np_accel_gauss_cdf2_vector(const double * const xt,
+                                       const int n,
+                                       const double x,
+                                       const double zscale,
+                                       const double coef,
+                                       double * const out)
+{
+  const double minus_one = -1.0;
+  const double sqrt_half = 0.7071067810;
+  const double half = 0.5;
+  const double offset = 0.5;
+  const double zcoef = sqrt_half*zscale;
+
+  np_accel_vsmsaD(xt, 1, &minus_one, &x,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+  np_accel_vsmulD(np_accel_gauss_tmp, 1, &zcoef,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+  np_accel_erfun_np_vector(np_accel_gauss_tmp, n, out,
+                           np_accel_gauss_arg,
+                           np_accel_gauss_work,
+                           np_accel_gauss_poly,
+                           np_accel_gauss_val);
+  np_accel_vsmsaD(out, 1, &half, &offset,
+                  out, 1, (np_vDSP_Length)n);
+  np_accel_vsmulD(out, 1, &coef,
+                  out, 1, (np_vDSP_Length)n);
 }
 
 static int np_p_ckernelv_accel_gauss2_deriv_try(const int KERNEL,
@@ -5732,10 +5865,12 @@ void np_accel_gauss_release_buffers(void)
   free(np_accel_gauss_arg);
   free(np_accel_gauss_work);
   free(np_accel_gauss_val);
+  free(np_accel_gauss_poly);
   np_accel_gauss_tmp = NULL;
   np_accel_gauss_arg = NULL;
   np_accel_gauss_work = NULL;
   np_accel_gauss_val = NULL;
+  np_accel_gauss_poly = NULL;
   np_accel_gauss_capacity = 0;
   if(np_accel_gauss_handle != NULL)
     dlclose(np_accel_gauss_handle);
@@ -5747,7 +5882,10 @@ void np_accel_gauss_release_buffers(void)
   np_accel_vmulD = NULL;
   np_accel_sveD = NULL;
   np_accel_dotprD = NULL;
+  np_accel_vaddD = NULL;
   np_accel_vvexp = NULL;
+  np_accel_vvfabs = NULL;
+  np_accel_vvrec = NULL;
 #endif
 }
 
@@ -5770,19 +5908,25 @@ static int NP_NOINLINE np_ckernelv_accel_try(const int KERNEL,
 {
 #if NP_ACCEL_GAUSS_COMPILED
   if(np_mseries_accelerate_enabled_cache &&
-     KERNEL >= 0 &&
-     KERNEL <= 3 &&
+     ((KERNEL >= 0 && KERNEL <= 3) || KERNEL == 30) &&
      xl == NULL &&
      num_xt >= 256 &&
+     (KERNEL != 30 || num_xt <= 8192) &&
      np_accel_gauss_resolve() &&
      np_accel_gauss_scratch_ensure(num_xt)) {
-    const double coef = invnorm*ONE_OVER_SQRT_TWO_PI;
+    const double coef = (KERNEL == 30) ? invnorm : invnorm*ONE_OVER_SQRT_TWO_PI;
     if(!bin_do_xw) {
-      np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, result);
+      if(KERNEL == 30)
+        np_accel_gauss_cdf2_vector(xt, num_xt, x, zscale, coef, result);
+      else
+        np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, result);
       return 1;
     }
     if(!np_accel_gauss_has_zero_weight(xw, num_xt)) {
-      np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, np_accel_gauss_val);
+      if(KERNEL == 30)
+        np_accel_gauss_cdf2_vector(xt, num_xt, x, zscale, coef, np_accel_gauss_val);
+      else
+        np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, np_accel_gauss_val);
       np_accel_vmulD(np_accel_gauss_val, 1, xw, 1, result, 1, (np_vDSP_Length)num_xt);
       return 1;
     }
