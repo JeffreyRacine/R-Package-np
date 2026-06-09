@@ -489,6 +489,8 @@ np_render_control <- function(style = c("band", "bar"),
       stop("renderer='rgl' is not yet implemented for this plot route. Use renderer='base'.",
            call. = FALSE)
     }
+    if (identical(dots$renderer, "rgl") && is.null(dots$view))
+      dots$view <- "fixed"
   }
 
   .np_with_seed(random.seed, do.call(method, c(list(bws = bws), dots)))
@@ -506,6 +508,8 @@ np_render_control <- function(style = c("band", "bar"),
       stop("renderer='rgl' is not yet implemented for this plot route. Use renderer='base'.",
            call. = FALSE)
     }
+    if (identical(dots$renderer, "rgl") && is.null(dots$view))
+      dots$view <- "fixed"
   }
   if (!is.null(dots$plot.rug)) {
     dots$plot.rug <- .np_plot_match_flag(dots$plot.rug, "plot.rug")

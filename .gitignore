@@ -3,3 +3,4 @@
 *.plist
 .DS_Store
 .Rlib/
+src/Makevars
