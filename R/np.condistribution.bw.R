@@ -3000,6 +3000,22 @@ npcdistbw.default <-
       ncon = sum(x.info$icon),
       where = "npcdistbw"
     )
+    public.spec <- spec
+    lc.lp0.search.engine <- isTRUE(bandwidth.compute) &&
+      identical(spec$regtype, "lc") &&
+      sum(x.info$icon) > 0L &&
+      (!("bwmethod" %in% mc.names) || identical(as.character(bwmethod)[1L], "cv.ls")) &&
+      (!("bwtype" %in% mc.names) || identical(as.character(bwtype)[1L], "fixed"))
+    if (isTRUE(lc.lp0.search.engine)) {
+      spec$regtype <- "lp"
+      spec$basis <- "glp"
+      spec$degree <- rep.int(0L, sum(x.info$icon))
+      spec$bernstein.basis <- FALSE
+      spec$regtype.engine <- "lp"
+      spec$basis.engine <- "glp"
+      spec$degree.engine <- rep.int(0L, sum(x.info$icon))
+      spec$bernstein.basis.engine <- FALSE
+    }
     pregtype <- switch(spec$regtype,
                        lc = "Local-Constant",
                        ll = "Local-Linear",
@@ -3237,6 +3253,17 @@ npcdistbw.default <-
     environment(mc) <- parent.frame()
     tbw$call <- mc
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
+    if (isTRUE(lc.lp0.search.engine)) {
+      tbw$regtype <- public.spec$regtype
+      tbw$pregtype <- "Local-Constant"
+      tbw$basis <- public.spec$basis
+      tbw$degree <- public.spec$degree
+      tbw$bernstein.basis <- public.spec$bernstein.basis
+      tbw$regtype.engine <- public.spec$regtype.engine
+      tbw$basis.engine <- public.spec$basis.engine
+      tbw$degree.engine <- public.spec$degree.engine
+      tbw$bernstein.basis.engine <- public.spec$bernstein.basis.engine
+    }
 
     return(tbw)
   }
