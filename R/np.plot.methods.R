@@ -490,6 +490,8 @@ np_render_control <- function(style = c("band", "bar"),
       stop("renderer='rgl' is not yet implemented for this plot route. Use renderer='base'.",
            call. = FALSE)
     }
+    if (identical(dots$renderer, "rgl") && is.null(dots$view))
+      dots$view <- "fixed"
   }
 
   .npRmpi_require_active_slave_pool(where = where)
@@ -532,6 +534,8 @@ np_render_control <- function(style = c("band", "bar"),
       stop("renderer='rgl' is not yet implemented for this plot route. Use renderer='base'.",
            call. = FALSE)
     }
+    if (identical(dots$renderer, "rgl") && is.null(dots$view))
+      dots$view <- "fixed"
   }
 
   if (!is.null(dots$plot.rug)) {
