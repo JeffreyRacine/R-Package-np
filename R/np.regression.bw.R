@@ -1607,7 +1607,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     list(
       objective = out$objective,
       degree = integer(0L),
-      num.feval = out$num.feval
+      num.feval = out$num.feval,
+      num.feval.fast = out$num.feval.fast
     )
   }
 
@@ -3073,6 +3074,38 @@ npRmpiNomadShadowSearchRegression <- function(template,
 }
 
 .npregbw_attach_degree_search <- function(bws, search_result) {
+  cumulative_count <- function(name, total.name) {
+    if (!is.null(search_result[[total.name]])) {
+      total <- suppressWarnings(as.numeric(search_result[[total.name]][1L]))
+      if (is.finite(total))
+        return(total)
+    }
+
+    trace <- search_result$trace
+    trace.summable <- !(search_result$method %in% c("nomad", "nomad+powell"))
+    if (!is.null(search_result$engine))
+      trace.summable <- trace.summable && !(search_result$engine %in% c("nomad", "nomad+powell"))
+    if (!isTRUE(trace.summable))
+      return(NA_real_)
+    if (!is.data.frame(trace) || !nrow(trace) || !(name %in% names(trace)))
+      return(NA_real_)
+
+    actual <- rep(TRUE, nrow(trace))
+    if ("status" %in% names(trace))
+      actual <- actual & !is.na(trace$status) & as.character(trace$status) == "ok"
+    if ("cached" %in% names(trace)) {
+      cached <- suppressWarnings(as.logical(trace$cached))
+      cached[is.na(cached)] <- FALSE
+      actual <- actual & !cached
+    }
+
+    values <- suppressWarnings(as.numeric(trace[[name]]))
+    values <- values[actual & is.finite(values)]
+    if (!length(values))
+      return(NA_real_)
+    sum(values)
+  }
+
   metadata <- list(
     mode = search_result$method,
     source = if (!is.null(search_result$source)) search_result$source else "explicit",
@@ -3113,6 +3146,12 @@ npRmpiNomadShadowSearchRegression <- function(template,
   if (is.null(bws$timing.profile) && is.list(search_result$best$timing.profile))
     bws$timing.profile <- search_result$best$timing.profile
   bws <- .np_attach_nomad_restart_summary(bws, search_result)
+  total.num.feval <- cumulative_count("num.feval", "num.feval.total")
+  total.num.feval.fast <- cumulative_count("num.feval.fast", "num.feval.fast.total")
+  if (is.finite(total.num.feval))
+    bws$num.feval <- total.num.feval
+  if (is.finite(total.num.feval.fast))
+    bws$num.feval.fast <- total.num.feval.fast
   bws$degree.search <- metadata
   bws
 }
@@ -3390,7 +3429,8 @@ npregbw.default <-
         list(
           objective = as.numeric(cell.bws$fval[1L]),
           payload = cell.bws,
-          num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_
+          num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_,
+          num.feval.fast = if (!is.null(cell.bws$num.feval.fast)) as.numeric(cell.bws$num.feval.fast[1L]) else NA_real_
         )
       }
 
