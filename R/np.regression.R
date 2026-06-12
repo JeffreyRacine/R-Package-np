@@ -746,7 +746,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   }
 
   has.fixed.bws.value <- !missing(bws) && !isa(bws, "rbandwidth")
-  if (.npRmpi_autodispatch_active() && !isTRUE(nomad) && !isTRUE(has.fixed.bws.value))
+  if (.npRmpi_autodispatch_active() && !npNomadControlRequested(nomad) && !isTRUE(has.fixed.bws.value))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   sc <- sys.call()

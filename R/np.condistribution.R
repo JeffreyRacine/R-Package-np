@@ -522,7 +522,7 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   }
   if (has.explicit.bws &&
       .npRmpi_autodispatch_active() &&
-      !isTRUE(nomad) &&
+      !npNomadControlRequested(nomad) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
       !.npRmpi_session_has_active_pool(comm = 1L)) {
     return(.npRmpi_with_local_cdist_eval(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
@@ -536,7 +536,7 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       bernstein.basis = bernstein.request
     )
   if (.npRmpi_autodispatch_active() &&
-      !isTRUE(nomad) &&
+      !npNomadControlRequested(nomad) &&
       !keep_local_cvls_nn &&
       !keep_local_raw_degree1_cvls &&
       !bws.formula &&

@@ -92,22 +92,24 @@ npregbw.NULL <-
     )
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     dot.names <- names(dots)
+    nomad.requested <- ("nomad" %in% dot.names) &&
+      npNomadControlRequested(dots$nomad, "nomad")
     degree.select.value <- if ("degree.select" %in% dot.names) {
       match.arg(as.character(dots$degree.select[[1L]]), c("manual", "coordinate", "exhaustive"))
     } else {
       "manual"
     }
-    automatic.degree.search <- isTRUE(dots$nomad) || !identical(degree.select.value, "manual")
+    automatic.degree.search <- isTRUE(nomad.requested) || !identical(degree.select.value, "manual")
     regtype.value <- if ("regtype" %in% dot.names) {
       match.arg(as.character(dots$regtype[[1L]]), c("lc", "ll", "lp"))
-    } else if (isTRUE(dots$nomad)) {
+    } else if (isTRUE(nomad.requested)) {
       "lp"
     } else {
       "lc"
     }
     search.engine.value <- if ("search.engine" %in% dot.names) {
       match.arg(as.character(dots$search.engine[[1L]]), c("nomad+powell", "cell", "nomad"))
-    } else if (isTRUE(dots$nomad)) {
+    } else if (isTRUE(nomad.requested)) {
       "nomad+powell"
     } else {
       "nomad+powell"
@@ -3402,6 +3404,13 @@ npregbw.default <-
         "bwsolver" %in% search.mc.names &&
         npBwsolverUsesMads(bwsolver)) {
       stop("bwsolver is for fixed-degree bandwidth searches; use search.engine for automatic degree search")
+    }
+    if (nomad.inner.named &&
+        (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
+      if (!is.null(degree.search) && identical(degree.search$source, "auto")) {
+        stop("nomad.nmulti applies only to NOMAD-backed degree search; nomad=\"auto\" selected exhaustive/cell search for this one-continuous-predictor problem")
+      }
+      stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
     }
     if (!is.null(degree.search) && is.null(reg.args$degree)) {
       reg.args$degree <- npSetupGlpDegree(

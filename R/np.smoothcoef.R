@@ -148,7 +148,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   explicit.scbandwidth <- (!missing(bws)) && inherits(bws, "scbandwidth")
   formula.forwarded <- (!missing(txdat)) && inherits(txdat, "formula")
   nomad <- npValidateNomadControl(nomad, "nomad")
-  degree.select.value <- if (isTRUE(nomad)) {
+  degree.select.value <- if (npNomadControlRequested(nomad)) {
     "coordinate"
   } else if ("degree.select" %in% names(list(...))) {
     match.arg(list(...)$degree.select, c("manual", "coordinate", "exhaustive"))

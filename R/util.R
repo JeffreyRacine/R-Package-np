@@ -261,6 +261,10 @@ npValidateNomadControl <- function(value, argname = "nomad") {
   stop(sprintf("'%s' must be TRUE, FALSE, or \"auto\"", argname), call. = FALSE)
 }
 
+npNomadControlRequested <- function(value, argname = "nomad") {
+  npValidateNomadControl(value, argname) %in% c("true", "auto")
+}
+
 npValidateNewdataColumns <- function(newdata, required, argname = "newdata") {
   nd <- toFrame(newdata)
   required <- unique(as.character(required))
