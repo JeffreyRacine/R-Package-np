@@ -255,8 +255,8 @@ npValidateNomadControl <- function(value, argname = "nomad") {
     stop(sprintf("'%s' must be TRUE, FALSE, or \"auto\"", argname), call. = FALSE)
 
   token <- tolower(trimws(value))
-  if (identical(token, "auto"))
-    return("auto")
+  if (token %in% c("true", "false", "auto"))
+    return(token)
 
   stop(sprintf("'%s' must be TRUE, FALSE, or \"auto\"", argname), call. = FALSE)
 }
