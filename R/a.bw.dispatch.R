@@ -156,8 +156,14 @@
   }
 
   nomad <- arg_value("nomad")
-  if (!is.null(nomad) && isTRUE(as.logical(nomad)[1L]))
-    return(TRUE)
+  if (!is.null(nomad)) {
+    nomad.mode <- tryCatch(
+      npValidateNomadControl(nomad, "nomad"),
+      error = function(e) "false"
+    )
+    if (nomad.mode %in% c("true", "auto"))
+      return(TRUE)
+  }
 
   regtype <- arg_value("regtype")
   if (is.null(regtype) || !identical(as.character(regtype)[1L], "lp"))

@@ -277,7 +277,7 @@ test_that("npplreg nomad to powell to fit route preserves single-line fit handof
     lines
   )
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", lines)
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", lines)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", lines)
 
   expect_s3_class(actual$value, "plregression")
   expect_true(length(bandwidth.pos) > 0L)

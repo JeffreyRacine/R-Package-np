@@ -127,7 +127,8 @@ npplregbw.NULL =
     mc <- match.call(expand.dots = FALSE)
     dots <- list(...)
     dot.names <- names(dots)
-    nomad.requested <- "nomad" %in% dot.names && isTRUE(dots$nomad)
+    nomad.requested <- "nomad" %in% dot.names &&
+      (npValidateNomadControl(dots$nomad, "nomad") %in% c("true", "auto"))
     degree.select.value <- if ("degree.select" %in% dot.names) {
       match.arg(as.character(dots$degree.select[[1L]]),
                 c("manual", "coordinate", "exhaustive"))
@@ -509,7 +510,9 @@ npplregbw.plbandwidth =
                                                    degree.search,
                                                    nomad.inner.nmulti = 0L,
                                                    random.seed = 42L,
-                                                   yname = deparse(substitute(ydat))) {
+                                                   yname = deparse(substitute(ydat)),
+                                                   source = "explicit",
+                                                   reason = NULL) {
   if (isTRUE(degree.search$verify))
     stop("npplreg child-specific NOMAD does not support degree.verify")
 
@@ -631,6 +634,8 @@ npplregbw.plbandwidth =
 
   list(
     method = degree.search$engine,
+    source = source,
+    reason = reason,
     direction = "min",
     verify = FALSE,
     completed = TRUE,
@@ -1106,7 +1111,10 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
                                          nomad.nmulti = 1L,
                                          nomad.inner.nmulti = 0L,
                                          random.seed = 42L,
-                                         remin = FALSE) {
+                                         remin = FALSE,
+                                         source = "explicit",
+                                         reason = NULL,
+                                         progress_label = NULL) {
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   old.messages <- getOption("np.messages")
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -1194,6 +1202,9 @@ npRmpiNomadShadowSearchPlreg <- function(zdat,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     remin = isTRUE(remin),
+    source = source,
+    reason = reason,
+    progress_label = progress_label,
     start.lower = start.lower,
     start.upper = start.upper,
     coordinate.roles = coordinate.roles,
@@ -1233,7 +1244,10 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
                                            nomad.nmulti = 1L,
                                            nomad.inner.nmulti = 0L,
                                            random.seed = 42L,
-                                           remin = FALSE) {
+                                           remin = FALSE,
+                                           source = "explicit",
+                                           reason = NULL,
+                                           progress_label = NULL) {
   with.active.comm <- function(comm, expr) {
     .Call("C_np_set_active_comm", TRUE, as.integer(comm), PACKAGE = "npRmpi")
     on.exit(.Call("C_np_set_active_comm", FALSE, as.integer(1L), PACKAGE = "npRmpi"), add = TRUE)
@@ -1273,7 +1287,10 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
       nomad.nmulti = nomad.nmulti,
       nomad.inner.nmulti = nomad.inner.nmulti,
       random.seed = random.seed,
-      remin = isTRUE(remin)
+      remin = isTRUE(remin),
+      source = source,
+      reason = reason,
+      progress_label = progress_label
     ))
   }
 
@@ -1707,6 +1724,9 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
       nomad.inner.nmulti = nomad.inner.nmulti,
       random.seed = random.seed,
       remin = isTRUE(remin),
+      source = source,
+      reason = reason,
+      progress_label = progress_label,
       start.lower = start.lower,
       start.upper = start.upper,
       coordinate.roles = coordinate.roles,
@@ -1750,7 +1770,10 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
                                     opt.args,
                                     degree.search,
                                     nomad.inner.nmulti = 0L,
-                                    random.seed = 42L) {
+                                    random.seed = 42L,
+                                    source = "explicit",
+                                    reason = NULL,
+                                    progress_label = NULL) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
 
@@ -1998,7 +2021,10 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
         NOMADNMULTI,
         INNERNMULTI,
         RSEED,
-        REMIN
+        REMIN,
+        SOURCE,
+        REASON,
+        PROGRESSLABEL
       ),
       list(
         ZDAT = zdat,
@@ -2017,7 +2043,10 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
         NOMADNMULTI = nomad.nmulti,
         INNERNMULTI = nomad.inner.nmulti,
         RSEED = random.seed,
-        REMIN = isTRUE(opt.args$nomad.remin)
+        REMIN = isTRUE(opt.args$nomad.remin),
+        SOURCE = source,
+        REASON = reason,
+        PROGRESSLABEL = progress_label
       )
     )
 
@@ -2088,6 +2117,9 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     remin = isTRUE(opt.args$nomad.remin),
+    source = source,
+    reason = reason,
+    progress_label = progress_label,
     start.lower = c(child.start.lower, degree.search$lower),
     start.upper = c(child.start.upper, degree.search$upper),
     coordinate.roles = coordinate.roles,
@@ -2117,11 +2149,21 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
                                               degree.max.cycles,
                                               degree.verify,
                                               bernstein.basis,
-                                              bernstein.named) {
+                                              bernstein.named,
+                                              nomad.source = "explicit",
+                                              nomad.auto.filled = character()) {
   degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
   if (identical(degree.select, "manual"))
     return(NULL)
-  search.engine <- .np_degree_search_engine_controls(search.engine)
+  resolved <- .np_degree_resolve_auto_engine(
+    search.engine = search.engine,
+    degree.select = degree.select,
+    ncon = ncon,
+    source = nomad.source,
+    auto.filled = nomad.auto.filled
+  )
+  search.engine <- .np_degree_search_engine_controls(resolved$search.engine)
+  degree.select <- resolved$degree.select
 
   regtype.requested <- if (isTRUE(regtype.named)) match.arg(regtype, c("lc", "ll", "lp")) else "lc"
   if (!identical(regtype.requested, "lp"))
@@ -2175,13 +2217,18 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
     restarts = npValidateNonNegativeInteger(degree.restarts, "degree.restarts"),
     max.cycles = npValidatePositiveInteger(degree.max.cycles, "degree.max.cycles"),
     verify = npValidateScalarLogical(degree.verify, "degree.verify"),
-    bernstein.basis = bern.auto
+    bernstein.basis = bern.auto,
+    source = resolved$source,
+    reason = resolved$reason
   )
 }
 
 .npplregbw_attach_degree_search <- function(bws, search_result) {
   metadata <- list(
     mode = search_result$method,
+    source = if (!is.null(search_result$source)) search_result$source else "explicit",
+    reason = if (!is.null(search_result$reason)) search_result$reason else NULL,
+    engine = if (!is.null(search_result$engine)) search_result$engine else search_result$method,
     verify = isTRUE(search_result$verify),
     completed = isTRUE(search_result$completed),
     certified = isTRUE(search_result$certified),
@@ -2295,7 +2342,8 @@ npplregbw.default =
       if ("degree.select" %in% mc.names &&
           identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
         stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
-      if ("search.engine" %in% mc.names &&
+      if (!identical(nomad.shortcut$metadata$source, "auto") &&
+          "search.engine" %in% mc.names &&
           !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
               c("nomad", "nomad+powell")))
         stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
@@ -2359,7 +2407,9 @@ npplregbw.default =
       degree.max.cycles = if ("degree.max.cycles" %in% mc.names) degree.max.cycles else 20L,
       degree.verify = if (!is.null(nomad.shortcut$values$degree.verify)) nomad.shortcut$values$degree.verify else FALSE,
       bernstein.basis = bernstein.arg,
-      bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% dot.names)
+      bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% dot.names),
+      nomad.source = nomad.shortcut$metadata$source,
+      nomad.auto.filled = nomad.shortcut$metadata$auto.filled
     )
     nomad.inner <- .np_nomad_validate_inner_multistart(
       call_names = mc.names,
@@ -2480,7 +2530,9 @@ npplregbw.default =
             eval_fun = eval_fun,
             direction = "min",
             trace_level = "full",
-            objective_name = "fval"
+            objective_name = "fval",
+            source = degree.search$source,
+            reason = degree.search$reason
           )
         } else {
           search.result <- .npplregbw_child_specific_nomad_search(
@@ -2494,7 +2546,9 @@ npplregbw.default =
             degree.search = degree.search,
             nomad.inner.nmulti = nomad.inner.nmulti,
             random.seed = random.seed.value,
-            yname = deparse(substitute(ydat))
+            yname = deparse(substitute(ydat)),
+            source = degree.search$source,
+            reason = degree.search$reason
           )
       }
         tbw <- .npplregbw_attach_degree_search(

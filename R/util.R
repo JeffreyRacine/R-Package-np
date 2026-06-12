@@ -247,6 +247,20 @@ npValidateScalarLogical <- function(value, argname) {
   value
 }
 
+npValidateNomadControl <- function(value, argname = "nomad") {
+  if (is.logical(value))
+    return(if (npValidateScalarLogical(value, argname)) "true" else "false")
+
+  if (!is.character(value) || length(value) != 1L || is.na(value))
+    stop(sprintf("'%s' must be TRUE, FALSE, or \"auto\"", argname), call. = FALSE)
+
+  token <- tolower(trimws(value))
+  if (identical(token, "auto"))
+    return("auto")
+
+  stop(sprintf("'%s' must be TRUE, FALSE, or \"auto\"", argname), call. = FALSE)
+}
+
 npValidateNewdataColumns <- function(newdata, required, argname = "newdata") {
   nd <- toFrame(newdata)
   required <- unique(as.character(required))
@@ -274,16 +288,19 @@ npValidateNewdataFormula <- function(newdata, formula, include.response = TRUE,
                                        values,
                                        where = "npregbw") {
   call_names <- if (is.null(call_names)) character(0) else call_names[nzchar(call_names)]
-  nomad.enabled <- if ("nomad" %in% call_names) {
-    npValidateScalarLogical(nomad, "nomad")
+  nomad.mode <- if ("nomad" %in% call_names) {
+    npValidateNomadControl(nomad, "nomad")
   } else {
-    FALSE
+    "false"
   }
+  nomad.enabled <- nomad.mode %in% c("true", "auto")
 
   metadata <- list(
     enabled = isTRUE(nomad.enabled),
     where = where,
     preset = "lp_nomad",
+    source = if (identical(nomad.mode, "auto")) "auto" else if (identical(nomad.mode, "true")) "explicit" else "default",
+    nomad = nomad.mode,
     auto.filled = character(0),
     user.supplied = character(0),
     normalized.values = preset
@@ -2920,6 +2937,7 @@ genBwSelStr <- function(x){
 
   pregtype.str <- if (is.null(pregtype)) "" else paste("\n", npPolynomialSummaryLabel(x), ": ", pregtype, sep = "")
   pmethod.str <- if (is.null(x$pmethod)) "" else paste("\nBandwidth Selection Method:", x$pmethod)
+  degree.search.str <- .np_degree_search_summary_str(x)
   formula.str <- if (!identical(x$formula, NULL)) paste("\nFormula:", paste(deparse(x$formula), collapse = "\n")) else ""
   ptype.str <- if (is.null(x$ptype)) "" else paste("\nBandwidth Type: ", x$ptype, sep = "")
   extendednn.str <- if (npRegressionHasExtendedNn(x)) {
@@ -2930,6 +2948,7 @@ genBwSelStr <- function(x){
 
   paste(pregtype.str,
         pmethod.str,
+        degree.search.str,
         formula.str,
         ptype.str,
         extendednn.str,

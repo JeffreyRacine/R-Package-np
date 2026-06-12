@@ -1166,7 +1166,7 @@ npqreg.condbandwidth <-
 
 
 npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
-  nomad <- npValidateScalarLogical(nomad, "nomad")
+  nomad <- npValidateNomadControl(nomad, "nomad")
   early.dots <- list(...)
   if ("tau" %in% names(early.dots))
     .npqreg_validate_tau(early.dots$tau)

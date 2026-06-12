@@ -139,7 +139,7 @@ npindex.call <-
 npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npindex()")
   explicit.sibandwidth <- (!missing(bws)) && inherits(bws, "sibandwidth")
-  nomad <- npValidateScalarLogical(nomad, "nomad")
+  nomad <- npValidateNomadControl(nomad, "nomad")
   degree.select.value <- if (isTRUE(nomad)) {
     "coordinate"
   } else if ("degree.select" %in% names(list(...))) {

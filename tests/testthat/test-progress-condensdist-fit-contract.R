@@ -565,7 +565,7 @@ test_that("npcdens nomad to powell to fit route preserves single-line fit handof
     lines
   )
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", lines)
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", lines)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", lines)
 
   expect_s3_class(actual$value, "condensity")
   expect_condensdist_clean_powell_surface(lines, pkg_pattern = "npRmpi")
@@ -692,7 +692,7 @@ test_that("npcdist nomad to powell to fit route preserves single-line fit handof
     lines
   )
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", lines)
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", lines)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", lines)
 
   expect_s3_class(actual$value, "condistribution")
   expect_true(length(bandwidth.pos) > 0L)
@@ -709,7 +709,7 @@ test_that("session npcdens nomad route keeps visible powell handoff in subproces
 
   actual <- run_condensdist_session_progress_contract()
   block <- condensdist_case_progress_lines(actual$lines, "npcdens")
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", block)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
     "^\\[npRmpi\\] Fitting conditional dens(?:ity)? 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
@@ -735,7 +735,7 @@ test_that("session npcdist nomad route keeps visible powell handoff in subproces
 
   actual <- run_condensdist_session_progress_contract()
   block <- condensdist_case_progress_lines(actual$lines, "npcdist")
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", block)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
     "^\\[npRmpi\\] Fitting conditional dist(?:ribution)? 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
@@ -762,7 +762,7 @@ test_that("attach npcdens nomad route keeps visible powell handoff in subprocess
 
   actual <- run_condensdist_attach_progress_contract()
   block <- condensdist_case_progress_lines(actual$lines, "npcdens")
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", block)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
     "^\\[npRmpi\\] Fitting conditional density 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
@@ -805,7 +805,7 @@ test_that("profile npcdens nomad route keeps visible powell handoff in subproces
 
   actual <- run_condensdist_profile_progress_contract()
   block <- condensdist_case_progress_lines(actual$lines, "npcdens")
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", block)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
     "^\\[npRmpi\\] Fitting conditional density 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",

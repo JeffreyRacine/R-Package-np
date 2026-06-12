@@ -243,7 +243,7 @@ These arguments control regression type, local-polynomial specification, and opt
   }
 
   \item{nomad}{
-    logical shortcut for the recommended automatic local-polynomial
+    logical or character shortcut for the recommended automatic local-polynomial
     NOMAD route. When \code{TRUE}, any missing values among
     \code{regtype}, \code{search.engine}, \code{degree.select},
     \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
@@ -253,7 +253,7 @@ These arguments control regression type, local-polynomial specification, and opt
     \code{bernstein.basis=TRUE}, \code{degree.min=0L},
     \code{degree.max=10L}, \code{degree.verify=FALSE}, and
     \code{bwtype="fixed"}. Explicit incompatible settings error
-    immediately; in particular, \code{nomad=TRUE} currently requires
+    immediately; in particular, explicit \code{nomad=TRUE} currently requires
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
     search, no explicit \code{degree},
     at least one continuous predictor, and
@@ -696,8 +696,8 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
   not restrict the admissible degree region searched by NOMAD. The
   direct NOMAD backend is provided by the suggested package
   \code{crs}, so install \code{crs} before using
-  \code{search.engine="nomad"}, \code{"nomad+powell"}, or
-  \code{nomad=TRUE}.
+  \code{search.engine="nomad"}, \code{"nomad+powell"},
+  \code{nomad=TRUE}, or \code{nomad="auto"}.
 
   The use of compactly supported kernels or the occurrence of small
   bandwidths during cross-validation can lead to numerical problems for
@@ -743,6 +743,13 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
   Compatible explicit tuning arguments are respected. Incompatible
   explicit settings fail fast so the shortcut never silently changes
   user-selected semantics.
+  The character value \code{nomad="auto"} applies the same LP
+  shortcut but leaves \code{search.engine} and \code{degree.select}
+  eligible for data-driven resolution when both were not supplied
+  explicitly: scalar continuous degree searches use the exhaustive
+  degree-grid route, while higher-dimensional degree searches keep the
+  NOMAD/Powell route. Explicit \code{search.engine} or
+  \code{degree.select} choices are honored.
   When the direct NOMAD route is active, \code{nmulti} controls the
   package-level outer restart count while \code{nomad.nmulti}
   controls the inner native \pkg{crs} NOMAD API multistart count used within

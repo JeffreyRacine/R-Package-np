@@ -459,7 +459,7 @@ npcdist.condbandwidth <-
 npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npcdist()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdist()")
-  nomad <- npValidateScalarLogical(nomad, "nomad")
+  nomad <- npValidateNomadControl(nomad, "nomad")
   sc <- sys.call()
   sc.names <- names(sc)
 

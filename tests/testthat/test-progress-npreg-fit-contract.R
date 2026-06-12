@@ -559,7 +559,7 @@ test_that("npreg nomad to powell to fit route preserves single-line fit handoff"
   )
 
   lines <- npreg_fit_progress_lines(actual)
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", lines)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", lines)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", lines)
   fit.start.pos <- grep(
     "^\\[npRmpi\\] Fitting regression 0/24 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
@@ -622,7 +622,7 @@ test_that("session npreg nomad route keeps visible powell handoff in subprocess"
 
   actual <- run_npreg_session_progress_contract()
   block <- npreg_case_progress_lines(actual$lines)
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", block)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
     "^\\[npRmpi\\] Fitting regression 0/24 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
@@ -662,7 +662,7 @@ test_that("profile npreg nomad route keeps visible powell handoff in subprocess"
 
   actual <- run_npreg_profile_progress_contract()
   block <- npreg_case_progress_lines(actual$lines)
-  bandwidth.pos <- grep("^\\[npRmpi\\] Selecting degree and bandwidth", block)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
     "^\\[npRmpi\\] Fitting regression 0/24 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",

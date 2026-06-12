@@ -458,7 +458,7 @@ test_that("NOMAD degree search emits its initial line before long first evaluati
 
   lines <- shadow_lines(actual)
 
-  expect_true(grepl("^\\[npRmpi\\] Selecting degree and bandwidth \\(", lines[[1L]]))
+  expect_true(grepl("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw) \\(", lines[[1L]]))
   expect_true(grepl("multistart 1/2", lines[[1L]], fixed = TRUE))
   expect_true(grepl("deg \\(", lines[[1L]]))
 })
@@ -493,7 +493,7 @@ test_that("NOMAD degree search redraws external bandwidth progress immediately",
 
   lines <- shadow_lines(actual)
 
-  expect_true(grepl("^\\[npRmpi\\] Selecting degree and bandwidth \\(", lines[[1L]]))
+  expect_true(grepl("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw) \\(", lines[[1L]]))
   expect_true(grepl("multistart 1/2", lines[[1L]], fixed = TRUE))
   expect_true(grepl("deg \\(", lines[[1L]]))
 })

@@ -477,7 +477,7 @@ npconmode.default <- function(bws, txdat, tydat,
                               gradients = FALSE,
                               level = NULL,
                               ...){
-  nomad <- npValidateScalarLogical(nomad, "nomad")
+  nomad <- npValidateNomadControl(nomad, "nomad")
   probabilities <- npValidateScalarLogical(probabilities, "probabilities")
   gradients <- npValidateScalarLogical(gradients, "gradients")
   .npRmpi_require_active_slave_pool(where = "npconmode()")

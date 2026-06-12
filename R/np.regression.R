@@ -721,7 +721,7 @@ npreg.rbandwidth <-
 npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npreg()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
-  nomad <- npValidateScalarLogical(nomad, "nomad")
+  nomad <- npValidateNomadControl(nomad, "nomad")
 
   if (!missing(bws) &&
       !isa(bws, "rbandwidth") &&
