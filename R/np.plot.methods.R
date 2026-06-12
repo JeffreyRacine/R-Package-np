@@ -646,9 +646,12 @@ np_render_control <- function(style = c("band", "bar"),
       !is.null(object$mean) &&
       !is.null(object$resid) &&
       NROW(object$eval) == length(object$mean) &&
-      length(object$mean) == length(object$resid)) {
+      length(object$mean) == length(object$resid) &&
+      all(is.finite(object$mean)) &&
+      all(is.finite(object$resid))) {
     dots$xdat <- object$eval
     dots$ydat <- object$mean + object$resid
+    dots$fit.mean.train <- object$mean
   }
 
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))

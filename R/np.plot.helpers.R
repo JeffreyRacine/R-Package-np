@@ -8953,6 +8953,7 @@ compute.bootstrap.errors = function(...,bws){
 compute.bootstrap.errors.rbandwidth =
   function(xdat, ydat,
            exdat,
+           fit.mean.train = NULL,
            gradients,
            gradient.order,
            slice.index,
@@ -9096,13 +9097,21 @@ compute.bootstrap.errors.rbandwidth =
           progress.label = progress.label
         )
       } else {
-        fit.mean <- as.vector(suppressWarnings(npreghat(
-          bws = bws,
-          txdat = xdat,
-          exdat = xdat,
-          y = ydat,
-          output = "apply"
-        )))
+        if (!is.null(fit.mean.train)) {
+          fit.mean.train <- as.double(fit.mean.train)
+          if (length(fit.mean.train) != length(ydat) || any(!is.finite(fit.mean.train))) {
+            stop("internal fit.mean.train payload is invalid for regression bootstrap", call. = FALSE)
+          }
+          fit.mean <- fit.mean.train
+        } else {
+          fit.mean <- as.vector(suppressWarnings(npreghat(
+            bws = bws,
+            txdat = xdat,
+            exdat = xdat,
+            y = ydat,
+            output = "apply"
+          )))
+        }
 
         s.vec <- NULL
         if (gradients && !xi.factor) {
@@ -9222,6 +9231,7 @@ compute.bootstrap.errors.scbandwidth =
            slice.index,
            progress.target = NULL,
            plot.errors.boot.method,
+           t0.override = NULL,
            plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
@@ -9362,6 +9372,14 @@ compute.bootstrap.errors.scbandwidth =
     if (is.null(boot.out))
       stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.scbandwidth", plot.errors.boot.method), call. = FALSE)
 
+    if (!is.null(t0.override)) {
+      t0.override <- as.double(t0.override)
+      if (length(t0.override) != length(boot.out$t0) || any(!is.finite(t0.override))) {
+        stop("invalid smooth coefficient bootstrap t0 override", call. = FALSE)
+      }
+      boot.out$t0 <- t0.override
+    }
+
     tdati <- if (slice.index <= ncol(xdat)) bws$xdati else bws$zdati
     ti <- if (slice.index <= ncol(xdat)) slice.index else slice.index - ncol(xdat)
     all.bp <- .np_plot_boot_factor_boxplots(
@@ -9405,6 +9423,7 @@ compute.bootstrap.errors.plbandwidth =
            slice.index,
            progress.target = NULL,
            plot.errors.boot.method,
+           t0.override = NULL,
            plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
@@ -9527,6 +9546,14 @@ compute.bootstrap.errors.plbandwidth =
 
       if (is.null(boot.out))
         stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.plbandwidth", plot.errors.boot.method), call. = FALSE)
+    }
+
+    if (!is.null(t0.override)) {
+      t0.override <- as.double(t0.override)
+      if (length(t0.override) != length(boot.out$t0) || any(!is.finite(t0.override))) {
+        stop("invalid partially linear bootstrap t0 override", call. = FALSE)
+      }
+      boot.out$t0 <- t0.override
     }
 
     if (slice.index <= bws$xndim){
