@@ -1702,7 +1702,10 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
                                     degree.search,
                                     nomad.inner.nmulti = 0L,
                                     random.seed = 42L,
-                                    nomad.opts = list()) {
+                                    nomad.opts = list(),
+                                    source = "explicit",
+                                    reason = NULL,
+                                    progress_label = NULL) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
   if (is.null(opt.args$nomad.opts) && length(nomad.opts))
@@ -1969,7 +1972,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     native.progress <- .np_nomad_native_progress_begin(
       nmulti = native.nmulti,
       baseline_degree = degree.search$start.degree,
-      best_record = native.baseline.record
+      best_record = native.baseline.record,
+      label = progress_label
     )
     on.exit(.np_nomad_native_progress_abort(native.progress), add = TRUE)
 
@@ -2129,6 +2133,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     )
     search.result <- list(
       method = degree.search$engine,
+      source = source,
+      reason = reason,
       direction = "min",
       verify = FALSE,
       completed = TRUE,
@@ -2199,6 +2205,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         !is.null(search.result$best_payload))
       attr(search.result$best_payload, "native.nomad.diagnostics") <- search.result$native.diagnostics
 
+    search.result$source <- source
+    search.result$reason <- reason
     return(search.result)
   }
 
@@ -2219,6 +2227,9 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     random.seed = random.seed,
     remin = isTRUE(opt.args$nomad.remin),
     nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
+    source = source,
+    reason = reason,
+    progress_label = progress_label,
     start.lower = c(bw_start_bounds$lower, degree.search$lower),
     start.upper = c(bw_start_bounds$upper, degree.search$upper),
     degree_spec = list(
@@ -2246,11 +2257,21 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
                                               degree.max.cycles,
                                               degree.verify,
                                               bernstein.basis,
-                                              bernstein.named) {
+                                              bernstein.named,
+                                              nomad.source = "explicit",
+                                              nomad.auto.filled = character()) {
   degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
   if (identical(degree.select, "manual"))
     return(NULL)
-  search.engine <- .np_degree_search_engine_controls(search.engine)
+  resolved <- .np_degree_resolve_auto_engine(
+    search.engine = search.engine,
+    degree.select = degree.select,
+    ncon = ncon,
+    source = nomad.source,
+    auto.filled = nomad.auto.filled
+  )
+  search.engine <- .np_degree_search_engine_controls(resolved$search.engine)
+  degree.select <- resolved$degree.select
 
   regtype.requested <- if (isTRUE(regtype.named)) match.arg(regtype, c("lc", "ll", "lp")) else "lc"
   if (!identical(regtype.requested, "lp"))
@@ -2299,13 +2320,18 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     restarts = npValidateNonNegativeInteger(degree.restarts, "degree.restarts"),
     max.cycles = npValidatePositiveInteger(degree.max.cycles, "degree.max.cycles"),
     verify = npValidateScalarLogical(degree.verify, "degree.verify"),
-    bernstein.basis = bern.auto
+    bernstein.basis = bern.auto,
+    source = resolved$source,
+    reason = resolved$reason
   )
 }
 
 .npcdistbw_attach_degree_search <- function(bws, search_result) {
   metadata <- list(
     mode = search_result$method,
+    source = if (!is.null(search_result$source)) search_result$source else "explicit",
+    reason = if (!is.null(search_result$reason)) search_result$reason else NULL,
+    engine = if (!is.null(search_result$engine)) search_result$engine else search_result$method,
     verify = isTRUE(search_result$verify),
     completed = isTRUE(search_result$completed),
     certified = isTRUE(search_result$certified),
@@ -2496,7 +2522,8 @@ npcdistbw.default <-
       if ("degree.select" %in% mc.names &&
           identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
         stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
-      if ("search.engine" %in% mc.names &&
+      if (!identical(nomad.shortcut$metadata$source, "auto") &&
+          "search.engine" %in% mc.names &&
           !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
               c("nomad", "nomad+powell")))
         stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
@@ -2598,7 +2625,9 @@ npcdistbw.default <-
       degree.max.cycles = degree.max.cycles.value,
       degree.verify = degree.verify.value,
       bernstein.basis = bernstein.value,
-      bernstein.named = bernstein.named
+      bernstein.named = bernstein.named,
+      nomad.source = nomad.shortcut$metadata$source,
+      nomad.auto.filled = nomad.shortcut$metadata$auto.filled
     )
     if (!is.null(degree.search) &&
         "bwsolver" %in% search.mc.names &&
@@ -2745,6 +2774,8 @@ npcdistbw.default <-
           eval_fun = eval_fun,
           direction = "min",
           trace_level = "full",
+          source = degree.search$source,
+          reason = degree.search$reason,
           objective_name = "fval"
         )
       } else {
@@ -2757,7 +2788,10 @@ npcdistbw.default <-
           degree.search = degree.search,
           nomad.inner.nmulti = nomad.inner.nmulti,
           random.seed = random.seed.value,
-          nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
+          nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
+          source = degree.search$source,
+          reason = degree.search$reason,
+          progress_label = .np_degree_search_label(degree.search$engine, degree.search$source)
         )
       }
       tbw <- .npcdistbw_attach_degree_search(

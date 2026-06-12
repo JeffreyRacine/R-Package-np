@@ -774,7 +774,10 @@ npindexbw.NULL <-
                                     opt.args,
                                     degree.search,
                                     nomad.inner.nmulti = 0L,
-                                    nomad.opts = list()) {
+                                    nomad.opts = list(),
+                                    source = "explicit",
+                                    reason = NULL,
+                                    progress_label = NULL) {
   if (is.null(opt.args$nomad.opts) && length(nomad.opts))
     opt.args$nomad.opts <- nomad.opts
 
@@ -1097,7 +1100,10 @@ npindexbw.NULL <-
       basis = degree.search$basis,
       nobs = degree.search$nobs,
       user_supplied = degree.search$start.user
-    )
+    ),
+    source = source,
+    reason = reason,
+    progress_label = progress_label
   )
 
   if (isTRUE(degree.search$verify)) {
@@ -1214,11 +1220,21 @@ npindexbw.NULL <-
                                               degree.max.cycles,
                                               degree.verify,
                                               bernstein.basis,
-                                              bernstein.named) {
+                                              bernstein.named,
+                                              nomad.source = "explicit",
+                                              nomad.auto.filled = character()) {
   degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
   if (identical(degree.select, "manual"))
     return(NULL)
-  search.engine <- .np_degree_search_engine_controls(search.engine)
+  resolved <- .np_degree_resolve_auto_engine(
+    search.engine = search.engine,
+    degree.select = degree.select,
+    ncon = 1L,
+    source = nomad.source,
+    auto.filled = nomad.auto.filled
+  )
+  search.engine <- .np_degree_search_engine_controls(resolved$search.engine)
+  degree.select <- resolved$degree.select
 
   regtype.requested <- if (isTRUE(regtype.named)) match.arg(regtype, c("lc", "ll", "lp")) else "lc"
   if (!identical(regtype.requested, "lp"))
@@ -1269,13 +1285,18 @@ npindexbw.NULL <-
     restarts = npValidateNonNegativeInteger(degree.restarts, "degree.restarts"),
     max.cycles = npValidatePositiveInteger(degree.max.cycles, "degree.max.cycles"),
     verify = npValidateScalarLogical(degree.verify, "degree.verify"),
-    bernstein.basis = bern.auto
+    bernstein.basis = bern.auto,
+    source = resolved$source,
+    reason = resolved$reason
   )
 }
 
 .npindexbw_attach_degree_search <- function(bws, search_result) {
   metadata <- list(
     mode = search_result$method,
+    source = if (!is.null(search_result$source)) search_result$source else "explicit",
+    reason = if (!is.null(search_result$reason)) search_result$reason else NULL,
+    engine = if (!is.null(search_result$engine)) search_result$engine else search_result$method,
     verify = isTRUE(search_result$verify),
     completed = isTRUE(search_result$completed),
     certified = isTRUE(search_result$certified),
@@ -1417,7 +1438,8 @@ npindexbw.default <-
       if ("degree.select" %in% mc.names &&
           identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
         stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
-      if ("search.engine" %in% mc.names &&
+      if (!identical(nomad.shortcut$metadata$source, "auto") &&
+          "search.engine" %in% mc.names &&
           !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
               c("nomad", "nomad+powell")))
         stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
@@ -1444,7 +1466,9 @@ npindexbw.default <-
       degree.max.cycles = if ("degree.max.cycles" %in% mc.names) degree.max.cycles else 20L,
       degree.verify = if (!is.null(nomad.shortcut$values$degree.verify)) nomad.shortcut$values$degree.verify else FALSE,
       bernstein.basis = if (!is.null(nomad.shortcut$values$bernstein.basis)) nomad.shortcut$values$bernstein.basis else bernstein.basis,
-      bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% mc.names)
+      bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% mc.names),
+      nomad.source = nomad.shortcut$metadata$source,
+      nomad.auto.filled = nomad.shortcut$metadata$auto.filled
     )
     nomad.inner.named <- "nomad.nmulti" %in% mc.names
     nomad.inner.nmulti <- if (nomad.inner.named) {
@@ -1600,7 +1624,9 @@ npindexbw.default <-
           eval_fun = eval_fun,
           direction = "min",
           trace_level = "full",
-          objective_name = "fval"
+          objective_name = "fval",
+          source = degree.search$source,
+          reason = degree.search$reason
         )
       } else {
         search.result <- .npindexbw_nomad_search(
@@ -1612,7 +1638,10 @@ npindexbw.default <-
           opt.args = utils::modifyList(opt.args, list(random.seed = random.seed.value)),
           degree.search = degree.search,
           nomad.inner.nmulti = nomad.inner.nmulti,
-          nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts
+          nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
+          source = degree.search$source,
+          reason = degree.search$reason,
+          progress_label = .np_degree_search_label(degree.search$engine, degree.search$source)
         )
       }
       tbw <- .npindexbw_attach_degree_search(

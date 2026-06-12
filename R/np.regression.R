@@ -560,7 +560,7 @@ npreg.rbandwidth <-
 npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
-  nomad <- npValidateScalarLogical(nomad, "nomad")
+  nomad <- npValidateNomadControl(nomad, "nomad")
 
   if (!missing(bws) &&
       !isa(bws, "rbandwidth") &&

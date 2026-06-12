@@ -514,6 +514,10 @@
       !grepl("Selecting polynomial degree and bw", line, fixed = TRUE) &&
       !grepl("Selecting degree and bandwidth", line, fixed = TRUE) &&
       !grepl("Selecting degree/bandwidth", line, fixed = TRUE) &&
+      !grepl("NOMAD degree/bw", line, fixed = TRUE) &&
+      !grepl("Exhaustive degree/bw", line, fixed = TRUE) &&
+      !grepl("Auto:NOMAD degree/bw", line, fixed = TRUE) &&
+      !grepl("Auto:exhaustive degree/bw", line, fixed = TRUE) &&
       !grepl("Refining bandwidth", line, fixed = TRUE)) {
     return(line)
   }
@@ -524,6 +528,10 @@
     out <- sub("Selecting polynomial degree and bw", "Degree/bw search", out, fixed = TRUE)
     out <- sub("Selecting degree and bandwidth", "Degree/bw search", out, fixed = TRUE)
     out <- sub("Selecting degree/bandwidth", "Degree/bw search", out, fixed = TRUE)
+    out <- sub("Auto:exhaustive degree/bw", "Auto:exhaustive deg/bw", out, fixed = TRUE)
+    out <- sub("Auto:NOMAD degree/bw", "Auto:NOMAD deg/bw", out, fixed = TRUE)
+    out <- sub("Exhaustive degree/bw", "Exhaustive deg/bw", out, fixed = TRUE)
+    out <- sub("NOMAD degree/bw", "NOMAD deg/bw", out, fixed = TRUE)
     out <- sub("Refining bandwidth", "Refining bw", out, fixed = TRUE)
     out <- gsub("elapsed ", "elap ", out, fixed = TRUE)
     out <- gsub("restart ", "r ", out, fixed = TRUE)

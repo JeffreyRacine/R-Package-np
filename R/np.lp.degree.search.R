@@ -60,6 +60,92 @@
   match.arg(search.engine, c("nomad+powell", "cell", "nomad"))
 }
 
+.np_degree_resolve_auto_engine <- function(search.engine,
+                                           degree.select,
+                                           ncon,
+                                           source = "explicit",
+                                           auto.filled = character()) {
+  search.engine <- .np_degree_search_engine_controls(search.engine)
+  degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
+  source <- as.character(source)[1L]
+  if (is.na(source) || !nzchar(source))
+    source <- "explicit"
+  auto.filled <- if (is.null(auto.filled)) character() else as.character(auto.filled)
+
+  reason <- "explicit degree-search controls"
+  if (identical(source, "auto") &&
+      all(c("search.engine", "degree.select") %in% auto.filled)) {
+    if (as.integer(ncon[1L]) == 1L) {
+      search.engine <- "cell"
+      degree.select <- "exhaustive"
+      reason <- "auto policy: p=1 LP degree lattice uses exhaustive/cell search"
+    } else {
+      search.engine <- "nomad+powell"
+      degree.select <- "coordinate"
+      reason <- "auto policy: p>=2 LP degree search uses NOMAD"
+    }
+  } else if (identical(source, "auto")) {
+    reason <- "auto requested with explicit degree-search controls"
+  }
+
+  list(
+    search.engine = search.engine,
+    degree.select = degree.select,
+    source = source,
+    reason = reason
+  )
+}
+
+.np_degree_search_label <- function(method, source = "explicit") {
+  method <- as.character(method)[1L]
+  source <- as.character(source)[1L]
+  nomad.method <- method %in% c("nomad", "nomad+powell")
+  base <- if (isTRUE(nomad.method)) {
+    "NOMAD degree/bw"
+  } else if (identical(method, "exhaustive")) {
+    "Exhaustive degree/bw"
+  } else {
+    "Degree/bw"
+  }
+
+  if (identical(source, "auto")) {
+    return(if (isTRUE(nomad.method)) {
+      "Auto:NOMAD degree/bw"
+    } else if (identical(method, "exhaustive")) {
+      "Auto:exhaustive degree/bw"
+    } else {
+      paste0("Auto:", base)
+    })
+  }
+
+  base
+}
+
+.np_degree_search_summary_str <- function(x) {
+  ds <- if (is.list(x) && !is.null(x$degree.search)) x$degree.search else NULL
+  if (!is.list(ds))
+    return("")
+
+  mode <- if (!is.null(ds$mode) && length(ds$mode)) as.character(ds$mode[1L]) else NULL
+  engine <- if (!is.null(ds$engine) && length(ds$engine)) as.character(ds$engine[1L]) else mode
+  if (is.null(engine) || is.na(engine) || !nzchar(engine))
+    return("")
+
+  label <- if (engine %in% c("nomad", "nomad+powell")) {
+    "NOMAD"
+  } else if (identical(engine, "cell") || identical(mode, "exhaustive")) {
+    "Exhaustive"
+  } else {
+    tools::toTitleCase(engine)
+  }
+
+  source <- if (!is.null(ds$source) && length(ds$source)) as.character(ds$source[1L]) else ""
+  if (identical(source, "auto"))
+    label <- paste0(label, " (auto)")
+
+  paste("\nDegree Search Method:", label)
+}
+
 .np_degree_trace_to_frame <- function(records, objective_name = "objective") {
   if (!length(records)) {
     out <- data.frame(
@@ -148,6 +234,8 @@
 
   list(
     method = degree.search$engine,
+    source = if (!is.null(degree.search$source)) degree.search$source else "explicit",
+    reason = if (!is.null(degree.search$reason)) degree.search$reason else NULL,
     direction = direction,
     verify = FALSE,
     completed = TRUE,
@@ -228,7 +316,12 @@
   label
 }
 
-.np_degree_progress_label <- function() {
+.np_degree_progress_label <- function(label = NULL) {
+  if (!is.null(label) && length(label)) {
+    label <- as.character(label)[1L]
+    if (!is.na(label) && nzchar(label))
+      return(label)
+  }
   "Selecting degree and bandwidth"
 }
 
@@ -313,9 +406,9 @@
   paste(fields, collapse = ", ")
 }
 
-.np_degree_progress_begin <- function(total = NULL, detail = NULL) {
+.np_degree_progress_begin <- function(total = NULL, detail = NULL, label = NULL) {
   state <- .np_progress_begin(
-    label = .np_degree_progress_label(),
+    label = .np_degree_progress_label(label),
     total = total,
     domain = "general",
     surface = "bandwidth"
@@ -680,10 +773,16 @@
                               eval_fun,
                               direction = c("min", "max"),
                               trace_level = c("full", "none"),
+                              source = "explicit",
+                              reason = NULL,
                               objective_name = "objective") {
   method <- match.arg(method)
   direction <- match.arg(direction)
   trace_level <- match.arg(trace_level)
+  source <- as.character(source)[1L]
+  if (is.na(source) || !nzchar(source))
+    source <- "explicit"
+  progress.label <- .np_degree_search_label(method, source = source)
   restarts <- npValidateNonNegativeInteger(restarts, "degree.restarts")
   max_cycles <- npValidatePositiveInteger(max_cycles, "degree.max.cycles")
   grid.size <- .np_degree_check_grid_budget(
@@ -840,6 +939,7 @@
       ))
       state$progress_state <- .np_degree_progress_begin(
         total = grid.size,
+        label = progress.label,
         detail = .np_degree_progress_detail(
           phase = "exhaustive",
           best_record = state$best_record,
@@ -868,6 +968,7 @@
         )
       ))
       state$progress_state <- .np_degree_progress_begin(
+        label = progress.label,
         detail = .np_degree_progress_detail(
           phase = "coordinate",
           best_record = state$best_record,
@@ -898,6 +999,7 @@
         ))
         state$progress_state <- .np_degree_progress_begin(
           total = grid.size,
+          label = progress.label,
           detail = .np_degree_progress_detail(
             phase = "verify",
             best_record = state$best_record,
@@ -931,6 +1033,8 @@
 
   list(
     method = method,
+    source = source,
+    reason = reason,
     verify = isTRUE(verify),
     completed = !isTRUE(state$interrupted),
     certified = !isTRUE(state$interrupted) && (identical(method, "exhaustive") || isTRUE(verify)),
@@ -1401,7 +1505,12 @@
   engine.value <- match_one(search.engine, c("nomad+powell", "cell", "nomad"), "nomad+powell")
   solver.value <- match_one(bwsolver, c("powell", "mads", "mads+powell"), "powell")
 
-  isTRUE(nomad) ||
+  nomad.value <- tryCatch(
+    npValidateNomadControl(nomad, "nomad"),
+    error = function(e) "false"
+  )
+
+  nomad.value %in% c("true", "auto") ||
     (!identical(degree.value, "manual") && engine.value %in% c("nomad", "nomad+powell")) ||
     solver.value %in% c("mads", "mads+powell")
 }
@@ -1583,9 +1692,10 @@
 
 .np_nomad_progress_begin <- function(nmulti,
                                      baseline_degree,
-                                     best_record) {
+                                     best_record,
+                                     label = NULL) {
   state <- .np_progress_begin(
-    label = .np_degree_progress_label(),
+    label = .np_degree_progress_label(label),
     domain = "general",
     surface = "bandwidth"
   )
@@ -1614,11 +1724,12 @@
 .np_nomad_progress_configure <- function(state,
                                          nmulti,
                                          baseline_degree,
-                                         best_record) {
+                                         best_record,
+                                         label = NULL) {
   if (is.null(state))
     return(state)
 
-  state$label <- .np_degree_progress_label()
+  state$label <- .np_degree_progress_label(label)
   state$unknown_total_fields <- .np_nomad_progress_fields
   state$nomad_nmulti <- npValidateNmulti(nmulti)
   state$nomad_restart_index <- 1L
@@ -1868,14 +1979,16 @@
 
 .np_nomad_native_progress_begin <- function(nmulti,
                                             baseline_degree,
-                                            best_record) {
+                                            best_record,
+                                            label = NULL) {
   handle <- new.env(parent = emptyenv())
   handle$old_state <- .np_progress_runtime$bandwidth_state
   handle$closed <- FALSE
   handle$state <- .np_nomad_progress_begin(
     nmulti = nmulti,
     baseline_degree = baseline_degree,
-    best_record = best_record
+    best_record = best_record,
+    label = label
   )
   handle$state$nomad_native_progress <- TRUE
   handle$state$nomad_eval_offset <- 0L
@@ -2066,9 +2179,17 @@
                              start.upper = NULL,
                              coordinate.roles = NULL,
                              nomad.opts = list(),
-                             native.r.bridge = FALSE) {
+                             native.r.bridge = FALSE,
+                             source = "explicit",
+                             reason = NULL,
+                             progress_label = NULL) {
   engine <- match.arg(engine)
   direction <- match.arg(direction)
+  source <- as.character(source)[1L]
+  if (is.na(source) || !nzchar(source))
+    source <- "explicit"
+  if (is.null(progress_label))
+    progress_label <- .np_degree_search_label(engine, source = source)
   .np_nomad_require_crs()
 
   state <- new.env(parent = emptyenv())
@@ -2265,14 +2386,16 @@
     set_progress_state(.np_nomad_progress_begin(
       nmulti = nomad.nmulti,
       baseline_degree = baseline.degree,
-      best_record = state$best_record
+      best_record = state$best_record,
+      label = progress_label
     ))
   } else {
     set_progress_state(.np_nomad_progress_configure(
       state = progress_state,
       nmulti = nomad.nmulti,
       baseline_degree = baseline.degree,
-      best_record = state$best_record
+      best_record = state$best_record,
+      label = progress_label
     ))
   }
 
@@ -2661,6 +2784,8 @@
 
   list(
     method = engine,
+    source = source,
+    reason = reason,
     direction = direction,
     verify = FALSE,
     completed = !isTRUE(state$interrupted),

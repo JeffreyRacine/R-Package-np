@@ -296,7 +296,7 @@ These arguments control the optional NOMAD direct-search route for local-polynom
 }
 
   \item{nomad}{
-    logical shortcut for the recommended automatic local-polynomial
+    logical or character shortcut for the recommended automatic local-polynomial
     NOMAD route. When \code{TRUE}, any missing values among
     \code{regtype}, \code{search.engine}, \code{degree.select},
     \code{bernstein.basis}, \code{degree.min}, \code{degree.max},
@@ -306,7 +306,7 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     \code{bernstein.basis=TRUE}, \code{degree.min=0L},
     \code{degree.max=10L}, \code{degree.verify=FALSE}, and
     \code{bwtype="fixed"}. Explicit incompatible settings error
-    immediately; in particular, \code{nomad=TRUE} currently requires
+    immediately; in particular, explicit \code{nomad=TRUE} currently requires
     \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
     search, no explicit \code{degree},
     and \code{search.engine \%in\% c("nomad", "nomad+powell")}.
@@ -565,6 +565,13 @@ or standard-deviation factors.
   Compatible explicit tuning arguments are respected. Incompatible
   explicit settings fail fast so the shortcut never silently changes
   user-selected semantics.
+  The character value \code{nomad="auto"} applies the same LP
+  shortcut but leaves \code{search.engine} and \code{degree.select}
+  eligible for data-driven resolution when both were not supplied
+  explicitly: scalar continuous degree searches use the exhaustive
+  degree-grid route, while higher-dimensional degree searches keep the
+  NOMAD/Powell route. Explicit \code{search.engine} or
+  \code{degree.select} choices are honored.
   
 }
 

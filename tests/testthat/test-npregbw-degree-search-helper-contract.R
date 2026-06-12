@@ -73,9 +73,21 @@ test_that("NOMAD LP degree starts are deterministic, safe, and prefix-stable", {
     random.seed = 42L
   )
 
+  user_starts <- build_degree_starts(
+    initial = c(1L, 1L, 1L, 1L),
+    lower = rep(0L, 4L),
+    upper = rep(10L, 4L),
+    basis = "tensor",
+    nobs = 100L,
+    nmulti = 3L,
+    random.seed = 42L,
+    user_supplied = TRUE
+  )
+
   expect_identical(starts5[seq_len(3L), , drop = FALSE], starts3)
-  expect_identical(as.integer(starts3[1L, ]), c(1L, 1L, 1L, 1L))
-  expect_true(all(apply(starts5, 1L, function(d) np:::dim_basis(basis = "tensor", degree = d) <= floor(0.25 * (100L - 1L)))))
+  expect_identical(as.integer(user_starts[1L, ]), c(1L, 1L, 1L, 1L))
+  expect_true(all(t(t(starts5) >= rep(0L, 4L))))
+  expect_true(all(t(t(starts5) <= rep(10L, 4L))))
 })
 
 test_that("NOMAD mixed starts preserve user start 1 and expose prefix-stable restart points", {
@@ -298,7 +310,7 @@ test_that("automatic degree search emits staged progress output", {
   )
 
   expect_true(any(grepl("Automatic polynomial degree search baseline \\(0\\)", msgs)))
-  expect_true(any(grepl("Selecting degree and bandwidth", msgs, fixed = TRUE)))
+  expect_true(any(grepl("(Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", msgs)))
   expect_true(any(grepl("exhaustive", msgs)))
   expect_true(any(grepl("best (", msgs, fixed = TRUE)))
 

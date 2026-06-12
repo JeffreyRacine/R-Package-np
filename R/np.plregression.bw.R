@@ -438,11 +438,21 @@ npplregbw.plbandwidth =
                                               degree.max.cycles,
                                               degree.verify,
                                               bernstein.basis,
-                                              bernstein.named) {
+                                              bernstein.named,
+                                              nomad.source = "explicit",
+                                              nomad.auto.filled = character()) {
   degree.select <- match.arg(degree.select, c("manual", "coordinate", "exhaustive"))
   if (identical(degree.select, "manual"))
     return(NULL)
-  search.engine <- .np_degree_search_engine_controls(search.engine)
+  resolved <- .np_degree_resolve_auto_engine(
+    search.engine = search.engine,
+    degree.select = degree.select,
+    ncon = ncon,
+    source = nomad.source,
+    auto.filled = nomad.auto.filled
+  )
+  search.engine <- .np_degree_search_engine_controls(resolved$search.engine)
+  degree.select <- resolved$degree.select
 
   regtype.requested <- if (isTRUE(regtype.named)) match.arg(regtype, c("lc", "ll", "lp")) else "lc"
   if (!identical(regtype.requested, "lp"))
@@ -496,13 +506,18 @@ npplregbw.plbandwidth =
     restarts = npValidateNonNegativeInteger(degree.restarts, "degree.restarts"),
     max.cycles = npValidatePositiveInteger(degree.max.cycles, "degree.max.cycles"),
     verify = npValidateScalarLogical(degree.verify, "degree.verify"),
-    bernstein.basis = bern.auto
+    bernstein.basis = bern.auto,
+    source = resolved$source,
+    reason = resolved$reason
   )
 }
 
 .npplregbw_attach_degree_search <- function(bws, search_result) {
   metadata <- list(
     mode = search_result$method,
+    source = if (!is.null(search_result$source)) search_result$source else "explicit",
+    reason = if (!is.null(search_result$reason)) search_result$reason else NULL,
+    engine = if (!is.null(search_result$engine)) search_result$engine else search_result$method,
     verify = isTRUE(search_result$verify),
     completed = isTRUE(search_result$completed),
     certified = isTRUE(search_result$certified),
@@ -601,7 +616,9 @@ npplregbw.plbandwidth =
                                                    degree.search,
                                                    nomad.inner.nmulti = 0L,
                                                    random.seed = 42L,
-                                                   yname = deparse(substitute(ydat))) {
+                                                   yname = deparse(substitute(ydat)),
+                                                   source = "explicit",
+                                                   reason = NULL) {
   if (isTRUE(degree.search$verify))
     stop("npplreg child-specific NOMAD does not support degree.verify")
 
@@ -719,6 +736,8 @@ npplregbw.plbandwidth =
 
   list(
     method = degree.search$engine,
+    source = source,
+    reason = reason,
     direction = "min",
     verify = FALSE,
     completed = TRUE,
@@ -768,7 +787,10 @@ npplregbw.plbandwidth =
                                     opt.args,
                                     degree.search,
                                     nomad.inner.nmulti = 0L,
-                                    random.seed = 42L) {
+                                    random.seed = 42L,
+                                    source = "explicit",
+                                    reason = NULL,
+                                    progress_label = NULL) {
   if (isTRUE(degree.search$verify))
     stop("automatic degree search with search.engine='nomad' does not support degree.verify")
 
@@ -1054,6 +1076,9 @@ npplregbw.plbandwidth =
     nomad.inner.nmulti = nomad.inner.nmulti,
     random.seed = random.seed,
     remin = isTRUE(opt.args$nomad.remin),
+    source = source,
+    reason = reason,
+    progress_label = progress_label,
     start.lower = c(child.start.lower, degree.search$lower),
     start.upper = c(child.start.upper, degree.search$upper),
     coordinate.roles = coordinate.roles,
@@ -1141,7 +1166,8 @@ npplregbw.default =
       if ("degree.select" %in% mc.names &&
           identical(as.character(match.arg(nomad.shortcut$values$degree.select, c("manual", "coordinate", "exhaustive")))[1L], "manual"))
         stop("nomad=TRUE requires automatic degree search; use degree.select='coordinate' or 'exhaustive'")
-      if ("search.engine" %in% mc.names &&
+      if (!identical(nomad.shortcut$metadata$source, "auto") &&
+          "search.engine" %in% mc.names &&
           !(as.character(match.arg(nomad.shortcut$values$search.engine, c("nomad+powell", "cell", "nomad")))[1L] %in%
               c("nomad", "nomad+powell")))
         stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'")
@@ -1205,7 +1231,9 @@ npplregbw.default =
       degree.max.cycles = if ("degree.max.cycles" %in% mc.names) degree.max.cycles else 20L,
       degree.verify = if (!is.null(nomad.shortcut$values$degree.verify)) nomad.shortcut$values$degree.verify else FALSE,
       bernstein.basis = bernstein.arg,
-      bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% dot.names)
+      bernstein.named = isTRUE(nomad.shortcut$enabled) || ("bernstein.basis" %in% dot.names),
+      nomad.source = nomad.shortcut$metadata$source,
+      nomad.auto.filled = nomad.shortcut$metadata$auto.filled
     )
     nomad.inner.named <- "nomad.nmulti" %in% mc.names
     nomad.inner.nmulti <- if (nomad.inner.named) {
@@ -1322,6 +1350,8 @@ npplregbw.default =
             eval_fun = eval_fun,
             direction = "min",
             trace_level = "full",
+            source = degree.search$source,
+            reason = degree.search$reason,
             objective_name = "fval"
           )
         } else {
@@ -1336,7 +1366,9 @@ npplregbw.default =
             degree.search = degree.search,
             nomad.inner.nmulti = nomad.inner.nmulti,
             random.seed = random.seed.value,
-            yname = deparse(substitute(ydat))
+            yname = deparse(substitute(ydat)),
+            source = degree.search$source,
+            reason = degree.search$reason
           )
         }
         tbw <- .npplregbw_attach_degree_search(

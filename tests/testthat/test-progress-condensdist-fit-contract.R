@@ -166,7 +166,7 @@ test_that("npcdens nomad to powell to fit route preserves single-line fit handof
     lines
   )
   powell.pos <- grep("^\\[np\\] Refining bandwidth \\(", lines)
-  bandwidth.pos <- grep("^\\[np\\] Selecting degree and bandwidth", lines)
+  bandwidth.pos <- grep("^\\[np\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", lines)
 
   expect_s3_class(actual$value, "condensity")
   expect_condensdist_clean_powell_surface(lines, pkg_pattern = "np")
@@ -288,7 +288,7 @@ test_that("npcdist nomad to powell to fit route preserves single-line fit handof
     lines
   )
   powell.pos <- grep("^\\[np\\] Refining bandwidth \\(", lines)
-  bandwidth.pos <- grep("^\\[np\\] Selecting degree and bandwidth", lines)
+  bandwidth.pos <- grep("^\\[np\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", lines)
 
   expect_s3_class(actual$value, "condistribution")
   expect_true(length(bandwidth.pos) > 0L)

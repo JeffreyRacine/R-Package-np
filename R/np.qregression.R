@@ -646,7 +646,7 @@ npqreg.condbandwidth <-
 
 
 npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
-  nomad <- npValidateScalarLogical(nomad, "nomad")
+  nomad <- npValidateNomadControl(nomad, "nomad")
   sc <- sys.call()
   sc.names <- names(sc)
 
