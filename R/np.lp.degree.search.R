@@ -925,18 +925,9 @@
   )
 
   tryCatch({
-    .np_progress_note(sprintf(
-      "Automatic polynomial degree search baseline %s",
-      .np_degree_format_degree(baseline_degree)
-    ))
     state$baseline_record <- state$evaluate(baseline_degree)
 
     if (identical(method, "exhaustive")) {
-      .np_progress_note(sprintf(
-        "Exhaustive automatic polynomial degree search over %s degree combinations on %s",
-        format(grid.size, scientific = FALSE, trim = TRUE),
-        .np_degree_format_search_space(candidates)
-      ))
       state$progress_state <- .np_degree_progress_begin(
         total = grid.size,
         label = progress.label,
@@ -954,19 +945,6 @@
       )
     } else {
       restart_total <- length(restart_starts) + 1L
-      .np_progress_note(sprintf(
-        "Coordinate automatic polynomial degree search over %s (max %s search evaluations)",
-        .np_degree_format_search_space(candidates),
-        format(
-          .np_degree_coordinate_visit_cap(
-            candidates = candidates,
-            max_cycles = max_cycles,
-            restart_total = restart_total
-          ),
-          scientific = FALSE,
-          trim = TRUE
-        )
-      ))
       state$progress_state <- .np_degree_progress_begin(
         label = progress.label,
         detail = .np_degree_progress_detail(
@@ -993,10 +971,6 @@
             objective_name = objective_name
           )
         )
-        .np_progress_note(sprintf(
-          "Exhaustively certifying automatic polynomial degree search over %s degree combinations (re-optimizing bandwidths)",
-          format(grid.size, scientific = FALSE, trim = TRUE)
-        ))
         state$progress_state <- .np_degree_progress_begin(
           total = grid.size,
           label = progress.label,
