@@ -158,6 +158,7 @@
       message = character(0),
       elapsed = numeric(0),
       num.feval = numeric(0),
+      num.feval.fast = numeric(0),
       stringsAsFactors = FALSE
     )
   } else {
@@ -176,6 +177,11 @@
         if (is.null(x$num.feval) || length(x$num.feval) != 1L || is.na(x$num.feval))
           NA_real_
         else as.numeric(x$num.feval)
+      }, numeric(1)),
+      num.feval.fast = vapply(records, function(x) {
+        if (is.null(x$num.feval.fast) || length(x$num.feval.fast) != 1L || is.na(x$num.feval.fast))
+          NA_real_
+        else as.numeric(x$num.feval.fast)
       }, numeric(1)),
       stringsAsFactors = FALSE
     )
@@ -208,6 +214,7 @@
   fixed.degree <- as.integer(degree.search$fixed.degree)
   objective <- as.numeric(eval_result$objective[1L])
   num.feval <- if (is.null(eval_result$num.feval)) NA_real_ else as.numeric(eval_result$num.feval[1L])
+  num.feval.fast <- if (is.null(eval_result$num.feval.fast)) NA_real_ else as.numeric(eval_result$num.feval.fast[1L])
   rec <- list(
     degree = fixed.degree,
     objective = objective,
@@ -215,7 +222,8 @@
     cached = FALSE,
     message = "singleton degree grid; fixed-degree bandwidth search",
     elapsed = NA_real_,
-    num.feval = num.feval
+    num.feval = num.feval,
+    num.feval.fast = num.feval.fast
   )
   trace <- data.frame(
     trace_id = 1L,
@@ -227,6 +235,7 @@
     message = rec$message,
     elapsed = NA_real_,
     num.feval = num.feval,
+    num.feval.fast = num.feval.fast,
     stringsAsFactors = FALSE
   )
   if (!identical(objective_name, "objective"))
@@ -855,6 +864,7 @@
     msg <- NULL
     objective <- NA_real_
     num.feval <- NA_real_
+    num.feval.fast <- NA_real_
 
     result <- tryCatch(
       {
@@ -884,7 +894,8 @@
         cached = FALSE,
         message = "search interrupted",
         elapsed = proc.time()[3] - started,
-        num.feval = NA_real_
+        num.feval = NA_real_,
+        num.feval.fast = NA_real_
       )
       return(state$record_trace(rec))
     }
@@ -896,6 +907,8 @@
       payload <- result$payload
       if (!is.null(result$num.feval))
         num.feval <- as.numeric(result$num.feval[1L])
+      if (!is.null(result$num.feval.fast))
+        num.feval.fast <- as.numeric(result$num.feval.fast[1L])
     }
 
     state$eval_id <- state$eval_id + 1L
@@ -907,7 +920,8 @@
       cached = FALSE,
       message = msg,
       elapsed = proc.time()[3] - started,
-      num.feval = num.feval
+      num.feval = num.feval,
+      num.feval.fast = num.feval.fast
     )
     assign(key, rec, envir = state$cache)
     state$record_trace(rec)
@@ -2286,6 +2300,7 @@
     objective <- NA_real_
     degree <- integer(0)
     num.feval <- NA_real_
+    num.feval.fast <- NA_real_
 
     result <- tryCatch(
       eval_fun(point),
@@ -2311,6 +2326,8 @@
       degree <- as.integer(result$degree)
       if (!is.null(result$num.feval))
         num.feval <- as.numeric(result$num.feval[1L])
+      if (!is.null(result$num.feval.fast))
+        num.feval.fast <- as.numeric(result$num.feval.fast[1L])
     }
 
     state$eval_id <- state$eval_id + 1L
@@ -2322,7 +2339,8 @@
       cached = FALSE,
       message = msg,
       elapsed = proc.time()[3L] - started,
-      num.feval = num.feval
+      num.feval = num.feval,
+      num.feval.fast = num.feval.fast
     )
     if (is.null(state$baseline_record))
       state$baseline_record <- rec
