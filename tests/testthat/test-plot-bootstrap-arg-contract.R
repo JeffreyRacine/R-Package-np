@@ -116,6 +116,24 @@ test_that("plot contract: bootstrap args require explicit bootstrap mode across 
   )
 })
 
+test_that("plot contract: legend defaults are role-sized and user-overridable (npRmpi)", {
+  legend_args <- getFromNamespace(".np_plot_legend_args", "npRmpi")
+
+  defaults <- list(x = "topright", legend = "A", cex = 0.8, bty = "n")
+  out <- legend_args(defaults, legend = TRUE)
+  expect_equal(out$cex, 0.8)
+  expect_equal(out$bty, "n")
+
+  overridden <- legend_args(
+    defaults,
+    legend = list(x = "bottomleft", cex = 0.55, bty = "o")
+  )
+  expect_equal(overridden$x, "bottomleft")
+  expect_equal(overridden$cex, 0.55)
+  expect_equal(overridden$bty, "o")
+  expect_equal(overridden$legend, "A")
+})
+
 test_that("plot contract: package legends are user-controllable on band-all plots (npRmpi)", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
@@ -155,7 +173,7 @@ test_that("plot contract: package legends are user-controllable on band-all plot
   expect_silent(suppressWarnings(plot(
     rbw, xdat = data.frame(x = x), ydat = y, perspective = FALSE,
     errors = "bootstrap", bootstrap = "wild", B = 9L, band = "all",
-    neval = 6L, legend = list(x = "bottomleft", bty = "o")
+    neval = 6L, legend = list(x = "bottomleft", bty = "o", cex = 0.55)
   )))
   expect_error(
     suppressWarnings(plot(

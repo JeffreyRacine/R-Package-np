@@ -10276,6 +10276,7 @@ draw.all.error.types <- function(ex, center, all.err,
            lty = .np_plot_lty("interval"),
            col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
            lwd = .np_plot_lwd("band_all_1d"),
+           cex = .np_plot_cex("legend"),
            bty = "n"),
       legend = legend.value,
       context = "legend"
@@ -11741,11 +11742,11 @@ plotFactor <- function(f, y, ...){
 
   base.names <- names(base.args)
   user.names <- names(user.args)
-  dup <- intersect(user.names[!(is.na(user.names) | user.names == "")],
-                   base.names[!(is.na(base.names) | base.names == "")])
+  dup <- intersect(base.names[!(is.na(base.names) | base.names == "")],
+                   user.names[!(is.na(user.names) | user.names == "")])
   if (length(dup)) {
-    keep <- is.na(user.names) | user.names == "" | !(user.names %in% dup)
-    user.args <- user.args[keep]
+    keep <- is.na(base.names) | base.names == "" | !(base.names %in% dup)
+    base.args <- base.args[keep]
   }
   c(base.args, user.args)
 }
@@ -11802,6 +11803,7 @@ plotFactor <- function(f, y, ...){
          lty = lty,
          col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
          lwd = lwd,
+         cex = .np_plot_cex("legend"),
          bty = bty),
     legend = legend.value,
     context = "legend"
@@ -12044,7 +12046,8 @@ plotFactor <- function(f, y, ...){
   }
   tau.legend.args <- .np_plot_legend_args(
     list(x = "topright", legend = tau.labels, col = curve.col,
-         lty = curve.lty, lwd = curve.lwd, bty = "n"),
+         lty = curve.lty, lwd = curve.lwd, cex = .np_plot_cex("legend"),
+         bty = "n"),
     legend = .np_plot_legend_role(legend, "tau"),
     context = "legend"
   )
@@ -12056,6 +12059,7 @@ plotFactor <- function(f, y, ...){
            legend = c("Pointwise", "Simultaneous", "Bonferroni"),
            lty = c(.np_plot_lty("pointwise"), .np_plot_lty("simultaneous"), .np_plot_lty("bonferroni")),
            col = graphics::par("col"),
+           cex = .np_plot_cex("legend"),
            bty = "n"),
       legend = .np_plot_legend_role(legend, "bands"),
       context = "legend"
