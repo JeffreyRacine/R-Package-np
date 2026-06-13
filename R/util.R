@@ -464,8 +464,7 @@ npValidateNewdataFormula <- function(newdata, formula, include.response = TRUE,
       !is.null(bws$powell.time) && is.finite(bws$powell.time))
     result$bws$powell.time <- as.double(bws$powell.time)
 
-  if ((is.null(result$bws$total.time) || !is.finite(result$bws$total.time)) &&
-      !is.null(bws$total.time) && is.finite(bws$total.time))
+  if (!is.null(bws$total.time) && is.finite(bws$total.time))
     result$bws$total.time <- as.double(bws$total.time)
 
   result$bws <- .npRmpi_reconcile_nomad_bws_timing(result$bws)
