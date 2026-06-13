@@ -215,6 +215,7 @@
   objective <- as.numeric(eval_result$objective[1L])
   num.feval <- if (is.null(eval_result$num.feval)) NA_real_ else as.numeric(eval_result$num.feval[1L])
   num.feval.fast <- if (is.null(eval_result$num.feval.fast)) NA_real_ else as.numeric(eval_result$num.feval.fast[1L])
+  nn.cache <- if (is.null(eval_result$nn.cache)) NULL else eval_result$nn.cache
   rec <- list(
     degree = fixed.degree,
     objective = objective,
@@ -255,6 +256,7 @@
     baseline = rec,
     best = rec,
     best_payload = eval_result$payload,
+    nn.cache = nn.cache,
     nomad.time = NA_real_,
     powell.time = if (!is.null(eval_result$payload$powell.time)) as.numeric(eval_result$payload$powell.time[1L]) else NA_real_,
     optim.time = if (!is.null(eval_result$payload$total.time)) as.numeric(eval_result$payload$total.time[1L]) else NA_real_,
@@ -808,6 +810,7 @@
   state$eval_id <- 0L
   state$visit_id <- 0L
   state$cached_visits <- 0L
+  state$nn_cache_stats <- list()
   state$best_record <- NULL
   state$best_payload <- NULL
   state$baseline_record <- NULL
@@ -865,6 +868,7 @@
     objective <- NA_real_
     num.feval <- NA_real_
     num.feval.fast <- NA_real_
+    nn.cache <- NULL
 
     result <- tryCatch(
       {
@@ -909,6 +913,8 @@
         num.feval <- as.numeric(result$num.feval[1L])
       if (!is.null(result$num.feval.fast))
         num.feval.fast <- as.numeric(result$num.feval.fast[1L])
+      if (!is.null(result$nn.cache))
+        nn.cache <- result$nn.cache
     }
 
     state$eval_id <- state$eval_id + 1L
@@ -921,12 +927,16 @@
       message = msg,
       elapsed = proc.time()[3] - started,
       num.feval = num.feval,
-      num.feval.fast = num.feval.fast
+      num.feval.fast = num.feval.fast,
+      nn.cache = nn.cache
     )
     assign(key, rec, envir = state$cache)
     state$record_trace(rec)
-    if (identical(status, "ok"))
+    if (identical(status, "ok")) {
+      if (!is.null(nn.cache))
+        state$nn_cache_stats[[length(state$nn_cache_stats) + 1L]] <- nn.cache
       state$update_best(rec, payload = payload)
+    }
     rec
   }
 
@@ -1035,6 +1045,7 @@
     n.cached = state$cached_visits,
     grid.size = grid.size,
     restart.starts = restart_starts,
+    nn.cache = .np_r_nn_cache_combine_stats(state$nn_cache_stats),
     trace = .np_degree_trace_to_frame(state$trace_records, objective_name = objective_name)
   )
 }

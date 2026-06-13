@@ -2923,15 +2923,28 @@ npUsesPolynomialSummaryLabel <- function(x){
          nsmall = 1L, trim = TRUE)
 }
 
-.np_summary_cache_rate_line <- function(label, hits, requests, request.label) {
+.np_summary_cache_avoided_line <- function(label, hits, requests, request.label) {
   if (.np_summary_missing_number(hits) ||
       .np_summary_missing_number(requests) ||
       hits <= 0 || requests <= 0 || requests < hits)
     return(NULL)
 
-  paste0(label, ": ", .np_summary_format_percent(hits, requests),
-         "% hits (", .np_summary_format_count(hits), "/",
-         .np_summary_format_count(requests), " ", request.label, ")")
+  paste0(label, ": ", .np_summary_format_count(hits),
+         " repeated ", request.label, " avoided out of ",
+         .np_summary_format_count(requests), " (",
+         .np_summary_format_percent(hits, requests), "%)")
+}
+
+.np_summary_fast_route_line <- function(fast, computed) {
+  if (.np_summary_missing_number(fast) ||
+      .np_summary_missing_number(computed) ||
+      fast <= 0 || computed <= 0 || fast > computed)
+    return(NULL)
+
+  paste0("Fast CV route: ", .np_summary_format_count(fast),
+         " of ", .np_summary_format_count(computed),
+         " function evaluations (",
+         .np_summary_format_percent(fast, computed), "%)")
 }
 
 .np_summary_named_number <- function(x, name) {
@@ -2969,68 +2982,59 @@ npUsesPolynomialSummaryLabel <- function(x){
   list(hits = hits, lookups = lookups)
 }
 
+.np_summary_powell_cache_counts <- function(x) {
+  ds <- x$degree.search
+  nn.cache <- if (is.list(ds) && !is.null(ds$nn.cache)) ds$nn.cache else x$nn.cache
+  objective.hits <- .np_summary_named_number(nn.cache, "objective.hits")
+  objective.lookups <- .np_summary_named_number(nn.cache, "objective.visits")
+  if (.np_summary_missing_number(objective.lookups)) {
+    objective.raw <- .np_summary_named_number(nn.cache, "objective.raw.evals")
+    if (!.np_summary_missing_number(objective.raw) &&
+        !.np_summary_missing_number(objective.hits))
+      objective.lookups <- objective.raw + objective.hits
+  }
+  list(hits = objective.hits, lookups = objective.lookups)
+}
+
 .np_bandwidth_eval_accounting_lines <- function(x) {
   lines <- character()
   cache.hits.displayed <- 0
 
   nomad.cache <- .np_summary_nomad_cache_counts(x)
-  line <- .np_summary_cache_rate_line("NOMAD cache diagnostics",
-                                      nomad.cache$hits,
-                                      nomad.cache$lookups,
-                                      "point lookups")
-  if (!is.null(line))
+  line <- .np_summary_cache_avoided_line("NOMAD cache",
+                                         nomad.cache$hits,
+                                         nomad.cache$lookups,
+                                         "point lookups")
+  has.nomad.cache <- !is.null(line)
+  if (has.nomad.cache)
     lines <- c(lines, line)
 
-  nn.cache <- x$nn.cache
-  objective.hits <- .np_summary_named_number(nn.cache, "objective.hits")
-  objective.requests <- .np_summary_named_number(nn.cache, "objective.visits")
-  if (.np_summary_missing_number(objective.requests)) {
-    objective.raw <- .np_summary_named_number(nn.cache, "objective.raw.evals")
-    if (!.np_summary_missing_number(objective.raw) &&
-        !.np_summary_missing_number(objective.hits))
-      objective.requests <- objective.raw + objective.hits
-  }
-  line <- .np_summary_cache_rate_line("Powell cache diagnostics",
-                                      objective.hits,
-                                      objective.requests,
-                                      "objective lookups")
-  if (!is.null(line)) {
-    lines <- c(lines, line)
-    cache.hits.displayed <- cache.hits.displayed + objective.hits
-  }
-
-  nn.hits <- .np_summary_named_number(nn.cache, "hits")
-  nn.requests <- .np_summary_named_number(nn.cache, "visits")
-  line <- .np_summary_cache_rate_line("NN cache diagnostics", nn.hits, nn.requests,
-                                      "integer-bandwidth lookups")
-  if (!is.null(line)) {
-    lines <- c(lines, line)
-    cache.hits.displayed <- cache.hits.displayed + nn.hits
-  }
-
+  powell.cache <- .np_summary_powell_cache_counts(x)
   degree.search <- x$degree.search
-  degree.hits <- if (is.list(degree.search) && !is.null(degree.search$n.cached)) {
-    suppressWarnings(as.numeric(degree.search$n.cached[1L]))
+  degree.engine <- if (is.list(degree.search) && !is.null(degree.search$engine)) {
+    as.character(degree.search$engine[1L])
   } else {
-    NA_real_
+    NA_character_
   }
-  degree.requests <- if (is.list(degree.search) && !is.null(degree.search$n.visits)) {
-    suppressWarnings(as.numeric(degree.search$n.visits[1L]))
+  powell.label <- if (isTRUE(has.nomad.cache) ||
+                      (!is.na(degree.engine) && degree.engine %in% c("nomad", "nomad+powell"))) {
+    "Powell refinement cache"
   } else {
-    NA_real_
+    "Powell cache"
   }
-  line <- .np_summary_cache_rate_line("Degree-search cache diagnostics",
-                                      degree.hits,
-                                      degree.requests,
-                                      "degree lookups")
+  line <- .np_summary_cache_avoided_line(powell.label,
+                                         powell.cache$hits,
+                                         powell.cache$lookups,
+                                         "objective lookups")
   if (!is.null(line)) {
     lines <- c(lines, line)
-    cache.hits.displayed <- cache.hits.displayed + degree.hits
+    cache.hits.displayed <- cache.hits.displayed + powell.cache$hits
   }
 
   if (!(is.null(x$num.feval.fast) ||
         (length(x$num.feval.fast) == 1L && is.na(x$num.feval.fast)))) {
     fast <- suppressWarnings(as.numeric(x$num.feval.fast[1L]))
+    computed <- suppressWarnings(as.numeric(x$num.feval[1L]))
     if (is.finite(fast) && fast > 0) {
       fast.extra <- if (cache.hits.displayed > 0) {
         fast - cache.hits.displayed
@@ -3038,14 +3042,9 @@ npUsesPolynomialSummaryLabel <- function(x){
         fast
       }
       if (is.finite(fast.extra) && fast.extra > 0) {
-        label <- if (cache.hits.displayed > 0) {
-          "Additional fast CV route"
-        } else {
-          "Fast CV route"
-        }
-        lines <- c(lines, paste0(label, ": ",
-                                 .np_summary_format_count(fast.extra),
-                                 " evaluations"))
+        line <- .np_summary_fast_route_line(fast.extra, computed)
+        if (!is.null(line))
+          lines <- c(lines, line)
       }
     }
   }

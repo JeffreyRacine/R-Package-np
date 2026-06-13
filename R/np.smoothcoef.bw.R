@@ -1450,6 +1450,7 @@ npscoefbw.NULL <-
     restart.bandwidth.starts = search_result$restart.bandwidth.starts,
     restart.start.info = search_result$restart.start.info,
     restart.results = search_result$restart.results,
+    nn.cache = search_result$nn.cache,
     trace = search_result$trace
   )
 
@@ -3126,7 +3127,8 @@ npscoefbw.default <-
         list(
           objective = as.numeric(cell.bws$fval[1L]),
           payload = cell.bws,
-          num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_
+          num.feval = if (!is.null(cell.bws$num.feval)) as.numeric(cell.bws$num.feval[1L]) else NA_real_,
+          nn.cache = cell.bws$nn.cache
         )
       }
 
