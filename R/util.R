@@ -2909,6 +2909,120 @@ npUsesPolynomialSummaryLabel <- function(x){
   any(class(x) %in% density.classes)
 }
 
+.np_summary_missing_number <- function(x) {
+  length(x) != 1L || is.na(x) || !is.finite(x)
+}
+
+.np_summary_format_count <- function(x) {
+  format(round(as.numeric(x)[1L]), big.mark = ",", trim = TRUE,
+         scientific = FALSE)
+}
+
+.np_summary_format_percent <- function(hits, requests) {
+  format(round(100 * as.numeric(hits)[1L] / as.numeric(requests)[1L], 1L),
+         nsmall = 1L, trim = TRUE)
+}
+
+.np_summary_cache_rate_line <- function(label, hits, requests, request.label) {
+  if (.np_summary_missing_number(hits) ||
+      .np_summary_missing_number(requests) ||
+      hits <= 0 || requests <= 0 || requests < hits)
+    return(NULL)
+
+  paste0(label, ": ", .np_summary_format_percent(hits, requests),
+         "% hits (", .np_summary_format_count(hits), "/",
+         .np_summary_format_count(requests), " ", request.label, ")")
+}
+
+.np_summary_named_number <- function(x, name) {
+  if (is.null(x) || is.null(names(x)) || !(name %in% names(x)))
+    return(NA_real_)
+  out <- suppressWarnings(as.numeric(x[[name]][1L]))
+  if (length(out) != 1L) NA_real_ else out
+}
+
+.np_bandwidth_eval_accounting_lines <- function(x) {
+  lines <- character()
+  cache.hits.displayed <- 0
+
+  nn.cache <- x$nn.cache
+  objective.hits <- .np_summary_named_number(nn.cache, "objective.hits")
+  objective.requests <- .np_summary_named_number(nn.cache, "objective.visits")
+  if (.np_summary_missing_number(objective.requests)) {
+    objective.raw <- .np_summary_named_number(nn.cache, "objective.raw.evals")
+    if (!.np_summary_missing_number(objective.raw) &&
+        !.np_summary_missing_number(objective.hits))
+      objective.requests <- objective.raw + objective.hits
+  }
+  line <- .np_summary_cache_rate_line("Powell objective cache",
+                                      objective.hits,
+                                      objective.requests,
+                                      "objective requests")
+  if (!is.null(line)) {
+    lines <- c(lines, line)
+    cache.hits.displayed <- cache.hits.displayed + objective.hits
+  }
+
+  nn.hits <- .np_summary_named_number(nn.cache, "hits")
+  nn.requests <- .np_summary_named_number(nn.cache, "visits")
+  line <- .np_summary_cache_rate_line("NN cache", nn.hits, nn.requests,
+                                      "integer-bandwidth requests")
+  if (!is.null(line)) {
+    lines <- c(lines, line)
+    cache.hits.displayed <- cache.hits.displayed + nn.hits
+  }
+
+  degree.search <- x$degree.search
+  degree.hits <- if (is.list(degree.search) && !is.null(degree.search$n.cached)) {
+    suppressWarnings(as.numeric(degree.search$n.cached[1L]))
+  } else {
+    NA_real_
+  }
+  degree.requests <- if (is.list(degree.search) && !is.null(degree.search$n.visits)) {
+    suppressWarnings(as.numeric(degree.search$n.visits[1L]))
+  } else {
+    NA_real_
+  }
+  line <- .np_summary_cache_rate_line("Degree-search cache",
+                                      degree.hits,
+                                      degree.requests,
+                                      "degree requests")
+  if (!is.null(line))
+    lines <- c(lines, line)
+
+  if (!(is.null(x$num.feval.fast) ||
+        (length(x$num.feval.fast) == 1L && is.na(x$num.feval.fast)))) {
+    fast <- suppressWarnings(as.numeric(x$num.feval.fast[1L]))
+    if (is.finite(fast) && fast > 0) {
+      fast.extra <- if (cache.hits.displayed > 0) {
+        fast - cache.hits.displayed
+      } else {
+        fast
+      }
+      if (is.finite(fast.extra) && fast.extra > 0) {
+        label <- if (cache.hits.displayed > 0) {
+          "Additional fast CV route"
+        } else {
+          "Fast CV route"
+        }
+        lines <- c(lines, paste0(label, ": ",
+                                 .np_summary_format_count(fast.extra),
+                                 " evaluations"))
+      }
+    }
+  }
+
+  if (!(is.null(x$num.feval.guarded) ||
+        (length(x$num.feval.guarded) == 1L && is.na(x$num.feval.guarded)))) {
+    guarded <- suppressWarnings(as.numeric(x$num.feval.guarded[1L]))
+    if (is.finite(guarded) && guarded > 0)
+      lines <- c(lines, paste0("Guarded evaluations: ",
+                               .np_summary_format_count(guarded)))
+  }
+
+  lines
+}
+
 
 ## bandwidth-related report generating functions
 genBwSelStr <- function(x){
@@ -2926,15 +3040,9 @@ genBwSelStr <- function(x){
   nfe.str <- ""
   if(!(is.null(x$num.feval) || (length(x$num.feval) == 1L && is.na(x$num.feval)))){
     nfe.str <- paste("\nNumber of Function Evaluations: ", format(x$num.feval), sep="")
-    nfe.parts <- character()
-    if(!(is.null(x$num.feval.fast) || (length(x$num.feval.fast) == 1L && is.na(x$num.feval.fast)))){
-      nfe.parts <- c(nfe.parts, paste("fast = ", format(x$num.feval.fast), sep = ""))
-    }
-    if(!(is.null(x$num.feval.guarded) || (length(x$num.feval.guarded) == 1L && is.na(x$num.feval.guarded)))){
-      nfe.parts <- c(nfe.parts, paste("guarded = ", format(x$num.feval.guarded), sep = ""))
-    }
-    if(length(nfe.parts) > 0L)
-      nfe.str <- paste(nfe.str, " (", paste(nfe.parts, collapse = ", "), ")", sep="")
+    nfe.lines <- .np_bandwidth_eval_accounting_lines(x)
+    if(length(nfe.lines) > 0L)
+      nfe.str <- paste(nfe.str, paste0("\n", nfe.lines), sep = "")
   }
 
   pregtype <- npFormatRegressionType(x)
