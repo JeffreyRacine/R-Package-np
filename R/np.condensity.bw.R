@@ -2208,6 +2208,8 @@ npNomadShadowSearchConditionalDensity <- function(template,
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("bwsolver='mads' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
 
+  source <- "explicit"
+  reason <- NULL
   setup <- .npcdensbw_nomad_bw_setup(
     xdat = xdat,
     ydat = ydat,

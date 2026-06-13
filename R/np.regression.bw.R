@@ -1192,6 +1192,8 @@ npregbw.rbandwidth <-
   mads.inner.nmulti <- opt.value("mads.nmulti", opt.value("nomad.nmulti", 0L))
   random.seed <- opt.value("random.seed", 42L)
   nomad.opts <- opt.value("nomad.opts", list())
+  source <- "explicit"
+  reason <- NULL
   mads.num.feval.total <- 0
   mads.num.feval.fast.total <- 0
 
