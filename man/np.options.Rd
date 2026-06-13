@@ -81,9 +81,11 @@
       controlled by this option, and the saturated extended-NN distance cache is
       governed by \code{np.extendednn}. Bandwidth summaries keep
       \code{Number of Function Evaluations} as the established cumulative
-      optimizer objective-request count and report cache hit rates,
-      nearest-neighbor cache reuse, guarded evaluations, and other fast CV
-      routes on separate lines when the corresponding counters are available.
+      optimizer evaluation count and report NOMAD, Powell, nearest-neighbor,
+      degree-search, guarded-evaluation, and other fast-CV diagnostics on
+      separate lines when the corresponding counters are available. These
+      diagnostics describe their own optimizer/cache layer and are not intended
+      to decompose the function-evaluation count arithmetically.
 
       \item \code{np.nomad.degree.start.policy} (character): controls automatic
       polynomial-degree starting values for NOMAD local-polynomial searches when
