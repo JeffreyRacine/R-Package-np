@@ -948,6 +948,8 @@
     exclude = list(start_degree, baseline_degree)
   )
 
+  search_started <- proc.time()[3]
+
   tryCatch({
     state$baseline_record <- state$evaluate(baseline_degree)
 
@@ -1029,6 +1031,8 @@
   if (is.null(state$best_payload))
     stop("automatic degree search failed to obtain any admissible fitted model")
 
+  search_elapsed <- as.numeric(proc.time()[3] - search_started)
+
   list(
     method = method,
     source = source,
@@ -1043,6 +1047,7 @@
     n.unique = state$eval_id,
     n.visits = state$visit_id,
     n.cached = state$cached_visits,
+    optim.time = search_elapsed,
     grid.size = grid.size,
     restart.starts = restart_starts,
     nn.cache = .np_r_nn_cache_combine_stats(state$nn_cache_stats),
