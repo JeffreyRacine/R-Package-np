@@ -2633,9 +2633,45 @@ npUsesPolynomialSummaryLabel <- function(x){
   if (length(out) != 1L) NA_real_ else out
 }
 
+.np_summary_nomad_cache_counts <- function(x) {
+  ds <- x$degree.search
+  if (!is.list(ds) || is.null(ds$restart.results) ||
+      !is.list(ds$restart.results))
+    return(list(hits = NA_real_, lookups = NA_real_))
+
+  hits <- 0
+  lookups <- 0
+  found <- FALSE
+
+  for (res in ds$restart.results) {
+    native <- if (is.list(res)) res$native else NULL
+    if (!is.list(native))
+      next
+    h <- .np_summary_named_number(native, "cache_hits")
+    l <- .np_summary_named_number(native, "total_evaluations")
+    if (.np_summary_missing_number(h) || .np_summary_missing_number(l))
+      next
+    hits <- hits + h
+    lookups <- lookups + l
+    found <- TRUE
+  }
+
+  if (!isTRUE(found))
+    return(list(hits = NA_real_, lookups = NA_real_))
+  list(hits = hits, lookups = lookups)
+}
+
 .np_bandwidth_eval_accounting_lines <- function(x) {
   lines <- character()
   cache.hits.displayed <- 0
+
+  nomad.cache <- .np_summary_nomad_cache_counts(x)
+  line <- .np_summary_cache_rate_line("NOMAD cache diagnostics",
+                                      nomad.cache$hits,
+                                      nomad.cache$lookups,
+                                      "point lookups")
+  if (!is.null(line))
+    lines <- c(lines, line)
 
   nn.cache <- x$nn.cache
   objective.hits <- .np_summary_named_number(nn.cache, "objective.hits")
@@ -2646,10 +2682,10 @@ npUsesPolynomialSummaryLabel <- function(x){
         !.np_summary_missing_number(objective.hits))
       objective.requests <- objective.raw + objective.hits
   }
-  line <- .np_summary_cache_rate_line("Powell objective cache",
+  line <- .np_summary_cache_rate_line("Powell cache diagnostics",
                                       objective.hits,
                                       objective.requests,
-                                      "objective requests")
+                                      "objective lookups")
   if (!is.null(line)) {
     lines <- c(lines, line)
     cache.hits.displayed <- cache.hits.displayed + objective.hits
@@ -2657,8 +2693,8 @@ npUsesPolynomialSummaryLabel <- function(x){
 
   nn.hits <- .np_summary_named_number(nn.cache, "hits")
   nn.requests <- .np_summary_named_number(nn.cache, "visits")
-  line <- .np_summary_cache_rate_line("NN cache", nn.hits, nn.requests,
-                                      "integer-bandwidth requests")
+  line <- .np_summary_cache_rate_line("NN cache diagnostics", nn.hits, nn.requests,
+                                      "integer-bandwidth lookups")
   if (!is.null(line)) {
     lines <- c(lines, line)
     cache.hits.displayed <- cache.hits.displayed + nn.hits
@@ -2675,12 +2711,14 @@ npUsesPolynomialSummaryLabel <- function(x){
   } else {
     NA_real_
   }
-  line <- .np_summary_cache_rate_line("Degree-search cache",
+  line <- .np_summary_cache_rate_line("Degree-search cache diagnostics",
                                       degree.hits,
                                       degree.requests,
-                                      "degree requests")
-  if (!is.null(line))
+                                      "degree lookups")
+  if (!is.null(line)) {
     lines <- c(lines, line)
+    cache.hits.displayed <- cache.hits.displayed + degree.hits
+  }
 
   if (!(is.null(x$num.feval.fast) ||
         (length(x$num.feval.fast) == 1L && is.na(x$num.feval.fast)))) {
@@ -2734,7 +2772,7 @@ genBwSelStr <- function(x){
     nfe.str <- paste("\nNumber of Function Evaluations: ", format(x$num.feval), sep="")
     nfe.lines <- .np_bandwidth_eval_accounting_lines(x)
     if(length(nfe.lines) > 0L)
-      nfe.str <- paste(nfe.str, paste0("\n", nfe.lines), sep = "")
+      nfe.str <- paste(c(nfe.str, nfe.lines), collapse = "\n")
   }
 
   pregtype <- npFormatRegressionType(x)
