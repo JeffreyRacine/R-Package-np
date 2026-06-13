@@ -75,7 +75,11 @@
       repeated Powell candidates through the objective evaluator for diagnostic
       timing comparisons. MADS/NOMAD solver caching is separate and is not
       controlled by this option, and the saturated extended-NN distance cache is
-      governed by \code{np.extendednn}.
+      governed by \code{np.extendednn}. Bandwidth summaries keep
+      \code{Number of Function Evaluations} as the established cumulative
+      optimizer objective-request count and report cache hit rates,
+      nearest-neighbor cache reuse, guarded evaluations, and other fast CV
+      routes on separate lines when the corresponding counters are available.
 
       \item \code{np.nomad.degree.start.policy} (character): controls automatic
       polynomial-degree starting values for NOMAD local-polynomial searches when
