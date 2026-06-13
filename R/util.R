@@ -2389,6 +2389,30 @@ genGofStr <- function(x){
   paste(mse.str, r2.str, sep = "")
 }
 
+.np_timing_optim_label <- function(x) {
+  degree.search <- if (is.list(x$degree.search)) {
+    x$degree.search
+  } else if (is.list(x$bws) && is.list(x$bws$degree.search)) {
+    x$bws$degree.search
+  } else {
+    NULL
+  }
+
+  if (is.list(degree.search)) {
+    labels <- character(0)
+    for (field in c("mode", "method", "engine")) {
+      value <- degree.search[[field]]
+      if (!is.null(value) && length(value))
+        labels <- c(labels, as.character(value[1L]))
+    }
+    labels <- labels[!is.na(labels)]
+    if ("exhaustive" %in% labels)
+      return("Exhaustive Powell")
+  }
+
+  "optim"
+}
+
 genTimingStr <- function(x){
   if (is.null(x$total.time) || is.na(x$total.time))
     return("")
@@ -2527,10 +2551,24 @@ genTimingStr <- function(x){
                  .npRmpiTimingSessionStr(), .npRmpiTimingProfileStr(), sep = ""))
   }
 
-  if (!is.null(x$optim.time) && !is.na(x$optim.time) &&
-      !is.null(x$fit.time) && !is.na(x$fit.time))
-    return(paste("\nEstimation Time: ", format(x$total.time), " seconds (optim ",
-                 format(x$optim.time), "s, fit ", format(x$fit.time), "s)",
+  optim.label <- .np_timing_optim_label(x)
+  optim.time <- if (!is.null(x$optim.time) && !is.na(x$optim.time)) {
+    as.double(x$optim.time)
+  } else if (!identical(optim.label, "optim")) {
+    as.double(x$total.time)
+  } else {
+    NA_real_
+  }
+
+  if (is.finite(optim.time) && !is.null(x$fit.time) && !is.na(x$fit.time))
+    return(paste("\nEstimation Time: ", format(x$total.time), " seconds (",
+                 optim.label, " ", format(optim.time), "s, fit ",
+                 format(x$fit.time), "s)",
+                 .npRmpiTimingSessionStr(), .npRmpiTimingProfileStr(), sep = ""))
+
+  if (is.finite(optim.time) && !identical(optim.label, "optim"))
+    return(paste("\nEstimation Time: ", format(x$total.time), " seconds (",
+                 optim.label, " ", format(optim.time), "s)",
                  .npRmpiTimingSessionStr(), .npRmpiTimingProfileStr(), sep = ""))
 
   paste("\nEstimation Time: ",format(x$total.time)," seconds",
