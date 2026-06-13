@@ -1084,6 +1084,7 @@ npregbw.rbandwidth <-
   tbw$ifval <- core$ifval
   tbw$num.feval <- core$num.feval
   tbw$num.feval.fast <- core$num.feval.fast
+  tbw$nn.cache <- core$nn.cache
   tbw$fval.history <- core$fval.history
   tbw$eval.history <- core$eval.history
   tbw$invalid.history <- core$invalid.history
