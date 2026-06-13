@@ -3024,8 +3024,14 @@ npUsesPolynomialSummaryLabel <- function(x){
   nn.cache <- if (is.list(ds) && !is.null(ds$nn.cache)) ds$nn.cache else x$nn.cache
   objective.hits <- .np_summary_named_number(nn.cache, "objective.hits")
   objective.lookups <- .np_summary_named_number(nn.cache, "objective.visits")
+  objective.raw <- .np_summary_named_number(nn.cache, "objective.raw.evals")
+  if (.np_summary_missing_number(objective.hits))
+    objective.hits <- .np_summary_named_number(nn.cache, "hits")
+  if (.np_summary_missing_number(objective.lookups))
+    objective.lookups <- .np_summary_named_number(nn.cache, "visits")
   if (.np_summary_missing_number(objective.lookups)) {
-    objective.raw <- .np_summary_named_number(nn.cache, "objective.raw.evals")
+    if (.np_summary_missing_number(objective.raw))
+      objective.raw <- .np_summary_named_number(nn.cache, "raw.evals")
     if (!.np_summary_missing_number(objective.raw) &&
         !.np_summary_missing_number(objective.hits))
       objective.lookups <- objective.raw + objective.hits
@@ -3046,6 +3052,9 @@ npUsesPolynomialSummaryLabel <- function(x){
   if (has.nomad.cache)
     lines <- c(lines, line)
 
+  ## NOMAD cache hits are whole-parameter point lookups. Powell/fast counts
+  ## below are objective-evaluation-layer lookups, so they are not subtracted
+  ## from one another.
   powell.cache <- .np_summary_powell_cache_counts(x)
   degree.search <- x$degree.search
   degree.engine <- if (is.list(degree.search) && !is.null(degree.search$engine)) {
