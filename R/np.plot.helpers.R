@@ -387,7 +387,7 @@
     return(state)
   }
 
-  par(mfrow = state$mfrow, cex = par()$cex)
+  graphics::par(mfrow = state$mfrow)
   state$pending <- FALSE
   state
 }
