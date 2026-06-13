@@ -870,6 +870,8 @@
                                 col = plot.args$col)
               do.call(lines, line.args)
             }
+            if (plot.rug)
+              .np_plot_draw_rug_1d(overlay.x)
           } else if (overlay.ok && xi.factor) {
             axis.labels <- levels(ei)
             axis.at <- seq_along(axis.labels)
@@ -1139,6 +1141,8 @@
                                   col = plot.args$col)
                 do.call(lines, line.args)
               }
+              if (plot.rug)
+                .np_plot_draw_rug_1d(overlay.x)
             } else if (overlay.ok && xi.factor) {
               axis.labels <- levels(ei)
               axis.at <- seq_along(axis.labels)
@@ -1369,6 +1373,8 @@
                                 col = plot.args$col)
               do.call(lines, line.args)
             }
+            if (plot.rug)
+              .np_plot_draw_rug_1d(overlay.x)
           } else if (overlay.ok && xi.factor) {
             axis.labels <- levels(allei[,plot.index])
             axis.at <- seq_along(axis.labels)

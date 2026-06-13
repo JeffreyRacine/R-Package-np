@@ -1097,11 +1097,35 @@
           }
           plot.args$main <- scalar_default(main, "")
           plot.args$sub <- scalar_default(sub, "")
-          .np_plot_first_render_begin(first.render)
-          do.call(plot.fun, plot.args)
-          .np_plot_first_render_end(first.render)
-          if (plot.rug && !xi.factor)
-            .np_plot_draw_rug_1d(if (xOrZ == "x") xdat[,i] else zdat[,i])
+          if (overlay.ok && !xi.factor) {
+            type.val <- plot.args$type
+            plot.args$type <- "n"
+            .np_plot_first_render_begin(first.render)
+            do.call(plot.fun, plot.args)
+            .np_plot_first_render_end(first.render)
+            overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
+            do.call(.np_plot_overlay_points_1d,
+                    c(list(x = overlay.x, y = ydat),
+                      overlay.points.args))
+            if (!identical(type.val, "n")) {
+              ok.line <- is.finite(ei) & is.finite(temp.mean)
+              line.args <- list(x = ei[ok.line],
+                                y = temp.mean[ok.line],
+                                type = type.val,
+                                lty = plot.args$lty,
+                                lwd = plot.args$lwd,
+                                col = plot.args$col)
+              do.call(lines, line.args)
+            }
+            if (plot.rug)
+              .np_plot_draw_rug_1d(overlay.x)
+          } else {
+            .np_plot_first_render_begin(first.render)
+            do.call(plot.fun, plot.args)
+            .np_plot_first_render_end(first.render)
+            if (plot.rug && !xi.factor)
+              .np_plot_draw_rug_1d(if (xOrZ == "x") xdat[,i] else zdat[,i])
+          }
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
@@ -1275,6 +1299,8 @@
                                 col = plot.args$col)
               do.call(lines, line.args)
             }
+            if (plot.rug)
+              .np_plot_draw_rug_1d(overlay.x)
           } else if (overlay.ok && xi.factor) {
             axis.labels <- levels(allei[,plot.index])
             axis.at <- seq_along(axis.labels)
