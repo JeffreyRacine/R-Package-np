@@ -9304,6 +9304,162 @@ compute.default.error.range <- function(center, err) {
   )
 }
 
+.np_plot_refresh_plbandwidth_summaries <- function(bws) {
+  bws$sfactor <- lapply(seq_along(bws$bw), function(i) unlist(bws$bw[[i]]$sfactor))
+  bws$bandwidth <- lapply(seq_along(bws$bw), function(i) unlist(bws$bw[[i]]$bandwidth))
+  bws$sumNum <- lapply(seq_along(bws$bw), function(i) unlist(bws$bw[[i]]$sumNum))
+  names(bws$sfactor) <- names(bws$bandwidth) <- names(bws$sumNum) <- rep("z", length(bws$bw))
+  bws
+}
+
+.np_plot_oversmooth_scbandwidth_bws <- function(bws) {
+  if (!inherits(bws, "scbandwidth"))
+    stop("oversmoothed bootstrap center is currently implemented only for smooth coefficient bandwidth objects", call. = FALSE)
+  if (!identical(bws$type, "fixed"))
+    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed smooth coefficient bandwidths", call. = FALSE)
+  icon <- bws$icon
+  if (is.null(icon) || !length(icon) || !any(icon))
+    stop("center=\"bias-corrected-oversmoothed\" requires at least one continuous smoothing variable for smooth coefficient plots", call. = FALSE)
+  if (!is.numeric(bws$bw) || length(bws$bw) != length(icon))
+    stop("invalid smooth coefficient bandwidth vector for oversmoothed bootstrap center", call. = FALSE)
+
+  pilot <- .np_plot_oversmooth_factor(
+    nobs = bws$nobs,
+    p.continuous = sum(icon),
+    kernel.order = bws$ckerorder
+  )
+
+  out <- bws
+  out$bw[icon] <- out$bw[icon] * pilot$factor
+  bw.name <- names(out$bandwidth)[1L]
+  if (is.null(bw.name) || !nzchar(bw.name))
+    bw.name <- "x"
+  out$bandwidth[[bw.name]] <- out$bw
+  if (!is.null(out$sfactor[[bw.name]]) && length(out$sfactor[[bw.name]]) == length(out$bw))
+    out$sfactor[[bw.name]][icon] <- out$sfactor[[bw.name]][icon] * pilot$factor
+  if (!is.null(out$sumNum[[bw.name]]) && length(out$sumNum[[bw.name]]) == length(out$bw))
+    out$sumNum[[bw.name]][icon] <- out$sumNum[[bw.name]][icon] * pilot$factor
+  .np_plot_mark_oversmoothed_bws(
+    bws = out,
+    factor = pilot$factor,
+    exponent = pilot$exponent,
+    family = "smooth-coefficient"
+  )
+}
+
+.np_plot_oversmooth_plbandwidth_bws <- function(bws) {
+  if (!inherits(bws, "plbandwidth"))
+    stop("oversmoothed bootstrap center is currently implemented only for partially linear bandwidth objects", call. = FALSE)
+  if (!identical(bws$type, "fixed"))
+    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed partially linear bandwidths", call. = FALSE)
+  icon <- bws$zdati$icon
+  if (is.null(icon) || !length(icon) || !any(icon))
+    stop("center=\"bias-corrected-oversmoothed\" requires at least one continuous nonparametric smoothing variable for partially linear plots", call. = FALSE)
+  if (!is.list(bws$bw) || !length(bws$bw))
+    stop("invalid partially linear bandwidth object for oversmoothed bootstrap center", call. = FALSE)
+
+  pilot <- .np_plot_oversmooth_factor(
+    nobs = bws$nobs,
+    p.continuous = sum(icon),
+    kernel.order = bws$ckerorder
+  )
+
+  out <- bws
+  for (ii in seq_along(out$bw)) {
+    child <- out$bw[[ii]]
+    if (!inherits(child, "rbandwidth") || is.null(child$xdati$icon) ||
+        length(child$xdati$icon) != length(icon) || !identical(as.logical(child$xdati$icon), as.logical(icon))) {
+      stop("partially linear child bandwidths are not coherent for oversmoothed bootstrap center", call. = FALSE)
+    }
+    if (!is.numeric(child$bw) || length(child$bw) != length(icon))
+      stop("invalid partially linear child bandwidth vector for oversmoothed bootstrap center", call. = FALSE)
+    child$bw[icon] <- child$bw[icon] * pilot$factor
+    child$bandwidth$x <- child$bw
+    if (!is.null(child$sfactor$x) && length(child$sfactor$x) == length(child$bw))
+      child$sfactor$x[icon] <- child$sfactor$x[icon] * pilot$factor
+    if (!is.null(child$sumNum$x) && length(child$sumNum$x) == length(child$bw))
+      child$sumNum$x[icon] <- child$sumNum$x[icon] * pilot$factor
+    out$bw[[ii]] <- child
+  }
+  out <- .np_plot_refresh_plbandwidth_summaries(out)
+  .np_plot_mark_oversmoothed_bws(
+    bws = out,
+    factor = pilot$factor,
+    exponent = pilot$exponent,
+    family = "partially-linear"
+  )
+}
+
+.np_plot_scoef_oversmoothed_boot <- function(xdat, ydat, zdat,
+                                             exdat, ezdat,
+                                             bws,
+                                             miss.z,
+                                             plot.errors.boot.method,
+                                             plot.errors.boot.blocklen,
+                                             plot.errors.boot.num,
+                                             progress.label,
+                                             helper.mode) {
+  bws.pilot <- .np_plot_oversmooth_scbandwidth_bws(bws)
+  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+  counts.drawer <- if (is.block) {
+    .np_block_counts_drawer(
+      n = nrow(xdat),
+      B = plot.errors.boot.num,
+      blocklen = plot.errors.boot.blocklen,
+      sim = plot.errors.boot.method
+    )
+  } else {
+    NULL
+  }
+  .np_inid_boot_from_scoef(
+    txdat = xdat,
+    ydat = ydat,
+    tzdat = if (miss.z) NULL else zdat,
+    exdat = exdat,
+    ezdat = if (miss.z) NULL else ezdat,
+    bws = bws.pilot,
+    B = plot.errors.boot.num,
+    counts.drawer = counts.drawer,
+    leave.one.out = FALSE,
+    progress.label = progress.label,
+    mode = helper.mode
+  )
+}
+
+.np_plot_plreg_oversmoothed_boot <- function(xdat, ydat, zdat,
+                                             exdat, ezdat,
+                                             bws,
+                                             plot.errors.boot.method,
+                                             plot.errors.boot.blocklen,
+                                             plot.errors.boot.num,
+                                             progress.label,
+                                             helper.mode) {
+  bws.pilot <- .np_plot_oversmooth_plbandwidth_bws(bws)
+  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+  counts.drawer <- if (is.block) {
+    .np_block_counts_drawer(
+      n = nrow(xdat),
+      B = plot.errors.boot.num,
+      blocklen = plot.errors.boot.blocklen,
+      sim = plot.errors.boot.method
+    )
+  } else {
+    NULL
+  }
+  .np_inid_boot_from_plreg(
+    txdat = xdat,
+    ydat = ydat,
+    tzdat = zdat,
+    exdat = exdat,
+    ezdat = ezdat,
+    bws = bws.pilot,
+    B = plot.errors.boot.num,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label,
+    mode = helper.mode
+  )
+}
+
 .np_plot_reject_oversmoothed_center <- function(center, where) {
   if (.np_plot_center_is_oversmoothed(center)) {
     stop(sprintf("center=\"bias-corrected-oversmoothed\" is not yet implemented for %s",
@@ -9682,10 +9838,10 @@ compute.bootstrap.errors.scbandwidth =
     )
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.scbandwidth")
-    .np_plot_reject_oversmoothed_center(plot.errors.center, "smooth coefficient plots")
     miss.z <- missing(zdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
+    oversmooth.boot <- NULL
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
@@ -9694,6 +9850,15 @@ compute.bootstrap.errors.scbandwidth =
       !identical(bws$type, "fixed")
     helper.mode <- if (isTRUE(use.frozen.nonfixed)) "frozen" else "exact"
     boot.out <- NULL
+
+    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+      if (isTRUE(is.wild.hat))
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "smooth coefficient wild bootstrap plots")
+      if (isTRUE(gradients))
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "smooth coefficient gradient plots")
+      if (!identical(bws$type, "fixed"))
+        stop("center=\"bias-corrected-oversmoothed\" currently requires fixed smooth coefficient bandwidths", call. = FALSE)
+    }
 
     if (is.inid) {
       if (isTRUE(gradients))
@@ -9799,6 +9964,33 @@ compute.bootstrap.errors.scbandwidth =
       boot.out$t0 <- t0.override
     }
 
+    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+      oversmooth.boot <- tryCatch(
+        .np_plot_scoef_oversmoothed_boot(
+          xdat = xdat,
+          ydat = ydat,
+          zdat = if (miss.z) NULL else zdat,
+          exdat = exdat,
+          ezdat = if (miss.z) NULL else ezdat,
+          bws = bws,
+          miss.z = miss.z,
+          plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+          plot.errors.boot.num = plot.errors.boot.num,
+          progress.label = .np_plot_bootstrap_stage_label(
+            stage = "Oversmoothed bias bootstrap",
+            target_label = progress.target
+          ),
+          helper.mode = helper.mode
+        ),
+        error = function(e) {
+          stop(sprintf("oversmoothed smooth coefficient bootstrap center failed (%s)",
+                       conditionMessage(e)),
+               call. = FALSE)
+        }
+      )
+    }
+
     tdati <- if (slice.index <= ncol(xdat)) bws$xdati else bws$zdati
     ti <- if (slice.index <= ncol(xdat)) slice.index else slice.index - ncol(xdat)
     all.bp <- .np_plot_boot_factor_boxplots(
@@ -9830,8 +10022,13 @@ compute.bootstrap.errors.scbandwidth =
       boot.err[,1:2] <- interval.summary$err
       boot.all.err <- interval.summary$all.err
     }
-    if (plot.errors.center == "bias-corrected")
-      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    if (.np_plot_center_is_bias_corrected(plot.errors.center))
+      boot.err[,3] <- .np_plot_bootstrap_center(
+        center = plot.errors.center,
+        t0 = boot.out$t0,
+        boot.t = boot.out$t,
+        oversmooth.boot = oversmooth.boot
+      )
     list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
@@ -9875,9 +10072,9 @@ compute.bootstrap.errors.plbandwidth =
     )
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.plbandwidth")
-    .np_plot_reject_oversmoothed_center(plot.errors.center, "partial linear regression plots")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
+    oversmooth.boot <- NULL
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
@@ -9885,6 +10082,14 @@ compute.bootstrap.errors.plbandwidth =
     use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
       !identical(bws$type, "fixed")
     helper.mode <- if (isTRUE(use.frozen.nonfixed)) "frozen" else "exact"
+    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+      if (isTRUE(is.wild.hat))
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "partial linear wild bootstrap plots")
+      if (isTRUE(gradients))
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "partial linear gradient plots")
+      if (!identical(bws$type, "fixed"))
+        stop("center=\"bias-corrected-oversmoothed\" currently requires fixed partially linear bandwidths", call. = FALSE)
+    }
     if (is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
@@ -9976,6 +10181,32 @@ compute.bootstrap.errors.plbandwidth =
       boot.out$t0 <- t0.override
     }
 
+    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+      oversmooth.boot <- tryCatch(
+        .np_plot_plreg_oversmoothed_boot(
+          xdat = xdat,
+          ydat = ydat,
+          zdat = zdat,
+          exdat = exdat,
+          ezdat = ezdat,
+          bws = bws,
+          plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+          plot.errors.boot.num = plot.errors.boot.num,
+          progress.label = .np_plot_bootstrap_stage_label(
+            stage = "Oversmoothed bias bootstrap",
+            target_label = progress.target
+          ),
+          helper.mode = helper.mode
+        ),
+        error = function(e) {
+          stop(sprintf("oversmoothed partially linear bootstrap center failed (%s)",
+                       conditionMessage(e)),
+               call. = FALSE)
+        }
+      )
+    }
+
     if (slice.index <= bws$xndim){
       tdati <- bws$xdati
       ti <- slice.index
@@ -10012,8 +10243,13 @@ compute.bootstrap.errors.plbandwidth =
       boot.err[,1:2] <- interval.summary$err
       boot.all.err <- interval.summary$all.err
     }
-    if (plot.errors.center == "bias-corrected")
-      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    if (.np_plot_center_is_bias_corrected(plot.errors.center))
+      boot.err[,3] <- .np_plot_bootstrap_center(
+        center = plot.errors.center,
+        t0 = boot.out$t0,
+        boot.t = boot.out$t,
+        oversmooth.boot = oversmooth.boot
+      )
     list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
