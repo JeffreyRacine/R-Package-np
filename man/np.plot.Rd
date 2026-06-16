@@ -407,6 +407,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   can be recovered as \code{estimate - bias}. For example, regression
   plot objects use \code{mean - bias}; density objects use
   \code{dens - bias}; and distribution objects use \code{dist - bias}.
+  Regression-gradient plot objects use the analogous convention
+  \code{gbias = grad - gradient.bias.corrected}, so the corrected
+  gradient can be recovered as \code{grad - gbias}.
   Two-dimensional plots do not draw a second corrected surface in this
   tranche; use \code{output="data"} to recover the corrected surface
   values.
