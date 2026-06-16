@@ -59,8 +59,7 @@ npcopula(bws, \dots)
      alpha = 0.05,
      bootstrap = c("inid", "fixed", "geom"),
      B = 1999,
-     center = c("estimate", "bias-corrected",
-                "bias-corrected-oversmoothed"),
+     center = c("estimate", "bias-corrected"),
      boot_control = np_boot_control(),
      output = c("plot", "data", "plot-data", "both"),
      legend = TRUE,
@@ -287,11 +286,8 @@ surface plots.
   }
 
   \item{center}{
-    centering convention for bootstrap intervals. Copula plots support
-    \code{"estimate"} and \code{"bias-corrected"}; the shared spelling
-    \code{"bias-corrected-oversmoothed"} is accepted for consistency
-    but currently errors clearly because oversmoothed copula bias
-    correction is not implemented.
+    centering convention for bootstrap intervals, either
+    \code{"estimate"} or \code{"bias-corrected"}.
   }
 
   \item{errors}{
