@@ -447,15 +447,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   supports, and data types.
 
   For supported fixed-bandwidth regression, conditional density/distribution,
-  smooth coefficient, partially linear regression, and single-index plots,
+  conditional quantile level, smooth coefficient, partially linear regression,
+  and single-index plots,
   \code{center="bias-corrected-oversmoothed"} estimates the bias center
   from a second pilot bootstrap matrix while retaining the ordinary
   bootstrap matrix for variability widths. With \code{bootstrap="wild"},
   the regression pilot matrix uses a two-bandwidth wild bootstrap center; with
   \code{bootstrap="inid"}, \code{"fixed"}, or \code{"geom"}, supported
-  regression, conditional density/distribution, smooth coefficient, partially
-  linear regression, and single-index routes use the corresponding resampling
-  scheme evaluated with the pilot bandwidths.
+  regression, conditional density/distribution, conditional quantile level,
+  smooth coefficient, partially linear regression, and single-index routes use
+  the corresponding resampling scheme evaluated with the pilot bandwidths.
   These combinations can behave differently in finite samples, so the
   returned \code{bias} and \code{bias.corrected} components should be
   inspected when bias correction is scientifically important. For supported
@@ -482,8 +483,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   In practice, users who want confidence-style bounds should prefer
   bootstrap errors with \code{center="bias-corrected"} or, for supported
-  regression, conditional density/distribution, smooth coefficient, partially
-  linear regression, and single-index routes,
+  regression, conditional density/distribution, conditional quantile level,
+  smooth coefficient, partially linear regression, and single-index routes,
   \code{center="bias-corrected-oversmoothed"}. The
   ordinary fitted curve or surface remains the default estimate because
   bias correction can increase variance and may have larger mean squared
