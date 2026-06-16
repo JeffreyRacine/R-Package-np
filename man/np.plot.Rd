@@ -195,6 +195,8 @@ Named options passed via \code{\dots} include:
         For one-dimensional regression curves, the
         ordinary estimate remains visible and the selected bias-corrected
         estimate is drawn as an additional center line when available.
+        Fixed-bandwidth regression gradient plots use the same returned
+        gradient-bias convention described below.
       }
       \item{\code{errors}}{
         one of \code{"none"}, \code{"bootstrap"}, or
@@ -456,7 +458,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   scheme evaluated with the pilot bandwidths.
   These combinations can behave differently in finite samples, so the
   returned \code{bias} and \code{bias.corrected} components should be
-  inspected when bias correction is scientifically important. For ordinary second-order
+  inspected when bias correction is scientifically important. For fixed
+  regression gradient plots, inspect \code{gbias} and
+  \code{gradient.bias.corrected}; different bootstrap schemes can give
+  materially different derivative-bias corrections. For ordinary second-order
   continuous kernels, the pilot bandwidth for continuous variable
   \eqn{j} is
   \deqn{g_j = h_j n^{4 / ((p + 4)(p + 8))},}
