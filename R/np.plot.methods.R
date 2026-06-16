@@ -260,7 +260,8 @@ np_render_control <- function(style = c("band", "bar"),
   }
   if (has("center")) {
     center <- .np_plot_scalar_match(dots$center,
-                                    c("estimate", "bias-corrected"),
+                                    c("estimate", "bias-corrected",
+                                      "bias-corrected-oversmoothed"),
                                     "center")
     dots$center <- NULL
     dots <- .np_plot_set_normalized_arg(dots, "center",
@@ -1778,7 +1779,8 @@ np_render_control <- function(style = c("band", "bar"),
     dots$plot.errors.alpha
   center <- if (is.null(dots$plot.errors.center)) "estimate" else
     .np_plot_scalar_match(dots$plot.errors.center,
-                          c("estimate", "bias-corrected"),
+                          c("estimate", "bias-corrected",
+                            "bias-corrected-oversmoothed"),
                           "plot.errors.center")
   if (!is.numeric(alpha) || length(alpha) != 1L ||
       is.na(alpha) || alpha <= 0 || alpha >= 0.5)
