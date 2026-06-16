@@ -27,7 +27,7 @@
            plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
-           plot.errors.center = c("estimate","bias-corrected","bias-corrected-oversmoothed"),
+           plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
@@ -296,7 +296,7 @@
                         plot.errors.bar = plot.errors.bar,
                         plot.errors.bar.num = plot.errors.bar.num,
                         lty = .np_plot_lty("interval"))
-          } else if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
+          } else if (plot.errors.center == "bias-corrected") {
             lines(na.omit(tobj$index[i.sort]), na.omit(temp.err[i.sort,3]), lty = .np_plot_lty("center"))
             draw.errors(ex = na.omit(tobj$index[i.sort]),
                         ely = na.omit(temp.err[i.sort,3] - temp.err[i.sort,1]),
@@ -345,7 +345,7 @@
         )
         if (plot.errors) {
           plot.out[[1]]$merr <- cbind(-temp.err[,1], temp.err[,2])
-          if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
+          if (plot.errors.center == "bias-corrected") {
             plot.out[[1]]$bias <- temp.err[,3] - temp.mean
           }
         }
@@ -469,7 +469,7 @@
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
                             lty = .np_plot_lty("interval"))
-              } else if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
+              } else if (plot.errors.center == "bias-corrected") {
                 lo.i <- bws$beta[i] * (temp.err[i.sort,3] - temp.err[i.sort,1])
                 hi.i <- bws$beta[i] * (temp.err[i.sort,3] + temp.err[i.sort,2])
                 lines(na.omit(tobj$index[i.sort]), na.omit(bws$beta[i] * temp.err[i.sort,3]), lty = .np_plot_lty("center"))

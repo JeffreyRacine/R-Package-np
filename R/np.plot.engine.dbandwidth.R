@@ -34,7 +34,7 @@
            plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 1999,
-           plot.errors.center = c("estimate","bias-corrected","bias-corrected-oversmoothed"),
+           plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
@@ -232,7 +232,7 @@
         terr <- terr.obj[["boot.err"]]
         terr.all <- terr.obj[["boot.all.err"]]
 
-        pc = (.np_plot_center_is_bias_corrected(plot.errors.center))
+        pc = (plot.errors.center == "bias-corrected")
         center.val <- if (pc) terr[,3] else tobj$dist
 
         lerr = matrix(data = center.val - terr[,1],
@@ -289,7 +289,7 @@
         d1$bias = NA
         d1$bias.corrected = NA
 
-        if (.np_plot_center_is_bias_corrected(plot.errors.center))
+        if (plot.errors.center == "bias-corrected")
           d1 <- .np_plot_add_bias_fields(d1, tobj$dist, terr[,3])
         
         if (plot.behavior == "data")
@@ -643,7 +643,7 @@
           )
           plot.out[[i]]$bias = NA
           plot.out[[i]]$bias.corrected = NA
-          if (.np_plot_center_is_bias_corrected(plot.errors.center))
+          if (plot.errors.center == "bias-corrected")
             plot.out[[i]] <- .np_plot_add_bias_fields(
               plot.out[[i]],
               na.omit(temp.dens),
@@ -688,7 +688,7 @@
             if (plot.errors) na.omit(as.double(data.err[,jj-2]))
             else 0
             )
-        } else if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
+        } else if (plot.errors.center == "bias-corrected") {
           y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
           y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
         }

@@ -176,18 +176,11 @@ Named options passed via \code{\dots} include:
         displays when available.
       }
       \item{\code{center}}{
-        one of \code{"estimate"}, \code{"bias-corrected"}, or
-        \code{"bias-corrected-oversmoothed"}. When
+        one of \code{"estimate"} or \code{"bias-corrected"}. When
         bootstrap errors are requested, \code{center="bias-corrected"}
         centers plotted uncertainty bands or bars on the bootstrap
-        bias-corrected estimate. The
-        \code{"bias-corrected-oversmoothed"} option uses a second
-        oversmoothed pilot bootstrap matrix to estimate the bias center
-        where implemented; it is therefore more computationally
-        expensive. In this tranche it is implemented for fixed-bandwidth
-        regression plots with \code{bootstrap="inid"}, \code{"fixed"},
-        or \code{"geom"}. For one-dimensional regression curves, the
-        ordinary estimate remains visible and the selected bias-corrected
+        bias-corrected estimate. For one-dimensional regression curves,
+        the ordinary estimate remains visible and the bias-corrected
         estimate is drawn as an additional center line when available.
       }
       \item{\code{errors}}{
@@ -406,10 +399,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   typically \eqn{m=\texttt{neval}^2}{m=neval^2} for full 2D perspective
   surfaces).
 
-  When \code{center="bias-corrected"} or
-  \code{center="bias-corrected-oversmoothed"} and
-  \code{output="data"} (or \code{output="both"}) is requested, returned
-  plot objects that support bootstrap bias correction include \code{bias} and
+  When \code{center="bias-corrected"} and \code{output="data"} (or
+  \code{output="both"}) is requested, returned plot objects that support
+  bootstrap bias correction include \code{bias} and
   \code{bias.corrected} components where available. The sign convention
   is \code{bias = estimate - bias.corrected}, so the corrected estimate
   can be recovered as \code{estimate - bias}. For example, regression
@@ -440,28 +432,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   universal correction is optimal across estimators, bandwidths,
   supports, and data types.
 
-  For supported fixed-bandwidth regression plots,
-  \code{center="bias-corrected-oversmoothed"} estimates the bias center
-  from a second pilot bootstrap matrix while retaining the ordinary
-  bootstrap matrix for variability widths. For ordinary second-order
-  continuous kernels, the pilot bandwidth for continuous variable
-  \eqn{j} is
-  \deqn{g_j = h_j n^{4 / ((p + 4)(p + 8))},}
-  where \eqn{h_j} is the selected bandwidth, \eqn{p} is the number of
-  continuous smoothing variables in the regression problem, and
-  categorical variables do not enter this continuous-rate exponent. Thus
-  for univariate density-style smoothing or one-continuous-predictor
-  regression this reduces to \eqn{g_j = h_j n^{4/45}}. For higher-order
-  continuous kernels, the same rate-matching idea is adjusted using the
-  corresponding kernel-order bias and variance rates. This rule is a
-  practical smoothed-bootstrap pilot default following the
-  smoothed-bootstrap literature, not a claim of universal optimality.
-
   In practice, users who want confidence-style bounds should prefer
-  bootstrap errors with \code{center="bias-corrected"} or, for supported
-  regression routes, \code{center="bias-corrected-oversmoothed"}. The
-  ordinary fitted curve or surface remains the default estimate because
-  bias correction can increase variance and may have larger mean squared
+  bootstrap errors with \code{center="bias-corrected"}. The ordinary
+  fitted curve or surface remains the default estimate because bias
+  correction can increase variance and may have larger mean squared
   error than the uncorrected estimator.
 
   For asymptotic intervals, let \eqn{T(x)} denote the plotted functional
@@ -627,12 +601,6 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Politis, D.N. and J.P. Romano (1994), \dQuote{The stationary
     bootstrap,} Journal of the American Statistical Association, 89,
   1303-1313.
-
-  Silverman, B.W. and G.A. Young (1987), \dQuote{The bootstrap: to smooth or
-    not to smooth?} Biometrika, 74, 469-479.
-
-  De Angelis, D. and G.A. Young (1992), \dQuote{Smoothing the bootstrap,}
-    International Statistical Review, 60, 45-56.
 
   Scott, D.W. (1992), \emph{Multivariate Density Estimation. Theory,
   Practice and Visualization,} New York: Wiley.
