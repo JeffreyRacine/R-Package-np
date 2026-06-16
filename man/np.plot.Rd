@@ -185,8 +185,8 @@ Named options passed via \code{\dots} include:
         oversmoothed pilot bootstrap matrix to estimate the bias center
         where implemented; it is therefore more computationally
         expensive. In this tranche it is implemented for fixed-bandwidth
-        regression plots with \code{bootstrap="inid"}, \code{"fixed"},
-        or \code{"geom"}. For one-dimensional regression curves, the
+        regression plots with \code{bootstrap="wild"}, \code{"inid"},
+        \code{"fixed"}, or \code{"geom"}. For one-dimensional regression curves, the
         ordinary estimate remains visible and the selected bias-corrected
         estimate is drawn as an additional center line when available.
       }
@@ -441,7 +441,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   For supported fixed-bandwidth regression plots,
   \code{center="bias-corrected-oversmoothed"} estimates the bias center
   from a second pilot bootstrap matrix while retaining the ordinary
-  bootstrap matrix for variability widths. For ordinary second-order
+  bootstrap matrix for variability widths. With \code{bootstrap="wild"},
+  the pilot matrix uses a two-bandwidth wild bootstrap center; with
+  \code{bootstrap="inid"}, \code{"fixed"}, or \code{"geom"}, it uses the
+  corresponding resampling scheme evaluated with the pilot bandwidths.
+  These combinations can behave differently in finite samples, so the
+  returned \code{bias} and \code{bias.corrected} components should be
+  inspected when bias correction is scientifically important. For ordinary second-order
   continuous kernels, the pilot bandwidth for continuous variable
   \eqn{j} is
   \deqn{g_j = h_j n^{4 / ((p + 4)(p + 8))},}

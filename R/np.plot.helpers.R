@@ -804,6 +804,30 @@
   )
 }
 
+.np_plot_boot_from_hat_wild_residuals <- function(H,
+                                                  ydat,
+                                                  fit.center,
+                                                  residuals,
+                                                  B,
+                                                  wild,
+                                                  progress.label = "Plot bootstrap wild") {
+  fit.center <- as.vector(fit.center)
+  residuals <- as.vector(residuals)
+  if (length(fit.center) != length(residuals))
+    stop("length mismatch between wild bootstrap center and residuals")
+  list(
+    t = .np_wild_boot_t(
+      H = H,
+      fit.mean = fit.center,
+      residuals = as.double(residuals),
+      B = as.integer(B),
+      wild = wild,
+      progress.label = progress.label
+    ),
+    t0 = as.vector(H %*% as.double(ydat))
+  )
+}
+
 .np_plot_boot_from_hat_blocks_wild <- function(hat.block.fun,
                                                neval,
                                                ntrain,
@@ -9068,16 +9092,80 @@ compute.default.error.range <- function(center, err) {
                                                   gradient.order,
                                                   slice.index,
                                                   plot.errors.boot.method,
+                                                  plot.errors.boot.wild,
                                                   plot.errors.boot.blocklen,
                                                   plot.errors.boot.num,
                                                   progress.label,
                                                   prep.label,
                                                   profile.setup = NULL) {
+  bws.pilot <- .np_plot_oversmooth_regression_bws(bws)
   if (.np_plot_is_wild_method(plot.errors.boot.method)) {
-    stop("center=\"bias-corrected-oversmoothed\" requires bootstrap=\"inid\", \"fixed\", or \"geom\" for regression plots", call. = FALSE)
+    fit.h.train <- as.vector(suppressWarnings(npreghat(
+      bws = bws,
+      txdat = xdat,
+      exdat = xdat,
+      y = ydat,
+      output = "apply"
+    )))
+    fit.g.train <- as.vector(suppressWarnings(npreghat(
+      bws = bws.pilot,
+      txdat = xdat,
+      exdat = xdat,
+      y = ydat,
+      output = "apply"
+    )))
+
+    cont.idx <- which(bws$xdati$icon)
+    xi.factor <- isTRUE(slice.index > 0L) &&
+      (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
+    s.vec <- NULL
+    if (gradients && !xi.factor) {
+      cpos <- match(slice.index, cont.idx)
+      gorder <- if (length(gradient.order) == 1L) {
+        rep.int(as.integer(gradient.order), length(cont.idx))
+      } else {
+        as.integer(gradient.order)
+      }
+      if (length(gorder) != length(cont.idx))
+        gorder <- rep.int(1L, length(cont.idx))
+      s.vec <- integer(length(cont.idx))
+      s.vec[cpos] <- gorder[cpos]
+    }
+
+    H <- suppressWarnings(npreghat(
+      bws = bws,
+      txdat = xdat,
+      exdat = exdat,
+      s = s.vec,
+      output = "matrix"
+    ))
+    H.pilot <- suppressWarnings(npreghat(
+      bws = bws.pilot,
+      txdat = xdat,
+      exdat = exdat,
+      s = s.vec,
+      output = "matrix"
+    ))
+
+    out <- .np_plot_boot_from_hat_wild_residuals(
+      H = H,
+      ydat = ydat,
+      fit.center = fit.g.train,
+      residuals = as.double(ydat - fit.h.train),
+      B = plot.errors.boot.num,
+      wild = plot.errors.boot.wild,
+      progress.label = progress.label
+    )
+    center <- as.vector(H.pilot %*% as.double(ydat))
+    if (gradients && xi.factor && ncol(out$t) >= 1L) {
+      out$t <- sweep(out$t, 1L, out$t[, 1L], "-", check.margin = FALSE)
+      out$t0 <- out$t0 - out$t0[1L]
+      center <- center - center[1L]
+    }
+    out$center <- center
+    return(out)
   }
 
-  bws.pilot <- .np_plot_oversmooth_regression_bws(bws)
   is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
   counts.drawer <- if (is.block) {
     .np_block_counts_drawer(
@@ -9140,7 +9228,10 @@ compute.default.error.range <- function(center, err) {
   if (identical(center, "bias-corrected-oversmoothed")) {
     if (is.null(oversmooth.boot) || is.null(oversmooth.boot$t))
       stop("oversmoothed bootstrap center was requested but no oversmoothed bootstrap matrix is available", call. = FALSE)
-    return(t0 - (colMeans(oversmooth.boot$t) - t0))
+    reference <- oversmooth.boot$center
+    if (is.null(reference))
+      reference <- t0
+    return(t0 - (colMeans(oversmooth.boot$t) - reference))
   }
   stop("unknown bootstrap center", call. = FALSE)
 }
@@ -9402,6 +9493,7 @@ compute.bootstrap.errors.rbandwidth =
           gradient.order = gradient.order,
           slice.index = slice.index,
           plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.wild = plot.errors.boot.wild,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
           plot.errors.boot.num = plot.errors.boot.num,
           progress.label = .np_plot_bootstrap_stage_label(
