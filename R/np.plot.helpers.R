@@ -14062,6 +14062,7 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
 }
 
 .np_plot_bootstrap_quantile_tau_payload <- function(boot.out,
+                                                    oversmooth.boot = NULL,
                                                     neval,
                                                     tau,
                                                     alpha,
@@ -14119,8 +14120,25 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
       boot.all.err[[kk]] <- interval.summary$all.err
     }
 
-    if (identical(center, "bias-corrected")) {
-      boot.err[, 3L, kk] <- 2 * t0.k - colMeans(boot.t.k)
+    if (center %in% c("bias-corrected", "bias-corrected-oversmoothed")) {
+      oversmooth.k <- NULL
+      if (identical(center, "bias-corrected-oversmoothed")) {
+        if (is.null(oversmooth.boot) || is.null(oversmooth.boot$t))
+          stop("oversmoothed bootstrap center was requested but no oversmoothed quantile bootstrap matrix is available", call. = FALSE)
+        if (ncol(oversmooth.boot$t) != expected) {
+          stop("vector tau oversmoothed quantile bootstrap helper returned an incompatible payload", call. = FALSE)
+        }
+        oversmooth.k <- list(
+          t = oversmooth.boot$t[, idx, drop = FALSE],
+          center = if (!is.null(oversmooth.boot$center)) oversmooth.boot$center[idx] else NULL
+        )
+      }
+      boot.err[, 3L, kk] <- .np_plot_bootstrap_center(
+        center = center,
+        t0 = t0.k,
+        boot.t = boot.t.k,
+        oversmooth.boot = oversmooth.k
+      )
     }
   }
 
@@ -14587,6 +14605,38 @@ compute.default.error.range <- function(center, err) {
     bws = bws.pilot,
     B = plot.errors.boot.num,
     cdf = cdf,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
+  )
+}
+
+.np_plot_quantile_level_oversmoothed_boot <- function(xdat, ydat,
+                                                      exdat,
+                                                      bws,
+                                                      tau,
+                                                      plot.errors.boot.method,
+                                                      plot.errors.boot.blocklen,
+                                                      plot.errors.boot.num,
+                                                      progress.label) {
+  bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = TRUE)
+  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+  counts.drawer <- if (is.block) {
+    .np_block_counts_drawer(
+      n = nrow(xdat),
+      B = plot.errors.boot.num,
+      blocklen = plot.errors.boot.blocklen,
+      sim = plot.errors.boot.method
+    )
+  } else {
+    NULL
+  }
+  .npRmpi_inid_boot_from_quantile_level(
+    xdat = xdat,
+    ydat = ydat[[1L]],
+    exdat = exdat,
+    bws = bws.pilot,
+    B = plot.errors.boot.num,
+    tau = tau,
     counts.drawer = counts.drawer,
     progress.label = progress.label
   )
@@ -16229,8 +16279,8 @@ compute.bootstrap.errors.conbandwidth =
 
     oversmooth.boot <- NULL
     if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
-      if (identical(tboo, "quant")) {
-        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional quantile plots")
+      if (identical(tboo, "quant") && isTRUE(gradients)) {
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional quantile gradient plots")
       }
       if (isTRUE(proper)) {
         stop("center=\"bias-corrected-oversmoothed\" is not yet implemented for proper conditional density/distribution projections", call. = FALSE)
@@ -16493,7 +16543,19 @@ compute.bootstrap.errors.conbandwidth =
     if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
       oversmooth.boot <- .npRmpi_with_local_bootstrap({
         tryCatch(
-          if (isTRUE(gradients)) {
+          if (identical(tboo, "quant")) {
+            .np_plot_quantile_level_oversmoothed_boot(
+              xdat = xdat,
+              ydat = ydat,
+              exdat = exdat,
+              bws = bws,
+              tau = tau,
+              plot.errors.boot.method = plot.errors.boot.method,
+              plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+              plot.errors.boot.num = plot.errors.boot.num,
+              progress.label = progress.label
+            )
+          } else if (isTRUE(gradients)) {
             .np_plot_conditional_gradient_oversmoothed_boot(
               xdat = xdat,
               ydat = ydat,
@@ -16523,7 +16585,7 @@ compute.bootstrap.errors.conbandwidth =
             )
           },
           error = function(e) {
-            stop(sprintf("oversmoothed conditional density/distribution bootstrap center failed (%s)",
+            stop(sprintf("oversmoothed conditional density/distribution or quantile bootstrap center failed (%s)",
                          conditionMessage(e)),
                  call. = FALSE)
           }
@@ -16543,6 +16605,7 @@ compute.bootstrap.errors.conbandwidth =
     if (identical(tboo, "quant") && length(tau) > 1L) {
       tau.payload <- .np_plot_bootstrap_quantile_tau_payload(
         boot.out = boot.out,
+        oversmooth.boot = oversmooth.boot,
         neval = nrow(exdat),
         tau = tau,
         alpha = plot.errors.alpha,
