@@ -176,7 +176,12 @@ Named options passed via \code{\dots} include:
         displays when available.
       }
       \item{\code{center}}{
-        one of \code{"estimate"} or \code{"bias-corrected"}.
+        one of \code{"estimate"} or \code{"bias-corrected"}. When
+        bootstrap errors are requested, \code{center="bias-corrected"}
+        centers plotted uncertainty bands or bars on the bootstrap
+        bias-corrected estimate. For one-dimensional regression curves,
+        the ordinary estimate remains visible and the bias-corrected
+        estimate is drawn as an additional center line when available.
       }
       \item{\code{errors}}{
         one of \code{"none"}, \code{"bootstrap"}, or
@@ -393,6 +398,42 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   curve/surface (\eqn{m=\texttt{neval}}{m=neval} for univariate curves,
   typically \eqn{m=\texttt{neval}^2}{m=neval^2} for full 2D perspective
   surfaces).
+
+  When \code{center="bias-corrected"} and \code{output="data"} (or
+  \code{output="both"}) is requested, returned plot objects that support
+  bootstrap bias correction include \code{bias} and
+  \code{bias.corrected} components where available. The sign convention
+  is \code{bias = estimate - bias.corrected}, so the corrected estimate
+  can be recovered as \code{estimate - bias}. For example, regression
+  plot objects use \code{mean - bias}; density objects use
+  \code{dens - bias}; and distribution objects use \code{dist - bias}.
+  Two-dimensional plots do not draw a second corrected surface in this
+  tranche; use \code{output="data"} to recover the corrected surface
+  values.
+
+  Kernel estimators are generally biased because smoothing trades
+  variance reduction for bias. For this reason, pointwise and
+  simultaneous error bounds centered on the fitted kernel estimate are
+  often best interpreted as variability bounds rather than literal
+  confidence intervals for the unknown target function.
+  Confidence-interval interpretation requires the smoothing bias to be
+  negligible relative to sampling variability, or to be corrected with
+  sufficient accuracy.
+
+  When bootstrap errors are requested, \code{center="bias-corrected"}
+  recenters the plotted bootstrap bounds on the Efron-Tibshirani
+  bootstrap bias-corrected estimate, where available. This produces
+  bounds that are closer in spirit to confidence intervals than
+  variability bounds centered on the original biased estimate. Bias
+  correction for nonparametric estimators is difficult, however, and no
+  universal correction is optimal across estimators, bandwidths,
+  supports, and data types.
+
+  In practice, users who want confidence-style bounds should prefer
+  bootstrap errors with \code{center="bias-corrected"}. The ordinary
+  fitted curve or surface remains the default estimate because bias
+  correction can increase variance and may have larger mean squared
+  error than the uncorrected estimator.
 
   For asymptotic intervals, let \eqn{T(x)} denote the plotted functional
   (mean, gradient, density, distribution, etc.) and \eqn{\widehat{se}(x)}
@@ -748,6 +789,22 @@ with(cps71, plot(age, logwage, cex=0.2, xlab="Age", ylab="log(Wage)"))
 lines(age.eval,logwage.eval)
 lines(age.eval,logwage.lower.ci,lty=3)
 lines(age.eval,logwage.upper.ci,lty=3)
+
+# Bias-corrected bootstrap output includes the estimated bias and the
+# bias-corrected center when available. The sign convention is
+# bias = estimate - bias.corrected, so bias.corrected = estimate - bias.
+
+plot.out <- plot(fit,
+                 perspective=FALSE,
+                 errors="bootstrap",
+                 center="bias-corrected",
+                 B=25,
+                 output="data")
+
+logwage.eval <- fitted(plot.out$r1)
+logwage.bias <- plot.out$r1$bias
+logwage.bc <- plot.out$r1$bias.corrected
+stopifnot(all.equal(logwage.bc, logwage.eval - logwage.bias))
 
 # If you wanted plot() data for gradients, you would use the argument
 # `gradients=TRUE' in the call to plot() as the following

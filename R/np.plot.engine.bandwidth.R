@@ -286,9 +286,10 @@
       if (plot.behavior != "plot"){
         d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens, derr = terr[,1:2], ntrain = nrow(xdat))
         d1$bias = NA
+        d1$bias.corrected = NA
 
         if (plot.errors.center == "bias-corrected")
-          d1$bias = terr[,3] - tobj$dens
+          d1 <- .np_plot_add_bias_fields(d1, tobj$dens, terr[,3])
         
         if (plot.behavior == "data")
           return ( list(d1 = d1) )
@@ -634,7 +635,14 @@
             derr = na.omit(cbind(-temp.err[,1], temp.err[,2])),
             ntrain = bws$nobs
           )
-          plot.out[[i]]$bias = na.omit(temp.dens - temp.err[,3])
+          plot.out[[i]]$bias = NA
+          plot.out[[i]]$bias.corrected = NA
+          if (plot.errors.center == "bias-corrected")
+            plot.out[[i]] <- .np_plot_add_bias_fields(
+              plot.out[[i]],
+              na.omit(temp.dens),
+              na.omit(temp.err[,3])
+            )
           plot.out[[i]]$bxp = temp.boot
         }
       }

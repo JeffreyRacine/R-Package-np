@@ -386,6 +386,14 @@
   )
 }
 
+.np_plot_add_bias_fields <- function(object, estimate, bias.corrected) {
+  estimate <- as.numeric(estimate)
+  bias.corrected <- as.numeric(bias.corrected)
+  object$bias <- estimate - bias.corrected
+  object$bias.corrected <- bias.corrected
+  object
+}
+
 .np_plot_layout_begin <- function(plot.behavior, plot.par.mfrow, mfrow) {
   list(
     pending = isTRUE(plot.behavior != "data" && plot.par.mfrow),
@@ -11805,6 +11813,50 @@ plotFactor <- function(f, y, ...){
          lwd = lwd,
          cex = .np_plot_cex("legend"),
          bty = bty),
+    legend = legend.value,
+    context = "legend"
+  )
+  if (!is.null(legend.args))
+    do.call(graphics::legend, legend.args)
+  invisible(NULL)
+}
+
+.np_plot_draw_bias_center_legend <- function(legend = TRUE,
+                                             estimate.col = par()$col,
+                                             estimate.lty = par()$lty,
+                                             estimate.lwd = par()$lwd,
+                                             center.col = par()$col,
+                                             center.lwd = estimate.lwd,
+                                             legend.loc = "topright") {
+  normalize_lty <- function(value) {
+    if (is.null(value) || !length(value))
+      return(.np_plot_lty("solid"))
+    value <- value[1L]
+    if (is.character(value)) {
+      if (identical(value, "solid"))
+        return(.np_plot_lty("solid"))
+      if (identical(value, "dashed"))
+        return(.np_plot_lty("interval"))
+      if (identical(value, "dotted"))
+        return(.np_plot_lty("center"))
+    }
+    value
+  }
+
+  estimate.lty <- normalize_lty(estimate.lty)
+  legend.value <- if (is.list(legend) && any(names(legend) %in% c("tau", "bands", "center"))) {
+    if (!is.null(legend$center)) legend$center else TRUE
+  } else {
+    legend
+  }
+  legend.args <- .np_plot_legend_args(
+    list(x = legend.loc,
+         legend = c("Estimate", "Bias-corrected estimate"),
+         col = c(estimate.col, center.col),
+         lty = c(estimate.lty, .np_plot_lty("center")),
+         lwd = c(estimate.lwd, center.lwd),
+         cex = .np_plot_cex("legend"),
+         bty = "n"),
     legend = legend.value,
     context = "legend"
   )
