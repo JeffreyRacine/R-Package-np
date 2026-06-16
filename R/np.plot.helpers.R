@@ -383,6 +383,14 @@
   object
 }
 
+.np_plot_add_gradient_bias_fields <- function(object, gradient, gradient.bias.corrected) {
+  gradient <- as.numeric(gradient)
+  gradient.bias.corrected <- as.numeric(gradient.bias.corrected)
+  object$gbias <- na.omit(gradient - gradient.bias.corrected)
+  object$gradient.bias.corrected <- na.omit(gradient.bias.corrected)
+  object
+}
+
 .np_plot_layout_begin <- function(plot.behavior, plot.par.mfrow, mfrow) {
   list(
     pending = isTRUE(plot.behavior != "data" && plot.par.mfrow),

@@ -856,7 +856,11 @@
                              temp.err[,2])),
                            gradient.order = gradient.order,
                            ntrain = dim(xdat)[1])
-            plot.out[[i]]$gbias = na.omit(temp.mean - temp.err[,3])
+            plot.out[[i]] <- .np_plot_add_gradient_bias_fields(
+              plot.out[[i]],
+              temp.mean,
+              temp.err[,3]
+            )
           } else {
             plot.out[[i]] =
               npregression(bws = bws,
