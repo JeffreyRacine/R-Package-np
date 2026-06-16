@@ -9212,6 +9212,78 @@ compute.default.error.range <- function(center, err) {
   }
 }
 
+.np_plot_oversmooth_conditional_density_bws <- function(bws) {
+  if (!inherits(bws, "conbandwidth") || inherits(bws, "condbandwidth"))
+    stop("oversmoothed bootstrap center is currently implemented only for conditional density bandwidth objects", call. = FALSE)
+  if (!identical(bws$type, "fixed"))
+    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed conditional density bandwidths", call. = FALSE)
+
+  xicon <- bws$xdati$icon
+  yicon <- bws$ydati$icon
+  if (is.null(xicon) || is.null(yicon) || !any(xicon) || !any(yicon))
+    stop("center=\"bias-corrected-oversmoothed\" requires continuous dependent and explanatory variables for conditional density", call. = FALSE)
+
+  cx.order <- as.numeric(bws$cxkerorder[1L])
+  cy.order <- as.numeric(bws$cykerorder[1L])
+  if (!is.finite(cx.order) || !is.finite(cy.order) || cx.order <= 0 || cy.order <= 0 ||
+      !isTRUE(all.equal(cx.order, cy.order, tolerance = 0))) {
+    stop("center=\"bias-corrected-oversmoothed\" currently requires matching continuous x/y kernel orders for conditional density", call. = FALSE)
+  }
+
+  exponent <- .np_plot_oversmooth_exponent(
+    p.continuous = bws$ncon,
+    kernel.order = cx.order
+  )
+  factor <- as.numeric(bws$nobs)^exponent
+  if (!is.finite(factor) || factor <= 0)
+    stop("invalid conditional-density oversmoothed bootstrap pilot factor", call. = FALSE)
+
+  out <- bws
+  out$bandwidth$x[xicon] <- out$bandwidth$x[xicon] * factor
+  out$bandwidth$y[yicon] <- out$bandwidth$y[yicon] * factor
+  if (!is.null(out$sfactor$x) && length(out$sfactor$x) == length(out$bandwidth$x)) {
+    out$sfactor$x[xicon] <- out$sfactor$x[xicon] * factor
+  }
+  if (!is.null(out$sfactor$y) && length(out$sfactor$y) == length(out$bandwidth$y)) {
+    out$sfactor$y[yicon] <- out$sfactor$y[yicon] * factor
+  }
+  attr(out, "np.oversmooth.factor") <- factor
+  attr(out, "np.oversmooth.exponent") <- exponent
+  out
+}
+
+.np_plot_conditional_density_oversmoothed_boot <- function(xdat, ydat,
+                                                           exdat, eydat,
+                                                           bws,
+                                                           plot.errors.boot.method,
+                                                           plot.errors.boot.blocklen,
+                                                           plot.errors.boot.num,
+                                                           progress.label) {
+  bws.pilot <- .np_plot_oversmooth_conditional_density_bws(bws)
+  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+  counts.drawer <- if (is.block) {
+    .np_block_counts_drawer(
+      n = nrow(xdat),
+      B = plot.errors.boot.num,
+      blocklen = plot.errors.boot.blocklen,
+      sim = plot.errors.boot.method
+    )
+  } else {
+    NULL
+  }
+  .np_inid_boot_from_ksum_conditional(
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    bws = bws.pilot,
+    B = plot.errors.boot.num,
+    cdf = FALSE,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
+  )
+}
+
 .np_plot_reject_oversmoothed_center <- function(center, where) {
   if (.np_plot_center_is_oversmoothed(center)) {
     stop(sprintf("center=\"bias-corrected-oversmoothed\" is not yet implemented for %s",
@@ -10109,15 +10181,30 @@ compute.bootstrap.errors.conbandwidth =
     activity <- .np_plot_activity_begin(prep.label)
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.conbandwidth")
-    .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional density/distribution plots")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
+    oversmooth.boot <- NULL
 
     tboo =
       if(quantreg) "quant"
       else if (cdf) "dist"
       else "dens"
+
+    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+      if (!identical(tboo, "dens")) {
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional distribution or quantile plots")
+      }
+      if (isTRUE(gradients)) {
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional density gradient plots")
+      }
+      if (isTRUE(proper)) {
+        stop("center=\"bias-corrected-oversmoothed\" is not yet implemented for proper conditional density projections", call. = FALSE)
+      }
+      if (!identical(bws$type, "fixed")) {
+        stop("center=\"bias-corrected-oversmoothed\" currently requires fixed conditional density bandwidths", call. = FALSE)
+      }
+    }
 
     if (!identical(tboo, "quant")) {
       .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "conditional density/distribution estimators")
@@ -10347,6 +10434,27 @@ compute.bootstrap.errors.conbandwidth =
       }
     }
 
+    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+      oversmooth.boot <- tryCatch(
+        .np_plot_conditional_density_oversmoothed_boot(
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          eydat = eydat,
+          bws = bws,
+          plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+          plot.errors.boot.num = plot.errors.boot.num,
+          progress.label = progress.label
+        ),
+        error = function(e) {
+          stop(sprintf("oversmoothed conditional density bootstrap center failed (%s)",
+                       conditionMessage(e)),
+               call. = FALSE)
+        }
+      )
+    }
+
     if (slice.index <= bws$xndim){
       tdati <- bws$xdati
       ti <- slice.index
@@ -10402,8 +10510,14 @@ compute.bootstrap.errors.conbandwidth =
       boot.err[,1:2] <- interval.summary$err
       boot.all.err <- interval.summary$all.err
     }
-    if (plot.errors.center == "bias-corrected")
-      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    if (plot.errors.center %in% c("bias-corrected", "bias-corrected-oversmoothed")) {
+      boot.err[,3] <- .np_plot_bootstrap_center(
+        center = plot.errors.center,
+        t0 = boot.out$t0,
+        boot.t = boot.out$t,
+        oversmooth.boot = oversmooth.boot
+      )
+    }
     list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
