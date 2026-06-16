@@ -9460,6 +9460,80 @@ compute.default.error.range <- function(center, err) {
   )
 }
 
+.np_plot_oversmooth_sibandwidth_bws <- function(bws) {
+  if (!inherits(bws, "sibandwidth"))
+    stop("oversmoothed bootstrap center is currently implemented only for single-index bandwidth objects", call. = FALSE)
+  if (!identical(bws$type, "fixed"))
+    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed single-index bandwidths", call. = FALSE)
+  if (!is.numeric(bws$bw) || length(bws$bw) != 1L || !is.finite(bws$bw))
+    stop("invalid single-index bandwidth for oversmoothed bootstrap center", call. = FALSE)
+  if (is.null(bws$beta) || !is.numeric(bws$beta) || !length(bws$beta) ||
+      any(!is.finite(bws$beta)))
+    stop("invalid single-index beta vector for oversmoothed bootstrap center", call. = FALSE)
+
+  pilot <- .np_plot_oversmooth_factor(
+    nobs = bws$nobs,
+    p.continuous = 1L,
+    kernel.order = bws$ckerorder
+  )
+
+  out <- bws
+  beta.original <- out$beta
+  out$bw <- out$bw * pilot$factor
+  out$bandwidth$index <- out$bw
+  if (!is.null(out$sfactor$index) &&
+      length(out$sfactor$index) == 1L &&
+      is.finite(out$sfactor$index)) {
+    out$sfactor$index <- out$sfactor$index * pilot$factor
+  }
+  if (!is.null(out$sumNum$index) &&
+      length(out$sumNum$index) == 1L &&
+      is.finite(out$sumNum$index)) {
+    out$sumNum$index <- out$sumNum$index * pilot$factor
+  }
+  if (!identical(out$beta, beta.original))
+    stop("single-index oversmoothed pilot changed beta", call. = FALSE)
+
+  .np_plot_mark_oversmoothed_bws(
+    bws = out,
+    factor = pilot$factor,
+    exponent = pilot$exponent,
+    family = "single-index"
+  )
+}
+
+.np_plot_singleindex_oversmoothed_boot <- function(xdat, ydat,
+                                                   bws,
+                                                   idx.eval,
+                                                   plot.errors.boot.method,
+                                                   plot.errors.boot.blocklen,
+                                                   plot.errors.boot.num,
+                                                   progress.label) {
+  bws.pilot <- .np_plot_oversmooth_sibandwidth_bws(bws)
+  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+  counts.drawer <- if (is.block) {
+    .np_block_counts_drawer(
+      n = nrow(xdat),
+      B = plot.errors.boot.num,
+      blocklen = plot.errors.boot.blocklen,
+      sim = plot.errors.boot.method
+    )
+  } else {
+    NULL
+  }
+  .np_inid_boot_from_index(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bws.pilot,
+    B = plot.errors.boot.num,
+    counts.drawer = counts.drawer,
+    gradients = FALSE,
+    frozen = FALSE,
+    idx.eval = idx.eval,
+    progress.label = progress.label
+  )
+}
+
 .np_plot_reject_oversmoothed_center <- function(center, where) {
   if (.np_plot_center_is_oversmoothed(center)) {
     stop(sprintf("center=\"bias-corrected-oversmoothed\" is not yet implemented for %s",
@@ -10855,7 +10929,6 @@ compute.bootstrap.errors.sibandwidth =
     )
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.sibandwidth")
-    .np_plot_reject_oversmoothed_center(plot.errors.center, "single-index plots")
     xdat <- toFrame(xdat)
     idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
     dots <- list(...)
@@ -10866,12 +10939,22 @@ compute.bootstrap.errors.sibandwidth =
 
     boot.err = matrix(data = NA, nrow = nrow(idx.eval), ncol = 3)
     boot.all.err <- NULL
+    oversmooth.boot <- NULL
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method=="inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
       !identical(bws$type, "fixed")
+
+    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+      if (isTRUE(is.wild.hat))
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "single-index wild bootstrap plots")
+      if (isTRUE(gradients))
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "single-index gradient plots")
+      if (!identical(bws$type, "fixed"))
+        stop("center=\"bias-corrected-oversmoothed\" currently requires fixed single-index bandwidths", call. = FALSE)
+    }
 
     if (is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
@@ -10953,6 +11036,29 @@ compute.bootstrap.errors.sibandwidth =
 
     if (is.null(boot.out))
       stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.sibandwidth", plot.errors.boot.method), call. = FALSE)
+
+    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+      oversmooth.boot <- tryCatch(
+        .np_plot_singleindex_oversmoothed_boot(
+          xdat = xdat,
+          ydat = ydat,
+          bws = bws,
+          idx.eval = idx.eval,
+          plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+          plot.errors.boot.num = plot.errors.boot.num,
+          progress.label = .np_plot_bootstrap_stage_label(
+            stage = "Oversmoothed bias bootstrap",
+            target_label = progress.target
+          )
+        ),
+        error = function(e) {
+          stop(sprintf("oversmoothed single-index bootstrap center failed (%s)",
+                       conditionMessage(e)),
+               call. = FALSE)
+        }
+      )
+    }
     
     if (plot.errors.type == "pmzsd") {
       pmz.progress <- .np_plot_stage_progress_begin(
@@ -10976,8 +11082,13 @@ compute.bootstrap.errors.sibandwidth =
       boot.err[,1:2] <- interval.summary$err
       boot.all.err <- interval.summary$all.err
     }
-    if (plot.errors.center == "bias-corrected")
-      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    if (.np_plot_center_is_bias_corrected(plot.errors.center))
+      boot.err[,3] <- .np_plot_bootstrap_center(
+        center = plot.errors.center,
+        t0 = boot.out$t0,
+        boot.t = boot.out$t,
+        oversmooth.boot = oversmooth.boot
+      )
     list(boot.err = boot.err, bxp = list(), boot.all.err = boot.all.err)
   }
 
