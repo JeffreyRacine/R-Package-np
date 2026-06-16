@@ -14592,6 +14592,43 @@ compute.default.error.range <- function(center, err) {
   )
 }
 
+.np_plot_conditional_gradient_oversmoothed_boot <- function(xdat, ydat,
+                                                            exdat, eydat,
+                                                            bws,
+                                                            cdf,
+                                                            gradient.index,
+                                                            gradient.order,
+                                                            plot.errors.boot.method,
+                                                            plot.errors.boot.blocklen,
+                                                            plot.errors.boot.num,
+                                                            progress.label) {
+  bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = cdf)
+  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+  counts.drawer <- if (is.block) {
+    .np_block_counts_drawer(
+      n = nrow(xdat),
+      B = plot.errors.boot.num,
+      blocklen = plot.errors.boot.blocklen,
+      sim = plot.errors.boot.method
+    )
+  } else {
+    NULL
+  }
+  .npRmpi_inid_boot_from_conditional_gradient(
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    bws = bws.pilot,
+    B = plot.errors.boot.num,
+    cdf = cdf,
+    gradient.index = gradient.index,
+    gradient.order = gradient.order,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
+  )
+}
+
 .np_plot_refresh_plbandwidth_summaries <- function(bws) {
   bws$sfactor <- lapply(seq_along(bws$bw), function(i) unlist(bws$bw[[i]]$sfactor))
   bws$bandwidth <- lapply(seq_along(bws$bw), function(i) unlist(bws$bw[[i]]$bandwidth))
@@ -16195,9 +16232,6 @@ compute.bootstrap.errors.conbandwidth =
       if (identical(tboo, "quant")) {
         .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional quantile plots")
       }
-      if (isTRUE(gradients)) {
-        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional density/distribution gradient plots")
-      }
       if (isTRUE(proper)) {
         stop("center=\"bias-corrected-oversmoothed\" is not yet implemented for proper conditional density/distribution projections", call. = FALSE)
       }
@@ -16459,18 +16493,35 @@ compute.bootstrap.errors.conbandwidth =
     if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
       oversmooth.boot <- .npRmpi_with_local_bootstrap({
         tryCatch(
-          .np_plot_conditional_oversmoothed_boot(
-            xdat = xdat,
-            ydat = ydat,
-            exdat = exdat,
-            eydat = eydat,
-            bws = bws,
-            cdf = cdf,
-            plot.errors.boot.method = plot.errors.boot.method,
-            plot.errors.boot.blocklen = plot.errors.boot.blocklen,
-            plot.errors.boot.num = plot.errors.boot.num,
-            progress.label = progress.label
-          ),
+          if (isTRUE(gradients)) {
+            .np_plot_conditional_gradient_oversmoothed_boot(
+              xdat = xdat,
+              ydat = ydat,
+              exdat = exdat,
+              eydat = eydat,
+              bws = bws,
+              cdf = cdf,
+              gradient.index = gradient.index,
+              gradient.order = gradient.order,
+              plot.errors.boot.method = plot.errors.boot.method,
+              plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+              plot.errors.boot.num = plot.errors.boot.num,
+              progress.label = progress.label
+            )
+          } else {
+            .np_plot_conditional_oversmoothed_boot(
+              xdat = xdat,
+              ydat = ydat,
+              exdat = exdat,
+              eydat = eydat,
+              bws = bws,
+              cdf = cdf,
+              plot.errors.boot.method = plot.errors.boot.method,
+              plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+              plot.errors.boot.num = plot.errors.boot.num,
+              progress.label = progress.label
+            )
+          },
           error = function(e) {
             stop(sprintf("oversmoothed conditional density/distribution bootstrap center failed (%s)",
                          conditionMessage(e)),
