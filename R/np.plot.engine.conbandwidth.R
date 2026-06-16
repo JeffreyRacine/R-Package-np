@@ -393,9 +393,10 @@
         }
         cd1 <- do.call(ret.fun, ret.args)
         cd1$bias = NA
+        cd1$bias.corrected = NA
 
         if (plot.errors.center == "bias-corrected")
-          cd1$bias = terr[,3] - tcomp
+          cd1 <- .np_plot_add_bias_fields(cd1, tcomp, terr[,3])
         
         if (plot.behavior == "data")
           return ( list(cd1 = cd1) )

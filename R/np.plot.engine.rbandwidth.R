@@ -360,9 +360,10 @@
           merr = terr[,1:2],
           ntrain = dim(xdat)[1])
           r1$bias = NA
+          r1$bias.corrected = NA
 
         if (plot.errors.center == "bias-corrected")
-          r1$bias = terr[,3] - treg
+          r1 <- .np_plot_add_bias_fields(r1, as.double(treg), terr[,3])
 
         if (plot.behavior == "data")
           return ( list(r1 = r1) )
@@ -831,6 +832,13 @@
               )
               do.call(draw.errors, draw.args)
             }
+            if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
+              .np_plot_draw_bias_center_legend(
+                legend = plot.legend,
+                estimate.col = plot.args$col,
+                estimate.lty = plot.args$lty,
+                estimate.lwd = plot.args$lwd
+              )
           }
                             
         }
@@ -857,7 +865,14 @@
                            merr = na.omit(cbind(-temp.err[,1],
                              temp.err[,2])),
                            ntrain = dim(xdat)[1])
-            plot.out[[i]]$bias = na.omit(temp.mean - temp.err[,3])
+            plot.out[[i]]$bias = NA
+            plot.out[[i]]$bias.corrected = NA
+            if (plot.errors.center == "bias-corrected")
+              plot.out[[i]] <- .np_plot_add_bias_fields(
+                plot.out[[i]],
+                na.omit(temp.mean),
+                na.omit(temp.err[,3])
+              )
           }
           plot.out[[i]]$bxp = temp.boot
         }
@@ -1072,6 +1087,13 @@
               )
               do.call(draw.errors, draw.args)
             }
+            if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
+              .np_plot_draw_bias_center_legend(
+                legend = plot.legend,
+                estimate.col = plot.args$col,
+                estimate.lty = plot.args$lty,
+                estimate.lwd = plot.args$lwd
+              )
           }
         }
       }

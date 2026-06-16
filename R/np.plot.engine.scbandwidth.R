@@ -428,9 +428,10 @@
           ntrain = dim(xdat)[1]
         ))
         r1$bias = NA
+        r1$bias.corrected = NA
 
         if (plot.errors.center == "bias-corrected")
-          r1$bias = terr[,3] - treg
+          r1 <- .np_plot_add_bias_fields(r1, as.double(treg), terr[,3])
 
         if (plot.behavior == "data")
           return ( list(r1 = r1) )
@@ -976,12 +977,17 @@
                                 xtra = c(0, 0, 0, 0, 0, 0))
             plot.out[[plot.index]]$merr = NA
             plot.out[[plot.index]]$bias = NA
+            plot.out[[plot.index]]$bias.corrected = NA
 
             if (plot.errors)
               plot.out[[plot.index]]$merr = temp.err[,1:2]
 
             if (plot.errors.center == "bias-corrected")
-              plot.out[[plot.index]]$bias = temp.err[,3] - temp.mean
+              plot.out[[plot.index]] <- .np_plot_add_bias_fields(
+                plot.out[[plot.index]],
+                temp.mean,
+                temp.err[,3]
+              )
             plot.out[[plot.index]]$bxp = temp.boot
           }
         }
@@ -1243,12 +1249,17 @@
 
               plot.out[[plot.index]]$merr = NA
               plot.out[[plot.index]]$bias = NA
+              plot.out[[plot.index]]$bias.corrected = NA
 
               if (plot.errors)
                 plot.out[[plot.index]]$merr = temp.err[,1:2]
 
               if (plot.errors.center == "bias-corrected")
-                plot.out[[plot.index]]$bias = temp.err[,3] - temp.mean
+                plot.out[[plot.index]] <- .np_plot_add_bias_fields(
+                  plot.out[[plot.index]],
+                  temp.mean,
+                  temp.err[,3]
+                )
               plot.out[[plot.index]]$bxp = temp.boot
             }
           }
