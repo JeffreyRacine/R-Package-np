@@ -188,7 +188,10 @@ Named options passed via \code{\dots} include:
         regression plots with \code{bootstrap="wild"}, \code{"inid"},
         \code{"fixed"}, or \code{"geom"}, and for fixed-bandwidth
         conditional density/distribution plots with \code{bootstrap="inid"},
-        \code{"fixed"}, or \code{"geom"}. For one-dimensional regression curves, the
+        \code{"fixed"}, or \code{"geom"}. It is also implemented for
+        fixed-bandwidth smooth coefficient and partially linear regression
+        plots with \code{bootstrap="inid"}, \code{"fixed"}, or
+        \code{"geom"}. For one-dimensional regression curves, the
         ordinary estimate remains visible and the selected bias-corrected
         estimate is drawn as an additional center line when available.
       }
@@ -442,15 +445,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   universal correction is optimal across estimators, bandwidths,
   supports, and data types.
 
-  For supported fixed-bandwidth regression and conditional density/distribution
-  plots,
+  For supported fixed-bandwidth regression, conditional density/distribution,
+  smooth coefficient, and partially linear regression plots,
   \code{center="bias-corrected-oversmoothed"} estimates the bias center
   from a second pilot bootstrap matrix while retaining the ordinary
   bootstrap matrix for variability widths. With \code{bootstrap="wild"},
   the regression pilot matrix uses a two-bandwidth wild bootstrap center; with
   \code{bootstrap="inid"}, \code{"fixed"}, or \code{"geom"}, supported
-  regression and conditional density/distribution routes use the corresponding resampling
-  scheme evaluated with the pilot bandwidths.
+  regression, conditional density/distribution, smooth coefficient, and
+  partially linear regression routes use the corresponding resampling scheme
+  evaluated with the pilot bandwidths.
   These combinations can behave differently in finite samples, so the
   returned \code{bias} and \code{bias.corrected} components should be
   inspected when bias correction is scientifically important. For ordinary second-order
@@ -460,7 +464,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   where \eqn{h_j} is the selected bandwidth, \eqn{p} is the number of
   continuous smoothing variables in the supported route (for conditional
   density/distribution this includes continuous dependent and explanatory
-  variables), and
+  variables; for partially linear regression and smooth coefficient plots it
+  is the dimension of the nonparametric smoothing variables), and
   categorical variables do not enter this continuous-rate exponent. Thus
   for univariate density-style smoothing or one-continuous-predictor
   regression this reduces to \eqn{g_j = h_j n^{4/45}}. For higher-order
@@ -471,7 +476,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   In practice, users who want confidence-style bounds should prefer
   bootstrap errors with \code{center="bias-corrected"} or, for supported
-  regression and conditional density/distribution routes,
+  regression, conditional density/distribution, smooth coefficient, and
+  partially linear regression routes,
   \code{center="bias-corrected-oversmoothed"}. The
   ordinary fitted curve or surface remains the default estimate because
   bias correction can increase variance and may have larger mean squared
