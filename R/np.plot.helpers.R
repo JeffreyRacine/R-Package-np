@@ -365,7 +365,7 @@
 
     err <- bootstrap_raw[["boot.err"]]
     all.err <- bootstrap_raw[["boot.all.err"]]
-    center <- if (identical(plot.errors.center, "bias-corrected")) err[,3] else estimate
+    center <- if (.np_plot_center_is_bias_corrected(plot.errors.center)) err[,3] else estimate
     bxp <- bootstrap_raw[["bxp"]]
   } else if (identical(plot.errors.method, "asymptotic")) {
     asym.obj <- .np_plot_asymptotic_error_from_se(
@@ -14225,7 +14225,7 @@ compute.default.error.range <- function(center, err) {
   )
   plot.errors.center <- match.arg(
     scalar_choice(plot.errors.center, "estimate"),
-    c("estimate", "bias-corrected")
+    c("estimate", "bias-corrected", "bias-corrected-oversmoothed")
   )
   plot.errors.type <- match.arg(
     scalar_choice(plot.errors.type, "simultaneous"),
@@ -14265,7 +14265,7 @@ compute.default.error.range <- function(center, err) {
     if (plot.errors.type == "all")
       .np_warning("asymptotic simultaneous confidence bands are unavailable here; 'all' returns pointwise/bonferroni and NA simultaneous")
 
-    if (plot.errors.center == "bias-corrected") {
+    if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
       .np_warning("no bias corrections can be calculated with asymptotics, centering on estimate")
       plot.errors.center <- "estimate"
     }
@@ -14290,6 +14290,144 @@ compute.default.error.range <- function(center, err) {
     common.scale = common.scale,
     plot.errors = (plot.errors.method != "none")
   )
+}
+
+.np_plot_center_is_bias_corrected <- function(center) {
+  identical(center, "bias-corrected") ||
+    identical(center, "bias-corrected-oversmoothed")
+}
+
+.np_plot_center_is_oversmoothed <- function(center) {
+  identical(center, "bias-corrected-oversmoothed")
+}
+
+.np_plot_oversmooth_exponent <- function(p.continuous, kernel.order) {
+  p.continuous <- as.integer(p.continuous[1L])
+  kernel.order <- as.numeric(kernel.order[1L])
+  if (!is.finite(p.continuous) || p.continuous < 1L ||
+      !is.finite(kernel.order) || kernel.order <= 0) {
+    stop("cannot compute oversmoothed bootstrap pilot rate from invalid dimension/order", call. = FALSE)
+  }
+  (2 * kernel.order) / ((p.continuous + 2 * kernel.order) *
+                          (p.continuous + 4 * kernel.order))
+}
+
+.np_plot_oversmooth_regression_bws <- function(bws) {
+  if (!inherits(bws, "rbandwidth"))
+    stop("oversmoothed bootstrap center is currently implemented only for regression bandwidth objects", call. = FALSE)
+  if (!identical(bws$type, "fixed"))
+    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed regression bandwidths", call. = FALSE)
+
+  icon <- bws$icon
+  if (is.null(icon) || !length(icon) || !any(icon))
+    stop("center=\"bias-corrected-oversmoothed\" requires at least one continuous predictor", call. = FALSE)
+
+  bw <- bws$bw
+  if (!is.numeric(bw) || length(bw) != length(icon))
+    stop("invalid regression bandwidth vector for oversmoothed bootstrap center", call. = FALSE)
+
+  exponent <- .np_plot_oversmooth_exponent(
+    p.continuous = sum(icon),
+    kernel.order = bws$ckerorder
+  )
+  factor <- as.numeric(bws$nobs)^exponent
+  if (!is.finite(factor) || factor <= 0)
+    stop("invalid oversmoothed bootstrap pilot factor", call. = FALSE)
+
+  out <- bws
+  out$bw[icon] <- out$bw[icon] * factor
+  out$bandwidth$x <- out$bw
+  if (!is.null(out$sfactor$x) && length(out$sfactor$x) == length(out$bw)) {
+    out$sfactor$x[icon] <- out$sfactor$x[icon] * factor
+  }
+  attr(out, "np.oversmooth.factor") <- factor
+  attr(out, "np.oversmooth.exponent") <- exponent
+  out
+}
+
+.np_plot_regression_oversmoothed_boot <- function(xdat, ydat,
+                                                  exdat,
+                                                  bws,
+                                                  gradients,
+                                                  gradient.order,
+                                                  slice.index,
+                                                  plot.errors.boot.method,
+                                                  plot.errors.boot.blocklen,
+                                                  plot.errors.boot.num,
+                                                  progress.label,
+                                                  prep.label,
+                                                  profile.setup = NULL) {
+  if (.np_plot_is_wild_method(plot.errors.boot.method)) {
+    stop("center=\"bias-corrected-oversmoothed\" requires bootstrap=\"inid\", \"fixed\", or \"geom\" for regression plots", call. = FALSE)
+  }
+
+  bws.pilot <- .np_plot_oversmooth_regression_bws(bws)
+  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+  counts.drawer <- if (is.block) {
+    .np_block_counts_drawer(
+      n = nrow(xdat),
+      B = plot.errors.boot.num,
+      blocklen = plot.errors.boot.blocklen,
+      sim = plot.errors.boot.method
+    )
+  } else {
+    NULL
+  }
+
+  profile.setup.pilot <- NULL
+  if (!is.null(profile.setup) && !isTRUE(gradients)) {
+    profile.setup.pilot <- .np_regression_cat_profile_boot_setup(
+      xdat = xdat,
+      exdat = exdat,
+      ydat = ydat,
+      bws = bws.pilot
+    )
+  }
+
+  if (!is.null(profile.setup.pilot)) {
+    .np_inid_boot_from_regression_cat_profile(
+      setup = profile.setup.pilot,
+      B = plot.errors.boot.num,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    )
+  } else {
+    .np_inid_boot_from_regression(
+      xdat = xdat,
+      exdat = exdat,
+      bws = bws.pilot,
+      ydat = ydat,
+      B = plot.errors.boot.num,
+      counts.drawer = counts.drawer,
+      gradients = gradients,
+      gradient.order = gradient.order,
+      slice.index = slice.index,
+      prefer.local.single_worker = identical(bws$type, "fixed"),
+      prep.label = prep.label,
+      progress.label = progress.label
+    )
+  }
+}
+
+.np_plot_reject_oversmoothed_center <- function(center, where) {
+  if (.np_plot_center_is_oversmoothed(center)) {
+    stop(sprintf("center=\"bias-corrected-oversmoothed\" is not yet implemented for %s",
+                 where),
+         call. = FALSE)
+  }
+}
+
+.np_plot_bootstrap_center <- function(center, t0, boot.t, oversmooth.boot = NULL) {
+  if (identical(center, "estimate"))
+    return(t0)
+  if (identical(center, "bias-corrected"))
+    return(2 * t0 - colMeans(boot.t))
+  if (identical(center, "bias-corrected-oversmoothed")) {
+    if (is.null(oversmooth.boot) || is.null(oversmooth.boot$t))
+      stop("oversmoothed bootstrap center was requested but no oversmoothed bootstrap matrix is available", call. = FALSE)
+    return(t0 - (colMeans(oversmooth.boot$t) - t0))
+  }
+  stop("unknown bootstrap center", call. = FALSE)
 }
 
 
@@ -14339,6 +14477,7 @@ compute.bootstrap.errors.rbandwidth =
       neval = .np_nrows_safe(exdat)
     )
     boot.out <- NULL
+    oversmooth.boot <- NULL
 
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -14632,6 +14771,34 @@ compute.bootstrap.errors.rbandwidth =
     if (is.null(boot.out))
       stop("no MPI helper path available for this regression bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
+    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+      oversmooth.boot <- tryCatch(
+        .np_plot_regression_oversmoothed_boot(
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          bws = bws,
+          gradients = gradients,
+          gradient.order = gradient.order,
+          slice.index = slice.index,
+          plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+          plot.errors.boot.num = plot.errors.boot.num,
+          progress.label = .np_plot_bootstrap_stage_label(
+            stage = "Oversmoothed bias bootstrap",
+            target_label = progress.target
+          ),
+          prep.label = prep.label,
+          profile.setup = profile.setup
+        ),
+        error = function(e) {
+          stop(sprintf("oversmoothed regression bootstrap center failed (%s)",
+                       conditionMessage(e)),
+               call. = FALSE)
+        }
+      )
+    }
+
     all.bp <- list()
 
     if (slice.index > 0 && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])){
@@ -14679,8 +14846,13 @@ compute.bootstrap.errors.rbandwidth =
       boot.err[,1:2] <- boot.summary$err
       boot.all.err <- boot.summary$all.err
     }
-    if (plot.errors.center == "bias-corrected")
-      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    if (.np_plot_center_is_bias_corrected(plot.errors.center))
+      boot.err[,3] <- .np_plot_bootstrap_center(
+        center = plot.errors.center,
+        t0 = boot.out$t0,
+        boot.t = boot.out$t,
+        oversmooth.boot = oversmooth.boot
+      )
     .npRmpi_profile_finalize_bootstrap(
       boot.err = boot.err,
       bxp = all.bp,
@@ -14727,6 +14899,8 @@ compute.bootstrap.errors.scbandwidth =
     activity <- .np_plot_activity_begin(prep.label)
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.scbandwidth")
+    .np_plot_reject_oversmoothed_center(plot.errors.center,
+                                         "smooth coefficient plots")
     prof.ctx <- .npRmpi_profile_bootstrap_begin(
       where = "compute.bootstrap.errors.scbandwidth",
       method = plot.errors.boot.method,
@@ -14972,6 +15146,8 @@ compute.bootstrap.errors.plbandwidth =
     activity <- .np_plot_activity_begin(prep.label)
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.plbandwidth")
+    .np_plot_reject_oversmoothed_center(plot.errors.center,
+                                         "partial linear regression plots")
     prof.ctx <- .npRmpi_profile_bootstrap_begin(
       where = "compute.bootstrap.errors.plbandwidth",
       method = plot.errors.boot.method,
@@ -15182,6 +15358,8 @@ compute.bootstrap.errors.bandwidth =
     )
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.bandwidth")
+    .np_plot_reject_oversmoothed_center(plot.errors.center,
+                                         "unconditional density plots")
     prof.ctx <- .npRmpi_profile_bootstrap_begin(
       where = "compute.bootstrap.errors.bandwidth",
       method = plot.errors.boot.method,
@@ -15331,6 +15509,8 @@ compute.bootstrap.errors.dbandwidth =
     )
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.dbandwidth")
+    .np_plot_reject_oversmoothed_center(plot.errors.center,
+                                         "unconditional distribution plots")
     prof.ctx <- .npRmpi_profile_bootstrap_begin(
       where = "compute.bootstrap.errors.dbandwidth",
       method = plot.errors.boot.method,
@@ -15495,6 +15675,8 @@ compute.bootstrap.errors.conbandwidth =
     activity <- .np_plot_activity_begin(prep.label)
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.conbandwidth")
+    .np_plot_reject_oversmoothed_center(plot.errors.center,
+                                         "conditional density/distribution plots")
     prof.ctx <- .npRmpi_profile_bootstrap_begin(
       where = "compute.bootstrap.errors.conbandwidth",
       method = plot.errors.boot.method,
@@ -15899,6 +16081,8 @@ compute.bootstrap.errors.sibandwidth =
     activity <- .np_plot_activity_begin(prep.label)
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.sibandwidth")
+    .np_plot_reject_oversmoothed_center(plot.errors.center,
+                                         "single-index plots")
     xdat <- toFrame(xdat)
     idx.train <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
     dots <- list(...)
