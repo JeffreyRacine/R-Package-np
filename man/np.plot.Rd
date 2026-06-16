@@ -458,9 +458,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   scheme evaluated with the pilot bandwidths.
   These combinations can behave differently in finite samples, so the
   returned \code{bias} and \code{bias.corrected} components should be
-  inspected when bias correction is scientifically important. For fixed
-  regression gradient plots, inspect \code{gbias} and
-  \code{gradient.bias.corrected}; different bootstrap schemes can give
+  inspected when bias correction is scientifically important. For supported
+  fixed regression and conditional density/distribution gradient plots, inspect
+  \code{gbias}, \code{gradient.bias.corrected}, or route-specific gradient-bias
+  components such as \code{gc1bias}; different bootstrap schemes can give
   materially different derivative-bias corrections. For ordinary second-order
   continuous kernels, the pilot bandwidth for continuous variable
   \eqn{j} is
@@ -481,8 +482,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   In practice, users who want confidence-style bounds should prefer
   bootstrap errors with \code{center="bias-corrected"} or, for supported
-  regression, conditional density/distribution, smooth coefficient, and
-  partially linear regression, and single-index routes,
+  regression, conditional density/distribution, smooth coefficient, partially
+  linear regression, and single-index routes,
   \code{center="bias-corrected-oversmoothed"}. The
   ordinary fitted curve or surface remains the default estimate because
   bias correction can increase variance and may have larger mean squared
