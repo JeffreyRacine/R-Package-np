@@ -8417,6 +8417,15 @@ plotFactor <- function(f, y, ...){
       gradient.order = glp.gradient.order,
       ncon = bws$xncon
     )
+  if (isTRUE(gradients) && identical(reg.engine, "lp")) {
+    npValidateGlpGradientDegree(
+      regtype.engine = reg.engine,
+      degree.engine = degree.engine,
+      gradient.order = glp.gradient.order,
+      ncon = bws$xncon,
+      where = "plot conditional"
+    )
+  }
 
   reg.c <- npRegtypeToC(
     regtype = if (identical(reg.engine, "lp") && !lp.degree0.lc.gradient) "lp" else "lc",
@@ -8534,14 +8543,7 @@ plotFactor <- function(f, y, ...){
 
     if (identical(reg.engine, "lp") && bws$xncon > 0L && !lp.degree0.lc.gradient) {
       cont.idx <- which(bws$ixcon)
-      invalid.order <- glp.gradient.order > degree.engine
-      if (any(invalid.order)) {
-        myout$congrad[, cont.idx[invalid.order]] <- NA_real_
-        myout$congerr[, cont.idx[invalid.order]] <- NA_real_
-        .np_warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
-      }
-
-      higher.order <- (glp.gradient.order > 1L) & !invalid.order
+      higher.order <- glp.gradient.order > 1L
       if (any(higher.order)) {
         rhs <- rep.int(1.0, nrow(hat.context$xdat))
         hat.fun <- if (isTRUE(cdf)) npcdisthat else npcdenshat

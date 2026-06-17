@@ -273,6 +273,15 @@ npreg.rbandwidth <-
         all(reg.spec$degree.engine == 0L)) {
       stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
     }
+    if (isTRUE(gradients) && identical(reg.spec$regtype.engine, "lp")) {
+      npValidateGlpGradientDegree(
+        regtype.engine = reg.spec$regtype.engine,
+        degree.engine = reg.spec$degree.engine,
+        gradient.order = glp.gradient.order,
+        ncon = bws$ncon,
+        where = "npreg"
+      )
+    }
 
     reg.c <- npRegtypeToC(regtype = if (lp.degree0.lc.gradient) "lc" else reg.spec$regtype.engine,
                           degree = if (lp.degree0.lc.gradient) rep.int(0L, bws$ncon) else reg.spec$degree.engine,
@@ -511,19 +520,6 @@ npreg.rbandwidth <-
       myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE) 
       myout$gerr = as.matrix(myout$gerr[,rorder])
 
-      if (identical(bws$regtype, "lp") && !lp.degree0.lc.gradient) {
-        cont.idx <- which(bws$icon)
-        if (length(cont.idx)) {
-          invalid.order <- glp.gradient.order > bws$degree
-          if (any(invalid.order)) {
-            bad.idx <- cont.idx[invalid.order]
-            myout$g[, bad.idx] <- NA_real_
-            myout$gerr[, bad.idx] <- NA_real_
-            if (warn.glp.gradient)
-              .np_warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
-          }
-        }
-      }
     }
 
 

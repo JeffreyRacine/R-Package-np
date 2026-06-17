@@ -197,14 +197,13 @@
                                        ncon = bws$ncon)
     if (length(go))
       plot.gradient.order.label[which(bws$icon)] <- go
-      if (any(go > bws$degree) &&
-          !npGlpDegree0FirstDerivativeLcOk(
-            regtype.engine = bws$regtype,
-            degree.engine = bws$degree,
-            gradient.order = go,
-            ncon = bws$ncon
-          ))
-        .np_warning("some requested glp derivatives exceed polynomial degree; plotting NA for those components")
+      npValidateGlpGradientDegree(
+        regtype.engine = bws$regtype,
+        degree.engine = bws$degree,
+        gradient.order = go,
+        ncon = bws$ncon,
+        where = "plot.rbandwidth()"
+      )
     }
 
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
