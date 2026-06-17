@@ -397,8 +397,8 @@
 .np_plot_add_gradient_bias_fields <- function(object, gradient, gradient.bias.corrected) {
   gradient <- as.numeric(gradient)
   gradient.bias.corrected <- as.numeric(gradient.bias.corrected)
-  object$gbias <- na.omit(gradient - gradient.bias.corrected)
-  object$gradient.bias.corrected <- na.omit(gradient.bias.corrected)
+  object$gbias <- gradient - gradient.bias.corrected
+  object$gradient.bias.corrected <- gradient.bias.corrected
   object
 }
 
@@ -14278,7 +14278,7 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
     if (identical(center, "bias-corrected")) {
       oversmooth.k <- NULL
       if (!is.null(oversmooth.boot)) {
-        if (is.null(oversmooth.boot) || is.null(oversmooth.boot$t))
+        if (is.null(oversmooth.boot$t))
           stop("oversmoothed bootstrap center was requested but no oversmoothed quantile bootstrap matrix is available", call. = FALSE)
         if (ncol(oversmooth.boot$t) != expected) {
           stop("vector tau oversmoothed quantile bootstrap helper returned an incompatible payload", call. = FALSE)
@@ -15149,7 +15149,7 @@ compute.default.error.range <- function(center, err) {
   if (identical(center, "estimate"))
     return(t0)
   if (identical(center, "bias-corrected") && !is.null(oversmooth.boot)) {
-    if (is.null(oversmooth.boot) || is.null(oversmooth.boot$t))
+    if (is.null(oversmooth.boot$t))
       stop("oversmoothed bootstrap center was requested but no oversmoothed bootstrap matrix is available", call. = FALSE)
     reference <- oversmooth.boot$center
     if (is.null(reference))
@@ -16217,7 +16217,8 @@ compute.bootstrap.errors.bandwidth =
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.bandwidth")
     .np_plot_reject_oversmoothed_center(plot.errors.center,
-                                         "unconditional density plots")
+                                         "unconditional density plots",
+                                         plot.errors.boot.method = plot.errors.boot.method)
     prof.ctx <- .npRmpi_profile_bootstrap_begin(
       where = "compute.bootstrap.errors.bandwidth",
       method = plot.errors.boot.method,
@@ -16368,7 +16369,8 @@ compute.bootstrap.errors.dbandwidth =
     on.exit(.np_plot_activity_end(activity), add = TRUE)
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.dbandwidth")
     .np_plot_reject_oversmoothed_center(plot.errors.center,
-                                         "unconditional distribution plots")
+                                         "unconditional distribution plots",
+                                         plot.errors.boot.method = plot.errors.boot.method)
     prof.ctx <- .npRmpi_profile_bootstrap_begin(
       where = "compute.bootstrap.errors.dbandwidth",
       method = plot.errors.boot.method,
