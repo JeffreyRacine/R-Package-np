@@ -104,6 +104,14 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
     else
       "gradient standard errors are not available: fit the model with gradients=TRUE")
 
+  if (identical(x$bws$regtype, "lc") && !is.null(gradient.order)) {
+    npValidateLcGradientOrder(
+      regtype = x$bws$regtype,
+      gradient.order = gradient.order,
+      ncon = x$bws$ncon,
+      where = "gradients.npregression"
+    )
+  }
   if (!identical(x$bws$regtype, "lp") || is.null(gradient.order))
     return(gout)
 

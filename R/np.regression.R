@@ -215,6 +215,14 @@ npreg.rbandwidth <-
       ncon = bws$ncon,
       where = "npreg"
     )
+    if (isTRUE(gradients) && identical(regtype.raw, "lc")) {
+      npValidateLcGradientOrder(
+        regtype = regtype.raw,
+        gradient.order = gradient.order,
+        ncon = bws$ncon,
+        where = "npreg"
+      )
+    }
     world.size <- .npRmpi_safe_int(mpi.comm.size(0))
     world.size <- if (is.na(world.size)) 1L else as.integer(world.size)
 
@@ -352,6 +360,14 @@ npreg.rbandwidth <-
       ncon = bws$ncon,
       where = "npreg"
     )
+    if (isTRUE(gradients) && identical(bws$regtype, "lc")) {
+      npValidateLcGradientOrder(
+        regtype = bws$regtype,
+        gradient.order = gradient.order,
+        ncon = bws$ncon,
+        where = "npreg"
+      )
+    }
     glp.gradient.order <- if (identical(reg.spec$regtype.engine, "lp")) {
       if (identical(bws$regtype, "lp")) {
         npValidateGlpGradientOrder(regtype = bws$regtype,

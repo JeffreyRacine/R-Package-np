@@ -4472,6 +4472,14 @@
   }
 
   if (isTRUE(gradients)) {
+    if (identical(regtype, "lc")) {
+      npValidateLcGradientOrder(
+        regtype = regtype,
+        gradient.order = gradient.order,
+        ncon = bws$ncon,
+        where = ".np_inid_boot_from_regression"
+      )
+    }
     if (!identical(regtype, "lc")) {
       use.exact.degree0.derivative <- .np_plot_regression_lp0_derivative_requested(
         bws = bws,

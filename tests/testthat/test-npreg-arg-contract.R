@@ -41,7 +41,7 @@ test_that("lp regtype remains lp internally for degree 0/1", {
   expect_identical(npRegtypeToC(regtype = "lp", degree = 1L, ncon = 1L)$code, REGTYPE_LP)
 })
 
-test_that("lp degree-0 gradients fail fast while value path remains available under autodispatch", {
+test_that("lp degree-0 gradients allow first derivatives and reject higher orders under autodispatch", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
@@ -60,14 +60,55 @@ test_that("lp degree-0 gradients fail fast while value path remains available un
   )
 
   expect_identical(bw$regtype, "lp")
+  expect_no_error(
+    fit <- npRmpi::npreg(bws = bw, data = dat, gradients = TRUE, gradient.order = 1L)
+  )
   expect_error(
-    npRmpi::npreg(bws = bw, data = dat, gradients = TRUE),
+    npRmpi::npreg(bws = bw, data = dat, gradients = TRUE, gradient.order = 2L),
     "regtype='lp' with degree=0 does not support derivatives"
   )
   expect_no_error(
-    fit <- npRmpi::npreg(bws = bw, data = dat, gradients = FALSE)
+    value.fit <- npRmpi::npreg(bws = bw, data = dat, gradients = FALSE)
   )
   expect_identical(fit$bws$regtype, "lp")
+  expect_identical(value.fit$bws$regtype, "lp")
+})
+
+test_that("lc gradients reject higher-order derivative requests under autodispatch", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(20260617)
+  dat <- data.frame(y = rnorm(40), x = runif(40))
+  bw <- npRmpi::npregbw(
+    y ~ x,
+    data = dat,
+    bws = 0.45,
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+
+  expect_no_error(
+    fit <- npRmpi::npreg(bws = bw, data = dat, gradients = TRUE, gradient.order = 1L)
+  )
+  expect_error(
+    npRmpi::npreg(bws = bw, data = dat, gradients = TRUE, gradient.order = 2L),
+    "supports only first derivatives for regtype='lc'"
+  )
+  expect_error(
+    npRmpi::gradients(fit, gradient.order = 2L),
+    "supports only first derivatives for regtype='lc'"
+  )
+
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  expect_error(
+    plot(fit, gradients = TRUE, gradient_order = 2L, output = "data"),
+    "supports only first derivatives for regtype='lc'"
+  )
 })
 
 test_that("npreg.rbandwidth no longer contains bernstein OOS direct fallback", {
