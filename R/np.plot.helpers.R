@@ -3932,6 +3932,137 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_wild_boot_from_regression_exact <- function(xdat,
+                                                exdat,
+                                                bws,
+                                                ydat,
+                                                B,
+                                                wild = c("rademacher", "mammen"),
+                                                fit.mean.train = NULL,
+                                                gradients = FALSE,
+                                                gradient.order = 1L,
+                                                slice.index = 1L,
+                                                progress.label = NULL,
+                                                prefer.local.single_worker = FALSE,
+                                                master_local_chunk = TRUE) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in exact wild regression bootstrap helper")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid exact wild regression bootstrap dimensions")
+
+  use.local.direct <- TRUE
+
+  if (is.null(fit.mean.train)) {
+    fit.mean.train <- as.vector(.np_regression_direct(
+      bws = bws,
+      txdat = xdat,
+      tydat = ydat,
+      exdat = xdat,
+      gradients = FALSE,
+      gradient.order = gradient.order,
+      local.mode = use.local.direct
+    )$mean)
+  } else {
+    fit.mean.train <- as.double(fit.mean.train)
+  }
+  if (length(fit.mean.train) != n || any(!is.finite(fit.mean.train)))
+    stop("internal fit.mean.train payload is invalid for exact wild regression bootstrap", call. = FALSE)
+
+  fit_hat <- function(y.train) {
+    fit <- .np_regression_direct(
+      bws = bws,
+      txdat = xdat,
+      tydat = y.train,
+      exdat = exdat,
+      gradients = isTRUE(gradients),
+      gradient.order = gradient.order,
+      local.mode = use.local.direct
+    )
+    if (isTRUE(gradients))
+      as.vector(fit$grad[, slice.index])
+    else
+      as.vector(fit$mean)
+  }
+
+  t0 <- fit_hat(ydat)
+  nout <- length(t0)
+  residuals <- as.double(ydat - fit.mean.train)
+  wild <- .np_plot_normalize_wild(wild)
+  draw.fun <- if (identical(wild, "mammen")) .np_mammen_draws else .np_rademacher_draws
+  draws <- draw.fun(n = n, B = B)
+  tmat <- matrix(NA_real_, nrow = B, ncol = nout)
+
+  compute_draw_chunk <- function(draws.chunk) {
+    draws.chunk <- as.matrix(draws.chunk)
+    bsz <- ncol(draws.chunk)
+    out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+    for (jj in seq_len(bsz)) {
+      ystar <- fit.mean.train + residuals * draws.chunk[, jj]
+      out[jj, ] <- fit_hat(ystar)
+    }
+    out
+  }
+
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_wild_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
+
+  if (.npRmpi_bootstrap_fanout_enabled(
+        comm = 1L,
+        n = n,
+        B = B,
+        chunk.size = chunk.size,
+        what = "wild-regression-exact"
+      )) {
+    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    worker <- function(task) {
+      start <- as.integer(task$start)
+      stopi <- start + as.integer(task$bsz) - 1L
+      compute_draw_chunk(draws.chunk = draws[, start:stopi, drop = FALSE])
+    }
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = nout,
+      what = "wild-regression-exact",
+      progress.label = progress.label,
+      profile.where = "mpi.applyLB:wild-regression-exact",
+      comm = 1L,
+      prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = master_local_chunk,
+      required.bindings = list(
+        draws = draws,
+        compute_draw_chunk = compute_draw_chunk
+      )
+    )
+  } else {
+    progress.label <- if (is.null(progress.label)) "Plot bootstrap wild" else progress.label
+    progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+    on.exit({
+      .np_plot_progress_end(progress)
+    }, add = TRUE)
+    for (bb in seq_len(B)) {
+      tmat[bb, ] <- compute_draw_chunk(draws.chunk = draws[, bb, drop = FALSE])
+      progress <- .np_plot_progress_tick(state = progress, done = bb)
+    }
+  }
+
+  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
+    stop("wild regression exact helper path produced non-finite values")
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_inid_boot_from_regression_localpoly_frozen <- function(xdat,
                                                            exdat,
                                                            bws,
@@ -4342,6 +4473,30 @@
 
   if (isTRUE(gradients)) {
     if (!identical(regtype, "lc")) {
+      use.exact.degree0.derivative <- .np_plot_regression_lp0_derivative_requested(
+        bws = bws,
+        regtype = regtype,
+        gradient.order = gradient.order
+      )
+
+      if (isTRUE(use.exact.degree0.derivative)) {
+        return(.np_inid_boot_from_regression_exact(
+          xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          ydat = ydat,
+          B = B,
+          counts = counts,
+          counts.drawer = counts.drawer,
+          gradients = TRUE,
+          gradient.order = gradient.order,
+          slice.index = slice.index,
+          prefer.local.single_worker = prefer.local.single_worker,
+          master_local_chunk = master_local_chunk,
+          progress.label = progress.label
+        ))
+      }
+
       return(.np_inid_boot_from_regression_localpoly_fixed(
         xdat = xdat,
         exdat = exdat,
@@ -14355,6 +14510,26 @@ compute.default.error.range <- function(center, err) {
   "wild-standard"
 }
 
+.np_plot_regression_lp0_derivative_requested <- function(bws, regtype, gradient.order) {
+  identical(regtype, "lp") &&
+    isTRUE(!is.null(bws$ncon)) &&
+    bws$ncon > 0L &&
+    npGlpDegree0FirstDerivativeLcOk(
+      regtype.engine = regtype,
+      degree.engine = npValidateGlpDegree(
+        regtype = "lp",
+        degree = bws$degree,
+        ncon = bws$ncon
+      ),
+      gradient.order = npValidateGlpGradientOrder(
+        regtype = "lp",
+        gradient.order = gradient.order,
+        ncon = bws$ncon
+      ),
+      ncon = bws$ncon
+    )
+}
+
 .np_plot_oversmooth_exponent <- function(p.continuous, kernel.order) {
   p.continuous <- as.integer(p.continuous[1L])
   kernel.order <- as.numeric(kernel.order[1L])
@@ -15010,6 +15185,7 @@ compute.bootstrap.errors.rbandwidth =
     if (is.wild.hat && gradients && !xi.factor && is.na(match(slice.index, cont.idx))) {
       stop("bootstrap=\"wild\" supports gradients only for continuous or categorical slices in npRmpi; no serial fallback is permitted", call. = FALSE)
     }
+    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
 
     profile.setup <- NULL
     if (!isTRUE(gradients)) {
@@ -15143,6 +15319,49 @@ compute.bootstrap.errors.rbandwidth =
         )
       )
 
+      use.exact.degree0.derivative <- isTRUE(gradients) &&
+        !isTRUE(xi.factor) &&
+        .np_plot_regression_lp0_derivative_requested(
+          bws = bws,
+          regtype = regtype,
+          gradient.order = gradient.order
+        )
+
+      if (isTRUE(use.exact.degree0.derivative)) {
+        .npRmpi_bootstrap_transport_trace(
+          what = "rbandwidth.wild",
+          event = "wild.exact.start",
+          fields = list(
+            slice = slice.index,
+            n = length(ydat),
+            B = plot.errors.boot.num
+          )
+        )
+        boot.out <- .np_wild_boot_from_regression_exact(
+          xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          ydat = ydat,
+          B = plot.errors.boot.num,
+          wild = plot.errors.boot.wild,
+          fit.mean.train = fit.mean.train,
+          gradients = TRUE,
+          gradient.order = gradient.order,
+          slice.index = slice.index,
+          progress.label = progress.label,
+          prefer.local.single_worker = identical(bws$type, "fixed"),
+          master_local_chunk = TRUE
+        )
+        .npRmpi_bootstrap_transport_trace(
+          what = "rbandwidth.wild",
+          event = "wild.exact.done",
+          fields = list(
+            slice = slice.index,
+            t_rows = nrow(boot.out$t),
+            t_cols = ncol(boot.out$t)
+          )
+        )
+      } else {
       s.vec <- NULL
       if (gradients && !xi.factor) {
         cpos <- match(slice.index, cont.idx)
@@ -15272,6 +15491,7 @@ compute.bootstrap.errors.rbandwidth =
             prefer.local.single_worker = identical(bws$type, "fixed")
           )
         }
+      }
       }
       .npRmpi_bootstrap_transport_trace(
         what = "rbandwidth.wild",
