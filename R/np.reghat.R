@@ -944,6 +944,14 @@ npreghat <-
     ncon = bws$ncon,
     where = ".np_regression_direct"
   )
+  if (isTRUE(gradients) && identical(regtype, "lc")) {
+    npValidateLcGradientOrder(
+      regtype = regtype,
+      gradient.order = gradient.order,
+      ncon = bws$ncon,
+      where = ".np_regression_direct"
+    )
+  }
   glp.gradient.order <- if (identical(reg.spec$regtype.engine, "lp")) {
     if (identical(regtype, "lp")) {
       npValidateGlpGradientOrder(regtype = regtype,

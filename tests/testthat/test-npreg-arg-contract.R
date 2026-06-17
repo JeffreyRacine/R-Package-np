@@ -30,7 +30,7 @@ test_that("lp regtype remains lp internally for degree 0/1", {
   expect_identical(npRegtypeToC(regtype = "lp", degree = 1L, ncon = 1L)$code, REGTYPE_LP)
 })
 
-test_that("lp degree-0 gradients fail fast while value path remains available", {
+test_that("lp degree-0 gradients allow first derivatives and reject higher orders", {
   set.seed(20260305)
   dat <- data.frame(y = rnorm(30), x = runif(30))
   bw <- np::npregbw(
@@ -43,14 +43,49 @@ test_that("lp degree-0 gradients fail fast while value path remains available", 
   )
 
   expect_identical(bw$regtype, "lp")
+  expect_no_error(
+    fit <- np::npreg(bws = bw, data = dat, gradients = TRUE, gradient.order = 1L)
+  )
   expect_error(
-    np::npreg(bws = bw, data = dat, gradients = TRUE),
+    np::npreg(bws = bw, data = dat, gradients = TRUE, gradient.order = 2L),
     "regtype='lp' with degree=0 does not support derivatives"
   )
   expect_no_error(
-    fit <- np::npreg(bws = bw, data = dat, gradients = FALSE)
+    value.fit <- np::npreg(bws = bw, data = dat, gradients = FALSE)
   )
   expect_identical(fit$bws$regtype, "lp")
+  expect_identical(value.fit$bws$regtype, "lp")
+})
+
+test_that("lc gradients reject higher-order derivative requests", {
+  set.seed(20260617)
+  dat <- data.frame(y = rnorm(40), x = runif(40))
+  bw <- np::npregbw(
+    y ~ x,
+    data = dat,
+    bws = 0.45,
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+
+  expect_no_error(
+    fit <- np::npreg(bws = bw, data = dat, gradients = TRUE, gradient.order = 1L)
+  )
+  expect_error(
+    np::npreg(bws = bw, data = dat, gradients = TRUE, gradient.order = 2L),
+    "supports only first derivatives for regtype='lc'"
+  )
+  expect_error(
+    np::gradients(fit, gradient.order = 2L),
+    "supports only first derivatives for regtype='lc'"
+  )
+
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  expect_error(
+    plot(fit, gradients = TRUE, gradient_order = 2L, output = "data"),
+    "supports only first derivatives for regtype='lc'"
+  )
 })
 
 test_that("lp bernstein OOS warns but keeps canonical npreg path", {

@@ -238,6 +238,14 @@ npreg.rbandwidth <-
       ncon = bws$ncon,
       where = "npreg"
     )
+    if (isTRUE(gradients) && identical(bws$regtype, "lc")) {
+      npValidateLcGradientOrder(
+        regtype = bws$regtype,
+        gradient.order = gradient.order,
+        ncon = bws$ncon,
+        where = "npreg"
+      )
+    }
     glp.gradient.order <- if (identical(reg.spec$regtype.engine, "lp")) {
       if (identical(bws$regtype, "lp")) {
         npValidateGlpGradientOrder(regtype = bws$regtype,

@@ -182,6 +182,15 @@
       plot.data.overlay.missing = missing(plot.data.overlay)
     )
     plot.gradient.order.label <- rep.int(1L, bws$ndim)
+    if (gradients && identical(bws$regtype, "lc")) {
+      npValidateLcGradientOrder(
+        regtype = bws$regtype,
+        gradient.order = gradient.order,
+        ncon = bws$ncon,
+        argname = "gradient_order",
+        where = "plot.rbandwidth()"
+      )
+    }
     if (gradients && identical(bws$regtype, "lp")) {
       go <- npValidateGlpGradientOrder(regtype = bws$regtype,
                                        gradient.order = gradient.order,

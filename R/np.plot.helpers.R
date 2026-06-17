@@ -2388,6 +2388,14 @@
   }
 
   if (isTRUE(gradients)) {
+    if (identical(regtype, "lc")) {
+      npValidateLcGradientOrder(
+        regtype = regtype,
+        gradient.order = gradient.order,
+        ncon = bws$ncon,
+        where = ".np_inid_boot_from_regression"
+      )
+    }
     xi.factor <- isTRUE(slice.index > 0L) &&
       !is.null(bws$xdati) &&
       (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
