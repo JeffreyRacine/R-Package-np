@@ -934,6 +934,26 @@
   all.bp
 }
 
+.np_plot_regression_lp0_derivative_requested <- function(bws, regtype, gradient.order) {
+  identical(regtype, "lp") &&
+    isTRUE(!is.null(bws$ncon)) &&
+    bws$ncon > 0L &&
+    npGlpDegree0FirstDerivativeLcOk(
+      regtype.engine = regtype,
+      degree.engine = npValidateGlpDegree(
+        regtype = "lp",
+        degree = bws$degree,
+        ncon = bws$ncon
+      ),
+      gradient.order = npValidateGlpGradientOrder(
+        regtype = "lp",
+        gradient.order = gradient.order,
+        ncon = bws$ncon
+      ),
+      ncon = bws$ncon
+    )
+}
+
 .np_inid_chunk_size <- function(n, B, progress_cap = FALSE,
                                 progress_enabled = .np_plot_progress_enabled()) {
   chunk.opt <- getOption("np.plot.inid.chunk.size")
@@ -2388,6 +2408,28 @@
     }
 
     if (!identical(regtype, "lc")) {
+      use.exact.degree0.derivative <- .np_plot_regression_lp0_derivative_requested(
+        bws = bws,
+        regtype = regtype,
+        gradient.order = gradient.order
+      )
+
+      if (isTRUE(use.exact.degree0.derivative)) {
+        return(.np_inid_boot_from_reghat_exact(
+          xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          ydat = ydat,
+          B = B,
+          counts = counts,
+          counts.drawer = counts.drawer,
+          gradients = TRUE,
+          gradient.order = gradient.order,
+          slice.index = slice.index,
+          progress.label = progress.label
+        ))
+      }
+
       return(.np_inid_boot_from_regression_localpoly_fixed(
         xdat = xdat,
         exdat = exdat,
@@ -2549,6 +2591,80 @@
       elapsed.sec = .np_progress_now() - chunk.started
     )
     start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
+.np_wild_boot_from_reghat_exact <- function(xdat,
+                                            exdat,
+                                            bws,
+                                            ydat,
+                                            B,
+                                            wild = c("rademacher", "mammen"),
+                                            fit.mean.train = NULL,
+                                            gradients = FALSE,
+                                            gradient.order = 1L,
+                                            slice.index = 1L,
+                                            progress.label = NULL) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+
+  n <- nrow(xdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in exact wild regression bootstrap helper")
+  if (n < 1L || nrow(exdat) < 1L || B < 1L)
+    stop("invalid exact wild regression bootstrap dimensions")
+
+  if (is.null(fit.mean.train)) {
+    fit.mean.train <- as.vector(.np_regression_direct(
+      bws = bws,
+      txdat = xdat,
+      tydat = ydat,
+      exdat = xdat,
+      gradients = FALSE,
+      gradient.order = gradient.order
+    )$mean)
+  } else {
+    fit.mean.train <- as.double(fit.mean.train)
+  }
+  if (length(fit.mean.train) != n || any(!is.finite(fit.mean.train)))
+    stop("internal fit.mean.train payload is invalid for exact wild regression bootstrap", call. = FALSE)
+
+  fit_hat <- function(y.train) {
+    fit <- .np_regression_direct(
+      bws = bws,
+      txdat = xdat,
+      tydat = y.train,
+      exdat = exdat,
+      gradients = isTRUE(gradients),
+      gradient.order = gradient.order
+    )
+    if (isTRUE(gradients))
+      as.vector(fit$grad[, slice.index])
+    else
+      as.vector(fit$mean)
+  }
+
+  t0 <- fit_hat(ydat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+  residuals <- as.double(ydat - fit.mean.train)
+  wild <- .np_plot_normalize_wild(wild)
+  draw.fun <- if (identical(wild, "mammen")) .np_mammen_draws else .np_rademacher_draws
+  draws <- draw.fun(n = n, B = B)
+
+  progress.label <- if (is.null(progress.label)) "Plot bootstrap wild" else progress.label
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
+  for (bb in seq_len(B)) {
+    ystar <- fit.mean.train + residuals * draws[, bb]
+    tmat[bb, ] <- fit_hat(ystar)
+    progress <- .np_plot_progress_tick(state = progress, done = bb)
   }
 
   list(t = tmat, t0 = t0)
@@ -9709,6 +9825,7 @@ compute.bootstrap.errors.rbandwidth =
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
       !identical(bws$type, "fixed")
+    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
 
     cont.idx <- which(bws$xdati$icon)
     xi.factor <- isTRUE(slice.index > 0L) &&
@@ -9827,75 +9944,99 @@ compute.bootstrap.errors.rbandwidth =
           )))
         }
 
-        s.vec <- NULL
-        if (gradients && !xi.factor) {
-          cpos <- match(slice.index, cont.idx)
-          gorder <- if (length(gradient.order) == 1L) {
-            rep.int(as.integer(gradient.order), length(cont.idx))
-          } else {
-            as.integer(gradient.order)
-          }
-          if (length(gorder) != length(cont.idx))
-            gorder <- rep.int(1L, length(cont.idx))
-          s.vec <- integer(length(cont.idx))
-          s.vec[cpos] <- gorder[cpos]
-        }
+        use.exact.degree0.derivative <- isTRUE(gradients) &&
+          !isTRUE(xi.factor) &&
+          .np_plot_regression_lp0_derivative_requested(
+            bws = bws,
+            regtype = regtype,
+            gradient.order = gradient.order
+          )
 
-        use.blocks <- .np_plot_wild_apply_operator_enabled(ntrain = nrow(xdat),
-                                                           neval = nrow(exdat),
-                                                           bwtype = bws$type)
-        if (use.blocks) {
-          hat.block.fun <- function(start, stopi) {
-            suppressWarnings(npreghat(
+        if (isTRUE(use.exact.degree0.derivative)) {
+          boot.out <- .np_wild_boot_from_reghat_exact(
+            xdat = xdat,
+            exdat = exdat,
+            bws = bws,
+            ydat = ydat,
+            B = plot.errors.boot.num,
+            wild = plot.errors.boot.wild,
+            fit.mean.train = fit.mean,
+            gradients = TRUE,
+            gradient.order = gradient.order,
+            slice.index = slice.index,
+            progress.label = progress.label
+          )
+        } else {
+          s.vec <- NULL
+          if (gradients && !xi.factor) {
+            cpos <- match(slice.index, cont.idx)
+            gorder <- if (length(gradient.order) == 1L) {
+              rep.int(as.integer(gradient.order), length(cont.idx))
+            } else {
+              as.integer(gradient.order)
+            }
+            if (length(gorder) != length(cont.idx))
+              gorder <- rep.int(1L, length(cont.idx))
+            s.vec <- integer(length(cont.idx))
+            s.vec[cpos] <- gorder[cpos]
+          }
+
+          use.blocks <- .np_plot_wild_apply_operator_enabled(ntrain = nrow(xdat),
+                                                             neval = nrow(exdat),
+                                                             bwtype = bws$type)
+          if (use.blocks) {
+            hat.block.fun <- function(start, stopi) {
+              suppressWarnings(npreghat(
+                bws = bws,
+                txdat = xdat,
+                exdat = exdat[start:stopi, , drop = FALSE],
+                s = s.vec,
+                output = "matrix"
+              ))
+            }
+
+            boot.out <- .np_plot_boot_from_hat_blocks_wild(
+              hat.block.fun = hat.block.fun,
+              neval = nrow(exdat),
+              ntrain = nrow(xdat),
+              ydat = ydat,
+              fit.mean = fit.mean,
+              B = plot.errors.boot.num,
+              wild = plot.errors.boot.wild,
+              progress.label = progress.label
+            )
+            if (gradients && xi.factor && ncol(boot.out$t) >= 1L) {
+              boot.out$t <- sweep(boot.out$t, 1L, boot.out$t[, 1L], "-", check.margin = FALSE)
+              boot.out$t0 <- boot.out$t0 - boot.out$t0[1L]
+            }
+          } else {
+            H <- suppressWarnings(npreghat(
               bws = bws,
               txdat = xdat,
-              exdat = exdat[start:stopi, , drop = FALSE],
+              exdat = exdat,
               s = s.vec,
               output = "matrix"
             ))
-          }
 
-          boot.out <- .np_plot_boot_from_hat_blocks_wild(
-            hat.block.fun = hat.block.fun,
-            neval = nrow(exdat),
-            ntrain = nrow(xdat),
-            ydat = ydat,
-            fit.mean = fit.mean,
-            B = plot.errors.boot.num,
-            wild = plot.errors.boot.wild,
-            progress.label = progress.label
-          )
-          if (gradients && xi.factor && ncol(boot.out$t) >= 1L) {
-            boot.out$t <- sweep(boot.out$t, 1L, boot.out$t[, 1L], "-", check.margin = FALSE)
-            boot.out$t0 <- boot.out$t0 - boot.out$t0[1L]
-          }
-        } else {
-          H <- suppressWarnings(npreghat(
-            bws = bws,
-            txdat = xdat,
-            exdat = exdat,
-            s = s.vec,
-            output = "matrix"
-          ))
-
-          boot.out <- if (gradients && xi.factor) {
-            .np_plot_boot_from_hat_wild_factor_effects(
-              H = H,
-              ydat = ydat,
-              fit.mean = fit.mean,
-              B = plot.errors.boot.num,
-              wild = plot.errors.boot.wild,
-              progress.label = progress.label
-            )
-          } else {
-            .np_plot_boot_from_hat_wild(
-              H = H,
-              ydat = ydat,
-              fit.mean = fit.mean,
-              B = plot.errors.boot.num,
-              wild = plot.errors.boot.wild,
-              progress.label = progress.label
-            )
+            boot.out <- if (gradients && xi.factor) {
+              .np_plot_boot_from_hat_wild_factor_effects(
+                H = H,
+                ydat = ydat,
+                fit.mean = fit.mean,
+                B = plot.errors.boot.num,
+                wild = plot.errors.boot.wild,
+                progress.label = progress.label
+              )
+            } else {
+              .np_plot_boot_from_hat_wild(
+                H = H,
+                ydat = ydat,
+                fit.mean = fit.mean,
+                B = plot.errors.boot.num,
+                wild = plot.errors.boot.wild,
+                progress.label = progress.label
+              )
+            }
           }
         }
       }
