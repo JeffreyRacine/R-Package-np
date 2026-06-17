@@ -14924,6 +14924,11 @@ compute.default.error.range <- function(center, err) {
   yicon <- bws$ydati$icon
   if (is.null(xicon) || is.null(yicon) || !any(xicon) || !any(yicon))
     stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires continuous dependent and explanatory variables for conditional density/distribution", call. = FALSE)
+  if (!isTRUE(all(xicon)) || !isTRUE(all(yicon)) ||
+      isTRUE(bws$xnuno > 0L) || isTRUE(bws$ynuno > 0L) ||
+      isTRUE(bws$xnord > 0L) || isTRUE(bws$ynord > 0L)) {
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap is currently implemented only for all-continuous conditional density/distribution plots", call. = FALSE)
+  }
 
   cx.order <- as.numeric(bws$cxkerorder[1L])
   cy.order <- as.numeric(bws$cykerorder[1L])
@@ -14934,8 +14939,9 @@ compute.default.error.range <- function(center, err) {
 
   pilot <- .np_plot_oversmooth_factor(
     nobs = bws$nobs,
-    p.continuous = bws$ncon,
-    kernel.order = cx.order
+    p.continuous = sum(xicon) + sum(yicon),
+    kernel.order = cx.order,
+    family = if (isTRUE(cdf)) "distribution" else "density"
   )
 
   out <- bws
@@ -16801,8 +16807,11 @@ compute.bootstrap.errors.conbandwidth =
 
     oversmooth.boot <- NULL
     if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
-      if (identical(tboo, "quant") && isTRUE(gradients)) {
-        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional quantile gradient plots")
+      if (identical(tboo, "quant")) {
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional quantile plots")
+      }
+      if (isTRUE(gradients)) {
+        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional density/distribution gradient plots")
       }
       if (isTRUE(proper)) {
         stop("center=\"bias-corrected\" with pair/block/geometric bootstrap is not yet implemented for proper conditional density/distribution projections", call. = FALSE)
