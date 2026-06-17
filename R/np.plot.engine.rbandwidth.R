@@ -683,13 +683,18 @@
             plot.args$y <- temp.mean
           panel.ylim <- NULL
           if (plot.errors)
-            panel.ylim <- if (plot.errors.type == "all")
-              compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
-            else
-              c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-                max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
+            panel.ylim <- .np_plot_panel_error_range(
+              estimate = temp.mean,
+              err = temp.err,
+              all.err = temp.all.err,
+              plot.errors.type = plot.errors.type,
+              plotOnEstimate = plotOnEstimate
+            )
+          else
+            panel.ylim <- range(temp.mean, finite = TRUE)
           if (overlay.ok)
             panel.ylim <- .np_plot_overlay_range(panel.ylim, ydat)
+          panel.ylim <- .np_plot_include_requested_ylim(panel.ylim, ylim)
           if (!is.null(panel.ylim))
             plot.args$ylim <- panel.ylim
           plot.args$xlab <- scalar_default(xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
@@ -885,17 +890,18 @@
       if (common.scale && (plot.behavior != "data")){
         jj = seq_len(bws$ndim)*3
 
-        if (plot.errors && plot.errors.type == "all") {
+        if (plot.errors) {
           y.min <- Inf
           y.max <- -Inf
           for (k in seq_len(bws$ndim)) {
-            if (is.null(data.err.all[[k]])) next
-            nkeep.k <- nrow(data.err.all[[k]]$pointwise)
-            center.k <- if (plot.errors.center == "estimate")
-              data.eval[seq_len(nkeep.k),k]
-            else
-              data.err[seq_len(nkeep.k),3*k]
-            range.k <- compute.all.error.range(center.k, data.err.all[[k]])
+            err.k <- data.err[, c(3*k - 2L, 3*k - 1L, 3*k), drop = FALSE]
+            range.k <- .np_plot_panel_error_range(
+              estimate = data.eval[, k],
+              err = err.k,
+              all.err = data.err.all[[k]],
+              plot.errors.type = plot.errors.type,
+              plotOnEstimate = plotOnEstimate
+            )
             y.min <- min(y.min, range.k[1], na.rm = TRUE)
             y.max <- max(y.max, range.k[2], na.rm = TRUE)
           }
@@ -908,18 +914,11 @@
               y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
             }
           }
-        } else if (plot.errors.center == "estimate" || !plot.errors) {
+        } else {
           y.max = max(na.omit(as.double(data.eval)) +
-            if (plot.errors) na.omit(as.double(data.err[,jj-1]))
-            else 0
-            )
+            0)
           y.min = min(na.omit(as.double(data.eval)) -
-            if (plot.errors) na.omit(as.double(data.err[,jj-2]))
-            else 0
-            )
-        } else if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
-          y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
-          y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+            0)
         }
 
         if (overlay.ok) {
@@ -929,8 +928,9 @@
         }
 
         if(!is.null(ylim)){
-          y.min = ylim[1]
-          y.max = ylim[2]
+          y.range <- .np_plot_include_requested_ylim(c(y.min, y.max), ylim)
+          y.min = y.range[1]
+          y.max = y.range[2]
         }
         
         for (i in seq_len(bws$ndim)){
