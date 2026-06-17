@@ -8847,9 +8847,13 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
                                                 t0,
                                                 alpha,
                                                 band.type,
-                                                progress.label = NULL) {
+                                                progress.label = NULL,
+                                                reference = t0) {
   if (!(band.type %in% c("pointwise", "bonferroni", "simultaneous", "all")))
     stop("'band.type' must be one of pointwise, bonferroni, simultaneous, all")
+  reference <- as.numeric(reference)
+  if (length(reference) != length(t0))
+    stop("bootstrap interval reference has incompatible length", call. = FALSE)
 
   neval <- max(1L, ncol(boot.t))
   progress.total <- switch(
@@ -8880,7 +8884,7 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
     )
     bounds <- all.bounds$pointwise
     all.err <- lapply(all.bounds, function(bb) {
-      cbind(t0 - bb[, 1L], bb[, 2L] - t0)
+      cbind(reference - bb[, 1L], bb[, 2L] - reference)
     })
   } else {
     bounds <- compute.bootstrap.quantile.bounds(
@@ -8893,8 +8897,49 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
   }
 
   list(
-    err = cbind(t0 - bounds[, 1L], bounds[, 2L] - t0),
+    err = cbind(reference - bounds[, 1L], bounds[, 2L] - reference),
     all.err = all.err
+  )
+}
+
+.np_plot_bootstrap_centered_interval_payload <- function(boot.t,
+                                                         t0,
+                                                         alpha,
+                                                         band.type,
+                                                         center,
+                                                         oversmooth.boot = NULL,
+                                                         progress.label = NULL) {
+  if (!(band.type %in% c("pointwise", "bonferroni", "simultaneous", "all")))
+    stop("'band.type' must be one of pointwise, bonferroni, simultaneous, all")
+
+  selected.center <- .np_plot_bootstrap_center(
+    center = center,
+    t0 = t0,
+    boot.t = boot.t,
+    oversmooth.boot = oversmooth.boot
+  )
+
+  interval.reference <- if (.np_plot_center_is_bias_corrected(center)) {
+    colMeans(as.matrix(boot.t))
+  } else {
+    t0
+  }
+
+  interval.summary <- .np_plot_bootstrap_interval_summary(
+    boot.t = boot.t,
+    t0 = t0,
+    alpha = alpha,
+    band.type = band.type,
+    progress.label = progress.label,
+    reference = interval.reference
+  )
+
+  list(
+    center = selected.center,
+    reference = interval.reference,
+    err = interval.summary$err,
+    all.err = interval.summary$all.err,
+    bias = t0 - selected.center
   )
 }
 
@@ -8946,18 +8991,33 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
       boot.err[, 1:2, kk] <- qnorm(alpha / 2, lower.tail = FALSE) * boot.sd
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     } else {
-      interval.summary <- .np_plot_bootstrap_interval_summary(
+      oversmooth.k <- NULL
+      if (!is.null(oversmooth.boot)) {
+        if (is.null(oversmooth.boot$t))
+          stop("oversmoothed bootstrap center was requested but no oversmoothed quantile bootstrap matrix is available", call. = FALSE)
+        if (ncol(oversmooth.boot$t) != expected) {
+          stop("vector tau oversmoothed quantile bootstrap helper returned an incompatible payload", call. = FALSE)
+        }
+        oversmooth.k <- list(
+          t = oversmooth.boot$t[, idx, drop = FALSE],
+          center = if (!is.null(oversmooth.boot$center)) oversmooth.boot$center[idx] else NULL
+        )
+      }
+      interval.payload <- .np_plot_bootstrap_centered_interval_payload(
         boot.t = boot.t.k,
         t0 = t0.k,
         alpha = alpha,
         band.type = band.type,
+        center = center,
+        oversmooth.boot = oversmooth.k,
         progress.label = label.k
       )
-      boot.err[, 1:2, kk] <- interval.summary$err
-      boot.all.err[[kk]] <- interval.summary$all.err
+      boot.err[, 1:2, kk] <- interval.payload$err
+      boot.err[, 3L, kk] <- interval.payload$center
+      boot.all.err[[kk]] <- interval.payload$all.err
     }
 
-    if (identical(center, "bias-corrected")) {
+    if (identical(center, "bias-corrected") && identical(band.type, "pmzsd")) {
       oversmooth.k <- NULL
       if (!is.null(oversmooth.boot)) {
         if (is.null(oversmooth.boot$t))
@@ -10132,17 +10192,21 @@ compute.bootstrap.errors.rbandwidth =
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      interval.summary <- .np_plot_bootstrap_interval_summary(
+      interval.payload <- .np_plot_bootstrap_centered_interval_payload(
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
         band.type = plot.errors.type,
+        center = plot.errors.center,
+        oversmooth.boot = oversmooth.boot,
         progress.label = interval.label
       )
-      boot.err[,1:2] <- interval.summary$err
-      boot.all.err <- interval.summary$all.err
+      boot.err[,1:2] <- interval.payload$err
+      boot.err[,3] <- interval.payload$center
+      boot.all.err <- interval.payload$all.err
     }
-    if (.np_plot_center_is_bias_corrected(plot.errors.center))
+    if (.np_plot_center_is_bias_corrected(plot.errors.center) &&
+        identical(plot.errors.type, "pmzsd"))
       boot.err[,3] <- .np_plot_bootstrap_center(
         center = plot.errors.center,
         t0 = boot.out$t0,
@@ -10366,17 +10430,21 @@ compute.bootstrap.errors.scbandwidth =
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      interval.summary <- .np_plot_bootstrap_interval_summary(
+      interval.payload <- .np_plot_bootstrap_centered_interval_payload(
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
         band.type = plot.errors.type,
+        center = plot.errors.center,
+        oversmooth.boot = oversmooth.boot,
         progress.label = interval.label
       )
-      boot.err[,1:2] <- interval.summary$err
-      boot.all.err <- interval.summary$all.err
+      boot.err[,1:2] <- interval.payload$err
+      boot.err[,3] <- interval.payload$center
+      boot.all.err <- interval.payload$all.err
     }
-    if (.np_plot_center_is_bias_corrected(plot.errors.center))
+    if (.np_plot_center_is_bias_corrected(plot.errors.center) &&
+        identical(plot.errors.type, "pmzsd"))
       boot.err[,3] <- .np_plot_bootstrap_center(
         center = plot.errors.center,
         t0 = boot.out$t0,
@@ -10587,17 +10655,21 @@ compute.bootstrap.errors.plbandwidth =
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      interval.summary <- .np_plot_bootstrap_interval_summary(
+      interval.payload <- .np_plot_bootstrap_centered_interval_payload(
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
         band.type = plot.errors.type,
+        center = plot.errors.center,
+        oversmooth.boot = oversmooth.boot,
         progress.label = interval.label
       )
-      boot.err[,1:2] <- interval.summary$err
-      boot.all.err <- interval.summary$all.err
+      boot.err[,1:2] <- interval.payload$err
+      boot.err[,3] <- interval.payload$center
+      boot.all.err <- interval.payload$all.err
     }
-    if (.np_plot_center_is_bias_corrected(plot.errors.center))
+    if (.np_plot_center_is_bias_corrected(plot.errors.center) &&
+        identical(plot.errors.type, "pmzsd"))
       boot.err[,3] <- .np_plot_bootstrap_center(
         center = plot.errors.center,
         t0 = boot.out$t0,
@@ -10711,16 +10783,20 @@ compute.bootstrap.errors.bandwidth =
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      interval.summary <- .np_plot_bootstrap_interval_summary(
+      interval.payload <- .np_plot_bootstrap_centered_interval_payload(
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
-        band.type = plot.errors.type
+        band.type = plot.errors.type,
+        center = plot.errors.center,
+        progress.label = NULL
       )
-      boot.err[,1:2] <- interval.summary$err
-      boot.all.err <- interval.summary$all.err
+      boot.err[,1:2] <- interval.payload$err
+      boot.err[,3] <- interval.payload$center
+      boot.all.err <- interval.payload$all.err
     }
-    if (plot.errors.center == "bias-corrected")
+    if (plot.errors.center == "bias-corrected" &&
+        identical(plot.errors.type, "pmzsd"))
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
     list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
@@ -11142,17 +11218,21 @@ compute.bootstrap.errors.conbandwidth =
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      interval.summary <- .np_plot_bootstrap_interval_summary(
+      interval.payload <- .np_plot_bootstrap_centered_interval_payload(
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
         band.type = plot.errors.type,
+        center = plot.errors.center,
+        oversmooth.boot = oversmooth.boot,
         progress.label = interval.label
       )
-      boot.err[,1:2] <- interval.summary$err
-      boot.all.err <- interval.summary$all.err
+      boot.err[,1:2] <- interval.payload$err
+      boot.err[,3] <- interval.payload$center
+      boot.all.err <- interval.payload$all.err
     }
-    if (identical(plot.errors.center, "bias-corrected")) {
+    if (identical(plot.errors.center, "bias-corrected") &&
+        identical(plot.errors.type, "pmzsd")) {
       boot.err[,3] <- .np_plot_bootstrap_center(
         center = plot.errors.center,
         t0 = boot.out$t0,
@@ -11380,17 +11460,21 @@ compute.bootstrap.errors.sibandwidth =
       pmz.progress <- .np_plot_progress_tick(state = pmz.progress, done = 2L, force = TRUE)
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      interval.summary <- .np_plot_bootstrap_interval_summary(
+      interval.payload <- .np_plot_bootstrap_centered_interval_payload(
         boot.t = boot.out$t,
         t0 = boot.out$t0,
         alpha = plot.errors.alpha,
         band.type = plot.errors.type,
+        center = plot.errors.center,
+        oversmooth.boot = oversmooth.boot,
         progress.label = interval.label
       )
-      boot.err[,1:2] <- interval.summary$err
-      boot.all.err <- interval.summary$all.err
+      boot.err[,1:2] <- interval.payload$err
+      boot.err[,3] <- interval.payload$center
+      boot.all.err <- interval.payload$all.err
     }
-    if (.np_plot_center_is_bias_corrected(plot.errors.center))
+    if (.np_plot_center_is_bias_corrected(plot.errors.center) &&
+        identical(plot.errors.type, "pmzsd"))
       boot.err[,3] <- .np_plot_bootstrap_center(
         center = plot.errors.center,
         t0 = boot.out$t0,
