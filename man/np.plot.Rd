@@ -446,8 +446,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   For wild-bootstrap regression routes, \code{center="bias-corrected"}
   uses the standard wild-bootstrap correction. For supported
   fixed-bandwidth regression, conditional density/distribution,
-  conditional quantile level, smooth coefficient, partially linear
-  regression, and single-index plots with \code{bootstrap="inid"},
+  conditional quantile level, and single-index plots with \code{bootstrap="inid"},
   \code{"fixed"}, or \code{"geom"}, \code{center="bias-corrected"}
   estimates the bias center from a second oversmoothed pilot bootstrap
   matrix while retaining the ordinary bootstrap matrix for variability
@@ -462,7 +461,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   fixed regression and conditional density/distribution gradient plots, inspect
   \code{gbias}, \code{gradient.bias.corrected}, or route-specific gradient-bias
   components such as \code{gc1bias}; different bootstrap schemes can give
-  materially different derivative-bias corrections. For ordinary second-order
+  materially different derivative-bias corrections. Pairwise/block/geometric
+  bias-corrected centers are not currently enabled for smooth coefficient or
+  partially linear plots; use wild bootstrap for bias-corrected semiparametric
+  plot bands. For ordinary second-order
   continuous kernels, the pilot bandwidth for continuous variable
   \eqn{j} is
   \deqn{g_j = h_j n^{4 / ((p + 4)(p + 8))},}
