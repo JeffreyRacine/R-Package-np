@@ -223,6 +223,33 @@ npreg.rbandwidth <-
         where = "npreg"
       )
     }
+    glp.gradient.order.raw <- if (identical(reg.spec.raw$regtype.engine, "lp")) {
+      if (identical(regtype.raw, "lp")) {
+        npValidateGlpGradientOrder(regtype = regtype.raw,
+                                   gradient.order = gradient.order,
+                                   ncon = bws$ncon)
+      } else if (bws$ncon > 0L) {
+        rep.int(1L, bws$ncon)
+      } else {
+        integer(0)
+      }
+    } else {
+      NULL
+    }
+    lp.degree0.lc.gradient.raw <- isTRUE(gradients) &&
+      npGlpDegree0FirstDerivativeLcOk(
+        regtype.engine = reg.spec.raw$regtype.engine,
+        degree.engine = reg.spec.raw$degree.engine,
+        gradient.order = glp.gradient.order.raw,
+        ncon = bws$ncon
+      )
+    if (isTRUE(gradients) &&
+        identical(reg.spec.raw$regtype.engine, "lp") &&
+        (bws$ncon > 0L) &&
+        !lp.degree0.lc.gradient.raw &&
+        all(reg.spec.raw$degree.engine == 0L)) {
+      stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
+    }
     world.size <- .npRmpi_safe_int(mpi.comm.size(0))
     world.size <- if (is.na(world.size)) 1L else as.integer(world.size)
 

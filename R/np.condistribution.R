@@ -100,6 +100,27 @@ npcdist.condbandwidth <-
     )
     .npRmpi_require_active_slave_pool(where = "npcdist()")
     .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdist()")
+    reg.spec.preflight <- npConditionalRegEngineSpec(bws, where = "npcdist")
+    glp.gradient.order.preflight <- npConditionalGradientOrder(
+      bws = bws,
+      reg.engine = reg.spec.preflight$reg.engine,
+      gradient.order = gradient.order,
+      where = "npcdist"
+    )
+    lp.degree0.lc.gradient.preflight <- isTRUE(gradients) &&
+      npGlpDegree0FirstDerivativeLcOk(
+        regtype.engine = reg.spec.preflight$reg.engine,
+        degree.engine = reg.spec.preflight$degree.engine,
+        gradient.order = glp.gradient.order.preflight,
+        ncon = bws$xncon
+      )
+    if (isTRUE(gradients) &&
+        identical(reg.spec.preflight$reg.engine, "lp") &&
+        (bws$xncon > 0L) &&
+        !lp.degree0.lc.gradient.preflight &&
+        all(reg.spec.preflight$degree.engine == 0L)) {
+      stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
+    }
     if (.npRmpi_autodispatch_active() &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
         !.npRmpi_session_has_active_pool(comm = 1L)) {
