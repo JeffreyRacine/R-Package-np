@@ -9857,6 +9857,18 @@ compute.default.error.range <- function(center, err) {
   }
 }
 
+.np_plot_reject_semiparametric_pair_bias_center <- function(center,
+                                                           plot.errors.boot.method,
+                                                           where) {
+  if (identical(center, "bias-corrected") &&
+      is.element(plot.errors.boot.method, c("inid", "fixed", "geom"))) {
+    stop(sprintf("center=\"bias-corrected\" with bootstrap=\"%s\" is not supported for %s; use bootstrap=\"wild\" for bias-corrected semiparametric plot bands",
+                 plot.errors.boot.method,
+                 where),
+         call. = FALSE)
+  }
+}
+
 .np_plot_bootstrap_center <- function(center, t0, boot.t, oversmooth.boot = NULL) {
   if (identical(center, "estimate"))
     return(t0)
@@ -10272,6 +10284,11 @@ compute.bootstrap.errors.scbandwidth =
     if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       if (isTRUE(is.wild.hat))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "smooth coefficient wild bootstrap plots")
+      .np_plot_reject_semiparametric_pair_bias_center(
+        center = plot.errors.center,
+        plot.errors.boot.method = plot.errors.boot.method,
+        where = "smooth coefficient plots"
+      )
       if (isTRUE(gradients))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "smooth coefficient gradient plots")
       if (!identical(bws$type, "fixed"))
@@ -10507,6 +10524,11 @@ compute.bootstrap.errors.plbandwidth =
     if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       if (isTRUE(is.wild.hat))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "partial linear wild bootstrap plots")
+      .np_plot_reject_semiparametric_pair_bias_center(
+        center = plot.errors.center,
+        plot.errors.boot.method = plot.errors.boot.method,
+        where = "partially linear plots"
+      )
       if (isTRUE(gradients))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "partial linear gradient plots")
       if (!identical(bws$type, "fixed"))
