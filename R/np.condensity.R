@@ -121,6 +121,15 @@ npcdens.conbandwidth <- function(bws,
       all(reg.spec.preflight$degree.engine == 0L)) {
     stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
   }
+  if (isTRUE(gradients) && identical(reg.spec.preflight$reg.engine, "lp")) {
+    npValidateGlpGradientDegree(
+      regtype.engine = reg.spec.preflight$reg.engine,
+      degree.engine = reg.spec.preflight$degree.engine,
+      gradient.order = glp.gradient.order.preflight,
+      ncon = bws$xncon,
+      where = "npcdens"
+    )
+  }
   if (.npRmpi_autodispatch_active() &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
       !.npRmpi_session_has_active_pool(comm = 1L)) {
@@ -309,6 +318,15 @@ npcdens.conbandwidth <- function(bws,
       all(degree.engine == 0L)) {
     stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
   }
+  if (isTRUE(gradients) && identical(reg.engine, "lp")) {
+    npValidateGlpGradientDegree(
+      regtype.engine = reg.engine,
+      degree.engine = degree.engine,
+      gradient.order = glp.gradient.order,
+      ncon = bws$xncon,
+      where = "npcdens"
+    )
+  }
 
   reg.c <- npRegtypeToC(
     regtype = if (identical(reg.engine, "lp") && !lp.degree0.lc.gradient) "lp" else "lc",
@@ -414,14 +432,7 @@ npcdens.conbandwidth <- function(bws,
 
     if (identical(reg.engine, "lp") && bws$xncon > 0L && !lp.degree0.lc.gradient) {
       cont.idx <- which(bws$ixcon)
-      invalid.order <- glp.gradient.order > degree.engine
-      if (any(invalid.order)) {
-        myout$congrad[, cont.idx[invalid.order]] <- NA_real_
-        myout$congerr[, cont.idx[invalid.order]] <- NA_real_
-        .np_warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
-      }
-
-      higher.order <- (glp.gradient.order > 1L) & !invalid.order
+      higher.order <- glp.gradient.order > 1L
       if (any(higher.order)) {
         rhs <- rep.int(1.0, nrow(proper.slice.context$txdat))
         for (jj in which(higher.order)) {

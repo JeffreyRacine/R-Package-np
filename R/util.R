@@ -815,6 +815,43 @@ npGlpDegree0FirstDerivativeLcOk <- function(regtype.engine,
     all(gradient.order == 1L)
 }
 
+npValidateGlpGradientDegree <- function(regtype.engine,
+                                        degree.engine,
+                                        gradient.order,
+                                        ncon,
+                                        where = "local-polynomial estimator",
+                                        allow.lp0.lc.first = TRUE) {
+  if (!identical(regtype.engine, "lp") || ncon == 0L)
+    return(invisible(gradient.order))
+
+  degree.engine <- as.integer(degree.engine)
+  gradient.order <- as.integer(gradient.order)
+
+  if (!length(degree.engine) || !length(gradient.order))
+    return(invisible(gradient.order))
+
+  if (isTRUE(allow.lp0.lc.first) &&
+      npGlpDegree0FirstDerivativeLcOk(
+        regtype.engine = regtype.engine,
+        degree.engine = degree.engine,
+        gradient.order = gradient.order,
+        ncon = ncon
+      ))
+    return(invisible(gradient.order))
+
+  bad <- which(gradient.order > degree.engine)
+  if (length(bad)) {
+    stop(sprintf(
+      "%s supports derivative orders only up to the fitted polynomial degree; requested order %s for degree %s",
+      where,
+      paste(gradient.order[bad], collapse = ","),
+      paste(degree.engine[bad], collapse = ",")
+    ), call. = FALSE)
+  }
+
+  invisible(gradient.order)
+}
+
 npConditionalRegEngineSpec <- function(bws, where = "conditional estimator") {
   reg.engine <- if (is.null(bws$regtype.engine)) {
     if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)

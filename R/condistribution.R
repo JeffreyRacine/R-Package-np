@@ -137,6 +137,13 @@ gradients.condistribution <- function(x, errors = FALSE, gradient.order = NULL, 
   stored.order <- npValidateGlpGradientOrder(regtype = "lp",
                                              gradient.order = stored.order,
                                              ncon = x$bws$xncon)
+  npValidateGlpGradientDegree(
+    regtype.engine = reg.spec$reg.engine,
+    degree.engine = reg.spec$degree.engine,
+    gradient.order = gorder,
+    ncon = x$bws$xncon,
+    where = "gradients.condistribution"
+  )
   if (length(gorder)) {
     defined.request <- (gorder <= reg.spec$degree.engine)
     if (any(defined.request & (gorder != stored.order))) {
@@ -162,8 +169,6 @@ gradients.condistribution <- function(x, errors = FALSE, gradient.order = NULL, 
       keep.idx <- cont.idx[keep.cont]
       gout.masked[, keep.idx] <- gout[, keep.idx, drop = FALSE]
     }
-    if (any(gorder > reg.spec$degree.engine) && !lp.degree0.lc.gradient)
-      .np_warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
   }
   gout.masked
 }
