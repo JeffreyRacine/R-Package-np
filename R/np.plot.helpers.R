@@ -14383,6 +14383,45 @@ compute.default.error.range <- function(center, err) {
   range(center, finite = TRUE)
 }
 
+.np_plot_panel_error_range <- function(estimate,
+                                       err = NULL,
+                                       all.err = NULL,
+                                       plot.errors.type = NULL,
+                                       plotOnEstimate = TRUE) {
+  estimate <- as.double(estimate)
+  center <- estimate
+  if (!isTRUE(plotOnEstimate) && !is.null(err) && NCOL(err) >= 3L) {
+    corrected <- as.double(err[, 3L])
+    keep <- is.finite(corrected)
+    center[keep] <- corrected[keep]
+  }
+
+  vals <- c(estimate, center)
+  if (!is.null(err) && NCOL(err) >= 2L) {
+    if (identical(plot.errors.type, "all") && !is.null(all.err)) {
+      vals <- c(vals, compute.all.error.range(center, all.err))
+    } else {
+      vals <- c(vals,
+                center - as.double(err[, 1L]),
+                center + as.double(err[, 2L]))
+    }
+  }
+
+  rng <- range(vals, finite = TRUE)
+  if (length(rng) == 2L && all(is.finite(rng)))
+    return(rng)
+  c(NA_real_, NA_real_)
+}
+
+.np_plot_include_requested_ylim <- function(panel.ylim, ylim = NULL) {
+  if (is.null(ylim))
+    return(panel.ylim)
+  out <- range(c(panel.ylim, ylim), finite = TRUE)
+  if (length(out) == 2L && all(is.finite(out)))
+    return(out)
+  panel.ylim
+}
+
 .np_plot_normalize_common_options <- function(plot.behavior,
                                              plot.errors.method,
                                              plot.errors.boot.method,
