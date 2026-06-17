@@ -8841,9 +8841,9 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
       boot.all.err[[kk]] <- interval.summary$all.err
     }
 
-    if (center %in% c("bias-corrected", "bias-corrected-oversmoothed")) {
+    if (identical(center, "bias-corrected")) {
       oversmooth.k <- NULL
-      if (identical(center, "bias-corrected-oversmoothed")) {
+      if (!is.null(oversmooth.boot)) {
         if (is.null(oversmooth.boot) || is.null(oversmooth.boot$t))
           stop("oversmoothed bootstrap center was requested but no oversmoothed quantile bootstrap matrix is available", call. = FALSE)
         if (ncol(oversmooth.boot$t) != expected) {
@@ -8990,7 +8990,7 @@ compute.default.error.range <- function(center, err) {
   )
   plot.errors.center <- match.arg(
     scalar_choice(plot.errors.center, "estimate"),
-    c("estimate", "bias-corrected", "bias-corrected-oversmoothed")
+    c("estimate", "bias-corrected")
   )
   plot.errors.type <- match.arg(
     scalar_choice(plot.errors.type, "simultaneous"),
@@ -9051,12 +9051,22 @@ compute.default.error.range <- function(center, err) {
 }
 
 .np_plot_center_is_bias_corrected <- function(center) {
-  identical(center, "bias-corrected") ||
-    identical(center, "bias-corrected-oversmoothed")
+  identical(center, "bias-corrected")
 }
 
-.np_plot_center_is_oversmoothed <- function(center) {
-  identical(center, "bias-corrected-oversmoothed")
+.np_plot_center_is_oversmoothed <- function(center, plot.errors.boot.method = NULL) {
+  identical(center, "bias-corrected") &&
+    is.element(plot.errors.boot.method, c("inid", "fixed", "geom"))
+}
+
+.np_plot_bias_center_engine <- function(center, plot.errors.boot.method = NULL) {
+  if (identical(center, "estimate"))
+    return("none")
+  if (!identical(center, "bias-corrected"))
+    stop("unknown bootstrap center", call. = FALSE)
+  if (.np_plot_center_is_oversmoothed(center, plot.errors.boot.method))
+    return("oversmoothed-pilot")
+  "wild-standard"
 }
 
 .np_plot_oversmooth_exponent <- function(p.continuous, kernel.order) {
@@ -9090,12 +9100,12 @@ compute.default.error.range <- function(center, err) {
 
 .np_plot_oversmooth_regression_bws <- function(bws) {
   if (!inherits(bws, "rbandwidth"))
-    stop("oversmoothed bootstrap center is currently implemented only for regression bandwidth objects", call. = FALSE)
+    stop("oversmoothed pair/block/geometric bootstrap center is currently implemented only for regression bandwidth objects", call. = FALSE)
   if (!identical(bws$type, "fixed"))
-    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed regression bandwidths", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed regression bandwidths", call. = FALSE)
   icon <- bws$icon
   if (is.null(icon) || !length(icon) || !any(icon))
-    stop("center=\"bias-corrected-oversmoothed\" requires at least one continuous predictor", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires at least one continuous predictor", call. = FALSE)
 
   bw <- bws$bw
   if (!is.numeric(bw) || length(bw) != length(icon))
@@ -9250,20 +9260,20 @@ compute.default.error.range <- function(center, err) {
 
 .np_plot_oversmooth_conditional_bws <- function(bws, cdf = FALSE) {
   if (!(inherits(bws, "conbandwidth") || inherits(bws, "condbandwidth")))
-    stop("oversmoothed bootstrap center is currently implemented only for conditional density/distribution bandwidth objects", call. = FALSE)
+    stop("oversmoothed pair/block/geometric bootstrap center is currently implemented only for conditional density/distribution bandwidth objects", call. = FALSE)
   if (!identical(bws$type, "fixed"))
-    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed conditional density/distribution bandwidths", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed conditional density/distribution bandwidths", call. = FALSE)
 
   xicon <- bws$xdati$icon
   yicon <- bws$ydati$icon
   if (is.null(xicon) || is.null(yicon) || !any(xicon) || !any(yicon))
-    stop("center=\"bias-corrected-oversmoothed\" requires continuous dependent and explanatory variables for conditional density/distribution", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires continuous dependent and explanatory variables for conditional density/distribution", call. = FALSE)
 
   cx.order <- as.numeric(bws$cxkerorder[1L])
   cy.order <- as.numeric(bws$cykerorder[1L])
   if (!is.finite(cx.order) || !is.finite(cy.order) || cx.order <= 0 || cy.order <= 0 ||
       !isTRUE(all.equal(cx.order, cy.order, tolerance = 0))) {
-    stop("center=\"bias-corrected-oversmoothed\" currently requires matching continuous x/y kernel orders for conditional density/distribution", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires matching continuous x/y kernel orders for conditional density/distribution", call. = FALSE)
   }
 
   pilot <- .np_plot_oversmooth_factor(
@@ -9401,12 +9411,12 @@ compute.default.error.range <- function(center, err) {
 
 .np_plot_oversmooth_scbandwidth_bws <- function(bws) {
   if (!inherits(bws, "scbandwidth"))
-    stop("oversmoothed bootstrap center is currently implemented only for smooth coefficient bandwidth objects", call. = FALSE)
+    stop("oversmoothed pair/block/geometric bootstrap center is currently implemented only for smooth coefficient bandwidth objects", call. = FALSE)
   if (!identical(bws$type, "fixed"))
-    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed smooth coefficient bandwidths", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed smooth coefficient bandwidths", call. = FALSE)
   icon <- bws$icon
   if (is.null(icon) || !length(icon) || !any(icon))
-    stop("center=\"bias-corrected-oversmoothed\" requires at least one continuous smoothing variable for smooth coefficient plots", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires at least one continuous smoothing variable for smooth coefficient plots", call. = FALSE)
   if (!is.numeric(bws$bw) || length(bws$bw) != length(icon))
     stop("invalid smooth coefficient bandwidth vector for oversmoothed bootstrap center", call. = FALSE)
 
@@ -9436,12 +9446,12 @@ compute.default.error.range <- function(center, err) {
 
 .np_plot_oversmooth_plbandwidth_bws <- function(bws) {
   if (!inherits(bws, "plbandwidth"))
-    stop("oversmoothed bootstrap center is currently implemented only for partially linear bandwidth objects", call. = FALSE)
+    stop("oversmoothed pair/block/geometric bootstrap center is currently implemented only for partially linear bandwidth objects", call. = FALSE)
   if (!identical(bws$type, "fixed"))
-    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed partially linear bandwidths", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed partially linear bandwidths", call. = FALSE)
   icon <- bws$zdati$icon
   if (is.null(icon) || !length(icon) || !any(icon))
-    stop("center=\"bias-corrected-oversmoothed\" requires at least one continuous nonparametric smoothing variable for partially linear plots", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires at least one continuous nonparametric smoothing variable for partially linear plots", call. = FALSE)
   if (!is.list(bws$bw) || !length(bws$bw))
     stop("invalid partially linear bandwidth object for oversmoothed bootstrap center", call. = FALSE)
 
@@ -9549,9 +9559,9 @@ compute.default.error.range <- function(center, err) {
 
 .np_plot_oversmooth_sibandwidth_bws <- function(bws) {
   if (!inherits(bws, "sibandwidth"))
-    stop("oversmoothed bootstrap center is currently implemented only for single-index bandwidth objects", call. = FALSE)
+    stop("oversmoothed pair/block/geometric bootstrap center is currently implemented only for single-index bandwidth objects", call. = FALSE)
   if (!identical(bws$type, "fixed"))
-    stop("center=\"bias-corrected-oversmoothed\" currently requires fixed single-index bandwidths", call. = FALSE)
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed single-index bandwidths", call. = FALSE)
   if (!is.numeric(bws$bw) || length(bws$bw) != 1L || !is.finite(bws$bw))
     stop("invalid single-index bandwidth for oversmoothed bootstrap center", call. = FALSE)
   if (is.null(bws$beta) || !is.numeric(bws$beta) || !length(bws$beta) ||
@@ -9621,9 +9631,12 @@ compute.default.error.range <- function(center, err) {
   )
 }
 
-.np_plot_reject_oversmoothed_center <- function(center, where) {
-  if (.np_plot_center_is_oversmoothed(center)) {
-    stop(sprintf("center=\"bias-corrected-oversmoothed\" is not yet implemented for %s",
+.np_plot_reject_oversmoothed_center <- function(center, where,
+                                               plot.errors.boot.method = NULL) {
+  if (identical(center, "bias-corrected") &&
+      (is.null(plot.errors.boot.method) ||
+       is.element(plot.errors.boot.method, c("inid", "fixed", "geom")))) {
+    stop(sprintf("center=\"bias-corrected\" with pair/block/geometric bootstrap is not yet implemented for %s",
                  where),
          call. = FALSE)
   }
@@ -9632,9 +9645,7 @@ compute.default.error.range <- function(center, err) {
 .np_plot_bootstrap_center <- function(center, t0, boot.t, oversmooth.boot = NULL) {
   if (identical(center, "estimate"))
     return(t0)
-  if (identical(center, "bias-corrected"))
-    return(2 * t0 - colMeans(boot.t))
-  if (identical(center, "bias-corrected-oversmoothed")) {
+  if (identical(center, "bias-corrected") && !is.null(oversmooth.boot)) {
     if (is.null(oversmooth.boot) || is.null(oversmooth.boot$t))
       stop("oversmoothed bootstrap center was requested but no oversmoothed bootstrap matrix is available", call. = FALSE)
     reference <- oversmooth.boot$center
@@ -9642,6 +9653,8 @@ compute.default.error.range <- function(center, err) {
       reference <- t0
     return(t0 - (colMeans(oversmooth.boot$t) - reference))
   }
+  if (identical(center, "bias-corrected"))
+    return(2 * t0 - colMeans(boot.t))
   stop("unknown bootstrap center", call. = FALSE)
 }
 
@@ -9891,7 +9904,7 @@ compute.bootstrap.errors.rbandwidth =
     if (is.null(boot.out))
       stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.rbandwidth", plot.errors.boot.method), call. = FALSE)
 
-    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+    if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       oversmooth.boot <- tryCatch(
         .np_plot_regression_oversmoothed_boot(
           xdat = xdat,
@@ -10012,13 +10025,13 @@ compute.bootstrap.errors.scbandwidth =
     helper.mode <- if (isTRUE(use.frozen.nonfixed)) "frozen" else "exact"
     boot.out <- NULL
 
-    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+    if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       if (isTRUE(is.wild.hat))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "smooth coefficient wild bootstrap plots")
       if (isTRUE(gradients))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "smooth coefficient gradient plots")
       if (!identical(bws$type, "fixed"))
-        stop("center=\"bias-corrected-oversmoothed\" currently requires fixed smooth coefficient bandwidths", call. = FALSE)
+        stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed smooth coefficient bandwidths", call. = FALSE)
     }
 
     if (is.inid) {
@@ -10125,7 +10138,7 @@ compute.bootstrap.errors.scbandwidth =
       boot.out$t0 <- t0.override
     }
 
-    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+    if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       oversmooth.boot <- tryCatch(
         .np_plot_scoef_oversmoothed_boot(
           xdat = xdat,
@@ -10243,13 +10256,13 @@ compute.bootstrap.errors.plbandwidth =
     use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
       !identical(bws$type, "fixed")
     helper.mode <- if (isTRUE(use.frozen.nonfixed)) "frozen" else "exact"
-    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+    if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       if (isTRUE(is.wild.hat))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "partial linear wild bootstrap plots")
       if (isTRUE(gradients))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "partial linear gradient plots")
       if (!identical(bws$type, "fixed"))
-        stop("center=\"bias-corrected-oversmoothed\" currently requires fixed partially linear bandwidths", call. = FALSE)
+        stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed partially linear bandwidths", call. = FALSE)
     }
     if (is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
@@ -10342,7 +10355,7 @@ compute.bootstrap.errors.plbandwidth =
       boot.out$t0 <- t0.override
     }
 
-    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+    if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       oversmooth.boot <- tryCatch(
         .np_plot_plreg_oversmoothed_boot(
           xdat = xdat,
@@ -10611,15 +10624,15 @@ compute.bootstrap.errors.conbandwidth =
       else if (cdf) "dist"
       else "dens"
 
-    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+    if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       if (identical(tboo, "quant") && isTRUE(gradients)) {
         .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional quantile gradient plots")
       }
       if (isTRUE(proper)) {
-        stop("center=\"bias-corrected-oversmoothed\" is not yet implemented for proper conditional density/distribution projections", call. = FALSE)
+        stop("center=\"bias-corrected\" with pair/block/geometric bootstrap is not yet implemented for proper conditional density/distribution projections", call. = FALSE)
       }
       if (!identical(bws$type, "fixed")) {
-        stop("center=\"bias-corrected-oversmoothed\" currently requires fixed conditional density/distribution bandwidths", call. = FALSE)
+        stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed conditional density/distribution bandwidths", call. = FALSE)
       }
     }
 
@@ -10851,7 +10864,7 @@ compute.bootstrap.errors.conbandwidth =
       }
     }
 
-    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+    if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       oversmooth.boot <- tryCatch(
         if (identical(tboo, "quant")) {
           .np_plot_quantile_level_oversmoothed_boot(
@@ -10958,7 +10971,7 @@ compute.bootstrap.errors.conbandwidth =
       boot.err[,1:2] <- interval.summary$err
       boot.all.err <- interval.summary$all.err
     }
-    if (plot.errors.center %in% c("bias-corrected", "bias-corrected-oversmoothed")) {
+    if (identical(plot.errors.center, "bias-corrected")) {
       boot.err[,3] <- .np_plot_bootstrap_center(
         center = plot.errors.center,
         t0 = boot.out$t0,
@@ -11061,13 +11074,13 @@ compute.bootstrap.errors.sibandwidth =
     use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
       !identical(bws$type, "fixed")
 
-    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+    if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       if (isTRUE(is.wild.hat))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "single-index wild bootstrap plots")
       if (isTRUE(gradients))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "single-index gradient plots")
       if (!identical(bws$type, "fixed"))
-        stop("center=\"bias-corrected-oversmoothed\" currently requires fixed single-index bandwidths", call. = FALSE)
+        stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed single-index bandwidths", call. = FALSE)
     }
 
     if (is.wild.hat) {
@@ -11151,7 +11164,7 @@ compute.bootstrap.errors.sibandwidth =
     if (is.null(boot.out))
       stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.sibandwidth", plot.errors.boot.method), call. = FALSE)
 
-    if (.np_plot_center_is_oversmoothed(plot.errors.center)) {
+    if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       oversmooth.boot <- tryCatch(
         .np_plot_singleindex_oversmoothed_boot(
           xdat = xdat,

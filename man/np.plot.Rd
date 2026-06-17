@@ -176,22 +176,18 @@ Named options passed via \code{\dots} include:
         displays when available.
       }
       \item{\code{center}}{
-        one of \code{"estimate"}, \code{"bias-corrected"}, or
-        \code{"bias-corrected-oversmoothed"}. When
+        one of \code{"estimate"} or \code{"bias-corrected"}. When
         bootstrap errors are requested, \code{center="bias-corrected"}
-        centers plotted uncertainty bands or bars on the bootstrap
-        bias-corrected estimate. The
-        \code{"bias-corrected-oversmoothed"} option uses a second
-        oversmoothed pilot bootstrap matrix to estimate the bias center
-        where implemented; it is therefore more computationally
-        expensive. In this tranche it is implemented for fixed-bandwidth
-        regression plots with \code{bootstrap="wild"}, \code{"inid"},
-        \code{"fixed"}, or \code{"geom"}, and for fixed-bandwidth
-        conditional density/distribution plots with \code{bootstrap="inid"},
-        \code{"fixed"}, or \code{"geom"}. It is also implemented for
-        fixed-bandwidth smooth coefficient and partially linear regression
-        plots, and fixed-bandwidth single-index plots, with
-        \code{bootstrap="inid"}, \code{"fixed"}, or \code{"geom"}.
+        centers plotted uncertainty bands or bars on a bootstrap
+        bias-corrected estimate. The package chooses the validated
+        correction engine for the requested bootstrap route. Wild
+        bootstrap regression routes use the standard wild-bootstrap
+        correction. Pairwise and dependent-bootstrap routes
+        \code{"inid"}, \code{"fixed"}, and \code{"geom"} use an
+        oversmoothed pilot correction for fixed-bandwidth estimators where
+        that route has been implemented and validated. Unsupported
+        combinations fail clearly rather than silently using a weak
+        correction.
         For one-dimensional regression curves, the
         ordinary estimate remains visible and the selected bias-corrected
         estimate is drawn as an additional center line when available.
@@ -412,9 +408,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   typically \eqn{m=\texttt{neval}^2}{m=neval^2} for full 2D perspective
   surfaces).
 
-  When \code{center="bias-corrected"} or
-  \code{center="bias-corrected-oversmoothed"} and
-  \code{output="data"} (or \code{output="both"}) is requested, returned
+  When \code{center="bias-corrected"} and \code{output="data"} (or
+  \code{output="both"}) is requested, returned
   plot objects that support bootstrap bias correction include \code{bias} and
   \code{bias.corrected} components where available. The sign convention
   is \code{bias = estimate - bias.corrected}, so the corrected estimate
@@ -438,28 +433,30 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   sufficient accuracy.
 
   When bootstrap errors are requested, \code{center="bias-corrected"}
-  recenters the plotted bootstrap bounds on the Efron-Tibshirani
-  bootstrap bias-corrected estimate, where available. This produces
-  bounds that are closer in spirit to confidence intervals than
-  variability bounds centered on the original biased estimate. Bias
+  recenters the plotted bootstrap bounds on a method-specific
+  Efron-Tibshirani bootstrap bias-corrected estimate, where available.
+  This produces bounds that are closer in spirit to confidence intervals
+  than variability bounds centered on the original biased estimate. Bias
   correction for nonparametric estimators is difficult, however, and no
   universal correction is optimal across estimators, bandwidths,
   supports, and data types.
 
-  For supported fixed-bandwidth regression, conditional density/distribution,
-  conditional quantile level, smooth coefficient, partially linear regression,
-  and single-index plots,
-  \code{center="bias-corrected-oversmoothed"} estimates the bias center
-  from a second pilot bootstrap matrix while retaining the ordinary
-  bootstrap matrix for variability widths. With \code{bootstrap="wild"},
-  the regression pilot matrix uses a two-bandwidth wild bootstrap center; with
-  \code{bootstrap="inid"}, \code{"fixed"}, or \code{"geom"}, supported
-  regression, conditional density/distribution, conditional quantile level,
-  smooth coefficient, partially linear regression, and single-index routes use
-  the corresponding resampling scheme evaluated with the pilot bandwidths.
-  These combinations can behave differently in finite samples, so the
-  returned \code{bias} and \code{bias.corrected} components should be
-  inspected when bias correction is scientifically important. For supported
+  For wild-bootstrap regression routes, \code{center="bias-corrected"}
+  uses the standard wild-bootstrap correction. For supported
+  fixed-bandwidth regression, conditional density/distribution,
+  conditional quantile level, smooth coefficient, partially linear
+  regression, and single-index plots with \code{bootstrap="inid"},
+  \code{"fixed"}, or \code{"geom"}, \code{center="bias-corrected"}
+  estimates the bias center from a second oversmoothed pilot bootstrap
+  matrix while retaining the ordinary bootstrap matrix for variability
+  widths. The two-bandwidth wild-bootstrap literature motivates
+  oversmoothing for error-bar calibration, but finite-sample pilot-bias
+  estimation can underadjust; the package therefore uses the standard
+  wild correction for wild bootstrap and the oversmoothed pilot
+  correction for pairwise/dependent resampling routes. These combinations
+  can behave differently in finite samples, so the returned \code{bias}
+  and \code{bias.corrected} components should be inspected when bias
+  correction is scientifically important. For supported
   fixed regression and conditional density/distribution gradient plots, inspect
   \code{gbias}, \code{gradient.bias.corrected}, or route-specific gradient-bias
   components such as \code{gc1bias}; different bootstrap schemes can give
@@ -482,10 +479,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   smoothed-bootstrap literature, not a claim of universal optimality.
 
   In practice, users who want confidence-style bounds should prefer
-  bootstrap errors with \code{center="bias-corrected"} or, for supported
-  regression, conditional density/distribution, conditional quantile level,
-  smooth coefficient, partially linear regression, and single-index routes,
-  \code{center="bias-corrected-oversmoothed"}. The
+  bootstrap errors with \code{center="bias-corrected"}. The
   ordinary fitted curve or surface remains the default estimate because
   bias correction can increase variance and may have larger mean squared
   error than the uncorrected estimator.
@@ -636,9 +630,24 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.
 
+  Cao-Abad, R. (1991), \dQuote{Rate of convergence for the wild
+    bootstrap in nonparametric regression,} The Annals of Statistics,
+  19, 2226-2231.
+
   Hall, P. and J.S. Racine and Q. Li (2004), \dQuote{Cross-validation and the
     estimation of conditional probability densities,} Journal of the
   American Statistical Association, 99, 1015-1026.
+
+  Hall, P. (1992a), \dQuote{Effect of bias estimation on coverage
+    accuracy of bootstrap confidence intervals for a probability
+    density,} The Annals of Statistics, 20, 675-694.
+
+  Hall, P. (1992b), \dQuote{On bootstrap confidence intervals in
+    nonparametric regression,} The Annals of Statistics, 20, 695-711.
+
+  Hardle, W. and J.S. Marron (1991), \dQuote{Bootstrap simultaneous
+    error bars for nonparametric regression,} The Annals of Statistics,
+  19, 778-796.
 
   Kunsch, H.R. (1989), \dQuote{The jackknife and the bootstrap for
     general stationary observations,} The Annals of Statistics, 17,
