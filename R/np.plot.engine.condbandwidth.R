@@ -1038,9 +1038,26 @@
                   all.err = temp.all.err,
                   xi.factor = xi.factor,
                   legend = plot.legend)
+                .np_plot_draw_bias_center_1d(
+                  x = ei,
+                  center = temp.err[,3],
+                  xi.factor = xi.factor,
+                  plotOnEstimate = plotOnEstimate,
+                  legend = plot.legend,
+                  estimate.col = plot.args$col,
+                  estimate.lty = plot.args$lty,
+                  estimate.lwd = plot.args$lwd,
+                  draw.legend = FALSE)
               } else {
-                if (!xi.factor && !plotOnEstimate)
-                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
+                .np_plot_draw_bias_center_1d(
+                  x = ei,
+                  center = temp.err[,3],
+                  xi.factor = xi.factor,
+                  plotOnEstimate = plotOnEstimate,
+                  legend = plot.legend,
+                  estimate.col = plot.args$col,
+                  estimate.lty = plot.args$lty,
+                  estimate.lwd = plot.args$lwd)
                 draw.args <- list(
                   ex = as.numeric(na.omit(ei)),
                   ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
@@ -1066,8 +1083,14 @@
           if (plot.behavior != "plot" && plot.errors && !multi.eval) {
             err.name <- if (gradients) paste("gc", grad.j, "err", sep = "") else if (quantreg) "quanterr" else "conderr"
             bias.name <- if (gradients) paste("gc", grad.j, "bias", sep = "") else "bias"
+            corrected.name <- if (gradients) paste("gc", grad.j, "bias.corrected", sep = "") else "bias.corrected"
             plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))
-            plot.out[[plot.index]][[bias.name]] <- na.omit(temp.dens - temp.err[,3])
+            plot.out[[plot.index]] <- .np_plot_add_named_bias_fields(
+              plot.out[[plot.index]],
+              estimate = temp.dens,
+              bias.corrected = temp.err[,3],
+              bias.name = bias.name,
+              corrected.name = corrected.name)
             plot.out[[plot.index]]$bxp <- temp.boot
           }
         }
@@ -1274,9 +1297,26 @@
                     all.err = temp.all.err,
                     xi.factor = xi.factor,
                   legend = plot.legend)
+                  .np_plot_draw_bias_center_1d(
+                    x = ei,
+                    center = temp.err[,3],
+                    xi.factor = xi.factor,
+                    plotOnEstimate = plotOnEstimate,
+                    legend = plot.legend,
+                    estimate.col = plot.args$col,
+                    estimate.lty = plot.args$lty,
+                    estimate.lwd = plot.args$lwd,
+                    draw.legend = FALSE)
                 } else {
-                  if (!xi.factor && !plotOnEstimate)
-                    lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
+                  .np_plot_draw_bias_center_1d(
+                    x = ei,
+                    center = temp.err[,3],
+                    xi.factor = xi.factor,
+                    plotOnEstimate = plotOnEstimate,
+                    legend = plot.legend,
+                    estimate.col = plot.args$col,
+                    estimate.lty = plot.args$lty,
+                    estimate.lwd = plot.args$lwd)
                   draw.args <- list(
                     ex = as.numeric(na.omit(ei)),
                     ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
@@ -1295,8 +1335,14 @@
             if (plot.behavior != "plot" && plot.errors) {
               err.name <- if (gradients) paste("gc", j, "err", sep = "") else if (quantreg) "quanterr" else "conderr"
               bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
+              corrected.name <- if (gradients) paste("gc", j, "bias.corrected", sep = "") else "bias.corrected"
               plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))
-              plot.out[[plot.index]][[bias.name]] <- na.omit(temp.dens - temp.err[,3])
+              plot.out[[plot.index]] <- .np_plot_add_named_bias_fields(
+                plot.out[[plot.index]],
+                estimate = temp.dens,
+                bias.corrected = temp.err[,3],
+                bias.name = bias.name,
+                corrected.name = corrected.name)
               plot.out[[plot.index]]$bxp <- temp.boot
             }
           }
@@ -1410,9 +1456,26 @@
                   all.err = data.err.all[[idx]],
                   xi.factor = xi.factor,
                   legend = plot.legend)
+                .np_plot_draw_bias_center_1d(
+                  x = allei[,plot.index],
+                  center = data.err[,3*idx],
+                  xi.factor = xi.factor,
+                  plotOnEstimate = plotOnEstimate,
+                  legend = plot.legend,
+                  estimate.col = plot.args$col,
+                  estimate.lty = plot.args$lty,
+                  estimate.lwd = plot.args$lwd,
+                  draw.legend = FALSE)
               } else {
-                if (!xi.factor && !plotOnEstimate)
-                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
+                .np_plot_draw_bias_center_1d(
+                  x = allei[,plot.index],
+                  center = data.err[,3*idx],
+                  xi.factor = xi.factor,
+                  plotOnEstimate = plotOnEstimate,
+                  legend = plot.legend,
+                  estimate.col = plot.args$col,
+                  estimate.lty = plot.args$lty,
+                  estimate.lwd = plot.args$lwd)
                 draw.args <- list(
                   ex = as.numeric(na.omit(allei[,plot.index])),
                   ely = if (plotOnEstimate) na.omit(data.eval[,idx] - data.err[,3*idx-2]) else na.omit(data.err[,3*idx] - data.err[,3*idx-2]),
