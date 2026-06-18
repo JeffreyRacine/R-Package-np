@@ -471,22 +471,31 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   continuous-rate exponent. Supported semiparametric regression and
   single-index plot routes use the square-root version of this rule.
 
-  For unconditional all-continuous density and distribution plots, the
+  For unconditional density and distribution plots with continuous
+  variables, including mixed-data routes supported by the estimator, the
   smooth-bootstrap perturbation rule uses \eqn{g_j = h_j}, following the
-  density smooth-bootstrap literature. For all-continuous conditional
-  density/distribution plots, the continuous dependent-variable side uses
-  the same density-style rule \eqn{g_y = h_y}, while the continuous
-  conditioning-variable side uses a full regression-style pilot. For
+  density smooth-bootstrap literature. Continuous variables are
+  perturbed and categorical variables are resampled row-wise without
+  perturbation. For conditional density/distribution plots, the
+  continuous dependent-variable side uses the same density-style rule
+  \eqn{g_y = h_y}; categorical dependent variables are resampled row-wise
+  without perturbation. The conditioning-variable side uses a full
+  regression-style pilot: continuous conditioning bandwidths are
+  enlarged, and categorical conditioning lambdas are moved toward their
+  admissible upper bounds without crossing them. For
   conditional density this is
   \deqn{g_{xj} = h_{xj} n^{2r / ((p + 2r)(p + 4r))},}
   and for conditional distribution this is
   \deqn{g_{xj} = h_{xj} n^{r / ((p + r)(p + 2r))},}
   where here \eqn{p} is the total number of continuous dependent and
   explanatory variables. The same conditional pilot rule is used for
-  supported fixed-bandwidth conditional density/distribution gradient
-  plots. These are practical, evidence-backed rules-of-thumb guided by
-  the smoothed-bootstrap and regression two-bandwidth literatures, not
-  claims of universal optimality.
+  supported all-continuous fixed-bandwidth conditional
+  density/distribution gradient plots. Mixed-data conditional
+  density/distribution gradient bootstrap plots remain fail-closed until
+  their gradient bootstrap helper contract is separately validated.
+  These are practical, evidence-backed rules-of-thumb guided by the
+  smoothed-bootstrap and regression two-bandwidth literatures, not claims
+  of universal optimality.
 
   In practice, users who want confidence-style bounds should prefer
   bootstrap errors with \code{center="bias-corrected"}. The
