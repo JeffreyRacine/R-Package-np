@@ -610,6 +610,13 @@
               )
               do.call(draw.errors, draw.args)
             }
+            if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
+              .np_plot_draw_bias_center_legend(
+                legend = plot.legend,
+                estimate.col = plot.args$col,
+                estimate.lty = plot.args$lty,
+                estimate.lwd = plot.args$lwd
+              )
           }
         }
 
@@ -754,6 +761,13 @@
               )
               do.call(draw.errors, draw.args)
             }
+            if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
+              .np_plot_draw_bias_center_legend(
+                legend = plot.legend,
+                estimate.col = plot.args$col,
+                estimate.lty = plot.args$lty,
+                estimate.lwd = plot.args$lwd
+              )
           }
         }
       }
