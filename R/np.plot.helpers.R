@@ -11344,9 +11344,6 @@ compute.bootstrap.errors.conbandwidth =
       if (identical(tboo, "quant")) {
         .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional quantile plots")
       }
-      if (isTRUE(gradients)) {
-        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional density/distribution gradient plots")
-      }
       if (isTRUE(proper)) {
         stop("center=\"bias-corrected\" with pair/block/geometric bootstrap is not yet implemented for proper conditional density/distribution projections", call. = FALSE)
       }
