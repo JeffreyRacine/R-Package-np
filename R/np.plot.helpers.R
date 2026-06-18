@@ -14640,7 +14640,8 @@ compute.default.error.range <- function(center, err) {
 }
 
 .np_plot_oversmooth_exponent <- function(p.continuous, kernel.order,
-                                         family = c("density", "distribution")) {
+                                         family = c("density", "distribution",
+                                                    "density-sqrt", "distribution-sqrt")) {
   family <- match.arg(family)
   p.continuous <- as.integer(p.continuous[1L])
   kernel.order <- as.numeric(kernel.order[1L])
@@ -14648,17 +14649,20 @@ compute.default.error.range <- function(center, err) {
       !is.finite(kernel.order) || kernel.order <= 0) {
     stop("cannot compute oversmoothed bootstrap pilot rate from invalid dimension/order", call. = FALSE)
   }
-  if (identical(family, "distribution")) {
-    kernel.order / ((p.continuous + kernel.order) *
-                      (p.continuous + 2 * kernel.order))
-  } else {
-    (2 * kernel.order) / ((p.continuous + 2 * kernel.order) *
-                            (p.continuous + 4 * kernel.order))
-  }
+  density.full <- (2 * kernel.order) / ((p.continuous + 2 * kernel.order) *
+                                          (p.continuous + 4 * kernel.order))
+  distribution.full <- kernel.order / ((p.continuous + kernel.order) *
+                                         (p.continuous + 2 * kernel.order))
+  switch(family,
+         density = density.full,
+         distribution = distribution.full,
+         `density-sqrt` = density.full / 2,
+         `distribution-sqrt` = distribution.full / 2)
 }
 
 .np_plot_oversmooth_factor <- function(nobs, p.continuous, kernel.order,
-                                       family = c("density", "distribution")) {
+                                       family = c("density", "distribution",
+                                                  "density-sqrt", "distribution-sqrt")) {
   family <- match.arg(family)
   exponent <- .np_plot_oversmooth_exponent(
     p.continuous = p.continuous,
@@ -14694,7 +14698,8 @@ compute.default.error.range <- function(center, err) {
   pilot <- .np_plot_oversmooth_factor(
     nobs = bws$nobs,
     p.continuous = sum(icon),
-    kernel.order = bws$ckerorder
+    kernel.order = bws$ckerorder,
+    family = "density-sqrt"
   )
 
   out <- bws
@@ -14707,7 +14712,7 @@ compute.default.error.range <- function(center, err) {
     bws = out,
     factor = pilot$factor,
     exponent = pilot$exponent,
-    family = "regression"
+    family = "regression-square-root"
   )
 }
 
@@ -14729,12 +14734,7 @@ compute.default.error.range <- function(center, err) {
   if (!is.numeric(bw) || length(bw) != length(icon))
     stop("invalid unconditional bandwidth vector for oversmoothed bootstrap center", call. = FALSE)
 
-  pilot <- .np_plot_oversmooth_factor(
-    nobs = bws$nobs,
-    p.continuous = sum(icon),
-    kernel.order = bws$ckerorder,
-    family = if (isTRUE(cdf)) "distribution" else "density"
-  )
+  pilot <- list(factor = 1, exponent = 0)
 
   out <- bws
   out$bw[icon] <- out$bw[icon] * pilot$factor
@@ -14751,7 +14751,7 @@ compute.default.error.range <- function(center, err) {
     bws = out,
     factor = pilot$factor,
     exponent = pilot$exponent,
-    family = if (isTRUE(cdf)) "unconditional-distribution" else "unconditional-density"
+    family = if (isTRUE(cdf)) "unconditional-distribution-g-equals-h" else "unconditional-density-g-equals-h"
   )
 }
 
@@ -14941,23 +14941,19 @@ compute.default.error.range <- function(center, err) {
     nobs = bws$nobs,
     p.continuous = sum(xicon) + sum(yicon),
     kernel.order = cx.order,
-    family = if (isTRUE(cdf)) "distribution" else "density"
+    family = if (isTRUE(cdf)) "distribution-sqrt" else "density-sqrt"
   )
 
   out <- bws
   out$bandwidth$x[xicon] <- out$bandwidth$x[xicon] * pilot$factor
-  out$bandwidth$y[yicon] <- out$bandwidth$y[yicon] * pilot$factor
   if (!is.null(out$sfactor$x) && length(out$sfactor$x) == length(out$bandwidth$x)) {
     out$sfactor$x[xicon] <- out$sfactor$x[xicon] * pilot$factor
-  }
-  if (!is.null(out$sfactor$y) && length(out$sfactor$y) == length(out$bandwidth$y)) {
-    out$sfactor$y[yicon] <- out$sfactor$y[yicon] * pilot$factor
   }
   .np_plot_mark_oversmoothed_bws(
     bws = out,
     factor = pilot$factor,
     exponent = pilot$exponent,
-    family = if (isTRUE(cdf)) "conditional-distribution" else "conditional-density"
+    family = if (isTRUE(cdf)) "conditional-distribution-x-square-root-y-equals-h" else "conditional-density-x-square-root-y-equals-h"
   )
 }
 
@@ -15085,7 +15081,8 @@ compute.default.error.range <- function(center, err) {
   pilot <- .np_plot_oversmooth_factor(
     nobs = bws$nobs,
     p.continuous = sum(icon),
-    kernel.order = bws$ckerorder
+    kernel.order = bws$ckerorder,
+    family = "density-sqrt"
   )
 
   out <- bws
@@ -15102,7 +15099,7 @@ compute.default.error.range <- function(center, err) {
     bws = out,
     factor = pilot$factor,
     exponent = pilot$exponent,
-    family = "smooth-coefficient"
+    family = "smooth-coefficient-square-root"
   )
 }
 
@@ -15120,7 +15117,8 @@ compute.default.error.range <- function(center, err) {
   pilot <- .np_plot_oversmooth_factor(
     nobs = bws$nobs,
     p.continuous = sum(icon),
-    kernel.order = bws$ckerorder
+    kernel.order = bws$ckerorder,
+    family = "density-sqrt"
   )
 
   out <- bws
@@ -15145,7 +15143,7 @@ compute.default.error.range <- function(center, err) {
     bws = out,
     factor = pilot$factor,
     exponent = pilot$exponent,
-    family = "partially-linear"
+    family = "partially-linear-square-root"
   )
 }
 
@@ -15234,7 +15232,8 @@ compute.default.error.range <- function(center, err) {
   pilot <- .np_plot_oversmooth_factor(
     nobs = bws$nobs,
     p.continuous = 1L,
-    kernel.order = bws$ckerorder
+    kernel.order = bws$ckerorder,
+    family = "density-sqrt"
   )
 
   out <- bws
@@ -15258,7 +15257,7 @@ compute.default.error.range <- function(center, err) {
     bws = out,
     factor = pilot$factor,
     exponent = pilot$exponent,
-    family = "single-index"
+    family = "single-index-square-root"
   )
 }
 

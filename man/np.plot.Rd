@@ -444,46 +444,48 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   supports, and data types.
 
   For wild-bootstrap regression routes, \code{center="bias-corrected"}
-  uses the standard wild-bootstrap correction. For supported
-  fixed-bandwidth regression, all-continuous density/distribution, and
-  single-index plots with \code{bootstrap="inid"}, \code{"fixed"}, or
-  \code{"geom"}, \code{center="bias-corrected"} estimates the bias
-  center from a second oversmoothed pilot bootstrap matrix while
-  retaining the ordinary bootstrap matrix for variability widths. The
-  two-bandwidth wild-bootstrap literature motivates oversmoothing for
-  error-bar calibration, but finite-sample pilot-bias estimation can
-  underadjust; the package therefore uses the standard wild correction
-  for wild bootstrap and the oversmoothed pilot correction for
-  pairwise/dependent resampling routes. These combinations can behave
-  differently in finite samples, so the returned \code{bias} and
-  \code{bias.corrected} components should be inspected when bias
-  correction is scientifically important. For supported fixed regression
-  gradient plots, inspect \code{gbias}, \code{gradient.bias.corrected},
-  or route-specific gradient-bias components such as \code{gc1bias};
-  different bootstrap schemes can give materially different
-  derivative-bias corrections. Pairwise/block/geometric bias-corrected
-  centers are not currently enabled for conditional density/distribution
-  gradients, conditional quantile plots, smooth coefficient plots, or
-  partially linear plots; use wild bootstrap for bias-corrected
-  semiparametric plot bands where available. For ordinary second-order
-  continuous density-style kernels, the pilot bandwidth for continuous
-  variable \eqn{j} is
-  \deqn{g_j = h_j n^{4 / ((p + 4)(p + 8))},}
-  where \eqn{h_j} is the selected bandwidth, \eqn{p} is the number of
-  continuous smoothing variables in the supported route (for conditional
-  density/distribution this includes continuous dependent and explanatory
-  variables; for partially linear regression and smooth coefficient plots it
-  is the dimension of the nonparametric smoothing variables; for single-index
-  plots it is the scalar index dimension), and
-  categorical variables do not enter this continuous-rate exponent. Thus
-  for univariate density-style smoothing or one-continuous-predictor
-  regression this reduces to \eqn{g_j = h_j n^{4/45}}. For distribution
-  smoothing the corresponding ordinary second-order pilot is
-  \deqn{g_j = h_j n^{2 / ((p + 2)(p + 4))}.}
-  For higher-order continuous kernels, the same rate-matching idea is
-  adjusted using the corresponding kernel-order bias and variance rates.
-  This rule is a practical smoothed-bootstrap pilot default following the
-  smoothed-bootstrap literature, not a claim of universal optimality.
+  uses the standard wild-bootstrap correction, without a second
+  oversmoothed pilot bandwidth. This follows the wild-bootstrap
+  regression literature and the package's finite-sample evidence that
+  an additional pilot can underadjust in this route. For supported
+  fixed-bandwidth regression-style routes with \code{bootstrap="inid"},
+  \code{"fixed"}, or \code{"geom"}, \code{center="bias-corrected"}
+  estimates the bias center from a second pilot bootstrap matrix while
+  retaining the ordinary bootstrap matrix for variability widths. These
+  combinations can behave differently in finite samples, so the returned
+  \code{bias} and \code{bias.corrected} components should be inspected
+  when bias correction is scientifically important. For supported fixed
+  regression gradient plots, inspect \code{gbias},
+  \code{gradient.bias.corrected}, or route-specific gradient-bias
+  components such as \code{gc1bias}; different bootstrap schemes can
+  give materially different derivative-bias corrections.
+
+  The pilot rule is family-specific. For regression-style smoothing
+  variables, including regression, supported semiparametric regression
+  plots, and single-index plots, the non-wild pilot uses the
+  square-root version of the usual oversmoothing-rate rule:
+  \deqn{g_j = h_j n^{r / ((p + 2r)(p + 4r))},}
+  where \eqn{h_j} is the selected bandwidth, \eqn{r} is the continuous
+  kernel order, and \eqn{p} is the number of continuous smoothing
+  variables in that regression-style route. For ordinary second-order
+  kernels with one continuous smoothing variable this reduces to
+  \eqn{g_j = h_j n^{2/45}}. Categorical variables do not enter this
+  continuous-rate exponent.
+
+  For unconditional all-continuous density and distribution plots, the
+  smooth-bootstrap perturbation rule uses \eqn{g_j = h_j}, following the
+  density smooth-bootstrap literature. For all-continuous conditional
+  density/distribution plots, the continuous dependent-variable side uses
+  the same density-style rule \eqn{g_y = h_y}, while the continuous
+  conditioning-variable side uses a regression-style pilot. For
+  conditional density this is
+  \deqn{g_{xj} = h_{xj} n^{r / ((p + 2r)(p + 4r))},}
+  and for conditional distribution this is
+  \deqn{g_{xj} = h_{xj} n^{r / (2(p + r)(p + 2r))},}
+  where here \eqn{p} is the total number of continuous dependent and
+  explanatory variables. These are practical, evidence-backed
+  rules-of-thumb guided by the smoothed-bootstrap and regression
+  two-bandwidth literatures, not claims of universal optimality.
 
   In practice, users who want confidence-style bounds should prefer
   bootstrap errors with \code{center="bias-corrected"}. The
