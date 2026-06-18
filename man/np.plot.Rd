@@ -482,9 +482,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   and for conditional distribution this is
   \deqn{g_{xj} = h_{xj} n^{r / ((p + r)(p + 2r))},}
   where here \eqn{p} is the total number of continuous dependent and
-  explanatory variables. These are practical, evidence-backed
-  rules-of-thumb guided by the smoothed-bootstrap and regression
-  two-bandwidth literatures, not claims of universal optimality.
+  explanatory variables. The same conditional pilot rule is used for
+  supported fixed-bandwidth conditional density/distribution gradient
+  plots. These are practical, evidence-backed rules-of-thumb guided by
+  the smoothed-bootstrap and regression two-bandwidth literatures, not
+  claims of universal optimality.
 
   In practice, users who want confidence-style bounds should prefer
   bootstrap errors with \code{center="bias-corrected"}. The
