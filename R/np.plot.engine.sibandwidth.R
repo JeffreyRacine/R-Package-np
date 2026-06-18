@@ -346,7 +346,11 @@
         if (plot.errors) {
           plot.out[[1]]$merr <- cbind(-temp.err[,1], temp.err[,2])
           if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
-            plot.out[[1]]$bias <- temp.err[,3] - temp.mean
+            plot.out[[1]] <- .np_plot_add_bias_fields(
+              object = plot.out[[1]],
+              estimate = temp.mean,
+              bias.corrected = temp.err[,3]
+            )
           }
         }
       }
@@ -386,7 +390,10 @@
           )
           plot.out[[1]]$glerr = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
           plot.out[[1]]$gherr = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
-          plot.out[[1]]$gbias = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
+          if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
+            plot.out[[1]]$gbias = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
+            plot.out[[1]]$gradient.bias.corrected = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
+          }
           
         }
 
@@ -485,14 +492,19 @@
           }
 
           if (plot.behavior != "plot"){
-            plot.out[[1]]$grad[,i] = bws$beta[i]*temp.mean[i.sort]
+            grad.i <- bws$beta[i]*temp.mean[i.sort]
+            plot.out[[1]]$grad[,i] = grad.i
             center.out.i <- if (plot.errors.center == "estimate")
               temp.mean[i.sort] else temp.err[i.sort,3]
             lo.i <- bws$beta[i] * (center.out.i - temp.err[i.sort,1])
             hi.i <- bws$beta[i] * (center.out.i + temp.err[i.sort,2])
             plot.out[[1]]$glerr[,i] = pmin(lo.i, hi.i)
             plot.out[[1]]$gherr[,i] = pmax(lo.i, hi.i)
-            plot.out[[1]]$gbias[,i] = bws$beta[i]*temp.err[i.sort,3]
+            if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
+              gradient.bias.corrected.i <- bws$beta[i]*temp.err[i.sort,3]
+              plot.out[[1]]$gbias[,i] = grad.i - gradient.bias.corrected.i
+              plot.out[[1]]$gradient.bias.corrected[,i] = gradient.bias.corrected.i
+            }
           }
 
         }
