@@ -563,10 +563,12 @@
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- temp.dens
           if (plot.errors)
-            plot.args$ylim <- if (plot.errors.type == "all")
-              compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err)
-            else
-              compute.default.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.err)
+            plot.args$ylim <- .np_plot_panel_error_range(
+              estimate = temp.dens,
+              err = temp.err,
+              all.err = temp.all.err,
+              plotOnEstimate = plotOnEstimate,
+              plot.errors.type = plot.errors.type)
           plot.args$xlab <- scalar_default(xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
           plot.args$ylab <- scalar_default(ylab, "Density")
           if (!xi.factor) {
@@ -597,25 +599,43 @@
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
-            if (!xi.factor && !plotOnEstimate)
-              lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
-
             if (plot.errors.type == "all") {
               draw.all.error.types(
-                ex = as.numeric(na.omit(ei)),
-                center = as.numeric(na.omit(if (plotOnEstimate) temp.dens else temp.err[,3])),
+                ex = as.numeric(ei),
+                center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
                 all.err = temp.all.err,
+                xi.factor = xi.factor,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = .np_plot_lty("interval"),
                 add.legend = TRUE,
                 legend = plot.legend)
+              .np_plot_draw_bias_center_1d(
+                x = ei,
+                center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
+                xi.factor = xi.factor,
+                plotOnEstimate = plotOnEstimate,
+                legend = plot.legend,
+                estimate.col = plot.args$col,
+                estimate.lty = plot.args$lty,
+                estimate.lwd = plot.args$lwd,
+                draw.legend = FALSE)
             } else {
+              .np_plot_draw_bias_center_1d(
+                x = ei,
+                center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
+                xi.factor = xi.factor,
+                plotOnEstimate = plotOnEstimate,
+                legend = plot.legend,
+                estimate.col = plot.args$col,
+                estimate.lty = plot.args$lty,
+                estimate.lwd = plot.args$lwd)
+              draw.vec <- .np_plot_error_draw_vectors(ei, temp.dens, temp.err, plotOnEstimate)
               draw.args <- list(
-                ex = as.numeric(na.omit(ei)),
-                ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
-                ehy = if (plotOnEstimate) na.omit(temp.dens + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
+                ex = draw.vec$x,
+                ely = draw.vec$lower,
+                ehy = draw.vec$upper,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
@@ -623,13 +643,6 @@
               )
               do.call(draw.errors, draw.args)
             }
-            if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
-              .np_plot_draw_bias_center_legend(
-                legend = plot.legend,
-                estimate.col = plot.args$col,
-                estimate.lty = plot.args$lty,
-                estimate.lwd = plot.args$lwd
-              )
           }
         }
 
@@ -655,43 +668,22 @@
       }
       
       if (common.scale && (plot.behavior != "data")){
-        jj = seq_len(bws$ndim)*3
-
-        if (plot.errors && plot.errors.type == "all") {
-          y.min <- Inf
-          y.max <- -Inf
-          for (k in seq_len(bws$ndim)) {
-            if (is.null(data.err.all[[k]])) next
-            nkeep.k <- nrow(data.err.all[[k]]$pointwise)
-            center.k <- if (plot.errors.center == "estimate")
-              data.eval[seq_len(nkeep.k),k]
-            else
-              data.err[seq_len(nkeep.k),3*k]
-            range.k <- compute.all.error.range(center.k, data.err.all[[k]])
-            y.min <- min(y.min, range.k[1], na.rm = TRUE)
-            y.max <- max(y.max, range.k[2], na.rm = TRUE)
+        y.min <- Inf
+        y.max <- -Inf
+        for (k in seq_len(bws$ndim)) {
+          range.k <- if (plot.errors) {
+            err.block <- data.err[, seq(3*k - 2L, length.out = 3L), drop = FALSE]
+            .np_plot_panel_error_range(
+              estimate = data.eval[,k],
+              err = err.block,
+              all.err = data.err.all[[k]],
+              plotOnEstimate = plotOnEstimate,
+              plot.errors.type = plot.errors.type)
+          } else {
+            range(data.eval[,k], finite = TRUE)
           }
-          if (!is.finite(y.min) || !is.finite(y.max)) {
-            if (plot.errors.center == "estimate") {
-              y.max = max(na.omit(as.double(data.eval)) + na.omit(as.double(data.err[,jj-1])))
-              y.min = min(na.omit(as.double(data.eval)) - na.omit(as.double(data.err[,jj-2])))
-            } else {
-              y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
-              y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
-            }
-          }
-        } else if (plot.errors.center == "estimate" || !plot.errors) {
-          y.max = max(na.omit(as.double(data.eval)) +
-            if (plot.errors) na.omit(as.double(data.err[,jj-1]))
-            else 0
-            )
-          y.min = min(na.omit(as.double(data.eval)) -
-            if (plot.errors) na.omit(as.double(data.err[,jj-2]))
-            else 0
-            )
-        } else if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
-          y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
-          y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+          y.min <- min(y.min, range.k[1], na.rm = TRUE)
+          y.max <- max(y.max, range.k[2], na.rm = TRUE)
         }
 
         if(!is.null(ylim)){
@@ -748,25 +740,44 @@
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
-            if (!xi.factor && !plotOnEstimate)
-              lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
-
+            err.block <- data.err[, seq(3*i - 2L, length.out = 3L), drop = FALSE]
             if (plot.errors.type == "all") {
               draw.all.error.types(
-                ex = as.numeric(na.omit(allei[,i])),
-                center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,i] else data.err[,3*i])),
+                ex = as.numeric(allei[,i]),
+                center = .np_plot_error_center(data.eval[,i], err.block, plotOnEstimate),
                 all.err = data.err.all[[i]],
+                xi.factor = xi.factor,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = .np_plot_lty("interval"),
                 add.legend = TRUE,
                 legend = plot.legend)
+              .np_plot_draw_bias_center_1d(
+                x = allei[,i],
+                center = .np_plot_error_center(data.eval[,i], err.block, plotOnEstimate),
+                xi.factor = xi.factor,
+                plotOnEstimate = plotOnEstimate,
+                legend = plot.legend,
+                estimate.col = plot.args$col,
+                estimate.lty = plot.args$lty,
+                estimate.lwd = plot.args$lwd,
+                draw.legend = FALSE)
             } else {
+              .np_plot_draw_bias_center_1d(
+                x = allei[,i],
+                center = .np_plot_error_center(data.eval[,i], err.block, plotOnEstimate),
+                xi.factor = xi.factor,
+                plotOnEstimate = plotOnEstimate,
+                legend = plot.legend,
+                estimate.col = plot.args$col,
+                estimate.lty = plot.args$lty,
+                estimate.lwd = plot.args$lwd)
+              draw.vec <- .np_plot_error_draw_vectors(allei[,i], data.eval[,i], err.block, plotOnEstimate)
               draw.args <- list(
-                ex = as.numeric(na.omit(allei[,i])),
-                ely = if (plotOnEstimate) na.omit(data.eval[,i] - data.err[,3*i-2]) else na.omit(data.err[,3*i] - data.err[,3*i-2]),
-                ehy = if (plotOnEstimate) na.omit(data.eval[,i] + data.err[,3*i-1]) else na.omit(data.err[,3*i] + data.err[,3*i-1]),
+                ex = draw.vec$x,
+                ely = draw.vec$lower,
+                ehy = draw.vec$upper,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
@@ -774,13 +785,6 @@
               )
               do.call(draw.errors, draw.args)
             }
-            if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
-              .np_plot_draw_bias_center_legend(
-                legend = plot.legend,
-                estimate.col = plot.args$col,
-                estimate.lty = plot.args$lty,
-                estimate.lwd = plot.args$lwd
-              )
           }
         }
       }
