@@ -2072,6 +2072,79 @@
   }
 }
 
+.np_block_indices_drawer <- function(n,
+                                     B,
+                                     blocklen,
+                                     sim = c("fixed", "geom"),
+                                     n.sim = n,
+                                     endcorr = TRUE) {
+  sim <- match.arg(sim)
+  n <- as.integer(n)
+  B <- as.integer(B)
+  n.sim <- as.integer(n.sim)
+  blocklen <- as.integer(blocklen)
+
+  if (n < 1L || B < 1L || n.sim < 1L)
+    stop("invalid block bootstrap dimensions")
+  if (length(blocklen) != 1L || is.na(blocklen) || blocklen < 1L || blocklen > n)
+    stop("invalid block length for block bootstrap")
+
+  if (identical(blocklen, 1L)) {
+    return(function(start, stopi) {
+      start <- as.integer(start)
+      stopi <- as.integer(stopi)
+      if (start < 1L || stopi < start || stopi > B)
+        stop("invalid block bootstrap chunk bounds")
+      matrix(
+        sample.int(n = n, size = n.sim * (stopi - start + 1L), replace = TRUE),
+        nrow = n.sim
+      )
+    })
+  }
+
+  ts.array <- utils::getFromNamespace("ts.array", "boot")
+  make.ends <- utils::getFromNamespace("make.ends", "boot")
+
+  function(start, stopi) {
+    start <- as.integer(start)
+    stopi <- as.integer(stopi)
+    if (start < 1L || stopi < start || stopi > B)
+      stop("invalid block bootstrap chunk bounds")
+
+    bsz <- stopi - start + 1L
+    ts.draws <- ts.array(
+      n = n,
+      n.sim = n.sim,
+      R = bsz,
+      l = blocklen,
+      sim = sim,
+      endcorr = isTRUE(endcorr)
+    )
+
+    starts <- as.matrix(ts.draws$starts)
+    lengths <- ts.draws$lengths
+    out <- matrix(NA_integer_, nrow = n.sim, ncol = bsz)
+
+    for (rr in seq_len(bsz)) {
+      ends <- if (identical(sim, "geom")) {
+        cbind(starts[rr, ], lengths[rr, ])
+      } else {
+        cbind(starts[rr, ], lengths)
+      }
+
+      inds <- apply(ends, 1L, make.ends, n)
+      inds <- if (is.list(inds)) {
+        as.integer(unlist(inds)[seq_len(n.sim)])
+      } else {
+        as.integer(inds)[seq_len(n.sim)]
+      }
+      out[, rr] <- inds
+    }
+
+    out
+  }
+}
+
 .np_inid_lc_boot_from_hat <- function(H, ydat, B, counts = NULL, counts.drawer = NULL,
                                       progress.label = NULL) {
   H <- as.matrix(H)
@@ -14729,6 +14802,8 @@ compute.default.error.range <- function(center, err) {
     stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires continuous variables for unconditional density/distribution", call. = FALSE)
   if (!isTRUE(all(icon)) || isTRUE(bws$nuno > 0L) || isTRUE(bws$nord > 0L))
     stop("center=\"bias-corrected\" with pair/block/geometric bootstrap is currently implemented only for all-continuous unconditional density/distribution plots", call. = FALSE)
+  if (!identical(bws$ckertype, "gaussian") || !isTRUE(all(as.numeric(bws$ckerorder) == 2)))
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires ordinary second-order Gaussian kernels for unconditional density/distribution plots", call. = FALSE)
 
   bw <- bws$bw
   if (!is.numeric(bw) || length(bw) != length(icon))
@@ -14763,26 +14838,92 @@ compute.default.error.range <- function(center, err) {
                                                      plot.errors.boot.blocklen,
                                                      plot.errors.boot.num,
                                                      progress.label) {
-  bws.pilot <- .np_plot_oversmooth_unconditional_bws(bws, cdf = cdf)
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(plot.errors.boot.num)
+  if (B < 1L)
+    stop("B must be a positive integer")
+
+  bws.smooth <- .np_plot_oversmooth_unconditional_bws(bws, cdf = cdf)
+  g <- as.numeric(bws.smooth$bw)
+  if (length(g) != ncol(xdat) || anyNA(g) || !all(is.finite(g)) || any(g <= 0))
+    stop("invalid smooth-bootstrap pilot bandwidth vector for unconditional plot bias correction", call. = FALSE)
+
+  operator <- if (isTRUE(cdf)) "integral" else "normal"
+  n <- nrow(xdat)
+  p <- ncol(xdat)
+  neval <- nrow(exdat)
+  xnames <- names(xdat)
+  xmat <- as.matrix(xdat)
+  storage.mode(xmat) <- "double"
+
+  t0 <- .np_ksum_unconditional_eval_exact(
+    xdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    operator = operator
+  )
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+
   is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-  counts.drawer <- if (is.block) {
-    .np_block_counts_drawer(
-      n = nrow(xdat),
-      B = plot.errors.boot.num,
+  index.drawer <- if (is.block) {
+    .np_block_indices_drawer(
+      n = n,
+      B = B,
       blocklen = plot.errors.boot.blocklen,
       sim = plot.errors.boot.method
     )
   } else {
     NULL
   }
-  .np_inid_boot_from_ksum_unconditional(
-    xdat = xdat,
-    exdat = exdat,
-    bws = bws.pilot,
-    B = plot.errors.boot.num,
-    operator = if (isTRUE(cdf)) "integral" else "normal",
-    counts.drawer = counts.drawer
+
+  fit_one <- function(idx) {
+    xstar <- xmat[idx, , drop = FALSE] +
+      matrix(stats::rnorm(length(idx) * p), nrow = length(idx), ncol = p) *
+      matrix(g, nrow = length(idx), ncol = p, byrow = TRUE)
+    xstar <- as.data.frame(xstar)
+    names(xstar) <- xnames
+    .np_ksum_unconditional_eval_exact(
+      xdat = xstar,
+      exdat = exdat,
+      bws = bws,
+      operator = operator
+    )
+  }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = is.block)
+  progress <- .np_plot_bootstrap_progress_begin(
+    total = B,
+    label = if (is.null(progress.label)) "Plot bootstrap smooth" else progress.label
   )
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    idx.chunk <- if (!is.null(index.drawer)) {
+      index.drawer(start, stopi)
+    } else {
+      matrix(sample.int(n = n, size = n * bsz, replace = TRUE), nrow = n)
+    }
+    for (jj in seq_len(bsz))
+      tmat[start + jj - 1L, ] <- fit_one(idx.chunk[, jj])
+
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
 }
 
 .np_plot_regression_oversmoothed_boot <- function(xdat, ydat,
