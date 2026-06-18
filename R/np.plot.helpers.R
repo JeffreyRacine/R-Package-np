@@ -14588,27 +14588,75 @@ compute.default.error.range <- function(center, err) {
   range(center, finite = TRUE)
 }
 
+.np_plot_error_center <- function(estimate, err = NULL, plotOnEstimate = TRUE) {
+  estimate <- as.double(estimate)
+  center <- estimate
+  if (!isTRUE(plotOnEstimate) && !is.null(err) && NCOL(err) >= 3L) {
+    corrected <- as.double(err[, 3L])
+    n <- min(length(center), length(corrected))
+    if (n) {
+      idx <- seq_len(n)
+      keep <- is.finite(corrected[idx])
+      center[idx[keep]] <- corrected[idx[keep]]
+    }
+  }
+  center
+}
+
+.np_plot_error_bounds <- function(estimate, err, plotOnEstimate = TRUE) {
+  center <- .np_plot_error_center(estimate, err, plotOnEstimate)
+  lower <- upper <- rep(NA_real_, length(center))
+  if (is.null(err) || NCOL(err) < 2L)
+    return(list(center = center, lower = lower, upper = upper))
+  n <- min(length(center), NROW(err))
+  if (!n)
+    return(list(center = center, lower = lower, upper = upper))
+  idx <- seq_len(n)
+  list(
+    center = center,
+    lower = {
+      lower[idx] <- center[idx] - as.double(err[idx, 1L])
+      lower
+    },
+    upper = {
+      upper[idx] <- center[idx] + as.double(err[idx, 2L])
+      upper
+    }
+  )
+}
+
+.np_plot_error_draw_vectors <- function(x, estimate, err, plotOnEstimate = TRUE) {
+  x <- as.double(x)
+  bounds <- .np_plot_error_bounds(estimate, err, plotOnEstimate)
+  n <- min(length(x), length(bounds$lower), length(bounds$upper))
+  if (!n)
+    return(list(x = numeric(), lower = numeric(), upper = numeric()))
+
+  idx <- seq_len(n)
+  keep <- is.finite(x[idx]) & is.finite(bounds$lower[idx]) & is.finite(bounds$upper[idx])
+  list(
+    x = x[idx][keep],
+    lower = bounds$lower[idx][keep],
+    upper = bounds$upper[idx][keep]
+  )
+}
+
 .np_plot_panel_error_range <- function(estimate,
                                        err = NULL,
                                        all.err = NULL,
                                        plot.errors.type = NULL,
                                        plotOnEstimate = TRUE) {
   estimate <- as.double(estimate)
-  center <- estimate
-  if (!isTRUE(plotOnEstimate) && !is.null(err) && NCOL(err) >= 3L) {
-    corrected <- as.double(err[, 3L])
-    keep <- is.finite(corrected)
-    center[keep] <- corrected[keep]
-  }
-
+  center <- .np_plot_error_center(estimate, err, plotOnEstimate)
   vals <- c(estimate, center)
   if (!is.null(err) && NCOL(err) >= 2L) {
     if (identical(plot.errors.type, "all") && !is.null(all.err)) {
       vals <- c(vals, compute.all.error.range(center, all.err))
     } else {
+      bounds <- .np_plot_error_bounds(estimate, err, plotOnEstimate)
       vals <- c(vals,
-                center - as.double(err[, 1L]),
-                center + as.double(err[, 2L]))
+                bounds$lower,
+                bounds$upper)
     }
   }
 
