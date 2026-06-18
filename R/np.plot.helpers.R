@@ -7194,24 +7194,38 @@ plotFactor <- function(f, y, ...){
                                          center.col = par()$col,
                                          center.lwd = estimate.lwd,
                                          draw.legend = TRUE) {
-  if (isTRUE(xi.factor) || isTRUE(plotOnEstimate))
+  if (isTRUE(plotOnEstimate))
     return(invisible(FALSE))
 
-  x <- as.numeric(x)
   center <- as.numeric(center)
-  n <- min(length(x), length(center))
+  n <- if (isTRUE(xi.factor)) length(center) else min(length(x), length(center))
   if (!n)
     return(invisible(FALSE))
 
   idx <- seq_len(n)
-  keep <- is.finite(x[idx]) & is.finite(center[idx])
+  x <- if (isTRUE(xi.factor)) idx else as.numeric(x)[idx]
+  keep <- is.finite(x) & is.finite(center[idx])
   if (!any(keep))
     return(invisible(FALSE))
 
-  graphics::lines(x[idx][keep], center[idx][keep],
-                  lty = .np_plot_lty("center"),
-                  col = center.col,
-                  lwd = center.lwd)
+  if (isTRUE(xi.factor)) {
+    half.width <- 0.06
+    graphics::segments(x0 = x[keep] - half.width,
+                       y0 = center[idx][keep],
+                       x1 = x[keep] + half.width,
+                       y1 = center[idx][keep],
+                       lty = .np_plot_lty("center"),
+                       col = center.col,
+                       lwd = center.lwd)
+    graphics::points(x[keep], center[idx][keep],
+                     col = center.col,
+                     pch = 1L)
+  } else {
+    graphics::lines(x[keep], center[idx][keep],
+                    lty = .np_plot_lty("center"),
+                    col = center.col,
+                    lwd = center.lwd)
+  }
   if (isTRUE(draw.legend))
     .np_plot_draw_bias_center_legend(
       legend = legend,
