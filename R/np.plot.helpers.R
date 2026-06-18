@@ -15139,6 +15139,12 @@ compute.default.error.range <- function(center, err) {
       !isTRUE(all.equal(cx.order, cy.order, tolerance = 0))) {
     stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires matching continuous x/y kernel orders for conditional density/distribution", call. = FALSE)
   }
+  if (!identical(bws$cxkertype, "gaussian") ||
+      !identical(bws$cykertype, "gaussian") ||
+      !isTRUE(all(as.numeric(bws$cxkerorder) == 2)) ||
+      !isTRUE(all(as.numeric(bws$cykerorder) == 2))) {
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires ordinary second-order Gaussian kernels for conditional density/distribution plots", call. = FALSE)
+  }
 
   pilot <- .np_plot_oversmooth_factor(
     nobs = bws$nobs,
@@ -15160,6 +15166,124 @@ compute.default.error.range <- function(center, err) {
   )
 }
 
+.np_plot_conditional_smooth_boot <- function(xdat, ydat,
+                                             exdat, eydat,
+                                             bws,
+                                             cdf,
+                                             plot.errors.boot.method,
+                                             plot.errors.boot.blocklen,
+                                             plot.errors.boot.num,
+                                             progress.label) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  B <- as.integer(plot.errors.boot.num)
+  n <- nrow(xdat)
+  p.x <- ncol(xdat)
+  p.y <- ncol(ydat)
+  neval <- nrow(exdat)
+
+  if (nrow(ydat) != n || nrow(eydat) != neval)
+    stop("conditional smooth-bootstrap helper requires aligned x/y training and evaluation rows")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid conditional smooth-bootstrap dimensions")
+
+  bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = cdf)
+  gx <- as.numeric(bws.pilot$bandwidth$x)
+  gy <- as.numeric(bws.pilot$bandwidth$y)
+  if (length(gx) != p.x || length(gy) != p.y ||
+      anyNA(gx) || anyNA(gy) ||
+      !all(is.finite(gx)) || !all(is.finite(gy)) ||
+      any(gx <= 0) || any(gy <= 0)) {
+    stop("invalid smooth-bootstrap pilot bandwidth vectors for conditional plot bias correction", call. = FALSE)
+  }
+
+  xnames <- names(xdat)
+  ynames <- names(ydat)
+  xmat <- as.matrix(xdat)
+  ymat <- as.matrix(ydat)
+  storage.mode(xmat) <- "double"
+  storage.mode(ymat) <- "double"
+
+  fit_one <- function(x.train, y.train) {
+    kbx <- .np_con_make_kbandwidth_x(bws = bws, xdat = x.train)
+    kbxy <- .np_con_make_kbandwidth_xy(bws = bws, xdat = x.train, ydat = y.train)
+    .np_ksum_conditional_eval_exact(
+      xdat = x.train,
+      ydat = y.train,
+      exdat = exdat,
+      eydat = eydat,
+      kbx = kbx,
+      kbxy = kbxy,
+      cdf = cdf
+    )
+  }
+
+  t0 <- fit_one(x.train = xdat, y.train = ydat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+
+  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+  index.drawer <- if (is.block) {
+    .np_block_indices_drawer(
+      n = n,
+      B = B,
+      blocklen = plot.errors.boot.blocklen,
+      sim = plot.errors.boot.method
+    )
+  } else {
+    NULL
+  }
+
+  smooth_one <- function(idx) {
+    xstar <- xmat[idx, , drop = FALSE] +
+      matrix(stats::rnorm(length(idx) * p.x), nrow = length(idx), ncol = p.x) *
+      matrix(gx, nrow = length(idx), ncol = p.x, byrow = TRUE)
+    ystar <- ymat[idx, , drop = FALSE] +
+      matrix(stats::rnorm(length(idx) * p.y), nrow = length(idx), ncol = p.y) *
+      matrix(gy, nrow = length(idx), ncol = p.y, byrow = TRUE)
+    xstar <- as.data.frame(xstar)
+    ystar <- as.data.frame(ystar)
+    names(xstar) <- xnames
+    names(ystar) <- ynames
+    fit_one(x.train = xstar, y.train = ystar)
+  }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = is.block)
+  progress <- .np_plot_bootstrap_progress_begin(
+    total = B,
+    label = if (is.null(progress.label)) "Plot bootstrap smooth" else progress.label
+  )
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    idx.chunk <- if (!is.null(index.drawer)) {
+      index.drawer(start, stopi)
+    } else {
+      matrix(sample.int(n = n, size = n * bsz, replace = TRUE), nrow = n)
+    }
+    for (jj in seq_len(bsz))
+      tmat[start + jj - 1L, ] <- smooth_one(idx.chunk[, jj])
+
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_plot_conditional_oversmoothed_boot <- function(xdat, ydat,
                                                    exdat, eydat,
                                                    bws,
@@ -15168,27 +15292,16 @@ compute.default.error.range <- function(center, err) {
                                                    plot.errors.boot.blocklen,
                                                    plot.errors.boot.num,
                                                    progress.label) {
-  bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = cdf)
-  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-  counts.drawer <- if (is.block) {
-    .np_block_counts_drawer(
-      n = nrow(xdat),
-      B = plot.errors.boot.num,
-      blocklen = plot.errors.boot.blocklen,
-      sim = plot.errors.boot.method
-    )
-  } else {
-    NULL
-  }
-  .np_inid_boot_from_ksum_conditional(
+  .np_plot_conditional_smooth_boot(
     xdat = xdat,
     ydat = ydat,
     exdat = exdat,
     eydat = eydat,
-    bws = bws.pilot,
-    B = plot.errors.boot.num,
+    bws = bws,
     cdf = cdf,
-    counts.drawer = counts.drawer,
+    plot.errors.boot.method = plot.errors.boot.method,
+    plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+    plot.errors.boot.num = plot.errors.boot.num,
     progress.label = progress.label
   )
 }
