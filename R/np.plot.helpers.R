@@ -391,6 +391,27 @@
   object
 }
 
+.np_plot_add_named_bias_fields <- function(object,
+                                           estimate,
+                                           bias.corrected,
+                                           bias.name = "bias",
+                                           corrected.name = "bias.corrected") {
+  estimate <- as.numeric(estimate)
+  bias.corrected <- as.numeric(bias.corrected)
+  n <- min(length(estimate), length(bias.corrected))
+  if (!n) {
+    object[[bias.name]] <- numeric()
+    object[[corrected.name]] <- numeric()
+    return(object)
+  }
+  estimate <- estimate[seq_len(n)]
+  bias.corrected <- bias.corrected[seq_len(n)]
+  keep <- is.finite(estimate) & is.finite(bias.corrected)
+  object[[bias.name]] <- estimate[keep] - bias.corrected[keep]
+  object[[corrected.name]] <- bias.corrected[keep]
+  object
+}
+
 .np_plot_layout_begin <- function(plot.behavior, plot.par.mfrow, mfrow) {
   list(
     pending = isTRUE(plot.behavior != "data" && plot.par.mfrow),
@@ -7160,6 +7181,47 @@ plotFactor <- function(f, y, ...){
   if (!is.null(legend.args))
     do.call(graphics::legend, legend.args)
   invisible(NULL)
+}
+
+.np_plot_draw_bias_center_1d <- function(x,
+                                         center,
+                                         xi.factor = FALSE,
+                                         plotOnEstimate = TRUE,
+                                         legend = TRUE,
+                                         estimate.col = par()$col,
+                                         estimate.lty = par()$lty,
+                                         estimate.lwd = par()$lwd,
+                                         center.col = par()$col,
+                                         center.lwd = estimate.lwd,
+                                         draw.legend = TRUE) {
+  if (isTRUE(xi.factor) || isTRUE(plotOnEstimate))
+    return(invisible(FALSE))
+
+  x <- as.numeric(x)
+  center <- as.numeric(center)
+  n <- min(length(x), length(center))
+  if (!n)
+    return(invisible(FALSE))
+
+  idx <- seq_len(n)
+  keep <- is.finite(x[idx]) & is.finite(center[idx])
+  if (!any(keep))
+    return(invisible(FALSE))
+
+  graphics::lines(x[idx][keep], center[idx][keep],
+                  lty = .np_plot_lty("center"),
+                  col = center.col,
+                  lwd = center.lwd)
+  if (isTRUE(draw.legend))
+    .np_plot_draw_bias_center_legend(
+      legend = legend,
+      estimate.col = estimate.col,
+      estimate.lty = estimate.lty,
+      estimate.lwd = estimate.lwd,
+      center.col = center.col,
+      center.lwd = center.lwd
+    )
+  invisible(TRUE)
 }
 
 .np_plot_draw_all_band_legend <- function(legend = TRUE,
