@@ -5983,6 +5983,7 @@ plotFactor <- function(f, y, ...){
   dot.args <- list(...)
   dot.names <- names(dot.args)
   has.user.lty <- !is.null(dot.names) && any(dot.names == "lty")
+  has.user.pch <- !is.null(dot.names) && any(dot.names == "pch")
   is.fac <- is.factor(f) || is.ordered(f)
   has.user.xaxt <- !is.null(dot.names) && any(dot.names == "xaxt")
   has.user.xlim <- !is.null(dot.names) && any(dot.names == "xlim")
@@ -5996,6 +5997,8 @@ plotFactor <- function(f, y, ...){
     base.args$xlim <- c(0.5, length(levels(f)) + 0.5)
   if (!has.user.lty)
     base.args$lty <- "blank"
+  if (is.fac && !has.user.pch)
+    base.args$pch <- .np_plot_pch("factor_estimate")
   do.call(graphics::plot.default, base.args)
   if (add.axis)
     axis(1, at = seq_along(levels(f)), labels = levels(f))
@@ -6013,7 +6016,11 @@ plotFactor <- function(f, y, ...){
 
   point.args <- list(x = f, y = y)
   if (!is.null(dot.args$col)) point.args$col <- dot.args$col
-  if (!is.null(dot.args$pch)) point.args$pch <- dot.args$pch
+  if (!is.null(dot.args$pch)) {
+    point.args$pch <- dot.args$pch
+  } else if (is.fac) {
+    point.args$pch <- .np_plot_pch("factor_estimate")
+  }
   if (!is.null(dot.args$cex)) point.args$cex <- dot.args$cex
   if (!is.null(dot.args$bg)) point.args$bg <- dot.args$bg
   do.call(points, point.args)
@@ -6579,6 +6586,8 @@ plotFactor <- function(f, y, ...){
   switch(
     role,
     data_overlay = 20L,
+    factor_estimate = 16L,
+    bias_center = 1L,
     stop("unknown plot point-character role: ", role, call. = FALSE)
   )
 }
@@ -7172,7 +7181,8 @@ plotFactor <- function(f, y, ...){
     list(x = legend.loc,
          legend = c("Estimate", "Bias-corrected estimate"),
          col = c(estimate.col, center.col),
-         pch = c(16L, 1L),
+         pch = c(.np_plot_pch("factor_estimate"),
+                 .np_plot_pch("bias_center")),
          lty = c(0L, 0L),
          cex = .np_plot_cex("legend"),
          bty = "n")
@@ -7231,7 +7241,7 @@ plotFactor <- function(f, y, ...){
                        lwd = center.lwd)
     graphics::points(x[keep], center[idx][keep],
                      col = center.col,
-                     pch = 1L)
+                     pch = .np_plot_pch("bias_center"))
   } else {
     graphics::lines(x[keep], center[idx][keep],
                     lty = .np_plot_lty("center"),
