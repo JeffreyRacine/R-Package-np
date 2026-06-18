@@ -15150,7 +15150,7 @@ compute.default.error.range <- function(center, err) {
     nobs = bws$nobs,
     p.continuous = sum(xicon) + sum(yicon),
     kernel.order = cx.order,
-    family = if (isTRUE(cdf)) "distribution-sqrt" else "density-sqrt"
+    family = if (isTRUE(cdf)) "distribution" else "density"
   )
 
   out <- bws
@@ -15162,7 +15162,7 @@ compute.default.error.range <- function(center, err) {
     bws = out,
     factor = pilot$factor,
     exponent = pilot$exponent,
-    family = if (isTRUE(cdf)) "conditional-distribution-x-square-root-y-equals-h" else "conditional-density-x-square-root-y-equals-h"
+    family = if (isTRUE(cdf)) "conditional-distribution-x-full-y-equals-h" else "conditional-density-x-full-y-equals-h"
   )
 }
 

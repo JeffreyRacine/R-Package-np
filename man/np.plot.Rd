@@ -476,11 +476,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   density smooth-bootstrap literature. For all-continuous conditional
   density/distribution plots, the continuous dependent-variable side uses
   the same density-style rule \eqn{g_y = h_y}, while the continuous
-  conditioning-variable side uses a regression-style pilot. For
+  conditioning-variable side uses a full regression-style pilot. For
   conditional density this is
-  \deqn{g_{xj} = h_{xj} n^{r / ((p + 2r)(p + 4r))},}
+  \deqn{g_{xj} = h_{xj} n^{2r / ((p + 2r)(p + 4r))},}
   and for conditional distribution this is
-  \deqn{g_{xj} = h_{xj} n^{r / (2(p + r)(p + 2r))},}
+  \deqn{g_{xj} = h_{xj} n^{r / ((p + r)(p + 2r))},}
   where here \eqn{p} is the total number of continuous dependent and
   explanatory variables. These are practical, evidence-backed
   rules-of-thumb guided by the smoothed-bootstrap and regression
