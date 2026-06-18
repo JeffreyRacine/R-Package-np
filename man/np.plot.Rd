@@ -476,7 +476,15 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   smooth-bootstrap perturbation rule uses \eqn{g_j = h_j}, following the
   density smooth-bootstrap literature. Continuous variables are
   perturbed and categorical variables are resampled row-wise without
-  perturbation. For conditional density/distribution plots, the
+  perturbation. The smooth perturbation law is drawn from the selected
+  ordinary continuous kernel when that kernel defines a probability law:
+  second-order Gaussian, uniform, and second-order Epanechnikov kernels
+  are supported. Higher-order Gaussian and Epanechnikov kernels remain
+  valid estimation kernels, but their signed equivalent-kernel forms do
+  not define ordinary random perturbations, so
+  \code{center="bias-corrected"} with pair/block/geometric bootstrap
+  fails clearly for those higher-order smooth-bootstrap perturbation
+  routes. For conditional density/distribution plots, the
   continuous dependent-variable side uses the same density-style rule
   \eqn{g_y = h_y}; categorical dependent variables are resampled row-wise
   without perturbation. The conditioning-variable side uses a full

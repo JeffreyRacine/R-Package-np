@@ -14976,7 +14976,95 @@ compute.default.error.range <- function(center, err) {
   bws
 }
 
-.np_plot_smooth_resample_frame <- function(dat, idx, icon, g) {
+.np_plot_kernel_perturbation_policy <- function(ckertype, ckerorder = 2L,
+                                                context = "smooth bootstrap perturbation") {
+  raw.type <- as.character(ckertype)[1L]
+  if (is.na(raw.type) || !nzchar(raw.type))
+    stop(sprintf("%s requires a valid continuous kernel type", context), call. = FALSE)
+
+  type <- tolower(gsub("[[:space:]_-]+", "", raw.type))
+  order <- suppressWarnings(as.numeric(ckerorder[1L]))
+  if (!is.finite(order))
+    order <- 2
+
+  if (identical(type, "uniform")) {
+    return(list(family = "uniform", order = 2L))
+  }
+
+  if (identical(type, "gaussian")) {
+    if (!isTRUE(all(as.numeric(ckerorder) == 2))) {
+      stop(sprintf(
+        "%s supports ordinary second-order Gaussian perturbations only; higher-order Gaussian kernels are signed estimation kernels and do not define ordinary smooth-bootstrap random perturbations",
+        context
+      ), call. = FALSE)
+    }
+    return(list(family = "gaussian", order = 2L))
+  }
+
+  if (identical(type, "epanechnikov")) {
+    if (!isTRUE(all(as.numeric(ckerorder) == 2))) {
+      stop(sprintf(
+        "%s supports second-order Epanechnikov perturbations only; higher-order Epanechnikov kernels are signed estimation kernels and do not define ordinary smooth-bootstrap random perturbations",
+        context
+      ), call. = FALSE)
+    }
+    return(list(family = "epanechnikov", order = 2L))
+  }
+
+  stop(sprintf(
+    "%s currently supports Gaussian, uniform, and second-order Epanechnikov perturbations only",
+    context
+  ), call. = FALSE)
+}
+
+.np_plot_rep_kernel_arg <- function(x, n, default = NULL) {
+  if (is.null(x) || !length(x))
+    x <- default
+  if (is.null(x) || !length(x))
+    x <- NA
+  rep(as.vector(x), length.out = n)
+}
+
+.np_plot_repan2 <- function(n) {
+  n <- as.integer(n[1L])
+  if (!is.finite(n) || n < 0L)
+    stop("invalid Epanechnikov perturbation draw count", call. = FALSE)
+  out <- numeric(n)
+  filled <- 0L
+  while (filled < n) {
+    m <- max(8L, ceiling((n - filled) * 1.75))
+    u <- stats::runif(m, -1, 1)
+    keep <- stats::runif(m) <= (1 - u * u)
+    vals <- u[keep]
+    take <- min(length(vals), n - filled)
+    if (take > 0L) {
+      out[filled + seq_len(take)] <- vals[seq_len(take)]
+      filled <- filled + take
+    }
+  }
+  out
+}
+
+.np_plot_kernel_random <- function(n, ckertype, ckerorder = 2L,
+                                   context = "smooth bootstrap perturbation") {
+  policy <- .np_plot_kernel_perturbation_policy(
+    ckertype = ckertype,
+    ckerorder = ckerorder,
+    context = context
+  )
+  out <- switch(policy$family,
+                gaussian = stats::rnorm(n),
+                uniform = stats::runif(n, -1, 1),
+                epanechnikov = .np_plot_repan2(n))
+  if (length(out) != n || anyNA(out) || !all(is.finite(out)))
+    stop(sprintf("%s produced invalid kernel perturbation draws", context), call. = FALSE)
+  out
+}
+
+.np_plot_smooth_resample_frame <- function(dat, idx, icon, g,
+                                           ckertype = "gaussian",
+                                           ckerorder = 2L,
+                                           context = "smooth bootstrap perturbation") {
   dat <- toFrame(dat)
   icon <- as.logical(icon)
   if (length(icon) != ncol(dat))
@@ -14990,11 +15078,17 @@ compute.default.error.range <- function(center, err) {
         !all(is.finite(g[cont.idx])) || any(g[cont.idx] <= 0)) {
       stop("invalid smooth-bootstrap pilot bandwidth vector", call. = FALSE)
     }
-    noise <- matrix(stats::rnorm(length(idx) * length(cont.idx)),
-                    nrow = length(idx), ncol = length(cont.idx))
+    kernel.types <- .np_plot_rep_kernel_arg(ckertype, ncol(dat), default = "gaussian")
+    kernel.orders <- .np_plot_rep_kernel_arg(ckerorder, ncol(dat), default = 2L)
     for (k in seq_along(cont.idx)) {
       j <- cont.idx[k]
-      out[[j]] <- as.numeric(out[[j]]) + noise[, k] * g[j]
+      noise <- .np_plot_kernel_random(
+        n = length(idx),
+        ckertype = kernel.types[j],
+        ckerorder = kernel.orders[j],
+        context = context
+      )
+      out[[j]] <- as.numeric(out[[j]]) + noise * g[j]
     }
   }
   out
@@ -15070,8 +15164,11 @@ compute.default.error.range <- function(center, err) {
     icon <- bws$icon
   if (is.null(icon) || !length(icon) || !any(icon))
     stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires continuous variables for unconditional density/distribution", call. = FALSE)
-  if (!identical(bws$ckertype, "gaussian") || !isTRUE(all(as.numeric(bws$ckerorder) == 2)))
-    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires ordinary second-order Gaussian kernels for unconditional density/distribution plots", call. = FALSE)
+  invisible(.np_plot_kernel_perturbation_policy(
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    context = "center=\"bias-corrected\" with pair/block/geometric bootstrap for unconditional density/distribution plots"
+  ))
 
   bw <- bws$bw
   if (!is.numeric(bw) || length(bw) != length(icon))
@@ -15151,7 +15248,10 @@ compute.default.error.range <- function(center, err) {
       dat = xdat,
       idx = idx,
       icon = icon,
-      g = g
+      g = g,
+      ckertype = bws$ckertype,
+      ckerorder = bws$ckerorder,
+      context = "unconditional density/distribution smooth bootstrap"
     )
     .np_ksum_unconditional_eval_exact(
       xdat = xstar,
@@ -15336,17 +15436,21 @@ compute.default.error.range <- function(center, err) {
   if (is.null(xicon) || is.null(yicon) || !any(yicon))
     stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires at least one continuous dependent variable for conditional density/distribution", call. = FALSE)
 
-  cx.order <- as.numeric(bws$cxkerorder[1L])
-  cy.order <- as.numeric(bws$cykerorder[1L])
+  cx.policy <- .np_plot_kernel_perturbation_policy(
+    ckertype = bws$cxkertype,
+    ckerorder = bws$cxkerorder,
+    context = "center=\"bias-corrected\" with pair/block/geometric bootstrap for conditional density/distribution x-kernel plots"
+  )
+  cy.policy <- .np_plot_kernel_perturbation_policy(
+    ckertype = bws$cykertype,
+    ckerorder = bws$cykerorder,
+    context = "center=\"bias-corrected\" with pair/block/geometric bootstrap for conditional density/distribution y-kernel plots"
+  )
+  cx.order <- as.numeric(cx.policy$order)
+  cy.order <- as.numeric(cy.policy$order)
   if (!is.finite(cx.order) || !is.finite(cy.order) || cx.order <= 0 || cy.order <= 0 ||
       !isTRUE(all.equal(cx.order, cy.order, tolerance = 0))) {
     stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires matching continuous x/y kernel orders for conditional density/distribution", call. = FALSE)
-  }
-  if (!identical(bws$cxkertype, "gaussian") ||
-      !identical(bws$cykertype, "gaussian") ||
-      !isTRUE(all(as.numeric(bws$cxkerorder) == 2)) ||
-      !isTRUE(all(as.numeric(bws$cykerorder) == 2))) {
-    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires ordinary second-order Gaussian kernels for conditional density/distribution plots", call. = FALSE)
   }
 
   pilot <- .np_plot_oversmooth_factor(
@@ -15449,13 +15553,19 @@ compute.default.error.range <- function(center, err) {
       dat = xdat,
       idx = idx,
       icon = xicon,
-      g = gx
+      g = gx,
+      ckertype = bws$cxkertype,
+      ckerorder = bws$cxkerorder,
+      context = "conditional density/distribution x-side smooth bootstrap"
     )
     ystar <- .np_plot_smooth_resample_frame(
       dat = ydat,
       idx = idx,
       icon = yicon,
-      g = gy
+      g = gy,
+      ckertype = bws$cykertype,
+      ckerorder = bws$cykerorder,
+      context = "conditional density/distribution y-side smooth bootstrap"
     )
     fit_one(x.train = xstar, y.train = ystar)
   }
