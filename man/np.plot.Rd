@@ -458,17 +458,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   components such as \code{gc1bias}; different bootstrap schemes can
   give materially different derivative-bias corrections.
 
-  The pilot rule is family-specific. For regression-style smoothing
-  variables, including regression, supported semiparametric regression
-  plots, and single-index plots, the non-wild pilot uses the
-  square-root version of the usual oversmoothing-rate rule:
-  \deqn{g_j = h_j n^{r / ((p + 2r)(p + 4r))},}
+  The pilot rule is family-specific. For fixed-bandwidth regression
+  plots, the non-wild pilot uses the full oversmoothing-rate rule:
+  \deqn{g_j = h_j n^{2r / ((p + 2r)(p + 4r))},}
   where \eqn{h_j} is the selected bandwidth, \eqn{r} is the continuous
   kernel order, and \eqn{p} is the number of continuous smoothing
-  variables in that regression-style route. For ordinary second-order
+  variables in that regression route. For ordinary second-order
   kernels with one continuous smoothing variable this reduces to
-  \eqn{g_j = h_j n^{2/45}}. Categorical variables do not enter this
-  continuous-rate exponent.
+  \eqn{g_j = h_j n^{4/45}}. Categorical variables do not enter this
+  continuous-rate exponent. Supported semiparametric regression and
+  single-index plot routes use the square-root version of this rule.
 
   For unconditional all-continuous density and distribution plots, the
   smooth-bootstrap perturbation rule uses \eqn{g_j = h_j}, following the

@@ -9427,7 +9427,7 @@ compute.default.error.range <- function(center, err) {
     nobs = bws$nobs,
     p.continuous = sum(icon),
     kernel.order = bws$ckerorder,
-    family = "density-sqrt"
+    family = "density"
   )
 
   out <- bws
@@ -9440,7 +9440,7 @@ compute.default.error.range <- function(center, err) {
     bws = out,
     factor = pilot$factor,
     exponent = pilot$exponent,
-    family = "regression-square-root"
+    family = "regression-full"
   )
 }
 
