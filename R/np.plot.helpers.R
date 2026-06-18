@@ -14483,13 +14483,13 @@ compute.default.error.range <- function(center, err) {
   c(NA_real_, NA_real_)
 }
 
-.np_plot_include_requested_ylim <- function(panel.ylim, ylim = NULL) {
+.np_plot_resolve_requested_ylim <- function(panel.ylim, ylim = NULL) {
   if (is.null(ylim))
     return(panel.ylim)
-  out <- range(c(panel.ylim, ylim), finite = TRUE)
-  if (length(out) == 2L && all(is.finite(out)))
-    return(out)
-  panel.ylim
+  out <- as.numeric(ylim)
+  if (length(out) != 2L || anyNA(out) || !all(is.finite(out)) || out[1L] == out[2L])
+    stop("ylim must be a finite numeric vector of length two with distinct values")
+  out
 }
 
 .np_plot_normalize_common_options <- function(plot.behavior,

@@ -828,7 +828,7 @@
             panel.ylim <- range(temp.mean, finite = TRUE)
           if (overlay.ok)
             panel.ylim <- .np_plot_overlay_range(panel.ylim, ydat)
-          panel.ylim <- .np_plot_include_requested_ylim(panel.ylim, ylim)
+          panel.ylim <- .np_plot_resolve_requested_ylim(panel.ylim, ylim)
           if (!is.null(panel.ylim))
             plot.args$ylim <- panel.ylim
           plot.args$xlab <- scalar_default(xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
@@ -1061,7 +1061,7 @@
         }
 
         if(!is.null(ylim)){
-          y.range <- .np_plot_include_requested_ylim(c(y.min, y.max), ylim)
+          y.range <- .np_plot_resolve_requested_ylim(c(y.min, y.max), ylim)
           y.min = y.range[1]
           y.max = y.range[2]
         }
