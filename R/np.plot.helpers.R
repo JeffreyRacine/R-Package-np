@@ -8053,6 +8053,22 @@ plotFactor <- function(f, y, ...){
   list(t = tmat, t0 = t0)
 }
 
+.np_plot_conditional_gradient_bootstrap_has_discrete <- function(bws) {
+  xicon <- bws$xdati$icon
+  yicon <- bws$ydati$icon
+  is.null(xicon) || is.null(yicon) || any(!as.logical(xicon)) || any(!as.logical(yicon))
+}
+
+.np_plot_require_conditional_gradient_bootstrap_supported <- function(bws, where) {
+  if (.np_plot_conditional_gradient_bootstrap_has_discrete(bws)) {
+    stop(sprintf(
+      "%s currently supports bootstrap gradient bias correction only for all-continuous conditional density/distribution bandwidths",
+      where
+    ), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
 .np_inid_boot_from_quantile_level_local <- function(xdat,
                                                     ydat,
                                                     exdat,
@@ -9472,6 +9488,104 @@ compute.default.error.range <- function(center, err) {
   bws
 }
 
+.np_plot_cat_upper_from_metadata <- function(dati, index, kernel) {
+  if (identical(kernel, "aitchisonaitken")) {
+    nlev <- NA_integer_
+    if (!is.null(dati$all.nlev) && length(dati$all.nlev) >= index)
+      nlev <- suppressWarnings(as.integer(dati$all.nlev[[index]][1L]))
+    if ((!is.finite(nlev) || nlev < 2L) &&
+        !is.null(dati$all.lev) && length(dati$all.lev) >= index)
+      nlev <- length(dati$all.lev[[index]])
+    if (is.finite(nlev) && nlev > 1L)
+      return((nlev - 1) / nlev)
+  }
+  1
+}
+
+.np_plot_cat_lambda_pilot <- function(lambda, upper, factor) {
+  lambda <- as.numeric(lambda)
+  upper <- as.numeric(upper)
+  factor <- as.numeric(factor[1L])
+  if (!is.finite(lambda) || !is.finite(upper) ||
+      !is.finite(factor) || factor < 1)
+    return(lambda)
+  upper <- max(lambda, upper)
+  lambda + (upper - lambda) * (1 - 1 / factor)
+}
+
+.np_plot_apply_cat_lambda_pilot <- function(bws, side = "x", icon, dati,
+                                            ukernel = NULL, okernel = NULL,
+                                            factor) {
+  if (is.null(icon) || !length(icon) || !any(!icon))
+    return(bws)
+  side <- match.arg(side, c("x", "y"))
+  cat.idx <- which(!icon)
+  if (!length(cat.idx))
+    return(bws)
+  if (is.null(dati))
+    return(bws)
+
+  if (side == "x") {
+    raw.field <- if (!is.null(bws$xbw)) "xbw" else "bw"
+    current <- if (!is.null(bws$bandwidth$x)) bws$bandwidth$x else bws[[raw.field]]
+  } else {
+    raw.field <- if (!is.null(bws$ybw)) "ybw" else "bw"
+    current <- if (!is.null(bws$bandwidth$y)) bws$bandwidth$y else bws[[raw.field]]
+  }
+  if (!is.numeric(current) || length(current) < max(cat.idx))
+    return(bws)
+
+  iuno <- if (!is.null(dati$iuno)) as.logical(dati$iuno) else rep(FALSE, length(icon))
+  iord <- if (!is.null(dati$iord)) as.logical(dati$iord) else rep(FALSE, length(icon))
+  new.values <- current
+  for (j in cat.idx) {
+    kernel <- if (isTRUE(iuno[j])) ukernel else if (isTRUE(iord[j])) okernel else NULL
+    upper <- .np_plot_cat_upper_from_metadata(dati = dati, index = j, kernel = kernel)
+    new.values[j] <- .np_plot_cat_lambda_pilot(current[j], upper, factor)
+  }
+
+  if (!is.null(bws[[raw.field]]) && length(bws[[raw.field]]) >= max(cat.idx))
+    bws[[raw.field]][cat.idx] <- new.values[cat.idx]
+  if (side == "x") {
+    if (!is.null(bws$bandwidth$x) && length(bws$bandwidth$x) >= max(cat.idx))
+      bws$bandwidth$x[cat.idx] <- new.values[cat.idx]
+    if (!is.null(bws$sfactor$x) && length(bws$sfactor$x) >= max(cat.idx) &&
+        !is.null(bws$ncatfac) && is.finite(bws$ncatfac) && bws$ncatfac > 0)
+      bws$sfactor$x[cat.idx] <- new.values[cat.idx] / bws$ncatfac
+  } else {
+    if (!is.null(bws$bandwidth$y) && length(bws$bandwidth$y) >= max(cat.idx))
+      bws$bandwidth$y[cat.idx] <- new.values[cat.idx]
+    if (!is.null(bws$sfactor$y) && length(bws$sfactor$y) >= max(cat.idx) &&
+        !is.null(bws$ncatfac) && is.finite(bws$ncatfac) && bws$ncatfac > 0)
+      bws$sfactor$y[cat.idx] <- new.values[cat.idx] / bws$ncatfac
+  }
+  bws
+}
+
+.np_plot_smooth_resample_frame <- function(dat, idx, icon, g) {
+  dat <- toFrame(dat)
+  icon <- as.logical(icon)
+  if (length(icon) != ncol(dat))
+    stop("smooth-bootstrap resampling received incompatible variable metadata", call. = FALSE)
+  out <- dat[idx, , drop = FALSE]
+  row.names(out) <- NULL
+  cont.idx <- which(icon)
+  if (length(cont.idx)) {
+    g <- as.numeric(g)
+    if (length(g) != ncol(dat) || anyNA(g[cont.idx]) ||
+        !all(is.finite(g[cont.idx])) || any(g[cont.idx] <= 0)) {
+      stop("invalid smooth-bootstrap pilot bandwidth vector", call. = FALSE)
+    }
+    noise <- matrix(stats::rnorm(length(idx) * length(cont.idx)),
+                    nrow = length(idx), ncol = length(cont.idx))
+    for (k in seq_along(cont.idx)) {
+      j <- cont.idx[k]
+      out[[j]] <- as.numeric(out[[j]]) + noise[, k] * g[j]
+    }
+  }
+  out
+}
+
 .np_plot_oversmooth_regression_bws <- function(bws) {
   if (!inherits(bws, "rbandwidth"))
     stop("oversmoothed pair/block/geometric bootstrap center is currently implemented only for regression bandwidth objects", call. = FALSE)
@@ -9498,6 +9612,15 @@ compute.default.error.range <- function(center, err) {
   if (!is.null(out$sfactor$x) && length(out$sfactor$x) == length(out$bw)) {
     out$sfactor$x[icon] <- out$sfactor$x[icon] * pilot$factor
   }
+  out <- .np_plot_apply_cat_lambda_pilot(
+    bws = out,
+    side = "x",
+    icon = icon,
+    dati = out$xdati,
+    ukernel = out$ukertype,
+    okernel = out$okertype,
+    factor = pilot$factor
+  )
   .np_plot_mark_oversmoothed_bws(
     bws = out,
     factor = pilot$factor,
@@ -9517,8 +9640,6 @@ compute.default.error.range <- function(center, err) {
     icon <- bws$icon
   if (is.null(icon) || !length(icon) || !any(icon))
     stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires continuous variables for unconditional density/distribution", call. = FALSE)
-  if (!isTRUE(all(icon)) || isTRUE(bws$nuno > 0L) || isTRUE(bws$nord > 0L))
-    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap is currently implemented only for all-continuous unconditional density/distribution plots", call. = FALSE)
   if (!identical(bws$ckertype, "gaussian") || !isTRUE(all(as.numeric(bws$ckerorder) == 2)))
     stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires ordinary second-order Gaussian kernels for unconditional density/distribution plots", call. = FALSE)
 
@@ -9563,16 +9684,17 @@ compute.default.error.range <- function(center, err) {
 
   bws.smooth <- .np_plot_oversmooth_unconditional_bws(bws, cdf = cdf)
   g <- as.numeric(bws.smooth$bw)
-  if (length(g) != ncol(xdat) || anyNA(g) || !all(is.finite(g)) || any(g <= 0))
+  icon <- bws$xdati$icon
+  if (is.null(icon))
+    icon <- bws$icon
+  icon <- as.logical(icon)
+  if (length(g) != ncol(xdat) || length(icon) != ncol(xdat) ||
+      anyNA(g[icon]) || !all(is.finite(g[icon])) || any(g[icon] <= 0))
     stop("invalid smooth-bootstrap pilot bandwidth vector for unconditional plot bias correction", call. = FALSE)
 
   operator <- if (isTRUE(cdf)) "integral" else "normal"
   n <- nrow(xdat)
-  p <- ncol(xdat)
   neval <- nrow(exdat)
-  xnames <- names(xdat)
-  xmat <- as.matrix(xdat)
-  storage.mode(xmat) <- "double"
 
   t0 <- .np_ksum_unconditional_eval_exact(
     xdat = xdat,
@@ -9595,11 +9717,12 @@ compute.default.error.range <- function(center, err) {
   }
 
   fit_one <- function(idx) {
-    xstar <- xmat[idx, , drop = FALSE] +
-      matrix(stats::rnorm(length(idx) * p), nrow = length(idx), ncol = p) *
-      matrix(g, nrow = length(idx), ncol = p, byrow = TRUE)
-    xstar <- as.data.frame(xstar)
-    names(xstar) <- xnames
+    xstar <- .np_plot_smooth_resample_frame(
+      dat = xdat,
+      idx = idx,
+      icon = icon,
+      g = g
+    )
     .np_ksum_unconditional_eval_exact(
       xdat = xstar,
       exdat = exdat,
@@ -9778,13 +9901,8 @@ compute.default.error.range <- function(center, err) {
 
   xicon <- bws$xdati$icon
   yicon <- bws$ydati$icon
-  if (is.null(xicon) || is.null(yicon) || !any(xicon) || !any(yicon))
-    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires continuous dependent and explanatory variables for conditional density/distribution", call. = FALSE)
-  if (!isTRUE(all(xicon)) || !isTRUE(all(yicon)) ||
-      isTRUE(bws$xnuno > 0L) || isTRUE(bws$ynuno > 0L) ||
-      isTRUE(bws$xnord > 0L) || isTRUE(bws$ynord > 0L)) {
-    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap is currently implemented only for all-continuous conditional density/distribution plots", call. = FALSE)
-  }
+  if (is.null(xicon) || is.null(yicon) || !any(yicon))
+    stop("center=\"bias-corrected\" with pair/block/geometric bootstrap requires at least one continuous dependent variable for conditional density/distribution", call. = FALSE)
 
   cx.order <- as.numeric(bws$cxkerorder[1L])
   cy.order <- as.numeric(bws$cykerorder[1L])
@@ -9808,9 +9926,21 @@ compute.default.error.range <- function(center, err) {
 
   out <- bws
   out$bandwidth$x[xicon] <- out$bandwidth$x[xicon] * pilot$factor
+  if (!is.null(out$xbw) && length(out$xbw) == length(out$bandwidth$x)) {
+    out$xbw[xicon] <- out$xbw[xicon] * pilot$factor
+  }
   if (!is.null(out$sfactor$x) && length(out$sfactor$x) == length(out$bandwidth$x)) {
     out$sfactor$x[xicon] <- out$sfactor$x[xicon] * pilot$factor
   }
+  out <- .np_plot_apply_cat_lambda_pilot(
+    bws = out,
+    side = "x",
+    icon = xicon,
+    dati = out$xdati,
+    ukernel = out$uxkertype,
+    okernel = out$oxkertype,
+    factor = pilot$factor
+  )
   .np_plot_mark_oversmoothed_bws(
     bws = out,
     factor = pilot$factor,
@@ -9833,8 +9963,6 @@ compute.default.error.range <- function(center, err) {
   eydat <- toFrame(eydat)
   B <- as.integer(plot.errors.boot.num)
   n <- nrow(xdat)
-  p.x <- ncol(xdat)
-  p.y <- ncol(ydat)
   neval <- nrow(exdat)
 
   if (nrow(ydat) != n || nrow(eydat) != neval)
@@ -9845,19 +9973,15 @@ compute.default.error.range <- function(center, err) {
   bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = cdf)
   gx <- as.numeric(bws.pilot$bandwidth$x)
   gy <- as.numeric(bws.pilot$bandwidth$y)
-  if (length(gx) != p.x || length(gy) != p.y ||
-      anyNA(gx) || anyNA(gy) ||
-      !all(is.finite(gx)) || !all(is.finite(gy)) ||
-      any(gx <= 0) || any(gy <= 0)) {
+  xicon <- as.logical(bws$xdati$icon)
+  yicon <- as.logical(bws$ydati$icon)
+  if (length(gx) != ncol(xdat) || length(gy) != ncol(ydat) ||
+      length(xicon) != ncol(xdat) || length(yicon) != ncol(ydat) ||
+      anyNA(gx[xicon]) || anyNA(gy[yicon]) ||
+      !all(is.finite(gx[xicon])) || !all(is.finite(gy[yicon])) ||
+      any(gx[xicon] <= 0) || any(gy[yicon] <= 0)) {
     stop("invalid smooth-bootstrap pilot bandwidth vectors for conditional plot bias correction", call. = FALSE)
   }
-
-  xnames <- names(xdat)
-  ynames <- names(ydat)
-  xmat <- as.matrix(xdat)
-  ymat <- as.matrix(ydat)
-  storage.mode(xmat) <- "double"
-  storage.mode(ymat) <- "double"
 
   fit_one <- function(x.train, y.train) {
     kbx <- .np_con_make_kbandwidth_x(bws = bws, xdat = x.train)
@@ -9889,16 +10013,18 @@ compute.default.error.range <- function(center, err) {
   }
 
   smooth_one <- function(idx) {
-    xstar <- xmat[idx, , drop = FALSE] +
-      matrix(stats::rnorm(length(idx) * p.x), nrow = length(idx), ncol = p.x) *
-      matrix(gx, nrow = length(idx), ncol = p.x, byrow = TRUE)
-    ystar <- ymat[idx, , drop = FALSE] +
-      matrix(stats::rnorm(length(idx) * p.y), nrow = length(idx), ncol = p.y) *
-      matrix(gy, nrow = length(idx), ncol = p.y, byrow = TRUE)
-    xstar <- as.data.frame(xstar)
-    ystar <- as.data.frame(ystar)
-    names(xstar) <- xnames
-    names(ystar) <- ynames
+    xstar <- .np_plot_smooth_resample_frame(
+      dat = xdat,
+      idx = idx,
+      icon = xicon,
+      g = gx
+    )
+    ystar <- .np_plot_smooth_resample_frame(
+      dat = ydat,
+      idx = idx,
+      icon = yicon,
+      g = gy
+    )
     fit_one(x.train = xstar, y.train = ystar)
   }
 
@@ -10001,6 +10127,10 @@ compute.default.error.range <- function(center, err) {
                                                             plot.errors.boot.blocklen,
                                                             plot.errors.boot.num,
                                                             progress.label) {
+  .np_plot_require_conditional_gradient_bootstrap_supported(
+    bws = bws,
+    where = "center=\"bias-corrected\" with pair/block/geometric bootstrap"
+  )
   bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = cdf)
   is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
   counts.drawer <- if (is.block) {
@@ -11374,6 +11504,14 @@ compute.bootstrap.errors.conbandwidth =
     quantile.level.local.ok <- isTRUE(quantreg) && isTRUE(!gradients)
     gradient.local.ok <- isTRUE(!quantreg) && isTRUE(gradients)
     quantile.gradient.local.ok <- isTRUE(quantreg) && isTRUE(gradients)
+
+    if (isTRUE(gradient.local.ok) && (isTRUE(is.inid) || isTRUE(is.block))) {
+      .np_plot_require_conditional_gradient_bootstrap_supported(
+        bws = bws,
+        where = sprintf("%s conditional density/distribution bootstrap gradients",
+                        if (is.block) plot.errors.boot.method else "inid")
+      )
+    }
 
     if (is.inid && !isTRUE(fast.inid) && !isTRUE(quantile.level.local.ok) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.gradient.local.ok))
       stop("inid conditional helper unavailable for this configuration; no alternate fallback is permitted", call. = FALSE)
