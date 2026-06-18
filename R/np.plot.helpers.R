@@ -12120,7 +12120,8 @@ plotFactor <- function(f, y, ...){
                                              estimate.lwd = par()$lwd,
                                              center.col = par()$col,
                                              center.lwd = estimate.lwd,
-                                             legend.loc = "topright") {
+                                             legend.loc = "topright",
+                                             factor.panel = FALSE) {
   normalize_lty <- function(value) {
     if (is.null(value) || !length(value))
       return(.np_plot_lty("solid"))
@@ -12142,14 +12143,25 @@ plotFactor <- function(f, y, ...){
   } else {
     legend
   }
-  legend.args <- .np_plot_legend_args(
+  legend.defaults <- if (isTRUE(factor.panel)) {
+    list(x = legend.loc,
+         legend = c("Estimate", "Bias-corrected estimate"),
+         col = c(estimate.col, center.col),
+         pch = c(16L, 1L),
+         lty = c(0L, 0L),
+         cex = .np_plot_cex("legend"),
+         bty = "n")
+  } else {
     list(x = legend.loc,
          legend = c("Estimate", "Bias-corrected estimate"),
          col = c(estimate.col, center.col),
          lty = c(estimate.lty, .np_plot_lty("center")),
          lwd = c(estimate.lwd, center.lwd),
          cex = .np_plot_cex("legend"),
-         bty = "n"),
+         bty = "n")
+  }
+  legend.args <- .np_plot_legend_args(
+    legend.defaults,
     legend = legend.value,
     context = "legend"
   )
@@ -12208,7 +12220,8 @@ plotFactor <- function(f, y, ...){
       estimate.lty = estimate.lty,
       estimate.lwd = estimate.lwd,
       center.col = center.col,
-      center.lwd = center.lwd
+      center.lwd = center.lwd,
+      factor.panel = isTRUE(xi.factor)
     )
   invisible(TRUE)
 }
