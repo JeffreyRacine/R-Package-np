@@ -547,6 +547,14 @@
   }
 
   if (isTRUE(gradients) && !is.na(gradient.index) && gradient.index > 0L) {
+    gradient.index <- tryCatch(
+      .np_plot_resolve_conditional_gradient_index(
+        bws = bws,
+        gradient.index = gradient.index,
+        where = "conditional bootstrap progress label"
+      ),
+      error = function(e) gradient.index
+    )
     grad_name <- .np_plot_progress_target_name(
       if (!is.null(bws$xnames) && length(bws$xnames) >= gradient.index) bws$xnames[[gradient.index]] else NULL,
       sprintf("x%d", gradient.index)
@@ -12953,6 +12961,74 @@ plotFactor <- function(f, y, ...){
   )
 }
 
+.np_plot_resolve_conditional_gradient_index <- function(bws,
+                                                        gradient.index,
+                                                        where) {
+  xicon <- bws$xdati$icon
+  gradient.index <- as.integer(gradient.index)[1L]
+  if (is.null(xicon) || !length(xicon) || is.na(gradient.index) ||
+      gradient.index < 1L) {
+    stop(sprintf("%s requested an invalid conditional gradient coordinate",
+                 where),
+         call. = FALSE)
+  }
+  xicon <- as.logical(xicon)
+  cont.index <- which(xicon)
+  if (!length(cont.index)) {
+    stop(sprintf("%s can compute bootstrap gradient bias correction only for continuous conditioning variables",
+                 where),
+         call. = FALSE)
+  }
+  if (gradient.index <= length(xicon) && isTRUE(xicon[gradient.index])) {
+    return(gradient.index)
+  }
+  if (gradient.index <= length(cont.index)) {
+    return(cont.index[[gradient.index]])
+  }
+  if (gradient.index <= length(xicon) && length(cont.index) == 1L) {
+    return(cont.index[[1L]])
+  }
+  stop(sprintf("%s requested an invalid conditional gradient coordinate",
+               where),
+       call. = FALSE)
+}
+
+.np_plot_validate_conditional_gradient_target <- function(bws,
+                                                          gradient.index,
+                                                          where) {
+  gradient.index <- .np_plot_resolve_conditional_gradient_index(
+    bws = bws,
+    gradient.index = gradient.index,
+    where = where
+  )
+  xicon <- as.logical(bws$xdati$icon)
+  if (!isTRUE(xicon[gradient.index])) {
+    stop(sprintf("%s can compute bootstrap gradient bias correction only for continuous conditioning variables",
+                 where),
+         call. = FALSE)
+  }
+  invisible(gradient.index)
+}
+
+.np_plot_extract_conditional_gradient <- function(fit,
+                                                  gradient.index,
+                                                  neval,
+                                                  where) {
+  congrad <- fit$congrad
+  if (is.null(congrad)) {
+    stop(sprintf("%s did not return conditional gradient estimates", where),
+         call. = FALSE)
+  }
+  congrad <- as.matrix(congrad)
+  if (nrow(congrad) != neval ||
+      ncol(congrad) < gradient.index) {
+    stop(sprintf("%s returned conditional gradient estimates with unexpected dimensions",
+                 where),
+         call. = FALSE)
+  }
+  as.vector(congrad[, gradient.index, drop = TRUE])
+}
+
 .np_inid_boot_from_conditional_gradient_local <- function(xdat,
                                                           ydat,
                                                           exdat,
@@ -12977,8 +13053,20 @@ plotFactor <- function(f, y, ...){
   if (n < 1L || B < 1L)
     stop("invalid conditional gradient bootstrap dimensions")
 
+  where <- if (isTRUE(cdf)) {
+    "conditional distribution gradient bootstrap"
+  } else {
+    "conditional density gradient bootstrap"
+  }
+  gradient.index <- .np_plot_validate_conditional_gradient_target(
+    bws = bws,
+    gradient.index = gradient.index,
+    where = where
+  )
+  neval <- nrow(exdat)
+
   fit.fun <- function(x.train, y.train) {
-    as.vector(.np_plot_conditional_eval(
+    fit <- .np_plot_conditional_eval(
       bws = bws,
       xdat = x.train,
       ydat = y.train,
@@ -12987,7 +13075,13 @@ plotFactor <- function(f, y, ...){
       cdf = cdf,
       gradients = TRUE,
       gradient.order = gradient.order
-    )$congrad[, gradient.index, drop = TRUE])
+    )
+    .np_plot_extract_conditional_gradient(
+      fit = fit,
+      gradient.index = gradient.index,
+      neval = neval,
+      where = where
+    )
   }
 
   t0 <- fit.fun(x.train = xdat, y.train = ydat)
@@ -13356,6 +13450,12 @@ plotFactor <- function(f, y, ...){
           counts.mode = counts.mode,
           .np_inid_boot_from_conditional_gradient_local =
             .np_inid_boot_from_conditional_gradient_local,
+          .np_plot_resolve_conditional_gradient_index =
+            .np_plot_resolve_conditional_gradient_index,
+          .np_plot_validate_conditional_gradient_target =
+            .np_plot_validate_conditional_gradient_target,
+          .np_plot_extract_conditional_gradient =
+            .np_plot_extract_conditional_gradient,
           .np_inid_counts_matrix = .np_inid_counts_matrix,
           .npRmpi_with_local_bootstrap = .npRmpi_with_local_bootstrap
         ),
@@ -15094,19 +15194,14 @@ compute.default.error.range <- function(center, err) {
   out
 }
 
-.np_plot_conditional_gradient_bootstrap_has_discrete <- function(bws) {
-  xicon <- bws$xdati$icon
-  yicon <- bws$ydati$icon
-  is.null(xicon) || is.null(yicon) || any(!as.logical(xicon)) || any(!as.logical(yicon))
-}
-
-.np_plot_require_conditional_gradient_bootstrap_supported <- function(bws, where) {
-  if (.np_plot_conditional_gradient_bootstrap_has_discrete(bws)) {
-    stop(sprintf(
-      "%s currently supports bootstrap gradient bias correction only for all-continuous conditional density/distribution bandwidths",
-      where
-    ), call. = FALSE)
-  }
+.np_plot_require_conditional_gradient_bootstrap_supported <- function(bws,
+                                                                      gradient.index,
+                                                                      where) {
+  .np_plot_validate_conditional_gradient_target(
+    bws = bws,
+    gradient.index = gradient.index,
+    where = where
+  )
   invisible(TRUE)
 }
 
@@ -15605,6 +15700,145 @@ compute.default.error.range <- function(center, err) {
   list(t = tmat, t0 = t0)
 }
 
+.np_plot_conditional_gradient_smooth_boot <- function(xdat, ydat,
+                                                      exdat, eydat,
+                                                      bws,
+                                                      cdf,
+                                                      gradient.index,
+                                                      gradient.order,
+                                                      plot.errors.boot.method,
+                                                      plot.errors.boot.blocklen,
+                                                      plot.errors.boot.num,
+                                                      progress.label) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  B <- as.integer(plot.errors.boot.num)
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  where <- if (isTRUE(cdf)) {
+    "conditional distribution gradient smooth bootstrap"
+  } else {
+    "conditional density gradient smooth bootstrap"
+  }
+
+  if (nrow(ydat) != n || nrow(eydat) != neval)
+    stop("conditional gradient smooth-bootstrap helper requires aligned x/y training and evaluation rows")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid conditional gradient smooth-bootstrap dimensions")
+
+  gradient.index <- .np_plot_validate_conditional_gradient_target(
+    bws = bws,
+    gradient.index = gradient.index,
+    where = where
+  )
+
+  bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = cdf)
+  gx <- as.numeric(bws.pilot$bandwidth$x)
+  gy <- as.numeric(bws.pilot$bandwidth$y)
+  xicon <- as.logical(bws$xdati$icon)
+  yicon <- as.logical(bws$ydati$icon)
+  if (length(gx) != ncol(xdat) || length(gy) != ncol(ydat) ||
+      length(xicon) != ncol(xdat) || length(yicon) != ncol(ydat) ||
+      anyNA(gx[xicon]) || anyNA(gy[yicon]) ||
+      !all(is.finite(gx[xicon])) || !all(is.finite(gy[yicon])) ||
+      any(gx[xicon] <= 0) || any(gy[yicon] <= 0)) {
+    stop("invalid smooth-bootstrap pilot bandwidth vectors for conditional gradient plot bias correction",
+         call. = FALSE)
+  }
+
+  fit_one <- function(x.train, y.train) {
+    fit <- .np_plot_conditional_eval(
+      bws = bws,
+      xdat = x.train,
+      ydat = y.train,
+      exdat = exdat,
+      eydat = eydat,
+      cdf = cdf,
+      gradients = TRUE,
+      gradient.order = gradient.order
+    )
+    .np_plot_extract_conditional_gradient(
+      fit = fit,
+      gradient.index = gradient.index,
+      neval = neval,
+      where = where
+    )
+  }
+
+  t0 <- fit_one(x.train = xdat, y.train = ydat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+
+  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+  index.drawer <- if (is.block) {
+    .np_block_indices_drawer(
+      n = n,
+      B = B,
+      blocklen = plot.errors.boot.blocklen,
+      sim = plot.errors.boot.method
+    )
+  } else {
+    NULL
+  }
+
+  smooth_one <- function(idx) {
+    xstar <- .np_plot_smooth_resample_frame(
+      dat = xdat,
+      idx = idx,
+      icon = xicon,
+      g = gx,
+      ckertype = bws$cxkertype,
+      ckerorder = bws$cxkerorder,
+      context = "conditional density/distribution gradient x-side smooth bootstrap"
+    )
+    ystar <- .np_plot_smooth_resample_frame(
+      dat = ydat,
+      idx = idx,
+      icon = yicon,
+      g = gy,
+      ckertype = bws$cykertype,
+      ckerorder = bws$cykerorder,
+      context = "conditional density/distribution gradient y-side smooth bootstrap"
+    )
+    fit_one(x.train = xstar, y.train = ystar)
+  }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = is.block)
+  progress <- .np_plot_bootstrap_progress_begin(
+    total = B,
+    label = if (is.null(progress.label)) "Plot bootstrap gradient smooth" else progress.label
+  )
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    idx.chunk <- if (!is.null(index.drawer)) {
+      index.drawer(start, stopi)
+    } else {
+      matrix(sample.int(n = n, size = n * bsz, replace = TRUE), nrow = n)
+    }
+    for (jj in seq_len(bsz))
+      tmat[start + jj - 1L, ] <- smooth_one(idx.chunk[, jj])
+
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_plot_conditional_oversmoothed_boot <- function(xdat, ydat,
                                                    exdat, eydat,
                                                    bws,
@@ -15669,33 +15903,18 @@ compute.default.error.range <- function(center, err) {
                                                             plot.errors.boot.blocklen,
                                                             plot.errors.boot.num,
                                                             progress.label) {
-  .np_plot_require_conditional_gradient_bootstrap_supported(
-    bws = bws,
-    where = "center=\"bias-corrected\" with pair/block/geometric bootstrap"
-  )
-  bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = cdf)
-  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-  counts.drawer <- if (is.block) {
-    .np_block_counts_drawer(
-      n = nrow(xdat),
-      B = plot.errors.boot.num,
-      blocklen = plot.errors.boot.blocklen,
-      sim = plot.errors.boot.method
-    )
-  } else {
-    NULL
-  }
-  .npRmpi_inid_boot_from_conditional_gradient(
+  .np_plot_conditional_gradient_smooth_boot(
     xdat = xdat,
     ydat = ydat,
     exdat = exdat,
     eydat = eydat,
-    bws = bws.pilot,
-    B = plot.errors.boot.num,
+    bws = bws,
     cdf = cdf,
     gradient.index = gradient.index,
     gradient.order = gradient.order,
-    counts.drawer = counts.drawer,
+    plot.errors.boot.method = plot.errors.boot.method,
+    plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+    plot.errors.boot.num = plot.errors.boot.num,
     progress.label = progress.label
   )
 }
@@ -17488,6 +17707,7 @@ compute.bootstrap.errors.conbandwidth =
     if (isTRUE(gradient.local.ok) && (isTRUE(is.inid) || isTRUE(is.block))) {
       .np_plot_require_conditional_gradient_bootstrap_supported(
         bws = bws,
+        gradient.index = gradient.index,
         where = sprintf("%s conditional density/distribution bootstrap gradients",
                         if (is.block) plot.errors.boot.method else "inid")
       )
