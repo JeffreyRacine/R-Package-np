@@ -1,5 +1,8 @@
 library(npRmpi)
 
+npRmpi.init(nslaves = 1L)
+on.exit(npRmpi.quit(), add = TRUE)
+
 set.seed(70619)
 n <- 30L
 xdat <- data.frame(x = runif(n))
