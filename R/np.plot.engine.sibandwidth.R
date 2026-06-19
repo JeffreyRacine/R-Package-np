@@ -217,32 +217,85 @@
     i.sort = sort(tobj$index, index.return=TRUE)$ix
     train.index <- as.numeric(as.matrix(xdat) %*% as.numeric(bws$beta))
 
+    finite_range <- function(...) {
+      vals <- unlist(list(...), use.names = FALSE)
+      vals <- vals[is.finite(vals)]
+      if (!length(vals))
+        return(c(NA_real_, NA_real_))
+      range(vals)
+    }
+
+    singleindex_level_range <- function() {
+      if (plot.errors && plot.errors.type == "all") {
+        center <- if (plot.errors.center == "estimate") temp.mean else temp.err[, 3L]
+        yr <- compute.all.error.range(center, temp.all.err)
+        vals <- c(yr, temp.mean)
+        if (.np_plot_center_is_bias_corrected(plot.errors.center))
+          vals <- c(vals, temp.err[, 3L])
+        out <- finite_range(vals)
+      } else if (plot.errors) {
+        vals <- c(temp.mean,
+                  temp.mean + temp.err[, 2L],
+                  temp.mean - temp.err[, 1L])
+        if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
+          vals <- c(vals,
+                    temp.err[, 3L],
+                    temp.err[, 3L] + temp.err[, 2L],
+                    temp.err[, 3L] - temp.err[, 1L])
+        }
+        out <- finite_range(vals)
+      } else {
+        out <- finite_range(temp.mean)
+      }
+      if (overlay.ok) {
+        overlay.range <- .np_plot_overlay_range(out, ydat)
+        out <- overlay.range
+      }
+      out
+    }
+
+    singleindex_gradient_component_range <- function(beta.i, idx = seq_along(temp.mean)) {
+      estimate.i <- beta.i * temp.mean[idx]
+      if (plot.errors && plot.errors.type == "all" && !is.null(temp.all.err)) {
+        center.base <- if (plot.errors.center == "estimate") temp.mean[idx] else temp.err[idx, 3L]
+        center.i <- beta.i * center.base
+        scaled.all.err <- lapply(temp.all.err, function(err) {
+          if (is.null(err)) return(NULL)
+          abs(beta.i) * err[idx,,drop = FALSE]
+        })
+        yr <- compute.all.error.range(center.i, scaled.all.err)
+        vals <- c(estimate.i, yr)
+        if (.np_plot_center_is_bias_corrected(plot.errors.center))
+          vals <- c(vals, center.i)
+        finite_range(vals)
+      } else if (plot.errors) {
+        center.base <- if (plot.errors.center == "estimate") temp.mean[idx] else temp.err[idx, 3L]
+        lo.i <- beta.i * (center.base - temp.err[idx, 1L])
+        hi.i <- beta.i * (center.base + temp.err[idx, 2L])
+        vals <- c(estimate.i, pmin(lo.i, hi.i), pmax(lo.i, hi.i))
+        if (.np_plot_center_is_bias_corrected(plot.errors.center))
+          vals <- c(vals, beta.i * temp.err[idx, 3L])
+        finite_range(vals)
+      } else {
+        finite_range(estimate.i)
+      }
+    }
+
+    singleindex_gradient_common_range <- function() {
+      ranges <- lapply(seq_len(ncol(xdat)), function(j) {
+        singleindex_gradient_component_range(bws$beta[j])
+      })
+      finite_range(ranges)
+    }
+
     if (!gradients){
       if(!is.null(ylim)){
         ymin = ylim[1]
         ymax = ylim[2]
       } else {
-        if (plot.errors && plot.errors.type == "all") {
-          yr <- compute.all.error.range(if (plot.errors.center == "estimate") temp.mean else temp.err[,3],
-                                        temp.all.err)
-          ymin <- yr[1]
-          ymax <- yr[2]
-        } else {
-          if (plot.errors){
-            ymin <- min(na.omit(c(temp.mean - temp.err[,1],
-                                  temp.err[,3] - temp.err[,1])))
-            ymax <- max(na.omit(c(temp.mean + temp.err[,2],
-                                  temp.err[,3] + temp.err[,2])))
-          } else {
-            ymin <- min(c(temp.mean, temp.err[,3]))
-            ymax <- max(c(temp.mean, temp.err[,3]))
-          }
-          if (overlay.ok) {
-            overlay.range <- .np_plot_overlay_range(c(ymin, ymax), ydat)
-            ymin <- overlay.range[1L]
-            ymax <- overlay.range[2L]
-          }
-        }
+        yr <- singleindex_level_range()
+        ymin <- yr[1L]
+        ymax <- yr[2L]
       }
 
 
@@ -305,6 +358,14 @@
                         plot.errors.bar = plot.errors.bar,
                         plot.errors.bar.num = plot.errors.bar.num,
                         lty = .np_plot_lty("interval"))
+            .np_plot_draw_bias_center_legend(
+              legend = plot.legend,
+              estimate.col = scalar_default(col, par()$col),
+              estimate.lty = scalar_default(lty, par()$lty),
+              estimate.lwd = scalar_default(lwd, par()$lwd),
+              center.col = scalar_default(col, par()$col),
+              center.lwd = scalar_default(lwd, par()$lwd)
+            )
           }
         } else {
           plot.args <- list(x = tobj$index[i.sort],
@@ -357,23 +418,8 @@
 
     } else {
 
-        bmax = max(bws$beta)
-        bmin = min(bws$beta)
-
         if (is.null(ylim)) {
-          if (plot.errors && plot.errors.type == "all"){
-            yr <- compute.all.error.range(if (plot.errors.center == "estimate") temp.mean else temp.err[,3],
-                                          temp.all.err)
-            ymax = yr[2]
-            ymin = yr[1]
-          } else if (plot.errors){
-            ymax = max(temp.mean + temp.err[,2], na.rm = TRUE)
-            ymin = min(temp.mean - temp.err[,1], na.rm = TRUE)
-          } else {
-            ymax = max(temp.mean, na.rm = TRUE)
-            ymin = min(temp.mean, na.rm = TRUE)
-          }
-          common.ylim <- c(min(bmin*ymax,bmax*ymin),max(bmax*ymax,bmin*ymin))
+          common.ylim <- singleindex_gradient_common_range()
         } else {
           common.ylim <- ylim
         }
@@ -404,24 +450,7 @@
 
             if (is.null(ylim)) {
               if (!common.scale) {
-                center.base.i <- if (plot.errors.center == "estimate")
-                  temp.mean[i.sort] else temp.err[i.sort,3]
-                center.i <- bws$beta[i] * center.base.i
-                if (plot.errors && plot.errors.type == "all" && !is.null(temp.all.err)) {
-                  sorted.all.err <- lapply(temp.all.err, function(err) {
-                    if (is.null(err)) return(NULL)
-                    abs(bws$beta[i]) * err[i.sort,,drop = FALSE]
-                  })
-                  panel.range <- compute.all.error.range(center.i, sorted.all.err)
-                } else if (plot.errors) {
-                  lo.i <- bws$beta[i] * (center.base.i - temp.err[i.sort,1])
-                  hi.i <- bws$beta[i] * (center.base.i + temp.err[i.sort,2])
-                  panel.range <- c(min(pmin(lo.i, hi.i), na.rm = TRUE),
-                                   max(pmax(lo.i, hi.i), na.rm = TRUE))
-                } else {
-                  panel.range <- c(min(center.i, na.rm = TRUE), max(center.i, na.rm = TRUE))
-                }
-                panel.ylim <- panel.range
+                  panel.ylim <- singleindex_gradient_component_range(bws$beta[i], idx = i.sort)
               } else {
                 panel.ylim <- common.ylim
               }
@@ -487,6 +516,14 @@
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
                             lty = .np_plot_lty("interval"))
+                .np_plot_draw_bias_center_legend(
+                  legend = plot.legend,
+                  estimate.col = scalar_default(col, par()$col),
+                  estimate.lty = scalar_default(lty, par()$lty),
+                  estimate.lwd = scalar_default(lwd, par()$lwd),
+                  center.col = scalar_default(col, par()$col),
+                  center.lwd = scalar_default(lwd, par()$lwd)
+                )
               }
             }
           }

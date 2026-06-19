@@ -16124,6 +16124,7 @@ compute.default.error.range <- function(center, err) {
 .np_plot_singleindex_oversmoothed_boot <- function(xdat, ydat,
                                                    bws,
                                                    idx.eval,
+                                                   gradients = FALSE,
                                                    plot.errors.boot.method,
                                                    plot.errors.boot.blocklen,
                                                    plot.errors.boot.num,
@@ -16146,7 +16147,7 @@ compute.default.error.range <- function(center, err) {
     bws = bws.pilot,
     B = plot.errors.boot.num,
     counts.drawer = counts.drawer,
-    gradients = FALSE,
+    gradients = gradients,
     frozen = FALSE,
     idx.eval = idx.eval,
     progress.label = progress.label
@@ -18166,8 +18167,6 @@ compute.bootstrap.errors.sibandwidth =
     if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       if (isTRUE(is.wild.hat))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "single-index wild bootstrap plots")
-      if (isTRUE(gradients))
-        .np_plot_reject_oversmoothed_center(plot.errors.center, "single-index gradient plots")
       if (!identical(bws$type, "fixed"))
         stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed single-index bandwidths", call. = FALSE)
     }
@@ -18296,6 +18295,7 @@ compute.bootstrap.errors.sibandwidth =
             ydat = ydat,
             bws = bws,
             idx.eval = idx.eval,
+            gradients = gradients,
             plot.errors.boot.method = plot.errors.boot.method,
             plot.errors.boot.blocklen = plot.errors.boot.blocklen,
             plot.errors.boot.num = plot.errors.boot.num,
