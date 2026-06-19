@@ -542,10 +542,12 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   fixed-bandwidth plot routes. Non-fixed, adaptive-nearest-neighbor, and
   generalized-nearest-neighbor bandwidth routes fail closed for
   \code{center="bias-corrected"}. Conditional quantile
-  \code{npqreg}, copula \code{npcopula}, and instrumental-variable
-  \code{npregiv} bias-corrected bootstrap plot routes are not claimed in
-  this release tranche and fail clearly when unsupported
-  bias-corrected bootstrap controls are requested. Partially linear
+  \code{npqreg} bootstrap plots currently require \code{center="estimate"};
+  \code{center="bias-corrected"} fails clearly for this route. Copula
+  \code{npcopula} and instrumental-variable \code{npregiv}
+  bias-corrected bootstrap plot routes are not claimed in this release
+  tranche and fail clearly when unsupported bias-corrected bootstrap
+  controls are requested. Partially linear
   \code{npplreg} level plots support the regression-family bootstrap
   methods above; \code{gradients=TRUE} is not a partially linear plot
   route and fails clearly.
