@@ -94,13 +94,21 @@
     if (!is.null(lwd)) bxp.args$lwd <- lwd
     if (!is.null(border)) bxp.args$border <- border
 
-    if(!missing(gradients))
-      stop("gradients not supported with smooth coefficient models.")
+    gradients <- isTRUE(gradients)
     coef <- isTRUE(coef)
+    if (coef && gradients)
+      stop("coef=TRUE and gradients=TRUE cannot be combined for smooth coefficient plots.", call. = FALSE)
     coef.index <- as.integer(coef.index)[1L]
     if (!is.finite(coef.index) || is.na(coef.index) || coef.index < 1L)
       coef.index <- 1L
+    gradient.index <- coef.index
     extract_scoef_value <- function(obj) {
+      if (gradients)
+        return(.np_scoef_bootstrap_target(
+          obj,
+          target = "grad",
+          gradient.index = gradient.index
+        ))
       if (!coef)
         return(as.double(obj$mean))
       beta.plot <- obj$beta
@@ -109,6 +117,15 @@
       if (is.matrix(beta.plot))
         return(as.double(beta.plot[, min(coef.index, ncol(beta.plot))]))
       as.double(beta.plot)
+    }
+    extract_scoef_se <- function(obj) {
+      if (gradients) {
+        gerr <- obj$gerr
+        if (is.null(gerr) || !is.matrix(gerr) || ncol(gerr) < gradient.index)
+          return(rep_len(NA_real_, length(extract_scoef_value(obj))))
+        return(as.double(gerr[, gradient.index]))
+      }
+      as.double(obj$merr)
     }
 
     miss.xy = c(missing(xdat),missing(ydat))
@@ -222,7 +239,7 @@
     overlay.ok <- .np_plot_overlay_enabled(
       plot.data.overlay = plot.data.overlay,
       plot.behavior = plot.behavior,
-      gradients = FALSE,
+      gradients = gradients,
       coef = coef,
       plot.data.overlay.missing = missing(plot.data.overlay)
     )
@@ -239,7 +256,7 @@
       perspective = perspective,
       supported.route = surface.supported,
       view = if (missing(view)) "fixed" else view,
-      gradients = FALSE,
+      gradients = gradients,
       coef = coef,
       plot.errors.method = plot.errors.method,
       plot.data.overlay = overlay.ok,
@@ -678,7 +695,7 @@
       plotOnEstimate = (plot.errors.center == "estimate")
 
       txobj_call <- function(ex.slice, ez.slice = NULL) {
-        if (coef || identical(plot.errors.method, "asymptotic")) {
+        if (coef || gradients || identical(plot.errors.method, "asymptotic")) {
           tx.args <- list(
             txdat = xdat,
             tydat = ydat,
@@ -747,7 +764,7 @@
         if (plot.errors){
           if (plot.errors.method == "asymptotic") {
             asym.obj <- .np_plot_asymptotic_error_from_se(
-              se = tobj$merr,
+              se = extract_scoef_se(tobj),
               alpha = plot.errors.alpha,
               band.type = plot.errors.type,
               m = xi.neval
@@ -766,7 +783,8 @@
                 slice.index = plot.index
               ),
               plot.errors.boot.method = plot.errors.boot.method,
-              t0.override = as.vector(tobj$mean),
+              t0.override = as.vector(temp.mean[seq_len(xi.neval)]),
+              gradient.index = gradient.index,
               plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
               plot.errors.boot.wild = plot.errors.boot.wild,
               plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -967,6 +985,32 @@
         if (plot.behavior != "plot") {
           plot.out[plot.index] = NA
           if (gradients){
+            eval.obj <- if (miss.z) {
+              subcol(exdat, ei, i)[seq_len(xi.neval),, drop = FALSE]
+            } else {
+              list(exdat = subcol(exdat, ei, i)[seq_len(xi.neval),, drop = FALSE],
+                   ezdat = ezdat[seq_len(xi.neval),, drop = FALSE])
+            }
+            eval.rows <- seq_len(xi.neval)
+            plot.out[[plot.index]] <-
+              smoothcoefficient(bws = bws,
+                                eval = eval.obj,
+                                mean = na.omit(temp.mean),
+                                grad = na.omit(temp.mean),
+                                gerr = if (plot.errors) na.omit(cbind(-temp.err[eval.rows, 1],
+                                                                       temp.err[eval.rows, 2])) else NA,
+                                ntrain = dim(xdat)[1],
+                                trainiseval = FALSE,
+                                xtra = c(0, 0, 0, 0, 0, 0))
+            plot.out[[plot.index]]$gbias = NA
+            plot.out[[plot.index]]$gradient.bias.corrected = NA
+            if (.np_plot_center_is_bias_corrected(plot.errors.center))
+              plot.out[[plot.index]] <- .np_plot_add_gradient_bias_fields(
+                plot.out[[plot.index]],
+                temp.mean[eval.rows],
+                temp.err[eval.rows, 3]
+              )
+            plot.out[[plot.index]]$bxp = temp.boot
           } else {
             eval.obj <- if (miss.z) {
               subcol(exdat, ei, i)[seq_len(xi.neval),, drop = FALSE]
@@ -1035,7 +1079,7 @@
           if (plot.errors){
             if (plot.errors.method == "asymptotic") {
               asym.obj <- .np_plot_asymptotic_error_from_se(
-                se = tobj$merr,
+              se = extract_scoef_se(tobj),
                 alpha = plot.errors.alpha,
                 band.type = plot.errors.type,
                 m = xi.neval
@@ -1056,7 +1100,8 @@
                                                       slice.index = plot.index
                                                     ),
                                                     plot.errors.boot.method = plot.errors.boot.method,
-                                                    t0.override = as.vector(tobj$mean),
+                                                    t0.override = as.vector(temp.mean[seq_len(xi.neval)]),
+                                                    gradient.index = gradient.index,
                                                     plot.errors.boot.nonfixed = plot.errors.boot.nonfixed,
                                                     plot.errors.boot.wild = plot.errors.boot.wild,
                                                     plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -1252,6 +1297,26 @@
           if (plot.behavior != "plot") {
             plot.out[plot.index] = NA
             if (gradients){
+              eval.rows <- seq_len(xi.neval)
+              plot.out[[plot.index]] =
+                smoothcoefficient(bws = bws,
+                                  eval = list(exdat = exdat[eval.rows,, drop = FALSE],
+                                    ezdat = subcol(ezdat,ei,i)[eval.rows,, drop = FALSE]),
+                                  mean = na.omit(temp.mean),
+                                  grad = na.omit(temp.mean),
+                                  gerr = if (plot.errors) na.omit(cbind(-temp.err[eval.rows, 1],
+                                                                         temp.err[eval.rows, 2])) else NA,
+                                  ntrain = dim(zdat)[1],
+                                  trainiseval = FALSE)
+              plot.out[[plot.index]]$gbias = NA
+              plot.out[[plot.index]]$gradient.bias.corrected = NA
+              if (.np_plot_center_is_bias_corrected(plot.errors.center))
+                plot.out[[plot.index]] <- .np_plot_add_gradient_bias_fields(
+                  plot.out[[plot.index]],
+                  temp.mean[eval.rows],
+                  temp.err[eval.rows, 3]
+                )
+              plot.out[[plot.index]]$bxp = temp.boot
             } else {
               plot.out[[plot.index]] =
                 smoothcoefficient(bws = bws, 
@@ -1499,9 +1564,8 @@
       
       if (plot.behavior != "plot"){
         names(plot.out) =
-          if (gradients){ }
-          else
-            paste("sc", seq_len(bws$xndim + bws$zndim), sep = "")
+          paste(if (gradients) "gsc" else "sc",
+                seq_len(bws$xndim + bws$zndim), sep = "")
         
         return (plot.out)
       }

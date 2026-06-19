@@ -3838,6 +3838,22 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_scoef_bootstrap_target <- function(fit,
+                                        target = c("mean", "grad"),
+                                        gradient.index = 1L) {
+  target <- match.arg(target)
+  if (identical(target, "mean"))
+    return(as.vector(fit$mean))
+
+  gradient.index <- as.integer(gradient.index)[1L]
+  if (!is.finite(gradient.index) || is.na(gradient.index) || gradient.index < 1L)
+    stop("invalid smooth coefficient gradient index", call. = FALSE)
+  grad <- fit$grad
+  if (is.null(grad) || !is.matrix(grad) || ncol(grad) < gradient.index)
+    stop("smooth coefficient fit did not return the requested gradient target", call. = FALSE)
+  as.vector(grad[, gradient.index])
+}
+
 .np_inid_boot_from_scoef_exact <- function(txdat,
                                            ydat,
                                            tzdat,
@@ -3848,7 +3864,10 @@
                                            counts = NULL,
                                            counts.drawer = NULL,
                                            leave.one.out = FALSE,
-                                           progress.label = NULL) {
+                                           progress.label = NULL,
+                                           target = c("mean", "grad"),
+                                           gradient.index = 1L) {
+  target <- match.arg(target)
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
   B <- as.integer(B)
@@ -3887,7 +3906,11 @@
       fit.args$tzdat <- tz.train
       fit.args$ezdat <- ezdat
     }
-    as.vector(do.call(.np_scoef_fit_internal, fit.args)$mean)
+    .np_scoef_bootstrap_target(
+      fit = do.call(.np_scoef_fit_internal, fit.args),
+      target = target,
+      gradient.index = gradient.index
+    )
   }
 
   t0 <- fit.fun(tx.train = txdat, y.train = ydat, tz.train = tzdat)
@@ -3940,6 +3963,109 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_wild_boot_from_scoef_exact <- function(txdat,
+                                           ydat,
+                                           tzdat,
+                                           exdat,
+                                           ezdat,
+                                           bws,
+                                           B,
+                                           wild = c("rademacher", "mammen"),
+                                           leave.one.out = FALSE,
+                                           progress.label = NULL,
+                                           target = c("mean", "grad"),
+                                           gradient.index = 1L) {
+  target <- match.arg(target)
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+
+  miss.z <- missing(tzdat) || is.null(tzdat)
+  if (miss.z) {
+    tzdat <- txdat
+    ezdat <- exdat
+  } else {
+    tzdat <- toFrame(tzdat)
+    ezdat <- toFrame(ezdat)
+  }
+
+  n <- nrow(txdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in exact wild smooth coefficient bootstrap helper")
+  if (n < 1L || nrow(exdat) < 1L || B < 1L)
+    stop("invalid exact wild smooth coefficient bootstrap dimensions")
+
+  fit.fun <- function(tx.eval, y.train, tz.eval, target.eval = target) {
+    fit.args <- list(
+      bws = bws,
+      txdat = txdat,
+      tydat = y.train,
+      exdat = tx.eval,
+      iterate = FALSE,
+      errors = FALSE,
+      leave.one.out = leave.one.out
+    )
+    if (!miss.z) {
+      fit.args$tzdat <- tzdat
+      fit.args$ezdat <- tz.eval
+    }
+    .np_scoef_bootstrap_target(
+      fit = do.call(.np_scoef_fit_internal, fit.args),
+      target = target.eval,
+      gradient.index = gradient.index
+    )
+  }
+
+  fit.mean.train <- fit.fun(
+    tx.eval = txdat,
+    y.train = ydat,
+    tz.eval = tzdat,
+    target.eval = "mean"
+  )
+  if (length(fit.mean.train) != n || any(!is.finite(fit.mean.train)))
+    stop("internal fit.mean.train payload is invalid for exact wild smooth coefficient bootstrap", call. = FALSE)
+
+  t0 <- fit.fun(tx.eval = exdat, y.train = ydat, tz.eval = ezdat)
+  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+  residuals <- ydat - fit.mean.train
+  wild <- .np_plot_normalize_wild(wild)
+  draw.fun <- if (identical(wild, "mammen")) .np_mammen_draws else .np_rademacher_draws
+
+  progress.label <- if (is.null(progress.label)) "Plot bootstrap wild" else progress.label
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+  chunk.size <- .np_wild_chunk_size(n = n, B = B)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    draws <- draw.fun(n = n, B = bsz)
+    for (jj in seq_len(bsz)) {
+      ystar <- fit.mean.train + residuals * draws[, jj]
+      tmat[start + jj - 1L, ] <- fit.fun(
+        tx.eval = exdat,
+        y.train = ystar,
+        tz.eval = ezdat
+      )
+    }
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_inid_boot_from_scoef <- function(txdat,
                                      ydat,
                                      tzdat,
@@ -3951,8 +4077,11 @@
                                      counts.drawer = NULL,
                                      leave.one.out = FALSE,
                                      progress.label = NULL,
-                                     mode = c("exact", "frozen")) {
+                                     mode = c("exact", "frozen"),
+                                     target = c("mean", "grad"),
+                                     gradient.index = 1L) {
   mode <- match.arg(mode)
+  target <- match.arg(target)
 
   z.source <- if (missing(tzdat) || is.null(tzdat)) txdat else tzdat
   spec <- .npscoef_canonical_spec(
@@ -3960,6 +4089,24 @@
     zdat = z.source,
     where = "smooth coefficient inid helper"
   )
+
+  if (identical(target, "grad")) {
+    return(.np_inid_boot_from_scoef_exact(
+      txdat = txdat,
+      ydat = ydat,
+      tzdat = tzdat,
+      exdat = exdat,
+      ezdat = ezdat,
+      bws = bws,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      leave.one.out = leave.one.out,
+      progress.label = progress.label,
+      target = target,
+      gradient.index = gradient.index
+    ))
+  }
 
   if (!identical(spec$regtype.engine, "lc") &&
       (identical(mode, "frozen") || identical(bws$type, "fixed"))) {
@@ -4005,7 +4152,9 @@
     counts = counts,
     counts.drawer = counts.drawer,
     leave.one.out = leave.one.out,
-    progress.label = progress.label
+    progress.label = progress.label,
+    target = target,
+    gradient.index = gradient.index
   )
 }
 
@@ -10662,7 +10811,10 @@ compute.default.error.range <- function(center, err) {
                                              plot.errors.boot.blocklen,
                                              plot.errors.boot.num,
                                              progress.label,
-                                             helper.mode) {
+                                             helper.mode,
+                                             target = c("mean", "grad"),
+                                             gradient.index = 1L) {
+  target <- match.arg(target)
   bws.pilot <- .np_plot_oversmooth_scbandwidth_bws(bws)
   is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
   counts.drawer <- if (is.block) {
@@ -10686,7 +10838,9 @@ compute.default.error.range <- function(center, err) {
     counts.drawer = counts.drawer,
     leave.one.out = FALSE,
     progress.label = progress.label,
-    mode = helper.mode
+    mode = helper.mode,
+    target = target,
+    gradient.index = gradient.index
   )
 }
 
@@ -11186,6 +11340,7 @@ compute.bootstrap.errors.scbandwidth =
   function(xdat, ydat, zdat,
            exdat, ezdat,
            gradients,
+           gradient.index = 1L,
            slice.index,
            progress.target = NULL,
            plot.errors.boot.method,
@@ -11230,6 +11385,11 @@ compute.bootstrap.errors.scbandwidth =
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    target <- if (isTRUE(gradients)) "grad" else "mean"
+    gradient.index <- as.integer(gradient.index)[1L]
+    if (identical(target, "grad") &&
+        (!is.finite(gradient.index) || is.na(gradient.index) || gradient.index < 1L))
+      stop("invalid smooth coefficient gradient index", call. = FALSE)
     use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
       !identical(bws$type, "fixed")
     helper.mode <- if (isTRUE(use.frozen.nonfixed)) "frozen" else "exact"
@@ -11238,20 +11398,11 @@ compute.bootstrap.errors.scbandwidth =
     if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       if (isTRUE(is.wild.hat))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "smooth coefficient wild bootstrap plots")
-      .np_plot_reject_semiparametric_pair_bias_center(
-        center = plot.errors.center,
-        plot.errors.boot.method = plot.errors.boot.method,
-        where = "smooth coefficient plots"
-      )
-      if (isTRUE(gradients))
-        .np_plot_reject_oversmoothed_center(plot.errors.center, "smooth coefficient gradient plots")
       if (!identical(bws$type, "fixed"))
         stop("center=\"bias-corrected\" with pair/block/geometric bootstrap currently requires fixed smooth coefficient bandwidths", call. = FALSE)
     }
 
     if (is.inid) {
-      if (isTRUE(gradients))
-        stop("inid bootstrap for smooth coefficient gradients is not supported in helper mode", call. = FALSE)
       boot.out <- tryCatch(
         .np_inid_boot_from_scoef(
           txdat = xdat,
@@ -11263,7 +11414,9 @@ compute.bootstrap.errors.scbandwidth =
           B = plot.errors.boot.num,
           leave.one.out = FALSE,
           progress.label = progress.label,
-          mode = helper.mode
+          mode = helper.mode,
+          target = target,
+          gradient.index = gradient.index
         ),
         error = function(e) {
           stop(sprintf("inid smooth coefficient helper failed in compute.bootstrap.errors.scbandwidth (%s)",
@@ -11273,8 +11426,6 @@ compute.bootstrap.errors.scbandwidth =
       )
     }
     if (is.null(boot.out) && is.block) {
-      if (isTRUE(gradients))
-        stop("fixed/geom bootstrap for smooth coefficient gradients is not supported in helper mode", call. = FALSE)
       counts.drawer <- .np_block_counts_drawer(
         n = nrow(xdat),
         B = plot.errors.boot.num,
@@ -11293,7 +11444,9 @@ compute.bootstrap.errors.scbandwidth =
           counts.drawer = counts.drawer,
           leave.one.out = FALSE,
           progress.label = progress.label,
-          mode = helper.mode
+          mode = helper.mode,
+          target = target,
+          gradient.index = gradient.index
         ),
         error = function(e) {
           stop(sprintf("%s smooth coefficient helper failed in compute.bootstrap.errors.scbandwidth (%s)",
@@ -11307,39 +11460,56 @@ compute.bootstrap.errors.scbandwidth =
     if (is.null(boot.out) && is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
-      hat.eval.args <- list(
-        bws = bws,
-        txdat = xdat,
-        exdat = exdat,
-        output = "matrix",
-        iterate = FALSE
-      )
-      hat.train.args <- list(
-        bws = bws,
-        txdat = xdat,
-        exdat = xdat,
-        y = ydat,
-        output = "apply",
-        iterate = FALSE
-      )
-      if (!miss.z) {
-        hat.eval.args$tzdat <- zdat
-        hat.eval.args$ezdat <- ezdat
-        hat.train.args$tzdat <- zdat
-        hat.train.args$ezdat <- zdat
+      if (identical(target, "grad")) {
+        boot.out <- .np_wild_boot_from_scoef_exact(
+          txdat = xdat,
+          ydat = ydat,
+          tzdat = if (miss.z) NULL else zdat,
+          exdat = exdat,
+          ezdat = if (miss.z) NULL else ezdat,
+          bws = bws,
+          B = plot.errors.boot.num,
+          wild = plot.errors.boot.wild,
+          leave.one.out = FALSE,
+          progress.label = progress.label,
+          target = target,
+          gradient.index = gradient.index
+        )
+      } else {
+        hat.eval.args <- list(
+          bws = bws,
+          txdat = xdat,
+          exdat = exdat,
+          output = "matrix",
+          iterate = FALSE
+        )
+        hat.train.args <- list(
+          bws = bws,
+          txdat = xdat,
+          exdat = xdat,
+          y = ydat,
+          output = "apply",
+          iterate = FALSE
+        )
+        if (!miss.z) {
+          hat.eval.args$tzdat <- zdat
+          hat.eval.args$ezdat <- ezdat
+          hat.train.args$tzdat <- zdat
+          hat.train.args$ezdat <- zdat
+        }
+
+        fit.mean <- as.vector(do.call(npscoefhat, hat.train.args))
+        H <- do.call(npscoefhat, hat.eval.args)
+
+        boot.out <- .np_plot_boot_from_hat_wild(
+          H = H,
+          ydat = ydat,
+          fit.mean = fit.mean,
+          B = plot.errors.boot.num,
+          wild = plot.errors.boot.wild,
+          progress.label = progress.label
+        )
       }
-
-      fit.mean <- as.vector(do.call(npscoefhat, hat.train.args))
-      H <- do.call(npscoefhat, hat.eval.args)
-
-      boot.out <- .np_plot_boot_from_hat_wild(
-        H = H,
-        ydat = ydat,
-        fit.mean = fit.mean,
-        B = plot.errors.boot.num,
-        wild = plot.errors.boot.wild,
-        progress.label = progress.label
-      )
     }
 
     if (is.null(boot.out))
@@ -11370,7 +11540,9 @@ compute.bootstrap.errors.scbandwidth =
             stage = "Oversmoothed bias bootstrap",
             target_label = progress.target
           ),
-          helper.mode = helper.mode
+          helper.mode = helper.mode,
+          target = target,
+          gradient.index = gradient.index
         ),
         error = function(e) {
           stop(sprintf("oversmoothed smooth coefficient bootstrap center failed (%s)",
