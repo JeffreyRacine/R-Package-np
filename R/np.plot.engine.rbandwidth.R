@@ -804,7 +804,10 @@
               lines(x = l.f, y = l.y, lty = .np_plot_lty("interval"))
               point.args <- list(x = ei, y = temp.mean)
               if (!is.null(col)) point.args$col <- col
-              if (!is.null(points.user.args$pch)) point.args$pch <- points.user.args$pch
+              if (!is.null(points.user.args$pch))
+                point.args$pch <- points.user.args$pch
+              else
+                point.args$pch <- .np_plot_pch("factor_estimate")
               if (!is.null(points.user.args$cex)) point.args$cex <- points.user.args$cex
               if (!is.null(points.user.args$bg)) point.args$bg <- points.user.args$bg
               do.call(points, point.args)
@@ -819,8 +822,17 @@
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
-            if (!xi.factor && !plotOnEstimate)
-              lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
+            drew.bias.center <- .np_plot_draw_bias_center_1d(
+              x = ei,
+              center = temp.err[,3],
+              xi.factor = xi.factor,
+              plotOnEstimate = plotOnEstimate,
+              legend = plot.legend,
+              estimate.col = plot.args$col,
+              estimate.lty = plot.args$lty,
+              estimate.lwd = plot.args$lwd,
+              draw.legend = FALSE
+            )
 
             if (plot.errors.type == "all") {
               draw.all.error.types(
@@ -832,7 +844,8 @@
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = .np_plot_lty("interval"),
                 add.legend = TRUE,
-                legend = plot.legend)
+                legend = plot.legend,
+                xi.factor = xi.factor)
             } else {
               draw.args <- list(
                 ex = as.numeric(na.omit(ei)),
@@ -845,12 +858,13 @@
               )
               do.call(draw.errors, draw.args)
             }
-            if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
+            if (isTRUE(drew.bias.center))
               .np_plot_draw_bias_center_legend(
                 legend = plot.legend,
                 estimate.col = plot.args$col,
                 estimate.lty = plot.args$lty,
-                estimate.lwd = plot.args$lwd
+                estimate.lwd = plot.args$lwd,
+                factor.panel = xi.factor
               )
           }
                             
@@ -1058,7 +1072,10 @@
               lines(x = l.f, y = l.y, lty = .np_plot_lty("interval"))
               point.args <- list(x = allei[,i], y = data.eval[,i])
               if (!is.null(col)) point.args$col <- col
-              if (!is.null(points.user.args$pch)) point.args$pch <- points.user.args$pch
+              if (!is.null(points.user.args$pch))
+                point.args$pch <- points.user.args$pch
+              else
+                point.args$pch <- .np_plot_pch("factor_estimate")
               if (!is.null(points.user.args$cex)) point.args$cex <- points.user.args$cex
               if (!is.null(points.user.args$bg)) point.args$bg <- points.user.args$bg
               do.call(points, point.args)
@@ -1073,8 +1090,17 @@
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
-            if (!xi.factor && !plotOnEstimate)
-              lines(na.omit(allei[,i]), na.omit(data.err[,3*i]), lty = .np_plot_lty("center"))
+            drew.bias.center <- .np_plot_draw_bias_center_1d(
+              x = allei[,i],
+              center = data.err[,3*i],
+              xi.factor = xi.factor,
+              plotOnEstimate = plotOnEstimate,
+              legend = plot.legend,
+              estimate.col = plot.args$col,
+              estimate.lty = plot.args$lty,
+              estimate.lwd = plot.args$lwd,
+              draw.legend = FALSE
+            )
             
             if (plot.errors.type == "all") {
               draw.all.error.types(
@@ -1086,7 +1112,8 @@
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = .np_plot_lty("interval"),
                 add.legend = TRUE,
-                legend = plot.legend)
+                legend = plot.legend,
+                xi.factor = xi.factor)
             } else {
               draw.args <- list(
                 ex = as.numeric(na.omit(allei[,i])),
@@ -1099,12 +1126,13 @@
               )
               do.call(draw.errors, draw.args)
             }
-            if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
+            if (isTRUE(drew.bias.center))
               .np_plot_draw_bias_center_legend(
                 legend = plot.legend,
                 estimate.col = plot.args$col,
                 estimate.lty = plot.args$lty,
-                estimate.lwd = plot.args$lwd
+                estimate.lwd = plot.args$lwd,
+                factor.panel = xi.factor
               )
           }
         }
