@@ -910,6 +910,43 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_plot_factor_contrast_vector <- function(x, ref = 1L) {
+  x <- as.double(x)
+  ref <- as.integer(ref)[1L]
+  if (length(x) < 1L)
+    return(x)
+  if (is.na(ref) || ref < 1L || ref > length(x))
+    stop("invalid categorical reference index for plot contrast", call. = FALSE)
+  x - x[ref]
+}
+
+.np_plot_factor_contrast_matrix <- function(x, ref = 1L) {
+  x <- as.matrix(x)
+  ref <- as.integer(ref)[1L]
+  if (ncol(x) < 1L)
+    return(x)
+  if (is.na(ref) || ref < 1L || ref > ncol(x))
+    stop("invalid categorical reference index for plot contrast", call. = FALSE)
+  sweep(x, 1L, x[, ref], "-", check.margin = FALSE)
+}
+
+.np_plot_factor_contrast_boot <- function(boot, ref = 1L) {
+  if (is.null(boot))
+    return(boot)
+  if (!is.list(boot))
+    stop("bootstrap contrast payload must be a list", call. = FALSE)
+  if (isTRUE(attr(boot, "np.factor.contrast")))
+    return(boot)
+  if (!is.null(boot$t))
+    boot$t <- .np_plot_factor_contrast_matrix(boot$t, ref = ref)
+  if (!is.null(boot$t0))
+    boot$t0 <- .np_plot_factor_contrast_vector(boot$t0, ref = ref)
+  if (!is.null(boot$center))
+    boot$center <- .np_plot_factor_contrast_vector(boot$center, ref = ref)
+  attr(boot, "np.factor.contrast") <- TRUE
+  boot
+}
+
 .np_plot_boot_from_hat_wild_factor_effects <- function(H,
                                                        ydat,
                                                        fit.mean,
@@ -926,9 +963,7 @@
   )
   if (ncol(out$t) < 1L)
     return(out)
-  out$t <- sweep(out$t, 1L, out$t[, 1L], "-", check.margin = FALSE)
-  out$t0 <- out$t0 - out$t0[1L]
-  out
+  .np_plot_factor_contrast_boot(out)
 }
 
 .np_plot_require_bws <- function(bws, where) {
@@ -967,23 +1002,35 @@
   all.bp
 }
 
-.np_plot_regression_lp0_derivative_requested <- function(bws, regtype, gradient.order) {
+.np_plot_regression_exact_lc_derivative_requested <- function(bws, regtype, gradient.order) {
+  ncon <- bws$ncon
+  if (is.null(ncon) || ncon < 1L)
+    return(FALSE)
+
+  if (identical(regtype, "lc")) {
+    gradient.order <- npValidateLcGradientOrder(
+      regtype = regtype,
+      gradient.order = gradient.order,
+      ncon = ncon,
+      where = ".np_plot_regression_exact_lc_derivative_requested"
+    )
+    return(length(gradient.order) == ncon && all(gradient.order == 1L))
+  }
+
   identical(regtype, "lp") &&
-    isTRUE(!is.null(bws$ncon)) &&
-    bws$ncon > 0L &&
     npGlpDegree0FirstDerivativeLcOk(
       regtype.engine = regtype,
       degree.engine = npValidateGlpDegree(
         regtype = "lp",
         degree = bws$degree,
-        ncon = bws$ncon
+        ncon = ncon
       ),
       gradient.order = npValidateGlpGradientOrder(
         regtype = "lp",
         gradient.order = gradient.order,
-        ncon = bws$ncon
+        ncon = ncon
       ),
-      ncon = bws$ncon
+      ncon = ncon
     )
 }
 
@@ -2522,7 +2569,7 @@
     }
 
     if (!identical(regtype, "lc")) {
-      use.exact.degree0.derivative <- .np_plot_regression_lp0_derivative_requested(
+      use.exact.degree0.derivative <- .np_plot_regression_exact_lc_derivative_requested(
         bws = bws,
         regtype = regtype,
         gradient.order = gradient.order
@@ -2644,6 +2691,9 @@
     stop("length of ydat must match training rows in exact regression bootstrap helper")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid exact regression bootstrap dimensions")
+  xi.factor <- isTRUE(slice.index > 0L) &&
+    !is.null(bws$xdati) &&
+    (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
 
   fit_hat <- function(x.train, y.train) {
     fit <- .np_regression_direct(
@@ -2654,6 +2704,8 @@
       gradients = isTRUE(gradients),
       gradient.order = gradient.order
     )
+    if (isTRUE(gradients) && isTRUE(xi.factor))
+      return(.np_plot_factor_contrast_vector(fit$mean))
     if (isTRUE(gradients))
       as.vector(fit$grad[, slice.index])
     else
@@ -2731,6 +2783,9 @@
     stop("length of ydat must match training rows in exact wild regression bootstrap helper")
   if (n < 1L || nrow(exdat) < 1L || B < 1L)
     stop("invalid exact wild regression bootstrap dimensions")
+  xi.factor <- isTRUE(slice.index > 0L) &&
+    !is.null(bws$xdati) &&
+    (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
 
   if (is.null(fit.mean.train)) {
     fit.mean.train <- as.vector(.np_regression_direct(
@@ -2756,6 +2811,8 @@
       gradients = isTRUE(gradients),
       gradient.order = gradient.order
     )
+    if (isTRUE(gradients) && isTRUE(xi.factor))
+      return(.np_plot_factor_contrast_vector(fit$mean))
     if (isTRUE(gradients))
       as.vector(fit$grad[, slice.index])
     else
@@ -10274,9 +10331,8 @@ compute.default.error.range <- function(center, err) {
     )
     center <- as.vector(H.pilot %*% as.double(ydat))
     if (gradients && xi.factor && ncol(out$t) >= 1L) {
-      out$t <- sweep(out$t, 1L, out$t[, 1L], "-", check.margin = FALSE)
-      out$t0 <- out$t0 - out$t0[1L]
-      center <- center - center[1L]
+      out <- .np_plot_factor_contrast_boot(out)
+      center <- .np_plot_factor_contrast_vector(center)
     }
     out$center <- center
     return(out)
@@ -11177,7 +11233,7 @@ compute.bootstrap.errors.rbandwidth =
 
         use.exact.degree0.derivative <- isTRUE(gradients) &&
           !isTRUE(xi.factor) &&
-          .np_plot_regression_lp0_derivative_requested(
+          .np_plot_regression_exact_lc_derivative_requested(
             bws = bws,
             regtype = regtype,
             gradient.order = gradient.order
@@ -11237,8 +11293,7 @@ compute.bootstrap.errors.rbandwidth =
               progress.label = progress.label
             )
             if (gradients && xi.factor && ncol(boot.out$t) >= 1L) {
-              boot.out$t <- sweep(boot.out$t, 1L, boot.out$t[, 1L], "-", check.margin = FALSE)
-              boot.out$t0 <- boot.out$t0 - boot.out$t0[1L]
+              boot.out <- .np_plot_factor_contrast_boot(boot.out)
             }
           } else {
             H <- suppressWarnings(npreghat(
@@ -11303,6 +11358,12 @@ compute.bootstrap.errors.rbandwidth =
                call. = FALSE)
         }
       )
+    }
+
+    if (gradients && xi.factor) {
+      boot.out <- .np_plot_factor_contrast_boot(boot.out)
+      if (!is.null(oversmooth.boot))
+        oversmooth.boot <- .np_plot_factor_contrast_boot(oversmooth.boot)
     }
 
     all.bp <- .np_plot_boot_factor_boxplots(
