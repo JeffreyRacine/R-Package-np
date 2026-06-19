@@ -907,8 +907,8 @@
             if (.np_plot_center_is_bias_corrected(plot.errors.center))
               plot.out[[i]] <- .np_plot_add_bias_fields(
                 plot.out[[i]],
-                na.omit(temp.mean),
-                na.omit(temp.err[,3])
+                temp.mean,
+                temp.err[,3]
               )
           }
           plot.out[[i]]$bxp = temp.boot

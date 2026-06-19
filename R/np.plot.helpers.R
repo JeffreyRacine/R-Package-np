@@ -11048,18 +11048,6 @@ compute.default.error.range <- function(center, err) {
        call. = FALSE)
 }
 
-.np_plot_reject_semiparametric_pair_bias_center <- function(center,
-                                                           plot.errors.boot.method,
-                                                           where) {
-  if (identical(center, "bias-corrected") &&
-      is.element(plot.errors.boot.method, c("inid", "fixed", "geom"))) {
-    stop(sprintf("center=\"bias-corrected\" with bootstrap=\"%s\" is not supported for %s; use bootstrap=\"wild\" for bias-corrected semiparametric plot bands",
-                 plot.errors.boot.method,
-                 where),
-         call. = FALSE)
-  }
-}
-
 .np_plot_bootstrap_center <- function(center, t0, boot.t, oversmooth.boot = NULL) {
   if (identical(center, "estimate"))
     return(t0)
@@ -12043,7 +12031,7 @@ compute.bootstrap.errors.bandwidth =
       boot.err[,3] <- interval.payload$center
       boot.all.err <- interval.payload$all.err
     }
-    if (plot.errors.center == "bias-corrected" &&
+    if (.np_plot_center_is_bias_corrected(plot.errors.center) &&
         identical(plot.errors.type, "pmzsd"))
       boot.err[,3] <- .np_plot_bootstrap_center(
         center = plot.errors.center,
