@@ -275,3 +275,38 @@ test_that("npqreg gradient plots support asymptotic errors", {
   expect_true(all(is.finite(gradients(fit))))
   expect_true(all(is.finite(gradients(fit, errors = TRUE))))
 })
+
+test_that("npqreg bias-corrected bootstrap plots fail closed clearly", {
+  set.seed(70619)
+  n <- 30L
+  xdat <- data.frame(x = runif(n))
+  ydat <- rnorm(n)
+  bw <- npcdistbw(
+    xdat = xdat,
+    ydat = data.frame(y = ydat),
+    bws = c(0.35, 0.35),
+    bandwidth.compute = FALSE
+  )
+  fit <- npqreg(bws = bw, txdat = xdat, tydat = ydat, tau = 0.5)
+
+  for (boot in c("inid", "fixed", "geom", "wild")) {
+    msg <- tryCatch({
+      plot(
+        fit,
+        output = "data",
+        perspective = FALSE,
+        errors = "bootstrap",
+        bootstrap = boot,
+        center = "bias-corrected",
+        B = 5L,
+        neval = 4L
+      )
+      NA_character_
+    }, error = conditionMessage)
+
+    expect_false(is.na(msg), info = boot)
+    expect_match(msg, "conditional quantile \\(npqreg\\) bootstrap plots", info = boot)
+    expect_match(msg, "use center=\"estimate\"", fixed = TRUE, info = boot)
+    expect_match(msg, sprintf("bootstrap=\"%s\"", boot), fixed = TRUE, info = boot)
+  }
+})

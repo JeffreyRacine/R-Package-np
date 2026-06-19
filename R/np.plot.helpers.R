@@ -11033,6 +11033,21 @@ compute.default.error.range <- function(center, err) {
   }
 }
 
+.np_plot_reject_quantile_bias_center <- function(center, plot.errors.boot.method = NULL) {
+  if (!identical(center, "bias-corrected"))
+    return(invisible(FALSE))
+  method <- if (!is.null(plot.errors.boot.method) &&
+                length(plot.errors.boot.method) == 1L &&
+                !is.na(plot.errors.boot.method)) {
+    sprintf(" with bootstrap=\"%s\"", plot.errors.boot.method)
+  } else {
+    ""
+  }
+  stop(sprintf("center=\"bias-corrected\"%s is not supported for conditional quantile (npqreg) bootstrap plots; use center=\"estimate\"",
+               method),
+       call. = FALSE)
+}
+
 .np_plot_reject_semiparametric_pair_bias_center <- function(center,
                                                            plot.errors.boot.method,
                                                            where) {
@@ -12119,10 +12134,14 @@ compute.bootstrap.errors.conbandwidth =
       else if (cdf) "dist"
       else "dens"
 
+    if (identical(tboo, "quant")) {
+      .np_plot_reject_quantile_bias_center(
+        center = plot.errors.center,
+        plot.errors.boot.method = plot.errors.boot.method
+      )
+    }
+
     if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
-      if (identical(tboo, "quant")) {
-        .np_plot_reject_oversmoothed_center(plot.errors.center, "conditional quantile plots")
-      }
       if (isTRUE(proper)) {
         stop("center=\"bias-corrected\" with pair/block/geometric bootstrap is not yet implemented for proper conditional density/distribution projections", call. = FALSE)
       }
