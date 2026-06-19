@@ -18,6 +18,18 @@ npindex <-
     args <- list(...)
 
     if (!missing(bws)){
+      if (length(args) > 0L &&
+          inherits(args[[1L]], "formula") &&
+          is.null(args$txdat)) {
+        formula <- args[[1L]]
+        args <- args[-1L]
+        args$.np_index_explicit_bws <- bws
+        return(do.call(npindex.formula,
+                       c(list(bws = formula), args),
+                       envir = parent.frame()))
+      }
+      if (inherits(bws, "formula") && is.null(args$txdat))
+        UseMethod("npindex", bws)
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$txdat))
           UseMethod("npindex",bws$formula)
@@ -38,12 +50,24 @@ npindex <-
 npindex.formula <-
     function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
 
+        mc <- match.call(expand.dots = FALSE)
         tt <- terms(bws)
-        m <- match(c("formula", "data", "subset", "na.action"),
-                   names(bws$call), nomatch = 0)
-        tmf <- bws$call[c(1,m)]
+        tmf <- if (!is.null(bws$call)) {
+          m <- match(c("formula", "data", "subset", "na.action"),
+                     names(bws$call), nomatch = 0)
+          bws$call[c(1, m)]
+        } else {
+          m <- match(c("bws", "data", "subset", "na.action"),
+                     names(mc), nomatch = 0)
+          tmf <- mc[c(1, m)]
+          if ("bws" %in% names(tmf))
+            names(tmf)[names(tmf) == "bws"] <- "formula"
+          tmf
+        }
         tmf[[1]] <- as.name("model.frame")
         tmf[["formula"]] <- tt
+        if (!missing(data) && !is.null(data))
+          tmf[["data"]] <- substitute(data)
         mf.args <- as.list(tmf)[-1L]
         umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
@@ -88,14 +112,29 @@ npindex.formula <-
           exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
         }
 
+        dots <- list(...)
+        si.bws <- if (!is.null(dots$.np_index_explicit_bws)) {
+            out <- dots$.np_index_explicit_bws
+            dots$.np_index_explicit_bws <- NULL
+            out
+        } else if (!is.null(dots$bws)) {
+            out <- dots$bws
+            dots$bws <- NULL
+            out
+        } else {
+            bws
+        }
+
         si.args <- list(txdat = txdat, tydat = tydat)
         if (has.eval) {
           si.args$exdat <- exdat
           if (y.eval)
             si.args$eydat <- eydat
         }
-        si.args$bws <- bws
-        ev <- do.call(npindex, c(si.args, list(...)))
+        si.args$bws <- si.bws
+        ev <- do.call(npindex, c(si.args, dots))
+        ev$call <- mc
+        environment(ev$call) <- parent.frame()
 
         if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
             if (!is.null(ev$bws))
@@ -138,7 +177,15 @@ npindex.call <-
 
 npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npindex()")
-  explicit.sibandwidth <- (!missing(bws)) && inherits(bws, "sibandwidth")
+  sc <- sys.call()
+  sc.names <- names(sc)
+
+  no.bws <- missing(bws)
+  no.txdat <- missing(txdat)
+  no.tydat <- missing(tydat)
+  explicit.sibandwidth <- (!no.bws) && inherits(bws, "sibandwidth")
+  bws.formula <- (!no.bws) && inherits(bws, "formula")
+  bws.call <- (!no.bws) && is.call(bws)
   nomad <- npValidateNomadControl(nomad, "nomad")
   degree.select.value <- if (npNomadControlRequested(nomad)) {
     "coordinate"
@@ -148,11 +195,10 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     "manual"
   }
   if (.npRmpi_autodispatch_active() &&
+      !bws.formula &&
+      !bws.call &&
       (explicit.sibandwidth || identical(degree.select.value, "manual")))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-
-  sc <- sys.call()
-  sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
   ## if it was, we need to catch that and map it to dat =
@@ -162,11 +208,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   txdat.named <- any(sc.names == "txdat")
   tydat.named <- any(sc.names == "tydat")
 
-  no.bws <- missing(bws)
-  no.txdat <- missing(txdat)
-  no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "sibandwidth")
-  bws.formula <- (!no.bws) && inherits(bws, "formula")
 
   ## if bws was passed in explicitly, do not compute bandwidths
 
@@ -219,7 +261,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       call.args <- c(call.args, list(tydat))
     }
   }
-  if (no.bws || bws.formula || is.call(bws))
+  if (no.bws || bws.formula || bws.call)
     call.args$.np_fit_progress_handoff <- TRUE
   do.call(npindex, c(call.args, list(...)))
 }
@@ -277,6 +319,20 @@ npindex.sibandwidth <-
     boot.num <- as.integer(boot.num)
     .npRmpi_require_active_slave_pool(where = "npindex()")
     spec <- .npindex_resolve_spec(bws, where = "npindex")
+    no.ex = missing(exdat)
+    no.ey = missing(eydat)
+
+    txdat <- toFrame(txdat)
+    if (!(is.vector(tydat) || is.factor(tydat)))
+      stop("'tydat' must be a vector or a factor")
+    tydat <-
+      if (is.factor(tydat))
+        as.numeric(levels(tydat))[as.integer(tydat)]
+      else
+        as.double(tydat)
+    if (!no.ex)
+      exdat <- toFrame(exdat)
+
     use.local.exact.exec <- .npRmpi_autodispatch_active() &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       identical(spec$regtype.engine, "lc") &&
@@ -316,29 +372,13 @@ npindex.sibandwidth <-
       return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
     }
 
-    no.ex = missing(exdat)
-    no.ey = missing(eydat)
-
     ## if no.ex then if !no.ey then ey and tx must match, to get
     ## oos errors alternatively if no.ey you get is errors if
     ## !no.ex then if !no.ey then ey and ex must match, to get
     ## oos errors alternatively if no.ey you get NO errors since we
     ## don't evaluate on the training data
 
-    txdat = toFrame(txdat)
-
-    if (!(is.vector(tydat) || is.factor(tydat)))
-      stop("'tydat' must be a vector or a factor")
-
-    tydat =
-      if (is.factor(tydat))
-        as.numeric(levels(tydat))[as.integer(tydat)]
-      else
-        as.double(tydat)
-
     if (!no.ex){
-      exdat = toFrame(exdat)
-
       if (! txdat %~% exdat )
         stop("'txdat' and 'exdat' are not similar data frames!")
 
