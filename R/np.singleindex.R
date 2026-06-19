@@ -18,6 +18,18 @@ npindex <-
     args <- list(...)
 
     if (!missing(bws)){
+      if (length(args) > 0L &&
+          inherits(args[[1L]], "formula") &&
+          is.null(args$txdat)) {
+        formula <- args[[1L]]
+        args <- args[-1L]
+        args$.np_index_explicit_bws <- bws
+        return(do.call(npindex.formula,
+                       c(list(bws = formula), args),
+                       envir = parent.frame()))
+      }
+      if (inherits(bws, "formula") && is.null(args$txdat))
+        UseMethod("npindex", bws)
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$txdat))
           UseMethod("npindex",bws$formula)
@@ -38,12 +50,24 @@ npindex <-
 npindex.formula <-
     function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
 
+        mc <- match.call(expand.dots = FALSE)
         tt <- terms(bws)
-        m <- match(c("formula", "data", "subset", "na.action"),
-                   names(bws$call), nomatch = 0)
-        tmf <- bws$call[c(1,m)]
+        tmf <- if (!is.null(bws$call)) {
+          m <- match(c("formula", "data", "subset", "na.action"),
+                     names(bws$call), nomatch = 0)
+          bws$call[c(1, m)]
+        } else {
+          m <- match(c("bws", "data", "subset", "na.action"),
+                     names(mc), nomatch = 0)
+          tmf <- mc[c(1, m)]
+          if ("bws" %in% names(tmf))
+            names(tmf)[names(tmf) == "bws"] <- "formula"
+          tmf
+        }
         tmf[[1]] <- as.name("model.frame")
         tmf[["formula"]] <- tt
+        if (!missing(data) && !is.null(data))
+          tmf[["data"]] <- substitute(data)
         mf.args <- as.list(tmf)[-1L]
         umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
@@ -88,14 +112,29 @@ npindex.formula <-
           exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
         }
 
+        dots <- list(...)
+        si.bws <- if (!is.null(dots$.np_index_explicit_bws)) {
+            out <- dots$.np_index_explicit_bws
+            dots$.np_index_explicit_bws <- NULL
+            out
+        } else if (!is.null(dots$bws)) {
+            out <- dots$bws
+            dots$bws <- NULL
+            out
+        } else {
+            bws
+        }
+
         si.args <- list(txdat = txdat, tydat = tydat)
         if (has.eval) {
           si.args$exdat <- exdat
           if (y.eval)
             si.args$eydat <- eydat
         }
-        si.args$bws <- bws
-        ev <- do.call(npindex, c(si.args, list(...)))
+        si.args$bws <- si.bws
+        ev <- do.call(npindex, c(si.args, dots))
+        ev$call <- mc
+        environment(ev$call) <- parent.frame()
 
         if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
             if (!is.null(ev$bws))
