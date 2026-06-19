@@ -387,19 +387,23 @@
 }
 
 .np_plot_add_bias_fields <- function(object, estimate, bias.corrected) {
-  estimate <- as.numeric(estimate)
-  bias.corrected <- as.numeric(bias.corrected)
-  object$bias <- estimate - bias.corrected
-  object$bias.corrected <- bias.corrected
-  object
+  .np_plot_add_named_bias_fields(
+    object = object,
+    estimate = estimate,
+    bias.corrected = bias.corrected,
+    bias.name = "bias",
+    corrected.name = "bias.corrected"
+  )
 }
 
 .np_plot_add_gradient_bias_fields <- function(object, gradient, gradient.bias.corrected) {
-  gradient <- as.numeric(gradient)
-  gradient.bias.corrected <- as.numeric(gradient.bias.corrected)
-  object$gbias <- gradient - gradient.bias.corrected
-  object$gradient.bias.corrected <- gradient.bias.corrected
-  object
+  .np_plot_add_named_bias_fields(
+    object = object,
+    estimate = gradient,
+    bias.corrected = gradient.bias.corrected,
+    bias.name = "gbias",
+    corrected.name = "gradient.bias.corrected"
+  )
 }
 
 .np_plot_add_named_bias_fields <- function(object,
@@ -4581,6 +4585,26 @@
         ncon = bws$ncon,
         where = ".np_inid_boot_from_regression"
       )
+    }
+    xi.factor <- isTRUE(slice.index > 0L) &&
+      !is.null(bws$xdati) &&
+      (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
+    if (isTRUE(xi.factor)) {
+      return(.np_inid_boot_from_regression_exact(
+        xdat = xdat,
+        exdat = exdat,
+        bws = bws,
+        ydat = ydat,
+        B = B,
+        counts = counts,
+        counts.drawer = counts.drawer,
+        gradients = TRUE,
+        gradient.order = gradient.order,
+        slice.index = slice.index,
+        prefer.local.single_worker = prefer.local.single_worker,
+        master_local_chunk = master_local_chunk,
+        progress.label = progress.label
+      ))
     }
     if (!identical(regtype, "lc")) {
       use.exact.degree0.derivative <- .np_plot_regression_lp0_derivative_requested(
@@ -12290,6 +12314,14 @@ plotFactor <- function(f, y, ...){
                                              center.lwd = estimate.lwd,
                                              legend.loc = "topright",
                                              factor.panel = FALSE) {
+  if (is.null(estimate.col) || !length(estimate.col))
+    estimate.col <- par()$col
+  if (is.null(center.col) || !length(center.col))
+    center.col <- par()$col
+  if (is.null(estimate.lwd) || !length(estimate.lwd))
+    estimate.lwd <- par()$lwd
+  if (is.null(center.lwd) || !length(center.lwd))
+    center.lwd <- estimate.lwd
   normalize_lty <- function(value) {
     if (is.null(value) || !length(value))
       return(.np_plot_lty("solid"))
