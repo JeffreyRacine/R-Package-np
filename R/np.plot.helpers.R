@@ -17031,11 +17031,6 @@ compute.bootstrap.errors.plbandwidth =
     if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
       if (isTRUE(is.wild.hat))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "partial linear wild bootstrap plots")
-      .np_plot_reject_semiparametric_pair_bias_center(
-        center = plot.errors.center,
-        plot.errors.boot.method = plot.errors.boot.method,
-        where = "partially linear plots"
-      )
       if (isTRUE(gradients))
         .np_plot_reject_oversmoothed_center(plot.errors.center, "partial linear gradient plots")
       if (!identical(bws$type, "fixed"))
