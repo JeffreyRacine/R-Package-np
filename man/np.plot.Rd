@@ -495,10 +495,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \deqn{g_{xj} = h_{xj} n^{r / ((p + r)(p + 2r))},}
   where here \eqn{p} is the total number of continuous dependent and
   explanatory variables. The same conditional pilot rule is used for
-  supported all-continuous fixed-bandwidth conditional
-  density/distribution gradient plots. Mixed-data conditional
-  density/distribution gradient bootstrap plots remain fail-closed until
-  their gradient bootstrap helper contract is separately validated.
+  supported fixed-bandwidth conditional density/distribution gradient
+  plots, including mixed-data routes. In mixed-data conditional
+  gradients, continuous dependent variables are perturbed by the
+  density-style rule, categorical dependent variables are resampled
+  row-wise without perturbation, continuous conditioning variables use
+  the conditional regression-style pilot, and categorical conditioning
+  lambdas are moved toward their admissible upper bounds as in the
+  corresponding level route.
   These are practical, evidence-backed rules-of-thumb guided by the
   smoothed-bootstrap and regression two-bandwidth literatures, not claims
   of universal optimality.
@@ -529,9 +533,20 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Bootstrap method support differs by estimator family:
   \preformatted{
   Regression-family (npreg/npindex/npscoef/npplreg): wild, inid, fixed, geom
-  Density/distribution-family (npudens/npudist/npcdens/npcdist): inid, fixed, geom
+  Density/distribution-family (npudens/npudist/npcdens/npcdist/npconmode): inid, fixed, geom
   }
   hence \code{"wild"} is only available for regression-family plotting.
+  Bias-corrected bootstrap centering is currently restricted to supported
+  fixed-bandwidth plot routes. Non-fixed, adaptive-nearest-neighbor, and
+  generalized-nearest-neighbor bandwidth routes fail closed for
+  \code{center="bias-corrected"}. Conditional quantile
+  \code{npqreg}, copula \code{npcopula}, and instrumental-variable
+  \code{npregiv} bias-corrected bootstrap plot routes are not claimed in
+  this release tranche and fail clearly when unsupported
+  bias-corrected bootstrap controls are requested. Partially linear
+  \code{npplreg} level plots support the regression-family bootstrap
+  methods above; \code{gradients=TRUE} is not a partially linear plot
+  route and fails clearly.
 
   Implementation notes for speed:
   \preformatted{
