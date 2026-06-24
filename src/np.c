@@ -80,6 +80,17 @@ static int np_int_product3_overflows(int a, int b, int c)
     np_int_product_overflows(a * b, c);
 }
 
+static void np_load_crs_namespace(void)
+{
+  SEXP pkg;
+  SEXP call;
+
+  PROTECT(pkg = mkString("crs"));
+  PROTECT(call = lang2(install("loadNamespace"), pkg));
+  Rf_eval(call, R_GlobalEnv);
+  UNPROTECT(2);
+}
+
 SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
                                          SEXP eval_env,
                                          SEXP x0,
@@ -95,7 +106,7 @@ SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
   SEXP eval_fun = R_NilValue, eval_rho = R_NilValue;
   SEXP x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue;
   SEXP upper_r = R_NilValue, option_names_s = R_NilValue, option_values_s = R_NilValue;
-  SEXP call = R_NilValue, out = R_NilValue, names = R_NilValue, sol = R_NilValue;
+  SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue;
   crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
@@ -148,9 +159,7 @@ SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
   }
   n_options = (int) XLENGTH(option_names_s);
 
-  PROTECT(call = lang2(install("loadNamespace"), mkString("crs"))); nprotect++;
-  Rf_eval(call, R_GlobalEnv);
-  UNPROTECT(1); nprotect--;
+  np_load_crs_namespace();
 
   solve = (crs_nomad_solve_fn)
     R_GetCCallable("crs", "crs_nomad_solve");
@@ -4102,7 +4111,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   SEXP point_upper_r = R_NilValue, option_values_s = R_NilValue, out = R_NilValue;
   SEXP option_names_s = R_NilValue;
   SEXP names = R_NilValue, sol = R_NilValue, best = R_NilValue;
-  SEXP best_flat = R_NilValue, best_degree = R_NilValue, call = R_NilValue;
+  SEXP best_flat = R_NilValue, best_degree = R_NilValue;
   crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
@@ -4168,9 +4177,7 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   }
   n_options = (int) XLENGTH(option_names_s);
 
-  PROTECT(call = lang2(install("loadNamespace"), mkString("crs")));
-  Rf_eval(call, R_GlobalEnv);
-  UNPROTECT(1);
+  np_load_crs_namespace();
 
   solve = (crs_nomad_solve_fn)
     R_GetCCallable("crs", "crs_nomad_solve");
@@ -4366,7 +4373,7 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   SEXP point_upper_r = R_NilValue, option_values_s = R_NilValue, out = R_NilValue;
   SEXP option_names_s = R_NilValue;
   SEXP names = R_NilValue, sol = R_NilValue, best = R_NilValue;
-  SEXP best_flat = R_NilValue, best_degree = R_NilValue, call = R_NilValue;
+  SEXP best_flat = R_NilValue, best_degree = R_NilValue;
   crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
@@ -4432,9 +4439,7 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   }
   n_options = (int) XLENGTH(option_names_s);
 
-  PROTECT(call = lang2(install("loadNamespace"), mkString("crs")));
-  Rf_eval(call, R_GlobalEnv);
-  UNPROTECT(1);
+  np_load_crs_namespace();
 
   solve = (crs_nomad_solve_fn)
     R_GetCCallable("crs", "crs_nomad_solve");
@@ -5295,7 +5300,6 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue, decode_scale_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_degree = R_NilValue, first_degree = R_NilValue;
-  SEXP call = R_NilValue;
   crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
@@ -5370,9 +5374,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   }
   n_options = (int) XLENGTH(option_names_s);
 
-  PROTECT(call = lang2(install("loadNamespace"), mkString("crs")));
-  Rf_eval(call, R_GlobalEnv);
-  UNPROTECT(1);
+  np_load_crs_namespace();
 
   solve = (crs_nomad_solve_fn)
     R_GetCCallable("crs", "crs_nomad_solve");
@@ -8171,7 +8173,6 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   SEXP upper_r = R_NilValue, option_names_s = R_NilValue, option_values_s = R_NilValue;
   SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
-  SEXP call = R_NilValue;
   crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
@@ -8227,9 +8228,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   }
   n_options = (int) XLENGTH(option_names_s);
 
-  PROTECT(call = lang2(install("loadNamespace"), mkString("crs")));
-  Rf_eval(call, R_GlobalEnv);
-  UNPROTECT(1);
+  np_load_crs_namespace();
 
   solve = (crs_nomad_solve_fn)
     R_GetCCallable("crs", "crs_nomad_solve");
@@ -8781,7 +8780,6 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   SEXP upper_r = R_NilValue, option_names_s = R_NilValue, option_values_s = R_NilValue;
   SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
-  SEXP call = R_NilValue;
   crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
@@ -8840,9 +8838,7 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   }
   n_options = (int) XLENGTH(option_names_s);
 
-  PROTECT(call = lang2(install("loadNamespace"), mkString("crs")));
-  Rf_eval(call, R_GlobalEnv);
-  UNPROTECT(1);
+  np_load_crs_namespace();
 
   solve = (crs_nomad_solve_fn)
     R_GetCCallable("crs", "crs_nomad_solve");
@@ -9655,7 +9651,7 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   SEXP option_names_s = R_NilValue, option_values_s = R_NilValue, degree_i = R_NilValue;
   SEXP cxkerlb_r = R_NilValue, cxkerub_r = R_NilValue, cykerlb_r = R_NilValue, cykerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
-  SEXP best_degree = R_NilValue, first_degree = R_NilValue, call = R_NilValue;
+  SEXP best_degree = R_NilValue, first_degree = R_NilValue;
   crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
@@ -9729,9 +9725,7 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   }
   n_options = (int) XLENGTH(option_names_s);
 
-  PROTECT(call = lang2(install("loadNamespace"), mkString("crs")));
-  Rf_eval(call, R_GlobalEnv);
-  UNPROTECT(1);
+  np_load_crs_namespace();
 
   solve = (crs_nomad_solve_fn) R_GetCCallable("crs", "crs_nomad_solve");
   if (solve == NULL) {
