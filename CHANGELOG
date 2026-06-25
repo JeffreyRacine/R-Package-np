@@ -1,4 +1,4 @@
-Changes from Version 0.70-3 to 0.70-4 [XX-XXX-XXXX]
+Changes from Version 0.70-3 to 0.70-4 [26-Jun-2026]
 
 * Hardened proactive C cleanup paths by aligning LAPACK helper out-of-memory
   cleanup with the serial package, clearing extended nearest-neighbor alias
@@ -12,6 +12,64 @@ Changes from Version 0.70-3 to 0.70-4 [XX-XXX-XXXX]
   unacceptable MPI cache-invalidation risk, so the current MPI implementation
   was retained and the cache work was recorded as a future design item rather
   than promoted in this hardening tranche.
+
+* Added `nomad = "auto"` for local-polynomial degree searches, preserving the
+  serial package policy while keeping MPI autodispatch and NOMAD shadow
+  protocols explicit. Small one-dimensional degree lattices use exhaustive
+  Powell-style search; larger or explicitly requested NOMAD surfaces continue
+  to use NOMAD.
+
+* Repaired `npRmpi` fit-wrapper NOMAD guards after normalized NOMAD control
+  handling so `nomad = TRUE` and `nomad = "auto"` routes stay on the intended
+  local/native path rather than being accidentally autodispatched.
+
+* Improved bandwidth and fit summaries for NOMAD, Powell, exhaustive Powell,
+  and hybrid NOMAD+Powell searches. Summaries now report cumulative evaluation
+  counts, distinguish NOMAD point-lookups from true objective computations,
+  expose Powell objective-cache reuse, and label timing components
+  consistently.
+
+* Hardened base-graphics plot scaling and legends so multi-panel plots honor
+  the active device `mfrow`/`cex` behavior, use role-appropriate legend sizes,
+  and draw factor legends with point glyphs matching the plotted estimates.
+
+* Reworked fixed-bandwidth bias-corrected bootstrap plot intervals across the
+  supported serial-equivalent and MPI-aware plot families. Bias-corrected
+  centers and intervals now share a common centering contract for regression,
+  unconditional density and distribution, conditional density and distribution,
+  single-index, partially linear, and smooth-coefficient plots where
+  supported.
+
+* Added smooth-bootstrap bias correction for pair/block/geometric bootstrap
+  intervals in fixed-bandwidth regression-style routes, and perturbation-based
+  smooth-bootstrap bias correction for unconditional and conditional
+  density/distribution routes. Gaussian, uniform, and second-order
+  Epanechnikov perturbation kernels are supported; higher-order signed
+  perturbation kernels fail closed.
+
+* Extended bias-corrected plot support to mixed-data density and conditional
+  density/distribution routes, including conditional gradient displays, while
+  keeping non-fixed/adaptive/generalized bandwidth bias correction and
+  empirically unsupported `npqreg` bias correction fail-closed with explicit
+  messages.
+
+* Repaired and validated bias-corrected plot payloads returned by
+  `output = "data"` and `output = "both"` so fitted values, bias-corrected
+  values, gradients, gradient bias corrections, and interval payloads are
+  consistently named and centered in MPI and serial-equivalent plot routes.
+
+* Hardened derivative-order validation across plot/gradient routes so
+  requested derivatives that are unsupported by the selected local-polynomial
+  degree fail early or are represented consistently rather than silently
+  plotting a lower-order derivative.
+
+* Fixed single-index formula dispatch when explicit bandwidths are supplied
+  under MPI-aware routes and tightened single-index bias-corrected plot
+  centers, output payloads, and legends.
+
+* Protected the native `loadNamespace("crs")` call construction used by
+  CRS-backed native search routes, resolving the RCHK protection finding
+  without changing the native NOMAD search contract.
 
 Changes from Version 0.70-2 to 0.70-3 [01-Jun-2026]
 
