@@ -1,4 +1,4 @@
-Changes from Version 0.70-3 to 0.70-4 [XX-XXX-XXXX]
+Changes from Version 0.70-3 to 0.70-4 [26-Jun-2026]
 
 * Hardened proactive C cleanup paths by clearing extended nearest-neighbor
   alias state in the shared estimator cleanup helper, routing selected
@@ -10,6 +10,58 @@ Changes from Version 0.70-3 to 0.70-4 [XX-XXX-XXXX]
   package. The serial cache remains active where previously introduced; no
   additional `np` source changes were required for the MPI-specific cache
   reassessment.
+
+* Added `nomad = "auto"` for local-polynomial degree searches. The automatic
+  policy uses exhaustive Powell-style degree search for small one-dimensional
+  degree lattices where evidence showed it is more reliable than heuristic
+  NOMAD restarts, while preserving NOMAD for larger or explicitly requested
+  search surfaces.
+
+* Improved bandwidth and fit summaries for NOMAD, Powell, exhaustive Powell,
+  and hybrid NOMAD+Powell searches. Summaries now report cumulative evaluation
+  counts, distinguish NOMAD point-lookups from true objective computations,
+  expose Powell objective-cache reuse, and label timing components consistently.
+
+* Hardened base-graphics plot scaling and legends so multi-panel plots honor
+  the active device `mfrow`/`cex` behavior, use role-appropriate legend sizes,
+  and draw factor legends with point glyphs matching the plotted estimates.
+
+* Reworked fixed-bandwidth bias-corrected bootstrap plot intervals across the
+  supported plot families. Bias-corrected centers and intervals now share a
+  common centering contract for regression, unconditional density and
+  distribution, conditional density and distribution, single-index,
+  partially linear, and smooth-coefficient plots where supported.
+
+* Added smooth-bootstrap bias correction for pair/block/geometric bootstrap
+  intervals in fixed-bandwidth regression-style routes, and perturbation-based
+  smooth-bootstrap bias correction for unconditional and conditional
+  density/distribution routes. Gaussian, uniform, and second-order
+  Epanechnikov perturbation kernels are supported; higher-order signed
+  perturbation kernels fail closed.
+
+* Extended bias-corrected plot support to mixed-data density and conditional
+  density/distribution routes, including conditional gradient displays, while
+  keeping non-fixed/adaptive/generalized bandwidth bias correction and
+  empirically unsupported `npqreg` bias correction fail-closed with explicit
+  messages.
+
+* Repaired and validated bias-corrected plot payloads returned by
+  `output = "data"` and `output = "both"` so fitted values, bias-corrected
+  values, gradients, gradient bias corrections, and interval payloads are
+  consistently named and centered.
+
+* Hardened derivative-order validation across plot/gradient routes so
+  requested derivatives that are unsupported by the selected local-polynomial
+  degree fail early or are represented consistently rather than silently
+  plotting a lower-order derivative.
+
+* Fixed single-index formula dispatch when explicit bandwidths are supplied
+  and tightened single-index bias-corrected plot centers, output payloads, and
+  legends.
+
+* Protected the native `loadNamespace("crs")` call construction used by
+  CRS-backed native search routes, resolving the RCHK protection finding
+  without changing the native NOMAD search contract.
 
 Changes from Version 0.70-2 to 0.70-3 [01-Jun-2026]
 
