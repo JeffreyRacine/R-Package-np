@@ -1,3 +1,5 @@
+Changes from Version 0.70-4 to 0.70-5 [XX-XXX-XXXX]
+
 Changes from Version 0.70-3 to 0.70-4 [26-Jun-2026]
 
 * Hardened proactive C cleanup paths by aligning LAPACK helper out-of-memory
