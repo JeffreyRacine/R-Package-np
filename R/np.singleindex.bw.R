@@ -893,13 +893,27 @@ npindexbw.NULL <-
 
   ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = 0.0, cap = 1.0)
   fit.block <- double(length(idx))
+  q <- ncol(W)
+  m <- length(idx)
+  sum.w <- as.vector(crossprod(kw, rep.int(1.0, n)))
+  XtWy0 <- as.vector(crossprod(kw, ydat))
+  lc.mean <- XtWy0 / NZD(sum.w)
+  z.mom <- matrix(0.0, nrow = m, ncol = q)
+  for (a in seq_len(q)) {
+    z.mom[, a] <- as.vector(crossprod(kw, ydat * W[, a]))
+  }
+  A.mom <- array(0.0, dim = c(m, q, q))
+  for (a in seq_len(q)) {
+    for (b in a:q) {
+      val <- as.vector(crossprod(kw, W[, a] * W[, b]))
+      A.mom[, a, b] <- val
+      A.mom[, b, a] <- val
+    }
+  }
 
-  for (jj in seq_along(idx)) {
-    w <- kw[, jj]
-    XtWy0 <- sum(w * ydat)
-    lc.mean <- XtWy0 / NZD(sum(w))
-    A <- crossprod(W, W * w)
-    z <- crossprod(W, ydat * w)
+  for (jj in seq_len(m)) {
+    A <- matrix(A.mom[jj, , ], nrow = q, ncol = q)
+    z <- z.mom[jj, ]
     solved <- FALSE
 
     for (ridge in ridge.grid) {
@@ -907,21 +921,21 @@ npindexbw.NULL <-
       zr <- z
       if (ridge > 0) {
         diag(Ar) <- diag(Ar) + ridge
-        zr[1L] <- XtWy0 + ridge * XtWy0 / NZD(A[1L, 1L])
+        zr[1L] <- XtWy0[[jj]] + ridge * XtWy0[[jj]] / NZD(A[1L, 1L])
       }
 
       coef <- tryCatch(chol2inv(chol(Ar)) %*% zr, error = function(e) NULL)
       if (!is.null(coef) && all(is.finite(coef))) {
         alpha <- min(1.0, ridge)
         fit.block[jj] <- (1.0 - alpha) * drop(W.eval.block[jj, , drop = FALSE] %*% coef) +
-          alpha * lc.mean
+          alpha * lc.mean[[jj]]
         solved <- TRUE
         break
       }
     }
 
     if (!solved)
-      fit.block[jj] <- lc.mean
+      fit.block[jj] <- lc.mean[[jj]]
   }
 
   list(index = idx, fitted = fit.block)
