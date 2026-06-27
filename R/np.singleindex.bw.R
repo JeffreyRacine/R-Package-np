@@ -168,19 +168,58 @@ npindexbw.NULL <-
   )
 }
 
-.npindexbw_lc_ichimura_fixed_lp0_objective_spec <- function(bws, spec) {
-  if (!identical(as.character(bws$method[1L]), "ichimura") ||
-      !identical(as.character(bws$type[1L]), "fixed") ||
-      !identical(as.character(spec$regtype[1L]), "lc") ||
-      !identical(as.character(spec$regtype.engine[1L]), "lc")) {
-    return(spec)
+.npindex_objective_policy <- function(bws,
+                                      spec,
+                                      bandwidth.compute = TRUE,
+                                      where = "npindexbw") {
+  method <- as.character(bws$method[1L])
+  bwtype <- as.character(bws$type[1L])
+  public.regtype <- as.character(spec$regtype[1L])
+  engine.regtype <- as.character(spec$regtype.engine[1L])
+  objective.spec <- spec
+  route <- if (identical(public.regtype, "lc")) {
+    "lc"
+  } else if (identical(public.regtype, "ll")) {
+    "ll"
+  } else {
+    paste0("lp", paste(as.integer(spec$degree), collapse = ","))
   }
 
-  spec$regtype.engine <- "lp"
-  spec$basis.engine <- "glp"
-  spec$degree.engine <- 0L
-  spec$bernstein.basis.engine <- FALSE
-  spec
+  canonical.degree <- if (identical(public.regtype, "lc")) {
+    0L
+  } else if (identical(public.regtype, "ll")) {
+    1L
+  } else {
+    as.integer(spec$degree.engine)
+  }
+
+  executor <- if (identical(engine.regtype, "lc")) "lc_npksum" else "lp_engine"
+
+  if (identical(method, "ichimura") &&
+      identical(bwtype, "fixed") &&
+      identical(public.regtype, "lc") &&
+      identical(engine.regtype, "lc")) {
+    objective.spec$regtype.engine <- "lp"
+    objective.spec$basis.engine <- "glp"
+    objective.spec$degree.engine <- 0L
+    objective.spec$bernstein.basis.engine <- FALSE
+    executor <- "lp0_npreg"
+  }
+
+  list(
+    method = method,
+    bwtype = bwtype,
+    bandwidth.compute = isTRUE(bandwidth.compute),
+    public.regtype = public.regtype,
+    public.degree = as.integer(spec$degree),
+    route = route,
+    canonical.regtype = if (identical(public.regtype, "lc") || identical(public.regtype, "ll")) "lp" else engine.regtype,
+    canonical.degree = canonical.degree,
+    executor = executor,
+    objective.spec = objective.spec,
+    support = "supported",
+    where = where
+  )
 }
 
 .npindex_nn_candidate_bandwidth <- function(h, bwtype, nobs) {
@@ -1065,7 +1104,13 @@ npindexbw.NULL <-
   beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
   h <- as.double(param[p])
   nobs <- nrow(xmat)
-  spec <- .npindexbw_lc_ichimura_fixed_lp0_objective_spec(bws, spec)
+  policy <- .npindex_objective_policy(
+    bws = bws,
+    spec = spec,
+    bandwidth.compute = TRUE,
+    where = "npindexbw objective"
+  )
+  spec <- policy$objective.spec
 
   if (identical(bws$method, "ichimura")) {
     invalid.penalty <- 10 * mean(ydat^2)
@@ -2265,7 +2310,13 @@ npindexbw.sibandwidth <-
     beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
     nobs <- nrow(xdat)
     spec <- .npindex_resolve_spec(bws, where = "npindexbw")
-    objective.spec <- .npindexbw_lc_ichimura_fixed_lp0_objective_spec(bws, spec)
+    objective.policy <- .npindex_objective_policy(
+      bws = bws,
+      spec = spec,
+      bandwidth.compute = bandwidth.compute,
+      where = "npindexbw"
+    )
+    objective.spec <- objective.policy$objective.spec
     service.ctx <- .npindexbw_ichimura_lp_service_context(
       bws = bws,
       spec = objective.spec,
