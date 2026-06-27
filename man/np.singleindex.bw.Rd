@@ -400,7 +400,7 @@ These arguments control outer optimization behavior for the semiparametric searc
 
   \item{optim.maxattempts}{
     maximum number of attempts taken trying to achieve successful
-    convergence in \code{\link{optim}}. Defaults to \code{100}.
+    convergence in \code{\link{optim}}. Defaults to \code{10}.
   }
 
   \item{optim.maxit}{
@@ -429,6 +429,15 @@ These arguments control outer optimization behavior for the semiparametric searc
     methods will generally be more fragile than the BFGS method, but as
     they do not store a matrix they may be successful in much larger
     optimization problems.
+
+    For single-index models with a high-dimensional coefficient vector
+    \eqn{\beta}, particularly continuous-response Ichimura fits,
+    \code{optim.method="BFGS"} may require substantially fewer objective
+    evaluations than the default \code{"Nelder-Mead"} search. Because
+    the objective can be nonconvex and route-sensitive, users should
+    compare the selected objective value, convergence behavior, and
+    resulting bandwidth object against the default search before relying
+    on the result.
   }
 
   \item{optim.reltol}{
@@ -525,7 +534,12 @@ or standard-deviation factors.
   exploratory purposes, you may wish to override the default search
   tolerances, say, setting \code{optim.reltol=.1} and conduct
   multistarting (the default is to restart min(2, ncol(xdat)) times) as is done
-  for a number of examples.
+  for a number of examples. When the number of predictors is large and
+  the resulting \eqn{\beta} search is high-dimensional, users may also
+  wish to try \code{optim.method="BFGS"} as an exploratory comparison,
+  especially for \code{method="ichimura"}, while checking that the final
+  objective value and fitted object are at least as satisfactory as
+  those obtained with the default \code{"Nelder-Mead"} method.
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{dependent data
