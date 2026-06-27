@@ -168,6 +168,21 @@ npindexbw.NULL <-
   )
 }
 
+.npindexbw_lc_ichimura_fixed_lp0_objective_spec <- function(bws, spec) {
+  if (!identical(as.character(bws$method[1L]), "ichimura") ||
+      !identical(as.character(bws$type[1L]), "fixed") ||
+      !identical(as.character(spec$regtype[1L]), "lc") ||
+      !identical(as.character(spec$regtype.engine[1L]), "lc")) {
+    return(spec)
+  }
+
+  spec$regtype.engine <- "lp"
+  spec$basis.engine <- "glp"
+  spec$degree.engine <- 0L
+  spec$bernstein.basis.engine <- FALSE
+  spec
+}
+
 .npindex_nn_candidate_bandwidth <- function(h, bwtype, nobs) {
   if (identical(bwtype, "fixed")) {
     return(list(ok = is.finite(h) && (h > 0), value = as.double(h)))
@@ -1050,6 +1065,7 @@ npindexbw.NULL <-
   beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
   h <- as.double(param[p])
   nobs <- nrow(xmat)
+  spec <- .npindexbw_lc_ichimura_fixed_lp0_objective_spec(bws, spec)
 
   if (identical(bws$method, "ichimura")) {
     invalid.penalty <- 10 * mean(ydat^2)
@@ -2249,9 +2265,10 @@ npindexbw.sibandwidth <-
     beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
     nobs <- nrow(xdat)
     spec <- .npindex_resolve_spec(bws, where = "npindexbw")
+    objective.spec <- .npindexbw_lc_ichimura_fixed_lp0_objective_spec(bws, spec)
     service.ctx <- .npindexbw_ichimura_lp_service_context(
       bws = bws,
-      spec = spec,
+      spec = objective.spec,
       bandwidth.compute = bandwidth.compute,
       comm = 1L,
       service_id = "npindex_ichimura_lp_fixed"
@@ -2261,7 +2278,7 @@ npindexbw.sibandwidth <-
         xmat = xdat,
         ydat = ydat,
         bws = bws,
-        spec = spec,
+        spec = objective.spec,
         ctx = service.ctx
       ))
     service.eval.counter <- 0L
@@ -2351,7 +2368,7 @@ npindexbw.sibandwidth <-
 
               index <- xmat %*% c(1, beta)
 
-              fit.loo <- if (identical(spec$regtype.engine, "lc")) {
+              fit.loo <- if (identical(objective.spec$regtype.engine, "lc")) {
                 ## One call to npksum to avoid repeated computation of the
                 ## product kernel (the expensive part)
                 tww <- .npindex_selector_with_local_kernelsum(
@@ -2377,7 +2394,7 @@ npindexbw.sibandwidth <-
                     xmat = xmat,
                     ydat = ydat,
                     bws = bws,
-                    spec = spec,
+                    spec = objective.spec,
                     ctx = service.ctx,
                     eval_id = service.eval.counter
                   )
@@ -2387,7 +2404,7 @@ npindexbw.sibandwidth <-
                     ydat = ydat,
                     h = h,
                     bws = bws,
-                    spec = spec,
+                    spec = objective.spec,
                     invalid.penalty = ichimuraMaxPenalty
                   )
                 }
