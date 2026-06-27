@@ -208,6 +208,9 @@ npindexbw.NULL <-
     objective.spec$degree.engine <- 0L
     objective.spec$bernstein.basis.engine <- FALSE
     executor <- "lc_npksum"
+  } else if (identical(method, "kleinspady") &&
+             !identical(objective.spec$regtype.engine, "lc")) {
+    executor <- "ks_lp_root_service"
   }
 
   list(
@@ -921,13 +924,77 @@ npindexbw.NULL <-
     !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))
 }
 
-.npindexbw_eval_kleinspady_lp_collective <- function(index,
-                                                     ydat,
-                                                     h,
-                                                     bws,
+.npindexbw_kleinspady_lp_service_context <- function(bws,
                                                      spec,
-                                                     floor = sqrt(.Machine$double.eps),
-                                                     comm = 1L) {
+                                                     policy,
+                                                     bandwidth.compute = TRUE,
+                                                     comm = 1L,
+                                                     service_id = "npindex_kleinspady_lp") {
+  rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) 0L)
+  size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) 1L)
+  if (!is.finite(rank)) rank <- 0L
+  if (!is.finite(size) || size < 1L) size <- 1L
+
+  in.context <- isTRUE(.npRmpi_autodispatch_in_context()) ||
+    isTRUE(.npRmpi_manual_bcast_in_context()) ||
+    isTRUE(.npRmpi_autodispatch_called_from_bcast())
+  pool.ok <- if (isTRUE(in.context)) {
+    size > 1L
+  } else {
+    isTRUE(.npRmpi_has_active_slave_pool(comm = comm))
+  }
+
+  active <- isTRUE(bandwidth.compute) &&
+    identical(as.character(bws$method[1L]), "kleinspady") &&
+    identical(as.character(policy$executor[1L]), "ks_lp_root_service") &&
+    !identical(as.character(spec$regtype.engine[1L]), "lc") &&
+    isTRUE(pool.ok) &&
+    !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+    isTRUE(in.context)
+
+  list(
+    active = isTRUE(active) && size > 1L,
+    root = identical(rank, 0L),
+    rank = rank,
+    size = size,
+    comm = as.integer(comm),
+    service_id = as.character(service_id)[1L]
+  )
+}
+
+.npindexbw_kleinspady_lp_loss_block <- function(idx,
+                                                index,
+                                                ydat,
+                                                h,
+                                                bws,
+                                                spec,
+                                                floor = sqrt(.Machine$double.eps)) {
+  piece <- .npindex_lp_loo_fit_block(
+    idx = idx,
+    index = index,
+    ydat = ydat,
+    h = h,
+    bws = bws,
+    spec = spec
+  )
+  idx <- as.integer(piece$index)
+  fit <- as.double(piece$fitted)
+  if (length(idx) != length(fit) || any(!is.finite(fit)))
+    stop("invalid local Klein-Spady LP fit", call. = FALSE)
+
+  fit[fit < floor] <- floor
+  fit[fit > 1.0 - floor] <- 1.0 - floor
+  loss <- -sum(ydat[idx] * log(fit) + (1.0 - ydat[idx]) * log1p(-fit))
+  c(loss, 0.0, as.double(length(idx)))
+}
+
+.npindexbw_eval_kleinspady_lp_collective_from_index <- function(index,
+                                                               ydat,
+                                                               h,
+                                                               bws,
+                                                               spec,
+                                                               floor = sqrt(.Machine$double.eps),
+                                                               comm = 1L) {
   index <- as.double(index)
   ydat <- as.double(ydat)
   n <- length(index)
@@ -945,22 +1012,15 @@ npindexbw.NULL <-
     integer(0L)
 
   local <- tryCatch({
-    piece <- .npindex_lp_loo_fit_block(
+    .npindexbw_kleinspady_lp_loss_block(
       idx = local.idx,
       index = index,
       ydat = ydat,
       h = h,
       bws = bws,
-      spec = spec
+      spec = spec,
+      floor = floor
     )
-    idx <- as.integer(piece$index)
-    fit <- as.double(piece$fitted)
-    if (length(idx) != length(fit) || any(!is.finite(fit)))
-      stop("invalid local Klein-Spady LP fit", call. = FALSE)
-    fit[fit < floor] <- floor
-    fit[fit > 1.0 - floor] <- 1.0 - floor
-    loss <- -sum(ydat[idx] * log(fit) + (1.0 - ydat[idx]) * log1p(-fit))
-    c(loss, 0.0, as.double(length(idx)))
   }, error = function(e) {
     c(0.0, 1.0, 0.0)
   })
@@ -971,6 +1031,121 @@ npindexbw.NULL <-
     objective = if (isTRUE(invalid)) sqrt(.Machine$double.xmax) else totals[1L] / totals[3L],
     invalid = isTRUE(invalid)
   )
+}
+
+.npindexbw_eval_kleinspady_lp_collective <- function(index,
+                                                     ydat,
+                                                     h,
+                                                     bws,
+                                                     spec,
+                                                     floor = sqrt(.Machine$double.eps),
+                                                     comm = 1L) {
+  .npindexbw_eval_kleinspady_lp_collective_from_index(
+    index = index,
+    ydat = ydat,
+    h = h,
+    bws = bws,
+    spec = spec,
+    floor = floor,
+    comm = comm
+  )
+}
+
+.npindexbw_kleinspady_lp_service_worker_loop <- function(xmat,
+                                                         ydat,
+                                                         bws,
+                                                         spec,
+                                                         ctx) {
+  repeat {
+    task <- mpi.bcast.Robj(rank = 0L, comm = ctx$comm)
+    if (!is.list(task) || is.null(task$kind))
+      stop("malformed npindex Klein-Spady LP service task", call. = FALSE)
+
+    task.service <- if (is.null(task$service_id)) ctx$service_id else as.character(task$service_id)[1L]
+    if (!identical(task.service, ctx$service_id))
+      stop("unexpected npindex Klein-Spady LP service identifier", call. = FALSE)
+
+    if (identical(task$kind, "eval")) {
+      task.spec <- if (is.null(task$spec)) spec else task$spec
+      beta <- as.double(task$beta)
+      h <- as.double(task$h[1L])
+      index <- xmat %*% c(1, beta)
+      .npindexbw_eval_kleinspady_lp_collective_from_index(
+        index = index,
+        ydat = ydat,
+        h = h,
+        bws = bws,
+        spec = task.spec,
+        floor = if (is.null(task$floor)) sqrt(.Machine$double.eps) else as.double(task$floor[1L]),
+        comm = ctx$comm
+      )
+      next
+    }
+
+    if (identical(task$kind, "result"))
+      return(task$value)
+    if (identical(task$kind, "error"))
+      stop(as.character(task$message)[1L], call. = FALSE)
+    if (identical(task$kind, "stop"))
+      return(invisible(NULL))
+
+    stop("unknown npindex Klein-Spady LP service task", call. = FALSE)
+  }
+}
+
+.npindexbw_kleinspady_lp_service_eval <- function(beta,
+                                                  h,
+                                                  index,
+                                                  ydat,
+                                                  bws,
+                                                  spec,
+                                                  floor,
+                                                  ctx,
+                                                  eval_id = NA_integer_) {
+  mpi.bcast.Robj(
+    list(
+      kind = "eval",
+      service_id = ctx$service_id,
+      eval_id = eval_id,
+      beta = as.numeric(beta),
+      h = as.numeric(h)[1L],
+      spec = spec,
+      floor = as.numeric(floor)[1L]
+    ),
+    rank = 0L,
+    comm = ctx$comm
+  )
+
+  .npindexbw_eval_kleinspady_lp_collective_from_index(
+    index = index,
+    ydat = ydat,
+    h = h,
+    bws = bws,
+    spec = spec,
+    floor = floor,
+    comm = ctx$comm
+  )
+}
+
+.npindexbw_kleinspady_lp_service_result <- function(value, ctx) {
+  mpi.bcast.Robj(
+    list(kind = "result", service_id = ctx$service_id, value = value),
+    rank = 0L,
+    comm = ctx$comm
+  )
+  value
+}
+
+.npindexbw_kleinspady_lp_service_error <- function(message, ctx) {
+  try(
+    mpi.bcast.Robj(
+      list(kind = "error", service_id = ctx$service_id, message = as.character(message)[1L]),
+      rank = 0L,
+      comm = ctx$comm
+    ),
+    silent = TRUE
+  )
+  invisible(NULL)
 }
 
 .npindex_lp_loo_fit <- function(index,
@@ -2381,12 +2556,35 @@ npindexbw.sibandwidth <-
         spec = objective.spec,
         ctx = service.ctx
       ))
+    ks.service.ctx <- .npindexbw_kleinspady_lp_service_context(
+      bws = bws,
+      spec = objective.spec,
+      policy = objective.policy,
+      bandwidth.compute = bandwidth.compute,
+      comm = 1L,
+      service_id = "npindex_kleinspady_lp_fixed"
+    )
+    if (isTRUE(ks.service.ctx$active) && !isTRUE(ks.service.ctx$root))
+      return(.npindexbw_kleinspady_lp_service_worker_loop(
+        xmat = xdat,
+        ydat = ydat,
+        bws = bws,
+        spec = objective.spec,
+        ctx = ks.service.ctx
+      ))
     service.eval.counter <- 0L
     service.done <- FALSE
     if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
       on.exit({
         if (!isTRUE(service.done))
           .npindexbw_ichimura_lp_service_error("npindex Ichimura LP fixed-degree service stopped before returning a result", service.ctx)
+      }, add = TRUE)
+    }
+    ks.service.done <- FALSE
+    if (isTRUE(ks.service.ctx$active) && isTRUE(ks.service.ctx$root)) {
+      on.exit({
+        if (!isTRUE(ks.service.done))
+          .npindexbw_kleinspady_lp_service_error("npindex Klein-Spady LP fixed-degree service stopped before returning a result", ks.service.ctx)
       }, add = TRUE)
     }
 
@@ -2591,6 +2789,27 @@ npindexbw.sibandwidth <-
                 }, error = function(e) FALSE)
                 if (!ok.design)
                   return(sqrt(.Machine$double.xmax))
+
+                if (isTRUE(ks.service.ctx$active) && isTRUE(ks.service.ctx$root)) {
+                  service.eval.counter <<- service.eval.counter + 1L
+                  collective <- .npindexbw_kleinspady_lp_service_eval(
+                    beta = beta,
+                    h = h,
+                    index = index,
+                    ydat = ydat,
+                    bws = bws,
+                    spec = objective.spec,
+                    floor = kleinspadyFloor,
+                    ctx = ks.service.ctx,
+                    eval_id = service.eval.counter
+                  )
+                  if (isTRUE(collective$invalid))
+                    return(sqrt(.Machine$double.xmax))
+                  if (is.finite(collective$objective) &&
+                      .npindexbw_fast_eligible(h = h, bws = bws, eval.index = index))
+                    num.feval.fast.overall <<- num.feval.fast.overall + 1L
+                  return(as.numeric(collective$objective[1L]))
+                }
 
                 if (.npindexbw_kleinspady_collective_enabled(comm = 1L)) {
                   collective <- .npindexbw_eval_kleinspady_lp_collective(
@@ -2885,6 +3104,10 @@ npindexbw.sibandwidth <-
     if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
       service.done <- TRUE
       return(.npindexbw_ichimura_lp_service_result(bws, service.ctx))
+    }
+    if (isTRUE(ks.service.ctx$active) && isTRUE(ks.service.ctx$root)) {
+      ks.service.done <- TRUE
+      return(.npindexbw_kleinspady_lp_service_result(bws, ks.service.ctx))
     }
 
     bws
