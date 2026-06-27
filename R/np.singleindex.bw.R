@@ -194,16 +194,20 @@ npindexbw.NULL <-
   }
 
   executor <- if (identical(engine.regtype, "lc")) "lc_npksum" else "lp_engine"
+  canonical.degree0 <- length(canonical.degree) > 0L && all(canonical.degree == 0L)
 
-  if (identical(method, "ichimura") &&
-      identical(bwtype, "fixed") &&
-      identical(public.regtype, "lc") &&
-      identical(engine.regtype, "lc")) {
+  if (identical(method, "ichimura") && identical(bwtype, "fixed") && canonical.degree0) {
     objective.spec$regtype.engine <- "lp"
     objective.spec$basis.engine <- "glp"
     objective.spec$degree.engine <- 0L
     objective.spec$bernstein.basis.engine <- FALSE
     executor <- "lp0_npreg"
+  } else if (canonical.degree0) {
+    objective.spec$regtype.engine <- "lc"
+    objective.spec$basis.engine <- "glp"
+    objective.spec$degree.engine <- 0L
+    objective.spec$bernstein.basis.engine <- FALSE
+    executor <- "lc_npksum"
   }
 
   list(
@@ -566,6 +570,61 @@ npindexbw.NULL <-
   old.mode <- .Call("C_np_set_local_regression_mode", TRUE, PACKAGE = "npRmpi")
   on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"), add = TRUE)
   force(expr)
+}
+
+.npindexbw_lc_loo_fit <- function(index,
+                                  ydat,
+                                  h,
+                                  bws,
+                                  selector = c("direct", "bandwidth")) {
+  selector <- match.arg(selector)
+  wmat <- cbind(ydat, 1.0)
+  tww <- tryCatch(
+    if (identical(selector, "bandwidth")) {
+      .npindex_selector_with_local_kernelsum(
+        npksum(
+          txdat = index,
+          tydat = wmat,
+          weights = wmat,
+          leave.one.out = TRUE,
+          bandwidth.divide = TRUE,
+          bws = c(h),
+          bwtype = bws$type,
+          ckertype = bws$ckertype,
+          ckerorder = bws$ckerorder,
+          ckerbound = bws$ckerbound,
+          ckerlb = bws$ckerlb,
+          ckerub = bws$ckerub
+        )
+      )
+    } else {
+      .npRmpi_with_local_regression(
+        npksum(
+          txdat = index,
+          tydat = wmat,
+          weights = wmat,
+          leave.one.out = TRUE,
+          bandwidth.divide = TRUE,
+          bws = c(h),
+          bwtype = bws$type,
+          ckertype = bws$ckertype,
+          ckerorder = bws$ckerorder,
+          ckerbound = bws$ckerbound,
+          ckerlb = bws$ckerlb,
+          ckerub = bws$ckerub
+        )
+      )
+    },
+    error = function(e) NULL
+  )
+  if (is.null(tww))
+    return(NULL)
+  tww$ksum[1, 2, ] / NZD(tww$ksum[2, 2, ])
+}
+
+.npindexbw_is_degree0_policy <- function(policy) {
+  degree <- as.integer(policy$canonical.degree)
+  length(degree) > 0L && all(degree == 0L)
 }
 
 .npindexbw_build_lp_regression_leaf <- function(index,
@@ -1124,10 +1183,11 @@ npindexbw.NULL <-
   h <- h.candidate$value
 
   index <- xmat %*% c(1, beta)
-  wmat <- cbind(ydat, 1.0)
+  degree0.policy <- .npindexbw_is_degree0_policy(policy)
 
-  if (!identical(spec$regtype.engine, "lc") &&
-      identical(bws$method, "ichimura")) {
+  if (identical(bws$method, "ichimura") &&
+      (identical(policy$executor, "lp0_npreg") ||
+       !identical(spec$regtype.engine, "lc"))) {
     return(.npindexbw_eval_ichimura_lp_via_npreg(
       index = index,
       ydat = ydat,
@@ -1139,29 +1199,17 @@ npindexbw.NULL <-
     ))
   }
 
-  fit.loo <- if (identical(spec$regtype.engine, "lc")) {
-    tww <- tryCatch(
-      .npRmpi_with_local_regression(
-        npksum(
-          txdat = index,
-          tydat = wmat,
-          weights = wmat,
-          leave.one.out = TRUE,
-          bandwidth.divide = TRUE,
-          bws = c(h),
-          bwtype = bws$type,
-          ckertype = bws$ckertype,
-          ckerorder = bws$ckerorder,
-          ckerbound = bws$ckerbound,
-          ckerlb = bws$ckerlb,
-          ckerub = bws$ckerub
-        )
-      )$ksum,
-      error = function(e) NULL
+  fit.loo <- if (identical(spec$regtype.engine, "lc") || isTRUE(degree0.policy)) {
+    fit <- .npindexbw_lc_loo_fit(
+      index = index,
+      ydat = ydat,
+      h = h,
+      bws = bws,
+      selector = "direct"
     )
-    if (is.null(tww))
+    if (is.null(fit))
       return(list(objective = invalid.penalty, num.feval.fast = 0L))
-    tww[1, 2, ] / NZD(tww[2, 2, ])
+    fit
   } else {
     ok.design <- tryCatch({
       npCheckRegressionDesignCondition(
@@ -2317,6 +2365,7 @@ npindexbw.sibandwidth <-
       where = "npindexbw"
     )
     objective.spec <- objective.policy$objective.spec
+    objective.degree0 <- .npindexbw_is_degree0_policy(objective.policy)
     service.ctx <- .npindexbw_ichimura_lp_service_context(
       bws = bws,
       spec = objective.spec,
@@ -2349,7 +2398,6 @@ npindexbw.sibandwidth <-
           ## Invariant objects used by objective evaluations.
           xmat <- xdat
           beta.coord <- .npindex_beta_coordinate_setup(xmat)
-          wmat <- cbind(ydat, 1.0)
           bandwidth_eval_count <- 0L
           objective.cache.enabled <- npObjectiveCacheEnabled()
           r.nn.cache.surface <- !isTRUE(only.optimize.beta) &&
@@ -2419,24 +2467,19 @@ npindexbw.sibandwidth <-
 
               index <- xmat %*% c(1, beta)
 
-              fit.loo <- if (identical(objective.spec$regtype.engine, "lc")) {
-                ## One call to npksum to avoid repeated computation of the
-                ## product kernel (the expensive part)
-                tww <- .npindex_selector_with_local_kernelsum(
-                  npksum(txdat=index,
-                         tydat=wmat,
-                         weights=wmat,
-                         leave.one.out=TRUE,
-                         bandwidth.divide=TRUE,
-                         bws=c(h),
-                         bwtype = bws$type,
-                         ckertype = bws$ckertype,
-                         ckerorder = bws$ckerorder,
-                         ckerbound = bws$ckerbound,
-                         ckerlb = bws$ckerlb,
-                         ckerub = bws$ckerub)
-                )$ksum
-                tww[1,2,]/NZD(tww[2,2,])
+              fit.loo <- if (!identical(objective.policy$executor, "lp0_npreg") &&
+                             (identical(objective.spec$regtype.engine, "lc") ||
+                              isTRUE(objective.degree0))) {
+                fit <- .npindexbw_lc_loo_fit(
+                  index = index,
+                  ydat = ydat,
+                  h = h,
+                  bws = bws,
+                  selector = "bandwidth"
+                )
+                if (is.null(fit))
+                  return(ichimuraMaxPenalty)
+                fit
               } else {
                 service.eval.counter <<- service.eval.counter + 1L
                 objective <- if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
@@ -2522,32 +2565,26 @@ npindexbw.sibandwidth <-
 
               index <- xmat %*% c(1, beta)
 
-              ks.loo <- if (identical(spec$regtype.engine, "lc")) {
-                ## One call to npksum to avoid repeated computation of the
-                ## product kernel (the expensive part)
-                tww <- .npindex_selector_with_local_kernelsum(
-                  npksum(txdat=index,
-                         tydat=wmat,
-                         weights=wmat,
-                         leave.one.out=TRUE,
-                         bandwidth.divide=TRUE,
-                         bws=c(h),
-                         bwtype = bws$type,
-                         ckertype = bws$ckertype,
-                         ckerorder = bws$ckerorder,
-                         ckerbound = bws$ckerbound,
-                         ckerlb = bws$ckerlb,
-                         ckerub = bws$ckerub)
-                )$ksum
-                tww[1,2,]/NZD(tww[2,2,])
+              ks.loo <- if (identical(objective.spec$regtype.engine, "lc") ||
+                            isTRUE(objective.degree0)) {
+                fit <- .npindexbw_lc_loo_fit(
+                  index = index,
+                  ydat = ydat,
+                  h = h,
+                  bws = bws,
+                  selector = "bandwidth"
+                )
+                if (is.null(fit))
+                  return(sqrt(.Machine$double.xmax))
+                fit
               } else {
                 ok.design <- tryCatch({
                   npCheckRegressionDesignCondition(
                     reg.code = REGTYPE_LP,
                     xcon = data.frame(index = index),
-                    basis = spec$basis.engine,
-                    degree = spec$degree.engine,
-                    bernstein.basis = spec$bernstein.basis.engine,
+                    basis = objective.spec$basis.engine,
+                    degree = objective.spec$degree.engine,
+                    bernstein.basis = objective.spec$bernstein.basis.engine,
                     where = "npindexbw"
                   )
                   TRUE
@@ -2561,7 +2598,7 @@ npindexbw.sibandwidth <-
                     ydat = ydat,
                     h = h,
                     bws = bws,
-                    spec = spec,
+                    spec = objective.spec,
                     floor = kleinspadyFloor,
                     comm = 1L
                   )
@@ -2578,7 +2615,7 @@ npindexbw.sibandwidth <-
                   ydat = ydat,
                   h = h,
                   bws = bws,
-                  spec = spec
+                  spec = objective.spec
                 )
               }
 
