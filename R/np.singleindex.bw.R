@@ -2013,7 +2013,6 @@ npindexbw.sibandwidth <-
           fval.min <- .Machine$double.xmax
           numimp <- 0
           fval.value <- numeric(nmulti)
-          num.feval.overall <- 0
           num.feval.fast.overall <- 0L
 
           if(bws$method == "ichimura"){
@@ -2037,7 +2036,6 @@ npindexbw.sibandwidth <-
           }
 
           for (i in seq_len(nmulti)) {
-            bandwidth_eval_count <- 0L
             ## We use the nlm command to minimize the objective function using
             ## starting values. Note that since we normalize beta_1=1 here beta
             ## is the k-1 vector containing beta_2...beta_k
@@ -2113,8 +2111,6 @@ npindexbw.sibandwidth <-
               optim.base.args$h <- h
             }
             suppressWarnings(optim.return <- do.call(optim, optim.base.args))
-            if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
-              num.feval.overall <- num.feval.overall + optim.return$counts[1]
             attempts <- 0
             while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
               attempts <- attempts + 1
@@ -2153,8 +2149,6 @@ npindexbw.sibandwidth <-
                 optim.base.args$h <- h
               }
               suppressWarnings(optim.return <- do.call(optim, optim.base.args))
-              if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
-                num.feval.overall <- num.feval.overall + optim.return$counts[1]
             }
 
             if(optim.return$convergence != 0)
@@ -2189,7 +2183,7 @@ npindexbw.sibandwidth <-
           )
           bws$fval <- fval.min
           bws$ifval <- best
-          bws$num.feval <- num.feval.overall
+          bws$num.feval <- bandwidth_eval_count
           bws$num.feval.fast <- num.feval.fast.overall
           bws$nn.cache <- .np_r_nn_cache_stats(r.nn.cache)
           bws$numimp <- numimp
