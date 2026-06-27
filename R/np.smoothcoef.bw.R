@@ -2610,6 +2610,7 @@ npscoefbw.scbandwidth <-
 
             suppressWarnings(optim.return <- optim(tbw,
                                                    fn = overall.cv.ls,
+                                                   method = optim.method,
                                                    control = optim.control))
             if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
               num.feval.overall <- num.feval.overall + optim.return$counts[1]
@@ -2628,6 +2629,7 @@ npscoefbw.scbandwidth <-
               optim.control <- lapply(optim.control, '*', 10.0)
               suppressWarnings(optim.return <- optim(tbw,
                                                      fn = overall.cv.ls,
+                                                     method = optim.method,
                                                      control = optim.control))
               if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
                 num.feval.overall <- num.feval.overall + optim.return$counts[1]
@@ -2728,6 +2730,7 @@ npscoefbw.scbandwidth <-
                 ## minimise
                 suppressWarnings(optim.return <-
                                  optim(tbw, fn = partial.cv.ls,
+                                       method = optim.method,
                                        control = optim.control,
                                        partial.index = j))
                 if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
