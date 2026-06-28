@@ -219,7 +219,16 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   
   sc.bw[[1]] <- quote(npindexbw)
 
-  if(bws.named){
+  if (bws.formula) {
+    ib <- match("bws", names(sc.bw), nomatch = 0L)
+    if (ib > 0L)
+      names(sc.bw)[ib] <- "formula"
+    drop.xy <- names(sc.bw) %in% c("txdat", "tydat")
+    if (any(drop.xy))
+      sc.bw <- sc.bw[!drop.xy]
+  }
+
+  if(bws.named && !bws.formula){
     sc.bw$bandwidth.compute <- FALSE
   }
 
@@ -228,7 +237,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   
   m.txy <- match(ostxy, names(sc.bw), nomatch = 0)
 
-  if(any(m.txy > 0)) {
+  if(!bws.formula && any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
