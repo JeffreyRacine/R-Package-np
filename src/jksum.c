@@ -10608,6 +10608,7 @@ static inline int np_reg_cv_use_symmetric_dropone_path(const int bwm,
                                                        const int ks_tree_use,
                                                        const int BANDWIDTH_reg){
   return (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
+    (bwm == RBWM_CVKS) ||
     ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN);
 }
 
@@ -10633,6 +10634,12 @@ static inline double np_regression_cv_loss_value(const int bwm,
                                                  const double fit_response,
                                                  const double loss_response)
 {
+  if(bwm == RBWM_CVKS){
+    const double floor = sqrt(DBL_EPSILON);
+    const double p = MIN(1.0 - floor, MAX(floor, fit_response));
+    return -(loss_response*log(p) + (1.0 - loss_response)*log1p(-p));
+  }
+
   const double residual = loss_response - fit_response;
   return (bwm == RBWM_CVCHECK) ?
     np_check_loss_value(residual, np_lsq_tau_extern) :
@@ -10652,7 +10659,8 @@ static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int int_ll,
     return (int_ll == LL_LP) &&
       (int_glp_basis_extern == 1);
 
-  if((bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK))
+  if((bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK) &&
+     (bwm != RBWM_CVKS))
     return 0;
 
   if(int_ll == LL_LL)
@@ -10676,7 +10684,8 @@ static inline int np_reg_cv_use_canonical_ll_degree1_lp_objective(const int int_
                                                                   const int num_reg_continuous,
                                                                   const int ks_tree_use){
   return (int_ll == LL_LL) &&
-    ((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)) &&
+    ((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
+     (bwm == RBWM_CVKS)) &&
     (BANDWIDTH_reg == BW_FIXED) &&
     (num_reg_continuous > 0) &&
     (!ks_tree_use);
@@ -11759,7 +11768,8 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
   int use_sparse_tree = 0;
   int tsf = 0;
   const int center_raw_basis = (int_glp_bernstein_extern == 0) && (int_glp_basis_extern == 1);
-  const int track_lowsupport = (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK);
+  const int track_lowsupport = (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
+    (bwm == RBWM_CVKS);
 #ifdef MPI2
   const int use_mpi_transport = (iNum_Processors > 1);
 #else
@@ -12469,7 +12479,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   int ov_cont_from_cache = 0;
 
-  const int leave_one_out = ((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK))?1:0;
+  const int leave_one_out = ((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
+                             (bwm == RBWM_CVKS))?1:0;
 
   if(!np_reg_cv_core_cache_prepare(KERNEL_reg,
                                    KERNEL_unordered_reg,
@@ -12542,7 +12553,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     
     return(DBL_MAX);
   }
-  if(np_extendednn_mpi_lc_all_large_gate(BANDWIDTH_reg,
+  if((bwm != RBWM_CVKS) &&
+     np_extendednn_mpi_lc_all_large_gate(BANDWIDTH_reg,
                                       int_ll_cv,
                                       num_obs,
                                       num_reg_continuous,
@@ -12608,7 +12620,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                  num_reg_continuous,
                                                  ks_tree_use,
                                                  use_bernstein);
-      const int all_large_gate = np_reg_cv_all_large_gate(BANDWIDTH_reg,
+      const int all_large_gate = (bwm != RBWM_CVKS) &&
+        np_reg_cv_all_large_gate(BANDWIDTH_reg,
                                                           num_obs,
                                                           num_reg_continuous,
                                                           num_reg_unordered,
@@ -13326,7 +13339,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     - CVAIC: SSE term from in-sample residuals, trace(H)=sum(h_ii)
   */
   {
-    const int all_large_gate = np_reg_cv_all_large_gate(BANDWIDTH_reg,
+    const int all_large_gate = (bwm != RBWM_CVKS) &&
+      np_reg_cv_all_large_gate(BANDWIDTH_reg,
                                                         num_obs,
                                                         num_reg_continuous,
                                                         num_reg_unordered,

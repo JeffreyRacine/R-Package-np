@@ -196,21 +196,14 @@ npindexbw.NULL <-
   executor <- if (identical(engine.regtype, "lc")) "lc_npksum" else "lp_engine"
   canonical.degree0 <- length(canonical.degree) > 0L && all(canonical.degree == 0L)
 
-  if (identical(method, "ichimura") && identical(bwtype, "fixed") && canonical.degree0) {
-    objective.spec$regtype.engine <- "lp"
-    objective.spec$basis.engine <- "glp"
-    objective.spec$degree.engine <- 0L
-    objective.spec$bernstein.basis.engine <- FALSE
-    executor <- "lp0_npreg"
-  } else if (canonical.degree0) {
+  if (canonical.degree0) {
     objective.spec$regtype.engine <- "lc"
     objective.spec$basis.engine <- "glp"
     objective.spec$degree.engine <- 0L
     objective.spec$bernstein.basis.engine <- FALSE
-    executor <- "lc_npksum"
-  } else if (identical(method, "kleinspady") &&
-             !identical(objective.spec$regtype.engine, "lc")) {
-    executor <- "ks_lp_root_service"
+    executor <- "npreg_loo"
+  } else if (identical(method, "ichimura") || identical(method, "kleinspady")) {
+    executor <- "npreg_loo"
   }
 
   list(
@@ -630,17 +623,60 @@ npindexbw.NULL <-
   length(degree) > 0L && all(degree == 0L)
 }
 
+.npindexbw_check_index_bound_contract <- function(bws,
+                                                  policy,
+                                                  where = "npindexbw") {
+  if (!identical(as.character(policy$executor[1L]), "npreg_loo"))
+    return(invisible(TRUE))
+
+  ckerbound <- if (is.null(bws$ckerbound) || !length(bws$ckerbound)) {
+    "none"
+  } else {
+    as.character(bws$ckerbound[1L])
+  }
+
+  if (identical(ckerbound, "fixed")) {
+    stop(
+      sprintf(
+        "%s does not support ckerbound='fixed' for single-index objective evaluation; use ckerbound='range' to compute bounds on the scalar index or ckerbound='none'",
+        where
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
 .npindexbw_build_lp_regression_leaf <- function(index,
                                                 ydat,
                                                 h,
                                                 bws,
                                                 spec) {
   index.df <- data.frame(index = as.double(index))
+  engine.regtype <- if (is.null(spec$regtype.engine) ||
+                        !length(spec$regtype.engine)) {
+    "lc"
+  } else {
+    as.character(spec$regtype.engine[1L])
+  }
+  engine.basis <- if (identical(engine.regtype, "lp")) {
+    as.character(spec$basis.engine)
+  } else {
+    "glp"
+  }
+  engine.degree <- if (identical(engine.regtype, "lp")) {
+    as.integer(spec$degree.engine)
+  } else {
+    NULL
+  }
+  engine.bernstein <- identical(engine.regtype, "lp") &&
+    isTRUE(spec$bernstein.basis.engine)
   reg.args <- list(
-    regtype = "lp",
-    basis = as.character(spec$basis.engine),
-    degree = as.integer(spec$degree.engine),
-    bernstein.basis = isTRUE(spec$bernstein.basis.engine),
+    regtype = engine.regtype,
+    basis = engine.basis,
+    degree = engine.degree,
+    bernstein.basis = engine.bernstein,
     bwmethod = "cv.ls",
     bwtype = bws$type,
     ckertype = bws$ckertype,
@@ -710,6 +746,45 @@ npindexbw.NULL <-
   )
 }
 
+.npindexbw_eval_kleinspady_lp_via_npreg <- function(index,
+                                                     ydat,
+                                                     h,
+                                                     bws,
+                                                     spec,
+                                                     invalid.penalty,
+                                                     localize = TRUE) {
+  leaf <- .npindexbw_build_lp_regression_leaf(
+    index = index,
+    ydat = ydat,
+    h = h,
+    bws = bws,
+    spec = spec
+  )
+
+  out <- tryCatch(
+    .npindexbw_with_inner_bandwidth_progress_suppressed(
+      .npregbw_eval_only(
+        xdat = leaf$xdat,
+        ydat = ydat,
+        bws = leaf$bws,
+        invalid.penalty = "dbmax",
+        penalty.multiplier = 10,
+        localize = localize,
+        objective = "ks"
+      )
+    ),
+    error = function(e) NULL
+  )
+
+  if (is.null(out) || !is.finite(out$objective[1L]))
+    return(list(objective = as.numeric(invalid.penalty), num.feval.fast = 0L))
+
+  list(
+    objective = as.numeric(out$objective[1L]),
+    num.feval.fast = as.numeric(out$num.feval.fast[1L])
+  )
+}
+
 .npindexbw_ichimura_lp_service_context <- function(bws,
                                                    spec,
                                                    bandwidth.compute = TRUE,
@@ -731,7 +806,6 @@ npindexbw.NULL <-
 
   active <- isTRUE(bandwidth.compute) &&
     identical(as.character(bws$method[1L]), "ichimura") &&
-    !identical(as.character(spec$regtype.engine[1L]), "lc") &&
     isTRUE(pool.ok) &&
     !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
     isTRUE(in.context)
@@ -756,6 +830,71 @@ npindexbw.NULL <-
   as.numeric(total.invalid[1L]) > 0.0
 }
 
+.npindexbw_eval_objective_service_traced <- function(param,
+                                                     xmat,
+                                                     ydat,
+                                                     bws,
+                                                     spec,
+                                                     ctx,
+                                                     eval_id = NA_integer_) {
+  assignments <- .splitIndices(nrow(xmat), ctx$size)
+  local.idx <- if (length(assignments) >= (ctx$rank + 1L)) {
+    assignments[[ctx$rank + 1L]]
+  } else {
+    integer(0L)
+  }
+  started <- proc.time()[3L]
+  .npRmpi_transport_trace(
+    role = "npindex.npreg_loo.service",
+    event = "eval.enter",
+    fields = list(
+      service_id = ctx$service_id,
+      executor = if (is.null(ctx$executor)) "npreg_loo" else ctx$executor,
+      eval_id = eval_id,
+      rank = ctx$rank,
+      size = ctx$size,
+      owned_rows = length(local.idx),
+      n = nrow(xmat)
+    )
+  )
+  out <- tryCatch(
+    .npindexbw_eval_objective(
+      param = param,
+      xmat = xmat,
+      ydat = ydat,
+      bws = bws,
+      spec = spec,
+      localize = FALSE
+    ),
+    error = function(e) {
+      list(
+        objective = NA_real_,
+        num.feval.fast = 0L,
+        error = conditionMessage(e)
+      )
+    }
+  )
+  .npRmpi_transport_trace(
+    role = "npindex.npreg_loo.service",
+    event = "eval.exit",
+    fields = list(
+      service_id = ctx$service_id,
+      executor = if (is.null(ctx$executor)) "npreg_loo" else ctx$executor,
+      eval_id = eval_id,
+      rank = ctx$rank,
+      size = ctx$size,
+      owned_rows = length(local.idx),
+      elapsed = proc.time()[3L] - started,
+      objective = if (is.null(out$objective)) NA_real_ else as.numeric(out$objective[1L]),
+      ok = is.null(out$error),
+      error = if (is.null(out$error)) "" else out$error
+    )
+  )
+  if (!is.null(out$error))
+    stop(out$error, call. = FALSE)
+  out
+}
+
 .npindexbw_ichimura_lp_service_worker_loop <- function(xmat,
                                                        ydat,
                                                        bws,
@@ -777,13 +916,14 @@ npindexbw.NULL <-
       if (isTRUE(invalid.eval))
         next
       task.spec <- if (is.null(task$spec)) spec else task$spec
-      .npindexbw_eval_objective(
+      .npindexbw_eval_objective_service_traced(
         param = param,
         xmat = xmat,
         ydat = ydat,
         bws = bws,
         spec = task.spec,
-        localize = FALSE
+        ctx = ctx,
+        eval_id = if (is.null(task$eval_id)) NA_integer_ else as.integer(task$eval_id[1L])
       )
       next
     }
@@ -831,13 +971,14 @@ npindexbw.NULL <-
       num.feval.fast = 0L
     ))
 
-  .npindexbw_eval_objective(
+  .npindexbw_eval_objective_service_traced(
     param = as.numeric(param),
     xmat = xmat,
     ydat = ydat,
     bws = bws,
     spec = spec,
-    localize = FALSE
+    ctx = ctx,
+    eval_id = eval_id
   )
 }
 
@@ -992,66 +1133,6 @@ npindexbw.NULL <-
   )
 }
 
-.npindex_lp_loo_fit_fixed_native_block <- function(idx,
-                                                   index,
-                                                   ydat,
-                                                   h,
-                                                   bws,
-                                                   spec) {
-  idx <- as.integer(idx)
-  if (!length(idx))
-    return(list(index = idx, fitted = numeric(0L)))
-  if (!identical(as.character(bws$type[1L]), "fixed"))
-    stop("npindex fixed native LP block helper requires bwtype='fixed'", call. = FALSE)
-
-  index <- as.double(index)
-  ydat <- as.double(ydat)
-  n <- length(index)
-  if (length(ydat) != n)
-    stop("index and ydat must have the same length", call. = FALSE)
-
-  index.df <- data.frame(index = index)
-  degree <- as.integer(spec$degree.engine)
-  W <- W.lp(
-    xdat = index.df,
-    degree = degree,
-    basis = spec$basis.engine,
-    bernstein.basis = spec$bernstein.basis.engine
-  )
-  W.eval.block <- W.lp(
-    xdat = index.df,
-    exdat = index.df[idx, , drop = FALSE],
-    degree = degree,
-    basis = spec$basis.engine,
-    bernstein.basis = spec$bernstein.basis.engine
-  )
-  if (!is.matrix(W))
-    W <- matrix(W, nrow = n)
-  if (!is.matrix(W.eval.block))
-    W.eval.block <- matrix(W.eval.block, nrow = length(idx))
-
-  list(
-    index = idx,
-    fitted = .Call(
-      "C_npindex_ks_lp_fit_fixed_epan2_block",
-      index,
-      as.double(ydat),
-      as.matrix(W),
-      as.matrix(W.eval.block),
-      idx,
-      as.double(h),
-      as.double(npRidgeSequenceFromBase(n.train = n, ridge.base = 0.0, cap = 1.0)),
-      PACKAGE = "npRmpi"
-    )
-  )
-}
-
-.npindex_ks_fixed_native_block_supported <- function(bws) {
-  identical(as.character(bws$type[1L]), "fixed") &&
-    identical(as.character(bws$ckertype[1L]), "epanechnikov") &&
-    identical(as.integer(bws$ckerorder[1L]), 2L)
-}
-
 .npindexbw_kleinspady_collective_enabled <- function(comm = 1L) {
   .npRmpi_has_active_slave_pool(comm = comm) &&
     isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
@@ -1078,10 +1159,15 @@ npindexbw.NULL <-
     isTRUE(.npRmpi_has_active_slave_pool(comm = comm))
   }
 
+  executor <- as.character(policy$executor[1L])
+  service.executor <- identical(executor, "ks_lp_root_service") ||
+    identical(executor, "npreg_loo")
+
   active <- isTRUE(bandwidth.compute) &&
     identical(as.character(bws$method[1L]), "kleinspady") &&
-    identical(as.character(policy$executor[1L]), "ks_lp_root_service") &&
-    !identical(as.character(spec$regtype.engine[1L]), "lc") &&
+    isTRUE(service.executor) &&
+    (identical(executor, "npreg_loo") ||
+       !identical(as.character(spec$regtype.engine[1L]), "lc")) &&
     isTRUE(pool.ok) &&
     !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
     isTRUE(in.context)
@@ -1092,7 +1178,8 @@ npindexbw.NULL <-
     rank = rank,
     size = size,
     comm = as.integer(comm),
-    service_id = as.character(service_id)[1L]
+    service_id = as.character(service_id)[1L],
+    executor = executor
   )
 }
 
@@ -1103,25 +1190,14 @@ npindexbw.NULL <-
                                                 bws,
                                                 spec,
                                                 floor = sqrt(.Machine$double.eps)) {
-  piece <- if (isTRUE(.npindex_ks_fixed_native_block_supported(bws))) {
-    .npindex_lp_loo_fit_fixed_native_block(
-      idx = idx,
-      index = index,
-      ydat = ydat,
-      h = h,
-      bws = bws,
-      spec = spec
-    )
-  } else {
-    .npindex_lp_loo_fit_block(
-      idx = idx,
-      index = index,
-      ydat = ydat,
-      h = h,
-      bws = bws,
-      spec = spec
-    )
-  }
+  piece <- .npindex_lp_loo_fit_block(
+    idx = idx,
+    index = index,
+    ydat = ydat,
+    h = h,
+    bws = bws,
+    spec = spec
+  )
   idx <- as.integer(piece$index)
   fit <- as.double(piece$fitted)
   if (length(idx) != length(fit) || any(!is.finite(fit)))
@@ -1266,15 +1342,27 @@ npindexbw.NULL <-
       }
       task.spec <- if (is.null(task$spec)) spec else task$spec
       index <- xmat %*% c(1, beta)
-      .npindexbw_eval_kleinspady_lp_collective_from_index(
-        index = index,
-        ydat = ydat,
-        h = h,
-        bws = bws,
-        spec = task.spec,
-        floor = if (is.null(task$floor)) sqrt(.Machine$double.eps) else as.double(task$floor[1L]),
-        comm = ctx$comm
-      )
+      if (identical(ctx$executor, "npreg_loo")) {
+        .npindexbw_eval_objective_service_traced(
+          param = c(beta, h),
+          xmat = xmat,
+          ydat = ydat,
+          bws = bws,
+          spec = task.spec,
+          ctx = ctx,
+          eval_id = if (is.null(task$eval_id)) NA_integer_ else as.integer(task$eval_id[1L])
+        )
+      } else {
+        .npindexbw_eval_kleinspady_lp_collective_from_index(
+          index = index,
+          ydat = ydat,
+          h = h,
+          bws = bws,
+          spec = task.spec,
+          floor = if (is.null(task$floor)) sqrt(.Machine$double.eps) else as.double(task$floor[1L]),
+          comm = ctx$comm
+        )
+      }
       next
     }
 
@@ -1296,6 +1384,7 @@ npindexbw.NULL <-
 .npindexbw_kleinspady_lp_service_eval <- function(beta,
                                                   h,
                                                   index,
+                                                  xmat,
                                                   ydat,
                                                   bws,
                                                   spec,
@@ -1325,6 +1414,22 @@ npindexbw.NULL <-
       objective = sqrt(.Machine$double.xmax),
       invalid = TRUE
     ))
+
+  if (identical(ctx$executor, "npreg_loo")) {
+    objective <- .npindexbw_eval_objective_service_traced(
+      param = c(as.numeric(beta), as.numeric(h)[1L]),
+      xmat = xmat,
+      ydat = ydat,
+      bws = bws,
+      spec = spec,
+      ctx = ctx,
+      eval_id = eval_id
+    )
+    return(list(
+      objective = as.numeric(objective$objective[1L]),
+      invalid = !is.finite(as.numeric(objective$objective[1L]))
+    ))
+  }
 
   .npindexbw_eval_kleinspady_lp_collective_from_index(
     index = index,
@@ -1531,6 +1636,11 @@ npindexbw.NULL <-
     bandwidth.compute = TRUE,
     where = "npindexbw objective"
   )
+  .npindexbw_check_index_bound_contract(
+    bws = bws,
+    policy = policy,
+    where = "npindexbw objective"
+  )
   spec <- policy$objective.spec
 
   if (identical(bws$method, "ichimura")) {
@@ -1548,9 +1658,21 @@ npindexbw.NULL <-
   degree0.policy <- .npindexbw_is_degree0_policy(policy)
 
   if (identical(bws$method, "ichimura") &&
-      (identical(policy$executor, "lp0_npreg") ||
-       !identical(spec$regtype.engine, "lc"))) {
+      identical(policy$executor, "npreg_loo")) {
     return(.npindexbw_eval_ichimura_lp_via_npreg(
+      index = index,
+      ydat = ydat,
+      h = h,
+      bws = bws,
+      spec = spec,
+      invalid.penalty = invalid.penalty,
+      localize = localize
+    ))
+  }
+
+  if (identical(bws$method, "kleinspady") &&
+      identical(policy$executor, "npreg_loo")) {
+    return(.npindexbw_eval_kleinspady_lp_via_npreg(
       index = index,
       ydat = ydat,
       h = h,
@@ -2726,6 +2848,11 @@ npindexbw.sibandwidth <-
       bandwidth.compute = bandwidth.compute,
       where = "npindexbw"
     )
+    .npindexbw_check_index_bound_contract(
+      bws = bws,
+      policy = objective.policy,
+      where = "npindexbw"
+    )
     objective.spec <- objective.policy$objective.spec
     objective.degree0 <- .npindexbw_is_degree0_policy(objective.policy)
     service.ctx <- .npindexbw_ichimura_lp_service_context(
@@ -2852,7 +2979,7 @@ npindexbw.sibandwidth <-
 
               index <- xmat %*% c(1, beta)
 
-              fit.loo <- if (!identical(objective.policy$executor, "lp0_npreg") &&
+              fit.loo <- if (!identical(objective.policy$executor, "npreg_loo") &&
                              (identical(objective.spec$regtype.engine, "lc") ||
                               isTRUE(objective.degree0))) {
                 fit <- .npindexbw_lc_loo_fit(
@@ -2950,6 +3077,43 @@ npindexbw.sibandwidth <-
 
               index <- xmat %*% c(1, beta)
 
+              if (identical(objective.policy$executor, "npreg_loo")) {
+                service.eval.counter <<- service.eval.counter + 1L
+                objective <- if (isTRUE(ks.service.ctx$active) && isTRUE(ks.service.ctx$root)) {
+                  collective <- .npindexbw_kleinspady_lp_service_eval(
+                    beta = beta,
+                    h = h,
+                    index = index,
+                    xmat = xmat,
+                    ydat = ydat,
+                    bws = bws,
+                    spec = objective.spec,
+                    floor = kleinspadyFloor,
+                    ctx = ks.service.ctx,
+                    eval_id = service.eval.counter
+                  )
+                  list(
+                    objective = if (isTRUE(collective$invalid))
+                      sqrt(.Machine$double.xmax)
+                    else
+                      as.numeric(collective$objective[1L]),
+                    num.feval.fast = if (.npindexbw_fast_eligible(h = h, bws = bws, eval.index = index)) 1L else 0L
+                  )
+                } else {
+                  .npindexbw_eval_kleinspady_lp_via_npreg(
+                    index = index,
+                    ydat = ydat,
+                    h = h,
+                    bws = bws,
+                    spec = objective.spec,
+                    invalid.penalty = sqrt(.Machine$double.xmax)
+                  )
+                }
+                num.feval.fast.overall <<- num.feval.fast.overall +
+                  as.numeric(objective$num.feval.fast[1L])
+                return(as.numeric(objective$objective[1L]))
+              }
+
               ks.loo <- if (identical(objective.spec$regtype.engine, "lc") ||
                             isTRUE(objective.degree0)) {
                 fit <- .npindexbw_lc_loo_fit(
@@ -2981,11 +3145,12 @@ npindexbw.sibandwidth <-
                   service.eval.counter <<- service.eval.counter + 1L
                   collective <- .npindexbw_kleinspady_lp_service_eval(
                     beta = beta,
-                    h = h,
-                    index = index,
-                    ydat = ydat,
-                    bws = bws,
-                    spec = objective.spec,
+	                    h = h,
+	                    index = index,
+	                    xmat = xmat,
+	                    ydat = ydat,
+	                    bws = bws,
+	                    spec = objective.spec,
                     floor = kleinspadyFloor,
                     ctx = ks.service.ctx,
                     eval_id = service.eval.counter
