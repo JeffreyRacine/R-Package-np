@@ -746,6 +746,16 @@ npindexbw.NULL <-
   )
 }
 
+.npindexbw_service_eval_preflight <- function(ok,
+                                              comm = 1L) {
+  local.invalid <- if (isTRUE(ok)) 0.0 else 1.0
+  total.invalid <- mpi.allreduce(as.double(local.invalid),
+                                 type = 2,
+                                 op = "sum",
+                                 comm = comm)
+  as.numeric(total.invalid[1L]) > 0.0
+}
+
 .npindexbw_ichimura_lp_service_worker_loop <- function(xmat,
                                                        ydat,
                                                        bws,
@@ -759,9 +769,16 @@ npindexbw.NULL <-
     task.service <- if (is.null(task$service_id)) ctx$service_id else as.character(task$service_id)[1L]
 
     if (identical(task$kind, "eval")) {
+      param <- if (is.null(task$param)) numeric(0L) else as.numeric(task$param)
+      invalid.eval <- .npindexbw_service_eval_preflight(
+        ok = length(param) == ncol(xmat) && all(is.finite(param)),
+        comm = ctx$comm
+      )
+      if (isTRUE(invalid.eval))
+        next
       task.spec <- if (is.null(task$spec)) spec else task$spec
       .npindexbw_eval_objective(
-        param = as.numeric(task$param),
+        param = param,
         xmat = xmat,
         ydat = ydat,
         bws = bws,
@@ -803,6 +820,16 @@ npindexbw.NULL <-
     rank = 0L,
     comm = ctx$comm
   )
+
+  invalid.eval <- .npindexbw_service_eval_preflight(
+    ok = length(param) == ncol(xmat) && all(is.finite(param)),
+    comm = ctx$comm
+  )
+  if (isTRUE(invalid.eval))
+    return(list(
+      objective = 10 * mean(ydat^2),
+      num.feval.fast = 0L
+    ))
 
   .npindexbw_eval_objective(
     param = as.numeric(param),
@@ -965,6 +992,66 @@ npindexbw.NULL <-
   )
 }
 
+.npindex_lp_loo_fit_fixed_native_block <- function(idx,
+                                                   index,
+                                                   ydat,
+                                                   h,
+                                                   bws,
+                                                   spec) {
+  idx <- as.integer(idx)
+  if (!length(idx))
+    return(list(index = idx, fitted = numeric(0L)))
+  if (!identical(as.character(bws$type[1L]), "fixed"))
+    stop("npindex fixed native LP block helper requires bwtype='fixed'", call. = FALSE)
+
+  index <- as.double(index)
+  ydat <- as.double(ydat)
+  n <- length(index)
+  if (length(ydat) != n)
+    stop("index and ydat must have the same length", call. = FALSE)
+
+  index.df <- data.frame(index = index)
+  degree <- as.integer(spec$degree.engine)
+  W <- W.lp(
+    xdat = index.df,
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+  W.eval.block <- W.lp(
+    xdat = index.df,
+    exdat = index.df[idx, , drop = FALSE],
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+  if (!is.matrix(W))
+    W <- matrix(W, nrow = n)
+  if (!is.matrix(W.eval.block))
+    W.eval.block <- matrix(W.eval.block, nrow = length(idx))
+
+  list(
+    index = idx,
+    fitted = .Call(
+      "C_npindex_ks_lp_fit_fixed_epan2_block",
+      index,
+      as.double(ydat),
+      as.matrix(W),
+      as.matrix(W.eval.block),
+      idx,
+      as.double(h),
+      as.double(npRidgeSequenceFromBase(n.train = n, ridge.base = 0.0, cap = 1.0)),
+      PACKAGE = "npRmpi"
+    )
+  )
+}
+
+.npindex_ks_fixed_native_block_supported <- function(bws) {
+  identical(as.character(bws$type[1L]), "fixed") &&
+    identical(as.character(bws$ckertype[1L]), "epanechnikov") &&
+    identical(as.integer(bws$ckerorder[1L]), 2L)
+}
+
 .npindexbw_kleinspady_collective_enabled <- function(comm = 1L) {
   .npRmpi_has_active_slave_pool(comm = comm) &&
     isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
@@ -1016,14 +1103,25 @@ npindexbw.NULL <-
                                                 bws,
                                                 spec,
                                                 floor = sqrt(.Machine$double.eps)) {
-  piece <- .npindex_lp_loo_fit_block(
-    idx = idx,
-    index = index,
-    ydat = ydat,
-    h = h,
-    bws = bws,
-    spec = spec
-  )
+  piece <- if (isTRUE(.npindex_ks_fixed_native_block_supported(bws))) {
+    .npindex_lp_loo_fit_fixed_native_block(
+      idx = idx,
+      index = index,
+      ydat = ydat,
+      h = h,
+      bws = bws,
+      spec = spec
+    )
+  } else {
+    .npindex_lp_loo_fit_block(
+      idx = idx,
+      index = index,
+      ydat = ydat,
+      h = h,
+      bws = bws,
+      spec = spec
+    )
+  }
   idx <- as.integer(piece$index)
   fit <- as.double(piece$fitted)
   if (length(idx) != length(fit) || any(!is.finite(fit)))
@@ -1152,7 +1250,13 @@ npindexbw.NULL <-
     }
 
     if (identical(task$kind, "eval")) {
-      if (is.null(task$beta) || is.null(task$h)) {
+      beta <- if (is.null(task$beta)) numeric(0L) else as.double(task$beta)
+      h <- if (is.null(task$h)) NA_real_ else as.double(task$h[1L])
+      invalid.eval <- .npindexbw_service_eval_preflight(
+        ok = length(beta) == (ncol(xmat) - 1L) && is.finite(h),
+        comm = ctx$comm
+      )
+      if (isTRUE(invalid.eval)) {
         .npindexbw_kleinspady_lp_service_task_error(
           "malformed npindex Klein-Spady LP eval task",
           task = task,
@@ -1161,8 +1265,6 @@ npindexbw.NULL <-
         next
       }
       task.spec <- if (is.null(task$spec)) spec else task$spec
-      beta <- as.double(task$beta)
-      h <- as.double(task$h[1L])
       index <- xmat %*% c(1, beta)
       .npindexbw_eval_kleinspady_lp_collective_from_index(
         index = index,
@@ -1213,6 +1315,16 @@ npindexbw.NULL <-
     rank = 0L,
     comm = ctx$comm
   )
+
+  invalid.eval <- .npindexbw_service_eval_preflight(
+    ok = all(is.finite(as.numeric(beta))) && is.finite(as.numeric(h)[1L]),
+    comm = ctx$comm
+  )
+  if (isTRUE(invalid.eval))
+    return(list(
+      objective = sqrt(.Machine$double.xmax),
+      invalid = TRUE
+    ))
 
   .npindexbw_eval_kleinspady_lp_collective_from_index(
     index = index,
