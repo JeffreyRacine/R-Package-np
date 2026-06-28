@@ -1098,6 +1098,33 @@ npindexbw.NULL <-
   )
 }
 
+.npindexbw_kleinspady_lp_service_task_error <- function(message,
+                                                        task,
+                                                        ctx) {
+  task.kind <- if (is.list(task) && !is.null(task$kind))
+    as.character(task$kind)[1L]
+  else
+    NA_character_
+  task.service <- if (is.list(task) && !is.null(task$service_id))
+    as.character(task$service_id)[1L]
+  else
+    NA_character_
+  err <- list(
+    kind = "service_error",
+    service_id = ctx$service_id,
+    rank = ctx$rank,
+    task_kind = task.kind,
+    task_service_id = task.service,
+    message = as.character(message)[1L]
+  )
+  .npRmpi_transport_trace(
+    role = "npindex.kleinspady.lp.service",
+    event = "task.error",
+    fields = err
+  )
+  invisible(err)
+}
+
 .npindexbw_kleinspady_lp_service_worker_loop <- function(xmat,
                                                          ydat,
                                                          bws,
@@ -1105,14 +1132,34 @@ npindexbw.NULL <-
                                                          ctx) {
   repeat {
     task <- mpi.bcast.Robj(rank = 0L, comm = ctx$comm)
-    if (!is.list(task) || is.null(task$kind))
-      stop("malformed npindex Klein-Spady LP service task", call. = FALSE)
+    if (!is.list(task) || is.null(task$kind)) {
+      .npindexbw_kleinspady_lp_service_task_error(
+        "malformed npindex Klein-Spady LP service task",
+        task = task,
+        ctx = ctx
+      )
+      next
+    }
 
     task.service <- if (is.null(task$service_id)) ctx$service_id else as.character(task$service_id)[1L]
-    if (!identical(task.service, ctx$service_id))
-      stop("unexpected npindex Klein-Spady LP service identifier", call. = FALSE)
+    if (!identical(task.service, ctx$service_id)) {
+      .npindexbw_kleinspady_lp_service_task_error(
+        "unexpected npindex Klein-Spady LP service identifier",
+        task = task,
+        ctx = ctx
+      )
+      next
+    }
 
     if (identical(task$kind, "eval")) {
+      if (is.null(task$beta) || is.null(task$h)) {
+        .npindexbw_kleinspady_lp_service_task_error(
+          "malformed npindex Klein-Spady LP eval task",
+          task = task,
+          ctx = ctx
+        )
+        next
+      }
       task.spec <- if (is.null(task$spec)) spec else task$spec
       beta <- as.double(task$beta)
       h <- as.double(task$h[1L])
@@ -1136,7 +1183,11 @@ npindexbw.NULL <-
     if (identical(task$kind, "stop"))
       return(invisible(NULL))
 
-    stop("unknown npindex Klein-Spady LP service task", call. = FALSE)
+    .npindexbw_kleinspady_lp_service_task_error(
+      "unknown npindex Klein-Spady LP service task",
+      task = task,
+      ctx = ctx
+    )
   }
 }
 
