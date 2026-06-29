@@ -1058,7 +1058,7 @@
   if (!identical(plot.errors.method, "none")) {
     merr <- cbind(-temp.err[, 1L], temp.err[, 2L])
     if (identical(plot.errors.center, "bias-corrected"))
-      bias <- temp.err[, 3L] - temp.mean
+      bias <- temp.mean - temp.err[, 3L]
   }
   plot.data <- list(si1 = .np_plot_proto_npindex_payload(
     bws = bws,

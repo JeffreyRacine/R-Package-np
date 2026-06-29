@@ -388,29 +388,12 @@ npreghat <-
   ntrain <- nrow(txdat)
   neval <- nrow(eval.data)
   want.grad <- length(s) > 0L && any(s > 0L)
-  tree.enabled <- npUseContinuousTree(ncon = bws$ncon, bws = bws)
-
   if (identical(bws$type, "generalized_nn") &&
-      any(degree > 1L) &&
-      tree.enabled) {
+      any(degree > 1L)) {
     return(.npreghat_exact_matrix_from_core(
       bws = bws,
       txdat = txdat,
       exdat = if (miss.ex) NULL else exdat,
-      s = s
-    ))
-  }
-
-  if (identical(bws$type, "generalized_nn") &&
-      any(degree > 1L) &&
-      !tree.enabled) {
-    return(.npreghat_exact_lp_matrix_from_regression_core_chunked(
-      bws = bws,
-      txdat = txdat,
-      exdat = if (miss.ex) NULL else exdat,
-      basis = basis,
-      degree = degree,
-      bernstein.basis = bernstein.basis,
       s = s
     ))
   }

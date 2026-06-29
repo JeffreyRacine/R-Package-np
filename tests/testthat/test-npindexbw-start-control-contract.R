@@ -16,7 +16,7 @@ test_that("npindexbw fixed-h helper replays legacy defaults", {
 
   expect_equal(
     npindex_default_start_bandwidth(fit = fit, bwtype = "fixed", nobs = 80L, start.controls = controls),
-    1.059224 * getFromNamespace("EssDee", "np")(fit) * 80^(-1 / 5)
+    controls$scale.factor.init * getFromNamespace("EssDee", "np")(fit) * 80^(-1 / 5)
   )
 
   set.seed(20260405)
@@ -27,7 +27,8 @@ test_that("npindexbw fixed-h helper replays legacy defaults", {
     start.controls = controls
   )
   set.seed(20260405)
-  expect_equal(got, runif(1, min = 0.5, max = 1.5) * getFromNamespace("EssDee", "np")(fit) * 80^(-1 / 5))
+  expect_equal(got, runif(1, min = controls$scale.factor.init.lower, max = controls$scale.factor.init.upper) *
+                 getFromNamespace("EssDee", "np")(fit) * 80^(-1 / 5))
 })
 
 test_that("npindexbw fixed-h helper honors explicit overrides", {

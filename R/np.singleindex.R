@@ -171,22 +171,31 @@ npindex.call <-
   }
 
 .np_index_regression_bandwidth <- function(index.df, ydat, bws, spec) {
-  bw.args <- list(
-    xdat = index.df,
-    ydat = ydat,
-    bws = bws$bw,
-    bandwidth.compute = FALSE,
+  reg.args <- list(
     bwtype = bws$type,
     ckertype = bws$ckertype,
     ckerorder = bws$ckerorder,
     regtype = spec$regtype.engine
   )
   if (identical(spec$regtype.engine, "lp")) {
-    bw.args$basis <- spec$basis.engine
-    bw.args$degree <- spec$degree.engine
-    bw.args$bernstein.basis <- spec$bernstein.basis.engine
+    reg.args$basis <- spec$basis.engine
+    reg.args$degree <- spec$degree.engine
+    reg.args$bernstein.basis <- spec$bernstein.basis.engine
   }
-  do.call(npregbw, bw.args)
+  template <- .npregbw_build_rbandwidth(
+    xdat = index.df,
+    ydat = ydat,
+    bws = bws$bw,
+    bandwidth.compute = FALSE,
+    reg.args = reg.args,
+    yname = bws$ynames
+  )
+  npregbw.rbandwidth(
+    xdat = index.df,
+    ydat = ydat,
+    bws = template,
+    bandwidth.compute = FALSE
+  )
 }
 
 npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
@@ -269,7 +278,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       .np_eval_bw_call(sc.bw, caller_env = parent.frame())
     }
   } else {
-    .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+    bws
   }
 
   call.args <- list(bws = tbw)

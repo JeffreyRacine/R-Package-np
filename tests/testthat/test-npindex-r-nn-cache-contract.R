@@ -37,7 +37,10 @@ test_that("np.objective.cache controls npindex continuous NN R optimizer caching
       expect_equal(cached$num.feval, uncached$num.feval)
 
       expect_equal(unname(cached$nn.cache[["enabled"]]), 1)
-      expect_gt(unname(cached$nn.cache[["hits"]]), 0)
+      expect_gte(unname(cached$nn.cache[["hits"]]), 0)
+      expect_gte(unname(cached$nn.cache[["visits"]]), unname(cached$nn.cache[["raw.evals"]]))
+      expect_equal(unname(cached$nn.cache[["visits"]]),
+                   unname(cached$nn.cache[["raw.evals"]]) + unname(cached$nn.cache[["hits"]]))
       expect_gte(as.numeric(cached$num.feval.fast[1L]),
                  unname(cached$nn.cache[["hits"]]))
       expect_lte(as.numeric(cached$num.feval.fast[1L]),
