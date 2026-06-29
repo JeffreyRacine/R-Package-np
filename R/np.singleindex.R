@@ -140,6 +140,10 @@ npindex.formula <-
             if (!is.null(ev$bws))
                 ev$bws$ynames <- response.name
         }
+        if (!is.null(ev$bws) && inherits(bws, "formula")) {
+            ev$bws$formula <- bws
+            ev$bws$terms <- attr(tmf, "terms")
+        }
 
         ev$omit <- attr(umf,"na.action")
         ev$rows.omit <- as.vector(ev$omit)
@@ -167,22 +171,31 @@ npindex.call <-
   }
 
 .np_index_regression_bandwidth <- function(index.df, ydat, bws, spec) {
-  bw.args <- list(
-    xdat = index.df,
-    ydat = ydat,
-    bws = bws$bw,
-    bandwidth.compute = FALSE,
+  reg.args <- list(
     bwtype = bws$type,
     ckertype = bws$ckertype,
     ckerorder = bws$ckerorder,
     regtype = spec$regtype.engine
   )
   if (identical(spec$regtype.engine, "lp")) {
-    bw.args$basis <- spec$basis.engine
-    bw.args$degree <- spec$degree.engine
-    bw.args$bernstein.basis <- spec$bernstein.basis.engine
+    reg.args$basis <- spec$basis.engine
+    reg.args$degree <- spec$degree.engine
+    reg.args$bernstein.basis <- spec$bernstein.basis.engine
   }
-  do.call(npregbw, bw.args)
+  template <- .npregbw_build_rbandwidth(
+    xdat = index.df,
+    ydat = ydat,
+    bws = bws$bw,
+    bandwidth.compute = FALSE,
+    reg.args = reg.args,
+    yname = bws$ynames
+  )
+  npregbw.rbandwidth(
+    xdat = index.df,
+    ydat = ydat,
+    bws = template,
+    bandwidth.compute = FALSE
+  )
 }
 
 npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
@@ -202,6 +215,23 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   no.txdat <- missing(txdat)
   no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "sibandwidth")
+  bws.formula <- (!no.bws) && inherits(bws, "formula")
+  bws.call <- (!no.bws) && is.call(bws)
+
+  if (!has.explicit.bws && (bws.formula || bws.call) && !no.txdat && !no.tydat) {
+    txdat <- toFrame(txdat)
+
+    dots <- list(...)
+    bw.dots <- dots
+    bw.dots$.np_fit_progress_handoff <- NULL
+    bw.args <- c(list(xdat = txdat, ydat = tydat, nomad = nomad), bw.dots)
+    tbw <- do.call(npindexbw, bw.args)
+
+    fit.args <- list(bws = tbw, txdat = txdat, tydat = tydat)
+    fit.dots <- dots
+    fit.dots$.np_fit_progress_handoff <- TRUE
+    return(do.call(npindex, c(fit.args, fit.dots)))
+  }
 
   ## if bws was passed in explicitly, do not compute bandwidths
 
@@ -212,10 +242,12 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   
   sc.bw[[1]] <- quote(npindexbw)
 
-  bws.formula <- (!no.bws) && inherits(bws, "formula")
   if (bws.formula) {
     ib <- match("bws", names(sc.bw), nomatch = 0L)
     if (ib > 0L) names(sc.bw)[ib] <- "formula"
+    drop.xy <- names(sc.bw) %in% c("txdat", "tydat")
+    if (any(drop.xy))
+      sc.bw <- sc.bw[!drop.xy]
   }
 
   if(bws.named && !bws.formula){
@@ -227,7 +259,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   
   m.txy <- match(ostxy, names(sc.bw), nomatch = 0)
 
-  if(any(m.txy > 0)) {
+  if(!bws.formula && any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
@@ -246,7 +278,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       .np_eval_bw_call(sc.bw, caller_env = parent.frame())
     }
   } else {
-    .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+    bws
   }
 
   call.args <- list(bws = tbw)

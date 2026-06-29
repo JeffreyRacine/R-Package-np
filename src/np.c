@@ -2930,6 +2930,22 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   safe_free(np_conditional_density_nomad_shadow.ipt_xy);
   safe_free(np_conditional_density_nomad_shadow.ipt_lookup_xy);
 
+  np_conditional_density_nomad_shadow.glp_degree = NULL;
+  np_conditional_density_nomad_shadow.vector_scale_factor = NULL;
+  np_conditional_density_nomad_shadow.cxkerlb = NULL;
+  np_conditional_density_nomad_shadow.cxkerub = NULL;
+  np_conditional_density_nomad_shadow.cykerlb = NULL;
+  np_conditional_density_nomad_shadow.cykerub = NULL;
+  np_conditional_density_nomad_shadow.cxykerlb = NULL;
+  np_conditional_density_nomad_shadow.cxykerub = NULL;
+  np_conditional_density_nomad_shadow.extendednn_upper = NULL;
+  np_conditional_density_nomad_shadow.ipt_x = NULL;
+  np_conditional_density_nomad_shadow.ipt_y = NULL;
+  np_conditional_density_nomad_shadow.ipt_xy = NULL;
+  np_conditional_density_nomad_shadow.ipt_lookup_x = NULL;
+  np_conditional_density_nomad_shadow.ipt_lookup_y = NULL;
+  np_conditional_density_nomad_shadow.ipt_lookup_xy = NULL;
+
   matrix_Y_unordered_train_extern = NULL;
   matrix_Y_ordered_train_extern = NULL;
   matrix_Y_continuous_train_extern = NULL;
@@ -2993,7 +3009,6 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   int_glp_basis_extern = 1;
   int_ll_extern = LL_LC;
   int_nn_k_min_extern = 1;
-  np_conditional_density_nomad_shadow.extendednn_upper = NULL;
   BANDWIDTH_den_extern = 0;
   BANDWIDTH_reg_extern = 0;
   KERNEL_reg_extern = 0;
@@ -15688,6 +15703,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   case RBWM_CVAIC : bwmfunc = cv_func_regression_categorical_aic_c; break;
   case RBWM_CVLS : bwmfunc = cv_func_regression_categorical_ls; break;
   case RBWM_CVCHECK : bwmfunc = cv_func_lsqregression_categorical_check; break;
+  case RBWM_CVKS : bwmfunc = cv_func_regression_categorical_ks; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
     bw_error_msg = "np.c: invalid bandwidth selection method.";
     goto cleanup_np_regression_bw_mode;
