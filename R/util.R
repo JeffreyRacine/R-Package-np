@@ -144,7 +144,7 @@ npRidgeSequenceFromBase <- function(n.train, ridge.base = 0.0, cap = 1.0) {
 
   threshold <- .np_glp_degree_warn_threshold
   if (any(value > threshold)) {
-    warning(
+    .np_warning(
       sprintf(
         "%s contains unusually large polynomial degree values above %d; numerical instability is possible",
         argname,

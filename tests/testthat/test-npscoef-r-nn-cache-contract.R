@@ -44,7 +44,7 @@ test_that("np.objective.cache controls npscoef continuous NN R optimizer caching
   }
 })
 
-test_that("npscoef R NN cache leaves fixed bandwidth searches unmarked", {
+test_that("npscoef R NN cache records inert fixed-bandwidth stats", {
   old <- options(np.messages = FALSE, np.objective.cache = TRUE)
   on.exit(options(old), add = TRUE)
 
@@ -67,5 +67,7 @@ test_that("npscoef R NN cache leaves fixed bandwidth searches unmarked", {
     optim.maxattempts = 1L
   )
 
-  expect_null(bw$nn.cache)
+  expect_equal(unname(bw$nn.cache[["enabled"]]), 1)
+  expect_equal(unname(bw$nn.cache[["hits"]]), 0)
+  expect_equal(as.numeric(bw$num.feval.fast[1L]), 0)
 })

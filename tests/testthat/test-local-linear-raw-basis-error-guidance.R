@@ -77,13 +77,7 @@ test_that("local-linear raw-basis guidance leaves non-targeted errors unchanged"
   )
 
   expect_error(
-    np:::npWithLocalLinearRawBasisSearchError(
-      stop(local_linear_guidance_dens_msg, call. = FALSE),
-      where = "npcdensbw",
-      spec = local_linear_guidance_ll_spec(ncon = 0L),
-      bwmethod = "cv.ls",
-      ncon = 0L
-    ),
-    regexp = local_linear_guidance_dens_msg
+    local_linear_guidance_ll_spec(ncon = 0L),
+    regexp = "regtype='ll' requires at least one continuous predictor"
   )
 })

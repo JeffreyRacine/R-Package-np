@@ -2562,8 +2562,8 @@ npregbw.default <-
       )
     if ("remin" %in% names(lp.dot.args)) {
       legacy.remin <- npValidateScalarLogical(lp.dot.args$remin, "remin")
-      warning("npregbw: argument 'remin' is deprecated; use 'powell.remin' and 'nomad.remin'",
-              call. = FALSE)
+      .np_warning("npregbw: argument 'remin' is deprecated; use 'powell.remin' and 'nomad.remin'",
+                  call. = FALSE)
       if (missing(powell.remin))
         powell.remin <- legacy.remin
       if (missing(nomad.remin))

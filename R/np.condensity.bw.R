@@ -931,7 +931,7 @@ npcdensbw.conbandwidth <-
   if (!.npcdensbw_has_explicit_fixed_infinite_y_bound(kerlb, kerub, kerbound))
     return(invisible(FALSE))
 
-  warning(sprintf(
+  .np_warning(sprintf(
     "%s with fixed infinite response bounds uses a finite cv.ls quadrature surrogate; consider setting cvls.quadrature.points explicitly for this edge case",
     where
   ), call. = FALSE)
@@ -1793,6 +1793,20 @@ npNomadShadowSearchConditionalDensity <- function(template,
       rep.int(Inf, length(setup$cont_flat))
     }
     native.point.upper <- c(native.cont.upper, rep.int(Inf, length(setup$cat_flat)))
+    native.baseline.started <- proc.time()[3L]
+    native.baseline <- eval_fun(x0)
+    native.baseline.record <- list(
+      eval_id = 0L,
+      degree = as.integer(native.baseline$degree),
+      objective = as.numeric(native.baseline$objective[1L]),
+      status = "ok",
+      cached = FALSE,
+      message = NULL,
+      elapsed = proc.time()[3L] - native.baseline.started,
+      num.feval = as.numeric(native.baseline$num.feval[1L]),
+      num.feval.fast = as.numeric(native.baseline$num.feval.fast[1L]),
+      num.feval.guarded = as.numeric(native.baseline$num.feval.guarded[1L])
+    )
     native.start.matrix <- .np_nomad_build_starts(
       x0 = x0,
       bbin = bbin,
@@ -1819,7 +1833,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
     native.progress <- .np_nomad_native_progress_begin(
       nmulti = native.nmulti,
       baseline_degree = degree.search$start.degree,
-      best_record = NULL,
+      best_record = native.baseline.record,
       label = progress_label
     )
     on.exit(.np_nomad_native_progress_abort(native.progress), add = TRUE)
@@ -1941,23 +1955,73 @@ npNomadShadowSearchConditionalDensity <- function(template,
       num.feval.fast = as.numeric(native$best_num.feval.fast[1L]),
       num.feval.guarded = as.numeric(native$best_num.feval.guarded[1L])
     )
+    native.best.record <- native.record
+    native.best.point <- as.numeric(native.best$best_point)
+    native.best.restart <- native.best.index
+    if (is.finite(native.baseline.record$objective) &&
+        .np_degree_better(native.baseline.record$objective, native.record$objective, direction = "max")) {
+      native.best.record <- native.baseline.record
+      native.best.point <- as.numeric(x0)
+      native.best.restart <- NA_integer_
+    }
     .np_nomad_native_progress_end(
       handle = native.progress,
-      degree = native.record$degree,
-      best_record = native.record
+      degree = native.best.record$degree,
+      best_record = native.best.record
+    )
+    native.count <- function(name) {
+      sum(vapply(
+        native.results,
+        function(item) as.integer(item$native[[name]][1L]),
+        integer(1L)
+      ))
+    }
+    n.unique.native <- native.count("compiled_callback_calls") + 1L
+    n.cached.native <- native.count("cache_hits")
+    n.visits.native <- native.count("total_evaluations") + 1L
+    restart.degree.starts <- lapply(
+      seq_len(nrow(native.start.matrix)),
+      function(i) as.integer(native.start.matrix[i, bwdim + seq_len(ndeg)])
+    )
+    restart.bandwidth.starts <- lapply(
+      seq_len(nrow(native.start.matrix)),
+      function(i) as.numeric(native.start.matrix[i, seq_len(bwdim)])
     )
     search.result <- list(
-      best = native.record,
-      best_point = as.numeric(native.best$best_point),
+      best = native.best.record,
+      best_point = native.best.point,
       best_payload = NULL,
       completed = TRUE,
       method = search.engine.used,
       source = source,
       reason = reason,
+      direction = "max",
+      verify = FALSE,
+      certified = FALSE,
+      interrupted = FALSE,
+      baseline = native.baseline.record,
+      n.unique = as.integer(n.unique.native),
+      n.visits = as.integer(n.visits.native),
+      n.cached = as.integer(n.cached.native),
+      grid.size = NA_integer_,
       restart.results = native.results,
-      best.restart = native.best.index,
+      best.restart = native.best.restart,
+      restart.starts = lapply(
+        seq_len(nrow(native.start.matrix)),
+        function(i) as.numeric(native.start.matrix[i, ])
+      ),
+      restart.degree.starts = restart.degree.starts,
+      restart.bandwidth.starts = restart.bandwidth.starts,
+      restart.start.info = list(
+        basis = if (is.null(degree.search$basis)) "glp" else degree.search$basis,
+        degree.start.policy = .np_lp_nomad_degree_start_policy(),
+        lower = as.integer(degree.search$lower),
+        upper = as.integer(degree.search$upper),
+        user_supplied_start = isTRUE(degree.search$start.user)
+      ),
       nomad.time = native.nomad.elapsed,
       powell.time = NA_real_,
+      optim.time = native.nomad.elapsed,
       num.feval.total = nomad.num.feval.total,
       num.feval.fast.total = nomad.num.feval.fast.total,
       num.feval.guarded.total = nomad.num.feval.guarded.total,
@@ -2137,10 +2201,19 @@ npNomadShadowSearchConditionalDensity <- function(template,
       list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
     }
 
-    payload.result <- build_shadow_payload(
-      point = search.result$best_point,
-      best_record = search.result$best,
-      solution = best.solution,
+  if (identical(degree.search$engine, "nomad+powell") &&
+      !is.null(native.progress)) {
+    native.progress <- .np_nomad_progress_enter_powell(
+      state = native.progress,
+      degree = search.result$best$degree,
+      best_record = search.result$best
+    )
+  }
+
+  payload.result <- build_shadow_payload(
+    point = search.result$best_point,
+    best_record = search.result$best,
+    solution = best.solution,
       interrupted = !isTRUE(search.result$completed)
     )
     if (is.list(payload.result) && !is.null(payload.result$payload)) {
@@ -2162,12 +2235,9 @@ npNomadShadowSearchConditionalDensity <- function(template,
     search.result$best_payload <- NULL
   if (is.null(search.result$powell.time))
     search.result$powell.time <- NA_real_
-  if (is.null(search.result$optim.time) ||
-      !is.finite(as.numeric(search.result$optim.time[1L]))) {
-    timing.parts <- as.numeric(c(search.result$nomad.time, search.result$powell.time))
-    timing.parts <- timing.parts[is.finite(timing.parts)]
-    search.result$optim.time <- if (length(timing.parts)) sum(timing.parts) else NA_real_
-  }
+  timing.parts <- as.numeric(c(search.result$nomad.time, search.result$powell.time))
+  timing.parts <- timing.parts[is.finite(timing.parts)]
+  search.result$optim.time <- if (length(timing.parts)) sum(timing.parts) else NA_real_
   search.result$num.feval.total <- as.numeric(nomad.num.feval.total)
   search.result$num.feval.fast.total <- as.numeric(nomad.num.feval.fast.total)
   search.result$num.feval.guarded.total <- as.numeric(nomad.num.feval.guarded.total)

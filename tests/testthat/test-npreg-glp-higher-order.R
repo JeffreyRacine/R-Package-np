@@ -135,11 +135,10 @@ test_that("npreg lp gradients accessor honors stored derivative order", {
     gradient.order = 1L,
     warn.glp.gradient = FALSE
   )
-  expect_warning(
-    undefined <- gradients(fit.degree1, gradient.order = 2L),
-    "exceed polynomial degree"
+  expect_error(
+    gradients(fit.degree1, gradient.order = 2L),
+    "supports derivative orders only up to the fitted polynomial degree"
   )
-  expect_true(all(is.na(undefined[, 1L])))
 })
 
 test_that("npreg lp Bernstein derivatives are returned on original scale", {

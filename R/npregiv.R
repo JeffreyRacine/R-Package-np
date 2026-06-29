@@ -2533,11 +2533,12 @@ plot.npregiv <- function(x,
     method_args = c("plot.data", "deriv"),
     context = "plot.npregiv"
   )
-  dots <- list(...)
+  dots.env <- new.env(parent = emptyenv())
+  dots.env$dots <- list(...)
   take_arg <- function(name, default = NULL) {
-    if (!is.null(dots[[name]])) {
-      val <- dots[[name]]
-      dots[[name]] <<- NULL
+    if (!is.null(dots.env$dots[[name]])) {
+      val <- dots.env$dots[[name]]
+      dots.env$dots[[name]] <- NULL
       return(val)
     }
     default
@@ -2561,10 +2562,10 @@ plot.npregiv <- function(x,
     plot.ylab <- take_arg("ylab", paste("d", yname, "/d", zname, sep=""))
     do.call(plot, c(list(x = z[order(z)],
                          y = phi.prime[order(z)],
-                         type = plot.type,
-                         xlab = plot.xlab,
-                         ylab = plot.ylab),
-                    dots))
+	                         type = plot.type,
+	                         xlab = plot.xlab,
+	                         ylab = plot.ylab),
+	                    dots.env$dots))
 
   } else {
 
@@ -2578,17 +2579,17 @@ plot.npregiv <- function(x,
                           y = y,
                           xlab = plot.xlab,
                           ylab = plot.ylab,
-                          type = plot.type,
-                          col = if (is.null(user.col)) "lightgrey" else user.col),
-                     dots)
-      do.call(plot, plot.args)
+	                          type = plot.type,
+	                          col = if (is.null(user.col)) "lightgrey" else user.col),
+	                     dots.env$dots)
+	      do.call(plot, plot.args)
       line.args <- list(x = z[order(z)],
                         y = phi[order(z)],
                         lwd = line.lwd)
       if (!is.null(user.col)) {
         line.args$col <- user.col
       }
-      do.call(lines, c(line.args, dots))
+	      do.call(lines, c(line.args, dots.env$dots))
     } else {
       plot.type <- take_arg("type", "l")
       plot.xlab <- take_arg("xlab", zname)
@@ -2604,7 +2605,7 @@ plot.npregiv <- function(x,
       if (!is.null(user.col)) {
         plot.args$col <- user.col
       }
-      do.call(plot, c(plot.args, dots))
+	      do.call(plot, c(plot.args, dots.env$dots))
     }
   }
 
