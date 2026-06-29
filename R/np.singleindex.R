@@ -140,6 +140,10 @@ npindex.formula <-
             if (!is.null(ev$bws))
                 ev$bws$ynames <- response.name
         }
+        if (!is.null(ev$bws) && inherits(bws, "formula")) {
+            ev$bws$formula <- bws
+            ev$bws$terms <- attr(tmf, "terms")
+        }
 
         ev$omit <- attr(umf,"na.action")
         ev$rows.omit <- as.vector(ev$omit)
@@ -197,8 +201,27 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   if (.npRmpi_autodispatch_active() &&
       !bws.formula &&
       !bws.call &&
-      (explicit.sibandwidth || identical(degree.select.value, "manual")))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      (explicit.sibandwidth || identical(degree.select.value, "manual"))) {
+    dispatch.call <- match.call()
+    if (explicit.sibandwidth && isTRUE(.np_progress_enabled(domain = "bandwidth")))
+      dispatch.call$.np_lc_fixed_progress_route <- TRUE
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+  }
+
+  if (!explicit.sibandwidth && (bws.formula || bws.call) && !no.txdat && !no.tydat) {
+    txdat <- toFrame(txdat)
+
+    dots <- list(...)
+    bw.dots <- dots
+    bw.dots$.np_fit_progress_handoff <- NULL
+    bw.args <- c(list(xdat = txdat, ydat = tydat, nomad = nomad), bw.dots)
+    tbw <- do.call(npindexbw, bw.args)
+
+    fit.args <- list(bws = tbw, txdat = txdat, tydat = tydat)
+    fit.dots <- dots
+    fit.dots$.np_fit_progress_handoff <- TRUE
+    return(do.call(npindex, c(fit.args, fit.dots)))
+  }
 
   ## here we check to see if the function was called with tdat =
   ## if it was, we need to catch that and map it to dat =
@@ -219,7 +242,16 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   
   sc.bw[[1]] <- quote(npindexbw)
 
-  if(bws.named){
+  if (bws.formula) {
+    ib <- match("bws", names(sc.bw), nomatch = 0L)
+    if (ib > 0L)
+      names(sc.bw)[ib] <- "formula"
+    drop.xy <- names(sc.bw) %in% c("txdat", "tydat")
+    if (any(drop.xy))
+      sc.bw <- sc.bw[!drop.xy]
+  }
+
+  if(bws.named && !bws.formula){
     sc.bw$bandwidth.compute <- FALSE
   }
 
@@ -228,7 +260,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   
   m.txy <- match(ostxy, names(sc.bw), nomatch = 0)
 
-  if(any(m.txy > 0)) {
+  if(!bws.formula && any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
@@ -247,7 +279,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       .np_eval_bw_call(sc.bw, caller_env = parent.frame())
     }
   } else {
-    .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+    bws
   }
 
   call.args <- list(bws = tbw)
@@ -309,6 +341,8 @@ npindex.sibandwidth <-
     fit.start <- proc.time()[3]
     dots <- list(...)
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
+    lc.fixed.progress.intent <- isTRUE(dots$.np_lc_fixed_progress_route)
+    dots$.np_lc_fixed_progress_route <- NULL
     fit.progress.allow <- isTRUE(.np_progress_enabled(domain = "bandwidth"))
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
@@ -368,7 +402,18 @@ npindex.sibandwidth <-
     }
     if (.npRmpi_autodispatch_active() &&
         !(isTRUE(gradients) && identical(bws$type, "generalized_nn"))) {
-      result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+      dispatch.call <- match.call()
+      if (identical(bws$method, "ichimura") &&
+          identical(spec$regtype.engine, "lc") &&
+          identical(bws$type, "fixed") &&
+          !gradients &&
+          !errors &&
+          !residuals &&
+          (no.ex || (!no.ex && no.ey)) &&
+          (fit.progress.allow || fit.progress.handoff)) {
+        dispatch.call$.np_lc_fixed_progress_route <- TRUE
+      }
+      result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame())
       return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
     }
 
@@ -489,7 +534,7 @@ npindex.sibandwidth <-
       !errors &&
       !residuals &&
       (no.ex || (!no.ex && no.ey)) &&
-      (fit.progress.allow || fit.progress.handoff)
+      (fit.progress.allow || fit.progress.handoff || lc.fixed.progress.intent)
     npreg.idx.args <- list(
       txdat = if (gradients) index.df else index,
       tydat = tydat,
@@ -541,7 +586,9 @@ npindex.sibandwidth <-
     }
 
     run_npreg_fit <- function(args) {
-      if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+      if (isTRUE(lc.fixed.progress.route) ||
+          isTRUE(.npRmpi_autodispatch_called_from_bcast()) ||
+          isTRUE(.npRmpi_autodispatch_in_context()))
         .npRmpi_with_local_regression(do.call(npreg, args))
       else
         do.call(npreg, args)
