@@ -44,7 +44,7 @@ test_that("npregbw NOMAD plus Powell progress keeps lines compact and restart-or
         nomad = TRUE,
         degree.max = 1L,
         nmulti = 2L,
-        max.bb.eval = 8
+        nomad.opts = list(MAX_BB_EVAL = 8L)
       )
     )
   )
