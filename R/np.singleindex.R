@@ -140,6 +140,10 @@ npindex.formula <-
             if (!is.null(ev$bws))
                 ev$bws$ynames <- response.name
         }
+        if (!is.null(ev$bws) && inherits(bws, "formula")) {
+            ev$bws$formula <- bws
+            ev$bws$terms <- attr(tmf, "terms")
+        }
 
         ev$omit <- attr(umf,"na.action")
         ev$rows.omit <- as.vector(ev$omit)
@@ -202,6 +206,23 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   no.txdat <- missing(txdat)
   no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "sibandwidth")
+  bws.formula <- (!no.bws) && inherits(bws, "formula")
+  bws.call <- (!no.bws) && is.call(bws)
+
+  if (!has.explicit.bws && (bws.formula || bws.call) && !no.txdat && !no.tydat) {
+    txdat <- toFrame(txdat)
+
+    dots <- list(...)
+    bw.dots <- dots
+    bw.dots$.np_fit_progress_handoff <- NULL
+    bw.args <- c(list(xdat = txdat, ydat = tydat, nomad = nomad), bw.dots)
+    tbw <- do.call(npindexbw, bw.args)
+
+    fit.args <- list(bws = tbw, txdat = txdat, tydat = tydat)
+    fit.dots <- dots
+    fit.dots$.np_fit_progress_handoff <- TRUE
+    return(do.call(npindex, c(fit.args, fit.dots)))
+  }
 
   ## if bws was passed in explicitly, do not compute bandwidths
 
@@ -212,7 +233,6 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   
   sc.bw[[1]] <- quote(npindexbw)
 
-  bws.formula <- (!no.bws) && inherits(bws, "formula")
   if (bws.formula) {
     ib <- match("bws", names(sc.bw), nomatch = 0L)
     if (ib > 0L) names(sc.bw)[ib] <- "formula"
