@@ -69,11 +69,6 @@ capture_progress_shadow_trace <- function(expr,
       } else {
         list()
       },
-      if (exists(".npRmpi_autodispatch_active", envir = ns, inherits = FALSE)) {
-        list(.npRmpi_autodispatch_active = function() FALSE)
-      } else {
-        list()
-      },
       list(
         .np_progress_render_legacy = recorder,
         .np_progress_render_single_line = recorder,

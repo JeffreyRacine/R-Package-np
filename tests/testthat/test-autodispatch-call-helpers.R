@@ -14,6 +14,7 @@
 .npRmpi_autodispatch_replace_tmps <- getFromNamespace(".npRmpi_autodispatch_replace_tmps", "npRmpi")
 .npRmpi_autodispatch_sanitize_object <- getFromNamespace(".npRmpi_autodispatch_sanitize_object", "npRmpi")
 .npRmpi_autodispatch_remote_ref <- getFromNamespace(".npRmpi_autodispatch_remote_ref", "npRmpi")
+.npRmpi_autodispatch_fingerprint <- getFromNamespace(".npRmpi_autodispatch_fingerprint", "npRmpi")
 .npRmpi_is_missing_call_arg <- getFromNamespace(".npRmpi_is_missing_call_arg", "npRmpi")
 
 test_that(".npRmpi_bcast_cmd_expr forwards command expression structurally", {
@@ -120,6 +121,7 @@ test_that("autodispatch reuses semiparametric remote bandwidth references", {
     class = "sibandwidth"
   )
   attr(env$sibw, "npRmpi.autodispatch.remote") <- ".__npRmpi_remote_sibw"
+  attr(env$sibw, "npRmpi.autodispatch.fingerprint") <- .npRmpi_autodispatch_fingerprint(env$sibw)
   env$scbw <- structure(
     list(call = quote(npscoefbw(y ~ x | z, data = mydat)),
          formula = y ~ x | z,
@@ -127,6 +129,7 @@ test_that("autodispatch reuses semiparametric remote bandwidth references", {
     class = "scbandwidth"
   )
   attr(env$scbw, "npRmpi.autodispatch.remote") <- ".__npRmpi_remote_scbw"
+  attr(env$scbw, "npRmpi.autodispatch.fingerprint") <- .npRmpi_autodispatch_fingerprint(env$scbw)
 
   si <- .npRmpi_autodispatch_materialize_call(
     quote(npindex(bws = sibw, gradients = FALSE)),
@@ -141,6 +144,16 @@ test_that("autodispatch reuses semiparametric remote bandwidth references", {
   expect_identical(as.character(sc$call$bws), .npRmpi_autodispatch_remote_ref(env$scbw))
   expect_false(any(vapply(si$prepublish, inherits, logical(1), "sibandwidth")))
   expect_false(any(vapply(sc$prepublish, inherits, logical(1), "scbandwidth")))
+
+  env$sibw$ballast <- rev(env$sibw$ballast)
+  si.mutated <- .npRmpi_autodispatch_materialize_call(
+    quote(npindex(bws = sibw, gradients = FALSE)),
+    caller_env = env
+  )
+  mutated.ref <- as.character(si.mutated$call$bws)
+  expect_false(identical(mutated.ref, .npRmpi_autodispatch_remote_ref(env$sibw)))
+  mutated.payload <- c(si.mutated$tmpvals, si.mutated$prepublish)
+  expect_s3_class(mutated.payload[[mutated.ref]], "sibandwidth")
 })
 
 test_that("autodispatch target argument set covers gdat alias", {

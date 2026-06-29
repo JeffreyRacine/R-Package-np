@@ -129,7 +129,7 @@ test_that("autodispatch helpers leave calls without deferred dots unchanged", {
   expect_false("..." %in% names(call.args))
   expect_true(all(c("xdat", "ydat", "bws", "regtype", "bwmethod") %in% names(call.args)))
   expect_identical(prepared$tmpvals[[as.character(prepared$call$regtype)]], "lc")
-  expect_identical(prepared$call$bwmethod, "cv.ls")
+  expect_identical(prepared$tmpvals[[as.character(prepared$call$bwmethod)]], "cv.ls")
 })
 
 test_that("autodispatch generic-call rebuild expands deferred dots from method match.call", {

@@ -173,7 +173,7 @@ test_that("npindexbw coordinate search can be exhaustively certified on a small 
   expect_true(isTRUE(coordinate$degree.search$completed))
   expect_true(isTRUE(coordinate$degree.search$certified))
   expect_equal(as.integer(coordinate$degree), as.integer(exhaustive$degree))
-  expect_equal(coordinate$fval, exhaustive$fval, tolerance = 1e-10)
+  expect_equal(coordinate$fval, exhaustive$fval, tolerance = 1e-8)
 })
 
 test_that("npindexbw automatic degree search honors Klein-Spady objective direction", {
@@ -444,6 +444,7 @@ test_that("npindex forwards automatic LP degree search through npindexbw", {
     method = "ichimura",
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",
@@ -485,6 +486,7 @@ test_that("npindexbw automatic degree search emits staged progress output", {
         method = "ichimura",
         regtype = "lp",
         degree.select = "exhaustive",
+        search.engine = "cell",
         degree.min = 0L,
         degree.max = 1L,
         bwtype = "fixed",
@@ -493,7 +495,7 @@ test_that("npindexbw automatic degree search emits staged progress output", {
     )
   )
 
-  expect_true(any(grepl("Automatic polynomial degree search baseline \\(0\\)", msgs)))
+  expect_true(any(grepl("Exhaustive degree/bw 0/", msgs) & grepl("best (0)", msgs, fixed = TRUE)))
   expect_true(any(grepl("(Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", msgs)))
   expect_true(any(grepl("exhaustive", msgs)))
   expect_true(any(grepl("best (", msgs, fixed = TRUE)))

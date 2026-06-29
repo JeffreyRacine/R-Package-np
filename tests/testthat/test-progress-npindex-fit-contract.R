@@ -153,7 +153,7 @@ test_that("npindex lp bw to fit route hands off into the regression fit surface"
   )
 
   lines <- npindex_fit_progress_lines(actual)
-  bandwidth.pos <- grep("^\\[npRmpi\\] Bandwidth selection \\(", lines)
+  bandwidth.pos <- grep("^\\[npRmpi\\] (Degree/bw|Bandwidth selection)", lines)
   fit.start.pos <- grep(
     "^\\[npRmpi\\] Fitting regression 0/24 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
     lines
