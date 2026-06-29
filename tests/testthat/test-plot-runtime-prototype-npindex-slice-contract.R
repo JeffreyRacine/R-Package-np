@@ -130,14 +130,14 @@ test_that("npindex fixed asymptotic plot-data prototype matches current route", 
       xdat = x,
       ydat = y,
       neval = 15L,
-      band = band
+      plot.errors.type = band
     )
     stages <- proto(
       bw,
       xdat = x,
       ydat = y,
       neval = 15L,
-      band = band,
+      plot.errors.type = band,
       return.stages = TRUE
     )
 
@@ -199,10 +199,10 @@ test_that("npindex fixed bootstrap plot-data prototype matches current route", {
       xdat = x,
       ydat = y,
       neval = 13L,
-      bootstrap = method,
-      B = 11L,
-      center = center,
-      band = "pointwise"
+      plot.errors.boot.method = method,
+      plot.errors.boot.num = 11L,
+      plot.errors.center = center,
+      plot.errors.type = "pointwise"
     ))
     set.seed(boot.seed)
     stages <- suppressWarnings(proto(
@@ -210,10 +210,10 @@ test_that("npindex fixed bootstrap plot-data prototype matches current route", {
       xdat = x,
       ydat = y,
       neval = 13L,
-      bootstrap = method,
-      B = 11L,
-      center = center,
-      band = "pointwise",
+      plot.errors.boot.method = method,
+      plot.errors.boot.num = 11L,
+      plot.errors.center = center,
+      plot.errors.type = "pointwise",
       return.stages = TRUE
     ))
 

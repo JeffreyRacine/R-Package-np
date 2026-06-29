@@ -141,7 +141,7 @@ test_that("npplreg fixed asymptotic plot-data prototype matches current route", 
       zdat = z,
       ydat = y,
       neval = 6L,
-      band = band
+      plot.errors.type = band
     )
     stages <- proto(
       bw,
@@ -149,7 +149,7 @@ test_that("npplreg fixed asymptotic plot-data prototype matches current route", 
       zdat = z,
       ydat = y,
       neval = 6L,
-      band = band,
+      plot.errors.type = band,
       return.stages = TRUE
     )
 
@@ -216,10 +216,10 @@ test_that("npplreg fixed bootstrap plot-data prototype matches current route", {
       zdat = z,
       ydat = y,
       neval = 5L,
-      bootstrap = method,
-      B = 11L,
-      center = center,
-      band = "pointwise"
+      plot.errors.boot.method = method,
+      plot.errors.boot.num = 11L,
+      plot.errors.center = center,
+      plot.errors.type = "pointwise"
     ))
     set.seed(boot.seed)
     stages <- suppressWarnings(proto(
@@ -228,10 +228,10 @@ test_that("npplreg fixed bootstrap plot-data prototype matches current route", {
       zdat = z,
       ydat = y,
       neval = 5L,
-      bootstrap = method,
-      B = 11L,
-      center = center,
-      band = "pointwise",
+      plot.errors.boot.method = method,
+      plot.errors.boot.num = 11L,
+      plot.errors.center = center,
+      plot.errors.type = "pointwise",
       return.stages = TRUE
     ))
 

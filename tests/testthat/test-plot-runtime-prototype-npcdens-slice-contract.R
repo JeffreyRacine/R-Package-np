@@ -107,14 +107,14 @@ test_that("npcdens LC fixed asymptotic plot-data prototype matches current route
       xdat = x,
       ydat = y,
       neval = 9L,
-      band = band
+      plot.errors.type = band
     )
     stages <- proto(
       bw,
       xdat = x,
       ydat = y,
       neval = 9L,
-      band = band,
+      plot.errors.type = band,
       return.stages = TRUE
     )
 
@@ -178,9 +178,9 @@ test_that("npcdens LC fixed inid bootstrap plot-data prototype matches current r
       xdat = x,
       ydat = y,
       neval = 7L,
-      B = 19L,
-      center = center,
-      band = band
+      plot.errors.boot.num = 19L,
+      plot.errors.center = center,
+      plot.errors.type = band
     ))
     set.seed(boot.seed)
     stages <- suppressWarnings(proto(
@@ -188,9 +188,9 @@ test_that("npcdens LC fixed inid bootstrap plot-data prototype matches current r
       xdat = x,
       ydat = y,
       neval = 7L,
-      B = 19L,
-      center = center,
-      band = band,
+      plot.errors.boot.num = 19L,
+      plot.errors.center = center,
+      plot.errors.type = band,
       return.stages = TRUE
     ))
 
@@ -285,8 +285,8 @@ test_that("npcdens LC fixed proper plot-data prototype matches current route", {
     xdat = x,
     ydat = y,
     neval = 7L,
-    B = 19L,
-    band = "pmzsd",
+    plot.errors.boot.num = 19L,
+    plot.errors.type = "pmzsd",
     proper = TRUE
   ))
   set.seed(boot.seed)
@@ -295,8 +295,8 @@ test_that("npcdens LC fixed proper plot-data prototype matches current route", {
     xdat = x,
     ydat = y,
     neval = 7L,
-    B = 19L,
-    band = "pmzsd",
+    plot.errors.boot.num = 19L,
+    plot.errors.type = "pmzsd",
     proper = TRUE,
     return.stages = TRUE
   ))
@@ -351,10 +351,10 @@ test_that("npcdens LC fixed block bootstrap plot-data prototype matches current 
       xdat = x,
       ydat = y,
       neval = 7L,
-      bootstrap = method,
-      boot_control = np_boot_control(blocklen = 5L),
-      B = 19L,
-      band = "pmzsd"
+      plot.errors.boot.method = method,
+      plot.errors.boot.blocklen = 5L,
+      plot.errors.boot.num = 19L,
+      plot.errors.type = "pmzsd"
     ))
     set.seed(boot.seed)
     stages <- suppressWarnings(proto(
@@ -362,10 +362,10 @@ test_that("npcdens LC fixed block bootstrap plot-data prototype matches current 
       xdat = x,
       ydat = y,
       neval = 7L,
-      bootstrap = method,
-      boot_control = np_boot_control(blocklen = 5L),
-      B = 19L,
-      band = "pmzsd",
+      plot.errors.boot.method = method,
+      plot.errors.boot.blocklen = 5L,
+      plot.errors.boot.num = 19L,
+      plot.errors.type = "pmzsd",
       return.stages = TRUE
     ))
 
@@ -461,8 +461,8 @@ test_that("npcdens fixed LL/LP inid bootstrap plot-data prototype matches curren
       xdat = x,
       ydat = y,
       neval = 7L,
-      B = 17L,
-      band = "pmzsd"
+      plot.errors.boot.num = 17L,
+      plot.errors.type = "pmzsd"
     ))
     set.seed(boot.seed)
     stages <- suppressWarnings(proto(
@@ -470,8 +470,8 @@ test_that("npcdens fixed LL/LP inid bootstrap plot-data prototype matches curren
       xdat = x,
       ydat = y,
       neval = 7L,
-      B = 17L,
-      band = "pmzsd",
+      plot.errors.boot.num = 17L,
+      plot.errors.type = "pmzsd",
       return.stages = TRUE
     ))
 
@@ -564,8 +564,8 @@ test_that("npcdens generalized/adaptive NN inid bootstrap plot-data prototype ma
       xdat = x,
       ydat = y,
       neval = 5L,
-      B = 11L,
-      band = "pmzsd"
+      plot.errors.boot.num = 11L,
+      plot.errors.type = "pmzsd"
     ))
     set.seed(boot.seed)
     stages <- suppressWarnings(proto(
@@ -573,8 +573,8 @@ test_that("npcdens generalized/adaptive NN inid bootstrap plot-data prototype ma
       xdat = x,
       ydat = y,
       neval = 5L,
-      B = 11L,
-      band = "pmzsd",
+      plot.errors.boot.num = 11L,
+      plot.errors.type = "pmzsd",
       return.stages = TRUE
     ))
 
@@ -674,8 +674,8 @@ test_that("npcdist fixed inid bootstrap plot-data prototype matches current rout
       xdat = x,
       ydat = y,
       neval = 6L,
-      B = 13L,
-      band = "pmzsd"
+      plot.errors.boot.num = 13L,
+      plot.errors.type = "pmzsd"
     ))
     set.seed(boot.seed)
     stages <- suppressWarnings(proto(
@@ -683,8 +683,8 @@ test_that("npcdist fixed inid bootstrap plot-data prototype matches current rout
       xdat = x,
       ydat = y,
       neval = 6L,
-      B = 13L,
-      band = "pmzsd",
+      plot.errors.boot.num = 13L,
+      plot.errors.type = "pmzsd",
       return.stages = TRUE
     ))
 
@@ -754,8 +754,8 @@ test_that("npcdist generalized/adaptive NN plot-data prototype matches current r
       xdat = x,
       ydat = y,
       neval = 5L,
-      B = 11L,
-      band = "pmzsd"
+      plot.errors.boot.num = 11L,
+      plot.errors.type = "pmzsd"
     ))
     expect_equal(candidate.boot$cd1$condist, old.boot$cd1$condist, info = bwtype)
     expect_equal(candidate.boot$cd1$conderr, old.boot$cd1$conderr, info = bwtype)

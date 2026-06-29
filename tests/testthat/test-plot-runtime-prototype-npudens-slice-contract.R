@@ -129,8 +129,8 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
         bws,
         xdat = x,
         neval = 6L,
-        errors = "asymptotic",
-        band = band,
+        plot.errors.method = "asymptotic",
+        plot.errors.type = band,
         cdf = cdf
       )
       expect_equal(candidate$d1[[value.name]], old$d1[[value.name]], info = paste(case, band))
@@ -158,11 +158,11 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
       bws,
       xdat = x,
       neval = 5L,
-      errors = "bootstrap",
-      bootstrap = "inid",
-      B = 13L,
-      center = "bias-corrected",
-      band = "pointwise",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = "inid",
+      plot.errors.boot.num = 13L,
+      plot.errors.center = "bias-corrected",
+      plot.errors.type = "pointwise",
       cdf = cdf
     ))
     set.seed(boot.seed)
@@ -170,11 +170,11 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
       bws,
       xdat = x,
       neval = 5L,
-      errors = "bootstrap",
-      bootstrap = "inid",
-      B = 13L,
-      center = "bias-corrected",
-      band = "pointwise",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = "inid",
+      plot.errors.boot.num = 13L,
+      plot.errors.center = "bias-corrected",
+      plot.errors.type = "pointwise",
       cdf = cdf,
       return.stages = TRUE
     ))

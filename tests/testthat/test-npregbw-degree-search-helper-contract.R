@@ -309,7 +309,7 @@ test_that("automatic degree search emits staged progress output", {
     )
   )
 
-  expect_true(any(grepl("Automatic polynomial degree search baseline \\(0\\)", msgs)))
+  expect_true(any(grepl("Exhaustive degree/bw 0/2", msgs, fixed = TRUE)))
   expect_true(any(grepl("(Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", msgs)))
   expect_true(any(grepl("exhaustive", msgs)))
   expect_true(any(grepl("best (", msgs, fixed = TRUE)))
@@ -338,7 +338,10 @@ test_that("automatic degree search emits staged progress output", {
     )
   )
 
-  expect_true(any(grepl("Coordinate automatic polynomial degree search over 0:1", coord_msgs)))
-  expect_true(any(grepl("max 3 search evaluations", coord_msgs)))
-  expect_true(any(grepl("Exhaustively certifying automatic polynomial degree search over 2 degree combinations \\(re-optimizing bandwidths\\)", coord_msgs)))
+  expect_true(any(grepl("Degree/bw... elapsed", coord_msgs, fixed = TRUE) &
+                  grepl("coord", coord_msgs, fixed = TRUE)))
+  expect_true(any(grepl("Degree/bw 0/2", coord_msgs, fixed = TRUE) &
+                  grepl("verify", coord_msgs, fixed = TRUE)))
+  expect_true(any(grepl("Degree/bw 2/2", coord_msgs, fixed = TRUE) &
+                  grepl("best (", coord_msgs, fixed = TRUE)))
 })
