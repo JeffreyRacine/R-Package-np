@@ -187,6 +187,54 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
 
 }
 
+double cv_func_regression_categorical_ks(double *vector_scale_factor){
+  double cv = 0.0;
+  clock_t start, diff;
+
+  if(check_valid_scale_factor_cv(
+                                 KERNEL_reg_extern,
+                                 KERNEL_reg_unordered_extern,
+                                 BANDWIDTH_reg_extern,
+                                 BANDWIDTH_reg_extern,
+                                 0,
+                                 num_obs_train_extern,
+                                 0,
+                                 0,
+                                 0,
+                                 num_reg_continuous_extern,
+                                 num_reg_unordered_extern,
+                                 num_reg_ordered_extern,
+                                 num_categories_extern,
+                                 vector_scale_factor) == 1)
+    {
+      return(DBL_MAX);
+    }
+
+    start = clock();
+
+    cv = (np_kernel_estimate_regression_categorical_ls_aic(
+                                                            int_ll_extern,
+                                                            RBWM_CVKS,
+                                                            KERNEL_reg_extern,
+                                                            KERNEL_reg_unordered_extern,
+                                                            KERNEL_reg_ordered_extern,
+                                                            BANDWIDTH_reg_extern,
+                                                            num_obs_train_extern,
+                                                            num_reg_unordered_extern,
+                                                            num_reg_ordered_extern,
+                                                            num_reg_continuous_extern,
+                                                            matrix_X_unordered_train_extern,
+                                                            matrix_X_ordered_train_extern,
+                                                            matrix_X_continuous_train_extern,
+                                                            vector_Y_extern,
+                                                            &vector_scale_factor[1],
+                                                            num_categories_extern));
+    diff = clock() - start;
+    timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
+
+    return(cv);
+}
+
 double cv_func_lsqregression_categorical_check(double *vector_scale_factor){
   double cv = 0.0;
   clock_t start, diff;

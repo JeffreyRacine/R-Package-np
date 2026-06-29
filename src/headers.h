@@ -88,6 +88,7 @@ double cv_func_distribution_categorical_ls(double *vector_scale_factor);
 /* double cv_func_np_density_categorical_ml(double *vector_scale_factor); */
 double cv_func_regression_categorical_ls(double *vector_scale_factor);
 double cv_func_lsqregression_categorical_check(double *vector_scale_factor);
+double cv_func_regression_categorical_ks(double *vector_scale_factor);
 
 /*double erfun(double x, double small, int itmax);*/
 double erfun(double x);
@@ -366,6 +367,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define RBWM_CVAIC 0
 #define RBWM_CVLS 1
 #define RBWM_CVCHECK 2
+#define RBWM_CVKS 3
 
 #define RBW_NOBSI   0
 #define RBW_IMULTII 1

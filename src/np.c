@@ -15688,6 +15688,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   case RBWM_CVAIC : bwmfunc = cv_func_regression_categorical_aic_c; break;
   case RBWM_CVLS : bwmfunc = cv_func_regression_categorical_ls; break;
   case RBWM_CVCHECK : bwmfunc = cv_func_lsqregression_categorical_check; break;
+  case RBWM_CVKS : bwmfunc = cv_func_regression_categorical_ks; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
     bw_error_msg = "np.c: invalid bandwidth selection method.";
     goto cleanup_np_regression_bw_mode;

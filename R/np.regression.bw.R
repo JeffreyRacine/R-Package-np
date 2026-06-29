@@ -840,14 +840,17 @@ npregbw.rbandwidth <-
                                ydat,
                                bws,
                                invalid.penalty = c("baseline", "dbmax"),
-                               penalty.multiplier = 10) {
+                               penalty.multiplier = 10,
+                               objective = c("ls", "ks")) {
+  objective <- match.arg(objective)
   out <- .npregbw_call_fixed_degree_core(
     xdat = xdat,
     ydat = ydat,
     bws = bws,
     invalid.penalty = invalid.penalty,
     penalty.multiplier = penalty.multiplier,
-    eval.only = TRUE
+    eval.only = TRUE,
+    objective = objective
   )
 
   list(
@@ -885,8 +888,12 @@ npregbw.rbandwidth <-
                                             penalty.multiplier = 10,
                                             transform.bounds = FALSE,
                                             scale.factor.search.lower = NULL,
-                                            eval.only = FALSE) {
+                                            eval.only = FALSE,
+                                            objective = c("ls", "ks")) {
   invalid.penalty <- match.arg(invalid.penalty)
+  objective <- match.arg(objective)
+  if (identical(objective, "ks") && !isTRUE(eval.only))
+    stop("internal Klein-Spady regression objective is eval-only", call. = FALSE)
   scale.factor.search.lower <- npResolveScaleFactorLowerBound(
     if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
   )
@@ -962,7 +969,7 @@ npregbw.rbandwidth <-
     itmax = itmax,
     int_RESTART_FROM_MIN = if (isTRUE(remin)) RE_MIN_TRUE else RE_MIN_FALSE,
     int_MINIMIZE_IO = if (isTRUE(eval.only) || !isTRUE(getOption("np.messages"))) IO_MIN_TRUE else IO_MIN_FALSE,
-    bwmethod = switch(bws$method,
+    bwmethod = if (identical(objective, "ks")) 3L else switch(bws$method,
       cv.aic = BWM_CVAIC,
       cv.ls = BWM_CVLS),
     kerneval = switch(bws$ckertype,
