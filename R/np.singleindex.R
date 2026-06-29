@@ -140,6 +140,10 @@ npindex.formula <-
             if (!is.null(ev$bws))
                 ev$bws$ynames <- response.name
         }
+        if (!is.null(ev$bws) && inherits(bws, "formula")) {
+            ev$bws$formula <- bws
+            ev$bws$terms <- attr(tmf, "terms")
+        }
 
         ev$omit <- attr(umf,"na.action")
         ev$rows.omit <- as.vector(ev$omit)
@@ -199,6 +203,21 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       !bws.call &&
       (explicit.sibandwidth || identical(degree.select.value, "manual")))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
+  if (!explicit.sibandwidth && (bws.formula || bws.call) && !no.txdat && !no.tydat) {
+    txdat <- toFrame(txdat)
+
+    dots <- list(...)
+    bw.dots <- dots
+    bw.dots$.np_fit_progress_handoff <- NULL
+    bw.args <- c(list(xdat = txdat, ydat = tydat, nomad = nomad), bw.dots)
+    tbw <- do.call(npindexbw, bw.args)
+
+    fit.args <- list(bws = tbw, txdat = txdat, tydat = tydat)
+    fit.dots <- dots
+    fit.dots$.np_fit_progress_handoff <- TRUE
+    return(do.call(npindex, c(fit.args, fit.dots)))
+  }
 
   ## here we check to see if the function was called with tdat =
   ## if it was, we need to catch that and map it to dat =
