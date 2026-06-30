@@ -1765,14 +1765,20 @@
   if (is.null(state))
     return(state)
 
+  now <- .np_progress_now()
   state$label <- .np_nomad_powell_progress_label()
   state$unknown_total_fields <- .np_nomad_powell_progress_fields
   state$nomad_current_degree <- as.integer(degree)
   state$nomad_best_record <- best_record
+  state$started <- now
+  state$last_done <- NULL
+  state$last_emitted_done <- NULL
+  state$last_emitted_detail <- NULL
+  state$last_emit <- now - state$throttle_sec
   .np_progress_step_at(
     state = state,
-    now = .np_progress_now(),
-    done = state$last_done,
+    now = now,
+    done = NULL,
     force = TRUE
   )
 }
@@ -1813,6 +1819,7 @@
     local.state$unknown_total_fields <- .np_nomad_powell_progress_fields
     local.state$nomad_current_degree <- as.integer(degree)
     local.state$nomad_best_record <- best_record
+    local.state$nomad_nmulti <- 1L
     local.state <- .np_progress_show_now(local.state)
     .np_progress_runtime$bandwidth_state <- local.state
   } else if (isTRUE(worker_silent)) {

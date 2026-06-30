@@ -1269,6 +1269,7 @@ npindexbw.NULL <-
                                     nomad.opts = list(),
                                     source = "explicit",
                                     reason = NULL,
+                                    handoff_before_build = FALSE,
                                     progress_label = NULL) {
   if (is.null(opt.args$nomad.opts) && length(nomad.opts))
     opt.args$nomad.opts <- nomad.opts
@@ -1619,6 +1620,7 @@ npindexbw.NULL <-
     source = source,
     reason = reason,
     progress_label = progress_label,
+    handoff_before_build = isTRUE(handoff_before_build),
     nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     native.r.bridge = TRUE,
     start.lower = start.lb,
@@ -2218,6 +2220,7 @@ npindexbw.default <-
           nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
           source = degree.search$source,
           reason = degree.search$reason,
+          handoff_before_build = identical(degree.search$engine, "nomad+powell"),
           progress_label = .np_degree_search_label(degree.search$engine, degree.search$source)
         )
       }
