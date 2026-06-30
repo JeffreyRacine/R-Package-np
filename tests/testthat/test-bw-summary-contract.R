@@ -7,8 +7,8 @@ test_that("genBwSelStr suppresses unknown fast counts but prints known ones", {
 
   expect_match(s.na, "Number of Function Evaluations: 26")
   expect_false(grepl("fast =", s.na, fixed = TRUE))
-  expect_false(grepl("Fast CV route:", s.zero, fixed = TRUE))
-  expect_match(s.pos, "Fast CV route:\\s+3 of 26 function evaluations")
+  expect_true(grepl("Number of Function Evaluations: 26 (fast = 0)", s.zero, fixed = TRUE))
+  expect_true(grepl("Number of Function Evaluations: 26 (fast = 3)", s.pos, fixed = TRUE))
 })
 
 test_that("genBwSelStr prints guarded counts alongside fast counts", {
@@ -25,8 +25,15 @@ test_that("genBwSelStr prints guarded counts alongside fast counts", {
     num.feval.guarded = NA_real_
   ))
 
-  expect_match(s.guarded, "Fast CV route:\\s+3 of 26 function evaluations")
-  expect_true(grepl("Guarded evaluations: 5", s.guarded, fixed = TRUE))
-  expect_match(s.guard.na, "Fast CV route:\\s+3 of 26 function evaluations")
-  expect_false(grepl("Guarded evaluations:", s.guard.na, fixed = TRUE))
+  expect_true(grepl(
+    "Number of Function Evaluations: 26 (fast = 3, guarded = 5)",
+    s.guarded,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "Number of Function Evaluations: 26 (fast = 3)",
+    s.guard.na,
+    fixed = TRUE
+  ))
+  expect_false(grepl("guarded =", s.guard.na, fixed = TRUE))
 })

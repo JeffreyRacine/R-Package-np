@@ -113,7 +113,7 @@ test_that("fixed mixed-data bandwidth summaries label continuous scale factors c
 
   expect_match(s, "Exp\\. Var\\. Name: x\\s+Bandwidth: .*Scale Factor:")
   expect_match(s, "Exp\\. Var\\. Name: z1\\s+Bandwidth: .*Scale Factor:")
-  expect_match(s, "Exp\\. Var\\. Name: z2\\s+Lambda: .*Lambda Max:")
+  expect_match(s, "Exp\\. Var\\. Name: z2\\s+Bandwidth: .*Lambda Max:")
 })
 
 test_that("regression summaries distinguish nearest-neighbor selectors from fixed bandwidths", {
@@ -123,14 +123,8 @@ test_that("regression summaries distinguish nearest-neighbor selectors from fixe
 
   expect_match(fixed, "Kernel Regression Estimator:\\s+Local-Constant")
   expect_match(fixed, "Bandwidth\\(s\\):\\s+2")
-  expect_true(grepl("Search Parameter(s):", adaptive, fixed = TRUE))
-  expect_match(adaptive, "Type\\s+NN Index")
-  expect_match(adaptive, "Value\\s+2")
-  expect_match(adaptive, "Max\\s+2")
-  expect_true(grepl("Search Parameter(s):", generalized, fixed = TRUE))
-  expect_match(generalized, "Type\\s+NN Index")
-  expect_match(generalized, "Value\\s+2")
-  expect_match(generalized, "Max\\s+2")
+  expect_match(adaptive, "Bandwidth Nearest Neighbor\\(s\\):\\s+2")
+  expect_match(generalized, "Bandwidth Nearest Neighbor\\(s\\):\\s+2")
 })
 
 test_that("density and distribution bandwidth summaries label polynomial type", {

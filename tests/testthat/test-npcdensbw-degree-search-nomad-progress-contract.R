@@ -54,7 +54,7 @@ test_that("npcdensbw nomad+powell payload does not inject phantom multistart tot
     bwtype = "fixed",
     bwmethod = "cv.ml",
     nmulti = 2L,
-    nomad.opts = list(MAX_BB_EVAL = 20L),
+    max.bb.eval = 20L,
     cxkerbound = "range",
     cykerbound = "range"
   )
@@ -99,7 +99,7 @@ test_that("npcdensbw NOMAD plus Powell progress mirrors shared restart detail", 
         bwtype = "fixed",
         bwmethod = "cv.ml",
         nmulti = 2L,
-        nomad.opts = list(MAX_BB_EVAL = 12L),
+        max.bb.eval = 12L,
         cxkerbound = "range",
         cykerbound = "range"
       )

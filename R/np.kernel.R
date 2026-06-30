@@ -146,8 +146,21 @@ npksum.default <-
       tydat = as.matrix(tydat)
 
 #    if(class(bws) != "kbandwidth")
-    if(!isa(bws,"kbandwidth"))
-        bws = kbandwidth(bws)
+    if(!isa(bws,"kbandwidth")) {
+      if(is.numeric(bws) || is.integer(bws)) {
+        tydat.frame <- if(!miss.ty) toFrame(tydat) else NULL
+        bws = kbandwidth.numeric(
+          bw = as.numeric(bws),
+          nobs = nrow(txdat),
+          xdati = untangle(txdat),
+          ydati = if(!miss.ty) untangle(tydat.frame) else NULL,
+          xnames = names(txdat),
+          ynames = if(!miss.ty) names(tydat.frame) else NULL,
+          ...)
+      } else {
+        bws = kbandwidth(bws, ...)
+      }
+    }
 
     if (!miss.ex){
       exdat = toFrame(exdat)

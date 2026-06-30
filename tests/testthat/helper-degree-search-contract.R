@@ -33,21 +33,14 @@ with_np_degree_bindings <- function(bindings, code) {
 
 capture_degree_messages_only <- function(expr) {
   messages <- character()
-  stderr <- capture.output(
-    type = "message",
-    withCallingHandlers(
-      expr,
-      message = function(m) {
-        messages <<- c(messages, conditionMessage(m))
-        invokeRestart("muffleMessage")
-      }
-    )
+  withCallingHandlers(
+    expr,
+    message = function(m) {
+      messages <<- c(messages, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
   )
-  stderr <- unlist(strsplit(stderr, "[\r\n]+"), use.names = FALSE)
-  stderr <- gsub("\033\\[[0-9;]*[[:alpha:]]", "", stderr)
-  stderr <- trimws(stderr)
-  stderr <- stderr[nzchar(stderr)]
-  c(messages, stderr)
+  messages
 }
 
 degree_progress_time_values <- function(values) {

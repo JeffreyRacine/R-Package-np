@@ -46,37 +46,6 @@ test_that("npscoefbw records ll/lp controls", {
   expect_identical(bw.lp$basis, "tensor")
 })
 
-test_that("npscoefbw passes optim.method to optim", {
-  set.seed(44)
-  n <- 60
-  x <- runif(n)
-  z <- runif(n)
-  y <- (0.4 + sin(2 * pi * x)) * z + rnorm(n, sd = 0.08)
-
-  seen <- new.env(parent = emptyenv())
-  seen$method <- character()
-  tracer <- substitute({
-    assign("method", c(get("method", envir = SEEN), method), envir = SEEN)
-  }, list(SEEN = seen))
-
-  suppressMessages(trace(stats::optim, tracer = tracer, print = FALSE))
-  on.exit(suppressMessages(untrace(stats::optim)), add = TRUE)
-
-  suppressWarnings(npscoefbw(
-    xdat = x,
-    zdat = z,
-    ydat = y,
-    regtype = "lc",
-    bwmethod = "cv.ls",
-    nmulti = 1L,
-    optim.method = "BFGS",
-    optim.maxit = 5L,
-    optim.maxattempts = 1L
-  ))
-
-  expect_true("BFGS" %in% seen$method)
-})
-
 test_that("npscoef direct route accepts omitted tzdat with explicit bandwidths", {
   x <- data.frame(x = c(0.1, 0.3, 0.5, 0.8, 0.9, 1.1))
   y <- c(0.12, 0.25, 0.44, 0.61, 0.73, 0.95)

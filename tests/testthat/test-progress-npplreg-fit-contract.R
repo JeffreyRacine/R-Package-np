@@ -59,7 +59,7 @@ test_that("npplreg fit progress uses the bandwidth single-line surface", {
 
   expect_identical(state$surface, "bandwidth")
   expect_identical(state$renderer, "single_line")
-  expect_equal(state$total, 3L)
+  expect_equal(state$total, 2L)
 })
 
 test_that("npplreg direct bws fit emits known-total fit progress", {
@@ -87,15 +87,11 @@ test_that("npplreg direct bws fit emits known-total fit progress", {
 
   expect_s3_class(actual$value, "plregression")
   expect_true(any(grepl(
-    "^\\[np\\] Fitting partially linear regression 1/3 \\(33\\.3%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): E\\[y\\|z\\]$",
+    "^\\[np\\] Fitting partially linear regression 1/2 \\(50\\.0%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): y~z$",
     lines
   )))
   expect_true(any(grepl(
-    "^\\[np\\] Fitting partially linear regression 2/3 \\(66\\.7%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): E\\[x\\|z\\]$",
-    lines
-  )))
-  expect_true(any(grepl(
-    "^\\[np\\] Fitting partially linear regression 3/3 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\): final partially linear solve$",
+    "^\\[np\\] Fitting partially linear regression 2/2 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\): x~z$",
     lines
   )))
 })
@@ -147,19 +143,15 @@ test_that("npplreg formula bw to fit route hands off immediately into fit progre
 
   lines <- npplreg_fit_progress_lines(actual)
   fit.zero.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 0/3 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting E\\[y\\|z\\]$",
+    "^\\[np\\] Fitting partially linear regression 0/2 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting y~z$",
     lines
   )
   fit.one.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 1/3 \\(33\\.3%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): E\\[y\\|z\\]$",
+    "^\\[np\\] Fitting partially linear regression 1/2 \\(50\\.0%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): y~z$",
     lines
   )
   fit.two.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 2/3 \\(66\\.7%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): E\\[x\\|z\\]$",
-    lines
-  )
-  fit.three.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 3/3 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\): final partially linear solve$",
+    "^\\[np\\] Fitting partially linear regression 2/2 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\): x~z$",
     lines
   )
   bandwidth.pos <- grep("^\\[np\\] Bandwidth selection \\(", lines)
@@ -169,11 +161,9 @@ test_that("npplreg formula bw to fit route hands off immediately into fit progre
   expect_true(length(fit.zero.pos) == 1L)
   expect_true(length(fit.one.pos) >= 1L)
   expect_true(length(fit.two.pos) >= 1L)
-  expect_true(length(fit.three.pos) >= 1L)
   expect_lt(max(bandwidth.pos), fit.zero.pos[[1L]])
   expect_lt(fit.zero.pos[[1L]], fit.one.pos[[1L]])
   expect_lt(fit.one.pos[[1L]], fit.two.pos[[1L]])
-  expect_lt(fit.two.pos[[1L]], fit.three.pos[[1L]])
 })
 
 test_that("npplreg nomad to powell to fit route preserves single-line fit handoff", {
@@ -207,19 +197,15 @@ test_that("npplreg nomad to powell to fit route preserves single-line fit handof
 
   lines <- npplreg_fit_progress_lines(actual)
   fit.zero.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 0/3 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting E\\[y\\|z\\]$",
+    "^\\[np\\] Fitting partially linear regression 0/2 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting y~z$",
     lines
   )
   fit.one.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 1/3 \\(33\\.3%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): E\\[y\\|z\\]$",
+    "^\\[np\\] Fitting partially linear regression 1/2 \\(50\\.0%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): y~z$",
     lines
   )
   fit.two.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 2/3 \\(66\\.7%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): E\\[x\\|z\\]$",
-    lines
-  )
-  fit.three.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 3/3 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\): final partially linear solve$",
+    "^\\[np\\] Fitting partially linear regression 2/2 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\): x~z$",
     lines
   )
   powell.pos <- grep("^\\[np\\] Refining bandwidth \\(", lines)
@@ -231,10 +217,8 @@ test_that("npplreg nomad to powell to fit route preserves single-line fit handof
   expect_true(length(fit.zero.pos) == 1L)
   expect_true(length(fit.one.pos) >= 1L)
   expect_true(length(fit.two.pos) >= 1L)
-  expect_true(length(fit.three.pos) >= 1L)
   expect_lt(max(powell.pos), fit.zero.pos[[1L]])
   expect_lt(max(bandwidth.pos), fit.zero.pos[[1L]])
   expect_lt(fit.zero.pos[[1L]], fit.one.pos[[1L]])
   expect_lt(fit.one.pos[[1L]], fit.two.pos[[1L]])
-  expect_lt(fit.two.pos[[1L]], fit.three.pos[[1L]])
 })

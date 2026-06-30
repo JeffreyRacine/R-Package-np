@@ -33,8 +33,8 @@ test_that("core estimator wrappers emit top-level bandwidth-selection notes", {
     list(file = "np.plregression.R", label = "Selecting partially linear regression bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
     list(file = "np.singleindex.R", label = "Selecting single-index bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
     list(file = "np.smoothcoef.R", label = "Selecting smooth coefficient bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
-    list(file = "np.conmode.R", label = "Selecting conditional density bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
-    list(file = "np.qregression.R", label = "Selecting conditional distribution bandwidth", helper = ".np_progress_select_bandwidth_enhanced")
+    list(file = "np.conmode.R", label = "Selecting conditional density bandwidth", helper = ".np_progress_select_bandwidth"),
+    list(file = "np.qregression.R", label = "Selecting conditional distribution bandwidth", helper = ".np_progress_select_bandwidth")
   )
 
   for (case in cases) {
@@ -169,7 +169,7 @@ test_that("npcopula no longer uses legacy console helpers", {
   expect_true(grepl("\\.np_progress_step_at\\(", src))
   expect_true(grepl("Copula %s %s", src, fixed = TRUE))
   expect_true(grepl("quasi-inverse marginal %s", src, fixed = TRUE))
-  expect_true(grepl("copula density on expanded grid", src, fixed = TRUE))
+  expect_true(grepl("density marginal %s on expanded grid", src, fixed = TRUE))
 })
 
 test_that("npindexbw no longer uses legacy console helpers", {

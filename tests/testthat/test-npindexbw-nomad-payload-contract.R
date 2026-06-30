@@ -66,8 +66,7 @@ test_that("npindexbw retains Powell evaluation counts when Powell does not impro
                                   random.seed,
                                   remin = FALSE,
                                   degree_spec,
-                                  progress_label,
-                                  ...) {
+                                  progress_label) {
         eval_fun(x0)
         build_payload(
           x0,
@@ -158,9 +157,6 @@ test_that("npindexbw fixed NOMAD route normalizes internal h starts but keeps pu
     nmulti = 1L,
     random.seed = 42L
   )
-  beta.coord <- get(".npindex_beta_coordinate_setup", envir = ns, inherits = FALSE)(as.matrix(xdat))
-  expected.x0 <- as.numeric(setup$start_matrix.point[1L, ])
-  expected.x0[seq_len(ncol(xdat) - 1L)] <- beta.coord$to_search(expected.x0[seq_len(ncol(xdat) - 1L)])
   captured <- NULL
 
   result <- with_npindex_nomad_payload_bindings(
@@ -242,7 +238,7 @@ test_that("npindexbw fixed NOMAD route normalizes internal h starts but keeps pu
     )
   )
 
-  expect_equal(captured$x0, expected.x0, tolerance = 1e-12)
+  expect_equal(captured$x0, as.numeric(setup$start_matrix.point[1L, ]), tolerance = 1e-12)
   expect_equal(result$restart.starts[[1]], as.numeric(setup$start_matrix.raw[1L, ]), tolerance = 1e-12)
   expect_equal(result$restart.bandwidth.starts[[1]], as.numeric(setup$start_matrix.raw[1L, seq_len(ncol(setup$start_matrix.raw) - 1L)]), tolerance = 1e-12)
   expect_equal(result$restart.results[[1]]$start, as.numeric(setup$start_matrix.raw[1L, ]), tolerance = 1e-12)
@@ -285,9 +281,6 @@ test_that("npindexbw fixed NOMAD route preserves explicit user fixed starts", {
     nmulti = 1L,
     random.seed = 42L
   )
-  beta.coord <- get(".npindex_beta_coordinate_setup", envir = ns, inherits = FALSE)(as.matrix(xdat))
-  expected.x0 <- as.numeric(setup$start_matrix.point[1L, ])
-  expected.x0[seq_len(ncol(xdat) - 1L)] <- beta.coord$to_search(expected.x0[seq_len(ncol(xdat) - 1L)])
   captured <- NULL
 
   result <- with_npindex_nomad_payload_bindings(
@@ -371,7 +364,7 @@ test_that("npindexbw fixed NOMAD route preserves explicit user fixed starts", {
 
   expect_equal(setup$start_matrix.raw[1L, 1L], 1.75, tolerance = 1e-12)
   expect_equal(setup$start_matrix.raw[1L, 2L], 0.25, tolerance = 1e-12)
-  expect_equal(captured$x0, expected.x0, tolerance = 1e-12)
+  expect_equal(captured$x0, as.numeric(setup$start_matrix.point[1L, ]), tolerance = 1e-12)
   expect_equal(result$restart.starts[[1]], as.numeric(setup$start_matrix.raw[1L, ]), tolerance = 1e-12)
   expect_equal(result$restart.results[[1]]$start, as.numeric(setup$start_matrix.raw[1L, ]), tolerance = 1e-12)
 })

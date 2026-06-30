@@ -38,10 +38,10 @@ test_that("npplregbw uses coordinated generic bandwidth selection progress", {
   lines <- shadow_lines(actual)
 
   expect_s3_class(actual$value, "plbandwidth")
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(E\\[y\\|z\\], multistart 1/2\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(E\\[y\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(E\\[x\\|z\\], multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(E\\[x\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(y~z, multistart 1/2\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(y~z, multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(x1~z, multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(x1~z, multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
 })
 
 test_that("npplreg formula entry inherits coordinated generic bandwidth progress", {
@@ -70,7 +70,7 @@ test_that("npplreg formula entry inherits coordinated generic bandwidth progress
   lines <- shadow_lines(actual)
 
   expect_s3_class(actual$value, "plregression")
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(E\\[y\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(E\\[x\\|z\\], multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(E\\[x\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(y~z, multistart 1/2\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(x1~z, multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(x1~z, multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
 })
