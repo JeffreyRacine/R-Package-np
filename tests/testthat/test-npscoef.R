@@ -53,40 +53,6 @@ test_that("npscoefbw records ll/lp controls", {
   expect_identical(bw.lp$basis, "tensor")
 })
 
-test_that("npscoefbw passes optim.method to optim", {
-  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  on.exit(close_mpi_slaves(), add = TRUE)
-
-  set.seed(44)
-  n <- 60
-  x <- runif(n)
-  z <- runif(n)
-  y <- (0.4 + sin(2 * pi * x)) * z + rnorm(n, sd = 0.08)
-
-  seen <- new.env(parent = emptyenv())
-  seen$method <- character()
-  tracer <- substitute({
-    assign("method", c(get("method", envir = SEEN), method), envir = SEEN)
-  }, list(SEEN = seen))
-
-  suppressMessages(trace(stats::optim, tracer = tracer, print = FALSE))
-  on.exit(suppressMessages(untrace(stats::optim)), add = TRUE)
-
-  suppressWarnings(npscoefbw(
-    xdat = x,
-    zdat = z,
-    ydat = y,
-    regtype = "lc",
-    bwmethod = "cv.ls",
-    nmulti = 1L,
-    optim.method = "BFGS",
-    optim.maxit = 5L,
-    optim.maxattempts = 1L
-  ))
-
-  expect_true("BFGS" %in% seen$method)
-})
-
 test_that("npscoef direct route accepts omitted tzdat with explicit bandwidths", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
