@@ -289,18 +289,72 @@ npreghat <-
     ks <- out$ksum
     ps <- out$p.ksum
 
-    ks <- if (is.null(dim(ks))) {
-      matrix(ks, nrow = ib + 1L, ncol = neval)
-    } else {
-      as.matrix(ks)
+    expected.block.dim <- c(ib + 1L, neval)
+    format_block_dim <- function(x) {
+      d <- dim(x)
+      if (is.null(d))
+        return(sprintf("vector[%d]", length(x)))
+      paste(d, collapse = "x")
     }
-    ps <- if (is.null(dim(ps))) {
-      matrix(ps, nrow = ib + 1L, ncol = neval)
-    } else if (length(dim(ps)) == 3L && dim(ps)[3L] == 1L) {
-      ps[, , 1L, drop = TRUE]
-    } else {
-      as.matrix(ps)
+    block_matrix <- function(x, label) {
+      if (is.null(x))
+        stop(sprintf("lc derivative %s block is NULL", label), call. = FALSE)
+      d <- dim(x)
+      if (is.null(d)) {
+        if (length(x) != prod(expected.block.dim))
+          stop(sprintf(
+            "lc derivative %s block has length %d; expected %dx%d",
+            label,
+            length(x),
+            expected.block.dim[1L],
+            expected.block.dim[2L]
+          ), call. = FALSE)
+        x <- matrix(x, nrow = expected.block.dim[1L], ncol = expected.block.dim[2L])
+      } else if (length(d) == 2L) {
+        x <- as.matrix(x)
+      } else {
+        stop(sprintf(
+          "lc derivative %s block has dimensions %s; expected %dx%d",
+          label,
+          format_block_dim(x),
+          expected.block.dim[1L],
+          expected.block.dim[2L]
+        ), call. = FALSE)
+      }
+      if (!identical(as.integer(dim(x)), as.integer(expected.block.dim)))
+        stop(sprintf(
+          "lc derivative %s block has dimensions %s; expected %dx%d",
+          label,
+          format_block_dim(x),
+          expected.block.dim[1L],
+          expected.block.dim[2L]
+        ), call. = FALSE)
+      x
     }
+    derivative_block_matrix <- function(x) {
+      if (is.null(x))
+        stop("lc derivative p.ksum block is NULL", call. = FALSE)
+      d <- dim(x)
+      if (is.null(d))
+        return(block_matrix(x, "p.ksum"))
+      if (length(d) == 3L) {
+        if (d[3L] < target.cont)
+          stop(sprintf(
+            "lc derivative p.ksum tensor has third dimension %d but target continuous coordinate is %d",
+            d[3L],
+            target.cont
+          ), call. = FALSE)
+        x <- matrix(
+          x[, , target.cont, drop = FALSE],
+          nrow = d[1L],
+          ncol = d[2L]
+        )
+      }
+      block_matrix(x, "p.ksum")
+    }
+
+    ks <- block_matrix(ks, "ksum")
+    ps <- derivative_block_matrix(ps)
 
     sk <- ks[nrow(ks), ]
     dsk <- ps[nrow(ps), ]
@@ -1391,15 +1445,16 @@ npreghat.rbandwidth <-
       lp.degree0.lc.derivative.route ||
       (any(s > 0L) && all(reg.spec$degree.engine == 1L))
 
+    lc.derivative.exact.route <- identical(regtype, "lc") &&
+      first.derivative.request
+
     direct.apply <- identical(output, "apply") &&
       !is.null(y) &&
       !isTRUE(leave.one.out) &&
       (ncol(y) == 1L) &&
       simple.operator.request &&
-      direct.apply.compatible
-
-    lc.derivative.exact.route <- identical(regtype, "lc") &&
-      first.derivative.request
+      direct.apply.compatible &&
+      !lc.derivative.exact.route
 
     exact.lc.kernel.route <- !isTRUE(leave.one.out) &&
       !any(s > 0L) &&
