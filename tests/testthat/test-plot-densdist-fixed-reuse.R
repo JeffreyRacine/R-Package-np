@@ -178,13 +178,13 @@ test_that("fixed conditional density/distribution helper matches explicit refits
       expect_equal(
         dens.fast$t,
         dens.oracle$t,
-        tolerance = 1e-10,
+        tolerance = 1e-12,
         info = paste("density oracle", cfg$name)
       )
       expect_equal(
         dist.fast$t,
         dist.oracle$t,
-        tolerance = 1e-10,
+        tolerance = 1e-12,
         info = paste("distribution oracle", cfg$name)
       )
     expect_equal(
@@ -245,13 +245,13 @@ test_that("fixed conditional density/distribution helper matches explicit refits
       expect_equal(
         dens.fast.drawer$t,
         dens.oracle.drawer$t,
-        tolerance = 1e-10,
+        tolerance = 1e-12,
         info = paste("density drawer oracle", cfg$name)
       )
       expect_equal(
         dist.fast.drawer$t,
         dist.oracle.drawer$t,
-        tolerance = 1e-10,
+        tolerance = 1e-12,
         info = paste("distribution drawer oracle", cfg$name)
       )
     expect_equal(
@@ -356,9 +356,9 @@ test_that("fixed conditional ll/lp grouped inid helper matches the rowwise oracl
       counts = counts
     )
 
-    expect_equal(dens.fast$t, dens.oracle$t, tolerance = 1e-10, info = paste("density repeated-x oracle", cfg$name))
+    expect_equal(dens.fast$t, dens.oracle$t, tolerance = 1e-12, info = paste("density repeated-x oracle", cfg$name))
     expect_equal(dens.fast$t0, dens.oracle$t0, tolerance = 1e-10, info = paste("density repeated-x oracle t0", cfg$name))
-    expect_equal(dist.fast$t, dist.oracle$t, tolerance = 1e-10, info = paste("distribution repeated-x oracle", cfg$name))
+    expect_equal(dist.fast$t, dist.oracle$t, tolerance = 1e-12, info = paste("distribution repeated-x oracle", cfg$name))
     expect_equal(dist.fast$t0, dist.oracle$t0, tolerance = 1e-10, info = paste("distribution repeated-x oracle t0", cfg$name))
   }
 })

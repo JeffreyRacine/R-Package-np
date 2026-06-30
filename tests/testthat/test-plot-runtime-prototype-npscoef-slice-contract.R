@@ -139,7 +139,7 @@ test_that("npscoef fixed asymptotic plot-data prototype matches current route", 
       zdat = z,
       ydat = y,
       neval = 6L,
-      plot.errors.type = band
+      band = band
     )
     stages <- proto(
       bw,
@@ -147,7 +147,7 @@ test_that("npscoef fixed asymptotic plot-data prototype matches current route", 
       zdat = z,
       ydat = y,
       neval = 6L,
-      plot.errors.type = band,
+      band = band,
       return.stages = TRUE
     )
 
@@ -213,10 +213,10 @@ test_that("npscoef fixed bootstrap plot-data prototype matches current route", {
       zdat = z,
       ydat = y,
       neval = 5L,
-      plot.errors.boot.method = method,
-      plot.errors.boot.num = 11L,
-      plot.errors.center = center,
-      plot.errors.type = "pointwise"
+      bootstrap = method,
+      B = 11L,
+      center = center,
+      band = "pointwise"
     ))
     set.seed(boot.seed)
     stages <- suppressWarnings(proto(
@@ -225,10 +225,10 @@ test_that("npscoef fixed bootstrap plot-data prototype matches current route", {
       zdat = z,
       ydat = y,
       neval = 5L,
-      plot.errors.boot.method = method,
-      plot.errors.boot.num = 11L,
-      plot.errors.center = center,
-      plot.errors.type = "pointwise",
+      bootstrap = method,
+      B = 11L,
+      center = center,
+      band = "pointwise",
       return.stages = TRUE
     ))
 

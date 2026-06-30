@@ -170,8 +170,8 @@ npreg.rbandwidth <-
     dots <- list(...)
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     if ("remin" %in% names(dots)) {
-      .np_warning("npreg: bandwidth-selection argument 'remin' is ignored when a bandwidth object is supplied",
-                  call. = FALSE)
+      warning("npreg: bandwidth-selection argument 'remin' is ignored when a bandwidth object is supplied",
+              call. = FALSE)
       dots$remin <- NULL
     }
     npRejectLegacyLpArgs(names(dots), where = "npreg")

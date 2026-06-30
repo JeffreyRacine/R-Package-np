@@ -497,7 +497,7 @@
   if ((identical(method, "exhaustive") || isTRUE(verify)) &&
       is.finite(warn_threshold) &&
       (grid.size > warn_threshold)) {
-    .np_warning(
+    warning(
       sprintf(
         "exhaustive degree search will evaluate %s degree combinations; this may take considerable time",
         format(grid.size, scientific = FALSE, trim = TRUE)

@@ -36,7 +36,7 @@ test_that("conditional helper labels carry target context for block bootstrap ph
     captured$progress <- c(captured$progress, progress.label)
     list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
   }, ns = "np")
-  assignInNamespace(".np_plot_bootstrap_interval_summary", function(boot.t, t0, alpha, band.type, progress.label = NULL, reference = t0, ...) {
+  assignInNamespace(".np_plot_bootstrap_interval_summary", function(boot.t, t0, alpha, band.type, progress.label = NULL) {
     captured$interval <- c(captured$interval, progress.label)
     list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
   }, ns = "np")
@@ -55,7 +55,7 @@ test_that("conditional helper labels carry target context for block bootstrap ph
     yndim = 1L,
     xnames = c("x1", "x2"),
     ynames = "y",
-    xdati = list(icon = c(TRUE, TRUE)),
+    xdati = list(),
     ydati = list()
   )
 

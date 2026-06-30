@@ -360,7 +360,7 @@ test_that("npindexbw automatic degree search emits staged progress output", {
     )
   )
 
-  expect_true(any(grepl("Exhaustive degree/bw 0/", msgs) & grepl("best (0)", msgs, fixed = TRUE)))
+  expect_true(any(grepl("Automatic polynomial degree search baseline \\(0\\)", msgs)))
   expect_true(any(grepl("(Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", msgs)))
   expect_true(any(grepl("exhaustive", msgs)))
   expect_true(any(grepl("best (", msgs, fixed = TRUE)))

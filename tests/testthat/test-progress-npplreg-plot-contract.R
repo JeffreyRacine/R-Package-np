@@ -20,7 +20,7 @@ test_that("partially linear helper labels carry target context for bootstrap pha
     captured$progress <- c(captured$progress, progress.label)
     list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
   }, ns = "np")
-  assignInNamespace(".np_plot_bootstrap_interval_summary", function(boot.t, t0, alpha, band.type, progress.label = NULL, reference = t0, ...) {
+  assignInNamespace(".np_plot_bootstrap_interval_summary", function(boot.t, t0, alpha, band.type, progress.label = NULL) {
     captured$interval <- c(captured$interval, progress.label)
     list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
   }, ns = "np")
@@ -64,3 +64,4 @@ test_that("partially linear helper labels carry target context for bootstrap pha
   expect_true(any(grepl("Plot bootstrap \\(z 2/2\\)", captured$progress)))
   expect_true(any(grepl("Constructing bootstrap all bands \\(z 2/2\\)", captured$interval)))
 })
+

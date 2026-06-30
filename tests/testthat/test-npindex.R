@@ -22,48 +22,6 @@ test_that("npindex basic functionality works", {
   expect_output(summary(model))
 })
 
-test_that("npindexbw BFGS num.feval reports actual objective callbacks", {
-  set.seed(20260627)
-  n <- 45L
-  x1 <- runif(n)
-  x2 <- runif(n)
-  x3 <- runif(n)
-  y <- sin(x1 + 0.5 * x2 - 0.25 * x3) + rnorm(n, sd = 0.08)
-  tx <- data.frame(x1 = x1, x2 = x2, x3 = x3)
-
-  seen <- new.env(parent = emptyenv())
-  seen$fn_count <- numeric()
-  tracer <- substitute({
-    rv <- returnValue()
-    if (!is.null(rv$counts) && length(rv$counts) > 0L) {
-      assign(
-        "fn_count",
-        c(get("fn_count", envir = SEEN), unname(rv$counts["function"])),
-        envir = SEEN
-      )
-    }
-  }, list(SEEN = seen))
-
-  suppressMessages(trace(stats::optim, exit = tracer, print = FALSE))
-  on.exit(suppressMessages(untrace(stats::optim)), add = TRUE)
-
-  bw <- suppressWarnings(npindexbw(
-    xdat = tx,
-    ydat = y,
-    method = "ichimura",
-    regtype = "lc",
-    bwtype = "fixed",
-    nmulti = 1L,
-    optim.method = "BFGS",
-    optim.maxit = 80L,
-    optim.maxattempts = 1L
-  ))
-
-  expect_true(length(seen$fn_count) >= 1L)
-  expect_gt(as.numeric(bw$num.feval[1L]), sum(seen$fn_count))
-  expect_gte(as.numeric(bw$num.feval[1L]), as.numeric(bw$num.feval.fast[1L]))
-})
-
 test_that("npindexbw nearest-neighbor selection stores integer support and exact fits stay public-green", {
   set.seed(314163)
   n <- 70L

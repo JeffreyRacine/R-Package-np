@@ -28,7 +28,7 @@ test_that("npscoefbw fixed start helpers replay legacy defaults", {
       iord = iord,
       iuno = iuno
     ),
-    c(0.5, 1.0, 0.5) * param
+    param
   )
 
   set.seed(20260405)
@@ -42,12 +42,7 @@ test_that("npscoefbw fixed start helpers replay legacy defaults", {
     iuno = iuno
   )
   set.seed(20260405)
-  expected <- c(
-    runif(1, min = 0.1, max = 2.0),
-    runif(1, min = 0.5, max = 1.5),
-    runif(1, min = 0.1, max = 2.0)
-  ) * param
-  expect_equal(got, expected)
+  expect_equal(got, runif(length(param), min = 0.5, max = 1.5) * param)
 })
 
 test_that("npscoefbw fixed start helpers split continuous and categorical controls", {

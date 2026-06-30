@@ -48,7 +48,7 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
       bwmethod = "cv.ls",
       nmulti = 2L,
       ngrid = 30L,
-      nomad.opts = list(MAX_BB_EVAL = 8L)
+      max.bb.eval = 8L
     ),
     npplregbw = function() np::npplregbw(
       xdat = x,
@@ -64,7 +64,7 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
       bwtype = "fixed",
       bwmethod = "cv.ls",
       nmulti = 2L,
-      nomad.opts = list(MAX_BB_EVAL = 8L)
+      max.bb.eval = 8L
     ),
     npscoefbw = function() np::npscoefbw(
       xdat = x,
@@ -80,7 +80,7 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
       bwtype = "fixed",
       bwmethod = "cv.ls",
       nmulti = 2L,
-      nomad.opts = list(MAX_BB_EVAL = 8L)
+      max.bb.eval = 8L
     ),
     npindexbw = function() np::npindexbw(
       xdat = data.frame(x1 = x$x, x2 = z$z),
@@ -96,7 +96,7 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
       degree.verify = FALSE,
       bwtype = "fixed",
       nmulti = 2L,
-      nomad.opts = list(MAX_BB_EVAL = 8L)
+      max.bb.eval = 8L
     )
   )
 
