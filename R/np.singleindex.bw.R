@@ -1092,6 +1092,7 @@ npindexbw.NULL <-
     remin = isTRUE(opt.args$nomad.remin),
     nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     native.r.bridge = TRUE,
+    handoff_before_build = identical(degree.search$engine, "nomad+powell"),
     start.lower = start.lb,
     start.upper = start.ub,
     coordinate.roles = coordinate.roles,
