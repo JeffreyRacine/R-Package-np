@@ -191,3 +191,44 @@ test_that("lp gradient owner/apply routing covers degree-zero and heterogeneous 
   check_apply_contract(degree = c(0L, 0L), s = c(1L, 0L))
   check_apply_contract(degree = c(1L, 0L), s = c(1L, 0L))
 })
+
+test_that("tree-disabled higher-degree lp scalar apply routes through exact matrix contract", {
+  old_tree <- getOption("np.tree")
+  options(np.tree = FALSE)
+  on.exit(options(np.tree = old_tree), add = TRUE)
+
+  set.seed(20260630)
+  n <- 24L
+  x1 <- runif(n, -1, 1)
+  x2 <- runif(n, -1, 1)
+  f <- factor(sample(letters[1:3], n, replace = TRUE))
+  tx <- data.frame(x1 = x1, x2 = x2, f = f)
+  eta <- x1 + 0.5 * x2 + 0.2 * (as.integer(f) - 2L)
+  y <- sin(eta) + 0.15 * eta^2
+
+  check_scalar_apply_contract <- function(degree, s, tol = 1e-9) {
+    bw <- npregbw(
+      xdat = tx,
+      ydat = y,
+      regtype = "lp",
+      degree = degree,
+      bwtype = "generalized_nn",
+      bws = c(9, 9, 0.5),
+      bandwidth.compute = FALSE
+    )
+
+    H <- unclass(npreghat(bws = bw, txdat = tx, output = "matrix", s = s))
+    a <- npreghat(
+      bws = bw,
+      txdat = tx,
+      y = matrix(y, ncol = 1L),
+      output = "apply",
+      s = s
+    )
+
+    expect_equal(as.vector(a), as.vector(H %*% y), tolerance = tol)
+  }
+
+  check_scalar_apply_contract(degree = c(2L, 2L), s = c(0L, 0L))
+  check_scalar_apply_contract(degree = c(2L, 2L), s = c(1L, 0L))
+})
