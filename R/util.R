@@ -815,6 +815,77 @@ npGlpDegree0FirstDerivativeLcOk <- function(regtype.engine,
     all(gradient.order == 1L)
 }
 
+npGlpGradientAvailability <- function(regtype.engine,
+                                      degree.engine,
+                                      gradient.order,
+                                      ncon,
+                                      allow.lp0.lc.first = TRUE) {
+  if (!identical(regtype.engine, "lp") || ncon == 0L)
+    return(rep.int(TRUE, ncon))
+
+  degree.engine <- as.integer(degree.engine)
+  gradient.order <- as.integer(gradient.order)
+
+  if (length(degree.engine) != ncon || length(gradient.order) != ncon)
+    return(rep.int(FALSE, ncon))
+
+  available <- gradient.order <= degree.engine
+  if (isTRUE(allow.lp0.lc.first) &&
+      npGlpDegree0FirstDerivativeLcOk(
+        regtype.engine = regtype.engine,
+        degree.engine = degree.engine,
+        gradient.order = gradient.order,
+        ncon = ncon
+      )) {
+    available[] <- TRUE
+  }
+
+  available
+}
+
+npGlpGradientUnavailableSummary <- function(degree.engine,
+                                            gradient.order,
+                                            available,
+                                            con.names = NULL) {
+  bad <- which(!available)
+  if (!length(bad))
+    return(character(0))
+
+  if (is.null(con.names) || length(con.names) != length(available)) {
+    con.names <- paste0("continuous[", seq_along(available), "]")
+  }
+
+  sprintf("%s (requested order %d, degree %d)",
+          con.names[bad],
+          as.integer(gradient.order)[bad],
+          as.integer(degree.engine)[bad])
+}
+
+npWarnGlpGradientPartialAvailability <- function(where,
+                                                 degree.engine,
+                                                 gradient.order,
+                                                 available,
+                                                 con.names = NULL) {
+  unavailable <- npGlpGradientUnavailableSummary(
+    degree.engine = degree.engine,
+    gradient.order = gradient.order,
+    available = available,
+    con.names = con.names
+  )
+  if (!length(unavailable))
+    return(invisible(NULL))
+
+  .np_warning(
+    where,
+    ": requested derivative order would exceed polynomial degree or is unavailable for ",
+    paste(unavailable, collapse = ", "),
+    "; returning NA for unavailable gradient component(s)",
+    call. = FALSE
+  )
+
+  invisible(NULL)
+}
+
 npValidateGlpGradientDegree <- function(regtype.engine,
                                         degree.engine,
                                         gradient.order,

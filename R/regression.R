@@ -127,15 +127,23 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
   stored.order <- npValidateGlpGradientOrder(regtype = x$bws$regtype,
                                              gradient.order = stored.order,
                                              ncon = x$bws$ncon)
-  npValidateGlpGradientDegree(
+  available <- npGlpGradientAvailability(
     regtype.engine = x$bws$regtype,
     degree.engine = x$bws$degree,
     gradient.order = gorder,
-    ncon = x$bws$ncon,
-    where = "gradients.npregression"
+    ncon = x$bws$ncon
   )
+  if (any(!available)) {
+    npWarnGlpGradientPartialAvailability(
+      where = "gradients.npregression",
+      degree.engine = x$bws$degree,
+      gradient.order = gorder,
+      available = available,
+      con.names = x$bws$xnames[x$bws$icon]
+    )
+  }
   if (length(gorder)) {
-    defined.request <- (gorder <= x$bws$degree)
+    defined.request <- available
     if (any(defined.request & (gorder != stored.order))) {
       stop("requested gradient.order differs from the derivative order stored in this npregression object; refit or predict/evaluate with gradients=TRUE and the desired gradient.order",
            call. = FALSE)
@@ -146,15 +154,7 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
   gout.masked[,] <- NA_real_
   cont.idx <- which(x$bws$icon)
   if (length(cont.idx)) {
-    lp.degree0.lc.gradient <- npGlpDegree0FirstDerivativeLcOk(
-      regtype.engine = x$bws$regtype,
-      degree.engine = x$bws$degree,
-      gradient.order = gorder,
-      ncon = x$bws$ncon
-    )
-    keep.cont <- (gorder <= x$bws$degree)
-    if (lp.degree0.lc.gradient)
-      keep.cont[] <- TRUE
+    keep.cont <- available
     if (any(keep.cont)) {
       keep.idx <- cont.idx[keep.cont]
       gout.masked[, keep.idx] <- gout[, keep.idx, drop = FALSE]

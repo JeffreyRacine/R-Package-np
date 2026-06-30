@@ -923,6 +923,24 @@ npreghat <-
       gradient.order = glp.gradient.order,
       ncon = bws$ncon
     )
+  glp.gradient.available <- NULL
+  glp.gradient.partial <- FALSE
+  if (isTRUE(gradients) &&
+      identical(reg.spec$regtype.engine, "lp") &&
+      (bws$ncon > 0L)) {
+    glp.gradient.available <- npGlpGradientAvailability(
+      regtype.engine = reg.spec$regtype.engine,
+      degree.engine = reg.spec$degree.engine,
+      gradient.order = glp.gradient.order,
+      ncon = bws$ncon
+    )
+    if (!any(glp.gradient.available)) {
+      stop(".np_regression_direct has no available derivative components for the requested gradient.order and fitted polynomial degree",
+           call. = FALSE)
+    }
+    glp.gradient.partial <- !lp.degree0.lc.gradient &&
+      any(!glp.gradient.available)
+  }
   if (isTRUE(gradients) &&
       identical(reg.spec$regtype.engine, "lp") &&
       (bws$ncon > 0L) &&
@@ -930,7 +948,9 @@ npreghat <-
       all(reg.spec$degree.engine == 0L)) {
     stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
   }
-  if (isTRUE(gradients) && identical(reg.spec$regtype.engine, "lp")) {
+  if (isTRUE(gradients) &&
+      identical(reg.spec$regtype.engine, "lp") &&
+      !glp.gradient.partial) {
     npValidateGlpGradientDegree(
       regtype.engine = reg.spec$regtype.engine,
       degree.engine = reg.spec$degree.engine,
@@ -980,6 +1000,7 @@ npreghat <-
     (bws$ncon > 0L)
   txdat.frame <- txdat
   exdat.frame <- if (no.ex) NULL else exdat
+  do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
 
   txdat <- adjustLevels(txdat, bws$xdati)
   if (!no.ex) {
@@ -1050,6 +1071,7 @@ npreghat <-
     int_do_tree = .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
     old.reg = FALSE
   )
+  myopti$do_grad <- do.compiled.gradients
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
@@ -1082,7 +1104,7 @@ npreghat <-
     as.integer(npLpBasisCode(reg.spec$basis.engine)),
     as.integer(enrow),
     as.integer(ncol.x),
-    as.logical(gradients),
+    as.logical(do.compiled.gradients),
     as.double(cker.bounds.c$lb),
     as.double(cker.bounds.c$ub),
     PACKAGE = "npRmpi"
@@ -1100,7 +1122,7 @@ npreghat <-
 
   out <- list(mean = mean.out)
 
-  if (gradients) {
+  if (gradients && !glp.gradient.partial) {
     grad <- matrix(data = myout$g, nrow = enrow, ncol = ncol.x, byrow = FALSE)
     rorder <- numeric(ncol.x)
     ord.idx <- seq_len(ncol.x)
@@ -1117,6 +1139,17 @@ npreghat <-
     }
 
     out$grad <- grad
+  } else if (gradients) {
+    out$grad <- .npreg_glp_partial_gradients_from_npreghat(
+      bws = bws,
+      txdat = txdat.frame,
+      tydat = tydat,
+      exdat = exdat.frame,
+      gradient.order = glp.gradient.order,
+      available = glp.gradient.available,
+      nrow.eval = enrow,
+      ncol.x = ncol.x
+    )
   }
 
   out
@@ -1439,6 +1472,12 @@ npreghat.rbandwidth <-
         gradient.order = rep.int(1L, ncon),
         ncon = ncon
       )
+
+    if (identical(reg.spec$regtype.engine, "lp") &&
+        any(s > reg.spec$degree.engine) &&
+        !lp.degree0.lc.derivative.route) {
+      stop("requested derivative order in 's' exceeds local polynomial degree")
+    }
 
     direct.apply.compatible <- !identical(reg.spec$regtype.engine, "lp") ||
       (!any(s > 0L) && all(reg.spec$degree.engine <= 1L)) ||

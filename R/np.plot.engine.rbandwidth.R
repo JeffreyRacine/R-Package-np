@@ -213,13 +213,25 @@
                                        ncon = bws$ncon)
       if (length(go))
         plot.gradient.order.label[which(bws$icon)] <- go
-      npValidateGlpGradientDegree(
+      available <- npGlpGradientAvailability(
         regtype.engine = bws$regtype,
         degree.engine = bws$degree,
         gradient.order = go,
-        ncon = bws$ncon,
-        where = "plot.rbandwidth()"
+        ncon = bws$ncon
       )
+      if (!any(available)) {
+        stop("plot.rbandwidth() has no available derivative components for the requested gradient.order and fitted polynomial degree",
+             call. = FALSE)
+      }
+      if (any(!available)) {
+        npWarnGlpGradientPartialAvailability(
+          where = "plot.rbandwidth()",
+          degree.engine = bws$degree,
+          gradient.order = go,
+          available = available,
+          con.names = bws$xnames[bws$icon]
+        )
+      }
     }
 
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
