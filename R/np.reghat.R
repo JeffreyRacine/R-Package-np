@@ -1171,11 +1171,26 @@ npreghat.rbandwidth <-
     first.derivative.request <- (sum(s) == 1L) && all(s %in% c(0L, 1L))
     simple.operator.request <- (sum(s) == 0L) || first.derivative.request
 
+    lp.degree0.lc.derivative.route <- identical(regtype, "lp") &&
+      first.derivative.request &&
+      npGlpDegree0FirstDerivativeLcOk(
+        regtype.engine = reg.spec$regtype.engine,
+        degree.engine = reg.spec$degree.engine,
+        gradient.order = rep.int(1L, ncon),
+        ncon = ncon
+      )
+
+    direct.apply.compatible <- !any(s > 0L) ||
+      !identical(reg.spec$regtype.engine, "lp") ||
+      lp.degree0.lc.derivative.route ||
+      all(reg.spec$degree.engine >= 1L)
+
     direct.apply <- identical(output, "apply") &&
       !is.null(y) &&
       !isTRUE(leave.one.out) &&
       (ncol(y) == 1L) &&
-      simple.operator.request
+      simple.operator.request &&
+      direct.apply.compatible
 
     lc.derivative.exact.route <- identical(regtype, "lc") &&
       first.derivative.request
@@ -1194,6 +1209,7 @@ npreghat.rbandwidth <-
       simple.operator.request &&
       identical(regtype, "lp") &&
       identical(reg.spec$regtype.engine, "lp") &&
+      !lp.degree0.lc.derivative.route &&
       (bws$ncon > 0L)
 
     exact.core.route <- !isTRUE(leave.one.out) &&
@@ -1202,6 +1218,7 @@ npreghat.rbandwidth <-
         exact.lc.kernel.route ||
         exact.ll.kernel.route ||
         exact.lp.kernel.route ||
+        lp.degree0.lc.derivative.route ||
         lc.derivative.exact.route ||
         FALSE
       )
@@ -1272,7 +1289,14 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- if (lc.derivative.exact.route) {
+      H <- if (lp.degree0.lc.derivative.route) {
+        .npreghat_exact_matrix_from_core(
+          bws = bws,
+          txdat = txdat,
+          exdat = if (no.ex) NULL else exdat,
+          s = s
+        )
+      } else if (lc.derivative.exact.route) {
         .npreghat_exact_lc_derivative_matrix_from_npksum_chunked(
           bws = bws,
           txdat = txdat,

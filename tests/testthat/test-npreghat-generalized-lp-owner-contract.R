@@ -144,3 +144,50 @@ test_that("generalized higher-degree lp derivative owner matches npreg on evalua
            s = c(1L, 0L),
            basis = "tensor")
 })
+
+test_that("lp gradient owner/apply routing covers degree-zero and heterogeneous degrees", {
+  set.seed(20260630)
+  n <- 18L
+  x1 <- runif(n, -1, 1)
+  x2 <- runif(n, -1, 1)
+  f <- factor(sample(letters[1:3], n, replace = TRUE))
+  tx <- data.frame(x1 = x1, x2 = x2, f = f)
+  eta <- x1 + 0.5 * x2 + 0.2 * (as.integer(f) - 2L)
+  y1 <- sin(eta) + 0.15 * eta^2
+  y2 <- cos(eta) + seq_len(n) / (10 * n)
+  Y <- cbind(y1 = y1, y2 = y2)
+
+  check_apply_contract <- function(degree, s, tol = 1e-9) {
+    bw <- npregbw(
+      xdat = tx,
+      ydat = y1,
+      regtype = "lp",
+      degree = degree,
+      bwtype = "generalized_nn",
+      bws = c(7, 7, 0.5),
+      bandwidth.compute = FALSE
+    )
+
+    H <- unclass(npreghat(bws = bw, txdat = tx, s = s))
+    a1 <- npreghat(
+      bws = bw,
+      txdat = tx,
+      y = matrix(y1, ncol = 1L),
+      output = "apply",
+      s = s
+    )
+    a2 <- npreghat(
+      bws = bw,
+      txdat = tx,
+      y = Y,
+      output = "apply",
+      s = s
+    )
+
+    expect_equal(as.vector(a1), as.vector(H %*% y1), tolerance = tol)
+    expect_equal(unname(as.matrix(a2)), unname(H %*% Y), tolerance = tol)
+  }
+
+  check_apply_contract(degree = c(0L, 0L), s = c(1L, 0L))
+  check_apply_contract(degree = c(1L, 0L), s = c(1L, 0L))
+})
