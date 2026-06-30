@@ -75,6 +75,103 @@ npreghat <-
   as.integer(s)
 }
 
+.npreghat_operator_spec <- function(bws,
+                                    degree = NULL,
+                                    basis = NULL,
+                                    bernstein.basis = NULL,
+                                    s = NULL,
+                                    deriv = NULL,
+                                    con.names = NULL) {
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  ncon <- bws$ncon
+  if (is.null(con.names) || length(con.names) != ncon) {
+    con.names <- if (!is.null(bws$xnames)) {
+      bws$xnames[which(bws$icon)]
+    } else {
+      paste0("continuous[", seq_len(ncon), "]")
+    }
+  }
+
+  degree <- if (identical(regtype, "lc")) {
+    rep.int(0L, ncon)
+  } else if (identical(regtype, "ll")) {
+    rep.int(1L, ncon)
+  } else {
+    npValidateGlpDegree(regtype = "lp",
+                        degree = if (is.null(degree)) bws$degree else degree,
+                        ncon = ncon)
+  }
+
+  basis <- npValidateLpBasis(
+    regtype = "lp",
+    basis = if (is.null(basis)) {
+      if (is.null(bws$basis)) "glp" else bws$basis
+    } else {
+      basis
+    }
+  )
+
+  bernstein.basis <- npValidateGlpBernstein(
+    regtype = "lp",
+    bernstein.basis = if (is.null(bernstein.basis)) {
+      isTRUE(bws$bernstein.basis)
+    } else {
+      bernstein.basis
+    }
+  )
+
+  s <- .npreghat_resolve_s(s = s, deriv = deriv, ncon = ncon, con.names = con.names)
+  reg.spec <- npCanonicalConditionalRegSpec(
+    regtype = regtype,
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
+    ncon = ncon,
+    where = "npreghat"
+  )
+
+  first.derivative.request <- (sum(s) == 1L) && all(s %in% c(0L, 1L))
+  simple.operator.request <- (sum(s) == 0L) || first.derivative.request
+
+  lp.degree0.lc.derivative.route <- identical(regtype, "lp") &&
+    first.derivative.request &&
+    npGlpDegree0FirstDerivativeLcOk(
+      regtype.engine = reg.spec$regtype.engine,
+      degree.engine = reg.spec$degree.engine,
+      gradient.order = rep.int(1L, ncon),
+      ncon = ncon
+    )
+
+  if (identical(reg.spec$regtype.engine, "lp") &&
+      any(s > reg.spec$degree.engine) &&
+      !lp.degree0.lc.derivative.route) {
+    stop("requested derivative order in 's' exceeds local polynomial degree")
+  }
+
+  direct.apply.compatible <- !identical(reg.spec$regtype.engine, "lp") ||
+    (!any(s > 0L) && all(reg.spec$degree.engine <= 1L)) ||
+    lp.degree0.lc.derivative.route ||
+    (any(s > 0L) && all(reg.spec$degree.engine == 1L))
+
+  lc.derivative.exact.route <- identical(regtype, "lc") &&
+    first.derivative.request
+
+  list(
+    regtype = regtype,
+    ncon = ncon,
+    degree = degree,
+    basis = basis,
+    bernstein.basis = bernstein.basis,
+    s = s,
+    reg.spec = reg.spec,
+    first.derivative.request = first.derivative.request,
+    simple.operator.request = simple.operator.request,
+    lp.degree0.lc.derivative.route = lp.degree0.lc.derivative.route,
+    direct.apply.compatible = direct.apply.compatible,
+    lc.derivative.exact.route = lc.derivative.exact.route
+  )
+}
+
 .npreghat_native_apply_candidate <- function(bws, output, y, regtype, degree,
                                              basis, bernstein.basis, s,
                                              leave.one.out) {
@@ -1297,6 +1394,14 @@ npreghat.rbandwidth <-
     if (.npRmpi_has_active_slave_pool(comm = 1L) &&
         !.npRmpi_autodispatch_in_context() &&
         !.npRmpi_autodispatch_called_from_bcast()) {
+      invisible(.npreghat_operator_spec(
+        bws = bws,
+        degree = degree,
+        basis = basis,
+        bernstein.basis = bernstein.basis,
+        s = s,
+        deriv = deriv
+      ))
       expr <- substitute({
         old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
         old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -1419,73 +1524,27 @@ npreghat.rbandwidth <-
       exdat <- exdat[keep.eval, , drop = FALSE]
     }
 
-    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-    ncon <- bws$ncon
-    con.names <- names(txdat)[which(bws$icon)]
-
-    degree <- if (identical(regtype, "lc")) {
-      rep.int(0L, ncon)
-    } else if (identical(regtype, "ll")) {
-      rep.int(1L, ncon)
-    } else {
-      npValidateGlpDegree(regtype = "lp",
-                          degree = if (is.null(degree)) bws$degree else degree,
-                          ncon = ncon)
-    }
-
-    basis <- npValidateLpBasis(
-      regtype = "lp",
-      basis = if (is.null(basis)) {
-        if (is.null(bws$basis)) "glp" else bws$basis
-      } else {
-        basis
-      }
-    )
-
-    bernstein.basis <- npValidateGlpBernstein(
-      regtype = "lp",
-      bernstein.basis = if (is.null(bernstein.basis)) {
-        isTRUE(bws$bernstein.basis)
-      } else {
-        bernstein.basis
-      }
-    )
-
-    s <- .npreghat_resolve_s(s = s, deriv = deriv, ncon = ncon, con.names = con.names)
-    reg.spec <- npCanonicalConditionalRegSpec(
-      regtype = regtype,
-      basis = basis,
+    operator.spec <- .npreghat_operator_spec(
+      bws = bws,
       degree = degree,
+      basis = basis,
       bernstein.basis = bernstein.basis,
-      ncon = ncon,
-      where = "npreghat"
+      s = s,
+      deriv = deriv,
+      con.names = names(txdat)[which(bws$icon)]
     )
-
-    first.derivative.request <- (sum(s) == 1L) && all(s %in% c(0L, 1L))
-    simple.operator.request <- (sum(s) == 0L) || first.derivative.request
-
-    lp.degree0.lc.derivative.route <- identical(regtype, "lp") &&
-      first.derivative.request &&
-      npGlpDegree0FirstDerivativeLcOk(
-        regtype.engine = reg.spec$regtype.engine,
-        degree.engine = reg.spec$degree.engine,
-        gradient.order = rep.int(1L, ncon),
-        ncon = ncon
-      )
-
-    if (identical(reg.spec$regtype.engine, "lp") &&
-        any(s > reg.spec$degree.engine) &&
-        !lp.degree0.lc.derivative.route) {
-      stop("requested derivative order in 's' exceeds local polynomial degree")
-    }
-
-    direct.apply.compatible <- !identical(reg.spec$regtype.engine, "lp") ||
-      (!any(s > 0L) && all(reg.spec$degree.engine <= 1L)) ||
-      lp.degree0.lc.derivative.route ||
-      (any(s > 0L) && all(reg.spec$degree.engine == 1L))
-
-    lc.derivative.exact.route <- identical(regtype, "lc") &&
-      first.derivative.request
+    regtype <- operator.spec$regtype
+    ncon <- operator.spec$ncon
+    degree <- operator.spec$degree
+    basis <- operator.spec$basis
+    bernstein.basis <- operator.spec$bernstein.basis
+    s <- operator.spec$s
+    reg.spec <- operator.spec$reg.spec
+    first.derivative.request <- operator.spec$first.derivative.request
+    simple.operator.request <- operator.spec$simple.operator.request
+    lp.degree0.lc.derivative.route <- operator.spec$lp.degree0.lc.derivative.route
+    direct.apply.compatible <- operator.spec$direct.apply.compatible
+    lc.derivative.exact.route <- operator.spec$lc.derivative.exact.route
 
     direct.apply <- identical(output, "apply") &&
       !is.null(y) &&
