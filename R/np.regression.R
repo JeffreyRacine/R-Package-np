@@ -42,6 +42,39 @@ npreg <-
   code
 }
 
+.npreg_glp_partial_gradients_from_npreghat <- function(bws,
+                                                       txdat,
+                                                       tydat,
+                                                       exdat,
+                                                       gradient.order,
+                                                       available,
+                                                       nrow.eval,
+                                                       ncol.x) {
+  grad <- matrix(NA_real_, nrow = nrow.eval, ncol = ncol.x)
+  cont.idx <- which(bws$icon)
+
+  if (!length(cont.idx) || !any(available))
+    return(grad)
+
+  for (jj in which(available)) {
+    svec <- integer(bws$ncon)
+    svec[jj] <- as.integer(gradient.order[jj])
+    hat.args <- list(
+      bws = bws,
+      txdat = txdat,
+      y = tydat,
+      output = "apply",
+      s = svec
+    )
+    if (!is.null(exdat))
+      hat.args$exdat <- exdat
+
+    grad[, cont.idx[jj]] <- as.vector(do.call(npreghat, hat.args))
+  }
+
+  grad
+}
+
 npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
 
@@ -266,6 +299,34 @@ npreg.rbandwidth <-
         gradient.order = glp.gradient.order,
         ncon = bws$ncon
       )
+    glp.gradient.available <- NULL
+    glp.gradient.partial <- FALSE
+    if (isTRUE(gradients) &&
+        identical(reg.spec$regtype.engine, "lp") &&
+        (bws$ncon > 0L)) {
+      glp.gradient.available <- npGlpGradientAvailability(
+        regtype.engine = reg.spec$regtype.engine,
+        degree.engine = reg.spec$degree.engine,
+        gradient.order = glp.gradient.order,
+        ncon = bws$ncon
+      )
+      if (!any(glp.gradient.available)) {
+        stop("npreg has no available derivative components for the requested gradient.order and fitted polynomial degree",
+             call. = FALSE)
+      }
+      glp.gradient.partial <- !lp.degree0.lc.gradient &&
+        any(!glp.gradient.available)
+      if (glp.gradient.partial && any(!glp.gradient.available) &&
+          isTRUE(warn.glp.gradient)) {
+        npWarnGlpGradientPartialAvailability(
+          where = "npreg",
+          degree.engine = reg.spec$degree.engine,
+          gradient.order = glp.gradient.order,
+          available = glp.gradient.available,
+          con.names = names(txdat)[bws$icon]
+        )
+      }
+    }
     if (isTRUE(gradients) &&
         identical(reg.spec$regtype.engine, "lp") &&
         (bws$ncon > 0L) &&
@@ -273,7 +334,9 @@ npreg.rbandwidth <-
         all(reg.spec$degree.engine == 0L)) {
       stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
     }
-    if (isTRUE(gradients) && identical(reg.spec$regtype.engine, "lp")) {
+    if (isTRUE(gradients) &&
+        identical(reg.spec$regtype.engine, "lp") &&
+        !glp.gradient.partial) {
       npValidateGlpGradientDegree(
         regtype.engine = reg.spec$regtype.engine,
         degree.engine = reg.spec$degree.engine,
@@ -390,6 +453,10 @@ npreg.rbandwidth <-
         eydat <- as.double(eydat)
     }
 
+    hat.txdat <- txdat
+    hat.exdat <- if (no.ex) NULL else exdat
+    do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
+
     ## re-assign levels in training and evaluation data to ensure correct
     ## conversion to numeric type.
     
@@ -466,6 +533,7 @@ npreg.rbandwidth <-
       mcv.numRow = attr(bws$xmcv, "num.row"),
       int_do_tree = .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
       old.reg = FALSE)
+    myopti$do_grad <- do.compiled.gradients
 
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     
@@ -504,13 +572,13 @@ npreg.rbandwidth <-
             as.integer(npLpBasisCode(reg.spec$basis.engine)),
             as.integer(enrow),
             as.integer(ncol),
-            as.logical(gradients),
+            as.logical(do.compiled.gradients),
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
             PACKAGE = "np")
     )
 
-    if (gradients){
+    if (gradients && !glp.gradient.partial){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 
       rorder = numeric(ncol)
       ord_idx <- seq_len(ncol)
@@ -520,6 +588,18 @@ npreg.rbandwidth <-
       myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE) 
       myout$gerr = as.matrix(myout$gerr[,rorder])
 
+    } else if (gradients) {
+      myout$g <- .npreg_glp_partial_gradients_from_npreghat(
+        bws = bws,
+        txdat = hat.txdat,
+        tydat = tydat,
+        exdat = hat.exdat,
+        gradient.order = glp.gradient.order,
+        available = glp.gradient.available,
+        nrow.eval = enrow,
+        ncol.x = ncol
+      )
+      myout$gerr <- matrix(NA_real_, nrow = enrow, ncol = ncol)
     }
 
 

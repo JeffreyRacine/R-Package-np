@@ -70,6 +70,141 @@ test_that("npreg lp supports per-variable derivative orders", {
   expect_equal(as.vector(fit$grad[, 2]), as.vector(Hx2 %*% y), tolerance = 1e-6)
 })
 
+test_that("npreg lp mixed-degree derivatives preserve partial availability", {
+  set.seed(20260630)
+  n <- 70
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(2 * pi * x1) + x2^2 + rnorm(n, sd = 0.02)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  ex <- data.frame(x1 = seq(0.1, 0.9, length.out = 12),
+                   x2 = seq(0.15, 0.85, length.out = 12))
+
+  bw <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "lp",
+    degree = c(0L, 2L),
+    basis = "glp",
+    bws = c(0.3, 0.3),
+    bandwidth.compute = FALSE
+  )
+
+  expect_warning(
+    fit1 <- npreg(
+      txdat = tx,
+      tydat = y,
+      exdat = ex,
+      bws = bw,
+      gradients = TRUE,
+      gradient.order = 1L
+    ),
+    "exceed polynomial degree"
+  )
+  H01 <- npreghat(bws = bw, txdat = tx, exdat = ex, s = c(0L, 1L))
+  expect_true(all(is.na(fit1$grad[, 1L])))
+  expect_equal(as.vector(fit1$grad[, 2L]), as.vector(H01 %*% y), tolerance = 1e-8)
+  expect_true(all(is.na(fit1$gerr)))
+  expect_warning(
+    g1 <- gradients(fit1, gradient.order = 1L),
+    "exceed polynomial degree"
+  )
+  expect_equal(g1, fit1$grad, tolerance = 0)
+  expect_warning(
+    ge1 <- gradients(fit1, errors = TRUE, gradient.order = 1L),
+    "exceed polynomial degree"
+  )
+  expect_equal(ge1, fit1$gerr, tolerance = 0)
+  expect_error(
+    npreghat(bws = bw, txdat = tx, exdat = ex, s = c(1L, 0L)),
+    "exceeds local polynomial degree"
+  )
+
+  expect_warning(
+    fit2 <- npreg(
+      txdat = tx,
+      tydat = y,
+      exdat = ex,
+      bws = bw,
+      gradients = TRUE,
+      gradient.order = 2L
+    ),
+    "exceed polynomial degree"
+  )
+  H02 <- npreghat(bws = bw, txdat = tx, exdat = ex, s = c(0L, 2L))
+  expect_true(all(is.na(fit2$grad[, 1L])))
+  expect_equal(as.vector(fit2$grad[, 2L]), as.vector(H02 %*% y), tolerance = 1e-8)
+  expect_true(all(is.na(fit2$gerr)))
+
+  expect_warning(
+    g2 <- gradients(fit2, gradient.order = 2L),
+    "exceed polynomial degree"
+  )
+  expect_equal(g2, fit2$grad, tolerance = 0)
+  expect_warning(
+    ge2 <- gradients(fit2, errors = TRUE, gradient.order = 2L),
+    "exceed polynomial degree"
+  )
+  expect_equal(ge2, fit2$gerr, tolerance = 0)
+  expect_error(
+    suppressWarnings(gradients(fit1, gradient.order = 2L)),
+    "differs from the derivative order stored"
+  )
+  expect_error(
+    npreghat(bws = bw, txdat = tx, exdat = ex, s = c(2L, 0L)),
+    "exceeds local polynomial degree"
+  )
+
+  bw00 <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "lp",
+    degree = c(0L, 0L),
+    basis = "glp",
+    bws = c(0.3, 0.3),
+    bandwidth.compute = FALSE
+  )
+  fit00 <- npreg(
+    txdat = tx,
+    tydat = y,
+    exdat = ex,
+    bws = bw00,
+    gradients = TRUE,
+    gradient.order = 1L,
+    warn.glp.gradient = FALSE
+  )
+  H00.10 <- npreghat(bws = bw00, txdat = tx, exdat = ex, s = c(1L, 0L))
+  H00.01 <- npreghat(bws = bw00, txdat = tx, exdat = ex, s = c(0L, 1L))
+  expect_false(any(is.na(fit00$grad)))
+  expect_equal(as.vector(fit00$grad[, 1L]), as.vector(H00.10 %*% y), tolerance = 1e-8)
+  expect_equal(as.vector(fit00$grad[, 2L]), as.vector(H00.01 %*% y), tolerance = 1e-8)
+
+  bw01 <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "lp",
+    degree = c(0L, 1L),
+    basis = "glp",
+    bws = c(0.3, 0.3),
+    bandwidth.compute = FALSE
+  )
+  expect_error(
+    npreg(txdat = tx, tydat = y, exdat = ex, bws = bw01,
+          gradients = TRUE, gradient.order = 2L),
+    "no available derivative components"
+  )
+
+  pdf(NULL)
+  on.exit(dev.off(), add = TRUE)
+  expect_warning(
+    plot.out <- plot(bw, xdat = tx, ydat = y, gradients = TRUE,
+                     gradient.order = 2L, errors = "none",
+                     output = "data", neval = 8L),
+    "exceed polynomial degree"
+  )
+  expect_true(is.list(plot.out))
+})
+
 test_that("npreg lp gradients accessor honors stored derivative order", {
   set.seed(20260514)
   n <- 55
