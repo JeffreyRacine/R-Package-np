@@ -1180,10 +1180,10 @@ npreghat.rbandwidth <-
         ncon = ncon
       )
 
-    direct.apply.compatible <- !any(s > 0L) ||
-      !identical(reg.spec$regtype.engine, "lp") ||
+    direct.apply.compatible <- !identical(reg.spec$regtype.engine, "lp") ||
+      (!any(s > 0L) && all(reg.spec$degree.engine <= 1L)) ||
       lp.degree0.lc.derivative.route ||
-      all(reg.spec$degree.engine >= 1L)
+      (any(s > 0L) && all(reg.spec$degree.engine == 1L))
 
     direct.apply <- identical(output, "apply") &&
       !is.null(y) &&
