@@ -186,10 +186,115 @@ test_that("lp gradient owner/apply routing covers degree-zero and heterogeneous 
 
     expect_equal(as.vector(a1), as.vector(H %*% y1), tolerance = tol)
     expect_equal(unname(as.matrix(a2)), unname(H %*% Y), tolerance = tol)
+    if (identical(as.integer(degree), c(1L, 0L)) &&
+        identical(as.integer(s), c(1L, 0L))) {
+      fit <- npreg(
+        bws = bw,
+        txdat = tx,
+        tydat = y1,
+        gradients = TRUE,
+        warn.glp.gradient = FALSE
+      )
+      expect_equal(as.vector(H %*% y1), as.vector(fit$grad[, 1L]), tolerance = 1e-8)
+    }
   }
 
   check_apply_contract(degree = c(0L, 0L), s = c(1L, 0L))
   check_apply_contract(degree = c(1L, 0L), s = c(1L, 0L))
+})
+
+test_that("generalized-nn lp mixed-degree available derivative owner is nonrecursive", {
+  set.seed(20260701)
+  old_tree <- getOption("np.tree")
+  on.exit(options(np.tree = old_tree), add = TRUE)
+
+  n <- 24L
+  x1 <- runif(n, -1, 1)
+  x2 <- runif(n, -1, 1)
+  u <- factor(sample(letters[1:3], n, replace = TRUE))
+  o <- ordered(sample(1:3, n, replace = TRUE))
+  y <- sin(x1) + 0.25 * x1^2 + 0.15 * x2 + 0.2 * (as.integer(u) - 2L)
+  Y <- cbind(y = y, shifted = y + seq_len(n) / (10 * n))
+
+  check_case <- function(tx, ex, bws, degree, s_available, s_unavailable) {
+    bw <- npregbw(
+      xdat = tx,
+      ydat = y,
+      regtype = "lp",
+      degree = degree,
+      bwtype = "generalized_nn",
+      bws = bws,
+      bandwidth.compute = FALSE
+    )
+
+    for (tree in c(FALSE, TRUE)) {
+      options(np.tree = tree)
+      H <- npreghat(
+        bws = bw,
+        txdat = tx,
+        exdat = ex,
+        output = "matrix",
+        s = s_available
+      )
+      a1 <- npreghat(
+        bws = bw,
+        txdat = tx,
+        exdat = ex,
+        y = matrix(y, ncol = 1L),
+        output = "apply",
+        s = s_available
+      )
+      a2 <- npreghat(
+        bws = bw,
+        txdat = tx,
+        exdat = ex,
+        y = Y,
+        output = "apply",
+        s = s_available
+      )
+      fit <- npreg(
+        bws = bw,
+        txdat = tx,
+        tydat = y,
+        exdat = ex,
+        gradients = TRUE,
+        warn.glp.gradient = FALSE
+      )
+
+      expect_equal(as.vector(a1), as.vector(unclass(H) %*% y), tolerance = 1e-9)
+      expect_equal(unname(as.matrix(a2)), unname(unclass(H) %*% Y), tolerance = 1e-9)
+      expect_equal(
+        as.vector(unclass(H) %*% y),
+        as.vector(fit$grad[, which(s_available > 0L)]),
+        tolerance = 1e-8
+      )
+      expect_error(
+        npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix", s = s_unavailable),
+        "requested derivative order in 's' exceeds local polynomial degree"
+      )
+    }
+  }
+
+  tx.cont <- data.frame(x1 = x1, x2 = x2)
+  ex.cont <- tx.cont[seq(2L, n, by = 3L), , drop = FALSE]
+  check_case(tx.cont, ex.cont, bws = c(9, 9),
+             degree = c(2L, 0L), s_available = c(1L, 0L), s_unavailable = c(0L, 1L))
+  check_case(tx.cont, ex.cont, bws = c(9, 9),
+             degree = c(0L, 2L), s_available = c(0L, 1L), s_unavailable = c(1L, 0L))
+
+  tx.uno <- data.frame(x1 = x1, x2 = x2, u = u)
+  ex.uno <- tx.uno[seq(2L, n, by = 3L), , drop = FALSE]
+  check_case(tx.uno, ex.uno, bws = c(9, 9, 0.5),
+             degree = c(2L, 0L), s_available = c(1L, 0L), s_unavailable = c(0L, 1L))
+  check_case(tx.uno, ex.uno, bws = c(9, 9, 0.5),
+             degree = c(0L, 2L), s_available = c(0L, 1L), s_unavailable = c(1L, 0L))
+
+  tx.ord <- data.frame(x1 = x1, x2 = x2, o = o)
+  ex.ord <- tx.ord[seq(2L, n, by = 3L), , drop = FALSE]
+  check_case(tx.ord, ex.ord, bws = c(9, 9, 0.5),
+             degree = c(2L, 0L), s_available = c(1L, 0L), s_unavailable = c(0L, 1L))
+  check_case(tx.ord, ex.ord, bws = c(9, 9, 0.5),
+             degree = c(0L, 2L), s_available = c(0L, 1L), s_unavailable = c(1L, 0L))
 })
 
 test_that("tree-disabled higher-degree lp scalar apply routes through exact matrix contract", {

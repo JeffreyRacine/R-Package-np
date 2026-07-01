@@ -430,6 +430,26 @@ npreghat <-
   H
 }
 
+.npreghat_lp_explicit_first_derivative_operator_available <- function(degree, s) {
+  degree <- as.integer(degree)
+  s <- if (is.null(s)) integer(length(degree)) else as.integer(s)
+
+  length(s) == length(degree) &&
+    length(degree) > 0L &&
+    any(s > 0L) &&
+    sum(s) == 1L &&
+    all(s %in% c(0L, 1L)) &&
+    all(s <= degree) &&
+    any(rep.int(1L, length(degree)) > degree)
+}
+
+.npreghat_lp_generalized_nn_core_fallback_needed <- function(degree, s) {
+  degree <- as.integer(degree)
+  if (!any(degree > 1L))
+    return(FALSE)
+  !.npreghat_lp_explicit_first_derivative_operator_available(degree = degree, s = s)
+}
+
 .npreghat_exact_lp_matrix_from_kernel_weights <- function(bws,
                                                           txdat,
                                                           exdat = NULL,
@@ -441,9 +461,11 @@ npreghat <-
   eval.data <- if (miss.ex) txdat else exdat
   ntrain <- nrow(txdat)
   neval <- nrow(eval.data)
+  degree <- as.integer(degree)
+  s <- if (is.null(s)) integer(length(degree)) else as.integer(s)
   want.grad <- length(s) > 0L && any(s > 0L)
   if (identical(bws$type, "generalized_nn") &&
-      any(degree > 1L)) {
+      .npreghat_lp_generalized_nn_core_fallback_needed(degree = degree, s = s)) {
     return(.npreghat_exact_matrix_from_core(
       bws = bws,
       txdat = txdat,
