@@ -770,6 +770,10 @@ npreg.rbandwidth <-
             PACKAGE = "npRmpi")
     }
 
+    local.regression.context <- .npRmpi_has_active_slave_pool(comm = 1L) ||
+      isTRUE(.npRmpi_autodispatch_in_context()) ||
+      isTRUE(.npRmpi_autodispatch_called_from_bcast())
+
     use.local.regression <- (
       identical(bws$type, "generalized_nn") &&
       identical(reg.spec$regtype.engine, "lp") &&
@@ -780,14 +784,14 @@ npreg.rbandwidth <-
       !isTRUE(gradients) &&
       !isTRUE(residuals) &&
       no.ey &&
-      .npRmpi_has_active_slave_pool(comm = 1L)
+      isTRUE(local.regression.context)
     ) || (
       identical(reg.spec$regtype.engine, "lp") &&
       identical(reg.spec$basis.engine, "glp") &&
       !isTRUE(reg.spec$bernstein.basis.engine) &&
       (bws$ncon > 0L) &&
       (isTRUE(glp.gradient.partial) || isTRUE(lp.degree0.lc.gradient)) &&
-      .npRmpi_has_active_slave_pool(comm = 1L)
+      isTRUE(local.regression.context)
     )
 
     myout <- .np_with_compiled_fit_progress(
