@@ -137,15 +137,27 @@ gradients.condistribution <- function(x, errors = FALSE, gradient.order = NULL, 
   stored.order <- npValidateGlpGradientOrder(regtype = "lp",
                                              gradient.order = stored.order,
                                              ncon = x$bws$xncon)
-  npValidateGlpGradientDegree(
+  available <- npGlpGradientAvailability(
     regtype.engine = reg.spec$reg.engine,
     degree.engine = reg.spec$degree.engine,
     gradient.order = gorder,
-    ncon = x$bws$xncon,
-    where = "gradients.condistribution"
+    ncon = x$bws$xncon
   )
+  if (!any(available)) {
+    stop("gradients.condistribution has no available derivative components for the requested gradient.order and fitted polynomial degree",
+         call. = FALSE)
+  }
+  if (any(!available)) {
+    npWarnGlpGradientPartialAvailability(
+      where = "gradients.condistribution",
+      degree.engine = reg.spec$degree.engine,
+      gradient.order = gorder,
+      available = available,
+      con.names = x$xnames[x$bws$ixcon]
+    )
+  }
   if (length(gorder)) {
-    defined.request <- (gorder <= reg.spec$degree.engine)
+    defined.request <- available
     if (any(defined.request & (gorder != stored.order))) {
       stop("requested gradient.order differs from the derivative order stored in this condistribution object; refit or predict/evaluate with gradients=TRUE and the desired gradient.order",
            call. = FALSE)
@@ -156,15 +168,7 @@ gradients.condistribution <- function(x, errors = FALSE, gradient.order = NULL, 
   gout.masked[,] <- NA_real_
   cont.idx <- which(x$bws$ixcon)
   if (length(cont.idx)) {
-    lp.degree0.lc.gradient <- npGlpDegree0FirstDerivativeLcOk(
-      regtype.engine = reg.spec$reg.engine,
-      degree.engine = reg.spec$degree.engine,
-      gradient.order = gorder,
-      ncon = x$bws$xncon
-    )
-    keep.cont <- (gorder <= reg.spec$degree.engine)
-    if (lp.degree0.lc.gradient)
-      keep.cont[] <- TRUE
+    keep.cont <- available
     if (any(keep.cont)) {
       keep.idx <- cont.idx[keep.cont]
       gout.masked[, keep.idx] <- gout[, keep.idx, drop = FALSE]

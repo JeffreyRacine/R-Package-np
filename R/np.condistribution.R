@@ -114,6 +114,24 @@ npcdist.condbandwidth <-
         gradient.order = glp.gradient.order.preflight,
         ncon = bws$xncon
       )
+    glp.gradient.available.preflight <- NULL
+    glp.gradient.partial.preflight <- FALSE
+    if (isTRUE(gradients) &&
+        identical(reg.spec.preflight$reg.engine, "lp") &&
+        (bws$xncon > 0L)) {
+      glp.gradient.available.preflight <- npGlpGradientAvailability(
+        regtype.engine = reg.spec.preflight$reg.engine,
+        degree.engine = reg.spec.preflight$degree.engine,
+        gradient.order = glp.gradient.order.preflight,
+        ncon = bws$xncon
+      )
+      if (!any(glp.gradient.available.preflight)) {
+        stop("npcdist has no available derivative components for the requested gradient.order and fitted polynomial degree",
+             call. = FALSE)
+      }
+      glp.gradient.partial.preflight <- !lp.degree0.lc.gradient.preflight &&
+        any(!glp.gradient.available.preflight)
+    }
     if (isTRUE(gradients) &&
         identical(reg.spec.preflight$reg.engine, "lp") &&
         (bws$xncon > 0L) &&
@@ -121,7 +139,9 @@ npcdist.condbandwidth <-
         all(reg.spec.preflight$degree.engine == 0L)) {
       stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
     }
-    if (isTRUE(gradients) && identical(reg.spec.preflight$reg.engine, "lp")) {
+    if (isTRUE(gradients) &&
+        identical(reg.spec.preflight$reg.engine, "lp") &&
+        !glp.gradient.partial.preflight) {
       npValidateGlpGradientDegree(
         regtype.engine = reg.spec.preflight$reg.engine,
         degree.engine = reg.spec.preflight$degree.engine,
@@ -311,6 +331,33 @@ npcdist.condbandwidth <-
         gradient.order = glp.gradient.order,
         ncon = bws$xncon
       )
+    glp.gradient.available <- NULL
+    glp.gradient.partial <- FALSE
+    if (isTRUE(gradients) &&
+        identical(reg.engine, "lp") &&
+        (bws$xncon > 0L)) {
+      glp.gradient.available <- npGlpGradientAvailability(
+        regtype.engine = reg.engine,
+        degree.engine = degree.engine,
+        gradient.order = glp.gradient.order,
+        ncon = bws$xncon
+      )
+      if (!any(glp.gradient.available)) {
+        stop("npcdist has no available derivative components for the requested gradient.order and fitted polynomial degree",
+             call. = FALSE)
+      }
+      glp.gradient.partial <- !lp.degree0.lc.gradient &&
+        any(!glp.gradient.available)
+      if (glp.gradient.partial && any(!glp.gradient.available)) {
+        npWarnGlpGradientPartialAvailability(
+          where = "npcdist",
+          degree.engine = degree.engine,
+          gradient.order = glp.gradient.order,
+          available = glp.gradient.available,
+          con.names = colnames(txdat)[bws$ixcon]
+        )
+      }
+    }
     if (isTRUE(gradients) &&
         identical(reg.engine, "lp") &&
         (bws$xncon > 0L) &&
@@ -318,7 +365,9 @@ npcdist.condbandwidth <-
         all(degree.engine == 0L)) {
       stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
     }
-    if (isTRUE(gradients) && identical(reg.engine, "lp")) {
+    if (isTRUE(gradients) &&
+        identical(reg.engine, "lp") &&
+        !glp.gradient.partial) {
       npValidateGlpGradientDegree(
         regtype.engine = reg.engine,
         degree.engine = degree.engine,
@@ -340,6 +389,7 @@ npcdist.condbandwidth <-
       integer(0)
     }
     basis.code <- as.integer(npLpBasisCode(basis.engine))
+    do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
 
     myopti <- list(
         num_obs_train = tnrow,
@@ -381,7 +431,7 @@ npcdist.condbandwidth <-
         num_xord = bws$xnord,
         num_xcon = bws$xncon,
         no.exy = no.exy,
-        gradients = gradients,
+        gradients = do.compiled.gradients,
         ymcv.numRow = attr(bws$ymcv, "num.row"),
         xmcv.numRow = attr(bws$xmcv, "num.row"),
         densOrDist = NP_DO_DIST,
@@ -422,21 +472,30 @@ npcdist.condbandwidth <-
     names(myout)[1] <- "condist"
 
     if(gradients){
-      myout$congrad = matrix(data=myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE) 
-      rorder = numeric(bws$xndim)
-      xidx <- seq_len(bws$xndim)
-      rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
-      myout$congrad = myout$congrad[, rorder, drop = FALSE]
+      if (!glp.gradient.partial) {
+        myout$congrad = matrix(data=myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
+        rorder = numeric(bws$xndim)
+        xidx <- seq_len(bws$xndim)
+        rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
+        myout$congrad = myout$congrad[, rorder, drop = FALSE]
 
-      myout$congerr = matrix(data=myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
-      myout$congerr = myout$congerr[, rorder, drop = FALSE]
+        myout$congerr = matrix(data=myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
+        myout$congerr = myout$congerr[, rorder, drop = FALSE]
+      } else {
+        myout$congrad <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
+        myout$congerr <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
+      }
 
       if (identical(reg.engine, "lp") && bws$xncon > 0L && !lp.degree0.lc.gradient) {
         cont.idx <- which(bws$ixcon)
-        higher.order <- glp.gradient.order > 1L
-        if (any(higher.order)) {
+        hat.gradient.idx <- if (glp.gradient.partial) {
+          which(glp.gradient.available)
+        } else {
+          which(glp.gradient.order > 1L)
+        }
+        if (length(hat.gradient.idx)) {
           rhs <- rep.int(1.0, nrow(proper.slice.context$txdat))
-          for (jj in which(higher.order)) {
+          for (jj in hat.gradient.idx) {
             svec <- integer(bws$xncon)
             svec[jj] <- glp.gradient.order[jj]
             hat.args <- list(

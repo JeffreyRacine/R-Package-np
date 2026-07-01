@@ -92,6 +92,35 @@
   length(s) > 0L && any(s > 0L)
 }
 
+.npcdhat_validate_lp_x_s <- function(degree, s, ncon, where = "npcdhat") {
+  if (!.npcdhat_has_x_derivative(s))
+    return(invisible(NULL))
+
+  degree <- as.integer(degree)
+  s <- as.integer(s)
+  ncon <- as.integer(ncon)
+  if (length(degree) != ncon || length(s) != ncon) {
+    stop(sprintf("%s received incoherent local-polynomial derivative metadata", where),
+         call. = FALSE)
+  }
+
+  first.derivative.request <- (sum(s) == 1L) && all(s %in% c(0L, 1L))
+  lp.degree0.lc.derivative.route <- first.derivative.request &&
+    npGlpDegree0FirstDerivativeLcOk(
+      regtype.engine = "lp",
+      degree.engine = degree,
+      gradient.order = rep.int(1L, ncon),
+      ncon = ncon
+    )
+
+  if (any(s > degree) && !lp.degree0.lc.derivative.route) {
+    stop(sprintf("%s requested derivative order in 's' exceeds local polynomial degree", where),
+         call. = FALSE)
+  }
+
+  invisible(NULL)
+}
+
 .npcdhat_use_adaptive_ratio <- function(bws, x.s = NULL) {
   regtype <- if (is.null(bws$regtype.engine)) bws$regtype else bws$regtype.engine
   identical(bws$type, "adaptive_nn") &&
@@ -149,6 +178,13 @@
   }
 
   if (identical(regtype, "lp")) {
+    .npcdhat_validate_lp_x_s(
+      degree = degree,
+      s = s,
+      ncon = xbw$ncon,
+      where = "npcdhat"
+    )
+
     if (identical(xbw$type, "generalized_nn") && any(degree > 1L)) {
       H <- matrix(NA_real_, nrow = nrow(exdat), ncol = nrow(txdat))
       for (i in seq_len(nrow(exdat))) {
