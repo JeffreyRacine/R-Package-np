@@ -97,6 +97,13 @@
   ref
 }
 
+.npRmpi_autodispatch_raw_md5 <- function(raw) {
+  path <- tempfile("npRmpi-autodispatch-fingerprint-", fileext = ".bin")
+  on.exit(unlink(path), add = TRUE)
+  writeBin(raw, path, useBytes = TRUE)
+  unname(as.character(tools::md5sum(path)))
+}
+
 .npRmpi_autodispatch_fingerprint <- function(x) {
   normalize <- function(z) {
     if (is.environment(z))
@@ -134,9 +141,10 @@
   raw <- tryCatch(serialize(y, connection = NULL, xdr = FALSE), error = function(e) raw())
   if (!length(raw))
     return(NA_character_)
-  vals <- as.integer(raw)
-  idx <- seq_along(vals) %% 104729L
-  sprintf("%d:%.0f:%.0f", length(vals), sum(vals), sum(vals * idx))
+  digest <- tryCatch(.npRmpi_autodispatch_raw_md5(raw), error = function(e) NA_character_)
+  if (!is.character(digest) || length(digest) != 1L || is.na(digest) || !nzchar(digest))
+    return(NA_character_)
+  sprintf("md5:%d:%s", length(raw), digest)
 }
 
 .npRmpi_autodispatch_has_tmp_symbols <- function(x) {

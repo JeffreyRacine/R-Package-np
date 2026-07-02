@@ -14,6 +14,9 @@
 .npRmpi_autodispatch_replace_tmps <- getFromNamespace(".npRmpi_autodispatch_replace_tmps", "npRmpi")
 .npRmpi_autodispatch_sanitize_object <- getFromNamespace(".npRmpi_autodispatch_sanitize_object", "npRmpi")
 .npRmpi_autodispatch_remote_ref <- getFromNamespace(".npRmpi_autodispatch_remote_ref", "npRmpi")
+.npRmpi_autodispatch_fingerprint <- getFromNamespace(".npRmpi_autodispatch_fingerprint", "npRmpi")
+.npRmpi_autodispatch_raw_md5 <- getFromNamespace(".npRmpi_autodispatch_raw_md5", "npRmpi")
+.npRmpi_autodispatch_tag_result <- getFromNamespace(".npRmpi_autodispatch_tag_result", "npRmpi")
 .npRmpi_is_missing_call_arg <- getFromNamespace(".npRmpi_is_missing_call_arg", "npRmpi")
 
 test_that(".npRmpi_bcast_cmd_expr forwards command expression structurally", {
@@ -119,14 +122,20 @@ test_that("autodispatch reuses semiparametric remote bandwidth references", {
          ballast = seq_len(100)),
     class = "sibandwidth"
   )
-  attr(env$sibw, "npRmpi.autodispatch.remote") <- ".__npRmpi_remote_sibw"
+  env$sibw <- .npRmpi_autodispatch_tag_result(
+    env$sibw,
+    remote = ".__npRmpi_remote_sibw"
+  )
   env$scbw <- structure(
     list(call = quote(npscoefbw(y ~ x | z, data = mydat)),
          formula = y ~ x | z,
          ballast = seq_len(100)),
     class = "scbandwidth"
   )
-  attr(env$scbw, "npRmpi.autodispatch.remote") <- ".__npRmpi_remote_scbw"
+  env$scbw <- .npRmpi_autodispatch_tag_result(
+    env$scbw,
+    remote = ".__npRmpi_remote_scbw"
+  )
 
   si <- .npRmpi_autodispatch_materialize_call(
     quote(npindex(bws = sibw, gradients = FALSE)),
@@ -141,6 +150,29 @@ test_that("autodispatch reuses semiparametric remote bandwidth references", {
   expect_identical(as.character(sc$call$bws), .npRmpi_autodispatch_remote_ref(env$scbw))
   expect_false(any(vapply(si$prepublish, inherits, logical(1), "sibandwidth")))
   expect_false(any(vapply(sc$prepublish, inherits, logical(1), "scbandwidth")))
+})
+
+test_that("autodispatch remote bandwidth fingerprints use an MD5 digest", {
+  bw <- structure(
+    list(call = quote(npindexbw(y ~ x1 + x2, data = mydat)),
+         formula = y ~ x1 + x2,
+         bw = c(0.4, 0.6),
+         ballast = seq_len(100)),
+    class = "sibandwidth"
+  )
+
+  fp <- .npRmpi_autodispatch_fingerprint(bw)
+  expect_match(fp, "^md5:[0-9]+:[0-9a-f]{32}$")
+
+  bw_changed <- bw
+  bw_changed$bw[1L] <- bw_changed$bw[1L] + 0.01
+  expect_false(identical(fp, .npRmpi_autodispatch_fingerprint(bw_changed)))
+
+  body_text <- paste(
+    deparse(body(.npRmpi_autodispatch_raw_md5), width.cutoff = 500L),
+    collapse = " "
+  )
+  expect_true(grepl("tools::md5sum", body_text, fixed = TRUE))
 })
 
 test_that("autodispatch target argument set covers gdat alias", {
