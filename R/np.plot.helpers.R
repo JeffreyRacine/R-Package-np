@@ -7956,6 +7956,33 @@ plotFactor <- function(f, y, ...){
   )
 }
 
+.np_plot_singleindex_training_mean_index <- function(bws, idx.train, y) {
+  if (!identical(bws$type, "fixed")) {
+    return(as.vector(.np_plot_singleindex_hat_apply_index(
+      bws = bws,
+      idx.train = idx.train,
+      idx.eval = idx.train,
+      y = y
+    )))
+  }
+
+  rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+  fit <- .np_regression_direct(
+    bws = rbw,
+    txdat = idx.train,
+    tydat = y,
+    exdat = idx.train,
+    gradients = FALSE,
+    local.mode = identical(rbw$type, "generalized_nn")
+  )
+
+  mean <- as.vector(fit$mean)
+  if (length(mean) != nrow(idx.train))
+    stop("internal single-index training fit length mismatch",
+         call. = FALSE)
+  mean
+}
+
 .np_plot_singleindex_hat_matrix_index <- function(bws, idx.train, idx.eval, s = 0L) {
   s <- as.integer(s)[1L]
   if (is.na(s) || !(s %in% c(0L, 1L)))
@@ -12599,27 +12626,53 @@ compute.bootstrap.errors.sibandwidth =
     if (is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
-      fit.mean <- as.vector(.np_plot_singleindex_hat_apply_index(
+      fit.mean <- .np_plot_singleindex_training_mean_index(
         bws = bws,
         idx.train = idx.train,
-        idx.eval = idx.train,
         y = ydat
-      ))
-      H <- .np_plot_singleindex_hat_matrix_index(
-        bws = bws,
-        idx.train = idx.train,
-        idx.eval = idx.eval,
-        s = if (gradients) 1L else 0L
       )
+      s.index <- if (gradients) 1L else 0L
+      use.blocks <- .np_plot_wild_apply_operator_enabled(
+        ntrain = nrow(idx.train),
+        neval = nrow(idx.eval),
+        bwtype = bws$type
+      )
+      if (use.blocks) {
+        hat.block.fun <- function(start, stopi) {
+          .np_plot_singleindex_hat_matrix_index(
+            bws = bws,
+            idx.train = idx.train,
+            idx.eval = idx.eval[start:stopi, , drop = FALSE],
+            s = s.index
+          )
+        }
+        boot.out <- .np_plot_boot_from_hat_blocks_wild(
+          hat.block.fun = hat.block.fun,
+          neval = nrow(idx.eval),
+          ntrain = nrow(idx.train),
+          ydat = ydat,
+          fit.mean = fit.mean,
+          B = plot.errors.boot.num,
+          wild = plot.errors.boot.wild,
+          progress.label = progress.label
+        )
+      } else {
+        H <- .np_plot_singleindex_hat_matrix_index(
+          bws = bws,
+          idx.train = idx.train,
+          idx.eval = idx.eval,
+          s = s.index
+        )
 
-      boot.out <- .np_plot_boot_from_hat_wild(
-        H = H,
-        ydat = ydat,
-        fit.mean = fit.mean,
-        B = plot.errors.boot.num,
-        wild = plot.errors.boot.wild,
-        progress.label = progress.label
-      )
+        boot.out <- .np_plot_boot_from_hat_wild(
+          H = H,
+          ydat = ydat,
+          fit.mean = fit.mean,
+          B = plot.errors.boot.num,
+          wild = plot.errors.boot.wild,
+          progress.label = progress.label
+        )
+      }
     } else if (is.inid) {
       inid.helper.ok <- isTRUE(use.frozen.nonfixed) || (!isTRUE(gradients)) || identical(bws$type, "fixed")
       if (!isTRUE(inid.helper.ok)) {
