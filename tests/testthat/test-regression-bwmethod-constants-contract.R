@@ -1,5 +1,6 @@
 read_header_define <- function(symbol) {
   header <- testthat::test_path("..", "..", "src", "headers.h")
+  skip_if_not(file.exists(header), "source headers.h is not available in this test context")
   lines <- readLines(header, warn = FALSE)
   pattern <- sprintf("^#define[[:space:]]+%s[[:space:]]+([0-9]+)\\b", symbol)
   hit <- grep(pattern, lines, value = TRUE)
