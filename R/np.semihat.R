@@ -391,6 +391,20 @@
 }
 
 .np_indexhat_lc_kernel_weights <- function(bws, idx.train, idx.eval) {
+  collapse_bound <- function(v, nm) {
+    if (is.null(v))
+      return(NULL)
+    vv <- as.double(v)
+    if (length(vv) <= 1L)
+      return(vv)
+    uu <- unique(vv)
+    if (length(uu) == 1L)
+      return(uu)
+    stop(sprintf("cannot collapse %s with %d distinct values to scalar helper bound",
+                 nm, length(uu)),
+         call. = FALSE)
+  }
+
   kw <- .npRmpi_with_local_regression(npksum(
     txdat = idx.train,
     exdat = idx.eval,
@@ -398,6 +412,11 @@
     bwtype = bws$type,
     ckertype = bws$ckertype,
     ckerorder = bws$ckerorder,
+    ckerbound = bws$ckerbound,
+    ckerlb = if (identical(bws$ckerbound, "fixed"))
+      collapse_bound(bws$ckerlb, "ckerlb") else NULL,
+    ckerub = if (identical(bws$ckerbound, "fixed"))
+      collapse_bound(bws$ckerub, "ckerub") else NULL,
     return.kernel.weights = TRUE
   ))$kw
 
