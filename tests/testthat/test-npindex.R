@@ -22,6 +22,90 @@ test_that("npindex basic functionality works", {
   expect_output(summary(model))
 })
 
+test_that("npindexbw BFGS accounting uses bandwidth callback count", {
+  target_is_num_feval <- function(expr) {
+    is.call(expr) &&
+      identical(expr[[1L]], quote(`$`)) &&
+      identical(expr[[2L]], quote(bws)) &&
+      identical(expr[[3L]], quote(num.feval))
+  }
+
+  assigns_from_counter <- function(expr) {
+    ok <- FALSE
+    walk <- function(node) {
+      if (is.call(node)) {
+        if (identical(node[[1L]], quote(`<-`)) &&
+            length(node) == 3L &&
+            target_is_num_feval(node[[2L]]) &&
+            identical(node[[3L]], quote(bandwidth_eval_count))) {
+          ok <<- TRUE
+        }
+        for (idx in seq_along(node)[-1L])
+          walk(node[[idx]])
+      } else if (is.pairlist(node) || is.expression(node)) {
+        for (idx in seq_along(node))
+          walk(node[[idx]])
+      }
+    }
+    walk(expr)
+    ok
+  }
+
+  increments_counter <- function(expr) {
+    ok <- FALSE
+    walk <- function(node) {
+      if (is.call(node)) {
+        if (identical(node[[1L]], quote(`<<-`)) &&
+            length(node) == 3L &&
+            identical(node[[2L]], quote(bandwidth_eval_count)) &&
+            identical(node[[3L]], quote(bandwidth_eval_count + 1L))) {
+          ok <<- TRUE
+        }
+        for (idx in seq_along(node)[-1L])
+          walk(node[[idx]])
+      } else if (is.pairlist(node) || is.expression(node)) {
+        for (idx in seq_along(node))
+          walk(node[[idx]])
+      }
+    }
+    walk(expr)
+    ok
+  }
+
+  fn <- getFromNamespace("npindexbw.sibandwidth", "np")
+  expect_true(increments_counter(body(fn)))
+  expect_true(assigns_from_counter(body(fn)))
+})
+
+test_that("npindexbw BFGS adaptive-nn accounting exceeds fast callbacks", {
+  set.seed(20260627)
+  n <- 45L
+  x1 <- runif(n)
+  x2 <- runif(n)
+  x3 <- runif(n)
+  y <- sin(x1 + 0.5 * x2 - 0.25 * x3) + rnorm(n, sd = 0.08)
+  tx <- data.frame(x1 = x1, x2 = x2, x3 = x3)
+
+  bw <- suppressWarnings(npindexbw(
+    xdat = tx,
+    ydat = y,
+    method = "ichimura",
+    regtype = "lc",
+    bwtype = "adaptive_nn",
+    nmulti = 1L,
+    optim.method = "BFGS",
+    optim.maxit = 80L,
+    optim.maxattempts = 1L
+  ))
+
+  num.feval <- as.numeric(bw$num.feval[1L])
+  num.feval.fast <- as.numeric(bw$num.feval.fast[1L])
+
+  expect_true(is.finite(as.numeric(bw$fval[1L])))
+  expect_gt(num.feval.fast, 0)
+  expect_gt(num.feval, num.feval.fast)
+})
+
 test_that("npindexbw nearest-neighbor selection stores integer support and exact fits stay public-green", {
   set.seed(314163)
   n <- 70L
