@@ -198,6 +198,48 @@ npindex.call <-
   )
 }
 
+.np_index_formula_reentry_xdat <- function(mf) {
+  terms.obj <- attr(mf, "terms")
+  mf[, attr(terms.obj, "term.labels"), drop = FALSE]
+}
+
+.np_index_formula_reentry_model_frame <- function(formula, txdat, tydat, call, caller_env) {
+  response.vars <- all.vars(formula[[2L]])
+  if (length(response.vars) != 1L)
+    stop("direct formula 'bws' with explicit 'txdat'/'tydat' requires a single response variable",
+         call. = FALSE)
+
+  data <- toFrame(txdat)
+  if (is.data.frame(tydat) && ncol(tydat) == 1L)
+    tydat <- tydat[[1L]]
+  data[[response.vars]] <- tydat
+
+  mf.call <- as.call(list(quote(stats::model.frame),
+                          formula = formula,
+                          data = as.name(".np_index_formula_reentry_data")))
+  call.names <- names(call)
+  for (arg in c("subset", "na.action")) {
+    pos <- match(arg, call.names, nomatch = 0L)
+    if (pos > 0L)
+      mf.call[[arg]] <- call[[pos]]
+  }
+
+  eval.env <- new.env(parent = caller_env)
+  eval.env$.np_index_formula_reentry_data <- data
+  eval(mf.call, envir = eval.env)
+}
+
+.np_index_formula_reentry_eval_xdat <- function(formula, xdat, caller_env) {
+  tt <- delete.response(terms(formula))
+  mf.call <- as.call(list(quote(stats::model.frame),
+                          formula = tt,
+                          data = as.name(".np_index_formula_reentry_data")))
+  eval.env <- new.env(parent = caller_env)
+  eval.env$.np_index_formula_reentry_data <- toFrame(xdat)
+  mf <- eval(mf.call, envir = eval.env)
+  .np_index_formula_reentry_xdat(mf)
+}
+
 npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
@@ -220,16 +262,38 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
 
   if (!has.explicit.bws && (bws.formula || bws.call) && !no.txdat && !no.tydat) {
     txdat <- toFrame(txdat)
+    if (bws.formula) {
+      mf <- .np_index_formula_reentry_model_frame(
+        formula = bws,
+        txdat = txdat,
+        tydat = tydat,
+        call = sc,
+        caller_env = parent.frame()
+      )
+      txdat <- .np_index_formula_reentry_xdat(mf)
+      tydat <- model.response(mf)
+    }
 
     dots <- list(...)
     bw.dots <- dots
     bw.dots$.np_fit_progress_handoff <- NULL
+    if (bws.formula)
+      bw.dots[c("subset", "na.action")] <- NULL
     bw.args <- c(list(xdat = txdat, ydat = tydat, nomad = nomad), bw.dots)
     tbw <- do.call(npindexbw, bw.args)
 
     fit.args <- list(bws = tbw, txdat = txdat, tydat = tydat)
     fit.dots <- dots
     fit.dots$.np_fit_progress_handoff <- TRUE
+    if (bws.formula) {
+      fit.dots[c("subset", "na.action")] <- NULL
+      if (!is.null(fit.dots$exdat))
+        fit.dots$exdat <- .np_index_formula_reentry_eval_xdat(
+          formula = bws,
+          xdat = fit.dots$exdat,
+          caller_env = parent.frame()
+        )
+    }
     return(do.call(npindex, c(fit.args, fit.dots)))
   }
 
