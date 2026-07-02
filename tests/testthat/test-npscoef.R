@@ -53,6 +53,63 @@ test_that("npscoefbw records ll/lp controls", {
   expect_identical(bw.lp$basis, "tensor")
 })
 
+test_that("npscoefbw threads optim.method through direct optimizer calls", {
+  collect_direct_calls <- function(expr, fun) {
+    hits <- list()
+    walk <- function(node) {
+      if (is.call(node)) {
+        head <- node[[1L]]
+        if (is.symbol(head) && identical(as.character(head), fun))
+          hits[[length(hits) + 1L]] <<- node
+        for (idx in seq_along(node)[-1L])
+          walk(node[[idx]])
+      } else if (is.pairlist(node) || is.expression(node)) {
+        for (idx in seq_along(node))
+          walk(node[[idx]])
+      }
+    }
+    walk(expr)
+    hits
+  }
+
+  uses_optim_method <- function(call) {
+    args <- as.list(call)
+    "method" %in% names(args) && identical(args[["method"]], quote(optim.method))
+  }
+
+  fn <- getFromNamespace("npscoefbw.scbandwidth", "npRmpi")
+  optim.calls <- collect_direct_calls(body(fn), "optim")
+
+  expect_gte(length(optim.calls), 3L)
+  expect_true(all(vapply(optim.calls, uses_optim_method, logical(1))))
+})
+
+test_that("npscoefbw BFGS optimizer route returns finite public state", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(44)
+  n <- 60L
+  x <- runif(n)
+  z <- runif(n)
+  y <- (0.4 + sin(2 * pi * x)) * z + rnorm(n, sd = 0.08)
+
+  bw <- suppressWarnings(npscoefbw(
+    xdat = x,
+    zdat = z,
+    ydat = y,
+    regtype = "lc",
+    bwmethod = "cv.ls",
+    nmulti = 1L,
+    optim.method = "BFGS",
+    optim.maxit = 5L,
+    optim.maxattempts = 1L
+  ))
+
+  expect_true(is.finite(as.numeric(bw$fval[1L])))
+  expect_gt(as.numeric(bw$num.feval[1L]), 0)
+})
+
 test_that("npscoef direct route accepts omitted tzdat with explicit bandwidths", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
