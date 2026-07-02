@@ -191,6 +191,31 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   A matrix of gradients along with average derivatives are computed and
   returned if \code{gradients=TRUE} is used.
 
+  \subsection{Interpreting \eqn{\beta} Coefficients}{
+    Single-index coefficients are identified only up to scale, so
+    \code{npindexbw} normalizes the first coefficient to one. The
+    remaining coefficients describe relative movement in the index
+    \eqn{X^\prime\beta}, not standalone linear-model slopes. Holding
+    other variables fixed, a one-unit increase in \eqn{X_j} changes the
+    index by the same amount as a \eqn{\beta_j}-unit increase in
+    \eqn{X_1}. Where the link derivative exists and is nonzero, this is
+    also the local marginal-effect ratio relative to \eqn{X_1}. Choose
+    the first continuous regressor deliberately when coefficient
+    interpretation is important.
+  }
+
+  \subsection{Optimizer Choice When Bandwidths Are Computed}{
+    When \code{npindex} computes its bandwidth object internally,
+    optimizer controls in \code{\dots} are passed to \code{\link{npindexbw}}.
+    The default \code{optim.method="Nelder-Mead"} is a robust
+    derivative-free starting point for low-dimensional searches, such as
+    one bandwidth plus only a few index coefficients. For larger
+    \eqn{p}, \code{optim.method="BFGS"} can be useful as a performance
+    and sensitivity comparison, but users should compare objective
+    values, convergence behavior, and fitted objects because the
+    single-index criterion can be nonconvex and route-sensitive.
+  }
+
   For practitioners who want the recommended automatic local-polynomial degree-and-bandwidth NOMAD route
   without spelling out all LP tuning arguments,
   \code{npindex(..., nomad=TRUE)} and \code{npindexbw(..., nomad=TRUE)}
