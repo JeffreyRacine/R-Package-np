@@ -969,7 +969,7 @@ npregbw.rbandwidth <-
     itmax = itmax,
     int_RESTART_FROM_MIN = if (isTRUE(remin)) RE_MIN_TRUE else RE_MIN_FALSE,
     int_MINIMIZE_IO = if (isTRUE(eval.only) || !isTRUE(getOption("np.messages"))) IO_MIN_TRUE else IO_MIN_FALSE,
-    bwmethod = if (identical(objective, "ks")) 3L else switch(bws$method,
+    bwmethod = if (identical(objective, "ks")) RBWM_CVKS else switch(bws$method,
       cv.aic = BWM_CVAIC,
       cv.ls = BWM_CVLS),
     kerneval = switch(bws$ckertype,
