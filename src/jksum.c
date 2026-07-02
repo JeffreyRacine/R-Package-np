@@ -11096,7 +11096,8 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
   int use_sparse_tree = 0;
   int tsf = 0;
   const int center_raw_basis = (int_glp_bernstein_extern == 0) && (int_glp_basis_extern == 1);
-  const int track_lowsupport = (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK);
+  const int track_lowsupport = (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
+    (bwm == RBWM_CVKS);
 
   if((num_obs <= 0) || (num_reg_continuous <= 0))
     return result;
