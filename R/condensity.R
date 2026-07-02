@@ -141,7 +141,8 @@ gradients.condensity <- function(x, errors = FALSE, gradient.order = NULL, ...) 
     regtype.engine = reg.spec$reg.engine,
     degree.engine = reg.spec$degree.engine,
     gradient.order = gorder,
-    ncon = x$bws$xncon
+    ncon = x$bws$xncon,
+    where = "gradients.condensity"
   )
   if (!any(available)) {
     stop("gradients.condensity has no available derivative components for the requested gradient.order and fitted polynomial degree",
