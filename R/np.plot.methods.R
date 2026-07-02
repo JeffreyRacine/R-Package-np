@@ -1066,6 +1066,105 @@ np_render_control <- function(style = c("band", "bar"),
   .np_inid_counts_matrix(n = n, B = B, counts = drawer(1L, B))
 }
 
+.np_plot_conmode_apply_block_bytes <- function() {
+  target <- getOption("np.plot.conmode.apply.block.bytes",
+                      128 * 1024^2)
+  target <- suppressWarnings(as.numeric(target)[1L])
+  if (!is.finite(target) || is.na(target) || target <= 0)
+    target <- 128 * 1024^2
+  target
+}
+
+.np_plot_conmode_apply_block_rows <- function(ntrain, neval) {
+  ntrain <- as.integer(ntrain)
+  neval <- as.integer(neval)
+  target <- .np_plot_conmode_apply_block_bytes()
+  rows <- as.integer(floor(target / (8 * max(1L, ntrain))))
+  rows <- max(1L, rows)
+  min(neval, rows)
+}
+
+.np_plot_conmode_apply_needs_chunk <- function(ntrain, neval) {
+  as.double(ntrain) * as.double(neval) * 8.0 >
+    .np_plot_conmode_apply_block_bytes()
+}
+
+.np_plot_conmode_bootstrap_values_chunked <- function(object,
+                                                      xtrain,
+                                                      ytrain,
+                                                      exdat,
+                                                      level,
+                                                      levels,
+                                                      t0,
+                                                      B,
+                                                      counts) {
+  n <- nrow(xtrain)
+  neval <- nrow(exdat)
+  level.idx <- match(level, levels)
+  if (is.na(level.idx))
+    stop("'level' must identify one response level in the fitted conmode object",
+         call. = FALSE)
+
+  block.rows <- .np_plot_conmode_apply_block_rows(ntrain = n, neval = neval)
+  block.starts <- seq.int(1L, neval, by = block.rows)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  proper.control <- .np_plot_conmode_proper_control(object)
+
+  progress <- .np_plot_bootstrap_progress_begin(
+    total = length(block.starts),
+    label = "Conmode probability bootstrap"
+  )
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+
+  old.progress <- getOption("np.plot.progress", TRUE)
+  options(np.plot.progress = FALSE)
+  on.exit(options(np.plot.progress = old.progress), add = TRUE)
+
+  for (ii in seq_along(block.starts)) {
+    start <- block.starts[ii]
+    stopi <- min(neval, start + block.rows - 1L)
+    rows <- start:stopi
+    ex.block <- exdat[rows, , drop = FALSE]
+    level.boot <- vector("list", length(levels))
+
+    for (k in seq_along(levels)) {
+      out <- .np_inid_boot_from_ksum_conditional(
+        xdat = xtrain,
+        ydat = ytrain,
+        exdat = ex.block,
+        eydat = .np_plot_conmode_level_factor(ytrain, levels[k], length(rows)),
+        bws = object$bws,
+        B = B,
+        cdf = FALSE,
+        counts = counts
+      )
+      if (is.null(out) || !is.matrix(out$t) ||
+          nrow(out$t) != B || ncol(out$t) != length(rows)) {
+        stop("conmode chunked probability bootstrap helper returned unexpected output shape",
+             call. = FALSE)
+      }
+      level.boot[[k]] <- out$t
+    }
+
+    for (bb in seq_len(B)) {
+      pmat <- matrix(NA_real_, nrow = length(rows), ncol = length(levels),
+                     dimnames = list(NULL, levels))
+      for (k in seq_along(levels))
+        pmat[, k] <- level.boot[[k]][bb, ]
+      proper.out <- .npConmodeProperProbabilities(
+        pmat,
+        levels = levels,
+        proper = isTRUE(object$proper.requested),
+        proper.control = proper.control
+      )
+      tmat[bb, rows] <- proper.out$probabilities[, level.idx]
+    }
+    progress <- .np_plot_progress_tick(progress, ii)
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_plot_conmode_bootstrap_values <- function(object,
                                               xtrain,
                                               ytrain,
@@ -1090,6 +1189,19 @@ np_render_control <- function(style = c("band", "bar"),
     blocklen = blocklen
   )
   level.idx <- match(level, levels)
+  if (.np_plot_conmode_apply_needs_chunk(ntrain = n, neval = nrow(exdat))) {
+    return(.np_plot_conmode_bootstrap_values_chunked(
+      object = object,
+      xtrain = xtrain,
+      ytrain = ytrain,
+      exdat = exdat,
+      level = level,
+      levels = levels,
+      t0 = t0,
+      B = B,
+      counts = counts
+    ))
+  }
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   progress <- .np_plot_bootstrap_progress_begin(
     total = B,
