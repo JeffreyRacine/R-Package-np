@@ -512,23 +512,40 @@ npindexbw.NULL <-
   if (!identical(bws$type, "fixed"))
     return(FALSE)
 
+  ckerbound <- if (is.null(bws$ckerbound) || !length(bws$ckerbound)) {
+    "none"
+  } else {
+    as.character(bws$ckerbound)[1L]
+  }
+  if (!identical(ckerbound, "none"))
+    return(FALSE)
+
+  ckertype <- as.character(bws$ckertype)[1L]
+  ckerorder <- as.integer(bws$ckerorder)[1L]
+  if (identical(ckertype, "truncated gaussian"))
+    return(FALSE)
+  if (!identical(ckertype, "uniform") &&
+      (!is.finite(ckerorder) || ckerorder != 2L))
+    return(FALSE)
+
   fast_largeh_tol <- npLargehRelTol()
 
   cont_utol <- switch(
-    bws$ckertype,
+    ckertype,
     gaussian = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
-    "truncated gaussian" = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
     epanechnikov = sqrt(fast_largeh_tol),
     uniform = 1.0 - 32.0 * .Machine$double.eps,
     0.0
   )
 
+  h <- as.double(h)
+  if (length(h) != 1L)
+    return(FALSE)
   if (!is.finite(cont_utol) || cont_utol <= 0 || !is.finite(h) || h <= 0)
     return(FALSE)
 
   vals <- as.double(eval.index)
-  vals <- vals[is.finite(vals)]
-  if (!length(vals))
+  if (!length(vals) || any(!is.finite(vals)))
     return(FALSE)
 
   h >= (diff(range(vals)) / cont_utol)

@@ -170,12 +170,36 @@ npindex.call <-
             bws = bws, ...)
   }
 
-.np_index_regression_bandwidth <- function(index.df, ydat, bws, spec) {
-  reg.args <- list(
+.np_index_kernel_args <- function(bws) {
+  args <- list(
     bwtype = bws$type,
     ckertype = bws$ckertype,
-    ckerorder = bws$ckerorder,
-    regtype = spec$regtype.engine
+    ckerorder = bws$ckerorder
+  )
+  if (!is.null(bws$ckerbound))
+    args$ckerbound <- bws$ckerbound
+  args
+}
+
+.np_index_ks_prediction <- function(prob) {
+  pred <- as.integer(round(as.double(prob)))
+  pmax(0L, pmin(1L, pred))
+}
+
+.np_index_ks_confusion_matrix <- function(actual, pred) {
+  table(
+    factor(as.integer(actual), levels = 0:1),
+    factor(pred, levels = 0:1),
+    dnn = c("Actual", "Predicted")
+  )
+}
+
+.np_index_regression_bandwidth <- function(index.df, ydat, bws, spec) {
+  reg.args <- c(
+    .np_index_kernel_args(bws),
+    list(
+      regtype = spec$regtype.engine
+    )
   )
   if (identical(spec$regtype.engine, "lp")) {
     reg.args$basis <- spec$basis.engine
@@ -539,12 +563,10 @@ npindex.sibandwidth <-
       txdat = index.df,
       tydat = tydat,
       bws = bws$bw,
-      bwtype = bws$type,
-      ckertype = bws$ckertype,
-      ckerorder = bws$ckerorder,
       regtype = regtype,
       warn.glp.gradient = FALSE
     )
+    npreg.idx.args <- c(npreg.idx.args, .np_index_kernel_args(bws))
     if (identical(regtype, "lp")) {
       npreg.idx.args$basis <- spec$basis.engine
       npreg.idx.args$degree <- spec$degree.engine
@@ -589,7 +611,8 @@ npindex.sibandwidth <-
     fast.largeh <- FALSE
     fast.largeh.eval.mean <- NULL
     fast.largeh.train.mean <- NULL
-    if (identical(regtype, "lc") && !gradients && !errors && !lc.fixed.progress.route) {
+    if (identical(regtype, "lc") && !gradients && !errors && !lc.fixed.progress.route &&
+        identical(bws$ckerbound, "none")) {
       gate.index <- if (no.ex) index else c(index, index.eval)
       fast.largeh <- .npindexbw_fast_eligible(
         h = as.double(bws$bw),
@@ -606,7 +629,8 @@ npindex.sibandwidth <-
             bws = bws$bw,
             bwtype = bws$type,
             ckertype = bws$ckertype,
-            ckerorder = bws$ckerorder
+            ckerorder = bws$ckerorder,
+            ckerbound = bws$ckerbound
           )$ksum
           as.double(tww.fast[1, 2, 1L] / NZD(tww.fast[2, 2, 1L]))
         }
@@ -621,7 +645,8 @@ npindex.sibandwidth <-
               bws = bws$bw,
               bwtype = bws$type,
               ckertype = bws$ckertype,
-              ckerorder = bws$ckerorder
+              ckerorder = bws$ckerorder,
+              ckerbound = bws$ckerbound
             )$ksum
             as.double(tww.fast[1, 2, 1L] / NZD(tww.fast[2, 2, 1L]))
           }
@@ -643,7 +668,8 @@ npindex.sibandwidth <-
                         bws=bws$bw,
                         bwtype = bws$type,
                         ckertype = bws$ckertype,
-                        ckerorder = bws$ckerorder)$ksum
+                        ckerorder = bws$ckerorder,
+                        ckerbound = bws$ckerbound)$ksum
 
           index.mean <- tww[1,2,]/NZD(tww[2,2,])
         }
@@ -664,7 +690,8 @@ npindex.sibandwidth <-
                           bws=bws$bw,
                           bwtype = bws$type,
                           ckertype = bws$ckertype,
-                          ckerorder = bws$ckerorder)$ksum
+                          ckerorder = bws$ckerorder,
+                          ckerbound = bws$ckerbound)$ksum
 
             index.tmean <- tww[1,2,]/NZD(tww[2,2,])
           }
@@ -755,13 +782,15 @@ npindex.sibandwidth <-
                         bws = bws$bw,
                         bwtype = bws$type,
                         ckertype = bws$ckertype,
-                        ckerorder = bws$ckerorder)$ksum
+                        ckerorder = bws$ckerorder,
+                        ckerbound = bws$ckerbound)$ksum
 
       tindex <- npksum(txdat = index.df,
                        bws = bws$bw,
                        bwtype = bws$type,
                        ckertype = bws$ckertype,
-                       ckerorder = bws$ckerorder)$ksum
+                       ckerorder = bws$ckerorder,
+                       ckerbound = bws$ckerbound)$ksum
 
       ## Need to trap case where k-1=1... ksum will return a 1 D
       ## array, need a 1 x n matrix
@@ -830,6 +859,7 @@ npindex.sibandwidth <-
           bwtype = bws$type,
           ckertype = bws$ckertype,
           ckerorder = bws$ckerorder,
+          ckerbound = bws$ckerbound,
           regtype = regtype,
           gradients = TRUE,
           warn.glp.gradient = FALSE
@@ -856,7 +886,8 @@ npindex.sibandwidth <-
                         bws = bws$bw,
                         bwtype = bws$type,
                         ckertype = bws$ckertype,
-                        ckerorder = bws$ckerorder)$ksum
+                        ckerorder = bws$ckerorder,
+                        ckerbound = bws$ckerbound)$ksum
 
           tww[1,2,]/NZD(tww[2,2,])
         } else {
@@ -869,6 +900,7 @@ npindex.sibandwidth <-
             bwtype = bws$type,
             ckertype = bws$ckertype,
             ckerorder = bws$ckerorder,
+            ckerbound = bws$ckerbound,
             regtype = regtype,
             gradients = FALSE,
             warn.glp.gradient = FALSE
@@ -925,13 +957,14 @@ npindex.sibandwidth <-
       strgof = "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN),"
       strres = (if (residuals) "resid = tydat - index.tmean," else "")
     } else if(bws$method == "kleinspady") {
-      index.pred =
-        if (!no.ey) round(index.mean)
-        else round(index.tmean)
+      index.pred <- .np_index_ks_prediction(
+        if (!no.ey) index.mean else index.tmean
+      )
 
-      confusion.matrix =
-        table(if (!no.ey) eydat else tydat,
-              index.pred, dnn=c("Actual", "Predicted"))
+      confusion.matrix <- .np_index_ks_confusion_matrix(
+        actual = if (!no.ey) eydat else tydat,
+        pred = index.pred
+      )
 
       CCR.overall <- sum(diag(confusion.matrix))/sum(confusion.matrix)
       CCR.byoutcome <- diag(confusion.matrix)/rowSums(confusion.matrix)
