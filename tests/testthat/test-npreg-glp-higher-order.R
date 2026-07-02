@@ -270,11 +270,36 @@ test_that("npreg lp gradients accessor honors stored derivative order", {
     gradient.order = 1L,
     warn.glp.gradient = FALSE
   )
-  expect_warning(
-    undefined <- gradients(fit.degree1, gradient.order = 2L),
-    "exceed polynomial degree"
+  expect_error(
+    gradients(fit.degree1, gradient.order = 2L),
+    "no available derivative components"
   )
-  expect_true(all(is.na(undefined[, 1L])))
+})
+
+test_that("GLP gradient availability rejects incoherent metadata", {
+  availability <- getFromNamespace("npGlpGradientAvailability", "np")
+  validate <- getFromNamespace("npValidateGlpGradientDegree", "np")
+
+  expect_error(
+    availability(
+      regtype.engine = "lp",
+      degree.engine = 1L,
+      gradient.order = c(1L, 1L),
+      ncon = 2L,
+      where = "test helper"
+    ),
+    "test helper received incoherent local-polynomial derivative metadata"
+  )
+  expect_error(
+    validate(
+      regtype.engine = "lp",
+      degree.engine = 1L,
+      gradient.order = c(1L, 1L),
+      ncon = 2L,
+      where = "test helper"
+    ),
+    "test helper received incoherent local-polynomial derivative metadata"
+  )
 })
 
 test_that("npreg lp Bernstein derivatives are returned on original scale", {

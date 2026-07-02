@@ -646,15 +646,18 @@ npGlpGradientAvailability <- function(regtype.engine,
                                       degree.engine,
                                       gradient.order,
                                       ncon,
-                                      allow.lp0.lc.first = TRUE) {
+                                      allow.lp0.lc.first = TRUE,
+                                      where = "local-polynomial estimator") {
   if (!identical(regtype.engine, "lp") || ncon == 0L)
     return(rep.int(TRUE, ncon))
 
   degree.engine <- as.integer(degree.engine)
   gradient.order <- as.integer(gradient.order)
 
-  if (length(degree.engine) != ncon || length(gradient.order) != ncon)
-    return(rep.int(FALSE, ncon))
+  if (length(degree.engine) != ncon || length(gradient.order) != ncon) {
+    stop(sprintf("%s received incoherent local-polynomial derivative metadata", where),
+         call. = FALSE)
+  }
 
   available <- gradient.order <= degree.engine
   if (isTRUE(allow.lp0.lc.first) &&
@@ -727,6 +730,11 @@ npValidateGlpGradientDegree <- function(regtype.engine,
 
   if (!length(degree.engine) || !length(gradient.order))
     return(invisible(gradient.order))
+
+  if (length(degree.engine) != ncon || length(gradient.order) != ncon) {
+    stop(sprintf("%s received incoherent local-polynomial derivative metadata", where),
+         call. = FALSE)
+  }
 
   if (isTRUE(allow.lp0.lc.first) &&
       npGlpDegree0FirstDerivativeLcOk(

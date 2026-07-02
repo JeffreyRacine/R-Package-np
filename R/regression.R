@@ -123,8 +123,13 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
     regtype.engine = x$bws$regtype,
     degree.engine = x$bws$degree,
     gradient.order = gorder,
-    ncon = x$bws$ncon
+    ncon = x$bws$ncon,
+    where = "gradients.npregression"
   )
+  if (!any(available)) {
+    stop("gradients.npregression has no available derivative components for the requested gradient.order and fitted polynomial degree",
+         call. = FALSE)
+  }
   if (any(!available)) {
     npWarnGlpGradientPartialAvailability(
       where = "gradients.npregression",
