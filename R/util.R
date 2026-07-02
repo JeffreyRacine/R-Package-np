@@ -3983,6 +3983,7 @@ DBWM_CVLS = 0
 
 ##regression
 BWM_CVAIC = 0
+RBWM_CVKS = 3L
 
 REGTYPE_LC = 0
 REGTYPE_LL = 1
