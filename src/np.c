@@ -4239,6 +4239,22 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   safe_free(np_conditional_density_nomad_shadow.ipt_xy);
   safe_free(np_conditional_density_nomad_shadow.ipt_lookup_xy);
 
+  np_conditional_density_nomad_shadow.glp_degree = NULL;
+  np_conditional_density_nomad_shadow.vector_scale_factor = NULL;
+  np_conditional_density_nomad_shadow.cxkerlb = NULL;
+  np_conditional_density_nomad_shadow.cxkerub = NULL;
+  np_conditional_density_nomad_shadow.cykerlb = NULL;
+  np_conditional_density_nomad_shadow.cykerub = NULL;
+  np_conditional_density_nomad_shadow.cxykerlb = NULL;
+  np_conditional_density_nomad_shadow.cxykerub = NULL;
+  np_conditional_density_nomad_shadow.extendednn_upper = NULL;
+  np_conditional_density_nomad_shadow.ipt_x = NULL;
+  np_conditional_density_nomad_shadow.ipt_y = NULL;
+  np_conditional_density_nomad_shadow.ipt_xy = NULL;
+  np_conditional_density_nomad_shadow.ipt_lookup_x = NULL;
+  np_conditional_density_nomad_shadow.ipt_lookup_y = NULL;
+  np_conditional_density_nomad_shadow.ipt_lookup_xy = NULL;
+
   matrix_Y_unordered_train_extern = NULL;
   matrix_Y_ordered_train_extern = NULL;
   matrix_Y_continuous_train_extern = NULL;
