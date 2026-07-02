@@ -429,14 +429,15 @@ These arguments control outer optimization behavior for the semiparametric searc
     they do not store a matrix they may be successful in much larger
     optimization problems.
 
-    For single-index models with a high-dimensional coefficient vector
-    \eqn{\beta}, particularly continuous-response Ichimura fits,
-    \code{optim.method="BFGS"} may require substantially fewer objective
-    evaluations than the default \code{"Nelder-Mead"} search. Because
-    the objective can be nonconvex and route-sensitive, users should
-    compare the selected objective value, convergence behavior, and
-    resulting bandwidth object against the default search before relying
-    on the result.
+    The default \code{"Nelder-Mead"} method is a reasonable, robust
+    derivative-free default when the search dimension is small, such as
+    one scalar bandwidth plus only a few index coefficients. As the
+    number of predictors grows, the \eqn{\beta} search becomes higher
+    dimensional and \code{optim.method="BFGS"} can be a useful
+    performance and sensitivity comparison. Because the single-index
+    objective can be nonconvex and route-sensitive, compare the selected
+    objective value, convergence behavior, and resulting bandwidth
+    object against the default search before relying on the result.
   }
 
   \item{optim.reltol}{
@@ -518,6 +519,34 @@ or standard-deviation factors.
   requires that the explanatory variables contain \emph{at least one}
   continuous variable.
 
+  \subsection{Interpreting \eqn{\beta} Coefficients}{
+    The scale of \eqn{X^\prime\beta} and the scale of the unknown link
+    function are not separately identified, so \code{npindexbw}
+    normalizes the first coefficient to one. The remaining coefficients
+    should therefore be read relative to the first explanatory variable,
+    not as standalone linear-model slopes. Holding other variables fixed,
+    a one-unit increase in \eqn{X_j} changes the index by the same amount
+    as a \eqn{\beta_j}-unit increase in \eqn{X_1}. Where the link
+    derivative exists and is nonzero, marginal-effect ratios satisfy
+    \eqn{\partial g(X^\prime\beta)/\partial X_j \; /\;
+    \partial g(X^\prime\beta)/\partial X_1 = \beta_j}{dg/dX_j divided
+    by dg/dX_1 = beta_j}. Signs and magnitudes are therefore relative to
+    the chosen first variable and its units; choose the first continuous
+    regressor deliberately when interpretation is important.
+  }
+
+  \subsection{Choosing \code{optim.method}}{
+    The default \code{"Nelder-Mead"} search is often a good starting
+    point for low-dimensional single-index problems because it uses only
+    objective values and is comparatively tolerant of rough objective
+    surfaces. When \eqn{p} is larger, especially when many coefficients
+    enter \eqn{\beta}, \code{"BFGS"} may reduce runtime for some
+    problems, but it is more dependent on local smoothness and on the
+    quality of numerical gradient information. For important fits, try
+    both methods with adequate multistarts and compare the final
+    objective values, convergence messages, and fitted objects.
+  }
+
   \code{npindexbw} may be invoked \emph{either} with a formula-like
   symbolic description of variables on which bandwidth selection is to
   be performed \emph{or} through a simpler interface whereby data is
@@ -531,12 +560,9 @@ or standard-deviation factors.
   exploratory purposes, you may wish to override the default search
   tolerances, say, setting \code{optim.reltol=.1} and conduct
   multistarting (the default is to restart min(2, ncol(xdat)) times) as is done
-  for a number of examples. When the number of predictors is large and
-  the resulting \eqn{\beta} search is high-dimensional, users may also
-  wish to try \code{optim.method="BFGS"} as an exploratory comparison,
-  especially for \code{method="ichimura"}, while checking that the final
-  objective value and fitted object are at least as satisfactory as
-  those obtained with the default \code{"Nelder-Mead"} method.
+  for a number of examples. See the optimizer guidance above when
+  choosing between the default \code{"Nelder-Mead"} method and
+  \code{optim.method="BFGS"} for higher-dimensional index searches.
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{dependent data
