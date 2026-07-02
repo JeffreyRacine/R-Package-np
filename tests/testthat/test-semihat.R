@@ -1352,3 +1352,92 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
   expect_equal(ncol(si.out[[1]]$merr), 2L)
   expect_false(all(is.na(si.out[[1]]$merr)))
 })
+
+test_that("partial linear wild plot bootstrap apply helper matches dense hat contract", {
+  skip_on_cran()
+
+  old.chunk <- getOption("np.plot.wild.chunk.size")
+  old.block <- getOption("np.plot.plreg.apply.block.bytes")
+  old.threshold <- getOption("np.plot.plreg.wild.apply.operator.threshold.bytes")
+  on.exit(options(np.plot.wild.chunk.size = old.chunk,
+                  np.plot.plreg.apply.block.bytes = old.block,
+                  np.plot.plreg.wild.apply.operator.threshold.bytes = old.threshold),
+          add = TRUE)
+  options(np.plot.wild.chunk.size = 3L,
+          np.plot.plreg.apply.block.bytes = 64L,
+          np.plot.plreg.wild.apply.operator.threshold.bytes = 0)
+
+  set.seed(20260702)
+  n <- 32
+  x <- runif(n)
+  z <- runif(n)
+  y <- sin(2 * pi * z) + 1.25 * x + rnorm(n, sd = 0.03)
+  xdf <- data.frame(x = x)
+  zdf <- data.frame(z = z)
+  ex <- data.frame(x = seq(0.15, 0.85, length.out = 6L))
+  ez <- data.frame(z = seq(0.2, 0.8, length.out = 6L))
+
+  cfgs <- list(
+    list(regtype = "lc"),
+    list(regtype = "ll"),
+    list(regtype = "lp", basis = "glp", degree = 2L)
+  )
+  apply.helper <- getFromNamespace(".np_plot_plreg_boot_from_apply_wild", "npRmpi")
+  dense.helper <- getFromNamespace(".np_plot_boot_from_hat_wild", "npRmpi")
+
+  for (cfg in cfgs) {
+    args <- c(
+      list(
+        xdat = x,
+        zdat = z,
+        ydat = y,
+        bws = matrix(c(0.24, 0.24), nrow = 2L, ncol = 1L),
+        bandwidth.compute = FALSE,
+        regtype = cfg$regtype
+      ),
+      cfg[setdiff(names(cfg), "regtype")]
+    )
+    plbw <- do.call(npplregbw, args)
+
+    set.seed(1001)
+    bounded <- apply.helper(
+      bws = plbw,
+      txdat = xdf,
+      ydat = y,
+      tzdat = zdf,
+      exdat = ex,
+      ezdat = ez,
+      B = 7L,
+      wild = "rademacher"
+    )
+
+    fit.mean <- as.vector(npplreghat(
+      bws = plbw,
+      txdat = xdf,
+      tzdat = zdf,
+      exdat = xdf,
+      ezdat = zdf,
+      y = y,
+      output = "apply"
+    ))
+    H <- npplreghat(
+      bws = plbw,
+      txdat = xdf,
+      tzdat = zdf,
+      exdat = ex,
+      ezdat = ez,
+      output = "matrix"
+    )
+    set.seed(1001)
+    dense <- dense.helper(
+      H = H,
+      ydat = y,
+      fit.mean = fit.mean,
+      B = 7L,
+      wild = "rademacher"
+    )
+
+    expect_equal(bounded$t0, dense$t0, tolerance = 1.0e-8)
+    expect_equal(bounded$t, dense$t, tolerance = 1.0e-8)
+  }
+})

@@ -5962,6 +5962,277 @@
   list(train = x.train.num, eval = x.eval.num)
 }
 
+.np_plot_plreg_apply_block_rows <- function(ntrain, neval) {
+  target <- getOption("np.plot.plreg.apply.block.bytes", 32 * 1024^2)
+  target <- suppressWarnings(as.numeric(target)[1L])
+  if (!is.finite(target) || is.na(target) || target <= 0)
+    target <- 32 * 1024^2
+  rows <- as.integer(floor(target / (8 * max(1L, as.integer(ntrain)))))
+  max(1L, min(as.integer(neval), rows))
+}
+
+.np_plot_plreg_wild_apply_operator_enabled <- function(ntrain, neval) {
+  threshold <- getOption(
+    "np.plot.plreg.wild.apply.operator.threshold.bytes",
+    getOption("np.plot.wild.apply.operator.threshold.bytes", 128 * 1024^2)
+  )
+  threshold <- suppressWarnings(as.numeric(threshold)[1L])
+  if (!is.finite(threshold) || is.na(threshold) || threshold < 0)
+    threshold <- 128 * 1024^2
+  hidden.self.bytes <- as.double(ntrain) * as.double(ntrain) * 8.0
+  eval.bytes <- as.double(ntrain) * as.double(neval) * 8.0
+  max(hidden.self.bytes, eval.bytes) >= threshold
+}
+
+.np_plot_plreg_response_matrix <- function(y, n, where) {
+  yy <- as.matrix(y)
+  if (nrow(yy) != n)
+    stop(sprintf("%s requires response rows to match training rows", where),
+         call. = FALSE)
+  if (!is.numeric(yy))
+    storage.mode(yy) <- "double"
+  yy
+}
+
+.np_plot_plreg_npreghat_apply_chunked <- function(bws,
+                                                  txdat,
+                                                  exdat,
+                                                  y,
+                                                  where) {
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+  yy <- .np_plot_plreg_response_matrix(y, n = nrow(txdat), where = where)
+  neval <- nrow(exdat)
+  if (neval < 1L)
+    stop(sprintf("%s requires at least one evaluation row", where),
+         call. = FALSE)
+
+  out <- matrix(NA_real_, nrow = neval, ncol = ncol(yy))
+  block.rows <- .np_plot_plreg_apply_block_rows(ntrain = nrow(txdat),
+                                                neval = neval)
+  start <- 1L
+  while (start <= neval) {
+    stopi <- min(neval, start + block.rows - 1L)
+    rows <- seq.int(start, stopi)
+    val <- npreghat(
+      bws = bws,
+      txdat = txdat,
+      exdat = exdat[rows, , drop = FALSE],
+      y = yy,
+      output = "apply"
+    )
+    val <- matrix(as.double(val), nrow = length(rows), ncol = ncol(yy))
+    out[rows, ] <- val
+    start <- stopi + 1L
+  }
+
+  out
+}
+
+.np_plot_plreg_apply_common <- function(bws,
+                                        txdat,
+                                        tzdat,
+                                        where = "partial linear plot bootstrap") {
+  txdat <- toFrame(txdat)
+  tzdat <- toFrame(tzdat)
+  n <- nrow(txdat)
+  p <- ncol(txdat)
+  if (nrow(tzdat) != n)
+    stop(sprintf("%s requires aligned txdat/tzdat rows", where),
+         call. = FALSE)
+  if (n < 1L || p < 1L)
+    stop(sprintf("%s requires non-empty training data", where),
+         call. = FALSE)
+
+  txdat <- adjustLevels(txdat, bws$xdati)
+  tzdat <- adjustLevels(tzdat, bws$zdati)
+  x.num <- .np_plreg_numeric_x_matrix(txdat = txdat, exdat = txdat, bws = bws)
+  x.train.num <- x.num$train
+  resx.train <- matrix(0.0, nrow = n, ncol = p)
+
+  for (j in seq_len(p)) {
+    xhat.train <- .np_plot_plreg_npreghat_apply_chunked(
+      bws = bws$bw[[j + 1L]],
+      txdat = tzdat,
+      exdat = tzdat,
+      y = x.train.num[, j],
+      where = where
+    )
+    resx.train[, j] <- x.train.num[, j] - as.vector(xhat.train)
+  }
+
+  list(
+    bws = bws,
+    txdat = txdat,
+    tzdat = tzdat,
+    n = n,
+    p = p,
+    x.train.num = x.train.num,
+    qrR = qr(resx.train, tol = .Machine$double.eps)
+  )
+}
+
+.np_plot_plreg_apply_eval_state <- function(common,
+                                            exdat,
+                                            ezdat,
+                                            where = "partial linear plot bootstrap") {
+  exdat <- toFrame(exdat)
+  ezdat <- toFrame(ezdat)
+  if (nrow(exdat) != nrow(ezdat))
+    stop(sprintf("%s requires aligned exdat/ezdat rows", where),
+         call. = FALSE)
+  if (ncol(exdat) != common$p)
+    stop(sprintf("%s training/evaluation linear regressor dimensions do not match",
+                 where),
+         call. = FALSE)
+
+  npKernelBoundsCheckEval(ezdat, common$bws$zdati$icon,
+                          common$bws$ckerlb, common$bws$ckerub,
+                          argprefix = "cker")
+  exdat <- adjustLevels(exdat, common$bws$xdati, allowNewCells = TRUE)
+  ezdat <- adjustLevels(ezdat, common$bws$zdati, allowNewCells = TRUE)
+  x.num <- .np_plreg_numeric_x_matrix(txdat = common$txdat,
+                                      exdat = exdat,
+                                      bws = common$bws)
+  x.eval.num <- x.num$eval
+  resx.eval <- matrix(0.0, nrow = nrow(exdat), ncol = common$p)
+
+  for (j in seq_len(common$p)) {
+    xhat.eval <- .np_plot_plreg_npreghat_apply_chunked(
+      bws = common$bws$bw[[j + 1L]],
+      txdat = common$tzdat,
+      exdat = ezdat,
+      y = common$x.train.num[, j],
+      where = where
+    )
+    resx.eval[, j] <- x.eval.num[, j] - as.vector(xhat.eval)
+  }
+
+  list(
+    common = common,
+    ezdat = ezdat,
+    resx.eval = resx.eval
+  )
+}
+
+.np_plot_plreg_apply_from_state <- function(state,
+                                            y,
+                                            where = "partial linear plot bootstrap",
+                                            drop = TRUE) {
+  common <- state$common
+  yy <- .np_plot_plreg_response_matrix(y, n = common$n, where = where)
+  Hy.train <- .np_plot_plreg_npreghat_apply_chunked(
+    bws = common$bws$bw$yzbw,
+    txdat = common$tzdat,
+    exdat = common$tzdat,
+    y = yy,
+    where = where
+  )
+  Hy.eval <- .np_plot_plreg_npreghat_apply_chunked(
+    bws = common$bws$bw$yzbw,
+    txdat = common$tzdat,
+    exdat = state$ezdat,
+    y = yy,
+    where = where
+  )
+  beta <- qr.coef(common$qrR, yy - Hy.train)
+  beta[is.na(beta)] <- 0.0
+
+  out <- Hy.eval + state$resx.eval %*% beta
+  if (isTRUE(drop) && ncol(out) == 1L)
+    as.vector(out)
+  else
+    out
+}
+
+.np_plot_plreg_boot_from_apply_wild <- function(bws,
+                                                txdat,
+                                                ydat,
+                                                tzdat,
+                                                exdat,
+                                                ezdat,
+                                                B,
+                                                wild,
+                                                progress.label = "Plot bootstrap wild") {
+  B <- as.integer(B)
+  if (B < 1L)
+    stop("B must be a positive integer")
+  where <- "partial linear wild plot bootstrap"
+  common <- .np_plot_plreg_apply_common(
+    bws = bws,
+    txdat = txdat,
+    tzdat = tzdat,
+    where = where
+  )
+  train.state <- .np_plot_plreg_apply_eval_state(
+    common = common,
+    exdat = txdat,
+    ezdat = tzdat,
+    where = where
+  )
+  eval.state <- .np_plot_plreg_apply_eval_state(
+    common = common,
+    exdat = exdat,
+    ezdat = ezdat,
+    where = where
+  )
+
+  fit.mean <- as.vector(.np_plot_plreg_apply_from_state(
+    state = train.state,
+    y = ydat,
+    where = where
+  ))
+  ydat <- as.double(ydat)
+  residuals <- as.double(ydat - fit.mean)
+  if (length(residuals) != common$n)
+    stop("length mismatch between fitted means and residuals for wild bootstrap")
+
+  t0 <- as.vector(.np_plot_plreg_apply_from_state(
+    state = eval.state,
+    y = ydat,
+    where = where
+  ))
+  neval <- length(t0)
+  out <- matrix(NA_real_, nrow = B, ncol = neval)
+
+  chunk.size <- .np_wild_chunk_size(n = common$n, B = B)
+  wild <- .np_plot_normalize_wild(wild)
+  draw.fun <- if (identical(wild, "mammen")) .np_mammen_draws else .np_rademacher_draws
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size,
+                                                        progress = progress)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    draws <- draw.fun(n = common$n, B = bsz)
+    ystar <- residuals * draws
+    ystar <- ystar + fit.mean
+    pred <- .np_plot_plreg_apply_from_state(
+      state = eval.state,
+      y = ystar,
+      where = where,
+      drop = FALSE
+    )
+    pred <- matrix(as.double(pred), nrow = neval, ncol = bsz)
+    out[start:stopi, ] <- t(pred)
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = out, t0 = t0)
+}
+
 .np_plreg_weighted_coef <- function(X, y, w, ridge = 1.0e-12) {
   X <- as.matrix(X)
   y <- as.double(y)
@@ -17341,42 +17612,61 @@ compute.bootstrap.errors.plbandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.mean <- as.vector(npplreghat(
-        bws = bws,
-        txdat = xdat,
-        tzdat = zdat,
-        exdat = xdat,
-        ezdat = zdat,
-        y = ydat,
-        output = "apply"
-      ))
-      H <- npplreghat(
-        bws = bws,
-        txdat = xdat,
-        tzdat = zdat,
-        exdat = exdat,
-        ezdat = ezdat,
-        output = "matrix"
+      use.apply <- .np_plot_plreg_wild_apply_operator_enabled(
+        ntrain = nrow(xdat),
+        neval = nrow(exdat)
       )
-
-      t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - fit.mean)
-      n <- length(eps)
-      B <- plot.errors.boot.num
-
-      boot.out <- .npRmpi_with_local_bootstrap({
-        list(
-          t = .np_wild_boot_t(
-            H = H,
-            fit.mean = fit.mean,
-            residuals = eps,
-            B = B,
+      if (isTRUE(use.apply)) {
+        boot.out <- .npRmpi_with_local_bootstrap({
+          .np_plot_plreg_boot_from_apply_wild(
+            bws = bws,
+            txdat = xdat,
+            ydat = ydat,
+            tzdat = zdat,
+            exdat = exdat,
+            ezdat = ezdat,
+            B = plot.errors.boot.num,
             wild = plot.errors.boot.wild,
             progress.label = progress.label
-          ),
-          t0 = t0
+          )
+        })
+      } else {
+        fit.mean <- as.vector(npplreghat(
+          bws = bws,
+          txdat = xdat,
+          tzdat = zdat,
+          exdat = xdat,
+          ezdat = zdat,
+          y = ydat,
+          output = "apply"
+        ))
+        H <- npplreghat(
+          bws = bws,
+          txdat = xdat,
+          tzdat = zdat,
+          exdat = exdat,
+          ezdat = ezdat,
+          output = "matrix"
         )
-      })
+        t0 <- as.vector(H %*% as.double(ydat))
+        eps <- as.double(ydat - fit.mean)
+        n <- length(eps)
+        B <- plot.errors.boot.num
+
+        boot.out <- .npRmpi_with_local_bootstrap({
+          list(
+            t = .np_wild_boot_t(
+              H = H,
+              fit.mean = fit.mean,
+              residuals = eps,
+              B = B,
+              wild = plot.errors.boot.wild,
+              progress.label = progress.label
+            ),
+            t0 = t0
+          )
+        })
+      }
     } else {
       boot.out <- NULL
       if (is.inid) {
