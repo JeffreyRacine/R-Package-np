@@ -184,19 +184,35 @@ npindex.call <-
   mf[, attr(terms.obj, "term.labels"), drop = FALSE]
 }
 
-.np_index_formula_reentry_model_frame <- function(formula, txdat, tydat, call, caller_env) {
+.np_index_formula_reentry_rhs_terms <- function(formula, xdat) {
+  delete.response(terms(formula, data = toFrame(xdat)))
+}
+
+.np_index_formula_reentry_response_name <- function(formula) {
   response.vars <- all.vars(formula[[2L]])
   if (length(response.vars) != 1L)
     stop("direct formula 'bws' with explicit 'txdat'/'tydat' requires a single response variable",
          call. = FALSE)
+  response.vars
+}
 
+.np_index_formula_reentry_model_frame <- function(formula, txdat, tydat, call, caller_env) {
   data <- toFrame(txdat)
   if (is.data.frame(tydat) && ncol(tydat) == 1L)
     tydat <- tydat[[1L]]
-  data[[response.vars]] <- tydat
+  data[[.np_index_formula_reentry_response_name(formula)]] <- tydat
+  data[[".np_index_formula_reentry_response"]] <- tydat
+
+  rhs.formula <- formula(.np_index_formula_reentry_rhs_terms(formula, txdat))
+  mf.formula <- as.formula(
+    as.call(list(as.name("~"),
+                 as.name(".np_index_formula_reentry_response"),
+                 rhs.formula[[2L]])),
+    env = environment(formula)
+  )
 
   mf.call <- as.call(list(quote(stats::model.frame),
-                          formula = formula,
+                          formula = mf.formula,
                           data = as.name(".np_index_formula_reentry_data")))
   call.names <- names(call)
   for (arg in c("subset", "na.action")) {
@@ -211,7 +227,7 @@ npindex.call <-
 }
 
 .np_index_formula_reentry_eval_xdat <- function(formula, xdat, caller_env) {
-  tt <- delete.response(terms(formula))
+  tt <- .np_index_formula_reentry_rhs_terms(formula, xdat)
   mf.call <- as.call(list(quote(stats::model.frame),
                           formula = tt,
                           data = as.name(".np_index_formula_reentry_data")))
