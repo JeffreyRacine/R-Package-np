@@ -56,7 +56,10 @@
       Accelerate support; \code{TRUE} requests them when available; and
       \code{FALSE} disables them exactly. Default is \code{"auto"}. On
       non-macOS, non-arm64, or non-Accelerate builds, this option falls back to
-      the ordinary portable code path.
+      the ordinary portable code path. Accelerated and portable paths may use
+      different math-library kernels or summation orders, so platform or option
+      comparisons should use numerical tolerances; reserve exact equality for
+      controlled runs using the same acceleration setting.
     }
   }
 
