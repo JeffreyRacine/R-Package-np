@@ -828,6 +828,38 @@ npscoefbw.NULL <-
   invisible(NULL)
 }
 
+.npscoefbw_nomad_service_task_error <- function(message,
+                                                task,
+                                                rank) {
+  task.type <- if (is.list(task) && !is.null(task$type))
+    as.character(task$type)[1L]
+  else
+    NA_character_
+  err <- list(
+    kind = "service_error",
+    rank = as.integer(rank)[1L],
+    task_type = task.type,
+    message = as.character(message)[1L]
+  )
+  .npRmpi_transport_trace(
+    role = "npscoefbw.nomad.lp.service",
+    event = "task.error",
+    fields = err
+  )
+  invisible(err)
+}
+
+.npscoefbw_nomad_invalid_worker_result <- function(message,
+                                                   task,
+                                                   rank) {
+  .npscoefbw_nomad_service_task_error(
+    message = message,
+    task = task,
+    rank = rank
+  )
+  list(sse = 0.0, invalid = 1L)
+}
+
 .npscoefbw_nomad_slave_loop <- function(REF,
                                         COMM = 1L,
                                         REQ_BASE = 61100L,
@@ -844,7 +876,22 @@ npscoefbw.NULL <-
 
   repeat {
     msg <- mpi.recv.Robj(source = 0L, tag = REQ_BASE + rank, comm = COMM)
-    if (is.list(msg) && identical(msg$type, "stop")) {
+    if (!is.list(msg) || is.null(msg$type)) {
+      out <- .npscoefbw_nomad_invalid_worker_result(
+        message = "malformed npscoefbw NOMAD service task",
+        task = msg,
+        rank = rank
+      )
+      mpi.send.Robj(
+        obj = out,
+        dest = 0L,
+        tag = RES_BASE + rank,
+        comm = COMM
+      )
+      next
+    }
+
+    if (identical(msg$type, "stop")) {
       try(
         mpi.send.Robj(
           obj = list(type = "stopped", rank = rank),
@@ -857,6 +904,36 @@ npscoefbw.NULL <-
       break
     }
 
+    if (!identical(msg$type, "eval")) {
+      out <- .npscoefbw_nomad_invalid_worker_result(
+        message = "unknown npscoefbw NOMAD service task",
+        task = msg,
+        rank = rank
+      )
+      mpi.send.Robj(
+        obj = out,
+        dest = 0L,
+        tag = RES_BASE + rank,
+        comm = COMM
+      )
+      next
+    }
+
+    if (is.null(msg$bws) || is.null(msg$idx)) {
+      out <- .npscoefbw_nomad_invalid_worker_result(
+        message = "malformed npscoefbw NOMAD eval task",
+        task = msg,
+        rank = rank
+      )
+      mpi.send.Robj(
+        obj = out,
+        dest = 0L,
+        tag = RES_BASE + rank,
+        comm = COMM
+      )
+      next
+    }
+
     out <- tryCatch(
       .npscoefbw_nomad_lp_eval_subset(
         ctx = ctx,
@@ -865,7 +942,13 @@ npscoefbw.NULL <-
         maxPenalty = sqrt(.Machine$double.xmax),
         localize = TRUE
       ),
-      error = function(e) list(sse = 0.0, invalid = 1L)
+      error = function(e) {
+        .npscoefbw_nomad_invalid_worker_result(
+          message = conditionMessage(e),
+          task = msg,
+          rank = rank
+        )
+      }
     )
 
     mpi.send.Robj(
