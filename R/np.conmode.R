@@ -52,6 +52,8 @@ npconmode.formula <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
+    if (!is.null(data))
+      tmf[["data"]] <- substitute(data)
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
     train.omit <- attr(tmf, "na.action")
