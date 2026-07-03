@@ -42,6 +42,58 @@ test_that("np.largeh toggles continuous large-bandwidth shortcuts", {
   expect_equal(reenabled$num.feval.fast, 1)
 })
 
+test_that("np.largeh continuous shortcut eligibility rejects unsafe kernels", {
+  if (exists("spawn_mpi_slaves", mode = "function")) {
+    skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  } else {
+    skip_if_not(isTRUE(getOption("npRmpi.mpi.initialized", FALSE)),
+                "MPI pool unavailable")
+  }
+  on.exit(close_mpi_slaves(force = FALSE), add = TRUE)
+
+  old.options <- options(np.tree = FALSE, np.largeh = TRUE, np.largelambda = TRUE)
+  on.exit(options(old.options), add = TRUE)
+
+  npregbw <- getFromNamespace("npregbw", "npRmpi")
+  eval_only <- getFromNamespace(".npregbw_eval_only", "npRmpi")
+
+  set.seed(4401)
+  n <- 100L
+  xdat <- data.frame(x = runif(n))
+  ydat <- sin(xdat$x) + rnorm(n, sd = 0.05)
+  cases <- data.frame(
+    ckertype = c("gaussian", "gaussian", "epanechnikov", "epanechnikov",
+                 "uniform", "truncated gaussian"),
+    ckerorder = c(2L, 4L, 2L, 4L, 2L, 2L),
+    expected.fast = c(1L, 0L, 1L, 0L, 1L, 0L),
+    stringsAsFactors = FALSE
+  )
+
+  for (i in seq_len(nrow(cases))) {
+    row <- cases[i, ]
+    bws <- suppressWarnings(npregbw(
+      xdat = xdat,
+      ydat = ydat,
+      regtype = "ll",
+      bwmethod = "cv.ls",
+      ckertype = row$ckertype,
+      ckerorder = row$ckerorder,
+      bandwidth.compute = FALSE,
+      bws = 1e8
+    ))
+
+    options(np.largeh = TRUE)
+    enabled <- eval_only(xdat = xdat, ydat = ydat, bws = bws)
+    options(np.largeh = FALSE)
+    disabled <- eval_only(xdat = xdat, ydat = ydat, bws = bws)
+    options(np.largeh = TRUE)
+
+    expect_equal(enabled$objective, disabled$objective, tolerance = 1e-10)
+    expect_equal(as.integer(enabled$num.feval.fast), row$expected.fast)
+    expect_equal(as.integer(disabled$num.feval.fast), 0L)
+  }
+})
+
 test_that("np.largelambda toggles discrete upper-lambda shortcuts", {
   if (exists("spawn_mpi_slaves", mode = "function")) {
     skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
@@ -144,7 +196,8 @@ test_that("np.largeh toggles one-step continuous bandwidth-search fast counts", 
 
   expect_equal(enabled$fval, disabled$fval, tolerance = 1e-10)
   expect_gt(as.numeric(enabled$num.feval.fast[1L]), 0)
-  expect_equal(as.numeric(disabled$num.feval.fast[1L]), 0)
+  expect_gt(as.numeric(enabled$num.feval.fast[1L]),
+            as.numeric(disabled$num.feval.fast[1L]))
 })
 
 test_that("np.largeh and np.largelambda both gate mixed fast objective rows", {
@@ -306,7 +359,7 @@ test_that("np.largeh toggles unconditional distribution bandwidth fast counts", 
       "                      nmulti = 1L, itmax = 1L, ngrid = 20L)",
       "stopifnot(isTRUE(all.equal(enabled$fval, disabled$fval, tolerance = 1e-10)))",
       "stopifnot(as.numeric(enabled$num.feval.fast[1L]) > 0)",
-      "stopifnot(identical(as.numeric(disabled$num.feval.fast[1L]), 0))",
+      "stopifnot(as.numeric(enabled$num.feval.fast[1L]) > as.numeric(disabled$num.feval.fast[1L]))",
       "cat('NPUDIST_LARGEH_OPTION_OK\\n')"
     ),
     timeout = 60L,

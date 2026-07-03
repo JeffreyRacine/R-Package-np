@@ -582,7 +582,6 @@ npregbw.rbandwidth <-
   }
 
   if (ncon > 0L &&
-      identical(method, "cv.ls") &&
       bwtype %in% c("generalized_nn", "adaptive_nn") &&
       !identical(regtype, "lc")) {
     return(DO_TREE_NO)
