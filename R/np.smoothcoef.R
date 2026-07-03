@@ -874,7 +874,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
 
       i = 0
       max.err <- .Machine$double.xmax
-      aydat <- abs(tydat) + .Machine$double.eps
+      aydat <- max(mean(abs(tydat)),
+                   stats::sd(as.double(tydat)),
+                   .Machine$double.eps,
+                   na.rm = TRUE)
 
       n.part <- (ncol(txdat)+1)
 
@@ -886,10 +889,18 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
 
           ## use to calculate new beta implicitly
 
+          partial.bws <- bws
+          if (!is.null(bws$bw.fitted))
+            partial.bws <- .npscoef_apply_bw_to_scbw(
+              scbw = bws,
+              param = bws$bw.fitted[, j],
+              nobs = nrow(txdat)
+            )
+
           twww <- npksum(txdat=tzdat,
                          tydat=cbind(partial * W[,j],W[,j]^2),
                          weights=cbind(partial * W[,j],1),
-                         bws=bws,
+                         bws=partial.bws,
                          leave.one.out=leave.one.out)$ksum
 
           coef.mat[j,] <- twww[1,2,]/NZD(twww[2,2,])
@@ -900,7 +911,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
             fit.progress.step(sprintf("backfit cycle %d partial %d/%d", i, j, n.part))
           ## repeat for consistency ?
         }
-        max.err <- max(abs(resid.old - resid)/aydat)
+        max.err <- max(abs(resid.old - resid))/aydat
       }
       if (max.err > tol)
         .np_warning(paste("backfit iterations did not converge. max err= ", max.err,", tol= ", tol,", maxiter= ", maxiter, sep=''))
@@ -923,6 +934,11 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       MAPE = MAPEfunc(tydat, mean)
       CORR = CORRfunc(tydat, mean)
       SIGN = SIGNfunc(tydat, mean)
+    }
+
+    if (errors && do.iterate) {
+      .np_warning("standard errors are not available for iterated npscoef fits; returning fitted values without merr/gerr")
+      errors <- FALSE
     }
 
     if (errors || (residuals && miss.ex)) {
