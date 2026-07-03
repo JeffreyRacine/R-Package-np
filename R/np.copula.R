@@ -114,20 +114,12 @@ npcopula <- function(bws, ...) {
 
   copula <- fitted(npudens(bws = bws, tdat = data, edat = x.u))
   for (j in seq_len(length(bws$xnames))) {
-    bws.f.marginal <- npudensbw(formula(paste("~", bws$xnames[j])),
-                                bws = bws$bw[j],
-                                bandwidth.compute = FALSE,
-                                bwtype = bws$type,
-                                ckerorder = bws$ckerorder,
-                                ckertype = bws$ckertype,
-                                okertype = bws$okertype,
-                                ukertype = bws$ukertype,
-                                data = data)
-    xeval <- data.frame(x.u[, j])
-    names(xeval) <- bws$xnames[j]
+    bws.f.marginal <- .npcopula_marginal_bw(bws, data, j, target = "density")
+    tdat <- .npcopula_marginal_data(bws, data, j)
+    xeval <- .npcopula_marginal_eval_data(bws, x.u, j)
     copula <- copula / NZD(fitted(npudens(
       bws = bws.f.marginal,
-      tdat = data[, bws$xnames[j], drop = FALSE],
+      tdat = tdat,
       edat = xeval
     )))
   }
@@ -183,21 +175,71 @@ npcopula <- function(bws, ...) {
   d
 }
 
-.npcopula_marginal_bw <- function(bws, data, j) {
-  dat <- data[, bws$xnames[j], drop = FALSE]
-  continuous.slot <- if (!is.null(bws$icon)) match(j, bws$icon) else NA_integer_
-  marginal <- list(
-    bw = bws$bw[j],
-    type = bws$type,
+.npcopula_marginal_data <- function(bws, data, j) {
+  data[, bws$xnames[j], drop = FALSE]
+}
+
+.npcopula_marginal_eval_data <- function(bws, data, j) {
+  out <- data.frame(data[, j])
+  names(out) <- bws$xnames[j]
+  out
+}
+
+.npcopula_continuous_slot <- function(bws, j) {
+  if (is.null(bws$icon) || j > length(bws$icon) || !isTRUE(bws$icon[j]))
+    return(NA_integer_)
+  as.integer(sum(bws$icon[seq_len(j)]))
+}
+
+.npcopula_marginal_bw_args <- function(bws, data, j, target = c("distribution", "density")) {
+  target <- match.arg(target)
+  dat <- .npcopula_marginal_data(bws, data, j)
+  continuous.slot <- .npcopula_continuous_slot(bws, j)
+  out <- list(
+    dat = dat,
+    bws = bws$bw[j],
+    bandwidth.compute = FALSE,
+    bwtype = bws$type,
     ckerorder = bws$ckerorder,
     ckertype = bws$ckertype,
-    ckerbound = bws$ckerbound,
-    ckerlb = if (!is.null(bws$ckerlb) && !is.na(continuous.slot)) bws$ckerlb[continuous.slot] else NULL,
-    ckerub = if (!is.null(bws$ckerub) && !is.na(continuous.slot)) bws$ckerub[continuous.slot] else NULL,
-    ukertype = bws$ukertype,
     okertype = bws$okertype
   )
-  .np_make_kbandwidth_unconditional(marginal, dat)
+  if (identical(target, "density"))
+    out$ukertype <- bws$ukertype
+  if (!is.na(continuous.slot) && !is.null(bws$ckerbound))
+    out$ckerbound <- bws$ckerbound
+  if (!is.null(bws$ckerlb) && !is.na(continuous.slot))
+    out$ckerlb <- bws$ckerlb[continuous.slot]
+  if (!is.null(bws$ckerub) && !is.na(continuous.slot))
+    out$ckerub <- bws$ckerub[continuous.slot]
+  out
+}
+
+.npcopula_marginal_kbandwidth <- function(args) {
+  marginal <- list(
+    bw = args$bws,
+    type = args$bwtype,
+    ckerorder = args$ckerorder,
+    ckertype = args$ckertype,
+    ckerbound = args$ckerbound,
+    ckerlb = args$ckerlb,
+    ckerub = args$ckerub,
+    ukertype = args$ukertype,
+    okertype = args$okertype
+  )
+  .np_make_kbandwidth_unconditional(marginal, args$dat)
+}
+
+.npcopula_marginal_bw <- function(bws,
+                                  data,
+                                  j,
+                                  target = c("distribution", "density"),
+                                  kbandwidth = FALSE) {
+  target <- match.arg(target)
+  args <- .npcopula_marginal_bw_args(bws, data, j, target = target)
+  if (isTRUE(kbandwidth))
+    return(.npcopula_marginal_kbandwidth(args))
+  do.call(if (identical(target, "density")) npudensbw else npudistbw, args)
 }
 
 .npcopula_grid_eval <- function(x) {
@@ -240,8 +282,8 @@ npcopula <- function(bws, ...) {
   bws <- x$bws
   out <- vector("list", length(bws$xnames))
   for (j in seq_along(bws$xnames)) {
-    mbw <- .npcopula_marginal_bw(bws, data, j)
-    xdat <- data[, bws$xnames[j], drop = FALSE]
+    mbw <- .npcopula_marginal_bw(bws, data, j, target = "distribution", kbandwidth = TRUE)
+    xdat <- .npcopula_marginal_data(bws, data, j)
     out[[j]] <- .np_ksum_unconditional_eval_exact(
       xdat = xdat,
       exdat = xdat,
@@ -294,11 +336,9 @@ npcopula <- function(bws, ...) {
   if (isTRUE(x$density))
     return(x)
   data <- .npcopula_training_data(x)
-  f <- stats::as.formula(paste("~", paste(x$xnames, collapse = "+")))
   bws <- x$bws
   bw.args <- list(
-    formula = f,
-    data = data,
+    dat = data,
     bws = bws$bw,
     bandwidth.compute = FALSE,
     bwtype = bws$type,
@@ -427,10 +467,11 @@ npcopula <- function(bws, ...) {
 .npcopula_marginal_density_product <- function(bws, data, xgrid) {
   out <- rep.int(1.0, nrow(xgrid))
   for (j in seq_along(bws$xnames)) {
-    mbw <- .npcopula_marginal_bw(bws, data, j)
-    xeval <- xgrid[, bws$xnames[j], drop = FALSE]
+    mbw <- .npcopula_marginal_bw(bws, data, j, target = "density", kbandwidth = TRUE)
+    xdat <- .npcopula_marginal_data(bws, data, j)
+    xeval <- .npcopula_marginal_eval_data(bws, xgrid, j)
     out <- out * .np_ksum_unconditional_eval_exact(
-      xdat = data[, bws$xnames[j], drop = FALSE],
+      xdat = xdat,
       exdat = xeval,
       bws = mbw,
       operator = "normal"
@@ -504,7 +545,7 @@ npcopula <- function(bws, ...) {
     blocklen <- max(1L, floor(nrow(data)^(1/3)))
   marginal.bws <- if (density) {
     lapply(seq_along(bws$xnames), function(j) {
-      .npcopula_marginal_bw(bws, data, j)
+      .npcopula_marginal_bw(bws, data, j, target = "density", kbandwidth = TRUE)
     })
   } else {
     NULL
@@ -540,9 +581,11 @@ npcopula <- function(bws, ...) {
       if (density) {
         denom <- rep.int(1.0, nrow(xgrid))
         for (j in seq_along(bws$xnames)) {
+          xdat <- .npcopula_marginal_data(bws, data, j)
+          xeval <- .npcopula_marginal_eval_data(bws, xgrid, j)
           denom <- denom * .npcopula_boot_eval_weighted(
-            xdat = data[, bws$xnames[j], drop = FALSE],
-            exdat = xgrid[, bws$xnames[j], drop = FALSE],
+            xdat = xdat,
+            exdat = xeval,
             bws = marginal.bws[[j]],
             operator = "normal",
             counts.col = counts[, bb]
@@ -681,7 +724,7 @@ fitted.npcopula <- function(object, ...) {
   object$copula
 }
 
-.npcopula_predict_newdata_to_u <- function(object, newdata) {
+.npcopula_predict_newdata_to_u <- function(object, newdata, allow.xnames = TRUE) {
   if (is.null(newdata))
     return(NULL)
   if (is.vector(newdata) && !is.list(newdata))
@@ -690,12 +733,17 @@ fitted.npcopula <- function(object, ...) {
   nd <- as.data.frame(newdata)
   xnames <- object$xnames
   unames <- paste0("u", seq_along(xnames))
-  if (length(xnames) && all(xnames %in% names(nd)))
-    return(nd[, xnames, drop = FALSE])
   if (length(unames) && all(unames %in% names(nd))) {
     out <- nd[, unames, drop = FALSE]
     names(out) <- xnames
     return(out)
+  }
+  if (length(xnames) && all(xnames %in% names(nd))) {
+    if (!isTRUE(allow.xnames)) {
+      stop("newdata with original variable names is ambiguous for npcopula; supply probability coordinates via 'u' or use newdata columns named u1, u2, ...",
+           call. = FALSE)
+    }
+    return(nd[, xnames, drop = FALSE])
   }
   nd
 }
@@ -711,9 +759,9 @@ predict.npcopula <- function(object,
   dots <- list(...)
 
   if (is.null(u) && !is.null(newdata)) {
-    u <- .npcopula_predict_newdata_to_u(object, newdata)
+    u <- .npcopula_predict_newdata_to_u(object, newdata, allow.xnames = FALSE)
   } else if (!is.null(u)) {
-    u <- .npcopula_predict_newdata_to_u(object, u)
+    u <- .npcopula_predict_newdata_to_u(object, u, allow.xnames = TRUE)
   }
 
   if (is.null(u) && !length(dots)) {
@@ -1285,27 +1333,13 @@ npcopula.default <- function(bws,
         progress, stage,
         sprintf("marginal %s at sample realizations", bws$xnames[j])
       )
-      bws.F.marginal <- npudistbw(formula(paste("~",bws$xnames[j])),
-                         bws=bws$bw[j],
-                         bandwidth.compute=FALSE,
-                         bwtype=bws$type,
-                         ckerorder=bws$ckerorder,
-                         ckertype=bws$ckertype,
-                         okertype=bws$okertype,
-                         data=data)
+      tdat <- .npcopula_marginal_data(bws, data, j)
+      bws.F.marginal <- .npcopula_marginal_bw(bws, data, j, target = "distribution")
 
-      u[,j] <- fitted(npudist(bws=bws.F.marginal,data=data))
+      u[,j] <- fitted(npudist(bws = bws.F.marginal, tdat = tdat))
       if(density) {
-        bws.f.marginal <- npudensbw(formula(paste("~",bws$xnames[j])),
-                           bws=bws$bw[j],
-                           bandwidth.compute=FALSE,
-                           bwtype=bws$type,
-                           ckerorder=bws$ckerorder,
-                           ckertype=bws$ckertype,
-                           okertype=bws$okertype,
-                           ukertype=bws$ukertype,
-                           data=data)
-        copula <- copula/NZD(fitted(npudens(bws=bws.f.marginal,data=data)))
+        bws.f.marginal <- .npcopula_marginal_bw(bws, data, j, target = "density")
+        copula <- copula/NZD(fitted(npudens(bws = bws.f.marginal, tdat = tdat)))
 
       }
     }
@@ -1330,17 +1364,18 @@ npcopula.default <- function(bws,
         x.q <- sapply(seq_len(round(n.quasi.inv/2)), function(i) { uocquantile(x.marginal, quantile.seq[i]) })
         x.eval <- sort(ordered(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal)))
       }
-      F <- fitted(npudist(tdat=x.marginal,
-                          edat=x.eval,
-                          bws=bws$bw[j],
-                          bwtype=bws$type,
-                          ckerorder=bws$ckerorder,
-                          ckertype=bws$ckertype,
-                          okertype=bws$okertype,
-                          ukertype=bws$ukertype,data=data))
+      tdat <- .npcopula_marginal_data(bws, data, j)
+      edat <- .npcopula_marginal_eval_data(bws, data.frame(x.eval), 1L)
+      names(edat) <- bws$xnames[j]
+      bws.F.marginal <- .npcopula_marginal_bw(bws, data, j, target = "distribution")
+      F <- fitted(npudist(
+        tdat = tdat,
+        edat = edat,
+        bws = bws.F.marginal
+      ))
+      u[u[,j] < min(F), j] <- min(F)
+      u[u[,j] > max(F), j] <- max(F)
       for (i in seq_len(n.u)) {
-        u[u[,j]<min(F),j] <- min(F)
-        u[u[,j]>max(F),j] <- max(F)
         x.u[i,j] <-  min(x.eval[F>=u[i,j]])
       }
     }
