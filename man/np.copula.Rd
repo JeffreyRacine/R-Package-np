@@ -126,11 +126,10 @@ estimated and where it is evaluated.
 
   \item{newdata}{
     optional prediction data for \code{predict.npcopula}. This is a
-    compatibility alias for \code{u}: it should contain marginal
-    probability values in \eqn{[0,1]}, either in columns named as the
-    original variables or in columns named \code{u1}, \code{u2}, ....
-    If both \code{u} and \code{newdata} are supplied, \code{u} takes
-    precedence.
+    compatibility alias for probability coordinates in columns named
+    \code{u1}, \code{u2}, .... It is not interpreted as raw data on the
+    original variable scale. If both \code{u} and \code{newdata} are
+    supplied, \code{u} takes precedence.
   }
 
   \item{neval}{
@@ -154,8 +153,8 @@ estimated and where it is evaluated.
     If supplied, \code{npcopula} evaluates on the Cartesian product
     \code{expand.grid(u)}. For two-dimensional displays, the clearest
     spelling is often \code{data.frame(u1 = u1.seq, u2 = u2.seq)};
-    names matching the original variables are also accepted for
-    compatibility. If omitted with a formula route and
+    names matching the original variables are also accepted here because
+    \code{u} explicitly denotes probability coordinates. If omitted with a formula route and
     \code{evaluation="grid"}, a two-dimensional grid is generated
     automatically.
   }
@@ -355,7 +354,10 @@ prediction/evaluation route, or graphics renderer as appropriate.
   \eqn{m^d} rows. Therefore the formula route automatically generates a
   probability grid only for two-dimensional copulas. For
   higher-dimensional copulas, supply \code{u} explicitly or use
-  \code{evaluation="sample"}.
+  \code{evaluation="sample"}. The \code{predict.npcopula} method follows
+  these same probability-coordinate semantics: use \code{u} for
+  probability values named however convenient, or use \code{newdata}
+  only with \code{u1}, \code{u2}, ... columns.
 
   The \sQuote{quasi-inverse} is computed via Definition 2.3.6 from
   Nelsen (2006). An equi-quantile grid on the data range of length
@@ -364,7 +366,10 @@ prediction/evaluation route, or graphics renderer as appropriate.
   grid used for marginal inversion. If requested probability values lie
   outside the attainable estimated marginal distribution range, they
   are reset to the nearest attainable endpoint. Inspect the returned
-  \code{u} columns when endpoint behavior matters.
+  \code{u} columns when endpoint behavior matters. Higher-order
+  continuous CDF kernels can yield nonmonotone estimated marginal CDFs
+  on the finite inversion grid; the quasi-inverse follows the first grid
+  point whose estimated CDF reaches the requested probability.
 
   The \code{plot.npcopula} method supports base \code{\link{persp}},
   \code{\link{contour}}, and \code{\link{image}} displays for
@@ -374,9 +379,10 @@ prediction/evaluation route, or graphics renderer as appropriate.
   other surface plot methods. \code{renderer="rgl"} requests the shared
   interactive \pkg{rgl} surface renderer, using the same default-angle
   remapping used by the other package surface plots. For mixed ordered
-  margins, grid displays are drawn against the requested probability
-  grid, while the returned \code{u} columns retain the attainable
-  marginal probability values produced by quasi-inversion. The
+  margins and endpoint-clamped continuous margins, grid displays are
+  drawn against the requested probability grid, while the returned
+  \code{u} columns retain the attainable marginal probability values
+  produced by quasi-inversion. The
   \code{"empirical"} view plots empirical copula coordinates, and
   \code{"all"} gives a base-graphics four-panel diagnostic display.
 
@@ -387,7 +393,8 @@ prediction/evaluation route, or graphics renderer as appropriate.
   plug-in delta-method denominator correction corresponding to
   \eqn{c(u)=f(x_u)/\prod_j f_j(x_{u,j})}. Bootstrap intervals resample
   rows and recompute the plotted copula surface on the same probability
-  grid; \code{band="all"} overlays transparent pointwise,
+  grid. These interval conventions do not fully propagate uncertainty
+  from the marginal quasi-inverse transform; \code{band="all"} overlays transparent pointwise,
   simultaneous, and Bonferroni wireframes.
 }
 
