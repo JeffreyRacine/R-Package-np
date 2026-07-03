@@ -57,7 +57,7 @@ test_that("public npcdistbw cv.ls fixed LP/LL route activates with ll == lp pari
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-8)
 })
 
-test_that("npcdistbw cv.ls fixed continuous stream does not route through legacy tree rows", {
+test_that("npcdistbw cv.ls fixed continuous stream follows the tree option", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
   old_dispatch <- options(npRmpi.autodispatch = FALSE)
@@ -88,7 +88,7 @@ test_that("npcdistbw cv.ls fixed continuous stream does not route through legacy
       ncon = bw$yncon + bw$xncon,
       ncat = bw$ynuno + bw$ynord + bw$xnuno + bw$xnord
     ),
-    npRmpi:::DO_TREE_NO
+    npRmpi:::DO_TREE_YES
   )
 
   options(np.tree = FALSE)

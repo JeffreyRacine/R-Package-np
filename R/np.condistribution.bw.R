@@ -115,17 +115,32 @@ npcdistbw.formula <-
   force(expr)
 }
 
+.npcdistbw_method_name <- function(bws, where = "npcdistbw") {
+  method <- bws$method
+  if (is.null(method) || !length(method) || is.na(method[1L]))
+    stop(sprintf("%s requires valid bwmethod metadata", where), call. = FALSE)
+
+  method <- as.character(method[1L])
+  switch(method,
+    cv.ls = method,
+    stop(sprintf("%s does not support bwmethod '%s'", where, method),
+         call. = FALSE)
+  )
+}
+
+.npcdistbw_method_code <- function(bws, where = "npcdistbw") {
+  switch(.npcdistbw_method_name(bws, where = where),
+    cv.ls = CDBWM_CVLS
+  )
+}
+
 .npcdistbw_tree_code <- function(bws, ncon, ncat) {
   code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bws)
 
   if (!identical(code, DO_TREE_YES))
     return(code)
 
-  method <- if (!is.null(bws$method) && length(bws$method)) {
-    as.character(bws$method[1L])
-  } else {
-    "cv.ls"
-  }
+  method <- .npcdistbw_method_name(bws, where = ".npcdistbw_tree_code")
   bwtype <- if (!is.null(bws$type) && length(bws$type)) {
     as.character(bws$type[1L])
   } else {
@@ -468,8 +483,7 @@ npcdistbw.condbandwidth <-
           adaptive_nn = BW_ADAP_NN),
         itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE),
         int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
-        bwmethod = switch(bws$method,
-          cv.ls = CDBWM_CVLS),
+        bwmethod = .npcdistbw_method_code(bws),
         xkerneval = switch(bws$cxkertype,
           gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
           epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
