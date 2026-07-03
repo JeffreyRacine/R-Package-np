@@ -31,10 +31,35 @@ test_that("npudens formula reentry honors explicit data", {
     bw <- npudensbw(~ x, data = d1, bws = 0.4,
                     bandwidth.compute = FALSE)
     fit <- npudens(bws = bw, data = d2)
+    direct <- npudens(bws = bw, tdat = d2["x"])
+    original <- npudens(bws = bw, tdat = d1["x"])
 
     expect_identical(fit$nobs, nrow(d2))
     expect_identical(fit$ntrain, nrow(d2))
     expect_identical(length(fit$dens), nrow(d2))
+    expect_equal(fit$dens, direct$dens, tolerance = 1e-12)
+    expect_false(isTRUE(all.equal(fit$dens, original$dens, tolerance = 1e-8)))
+    expect_error(npudens(bws = bw, data = ~ x), "data.frame")
+  })
+})
+
+test_that("npudens direct formula numeric bws keeps formula out of data reentry", {
+  with_npudens_audit_runtime({
+    set.seed(42)
+    n <- 100L
+    X <- sort(rbinom(n, 2L, 0.4))
+    p <- as.numeric(prop.table(table(X)))
+    avar.p <- p * (1 - p) / n
+
+    fit <- npudens(~ factor(X), bws = 0, ukertype = "aitchisonaitken")
+    expect_equal(unique(fitted(fit)), p, tolerance = 1e-8)
+    expect_equal(unique(se(fit))^2, avar.p, tolerance = 1e-8)
+
+    x <- seq(0.1, 0.9, length.out = 12L)
+    fit.formula <- npudens(~ x, bws = 0.25)
+    bw <- npudensbw(~ x, bws = 0.25, bandwidth.compute = FALSE)
+    fit.direct <- npudens(bws = bw, tdat = data.frame(x = x))
+    expect_equal(fit.formula$dens, fit.direct$dens, tolerance = 1e-12)
   })
 })
 

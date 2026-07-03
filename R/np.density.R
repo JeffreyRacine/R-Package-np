@@ -277,6 +277,8 @@ npudens.default <- function(bws, tdat, ...){
   no.tdat <- missing(tdat)
   has.explicit.bws <- (!no.bws) && isa(bws, "bandwidth")
   bws.formula <- bws.formula.early
+  direct.formula.tdat <- (!no.tdat) && !tdat.named &&
+    inherits(tdat, "formula") && bws.named && !has.explicit.bws
 
   if (bws.named && no.tdat && bws.formula) {
     sc$`bws` <- NULL
@@ -318,7 +320,7 @@ npudens.default <- function(bws, tdat, ...){
 
   ## convention: first argument is always dropped, second, if present, propagated
   call.args <- list(bws = tbw)
-  if (!no.tdat) {
+  if (!no.tdat && !direct.formula.tdat) {
     if (tdat.named) {
       call.args$tdat <- tdat
     } else {
