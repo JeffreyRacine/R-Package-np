@@ -2,6 +2,8 @@ npdistribution <-
     function(bws, eval, dist, derr = NA,
              ntrain, trainiseval = FALSE,
              rows.omit = NA,
+             train.rows.omit = rows.omit,
+             eval.rows.omit = if (trainiseval) rows.omit else NA,
              timing = NA, total.time = NA,
              optim.time = NA, fit.time = NA){
 
@@ -10,6 +12,10 @@ npdistribution <-
 
         if (length(rows.omit) == 0)
             rows.omit <- NA
+        if (length(train.rows.omit) == 0)
+            train.rows.omit <- NA
+        if (length(eval.rows.omit) == 0)
+            eval.rows.omit <- NA
 
         d <- list(
             bw = bws$bw,
@@ -32,6 +38,10 @@ npdistribution <-
             trainiseval = trainiseval,
             rows.omit = rows.omit,
             nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
+            train.rows.omit = train.rows.omit,
+            ntrain.omit = if (identical(train.rows.omit, NA)) 0 else length(train.rows.omit),
+            eval.rows.omit = eval.rows.omit,
+            neval.omit = if (identical(eval.rows.omit, NA)) 0 else length(eval.rows.omit),
             timing = timing, total.time = total.time,
             optim.time = optim.time, fit.time = fit.time)
 

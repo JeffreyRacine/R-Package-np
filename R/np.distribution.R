@@ -75,11 +75,19 @@ npudist.dbandwidth <-
     dots <- list(...)
     fit.start <- proc.time()[3]
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
-    .npRmpi_require_active_slave_pool(where = "npudist()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-
     no.e = missing(edat)
+    .npRmpi_require_active_slave_pool(where = "npudist()")
+    if (.npRmpi_autodispatch_active()) {
+      tdat.preflight <- toFrame(tdat)
+      if (anyNA(tdat.preflight) && !any(stats::complete.cases(tdat.preflight)))
+        stop("Data has no rows without NAs")
+      if (!no.e) {
+        edat.preflight <- toFrame(edat)
+        if (anyNA(edat.preflight) && !any(stats::complete.cases(edat.preflight)))
+          stop("Evaluation data has no rows without NAs")
+      }
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    }
 
     tdat = toFrame(tdat)
 
@@ -102,12 +110,22 @@ npudist.dbandwidth <-
 
     npValidateExtendedNnContinuousBandwidth(bws, where = "npudist")
 
+    if(any(bws$iuno))
+      stop("distribution estimation does not support unordered data types")
+
     tdat = na.omit(tdat)
-    rows.omit <- unclass(na.action(tdat))
+    train.rows.omit <- unclass(na.action(tdat))
+    if (nrow(tdat) == 0L)
+      stop("Data has no rows without NAs")
+    rows.omit <- train.rows.omit
+    eval.rows.omit <- integer(0)
 
     if (!no.e){
       edat = na.omit(edat)
-      rows.omit <- unclass(na.action(edat))
+      eval.rows.omit <- unclass(na.action(edat))
+      if (nrow(edat) == 0L)
+        stop("Evaluation data has no rows without NAs")
+      rows.omit <- eval.rows.omit
     }
 
     tnrow = nrow(tdat)
@@ -209,6 +227,8 @@ npudist.dbandwidth <-
     ev <- npdistribution(bws=bws, eval=teval, dist = myout$dist,
                          derr = myout$derr, ntrain = tnrow, trainiseval = no.e,
                          rows.omit = rows.omit,
+                         train.rows.omit = train.rows.omit,
+                         eval.rows.omit = eval.rows.omit,
                          timing = bws$timing, total.time = total.time,
                          optim.time = optim.time, fit.time = fit.elapsed)
     return(ev)

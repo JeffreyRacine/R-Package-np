@@ -335,8 +335,11 @@ These controls tune the distribution-function integral and grid calculations.
 
   \item{do.full.integral}{
     a logical value which when set as \code{TRUE} evaluates the
-    moment-based integral on the entire sample. Defaults
-    to \code{FALSE}.
+    moment-based criterion on the empirical training support. Defaults
+    to \code{FALSE}, which uses a faster row-aligned marginal-quantile
+    path controlled by \code{ngrid}. For multivariate data, use
+    \code{do.full.integral = TRUE} when you want the criterion evaluated
+    on the empirical joint support and can tolerate the additional cost.
   }
 
   \item{memfac}{
@@ -352,8 +355,11 @@ These controls tune the distribution-function integral and grid calculations.
   }
 
   \item{ngrid}{
-    integer number of grid points to use when computing the moment-based
-    integral. Defaults to \code{100}.
+    integer number of row-aligned marginal-quantile grid points to use
+    when \code{gdat} is not supplied and
+    \code{do.full.integral = FALSE}. In multivariate problems this is a
+    one-dimensional path through the marginal quantiles, not a Cartesian
+    product grid. Defaults to \code{100}.
   }
 
 
@@ -640,6 +646,20 @@ or standard-deviation factors.
   target \eqn{F(x)=\Pr(X\le x)} estimated by \code{\link{npudist}}.
   The selected bandwidths control the integrated kernel factors used in
   the mixed-data CDF estimator.
+
+  By default, data-driven bandwidth selection evaluates the CDF criterion
+  on a row-aligned marginal-quantile path of length \code{ngrid}. This
+  default is fast and useful for routine selection. To evaluate the
+  criterion on the empirical joint support, set
+  \code{do.full.integral = TRUE}; to use a user-chosen evaluation cloud or
+  grid, supply \code{gdat}. For multivariate data, a Cartesian product of
+  marginal quantiles can be supplied explicitly through \code{gdat} when
+  appropriate, but it is not the default because its size grows
+  exponentially with dimension.
+
+  Higher-order continuous CDF kernels can yield estimates that are not
+  globally monotone and may fall outside \eqn{[0,1]} at some evaluation
+  points. Returned values are not silently clamped.
 
   For book-length derivations, see Li and Racine (2007), Chapter 1
   \emph{Density Estimation}, especially Sections 1.4 and 1.5, and Chapter
