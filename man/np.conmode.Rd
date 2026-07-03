@@ -4,6 +4,7 @@
 \alias{npconmode.default}
 \alias{npconmode.formula}
 \alias{npconmode.conbandwidth}
+\alias{npconmode.condbandwidth}
 \alias{predict.conmode}
 \alias{plot.conmode}
 \title{ Kernel Modal Regression with Mixed Data Types }

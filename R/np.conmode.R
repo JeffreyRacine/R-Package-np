@@ -54,6 +54,7 @@ npconmode.formula <-
     tmf[["formula"]] <- tt
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    train.omit <- attr(tmf, "na.action")
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
@@ -68,14 +69,18 @@ npconmode.formula <-
         umf.args <- list(formula = tt, data = newdata)
         umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
         emf <- umf
+        eval.omit <- attr(emf, "na.action")
         eydat <- emf[, bws$variableNames[["response"]], drop = FALSE]
       } else {
         umf.args <- list(formula = formula(bws)[-2], data = newdata)
         umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
         emf <- umf
+        eval.omit <- attr(emf, "na.action")
       }
 
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]
+    } else {
+      eval.omit <- NULL
     }
     
     cm.args <- list(txdat = txdat, tydat = tydat)
@@ -87,21 +92,13 @@ npconmode.formula <-
     cm.args$bws <- bws
     ev <- do.call(npconmode, c(cm.args, list(...)))
 
-    ev$omit <- attr(umf,"na.action")
-    ev$rows.omit <- as.vector(ev$omit)
-    ev$nobs.omit <- length(ev$rows.omit)
-
-    ev$conmode <- napredict(ev$omit, ev$conmode)
-    ev$condens <- napredict(ev$omit, ev$condens)
-    ev$conderr <- napredict(ev$omit, ev$conderr)
-    if (!is.null(ev$probabilities))
-      ev$probabilities <- napredict(ev$omit, ev$probabilities)
-    if (!is.null(ev$probability.errors))
-      ev$probability.errors <- napredict(ev$omit, ev$probability.errors)
-    if (!is.null(ev$probability.repaired.rows))
-      ev$probability.repaired.rows <- napredict(ev$omit, ev$probability.repaired.rows)
-    if (!is.null(ev$probability.gradients))
-      ev$probability.gradients <- .npConmodeNapredictArray(ev$omit, ev$probability.gradients)
+    ev <- .npConmodeRecordOmit(ev, train.omit)
+    if (has.eval) {
+      ev <- .npConmodeRecordEvalOmit(ev, eval.omit)
+      ev <- .npConmodePadRowOutputs(ev, eval.omit)
+    } else {
+      ev <- .npConmodePadRowOutputs(ev, train.omit)
+    }
 
     return(ev)
   }
@@ -111,6 +108,12 @@ npconmode.call <-
     npconmode(txdat = .np_eval_bws_call_arg(bws, "xdat"),
               tydat = .np_eval_bws_call_arg(bws, "ydat"),
               bws = bws, ...)
+  }
+
+npconmode.condbandwidth <-
+  function(bws, ...){
+    stop("incorrect bandwidth type: expected conditional density bandwidths instead of conditional distribution bandwidths",
+         call. = FALSE)
   }
 
 .npConmodeEffectiveProper <- function(bws, proper) {
@@ -238,17 +241,107 @@ npconmode.call <-
 .npConmodeSelect <- function(pmat, perr) {
   enrow <- nrow(pmat)
   nlev <- ncol(pmat)
-  mdens <- double(enrow)
+  mdens <- rep(-Inf, enrow)
   mderr <- rep(NA_real_, enrow)
   indices <- integer(enrow)
   for (i in seq_len(nlev)) {
-    tf <- pmat[, i] >= mdens
+    tf <- is.finite(pmat[, i]) & pmat[, i] > 0 & pmat[, i] > mdens
     tf[is.na(tf)] <- FALSE
     indices[tf] <- i
     mdens[tf] <- pmat[tf, i]
     mderr[tf] <- perr[tf, i]
   }
+  invalid <- indices == 0L
+  mdens[invalid] <- NA_real_
+  mderr[invalid] <- NA_real_
   list(indices = indices, condens = mdens, conderr = mderr)
+}
+
+.npConmodeSelectedFactor <- function(indices, levels, ordered = FALSE) {
+  out <- rep(NA_character_, length(indices))
+  valid <- indices > 0L
+  out[valid] <- as.character(levels[indices[valid]])
+  factor(out, levels = as.character(levels), ordered = ordered)
+}
+
+.npConmodeOmitLength <- function(omit) {
+  if (is.null(omit)) 0L else length(omit)
+}
+
+.npConmodeOmitRows <- function(omit) {
+  if (!.npConmodeOmitLength(omit)) NA_integer_ else as.vector(omit)
+}
+
+.npConmodeNapredictRows <- function(omit, x) {
+  if (is.null(x) || !.npConmodeOmitLength(omit))
+    return(x)
+  if (!is.null(dim(x)) && length(dim(x)) >= 3L)
+    return(.npConmodeNapredictArray(omit, x))
+
+  omit <- as.integer(omit)
+  keep <- seq_len(NROW(x) + length(omit))[-omit]
+  if (is.factor(x)) {
+    out <- factor(rep(NA_character_, length(x) + length(omit)),
+                  levels = levels(x), ordered = is.ordered(x))
+    out[keep] <- x
+    attr(out, "na.action") <- NULL
+    return(out)
+  }
+  if (is.data.frame(x)) {
+    out <- x[rep(NA_integer_, nrow(x) + length(omit)), , drop = FALSE]
+    out[keep, ] <- x
+    attr(out, "na.action") <- NULL
+    return(out)
+  }
+  if (is.null(dim(x))) {
+    out <- x[rep(NA_integer_, length(x) + length(omit))]
+    out[keep] <- x
+    attr(out, "na.action") <- NULL
+    return(out)
+  }
+  out <- x[rep(NA_integer_, nrow(x) + length(omit)), , drop = FALSE]
+  out[keep, ] <- x
+  attr(out, "na.action") <- NULL
+  out
+}
+
+.npConmodeRecordOmit <- function(obj, omit) {
+  obj$omit <- omit
+  obj$rows.omit <- .npConmodeOmitRows(omit)
+  obj$nobs.omit <- .npConmodeOmitLength(omit)
+  obj
+}
+
+.npConmodeRecordEvalOmit <- function(obj, omit) {
+  obj$eval.omit <- omit
+  obj$eval.rows.omit <- .npConmodeOmitRows(omit)
+  obj$eval.nobs.omit <- .npConmodeOmitLength(omit)
+  obj
+}
+
+.npConmodePadRowOutputs <- function(obj, omit) {
+  if (!.npConmodeOmitLength(omit))
+    return(obj)
+
+  n <- length(obj$conmode)
+  obj$conmode <- .npConmodeNapredictRows(omit, obj$conmode)
+  obj$condens <- .npConmodeNapredictRows(omit, obj$condens)
+  obj$conderr <- .npConmodeNapredictRows(omit, obj$conderr)
+  if (!is.null(obj$xeval) && NROW(obj$xeval) == n) {
+    obj$xeval <- .npConmodeNapredictRows(omit, obj$xeval)
+    obj$nobs <- NROW(obj$xeval)
+  }
+  if (!is.null(obj$yeval) && NROW(obj$yeval) == n)
+    obj$yeval <- .npConmodeNapredictRows(omit, obj$yeval)
+  if (!is.null(obj$probabilities))
+    obj$probabilities <- .npConmodeNapredictRows(omit, obj$probabilities)
+  if (!is.null(obj$probability.errors))
+    obj$probability.errors <- .npConmodeNapredictRows(omit, obj$probability.errors)
+  if (!is.null(obj$probability.repaired.rows))
+    obj$probability.repaired.rows <- .npConmodeNapredictRows(omit, obj$probability.repaired.rows)
+  if (!is.null(obj$probability.gradients))
+    obj$probability.gradients <- .npConmodeNapredictRows(omit, obj$probability.gradients)
+  obj
 }
 
 .npConmodeNapredictArray <- function(omit, x) {
@@ -258,10 +351,10 @@ npconmode.call <-
   if (is.null(dx) || length(dx) < 3L)
     return(napredict(omit, x))
 
+  keep <- seq_len(dx[1L] + length(omit))[-as.integer(omit)]
   dn <- dimnames(x)
   if (!is.null(dn))
     dn[[1L]] <- NULL
-  keep <- seq_len(dx[1L] + length(omit))[-as.integer(omit)]
   out <- array(NA_real_,
                dim = c(dx[1L] + length(omit), dx[-1L]),
                dimnames = dn)
@@ -299,9 +392,9 @@ npconmode.conbandwidth <-
 
     ## catch and destroy NA's
     keep.rows <- rep_len(TRUE, nrow(txdat))
-    rows.omit <- attr(na.omit(data.frame(txdat, tydat)), "na.action")
-    if (length(rows.omit) > 0L)
-      keep.rows[as.integer(rows.omit)] <- FALSE
+    train.omit <- attr(na.omit(data.frame(txdat, tydat)), "na.action")
+    if (.npConmodeOmitLength(train.omit) > 0L)
+      keep.rows[as.integer(train.omit)] <- FALSE
 
     if (!any(keep.rows))
       stop("Training data has no rows without NAs")
@@ -314,9 +407,9 @@ npconmode.conbandwidth <-
       eval.df <- data.frame(exdat)
       if (!no.ey)
         eval.df <- data.frame(eval.df, eydat)
-      rows.omit <- attr(na.omit(eval.df), "na.action")
-      if (length(rows.omit) > 0L)
-        keep.eval[as.integer(rows.omit)] <- FALSE
+      eval.omit <- attr(na.omit(eval.df), "na.action")
+      if (.npConmodeOmitLength(eval.omit) > 0L)
+        keep.eval[as.integer(eval.omit)] <- FALSE
 
       exdat <- exdat[keep.eval,,drop = FALSE]
 
@@ -325,6 +418,8 @@ npconmode.conbandwidth <-
 
       if (!any(keep.eval))
         stop("Evaluation data has no rows without NAs")
+    } else {
+      eval.omit <- NULL
     }
 
 
@@ -376,11 +471,11 @@ npconmode.conbandwidth <-
           exdat = if (no.ex) txdat else exdat,
           eydat = rep(efac[i], enrow),
           bws = bws,
-          gradients = isTRUE(gradients) && identical(i, gradient.level.index)
+          gradients = isTRUE(gradients) && i == gradient.level.index
         )
         pmat[, i] <- dens.obj$condens
         perr[, i] <- dens.obj$conderr
-        if (isTRUE(gradients) && identical(i, gradient.level.index)) {
+        if (isTRUE(gradients) && i == gradient.level.index) {
           if (is.null(dens.obj$congrad))
             stop("internal error: conditional-density gradient was not returned")
           pgrad[,] <- dens.obj$congrad
@@ -402,7 +497,7 @@ npconmode.conbandwidth <-
     cm.args <- list(
       bws = bws,
       xeval = if (no.ex) txdat else exdat,
-      conmode = efac[indices],
+      conmode = .npConmodeSelectedFactor(indices, efac, ordered = is.ordered(efac)),
       condens = mdens,
       conderr = mderr,
       ntrain = nrow(txdat),
@@ -465,6 +560,13 @@ npconmode.conbandwidth <-
 
       fit.mcfadden <- sum(t.diag) - (sum(confusion.matrix^2)-sum(t.diag^2))
       con.mode$fit.mcfadden <- fit.mcfadden
+    }
+    con.mode <- .npConmodeRecordOmit(con.mode, train.omit)
+    if (no.ex) {
+      con.mode <- .npConmodePadRowOutputs(con.mode, train.omit)
+    } else {
+      con.mode <- .npConmodeRecordEvalOmit(con.mode, eval.omit)
+      con.mode <- .npConmodePadRowOutputs(con.mode, eval.omit)
     }
     con.mode
   }
