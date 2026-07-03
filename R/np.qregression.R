@@ -39,16 +39,40 @@ npqreg <-
 .npqreg_napredict_eval <- function(omit, x) {
   if (!length(omit))
     return(x)
-  if (length(dim(x)) <= 2L)
-    return(napredict(omit, x))
+  omit <- as.integer(omit)
+  keep <- seq_len(NROW(x) + length(omit))[-omit]
+  if (is.null(dim(x))) {
+    out <- x[rep(NA_integer_, length(x) + length(omit))]
+    out[keep] <- x
+    attr(out, "na.action") <- NULL
+    return(out)
+  }
+  if (is.data.frame(x)) {
+    out <- x[rep(NA_integer_, nrow(x) + length(omit)), , drop = FALSE]
+    out[keep, ] <- x
+    attr(out, "na.action") <- NULL
+    return(out)
+  }
+  if (length(dim(x)) <= 2L) {
+    out <- x[rep(NA_integer_, nrow(x) + length(omit)), , drop = FALSE]
+    out[keep, ] <- x
+    attr(out, "na.action") <- NULL
+    return(out)
+  }
   d <- dim(x)
   dn <- dimnames(x)
-  if (!is.null(dn))
+  new.dim <- c(d[1L] + length(omit), d[-1L])
+  if (!is.null(dn)) {
     dn[[1L]] <- NULL
+    if (length(dn) != length(new.dim) ||
+        any(vapply(seq_along(dn), function(i) {
+          !is.null(dn[[i]]) && length(dn[[i]]) != new.dim[[i]]
+        }, logical(1L))))
+      dn <- NULL
+  }
   out <- array(NA_real_,
-               dim = c(d[1L] + length(omit), d[-1L]),
+               dim = new.dim,
                dimnames = dn)
-  keep <- seq_len(dim(out)[1L])[-as.integer(omit)]
   out[keep, , ] <- x
   out
 }
@@ -97,6 +121,49 @@ npqreg <-
   if (any(bad))
     .np_reject_unused_dots(dots[which(bad)[1L]], "npqreg")
 
+  invisible(TRUE)
+}
+
+.npqreg_validate_itmax <- function(itmax) {
+  if (!is.numeric(itmax) || length(itmax) != 1L || is.na(itmax) ||
+      !is.finite(itmax) || itmax < 1 || itmax != floor(itmax) ||
+      itmax > .Machine$integer.max)
+    stop("'itmax' must be a positive integer")
+  as.integer(itmax)
+}
+
+.npqreg_quantile_clamp_attr <- "npqreg.clamp"
+
+.npqreg_quantile_clamp <- function(quantile) {
+  clamp <- attr(quantile, .npqreg_quantile_clamp_attr, exact = TRUE)
+  if (is.null(clamp) || length(clamp) != length(quantile))
+    return(rep.int("none", length(quantile)))
+  as.character(clamp)
+}
+
+.npqreg_mark_clamped_delta <- function(delta, clamp) {
+  clamp <- as.character(clamp)
+  bad <- which(!is.na(clamp) & clamp != "none")
+  if (!length(bad))
+    return(delta)
+
+  if (!is.null(delta$quanterr) && length(delta$quanterr) >= max(bad))
+    delta$quanterr[bad] <- NA_real_
+  if (is.matrix(delta$quantgrad) && nrow(delta$quantgrad) >= max(bad))
+    delta$quantgrad[bad, ] <- NA_real_
+  if (is.matrix(delta$quantgerr) && nrow(delta$quantgerr) >= max(bad))
+    delta$quantgerr[bad, ] <- NA_real_
+  delta
+}
+
+.npqreg_assert_monotone_cdf_kernel <- function(bws) {
+  order <- bws$cykerorder
+  if (is.null(order))
+    return(invisible(TRUE))
+  order <- suppressWarnings(as.integer(order[1L]))
+  if (!is.finite(order) || order != 2L)
+    stop("npqreg requires cykerorder = 2 for conditional-quantile inversion; higher-order dependent-variable CDF kernels can be nonmonotone",
+         call. = FALSE)
   invisible(TRUE)
 }
 
@@ -253,9 +320,10 @@ npqreg <-
                                                exdat,
                                                ycand,
                                                cdf.cache = NULL,
-                                               row.keys = NULL) {
+                                               row.keys = NULL,
+                                               cdf.values = .npqreg_selected_cdf_values) {
   if (!is.environment(cdf.cache) || !isTRUE(cdf.cache$enabled))
-    return(.npqreg_selected_cdf_values(bws, xdat, ydat, exdat, ycand))
+    return(cdf.values(bws, xdat, ydat, exdat, ycand))
 
   exdat <- toFrame(exdat)
   n.eval <- nrow(exdat)
@@ -263,7 +331,7 @@ npqreg <-
   if (length(ycand) == 1L && n.eval > 1L)
     ycand <- rep.int(ycand, n.eval)
   if (length(ycand) != n.eval)
-    return(.npqreg_selected_cdf_values(bws, xdat, ydat, exdat, ycand))
+    return(cdf.values(bws, xdat, ydat, exdat, ycand))
   if (is.null(row.keys) || length(row.keys) != n.eval)
     row.keys <- .npqreg_selected_cdf_cache_row_keys(exdat)
 
@@ -291,7 +359,7 @@ npqreg <-
   }
 
   if (length(miss.first)) {
-    values <- .npqreg_selected_cdf_values(
+    values <- cdf.values(
       bws = bws,
       xdat = xdat,
       ydat = ydat,
@@ -313,6 +381,7 @@ npqreg <-
 }
 
 .npqreg_assert_selected_cdf_metadata <- function(bws) {
+  .npqreg_assert_monotone_cdf_kernel(bws)
   reg.engine <- if (is.null(bws$regtype.engine)) {
     if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
   } else {
@@ -335,12 +404,14 @@ npqreg <-
                                         small,
                                         itmax,
                                         cdf.cache = NULL,
-                                        cdf.row.keys = NULL) {
+                                        cdf.row.keys = NULL,
+                                        cdf.values = .npqreg_selected_cdf_values) {
   .npqreg_assert_selected_cdf_metadata(bws)
 
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
+  itmax <- .npqreg_validate_itmax(itmax)
   y <- as.double(ydat[[1L]])
   y <- y[is.finite(y)]
   if (!length(y))
@@ -351,16 +422,19 @@ npqreg <-
   y.max <- max(y)
   if (!is.finite(y.min) || !is.finite(y.max))
     stop("npqreg selected-CDF inversion found non-finite response support")
-  if (identical(y.min, y.max))
-    return(rep.int(y.min, n.eval))
+  if (identical(y.min, y.max)) {
+    out <- rep.int(y.min, n.eval)
+    attr(out, .npqreg_quantile_clamp_attr) <- rep.int("constant", n.eval)
+    return(out)
+  }
 
   lo <- rep.int(y.min, n.eval)
   hi <- rep.int(y.max, n.eval)
 
   flo <- .npqreg_selected_cdf_values_cached(bws, xdat, ydat, exdat, lo, cdf.cache = cdf.cache,
-                                            row.keys = cdf.row.keys)
+                                            row.keys = cdf.row.keys, cdf.values = cdf.values)
   fhi <- .npqreg_selected_cdf_values_cached(bws, xdat, ydat, exdat, hi, cdf.cache = cdf.cache,
-                                            row.keys = cdf.row.keys)
+                                            row.keys = cdf.row.keys, cdf.values = cdf.values)
   if (any(!is.finite(flo)) || any(!is.finite(fhi)))
     stop("npqreg selected-CDF inversion encountered non-finite bracket values")
 
@@ -368,7 +442,7 @@ npqreg <-
   done.high <- fhi < tau
   active <- !(done.low | done.high)
 
-  maxiter <- min(as.integer(itmax), 1000L)
+  maxiter <- itmax
   iter <- 0L
   while (any(active) && iter < maxiter) {
     iter <- iter + 1L
@@ -380,7 +454,8 @@ npqreg <-
       exdat = exdat[active, , drop = FALSE],
       ycand = mid,
       cdf.cache = cdf.cache,
-      row.keys = if (is.null(cdf.row.keys)) NULL else cdf.row.keys[active]
+      row.keys = if (is.null(cdf.row.keys)) NULL else cdf.row.keys[active],
+      cdf.values = cdf.values
     )
     if (any(!is.finite(fmid)))
       stop("npqreg selected-CDF inversion encountered non-finite refinement values")
@@ -398,9 +473,13 @@ npqreg <-
   if (any(active))
     stop("npqreg selected-CDF inversion failed to converge within 'itmax'")
 
-  out <- hi
+  out <- (lo + hi) / 2.0
   out[done.low] <- y.min
   out[done.high] <- y.max
+  clamp <- rep.int("none", n.eval)
+  clamp[done.low] <- "lower"
+  clamp[done.high] <- "upper"
+  attr(out, .npqreg_quantile_clamp_attr) <- clamp
   out
 }
 
@@ -478,16 +557,13 @@ npqreg.condbandwidth <-
     if (length(fit.dots))
       stop(sprintf("unused npqreg fit argument '%s'", names(fit.dots)[1L]))
     gradients <- npValidateScalarLogical(gradients, "gradients")
-    if (!is.numeric(itmax) || length(itmax) != 1L || is.na(itmax) ||
-        !is.finite(itmax) || itmax < 1 || itmax != floor(itmax))
-      stop("'itmax' must be a positive integer")
+    itmax <- .npqreg_validate_itmax(itmax)
     if (!is.numeric(tol) || length(tol) != 1L || is.na(tol) ||
         !is.finite(tol) || tol <= 0)
       stop("'tol' must be a positive finite numeric scalar")
     if (!is.numeric(small) || length(small) != 1L || is.na(small) ||
         !is.finite(small) || small <= 0)
       stop("'small' must be a positive finite numeric scalar")
-    itmax <- as.integer(itmax)
     tol <- as.double(tol)
     small <- as.double(small)
 
@@ -539,11 +615,12 @@ npqreg.condbandwidth <-
     txdat <- txdat[keep.rows,,drop = FALSE]
     tydat <- tydat[keep.rows,,drop = FALSE]
 
+    eval.omit <- NULL
     if (!no.ex){
       keep.eval <- rep_len(TRUE, nrow(exdat))
-      rows.omit <- attr(na.omit(exdat), "na.action")
-      if (length(rows.omit) > 0L)
-        keep.eval[as.integer(rows.omit)] <- FALSE
+      eval.omit <- attr(na.omit(exdat), "na.action")
+      if (length(eval.omit) > 0L)
+        keep.eval[as.integer(eval.omit)] <- FALSE
       exdat <- exdat[keep.eval,,drop = FALSE]
     }
     
@@ -557,7 +634,7 @@ npqreg.condbandwidth <-
     tydat <- adjustLevels(tydat, bws$ydati)
     
     if (!no.ex){
-      exdat <- adjustLevels(exdat, bws$xdati)
+      exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
     }
 
     ## grab the evaluation data before it is converted to numeric
@@ -592,6 +669,7 @@ npqreg.condbandwidth <-
         cdf.cache = cdf.cache,
         cdf.row.keys = cdf.row.keys
       )
+      qclamp <- .npqreg_quantile_clamp(yq)
       qdelta <- .npqreg_quantile_delta_from_conditional(
         bws = bws,
         xdat = txdat.df,
@@ -600,6 +678,7 @@ npqreg.condbandwidth <-
         quantile = yq,
         gradients = gradients
       )
+      qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
       list(
         yq = yq,
         yqerr = qdelta$quanterr,
@@ -635,6 +714,16 @@ npqreg.condbandwidth <-
           myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
         }
       }
+    }
+
+    if (!no.ex && length(eval.omit) > 0L) {
+      myout$yq <- .npqreg_napredict_eval(eval.omit, myout$yq)
+      myout$yqerr <- .npqreg_napredict_eval(eval.omit, myout$yqerr)
+      if (gradients) {
+        myout$yqgrad <- .npqreg_napredict_eval(eval.omit, myout$yqgrad)
+        myout$yqgerr <- .npqreg_napredict_eval(eval.omit, myout$yqgerr)
+      }
+      txeval <- .npqreg_napredict_eval(eval.omit, txeval)
     }
 
 

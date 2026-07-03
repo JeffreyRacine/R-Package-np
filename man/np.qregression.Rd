@@ -236,7 +236,10 @@ prediction/evaluation route, or plot route as appropriate.
   of the dependent variable using the same selected conditional CDF
   estimator that is later used for quantile standard errors and gradients.
   The arguments \code{tol}, \code{small}, and \code{itmax} control this
-  one-dimensional refinement.
+  one-dimensional refinement. Conditional quantile inversion requires a
+  monotone dependent-variable conditional distribution estimate; therefore
+  \code{npqreg} supports \code{cykerorder = 2} for this route and rejects
+  higher-order dependent-variable CDF kernels, which can be nonmonotone.
 
   Let \eqn{f(y|x) = \partial F(y|x)/\partial y} denote the conditional
   density. The asymptotic standard error of the conditional quantile is
