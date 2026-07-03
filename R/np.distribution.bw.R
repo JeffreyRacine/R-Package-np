@@ -8,6 +8,67 @@ npudistbw <- function(...){
   UseMethod("npudistbw", target)
 }
 
+.npudistbw_method_name <- function(bws, where = "npudistbw") {
+  method <- bws[["method"]]
+  method <- tryCatch(as.character(method)[1L], error = function(e) NA_character_)
+  if (is.na(method) || !nzchar(method))
+    stop(where, " requires a valid bandwidth method")
+  switch(method,
+         cv.cdf = method,
+         "normal-reference" = method,
+         stop(where, " does not support bwmethod = '", method, "'"))
+}
+
+.npudistbw_method_code <- function(bws, where = "npudistbw") {
+  switch(.npudistbw_method_name(bws, where = where),
+         cv.cdf = DBWM_CVLS,
+         "normal-reference" = NA_integer_)
+}
+
+.npudistbw_prepare_cdf_grid <- function(dat,
+                                        bws,
+                                        gdat = NULL,
+                                        do.full.integral = FALSE,
+                                        ngrid = 100L) {
+  if (!is.null(gdat)) {
+    gdat <- toFrame(gdat)
+    if (any(is.na(gdat)))
+      stop("na's not allowed to be present in cdf gdata")
+    gdat.matrix <- toMatrix(gdat)
+    return(list(
+      guno = gdat.matrix[, bws$iuno, drop = FALSE],
+      gord = gdat.matrix[, bws$iord, drop = FALSE],
+      gcon = gdat.matrix[, bws$icon, drop = FALSE],
+      cdf_on_train = FALSE,
+      nog = nrow(gdat.matrix)
+    ))
+  }
+
+  if (isTRUE(do.full.integral)) {
+    return(list(
+      guno = data.frame(),
+      gord = data.frame(),
+      gcon = data.frame(),
+      cdf_on_train = TRUE,
+      nog = 0L
+    ))
+  }
+
+  nog <- as.integer(ngrid)
+  probs <- seq(0, 1, length.out = nog)
+  ev <- dat[rep(1L, nog), , drop = FALSE]
+  for (i in seq_len(ncol(ev)))
+    ev[, i] <- cast(uocquantile(dat[, i], probs), dat[, i])
+  ev <- toMatrix(ev)
+  list(
+    guno = ev[, bws$iuno, drop = FALSE],
+    gord = ev[, bws$iord, drop = FALSE],
+    gcon = ev[, bws$icon, drop = FALSE],
+    cdf_on_train = FALSE,
+    nog = nog
+  )
+}
+
 npudistbw.formula <-
   function(formula, data, subset, na.action, call, gdata = NULL, ...){
     formula.terms <- terms(formula)
@@ -95,6 +156,9 @@ npudistbw.NULL <-
     
     if(!is.null(t.names))
       names(dat) <- t.names
+
+    if (anyNA(dat) && !any(stats::complete.cases(dat)))
+      stop("Data has no rows without NAs")
 
     bws = double(dim(dat)[2])
 
@@ -185,35 +249,18 @@ npudistbw.NULL <-
     where = "npudistbw"
   )
 
-  if (!is.null(gdat)) {
-    gdat <- toFrame(gdat)
-    if (any(is.na(gdat)))
-      stop("na's not allowed to be present in cdf gdata")
-    gdat.matrix <- toMatrix(gdat)
-    guno <- gdat.matrix[, bws$iuno, drop = FALSE]
-    gord <- gdat.matrix[, bws$iord, drop = FALSE]
-    gcon <- gdat.matrix[, bws$icon, drop = FALSE]
-    cdf_on_train <- FALSE
-    nog <- nrow(gdat.matrix)
-  } else if (isTRUE(do.full.integral)) {
-    guno <- data.frame()
-    gord <- data.frame()
-    gcon <- data.frame()
-    cdf_on_train <- TRUE
-    nog <- 0L
-  } else {
-    nog <- as.integer(ngrid)
-    probs <- seq(0, 1, length.out = nog)
-    odat <- dat
-    ev <- odat[seq_len(nog), , drop = FALSE]
-    for (i in seq_len(ncol(ev)))
-      ev[, i] <- cast(uocquantile(odat[, i], probs), odat[, i])
-    ev <- toMatrix(ev)
-    guno <- ev[, bws$iuno, drop = FALSE]
-    gord <- ev[, bws$iord, drop = FALSE]
-    gcon <- ev[, bws$icon, drop = FALSE]
-    cdf_on_train <- FALSE
-  }
+  cdf.grid <- .npudistbw_prepare_cdf_grid(
+    dat = dat,
+    bws = bws,
+    gdat = gdat,
+    do.full.integral = do.full.integral,
+    ngrid = ngrid
+  )
+  guno <- cdf.grid$guno
+  gord <- cdf.grid$gord
+  gcon <- cdf.grid$gcon
+  cdf_on_train <- cdf.grid$cdf_on_train
+  nog <- cdf.grid$nog
 
   myopti <- list(
     num_obs_train = nrow,
@@ -229,8 +276,7 @@ npudistbw.NULL <-
     itmax = itmax,
     int_RESTART_FROM_MIN = RE_MIN_FALSE,
     int_MINIMIZE_IO = IO_MIN_TRUE,
-    bwmethod = switch(bws$method,
-      cv.cdf = DBWM_CVLS),
+    bwmethod = .npudistbw_method_code(bws, where = "npudistbw"),
     ckerneval = switch(bws$ckertype,
       gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
       epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
@@ -713,9 +759,6 @@ npudistbw.dbandwidth <-
       if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
     )
 
-    nofi <- missing(do.full.integral)
-    nogi <- missing(ngrid)
-    
     if (missing(nmulti)){
       nmulti <- npDefaultNmulti(dim(dat)[2])
     }
@@ -741,6 +784,8 @@ npudistbw.dbandwidth <-
 
     dat <- na.omit(dat)
     rows.omit <- unclass(na.action(dat))
+    if (nrow(dat) == 0L)
+      stop("Data has no rows without NAs")
 
     nrow = dim(dat)[1]
     ncol = dim(dat)[2]
@@ -762,43 +807,18 @@ npudistbw.dbandwidth <-
     nconfac <- nrow^(-1.0/(1.0+bws$ckerorder))
     ncatfac <- nrow^(-2.0/(1.0+bws$ckerorder))
 
-    ## these are the points where we evaluate the CDF
-    ## for now we default to the training points (hence cdf_on_train = TRUE below)
-    if(!is.null(gdat)){
-      gdat <- toFrame(gdat)
-      if(any(is.na(gdat)))
-        stop("na's not allowed to be present in cdf gdata")
-      gdat <- toMatrix(gdat)
-
-      guno = gdat[, bws$iuno, drop = FALSE]
-      gord = gdat[, bws$iord, drop = FALSE]
-      gcon = gdat[, bws$icon, drop = FALSE]
-      cdf_on_train = FALSE
-      nog = nrow(gdat)
-      
-    } else {
-      if(do.full.integral) {
-        cdf_on_train = TRUE
-        nog = 0
-        guno = data.frame()
-        gord = data.frame()
-        gcon = data.frame()
-      } else {
-        cdf_on_train = FALSE
-        nog = ngrid
-        probs <- seq(0,1,length.out = nog)
-        ev <- odat[seq_len(nog),,drop = FALSE]
-        for (i in seq_len(ncol(ev))) {
-          ev[,i] <- cast(uocquantile(odat[,i], probs), odat[,i])
-        }
-
-        ev <- toMatrix(ev)
-        
-        guno = ev[, bws$iuno, drop = FALSE]
-        gord = ev[, bws$iord, drop = FALSE]
-        gcon = ev[, bws$icon, drop = FALSE]
-      }
-    }
+    cdf.grid <- .npudistbw_prepare_cdf_grid(
+      dat = odat,
+      bws = bws,
+      gdat = gdat,
+      do.full.integral = do.full.integral,
+      ngrid = ngrid
+    )
+    guno = cdf.grid$guno
+    gord = cdf.grid$gord
+    gcon = cdf.grid$gcon
+    cdf_on_train = cdf.grid$cdf_on_train
+    nog = cdf.grid$nog
 
     invalid.penalty <- match.arg(invalid.penalty)
     penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
@@ -859,8 +879,7 @@ npudistbw.dbandwidth <-
           adaptive_nn = BW_ADAP_NN),
         itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE), 
         int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE, 
-        bwmethod = switch(bws$method,
-          cv.cdf = DBWM_CVLS),
+        bwmethod = .npudistbw_method_code(bws, where = "npudistbw"),
         ckerneval = switch(bws$ckertype,
           gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
           epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
@@ -1072,6 +1091,9 @@ npudistbw.default <-
     
     if(!is.null(t.names))
       names(dat) <- t.names
+
+    if (anyNA(dat) && !any(stats::complete.cases(dat)))
+      stop("Data has no rows without NAs")
 
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
     ## bandwidth() call

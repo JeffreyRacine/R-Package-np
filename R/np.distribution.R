@@ -99,12 +99,22 @@ npudist.dbandwidth <-
 
     npValidateExtendedNnContinuousBandwidth(bws, where = "npudist")
 
+    if(any(bws$iuno))
+      stop("distribution estimation does not support unordered data types")
+
     tdat = na.omit(tdat)
-    rows.omit <- unclass(na.action(tdat))
+    train.rows.omit <- unclass(na.action(tdat))
+    if (nrow(tdat) == 0L)
+      stop("Data has no rows without NAs")
+    rows.omit <- train.rows.omit
+    eval.rows.omit <- integer(0)
 
     if (!no.e){
       edat = na.omit(edat)
-      rows.omit <- unclass(na.action(edat))
+      eval.rows.omit <- unclass(na.action(edat))
+      if (nrow(edat) == 0L)
+        stop("Evaluation data has no rows without NAs")
+      rows.omit <- eval.rows.omit
     }
 
     tnrow = nrow(tdat)
@@ -206,6 +216,8 @@ npudist.dbandwidth <-
     ev <- npdistribution(bws=bws, eval=teval, dist = myout$dist,
                          derr = myout$derr, ntrain = tnrow, trainiseval = no.e,
                          rows.omit = rows.omit,
+                         train.rows.omit = train.rows.omit,
+                         eval.rows.omit = eval.rows.omit,
                          timing = bws$timing, total.time = total.time,
                          optim.time = optim.time, fit.time = fit.elapsed)
     return(ev)
