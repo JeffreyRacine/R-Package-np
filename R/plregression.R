@@ -195,9 +195,20 @@ residuals.plregression <- function(object, ...) {
     stop("internal error: residual length does not match training rows")
 
   u2 <- u^2
-  neval <- nrow(dat$exdat)
+  keep.eval <- fit$eval.keep
+  if (is.null(keep.eval))
+    keep.eval <- rep_len(TRUE, nrow(dat$exdat))
+  keep.eval <- as.logical(keep.eval)
+  if (length(keep.eval) != nrow(dat$exdat))
+    stop("internal error: evaluation row map does not match evaluation data")
+  if (!any(keep.eval))
+    return(rep(NA_real_, nrow(dat$exdat)))
+
+  exdat.work <- dat$exdat[keep.eval, , drop = FALSE]
+  ezdat.work <- dat$ezdat[keep.eval, , drop = FALSE]
+  neval <- nrow(exdat.work)
   block.size <- .np_plreg_predict_se_block_size(nrow(dat$txdat))
-  se.fit <- numeric(neval)
+  se.work <- numeric(neval)
   starts <- seq.int(1L, neval, by = block.size)
 
   for (st in starts) {
@@ -207,13 +218,15 @@ residuals.plregression <- function(object, ...) {
       bws = bws,
       txdat = dat$txdat,
       tzdat = dat$tzdat,
-      exdat = dat$exdat[ii, , drop = FALSE],
-      ezdat = dat$ezdat[ii, , drop = FALSE],
+      exdat = exdat.work[ii, , drop = FALSE],
+      ezdat = ezdat.work[ii, , drop = FALSE],
       output = "matrix"
     )
-    se.fit[ii] <- sqrt(pmax(drop((H^2) %*% u2), 0.0))
+    se.work[ii] <- sqrt(pmax(drop((H^2) %*% u2), 0.0))
   }
 
+  se.fit <- rep(NA_real_, nrow(dat$exdat))
+  se.fit[keep.eval] <- se.work
   se.fit
 }
 

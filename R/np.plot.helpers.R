@@ -4421,8 +4421,10 @@
     y = yy,
     where = where
   )
+  .np_plreg_check_residualized_rank(qrX = common$qrR,
+                                    p = common$p,
+                                    where = where)
   beta <- qr.coef(common$qrR, yy - Hy.train)
-  beta[is.na(beta)] <- 0.0
 
   out <- Hy.eval + state$resx.eval %*% beta
   if (isTRUE(drop) && ncol(out) == 1L)
