@@ -181,7 +181,8 @@ These arguments choose the selection criterion and the way continuous bandwidths
     the number of observations, \eqn{P} the order of the kernel, and
     \eqn{l} the number of continuous variables. Note that when there
     exist factors and the normal-reference rule is used, there is zero
-    smoothing of the factors. Defaults to \code{cv.ml}.  }
+    smoothing of the factors, corresponding to exact cell-indicator
+    kernels for categorical coordinates. Defaults to \code{cv.ml}.  }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
     supplied bandwidths are interpreted as \sQuote{scale factors}

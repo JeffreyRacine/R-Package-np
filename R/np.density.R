@@ -31,8 +31,11 @@ npudens.formula <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
+    if (!missing(data) && !is.null(data))
+      tmf[["data"]] <- substitute(data)
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    train.omit <- attr(tmf, "na.action")
 
     tdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
 
@@ -42,8 +45,11 @@ npudens.formula <-
       umf.args <- list(formula = tt, data = newdata)
       umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
       emf <- umf
+      eval.omit <- attr(umf, "na.action")
 
       edat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
+    } else {
+      eval.omit <- train.omit
     }
 
     ud.args <- list(tdat = tdat)
@@ -55,6 +61,10 @@ npudens.formula <-
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
+    ev$train.rows.omit <- if (length(train.omit)) train.omit else NA
+    ev$ntrain.omit <- if (length(train.omit)) length(train.omit) else 0L
+    ev$eval.rows.omit <- if (length(eval.omit)) eval.omit else NA
+    ev$neval.omit <- if (length(eval.omit)) length(eval.omit) else 0L
 
     ev$dens <- napredict(ev$omit, ev$dens)
     ev$derr <- napredict(ev$omit, ev$derr)
@@ -101,11 +111,18 @@ npudens.bandwidth <-
   npValidateExtendedNnContinuousBandwidth(bws, where = "npudens")
 
   tdat <- na.omit(tdat)
-  rows.omit <- unclass(na.action(tdat))
+  train.rows.omit <- unclass(na.action(tdat))
+  if (nrow(tdat) == 0L)
+    stop("Data has no rows without NAs")
+  rows.omit <- train.rows.omit
+  eval.rows.omit <- integer(0)
 
   if (!no.e){
     edat <- na.omit(edat)
-    rows.omit <- unclass(na.action(edat))
+    eval.rows.omit <- unclass(na.action(edat))
+    if (nrow(edat) == 0L)
+      stop("Evaluation data has no rows without NAs")
+    rows.omit <- eval.rows.omit
   }
 
   tnrow = nrow(tdat)
@@ -201,7 +218,12 @@ npudens.bandwidth <-
 
   ## For purely categorical density with zero bandwidths, the variance of
   ## the sample proportion is p(1-p)/n. The C routine returns p/n; fix here.
-  if (bws$ncon == 0 && bws$nord == 0 && bws$nuno > 0 && all(bws$bw[bws$iuno] == 0)) {
+  cat.mask <- rep(FALSE, length(bws$bw))
+  if (isTRUE(bws$nuno > 0L))
+    cat.mask <- cat.mask | bws$iuno
+  if (isTRUE(bws$nord > 0L))
+    cat.mask <- cat.mask | bws$iord
+  if (bws$ncon == 0 && any(cat.mask) && all(bws$bw[cat.mask] == 0)) {
     p <- pmin(pmax(myout$dens, 0), 1)
     myout$derr <- sqrt(p * (1 - p) / tnrow)
   }
@@ -214,6 +236,8 @@ npudens.bandwidth <-
                   derr = myout$derr, ll = myout$log_likelihood,
                   ntrain = tnrow, trainiseval = no.e,
                   rows.omit = rows.omit,
+                  train.rows.omit = train.rows.omit,
+                  eval.rows.omit = if (no.e) integer(0) else eval.rows.omit,
                   timing = bws$timing, total.time = total.time,
                   optim.time = optim.time, fit.time = fit.elapsed)
   return(ev)
