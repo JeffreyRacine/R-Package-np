@@ -212,7 +212,7 @@ test_that("public npcdensbw cv.ls fixed LP tree and serial evaluators agree at f
   expect_equal(tree.at.tree, serial.at.tree, tolerance = 2e-2)
 })
 
-test_that("npcdensbw cv.ls fixed continuous stream does not route through legacy tree rows", {
+test_that("npcdensbw cv.ls fixed continuous stream preserves tree equality", {
   set.seed(145)
   n <- 36L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -236,7 +236,7 @@ test_that("npcdensbw cv.ls fixed continuous stream does not route through legacy
       ncon = bw$yncon + bw$xncon,
       ncat = bw$ynuno + bw$ynord + bw$xnuno + bw$xnord
     ),
-    np:::DO_TREE_NO
+    np:::DO_TREE_YES
   )
 
   tree.obj <- np:::.npcdensbw_eval_only(x, y, bw)$objective
@@ -245,6 +245,55 @@ test_that("npcdensbw cv.ls fixed continuous stream does not route through legacy
   serial.obj <- np:::.npcdensbw_eval_only(x, y, bw)$objective
 
   expect_equal(tree.obj, serial.obj, tolerance = 1e-12)
+})
+
+test_that("npcdens fit route uses the bandwidth tree predicate", {
+  set.seed(2204)
+  x <- data.frame(x = seq(-0.8, 0.8, length.out = 18L))
+  y <- data.frame(y = sin(2 * x$x))
+
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(5, 5),
+    bandwidth.compute = FALSE,
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    cxkertype = "epanechnikov",
+    cykertype = "epanechnikov"
+  )
+  ncon <- bw$yncon + bw$xncon
+  ncat <- bw$ynuno + bw$ynord + bw$xnuno + bw$xnord
+
+  old_opts <- options(np.tree = TRUE, np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  expect_identical(
+    np:::.npcdensbw_tree_code(bw, ncon = ncon, ncat = ncat),
+    np:::DO_TREE_NO
+  )
+  expect_false(identical(
+    np:::npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bw),
+    np:::DO_TREE_NO
+  ))
+
+  helper.name <- paste0("np_npcdens_tree_helper_hit_", Sys.getpid())
+  assign(helper.name, FALSE, envir = .GlobalEnv)
+  on.exit(rm(list = helper.name, envir = .GlobalEnv), add = TRUE)
+  invisible(trace(
+    ".npcdensbw_tree_code",
+    where = asNamespace("np"),
+    tracer = bquote(assign(.(helper.name), TRUE, envir = .GlobalEnv)),
+    print = FALSE
+  ))
+  on.exit(untrace(".npcdensbw_tree_code", where = asNamespace("np")), add = TRUE)
+
+  fit.tree <- npcdens(bws = bw, txdat = x, tydat = y)
+  expect_true(isTRUE(get(helper.name, envir = .GlobalEnv)))
+
+  options(np.tree = FALSE)
+  fit.no.tree <- npcdens(bws = bw, txdat = x, tydat = y)
+  expect_equal(fitted(fit.tree), fitted(fit.no.tree), tolerance = 1e-12)
 })
 
 test_that("public npcdensbw cv.ls generalized-nn LP route activates with ll == lp parity", {

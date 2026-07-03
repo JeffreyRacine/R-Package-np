@@ -130,3 +130,82 @@ test_that("categorical regression gradient bootstrap works for default, inid, an
     expect_true(all(is.finite(out[[1L]]$gherr)), info = boot.method)
   }
 })
+
+test_that("categorical regression gradient asymptotic intervals fail clearly", {
+  skip_if_not_installed("np")
+
+  library(np)
+
+  set.seed(20260313)
+  n <- 36L
+  g <- factor(sample(c("a", "b"), n, replace = TRUE))
+  x <- runif(n)
+  y <- 1 + 0.4 * (g == "b") + cos(2 * pi * x) + rnorm(n, sd = 0.05)
+  xdat <- data.frame(g = g, x = x)
+  bw <- npregbw(
+    xdat = xdat,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "fixed",
+    bws = c(0.25, 0.3),
+    bandwidth.compute = FALSE
+  )
+  fit <- npreg(
+    bws = bw,
+    txdat = xdat,
+    tydat = y,
+    gradients = TRUE,
+    errors = TRUE
+  )
+
+  expect_error(
+    suppressWarnings(plot(
+      fit,
+      output = "data",
+      perspective = FALSE,
+      gradients = TRUE,
+      errors = "asymptotic",
+      data_overlay = FALSE
+    )),
+    "categorical gradient contrast panels"
+  )
+})
+
+test_that("continuous regression gradient asymptotic intervals remain available", {
+  skip_if_not_installed("np")
+
+  library(np)
+
+  set.seed(20260314)
+  n <- 36L
+  x <- runif(n)
+  z <- runif(n)
+  y <- 1 + sin(2 * pi * x) + 0.5 * z + rnorm(n, sd = 0.05)
+  xdat <- data.frame(x = x, z = z)
+  bw <- npregbw(
+    xdat = xdat,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "fixed",
+    bws = c(0.25, 0.3),
+    bandwidth.compute = FALSE
+  )
+  fit <- npreg(
+    bws = bw,
+    txdat = xdat,
+    tydat = y,
+    gradients = TRUE,
+    errors = TRUE
+  )
+
+  out <- expect_no_error(suppressWarnings(plot(
+    fit,
+    output = "data",
+    perspective = FALSE,
+    gradients = TRUE,
+    errors = "asymptotic",
+    data_overlay = FALSE
+  )))
+  expect_type(out, "list")
+  expect_true(all(vapply(out, inherits, logical(1), "npregression")))
+})

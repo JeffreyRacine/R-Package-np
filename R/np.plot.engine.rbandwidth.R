@@ -638,6 +638,14 @@
           tr$mean
         }
 
+        if (plot.errors && gradients && xi.factor &&
+            identical(plot.errors.method, "asymptotic")) {
+          stop(
+            "asymptotic intervals for categorical gradient contrast panels are not available; use errors = \"bootstrap\"",
+            call. = FALSE
+          )
+        }
+
         if (plot.errors){
           if (plot.errors.method == "asymptotic") {
             asym.obj <- .np_plot_asymptotic_error_from_se(

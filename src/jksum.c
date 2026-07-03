@@ -2498,13 +2498,15 @@ static int np_disc_profile_cache_get_or_build(const int num_xt,
 }
 
 /*
-  Large-bandwidth shortcut for ordinary continuous kernels:
+  Large-bandwidth shortcut for conservative ordinary continuous kernels:
   if max_i |(x - x_i)/h| <= u_tol, replace K((x-x_i)/h) by K(0) to avoid
-  repeated kernel evaluations. This is intentionally conservative and only
-  enabled for ordinary continuous kernels (0..9).
+  repeated kernel evaluations. This is intentionally limited to Gaussian
+  order 2 (0), Epanechnikov order 2 (4), and uniform (8). Higher-order
+  kernels and truncated Gaussian have steeper or shifted near-zero behavior
+  under this tolerance contract.
 */
 static inline int np_cont_largeh_kernel_supported(const int kernel){
-  return (kernel >= 0 && kernel <= 9);
+  return (kernel == 0 || kernel == 4 || kernel == 8);
 }
 
 static inline double np_get_option_double(const char * const name, const double fallback){
