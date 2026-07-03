@@ -154,6 +154,66 @@ npplreg.call <-
   state
 }
 
+.np_plreg_numeric_response <- function(y, ydati) {
+  if (is.factor(y)) {
+    yy <- adjustLevels(data.frame(y), ydati)
+    return(ydati$all.dlev[[1L]][as.integer(yy[, 1L])])
+  }
+
+  as.double(y)
+}
+
+.np_plreg_check_residualized_rank <- function(qrX, p, where) {
+  if (qrX$rank < p) {
+    stop(sprintf(
+      "%s: residualized linear regressors are rank deficient after smoothing on z; the parametric component is not identified",
+      where
+    ), call. = FALSE)
+  }
+}
+
+.np_plreg_linear_solve <- function(resy,
+                                   resx,
+                                   response,
+                                   yhat.train,
+                                   zdim,
+                                   where = "npplreg") {
+  X <- as.matrix(resx)
+  y <- as.double(resy)
+  response <- as.double(response)
+  yhat.train <- as.double(yhat.train)
+  p <- ncol(X)
+  qrX <- qr(X, tol = .Machine$double.eps)
+
+  .np_plreg_check_residualized_rank(qrX = qrX, p = p, where = where)
+
+  beta <- as.double(qr.coef(qrX, y))
+  linear.fit <- as.vector(X %*% beta)
+  train.fit <- as.vector(yhat.train + linear.fit)
+
+  R <- qr.R(qrX)[seq_len(p), seq_len(p), drop = FALSE]
+  XtX.inv.pivoted <- chol2inv(R)
+  XtX.inv <- matrix(0.0, nrow = p, ncol = p)
+  XtX.inv[qrX$pivot, qrX$pivot] <- XtX.inv.pivoted
+
+  sigma2 <- sum((response - train.fit)^2) / (nrow(X) - p - as.integer(zdim))
+  vcov <- sigma2 * XtX.inv
+
+  list(
+    coef = beta,
+    vcov = vcov,
+    se = sqrt(diag(vcov)),
+    train.fit = train.fit,
+    qr = qrX
+  )
+}
+
+.np_plreg_pad_eval_vector <- function(x, keep.eval) {
+  out <- rep(NA_real_, length(keep.eval))
+  out[keep.eval] <- as.double(x)
+  out
+}
+
 .np_plot_plreg_local_fit <-
   function(bws,
            xdat,
@@ -196,12 +256,7 @@ npplreg.call <-
       ezdat <- ezdat[keep.eval, , drop = FALSE]
     }
 
-    if (is.factor(ydat)) {
-      tmp.ty <- adjustLevels(data.frame(ydat), bws$bw$yzbw$ydati)
-      tmp.ty <- (bws$bw$yzbw$ydati$all.dlev[[1L]])[as.integer(tmp.ty)]
-    } else {
-      tmp.ty <- as.double(ydat)
-    }
+    tmp.ty <- .np_plreg_numeric_response(ydat, bws$bw$yzbw$ydati)
 
     local.direct <- isTRUE(identical(bws$type, "generalized_nn"))
     cat.profile.cache <- new.env(parent = emptyenv())
@@ -379,14 +434,18 @@ npplreg.call <-
       }
     }
 
-    model <- lm(resy ~ resx - 1)
-    B <- coef(model)
-
-    train.fit <- as.vector(yhat.train + resx %*% B)
-    Bvcov <- sum((tmp.ty - train.fit)^2) /
-      (ntrain - ncol(xdat) - ncol(zdat)) *
-      chol2inv(chol(t(model.matrix(model)) %*% model.matrix(model)))
-    Berr <- sqrt(diag(Bvcov))
+    solved <- .np_plreg_linear_solve(
+      resy = resy,
+      resx = resx,
+      response = tmp.ty,
+      yhat.train = yhat.train,
+      zdim = ncol(zdat),
+      where = ".np_plot_plreg_local_fit"
+    )
+    B <- solved$coef
+    train.fit <- solved$train.fit
+    Bvcov <- solved$vcov
+    Berr <- solved$se
 
     RSQ <- RSQfunc(tmp.ty, train.fit)
     MSE <- MSEfunc(tmp.ty, train.fit)
@@ -463,8 +522,8 @@ npplreg.plbandwidth <-
     if (!no.exz){
       exdat = toFrame(exdat)
       ezdat = toFrame(ezdat)
-      if (!no.ey)
-        eydat = as.double(eydat)
+      exdat.full <- exdat
+      ezdat.full <- ezdat
 
       ## c& d NA's, part 2
 
@@ -486,21 +545,10 @@ npplreg.plbandwidth <-
     }
 
     ## tmp.ty and tmp.ey are the numeric representations of tydat and eydat
-    if (is.factor(tydat)){
-      tmp.ty <- adjustLevels(data.frame(tydat), bws$bw$yzbw$ydati)
-      tmp.ty <- (bws$bw$yzbw$ydati$all.dlev[[1]])[as.integer(tmp.ty)]
-    } else {
-      tmp.ty <- as.double(tydat)
-    }
+    tmp.ty <- .np_plreg_numeric_response(tydat, bws$bw$yzbw$ydati)
 
-    if (!no.ey){
-      if (is.factor(tydat)){
-        tmp.ey <- adjustLevels(data.frame(eydat), bws$bw$yzbw$ydati)
-        tmp.ey <- (bws$bw$yzbw$ydati$all.dlev[[1]])[as.integer(tmp.ey)]
-      } else {
-        tmp.ey <- as.double(eydat)
-      }
-    }
+    if (!no.ey)
+      tmp.ey <- .np_plreg_numeric_response(eydat, bws$bw$yzbw$ydati)
 
     reg_mean <- function(regbw, ytrain, zeval = NULL) {
       out <- .np_regression_cat_profile_mean(
@@ -584,28 +632,32 @@ npplreg.plbandwidth <-
       detail = fit.progress.targets[ncol + 2L]
     )
 
-    B = coef((model = lm(resy ~ resx - 1)))
+    solved <- .np_plreg_linear_solve(
+      resy = resy,
+      resx = resx,
+      response = tmp.ty,
+      yhat.train = yhat.train,
+      zdim = dim(tzdat)[2],
+      where = "npplreg"
+    )
+    B <- solved$coef
+    Bvcov <- solved$vcov
+    Berr <- solved$se
 
-    ## computes the standard errors of B using the model matrix
-    ## and the MSE of the training data predictions
-
-    Bvcov = sum((tmp.ty-(yhat.train + resx  %*% B))^2)/
-      (dim(txdat)[1]-dim(txdat)[2]-dim(tzdat)[2])*
-      chol2inv(chol(t(model.matrix(model))%*%model.matrix(model)))
-
-    Berr = sqrt(diag(Bvcov))
-
-    train.ply =  yhat.train + resx %*% B
-    ply = if (no.exz) train.ply else yhat.eval + resx.eval %*% B
+    train.ply <- solved$train.fit
+    ply.complete <- if (no.exz) train.ply else as.vector(yhat.eval + resx.eval %*% B)
+    ply <- if (no.exz) train.ply else .np_plreg_pad_eval_vector(ply.complete, keep.eval)
 
     if (!no.ey) {
-      RSQ = RSQfunc(tmp.ey, ply)
-      MSE = MSEfunc(tmp.ey, ply)
-      MAE = MAEfunc(tmp.ey, ply)
-      MAPE = MAPEfunc(tmp.ey, ply)
-      CORR = CORRfunc(tmp.ey, ply)
-      SIGN = SIGNfunc(tmp.ey, ply)
+      RSQ = RSQfunc(tmp.ey, ply.complete)
+      MSE = MSEfunc(tmp.ey, ply.complete)
+      MAE = MAEfunc(tmp.ey, ply.complete)
+      MAPE = MAPEfunc(tmp.ey, ply.complete)
+      CORR = CORRfunc(tmp.ey, ply.complete)
+      SIGN = SIGNfunc(tmp.ey, ply.complete)
 
+    } else if (!no.exz) {
+      RSQ = MSE = MAE = MAPE = CORR = SIGN = NA_real_
     } else {
       RSQ = RSQfunc(tmp.ty, train.ply)
       MSE = MSEfunc(tmp.ty, train.ply)
@@ -620,8 +672,8 @@ npplreg.plbandwidth <-
       xcoef = B,
       xcoeferr = Berr,
       xcoefvcov = Bvcov,
-      evalx = if (no.exz) txdat else exdat,
-      evalz = if (no.exz) tzdat else ezdat,
+      evalx = if (no.exz) txdat else exdat.full,
+      evalz = if (no.exz) tzdat else ezdat.full,
       mean = ply,
       ntrain = nrow,
       trainiseval = no.exz,
@@ -631,6 +683,10 @@ npplreg.plbandwidth <-
     if (residuals)
       ev.args$resid <- tmp.ty - train.ply
     ev <- do.call(plregression, ev.args)
+    if (!no.exz) {
+      ev$eval.keep <- keep.eval
+      ev$eval.rows.omit <- which(!keep.eval)
+    }
 
     fit.elapsed <- proc.time()[3] - fit.start
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
@@ -692,10 +748,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   if(txdat.named)
     txdat <- toFrame(txdat)
 
-  if(tydat.named)
-    tydat <- toFrame(tydat)
-
-  if(tydat.named)
+  if(tzdat.named)
     tzdat <- toFrame(tzdat)
 
   sc.bw <- sc
