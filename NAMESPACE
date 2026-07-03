@@ -340,6 +340,7 @@ S3method(npconmode, formula)
 S3method(npconmode, call)
 S3method(npconmode, default)
 S3method(npconmode, conbandwidth)
+S3method(npconmode, condbandwidth)
 S3method(npcopula, formula)
 S3method(npcopula, default)
 
