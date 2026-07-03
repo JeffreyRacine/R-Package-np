@@ -290,6 +290,22 @@ npscoefbw.NULL <-
   tdati <- if (is.null(sbw$zdati)) sbw$xdati else sbw$zdati
   eval.zdat <- toFrame(eval.zdat)
 
+  ckerbound <- if (is.null(sbw$ckerbound) || !length(sbw$ckerbound)) {
+    "none"
+  } else {
+    as.character(sbw$ckerbound)[1L]
+  }
+  if (!identical(ckerbound, "none"))
+    return(FALSE)
+
+  ckertype <- as.character(sbw$ckertype)[1L]
+  ckerorder <- as.integer(sbw$ckerorder)[1L]
+  if (identical(ckertype, "truncated gaussian"))
+    return(FALSE)
+  if (!identical(ckertype, "uniform") &&
+      (!is.finite(ckerorder) || ckerorder != 2L))
+    return(FALSE)
+
   if (any(tdati$icon) && !npLogicalOption("np.largeh", TRUE))
     return(FALSE)
   if ((any(tdati$iuno) || any(tdati$iord)) &&
@@ -300,9 +316,8 @@ npscoefbw.NULL <-
   fast_disc_tol <- npDiscUpperRelTol()
 
   cont_utol <- switch(
-    sbw$ckertype,
+    ckertype,
     gaussian = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
-    "truncated gaussian" = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
     epanechnikov = sqrt(fast_largeh_tol),
     uniform = 1.0 - 32.0 * .Machine$double.eps,
     0.0
@@ -313,8 +328,7 @@ npscoefbw.NULL <-
     zcon <- eval.zdat[, sbw$icon, drop = FALSE]
     cont_hmin <- vapply(zcon, function(col) {
       vals <- as.double(col)
-      vals <- vals[is.finite(vals)]
-      if (!length(vals))
+      if (!length(vals) || any(!is.finite(vals)))
         return(Inf)
       diff(range(vals)) / cont_utol
     }, numeric(1))
@@ -1484,14 +1498,55 @@ npscoefbw.NULL <-
     if (!is.finite(h))
       return(NA_real_)
     k <- .np_round_half_to_even(h)
+    if (k < lower)
+      return(NA_real_)
     if (k > upper &&
         npExtendedNnEnabled() &&
         bwtype %in% c("generalized_nn", "adaptive_nn") &&
         k <= hard.upper) {
       return(as.double(k))
     }
-    as.double(max(lower, min(upper, k)))
+    if (k > upper)
+      return(NA_real_)
+    as.double(k)
   }, numeric(1))
+}
+
+.npscoef_bw_scale_multiplier <- function(scbw) {
+  out <- rep.int(1.0, length(scbw$bw))
+  if (!isTRUE(scbw$scaling))
+    return(out)
+
+  if (is.null(scbw$ncatfac) || !is.finite(scbw$ncatfac) ||
+      is.null(scbw$nconfac) || !is.finite(scbw$nconfac))
+    stop("scaled smooth-coefficient bandwidth state is missing scale factors",
+         call. = FALSE)
+
+  out[] <- as.double(scbw$ncatfac)
+  if (any(scbw$icon)) {
+    if (is.null(scbw$sdev) || any(!is.finite(scbw$sdev)))
+      stop("scaled smooth-coefficient bandwidth state is missing continuous scales",
+           call. = FALSE)
+    icon.cumsum <- cumsum(scbw$icon)
+    out[scbw$icon] <- as.double(scbw$nconfac) *
+      as.double(scbw$sdev)[icon.cumsum[scbw$icon]]
+  }
+  out
+}
+
+.npscoef_apply_bw_to_scbw <- function(scbw, param, nobs = scbw$nobs) {
+  param <- .npscoef_nn_candidate_bandwidth(param = param,
+                                           bwtype = scbw$type,
+                                           nobs = nobs)
+  if (length(param) != length(scbw$bw))
+    stop("smooth-coefficient bandwidth candidate has wrong length",
+         call. = FALSE)
+  scbw$bw <- as.double(param)
+  if (isTRUE(scbw$scaling))
+    scbw$bandwidth[[1L]] <- scbw$bw * .npscoef_bw_scale_multiplier(scbw)
+  else
+    scbw$bandwidth[[1L]] <- scbw$bw
+  scbw
 }
 
 .npscoefbw_start_controls <- function(scale.factor.init.lower = 0.1,
@@ -1853,22 +1908,11 @@ npscoefbw.scbandwidth <-
     bws$sdev <- mysd
     bws$nconfac <- nconfac
     bws$ncatfac <- ncatfac
-    bw.scale.multiplier <- NULL
-    if (bws$scaling) {
-      bw.scale.multiplier <- rep(ncatfac, bws$ndim)
-      if (any(bws$icon)) {
-        icon.cumsum <- cumsum(dati$icon)
-        bw.scale.multiplier[bws$icon] <- nconfac * bws$sdev[icon.cumsum[bws$icon]]
-      }
-    }
     apply_bw_to_scbw <- function(scbw, param) {
-      param <- .npscoef_nn_candidate_bandwidth(param = param, bwtype = scbw$type, nobs = n)
-      scbw$bw <- param
-      if (scbw$scaling)
-        scbw$bandwidth[[1]] <- scbw$bw * bw.scale.multiplier
-      else
-        scbw$bandwidth[[1]] <- scbw$bw
-      scbw
+      scbw$sdev <- mysd
+      scbw$nconfac <- nconfac
+      scbw$ncatfac <- ncatfac
+      .npscoef_apply_bw_to_scbw(scbw = scbw, param = param, nobs = n)
     }
 
     fast_largeh_tol <- npLargehRelTol()
@@ -2432,8 +2476,10 @@ npscoefbw.scbandwidth <-
                       if (ridge.idx[ii] <= length(ridge.grid)) {
                         ridge[ii] <- ridge.grid[ridge.idx[ii]]
                         doridge[ii] <- TRUE
+                        next
                       }
-                      beta.ii <- rep(maxPenalty, nc)
+                      mean.loo[ii] <- NA_real_
+                      next
                     }
                     mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
                   }
@@ -2444,7 +2490,13 @@ npscoefbw.scbandwidth <-
               mean.loo <- rowSums(W * t(coef.loo))
             }
 
-            stopifnot(all(is.finite(mean.loo)))
+            if (!all(is.finite(mean.loo))) {
+              cv_progress_step(ridging = TRUE)
+              if (isTRUE(cv_state$objective_fast))
+                cv_state$fast_total <- cv_state$fast_total + 1L
+              r_objective_cache_store(overall.cache, cache.hit$token, maxPenalty)
+              return(maxPenalty)
+            }
 
             if(!any(mean.loo == maxPenalty)){
               fv <- sum((ydat-mean.loo)^2)/n
@@ -2466,7 +2518,7 @@ npscoefbw.scbandwidth <-
             bws = bws, txdat = xdat, tydat = ydat,
             leave.one.out = TRUE, iterate = TRUE,
             maxiter = backfit.maxiter, tol = backfit.tol,
-            betas = TRUE,
+            betas = TRUE, errors = FALSE,
             .np_fit_progress_allow = FALSE
           )
           if (!miss.z)
@@ -2493,8 +2545,18 @@ npscoefbw.scbandwidth <-
               use_cat_profile_cv_lc(sbw)
 
             if (backfit.iterate){
-              bws$bw.fitted[,partial.index] <- param
-              scoef.loo <- do.call(npscoef, scoef.loo.args)
+              local.bws <- bws
+              if (is.null(local.bws$bw.fitted)) {
+                local.bws$bw.fitted <- matrix(
+                  local.bws$bw,
+                  nrow = length(local.bws$bw),
+                  ncol = n.part
+                )
+              }
+              local.bws$bw.fitted[, partial.index] <- sbw$bw
+              local.args <- scoef.loo.args
+              local.args$bws <- local.bws
+              scoef.loo <- do.call(npscoef, local.args)
               partial.loo <- W[,partial.index]*scoef.loo$beta[,partial.index]
             } else {
               wj <- W[,partial.index]
@@ -2695,6 +2757,7 @@ npscoefbw.scbandwidth <-
               tydat = ydat,
               iterate = FALSE,
               betas = TRUE,
+              errors = FALSE,
               .np_fit_progress_allow = FALSE
             )
             if (!miss.z)
@@ -2728,8 +2791,9 @@ npscoefbw.scbandwidth <-
                 current.partial.cache <- r_objective_cache_new()
 
                 ## minimise
+                partial.start <- bws$bw.fitted[, j]
                 suppressWarnings(optim.return <-
-                                 optim(tbw, fn = partial.cv.ls,
+                                 optim(partial.start, fn = partial.cv.ls,
                                        method = optim.method,
                                        control = optim.control,
                                        partial.index = j))
@@ -2748,7 +2812,7 @@ npscoefbw.scbandwidth <-
                   scoef.args <- list(
                     bws = bws, txdat = xdat, tydat = ydat,
                     iterate = TRUE, maxiter = backfit.maxiter,
-                    tol = backfit.tol, betas = TRUE,
+                    tol = backfit.tol, betas = TRUE, errors = FALSE,
                     .np_fit_progress_allow = FALSE
                   )
                   if (!miss.z)
@@ -2789,6 +2853,7 @@ npscoefbw.scbandwidth <-
               bws = bws, txdat = xdat, tydat = ydat,
               iterate = TRUE, maxiter = backfit.maxiter,
               tol = backfit.tol, leave.one.out = TRUE,
+              errors = FALSE,
               .np_fit_progress_allow = FALSE
             )
             if (!miss.z)
@@ -2869,6 +2934,11 @@ npscoefbw.scbandwidth <-
                        znames = bws$znames,
                        sfactor = bws$sfactor,
                        bandwidth = bws$bandwidth,
+                       sdev = bws$sdev,
+                       nconfac = bws$nconfac,
+                       ncatfac = bws$ncatfac,
+                       bw.fitted = bws$bw.fitted,
+                       fval.fitted = bws$fval.fitted,
                        rows.omit = rows.omit,
                        bandwidth.compute = bandwidth.compute,
                        optim.method = optim.method,

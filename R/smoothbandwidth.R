@@ -27,6 +27,8 @@ scbandwidth <-
            nobs = NA,
            numimp = NA,
            fval.vector = NA,
+           bw.fitted = NULL,
+           fval.fitted = NA,
            xdati = stop("scbandwidth:argument 'xdati' missing"),
            ydati = stop("scbandwidth:argument 'ydati' missing"),
            zdati = NULL,
@@ -122,6 +124,12 @@ scbandwidth <-
   if (length(rows.omit) == 0)
     rows.omit <- NA
 
+  if (!is.null(bw.fitted)) {
+    bw.fitted <- as.matrix(bw.fitted)
+    if (nrow(bw.fitted) != ndim)
+      stop("bw.fitted must have one row per smooth-coefficient bandwidth")
+  }
+
   
   mybw = list(
     bw=bw,
@@ -181,7 +189,15 @@ scbandwidth <-
     vartitleabb = list(x = "Exp.", y = "Dep.", z = "Exp."),
     rows.omit = rows.omit,
     nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
+    sdev = sdev,
+    nconfac = nconfac,
+    ncatfac = ncatfac,
     total.time = total.time)
+
+  if (!is.null(bw.fitted))
+    mybw$bw.fitted <- bw.fitted
+  if (!(length(fval.fitted) == 1L && is.na(fval.fitted)))
+    mybw$fval.fitted <- fval.fitted
 
   mybw$klist <-
       list(list(ckertype = ckertype,
