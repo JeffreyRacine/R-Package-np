@@ -8,6 +8,25 @@ npudensbw <- function(...){
   UseMethod("npudensbw", target)
 }
 
+.npudensbw_method_name <- function(bws, where = "npudensbw") {
+  method <- bws[["method"]]
+  method <- tryCatch(as.character(method)[1L], error = function(e) NA_character_)
+  if (is.na(method) || !nzchar(method))
+    stop(where, " requires a valid bandwidth method")
+  switch(method,
+         cv.ml = method,
+         cv.ls = method,
+         "normal-reference" = method,
+         stop(where, " does not support bwmethod = '", method, "'"))
+}
+
+.npudensbw_method_code <- function(bws, where = "npudensbw") {
+  switch(.npudensbw_method_name(bws, where = where),
+         cv.ml = BWM_CVML,
+         cv.ls = BWM_CVLS,
+         "normal-reference" = NA_integer_)
+}
+
 npudensbw.formula <-
   function(formula, data, subset, na.action, call, ...){
     formula.terms <- terms(formula)
@@ -69,10 +88,14 @@ npudensbw.NULL <-
       "native npudens NOMAD route"
     )
     .npRmpi_require_active_slave_pool(where = "npudensbw()")
-    if (.npRmpi_autodispatch_active())
+    if (.npRmpi_autodispatch_active()) {
+      dat.preflight <- toFrame(dat)
+      if (anyNA(dat.preflight) && !any(stats::complete.cases(dat.preflight)))
+        stop("Data has no rows without NAs")
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
         parent.frame()))
+    }
 
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
@@ -82,6 +105,9 @@ npudensbw.NULL <-
 
     if(!is.null(t.names))
       names(dat) <- t.names
+
+    if (anyNA(dat) && !any(stats::complete.cases(dat)))
+      stop("Data has no rows without NAs")
 
     bws = double(dim(dat)[2])
 
@@ -691,10 +717,16 @@ npudensbw.bandwidth <-
     if (!missing(nmulti))
       nmulti <- npValidateNmulti(nmulti)
     .npRmpi_require_active_slave_pool(where = "npudensbw()")
-    if (.npRmpi_autodispatch_active())
+    if (.npRmpi_autodispatch_active()) {
+      if (bandwidth.compute)
+        .npudensbw_method_name(bws, where = "npudensbw")
+      dat.preflight <- toFrame(dat)
+      if (anyNA(dat.preflight) && !any(stats::complete.cases(dat.preflight)))
+        stop("Data has no rows without NAs")
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
         parent.frame()))
+    }
 
     dat = toFrame(dat)
 
@@ -720,6 +752,8 @@ npudensbw.bandwidth <-
 
     dat <- na.omit(dat)
     rows.omit <- unclass(na.action(dat))
+    if (nrow(dat) == 0L)
+      stop("Data has no rows without NAs")
 
     nrow = dim(dat)[1]
     ncol = dim(dat)[2]
@@ -742,6 +776,9 @@ npudensbw.bandwidth <-
 
     invalid.penalty <- match.arg(invalid.penalty)
     penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
+    method.name <- if (bandwidth.compute)
+      .npudensbw_method_name(bws, where = "npudensbw")
+    else as.character(bws$method)[1L]
 
     if (bandwidth.compute && !eval.only && npBwsolverUsesMads(bwsolver)) {
       return(.npudensbw_run_mads(
@@ -794,9 +831,7 @@ npudensbw.bandwidth <-
           adaptive_nn = BW_ADAP_NN),
         itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE),
         int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
-        bwmethod = switch(bws$method,
-          cv.ml = BWM_CVML,
-          cv.ls = BWM_CVLS),
+        bwmethod = .npudensbw_method_code(bws, where = "npudensbw"),
         ckerneval = switch(bws$ckertype,
           gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
           epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
@@ -835,7 +870,7 @@ npudensbw.bandwidth <-
 
       .npudensbw_assert_bounded_cvls_supported(tbw, where = "npudensbw()")
 
-      if (bws$method != "normal-reference"){
+      if (method.name != "normal-reference"){
         if (isTRUE(eval.only)) {
           myout <-
             .Call("C_np_density_bw_eval",
@@ -1004,10 +1039,14 @@ npudensbw.default <-
            ## dummy arguments for later passing into npudensbw.bandwidth
            ...){
     .npRmpi_require_active_slave_pool(where = "npudensbw()")
-    if (.npRmpi_autodispatch_active())
+    if (.npRmpi_autodispatch_active()) {
+      dat.preflight <- toFrame(dat)
+      if (anyNA(dat.preflight) && !any(stats::complete.cases(dat.preflight)))
+        stop("Data has no rows without NAs")
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
         parent.frame()))
+    }
 
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
@@ -1017,6 +1056,9 @@ npudensbw.default <-
 
     if(!is.null(t.names))
       names(dat) <- t.names
+
+    if (anyNA(dat) && !any(stats::complete.cases(dat)))
+      stop("Data has no rows without NAs")
 
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
     ## bandwidth() call
