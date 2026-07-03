@@ -82,17 +82,24 @@ npcdensbw.formula <-
   method <- if (!is.null(bws$method) && length(bws$method)) {
     as.character(bws$method[1L])
   } else {
-    "cv.ml"
+    NA_character_
   }
-
-  if (!identical(method, "cv.ls"))
-    return(invisible(TRUE))
 
   cykerlb <- if (is.null(bws$cykerlb)) numeric(0L) else bws$cykerlb[bws$iycon]
   cykerub <- if (is.null(bws$cykerub)) numeric(0L) else bws$cykerub[bws$iycon]
   bounded.y <- length(cykerlb) > 0L && any(is.finite(cykerlb) | is.finite(cykerub))
 
   if (!bounded.y)
+    return(invisible(TRUE))
+
+  if (is.na(method)) {
+    stop(sprintf(
+      "%s bounded response bandwidth objects must carry explicit bandwidth-selection method metadata",
+      where
+    ), call. = FALSE)
+  }
+
+  if (!identical(method, "cv.ls"))
     return(invisible(TRUE))
 
   if (bws$yncon < 1L || bws$yncon > 2L) {
@@ -1102,9 +1109,13 @@ npcdensbw.conbandwidth <-
   tbw
 }
 
+.npcdensbw_infinite_bound_surrogate <- function() {
+  1e300
+}
+
 .npcdensbw_marshal_y_bounds <- function(kerlb, kerub, kerbound) {
   if (.npcdensbw_is_explicit_fixed_all_infinite(kerlb, kerub, kerbound)) {
-    sentinel <- .Machine$double.xmax / 4
+    sentinel <- .npcdensbw_infinite_bound_surrogate()
     n <- max(length(kerlb), length(kerub))
     return(list(lb = rep.int(-sentinel, n), ub = rep.int(sentinel, n)))
   }

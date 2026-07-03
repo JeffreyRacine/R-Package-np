@@ -69,7 +69,7 @@ test_that("proper finalizer repairs supported synthetic grids and preserves raw 
     object = obj,
     proper = TRUE,
     proper.method = "project",
-    proper.control = list()
+    proper.control = list(mass.warn.tol = 0)
   )
 
   expect_true(isTRUE(out$proper.requested))
@@ -97,7 +97,7 @@ test_that("proper finalizer is a no-op for already-proper synthetic lc objects",
     object = obj,
     proper = TRUE,
     proper.method = "project",
-    proper.control = list()
+    proper.control = list(mass.warn.tol = 0)
   )
 
   expect_true(isTRUE(out$proper.requested))
@@ -163,13 +163,13 @@ test_that("mode='slice' still defers to exact-grid repair on supported synthetic
     object = obj,
     proper = TRUE,
     proper.method = "project",
-    proper.control = list()
+    proper.control = list(mass.warn.tol = 0)
   )
   out.slice <- getFromNamespace(".np_condens_finalize_proper_object", "npRmpi")(
     object = obj,
     proper = TRUE,
     proper.method = "project",
-    proper.control = list(mode = "slice")
+    proper.control = list(mode = "slice", mass.warn.tol = 0)
   )
 
   expect_true(isTRUE(out.slice$proper.applied))
