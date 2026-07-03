@@ -195,8 +195,9 @@
       go <- npValidateGlpGradientOrder(regtype = bws$regtype,
                                        gradient.order = gradient.order,
                                        ncon = bws$ncon)
-    if (length(go))
-      plot.gradient.order.label[which(bws$icon)] <- go
+      if (length(go)) {
+        plot.gradient.order.label[which(bws$icon)] <- go
+      }
       available <- npGlpGradientAvailability(
         regtype.engine = bws$regtype,
         degree.engine = bws$degree,
@@ -216,6 +217,14 @@
           con.names = bws$xnames[bws$icon]
         )
       }
+    }
+    if (plot.errors && gradients &&
+        identical(plot.errors.method, "asymptotic") &&
+        any(vapply(xdat, is.factor, logical(1)))) {
+      stop(
+        "asymptotic intervals for categorical gradient contrast panels are not available; use errors = \"bootstrap\"",
+        call. = FALSE
+      )
     }
 
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
@@ -636,14 +645,6 @@
           tr$grad[, i]
         } else {
           tr$mean
-        }
-
-        if (plot.errors && gradients && xi.factor &&
-            identical(plot.errors.method, "asymptotic")) {
-          stop(
-            "asymptotic intervals for categorical gradient contrast panels are not available; use errors = \"bootstrap\"",
-            call. = FALSE
-          )
         }
 
         if (plot.errors){

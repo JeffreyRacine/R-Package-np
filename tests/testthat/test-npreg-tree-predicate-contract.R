@@ -62,9 +62,9 @@ test_that("npreg bandwidth tree predicate rejects non-LC nearest-neighbor CV rou
     np:::DO_TREE_YES
   )
 
-  tree.obj <- np:::.npregbw_eval_only(x, y, bw.lp.nn)$objective
+  tree.obj <- np:::.npregbw_eval_only(x, y, bw.lp.fixed)$objective
   options(np.tree = FALSE)
-  serial.obj <- np:::.npregbw_eval_only(x, y, bw.lp.nn)$objective
+  serial.obj <- np:::.npregbw_eval_only(x, y, bw.lp.fixed)$objective
 
   expect_equal(tree.obj, serial.obj, tolerance = 1e-12)
 })

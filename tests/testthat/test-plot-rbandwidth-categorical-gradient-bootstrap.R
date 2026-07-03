@@ -158,6 +158,22 @@ test_that("categorical regression gradient asymptotic intervals fail clearly", {
     errors = TRUE
   )
 
+  eval.count.name <- paste0("np_plot_regression_eval_count_", Sys.getpid())
+  assign(eval.count.name, 0L, envir = .GlobalEnv)
+  on.exit(rm(list = eval.count.name, envir = .GlobalEnv), add = TRUE)
+  invisible(trace(
+    ".np_plot_regression_eval",
+    where = asNamespace("np"),
+    tracer = bquote(assign(
+      .(eval.count.name),
+      get(.(eval.count.name), envir = .GlobalEnv) + 1L,
+      envir = .GlobalEnv
+    )),
+    print = FALSE
+  ))
+  on.exit(untrace(".np_plot_regression_eval", where = asNamespace("np")),
+          add = TRUE)
+
   expect_error(
     suppressWarnings(plot(
       fit,
@@ -169,6 +185,7 @@ test_that("categorical regression gradient asymptotic intervals fail clearly", {
     )),
     "categorical gradient contrast panels"
   )
+  expect_identical(get(eval.count.name, envir = .GlobalEnv), 0L)
 })
 
 test_that("continuous regression gradient asymptotic intervals remain available", {
