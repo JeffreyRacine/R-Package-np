@@ -15,6 +15,41 @@ expect_omit <- function(x, value) {
   expect_identical(as.integer(x), as.integer(value))
 }
 
+test_that("npudist formula reentry honors explicit data argument", {
+  with_npudist_audit_runtime({
+    d1 <- data.frame(x = seq(0.1, 0.9, length.out = 17L))
+    d2 <- data.frame(x = seq(0.45, 1.25, length.out = 17L))
+    nd <- data.frame(x = c(0.18, 0.44, 0.77))
+    bw <- npudistbw(~ x, data = d1, bws = 0.25,
+                    bandwidth.compute = FALSE)
+
+    fit <- npudist(bws = bw, data = d2, newdata = nd)
+    direct <- npudist(bws = bw, tdat = d2["x"], edat = nd["x"])
+    original <- npudist(bws = bw, tdat = d1["x"], edat = nd["x"])
+
+    expect_equal(fit$dist, direct$dist, tolerance = 1e-12)
+    expect_false(isTRUE(all.equal(fit$dist, original$dist, tolerance = 1e-8)))
+    expect_error(npudist(bws = bw, data = ~ x), "data.frame")
+  })
+})
+
+test_that("npudist direct formula numeric bws keeps formula out of data reentry", {
+  with_npudist_audit_runtime({
+    x <- seq(0.1, 0.9, length.out = 12L)
+    fit.formula <- npudist(~ x, bws = 0.25)
+    bw <- npudistbw(~ x, bws = 0.25, bandwidth.compute = FALSE)
+    fit.direct <- npudist(bws = bw, tdat = data.frame(x = x))
+    expect_equal(fit.formula$dist, fit.direct$dist, tolerance = 1e-12)
+
+    X <- ordered(rep(1:4, times = c(3L, 4L, 5L, 6L)))
+    fit.ordered <- npudist(~ X, bws = 0, okertype = "liracine")
+    bw.ordered <- npudistbw(~ X, bws = 0, okertype = "liracine",
+                            bandwidth.compute = FALSE)
+    direct.ordered <- npudist(bws = bw.ordered, tdat = data.frame(X = X))
+    expect_equal(fit.ordered$dist, direct.ordered$dist, tolerance = 1e-12)
+  })
+})
+
 test_that("npudistbw CDF grid helper preserves public grid modes", {
   with_npudist_audit_runtime({
     dat <- data.frame(

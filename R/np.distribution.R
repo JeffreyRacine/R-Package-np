@@ -30,6 +30,8 @@ npudist.formula <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
+    if (!missing(data) && !is.null(data))
+      tmf[["data"]] <- substitute(data)
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
@@ -238,6 +240,8 @@ npudist.default <- function(bws, tdat, ...){
   no.tdat <- missing(tdat)
   has.explicit.bws <- (!no.bws) && isa(bws, "dbandwidth")
   bws.formula <- (!no.bws) && inherits(bws, "formula")
+  direct.formula.tdat <- (!no.tdat) && !tdat.named &&
+    inherits(tdat, "formula") && bws.named && !has.explicit.bws
 
   if (bws.named && no.tdat && bws.formula) {
     sc$`bws` <- NULL
@@ -279,7 +283,7 @@ npudist.default <- function(bws, tdat, ...){
 
   ## convention: first argument is always dropped, second, if present, propagated
   call.args <- list(bws = tbw)
-  if (!no.tdat) {
+  if (!no.tdat && !direct.formula.tdat) {
     if (tdat.named) {
       call.args$tdat <- tdat
     } else {
