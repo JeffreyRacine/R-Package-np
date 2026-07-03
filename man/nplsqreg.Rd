@@ -164,6 +164,12 @@ selection, prediction, or plotting route.
   \code{\link{npreg}} fit on the transformed response. Thus ordered-factor
   effects are finite-difference contrasts and unordered-factor effects
   follow the corresponding mixed-data regression semantics.
+
+  Standard errors are the asymptotic standard errors from that final
+  transformed-response regression, conditional on the selected
+  bandwidths, pilot scale, and \eqn{\delta}{delta}. For vector
+  \code{tau}, per-quantile fits are independent, so estimated quantile
+  curves are not monotonized and may cross in finite samples.
 }
 \value{
   \code{nplsqreg} returns an object of class \code{lsqregression}. The

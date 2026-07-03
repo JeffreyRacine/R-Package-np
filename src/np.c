@@ -16159,8 +16159,12 @@ cleanup_np_regression_bw_mode:
   safe_free(vector_Y_extern);
   safe_free(vector_lsq_scale_extern);
   safe_free(vector_lsq_q_extern);
+  vector_lsq_scale_extern = NULL;
   vector_lsq_loss_extern = NULL;
   vector_lsq_q_extern = NULL;
+  np_lsq_tau_extern = 0.5;
+  np_lsq_delta_lower_extern = DBL_EPSILON;
+  np_lsq_delta_upper_extern = 1.0-DBL_EPSILON;
 
   free_mat(matrix_y, num_search_var + 1);
   safe_free(vector_scale_factor);

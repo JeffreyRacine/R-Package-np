@@ -64,6 +64,130 @@ nplsqregbw <-
   paste0("tau=", format(tau, trim = TRUE, scientific = FALSE))
 }
 
+.nplsqreg_omit_length <- function(omit) {
+  if (is.null(omit)) 0L else length(omit)
+}
+
+.nplsqreg_omit_rows <- function(omit) {
+  if (!.nplsqreg_omit_length(omit)) NA_integer_ else as.vector(omit)
+}
+
+.nplsqreg_napredict_eval <- function(omit, x) {
+  if (!.nplsqreg_omit_length(omit))
+    return(x)
+  omit <- as.integer(omit)
+  keep <- seq_len(NROW(x) + length(omit))[-omit]
+  if (is.null(dim(x))) {
+    out <- x[rep(NA_integer_, length(x) + length(omit))]
+    out[keep] <- x
+    attr(out, "na.action") <- NULL
+    return(out)
+  }
+  if (is.data.frame(x)) {
+    out <- x[rep(NA_integer_, nrow(x) + length(omit)), , drop = FALSE]
+    out[keep, ] <- x
+    attr(out, "na.action") <- NULL
+    return(out)
+  }
+  if (length(dim(x)) <= 2L) {
+    out <- x[rep(NA_integer_, nrow(x) + length(omit)), , drop = FALSE]
+    out[keep, ] <- x
+    attr(out, "na.action") <- NULL
+    return(out)
+  }
+  d <- dim(x)
+  dn <- dimnames(x)
+  new.dim <- c(d[1L] + length(omit), d[-1L])
+  if (!is.null(dn)) {
+    dn[[1L]] <- NULL
+    if (length(dn) != length(new.dim) ||
+        any(vapply(seq_along(dn), function(i) {
+          !is.null(dn[[i]]) && length(dn[[i]]) != new.dim[[i]]
+        }, logical(1L))))
+      dn <- NULL
+  }
+  out <- array(NA_real_, dim = new.dim, dimnames = dn)
+  out[keep, , ] <- x
+  out
+}
+
+.nplsqreg_prepare_train_data <- function(xdat, ydat, scale = NULL) {
+  xdat <- toFrame(xdat)
+  if (!(is.vector(ydat) || is.factor(ydat)))
+    stop("'ydat' must be a vector")
+  if (nrow(xdat) != length(ydat))
+    stop("number of explanatory data and response data do not match")
+  if (is.factor(ydat))
+    stop("nplsqreg requires a numeric dependent variable", call. = FALSE)
+  ydat <- as.numeric(ydat)
+
+  rows.omit <- attr(na.omit(data.frame(xdat, .nplsqreg_y = ydat)),
+                    "na.action")
+  if (.nplsqreg_omit_length(rows.omit)) {
+    keep.rows <- rep(TRUE, nrow(xdat))
+    keep.rows[as.integer(rows.omit)] <- FALSE
+    xdat <- xdat[keep.rows, , drop = FALSE]
+    ydat <- ydat[keep.rows]
+    if (!is.null(scale) && length(scale) == length(keep.rows))
+      scale <- scale[keep.rows]
+  }
+  if (any(!is.finite(ydat)))
+    stop("'ydat' must be finite")
+  list(xdat = xdat, ydat = ydat, scale = scale, omit = rows.omit)
+}
+
+.nplsqreg_prepare_eval_data <- function(exdat) {
+  exdat <- toFrame(exdat)
+  rows.omit <- attr(na.omit(exdat), "na.action")
+  if (.nplsqreg_omit_length(rows.omit)) {
+    keep.rows <- rep(TRUE, nrow(exdat))
+    keep.rows[as.integer(rows.omit)] <- FALSE
+    exdat <- exdat[keep.rows, , drop = FALSE]
+  }
+  list(exdat = exdat, omit = rows.omit)
+}
+
+.nplsqreg_same_training_data <- function(xdat, ydat, bws) {
+  xdat <- toFrame(xdat)
+  bx <- toFrame(bws$xdat)
+  row.names(xdat) <- NULL
+  row.names(bx) <- NULL
+  identical(xdat, bx) && identical(as.numeric(ydat), as.numeric(bws$ydat))
+}
+
+.nplsqreg_assert_reuse_training_data <- function(bws, txdat, tydat) {
+  if (!.nplsqreg_same_training_data(txdat, tydat, bws))
+    stop("explicit txdat/tydat do not match the stored nplsqreg bandwidth training data",
+         call. = FALSE)
+  invisible(TRUE)
+}
+
+.nplsqreg_record_omit <- function(obj, omit) {
+  if (.nplsqreg_omit_length(omit)) {
+    obj$omit <- omit
+    obj$rows.omit <- as.vector(omit)
+    obj$nobs.omit <- length(omit)
+  } else {
+    obj$rows.omit <- NA_integer_
+    obj$nobs.omit <- 0L
+  }
+  obj
+}
+
+.nplsqreg_pad_fit_outputs <- function(out, omit) {
+  if (!.nplsqreg_omit_length(omit))
+    return(out)
+  out$quantile <- .nplsqreg_napredict_eval(omit, out$quantile)
+  out$quanterr <- .nplsqreg_napredict_eval(omit, out$quanterr)
+  if (isTRUE(out$gradients)) {
+    out$quantgrad <- .nplsqreg_napredict_eval(omit, out$quantgrad)
+    out$quantgerr <- .nplsqreg_napredict_eval(omit, out$quantgerr)
+  }
+  out$xeval <- .nplsqreg_napredict_eval(omit, out$xeval)
+  out$nobs <- nrow(out$xeval)
+  out
+}
+
 .nplsqreg_attach_native_diagnostics <- function(obj, diagnostics) {
   if (!is.null(diagnostics))
     attr(obj, "native.nomad.diagnostics") <- diagnostics
@@ -806,9 +930,11 @@ nplsqregbw.formula <-
     tmf[["formula"]] <- tt
     mf.args <- as.list(tmf)[-1L]
     mf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    train.omit <- attr(mf, "na.action")
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
     out <- nplsqregbw(xdat = xdat, ydat = ydat, tau = tau, ...)
+    out <- .nplsqreg_record_omit(out, attr(mf, "na.action"))
     out$formula <- bws
     out <- .nplsqreg_set_response_name(
       out, .nplsqreg_formula_response_name(bws))
@@ -885,8 +1011,9 @@ nplsqregbw.default <-
       warm.start.from <- rep(NA_integer_, length(tau.raw))
       warm.start.degree <- vector("list", length(tau.raw))
       previous.idx <- NA_integer_
-      refined.extra.args <- .nplsqreg_normalize_dots(list(...),
-                                                     where = "nplsqregbw")
+      full.extra.args <- .nplsqreg_normalize_dots(list(...),
+                                                  where = "nplsqregbw")
+      refined.extra.args <- full.extra.args
       tau.search.controls <- NULL
       if (identical(tau.search, "refined")) {
         refined.extra.args$nmulti <- 1L
@@ -897,11 +1024,21 @@ nplsqregbw.default <-
           nmulti = 1L,
           powell.remin = FALSE,
           nomad.remin = FALSE,
-          nomad.nmulti = 0L
+          nomad.nmulti = 0L,
+          anchor.controls = list(
+            nmulti = if (is.null(full.extra.args$nmulti)) NA_integer_ else full.extra.args$nmulti,
+            powell.remin = if (is.null(full.extra.args$powell.remin)) NA else full.extra.args$powell.remin,
+            nomad.remin = if (is.null(full.extra.args$nomad.remin)) NA else full.extra.args$nomad.remin,
+            nomad.nmulti = if (is.null(full.extra.args$nomad.nmulti)) NA_integer_ else full.extra.args$nomad.nmulti
+          )
         )
       }
       for (j in fit.order) {
-        extra.args <- refined.extra.args
+        extra.args <- if (identical(tau.search, "refined") && identical(j, central)) {
+          full.extra.args
+        } else {
+          refined.extra.args
+        }
         one.args <- list(
           xdat = xdat,
           ydat = ydat,
@@ -959,16 +1096,11 @@ nplsqregbw.default <-
                                                  "bandwidth.compute")
     dots <- .nplsqreg_normalize_dots(list(...), where = "nplsqregbw")
     controls <- .nplsqreg_optimizer_controls(dots, optim.control)
-    xdat <- toFrame(xdat)
-    if (!(is.vector(ydat) || is.factor(ydat)))
-      stop("'ydat' must be a vector")
-    if (nrow(xdat) != length(ydat))
-      stop("number of explanatory data and response data do not match")
-    if (is.factor(ydat))
-      stop("nplsqreg requires a numeric dependent variable", call. = FALSE)
-    ydat <- as.numeric(ydat)
-    if (any(!is.finite(ydat)))
-      stop("'ydat' must be finite")
+    prepared <- .nplsqreg_prepare_train_data(xdat, ydat, scale = scale)
+    xdat <- prepared$xdat
+    ydat <- prepared$ydat
+    scale <- prepared$scale
+    rows.omit <- prepared$omit
     if (!is.numeric(delta.bounds) || length(delta.bounds) != 2L ||
         any(!is.finite(delta.bounds)) || delta.bounds[1] <= 0 ||
         delta.bounds[2] >= 1 || delta.bounds[1] >= delta.bounds[2])
@@ -1148,6 +1280,8 @@ nplsqregbw.default <-
     reg.bws$invalid.history <- core$invalid.history
     reg.bws$timing <- core$timing
     reg.bws$total.time <- proc.time()[3] - elapsed.start
+    reg.bws$rows.omit <- .nplsqreg_omit_rows(rows.omit)
+    reg.bws$nobs.omit <- .nplsqreg_omit_length(rows.omit)
     if (!is.null(search.result)) {
       reg.bws <- .npregbw_attach_degree_search(reg.bws, search.result)
       reg.bws$nomad.shortcut <- list(enabled = TRUE, preset = "lp_nomad")
@@ -1168,6 +1302,7 @@ nplsqregbw.default <-
       scale.fit = scale.fit,
       formula = NULL,
       call = match.call(expand.dots = FALSE))
+    out <- .nplsqreg_record_omit(out, rows.omit)
     out <- .nplsqreg_attach_native_diagnostics(
       out,
       .nplsqreg_native_diagnostics_from_search(search.result)
@@ -1195,6 +1330,7 @@ nplsqreg.formula <-
     tmf[["formula"]] <- tt
     mf.args <- as.list(tmf)[-1L]
     mf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    train.omit <- attr(mf, "na.action")
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
 
@@ -1205,6 +1341,7 @@ nplsqreg.formula <-
       emf <- do.call(stats::model.frame,
                      list(formula = delete.response(tt), data = native.exdat),
                      envir = parent.frame())
+      eval.omit <- attr(emf, "na.action")
       exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]
     } else if (has.eval) {
       npValidateNewdataFormula(newdata, delete.response(tt),
@@ -1212,7 +1349,10 @@ nplsqreg.formula <-
       emf <- do.call(stats::model.frame,
                      list(formula = delete.response(tt), data = newdata),
                      envir = parent.frame())
+      eval.omit <- attr(emf, "na.action")
       exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]
+    } else {
+      eval.omit <- NULL
     }
 
     bw <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = tau),
@@ -1227,6 +1367,18 @@ nplsqreg.formula <-
     environment(out$call) <- parent.frame()
     out$bws$formula <- bws
     out <- .nplsqreg_set_response_name(out, response.name)
+    out <- .nplsqreg_record_omit(out, train.omit)
+    out$bws <- .nplsqreg_record_omit(out$bws, train.omit)
+    if (!has.eval)
+      out <- .nplsqreg_pad_fit_outputs(out, train.omit)
+    if (isTRUE(residuals) && .nplsqreg_omit_length(train.omit))
+      out$resid <- .nplsqreg_napredict_eval(train.omit, out$resid)
+    if (has.eval && .nplsqreg_omit_length(eval.omit)) {
+      out$eval.omit <- eval.omit
+      out$eval.rows.omit <- as.vector(eval.omit)
+      out$eval.nobs.omit <- length(eval.omit)
+      out <- .nplsqreg_pad_fit_outputs(out, eval.omit)
+    }
     if (!is.null(out$bws$tau.bws))
       for (j in seq_along(out$bws$tau.bws))
         out$bws$tau.bws[[j]]$formula <- bws
@@ -1327,18 +1479,25 @@ nplsqreg.default <-
       stop("cross-tau nplsqreg bandwidth-object reuse is not supported",
            call. = FALSE)
 
-    txdat <- toFrame(txdat)
-    tydat <- as.numeric(tydat)
-    if (nrow(txdat) != length(tydat))
-      stop("number of explanatory data and response data do not match")
+    prepared <- .nplsqreg_prepare_train_data(txdat, tydat)
+    txdat <- prepared$xdat
+    tydat <- prepared$ydat
+    train.omit <- prepared$omit
+    .nplsqreg_assert_reuse_training_data(bws, txdat, tydat)
 
     fit.args <- list(bws = bws$reg.bws, txdat = txdat, tydat = bws$qdat,
                      gradients = gradients)
     eval.present <- !missing(exdat) || !is.null(native.newdata)
-    if (!missing(exdat))
-      fit.args$exdat <- exdat
-    else if (!is.null(native.newdata))
-      fit.args$exdat <- native.newdata
+    eval.omit <- NULL
+    if (!missing(exdat)) {
+      eval.prepared <- .nplsqreg_prepare_eval_data(exdat)
+      fit.args$exdat <- eval.prepared$exdat
+      eval.omit <- eval.prepared$omit
+    } else if (!is.null(native.newdata)) {
+      eval.prepared <- .nplsqreg_prepare_eval_data(native.newdata)
+      fit.args$exdat <- eval.prepared$exdat
+      eval.omit <- eval.prepared$omit
+    }
     fit <- do.call(npreg, c(fit.args, dots))
 
     quant <- fitted(fit)
@@ -1377,6 +1536,17 @@ nplsqreg.default <-
       out,
       attr(bws, "native.nomad.diagnostics", exact = TRUE)
     )
+    out <- .nplsqreg_record_omit(out, train.omit)
+    if (!eval.present)
+      out <- .nplsqreg_pad_fit_outputs(out, train.omit)
+    if (isTRUE(residuals) && .nplsqreg_omit_length(train.omit))
+      out$resid <- .nplsqreg_napredict_eval(train.omit, out$resid)
+    if (eval.present && .nplsqreg_omit_length(eval.omit)) {
+      out$eval.omit <- eval.omit
+      out$eval.rows.omit <- as.vector(eval.omit)
+      out$eval.nobs.omit <- length(eval.omit)
+      out <- .nplsqreg_pad_fit_outputs(out, eval.omit)
+    }
     environment(out$call) <- parent.frame()
     out
   }
