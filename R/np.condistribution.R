@@ -28,6 +28,8 @@ npcdist.formula <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
+    if (!missing(data) && !is.null(data))
+      tmf[["data"]] <- substitute(data)
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
@@ -56,6 +58,12 @@ npcdist.formula <-
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
+    train.omit <- as.vector(attr(tmf, "na.action"))
+    eval.omit <- if (has.eval) as.vector(attr(umf, "na.action")) else integer(0)
+    ev$train.rows.omit <- if (length(train.omit)) train.omit else NA
+    ev$train.nobs.omit <- length(train.omit)
+    ev$eval.rows.omit <- if (length(eval.omit)) eval.omit else NA
+    ev$eval.nobs.omit <- length(eval.omit)
 
     ev$condist <- napredict(ev$omit, ev$condist)
     ev$conderr <- napredict(ev$omit, ev$conderr)
@@ -145,9 +153,9 @@ npcdist.condbandwidth <-
     
     ## catch and destroy NA's
     keep.rows <- rep_len(TRUE, nrow(txdat))
-    rows.omit <- attr(na.omit(data.frame(txdat, tydat)), "na.action")
-    if (length(rows.omit) > 0L)
-      keep.rows[as.integer(rows.omit)] <- FALSE
+    train.rows.omit <- attr(na.omit(data.frame(txdat, tydat)), "na.action")
+    if (length(train.rows.omit) > 0L)
+      keep.rows[as.integer(train.rows.omit)] <- FALSE
 
     if (!any(keep.rows))
       stop("Data has no rows without NAs")
@@ -155,11 +163,12 @@ npcdist.condbandwidth <-
     txdat <- txdat[keep.rows,,drop = FALSE]
     tydat <- tydat[keep.rows,,drop = FALSE]
 
+    eval.rows.omit <- integer(0)
     if (!no.exy){
       keep.eval <- rep_len(TRUE, nrow(exdat))
-      rows.omit <- attr(na.omit(data.frame(exdat, eydat)), "na.action")
-      if (length(rows.omit) > 0L)
-        keep.eval[as.integer(rows.omit)] <- FALSE
+      eval.rows.omit <- attr(na.omit(data.frame(exdat, eydat)), "na.action")
+      if (length(eval.rows.omit) > 0L)
+        keep.eval[as.integer(eval.rows.omit)] <- FALSE
 
       if (!any(keep.eval))
         stop("Data has no rows without NAs")
@@ -362,7 +371,10 @@ npcdist.condbandwidth <-
         ymcv.numRow = attr(bws$ymcv, "num.row"),
         xmcv.numRow = attr(bws$xmcv, "num.row"),
         densOrDist = NP_DO_DIST,
-        int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$yncon + bws$xncon, ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord, bws = bws))
+        int_do_tree = .npcdistbw_tree_code(
+          bws = bws,
+          ncon = bws$yncon + bws$xncon,
+          ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord))
 
     cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
     cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
@@ -459,7 +471,9 @@ npcdist.condbandwidth <-
                            congrad = myout$congrad, congerr = myout$congerr,
                            ntrain = tnrow, trainiseval = no.exy, gradients = gradients,
                            gradient.order = if (identical(reg.engine, "lp")) glp.gradient.order else NULL,
-                           rows.omit = rows.omit,
+                           rows.omit = if (no.exy) train.rows.omit else eval.rows.omit,
+                           train.rows.omit = train.rows.omit,
+                           eval.rows.omit = if (no.exy) integer(0) else eval.rows.omit,
                            timing = bws$timing, total.time = total.time,
                            optim.time = optim.time, fit.time = fit.elapsed)
     out$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
