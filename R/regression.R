@@ -5,6 +5,8 @@ npregression <-
              gradient.order = NULL,
              xtra = rep(NA, 6),
              rows.omit = NA,
+             train.rows.omit = NULL,
+             eval.rows.omit = NULL,
              timing = NA,
              total.time = NA,
              optim.time = NA,
@@ -15,6 +17,10 @@ npregression <-
 
         if (length(rows.omit) == 0)
             rows.omit <- NA
+        if (is.null(train.rows.omit) || length(train.rows.omit) == 0)
+            train.rows.omit <- NA
+        if (is.null(eval.rows.omit) || length(eval.rows.omit) == 0)
+            eval.rows.omit <- NA
 
         d <- list(
             bw = bws$bw,
@@ -51,6 +57,10 @@ npregression <-
             SIGN = xtra[6],
             rows.omit = rows.omit,
             nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
+            train.rows.omit = train.rows.omit,
+            train.nobs.omit = if (identical(train.rows.omit, NA)) 0 else length(train.rows.omit),
+            eval.rows.omit = eval.rows.omit,
+            eval.nobs.omit = if (identical(eval.rows.omit, NA)) 0 else length(eval.rows.omit),
             timing = timing,
             total.time = total.time,
             optim.time = optim.time,
