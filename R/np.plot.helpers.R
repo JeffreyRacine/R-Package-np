@@ -14332,9 +14332,7 @@ plotFactor <- function(f, y, ...){
       fit.start <- proc.time()[3]
       gradients <- npValidateScalarLogical(gradients, "gradients")
 
-      if (!is.numeric(itmax) || length(itmax) != 1L || is.na(itmax) ||
-          !is.finite(itmax) || itmax < 1 || itmax != floor(itmax))
-        stop("'itmax' must be a positive integer")
+      itmax <- .npqreg_validate_itmax(itmax)
       if (!is.numeric(tol) || length(tol) != 1L || is.na(tol) ||
           !is.finite(tol) || tol <= 0)
         stop("'tol' must be a positive finite numeric scalar")
@@ -14342,7 +14340,6 @@ plotFactor <- function(f, y, ...){
           !is.finite(small) || small <= 0)
         stop("'small' must be a positive finite numeric scalar")
 
-      itmax <- as.integer(itmax)
       tol <- as.double(tol)
       small <- as.double(small)
 
@@ -14388,11 +14385,12 @@ plotFactor <- function(f, y, ...){
       xdat <- xdat[keep.rows, , drop = FALSE]
       ydat <- ydat[keep.rows, , drop = FALSE]
 
+      eval.omit <- NULL
       if (!no.ex) {
         keep.eval <- rep_len(TRUE, nrow(exdat))
-        rows.omit <- attr(na.omit(exdat), "na.action")
-        if (length(rows.omit) > 0L)
-          keep.eval[as.integer(rows.omit)] <- FALSE
+        eval.omit <- attr(na.omit(exdat), "na.action")
+        if (length(eval.omit) > 0L)
+          keep.eval[as.integer(eval.omit)] <- FALSE
         exdat <- exdat[keep.eval, , drop = FALSE]
       }
 
@@ -14402,7 +14400,7 @@ plotFactor <- function(f, y, ...){
       xdat <- adjustLevels(xdat, bws$xdati)
       ydat <- adjustLevels(ydat, bws$ydati)
       if (!no.ex)
-        exdat <- adjustLevels(exdat, bws$xdati)
+        exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
 
       txeval <- if (no.ex) xdat else exdat
       xdat.df <- xdat
@@ -14451,6 +14449,7 @@ plotFactor <- function(f, y, ...){
           cdf.cache = cdf.cache,
           cdf.row.keys = cdf.row.keys
         )
+        qclamp <- .npqreg_quantile_clamp(yq)
         if (!isTRUE(need.errors) && !isTRUE(gradients)) {
           return(list(
             yq = yq,
@@ -14467,6 +14466,7 @@ plotFactor <- function(f, y, ...){
           quantile = yq,
           gradients = gradients
         )
+        qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
         list(
           yq = yq,
           yqerr = qdelta$quanterr,
@@ -14506,6 +14506,16 @@ plotFactor <- function(f, y, ...){
           }
         }
       }
+      }
+
+      if (!no.ex && length(eval.omit) > 0L) {
+        myout$yq <- .npqreg_napredict_eval(eval.omit, myout$yq)
+        myout$yqerr <- .npqreg_napredict_eval(eval.omit, myout$yqerr)
+        if (gradients) {
+          myout$yqgrad <- .npqreg_napredict_eval(eval.omit, myout$yqgrad)
+          myout$yqgerr <- .npqreg_napredict_eval(eval.omit, myout$yqgerr)
+        }
+        txeval <- .npqreg_napredict_eval(eval.omit, txeval)
       }
 
       fit.elapsed <- proc.time()[3] - fit.start
