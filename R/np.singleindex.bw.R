@@ -784,6 +784,42 @@ npindexbw.NULL <-
   as.numeric(total.invalid[1L]) > 0.0
 }
 
+.npindexbw_service_param_ok <- function(param, expected.length) {
+  param <- as.numeric(param)
+  expected.length <- as.integer(expected.length)[1L]
+  is.finite(expected.length) &&
+    length(param) == expected.length &&
+    all(is.finite(param))
+}
+
+.npindexbw_service_task_error <- function(role,
+                                          message,
+                                          task,
+                                          ctx) {
+  task.kind <- if (is.list(task) && !is.null(task$kind))
+    as.character(task$kind)[1L]
+  else
+    NA_character_
+  task.service <- if (is.list(task) && !is.null(task$service_id))
+    as.character(task$service_id)[1L]
+  else
+    NA_character_
+  err <- list(
+    kind = "service_error",
+    service_id = ctx$service_id,
+    rank = ctx$rank,
+    task_kind = task.kind,
+    task_service_id = task.service,
+    message = as.character(message)[1L]
+  )
+  .npRmpi_transport_trace(
+    role = role,
+    event = "task.error",
+    fields = err
+  )
+  invisible(err)
+}
+
 .npindexbw_eval_objective_service_traced <- function(param,
                                                      xmat,
                                                      ydat,
@@ -807,7 +843,9 @@ npindexbw.NULL <-
       eval_id = eval_id,
       rank = ctx$rank,
       size = ctx$size,
-      owned_rows = length(local.idx),
+      nominal_partition_rows = length(local.idx),
+      objective_rows = nrow(xmat),
+      localize = FALSE,
       n = nrow(xmat)
     )
   )
@@ -837,7 +875,9 @@ npindexbw.NULL <-
       eval_id = eval_id,
       rank = ctx$rank,
       size = ctx$size,
-      owned_rows = length(local.idx),
+      nominal_partition_rows = length(local.idx),
+      objective_rows = nrow(xmat),
+      localize = FALSE,
       elapsed = proc.time()[3L] - started,
       objective = if (is.null(out$objective)) NA_real_ else as.numeric(out$objective[1L]),
       ok = is.null(out$error),
@@ -849,6 +889,17 @@ npindexbw.NULL <-
   out
 }
 
+.npindexbw_ichimura_lp_service_task_error <- function(message,
+                                                      task,
+                                                      ctx) {
+  .npindexbw_service_task_error(
+    role = "npindex.ichimura.lp.service",
+    message = message,
+    task = task,
+    ctx = ctx
+  )
+}
+
 .npindexbw_ichimura_lp_service_worker_loop <- function(xmat,
                                                        ydat,
                                                        bws,
@@ -856,19 +907,39 @@ npindexbw.NULL <-
                                                        ctx) {
   repeat {
     task <- mpi.bcast.Robj(rank = 0L, comm = ctx$comm)
-    if (!is.list(task) || is.null(task$kind))
-      stop("malformed npindex Ichimura LP service task", call. = FALSE)
+    if (!is.list(task) || is.null(task$kind)) {
+      .npindexbw_ichimura_lp_service_task_error(
+        "malformed npindex Ichimura LP service task",
+        task = task,
+        ctx = ctx
+      )
+      next
+    }
 
     task.service <- if (is.null(task$service_id)) ctx$service_id else as.character(task$service_id)[1L]
+    if (!identical(task.service, ctx$service_id)) {
+      .npindexbw_ichimura_lp_service_task_error(
+        "unexpected npindex Ichimura LP service identifier",
+        task = task,
+        ctx = ctx
+      )
+      next
+    }
 
     if (identical(task$kind, "eval")) {
       param <- if (is.null(task$param)) numeric(0L) else as.numeric(task$param)
       invalid.eval <- .npindexbw_service_eval_preflight(
-        ok = length(param) == ncol(xmat) && all(is.finite(param)),
+        ok = .npindexbw_service_param_ok(param, ncol(xmat)),
         comm = ctx$comm
       )
-      if (isTRUE(invalid.eval))
+      if (isTRUE(invalid.eval)) {
+        .npindexbw_ichimura_lp_service_task_error(
+          "malformed npindex Ichimura LP eval task",
+          task = task,
+          ctx = ctx
+        )
         next
+      }
       task.spec <- if (is.null(task$spec)) spec else task$spec
       .npindexbw_eval_objective_service_traced(
         param = param,
@@ -882,9 +953,6 @@ npindexbw.NULL <-
       next
     }
 
-    if (!identical(task.service, ctx$service_id))
-      next
-
     if (identical(task$kind, "result"))
       return(task$value)
     if (identical(task$kind, "error"))
@@ -892,7 +960,11 @@ npindexbw.NULL <-
     if (identical(task$kind, "stop"))
       return(invisible(NULL))
 
-    stop("unknown npindex Ichimura LP service task", call. = FALSE)
+    .npindexbw_ichimura_lp_service_task_error(
+      "unknown npindex Ichimura LP service task",
+      task = task,
+      ctx = ctx
+    )
   }
 }
 
@@ -916,7 +988,7 @@ npindexbw.NULL <-
   )
 
   invalid.eval <- .npindexbw_service_eval_preflight(
-    ok = length(param) == ncol(xmat) && all(is.finite(param)),
+    ok = .npindexbw_service_param_ok(param, ncol(xmat)),
     comm = ctx$comm
   )
   if (isTRUE(invalid.eval))
@@ -1000,28 +1072,12 @@ npindexbw.NULL <-
 .npindexbw_kleinspady_lp_service_task_error <- function(message,
                                                         task,
                                                         ctx) {
-  task.kind <- if (is.list(task) && !is.null(task$kind))
-    as.character(task$kind)[1L]
-  else
-    NA_character_
-  task.service <- if (is.list(task) && !is.null(task$service_id))
-    as.character(task$service_id)[1L]
-  else
-    NA_character_
-  err <- list(
-    kind = "service_error",
-    service_id = ctx$service_id,
-    rank = ctx$rank,
-    task_kind = task.kind,
-    task_service_id = task.service,
-    message = as.character(message)[1L]
-  )
-  .npRmpi_transport_trace(
+  .npindexbw_service_task_error(
     role = "npindex.kleinspady.lp.service",
-    event = "task.error",
-    fields = err
+    message = message,
+    task = task,
+    ctx = ctx
   )
-  invisible(err)
 }
 
 .npindexbw_kleinspady_lp_service_worker_loop <- function(xmat,
@@ -1054,7 +1110,7 @@ npindexbw.NULL <-
       beta <- if (is.null(task$beta)) numeric(0L) else as.double(task$beta)
       h <- if (is.null(task$h)) NA_real_ else as.double(task$h[1L])
       invalid.eval <- .npindexbw_service_eval_preflight(
-        ok = length(beta) == (ncol(xmat) - 1L) && is.finite(h),
+        ok = .npindexbw_service_param_ok(c(beta, h), ncol(xmat)),
         comm = ctx$comm
       )
       if (isTRUE(invalid.eval)) {
@@ -1115,7 +1171,7 @@ npindexbw.NULL <-
   )
 
   invalid.eval <- .npindexbw_service_eval_preflight(
-    ok = all(is.finite(as.numeric(beta))) && is.finite(as.numeric(h)[1L]),
+    ok = .npindexbw_service_param_ok(c(beta, h), ncol(xmat)),
     comm = ctx$comm
   )
   if (isTRUE(invalid.eval))

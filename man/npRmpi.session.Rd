@@ -115,6 +115,10 @@ startup/teardown behavior:
   used on small \code{n}.
   \item As \code{n} grows, compute usually dominates fixed messaging costs and
   relative penalties commonly shrink.
+  \item Worker-count changes can also change summation or reduction order at
+  numerical roundoff scale. Use tolerance-based comparisons for objective
+  values or selected bandwidths across worker counts unless the run is a
+  controlled single-process reproducibility check.
   \item In session/attach mode with auto-dispatch enabled, lightweight calls
   (especially post-bandwidth \code{npreg(bws=...)} and \code{predict(...)})
   can be slower due to command marshalling/serialization overhead. A practical

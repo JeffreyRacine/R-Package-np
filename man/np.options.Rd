@@ -59,7 +59,10 @@
       \code{FALSE} disables them exactly. Default is \code{"auto"}. On
       non-macOS, non-arm64, or non-Accelerate builds, this option falls back to
       the ordinary portable code path. The active option value is synchronized
-      to MPI workers in autodispatch sessions.
+      to MPI workers in autodispatch sessions. Accelerated and portable paths
+      may use different math-library kernels or summation orders, so platform
+      or option comparisons should use numerical tolerances; reserve exact
+      equality for controlled runs using the same acceleration setting.
     }
   }
 
@@ -156,7 +159,10 @@
       \code{mpi.bcast.cmd(...)} wrapping. Default is \code{FALSE}.
       For formula interfaces under autodispatch, provide explicit
       \code{data=} (or explicit \code{xdat}/\code{ydat}-style arguments) to
-      avoid unresolved-symbol failures on slave ranks.
+      avoid unresolved-symbol failures on slave ranks. Changing the active
+      worker count can change summation/reduction order at roundoff scale;
+      compare cross-worker-count bandwidths or objective values with numerical
+      tolerances unless running a controlled single-process comparison.
     }
   }
 
