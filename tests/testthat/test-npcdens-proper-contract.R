@@ -341,7 +341,8 @@ test_that("slice mode can properize fitted npcdens values when apply='fitted'", 
     tydat = data.frame(y = y),
     exdat = grid.eval$exdat,
     eydat = grid.eval$eydat,
-    proper = TRUE
+    proper = TRUE,
+    proper.control = list(mass.warn.tol = 0)
   )
 
   ypos <- match(y, grid.eval$y.grid)
@@ -467,7 +468,8 @@ test_that("slice mode defers to exact-grid repair when common grids are supplied
     tydat = data.frame(y = y),
     exdat = nd["x"],
     eydat = nd["y"],
-    proper = TRUE
+    proper = TRUE,
+    proper.control = list(mass.warn.tol = 0)
   )
   fit.slice <- npcdens(
     bws = bw,
@@ -530,7 +532,8 @@ test_that("slice mode on paired rows matches the internal explicit-grid oracle",
     tydat = data.frame(y = y),
     exdat = grid.eval$exdat,
     eydat = grid.eval$eydat,
-    proper = TRUE
+    proper = TRUE,
+    proper.control = list(mass.warn.tol = 0)
   )
 
   ypos <- match(nd$y, grid.eval$y.grid)

@@ -36,6 +36,7 @@
     grid.check = TRUE,
     store.raw = TRUE,
     fail.on.unsupported = FALSE,
+    mass.warn.tol = 0.05,
     mode = "grid",
     apply = "evaluation",
     slice.grid.size = 101L,
@@ -57,6 +58,10 @@
   ctrl$fail.on.unsupported <- npValidateScalarLogical(
     ctrl$fail.on.unsupported,
     "proper.control$fail.on.unsupported"
+  )
+  ctrl$mass.warn.tol <- .np_condens_validate_nonnegative_finite_numeric(
+    ctrl$mass.warn.tol,
+    "proper.control$mass.warn.tol"
   )
   ctrl$mode <- match.arg(as.character(ctrl$mode)[1L], c("grid", "slice"))
   ctrl$apply <- match.arg(as.character(ctrl$apply)[1L], c("evaluation", "fitted", "both"))
@@ -191,6 +196,91 @@
   g
 }
 
+.np_condens_numeric_equal <- function(a, b, tol) {
+  if (anyNA(c(a, b)))
+    return(isTRUE(all.equal(a, b, tolerance = 0, check.attributes = FALSE)))
+  if (!is.finite(a) || !is.finite(b))
+    return(identical(a, b))
+  abs(a - b) <= tol + tol * max(abs(a), abs(b), 1)
+}
+
+.np_condens_x_rows_match <- function(xeval, i, j, tol) {
+  if (!ncol(xeval))
+    return(TRUE)
+
+  for (col in seq_len(ncol(xeval))) {
+    values <- xeval[[col]]
+    if (is.numeric(values) || is.integer(values)) {
+      if (!.np_condens_numeric_equal(as.double(values[[i]]), as.double(values[[j]]), tol))
+        return(FALSE)
+    } else if (!identical(values[[i]], values[[j]])) {
+      return(FALSE)
+    }
+  }
+
+  TRUE
+}
+
+.np_condens_make_x_groups <- function(xeval, tol = 1e-10) {
+  n <- nrow(xeval)
+  if (!ncol(xeval))
+    return(factor(rep.int(1L, n)))
+
+  groups <- integer(n)
+  reps <- integer(0)
+  next.group <- 0L
+
+  for (i in seq_len(n)) {
+    matched <- FALSE
+    if (length(reps)) {
+      for (g in seq_along(reps)) {
+        if (.np_condens_x_rows_match(xeval, i, reps[[g]], tol)) {
+          groups[[i]] <- g
+          matched <- TRUE
+          break
+        }
+      }
+    }
+    if (!matched) {
+      next.group <- next.group + 1L
+      groups[[i]] <- next.group
+      reps[[next.group]] <- i
+    }
+  }
+
+  factor(groups, levels = seq_len(next.group))
+}
+
+.np_condens_grid_equal <- function(y, ref, tol) {
+  length(y) == length(ref) &&
+    all(abs(y - ref) <= tol + tol * pmax(abs(y), abs(ref), 1))
+}
+
+.np_condens_warn_proper_undercoverage <- function(info,
+                                                  proper.control,
+                                                  where = "npcdens()") {
+  tol <- proper.control$mass.warn.tol
+  if (!is.finite(tol) || tol <= 0)
+    return(invisible(FALSE))
+
+  integral.raw <- info$integral.raw
+  if (!length(integral.raw) || all(is.na(integral.raw)))
+    return(invisible(FALSE))
+
+  low <- which(is.finite(integral.raw) & integral.raw < (1 - tol))
+  if (!length(low))
+    return(invisible(FALSE))
+
+  warning(sprintf(
+    "%s proper=TRUE projected %d of %d fixed-x slice(s) whose raw trapezoid mass is below %.3g; the supplied y-grid may under-cover response support",
+    where,
+    length(low),
+    length(integral.raw),
+    1 - tol
+  ), call. = FALSE)
+  invisible(TRUE)
+}
+
 .np_condens_detect_proper_grid <- function(object, tol = 1e-10) {
   if (isTRUE(object$gradients)) {
     return(list(
@@ -226,11 +316,7 @@
     ))
   }
 
-  if (ncol(xeval) == 0L) {
-    groups <- factor(rep.int("all", nrow(yeval)))
-  } else {
-    groups <- do.call(interaction, c(unname(xeval), list(drop = TRUE, lex.order = TRUE)))
-  }
+  groups <- .np_condens_make_x_groups(xeval, tol = tol)
 
   slices.raw <- split(seq_len(nrow(yeval)), groups, drop = TRUE)
   if (!length(slices.raw) || all(lengths(slices.raw) < 2L)) {
@@ -266,7 +352,7 @@
 
     if (is.null(yref)) {
       yref <- y.sorted
-    } else if (!identical(y.sorted, yref)) {
+    } else if (!.np_condens_grid_equal(y.sorted, yref, tol = tol)) {
       return(list(
         supported = FALSE,
         reason = "y_grid_not_common"
@@ -522,6 +608,13 @@
   object$condens <- proper.out$condens
   object$proper.applied <- TRUE
   object$proper.info <- proper.out$proper.info
+  if (identical(args$proper.control$mode, "grid")) {
+    .np_condens_warn_proper_undercoverage(
+      info = object$proper.info,
+      proper.control = args$proper.control,
+      where = where
+    )
+  }
   if (!is.null(proper.out$condens.raw))
     object$condens.raw <- proper.out$condens.raw
 
