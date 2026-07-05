@@ -743,7 +743,8 @@ npindexbw.NULL <-
                                                    spec,
                                                    bandwidth.compute = TRUE,
                                                    comm = 1L,
-                                                   service_id = "npindex_ichimura_lp") {
+                                                   service_id = "npindex_ichimura_lp",
+                                                   child_service_ids = character(0L)) {
   rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) 0L)
   size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) 1L)
   if (!is.finite(rank)) rank <- 0L
@@ -770,7 +771,8 @@ npindexbw.NULL <-
     rank = rank,
     size = size,
     comm = as.integer(comm),
-    service_id = as.character(service_id)[1L]
+    service_id = as.character(service_id)[1L],
+    child_service_ids = unique(as.character(child_service_ids))
   )
 }
 
@@ -917,7 +919,9 @@ npindexbw.NULL <-
     }
 
     task.service <- if (is.null(task$service_id)) ctx$service_id else as.character(task$service_id)[1L]
-    if (!identical(task.service, ctx$service_id)) {
+    child.service <- !identical(task.service, ctx$service_id) &&
+      task.service %in% ctx$child_service_ids
+    if (!identical(task.service, ctx$service_id) && !isTRUE(child.service)) {
       .npindexbw_ichimura_lp_service_task_error(
         "unexpected npindex Ichimura LP service identifier",
         task = task,
@@ -925,18 +929,23 @@ npindexbw.NULL <-
       )
       next
     }
+    task.ctx <- ctx
+    ## The NOMAD owner may run a declared fixed-degree child service for
+    ## Powell refinement; only the parent service returns to the public caller.
+    if (isTRUE(child.service))
+      task.ctx$service_id <- task.service
 
     if (identical(task$kind, "eval")) {
       param <- if (is.null(task$param)) numeric(0L) else as.numeric(task$param)
       invalid.eval <- .npindexbw_service_eval_preflight(
         ok = .npindexbw_service_param_ok(param, ncol(xmat)),
-        comm = ctx$comm
+        comm = task.ctx$comm
       )
       if (isTRUE(invalid.eval)) {
         .npindexbw_ichimura_lp_service_task_error(
           "malformed npindex Ichimura LP eval task",
           task = task,
-          ctx = ctx
+          ctx = task.ctx
         )
         next
       }
@@ -947,18 +956,27 @@ npindexbw.NULL <-
         ydat = ydat,
         bws = bws,
         spec = task.spec,
-        ctx = ctx,
+        ctx = task.ctx,
         eval_id = if (is.null(task$eval_id)) NA_integer_ else as.integer(task$eval_id[1L])
       )
       next
     }
 
-    if (identical(task$kind, "result"))
+    if (identical(task$kind, "result")) {
+      if (isTRUE(child.service))
+        next
       return(task$value)
-    if (identical(task$kind, "error"))
+    }
+    if (identical(task$kind, "error")) {
+      if (isTRUE(child.service))
+        next
       stop(as.character(task$message)[1L], call. = FALSE)
-    if (identical(task$kind, "stop"))
+    }
+    if (identical(task$kind, "stop")) {
+      if (isTRUE(child.service))
+        next
       return(invisible(NULL))
+    }
 
     .npindexbw_ichimura_lp_service_task_error(
       "unknown npindex Ichimura LP service task",
@@ -1484,7 +1502,13 @@ npindexbw.NULL <-
     spec = service.spec,
     bandwidth.compute = TRUE,
     comm = 1L,
-    service_id = "npindex_ichimura_lp_nomad"
+    service_id = "npindex_ichimura_lp_nomad",
+    child_service_ids = if (identical(degree.search$engine, "nomad+powell") ||
+                            isTRUE(degree.search$verify)) {
+      "npindex_ichimura_lp_fixed"
+    } else {
+      character(0L)
+    }
   )
   if (isTRUE(service.ctx$active) && !isTRUE(service.ctx$root))
     return(.npindexbw_ichimura_lp_service_worker_loop(
