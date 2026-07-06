@@ -3726,6 +3726,14 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
     bwm_kernel_unordered_vec = NULL;
   }
   bwm_num_categories = num_categories_extern;
+  /* Shadow evaluators call bwmfunc_wrapper(), so prepare owns a fresh
+     bandwidth-objective cache lifecycle just like ordinary searches. */
+  bwm_nn_cache_configure_for_powell(BANDWIDTH_den_extern,
+                                    0,
+                                    0,
+                                    bwm_num_reg_continuous,
+                                    bwm_num_reg_unordered,
+                                    bwm_num_reg_ordered);
   bwm_reset_counters();
 
   np_conditional_density_nomad_shadow_refresh_penalty();
