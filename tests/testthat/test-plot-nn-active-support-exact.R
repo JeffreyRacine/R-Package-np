@@ -163,13 +163,17 @@ test_that("nonfixed conditional exact bootstrap matches duplicate-row oracle", {
 
     manual <- vapply(seq_len(ncol(counts)), function(j) {
       idx <- npRmpi:::.np_counts_to_indices(counts[, j])
+      xj <- xdat[idx, , drop = FALSE]
+      yj <- ydat[idx, , drop = FALSE]
+      kbx.j <- npRmpi:::.np_con_make_kbandwidth_x(bws = bw, xdat = xj)
+      kbxy.j <- npRmpi:::.np_con_make_kbandwidth_xy(bws = bw, xdat = xj, ydat = yj)
       npRmpi:::.np_ksum_conditional_eval_exact(
-        xdat = xdat[idx, , drop = FALSE],
-        ydat = ydat[idx, , drop = FALSE],
+        xdat = xj,
+        ydat = yj,
         exdat = exdat,
         eydat = eydat,
-        kbx = kbx,
-        kbxy = kbxy,
+        kbx = kbx.j,
+        kbxy = kbxy.j,
         cdf = FALSE
       )
     }, numeric(nrow(exdat)))

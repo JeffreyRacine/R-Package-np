@@ -23,7 +23,8 @@ test_that("conditional adaptive-NN exact bootstrap partitions replications acros
     .np_con_inid_ksum_eligible = function(bws) TRUE,
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
     .npRmpi_bootstrap_tune_chunk_size = function(B, chunk.size, comm = 1L, include.master = TRUE) 2L,
-    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size) {
+    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size, with.seeds = TRUE) {
+      expect_false(with.seeds)
       list(
         list(start = 1L, bsz = 2L, seed = 11L),
         list(start = 3L, bsz = 1L, seed = 12L)
@@ -62,4 +63,3 @@ test_that("conditional adaptive-NN exact bootstrap partitions replications acros
   expect_identical(out$t0, c(10, 20))
   expect_identical(dim(out$t), c(3L, 2L))
 })
-

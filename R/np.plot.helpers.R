@@ -9988,31 +9988,40 @@
   )
 }
 
-.np_inid_boot_from_ksum_conditional_adaptive_exact_mpi <- function(xdat,
-                                                                  ydat,
-                                                                  exdat,
-                                                                  eydat,
-                                                                  bws,
-                                                                  B,
-                                                                  cdf,
-                                                                  counts = NULL,
-                                                                  counts.drawer = NULL,
-                                                                  progress.label = NULL,
-                                                                  fit_one_local) {
-  ## Contract: partition adaptive-NN exact conditional bootstrap replications
-  ## across MPI workers. Worker payloads reconstruct active bootstrap samples
-  ## and call the supplied local evaluator; they must not call public
-  ## estimators, bandwidth constructors, or nested MPI wrappers.
+.np_inid_boot_from_ksum_conditional_nn_exact_mpi <- function(xdat,
+                                                            ydat,
+                                                            exdat,
+                                                            eydat,
+                                                            bws,
+                                                            B,
+                                                            cdf,
+                                                            counts = NULL,
+                                                            counts.drawer = NULL,
+                                                            progress.label = NULL,
+                                                            fit_one_local) {
+  ## Contract: partition exact conditional NN bootstrap replications across
+  ## MPI workers. Each worker reconstructs duplicate-row bootstrap samples and
+  ## calls the supplied local evaluator so sample-dependent NN bandwidth state
+  ## is rebuilt per replicate.
   n <- nrow(xdat)
   t0 <- fit_one_local(x.train = xdat, y.train = ydat)
   nout <- length(t0)
+  what.prefix <- if (identical(bws$type, "generalized_nn")) {
+    "inid-ksum-conditional-generalized-exact"
+  } else {
+    "inid-ksum-conditional-adaptive-exact"
+  }
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
     chunk.size = .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer)),
     comm = 1L,
     include.master = TRUE
   )
-  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  tasks <- .npRmpi_bootstrap_chunk_tasks(
+    B = B,
+    chunk.size = chunk.size,
+    with.seeds = FALSE
+  )
 
   eval_counts_chunk <- function(counts.chunk) {
     counts.chunk <- as.matrix(counts.chunk)
@@ -10045,7 +10054,7 @@
     .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
   )
 
-  run_adaptive_fanout <- function(what, worker, required.bindings) {
+  run_nn_fanout <- function(what, worker, required.bindings) {
     if (!.npRmpi_bootstrap_fanout_enabled(
           comm = 1L,
           n = n,
@@ -10074,43 +10083,36 @@
     list(t = tmat, t0 = t0)
   }
 
-  if (!is.null(counts)) {
-    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  run_counts_matrix_fanout <- function(counts.mat, what) {
     worker <- function(task) {
       start <- as.integer(task$start)
       stopi <- start + as.integer(task$bsz) - 1L
       eval_counts_chunk(counts.mat[, start:stopi, drop = FALSE])
     }
-    out <- run_adaptive_fanout(
-      what = "inid-ksum-conditional-adaptive-exact-counts",
+    run_nn_fanout(
+      what = what,
       worker = worker,
       required.bindings = c(common.bindings, list(counts.mat = counts.mat))
+    )
+  }
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    out <- run_counts_matrix_fanout(
+      counts.mat = counts.mat,
+      what = paste0(what.prefix, "-counts")
     )
     if (!is.null(out))
       return(out)
   } else if (!is.null(counts.drawer)) {
-    worker <- function(task) {
-      start <- as.integer(task$start)
-      stopi <- start + as.integer(task$bsz) - 1L
-      eval_counts_chunk(
-        .np_inid_counts_matrix(
-          n = n,
-          B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
-        )
-      )
-    }
-    out <- run_adaptive_fanout(
-      what = "inid-ksum-conditional-adaptive-exact-block",
-      worker = worker,
-      required.bindings = c(
-        common.bindings,
-        list(
-          n = n,
-          counts.drawer = counts.drawer,
-          .np_inid_counts_matrix = .np_inid_counts_matrix
-        )
-      )
+    counts.mat <- .np_inid_counts_matrix(
+      n = n,
+      B = B,
+      counts = counts.drawer(1L, B)
+    )
+    out <- run_counts_matrix_fanout(
+      counts.mat = counts.mat,
+      what = paste0(what.prefix, "-block")
     )
     if (!is.null(out))
       return(out)
@@ -10127,18 +10129,26 @@
         .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
       )
     }
-    out <- run_adaptive_fanout(
-      what = "inid-ksum-conditional-adaptive-exact",
+    out <- run_nn_fanout(
+      what = what.prefix,
       worker = worker,
-      required.bindings = c(common.bindings, list(n = n, prob = prob))
+      required.bindings = c(
+        common.bindings,
+        list(
+          n = n,
+          prob = prob,
+          .npRmpi_bootstrap_task_rmultinom = .npRmpi_bootstrap_task_rmultinom,
+          .npRmpi_bootstrap_use_task_rng = .npRmpi_bootstrap_use_task_rng
+        )
+      )
     )
     if (!is.null(out))
       return(out)
   }
 
   .npRmpi_bootstrap_fail_or_fallback(
-    msg = "adaptive exact conditional bootstrap fan-out did not dispatch",
-    what = "inid-ksum-conditional-adaptive-exact"
+    msg = "conditional NN exact bootstrap fan-out did not dispatch",
+    what = what.prefix
   )
 }
 
@@ -10258,8 +10268,8 @@
     return(list(t = tmat.local, t0 = t0.local))
   }
 
-  if (identical(bws$type, "adaptive_nn")) {
-    return(.np_inid_boot_from_ksum_conditional_adaptive_exact_mpi(
+  if (identical(bws$type, "adaptive_nn") || identical(bws$type, "generalized_nn")) {
+    return(.np_inid_boot_from_ksum_conditional_nn_exact_mpi(
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
