@@ -689,7 +689,9 @@ npcdensbw.conbandwidth <-
       cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
       cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
                                                     bws$cykerub[bws$iycon],
-                                                    bws$cykerbound)
+                                                    bws$cykerbound,
+                                                    ycon = ycon,
+                                                    extend.factor = tbw$cvls.quadrature.extend.factor)
 
       if (bws$method != "normal-reference"){
         myout <- npWithLocalLinearRawBasisSearchError(
@@ -1109,15 +1111,45 @@ npcdensbw.conbandwidth <-
   tbw
 }
 
-.npcdensbw_infinite_bound_surrogate <- function() {
-  1e300
+.npcdensbw_response_span_bounds <- function(ycon, extend.factor = 1) {
+  ycon <- as.matrix(ycon)
+  n <- ncol(ycon)
+  if (n == 0L)
+    return(list(lb = numeric(0L), ub = numeric(0L)))
+
+  extend.factor <- as.double(extend.factor)[1L]
+  if (!is.finite(extend.factor) || extend.factor < 0)
+    extend.factor <- 1
+
+  lb <- ub <- numeric(n)
+  for (j in seq_len(n)) {
+    vals <- as.double(ycon[, j])
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0L) {
+      rng <- c(0, 1)
+      span <- 1
+    } else {
+      rng <- range(vals)
+      span <- diff(rng)
+      if (!is.finite(span) || span <= 0)
+        span <- 1
+    }
+    lb[j] <- rng[1L] - extend.factor * span
+    ub[j] <- rng[2L] + extend.factor * span
+  }
+
+  list(lb = lb, ub = ub)
 }
 
-.npcdensbw_marshal_y_bounds <- function(kerlb, kerub, kerbound) {
+.npcdensbw_marshal_y_bounds <- function(kerlb,
+                                        kerub,
+                                        kerbound,
+                                        ycon = NULL,
+                                        extend.factor = 1) {
   if (.npcdensbw_is_explicit_fixed_all_infinite(kerlb, kerub, kerbound)) {
-    sentinel <- .npcdensbw_infinite_bound_surrogate()
-    n <- max(length(kerlb), length(kerub))
-    return(list(lb = rep.int(-sentinel, n), ub = rep.int(sentinel, n)))
+    if (is.null(ycon))
+      stop("internal error: response data required for fixed infinite response bounds")
+    return(.npcdensbw_response_span_bounds(ycon, extend.factor = extend.factor))
   }
 
   npKernelBoundsMarshal(kerlb, kerub)
@@ -1291,7 +1323,9 @@ npcdensbw.conbandwidth <-
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
                                                 bws$cykerub[bws$iycon],
-                                                bws$cykerbound)
+                                                bws$cykerbound,
+                                                ycon = ycon,
+                                                extend.factor = cvls.quadrature.extend.factor)
 
   eval_call <- function() {
     .Call(
@@ -1770,7 +1804,9 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- .npcdensbw_marshal_y_bounds(bws$cykerlb[bws$iycon],
                                                 bws$cykerub[bws$iycon],
-                                                bws$cykerbound)
+                                                bws$cykerbound,
+                                                ycon = ycon,
+                                                extend.factor = cvls.quadrature.extend.factor)
   if (is.null(start.bw)) {
     start.bw <- c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
                   bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
