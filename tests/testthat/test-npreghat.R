@@ -122,6 +122,7 @@ test_that("npreghat leave.one.out is honored and predict reuses it safely", {
   H.in <- npreghat(bws = bw, txdat = tx, leave.one.out = FALSE)
   H.loo <- npreghat(bws = bw, txdat = tx, leave.one.out = TRUE)
 
+  expect_identical(predict(H.in, output = "matrix"), H.in)
   expect_gt(max(abs(H.in - H.loo)), 1e-8)
   expect_lt(max(abs(diag(H.loo))), 1e-12)
   expect_error(
@@ -131,6 +132,18 @@ test_that("npreghat leave.one.out is honored and predict reuses it safely", {
 
   hy <- predict(H.loo, y = y, output = "apply")
   expect_equal(as.vector(hy), as.vector(H.loo %*% y), tolerance = 1e-10)
+  Y <- cbind(y, y + 0.1)
+  expect_equal(predict(H.loo, y = Y, output = "apply"), H.loo %*% Y,
+               tolerance = 1e-10)
+  expect_error(
+    predict(H.loo, output = "apply"),
+    "argument 'y' is required when output='apply'"
+  )
+
+  ex <- tx[seq_len(10L), , drop = FALSE]
+  H.ex <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix")
+  expect_equal(predict(H.in, newdata = ex, output = "matrix"), H.ex,
+               tolerance = 0, ignore_attr = TRUE)
 })
 
 test_that("npreghat lp bernstein path matches predict semantics", {
@@ -514,6 +527,12 @@ test_that("npreghat constraint output is exact row-weighted transpose", {
   )
 
   H.obj <- npreghat(bws = bw, txdat = tx, output = "matrix")
+  A.stored <- predict(H, y = y, output = "constraint")
+  expect_equal(A.stored, t(H) * y, tolerance = 0, ignore_attr = TRUE)
+  expect_error(
+    predict(H, output = "constraint"),
+    "argument 'y' is required"
+  )
   A.pred <- predict(H.obj, newdata = ex, y = y, output = "constraint")
   expect_equal(A.pred, t(H) * y, tolerance = 0, ignore_attr = TRUE)
 })
