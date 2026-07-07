@@ -116,7 +116,7 @@ npcdistbw.formula <-
 .npcdistbw_method_code <- function(bws, where = "npcdistbw") {
   switch(.npcdistbw_method_name(bws, where = where),
     cv.ls = CDBWM_CVLS,
-    "normal-reference" = CDBWM_CVLS
+    "normal-reference" = NA_integer_
   )
 }
 
@@ -501,6 +501,9 @@ npcdistbw.condbandwidth <-
       cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
 
       if (bws$method != "normal-reference"){
+        if (is.na(myopti$bwmethod))
+          stop("npcdistbw native search requires a valid bandwidth method code",
+               call. = FALSE)
         myout <-
           npWithLocalLinearRawBasisSearchError(
             .Call("C_np_distribution_conditional_bw",
