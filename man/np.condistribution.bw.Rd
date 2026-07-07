@@ -277,17 +277,19 @@ These arguments choose the selection criterion and the way continuous bandwidths
 
   \item{bwmethod}{ which method to use to select bandwidths.
     \code{cv.ls} specifies least-squares cross-validation (Li, Lin and
-    Racine (2013), and \code{normal-reference} just computes the
-    \sQuote{rule-of-thumb} bandwidth \eqn{h_j}{h[j]} using the standard
-    formula \eqn{h_j = 1.06 \sigma_j n^{-1/(2P+l)}}{h[j] =
-    1.06*sigma[j]*n^(-1.0/(2.0*P+l))}, where \eqn{\sigma_j}{sigma[j]} is
-    an adaptive measure of spread of the \eqn{j}th continuous variable
-    defined as min(standard deviation, mean absolute deviation/1.4826,
-    interquartile range/1.349), \eqn{n} the number of observations,
-    \eqn{P} the order of the kernel, and \eqn{l} the number of
-    continuous variables. Note that when there exist factors and the
-    normal-reference rule is used, there is zero smoothing of the
-    factors. Defaults to \code{cv.ls}.  }
+    Racine (2013)).  \code{normal-reference} computes an ad hoc
+    Silverman-style rule-of-thumb intended for fast exploratory data
+    analysis, not production bandwidth selection.  For raw continuous
+    bandwidths it uses \eqn{1.06 \sigma_j n^{-1/(2P+l)}}{1.06*sigma[j]*n^(-1.0/(2.0*P+l))}
+    for conditioning variables and
+    \eqn{1.587 \sigma_j n^{-1/(2P+l)}}{1.587*sigma[j]*n^(-1.0/(2.0*P+l))}
+    for response variables, where \eqn{\sigma_j}{sigma[j]} is an adaptive
+    measure of spread of the \eqn{j}th continuous variable defined as
+    min(standard deviation, mean absolute deviation/1.4826, interquartile
+    range/1.349), \eqn{n} the number of observations, \eqn{P} the order
+    of the kernel, and \eqn{l} the number of continuous variables. Note
+    that when there exist factors and the normal-reference rule is used,
+    there is zero smoothing of the factors. Defaults to \code{cv.ls}.  }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
     supplied bandwidths are interpreted as \sQuote{scale factors}
