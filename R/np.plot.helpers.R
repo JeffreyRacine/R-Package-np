@@ -7708,6 +7708,39 @@
   )
 }
 
+.np_inid_ksum_unconditional_exact_eval_counts <- function(counts.col,
+                                                          xdat,
+                                                          exdat,
+                                                          bws,
+                                                          kb,
+                                                          operator) {
+  if (identical(bws$type, "adaptive_nn")) {
+    idx <- .np_counts_to_indices(counts.col)
+    return(.np_ksum_unconditional_eval_exact(
+      xdat = xdat[idx, , drop = FALSE],
+      exdat = exdat,
+      bws = bws,
+      operator = operator
+    ))
+  }
+
+  active.sample <- .np_active_boot_sample(
+    xdat = xdat,
+    counts.col = counts.col
+  )
+  bw.eval <- if (!is.null(kb) &&
+                 .np_unconditional_exact_precomputed_kband_safe(
+                   bws = bws,
+                   n.train = nrow(active.sample$xdat)
+                 )) kb else bws
+  .np_inid_ksum_unconditional_exact_eval_one(
+    active.sample = active.sample,
+    exdat = exdat,
+    bw.eval = bw.eval,
+    operator = operator
+  )
+}
+
 .np_ksum_kernel_weights_matrix <- function(kernel.weights, ntrain, neval, where = "ksum helper path") {
   if (is.null(kernel.weights))
     stop(sprintf("%s did not return kernel weights", where))
@@ -7986,19 +8019,12 @@
         bsz <- ncol(counts.chunk)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          active.sample <- .np_active_boot_sample(
+          out[jj, ] <- .np_inid_ksum_unconditional_exact_eval_counts(
+            counts.col = counts.chunk[, jj],
             xdat = xdat,
-            counts.col = counts.chunk[, jj]
-          )
-          bw.eval <- if (!is.null(kb) &&
-                         .np_unconditional_exact_precomputed_kband_safe(
-                           bws = bws,
-                           n.train = nrow(active.sample$xdat)
-                         )) kb else bws
-          out[jj, ] <- .np_inid_ksum_unconditional_exact_eval_one(
-            active.sample = active.sample,
             exdat = exdat,
-            bw.eval = bw.eval,
+            bws = bws,
+            kb = kb,
             operator = operator
           )
         }
@@ -8021,8 +8047,10 @@
           operator = operator,
           n = n,
           nout = nout,
+          .np_counts_to_indices = .np_counts_to_indices,
           .np_active_boot_sample = .np_active_boot_sample,
           .np_inid_ksum_unconditional_exact_eval_one = .np_inid_ksum_unconditional_exact_eval_one,
+          .np_inid_ksum_unconditional_exact_eval_counts = .np_inid_ksum_unconditional_exact_eval_counts,
           .np_make_kbandwidth_unconditional = .np_make_kbandwidth_unconditional,
           .np_unconditional_exact_precomputed_kband_safe = .np_unconditional_exact_precomputed_kband_safe,
           .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
@@ -8055,19 +8083,12 @@
         bsz <- ncol(counts.chunk)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          active.sample <- .np_active_boot_sample(
+          out[jj, ] <- .np_inid_ksum_unconditional_exact_eval_counts(
+            counts.col = counts.chunk[, jj],
             xdat = xdat,
-            counts.col = counts.chunk[, jj]
-          )
-          bw.eval <- if (!is.null(kb) &&
-                         .np_unconditional_exact_precomputed_kband_safe(
-                           bws = bws,
-                           n.train = nrow(active.sample$xdat)
-                         )) kb else bws
-          out[jj, ] <- .np_inid_ksum_unconditional_exact_eval_one(
-            active.sample = active.sample,
             exdat = exdat,
-            bw.eval = bw.eval,
+            bws = bws,
+            kb = kb,
             operator = operator
           )
         }
@@ -8090,8 +8111,10 @@
           kb = kb,
           operator = operator,
           nout = nout,
+          .np_counts_to_indices = .np_counts_to_indices,
           .np_active_boot_sample = .np_active_boot_sample,
           .np_inid_ksum_unconditional_exact_eval_one = .np_inid_ksum_unconditional_exact_eval_one,
+          .np_inid_ksum_unconditional_exact_eval_counts = .np_inid_ksum_unconditional_exact_eval_counts,
           .np_make_kbandwidth_unconditional = .np_make_kbandwidth_unconditional,
           .np_unconditional_exact_precomputed_kband_safe = .np_unconditional_exact_precomputed_kband_safe,
           .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
@@ -8125,19 +8148,12 @@
         counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
         for (jj in seq_len(bsz)) {
-          active.sample <- .np_active_boot_sample(
+          out[jj, ] <- .np_inid_ksum_unconditional_exact_eval_counts(
+            counts.col = counts.chunk[, jj],
             xdat = xdat,
-            counts.col = counts.chunk[, jj]
-          )
-          bw.eval <- if (!is.null(kb) &&
-                         .np_unconditional_exact_precomputed_kband_safe(
-                           bws = bws,
-                           n.train = nrow(active.sample$xdat)
-                         )) kb else bws
-          out[jj, ] <- .np_inid_ksum_unconditional_exact_eval_one(
-            active.sample = active.sample,
             exdat = exdat,
-            bw.eval = bw.eval,
+            bws = bws,
+            kb = kb,
             operator = operator
           )
         }
@@ -8160,8 +8176,10 @@
           kb = kb,
           operator = operator,
           nout = nout,
+          .np_counts_to_indices = .np_counts_to_indices,
           .np_active_boot_sample = .np_active_boot_sample,
           .np_inid_ksum_unconditional_exact_eval_one = .np_inid_ksum_unconditional_exact_eval_one,
+          .np_inid_ksum_unconditional_exact_eval_counts = .np_inid_ksum_unconditional_exact_eval_counts,
           .np_make_kbandwidth_unconditional = .np_make_kbandwidth_unconditional,
           .np_unconditional_exact_precomputed_kband_safe = .np_unconditional_exact_precomputed_kband_safe,
           .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
