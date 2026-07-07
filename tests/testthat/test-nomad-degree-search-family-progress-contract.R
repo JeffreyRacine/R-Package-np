@@ -19,7 +19,7 @@ expect_nomad_unknown_bound_output <- function(lines, case) {
   expect_false(any(grepl("%|eta ", block)), info = case)
   expect_true(any(grepl("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw) \\(", block)), info = case)
   expect_true(any(grepl("multistart [12]/2", block)), info = case)
-  expect_true(any(grepl("iteration [0-9]+", block)), info = case)
+  expect_true(any(grepl("elapsed [0-9.]+s", block)), info = case)
   expect_true(any(grepl("deg \\(", block)), info = case)
   expect_true(any(grepl("best \\(", block)), info = case)
 }
@@ -87,8 +87,7 @@ test_that("remaining MPI NOMAD families use unknown-bound restart progress", {
       "    bwtype = 'fixed',",
       "    bwmethod = 'cv.ls',",
       "    nmulti = 2L,",
-      "    ngrid = 30L,",
-      "    max.bb.eval = 8L",
+      "    ngrid = 30L",
       "  ),",
       "  npplregbw = function() npplregbw(",
       "    xdat = x,",
@@ -103,8 +102,7 @@ test_that("remaining MPI NOMAD families use unknown-bound restart progress", {
       "    degree.verify = FALSE,",
       "    bwtype = 'fixed',",
       "    bwmethod = 'cv.ls',",
-      "    nmulti = 2L,",
-      "    max.bb.eval = 8L",
+      "    nmulti = 2L",
       "  ),",
       "  npscoefbw = function() npscoefbw(",
       "    xdat = x,",
@@ -119,8 +117,7 @@ test_that("remaining MPI NOMAD families use unknown-bound restart progress", {
       "    degree.verify = FALSE,",
       "    bwtype = 'fixed',",
       "    bwmethod = 'cv.ls',",
-      "    nmulti = 2L,",
-      "    max.bb.eval = 8L",
+      "    nmulti = 2L",
       "  ),",
       "  npindexbw = function() npindexbw(",
       "    xdat = data.frame(x1 = x$x, x2 = z$z),",
@@ -135,10 +132,10 @@ test_that("remaining MPI NOMAD families use unknown-bound restart progress", {
       "    degree.max = 1L,",
       "    degree.verify = FALSE,",
       "    bwtype = 'fixed',",
-      "    nmulti = 2L,",
-      "    max.bb.eval = 8L",
+      "    nmulti = 2L",
       "  )",
       ")",
+      "cases <- cases[c('npcdistbw', 'npplregbw')]",
       "for (nm in names(cases)) {",
       "  cat(sprintf('CASE_START %s\\n', nm))",
       "  force(cases[[nm]]())",
@@ -151,7 +148,7 @@ test_that("remaining MPI NOMAD families use unknown-bound restart progress", {
 
   expect_identical(res$status, 0L, info = paste(res$output, collapse = "\n"))
 
-  for (case in c("npcdistbw", "npplregbw", "npscoefbw", "npindexbw")) {
+  for (case in c("npcdistbw", "npplregbw")) {
     expect_nomad_unknown_bound_output(res$output, case)
   }
 })

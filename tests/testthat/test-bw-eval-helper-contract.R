@@ -1,3 +1,12 @@
+.np_try_eval_in_frames <- getFromNamespace(".np_try_eval_in_frames", "npRmpi")
+.np_eval_bw_call <- getFromNamespace(".np_eval_bw_call", "npRmpi")
+.np_bw_call_uses_nomad_degree_search <- getFromNamespace(
+  ".np_bw_call_uses_nomad_degree_search",
+  "npRmpi"
+)
+.np_bw_dispatch_target <- getFromNamespace(".np_bw_dispatch_target", "npRmpi")
+.np_bw_formula_from_call <- getFromNamespace(".np_bw_formula_from_call", "npRmpi")
+
 test_that(".np_try_eval_in_frames resolves symbols from eval env first", {
   env <- new.env(parent = emptyenv())
   env$x <- 11L

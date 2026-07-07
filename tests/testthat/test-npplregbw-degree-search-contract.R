@@ -1,3 +1,13 @@
+skip_slow_npplregbw_degree_search <- function() {
+  skip_if_not(
+    identical(Sys.getenv("NP_RUN_SLOW_NPPLREGBW_DEGREE_SEARCH_MPI"), "true"),
+    paste(
+      "set NP_RUN_SLOW_NPPLREGBW_DEGREE_SEARCH_MPI=true to run the slow",
+      "npplregbw automatic degree-search and NOMAD MPI contracts"
+    )
+  )
+}
+
 with_nprmpi_npplreg_degree_bindings <- function(bindings, code) {
   code <- substitute(code)
   ns <- asNamespace("npRmpi")
@@ -28,6 +38,7 @@ with_nprmpi_npplreg_degree_bindings <- function(bindings, code) {
 }
 
 test_that("npplreg collective child evaluator matches the serial oracle at a fixed point", {
+  skip_slow_npplregbw_degree_search()
   close_mpi_slaves(force = TRUE)
 
   trace.file <- tempfile("npplreg-collective-trace-", fileext = ".log")
@@ -156,6 +167,7 @@ test_that("npplreg collective child evaluator matches the serial oracle at a fix
 })
 
 test_that("npplregbw exhaustive degree search matches manual profile minimum", {
+  skip_slow_npplregbw_degree_search()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -227,6 +239,7 @@ test_that("npplregbw exhaustive degree search matches manual profile minimum", {
 })
 
 test_that("npplregbw coordinate search can be exhaustively certified on a small grid", {
+  skip_slow_npplregbw_degree_search()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -280,6 +293,7 @@ test_that("npplregbw coordinate search can be exhaustively certified on a small 
 })
 
 test_that("npplregbw automatic degree search enforces pilot guardrails", {
+  skip_slow_npplregbw_degree_search()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -346,6 +360,7 @@ test_that("npplregbw automatic degree search enforces pilot guardrails", {
 })
 
 test_that("npplreg forwards automatic LP degree search through npplregbw", {
+  skip_slow_npplregbw_degree_search()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -380,6 +395,7 @@ test_that("npplreg forwards automatic LP degree search through npplregbw", {
 })
 
 test_that("npplregbw NOMAD degree search backend improves over the baseline", {
+  skip_slow_npplregbw_degree_search()
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -415,6 +431,7 @@ test_that("npplregbw NOMAD degree search backend improves over the baseline", {
 })
 
 test_that("npplregbw automatic degree search defaults to NOMAD plus Powell", {
+  skip_slow_npplregbw_degree_search()
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -454,6 +471,7 @@ test_that("npplregbw automatic degree search defaults to NOMAD plus Powell", {
 })
 
 test_that("npplregbw NOMAD route uses the active pool for child objective evaluation", {
+  skip_slow_npplregbw_degree_search()
   skip_if_not_installed("crs")
 
   close_mpi_slaves(force = TRUE)
@@ -522,6 +540,7 @@ test_that("npplregbw NOMAD route uses the active pool for child objective evalua
 })
 
 test_that("npplreg explicit plbandwidth route preserves NOMAD child payload names", {
+  skip_slow_npplregbw_degree_search()
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -560,6 +579,7 @@ test_that("npplreg explicit plbandwidth route preserves NOMAD child payload name
 })
 
 test_that("npplregbw NOMAD degree search fails fast when crs is unavailable", {
+  skip_slow_npplregbw_degree_search()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 

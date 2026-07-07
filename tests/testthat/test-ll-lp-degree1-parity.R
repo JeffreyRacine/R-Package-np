@@ -1,4 +1,13 @@
+skip_slow_ll_lp_degree1_parity <- function() {
+  run_slow <- tolower(Sys.getenv("NP_RUN_SLOW_LL_LP_PARITY", ""))
+  skip_if_not(
+    run_slow %in% c("1", "true", "yes"),
+    "slow LL/LP degree-1 parity suite; set NP_RUN_SLOW_LL_LP_PARITY=true to run"
+  )
+}
+
 test_that("npreg cv objective and bandwidths match for ll and lp(degree=1)", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -33,6 +42,7 @@ test_that("npreg cv objective and bandwidths match for ll and lp(degree=1)", {
 })
 
 test_that("npreg multivariate cv.aic matches for ll and lp(all degree=1)", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -68,6 +78,7 @@ test_that("npreg multivariate cv.aic matches for ll and lp(all degree=1)", {
 })
 
 test_that("npreg categorical-only predictors reject impossible degree structure", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -118,6 +129,7 @@ test_that("npreg categorical-only predictors reject impossible degree structure"
 })
 
 test_that("npreg and npreghat match for ll and lp(degree=1) in 1D", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -177,6 +189,7 @@ test_that("npreg and npreghat match for ll and lp(degree=1) in 1D", {
 })
 
 test_that("npscoef cv and estimation match for ll and lp(degree=1) in 1D", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -248,6 +261,7 @@ test_that("npscoef cv and estimation match for ll and lp(degree=1) in 1D", {
 })
 
 test_that("npindex cv, fit, and npindexhat(s=1) match for ll and lp(degree=1) in 1D", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -311,6 +325,7 @@ test_that("npindex cv, fit, and npindexhat(s=1) match for ll and lp(degree=1) in
 })
 
 test_that("npplreg cv and estimation match for ll and lp(degree=1) in 1D", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -386,6 +401,7 @@ test_that("npplreg cv and estimation match for ll and lp(degree=1) in 1D", {
 })
 
 test_that("npscoef multivariate cv and estimation match for ll and lp(degree=1)", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -456,6 +472,7 @@ test_that("npscoef multivariate cv and estimation match for ll and lp(degree=1)"
 })
 
 test_that("npindex multivariate cv and estimation match for ll and lp(degree=1)", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -532,6 +549,7 @@ test_that("npindex multivariate cv and estimation match for ll and lp(degree=1)"
 })
 
 test_that("npplreg multivariate cv and estimation match for ll and lp(degree=1)", {
+  skip_slow_ll_lp_degree1_parity()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 

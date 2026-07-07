@@ -100,7 +100,7 @@ test_that("regression helper labels carry target context for block bootstrap pha
         captured$progress <- c(captured$progress, prep.label, progress.label)
         list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
       },
-      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL) {
+      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL, reference = NULL) {
         captured$interval <- c(captured$interval, progress.label)
         list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
       },
@@ -157,7 +157,7 @@ test_that("conditional helper labels carry target context for block bootstrap ph
         captured$progress <- c(captured$progress, progress.label)
         list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
       },
-      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL) {
+      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL, reference = NULL) {
         captured$interval <- c(captured$interval, progress.label)
         list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
       },
@@ -192,7 +192,7 @@ test_that("conditional helper labels carry target context for block bootstrap ph
         yndim = 1L,
         xnames = c("x1", "x2"),
         ynames = "y",
-        xdati = list(),
+        xdati = list(icon = c(TRUE, TRUE), iord = c(FALSE, FALSE), iuno = c(FALSE, FALSE)),
         ydati = list()
       )
     )
@@ -251,7 +251,7 @@ test_that("conditional bootstrap exact path forwards target label from compute h
         captured$progress <- c(captured$progress, progress.label)
         list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
       },
-      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL) {
+      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL, reference = NULL) {
         captured$interval <- c(captured$interval, progress.label)
         list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
       },
@@ -317,7 +317,7 @@ test_that("single-index helper labels carry target context for bootstrap phases"
         captured$progress <- c(captured$progress, progress.label)
         list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
       },
-      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL) {
+      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL, reference = NULL) {
         captured$interval <- c(captured$interval, progress.label)
         list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
       },
@@ -361,7 +361,7 @@ test_that("unconditional helper keeps user-facing bootstrap labels in MPI fanout
       ),
       .npRmpi_bootstrap_tune_chunk_size = function(...) 2L,
       .npRmpi_bootstrap_fanout_enabled = function(...) TRUE,
-      .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size) list(list(start = 1L, bsz = as.integer(B), seed = 1L)),
+      .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size, with.seeds = TRUE) list(list(start = 1L, bsz = as.integer(B), seed = 1L)),
       .npRmpi_bootstrap_run_fanout = function(tasks,
                                               worker,
                                               ncol.out,
@@ -406,7 +406,7 @@ test_that("smooth coefficient helper labels carry target context for bootstrap p
         captured$progress <- c(captured$progress, progress.label)
         list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
       },
-      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL) {
+      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL, reference = NULL) {
         captured$interval <- c(captured$interval, progress.label)
         list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
       },
@@ -466,7 +466,7 @@ test_that("partially linear helper labels carry target context for bootstrap pha
         captured$progress <- c(captured$progress, progress.label)
         list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
       },
-      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL) {
+      .np_plot_bootstrap_interval_summary = function(boot.t, t0, alpha, band.type, progress.label = NULL, reference = NULL) {
         captured$interval <- c(captured$interval, progress.label)
         list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
       },

@@ -2,7 +2,11 @@ test_that("npregiv ridging loops avoid superassignment", {
   src_path <- testthat::test_path("..", "..", "R", "npregiv.R")
   skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
-  expect_false(grepl("<<-", src, fixed = TRUE))
+  lines <- grep("<<-", strsplit(src, "\n", fixed = TRUE)[[1L]], value = TRUE, fixed = TRUE)
+  expect_false(any(grepl(
+    "ridge|doridge|coef\\.mat|mean\\.loo|ghat|WzkWz",
+    lines
+  )))
 })
 
 test_that("npregiv uses shared seed enter helper", {

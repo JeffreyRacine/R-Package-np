@@ -1,7 +1,7 @@
 test_that("npreg formula newdata path matches explicit data path", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
-  old.opts <- options(npRmpi.autodispatch = FALSE)
+  old.opts <- options(npRmpi.autodispatch = TRUE)
   on.exit(options(old.opts), add = TRUE)
 
   set.seed(20260222)
@@ -34,7 +34,7 @@ test_that("npreg formula newdata path matches explicit data path", {
 test_that("npreg formula y.eval path matches explicit data path", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
-  old.opts <- options(npRmpi.autodispatch = FALSE)
+  old.opts <- options(npRmpi.autodispatch = TRUE)
   on.exit(options(old.opts), add = TRUE)
 
   set.seed(20260222)

@@ -49,6 +49,9 @@ test_that("npudist ordered-categorical profile bandwidth CV matches dense CV", {
 })
 
 test_that("npudist ordered-categorical profile bandwidth CV supports training-grid integral", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
   old.tree <- getOption("np.tree")
   old.compress <- getOption("np.categorical.compress")
   old.messages <- getOption("np.messages")

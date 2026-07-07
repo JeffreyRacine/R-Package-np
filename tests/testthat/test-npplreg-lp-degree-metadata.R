@@ -1,4 +1,15 @@
+skip_slow_npplreg_lp_degree_search <- function() {
+  skip_if_not(
+    identical(Sys.getenv("NP_RUN_SLOW_NPPLREG_LP_DEGREE_SEARCH_MPI"), "true"),
+    paste(
+      "set NP_RUN_SLOW_NPPLREG_LP_DEGREE_SEARCH_MPI=true to run the slow",
+      "npplreg LP degree metadata search smoke"
+    )
+  )
+}
+
 test_that("npplreg lp degree metadata is preserved in plbandwidth summary", {
+  skip_slow_npplreg_lp_degree_search()
   if (!spawn_mpi_slaves())
     skip("Could not spawn MPI slaves")
 

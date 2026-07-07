@@ -847,9 +847,9 @@ test_that("npindexhat mean and derivative operators match core fits across bwtyp
   ex <- tx[seq_len(20), , drop = FALSE]
 
   cfgs <- list(
-    list(regtype = "lc", basis = NULL, degree = NULL, h = 0.85),
-    list(regtype = "ll", basis = NULL, degree = NULL, h = 0.85),
-    list(regtype = "lp", basis = "tensor", degree = 2L, h = 0.85)
+    list(regtype = "lc", basis = NULL, degree = NULL, h = 5L),
+    list(regtype = "ll", basis = NULL, degree = NULL, h = 5L),
+    list(regtype = "lp", basis = "tensor", degree = 2L, h = 5L)
   )
 
   for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
@@ -939,9 +939,9 @@ test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
   ex <- tx[seq_len(20), , drop = FALSE]
 
   cfgs <- list(
-    list(regtype = "lc", basis = NULL, degree = NULL, h = 0.85),
-    list(regtype = "ll", basis = NULL, degree = NULL, h = 0.85),
-    list(regtype = "lp", basis = "tensor", degree = 2L, h = 0.85)
+    list(regtype = "lc", basis = NULL, degree = NULL, h = 5L),
+    list(regtype = "ll", basis = NULL, degree = NULL, h = 5L),
+    list(regtype = "lp", basis = "tensor", degree = 2L, h = 5L)
   )
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
@@ -1012,7 +1012,7 @@ test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
       s = 0L,
       output = "matrix"
     ),
-    "Invalid bounds for 'ckerbound'|Evaluation data violate 'ckerbound' bounds"
+    "fixed continuous kernel bounds are not supported for scalar-index helpers|Invalid bounds for 'ckerbound'|Evaluation data violate 'ckerbound' bounds"
   )
 })
 

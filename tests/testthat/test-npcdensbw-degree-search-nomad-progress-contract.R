@@ -56,7 +56,6 @@ test_that("npcdensbw nomad+powell payload does not inject phantom multistart tot
     bwtype = "fixed",
     bwmethod = "cv.ml",
     nmulti = 2L,
-    max.bb.eval = 20L,
     cxkerbound = "range",
     cykerbound = "range"
   )
@@ -104,7 +103,6 @@ test_that("npcdensbw NOMAD plus Powell progress mirrors shared restart detail", 
         bwtype = "fixed",
         bwmethod = "cv.ml",
         nmulti = 2L,
-        max.bb.eval = 12L,
         cxkerbound = "range",
         cykerbound = "range"
       )
@@ -118,9 +116,9 @@ test_that("npcdensbw NOMAD plus Powell progress mirrors shared restart detail", 
   expect_true(any(grepl("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw) \\(", msgs)))
   expect_true(any(grepl("^\\[npRmpi\\] Refining bandwidth \\(", msgs)))
   expect_true(any(grepl("multistart [12]/2", msgs)))
-  expect_true(any(grepl("iteration [0-9]+", msgs)))
+  expect_true(any(grepl("(iteration|iter) [0-9]+", msgs)))
   if (any(grepl("multistart 2/2", msgs)))
-    expect_true(any(grepl("iteration [0-9]+( \\([0-9]+\\))?", msgs)))
+    expect_true(any(grepl("(iteration|iter) [0-9]+( \\([0-9]+\\))?", msgs)))
   expect_true(any(grepl("deg \\(", msgs)))
   expect_true(any(grepl("best \\(", msgs)))
 })

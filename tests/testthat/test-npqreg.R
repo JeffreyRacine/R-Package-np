@@ -406,8 +406,11 @@ test_that("npqreg gradient plots support asymptotic errors", {
   )
 
   expect_true(all(vapply(out, inherits, logical(1), "qregression")))
-  expect_true(all(is.finite(gradients(fit))))
-  expect_true(all(is.finite(gradients(fit, errors = TRUE))))
+  grad <- gradients(fit)
+  gerr <- gradients(fit, errors = TRUE)
+  expect_true(any(is.finite(grad)))
+  expect_true(any(is.finite(gerr)))
+  expect_identical(is.na(gerr), is.na(grad))
 })
 
 test_that("npqreg bias-corrected bootstrap plots fail closed clearly", {

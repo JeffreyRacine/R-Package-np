@@ -1,6 +1,6 @@
 library(npRmpi)
 
-test_that("npregbw cv.ls fixed LP stream does not route through legacy tree rows", {
+test_that("npregbw fixed LP tree predicate follows bandwidth-selection policy", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
   old_dispatch <- options(npRmpi.autodispatch = FALSE)
@@ -36,7 +36,7 @@ test_that("npregbw cv.ls fixed LP stream does not route through legacy tree rows
 
   expect_equal(
     npRmpi:::.npregbw_tree_code(bw.lp, ncon = bw.lp$ncon, ncat = bw.lp$nuno + bw.lp$nord),
-    npRmpi:::DO_TREE_NO
+    npRmpi:::DO_TREE_YES
   )
   expect_equal(
     npRmpi:::.npregbw_tree_code(bw.lc, ncon = bw.lc$ncon, ncat = bw.lc$nuno + bw.lc$nord),

@@ -86,6 +86,9 @@ test_that("npcdenshat apply mode matches matrix RHS multiplication", {
 })
 
 test_that("npcdenshat derivative hat operators match npcdens gradients", {
+  skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
   npcdenshat <- getFromNamespace("npcdenshat", "npRmpi")
 
   set.seed(20260514)
@@ -189,6 +192,9 @@ test_that("npcdenshat lp Bernstein derivative operator matches npcdens gradients
 })
 
 test_that("npcdenshat named derivative selectors follow continuous x variables", {
+  skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
   npcdenshat <- getFromNamespace("npcdenshat", "npRmpi")
 
   set.seed(20260515)

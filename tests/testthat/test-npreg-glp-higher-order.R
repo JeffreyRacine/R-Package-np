@@ -1,4 +1,15 @@
+skip_slow_npreg_glp_higher_order_matrix <- function() {
+  skip_if_not(
+    identical(Sys.getenv("NP_RUN_SLOW_NPREG_GLP_HIGHER_ORDER_MPI"), "true"),
+    paste(
+      "set NP_RUN_SLOW_NPREG_GLP_HIGHER_ORDER_MPI=true to run the slow",
+      "higher-order GLP npreghat matrix comparison contracts"
+    )
+  )
+}
+
 test_that("npreg lp higher-order gradients match npreghat across lp bases", {
+  skip_slow_npreg_glp_higher_order_matrix()
   skip_if_not(spawn_mpi_slaves(1))
   on.exit(close_mpi_slaves(), add = TRUE)
   old.opts <- options(npRmpi.autodispatch = FALSE)
@@ -40,6 +51,7 @@ test_that("npreg lp higher-order gradients match npreghat across lp bases", {
 })
 
 test_that("npreg lp supports per-variable derivative orders", {
+  skip_slow_npreg_glp_higher_order_matrix()
   skip_if_not(spawn_mpi_slaves(1))
   on.exit(close_mpi_slaves(), add = TRUE)
   old.opts <- options(npRmpi.autodispatch = FALSE)
@@ -81,6 +93,7 @@ test_that("npreg lp supports per-variable derivative orders", {
 })
 
 test_that("npreg lp mixed-degree derivatives preserve partial availability", {
+  skip_slow_npreg_glp_higher_order_matrix()
   skip_if_not(spawn_mpi_slaves(1))
   on.exit(close_mpi_slaves(), add = TRUE)
   old.opts <- options(npRmpi.autodispatch = FALSE)
@@ -222,6 +235,7 @@ test_that("npreg lp mixed-degree derivatives preserve partial availability", {
 })
 
 test_that("npreg lp gradients accessor honors stored derivative order", {
+  skip_slow_npreg_glp_higher_order_matrix()
   skip_if_not(spawn_mpi_slaves(1))
   on.exit(close_mpi_slaves(), add = TRUE)
   old.opts <- options(npRmpi.autodispatch = FALSE)
@@ -324,6 +338,7 @@ test_that("GLP gradient availability rejects incoherent metadata", {
 })
 
 test_that("npreg lp Bernstein derivatives are returned on original scale", {
+  skip_slow_npreg_glp_higher_order_matrix()
   skip_if_not(spawn_mpi_slaves(1))
   on.exit(close_mpi_slaves(), add = TRUE)
   old.opts <- options(npRmpi.autodispatch = FALSE)

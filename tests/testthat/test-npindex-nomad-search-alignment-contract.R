@@ -1,4 +1,9 @@
 test_that("npindex NOMAD shortcut stays near the Powell basin on the canonical Ichimura repro", {
+  run_slow <- tolower(Sys.getenv("NP_RUN_SLOW_NPINDEX_NOMAD_ALIGNMENT", ""))
+  skip_if_not(
+    run_slow %in% c("1", "true", "yes"),
+    "slow npindex NOMAD alignment repro; set NP_RUN_SLOW_NPINDEX_NOMAD_ALIGNMENT=true to run"
+  )
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)

@@ -1,6 +1,15 @@
 library(npRmpi)
 
+skip_slow_bounded_cvls_matrix <- function() {
+  run_slow <- tolower(Sys.getenv("NP_RUN_SLOW_BOUNDED_CVLS", ""))
+  skip_if_not(
+    run_slow %in% c("1", "true", "yes"),
+    "slow bounded cv.ls optimizer matrix; set NP_RUN_SLOW_BOUNDED_CVLS=true to run"
+  )
+}
+
 test_that("bounded cv.ls remains finite for gaussian order 2 and 4", {
+  skip_slow_bounded_cvls_matrix()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -34,6 +43,7 @@ test_that("bounded cv.ls remains finite for gaussian order 2 and 4", {
 })
 
 test_that("bounded unconditional cv.ls scalar quadrature supports generalized and adaptive NN bwtypes", {
+  skip_slow_bounded_cvls_matrix()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -67,6 +77,7 @@ test_that("bounded unconditional cv.ls scalar quadrature supports generalized an
 })
 
 test_that("bounded unconditional cv.ls admits mixed and bivariate continuous bounded data", {
+  skip_slow_bounded_cvls_matrix()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -113,6 +124,7 @@ test_that("bounded unconditional cv.ls admits mixed and bivariate continuous bou
 })
 
 test_that("bounded conditional cv.ls remains finite for gaussian order 2 and 4", {
+  skip_slow_bounded_cvls_matrix()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -160,6 +172,7 @@ test_that("bounded conditional cv.ls remains finite for gaussian order 2 and 4",
 })
 
 test_that("bounded conditional cv.ls scalar quadrature supports generalized and adaptive NN bwtypes", {
+  skip_slow_bounded_cvls_matrix()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -205,6 +218,7 @@ test_that("bounded conditional cv.ls scalar quadrature supports generalized and 
 })
 
 test_that("bounded conditional cv.ls admits mixed and bivariate continuous bounded responses", {
+  skip_slow_bounded_cvls_matrix()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -259,6 +273,7 @@ test_that("bounded conditional cv.ls admits mixed and bivariate continuous bound
 })
 
 test_that("bounded cv.ls still fails fast beyond two continuous bounded variables", {
+  skip_slow_bounded_cvls_matrix()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -293,6 +308,7 @@ test_that("bounded cv.ls still fails fast beyond two continuous bounded variable
 })
 
 test_that("bounded conditional distribution cv.ls remains finite for gaussian order 2 and 4", {
+  skip_slow_bounded_cvls_matrix()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -340,6 +356,7 @@ test_that("bounded conditional distribution cv.ls remains finite for gaussian or
 })
 
 test_that("bounded unconditional cv.ls remains finite after conditional bounded selectors", {
+  skip_slow_bounded_cvls_matrix()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
 

@@ -1,5 +1,13 @@
 library(npRmpi)
 
+skip_slow_npcdens_cvls_public <- function() {
+  run_slow <- tolower(Sys.getenv("NP_RUN_SLOW_NPCDENS_CVLS_PUBLIC", ""))
+  skip_if_not(
+    run_slow %in% c("1", "true", "yes"),
+    "slow npcdens cv.ls public optimizer sentinel; set NP_RUN_SLOW_NPCDENS_CVLS_PUBLIC=true to run"
+  )
+}
+
 test_that("provided fixed bounded cv.ls eval_only survives installed subprocess teardown", {
   skip_on_cran()
   env <- npRmpi_subprocess_env()
@@ -42,6 +50,7 @@ test_that("provided fixed bounded cv.ls eval_only survives installed subprocess 
 })
 
 test_that("public npcdensbw cv.ls lc matches the production fixed-point objective", {
+  skip_slow_npcdens_cvls_public()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
@@ -62,6 +71,7 @@ test_that("public npcdensbw cv.ls lc matches the production fixed-point objectiv
 })
 
 test_that("public npcdensbw cv.ls lc frozen benchmark stays on the serial-aligned route", {
+  skip_slow_npcdens_cvls_public()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -106,6 +116,7 @@ test_that("provided fixed lc cv.ls eval_only remains finite", {
 })
 
 test_that("public npcdensbw cv.ls fixed LP/LL route activates with ll == lp parity", {
+  skip_slow_npcdens_cvls_public()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
@@ -138,6 +149,7 @@ test_that("public npcdensbw cv.ls fixed LP/LL route activates with ll == lp pari
 })
 
 test_that("public npcdensbw cv.ls fixed LP tree and serial evaluators agree at fixed points", {
+  skip_slow_npcdens_cvls_public()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
@@ -281,6 +293,7 @@ test_that("npcdens fit route uses the bandwidth tree predicate", {
 })
 
 test_that("public npcdensbw cv.ls generalized-nn LP route activates with ll == lp parity", {
+  skip_slow_npcdens_cvls_public()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
@@ -319,6 +332,7 @@ test_that("public npcdensbw cv.ls generalized-nn LP route activates with ll == l
 })
 
 test_that("public npcdensbw cv.ls adaptive-nn LP route activates with ll == lp parity", {
+  skip_slow_npcdens_cvls_public()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)

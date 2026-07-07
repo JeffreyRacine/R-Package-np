@@ -4,7 +4,7 @@ test_that("Powell hot-start respects fixed continuous lower bound", {
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-  old_opts <- options(np.messages = FALSE, np.tree = FALSE, npRmpi.autodispatch = FALSE)
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE, npRmpi.autodispatch = TRUE)
   on.exit(options(old_opts), add = TRUE)
 
   floor_value <- function(y, n, p = 2L, q = 1L) {
@@ -41,7 +41,7 @@ test_that("Powell hot-start respects fixed continuous lower bound", {
   nom$regtype <- "lp"
   nom$pregtype <- "Local-Polynomial"
 
-  hot <- npRmpi:::npcdensbw.conbandwidth(
+  hot <- npcdensbw(
     xdat = data.frame(x = x),
     ydat = data.frame(y = y),
     bws = nom,

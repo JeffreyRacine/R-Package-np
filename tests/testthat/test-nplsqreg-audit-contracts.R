@@ -1,3 +1,13 @@
+skip_slow_nplsqreg_refined_tau_search <- function() {
+  skip_if_not(
+    identical(Sys.getenv("NP_RUN_SLOW_NPLSQREG_REFINED_TAU_MPI"), "true"),
+    paste(
+      "set NP_RUN_SLOW_NPLSQREG_REFINED_TAU_MPI=true to run the slow",
+      "refined tau-search control-retention smoke"
+    )
+  )
+}
+
 test_that("npRmpi nplsqreg direct routes omit incomplete training rows and realign output", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -133,6 +143,7 @@ test_that("npRmpi nplsqreg fixed delta layout is preserved by the check-loss bac
 })
 
 test_that("npRmpi nplsqreg refined tau search keeps full controls for the anchor", {
+  skip_slow_nplsqreg_refined_tau_search()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 

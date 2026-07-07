@@ -42,7 +42,7 @@ npplreg_semiparam_frozen_contract_case <- function() {
     "  stopifnot(all(modes == 'frozen'))",
     "  expected.slice <- local.fit(bws = bw, xdat = txdat, ydat = y, zdat = tzdat, exdat = seen.ex[[1L]], ezdat = seen.ez[[1L]])",
     "  center.check <- boot.method(xdat = txdat, ydat = y, zdat = tzdat, exdat = seen.ex[[1L]], ezdat = seen.ez[[1L]], gradients = FALSE, slice.index = 1L, plot.errors.boot.method = 'inid', t0.override = as.vector(expected.slice$mean), plot.errors.boot.nonfixed = 'frozen', plot.errors.boot.blocklen = 1L, plot.errors.boot.num = 41L, plot.errors.center = 'estimate', plot.errors.type = 'pointwise', plot.errors.alpha = 0.05, bws = bw)",
-    "  expected.err <- cbind(as.vector(expected.slice$mean), -as.vector(expected.slice$mean), rep(NA_real_, length(expected.slice$mean)))",
+    "  expected.err <- cbind(as.vector(expected.slice$mean), -as.vector(expected.slice$mean), as.vector(expected.slice$mean))",
     "  stopifnot(isTRUE(all.equal(center.check$boot.err, expected.err, tolerance = 1e-10)))",
     "}",
     "run_case()",

@@ -46,14 +46,16 @@ test_that("CVLS LL/LP route predicate is centralized in one helper", {
   expect_equal(sum(grepl("np_regression_cv_degree1_rawbasis_fixed", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("np_reg_degree1_center_raw_moments_at_eval", lines, fixed = TRUE)), 0L)
 
-  raw_pred <- "(bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)"
-  # Exactly one raw predicate instance is allowed (the helper definition itself).
-  expect_equal(sum(grepl(raw_pred, lines, fixed = TRUE)), 1L)
-  # The two-term suffix should also only appear inside the helper definition.
-  expect_equal(sum(grepl("ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)", lines, fixed = TRUE)), 1L)
-  # No inline ad hoc route predicates should remain in if-statements.
-  expect_equal(sum(grepl("if\\(\\(bwm == RBWM_CVLS\\)", lines)), 0L)
-  expect_equal(sum(grepl("if\\(ks_tree_use \\|\\| \\(BANDWIDTH_reg == BW_ADAP_NN\\)\\)", lines)), 0L)
+  helper_start <- grep("^static inline int np_reg_cv_use_symmetric_dropone_path\\(", lines)
+  helper_stop <- grep("^static inline int np_reg_cv_use_canonical_ll_degree1_lp_objective\\(", lines)
+  expect_length(helper_start, 1L)
+  expect_length(helper_stop, 1L)
+  expect_lt(helper_start, helper_stop)
+  helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
+  expect_true(grepl("bwm == RBWM_CVLS", helper_body, fixed = TRUE))
+  expect_true(grepl("bwm == RBWM_CVCHECK", helper_body, fixed = TRUE))
+  expect_true(grepl("ks_tree_use", helper_body, fixed = TRUE))
+  expect_true(grepl("BANDWIDTH_reg == BW_ADAP_NN", helper_body, fixed = TRUE))
 
   helper_calls <- sum(grepl("np_reg_cv_use_symmetric_dropone_path\\(", lines))
   expect_gte(helper_calls, 3L)

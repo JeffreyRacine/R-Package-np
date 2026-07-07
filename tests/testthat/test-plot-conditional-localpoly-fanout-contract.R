@@ -30,7 +30,7 @@ test_that("conditional fixed localpoly bootstrap core fans out with an active po
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
     .npRmpi_bootstrap_fanout_enabled = function(...) TRUE,
     .npRmpi_bootstrap_tune_chunk_size = function(B, chunk.size, comm = 1L, include.master = TRUE) 2L,
-    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size) {
+    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size, with.seeds = TRUE) {
       list(
         list(start = 1L, bsz = 2L, seed = 11L),
         list(start = 3L, bsz = 1L, seed = 12L)

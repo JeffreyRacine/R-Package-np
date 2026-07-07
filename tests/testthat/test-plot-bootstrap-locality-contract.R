@@ -41,7 +41,7 @@ test_that("regression plot direct eval stays on local compiled owner", {
   expect_match(fn.body, "\\.np_plot_with_local_compiled_eval\\(")
 })
 
-test_that("wild regression bootstrap restores adaptive hat-owner usage only", {
+test_that("wild regression bootstrap preserves adaptive hat-owner and exact LC derivative routes", {
   boot_fun <- getFromNamespace("compute.bootstrap.errors.rbandwidth", "npRmpi")
   fn.body <- paste(deparse(body(boot_fun), width.cutoff = 500L), collapse = " ")
 
@@ -52,5 +52,7 @@ test_that("wild regression bootstrap restores adaptive hat-owner usage only", {
   expect_match(fn.body, "output = \"matrix\"")
   expect_match(fn.body, "\\.npRmpi_with_local_regression\\(suppressWarnings\\(npreg\\.rbandwidth\\(")
   expect_match(fn.body, "\\.npRmpi_with_local_regression\\(suppressWarnings\\(npreghat\\.rbandwidth\\(")
-  expect_no_match(fn.body, "\\.np_wild_boot_from_regression_exact\\(")
+  expect_match(fn.body, "use\\.exact\\.degree0\\.derivative")
+  expect_match(fn.body, "\\.np_plot_regression_exact_lc_derivative_requested\\(")
+  expect_match(fn.body, "\\.np_wild_boot_from_regression_exact\\(")
 })

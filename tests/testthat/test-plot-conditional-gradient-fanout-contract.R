@@ -7,7 +7,8 @@ test_that("conditional gradient bootstrap uses fanout with an active pool", {
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
     .npRmpi_bootstrap_tune_chunk_size = function(B, chunk.size, comm = 1L, include.master = TRUE) 2L,
     .npRmpi_bootstrap_fanout_enabled = function(...) TRUE,
-    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size) {
+    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size, with.seeds = TRUE) {
+      expect_false(with.seeds)
       list(
         list(start = 1L, bsz = 2L, seed = 11L),
         list(start = 3L, bsz = 1L, seed = 12L)
@@ -35,6 +36,7 @@ test_that("conditional gradient bootstrap uses fanout with an active pool", {
                                                             B,
                                                             cdf,
                                                             gradient.index,
+                                                            gradient.order = 1L,
                                                             counts = NULL,
                                                             counts.drawer = NULL,
                                                             progress.label = NULL) {
@@ -74,7 +76,8 @@ test_that("quantile gradient bootstrap uses fanout with fixed counts", {
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
     .npRmpi_bootstrap_tune_chunk_size = function(B, chunk.size, comm = 1L, include.master = TRUE) 1L,
     .npRmpi_bootstrap_fanout_enabled = function(...) TRUE,
-    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size) {
+    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size, with.seeds = TRUE) {
+      expect_false(with.seeds)
       list(
         list(start = 1L, bsz = 1L, seed = 11L),
         list(start = 2L, bsz = 1L, seed = 12L)
@@ -138,7 +141,8 @@ test_that("quantile level bootstrap uses fanout with fixed counts", {
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
     .npRmpi_bootstrap_tune_chunk_size = function(B, chunk.size, comm = 1L, include.master = TRUE) 1L,
     .npRmpi_bootstrap_fanout_enabled = function(...) TRUE,
-    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size) {
+    .npRmpi_bootstrap_chunk_tasks = function(B, chunk.size, with.seeds = TRUE) {
+      expect_false(with.seeds)
       list(
         list(start = 1L, bsz = 1L, seed = 11L),
         list(start = 2L, bsz = 1L, seed = 12L)

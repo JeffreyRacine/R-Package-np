@@ -7,17 +7,19 @@ fixed_cvls_objective <- function(xdat,
                                  bernstein.basis = FALSE) {
   ns <- asNamespace("npRmpi")
   xdat <- as.data.frame(xdat)
-  bw0 <- npRmpi::npregbw(
-    xdat = xdat,
-    ydat = ydat,
-    bws = bws,
-    regtype = regtype,
-    degree = degree,
-    basis = basis,
-    bernstein.basis = bernstein.basis,
-    bwmethod = "cv.ls",
-    bandwidth.compute = FALSE
-  )
+  bw0 <- suppressMessages(suppressPackageStartupMessages(
+    npRmpi::npregbw(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bws,
+      regtype = regtype,
+      degree = degree,
+      basis = basis,
+      bernstein.basis = bernstein.basis,
+      bwmethod = "cv.ls",
+      bandwidth.compute = FALSE
+    )
+  ))
 
   xmat <- get("toMatrix", ns)(xdat)
   runo <- xmat[, bw0$iuno, drop = FALSE]
@@ -75,11 +77,12 @@ fixed_cvls_objective <- function(xdat,
     0.9,
     0.375,
     nconfac,
-    ncatfac
+    ncatfac,
+    0.1
   ))
   ck <- get("npKernelBoundsMarshal", ns)(bw0$ckerlb[bw0$icon], bw0$ckerub[bw0$icon])
 
-  out <- .Call(
+  out <- get(".npRmpi_with_local_regression", ns)(.Call(
     "C_np_regression_bw_eval",
     as.double(runo),
     as.double(rord),
@@ -98,13 +101,13 @@ fixed_cvls_objective <- function(xdat,
     as.double(ck$lb),
     as.double(ck$ub),
     PACKAGE = "npRmpi"
-  )
+  ))
 
   unname(out$fval[1])
 }
 
 test_that("fixed cv.ls is exact on in-class local polynomial fixtures", {
-  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
   on.exit(close_mpi_slaves(), add = TRUE)
 
   tol <- 1e-20
@@ -142,10 +145,24 @@ test_that("fixed cv.ls is exact on in-class local polynomial fixtures", {
     bws = c(0.3, 0.3)
   )
   expect_lt(abs(obj.lp2), tol)
+
+  set.seed(20260310)
+  x3 <- runif(40)
+  z3 <- runif(40)
+  w3 <- runif(40)
+  y3 <- 0.2 + 0.9 * x3 + 0.6 * z3 - 0.4 * w3 + 0.7 * x3^2
+  obj.lp211 <- fixed_cvls_objective(
+    xdat = data.frame(x = x3, z = z3, w = w3),
+    ydat = y3,
+    regtype = "lp",
+    degree = c(2L, 1L, 1L),
+    bws = c(0.35, 0.35, 0.35)
+  )
+  expect_lt(abs(obj.lp211), tol)
 })
 
 test_that("fixed cv.ls keeps ll and canonical lp degree-1 aligned off-model", {
-  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
   on.exit(close_mpi_slaves(), add = TRUE)
 
   set.seed(20260311)

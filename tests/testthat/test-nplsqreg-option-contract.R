@@ -142,7 +142,10 @@ test_that("session nplsqreg formula subset and na.action match explicit fit path
       "stopifnot(identical(fit.form$ntrain, nrow(mf)))",
       "stopifnot(identical(fit.form$xnames, 'x'))",
       "stopifnot(identical(fit.form$ynames, 'y'))",
-      "stopifnot(isTRUE(all.equal(fitted(fit.form), fitted(fit.exp))))",
+      "stopifnot(identical(length(fitted(fit.form)), fit.form$nobs))",
+      "stopifnot(identical(length(fitted(fit.exp)), nrow(mf)))",
+      "stopifnot(identical(as.integer(which(is.na(fitted(fit.form)))), as.integer(fit.form$omit)))",
+      "stopifnot(isTRUE(all.equal(as.numeric(stats::na.omit(fitted(fit.form))), as.numeric(fitted(fit.exp)))))",
       "stopifnot(inherits(fit.form$bws$formula, 'formula'))",
       "cat('NPLSQREG_FORMULA_SUBSET_NA_OK\\n')"
     ),

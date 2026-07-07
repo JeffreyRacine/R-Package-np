@@ -193,8 +193,8 @@ test_that("npsigtest local regression wrapper is safe under an active slave pool
   local.fun <- getFromNamespace(".npRmpi_npsig_npreg_local", "npRmpi")
   fit <- local.fun(txdat = data.frame(x = x), tydat = y, bws = bw, gradients = TRUE)
 
-  expect_s3_class(fit, "regression")
-  expect_identical(length(fit$mean), n)
+  expect_s3_class(fit, "npregression")
+  expect_equal(length(fit$mean), n)
   expect_identical(ncol(fit$grad), 1L)
 })
 

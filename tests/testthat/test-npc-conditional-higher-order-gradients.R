@@ -109,14 +109,10 @@ test_that("conditional higher-order gradient requests validate scope", {
     bws = c(0.3, 0.3),
     bandwidth.compute = FALSE
   )
-  expect_warning(
-    fit.ll <- npcdens(bws = bw.ll, txdat = x, tydat = y, gradients = TRUE,
-                      gradient.order = 2L),
-    "exceed polynomial degree"
-  )
-  expect_warning(
-    expect_true(all(is.na(gradients(fit.ll, gradient.order = 2L)[, 1L]))),
-    "exceed polynomial degree"
+  expect_error(
+    npcdens(bws = bw.ll, txdat = x, tydat = y, gradients = TRUE,
+            gradient.order = 2L),
+    "no available derivative components"
   )
 
   bw.lp1 <- npcdistbw(
@@ -127,14 +123,10 @@ test_that("conditional higher-order gradient requests validate scope", {
     bws = c(0.3, 0.3),
     bandwidth.compute = FALSE
   )
-  expect_warning(
-    fit <- npcdist(bws = bw.lp1, txdat = x, tydat = y, gradients = TRUE,
-                   gradient.order = 2L),
-    "exceed polynomial degree"
-  )
-  expect_warning(
-    expect_true(all(is.na(gradients(fit, gradient.order = 2L)[, 1L]))),
-    "exceed polynomial degree"
+  expect_error(
+    npcdist(bws = bw.lp1, txdat = x, tydat = y, gradients = TRUE,
+            gradient.order = 2L),
+    "no available derivative components"
   )
 })
 

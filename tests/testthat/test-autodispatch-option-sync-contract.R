@@ -15,6 +15,7 @@ test_that("autodispatch option sync treats a null snapshot as unsynchronized", {
 })
 
 test_that("npRmpi.init keeps autodispatch option snapshot unprimed", {
+  npRmpi.init <- getFromNamespace("npRmpi.init", "npRmpi")
   init_body <- paste(deparse(body(npRmpi.init)), collapse = "\n")
   expect_match(init_body, "npRmpi\\.autodispatch\\.option\\.snapshot = NULL")
   expect_false(grepl("\\.npRmpi_autodispatch_prime_options\\(\\)", init_body))

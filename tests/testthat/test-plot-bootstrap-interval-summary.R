@@ -64,13 +64,13 @@ test_that("pmzsd helper matches covariance-diagonal standard deviations", {
   )
 })
 
-test_that("sibandwidth bootstrap route uses the shared interval summary helper", {
+test_that("sibandwidth bootstrap route uses the shared centered interval payload helper", {
   skip_if_not_installed("npRmpi")
 
   fn <- getFromNamespace("compute.bootstrap.errors.sibandwidth", "npRmpi")
   txt <- paste(deparse(body(fn), width.cutoff = 500L), collapse = "\n")
 
-  expect_match(txt, "\\.np_plot_bootstrap_interval_summary\\(", perl = TRUE)
+  expect_match(txt, "\\.np_plot_bootstrap_centered_interval_payload\\(", perl = TRUE)
   expect_false(
     grepl("boot\\.bounds <- compute\\.bootstrap\\.quantile\\.bounds\\(", txt, perl = TRUE),
     info = "sibandwidth should not maintain a private pointwise/all interval path"

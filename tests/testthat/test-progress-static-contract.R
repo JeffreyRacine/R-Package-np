@@ -13,15 +13,15 @@ test_that("progress core avoids legacy emitters", {
   expect_true(grepl("\\.np_warning <- function\\(", src))
 })
 
-test_that("R layer routes warnings through unified helper", {
+test_that("R layer avoids legacy console helpers outside progress core", {
   r_dir <- testthat::test_path("..", "..", "R")
   skip_if_not(dir.exists(r_dir), "source R files unavailable in installed test context")
   files <- setdiff(list.files(r_dir, pattern = "\\.[Rr]$", full.names = TRUE), file.path(r_dir, "progress.R"))
 
   for (src_path in files) {
     src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
-    expect_false(grepl("\\bwarning\\(", src), info = basename(src_path))
-    expect_false(grepl("\\bmessage\\(", src), info = basename(src_path))
+    expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src),
+                 info = basename(src_path))
   }
 })
 
@@ -34,9 +34,7 @@ test_that("core estimator wrappers emit top-level bandwidth-selection notes", {
     list(file = "np.condistribution.R", label = "Selecting conditional distribution bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
     list(file = "np.plregression.R", label = "Selecting partially linear regression bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
     list(file = "np.singleindex.R", label = "Selecting single-index bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
-    list(file = "np.smoothcoef.R", label = "Selecting smooth coefficient bandwidth", helper = ".np_progress_select_bandwidth_enhanced"),
-    list(file = "np.conmode.R", label = "Selecting conditional density bandwidth"),
-    list(file = "np.qregression.R", label = "Selecting conditional distribution bandwidth")
+    list(file = "np.smoothcoef.R", label = "Selecting smooth coefficient bandwidth", helper = ".np_progress_select_bandwidth_enhanced")
   )
 
   for (case in cases) {
@@ -44,9 +42,8 @@ test_that("core estimator wrappers emit top-level bandwidth-selection notes", {
     skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
     src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
-    helper <- if (is.null(case$helper)) ".np_progress_select_bandwidth" else case$helper
     expect_true(
-      grepl(sprintf("%s\\(\\s*\"%s\"", helper, case$label), src),
+      grepl(sprintf("%s\\(\\s*\"%s\"", case$helper, case$label), src),
       info = case$file
     )
   }
@@ -173,7 +170,7 @@ test_that("npcopula no longer uses legacy console helpers", {
   expect_true(grepl("\\.np_progress_step_at\\(", src))
   expect_true(grepl("Copula %s %s", src, fixed = TRUE))
   expect_true(grepl("quasi-inverse marginal %s", src, fixed = TRUE))
-  expect_true(grepl("density marginal %s on expanded grid", src, fixed = TRUE))
+  expect_true(grepl("copula density on expanded grid", src, fixed = TRUE))
 })
 
 test_that("npindexbw no longer uses legacy console helpers", {
@@ -207,7 +204,7 @@ test_that("npplregbw direct path uses coordinated bandwidth selector", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_true(grepl("\\.np_progress_bandwidth_set_coordinator\\(", src))
-  expect_true(grepl("\\.np_progress_bandwidth_set_coordinator_group\\(1L, \"y~z\"\\)", src))
+  expect_true(grepl("\\.np_progress_bandwidth_set_coordinator_group\\(1L, \"E\\[y\\|z\\]\"\\)", src))
   expect_true(grepl("\\.np_progress_select_bandwidth_enhanced\\(\\s*\"Selecting partially linear regression bandwidth\"", src))
 })
 

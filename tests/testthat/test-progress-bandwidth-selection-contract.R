@@ -66,8 +66,7 @@ test_that("npudensbw uses the generic bandwidth selection line on master", {
       list(
         .np_progress_is_interactive = function() TRUE,
         .np_progress_is_master = function() TRUE,
-        .np_progress_now = progress_time_counter(),
-        .npRmpi_autodispatch_active = function() FALSE
+        .np_progress_now = progress_time_counter()
       ),
       npudensbw(
         dat = data.frame(x = x),
@@ -80,7 +79,7 @@ test_that("npudensbw uses the generic bandwidth selection line on master", {
   messages <- normalize_messages(messages)
 
   expect_s3_class(res, "bandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", messages)))
 })
@@ -107,8 +106,7 @@ test_that("npregbw uses the generic bandwidth selection line on master", {
       list(
         .np_progress_is_interactive = function() TRUE,
         .np_progress_is_master = function() TRUE,
-        .np_progress_now = progress_time_counter(),
-        .npRmpi_autodispatch_active = function() FALSE
+        .np_progress_now = progress_time_counter()
       ),
       npregbw(
         xdat = data.frame(x = x),
@@ -123,7 +121,7 @@ test_that("npregbw uses the generic bandwidth selection line on master", {
   messages <- normalize_messages(messages)
 
   expect_s3_class(res, "rbandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", messages)))
 })

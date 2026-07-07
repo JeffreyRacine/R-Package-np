@@ -15,7 +15,7 @@ test_that("adaptive conditional exact bootstrap plot binds only required worker 
       "y <- data.frame(y = rnorm(80))",
       "ex <- data.frame(x = seq(0, 1, length.out = 15))",
       "ey <- data.frame(y = seq(min(y$y), max(y$y), length.out = 15))",
-      "bw <- npcdensbw(xdat=x, ydat=y, exdat=ex, eydat=ey, bws=c(7, 7), bwtype='adaptive_nn', bandwidth.compute=FALSE)",
+      "bw <- npcdensbw(xdat=x, ydat=y, bws=c(7, 7), bwtype='adaptive_nn', bandwidth.compute=FALSE)",
       "out <- plot(",
       "  bw,",
       "  xdat=x,",

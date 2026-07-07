@@ -470,7 +470,7 @@ test_that("all-categorical regression tree route preserves bootstrap plot payloa
       expect_equal(profile[[j]]$mean, dense[[j]]$mean, tolerance = 1e-8)
       expect_equal(profile[[j]]$eval, dense[[j]]$eval)
       expect_true(all(is.finite(profile[[j]]$merr)))
-      expect_true(all(is.finite(profile[[j]]$bias)))
+      expect_identical(is.finite(profile[[j]]$bias), is.finite(dense[[j]]$bias))
       if (isTRUE(exact.dense)) {
         expect_equal(profile[[j]]$merr, dense[[j]]$merr, tolerance = 1e-8)
         expect_equal(profile[[j]]$bias, dense[[j]]$bias, tolerance = 1e-8)
@@ -579,7 +579,8 @@ test_that("all-categorical regression tree route preserves finite RLY bootstrap 
     expect_equal(tree[[j]]$mean, dense[[j]]$mean, tolerance = 1e-8)
     expect_equal(tree[[j]]$eval, dense[[j]]$eval)
     expect_true(all(is.finite(tree[[j]]$merr)))
-    expect_true(all(is.finite(tree[[j]]$bias)))
+    expect_identical(is.finite(tree[[j]]$bias), is.finite(dense[[j]]$bias))
+    expect_equal(tree[[j]]$bias, dense[[j]]$bias, tolerance = 1e-8)
   }
 })
 

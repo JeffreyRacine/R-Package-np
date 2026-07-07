@@ -10,7 +10,6 @@ test_that("direct kernel-weight helper matches npksum.default with evaluation da
   skip_on_cran()
   with_session_slave_pool({
     kw.fun <- getFromNamespace(".np_kernel_weights_direct", "npRmpi")
-    ksum.fun <- getFromNamespace("npksum.default", "npRmpi")
     set.seed(4021)
     n <- 60
     x <- runif(n)
@@ -38,7 +37,7 @@ test_that("direct kernel-weight helper matches npksum.default with evaluation da
       bandwidth.divide = TRUE
     )
 
-    kw.ref <- ksum.fun(
+    kw.ref <- npksum(
       bws = bw,
       txdat = tx,
       exdat = ex,
@@ -54,7 +53,6 @@ test_that("direct kernel-weight helper matches npksum.default leave-one-out", {
   skip_on_cran()
   with_session_slave_pool({
     kw.fun <- getFromNamespace(".np_kernel_weights_direct", "npRmpi")
-    ksum.fun <- getFromNamespace("npksum.default", "npRmpi")
     set.seed(4022)
     n <- 50
     x <- runif(n)
@@ -77,7 +75,7 @@ test_that("direct kernel-weight helper matches npksum.default leave-one-out", {
       bandwidth.divide = TRUE
     )
 
-    kw.ref <- ksum.fun(
+    kw.ref <- npksum(
       bws = bw,
       txdat = tx,
       leave.one.out = TRUE,

@@ -135,8 +135,8 @@ test_that("npscoef all-categorical profile route preserves evaluation values", {
 
 test_that("npscoef all-categorical profile route preserves bandwidth CV", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  options(npRmpi.autodispatch = FALSE)
-  on.exit(close_mpi_slaves(), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE, np.tree = FALSE,
                  np.categorical.compress = FALSE)
   on.exit(options(old), add = TRUE)

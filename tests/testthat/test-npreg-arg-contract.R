@@ -65,7 +65,7 @@ test_that("lp degree-0 gradients allow first derivatives and reject higher order
   )
   expect_error(
     npRmpi::npreg(bws = bw, data = dat, gradients = TRUE, gradient.order = 2L),
-    "regtype='lp' with degree=0 does not support derivatives"
+    "no available derivative components"
   )
   expect_no_error(
     value.fit <- npRmpi::npreg(bws = bw, data = dat, gradients = FALSE)

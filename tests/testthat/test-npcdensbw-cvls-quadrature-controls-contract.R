@@ -139,17 +139,19 @@ test_that("resident npcdens NOMAD shadow accepts cv.ls quadrature controls", {
   )
 
   expect_length(prep$myopti, 29L)
-  expect_length(prep$myoptd, 21L)
+  expect_length(prep$myoptd, 24L)
   expect_equal(prep$myopti[[28L]], 0L)
   expect_equal(prep$myopti[[29L]], 41L)
   expect_equal(prep$myoptd[[21L]], 1.5)
+  expect_equal(prep$myoptd[[22L]], bw$cvls.quadrature.ratios[[1L]])
+  expect_equal(prep$myoptd[[23L]], bw$cvls.quadrature.ratios[[2L]])
+  expect_equal(prep$myoptd[[24L]], bw$cvls.quadrature.ratios[[3L]])
 
   prepare_body <- paste(
     deparse(body(npRmpi:::npRmpiNomadShadowPrepareConditionalDensity)),
     collapse = "\n"
   )
-  expect_match(prepare_body, "length\\(myoptd\\) <= 20L")
-  expect_false(grepl("length(myoptd) <= 23L", prepare_body, fixed = TRUE))
+  expect_match(prepare_body, "length\\(myoptd\\) <= 23L")
 })
 
 test_that("explicit infinite response bounds warn when quadrature points are implicit", {

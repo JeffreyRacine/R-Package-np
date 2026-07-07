@@ -7,7 +7,8 @@ test_that("npreg nomad fit preserves bandwidth telemetry in returned bws", {
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(42)
-  n <- 1000
+  # This is a telemetry-preservation smoke contract, not an endurance test.
+  n <- 80
   x <- runif(n)
   y <- sin(2 * pi * x) + rnorm(n, sd = 0.1)
 

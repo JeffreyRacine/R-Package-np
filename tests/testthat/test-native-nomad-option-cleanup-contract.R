@@ -25,34 +25,48 @@ test_that("native NOMAD option builders reject cache-off solves before solver en
   }
 })
 
-test_that("native R callback failure does not poison the next package solve", {
-  bad <- npRmpi:::.np_nomad_native_r_callback_search(
-    eval.f = function(x) stop("intentional package R callback failure"),
-    x0 = 0,
-    bbin = 0L,
-    lb = -1,
-    ub = 1,
-    random.seed = 42L,
-    option.names = c("MAX_BB_EVAL", "NB_THREADS_PARALLEL_EVAL"),
-    option.values = c("1", "1")
-  )
-  expect_equal(bad$value$status, "error")
-  expect_match(bad$value$message, "callback", ignore.case = TRUE)
+test_that("native R callback failure is contained in an isolated process", {
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env))
 
-  good <- npRmpi:::.np_nomad_native_r_callback_search(
-    eval.f = function(x) sum((x - 0.25)^2),
-    x0 = 0,
-    bbin = 0L,
-    lb = -1,
-    ub = 1,
-    random.seed = 42L,
-    option.names = c("MAX_BB_EVAL", "NB_THREADS_PARALLEL_EVAL"),
-    option.values = c("10", "1")
+  out <- npRmpi_run_rscript_subprocess(
+    c(
+      "library(npRmpi)",
+      "bad <- npRmpi:::.np_nomad_native_r_callback_search(",
+      "  eval.f = function(x) stop('intentional package R callback failure'),",
+      "  x0 = 0,",
+      "  bbin = 0L,",
+      "  lb = -1,",
+      "  ub = 1,",
+      "  random.seed = 42L,",
+      "  option.names = c('MAX_BB_EVAL', 'NB_THREADS_PARALLEL_EVAL'),",
+      "  option.values = c('1', '1')",
+      ")",
+      "stopifnot(identical(bad$value$status, 'error'))",
+      "stopifnot(grepl('callback', bad$value$message, ignore.case = TRUE))",
+      "good <- npRmpi:::.np_nomad_native_r_callback_search(",
+      "  eval.f = function(x) sum((x - 0.25)^2),",
+      "  x0 = 0,",
+      "  bbin = 0L,",
+      "  lb = -1,",
+      "  ub = 1,",
+      "  random.seed = 42L,",
+      "  option.names = c('MAX_BB_EVAL', 'NB_THREADS_PARALLEL_EVAL'),",
+      "  option.values = c('10', '1')",
+      ")",
+      "stopifnot(identical(good$value$status, 'ok'))",
+      "stopifnot(identical(good$value$native_status, 0L))",
+      "stopifnot(identical(good$value$result_status, 0L))",
+      "stopifnot(is.finite(good$value$objective))",
+      "cat('NATIVE_R_CALLBACK_SUBPROCESS_OK\\n')"
+    ),
+    timeout = 45L,
+    env = env
   )
-  expect_equal(good$value$status, "ok")
-  expect_equal(good$value$native_status, 0L)
-  expect_equal(good$value$result_status, 0L)
-  expect_true(is.finite(good$value$objective))
+
+  expect_equal(out$status, 0L, info = paste(out$output, collapse = "\n"))
+  expect_true(any(grepl("NATIVE_R_CALLBACK_SUBPROCESS_OK", out$output, fixed = TRUE)),
+              info = paste(out$output, collapse = "\n"))
 })
 
 test_that("native npreg solver option failure does not poison the next MPI solve", {

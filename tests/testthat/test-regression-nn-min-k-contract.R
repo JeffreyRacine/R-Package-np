@@ -43,9 +43,9 @@ test_that("semiparametric NN helper floors are aligned at k >= 2", {
     2
   )
 
-  expect_equal(
+  expect_error(
     npRmpi:::.npscoef_finalize_bandwidth(c(1), "adaptive_nn", 80L, where = "npscoefbw"),
-    2
+    "nearest-neighbor bandwidth must be an integer vector in \\[2,"
   )
   expect_equal(
     npRmpi:::.npscoef_finalize_bandwidth(c(2), "adaptive_nn", 80L, where = "npscoefbw"),
