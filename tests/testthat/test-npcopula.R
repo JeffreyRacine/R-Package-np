@@ -74,6 +74,18 @@ test_that("npcopula formula route can request sample evaluation and density targ
   expect_equal(nrow(as.data.frame(sample.fit)), nrow(dat))
   expect_identical(sample.fit$evaluation, "sample")
 
+  sample.dens.fit <- npcopula(
+    ~ x + y,
+    data = dat,
+    target = "density",
+    evaluation = "sample",
+    nmulti = 1
+  )
+  expect_equal(nrow(as.data.frame(sample.dens.fit)), nrow(dat))
+  expect_identical(sample.dens.fit$target, "density")
+  expect_identical(sample.dens.fit$evaluation, "sample")
+  expect_true(all(is.finite(sample.dens.fit$copula)))
+
   dens.fit <- npcopula(~ x + y, data = dat, target = "density", neval = 3, nmulti = 1)
   expect_equal(nrow(as.data.frame(dens.fit)), 9L)
   expect_identical(dens.fit$target, "density")
