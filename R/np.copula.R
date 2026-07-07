@@ -1422,9 +1422,9 @@ npcopula.default <- function(bws,
       if(!density) "joint distribution at sample realizations" else "joint density at sample realizations"
     )
     if(!density) {
-      copula <- fitted(npudist(bws=bws,data=data))
+      copula <- fitted(npudist(bws=bws,tdat=data))
     } else {
-      copula <- fitted(npudens(bws=bws,data=data))
+      copula <- fitted(npudens(bws=bws,tdat=data))
     }
 
     u <- matrix(NA,bws$nobs,num.var)
