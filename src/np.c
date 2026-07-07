@@ -8373,6 +8373,14 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
                                          SEXP glp_basis,
                                          SEXP row_index)
 {
+  /*
+   * Registered test/proof helper only.
+   *
+   * npRmpi keeps this proof helper row-streamed.  Public estimator, plot,
+   * bootstrap, and CV routes must not call this helper as a production
+   * evaluator; production routes use their ordinary MPI/local streaming
+   * helpers directly.
+   */
   SEXP tycon_r = R_NilValue;
   SEXP txuno_r = R_NilValue, txord_r = R_NilValue, txcon_r = R_NilValue;
   SEXP rbw_r = R_NilValue, degree_i = R_NilValue;
