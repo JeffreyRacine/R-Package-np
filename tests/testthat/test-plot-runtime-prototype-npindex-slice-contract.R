@@ -1,5 +1,5 @@
 test_that("npindex fixed no-error plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npindex_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npindex_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2501)
 
@@ -49,13 +49,13 @@ test_that("npindex fixed no-error plot-data prototype matches current route", {
       return.stages = TRUE
     )
 
-    expect_named(candidate, names(old), info = case.name)
+    .np_expect_plot_proto_names(candidate, old, info = case.name)
     expect_s3_class(candidate$si1, "singleindex")
-    expect_named(candidate$si1, names(old$si1), info = case.name)
+    .np_expect_plot_proto_names(candidate$si1, old$si1, info = case.name)
     expect_equal(candidate$si1$index, old$si1$index, info = case.name)
     expect_equal(candidate$si1$mean, old$si1$mean, info = case.name)
     expect_equal(candidate$si1$merr, old$si1$merr, info = case.name)
-    expect_equal(candidate$si1$bias, old$si1$bias, info = case.name)
+    .np_expect_plot_proto_bias(candidate$si1$bias, old$si1$bias, info = case.name)
     expect_false(candidate$si1$gradients, info = case.name)
     expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "bootstrap", "plot_data"),
                  info = case.name)
@@ -67,7 +67,7 @@ test_that("npindex fixed no-error plot-data prototype matches current route", {
 })
 
 test_that("npindex plot prototype fails early outside its fixed non-gradient slice", {
-  proto <- getFromNamespace(".np_plot_proto_npindex_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npindex_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2502)
 
@@ -97,7 +97,7 @@ test_that("npindex plot prototype fails early outside its fixed non-gradient sli
 })
 
 test_that("npindex fixed asymptotic plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npindex_fixed_asymptotic_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npindex_fixed_asymptotic_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2503)
 
@@ -144,7 +144,7 @@ test_that("npindex fixed asymptotic plot-data prototype matches current route", 
     expect_equal(candidate$si1$index, old$si1$index, info = band)
     expect_equal(candidate$si1$mean, old$si1$mean, info = band)
     expect_equal(candidate$si1$merr, old$si1$merr, info = band)
-    expect_equal(candidate$si1$bias, old$si1$bias, info = band)
+    .np_expect_plot_proto_bias(candidate$si1$bias, old$si1$bias, info = band)
     expect_identical(stages$intervals$method, "asymptotic")
     expect_identical(stages$intervals$type, band)
     expect_null(stages$bootstrap, info = band)
@@ -153,7 +153,7 @@ test_that("npindex fixed asymptotic plot-data prototype matches current route", 
 })
 
 test_that("npindex fixed bootstrap plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npindex_fixed_bootstrap_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npindex_fixed_bootstrap_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2504)
 
@@ -220,7 +220,7 @@ test_that("npindex fixed bootstrap plot-data prototype matches current route", {
     expect_equal(candidate$si1$index, old$si1$index, info = paste(method, center))
     expect_equal(candidate$si1$mean, old$si1$mean, info = paste(method, center))
     expect_equal(candidate$si1$merr, old$si1$merr, info = paste(method, center))
-    expect_equal(candidate$si1$bias, old$si1$bias, info = paste(method, center))
+    .np_expect_plot_proto_bias(candidate$si1$bias, old$si1$bias, info = paste(method, center))
     expect_identical(stages$bootstrap$method, method)
     expect_identical(stages$bootstrap$center, center)
     expect_equal(stages$plot_data, candidate, info = paste(method, center))

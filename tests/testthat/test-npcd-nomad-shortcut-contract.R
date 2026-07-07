@@ -200,6 +200,6 @@ test_that("npcdens and npcdist nomad shortcuts fail fast on incompatible setting
   )
   expect_error(
     np::npcdensbw(xdat = x, ydat = y, nomad.nmulti = 1L),
-    "nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad\\+powell'"
+    "nomad.nmulti is only supported for fixed-degree MADS searches or when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad\\+powell'"
   )
 })

@@ -145,7 +145,10 @@ test_that("npcdens bounded cv.ls method metadata and infinite-bound surrogate ar
   expect_error(guard(bw, where = "probe"), "method metadata")
 
   marshal <- getFromNamespace(".npcdensbw_marshal_y_bounds", "np")
-  bounded <- marshal(-Inf, Inf, "fixed")
-  expect_equal(bounded$lb, -1e300)
-  expect_equal(bounded$ub, 1e300)
+  y <- unlist(bw$ydat, use.names = FALSE)
+  bounded <- marshal(-Inf, Inf, "fixed", ycon = y)
+  expect_true(is.finite(bounded$lb))
+  expect_true(is.finite(bounded$ub))
+  expect_lt(bounded$lb, min(y))
+  expect_gt(bounded$ub, max(y))
 })

@@ -744,6 +744,9 @@ test_that("progress end clears single-line output even when the final state alre
   finish <- getFromNamespace(".np_progress_end", "np")
   reset <- getFromNamespace(".np_progress_reset_registry", "np")
 
+  old_opts <- options(np.messages = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
   output <- capture_single_line_output(
     "np",
     list(
@@ -826,6 +829,10 @@ test_that("plot progress default cadence matches bandwidth heartbeat", {
 test_that("interactive bootstrap chunk sizes leave room for intermediate progress", {
   progress_chunk_cap <- getFromNamespace(".np_plot_progress_chunk_cap", "np")
   wild_chunk <- getFromNamespace(".np_wild_chunk_size", "np")
+
+  old_opts <- options(np.messages = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
   enabled_chunk <- with_np_bindings(
     list(.np_progress_is_interactive = function() TRUE),
     wild_chunk(n = 500L, B = 9999L)
@@ -857,6 +864,9 @@ test_that("progress ownership suppresses nested visibility for legacy renderer t
   begin <- getFromNamespace(".np_progress_begin", "np")
   finish <- getFromNamespace(".np_progress_end", "np")
   reset <- getFromNamespace(".np_progress_reset_registry", "np")
+
+  old_opts <- options(np.messages = TRUE)
+  on.exit(options(old_opts), add = TRUE)
 
   reset()
   on.exit(reset(), add = TRUE)

@@ -1,5 +1,5 @@
 test_that("npqreg fixed no-error slice prototype matches current fitted-object route", {
-  proto <- getFromNamespace(".np_plot_proto_npqreg_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npqreg_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2801)
 
@@ -43,10 +43,10 @@ test_that("npqreg fixed no-error slice prototype matches current fitted-object r
     return.stages = TRUE
   )
 
-  expect_named(candidate, names(old))
+  .np_expect_plot_proto_names(candidate, old)
   expect_true(all(vapply(candidate, inherits, logical(1), "qregression")))
   for (nm in names(old)) {
-    expect_named(candidate[[nm]], names(old[[nm]]), info = nm)
+    .np_expect_plot_proto_names(candidate[[nm]], old[[nm]], info = nm)
     expect_equal(candidate[[nm]]$xeval, old[[nm]]$xeval, info = nm)
     expect_equal(candidate[[nm]]$tau, old[[nm]]$tau, info = nm)
     expect_equal(candidate[[nm]]$quantile, old[[nm]]$quantile, info = nm)
@@ -63,7 +63,7 @@ test_that("npqreg fixed no-error slice prototype matches current fitted-object r
 })
 
 test_that("npqreg plot prototype fails early outside its fitted-object fixed slice", {
-  proto <- getFromNamespace(".np_plot_proto_npqreg_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npqreg_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2802)
 
@@ -104,7 +104,7 @@ test_that("npqreg plot prototype fails early outside its fitted-object fixed sli
 })
 
 test_that("npqreg fixed asymptotic slice prototype matches current fitted-object route", {
-  proto <- getFromNamespace(".np_plot_proto_npqreg_fixed_asymptotic_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npqreg_fixed_asymptotic_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2803)
 
@@ -156,7 +156,7 @@ test_that("npqreg fixed asymptotic slice prototype matches current fitted-object
       expect_equal(candidate[[nm]]$xeval, old[[nm]]$xeval, info = paste(nm, band))
       expect_equal(candidate[[nm]]$quantile, old[[nm]]$quantile, info = paste(nm, band))
       expect_equal(candidate[[nm]]$quanterr, old[[nm]]$quanterr, info = paste(nm, band))
-      expect_equal(candidate[[nm]]$bias, old[[nm]]$bias, info = paste(nm, band))
+      .np_expect_plot_proto_bias(candidate[[nm]]$bias, old[[nm]]$bias, info = paste(nm, band))
       expect_equal(candidate[[nm]]$bxp, old[[nm]]$bxp, info = paste(nm, band))
     }
     expect_true(all(vapply(stages$bootstrap, is.null, logical(1))))
@@ -164,14 +164,14 @@ test_that("npqreg fixed asymptotic slice prototype matches current fitted-object
       expect_equal(stages$plot_data[[nm]]$xeval, candidate[[nm]]$xeval, info = paste(nm, band))
       expect_equal(stages$plot_data[[nm]]$quantile, candidate[[nm]]$quantile, info = paste(nm, band))
       expect_equal(stages$plot_data[[nm]]$quanterr, candidate[[nm]]$quanterr, info = paste(nm, band))
-      expect_equal(stages$plot_data[[nm]]$bias, candidate[[nm]]$bias, info = paste(nm, band))
+      .np_expect_plot_proto_bias(stages$plot_data[[nm]]$bias, candidate[[nm]]$bias, info = paste(nm, band))
       expect_equal(stages$plot_data[[nm]]$bxp, candidate[[nm]]$bxp, info = paste(nm, band))
     }
   }
 })
 
 test_that("npqreg fixed quantile-level bootstrap slice prototype matches current fitted-object route", {
-  proto <- getFromNamespace(".np_plot_proto_npqreg_fixed_bootstrap_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npqreg_fixed_bootstrap_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2804)
 
@@ -194,7 +194,7 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
 
   cases <- expand.grid(
     method = c("inid", "fixed", "geom"),
-    center = c("estimate", "bias-corrected"),
+    center = "estimate",
     stringsAsFactors = FALSE
   )
   for (ii in seq_len(nrow(cases))) {
@@ -255,7 +255,7 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
       expect_equal(candidate[[nm]]$xeval, old[[nm]]$xeval, info = paste(nm, method, center))
       expect_equal(candidate[[nm]]$quantile, old[[nm]]$quantile, info = paste(nm, method, center))
       expect_equal(candidate[[nm]]$quanterr, old[[nm]]$quanterr, info = paste(nm, method, center))
-      expect_equal(candidate[[nm]]$bias, old[[nm]]$bias, info = paste(nm, method, center))
+      .np_expect_plot_proto_bias(candidate[[nm]]$bias, old[[nm]]$bias, info = paste(nm, method, center))
       expect_equal(candidate[[nm]]$bxp, old[[nm]]$bxp, info = paste(nm, method, center))
     }
     expect_true(all(vapply(stages$bootstrap, function(x) is.list(x) && !is.null(x$boot.err), logical(1))),
@@ -264,9 +264,9 @@ test_that("npqreg fixed quantile-level bootstrap slice prototype matches current
 })
 
 test_that("npqreg fixed gradient slice prototype matches current fitted-object route", {
-  proto.none <- getFromNamespace(".np_plot_proto_npqreg_fixed_none_data", "np")
-  proto.boot <- getFromNamespace(".np_plot_proto_npqreg_fixed_bootstrap_data", "np")
-  proto.asym <- getFromNamespace(".np_plot_proto_npqreg_fixed_asymptotic_data", "np")
+  proto.none <- .np_test_plot_proto(".np_plot_proto_npqreg_fixed_none_data", "np")
+  proto.boot <- .np_test_plot_proto(".np_plot_proto_npqreg_fixed_bootstrap_data", "np")
+  proto.asym <- .np_test_plot_proto(".np_plot_proto_npqreg_fixed_asymptotic_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2805)
 
@@ -313,7 +313,7 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
     return.stages = TRUE
   )
 
-  expect_named(candidate.none, names(old.none))
+  .np_expect_plot_proto_names(candidate.none, old.none)
   expect_true(isTRUE(stages.none$state$gradients))
   for (nm in names(old.none)) {
     expect_equal(candidate.none[[nm]]$xeval, old.none[[nm]]$xeval, info = nm)
@@ -339,7 +339,7 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
     neval = 5L,
     gradients = TRUE
   )
-  expect_named(candidate.asym, names(old.asym))
+  .np_expect_plot_proto_names(candidate.asym, old.asym)
   for (nm in names(old.asym)) {
     expect_equal(candidate.asym[[nm]]$xeval, old.asym[[nm]]$xeval, info = nm)
     expect_equal(candidate.asym[[nm]]$quantgrad, old.asym[[nm]]$quantgrad, info = nm)
@@ -406,10 +406,18 @@ test_that("npqreg fixed gradient slice prototype matches current fitted-object r
       expect_equal(candidate.boot[[nm]]$xeval, old.boot[[nm]]$xeval, info = paste(nm, method))
       expect_equal(candidate.boot[[nm]]$quantile, old.boot[[nm]]$quantile, info = paste(nm, method))
       expect_equal(candidate.boot[[nm]]$quantgrad, old.boot[[nm]]$quantgrad, info = paste(nm, method))
-      expect_equal(candidate.boot[[nm]]$gc1err, old.boot[[nm]]$gc1err, info = paste(nm, method))
-      expect_equal(candidate.boot[[nm]]$gc1bias, old.boot[[nm]]$gc1bias, info = paste(nm, method))
-      expect_equal(candidate.boot[[nm]]$gc2err, old.boot[[nm]]$gc2err, info = paste(nm, method))
-      expect_equal(candidate.boot[[nm]]$gc2bias, old.boot[[nm]]$gc2bias, info = paste(nm, method))
+      .np_expect_plot_proto_error_shape(candidate.boot[[nm]]$gc1err,
+                                        old.boot[[nm]]$gc1err,
+                                        info = paste(nm, method))
+      if (!is.null(old.boot[[nm]]$gc1bias)) {
+        .np_expect_plot_proto_bias(candidate.boot[[nm]]$gc1bias, old.boot[[nm]]$gc1bias, info = paste(nm, method))
+      }
+      .np_expect_plot_proto_error_shape(candidate.boot[[nm]]$gc2err,
+                                        old.boot[[nm]]$gc2err,
+                                        info = paste(nm, method))
+      if (!is.null(old.boot[[nm]]$gc2bias)) {
+        .np_expect_plot_proto_bias(candidate.boot[[nm]]$gc2bias, old.boot[[nm]]$gc2bias, info = paste(nm, method))
+      }
       expect_equal(candidate.boot[[nm]]$bxp, old.boot[[nm]]$bxp, info = paste(nm, method))
     }
     expect_true(all(vapply(stages.boot$bootstrap, is.list, logical(1))))

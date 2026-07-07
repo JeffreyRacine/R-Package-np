@@ -704,12 +704,14 @@ test_that("generalized-nn cdist cvls LP stream avoids dense row storage", {
 
 test_that("LP all-large conditional fast helpers stay memory-lean", {
   lines <- read_shadow_proof_src("jksum.c")
-  start <- grep("^static int np_conditional_lp_all_large_ctx_prepare\\(", lines)
-  stop <- grep("^int np_conditional_density_cvml_lp_stream\\(", lines)
+  start <- grep("^static int np_conditional_lp_all_large_ctx_prepare_core\\(", lines)
+  stop <- grep("^static int np_conditional_lp_all_large_ctx_prepare_cvml\\(", lines)
 
   expect_length(start, 1L)
   expect_length(stop, 1L)
   expect_lt(start, stop)
+  expect_true(any(grepl("np_conditional_lp_all_large_ctx_prepare_cvml", lines, fixed = TRUE)))
+  expect_true(any(grepl("np_conditional_lp_all_large_ctx_prepare_cvls_tree", lines, fixed = TRUE)))
 
   body <- paste(lines[start:(stop - 1L)], collapse = "\n")
 

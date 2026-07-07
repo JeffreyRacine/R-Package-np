@@ -1,5 +1,5 @@
 test_that("npreg fixed no-error plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npreg_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npreg_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2201)
 
@@ -50,13 +50,13 @@ test_that("npreg fixed no-error plot-data prototype matches current route", {
       return.stages = TRUE
     )
 
-    expect_named(candidate, names(old), info = case.name)
+    .np_expect_plot_proto_names(candidate, old, info = case.name)
     expect_s3_class(candidate$r1, "npregression")
-    expect_named(candidate$r1, names(old$r1), info = case.name)
+    .np_expect_plot_proto_names(candidate$r1, old$r1, info = case.name)
     expect_equal(candidate$r1$eval, old$r1$eval, info = case.name)
     expect_equal(candidate$r1$mean, old$r1$mean, info = case.name)
     expect_equal(candidate$r1$merr, old$r1$merr, info = case.name)
-    expect_equal(candidate$r1$bias, old$r1$bias, info = case.name)
+    .np_expect_plot_proto_bias(candidate$r1$bias, old$r1$bias, info = case.name)
     expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "bootstrap", "plot_data"),
                  info = case.name)
     expect_equal(stages$plot_data, candidate, info = case.name)
@@ -67,7 +67,7 @@ test_that("npreg fixed no-error plot-data prototype matches current route", {
 })
 
 test_that("npreg plot prototype fails early outside its fixed 2D slice", {
-  proto <- getFromNamespace(".np_plot_proto_npreg_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npreg_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2202)
 
@@ -97,7 +97,7 @@ test_that("npreg plot prototype fails early outside its fixed 2D slice", {
 })
 
 test_that("npreg fixed asymptotic plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npreg_fixed_asymptotic_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npreg_fixed_asymptotic_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2203)
 
@@ -145,7 +145,7 @@ test_that("npreg fixed asymptotic plot-data prototype matches current route", {
     expect_equal(candidate$r1$eval, old$r1$eval, info = band)
     expect_equal(candidate$r1$mean, old$r1$mean, info = band)
     expect_equal(candidate$r1$merr, old$r1$merr, info = band)
-    expect_equal(candidate$r1$bias, old$r1$bias, info = band)
+    .np_expect_plot_proto_bias(candidate$r1$bias, old$r1$bias, info = band)
     expect_identical(stages$intervals$method, "asymptotic")
     expect_identical(stages$intervals$type, band)
     expect_null(stages$bootstrap, info = band)
@@ -154,7 +154,7 @@ test_that("npreg fixed asymptotic plot-data prototype matches current route", {
 })
 
 test_that("npreg fixed bootstrap plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npreg_fixed_bootstrap_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npreg_fixed_bootstrap_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2204)
 
@@ -223,7 +223,7 @@ test_that("npreg fixed bootstrap plot-data prototype matches current route", {
     expect_equal(candidate$r1$eval, old$r1$eval, info = label)
     expect_equal(candidate$r1$mean, old$r1$mean, info = label)
     expect_equal(candidate$r1$merr, old$r1$merr, info = label)
-    expect_equal(candidate$r1$bias, old$r1$bias, info = label)
+    .np_expect_plot_proto_bias(candidate$r1$bias, old$r1$bias, info = label)
     expect_identical(stages$intervals$method, "bootstrap")
     expect_identical(stages$intervals$type, "pointwise")
     expect_identical(stages$bootstrap$method, method)
@@ -233,8 +233,8 @@ test_that("npreg fixed bootstrap plot-data prototype matches current route", {
 })
 
 test_that("npreg staged plot data can be rendered without estimator re-entry", {
-  proto <- getFromNamespace(".np_plot_proto_npreg_fixed_none_data", "np")
-  render <- getFromNamespace(".np_plot_proto_rectangular_surface_base_render", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npreg_fixed_none_data", "np")
+  render <- .np_test_plot_proto(".np_plot_proto_rectangular_surface_base_render", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2205)
 

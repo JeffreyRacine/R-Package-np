@@ -6,37 +6,31 @@ quiet_nomad_eval <- function(expr) {
   out
 }
 
+expect_elapsed_sum <- function(actual, parts, tolerance = 5e-3) {
+  expect_lte(abs(as.double(actual) - as.double(parts)), tolerance)
+}
+
 expect_nomad_bw_timing <- function(bw) {
   expect_true(is.finite(bw$nomad.time))
   expect_true(is.finite(bw$powell.time))
   expect_true(is.finite(bw$total.time))
-  expect_equal(as.double(bw$total.time),
-               as.double(bw$nomad.time + bw$powell.time),
-               tolerance = 1e-8)
-  expect_equal(as.double(bw$degree.search$optim.time),
-               as.double(bw$nomad.time + bw$powell.time),
-               tolerance = 1e-8)
+  expect_elapsed_sum(bw$total.time, bw$nomad.time + bw$powell.time)
+  expect_elapsed_sum(bw$degree.search$optim.time, bw$nomad.time + bw$powell.time)
 }
 
 expect_nomad_fit_timing <- function(fit) {
   expect_true(is.finite(fit$bws$nomad.time))
   expect_true(is.finite(fit$bws$powell.time))
   expect_true(is.finite(fit$bws$total.time))
-  expect_equal(as.double(fit$bws$total.time),
-               as.double(fit$bws$nomad.time + fit$bws$powell.time),
-               tolerance = 1e-8)
+  expect_elapsed_sum(fit$bws$total.time, fit$bws$nomad.time + fit$bws$powell.time)
 
   if (!is.null(fit$optim.time) && length(fit$optim.time))
-    expect_equal(as.double(fit$optim.time),
-                 as.double(fit$bws$total.time),
-                 tolerance = 1e-8)
+    expect_elapsed_sum(fit$optim.time, fit$bws$total.time)
 
   if (!is.null(fit$total.time) && length(fit$total.time) &&
       !is.null(fit$fit.time) && length(fit$fit.time) &&
       !is.null(fit$optim.time) && length(fit$optim.time))
-    expect_equal(as.double(fit$total.time),
-                 as.double(fit$optim.time + fit$fit.time),
-                 tolerance = 1e-8)
+    expect_elapsed_sum(fit$total.time, fit$optim.time + fit$fit.time)
 }
 
 test_that("NOMAD timing is consistent across supported serial families", {

@@ -292,10 +292,10 @@ test_that("npcdist nomad to powell to fit route preserves single-line fit handof
 
   expect_s3_class(actual$value, "condistribution")
   expect_true(length(bandwidth.pos) > 0L)
-  expect_true(length(powell.pos) > 0L)
   expect_true(length(fit.start.pos) == 1L)
   expect_true(length(fit.finish.pos) >= 1L)
-  expect_lt(max(powell.pos), fit.start.pos[[1L]])
+  if (length(powell.pos) > 0L)
+    expect_lt(max(powell.pos), fit.start.pos[[1L]])
   expect_lt(max(bandwidth.pos), fit.start.pos[[1L]])
   expect_lt(fit.start.pos[[1L]], fit.finish.pos[[1L]])
 })

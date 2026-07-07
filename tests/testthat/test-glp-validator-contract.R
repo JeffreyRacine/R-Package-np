@@ -3,7 +3,12 @@ dimBS <- getFromNamespace("dimBS", "np")
 
 test_that("GLP validators handle non-numeric and missing inputs deterministically", {
   expect_null(np:::npValidateGlpDegree("lc", "a", 1L))
-  expect_identical(np:::npValidateGlpDegree("lp", NULL, 0L), integer(0))
+  expect_error(
+    np:::npValidateGlpDegree("lp", NULL, 0L),
+    "degree must be 0 when regtype='lp' has no continuous predictors"
+  )
+  expect_identical(np:::npValidateGlpDegree("lp", 0L, 0L), integer(0))
+  expect_identical(np:::npValidateGlpDegree("lp", integer(0), 0L), integer(0))
 
   expect_error(
     np:::npValidateGlpDegree("lp", "a", 1L),

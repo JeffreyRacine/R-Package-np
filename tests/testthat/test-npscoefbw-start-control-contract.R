@@ -11,7 +11,7 @@ test_that("npscoefbw surfaces fixed-start controls as formal arguments", {
                     names(formals(npscoefbw_scbandwidth))))
 })
 
-test_that("npscoefbw fixed start helpers replay legacy defaults", {
+test_that("npscoefbw fixed start helpers replay scale-factor defaults", {
   param <- c(1.25, 0.6, 0.45)
   icon <- c(TRUE, FALSE, TRUE)
   iord <- c(FALSE, TRUE, FALSE)
@@ -28,7 +28,7 @@ test_that("npscoefbw fixed start helpers replay legacy defaults", {
       iord = iord,
       iuno = iuno
     ),
-    param
+    c(0.5, 1.0, 0.5) * param
   )
 
   set.seed(20260405)
@@ -42,7 +42,12 @@ test_that("npscoefbw fixed start helpers replay legacy defaults", {
     iuno = iuno
   )
   set.seed(20260405)
-  expect_equal(got, runif(length(param), min = 0.5, max = 1.5) * param)
+  expected <- c(
+    runif(1, min = 0.1, max = 2.0),
+    runif(1, min = 0.5, max = 1.5),
+    runif(1, min = 0.1, max = 2.0)
+  ) * param
+  expect_equal(got, expected)
 })
 
 test_that("npscoefbw fixed start helpers split continuous and categorical controls", {

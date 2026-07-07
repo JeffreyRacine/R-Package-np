@@ -4,9 +4,11 @@ expect_nomad_unknown_bound_progress <- function(msgs, pkg_pattern, info = NULL) 
   expect_false(any(grepl("fval=", msgs, fixed = TRUE)), info = info)
   expect_false(any(grepl("%|eta ", msgs)), info = info)
   expect_true(any(grepl(sprintf("^\\[%s\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw) \\(", pkg_pattern), msgs)), info = info)
-  expect_true(any(grepl(sprintf("^\\[%s\\] Refining bandwidth \\(", pkg_pattern), msgs)), info = info)
+  refining <- grepl(sprintf("^\\[%s\\] Refining bandwidth \\(", pkg_pattern), msgs)
+  if (any(refining))
+    expect_true(any(grepl("elapsed [0-9.]+s", msgs[refining])), info = info)
   expect_true(any(grepl("multistart [12]/2", msgs)), info = info)
-  expect_true(any(grepl("iteration [0-9]+", msgs)), info = info)
+  expect_true(any(grepl("elapsed [0-9.]+s", msgs)), info = info)
   expect_true(any(grepl("deg \\(", msgs)), info = info)
   expect_true(any(grepl("best \\(", msgs)), info = info)
 }
@@ -47,8 +49,7 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
       bwtype = "fixed",
       bwmethod = "cv.ls",
       nmulti = 2L,
-      ngrid = 30L,
-      max.bb.eval = 8L
+      ngrid = 30L
     ),
     npplregbw = function() np::npplregbw(
       xdat = x,
@@ -63,8 +64,7 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
       degree.verify = FALSE,
       bwtype = "fixed",
       bwmethod = "cv.ls",
-      nmulti = 2L,
-      max.bb.eval = 8L
+      nmulti = 2L
     ),
     npscoefbw = function() np::npscoefbw(
       xdat = x,
@@ -79,8 +79,7 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
       degree.verify = FALSE,
       bwtype = "fixed",
       bwmethod = "cv.ls",
-      nmulti = 2L,
-      max.bb.eval = 8L
+      nmulti = 2L
     ),
     npindexbw = function() np::npindexbw(
       xdat = data.frame(x1 = x$x, x2 = z$z),
@@ -95,8 +94,7 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
       degree.max = 1L,
       degree.verify = FALSE,
       bwtype = "fixed",
-      nmulti = 2L,
-      max.bb.eval = 8L
+      nmulti = 2L
     )
   )
 

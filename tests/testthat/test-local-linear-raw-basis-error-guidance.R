@@ -84,6 +84,6 @@ test_that("local-linear raw-basis guidance leaves non-targeted errors unchanged"
       bwmethod = "cv.ls",
       ncon = 0L
     ),
-    regexp = local_linear_guidance_dens_msg
+    regexp = "regtype='ll' requires at least one continuous predictor"
   )
 })

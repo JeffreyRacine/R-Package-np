@@ -10,30 +10,28 @@ expect_plot_modes_match_unconditional <- function(bw,
                                                   yfield,
                                                   errors,
                                                   band) {
+  data.args <- list(
+    x = bw,
+    xdat = xdat,
+    output = "data",
+    perspective = FALSE,
+    errors = errors,
+    band = band,
+    view = "fixed"
+  )
+  plot.args <- data.args
+  plot.args$output <- "plot-data"
+  if (identical(errors, "bootstrap")) {
+    data.args$B <- 5
+    plot.args$B <- 5
+  }
+
   data.out <- suppressWarnings(
-    plot(
-      bw,
-      xdat = xdat,
-      output = "data",
-      perspective = FALSE,
-      errors = errors,
-      band = band,
-      B = 5,
-      view = "fixed"
-    )
+    do.call(plot, data.args)
   )
 
   plot.out <- with_plot_contract_device(
-    plot(
-      bw,
-      xdat = xdat,
-      output = "plot-data",
-      perspective = FALSE,
-      errors = errors,
-      band = band,
-      B = 5,
-      view = "fixed"
-    )
+    do.call(plot, plot.args)
   )
 
   expect_true(is.list(plot.out), info = method_label)
@@ -85,10 +83,10 @@ test_that("unconditional interval payload helper preserves bootstrap and asympto
   boot.out <- payload(
     estimate = c(1, 2),
     se = c(0.1, 0.2),
-    errors = "bootstrap",
-    alpha = 0.05,
-    band = "all",
-    center = "bias-corrected",
+    plot.errors.method = "bootstrap",
+    plot.errors.alpha = 0.05,
+    plot.errors.type = "all",
+    plot.errors.center = "bias-corrected",
     bootstrap_raw = boot.raw
   )
 
@@ -100,10 +98,10 @@ test_that("unconditional interval payload helper preserves bootstrap and asympto
   asym.out <- payload(
     estimate = c(1, 2),
     se = c(0.1, 0.2),
-    errors = "asymptotic",
-    alpha = 0.05,
-    band = "pointwise",
-    center = "estimate",
+    plot.errors.method = "asymptotic",
+    plot.errors.alpha = 0.05,
+    plot.errors.type = "pointwise",
+    plot.errors.center = "estimate",
     bootstrap_raw = NULL
   )
 

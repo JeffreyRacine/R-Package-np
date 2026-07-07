@@ -186,8 +186,8 @@ test_that("plot contract: 3D plot-data matches data mode for regression and cond
     tydat = data.frame(y = y),
     proper = TRUE
   )
-  cdata <- plot(cfit, output = "data", view = "fixed")
-  expect_warning(plot(cfit, output = "data", view = "fixed"), NA)
+  cdata <- suppressWarnings(plot(cfit, output = "data", view = "fixed"))
+  expect_warning(plot(cfit, output = "data", view = "fixed"), "proper=TRUE projected")
   cplotdata <- with_plot_device(plot(cfit, output = "plot-data", view = "fixed"))
 
   expect_type(cplotdata, "list")

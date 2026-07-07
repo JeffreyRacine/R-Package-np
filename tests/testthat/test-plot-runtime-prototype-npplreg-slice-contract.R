@@ -1,5 +1,5 @@
 test_that("npplreg fixed no-error plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npplreg_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npplreg_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2701)
 
@@ -54,14 +54,14 @@ test_that("npplreg fixed no-error plot-data prototype matches current route", {
       return.stages = TRUE
     )
 
-    expect_named(candidate, names(old), info = case.name)
+    .np_expect_plot_proto_names(candidate, old, info = case.name)
     expect_s3_class(candidate$r1, "plregression")
-    expect_named(candidate$r1, names(old$r1), info = case.name)
+    .np_expect_plot_proto_names(candidate$r1, old$r1, info = case.name)
     expect_equal(candidate$r1$evalx, old$r1$evalx, info = case.name)
     expect_equal(candidate$r1$evalz, old$r1$evalz, info = case.name)
     expect_equal(candidate$r1$mean, old$r1$mean, info = case.name)
     expect_equal(candidate$r1$merr, old$r1$merr, info = case.name)
-    expect_equal(candidate$r1$bias, old$r1$bias, info = case.name)
+    .np_expect_plot_proto_bias(candidate$r1$bias, old$r1$bias, info = case.name)
     expect_equal(candidate$r1$xcoef, old$r1$xcoef, info = case.name)
     expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "bootstrap", "plot_data"),
                  info = case.name)
@@ -73,7 +73,7 @@ test_that("npplreg fixed no-error plot-data prototype matches current route", {
 })
 
 test_that("npplreg plot prototype fails early outside its explicit fixed surface slice", {
-  proto <- getFromNamespace(".np_plot_proto_npplreg_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npplreg_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2702)
 
@@ -105,7 +105,7 @@ test_that("npplreg plot prototype fails early outside its explicit fixed surface
 })
 
 test_that("npplreg fixed asymptotic plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npplreg_fixed_asymptotic_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npplreg_fixed_asymptotic_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2703)
 
@@ -157,7 +157,7 @@ test_that("npplreg fixed asymptotic plot-data prototype matches current route", 
     expect_equal(candidate$r1$evalz, old$r1$evalz, info = band)
     expect_equal(candidate$r1$mean, old$r1$mean, info = band)
     expect_equal(candidate$r1$merr, old$r1$merr, info = band)
-    expect_equal(candidate$r1$bias, old$r1$bias, info = band)
+    .np_expect_plot_proto_bias(candidate$r1$bias, old$r1$bias, info = band)
     expect_identical(stages$intervals$method, "asymptotic")
     expect_identical(stages$intervals$type, band)
     expect_null(stages$bootstrap, info = band)
@@ -166,7 +166,7 @@ test_that("npplreg fixed asymptotic plot-data prototype matches current route", 
 })
 
 test_that("npplreg fixed bootstrap plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npplreg_fixed_bootstrap_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npplreg_fixed_bootstrap_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2704)
 
@@ -239,7 +239,7 @@ test_that("npplreg fixed bootstrap plot-data prototype matches current route", {
     expect_equal(candidate$r1$evalz, old$r1$evalz, info = paste(method, center))
     expect_equal(candidate$r1$mean, old$r1$mean, info = paste(method, center))
     expect_equal(candidate$r1$merr, old$r1$merr, info = paste(method, center))
-    expect_equal(candidate$r1$bias, old$r1$bias, info = paste(method, center))
+    .np_expect_plot_proto_bias(candidate$r1$bias, old$r1$bias, info = paste(method, center))
     expect_identical(stages$bootstrap$method, method)
     expect_identical(stages$bootstrap$center, center)
     expect_equal(stages$plot_data, candidate, info = paste(method, center))

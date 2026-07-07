@@ -1005,7 +1005,7 @@ test_that("semihat helper routes preserve LP and kernel-bound option contracts",
       s = 0L,
       output = "matrix"
     ),
-    "Invalid bounds for 'ckerbound'|Evaluation data violate 'ckerbound' bounds"
+    "fixed continuous kernel bounds are not supported for scalar-index helpers|Invalid bounds for 'ckerbound'|Evaluation data violate 'ckerbound' bounds"
   )
 
   scbw <- npscoefbw(

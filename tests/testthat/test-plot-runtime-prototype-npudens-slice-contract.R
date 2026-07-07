@@ -1,6 +1,6 @@
 test_that("npudens and npudist fixed no-error plot-data prototypes match current routes", {
-  dens.proto <- getFromNamespace(".np_plot_proto_npudens_fixed_none_data", "np")
-  dist.proto <- getFromNamespace(".np_plot_proto_npudist_fixed_none_data", "np")
+  dens.proto <- .np_test_plot_proto(".np_plot_proto_npudens_fixed_none_data", "np")
+  dist.proto <- .np_test_plot_proto(".np_plot_proto_npudist_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2401)
 
@@ -40,13 +40,13 @@ test_that("npudens and npudist fixed no-error plot-data prototypes match current
     return.stages = TRUE
   )
 
-  expect_named(cand.dens, names(old.dens))
+  .np_expect_plot_proto_names(cand.dens, old.dens)
   expect_s3_class(cand.dens$d1, "npdensity")
-  expect_named(cand.dens$d1, names(old.dens$d1))
+  .np_expect_plot_proto_names(cand.dens$d1, old.dens$d1)
   expect_equal(cand.dens$d1$eval, old.dens$d1$eval)
   expect_equal(cand.dens$d1$dens, old.dens$d1$dens)
   expect_equal(cand.dens$d1$derr, old.dens$d1$derr)
-  expect_equal(cand.dens$d1$bias, old.dens$d1$bias)
+  .np_expect_plot_proto_bias(cand.dens$d1$bias, old.dens$d1$bias)
   expect_named(stages.dens, c("state", "target_grid", "evaluator", "intervals", "bootstrap", "plot_data"))
   expect_equal(stages.dens$plot_data, cand.dens)
   expect_null(stages.dens$intervals)
@@ -74,13 +74,13 @@ test_that("npudens and npudist fixed no-error plot-data prototypes match current
     return.stages = TRUE
   )
 
-  expect_named(cand.dist, names(old.dist))
+  .np_expect_plot_proto_names(cand.dist, old.dist)
   expect_s3_class(cand.dist$d1, "npdistribution")
-  expect_named(cand.dist$d1, names(old.dist$d1))
+  .np_expect_plot_proto_names(cand.dist$d1, old.dist$d1)
   expect_equal(cand.dist$d1$eval, old.dist$d1$eval)
   expect_equal(cand.dist$d1$dist, old.dist$d1$dist)
   expect_equal(cand.dist$d1$derr, old.dist$d1$derr)
-  expect_equal(cand.dist$d1$bias, old.dist$d1$bias)
+  .np_expect_plot_proto_bias(cand.dist$d1$bias, old.dist$d1$bias)
   expect_named(stages.dist, c("state", "target_grid", "evaluator", "intervals", "bootstrap", "plot_data"))
   expect_equal(stages.dist$plot_data, cand.dist)
   expect_null(stages.dist$intervals)
@@ -89,7 +89,7 @@ test_that("npudens and npudist fixed no-error plot-data prototypes match current
 })
 
 test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match current routes", {
-  proto <- getFromNamespace(".np_plot_proto_unconditional_fixed_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_unconditional_fixed_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2402)
 
@@ -181,7 +181,7 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
 
     expect_equal(candidate$d1[[value.name]], old$d1[[value.name]], info = case)
     expect_equal(candidate$d1[[error.name]], old$d1[[error.name]], info = case)
-    expect_equal(candidate$d1$bias, old$d1$bias, info = case)
+    .np_expect_plot_proto_bias(candidate$d1$bias, old$d1$bias, info = case)
     expect_identical(stages$intervals$method, "bootstrap")
     expect_identical(stages$bootstrap$method, "inid")
     expect_identical(stages$bootstrap$B, 13L)
@@ -190,9 +190,9 @@ test_that("npudens and npudist fixed asymptotic and bootstrap prototypes match c
 })
 
 test_that("npudens and npudist staged plot data can be rendered without estimator re-entry", {
-  dens.proto <- getFromNamespace(".np_plot_proto_npudens_fixed_none_data", "np")
-  dist.proto <- getFromNamespace(".np_plot_proto_npudist_fixed_none_data", "np")
-  render <- getFromNamespace(".np_plot_proto_rectangular_surface_base_render", "np")
+  dens.proto <- .np_test_plot_proto(".np_plot_proto_npudens_fixed_none_data", "np")
+  dist.proto <- .np_test_plot_proto(".np_plot_proto_npudist_fixed_none_data", "np")
+  render <- .np_test_plot_proto(".np_plot_proto_rectangular_surface_base_render", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(2403)
 

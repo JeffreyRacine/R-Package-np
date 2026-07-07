@@ -1,10 +1,10 @@
 test_that("npdeptest basic functionality works", {
   set.seed(42)
-  n <- 50
+  n <- 20
   x <- rnorm(n)
   y <- x + rnorm(n, sd=0.1)
   
-  # Use summation and small boot.num for speed
+  # Basic smoke only: keep n small and use the minimum bootstrap count.
   test <- npdeptest(x, y, method="summation", boot.num=9)
   
   expect_s3_class(test, "deptest")
@@ -13,7 +13,7 @@ test_that("npdeptest basic functionality works", {
 
 test_that("npsdeptest basic functionality works", {
   set.seed(42)
-  n <- 50
+  n <- 20
   y <- arima.sim(n=n, list(ar=0.5))
   
   test <- npsdeptest(y, lag.num=1, method="summation", boot.num=9)

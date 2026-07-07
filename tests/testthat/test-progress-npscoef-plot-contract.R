@@ -35,7 +35,7 @@ test_that("smooth coefficient helper labels carry target context for bootstrap p
     captured$progress <- c(captured$progress, progress.label)
     list(t = matrix(0, nrow = 2L, ncol = 3L), t0 = c(0, 0, 0))
   }, ns = "np")
-  assignInNamespace(".np_plot_bootstrap_interval_summary", function(boot.t, t0, alpha, band.type, progress.label = NULL) {
+  assignInNamespace(".np_plot_bootstrap_interval_summary", function(boot.t, t0, alpha, band.type, progress.label = NULL, reference = t0) {
     captured$interval <- c(captured$interval, progress.label)
     list(err = matrix(0, nrow = ncol(boot.t), ncol = 2L), all.err = list())
   }, ns = "np")

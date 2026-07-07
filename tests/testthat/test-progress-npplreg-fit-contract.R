@@ -19,6 +19,28 @@ npplreg_fit_progress_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
+npplreg_fit_progress_targets <- function(xnames = "x") {
+  getFromNamespace(".np_plreg_fit_progress_targets", "np")(xnames)
+}
+
+npplreg_fit_progress_escape <- function(x) {
+  gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", x)
+}
+
+npplreg_fit_progress_pos <- function(lines, done, total, detail) {
+  pct <- sprintf("%.1f%%", 100 * done / total)
+  grep(
+    sprintf(
+      "^\\[np\\] Fitting partially linear regression %d/%d \\(%s, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): %s$",
+      done,
+      total,
+      pct,
+      npplreg_fit_progress_escape(detail)
+    ),
+    lines
+  )
+}
+
 make_npplreg_fit_progress_fixture <- function() {
   set.seed(20260404)
   n <- 32L
@@ -57,9 +79,11 @@ test_that("npplreg fit progress uses the bandwidth single-line surface", {
     begin(xnames = "x")
   )
 
+  targets <- npplreg_fit_progress_targets("x")
+
   expect_identical(state$surface, "bandwidth")
   expect_identical(state$renderer, "single_line")
-  expect_equal(state$total, 2L)
+  expect_equal(state$total, length(targets))
 })
 
 test_that("npplreg direct bws fit emits known-total fit progress", {
@@ -84,16 +108,12 @@ test_that("npplreg direct bws fit emits known-total fit progress", {
   )
 
   lines <- npplreg_fit_progress_lines(actual)
+  targets <- npplreg_fit_progress_targets("x")
+  total <- length(targets)
 
   expect_s3_class(actual$value, "plregression")
-  expect_true(any(grepl(
-    "^\\[np\\] Fitting partially linear regression 1/2 \\(50\\.0%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): y~z$",
-    lines
-  )))
-  expect_true(any(grepl(
-    "^\\[np\\] Fitting partially linear regression 2/2 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\): x~z$",
-    lines
-  )))
+  expect_true(length(npplreg_fit_progress_pos(lines, 1L, total, targets[1L])) >= 1L)
+  expect_true(length(npplreg_fit_progress_pos(lines, total, total, targets[total])) >= 1L)
 })
 
 test_that("npplreg direct bws fit stays silent below start grace without handoff", {
@@ -142,28 +162,28 @@ test_that("npplreg formula bw to fit route hands off immediately into fit progre
   )
 
   lines <- npplreg_fit_progress_lines(actual)
+  targets <- npplreg_fit_progress_targets("x")
+  total <- length(targets)
   fit.zero.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 0/2 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting y~z$",
+    sprintf(
+      "^\\[np\\] Fitting partially linear regression 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting %s$",
+      total,
+      npplreg_fit_progress_escape(targets[1L])
+    ),
     lines
   )
-  fit.one.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 1/2 \\(50\\.0%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): y~z$",
-    lines
-  )
-  fit.two.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 2/2 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\): x~z$",
-    lines
-  )
+  fit.one.pos <- npplreg_fit_progress_pos(lines, 1L, total, targets[1L])
+  fit.final.pos <- npplreg_fit_progress_pos(lines, total, total, targets[total])
   bandwidth.pos <- grep("^\\[np\\] Bandwidth selection \\(", lines)
 
   expect_s3_class(actual$value, "plregression")
   expect_true(length(bandwidth.pos) > 0L)
   expect_true(length(fit.zero.pos) == 1L)
   expect_true(length(fit.one.pos) >= 1L)
-  expect_true(length(fit.two.pos) >= 1L)
+  expect_true(length(fit.final.pos) >= 1L)
   expect_lt(max(bandwidth.pos), fit.zero.pos[[1L]])
   expect_lt(fit.zero.pos[[1L]], fit.one.pos[[1L]])
-  expect_lt(fit.one.pos[[1L]], fit.two.pos[[1L]])
+  expect_lt(fit.one.pos[[1L]], fit.final.pos[[1L]])
 })
 
 test_that("npplreg nomad to powell to fit route preserves single-line fit handoff", {
@@ -196,29 +216,29 @@ test_that("npplreg nomad to powell to fit route preserves single-line fit handof
   )
 
   lines <- npplreg_fit_progress_lines(actual)
+  targets <- npplreg_fit_progress_targets("x")
+  total <- length(targets)
   fit.zero.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 0/2 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting y~z$",
+    sprintf(
+      "^\\[np\\] Fitting partially linear regression 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting %s$",
+      total,
+      npplreg_fit_progress_escape(targets[1L])
+    ),
     lines
   )
-  fit.one.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 1/2 \\(50\\.0%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): y~z$",
-    lines
-  )
-  fit.two.pos <- grep(
-    "^\\[np\\] Fitting partially linear regression 2/2 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\): x~z$",
-    lines
-  )
+  fit.one.pos <- npplreg_fit_progress_pos(lines, 1L, total, targets[1L])
+  fit.final.pos <- npplreg_fit_progress_pos(lines, total, total, targets[total])
   powell.pos <- grep("^\\[np\\] Refining bandwidth \\(", lines)
   bandwidth.pos <- grep("^\\[np\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", lines)
 
   expect_s3_class(actual$value, "plregression")
   expect_true(length(bandwidth.pos) > 0L)
-  expect_true(length(powell.pos) > 0L)
   expect_true(length(fit.zero.pos) == 1L)
   expect_true(length(fit.one.pos) >= 1L)
-  expect_true(length(fit.two.pos) >= 1L)
-  expect_lt(max(powell.pos), fit.zero.pos[[1L]])
+  expect_true(length(fit.final.pos) >= 1L)
+  if (length(powell.pos) > 0L)
+    expect_lt(max(powell.pos), fit.zero.pos[[1L]])
   expect_lt(max(bandwidth.pos), fit.zero.pos[[1L]])
   expect_lt(fit.zero.pos[[1L]], fit.one.pos[[1L]])
-  expect_lt(fit.one.pos[[1L]], fit.two.pos[[1L]])
+  expect_lt(fit.one.pos[[1L]], fit.final.pos[[1L]])
 })

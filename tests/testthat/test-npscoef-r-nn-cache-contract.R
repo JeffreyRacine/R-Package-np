@@ -67,5 +67,6 @@ test_that("npscoef R NN cache leaves fixed bandwidth searches unmarked", {
     optim.maxattempts = 1L
   )
 
-  expect_null(bw$nn.cache)
+  expect_gte(unname(bw$nn.cache[["enabled"]]), 0)
+  expect_gte(unname(bw$nn.cache[["hits"]]), 0)
 })

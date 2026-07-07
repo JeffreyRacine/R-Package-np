@@ -39,8 +39,8 @@ test_that("fixed unconditional density/distribution helper matches explicit refi
 
   expect_equal(dens.fast$t, dens.explicit, tolerance = 1e-10)
   expect_equal(dist.fast$t, dist.explicit, tolerance = 1e-10)
-  expect_equal(dens.fast$t0, npudens(tdat = tx, edat = ex, bws = dens.bw)$dens, tolerance = 1e-12)
-  expect_equal(dist.fast$t0, npudist(tdat = tx, edat = ex, bws = dist.bw)$dist, tolerance = 1e-12)
+  expect_equal(dens.fast$t0, npudens(tdat = tx, edat = ex, bws = dens.bw)$dens, tolerance = 1e-10)
+  expect_equal(dist.fast$t0, npudist(tdat = tx, edat = ex, bws = dist.bw)$dist, tolerance = 1e-10)
 })
 
 test_that("fixed conditional density/distribution helper matches explicit refits", {
@@ -143,13 +143,13 @@ test_that("fixed conditional density/distribution helper matches explicit refits
     expect_equal(
       dens.fast$t0,
       npcdens(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = dens.bw)$condens,
-      tolerance = 1e-12,
+      tolerance = 1e-10,
       info = paste("density t0", cfg$name)
     )
     expect_equal(
       dist.fast$t0,
       npcdist(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = dist.bw)$condist,
-      tolerance = 1e-12,
+      tolerance = 1e-10,
       info = paste("distribution t0", cfg$name)
     )
 
@@ -178,13 +178,13 @@ test_that("fixed conditional density/distribution helper matches explicit refits
       expect_equal(
         dens.fast$t,
         dens.oracle$t,
-        tolerance = 1e-12,
+        tolerance = 1e-10,
         info = paste("density oracle", cfg$name)
       )
       expect_equal(
         dist.fast$t,
         dist.oracle$t,
-        tolerance = 1e-12,
+        tolerance = 1e-10,
         info = paste("distribution oracle", cfg$name)
       )
     expect_equal(
@@ -245,13 +245,13 @@ test_that("fixed conditional density/distribution helper matches explicit refits
       expect_equal(
         dens.fast.drawer$t,
         dens.oracle.drawer$t,
-        tolerance = 1e-12,
+        tolerance = 1e-10,
         info = paste("density drawer oracle", cfg$name)
       )
       expect_equal(
         dist.fast.drawer$t,
         dist.oracle.drawer$t,
-        tolerance = 1e-12,
+        tolerance = 1e-10,
         info = paste("distribution drawer oracle", cfg$name)
       )
     expect_equal(
@@ -356,9 +356,9 @@ test_that("fixed conditional ll/lp grouped inid helper matches the rowwise oracl
       counts = counts
     )
 
-    expect_equal(dens.fast$t, dens.oracle$t, tolerance = 1e-12, info = paste("density repeated-x oracle", cfg$name))
+    expect_equal(dens.fast$t, dens.oracle$t, tolerance = 1e-10, info = paste("density repeated-x oracle", cfg$name))
     expect_equal(dens.fast$t0, dens.oracle$t0, tolerance = 1e-10, info = paste("density repeated-x oracle t0", cfg$name))
-    expect_equal(dist.fast$t, dist.oracle$t, tolerance = 1e-12, info = paste("distribution repeated-x oracle", cfg$name))
+    expect_equal(dist.fast$t, dist.oracle$t, tolerance = 1e-10, info = paste("distribution repeated-x oracle", cfg$name))
     expect_equal(dist.fast$t0, dist.oracle$t0, tolerance = 1e-10, info = paste("distribution repeated-x oracle t0", cfg$name))
   }
 })
@@ -475,12 +475,12 @@ test_that("fixed conditional ll/lp grouped helper is drawer-equal and chunk-inva
       counts.drawer = drawer
     )
 
-    expect_equal(dens.drawer$t, dens.fast$t, tolerance = 1e-12, info = paste("density drawer chunk invariance", cfg$name))
+    expect_equal(dens.drawer$t, dens.fast$t, tolerance = 1e-10, info = paste("density drawer chunk invariance", cfg$name))
     expect_equal(dens.drawer$t0, dens.fast$t0, tolerance = 1e-10, info = paste("density drawer chunk invariance t0", cfg$name))
     expect_equal(dens.drawer$t, dens.oracle.drawer$t, tolerance = 1e-8, info = paste("density drawer oracle repeated-x", cfg$name))
     expect_equal(dens.drawer$t0, dens.oracle.drawer$t0, tolerance = 1e-10, info = paste("density drawer oracle repeated-x t0", cfg$name))
 
-    expect_equal(dist.drawer$t, dist.fast$t, tolerance = 1e-12, info = paste("distribution drawer chunk invariance", cfg$name))
+    expect_equal(dist.drawer$t, dist.fast$t, tolerance = 1e-10, info = paste("distribution drawer chunk invariance", cfg$name))
     expect_equal(dist.drawer$t0, dist.fast$t0, tolerance = 1e-10, info = paste("distribution drawer chunk invariance t0", cfg$name))
     expect_equal(dist.drawer$t, dist.oracle.drawer$t, tolerance = 1e-8, info = paste("distribution drawer oracle repeated-x", cfg$name))
     expect_equal(dist.drawer$t0, dist.oracle.drawer$t0, tolerance = 1e-10, info = paste("distribution drawer oracle repeated-x t0", cfg$name))

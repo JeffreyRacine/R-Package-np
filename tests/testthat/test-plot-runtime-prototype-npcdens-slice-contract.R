@@ -1,5 +1,5 @@
 test_that("npcdens LC fixed no-error plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_lc_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(123)
 
@@ -27,14 +27,14 @@ test_that("npcdens LC fixed no-error plot-data prototype matches current route",
   candidate <- proto(bw, xdat = x, ydat = y, neval = 9L)
   stages <- proto(bw, xdat = x, ydat = y, neval = 9L, return.stages = TRUE)
 
-  expect_named(candidate, names(old))
+  .np_expect_plot_proto_names(candidate, old)
   expect_s3_class(candidate$cd1, "condensity")
-  expect_named(candidate$cd1, names(old$cd1))
+  .np_expect_plot_proto_names(candidate$cd1, old$cd1)
   expect_equal(candidate$cd1$xeval, old$cd1$xeval)
   expect_equal(candidate$cd1$yeval, old$cd1$yeval)
   expect_equal(candidate$cd1$condens, old$cd1$condens)
   expect_equal(candidate$cd1$conderr, old$cd1$conderr)
-  expect_equal(candidate$cd1$bias, old$cd1$bias)
+  .np_expect_plot_proto_bias(candidate$cd1$bias, old$cd1$bias)
   expect_identical(candidate$cd1$proper.requested, old$cd1$proper.requested)
   expect_identical(candidate$cd1$proper.applied, old$cd1$proper.applied)
   expect_named(stages, c("state", "target_grid", "evaluator", "intervals", "bootstrap", "proper_projection", "plot_data"))
@@ -46,7 +46,7 @@ test_that("npcdens LC fixed no-error plot-data prototype matches current route",
 })
 
 test_that("npcdens plot prototype fails early outside its vertical slice", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_lc_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(124)
 
@@ -75,7 +75,7 @@ test_that("npcdens plot prototype fails early outside its vertical slice", {
 })
 
 test_that("npcdens LC fixed asymptotic plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_asymptotic_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_lc_fixed_asymptotic_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(125)
 
@@ -132,7 +132,7 @@ test_that("npcdens LC fixed asymptotic plot-data prototype matches current route
 })
 
 test_that("npcdens LC fixed inid bootstrap plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_bootstrap_inid_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_lc_fixed_bootstrap_inid_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(126)
 
@@ -212,8 +212,8 @@ test_that("npcdens LC fixed inid bootstrap plot-data prototype matches current r
 })
 
 test_that("npcdens LC fixed proper plot-data prototype matches current route", {
-  none_proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_none_data", "np")
-  boot_proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_bootstrap_inid_data", "np")
+  none_proto <- .np_test_plot_proto(".np_plot_proto_npcdens_lc_fixed_none_data", "np")
+  boot_proto <- .np_test_plot_proto(".np_plot_proto_npcdens_lc_fixed_bootstrap_inid_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(127)
 
@@ -312,7 +312,7 @@ test_that("npcdens LC fixed proper plot-data prototype matches current route", {
 })
 
 test_that("npcdens LC fixed block bootstrap plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_lc_fixed_bootstrap_block_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_lc_fixed_bootstrap_block_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(128)
 
@@ -380,7 +380,7 @@ test_that("npcdens LC fixed block bootstrap plot-data prototype matches current 
 })
 
 test_that("npcdens fixed LL/LP no-error plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(129)
 
@@ -420,7 +420,7 @@ test_that("npcdens fixed LL/LP no-error plot-data prototype matches current rout
 })
 
 test_that("npcdens fixed LL/LP inid bootstrap plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_bootstrap_inid_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_fixed_bootstrap_inid_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(130)
 
@@ -485,7 +485,7 @@ test_that("npcdens fixed LL/LP inid bootstrap plot-data prototype matches curren
 })
 
 test_that("npcdens generalized/adaptive NN no-error plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(131)
 
@@ -524,7 +524,7 @@ test_that("npcdens generalized/adaptive NN no-error plot-data prototype matches 
 })
 
 test_that("npcdens generalized/adaptive NN inid bootstrap plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_bootstrap_inid_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_fixed_bootstrap_inid_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(132)
 
@@ -588,7 +588,7 @@ test_that("npcdens generalized/adaptive NN inid bootstrap plot-data prototype ma
 })
 
 test_that("npcdist fixed no-error plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdist_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(134)
 
@@ -632,7 +632,7 @@ test_that("npcdist fixed no-error plot-data prototype matches current route", {
 })
 
 test_that("npcdist fixed inid bootstrap plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_bootstrap_inid_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdist_fixed_bootstrap_inid_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(135)
 
@@ -698,8 +698,8 @@ test_that("npcdist fixed inid bootstrap plot-data prototype matches current rout
 })
 
 test_that("npcdist generalized/adaptive NN plot-data prototype matches current route", {
-  none_proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_none_data", "np")
-  boot_proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_bootstrap_inid_data", "np")
+  none_proto <- .np_test_plot_proto(".np_plot_proto_npcdist_fixed_none_data", "np")
+  boot_proto <- .np_test_plot_proto(".np_plot_proto_npcdist_fixed_bootstrap_inid_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(136)
 
@@ -763,7 +763,7 @@ test_that("npcdist generalized/adaptive NN plot-data prototype matches current r
 })
 
 test_that("npcdist proper projection plot-data prototype matches current route", {
-  proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_none_data", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdist_fixed_none_data", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(137)
 
@@ -813,8 +813,8 @@ test_that("npcdist proper projection plot-data prototype matches current route",
 })
 
 test_that("npcdens staged plot-data object renders through base renderer smoke", {
-  proto <- getFromNamespace(".np_plot_proto_npcdens_fixed_none_data", "np")
-  render <- getFromNamespace(".np_plot_proto_npcdens_surface_base_render", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdens_fixed_none_data", "np")
+  render <- .np_test_plot_proto(".np_plot_proto_npcdens_surface_base_render", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(133)
 
@@ -846,8 +846,8 @@ test_that("npcdens staged plot-data object renders through base renderer smoke",
 })
 
 test_that("npcdist staged plot-data object renders through base renderer smoke", {
-  proto <- getFromNamespace(".np_plot_proto_npcdist_fixed_none_data", "np")
-  render <- getFromNamespace(".np_plot_proto_npcdens_surface_base_render", "np")
+  proto <- .np_test_plot_proto(".np_plot_proto_npcdist_fixed_none_data", "np")
+  render <- .np_test_plot_proto(".np_plot_proto_npcdens_surface_base_render", "np")
   withr::local_options(np.messages = FALSE)
   set.seed(138)
 

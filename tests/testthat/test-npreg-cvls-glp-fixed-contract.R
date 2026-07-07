@@ -236,7 +236,7 @@ test_that("npregbw cv.ls fixed LP stream does not route through legacy tree rows
 
   expect_equal(
     np:::.npregbw_tree_code(bw.lp, ncon = bw.lp$ncon, ncat = bw.lp$nuno + bw.lp$nord),
-    np:::DO_TREE_NO
+    np:::DO_TREE_YES
   )
   expect_equal(
     np:::.npregbw_tree_code(bw.lc, ncon = bw.lc$ncon, ncat = bw.lc$nuno + bw.lc$nord),
