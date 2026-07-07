@@ -1892,6 +1892,33 @@ predict.npreghat <-
     if (is.null(bws) || is.null(txdat))
       stop("object does not carry 'bws' and training data attributes")
 
+    object.s <- attr(object, "s")
+    object.loo <- attr(object, "leave.one.out")
+    if (is.null(object.loo))
+      object.loo <- FALSE
+
+    no.recompute <- is.null(newdata) &&
+      length(dots) == 0L &&
+      (missing(deriv) || is.null(deriv)) &&
+      (missing(s) || identical(s, object.s)) &&
+      (missing(leave.one.out) || identical(leave.one.out, object.loo))
+
+    if (no.recompute) {
+      if (identical(output, "matrix"))
+        return(object)
+
+      if (identical(output, "apply")) {
+        if (is.null(y))
+          stop("argument 'y' is required when output='apply'")
+        out <- object %*% y
+        if (ncol(out) == 1L)
+          return(as.vector(out))
+        return(out)
+      }
+
+      return(.np_hat_constraint_from_matrix(object, y, "npreghat"))
+    }
+
     leave.one.out <- if (is.null(leave.one.out)) FALSE else leave.one.out
     call.args <- list(
       bws = bws,

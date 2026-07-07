@@ -24,6 +24,7 @@ test_that("npreghat reproduces npreg fitted values for mixed-data local constant
   expect_s3_class(H, "npreghat")
   expect_equal(as.vector(H %*% y), as.vector(fit$mean), tolerance = 1e-8)
 
+  expect_identical(predict(H, output = "matrix"), H)
   H.loo <- npreghat(bws = bw, txdat = tx, leave.one.out = TRUE)
   expect_gt(max(abs(H - H.loo)), 1e-8)
   expect_lt(max(abs(diag(H.loo))), 1e-12)
@@ -33,6 +34,18 @@ test_that("npreghat reproduces npreg fitted values for mixed-data local constant
   )
   hy <- predict(H.loo, y = y, output = "apply")
   expect_equal(as.vector(hy), as.vector(H.loo %*% y), tolerance = 1e-10)
+  Y <- cbind(y, y + 0.1)
+  expect_equal(predict(H.loo, y = Y, output = "apply"), H.loo %*% Y,
+               tolerance = 1e-10)
+  expect_error(
+    predict(H.loo, output = "apply"),
+    "argument 'y' is required when output='apply'"
+  )
+
+  ex <- tx[seq_len(10L), , drop = FALSE]
+  H.ex <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix")
+  expect_equal(predict(H, newdata = ex, output = "matrix"), H.ex,
+               tolerance = 0, ignore_attr = TRUE)
 })
 
 test_that("npreghat supports lp/ll derivatives and matrix apply mode", {
@@ -373,6 +386,12 @@ test_that("npreghat constraint output is exact row-weighted transpose", {
   )
 
   H.obj <- npreghat(bws = bw, txdat = tx, output = "matrix")
+  A.stored <- predict(H, y = y, output = "constraint")
+  expect_equal(A.stored, t(H) * y, tolerance = 1e-14, ignore_attr = TRUE)
+  expect_error(
+    predict(H, output = "constraint"),
+    "argument 'y' is required"
+  )
   A.pred <- predict(H.obj, newdata = ex, y = y, output = "constraint")
   expect_equal(A.pred, t(H) * y, tolerance = 1e-14, ignore_attr = TRUE)
 })
