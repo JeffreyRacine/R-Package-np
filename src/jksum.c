@@ -6265,6 +6265,7 @@ void np_p_ukernelv(const int KERNEL,
                    const XL * const p_xl,
                    const int swap_xxt,
                    const int do_ocg,
+                   const int do_perm,
                    double * const scratch_kbuf){
 
   /* 
@@ -6319,14 +6320,16 @@ void np_p_ukernelv(const int KERNEL,
       result[i] = xw[j]*kn;
       kbuf[i] = kn;
 
-      const double pkn = use_const_pk ?
-        pkn_const :
-        (((p_iscat_const ? p_iscat_const_val : (xt[i] == ex)) ? pkn_same : pkn_diff));
-      p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
+      if(do_perm){
+        const double pkn = use_const_pk ?
+          pkn_const :
+          (((p_iscat_const ? p_iscat_const_val : (xt[i] == ex)) ? pkn_same : pkn_diff));
+        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
+      }
     }
 
     for(l = 0, r = 0; l < P_NIDX; l++, r += bin_do_xw){
-      if(l == P_IDX) continue;
+      if((l == P_IDX) && do_perm) continue;
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
         p_result[l*num_xt + i] = pxw[r*num_xt + j]*kbuf[i];
       }
@@ -6347,20 +6350,22 @@ void np_p_ukernelv(const int KERNEL,
       }
     }
 
-    for (int m = 0; m < p_xl->n; m++){
-      const int istart = p_xl->istart[m];
-      const int nlev = p_xl->nlev[m];
-      for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        const double pkn = use_const_pk ?
-          pkn_const :
-          (((p_iscat_const ? p_iscat_const_val : (xt[i] == ex)) ? pkn_same : pkn_diff));
-        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
+    if(do_perm){
+      for (int m = 0; m < p_xl->n; m++){
+        const int istart = p_xl->istart[m];
+        const int nlev = p_xl->nlev[m];
+        for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
+          const double pkn = use_const_pk ?
+            pkn_const :
+            (((p_iscat_const ? p_iscat_const_val : (xt[i] == ex)) ? pkn_same : pkn_diff));
+          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
+        }
       }
     }
 
 
     for(l = 0, r = 0; l < P_NIDX; l++, r+=bin_do_xw){
-      if(l == P_IDX) continue;
+      if((l == P_IDX) && do_perm) continue;
       for (int m = 0; m < xl->n; m++){
         const int istart = xl->istart[m];
         const int nlev = xl->nlev[m];
@@ -6475,6 +6480,7 @@ void np_p_okernelv(const int KERNEL,
                    const XL * const p_xl,
                    const int swap_xxt,
                    const int do_ocg,
+                   const int do_perm,
                    const int * const ordered_indices,
                    const int swapped_index,
                    double * const scratch_kbuf){
@@ -6541,14 +6547,16 @@ void np_p_okernelv(const int KERNEL,
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
 
-        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
-          (fast_p_kernel
-            ? np_ordered_eval_kernel(P_KERNEL, c1, c3, lambda, max_cxy, lpow, cats, ncat, cl, ch)
-            : k[P_KERNEL](c1, c3, lambda, cl, ch));
+        if(do_perm){
+          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
+            (fast_p_kernel
+              ? np_ordered_eval_kernel(P_KERNEL, c1, c3, lambda, max_cxy, lpow, cats, ncat, cl, ch)
+              : k[P_KERNEL](c1, c3, lambda, cl, ch));
+        }
       }
 
       for(l = 0, r = 0; l < P_NIDX; l++, r += bin_do_xw){
-        if(l == P_IDX) continue;
+        if((l == P_IDX) && do_perm) continue;
         for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
           p_result[l*num_xt + i] = pxw[r*num_xt + j]*kbuf[i];
         }
@@ -6571,24 +6579,26 @@ void np_p_okernelv(const int KERNEL,
         }
       }
 
-      for (int m = 0; m < p_xl->n; m++){
-        const int istart = p_xl->istart[m];
-        const int nlev = p_xl->nlev[m];
-        for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-          const double cat = do_ocg ? (swap_xxt ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
-          const double c1 = swap_xxt ? x : xt[i];
-          const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
+      if(do_perm){
+        for (int m = 0; m < p_xl->n; m++){
+          const int istart = p_xl->istart[m];
+          const int nlev = p_xl->nlev[m];
+          for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
+            const double cat = do_ocg ? (swap_xxt ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
+            const double c1 = swap_xxt ? x : xt[i];
+            const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
 
-          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
-            (fast_p_kernel
-              ? np_ordered_eval_kernel(P_KERNEL, c1, c3, lambda, max_cxy, lpow, cats, ncat, cl, ch)
-              : k[P_KERNEL](c1, c3, lambda, cl, ch));
+            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
+              (fast_p_kernel
+                ? np_ordered_eval_kernel(P_KERNEL, c1, c3, lambda, max_cxy, lpow, cats, ncat, cl, ch)
+                : k[P_KERNEL](c1, c3, lambda, cl, ch));
+          }
         }
       }
 
 
       for(l = 0, r = 0; l < P_NIDX; l++, r+=bin_do_xw){
-        if(l == P_IDX) continue;
+        if((l == P_IDX) && do_perm) continue;
         for (int m = 0; m < xl->n; m++){
           const int istart = xl->istart[m];
           const int nlev = xl->nlev[m];
@@ -8707,7 +8717,7 @@ const int keep_kw_owner_local){
       for(i=0; i < num_reg_unordered; i++, l++, ip += doscoreocg){
         if(doscoreocg){
           np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], k, p_nvar, xtu[i], num_xt, l, xu[i][j], 
-                        lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0), perm_kbuf);
+                        lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, (p_pxl == NULL ? NULL : p_pxl + k), swap_xxt, (bpso[l] ? do_ocg : 0), bpso[l], perm_kbuf);
         } else {
           if((p_nvar == 0) && (disc_uno_const_ok != NULL) && disc_uno_const_ok[i]){
             deferred_const *= disc_uno_const[i];
@@ -8755,7 +8765,7 @@ const int keep_kw_owner_local){
                         xo[i][j], lambda[num_reg_unordered+i], 
                         (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                         (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                        tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0),
+                        tprod, tprod_mp, pxl, (p_pxl == NULL ? NULL : p_pxl + k), swap_xxt, (bpso[l] ? do_ocg : 0), bpso[l],
                         matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]),
                         perm_kbuf);
         }
