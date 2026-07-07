@@ -191,9 +191,20 @@
   )
 }
 
+.np_indexhat_scalar_source <- function(bws) {
+  source <- bws
+  if (identical(as.character(source$ckerbound)[1L], "range")) {
+    # The scalar index has its own range; original predictor-space bounds do not collapse.
+    source$ckerlb <- NULL
+    source$ckerub <- NULL
+  }
+  source
+}
+
 .np_indexhat_rbw <- function(bws, idx.train) {
+  source <- .np_indexhat_scalar_source(bws)
   .np_semihat_make_regbw_state(
-    source = bws,
+    source = source,
     xdat = idx.train,
     ydat = rep.int(0.0, nrow(idx.train)),
     bw = bws$bw
@@ -255,6 +266,13 @@
   ckerbound <- resolve_choice(bws$ckerbound, c("none", "range", "fixed"))
   ukertype <- resolve_choice(bws$ukertype, c("aitchisonaitken", "liracine"))
   okertype <- resolve_choice(bws$okertype, c("liracine", "wangvanryzin", "racineliyan", "nliracine"))
+  bound.args <- if (identical(ckerbound, "fixed")) {
+    list(ckerlb = collapse_bound(bws$ckerlb, "ckerlb"),
+         ckerub = collapse_bound(bws$ckerub, "ckerub"))
+  } else {
+    list(ckerlb = NULL, ckerub = NULL)
+  }
+
   kbandwidth.numeric(
     bw = c(bws$bw),
     bwtype = bwtype,
@@ -262,8 +280,8 @@
     ckertype = ckertype,
     ckerorder = bws$ckerorder,
     ckerbound = ckerbound,
-    ckerlb = collapse_bound(bws$ckerlb, "ckerlb"),
-    ckerub = collapse_bound(bws$ckerub, "ckerub"),
+    ckerlb = bound.args$ckerlb,
+    ckerub = bound.args$ckerub,
     ukertype = ukertype,
     okertype = okertype,
     nobs = nrow(idx.train),

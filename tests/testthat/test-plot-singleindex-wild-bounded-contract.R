@@ -86,3 +86,39 @@ test_that("single-index fixed wild bootstrap block path matches dense path", {
   expect_equal(block$mean, dense$mean, tolerance = 1e-12)
   expect_equal(block$merr, dense$merr, tolerance = 1e-12)
 })
+
+test_that("single-index range-bounded wild bootstrap uses scalar-index bounds", {
+  set.seed(32322)
+  n <- 36L
+  tx <- data.frame(x1 = runif(n), x2 = 2 * runif(n) - 1)
+  y <- sin(tx$x1 + 0.4 * tx$x2) + rnorm(n, sd = 0.05)
+
+  bw <- npindexbw(
+    xdat = tx,
+    ydat = y,
+    method = "ichimura",
+    ckerbound = "range",
+    bws = c(1, 0.25, 0.25),
+    bandwidth.compute = FALSE
+  )
+  fit <- npindex(bws = bw, txdat = tx, tydat = y)
+
+  for (object in list(bw, fit)) {
+    out <- suppressWarnings(plot(
+      object,
+      xdat = tx,
+      ydat = y,
+      output = "data",
+      perspective = FALSE,
+      errors = "bootstrap",
+      bootstrap = "wild",
+      B = 5L,
+      band = "pointwise"
+    ))
+
+    expect_type(out, "list")
+    expect_true(length(out) >= 1L)
+    expect_true(all(is.finite(out[[1L]]$mean)))
+    expect_true(all(is.finite(out[[1L]]$merr)))
+  }
+})
