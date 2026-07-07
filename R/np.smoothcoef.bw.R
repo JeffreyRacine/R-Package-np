@@ -2121,37 +2121,7 @@ npscoefbw.scbandwidth <-
 }
 
 .npscoefbw_attach_degree_search <- function(bws, search_result) {
-  metadata <- list(
-    mode = search_result$method,
-    source = if (!is.null(search_result$source)) search_result$source else "explicit",
-    reason = if (!is.null(search_result$reason)) search_result$reason else NULL,
-    engine = if (!is.null(search_result$engine)) search_result$engine else search_result$method,
-    verify = isTRUE(search_result$verify),
-    completed = isTRUE(search_result$completed),
-    certified = isTRUE(search_result$certified),
-    interrupted = isTRUE(search_result$interrupted),
-    baseline.degree = search_result$baseline$degree,
-    baseline.fval = search_result$baseline$objective,
-    best.degree = search_result$best$degree,
-    best.fval = search_result$best$objective,
-    nomad.time = search_result$nomad.time,
-    powell.time = search_result$powell.time,
-    optim.time = search_result$optim.time,
-    n.unique = search_result$n.unique,
-    n.visits = search_result$n.visits,
-    n.cached = search_result$n.cached,
-    grid.size = search_result$grid.size,
-    singleton = isTRUE(search_result$singleton),
-    fixed.degree = search_result$fixed.degree,
-    best.restart = search_result$best.restart,
-    restart.starts = search_result$restart.starts,
-    restart.degree.starts = search_result$restart.degree.starts,
-    restart.bandwidth.starts = search_result$restart.bandwidth.starts,
-    restart.start.info = search_result$restart.start.info,
-    restart.results = search_result$restart.results,
-    nn.cache = search_result$nn.cache,
-    trace = search_result$trace
-  )
+  metadata <- .np_degree_search_metadata(search_result, default_direction = "min")
 
   if (isTRUE(search_result$native) &&
       isTRUE(getOption("np.developer.native.nomad.diagnostics", FALSE)) &&

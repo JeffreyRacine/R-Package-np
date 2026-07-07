@@ -1822,6 +1822,20 @@ npNomadShadowSearchConditionalDensity <- function(template,
         user_supplied = degree.search$start.user
       )
     )
+    native.baseline.start <- proc.time()[3L]
+    native.baseline.eval <- eval_fun(x0)
+    native.baseline.record <- list(
+      eval_id = 1L,
+      degree = as.integer(native.baseline.eval$degree),
+      objective = as.numeric(native.baseline.eval$objective[1L]),
+      status = "ok",
+      cached = FALSE,
+      message = "baseline degree-search start",
+      elapsed = proc.time()[3L] - native.baseline.start,
+      num.feval = as.numeric(native.baseline.eval$num.feval[1L]),
+      num.feval.fast = as.numeric(native.baseline.eval$num.feval.fast[1L]),
+      num.feval.guarded = as.numeric(native.baseline.eval$num.feval.guarded[1L])
+    )
     native.results <- vector("list", nrow(native.start.matrix))
     native.best.index <- NA_integer_
     native.best.objective <- -Inf
@@ -1958,15 +1972,23 @@ npNomadShadowSearchConditionalDensity <- function(template,
       best_record = native.record
     )
     search.result <- list(
+      baseline = native.baseline.record,
       best = native.record,
       best_point = as.numeric(native.best$best_point),
       best_payload = NULL,
       completed = TRUE,
+      certified = FALSE,
+      interrupted = FALSE,
       method = search.engine.used,
       source = source,
       reason = reason,
+      direction = "max",
       restart.results = native.results,
       best.restart = native.best.index,
+      n.unique = if (is.finite(native.callback.total)) as.integer(native.callback.total + 1L) else NA_integer_,
+      n.visits = if (is.finite(native.callback.total)) as.integer(native.callback.total + 1L) else NA_integer_,
+      n.cached = 0L,
+      grid.size = NA_integer_,
       nomad.time = native.nomad.elapsed,
       powell.time = NA_real_,
       num.feval.total = nomad.num.feval.total,
@@ -3283,38 +3305,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
 }
 
 .npcdensbw_attach_degree_search <- function(bws, search_result) {
-  metadata <- list(
-    mode = search_result$method,
-    source = if (!is.null(search_result$source)) search_result$source else "explicit",
-    reason = if (!is.null(search_result$reason)) search_result$reason else NULL,
-    engine = if (!is.null(search_result$engine)) search_result$engine else search_result$method,
-    direction = search_result$direction,
-    verify = isTRUE(search_result$verify),
-    completed = isTRUE(search_result$completed),
-    certified = isTRUE(search_result$certified),
-    interrupted = isTRUE(search_result$interrupted),
-    baseline.degree = search_result$baseline$degree,
-    baseline.fval = search_result$baseline$objective,
-    best.degree = search_result$best$degree,
-    best.fval = search_result$best$objective,
-    nomad.time = search_result$nomad.time,
-    powell.time = search_result$powell.time,
-    optim.time = search_result$optim.time,
-    n.unique = search_result$n.unique,
-    n.visits = search_result$n.visits,
-    n.cached = search_result$n.cached,
-    grid.size = search_result$grid.size,
-    singleton = isTRUE(search_result$singleton),
-    fixed.degree = search_result$fixed.degree,
-    best.restart = search_result$best.restart,
-    restart.starts = search_result$restart.starts,
-    restart.degree.starts = search_result$restart.degree.starts,
-    restart.bandwidth.starts = search_result$restart.bandwidth.starts,
-    restart.start.info = search_result$restart.start.info,
-    restart.results = search_result$restart.results,
-    nn.cache = search_result$nn.cache,
-    trace = search_result$trace
-  )
+  metadata <- .np_degree_search_metadata(search_result, default_direction = "max")
 
   if (!is.null(search_result$nomad.time))
     bws$nomad.time <- as.numeric(search_result$nomad.time[1L])
