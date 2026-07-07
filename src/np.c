@@ -6552,6 +6552,15 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
                                          SEXP glp_basis,
                                          SEXP row_index)
 {
+  /*
+   * Registered test/proof helper only.
+   *
+   * This routine intentionally returns both the historical dense oracle row and
+   * the streamed row so small test fixtures can prove row-streaming equivalence.
+   * Public estimator, plot, bootstrap, and CV routes must not call this helper;
+   * production routes use the streaming helpers directly and must not allocate
+   * an O(n^2) proof matrix.
+   */
   SEXP tycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
   SEXP rbw_r=R_NilValue, degree_i=R_NilValue;
