@@ -274,6 +274,75 @@
   )
 }
 
+.np_degree_search_metadata <- function(search_result,
+                                       default_direction = c("min", "max")) {
+  default_direction <- match.arg(default_direction)
+  scalar_character <- function(value, default = NA_character_) {
+    if (is.null(value) || !length(value))
+      return(default)
+    value <- as.character(value[1L])
+    if (is.na(value) || !nzchar(value)) default else value
+  }
+  scalar_logical <- function(value, default = FALSE) {
+    if (is.null(value) || !length(value))
+      return(default)
+    isTRUE(value[1L])
+  }
+  scalar_real <- function(value) {
+    if (is.null(value) || !length(value))
+      return(NA_real_)
+    as.numeric(value[1L])
+  }
+  scalar_integer <- function(value) {
+    if (is.null(value) || !length(value))
+      return(NA_integer_)
+    as.integer(value[1L])
+  }
+  degree_value <- function(value) {
+    if (is.null(value) || !length(value))
+      return(integer(0L))
+    as.integer(value)
+  }
+
+  baseline <- search_result$baseline
+  best <- search_result$best
+  direction <- scalar_character(search_result$direction, default_direction)
+
+  list(
+    mode = scalar_character(search_result$method, "explicit"),
+    source = scalar_character(search_result$source, "explicit"),
+    reason = if (!is.null(search_result$reason)) search_result$reason else NULL,
+    engine = scalar_character(search_result$engine,
+                              scalar_character(search_result$method, "explicit")),
+    direction = direction,
+    verify = scalar_logical(search_result$verify),
+    completed = scalar_logical(search_result$completed),
+    certified = scalar_logical(search_result$certified),
+    interrupted = scalar_logical(search_result$interrupted),
+    baseline.degree = degree_value(baseline$degree),
+    baseline.fval = scalar_real(baseline$objective),
+    best.degree = degree_value(best$degree),
+    best.fval = scalar_real(best$objective),
+    nomad.time = scalar_real(search_result$nomad.time),
+    powell.time = scalar_real(search_result$powell.time),
+    optim.time = scalar_real(search_result$optim.time),
+    n.unique = scalar_integer(search_result$n.unique),
+    n.visits = scalar_integer(search_result$n.visits),
+    n.cached = scalar_integer(search_result$n.cached),
+    grid.size = scalar_integer(search_result$grid.size),
+    singleton = scalar_logical(search_result$singleton),
+    fixed.degree = degree_value(search_result$fixed.degree),
+    best.restart = scalar_integer(search_result$best.restart),
+    restart.starts = search_result$restart.starts,
+    restart.degree.starts = search_result$restart.degree.starts,
+    restart.bandwidth.starts = search_result$restart.bandwidth.starts,
+    restart.start.info = search_result$restart.start.info,
+    restart.results = search_result$restart.results,
+    nn.cache = search_result$nn.cache,
+    trace = search_result$trace
+  )
+}
+
 .np_degree_format_degree <- function(degree) {
   sprintf("(%s)", paste(as.integer(degree), collapse = ","))
 }
@@ -1037,6 +1106,7 @@
     method = method,
     source = source,
     reason = reason,
+    direction = direction,
     verify = isTRUE(verify),
     completed = !isTRUE(state$interrupted),
     certified = !isTRUE(state$interrupted) && (identical(method, "exhaustive") || isTRUE(verify)),
