@@ -623,6 +623,9 @@ test_that("progress ownership suppresses nested visibility for legacy renderer t
   finish <- getFromNamespace(".np_progress_end", "npRmpi")
   reset <- getFromNamespace(".np_progress_reset_registry", "npRmpi")
 
+  old_opts <- options(np.messages = TRUE)
+  on.exit(options(old_opts), add = TRUE)
+
   reset()
   on.exit(reset(), add = TRUE)
 

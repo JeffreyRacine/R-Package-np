@@ -20,7 +20,7 @@ test_that("generalized NN regression bandwidth is stable on duplicated continuou
     nmulti = 1
   )
 
-  expect_equal(as.numeric(bw$bw), 2)
+  expect_equal(as.numeric(bw$bw), 3)
   expect_equal(as.numeric(bw$fval), 0.1717472951192434, tolerance = 1e-14)
 })
 

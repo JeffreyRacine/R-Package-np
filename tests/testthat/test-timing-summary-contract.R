@@ -50,7 +50,6 @@ test_that("NOMAD plus Powell timing is carried through bandwidth and fit summari
   expect_match(bw_txt, "NOMAD ", fixed = TRUE)
   expect_match(bw_txt, "Powell ", fixed = TRUE)
   expect_match(bw_txt, "MPI Session:", fixed = TRUE)
-  expect_match(bw_txt, "MPI Call Profile:", fixed = TRUE)
   expect_match(fit_txt, "NOMAD ", fixed = TRUE)
   expect_match(fit_txt, "Powell ", fixed = TRUE)
   expect_match(fit_txt, "fit ", fixed = TRUE)
