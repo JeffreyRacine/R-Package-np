@@ -8094,9 +8094,51 @@ plotFactor <- function(f, y, ...){
   c(base.args, override.args)
 }
 
+.np_plot_resolve_native_xydat_from_bws_call <- function(bws, allow.failure = FALSE) {
+  if (is.null(bws$call))
+    return(NULL)
+
+  call.names <- names(bws$call)
+  has.xdat <- "xdat" %in% call.names
+  has.ydat <- "ydat" %in% call.names
+  if (!has.xdat && !has.ydat)
+    return(NULL)
+
+  if (!(has.xdat && has.ydat)) {
+    if (isTRUE(allow.failure))
+      return(NULL)
+    stop("plot bandwidth call must contain both 'xdat' and 'ydat'",
+         call. = FALSE)
+  }
+
+  tryCatch(
+    list(
+      xdat = data.frame(.np_eval_bws_call_arg(bws, "xdat")),
+      ydat = .np_eval_bws_call_arg(bws, "ydat")
+    ),
+    error = function(e) {
+      if (isTRUE(allow.failure))
+        return(NULL)
+      stop(conditionMessage(e), call. = FALSE)
+    }
+  )
+}
+
 .np_plot_resolve_xydat <- function(bws, xdat, ydat, miss.xy) {
   if (any(miss.xy) && !all(miss.xy))
     stop("one of, but not both, xdat and ydat was specified")
+
+  if (all(miss.xy)) {
+    native.xy <- .np_plot_resolve_native_xydat_from_bws_call(
+      bws = bws,
+      allow.failure = !is.null(bws$formula)
+    )
+    if (!is.null(native.xy)) {
+      xdat <- native.xy$xdat
+      ydat <- native.xy$ydat
+      miss.xy <- c(FALSE, FALSE)
+    }
+  }
 
   if (all(miss.xy) && !is.null(bws$formula)) {
     tt <- terms(bws)

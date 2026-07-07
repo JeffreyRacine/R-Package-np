@@ -66,3 +66,34 @@ test_that("semiparametric formula-fit plots do not regress on response labels", 
   expect_true(length(out.sc) > 0L)
   expect_true(length(out.si) > 0L)
 })
+
+test_that("direct formula npindex fit plots from retained materialized data", {
+  make_fit <- function(seed = 789, n = 30L) {
+    set.seed(seed)
+    dat <- data.frame(x1 = runif(n, -1, 1), x2 = runif(n, -1, 1))
+    idx <- dat$x1 + 0.5 * dat$x2
+    dat$y <- sin(idx) + 0.25 * idx^2 + rnorm(n, sd = 0.05)
+    np::npindex(
+      y ~ x1 + x2,
+      data = dat,
+      bws = c(1, 0.7, 0.7),
+      bandwidth.compute = FALSE,
+      method = "ichimura",
+      regtype = "lp",
+      degree = 1,
+      bwtype = "fixed"
+    )
+  }
+
+  fit <- make_fit()
+  auto <- expect_no_error(plot(fit, output = "data", perspective = FALSE))
+  explicit <- expect_no_error(plot(
+    fit,
+    xdat = fit$bws$call$xdat,
+    ydat = fit$bws$call$ydat,
+    output = "data",
+    perspective = FALSE
+  ))
+
+  expect_equal(auto, explicit, tolerance = 1e-12, ignore_attr = TRUE)
+})
