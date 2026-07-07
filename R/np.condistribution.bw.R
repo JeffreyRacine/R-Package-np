@@ -123,6 +123,7 @@ npcdistbw.formula <-
   method <- as.character(method[1L])
   switch(method,
     cv.ls = method,
+    "normal-reference" = method,
     stop(sprintf("%s does not support bwmethod '%s'", where, method),
          call. = FALSE)
   )
@@ -130,7 +131,8 @@ npcdistbw.formula <-
 
 .npcdistbw_method_code <- function(bws, where = "npcdistbw") {
   switch(.npcdistbw_method_name(bws, where = where),
-    cv.ls = CDBWM_CVLS
+    cv.ls = CDBWM_CVLS,
+    "normal-reference" = CDBWM_CVLS
   )
 }
 

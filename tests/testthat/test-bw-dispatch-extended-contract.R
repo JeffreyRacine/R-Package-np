@@ -21,6 +21,9 @@ test_that("extended bw generics route named data args without bws to NULL method
 
   expect_s3_class(bw_cdens, "conbandwidth")
   expect_s3_class(bw_cdist, "condbandwidth")
+  expect_identical(bw_cdist$method, "normal-reference")
+  expect_true(all(is.finite(c(bw_cdist$xbw[bw_cdist$ixcon],
+                              bw_cdist$ybw[bw_cdist$iycon]))))
   expect_s3_class(bw_pl, "plbandwidth")
   expect_s3_class(bw_si, "sibandwidth")
   expect_s3_class(bw_sc, "scbandwidth")
