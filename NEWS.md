@@ -1,5 +1,114 @@
 # np 0.70-5
 
+* Reworked `npindexbw()` / `npindex()` internals after 0.70-4. Ichimura and
+  Klein-Spady single-index objectives now reuse the established `npreg`
+  leave-one-out backend where applicable, preserving the public estimator
+  contract while materially improving high-dimensional and local-polynomial
+  objective evaluation. The single-index formula/materialization routes were
+  tightened so formula-selected variables, explicit bandwidth objects, and
+  direct formula calls with explicit smoothing parameters reenter consistently.
+
+* Added user documentation for `npindex()` optimizer choice and beta
+  interpretation. The documentation now gives practical guidance on when
+  derivative-free Nelder-Mead remains a reasonable low-dimensional default and
+  when BFGS is useful for higher-dimensional index searches, and it explains
+  the relative interpretation of normalized single-index beta coefficients.
+
+* Hardened single-index fit, evaluation, plotting, and summary behavior.
+  Bounded continuous-kernel options are now carried consistently through
+  objective, fit, evaluation, variance, and bootstrap routes; Klein-Spady
+  confusion-matrix output is guarded against out-of-range fitted values; and
+  large-bandwidth shortcuts are restricted to kernel/order combinations whose
+  constant-weight approximation was validated.
+
+* Repaired single-index plot bootstrap memory usage. Wild-bootstrap
+  self-maps now avoid public-facing `O(n^2)` kernel-weight allocations for the
+  ordinary large-sample plot route, while preserving the public fitted and
+  plotting contracts.
+
+* Repaired generalized-nearest-neighbor local-polynomial derivative ownership
+  across `npreghat()` and related public routes. Mixed-degree local-polynomial
+  fits now route available derivative components through the correct owner,
+  preserve `apply == H %*% y` contracts, and report unavailable derivative
+  components consistently rather than silently applying the wrong operator.
+
+* Repaired local-constant derivative ownership in `npreghat()` so degree-zero
+  local-polynomial derivative requests use the analytic local-constant
+  derivative contract only when that contract is mathematically available.
+  Scalar, matrix, and multi-column apply routes were validated separately.
+
+* Improved conditional mixed-degree local-polynomial gradients for
+  `npcdens()` / `npcdist()` and public conditional-gradient accessors. The
+  partial-availability contract now matches the regression-family policy:
+  available components are returned, unavailable components are represented as
+  `NA`, and incoherent metadata fails clearly.
+
+* Repaired formula/data reentry contracts across density, distribution,
+  conditional density, conditional distribution, single-index, smooth
+  coefficient, partially linear, quantile, conditional-mode, copula, and
+  significance-test routes. Explicit estimator `data=` now overrides stored
+  bandwidth-object data where that public call shape is supported, formula
+  `newdata` is validated against fitted RHS variables, and direct formula
+  calls with numeric smoothing parameters no longer misroute formula objects
+  as native data.
+
+* Repaired unconditional density and distribution edge contracts. Ordered
+  kernel-code selection is now consistent between conditional bandwidth
+  selection and fitting where normalization is required, all-NA input is
+  rejected before native calls, training and evaluation omission metadata are
+  retained separately where needed, categorical zero-bandwidth standard-error
+  handling is consistent across categorical configurations, and unsupported
+  bandwidth-selection method codes fail clearly.
+
+* Clarified normal-reference bandwidth documentation for density and
+  distribution routes. The rule-of-thumb formulas are documented as fast
+  exploratory Silverman-style heuristics, not production substitutes for
+  cross-validation or likelihood-based selection.
+
+* Hardened `npcdistbw()` normal-reference method handling so the R method code
+  and native C method code stay aligned, avoiding accidental fall-through to
+  an unintended bandwidth-selection branch.
+
+* Repaired and hardened public estimator contracts found during adversarial
+  audits of `npscoef`, `npplreg`, `npqreg`, `nplsqreg`, `npconmode`,
+  `npcopula`, `npreg`, `npcdens`, `npcdist`, `npudens`, and `npudist`.
+  Repairs include `npscoef` iterated backfit behavior, partially-linear fit
+  reentry, quantile inversion/clamping contracts, conditional-mode
+  probability/tie handling, copula sample reentry, regression tree/large-h
+  predicate alignment, and density/distribution formula/native argument
+  consistency.
+
+* Plot-bootstrap memory hardening now covers single-index, conditional-mode,
+  and partially-linear plot routes. The default plot evaluation grids remain
+  linear in the training sample size, and explicit `neval == ntrain` style
+  requests remain user-controlled.
+
+* Categorical-gradient and derivative workspace handling were repaired so
+  no-gradient and gradient calls can be mixed safely in one session without
+  stale native derivative workspace state affecting later calls.
+
+* Native shadow-object and cache lifecycles were hardened. Conditional-density
+  shadow pointers, native objective-cache state, and regression large-h /
+  large-lambda caches are cleared at the appropriate top-level lifecycle
+  boundary so pointer-keyed helper state cannot leak across independent calls
+  or datasets.
+
+* `npksum()` numeric-bandwidth dispatch now constructs data-aware bandwidth
+  objects for mixed continuous/categorical data instead of falling back to a
+  default-typed object. The serial and MPI packages now share the same public
+  behavior for numeric smoothing parameters.
+
+* The local-polynomial regression CVKS low-support objective path now uses a
+  named bandwidth-method code and aligns the R and C routing contracts,
+  reducing the risk of drift between search metadata and native objective
+  handling.
+
+* Expanded focused tests, demos, benchmarks, and release-protocol sentinels
+  across the public exported surface. The release protocol now requires an
+  explicit public-exported-surface inventory, estimator-family sentinels,
+  documentation/demo/benchmark smoke coverage, and installed package proof
+  before release-ready claims.
+
 # np 0.70-4
 
 * Hardened proactive C cleanup paths by clearing extended nearest-neighbor
