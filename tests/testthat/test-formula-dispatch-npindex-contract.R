@@ -1,13 +1,14 @@
 test_that("named bws formula dispatch matches positional npindex route", {
-  set.seed(20260323)
+  x1 <- seq(-0.95, 0.95, length.out = 24)
+  x2 <- cos(seq(0, pi, length.out = 24))
   dat <- data.frame(
-    y = rnorm(24),
-    x1 = runif(24),
-    x2 = runif(24)
+    y = 1 + 0.7 * x1 - 0.4 * x2 + sin(x1 + 0.5 * x2),
+    x1 = x1,
+    x2 = x2
   )
   ex <- data.frame(
-    x1 = seq(0.1, 0.9, length.out = 8),
-    x2 = seq(0.9, 0.1, length.out = 8)
+    x1 = seq(-0.8, 0.8, length.out = 8),
+    x2 = seq(0.8, -0.8, length.out = 8)
   )
 
   fit.pos <- npindex(
