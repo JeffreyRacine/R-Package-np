@@ -22025,6 +22025,7 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
                                                     double **matrix_Y_continuous_eval,
                                                     int num_eval,
                                                     int map_train_tree_index,
+                                                    int suppress_nn_parallel,
                                                     double *row_out);
 
 static int np_conditional_y_scalar_fixed_row_direct(NPConditionalYRowCtx *ctx,
@@ -22119,6 +22120,7 @@ static int np_conditional_y_scalar_eval_from_ctx(double *vector_scale_factor,
                                                     ctx->eval_ycon_one,
                                                     1,
                                                     0,
+                                                    0,
                                                     row_out);
   }
 
@@ -22172,6 +22174,7 @@ static int np_conditional_y_scalar_eval_from_ctx(double *vector_scale_factor,
 static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_factor,
                                                         int eval_idx,
                                                         int drop_eval_self,
+                                                        int suppress_nn_parallel,
                                                         double *row_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
@@ -22264,7 +22267,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
                            num_reg_continuous_extern,
                            num_reg_unordered_extern,
                            num_reg_ordered_extern,
-                           0,
+                           suppress_nn_parallel,
                            vsfx,
                            NULL,
                            NULL,
@@ -22433,6 +22436,18 @@ static int np_conditional_x_weight_row_stream_core(double *vector_scale_factor,
   return np_conditional_x_weight_row_stream_core_impl(vector_scale_factor,
                                                       eval_idx,
                                                       1,
+                                                      0,
+                                                      row_out);
+}
+
+static int np_conditional_x_weight_row_stream_core_suppress(double *vector_scale_factor,
+                                                            int eval_idx,
+                                                            int suppress_nn_parallel,
+                                                            double *row_out){
+  return np_conditional_x_weight_row_stream_core_impl(vector_scale_factor,
+                                                      eval_idx,
+                                                      1,
+                                                      suppress_nn_parallel,
                                                       row_out);
 }
 
@@ -22442,6 +22457,18 @@ static int np_conditional_x_weight_row_full_stream_core(double *vector_scale_fac
   return np_conditional_x_weight_row_stream_core_impl(vector_scale_factor,
                                                       eval_idx,
                                                       0,
+                                                      0,
+                                                      row_out);
+}
+
+static int np_conditional_x_weight_row_full_stream_core_suppress(double *vector_scale_factor,
+                                                                 int eval_idx,
+                                                                 int suppress_nn_parallel,
+                                                                 double *row_out){
+  return np_conditional_x_weight_row_stream_core_impl(vector_scale_factor,
+                                                      eval_idx,
+                                                      0,
+                                                      suppress_nn_parallel,
                                                       row_out);
 }
 
@@ -22459,6 +22486,7 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
                                                     double **matrix_Y_continuous_eval,
                                                     int num_eval,
                                                     int map_train_tree_index,
+                                                    int suppress_nn_parallel,
                                                     double *row_out){
   const int num_train = num_obs_train_extern;
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
@@ -22547,7 +22575,7 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
                            num_var_continuous_extern,
                            num_var_unordered_extern,
                            num_var_ordered_extern,
-                           0,
+                           suppress_nn_parallel,
                            vsfy,
                            NULL,
                            NULL,
@@ -22638,6 +22666,7 @@ static int np_conditional_y_row_stream_op_core(double *vector_scale_factor,
                                                   matrix_Y_continuous_train_extern,
                                                   num_obs_train_extern,
                                                   1,
+                                                  0,
                                                   row_out);
 }
 
@@ -24755,6 +24784,7 @@ static int np_conditional_y_eval_any_block_stream_core(double *vector_scale_fact
                                                        double **matrix_Y_unordered_eval,
                                                        double **matrix_Y_ordered_eval,
                                                        double **matrix_Y_continuous_eval,
+                                                       int suppress_nn_parallel,
                                                        double **rows_out){
   int b;
 
@@ -24770,7 +24800,7 @@ static int np_conditional_y_eval_any_block_stream_core(double *vector_scale_fact
                                                       matrix_Y_ordered_eval,
                                                       matrix_Y_continuous_eval,
                                                       block_rows,
-                                                      0,
+                                                      suppress_nn_parallel,
                                                       rows_out);
   }
 
@@ -24783,6 +24813,7 @@ static int np_conditional_y_eval_any_block_stream_core(double *vector_scale_fact
                                                 matrix_Y_continuous_eval,
                                                 block_rows,
                                                 0,
+                                                suppress_nn_parallel,
                                                 rows_out[b]) != 0)
       return 1;
   }
@@ -24906,18 +24937,48 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
     if(use_parallel_blocks && ((block_id % iNum_Processors) != my_rank))
       continue;
 
+    if(BANDWIDTH_den_extern == BW_GEN_NN){
+      if(np_conditional_x_weight_block_stream_core_suppress(vector_scale_factor,
+                                                            i0,
+                                                            ib,
+                                                            use_parallel_blocks,
+                                                            xblock) != 0){
+        local_fail = 1;
+      }
+      if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) &&
+         (np_conditional_x_weight_block_full_stream_core_suppress(vector_scale_factor,
+                                                                  i0,
+                                                                  ib,
+                                                                  use_parallel_blocks,
+                                                                  xblock_full) != 0))
+        local_fail = 1;
+    } else {
+      for(b = 0; b < ib; b++){
+        const int i = i0 + b;
+
+        if(np_conditional_x_weight_row_stream_core_suppress(vector_scale_factor,
+                                                            i,
+                                                            use_parallel_blocks,
+                                                            xblock[b]) != 0){
+          local_fail = 1;
+          break;
+        }
+        if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) &&
+           (np_conditional_x_weight_row_full_stream_core_suppress(vector_scale_factor,
+                                                                  i,
+                                                                  use_parallel_blocks,
+                                                                  xblock_full[b]) != 0)){
+          local_fail = 1;
+          break;
+        }
+      }
+    }
+    if(local_fail)
+      break;
+
     for(b = 0; b < ib; b++){
       const int i = i0 + b;
 
-      if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xblock[b]) != 0){
-        local_fail = 1;
-        break;
-      }
-      if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) &&
-         (np_conditional_x_weight_row_full_stream_core(vector_scale_factor, i, xblock_full[b]) != 0)){
-        local_fail = 1;
-        break;
-      }
       if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0){
         local_fail = 1;
         break;
@@ -24952,6 +25013,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
                                                      eval_yuno,
                                                      eval_yord,
                                                      eval_ycon,
+                                                     use_parallel_blocks,
                                                      yevalblock) != 0){
         local_fail = 1;
         break;
@@ -25607,6 +25669,7 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
                                                 matrix_Y_continuous_eval_extern,
                                                 num_eval,
                                                 cdfontrain_extern && (num_eval == ctx.num_train),
+                                                0,
                                                 yint) != 0)
       goto cleanup_cdist_all_large;
 
@@ -26275,6 +26338,7 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
                                                     matrix_Y_continuous_eval_extern,
                                                     num_eval,
                                                     cdfontrain_extern && (num_eval == num_train),
+                                                    0,
                                                     yint) != 0)
           goto cleanup_cdist_lp_stream;
       }
