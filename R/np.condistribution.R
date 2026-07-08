@@ -618,6 +618,28 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   } else {
     FALSE
   }
+  uses.nomad.degree.search <- FALSE
+  if (!has.explicit.bws && !bws.formula && !txdat.formula && !dots.formula) {
+    sc.bw.dispatch <- sc
+    sc.bw.dispatch[[1]] <- quote(npcdistbw)
+    ostxy.dispatch <- c("txdat", "tydat")
+    nstxy.dispatch <- c("xdat", "ydat")
+    m.txy.dispatch <- match(ostxy.dispatch, names(sc.bw.dispatch), nomatch = 0)
+    if (any(m.txy.dispatch > 0))
+      names(sc.bw.dispatch)[m.txy.dispatch] <- nstxy.dispatch[m.txy.dispatch > 0]
+    sc.bw.dispatch$newdata <- NULL
+    sc.bw.dispatch$exdat <- NULL
+    sc.bw.dispatch$eydat <- NULL
+    sc.bw.dispatch$gradients <- NULL
+    sc.bw.dispatch$gradient.order <- NULL
+    sc.bw.dispatch$proper <- NULL
+    sc.bw.dispatch$proper.method <- NULL
+    sc.bw.dispatch$proper.control <- NULL
+    uses.nomad.degree.search <- .np_bw_call_uses_nomad_degree_search(
+      sc.bw.dispatch,
+      caller_env = parent.frame()
+    )
+  }
   keep_local_cvls_nn <- if (has.explicit.bws) {
     identical(bws$method, "cv.ls") &&
       (identical(bwtype.request[1L], "adaptive_nn") ||
@@ -644,6 +666,7 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     )
   if (.npRmpi_autodispatch_active() &&
       !npNomadControlRequested(nomad) &&
+      !uses.nomad.degree.search &&
       !keep_local_cvls_nn &&
       !keep_local_raw_degree1_cvls &&
       !bws.formula &&
