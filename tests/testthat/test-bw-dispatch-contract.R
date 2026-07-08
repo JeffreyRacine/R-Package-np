@@ -81,10 +81,7 @@ test_that("formula bandwidth reuse preserves explicit bws objects", {
 })
 
 test_that("formula estimator fronts tolerate omitted legacy regtype defaults", {
-  skip_if_not(
-    identical(Sys.getenv("NP_RUN_SLOW_FORMULA_ESTIMATOR_DISPATCH_MPI"), "true"),
-    "set NP_RUN_SLOW_FORMULA_ESTIMATOR_DISPATCH_MPI=true to run slow formula-estimator dispatch smoke"
-  )
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 

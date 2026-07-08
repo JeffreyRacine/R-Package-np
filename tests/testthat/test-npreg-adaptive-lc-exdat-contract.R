@@ -1,11 +1,5 @@
 skip_slow_npreg_adaptive_lc_exdat_search <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RUN_SLOW_NPREG_ADAPTIVE_LC_EXDAT_MPI"), "true"),
-    paste(
-      "set NP_RUN_SLOW_NPREG_ADAPTIVE_LC_EXDAT_MPI=true to run the slow",
-      "computed adaptive-nn lc exdat bandwidth-search smoke"
-    )
-  )
+  skip_on_cran()
 }
 
 check_adaptive_lc_exdat_mean <- function(bw, tx, y, ex) {

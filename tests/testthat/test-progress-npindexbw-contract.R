@@ -35,19 +35,25 @@ capture_progress_conditions <- function(expr) {
   messages <- character()
   warnings <- character()
 
-  value <- withCallingHandlers(
-    expr,
-    message = function(m) {
-      messages <<- c(messages, conditionMessage(m))
-      invokeRestart("muffleMessage")
-    },
-    warning = function(w) {
-      warnings <<- c(warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
+  message_output <- capture.output(
+    output <- capture.output(
+      value <- withCallingHandlers(
+        expr,
+        message = function(m) {
+          messages <<- c(messages, conditionMessage(m))
+          invokeRestart("muffleMessage")
+        },
+        warning = function(w) {
+          warnings <<- c(warnings, conditionMessage(w))
+          invokeRestart("muffleWarning")
+        }
+      ),
+      type = "output"
+    ),
+    type = "message"
   )
 
-  list(value = value, messages = messages, warnings = warnings)
+  list(value = value, messages = c(messages, output, message_output), warnings = warnings)
 }
 
 normalize_messages <- function(x) {
@@ -65,10 +71,7 @@ progress_time_counter <- function(start = 0, by = 0.6) {
 }
 
 skip_live_route_slice <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
-    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
-  )
+  skip_on_cran()
 }
 
 test_that("npindexbw adopts the generic bandwidth selection line", {
@@ -92,8 +95,7 @@ test_that("npindexbw adopts the generic bandwidth selection line", {
     list(
       .np_progress_is_interactive = function() TRUE,
       .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
+      .np_progress_now = progress_time_counter()
     ),
     capture_progress_conditions(
       npindexbw(
@@ -112,7 +114,7 @@ test_that("npindexbw adopts the generic bandwidth selection line", {
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(2/3, iter [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", messages)))
 })
 
@@ -133,8 +135,7 @@ test_that("npindexbw progress respects np.messages FALSE", {
     list(
       .np_progress_is_interactive = function() TRUE,
       .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
+      .np_progress_now = progress_time_counter()
     ),
     capture_progress_conditions(
       npindexbw(
@@ -167,8 +168,7 @@ test_that("npindexbw progress respects suppressMessages", {
     list(
       .np_progress_is_interactive = function() TRUE,
       .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter(),
-      .npRmpi_autodispatch_active = function() FALSE
+      .np_progress_now = progress_time_counter()
     ),
     capture_progress_conditions(
       suppressMessages(

@@ -24,10 +24,7 @@ capture_progress_shadow_with_conditions <- function(expr, force_renderer = NULL,
 }
 
 skip_live_route_slice <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
-    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
-  )
+  skip_on_cran()
 }
 
 progress_time_counter <- function(start = 0, by = 2.1) {

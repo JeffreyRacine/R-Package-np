@@ -71,8 +71,7 @@ is_npreghat_error_symmetry_mpi_init_failure <- function(output) {
 
 test_that("public npreghat invalid derivative errors before active-pool broadcast", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode npreghat error-symmetry smoke")
+  skip_on_cran()
 
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")

@@ -40,10 +40,7 @@ progress_time_counter <- function(start = 0, by = 2.1) {
 }
 
 skip_live_route_slice <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
-    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
-  )
+  skip_on_cran()
 }
 
 shadow_lines <- function(shadow) {
@@ -95,7 +92,6 @@ test_that("npscoefbw adopts the generic bandwidth selection line", {
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/2\\)$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 50\\.0%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
 })
 

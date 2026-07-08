@@ -640,8 +640,7 @@ test_that("session npreg nomad route keeps visible powell handoff in subprocess"
 
 test_that("attach npreg nomad route does not duplicate fit-start lines in subprocess", {
   skip_if_not_installed("crs")
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
 
   actual <- run_npreg_attach_progress_contract()
   block <- npreg_case_progress_lines(actual$lines)
@@ -657,8 +656,7 @@ test_that("attach npreg nomad route does not duplicate fit-start lines in subpro
 
 test_that("profile npreg nomad route keeps visible powell handoff in subprocess", {
   skip_if_not_installed("crs")
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  skip_on_cran()
 
   actual <- run_npreg_profile_progress_contract()
   block <- npreg_case_progress_lines(actual$lines)

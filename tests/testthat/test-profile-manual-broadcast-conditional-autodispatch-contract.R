@@ -69,8 +69,7 @@ subprocess_env <- function(extra = character()) {
 
 test_that("profile manual-broadcast user-style conditional fixed-bandwidth routes stay stable with autodispatch enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 

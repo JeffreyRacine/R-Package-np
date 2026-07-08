@@ -4,10 +4,7 @@ nomad_shortcut_env <- function() {
     tolower(Sys.getenv("NOT_CRAN", "")) %in% c("true", "1", "yes"),
     "extended local subprocess NOMAD shortcut contract"
   )
-  skip_if_not(
-    identical(Sys.getenv("NP_RUN_SLOW_NOMAD_SHORTCUT_SUBPROCESS"), "true"),
-    "set NP_RUN_SLOW_NOMAD_SHORTCUT_SUBPROCESS=true to run slow NOMAD shortcut subprocess contracts"
-  )
+  skip_on_cran()
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   env

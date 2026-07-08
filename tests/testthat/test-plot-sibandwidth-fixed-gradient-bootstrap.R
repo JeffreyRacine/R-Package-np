@@ -20,10 +20,7 @@ explicit_singleindex_grad_index <- function(bw, tx, y, counts_vec) {
 }
 
 skip_singleindex_internal_helper_if_default <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_PLOT_INDEX_INTERNAL_HELPER_TESTS"), "true"),
-    "single-index internal gradient helper proof is opt-in; public plot route is covered by the default gate"
-  )
+  skip_on_cran()
 }
 
 test_that("fixed single-index gradient helper returns finite gradients", {

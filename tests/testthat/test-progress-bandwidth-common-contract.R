@@ -688,8 +688,7 @@ test_that("session selector routes avoid adjacent duplicate bandwidth lines", {
 })
 
 test_that("attach selector routes avoid adjacent duplicate bandwidth lines", {
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
 
   actual <- run_bandwidth_attach_contract()
 
@@ -705,8 +704,7 @@ test_that("attach selector routes avoid adjacent duplicate bandwidth lines", {
 })
 
 test_that("profile selector routes avoid adjacent duplicate bandwidth lines", {
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  skip_on_cran()
 
   actual <- run_bandwidth_profile_contract()
 

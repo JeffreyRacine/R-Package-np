@@ -1,13 +1,7 @@
 library(npRmpi)
 
 skip_slow_npcdistbw_degree_search <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RUN_SLOW_NPCDISTBW_DEGREE_SEARCH_MPI"), "true"),
-    paste(
-      "set NP_RUN_SLOW_NPCDISTBW_DEGREE_SEARCH_MPI=true to run slow",
-      "npcdistbw degree-search MPI contracts"
-    )
-  )
+  skip_on_cran()
 }
 
 with_nprmpi_npcdist_degree_bindings <- function(bindings, code) {

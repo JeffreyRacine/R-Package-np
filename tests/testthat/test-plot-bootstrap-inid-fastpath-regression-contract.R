@@ -1,8 +1,19 @@
 skip_exact_refit_contracts_if_disabled <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_PLOT_EXACT_REFIT_TESTS"), "true"),
-    "set NP_PLOT_EXACT_REFIT_TESTS=true to run exact refit helper contracts"
-  )
+  skip_on_cran()
+}
+
+exact_refit_smoke_tolerance <- function(label) {
+  ## Raw tensor LP refits with duplicate bootstrap rows are numerically more
+  ## sensitive than the algebraic fast helper. Serial np and npRmpi agree on
+  ## this scale; keep the wider tolerance local to that contract.
+  if (identical(label, "lp-tensor")) 1e-4 else 1e-6
+}
+
+with_public_autodispatch <- function(expr) {
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+  force(expr)
 }
 
 test_that("npindex inid fast path matches explicit resample refits", {
@@ -105,19 +116,26 @@ test_that("npindex ll/lp inid fast path matches explicit resample refits", {
     explicit.t <- matrix(NA_real_, nrow = B, ncol = n)
     for (b in seq_len(B)) {
       idx <- rep.int(seq_len(n), counts[, b])
-      explicit.t[b, ] <- npindex(
+      explicit.t[b, ] <- with_public_autodispatch(npindex(
         txdat = tx[idx, , drop = FALSE],
         tydat = y[idx],
         exdat = tx,
         bws = bw,
         gradients = FALSE
-      )$mean
+      )$mean)
     }
 
-    expect_equal(fast.out$t, explicit.t, tolerance = 1e-6, info = cfg$label)
+    expect_equal(
+      fast.out$t,
+      explicit.t,
+      tolerance = exact_refit_smoke_tolerance(cfg$label),
+      info = cfg$label
+    )
     expect_equal(
       fast.out$t0,
-      npindex(txdat = tx, tydat = y, exdat = tx, bws = bw, gradients = FALSE)$mean,
+      with_public_autodispatch(
+        npindex(txdat = tx, tydat = y, exdat = tx, bws = bw, gradients = FALSE)$mean
+      ),
       tolerance = 1e-6,
       info = cfg$label
     )
@@ -176,20 +194,27 @@ test_that("npreg inid ll/lp fast path matches explicit resample refits", {
     explicit.t <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
     for (b in seq_len(B)) {
       idx <- rep.int(seq_len(n), counts[, b])
-      explicit.t[b, ] <- npreg(
+      explicit.t[b, ] <- with_public_autodispatch(npreg(
         txdat = tx[idx, , drop = FALSE],
         tydat = y[idx],
         exdat = ex,
         bws = bw,
         gradients = FALSE,
         warn.glp.gradient = FALSE
-      )$mean
+      )$mean)
     }
 
-    expect_equal(fast.out$t, explicit.t, tolerance = 1e-6, info = cfg$label)
+    expect_equal(
+      fast.out$t,
+      explicit.t,
+      tolerance = exact_refit_smoke_tolerance(cfg$label),
+      info = cfg$label
+    )
     expect_equal(
       fast.out$t0,
-      npreg(txdat = tx, tydat = y, exdat = ex, bws = bw, gradients = FALSE, warn.glp.gradient = FALSE)$mean,
+      with_public_autodispatch(
+        npreg(txdat = tx, tydat = y, exdat = ex, bws = bw, gradients = FALSE, warn.glp.gradient = FALSE)$mean
+      ),
       tolerance = 1e-6,
       info = cfg$label
     )
@@ -348,26 +373,28 @@ test_that("npreg inid fast path supports continuous-slice gradients", {
   explicit.t <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
   for (b in seq_len(B)) {
     idx <- rep.int(seq_len(n), counts[, b])
-    explicit.t[b, ] <- npreg(
-      txdat = tx[idx, , drop = FALSE],
-      tydat = y[idx],
+      explicit.t[b, ] <- with_public_autodispatch(npreg(
+        txdat = tx[idx, , drop = FALSE],
+        tydat = y[idx],
+        exdat = ex,
+        bws = bw,
+        gradients = TRUE,
+        gradient.order = 1L,
+        warn.glp.gradient = FALSE
+      )$grad[, 1L])
+  }
+
+  fit0 <- with_public_autodispatch(
+    npreg(
+      txdat = tx,
+      tydat = y,
       exdat = ex,
       bws = bw,
       gradients = TRUE,
       gradient.order = 1L,
       warn.glp.gradient = FALSE
     )$grad[, 1L]
-  }
-
-  fit0 <- npreg(
-    txdat = tx,
-    tydat = y,
-    exdat = ex,
-    bws = bw,
-    gradients = TRUE,
-    gradient.order = 1L,
-    warn.glp.gradient = FALSE
-  )$grad[, 1L]
+  )
 
   expect_equal(fast.out$t, explicit.t, tolerance = 1e-6)
   expect_equal(as.vector(fast.out$t0), as.vector(fit0), tolerance = 1e-6)

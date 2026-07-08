@@ -23,10 +23,7 @@ shadow_lines <- function(shadow) {
 }
 
 skip_live_route_slice <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
-    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
-  )
+  skip_on_cran()
 }
 
 npqcmstest_fun <- function(...) {
@@ -36,14 +33,15 @@ npqcmstest_fun <- function(...) {
 test_that("npqcmstest single-line bootstrap progress matches legacy semantics", {
   skip_on_cran()
   skip_live_route_slice()
+  skip_if_not_installed("quantreg")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   set.seed(42)
   n <- 40
   x <- rnorm(n)
-  y <- x + rnorm(n, sd = 0.5)
-  model <- lm(y ~ x)
+  y <- 1 + x + rnorm(n, sd = 0.1)
+  model <- quantreg::rq(y ~ x, tau = 0.5, model = TRUE)
 
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)
@@ -63,7 +61,7 @@ test_that("npqcmstest single-line bootstrap progress matches legacy semantics", 
 
   lines <- shadow_lines(single_line)
 
-  expect_s3_class(single_line$value, "qcmstest")
+  expect_s3_class(single_line$value, "cmstest")
   expect_equal(shadow_bootstrap_signature(single_line), shadow_bootstrap_signature(legacy))
   expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications [0-9]+/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
@@ -72,14 +70,15 @@ test_that("npqcmstest single-line bootstrap progress matches legacy semantics", 
 test_that("npqcmstest progress respects np.messages FALSE", {
   skip_on_cran()
   skip_live_route_slice()
+  skip_if_not_installed("quantreg")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   set.seed(42)
   n <- 40
   x <- rnorm(n)
-  y <- x + rnorm(n, sd = 0.5)
-  model <- lm(y ~ x)
+  y <- 1 + x + rnorm(n, sd = 0.1)
+  model <- quantreg::rq(y ~ x, tau = 0.5, model = TRUE)
 
   old_opts <- options(np.messages = FALSE)
   on.exit(options(old_opts), add = TRUE)
@@ -95,14 +94,15 @@ test_that("npqcmstest progress respects np.messages FALSE", {
 test_that("npqcmstest progress respects suppressMessages", {
   skip_on_cran()
   skip_live_route_slice()
+  skip_if_not_installed("quantreg")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   set.seed(42)
   n <- 40
   x <- rnorm(n)
-  y <- x + rnorm(n, sd = 0.5)
-  model <- lm(y ~ x)
+  y <- 1 + x + rnorm(n, sd = 0.1)
+  model <- quantreg::rq(y ~ x, tau = 0.5, model = TRUE)
 
   old_opts <- options(np.messages = TRUE)
   on.exit(options(old_opts), add = TRUE)

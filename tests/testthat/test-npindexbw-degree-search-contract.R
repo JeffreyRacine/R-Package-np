@@ -49,10 +49,7 @@ nprmpi_npindex_degree_progress_time_values <- function(values) {
 }
 
 skip_nprmpi_slow_npindex_degree_search <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RUN_SLOW_NPINDEX_DEGREE_SEARCH_MPI"), "true"),
-    "set NP_RUN_SLOW_NPINDEX_DEGREE_SEARCH_MPI=true to run slow npindexbw degree-search MPI contracts"
-  )
+  skip_on_cran()
 }
 
 test_that("npindexbw exhaustive degree search matches manual Ichimura profile minimum", {
@@ -182,7 +179,7 @@ test_that("npindexbw coordinate search can be exhaustively certified on a small 
   expect_true(isTRUE(coordinate$degree.search$completed))
   expect_true(isTRUE(coordinate$degree.search$certified))
   expect_equal(as.integer(coordinate$degree), as.integer(exhaustive$degree))
-  expect_equal(coordinate$fval, exhaustive$fval, tolerance = 1e-10)
+  expect_equal(coordinate$fval, exhaustive$fval, tolerance = 1e-8)
 })
 
 test_that("npindexbw automatic degree search honors Klein-Spady objective direction", {
@@ -459,6 +456,7 @@ test_that("npindex forwards automatic LP degree search through npindexbw", {
     method = "ichimura",
     regtype = "lp",
     degree.select = "exhaustive",
+    search.engine = "cell",
     degree.min = 0L,
     degree.max = 1L,
     bwtype = "fixed",

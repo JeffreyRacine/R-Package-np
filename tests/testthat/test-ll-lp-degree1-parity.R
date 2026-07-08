@@ -1,9 +1,5 @@
 skip_slow_ll_lp_degree1_parity <- function() {
-  run_slow <- tolower(Sys.getenv("NP_RUN_SLOW_LL_LP_PARITY", ""))
-  skip_if_not(
-    run_slow %in% c("1", "true", "yes"),
-    "slow LL/LP degree-1 parity suite; set NP_RUN_SLOW_LL_LP_PARITY=true to run"
-  )
+  skip_on_cran()
 }
 
 test_that("npreg cv objective and bandwidths match for ll and lp(degree=1)", {

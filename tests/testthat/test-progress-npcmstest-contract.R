@@ -23,10 +23,7 @@ shadow_lines <- function(shadow) {
 }
 
 skip_live_route_slice <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
-    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
-  )
+  skip_on_cran()
 }
 
 npcmstest_fun <- function(...) {

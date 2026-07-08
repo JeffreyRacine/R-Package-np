@@ -75,16 +75,12 @@ test_that("npcdens cell cv.ml exhaustive search maximizes over degrees", {
 })
 
 test_that("npcdens nomad cv.ml retains the best objective found", {
-  run_slow <- tolower(Sys.getenv("NP_RUN_SLOW_NPCDENS_NOMAD_METADATA", ""))
-  skip_if_not(
-    run_slow %in% c("1", "true", "yes"),
-    "slow npcdens NOMAD/Powell metadata sentinel; set NP_RUN_SLOW_NPCDENS_NOMAD_METADATA=true to run"
-  )
+  skip_on_cran()
   skip_if_not(spawn_mpi_slaves(1L))
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   set.seed(42)
-  n <- 60
+  n <- 12
   x <- runif(n)
   y <- rbeta(n, 1, 1)
 
@@ -95,13 +91,14 @@ test_that("npcdens nomad cv.ml retains the best objective found", {
     cykerbound = "range",
     regtype = "lp",
     degree.min = 0,
-    degree.max = 3,
+    degree.max = 1,
     degree.select = "coordinate",
     search.engine = "nomad+powell",
     degree.verify = FALSE,
     bwtype = "fixed",
     bwmethod = "cv.ml",
-    nmulti = 2
+    nmulti = 1,
+    nomad.opts = list(MAX_BB_EVAL = 8)
   )
 
   expect_true(is.finite(auto$bws$degree.search$baseline.fval))

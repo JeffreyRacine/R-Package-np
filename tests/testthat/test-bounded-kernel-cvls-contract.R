@@ -1,11 +1,7 @@
 library(npRmpi)
 
 skip_slow_bounded_cvls_matrix <- function() {
-  run_slow <- tolower(Sys.getenv("NP_RUN_SLOW_BOUNDED_CVLS", ""))
-  skip_if_not(
-    run_slow %in% c("1", "true", "yes"),
-    "slow bounded cv.ls optimizer matrix; set NP_RUN_SLOW_BOUNDED_CVLS=true to run"
-  )
+  skip_on_cran()
 }
 
 test_that("bounded cv.ls remains finite for gaussian order 2 and 4", {

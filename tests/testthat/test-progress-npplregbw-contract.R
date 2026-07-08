@@ -40,10 +40,7 @@ progress_time_counter <- function(start = 0, by = 1.7) {
 }
 
 skip_live_route_slice <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RMPI_PROGRESS_LIVE_ROUTE_TESTS", ""), "true"),
-    "live npRmpi route slice is gated to manual session/attach/profile proof artifacts"
-  )
+  skip_on_cran()
 }
 
 shadow_lines <- function(shadow) {
@@ -73,8 +70,7 @@ test_that("npplregbw uses coordinated generic bandwidth selection progress", {
       .np_progress_is_interactive = function() TRUE,
       .np_progress_is_master = function() TRUE,
       .np_progress_now = progress_time_counter(),
-      .np_progress_output_width = function() 500L,
-      .npRmpi_autodispatch_active = function() FALSE
+      .np_progress_output_width = function() 500L
     ),
     capture_progress_shadow_trace(
       npplregbw(
@@ -90,10 +86,10 @@ test_that("npplregbw uses coordinated generic bandwidth selection progress", {
   lines <- shadow_lines(actual)
 
   expect_s3_class(actual$value, "plbandwidth")
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(y~z, multistart 1/2\\)$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(y~z, multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(x1~z, multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(x1~z, multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(E\\[y\\|z\\], multistart 1/2\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(E\\[y\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(E\\[x\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(E\\[x\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
 })
 
 test_that("npplreg formula entry inherits coordinated generic bandwidth progress", {
@@ -118,8 +114,7 @@ test_that("npplreg formula entry inherits coordinated generic bandwidth progress
       .np_progress_is_interactive = function() TRUE,
       .np_progress_is_master = function() TRUE,
       .np_progress_now = progress_time_counter(),
-      .np_progress_output_width = function() 500L,
-      .npRmpi_autodispatch_active = function() FALSE
+      .np_progress_output_width = function() 500L
     ),
     capture_progress_shadow_trace(
       npplreg(
@@ -134,7 +129,7 @@ test_that("npplreg formula entry inherits coordinated generic bandwidth progress
   lines <- shadow_lines(actual)
 
   expect_s3_class(actual$value, "plregression")
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(y~z, multistart 1/2\\)$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(x1~z, multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(x1~z, multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(E\\[y\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(E\\[x\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(E\\[x\\|z\\], multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
 })

@@ -1,11 +1,5 @@
 skip_slow_nplsqreg_refined_tau_search <- function() {
-  skip_if_not(
-    identical(Sys.getenv("NP_RUN_SLOW_NPLSQREG_REFINED_TAU_MPI"), "true"),
-    paste(
-      "set NP_RUN_SLOW_NPLSQREG_REFINED_TAU_MPI=true to run the slow",
-      "refined tau-search control-retention smoke"
-    )
-  )
+  skip_on_cran()
 }
 
 test_that("npRmpi nplsqreg direct routes omit incomplete training rows and realign output", {

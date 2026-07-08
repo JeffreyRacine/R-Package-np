@@ -757,8 +757,7 @@ test_that("session npcdist nomad route keeps visible powell handoff in subproces
 
 test_that("attach npcdens nomad route keeps visible powell handoff in subprocess", {
   skip_if_not_installed("crs")
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
 
   actual <- run_condensdist_attach_progress_contract()
   block <- condensdist_case_progress_lines(actual$lines, "npcdens")
@@ -784,8 +783,7 @@ test_that("attach npcdens nomad route keeps visible powell handoff in subprocess
 
 test_that("attach npcdens nomad route does not duplicate fit-start lines in subprocess", {
   skip_if_not_installed("crs")
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
 
   actual <- run_condensdist_attach_progress_contract()
   block <- condensdist_case_progress_lines(actual$lines, "npcdens")
@@ -800,8 +798,7 @@ test_that("attach npcdens nomad route does not duplicate fit-start lines in subp
 
 test_that("profile npcdens nomad route keeps visible powell handoff in subprocess", {
   skip_if_not_installed("crs")
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  skip_on_cran()
 
   actual <- run_condensdist_profile_progress_contract()
   block <- condensdist_case_progress_lines(actual$lines, "npcdens")

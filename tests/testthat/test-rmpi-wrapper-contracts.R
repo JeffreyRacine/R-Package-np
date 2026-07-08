@@ -222,8 +222,7 @@ test_that("string wrappers do not truncate to hostile receiver placeholders in s
 })
 
 test_that("wrapper attach smoke stays green under mpiexec when enabled", {
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode wrapper smoke")
+  skip_on_cran()
 
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
@@ -278,8 +277,7 @@ test_that("wrapper attach smoke stays green under mpiexec when enabled", {
 })
 
 test_that("wrapper profile smoke stays green under mpiexec when enabled", {
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode wrapper smoke")
+  skip_on_cran()
 
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
@@ -337,8 +335,7 @@ test_that("wrapper profile smoke stays green under mpiexec when enabled", {
 })
 
 test_that("supported string send/recv and bcast stay green under profile mpiexec when enabled", {
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode wrapper smoke")
+  skip_on_cran()
 
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")

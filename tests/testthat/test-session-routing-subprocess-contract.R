@@ -1341,8 +1341,7 @@ test_that("session npindex geom-block consumer plot preserves bwtype variants in
 
 test_that("session inid density plot smoke completes in subprocess", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_DENSITY_INID_TEST"), "1"),
-              "set NP_RMPI_ENABLE_DENSITY_INID_TEST=1 to run density inid session smoke")
+  skip_on_cran()
   env <- subprocess_env()
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   res <- run_rscript_subprocess(
@@ -1515,8 +1514,7 @@ test_that("manual-broadcast mode smoke completes in subprocess", {
 
 test_that("attach mode smoke completes under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -1631,8 +1629,7 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
 
 test_that("attach npindexhat adaptive-nn exact owner route completes under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -1702,8 +1699,7 @@ test_that("attach npindexhat adaptive-nn exact owner route completes under mpiex
 
 test_that("attach npindexhat adaptive-nn ll owner route stays exact under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -1781,8 +1777,7 @@ test_that("attach npindexhat adaptive-nn ll owner route stays exact under mpiexe
 
 test_that("attach npindex adaptive-nn public route preserves bwtype semantics under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -1854,8 +1849,7 @@ test_that("attach npindex adaptive-nn public route preserves bwtype semantics un
 
 test_that("attach npindex nearest-neighbor exact route stays green under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -1931,8 +1925,7 @@ test_that("attach npindex nearest-neighbor exact route stays green under mpiexec
 
 test_that("attach smooth-coefficient ll coef plot-data route completes under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -2008,8 +2001,7 @@ test_that("attach smooth-coefficient ll coef plot-data route completes under mpi
 
 test_that("attach mode NP transition close stays stable when stress test is enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_STRESS_TEST"), "1"),
-              "set NP_RMPI_ENABLE_ATTACH_STRESS_TEST=1 to run attach close stress")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -2087,8 +2079,7 @@ test_that("attach mode NP transition close stays stable when stress test is enab
 
 test_that("profile mode smoke completes under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -2226,8 +2217,7 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
 
 test_that("profile npindexhat adaptive-nn exact owner route completes under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -2308,8 +2298,7 @@ test_that("profile npindexhat adaptive-nn exact owner route completes under mpie
 
 test_that("profile npindexhat adaptive-nn ll owner route stays exact under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -2400,8 +2389,7 @@ test_that("profile npindexhat adaptive-nn ll owner route stays exact under mpiex
 
 test_that("profile npindex adaptive-nn public route preserves bwtype semantics under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
@@ -2486,8 +2474,7 @@ test_that("profile npindex adaptive-nn public route preserves bwtype semantics u
 
 test_that("profile npindex nearest-neighbor exact route stays green under mpiexec when enabled", {
   skip_on_cran()
-  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_PROFILE_TEST"), "1"),
-              "set NP_RMPI_ENABLE_PROFILE_TEST=1 to run profile-mode smoke")
+  skip_on_cran()
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 

@@ -65,11 +65,7 @@ local_npRmpi_subprocess_env <- function(extra = character()) {
 }
 
 skip_slow_npcdens_fitted_subprocess <- function() {
-  run_slow <- tolower(Sys.getenv("NP_RUN_SLOW_NPCDENS_FITTED_SUBPROCESS", ""))
-  skip_if_not(
-    run_slow %in% c("1", "true", "yes"),
-    "slow npRmpi fitted-subprocess smoke; set NP_RUN_SLOW_NPCDENS_FITTED_SUBPROCESS=true to run"
-  )
+  skip_on_cran()
 }
 
 test_that("npcdens formula route keeps estimator-only proper arguments out of bandwidth selection", {

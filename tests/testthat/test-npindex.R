@@ -265,10 +265,7 @@ test_that("npindex supports residual and mean-error branches with evaluation y d
 })
 
 test_that("npindex supports gradient-error branches with evaluation y data", {
-  skip_if_not(
-    identical(Sys.getenv("NP_RUN_SLOW_NPINDEX_GRADIENT_ERRORS_MPI"), "true"),
-    "set NP_RUN_SLOW_NPINDEX_GRADIENT_ERRORS_MPI=true to run slow npindex gradient-error MPI sentinel"
-  )
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
