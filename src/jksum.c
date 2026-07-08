@@ -2401,6 +2401,10 @@ static inline void np_cont_largeh_cache_clear(void){
   np_runtime_tol_cache_ready = 0;
 }
 
+void np_cont_largeh_cache_clear_extern(void){
+  np_cont_largeh_cache_clear();
+}
+
 static int np_disc_profile_cache_match(const int num_xt,
                                        const int num_reg_unordered,
                                        const int num_reg_ordered,

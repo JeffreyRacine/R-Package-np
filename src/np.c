@@ -15346,6 +15346,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int scale_cat;
   const char *bw_error_msg = NULL;
 
+  np_cont_largeh_cache_clear_extern();
   num_reg_continuous_extern = myopti[RBW_NCONI];
   num_reg_unordered_extern = myopti[RBW_NUNOI];
   num_reg_ordered_extern = myopti[RBW_NORDI];
@@ -16204,6 +16205,7 @@ cleanup_np_regression_bw_mode:
   int_TREE_PROFILE_X = NP_TREE_FALSE;
 
   np_glp_cv_clear_extern();
+  np_cont_largeh_cache_clear_extern();
   np_reg_cv_core_clear_extern();
 
   int_cker_bound_extern = 0;
