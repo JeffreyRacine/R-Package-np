@@ -31,6 +31,10 @@ mknpkg.sh
 ^\.Rlib/
 ^Rplots\.pdf$
 ^tests/testthat/Rplots\.pdf$
+^man/run$
+^man/dontrun$
+^man/sed_run\.scr$
+^man/sed_dontrun\.scr$
 
 ^benchmarks/oneoff
 ^benchmarks/perf
