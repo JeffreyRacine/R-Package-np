@@ -495,10 +495,12 @@ x2 <- ifelse(abs(x) < 2 , x, 2) / 0.8796
 
 y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
 
+data.train <- data.frame(y = factor(y), x1 = x1, x2 = x2)
+
 # Generate data-driven bandwidths (likelihood cross-validation). Note -
 # this may take a few minutes depending on the speed of your computer...
 
-bw <- npcdensbw(formula=factor(y)~x1+x2, nmulti=1)
+bw <- npcdensbw(formula=y~x1+x2, data=data.train, nmulti=1)
 
 # Next, create the evaluation data in order to generate a perspective
 # plot
@@ -507,7 +509,11 @@ x1.seq <- seq(min(x1), max(x1), length=30)
 x2.seq <- seq(min(x2), max(x2), length=30)
 X.eval <- expand.grid(x1=x1.seq,x2=x2.seq)
 
-data.eval <- data.frame(y=factor(rep(1, nrow(X.eval))),x1=X.eval[,1],x2=X.eval[,2])
+data.eval <- data.frame(
+  y=factor(rep(1, nrow(X.eval)), levels=levels(data.train$y)),
+  x1=X.eval[,1],
+  x2=X.eval[,2]
+)
 
 # Now evaluate the conditional probability for y=1 and for the
 # evaluation Xs
@@ -559,11 +565,12 @@ y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
 # Create the X matrix
 
 X <- cbind(x1, x2)
+y.factor <- factor(y)
 
 # Generate data-driven bandwidths (likelihood cross-validation). Note -
 # this may take a few minutes depending on the speed of your computer...
 
-bw <- npcdensbw(xdat=X, ydat=factor(y), nmulti=1)
+bw <- npcdensbw(xdat=X, ydat=y.factor, nmulti=1)
 
 # Next, create the evaluation data in order to generate a perspective
 # plot
@@ -576,7 +583,7 @@ X.eval <- expand.grid(x1=x1.seq,x2=x2.seq)
 # evaluation Xs
 
 fit <- fitted(npcdens(exdat=X.eval,
-               eydat=factor(rep(1, nrow(X.eval))),
+               eydat=factor(rep(1, nrow(X.eval)), levels=levels(y.factor)),
                bws=bw))
 
 # Finally, coerce the data into a matrix for plotting with persp()
