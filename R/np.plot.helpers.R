@@ -3912,8 +3912,6 @@
       gradient.order = gradient.order,
       local.mode = use.local.direct
     )
-    if (isTRUE(gradients) && isTRUE(xi.factor))
-      return(.np_plot_factor_contrast_vector(fit$mean))
     if (isTRUE(gradients))
       as.vector(fit$grad[, slice.index])
     else
@@ -4134,8 +4132,6 @@
       gradient.order = gradient.order,
       local.mode = use.local.direct
     )
-    if (isTRUE(gradients) && isTRUE(xi.factor))
-      return(.np_plot_factor_contrast_vector(fit$mean))
     if (isTRUE(gradients))
       as.vector(fit$grad[, slice.index])
     else

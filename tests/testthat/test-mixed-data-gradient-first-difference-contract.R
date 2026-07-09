@@ -54,8 +54,24 @@ test_that("categorical-only regression gradient plots are allowed under autodisp
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
 
-  expect_no_error(plot(npRmpi::npreg(y ~ xo, data = dat), gradients = TRUE))
-  expect_no_error(plot(npRmpi::npreg(y ~ xu, data = dat), gradients = TRUE))
+  fit.ord <- npRmpi::npreg(y ~ xo, data = dat)
+  ord.eval <- data.frame(xo = ordered(levels(dat$xo), levels = levels(dat$xo)))
+  ord.direct <- npRmpi::npreg(bws = fit.ord$bws, exdat = ord.eval,
+                              gradients = TRUE)$grad[, 1L]
+  ord.plot <- plot(fit.ord, gradients = TRUE, plot.behavior = "data")
+  expect_equal(as.numeric(ord.plot[[1L]]$grad), as.numeric(ord.direct),
+               tolerance = 1e-12)
+
+  fit.uno <- npRmpi::npreg(y ~ xu, data = dat)
+  uno.eval <- data.frame(xu = factor(levels(dat$xu), levels = levels(dat$xu)))
+  uno.direct <- npRmpi::npreg(bws = fit.uno$bws, exdat = uno.eval,
+                              gradients = TRUE)$grad[, 1L]
+  uno.plot <- plot(fit.uno, gradients = TRUE, plot.behavior = "data")
+  expect_equal(as.numeric(uno.plot[[1L]]$grad), as.numeric(uno.direct),
+               tolerance = 1e-12)
+
+  expect_no_error(plot(fit.ord, gradients = TRUE))
+  expect_no_error(plot(fit.uno, gradients = TRUE))
 })
 
 test_that("categorical-only conditional gradient accessors validate first differences under autodispatch", {
