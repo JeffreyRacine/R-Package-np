@@ -41,6 +41,52 @@ test_that("session-route wild categorical regression gradient helper matches exp
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session-route ordered regression gradient wild bootstrap targets adjacent differences", {
+  skip_on_cran()
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "options(npRmpi.autodispatch = FALSE, np.messages = FALSE)",
+      "npRmpi.init(nslaves = 1, quiet = TRUE)",
+      "on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
+      "wild_helper <- getFromNamespace('.np_plot_boot_from_hat_wild', 'npRmpi')",
+      "ordered_gradient_matrix <- function(x) { dx <- x[, -1L, drop = FALSE] - x[, -ncol(x), drop = FALSE]; cbind(dx[, 1L], dx) }",
+      "ordered_gradient_vector <- function(x) { dx <- diff(x); c(dx[1L], dx) }",
+      "set.seed(20260709)",
+      "n <- 60L",
+      "o <- ordered(rep(seq_len(5L), length.out = n), levels = seq_len(5L))",
+      "y <- as.numeric(o) + rnorm(n, sd = 0.08)",
+      "xdat <- data.frame(o = o)",
+      "bw <- npregbw(xdat = xdat, ydat = y, regtype = 'lc', bwtype = 'fixed', bws = 0.25, bandwidth.compute = FALSE)",
+      "fit <- npreg(bws = bw, txdat = xdat, tydat = y, gradients = TRUE, errors = TRUE)",
+      "base <- plot(fit, xdat = xdat, ydat = y, output = 'data', perspective = FALSE, gradients = TRUE)[[1L]]",
+      "exdat <- base$eval",
+      "H <- npreghat(bws = bw, txdat = xdat, exdat = exdat, output = 'matrix')",
+      "fit.mean <- as.vector(npreghat(bws = bw, txdat = xdat, exdat = xdat, y = y, output = 'apply'))",
+      "B <- 31L",
+      "set.seed(33)",
+      "expected.level <- wild_helper(H = H, ydat = y, fit.mean = fit.mean, B = B, wild = 'rademacher')",
+      "expected.t <- ordered_gradient_matrix(expected.level$t)",
+      "expected.t0 <- ordered_gradient_vector(expected.level$t0)",
+      "set.seed(33)",
+      "out <- plot(fit, xdat = xdat, ydat = y, output = 'data', perspective = FALSE, gradients = TRUE, errors = 'bootstrap', plot.errors.type = 'pmzsd', plot.errors.boot.method = 'wild', plot.errors.boot.wild = 'rademacher', plot.errors.boot.num = B, random.seed = 33)[[1L]]",
+      "expected.hw <- qnorm(0.05 / 2, lower.tail = FALSE) * apply(expected.t, 2L, stats::sd)",
+      "stopifnot(isTRUE(all.equal(as.vector(out$grad), as.vector(expected.t0), tolerance = 1e-10)))",
+      "stopifnot(isTRUE(all.equal(out$gerr[, 2L], expected.hw, tolerance = 1e-10)))",
+      "cat('RBAND_ORDERED_CATGRAD_WILD_TARGET_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("RBAND_ORDERED_CATGRAD_WILD_TARGET_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session-route categorical regression gradient bootstrap works for default and wild routes", {
   skip_on_cran()
   env <- npRmpi_subprocess_env()
