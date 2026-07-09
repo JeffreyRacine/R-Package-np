@@ -641,13 +641,7 @@
           need.asymptotic = identical(plot.errors.method, "asymptotic")
         )
 
-        temp.mean[seq_len(xi.neval)] = if (gradients && xi.factor) {
-          .np_plot_factor_contrast_vector(tr$mean)
-        } else if (gradients) {
-          tr$grad[, i]
-        } else {
-          tr$mean
-        }
+        temp.mean[seq_len(xi.neval)] = if (gradients) tr$grad[, i] else tr$mean
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic") {

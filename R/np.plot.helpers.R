@@ -2691,10 +2691,6 @@
     stop("length of ydat must match training rows in exact regression bootstrap helper")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid exact regression bootstrap dimensions")
-  xi.factor <- isTRUE(slice.index > 0L) &&
-    !is.null(bws$xdati) &&
-    (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
-
   fit_hat <- function(x.train, y.train) {
     fit <- .np_regression_direct(
       bws = bws,
@@ -2704,8 +2700,6 @@
       gradients = isTRUE(gradients),
       gradient.order = gradient.order
     )
-    if (isTRUE(gradients) && isTRUE(xi.factor))
-      return(.np_plot_factor_contrast_vector(fit$mean))
     if (isTRUE(gradients))
       as.vector(fit$grad[, slice.index])
     else
@@ -2811,8 +2805,6 @@
       gradients = isTRUE(gradients),
       gradient.order = gradient.order
     )
-    if (isTRUE(gradients) && isTRUE(xi.factor))
-      return(.np_plot_factor_contrast_vector(fit$mean))
     if (isTRUE(gradients))
       as.vector(fit$grad[, slice.index])
     else
