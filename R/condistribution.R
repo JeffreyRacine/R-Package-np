@@ -132,6 +132,15 @@ gradients.condistribution <- function(x, errors = FALSE, gradient.order = NULL, 
       "gradient standard errors are not available: fit the model with gradients=TRUE")
 
   reg.spec <- npConditionalRegEngineSpec(x$bws, where = "gradients.condistribution")
+  if (isTRUE(x$bws$xncon == 0L)) {
+    if (!is.null(gradient.order)) {
+      npValidateCategoricalFirstDifferenceGradientOrder(
+        gradient.order = gradient.order,
+        where = "gradients.condistribution"
+      )
+    }
+    return(gout)
+  }
   if (!identical(reg.spec$reg.engine, "lp") || is.null(gradient.order))
     return(gout)
 
