@@ -947,6 +947,65 @@
   boot
 }
 
+.np_plot_categorical_gradient_vector <- function(x, tdati, ti, ref = 1L) {
+  x <- as.double(x)
+  ti <- as.integer(ti)[1L]
+  if (length(x) < 1L)
+    return(x)
+  if (is.na(ti) || ti < 1L ||
+      ti > length(tdati$iord) || ti > length(tdati$iuno)) {
+    stop("invalid categorical gradient index for plot bootstrap", call. = FALSE)
+  }
+  if (isTRUE(tdati$iord[ti])) {
+    if (length(x) == 1L)
+      return(x - x[1L])
+    dx <- diff(x)
+    return(c(dx[1L], dx))
+  }
+  if (isTRUE(tdati$iuno[ti]))
+    return(.np_plot_factor_contrast_vector(x, ref = ref))
+  stop("plot bootstrap categorical gradient requested for a non-categorical slice",
+       call. = FALSE)
+}
+
+.np_plot_categorical_gradient_matrix <- function(x, tdati, ti, ref = 1L) {
+  x <- as.matrix(x)
+  ti <- as.integer(ti)[1L]
+  if (ncol(x) < 1L)
+    return(x)
+  if (is.na(ti) || ti < 1L ||
+      ti > length(tdati$iord) || ti > length(tdati$iuno)) {
+    stop("invalid categorical gradient index for plot bootstrap", call. = FALSE)
+  }
+  if (isTRUE(tdati$iord[ti])) {
+    if (ncol(x) == 1L)
+      return(sweep(x, 1L, x[, 1L], "-", check.margin = FALSE))
+    dx <- x[, -1L, drop = FALSE] - x[, -ncol(x), drop = FALSE]
+    return(cbind(dx[, 1L], dx))
+  }
+  if (isTRUE(tdati$iuno[ti]))
+    return(.np_plot_factor_contrast_matrix(x, ref = ref))
+  stop("plot bootstrap categorical gradient requested for a non-categorical slice",
+       call. = FALSE)
+}
+
+.np_plot_categorical_gradient_boot <- function(boot, tdati, ti, ref = 1L) {
+  if (is.null(boot))
+    return(boot)
+  if (!is.list(boot))
+    stop("bootstrap categorical-gradient payload must be a list", call. = FALSE)
+  if (isTRUE(attr(boot, "np.categorical.gradient")))
+    return(boot)
+  if (!is.null(boot$t))
+    boot$t <- .np_plot_categorical_gradient_matrix(boot$t, tdati = tdati, ti = ti, ref = ref)
+  if (!is.null(boot$t0))
+    boot$t0 <- .np_plot_categorical_gradient_vector(boot$t0, tdati = tdati, ti = ti, ref = ref)
+  if (!is.null(boot$center))
+    boot$center <- .np_plot_categorical_gradient_vector(boot$center, tdati = tdati, ti = ti, ref = ref)
+  attr(boot, "np.categorical.gradient") <- TRUE
+  boot
+}
+
 .np_plot_boot_from_hat_wild_factor_effects <- function(H,
                                                        ydat,
                                                        fit.mean,
@@ -10675,8 +10734,8 @@ compute.default.error.range <- function(center, err) {
     )
     center <- as.vector(H.pilot %*% as.double(ydat))
     if (gradients && xi.factor && ncol(out$t) >= 1L) {
-      out <- .np_plot_factor_contrast_boot(out)
-      center <- .np_plot_factor_contrast_vector(center)
+      out <- .np_plot_categorical_gradient_boot(out, tdati = bws$xdati, ti = slice.index)
+      center <- .np_plot_categorical_gradient_vector(center, tdati = bws$xdati, ti = slice.index)
     }
     out$center <- center
     return(out)
@@ -11640,7 +11699,11 @@ compute.bootstrap.errors.rbandwidth =
               progress.label = progress.label
             )
             if (gradients && xi.factor && ncol(boot.out$t) >= 1L) {
-              boot.out <- .np_plot_factor_contrast_boot(boot.out)
+              boot.out <- .np_plot_categorical_gradient_boot(
+                boot.out,
+                tdati = bws$xdati,
+                ti = slice.index
+              )
             }
           } else {
             H <- suppressWarnings(npreghat(
@@ -11651,23 +11714,19 @@ compute.bootstrap.errors.rbandwidth =
               output = "matrix"
             ))
 
-            boot.out <- if (gradients && xi.factor) {
-              .np_plot_boot_from_hat_wild_factor_effects(
-                H = H,
-                ydat = ydat,
-                fit.mean = fit.mean,
-                B = plot.errors.boot.num,
-                wild = plot.errors.boot.wild,
-                progress.label = progress.label
-              )
-            } else {
-              .np_plot_boot_from_hat_wild(
-                H = H,
-                ydat = ydat,
-                fit.mean = fit.mean,
-                B = plot.errors.boot.num,
-                wild = plot.errors.boot.wild,
-                progress.label = progress.label
+            boot.out <- .np_plot_boot_from_hat_wild(
+              H = H,
+              ydat = ydat,
+              fit.mean = fit.mean,
+              B = plot.errors.boot.num,
+              wild = plot.errors.boot.wild,
+              progress.label = progress.label
+            )
+            if (gradients && xi.factor && ncol(boot.out$t) >= 1L) {
+              boot.out <- .np_plot_categorical_gradient_boot(
+                boot.out,
+                tdati = bws$xdati,
+                ti = slice.index
               )
             }
           }
@@ -11705,12 +11764,6 @@ compute.bootstrap.errors.rbandwidth =
                call. = FALSE)
         }
       )
-    }
-
-    if (gradients && xi.factor) {
-      boot.out <- .np_plot_factor_contrast_boot(boot.out)
-      if (!is.null(oversmooth.boot))
-        oversmooth.boot <- .np_plot_factor_contrast_boot(oversmooth.boot)
     }
 
     all.bp <- .np_plot_boot_factor_boxplots(

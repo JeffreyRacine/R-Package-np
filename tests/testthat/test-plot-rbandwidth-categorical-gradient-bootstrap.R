@@ -81,6 +81,94 @@ test_that("wild categorical regression gradient helper matches explicit refits",
   expect_equal(as.vector(helper.out$t0), as.vector(fit0 - fit0[1L]), tolerance = 1e-6)
 })
 
+test_that("ordered regression gradient wild bootstrap targets adjacent differences", {
+  skip_if_not_installed("np")
+
+  library(np)
+
+  wild_helper <- getFromNamespace(".np_plot_boot_from_hat_wild", "np")
+  ordered_gradient_matrix <- function(x) {
+    dx <- x[, -1L, drop = FALSE] - x[, -ncol(x), drop = FALSE]
+    cbind(dx[, 1L], dx)
+  }
+  ordered_gradient_vector <- function(x) {
+    dx <- diff(x)
+    c(dx[1L], dx)
+  }
+
+  set.seed(20260709)
+  n <- 60L
+  o <- ordered(rep(seq_len(5L), length.out = n), levels = seq_len(5L))
+  y <- as.numeric(o) + rnorm(n, sd = 0.08)
+  xdat <- data.frame(o = o)
+  bw <- npregbw(
+    xdat = xdat,
+    ydat = y,
+    regtype = "lc",
+    bwtype = "fixed",
+    bws = 0.25,
+    bandwidth.compute = FALSE
+  )
+  fit <- npreg(
+    bws = bw,
+    txdat = xdat,
+    tydat = y,
+    gradients = TRUE,
+    errors = TRUE
+  )
+  base <- plot(
+    fit,
+    output = "data",
+    perspective = FALSE,
+    gradients = TRUE
+  )[[1L]]
+  exdat <- base$eval
+  H <- npreghat(
+    bws = bw,
+    txdat = xdat,
+    exdat = exdat,
+    output = "matrix"
+  )
+  fit.mean <- as.vector(npreghat(
+    bws = bw,
+    txdat = xdat,
+    exdat = xdat,
+    y = y,
+    output = "apply"
+  ))
+
+  B <- 31L
+  set.seed(33)
+  expected.level <- wild_helper(
+    H = H,
+    ydat = y,
+    fit.mean = fit.mean,
+    B = B,
+    wild = "rademacher"
+  )
+  expected.t <- ordered_gradient_matrix(expected.level$t)
+  expected.t0 <- ordered_gradient_vector(expected.level$t0)
+
+  set.seed(33)
+  out <- plot(
+    fit,
+    output = "data",
+    perspective = FALSE,
+    gradients = TRUE,
+    errors = "bootstrap",
+    plot.errors.type = "pmzsd",
+    plot.errors.boot.method = "wild",
+    plot.errors.boot.wild = "rademacher",
+    plot.errors.boot.num = B,
+    random.seed = 33
+  )[[1L]]
+  expected.hw <- qnorm(0.05 / 2, lower.tail = FALSE) *
+    apply(expected.t, 2L, stats::sd)
+
+  expect_equal(as.vector(out$grad), as.vector(expected.t0), tolerance = 1e-10)
+  expect_equal(out$gerr[, 2L], expected.hw, tolerance = 1e-10)
+})
+
 test_that("categorical regression gradient bootstrap works for default, inid, and wild routes", {
   skip_if_not_installed("np")
 
