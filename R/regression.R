@@ -114,6 +114,15 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
       where = "gradients.npregression"
     )
   }
+  if (isTRUE(x$bws$ncon == 0L)) {
+    if (!is.null(gradient.order)) {
+      npValidateCategoricalFirstDifferenceGradientOrder(
+        gradient.order = gradient.order,
+        where = "gradients.npregression"
+      )
+    }
+    return(gout)
+  }
   if (!identical(x$bws$regtype, "lp") || is.null(gradient.order))
     return(gout)
 

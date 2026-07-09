@@ -198,24 +198,26 @@
       if (length(go)) {
         plot.gradient.order.label[which(bws$icon)] <- go
       }
-      available <- npGlpGradientAvailability(
-        regtype.engine = bws$regtype,
-        degree.engine = bws$degree,
-        gradient.order = go,
-        ncon = bws$ncon
-      )
-      if (!any(available)) {
-        stop("plot.rbandwidth() has no available derivative components for the requested gradient.order and fitted polynomial degree",
-             call. = FALSE)
-      }
-      if (any(!available)) {
-        npWarnGlpGradientPartialAvailability(
-          where = "plot.rbandwidth()",
+      if (bws$ncon > 0L) {
+        available <- npGlpGradientAvailability(
+          regtype.engine = bws$regtype,
           degree.engine = bws$degree,
           gradient.order = go,
-          available = available,
-          con.names = bws$xnames[bws$icon]
+          ncon = bws$ncon
         )
+        if (!any(available)) {
+          stop("plot.rbandwidth() has no available derivative components for the requested gradient.order and fitted polynomial degree",
+               call. = FALSE)
+        }
+        if (any(!available)) {
+          npWarnGlpGradientPartialAvailability(
+            where = "plot.rbandwidth()",
+            degree.engine = bws$degree,
+            gradient.order = go,
+            available = available,
+            con.names = bws$xnames[bws$icon]
+          )
+        }
       }
     }
     if (plot.errors && gradients &&

@@ -576,6 +576,12 @@ npValidateGlpGradientOrder <- function(regtype,
   if (!identical(regtype, "lp"))
     return(NULL)
 
+  if (ncon == 0L)
+    return(npValidateCategoricalFirstDifferenceGradientOrder(
+      gradient.order = gradient.order,
+      argname = argname
+    ))
+
   if (is.null(gradient.order))
     gradient.order <- rep.int(1L, ncon)
 
@@ -605,6 +611,34 @@ npValidateGlpGradientOrder <- function(regtype,
     stop(sprintf("%s must contain integers in [1,%d]", argname, degree.max))
 
   as.integer(gradient.order)
+}
+
+npValidateCategoricalFirstDifferenceGradientOrder <- function(
+    gradient.order,
+    argname = "gradient.order",
+    where = "categorical gradients/effects") {
+  if (is.null(gradient.order) || !length(gradient.order))
+    return(integer(0))
+
+  if (!is.numeric(gradient.order))
+    stop(sprintf("%s must contain finite positive integers", argname))
+
+  if (anyNA(gradient.order) || any(!is.finite(gradient.order)))
+    stop(sprintf("%s must contain finite positive integers", argname))
+
+  if (any(gradient.order <= 0))
+    stop(sprintf("%s must contain finite positive integers", argname))
+
+  if (any(gradient.order != floor(gradient.order)))
+    stop(sprintf("%s must contain finite positive integers", argname))
+
+  if (any(as.integer(gradient.order) != 1L)) {
+    stop(sprintf("%s support only first differences for ordered/unordered predictors",
+                 where),
+         call. = FALSE)
+  }
+
+  integer(0)
 }
 
 npValidateLcGradientOrder <- function(regtype,
