@@ -20,13 +20,22 @@ test_that("tail slave index helper stays in bounds for small sizes", {
 })
 
 test_that("npRmpi.quit is harmless before MPI initialization", {
-  old <- getOption("npRmpi.mpi.initialized")
-  old.pool <- getOption("npRmpi.pool.active")
-  on.exit(options(npRmpi.mpi.initialized = old,
-                  npRmpi.pool.active = old.pool), add = TRUE)
+  env <- npRmpi_subprocess_env("NP_RMPI_SKIP_INIT=1")
+  skip_if(is.null(env), "installed npRmpi unavailable for subprocess test")
 
-  options(npRmpi.mpi.initialized = FALSE)
-  expect_false(npRmpi.quit())
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "stopifnot(isFALSE(npRmpi.quit()))",
+      "cat('PREINIT_QUIT_OK\\n')"
+    ),
+    timeout = 20L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("PREINIT_QUIT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
 })
 
 test_that("active slave pool guard fails closed before npRmpi.init", {
