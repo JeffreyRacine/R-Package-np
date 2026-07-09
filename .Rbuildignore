@@ -51,6 +51,10 @@ npver
 ^LARGE_H_REGRESSION_REMEDIATION_npRmpi\.md$
 ^SPMD_REMEDIATION_.*\.md$
 ^SPMD_REMEDIATION_.*\.json$
+^man/run$
+^man/dontrun$
+^man/sed_run\.scr$
+^man/sed_dontrun\.scr$
 
 ^benchmarks/oneoff
 ^benchmarks/perf
