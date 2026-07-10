@@ -429,11 +429,13 @@ npregbw.rbandwidth <-
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
-           ...){
+           ...,
+           nomad.opts = list()){
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     dots <- list(...)
-    if ("nomad.opts" %in% names(dots))
+    if (length(nomad.opts))
       .np_nomad_native_reject_unsupported_options_for_route(
-        opts = dots$nomad.opts,
+        opts = nomad.opts,
         route = "native npreg NOMAD route",
         bwsolver = bwsolver
       )
@@ -589,7 +591,7 @@ npregbw.rbandwidth <-
           transform.bounds = transform.bounds,
           bandwidth.compute = TRUE,
           bwsolver = bwsolver,
-          nomad.opts = dots$nomad.opts
+          nomad.opts = nomad.opts
         )
         return(.npregbw_run_fixed_degree_mads(
           xdat = xdat.frame,
@@ -2515,14 +2517,16 @@ npregbw.default <-
            tol,
            transform.bounds = FALSE,
            ukertype,
-           ...){
+           ...,
+           nomad.opts = list()){
 
     xdat <- toFrame(xdat)
     yname <- deparse(substitute(ydat))
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     lp.dot.args <- list(...)
-    if ("nomad.opts" %in% names(lp.dot.args))
+    if (length(nomad.opts))
       .np_nomad_native_reject_unsupported_options_for_route(
-        opts = lp.dot.args$nomad.opts,
+        opts = nomad.opts,
         route = "native npreg NOMAD route",
         nomad = nomad,
         degree.select = degree.select,
@@ -2648,8 +2652,6 @@ npregbw.default <-
 
     reg.args <- bw.args[setdiff(names(bw.args), c("bw", "nobs", "xdati", "ydati", "xnames", "ynames", "bandwidth.compute"))]
     opt.args <- c(list(bandwidth.compute = bandwidth.compute), opt.args)
-    if ("nomad.opts" %in% names(lp.dot.args))
-      opt.args$nomad.opts <- lp.dot.args$nomad.opts
     reg.args$scale.factor.search.lower <- scale.factor.search.lower
     opt.args$scale.factor.search.lower <- scale.factor.search.lower
 

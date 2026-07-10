@@ -80,7 +80,8 @@ npregbw(\dots)
         tol,
         transform.bounds = FALSE,
         ukertype,
-        \dots)
+        \dots,
+        nomad.opts = list())
 
 \method{npregbw}{rbandwidth}(xdat = stop("invoked without data 'xdat'"),
         ydat = stop("invoked without data 'ydat'"),
@@ -112,7 +113,8 @@ npregbw(\dots)
         small = 1.490116e-05,
         tol = 1.490116e-04,
         transform.bounds = FALSE,
-        \dots)
+        \dots,
+        nomad.opts = list())
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
@@ -513,6 +515,13 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     restart behavior. This does not replace \code{nmulti}:
     \code{nmulti} controls outer restarts, while \code{nomad.nmulti}
     controls inner NOMAD multistarts within each outer restart.
+  }
+
+  \item{nomad.opts}{
+    optional named list of native NOMAD parameters forwarded to the
+    \pkg{crs} NOMAD C API for MADS/NOMAD-backed bandwidth searches.
+    \code{NULL} is treated as no extra NOMAD options. Non-list values and
+    unsupported cache-off callback settings are rejected before solver entry.
   }
 
   \item{nomad.remin}{
