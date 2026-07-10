@@ -1053,6 +1053,38 @@
   stop(sprintf("MPI %s %s", what, msg), call. = FALSE)
 }
 
+.npRmpi_bootstrap_abort_active_pool <- function(comm = 1L,
+                                                what = "bootstrap",
+                                                reason = "") {
+  if (!isTRUE(.npRmpi_has_active_slave_pool(comm = comm)))
+    return(invisible(FALSE))
+
+  .npRmpi_bootstrap_transport_trace(
+    what = what,
+    event = "fanout.abort_pool.start",
+    fields = list(comm = comm, reason = as.character(reason)[1L])
+  )
+
+  ok <- tryCatch({
+    npRmpi.quit(force = TRUE, comm = comm)
+    TRUE
+  }, error = function(e) {
+    .npRmpi_bootstrap_transport_trace(
+      what = what,
+      event = "fanout.abort_pool.error",
+      fields = list(comm = comm, message = conditionMessage(e))
+    )
+    FALSE
+  })
+
+  .npRmpi_bootstrap_transport_trace(
+    what = what,
+    event = "fanout.abort_pool.done",
+    fields = list(comm = comm, ok = isTRUE(ok))
+  )
+  invisible(isTRUE(ok))
+}
+
 .npRmpi_bootstrap_dispatch_timeout_sec <- function() {
   val.env <- Sys.getenv("NP_RMPI_BOOTSTRAP_DISPATCH_TIMEOUT_SEC", unset = "")
   val.opt <- getOption("npRmpi.bootstrap.dispatch.timeout.sec", NA_real_)
@@ -1976,6 +2008,11 @@
       what = what,
       phase = "dispatch_error",
       where = profile.where
+    )
+    .npRmpi_bootstrap_abort_active_pool(
+      comm = comm,
+      what = what,
+      reason = conditionMessage(parts)
     )
     .npRmpi_bootstrap_fail_or_fallback(
       msg = sprintf("fan-out failed (%s)", conditionMessage(parts)),
