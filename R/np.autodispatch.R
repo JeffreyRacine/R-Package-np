@@ -1904,12 +1904,12 @@
     wall <- unname(as.double(dt[["elapsed"]]))
     if (!is.finite(wall) || wall < 0)
       wall <- 0.0
-    comm <- as.double(comm.elapsed)
-    if (!is.finite(comm) || comm < 0)
-      comm <- 0.0
-    compute <- max(0.0, wall - comm)
-    denom <- comm + compute
-    ratio <- if (denom > 0) min(1.0, max(0.0, comm / denom)) else NA_real_
+    comm.time <- as.double(comm.elapsed)
+    if (!is.finite(comm.time) || comm.time < 0)
+      comm.time <- 0.0
+    compute <- max(0.0, wall - comm.time)
+    denom <- comm.time + compute
+    ratio <- if (denom > 0) min(1.0, max(0.0, comm.time / denom)) else NA_real_
     rec <- list(
       profile_kind = "call",
       where = .npRmpi_autodispatch_call_name(mc),
@@ -1921,7 +1921,7 @@
       size = tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) NA_integer_),
       via_bcast = isTRUE(.npRmpi_autodispatch_called_from_bcast()),
       wall_elapsed_sec = wall,
-      comm_elapsed_sec = comm,
+      comm_elapsed_sec = comm.time,
       compute_elapsed_sec = compute,
       comm_ratio = ratio,
       comm_calls = as.integer(comm.calls),

@@ -32,6 +32,17 @@ test_that("npRmpi profiling helper defaults to basic mode and records timing", {
   expect_true("timing.profile" %in% names(out))
 })
 
+test_that("autodispatch call profiling keeps communicator identity separate from elapsed time", {
+  src.path <- testthat::test_path("..", "..", "R", "np.autodispatch.R")
+  skip_if_not(file.exists(src.path))
+
+  src <- readLines(src.path, warn = FALSE)
+  expect_false(any(grepl("comm <- as.double(comm.elapsed)", src, fixed = TRUE)))
+  expect_true(any(grepl("comm.time <- as.double(comm.elapsed)", src, fixed = TRUE)))
+  expect_true(any(grepl("mpi.comm.rank(comm)", src, fixed = TRUE)))
+  expect_true(any(grepl("mpi.comm.size(comm)", src, fixed = TRUE)))
+})
+
 test_that("npRmpi profiling helper supports detailed mode", {
   begin.fun <- getFromNamespace(".npRmpi_profile_bootstrap_begin", "npRmpi")
   add.fun <- getFromNamespace(".npRmpi_profile_add_comm_elapsed", "npRmpi")
