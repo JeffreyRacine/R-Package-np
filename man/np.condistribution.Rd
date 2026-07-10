@@ -68,15 +68,17 @@ These arguments identify the bandwidth specification, formula/data interface, an
 
   \item{txdat}{
     a \eqn{p}-variate data frame of sample realizations of explanatory
-    data (training data). Defaults to the training data used to
-    compute the bandwidth object.
+    data (training data). Defaults to the corresponding
+    training data recoverable from the bandwidth object in the current
+    session.
   }
 
 
   \item{tydat}{
     a \eqn{q}-variate data frame of sample realizations of dependent
-    data (training data). Defaults to the training data used to
-    compute the bandwidth object.
+    data (training data). Defaults to the corresponding
+    training data recoverable from the bandwidth object in the current
+    session.
   }
 
 
@@ -351,6 +353,14 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+
+  When reusing a bandwidth object without explicit training or evaluation
+  data, the required data are recovered from object-retained state or
+  from the stored call environment when available. This is a convenience
+  for ordinary same-session use, not a guarantee that a saved object is
+  self-contained. For reproducible replay after \code{saveRDS()} and
+  \code{readRDS()} in a fresh R session, supply the required data
+  arguments explicitly.
 }
 
 \seealso{

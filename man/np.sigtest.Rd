@@ -252,6 +252,14 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   as intended on mixed data types and will coerce the data to the same
   type.
 
+  When reusing a bandwidth object without explicit training or evaluation
+  data, the required data are recovered from object-retained state or
+  from the stored call environment when available. This is a convenience
+  for ordinary same-session use, not a guarantee that a saved object is
+  self-contained. For reproducible replay after \code{saveRDS()} and
+  \code{readRDS()} in a fresh R session, supply the required data
+  arguments explicitly.
+
   Caution: bootstrap methods are, by their nature, \emph{computationally
   intensive}. This can be frustrating for users possessing large
   datasets. For exploratory purposes, you may wish to override the

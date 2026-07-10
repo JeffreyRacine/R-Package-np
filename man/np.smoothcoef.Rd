@@ -333,6 +333,14 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   intended on mixed data types and will coerce the data to the same
   type.
 
+  When reusing a bandwidth object without explicit training or evaluation
+  data, the required data are recovered from object-retained state or
+  from the stored call environment when available. This is a convenience
+  for ordinary same-session use, not a guarantee that a saved object is
+  self-contained. For reproducible replay after \code{saveRDS()} and
+  \code{readRDS()} in a fresh R session, supply the required data
+  arguments explicitly.
+
   For practitioners who want the recommended automatic local-polynomial degree-and-bandwidth NOMAD route
   without spelling out all LP tuning arguments,
   \code{npscoef(..., nomad=TRUE)} and \code{npscoefbw(..., nomad=TRUE)}

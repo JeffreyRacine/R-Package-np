@@ -203,6 +203,14 @@ selection, prediction, or plotting route.
   \code{\link{data.frame}} function to construct your input data and not
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same type.
+
+  When reusing a bandwidth object without explicit training or evaluation
+  data, the required data are recovered from object-retained state or
+  from the stored call environment when available. This is a convenience
+  for ordinary same-session use, not a guarantee that a saved object is
+  self-contained. For reproducible replay after \code{saveRDS()} and
+  \code{readRDS()} in a fresh R session, supply the required data
+  arguments explicitly.
 }
 \seealso{
   \code{\link{nplsqregbw}}, \code{\link{npreg}}, \code{\link{npqreg}},

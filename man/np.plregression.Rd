@@ -85,8 +85,9 @@ These arguments identify the bandwidth specification, formula/data interface, an
   \item{tydat}{
   a one (1) dimensional numeric or integer vector of dependent data, each
   element \eqn{i} corresponding to each observation (row) \eqn{i} of
-  \code{txdat}. Defaults to the training data used to
-    compute the bandwidth object.
+  \code{txdat}. Defaults to the corresponding
+    training data recoverable from the bandwidth object in the current
+    session.
   }
 
 
@@ -360,6 +361,14 @@ Further arguments are passed to \code{\link{npplregbw}} and its component \code{
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+
+  When reusing a bandwidth object without explicit training or evaluation
+  data, the required data are recovered from object-retained state or
+  from the stored call environment when available. This is a convenience
+  for ordinary same-session use, not a guarantee that a saved object is
+  self-contained. For reproducible replay after \code{saveRDS()} and
+  \code{readRDS()} in a fresh R session, supply the required data
+  arguments explicitly.
 }
 
 \seealso{
