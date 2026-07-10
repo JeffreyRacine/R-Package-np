@@ -32,6 +32,30 @@
   joint / nzd(denom)
 }
 
+test_that("npcopula print and summary forward explicit formatting arguments", {
+  obj <- structure(
+    list(
+      target = "distribution",
+      evaluation = "sample",
+      ntrain = 1L,
+      xnames = "x",
+      grid.dim = NULL,
+      eval = data.frame(x = pi, copula = pi),
+      copula = pi,
+      bws = 1
+    ),
+    class = "npcopula"
+  )
+
+  printed <- capture.output(print(obj, digits = 2))
+  expect_true(any(grepl("3.1", printed, fixed = TRUE)))
+  expect_false(any(grepl("3.14159", printed, fixed = TRUE)))
+
+  summarized <- capture.output(summary(obj, digits = 2))
+  expect_true(any(grepl("3.1", summarized, fixed = TRUE)))
+  expect_false(any(grepl("3.14159", summarized, fixed = TRUE)))
+})
+
 test_that("npcopula marginal helper maps bounded continuous slots by position", {
   d <- .npcopula_audit_data()
   bw <- .npcopula_audit_density_bw(d)

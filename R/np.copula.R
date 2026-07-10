@@ -694,6 +694,13 @@ npcopula <- function(bws, ...) {
 }
 
 print.npcopula <- function(x, ...) {
+  dots <- list(...)
+  n <- 6L
+  if ("n" %in% names(dots)) {
+    n <- dots[["n"]]
+    dots[["n"]] <- NULL
+  }
+
   target <- x$target
   evaluation <- x$evaluation
   ntrain <- x$ntrain
@@ -707,16 +714,18 @@ print.npcopula <- function(x, ...) {
   if (!is.null(grid.dim))
     cat(" (grid ", paste(grid.dim, collapse = " x "), ")", sep = "")
   cat("\n\n")
-  print(utils::head(as.data.frame(x), ...))
+  do.call(print, c(list(x = utils::head(as.data.frame(x), n = n)), dots))
   invisible(x)
 }
 
 summary.npcopula <- function(object, ...) {
-  print(object)
+  print(object, ...)
   cat("\nBandwidth summary:\n")
   summary(object$bws)
   cat("\nCopula value summary:\n")
-  print(summary(object$copula))
+  dots <- list(...)
+  dots[["n"]] <- NULL
+  do.call(print, c(list(x = summary(object$copula)), dots))
   invisible(object)
 }
 
