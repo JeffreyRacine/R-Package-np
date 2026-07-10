@@ -320,7 +320,7 @@
 }
 
 .np_plot_restore_par <- function(oldpar, reset.new = TRUE) {
-  if (isTRUE(unname(as.integer(dev.cur())) == 1L))
+  if (isTRUE(unname(as.integer(grDevices::dev.cur())) == 1L))
     return(invisible(NULL))
   if (isTRUE(reset.new))
     suppressWarnings(try(par(new = FALSE), silent = TRUE))
