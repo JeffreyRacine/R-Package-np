@@ -1,9 +1,11 @@
 .np_plreg_bws <- function(object, where = "plregression") {
-  if (!is.null(object$bws))
-    return(object$bws)
+  bws <- object[["bws", exact = TRUE]]
+  if (!is.null(bws))
+    return(bws)
 
-  if (!is.null(object$bw) && inherits(object$bw, "plbandwidth"))
-    return(object$bw)
+  bw <- object[["bw", exact = TRUE]]
+  if (!is.null(bw) && inherits(bw, "plbandwidth"))
+    return(bw)
 
   stop(sprintf("%s object does not contain a usable partially linear bandwidth object", where),
        call. = FALSE)

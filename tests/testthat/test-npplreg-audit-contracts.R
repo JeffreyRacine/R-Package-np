@@ -21,6 +21,24 @@ npplreg_audit_bw <- function(dat, bw = 0.55, bwtype = "fixed") {
   )
 }
 
+test_that("npplreg bandwidth extraction avoids partial dollar matching", {
+  helper <- get(".np_plreg_bws", envir = asNamespace(npplreg_audit_ns()), inherits = FALSE)
+  fallback <- structure(list(ok = TRUE), class = "plbandwidth")
+  trap <- structure(
+    list(
+      bws.metadata = structure(list(wrong = TRUE), class = "plbandwidth"),
+      bw = fallback
+    ),
+    class = "plregression"
+  )
+
+  old <- options(warnPartialMatchDollar = TRUE)
+  on.exit(options(old), add = TRUE)
+
+  expect_warning(got <- helper(trap, where = "partial-match trap"), NA)
+  expect_identical(got, fallback)
+})
+
 test_that("npplreg direct default route preserves vector response and explicit-bw equivalence", {
   if (!npplreg_audit_ready()) skip("Could not initialize npplreg audit context")
 
