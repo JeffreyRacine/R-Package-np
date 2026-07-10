@@ -131,7 +131,7 @@ Full matrix intended for archive comparison:
 
 ```bash
 cd /Users/jracine/Development/np-npRmpi/demo
-NP_DEMO_TIER=sentinel CONTINUE_ON_ERROR=true CPU_MONITOR=true TIMEOUT_SEC=600 ./runall
+NP_DEMO_TIER=sentinel CONTINUE_ON_ERROR=true CPU_MONITOR=true TIMEOUT_SEC=600 RUNALL_REQUIRE_FULL_MATRIX=true ./runall
 ```
 
 Optional smaller smoke:
@@ -271,6 +271,10 @@ cd /Users/jracine/Development/np-npRmpi/demo
 - Parsed output: `results/<run-id>/timing/demo_results.csv`
 - Wide parsed output: `results/<run-id>/timing/demo_results_wide.csv`
 - Human-readable terminal summary: `results/<run-id>/timing/timing_all.dat`
+- Planned run inventory: `results/<run-id>/RUN_INVENTORY.tsv`
+- Observed mode/rank/slave ledger: `results/<run-id>/RUN_OBSERVED_MATRIX.tsv`
+- Matrix validation status: `results/<run-id>/RUN_MATRIX_VALIDATION.tsv`
+- Top-level run status: `results/<run-id>/RUN_STATUS.tsv`
 - Quarto report source: `results/<run-id>/timing/demo_summary.qmd`
 - Optional rendered report, when Quarto is installed:
   `results/<run-id>/timing/demo_summary.html`

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PKG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${PKG_ROOT}/demo_tools/runall" "$@"

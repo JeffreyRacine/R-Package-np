@@ -28,7 +28,7 @@ unset R_PROFILE
 
 ## Run everything
 
-From this directory:
+From the installed package root:
 
 ```bash
 ./runall
@@ -37,23 +37,37 @@ From this directory:
 This runs:
 
 1. `serial`
-2. `attach` for `NP=2,3,4`
-3. `profile` for `NP=2,3,4`
+2. `session` for `NSLAVES=1,2,3`
+3. `attach` for `NP=2,3,4`
+4. `profile` for `NP=2,3,4`
 
 Results are written under:
 
-- `serial/`
-- `n_2_attach/`, `n_3_attach/`, `n_4_attach/`
-- `n_2_profile/`, `n_3_profile/`, `n_4_profile/`
+- `results/<run-id>/serial/`
+- `results/<run-id>/session/slaves_01/`, etc.
+- `results/<run-id>/mpi_launch/ranks_02/attach/`, etc.
+- `results/<run-id>/mpi_launch/ranks_02/profile/`, etc.
+- `results/<run-id>/RUN_STATUS.tsv`
+- `results/<run-id>/RUN_INVENTORY.tsv`
+- `results/<run-id>/RUN_OBSERVED_MATRIX.tsv`
+- `results/<run-id>/RUN_MATRIX_VALIDATION.tsv`
+- `results/<run-id>/timing/demo_results.csv`
+
+For release proof, require the full matrix explicitly:
+
+```bash
+RUNALL_REQUIRE_FULL_MATRIX=true ./runall
+```
 
 ## Run a single mode manually
 
 Examples:
 
 ```bash
-mkdir -p serial && (cd serial && make -f ../makefile MODE=serial)
-mkdir -p n_2_attach && (cd n_2_attach && make -f ../makefile MODE=attach NP=2)
-mkdir -p n_2_profile && (cd n_2_profile && make -f ../makefile MODE=profile NP=2)
+PKG_ROOT="$(Rscript -e 'cat(system.file(package = "npRmpi"))')"
+mkdir -p serial && (cd serial && make -f "${PKG_ROOT}/demo_tools/makefile" DEMO_SRC="${PKG_ROOT}/demo" MODE=serial)
+mkdir -p n_2_attach && (cd n_2_attach && make -f "${PKG_ROOT}/demo_tools/makefile" DEMO_SRC="${PKG_ROOT}/demo" MODE=attach NP=2)
+mkdir -p n_2_profile && (cd n_2_profile && make -f "${PKG_ROOT}/demo_tools/makefile" DEMO_SRC="${PKG_ROOT}/demo" MODE=profile NP=2)
 ```
 
 ## Tiny smoke runs
@@ -69,7 +83,8 @@ Example:
 ```bash
 mkdir -p n_2_profile
 cd n_2_profile
-NP_DEMO_N=80 make -f ../makefile MODE=profile NP=2 DEMOS=npcdensml
+PKG_ROOT="$(Rscript -e 'cat(system.file(package = "npRmpi"))')"
+NP_DEMO_N=80 make -f "${PKG_ROOT}/demo_tools/makefile" DEMO_SRC="${PKG_ROOT}/demo" MODE=profile NP=2 DEMOS=npcdens
 ```
 
 ## Canonical Implementation Directive (2026-03-05)

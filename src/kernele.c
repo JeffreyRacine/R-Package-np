@@ -25,6 +25,14 @@ extern  int iNum_Processors;
 extern  int iSeed_my_rank;
 extern  MPI_Status status;
 extern MPI_Comm	*comm;
+
+static void np_mpi_gather_double_root0(double *buffer, int count)
+{
+	if(my_rank == 0)
+		MPI_Gather(MPI_IN_PLACE, count, MPI_DOUBLE, buffer, count, MPI_DOUBLE, 0, comm[1]);
+	else
+		MPI_Gather(buffer, count, MPI_DOUBLE, NULL, count, MPI_DOUBLE, 0, comm[1]);
+}
 #endif
 
 #define IO_MIN_TRUE  1
@@ -822,10 +830,10 @@ double *log_likelihood)
 
 	}
 
-	MPI_Gather(pdf, stride, MPI_DOUBLE, pdf, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(pdf, stride);
 	MPI_Bcast(pdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Gather(pdf_stderr, stride, MPI_DOUBLE, pdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(pdf_stderr, stride);
 	MPI_Bcast(pdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	MPI_Reduce(&log_likelihood_MPI, log_likelihood, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
@@ -2445,9 +2453,9 @@ int itmax)
 
 	}
 
-	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(cdf, stride);
 	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-	MPI_Gather(cdf_stderr, stride, MPI_DOUBLE, cdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(cdf_stderr, stride);
 	MPI_Bcast(cdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
@@ -4523,17 +4531,17 @@ double *SIGN)
 	/* Gather */
 	if(!np_mpi_local_regression_active())
 	{
-		MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(mean, stride);
 		MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-		MPI_Gather(mean_stderr, stride, MPI_DOUBLE, mean_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(mean_stderr, stride);
 		MPI_Bcast(mean_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 		for(l = 0; l < num_reg_continuous; l++)
 		{
 
-			MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+			np_mpi_gather_double_root0(&gradient[l][0], stride);
 			MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-			MPI_Gather(&gradient_stderr[l][0], stride, MPI_DOUBLE, &gradient_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+			np_mpi_gather_double_root0(&gradient_stderr[l][0], stride);
 			MPI_Bcast(&gradient_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 		}
@@ -6174,7 +6182,7 @@ double *mean)
 
 	/* Gather */
 
-	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(mean, stride);
 	MPI_Bcast(mean, num_obs, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
@@ -10676,7 +10684,7 @@ double **gradient)
 	/* Important - only one gather per module */
 	if(!np_mpi_local_regression_active())
 	{
-		MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(mean, stride);
 		MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 		if(int_compute_gradient == 1)
@@ -10685,7 +10693,7 @@ double **gradient)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+				np_mpi_gather_double_root0(&gradient[l][0], stride);
 				MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 			}
@@ -11385,10 +11393,10 @@ double *log_likelihood)
 
 	}
 
-	MPI_Gather(pdf, stride, MPI_DOUBLE, pdf, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(pdf, stride);
 	MPI_Bcast(pdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Gather(pdf_stderr, stride, MPI_DOUBLE, pdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(pdf_stderr, stride);
 	MPI_Bcast(pdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	MPI_Reduce(&log_likelihood_MPI, log_likelihood, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
@@ -11912,9 +11920,9 @@ int itmax)
 
 	}
 
-	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(cdf, stride);
 	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-	MPI_Gather(cdf_stderr, stride, MPI_DOUBLE, cdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(cdf_stderr, stride);
 	MPI_Bcast(cdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
@@ -12446,7 +12454,7 @@ int itmax)
 
 	}
 
-	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(cdf, stride);
 	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	#endif
@@ -13898,17 +13906,17 @@ double *log_likelihood)
 
 	}
 
-	MPI_Gather(pdf, stride, MPI_DOUBLE, pdf, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(pdf, stride);
 	MPI_Bcast(pdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-	MPI_Gather(pdf_stderr, stride, MPI_DOUBLE, pdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(pdf_stderr, stride);
 	MPI_Bcast(pdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	for(l = 0; l < num_reg_continuous; l++)
 	{
 
-		MPI_Gather(&pdf_deriv[l][0], stride, MPI_DOUBLE, &pdf_deriv[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(&pdf_deriv[l][0], stride);
 		MPI_Bcast(&pdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-		MPI_Gather(&pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(&pdf_deriv_stderr[l][0], stride);
 		MPI_Bcast(&pdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	}
@@ -14407,9 +14415,9 @@ double **pdf_deriv_stderr)
 	for(l = 0; l < num_reg_unordered+num_reg_ordered; l++)
 	{
 
-		MPI_Gather(&pdf_deriv[l][0], stride, MPI_DOUBLE, &pdf_deriv[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(&pdf_deriv[l][0], stride);
 		MPI_Bcast(&pdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-		MPI_Gather(&pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(&pdf_deriv_stderr[l][0], stride);
 		MPI_Bcast(&pdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	}
@@ -15217,17 +15225,17 @@ int itmax)
 
 	}
 
-	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(cdf, stride);
 	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-	MPI_Gather(cdf_stderr, stride, MPI_DOUBLE, cdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(cdf_stderr, stride);
 	MPI_Bcast(cdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	for(l = 0; l < num_reg_continuous; l++)
 	{
 
-		MPI_Gather(&cdf_deriv[l][0], stride, MPI_DOUBLE, &cdf_deriv[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(&cdf_deriv[l][0], stride);
 		MPI_Bcast(&cdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-		MPI_Gather(&cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(&cdf_deriv_stderr[l][0], stride);
 		MPI_Bcast(&cdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	}
@@ -15727,9 +15735,9 @@ int itmax)
 	for(l = 0; l < num_reg_unordered+num_reg_ordered; l++)
 	{
 
-		MPI_Gather(&cdf_deriv[l][0], stride, MPI_DOUBLE, &cdf_deriv[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(&cdf_deriv[l][0], stride);
 		MPI_Bcast(&cdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-		MPI_Gather(&cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		np_mpi_gather_double_root0(&cdf_deriv_stderr[l][0], stride);
 		MPI_Bcast(&cdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	}
@@ -17739,10 +17747,10 @@ double  initd_dir)
 
 	/* Collect */
 
-	MPI_Gather(quan, stride, MPI_DOUBLE, quan, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(quan, stride);
 	MPI_Bcast(quan, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Gather(quan_stderr, stride, MPI_DOUBLE, quan_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(quan_stderr, stride);
 	MPI_Bcast(quan_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	if(gradient_compute == 1)
@@ -17751,7 +17759,7 @@ double  initd_dir)
 		for(k = 0; k < num_reg_continuous; k++)
 		{
 
-			MPI_Gather(&quan_gradient[k][0], stride, MPI_DOUBLE, &quan_gradient[k][0], stride, MPI_DOUBLE, 0, comm[1]);
+			np_mpi_gather_double_root0(&quan_gradient[k][0], stride);
 			MPI_Bcast(&quan_gradient[k][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 		}
@@ -19407,7 +19415,7 @@ int *num_categories)
 
 	/* Gather */
 
-	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+	np_mpi_gather_double_root0(mean, stride);
 	MPI_Bcast(mean, num_obs, MPI_DOUBLE, 0, comm[1]);
 
 	MPI_Reduce(&trace_H_MPI, &trace_H, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);

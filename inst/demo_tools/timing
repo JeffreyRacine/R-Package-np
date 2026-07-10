@@ -1,0 +1,15 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${1:-.}"
+OUT_DIR="${2:-.}"
+
+Rscript --vanilla "${SCRIPT_DIR}/parse_demo_results.R" "${ROOT}" "${OUT_DIR}"
+
+if [ -f "${OUT_DIR}/demo_summary.qmd" ] && command -v quarto >/dev/null 2>&1; then
+  (
+    cd "${OUT_DIR}"
+    quarto render demo_summary.qmd --to html >/dev/null
+  ) || echo "Quarto report render skipped after render failure; CSV/dat outputs are complete." >&2
+fi

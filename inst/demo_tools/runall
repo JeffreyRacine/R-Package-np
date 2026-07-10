@@ -1,0 +1,268 @@
+#!/bin/bash
+set -euo pipefail
+
+TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ "$(basename "${TOOLS_DIR}")" = "demo_tools" ]; then
+  if [ -d "${TOOLS_DIR}/../demo" ]; then
+    DEMO_ROOT="$(cd "${TOOLS_DIR}/../demo" && pwd)"
+  else
+    DEMO_ROOT="$(cd "${TOOLS_DIR}/../../demo" && pwd)"
+  fi
+else
+  DEMO_ROOT="$(cd "${TOOLS_DIR}/.." && pwd)"
+fi
+PACKAGE_ROOT="$(cd "${DEMO_ROOT}/.." && pwd)"
+TIMING_BIN="${DEMO_ROOT}/timing"
+if [ ! -x "${TIMING_BIN}" ]; then
+  TIMING_BIN="${TOOLS_DIR}/timing"
+fi
+
+cleanup_slaves() {
+  local pids
+  pids="$(pgrep -f 'slavedaemon\.R|Rslaves\.sh' || true)"
+  if [ -n "${pids}" ]; then
+    printf '%s\n' "${pids}" | xargs kill >/dev/null 2>&1 || true
+  fi
+}
+
+MONITOR_PID=""
+STATUS_WRITTEN=false
+CURRENT_STAGE="startup"
+
+cleanup_all() {
+  if [ -n "${MONITOR_PID}" ]; then
+    kill "${MONITOR_PID}" >/dev/null 2>&1 || true
+  fi
+  cleanup_slaves
+}
+
+write_run_status() {
+  local effective_status="$1"
+  local raw_exit="$2"
+  local stage="$3"
+  local proof="$4"
+  mkdir -p "${RUN_DIR}"
+  {
+    printf 'run_id\t%s\n' "${RUN_ID}"
+    printf 'effective_status\t%s\n' "${effective_status}"
+    printf 'raw_exit\t%s\n' "${raw_exit}"
+    printf 'stage\t%s\n' "${stage}"
+    printf 'proof\t%s\n' "${proof}"
+    printf 'timestamp_utc\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "${RUN_STATUS}"
+  STATUS_WRITTEN=true
+}
+
+on_exit() {
+  local rc="$?"
+  cleanup_all
+  if [ "${STATUS_WRITTEN}" != "true" ]; then
+    write_run_status "FAIL" "${rc}" "${CURRENT_STAGE}" "runall_exited_before_success_status"
+  fi
+  exit "${rc}"
+}
+
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+if [ "${1:-}" = "--cleanup" ] || [ "${1:-}" = "cleanup" ]; then
+  exec "${DEMO_ROOT}/cleanup"
+fi
+
+RESULTS_ROOT="${RESULTS_ROOT:-${DEMO_ROOT}/results}"
+RUN_ID="${RUN_ID:-npRmpi_$(date +%Y%m%d_%H%M%S)}"
+RUN_DIR="${RESULTS_ROOT}/${RUN_ID}"
+SESSION_SLAVES="${SESSION_SLAVES:-1 2 3}"
+MPI_RANKS="${MPI_RANKS:-2 3 4}"
+DEMO_SET="${DEMO_SET:-all}"
+NP_DEMO_TIER="${NP_DEMO_TIER:-smoke}"
+TIMEOUT_SEC="${TIMEOUT_SEC:-600}"
+CONTINUE_ON_ERROR="${CONTINUE_ON_ERROR:-false}"
+CPU_MONITOR="${CPU_MONITOR:-false}"
+CPU_MONITOR_INTERVAL="${CPU_MONITOR_INTERVAL:-10}"
+RUN_LOG="${RUN_LOG:-${RUN_DIR}/runall_progress.log}"
+RUN_STATUS="${RUN_STATUS:-${RUN_DIR}/RUN_STATUS.tsv}"
+RUN_INVENTORY="${RUN_INVENTORY:-${RUN_DIR}/RUN_INVENTORY.tsv}"
+RUN_OBSERVED_MATRIX="${RUN_OBSERVED_MATRIX:-${RUN_DIR}/RUN_OBSERVED_MATRIX.tsv}"
+RUN_MATRIX_VALIDATION="${RUN_MATRIX_VALIDATION:-${RUN_DIR}/RUN_MATRIX_VALIDATION.tsv}"
+RUNALL_REQUIRE_FULL_MATRIX="${RUNALL_REQUIRE_FULL_MATRIX:-false}"
+
+if [ -z "${DEMOS:-}" ]; then
+  case "${DEMO_SET}" in
+    all)
+      ;;
+    pilot)
+      DEMOS="npcdens"
+      ;;
+    conditional-density)
+      DEMOS="npcdens"
+      ;;
+    conditional-core)
+      DEMOS="npcdens npcdist"
+      ;;
+    core-scaling)
+      DEMOS="npreg npcdens npcdist npudens npudist"
+      ;;
+    nomad)
+      DEMOS="npreg npcdens npcdist npindex npscoef npplreg"
+      ;;
+    semiparametric)
+      DEMOS="npindex npscoef npplreg"
+      ;;
+    unconditional)
+      DEMOS="npudens npudist"
+      ;;
+    tests)
+      DEMOS="npdeneqtest npdeptest npsdeptest npsigtest npsymtest npunitest"
+      ;;
+    auxiliary)
+      DEMOS="npcmstest npconmode npcopula npqreg npregiv"
+      ;;
+    *)
+      echo "unknown DEMO_SET=${DEMO_SET}" >&2
+      exit 2
+      ;;
+  esac
+fi
+
+write_metadata() {
+  mkdir -p "${RUN_DIR}"
+  {
+    echo "run_id=${RUN_ID}"
+    echo "start_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "host=$(hostname)"
+    echo "demo_src=${DEMO_ROOT}"
+    echo "tools_dir=${TOOLS_DIR}"
+    echo "results_root=${RESULTS_ROOT}"
+    echo "np_demo_n=${NP_DEMO_N:-}"
+    echo "np_demo_n_frac=${NP_DEMO_N_FRAC:-}"
+    echo "np_demo_tier=${NP_DEMO_TIER}"
+    echo "np_demo_cases=${NP_DEMO_CASES:-}"
+    echo "np_demo_matrix=${NP_DEMO_MATRIX:-}"
+    echo "session_slaves=${SESSION_SLAVES}"
+    echo "mpi_ranks=${MPI_RANKS}"
+    echo "timeout_sec=${TIMEOUT_SEC}"
+    echo "continue_on_error=${CONTINUE_ON_ERROR}"
+    echo "cpu_monitor=${CPU_MONITOR}"
+    echo "cpu_monitor_interval=${CPU_MONITOR_INTERVAL}"
+    echo "demo_set=${DEMO_SET}"
+    echo "demos=${DEMOS:-<makefile-default>}"
+    if [ -e "${PACKAGE_ROOT}/.git" ]; then
+      echo "git_commit=$(git -C "${PACKAGE_ROOT}" rev-parse --short HEAD 2>/dev/null || true)"
+      echo "git_status=$(git -C "${PACKAGE_ROOT}" status --short 2>/dev/null | tr '\n' ';' || true)"
+    else
+      echo "git_commit=NA"
+      echo "git_status=not_a_git_worktree"
+    fi
+    Rscript --vanilla -e 'cat("R.version.string=", R.version.string, "\n", sep=""); blas <- sessionInfo()$BLAS; if (is.null(blas) || length(blas) == 0L || is.na(blas[1L]) || !nzchar(blas[1L])) blas <- "unknown"; cat("BLAS=", as.character(blas[1L]), "\n", sep=""); cat("npRmpi.version=", as.character(utils::packageVersion("npRmpi")), "\n", sep="")' 2>/dev/null || true
+    command -v mpiexec >/dev/null 2>&1 && echo "mpiexec=$(command -v mpiexec)" || echo "mpiexec="
+  } > "${RUN_DIR}/RUN_METADATA.txt"
+}
+
+write_inventory() {
+  mkdir -p "${RUN_DIR}"
+  {
+    printf 'kind\tmode\tdemo_set\tdemos\tnslaves\tranks\tnp_demo_tier\tnp_demo_cases\tnp_demo_matrix\n'
+    printf 'planned_route\tserial\t%s\t%s\t\t\t%s\t%s\t%s\n' \
+      "${DEMO_SET}" "${DEMOS:-<makefile-default>}" "${NP_DEMO_TIER}" \
+      "${NP_DEMO_CASES:-}" "${NP_DEMO_MATRIX:-}"
+    for slaves in ${SESSION_SLAVES}; do
+      printf 'planned_route\tsession\t%s\t%s\t%s\t\t%s\t%s\t%s\n' \
+        "${DEMO_SET}" "${DEMOS:-<makefile-default>}" "${slaves}" \
+        "${NP_DEMO_TIER}" "${NP_DEMO_CASES:-}" "${NP_DEMO_MATRIX:-}"
+    done
+    for ranks in ${MPI_RANKS}; do
+      printf 'planned_route\tattach\t%s\t%s\t\t%s\t%s\t%s\t%s\n' \
+        "${DEMO_SET}" "${DEMOS:-<makefile-default>}" "${ranks}" \
+        "${NP_DEMO_TIER}" "${NP_DEMO_CASES:-}" "${NP_DEMO_MATRIX:-}"
+      printf 'planned_route\tprofile\t%s\t%s\t\t%s\t%s\t%s\t%s\n' \
+        "${DEMO_SET}" "${DEMOS:-<makefile-default>}" "${ranks}" \
+        "${NP_DEMO_TIER}" "${NP_DEMO_CASES:-}" "${NP_DEMO_MATRIX:-}"
+    done
+  } > "${RUN_INVENTORY}"
+}
+
+run_make() {
+  local work_dir="$1"
+  shift
+  mkdir -p "${work_dir}"
+  (
+    cd "${work_dir}"
+    if [ -n "${DEMOS:-}" ]; then
+      make -f "${TOOLS_DIR}/makefile" DEMO_SRC="${DEMO_ROOT}" \
+        NP_DEMO_TIER="${NP_DEMO_TIER}" \
+        NP_DEMO_CASES="${NP_DEMO_CASES:-}" \
+        NP_DEMO_MATRIX="${NP_DEMO_MATRIX:-}" \
+        TIMEOUT_SEC="${TIMEOUT_SEC}" \
+        CONTINUE_ON_ERROR="${CONTINUE_ON_ERROR}" \
+        "DEMOS=${DEMOS}" "$@"
+    else
+      make -f "${TOOLS_DIR}/makefile" DEMO_SRC="${DEMO_ROOT}" \
+        NP_DEMO_TIER="${NP_DEMO_TIER}" \
+        NP_DEMO_CASES="${NP_DEMO_CASES:-}" \
+        NP_DEMO_MATRIX="${NP_DEMO_MATRIX:-}" \
+        TIMEOUT_SEC="${TIMEOUT_SEC}" \
+        CONTINUE_ON_ERROR="${CONTINUE_ON_ERROR}" \
+        "$@"
+    fi
+  ) 2>&1 | tee -a "${RUN_LOG}"
+  local status="${PIPESTATUS[0]}"
+  return "${status}"
+}
+
+write_metadata
+write_inventory
+: > "${RUN_LOG}"
+
+if [ ! -x "${TIMING_BIN}" ]; then
+  echo "timing wrapper not found or not executable under ${DEMO_ROOT} or ${TOOLS_DIR}" >&2
+  exit 127
+fi
+
+if [ "${CPU_MONITOR}" = "true" ]; then
+  "${TOOLS_DIR}/monitor_demo_cpu.sh" "$$" "${RUN_LOG}" "${DEMO_ROOT}" \
+    "${RUN_DIR}/cpu_monitor.csv" "${CPU_MONITOR_INTERVAL}" &
+  MONITOR_PID="$!"
+fi
+
+CURRENT_STAGE="serial"
+run_make "${RUN_DIR}/serial" MODE=serial
+
+for slaves in ${SESSION_SLAVES}; do
+  CURRENT_STAGE="session_nslaves_${slaves}"
+  printf -v slave_dir "slaves_%02d" "${slaves}"
+  run_make "${RUN_DIR}/session/${slave_dir}" MODE=session NSLAVES="${slaves}"
+done
+
+for ranks in ${MPI_RANKS}; do
+  printf -v rank_dir "ranks_%02d" "${ranks}"
+  CURRENT_STAGE="attach_ranks_${ranks}"
+  run_make "${RUN_DIR}/mpi_launch/${rank_dir}/attach" MODE=attach NP="${ranks}"
+  CURRENT_STAGE="profile_ranks_${ranks}"
+  run_make "${RUN_DIR}/mpi_launch/${rank_dir}/profile" MODE=profile NP="${ranks}"
+done
+
+CURRENT_STAGE="timing_parse"
+mkdir -p "${RUN_DIR}/timing"
+"${TIMING_BIN}" "${RUN_DIR}" "${RUN_DIR}/timing"
+
+CURRENT_STAGE="matrix_validation"
+Rscript --vanilla "${TOOLS_DIR}/validate_demo_matrix.R" \
+  "${RUN_DIR}/timing/demo_results.csv" \
+  "${RUN_OBSERVED_MATRIX}" \
+  "${RUN_MATRIX_VALIDATION}" \
+  "${RUNALL_REQUIRE_FULL_MATRIX}"
+
+if [ -n "${MONITOR_PID}" ]; then
+  kill "${MONITOR_PID}" >/dev/null 2>&1 || true
+  wait "${MONITOR_PID}" >/dev/null 2>&1 || true
+  MONITOR_PID=""
+  if [ -s "${RUN_DIR}/cpu_monitor.csv" ]; then
+    Rscript --vanilla "${TOOLS_DIR}/summarize_cpu_monitor.R" \
+      "${RUN_DIR}/cpu_monitor.csv" "${RUN_DIR}/cpu_monitor_summary.csv" || true
+  fi
+fi
+
+write_run_status "PASS" "0" "complete" "timing_and_matrix_validation_completed"
+echo "demo run complete: ${RUN_DIR}"
