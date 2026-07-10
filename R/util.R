@@ -1105,6 +1105,37 @@ npRejectLegacyLpArgs <- function(dotnames, where = "npreg") {
   invisible(NULL)
 }
 
+npDimBasisCapacityError <- function() {
+  stop("dim_basis: basis dimension exceeds supported capacity", call. = FALSE)
+}
+
+npCheckDimBasisNativeCapacity <- function(degree, segments, include, categories, kernel) {
+  limit <- .Machine$integer.max
+
+  if ((length(degree) && any(degree > limit)) ||
+      (length(segments) && any(segments > limit)))
+    npDimBasisCapacityError()
+
+  if (length(degree)) {
+    rows <- as.double(degree) + as.double(segments)
+    if (any(!is.finite(rows)) || any(rows > limit))
+      npDimBasisCapacityError()
+  }
+
+  if (!isTRUE(kernel) &&
+      ((length(include) && any(include > limit)) ||
+       (length(categories) && any(categories > limit))))
+    npDimBasisCapacityError()
+
+  if (!isTRUE(kernel) && length(include)) {
+    categorical <- as.double(include) * as.double(categories)
+    if (any(!is.finite(categorical)) || any(categorical > limit))
+      npDimBasisCapacityError()
+  }
+
+  invisible(NULL)
+}
+
 dim_basis <- function(basis = c("glp", "additive", "tensor"),
                       kernel = TRUE,
                       degree = NULL,
@@ -1156,19 +1187,26 @@ dim_basis <- function(basis = c("glp", "additive", "tensor"),
       any(categories != floor(categories)))
     stop("categories must contain finite non-negative integers")
 
+  npCheckDimBasisNativeCapacity(degree, segments, include, categories, kernel)
+
   include <- as.integer(include)
   categories <- as.integer(categories)
 
   basis.code <- switch(basis, additive = 0L, glp = 1L, tensor = 2L)
 
-  .Call("C_np_dim_basis",
-        as.integer(basis.code),
-        as.integer(isTRUE(kernel)),
-        degree,
-        segments,
-        include,
-        categories,
-        PACKAGE = "np")
+  result <- .Call("C_np_dim_basis",
+                  as.integer(basis.code),
+                  as.integer(isTRUE(kernel)),
+                  degree,
+                  segments,
+                  include,
+                  categories,
+                  PACKAGE = "np")
+
+  if (!is.finite(result) || result > .Machine$integer.max)
+    npDimBasisCapacityError()
+
+  result
 }
 
 dimBS <- function(basis = "additive",
