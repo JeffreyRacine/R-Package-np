@@ -682,6 +682,7 @@ npRmpi.quit <- function(force = FALSE,
     .npRmpi_session_reset_spmd_state()
     .npRmpi_attach_state_reset()
     options(npRmpi.master.only = FALSE)
+    options(npRmpi.pool.active = FALSE)
     return(invisible(TRUE))
   }
 
