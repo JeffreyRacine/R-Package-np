@@ -2075,6 +2075,13 @@ test_that("attach mode NP transition close stays stable when stress test is enab
   expect_equal(res3$status, 0L, info = paste(res3$output, collapse = "\n"))
   expect_true(any(grepl("ATTACH_NPCONMODE_ROUTE_OK", res3$output, fixed = TRUE)),
               info = paste(res3$output, collapse = "\n"))
+
+  res3.repeat <- run_once(3L)
+  if (res3.repeat$status != 0L && .is_mpi_init_env_failure(res3.repeat$output))
+    skip("MPI runtime interface unavailable in this environment for attach stress")
+  expect_equal(res3.repeat$status, 0L, info = paste(res3.repeat$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_NPCONMODE_ROUTE_OK", res3.repeat$output, fixed = TRUE)),
+              info = paste(res3.repeat$output, collapse = "\n"))
 })
 
 test_that("profile mode smoke completes under mpiexec when enabled", {
