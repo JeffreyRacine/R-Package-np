@@ -68,7 +68,6 @@ npregbw(\dots)
         lbd.dir,
         lbd.init,
         nmulti,
-        nomad.opts = list(),
         okertype,
         penalty.multiplier = 10,
         regtype,
@@ -81,7 +80,8 @@ npregbw(\dots)
         tol,
         transform.bounds = FALSE,
         ukertype,
-        \dots)
+        \dots,
+        nomad.opts = list())
 
 \method{npregbw}{rbandwidth}(xdat = stop("invoked without data 'xdat'"),
         ydat = stop("invoked without data 'ydat'"),
@@ -105,7 +105,6 @@ npregbw(\dots)
         lbd.dir = 0.1,
         lbd.init = 0.1,
         nmulti,
-        nomad.opts = list(),
         penalty.multiplier = 10,
         powell.remin = TRUE,
         bwsolver = c("powell", "mads", "mads+powell"),
@@ -114,7 +113,8 @@ npregbw(\dots)
         small = 1.490116e-05,
         tol = 1.490116e-04,
         transform.bounds = FALSE,
-        \dots)
+        \dots,
+        nomad.opts = list())
 }
 \arguments{
 \subsection{Data And Bandwidth Inputs}{
@@ -495,7 +495,7 @@ These controls set numerical search starts, kernel choices, and support bounds.
     \code{"mads+powell"} applies one Powell hot start from the MADS
     solution. Use \code{search.engine} rather than \code{bwsolver} for
     automatic degree search. Advanced native NOMAD parameters may be supplied
-    as \code{nomad.opts} through \code{...}; invalid or unsupported
+    through the explicit \code{nomad.opts} argument; invalid or unsupported
     parameters are rejected by NOMAD rather than silently ignored.
   }
 
@@ -756,7 +756,7 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
   controls the inner native \pkg{crs} NOMAD API multistart count used within
   each outer restart. The default \code{nomad.nmulti=0L} preserves the
   current single-start inner NOMAD behavior. Advanced native NOMAD
-  parameters may be supplied through \code{nomad.opts} in \code{...};
+  parameters may be supplied through the explicit \code{nomad.opts} argument;
   invalid or unsupported parameters are rejected by NOMAD rather than
   silently ignored. Routes that evaluate R callbacks require serial
   callback evaluation and reject parallel callback settings such as

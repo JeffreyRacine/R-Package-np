@@ -1030,8 +1030,10 @@ nplsqregbw.default <-
            bandwidth.compute = TRUE,
            delta.bounds = c(1e-4, 1 - 1e-4),
            optim.control = list(maxit = 50L),
-           ...) {
+           ...,
+           nomad.opts = list()) {
 
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "nplsqregbw")
     .npRmpi_require_active_slave_pool(where = "nplsqregbw()")
     mc.dispatch <- match.call()
     tau.dispatch <- try(.nplsqreg_validate_tau_values(tau),
@@ -1079,8 +1081,9 @@ nplsqregbw.default <-
       warm.start.from <- rep(NA_integer_, length(tau.raw))
       warm.start.degree <- vector("list", length(tau.raw))
       previous.idx <- NA_integer_
-      full.extra.args <- .nplsqreg_normalize_dots(list(...),
-                                                  where = "nplsqregbw")
+      full.extra.args <- .nplsqreg_normalize_dots(
+        c(list(...), if (length(nomad.opts)) list(nomad.opts = nomad.opts) else list()),
+        where = "nplsqregbw")
       refined.extra.args <- full.extra.args
       tau.search.controls <- NULL
       if (identical(tau.search, "refined")) {
@@ -1162,7 +1165,9 @@ nplsqregbw.default <-
     nomad.pilot <- npValidateScalarLogical(nomad.pilot, "nomad.pilot")
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute,
                                                  "bandwidth.compute")
-    dots <- .nplsqreg_normalize_dots(list(...), where = "nplsqregbw")
+    dots <- .nplsqreg_normalize_dots(
+      c(list(...), if (length(nomad.opts)) list(nomad.opts = nomad.opts) else list()),
+      where = "nplsqregbw")
     controls <- .nplsqreg_optimizer_controls(dots, optim.control)
     prepared <- .nplsqreg_prepare_train_data(xdat, ydat, scale = scale)
     xdat <- prepared$xdat

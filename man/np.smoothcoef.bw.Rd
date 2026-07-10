@@ -78,7 +78,8 @@ npscoefbw(\dots)
           hbd.init = 1.5,
           dfac.init = 1.0,
           scale.factor.search.lower = NULL,
-          \dots)
+          \dots,
+          nomad.opts = list())
 
 \method{npscoefbw}{scbandwidth}(xdat = stop("invoked without data 'xdat'"),
           ydat = stop("invoked without data 'ydat'"),
@@ -499,9 +500,14 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     Defaults to \code{0L}, which preserves the current one-start-per-
     restart behavior. This does not replace \code{nmulti}:
     \code{nmulti} controls outer restarts, while \code{nomad.nmulti}
-    controls inner NOMAD multistarts within each outer restart. Advanced
-    native NOMAD parameters may be supplied as \code{nomad.opts} through
-    \code{...}; invalid or unsupported parameters are rejected by NOMAD
+    controls inner NOMAD multistarts within each outer restart.
+  }
+
+  \item{nomad.opts}{
+    optional named list of native NOMAD parameters forwarded to the
+    \pkg{crs} NOMAD C API for NOMAD-backed bandwidth searches.
+    \code{NULL} is treated as no extra NOMAD options. Non-list values and
+    invalid or unsupported parameters are rejected before solver entry
     rather than silently ignored. Routes that evaluate R callbacks require
     serial callback evaluation and reject parallel callback settings such as
     \code{NB_THREADS_PARALLEL_EVAL > 1}.

@@ -1978,11 +1978,15 @@ npindexbw.default <-
            scale.factor.init.upper = 2.0,
            scale.factor.init = 0.5,
            scale.factor.search.lower = NULL,
-           ...){
+           ...,
+           nomad.opts = list()){
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npindexbw")
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
     mc <- match.call(expand.dots = FALSE)
     search.mc.names <- names(mc)
     dots <- list(...)
+    if (length(nomad.opts))
+      dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npindexbw")
     dot.names <- names(dots)
     nomad.mode <- npValidateNomadControl(nomad, "nomad")

@@ -744,8 +744,12 @@ npudistbw.dbandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            eval.only = FALSE,
-           ...){
+           ...,
+           nomad.opts = list()){
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudistbw")
     dot.args <- list(...)
+    if (length(nomad.opts))
+      dot.args$nomad.opts <- nomad.opts
     elapsed.start <- proc.time()[3]
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     bwsolver <- npValidateBwsolver(bwsolver)
@@ -1105,7 +1109,9 @@ npudistbw.default <-
            small,
            tol,
            transform.bounds,
-           ...){
+           ...,
+           nomad.opts = list()){
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudistbw")
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
     if (.npRmpi_autodispatch_active()) {
       dat.preflight <- toFrame(dat)

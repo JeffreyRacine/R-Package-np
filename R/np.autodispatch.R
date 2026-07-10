@@ -269,7 +269,7 @@
   out.names <- character(0)
 
   append_arg <- function(val, nm) {
-    out.args[[length(out.args) + 1L]] <<- val
+    out.args[length(out.args) + 1L] <<- list(val)
     out.names[[length(out.names) + 1L]] <<- if (is.null(nm)) "" else nm
   }
 

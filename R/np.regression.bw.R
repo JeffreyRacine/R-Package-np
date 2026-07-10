@@ -168,7 +168,6 @@ npregbw.rbandwidth <-
            lbd.dir = 0.1,
            lbd.init = 0.1,
            nmulti,
-           nomad.opts = list(),
            penalty.multiplier = 10,
            powell.remin = TRUE,
            bwsolver = c("powell", "mads", "mads+powell"),
@@ -177,7 +176,8 @@ npregbw.rbandwidth <-
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
-           ...){
+           ...,
+           nomad.opts = list()){
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     .np_nomad_native_reject_unsupported_options_for_route(
       opts = nomad.opts,
@@ -3182,7 +3182,6 @@ npregbw.default <-
            lbd.dir,
            lbd.init,
            nmulti,
-           nomad.opts = list(),
            okertype,
            penalty.multiplier = 10,
            regtype,
@@ -3195,7 +3194,8 @@ npregbw.default <-
            tol,
            transform.bounds = FALSE,
            ukertype,
-           ...){
+           ...,
+           nomad.opts = list()){
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     .np_nomad_native_reject_unsupported_options_for_route(
       opts = nomad.opts,
