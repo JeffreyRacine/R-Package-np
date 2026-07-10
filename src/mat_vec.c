@@ -4,6 +4,23 @@
 #include <R.h>
 #include "headers.h"
 
+static void check_nonnegative_dim(int value, const char *name, const char *type)
+{
+  if(value < 0) {
+    error("\nFATAL ERROR: Negative allocation dimension %s=%d (type %s). Program terminated.\n",
+          name, value, type);
+  }
+}
+
+static size_t checked_size_mul(size_t a, size_t b, const char *type)
+{
+  if(a != 0 && b > ((size_t)-1) / a) {
+    error("\nFATAL ERROR: Allocation size overflow (type %s). Program terminated.\n",
+          type);
+  }
+  return a * b;
+}
+
 /*
  * This function allocates an n by k array of double precision floating  point numbers.
  */
@@ -14,17 +31,25 @@ double **alloc_tmatd(int nrows, int ncols)
   int i;
 
   double **m, *f;
+  size_t ptr_bytes, cell_count, data_bytes;
+
+  check_nonnegative_dim(nrows, "nrows", "DBL_MATRIX");
+  check_nonnegative_dim(ncols, "ncols", "DBL_MATRIX");
 
 	/* malloc() on 64 bit systems seems to barf on malloc(0) */
 
 	/*	if(ncols == 0) ncols++;*/
 
   if(((size_t)ncols * (size_t)nrows) != 0) {
-    if((m=(double**)malloc(sizeof(double*)*ncols))==NULL){
+    ptr_bytes = checked_size_mul((size_t)ncols, sizeof(double*), "DBL_MATRIX");
+    cell_count = checked_size_mul((size_t)nrows, (size_t)ncols, "DBL_MATRIX");
+    data_bytes = checked_size_mul(cell_count, sizeof(double), "DBL_MATRIX");
+
+    if((m=(double**)malloc(ptr_bytes))==NULL){
       error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
     }
 
-    if ((m[0]=(double*)malloc(sizeof(double) * (size_t)nrows * (size_t)ncols))==NULL){
+    if ((m[0]=(double*)malloc(data_bytes))==NULL){
       free(m);
       error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
     }
@@ -49,6 +74,10 @@ double **alloc_matd(int nrows, int ncols)
   int i;
 
   double **m;
+  size_t ptr_bytes, row_bytes;
+
+  check_nonnegative_dim(nrows, "nrows", "DBL_MATRIX");
+  check_nonnegative_dim(ncols, "ncols", "DBL_MATRIX");
 
   /* malloc() on 64 bit systems seems to barf on malloc(0) */
   
@@ -56,12 +85,15 @@ double **alloc_matd(int nrows, int ncols)
   
   if(ncols != 0) {
 
-    if((m=(double**)malloc(sizeof(double*) * (size_t)ncols))==NULL) {
+    ptr_bytes = checked_size_mul((size_t)ncols, sizeof(double*), "DBL_MATRIX");
+    row_bytes = checked_size_mul((size_t)nrows, sizeof(double), "DBL_MATRIX");
+
+    if((m=(double**)malloc(ptr_bytes))==NULL) {
       error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
     }
 
     for(i=0;i<ncols;i++) {
-      if((m[i]=(double*)malloc(sizeof(double) * (size_t)nrows))==NULL) {
+      if((m[i]=(double*)malloc(row_bytes))==NULL) {
         free_mat(m, i);
         error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
       }
@@ -122,6 +154,9 @@ void free_mat(double **x, int n)
 double *alloc_vecd(int nobs)
 {
   double *a;
+  size_t bytes;
+
+  check_nonnegative_dim(nobs, "nobs", "DBL_VECTOR");
 
 	/* malloc() on 64 bit systems seems to barf on malloc(0) */
 
@@ -129,7 +164,9 @@ double *alloc_vecd(int nobs)
 
 	if(nobs != 0) {
 
-  if ((a=(double *)malloc(sizeof(double)*nobs))==NULL)
+  bytes = checked_size_mul((size_t)nobs, sizeof(double), "DBL_VECTOR");
+
+  if ((a=(double *)malloc(bytes))==NULL)
   {
     error("\nFATAL ERROR: Memory allocation failure (type DBL_VECTOR). Program terminated.\n");
   }
@@ -145,6 +182,9 @@ double *alloc_vecd(int nobs)
 int *alloc_vecu(int nobs)
 {
   int *a;
+  size_t bytes;
+
+  check_nonnegative_dim(nobs, "nobs", "INT_VECTOR");
 
 	/* malloc() on 64 bit systems seems to barf on malloc(0) */
 
@@ -152,7 +192,9 @@ int *alloc_vecu(int nobs)
 
 	if(nobs != 0) {
 
-  if ((a=(int *)malloc(sizeof(int)*nobs))==NULL)
+  bytes = checked_size_mul((size_t)nobs, sizeof(int), "INT_VECTOR");
+
+  if ((a=(int *)malloc(bytes))==NULL)
   {
     error("\nFATAL ERROR: Memory allocation failure (type INT_VECTOR). Program terminated.\n");
   }
