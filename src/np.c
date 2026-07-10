@@ -855,6 +855,13 @@ static int bwm_reserve_transform_buf(int needed_len)
   return 1;
 }
 
+static double *bwm_alloc_transform_tmp(int needed_len)
+{
+  if (nomad_c_callback_active)
+    return NP_NOMAD_CALLBACK_CALLOC(needed_len, double);
+  return alloc_vecd(needed_len);
+}
+
 void np_release_static_buffers(int *unused)
 {
   (void)unused;
@@ -2048,14 +2055,20 @@ static void bwm_apply_transform(const double *p, double *out, int n)
   }
 }
 
-static void bwm_to_unconstrained(double *p, int n)
+static int bwm_to_unconstrained(double *p, int n)
 {
   int i;
   int idx;
   const double eps = 1e-12;
 
   if (!bwm_use_transform)
-    return;
+    return 0;
+
+  if (p == NULL || n < 0)
+    return 1;
+
+  if (!bwm_reserve_transform_buf(n + 1))
+    return 1;
 
   for (i = 1; i <= n; i++)
     bwm_transform_buf[i] = p[i];
@@ -2087,17 +2100,27 @@ static void bwm_to_unconstrained(double *p, int n)
     idx = bwm_num_reg_continuous + bwm_num_reg_unordered + 1 + i;
     p[idx] = bwm_logit(bwm_transform_buf[idx]);
   }
+
+  return 0;
 }
 
-static void bwm_to_constrained(double *p, int n)
+static int bwm_to_constrained(double *p, int n)
 {
   int i;
   if (!bwm_use_transform)
-    return;
+    return 0;
+
+  if (p == NULL || n < 0)
+    return 1;
+
+  if (!bwm_reserve_transform_buf(n + 1))
+    return 1;
 
   bwm_apply_transform(p, bwm_transform_buf, n);
   for (i = 1; i <= n; i++)
     p[i] = bwm_transform_buf[i];
+
+  return 0;
 }
 
 static int np_bw_candidate_is_admissible_with_floor(
@@ -2279,11 +2302,14 @@ static void np_copy_scale_factor(double *dest, const double *src, int n)
     dest[i] = src[i];
 }
 
-static void np_copy_scale_factor_for_raw(double *dest, const double *src, int n)
+static int np_copy_scale_factor_for_raw(double *dest, const double *src, int n)
 {
+  if (dest == NULL || src == NULL)
+    return 1;
   np_copy_scale_factor(dest, src, n);
   if (bwm_use_transform)
-    bwm_to_constrained(dest, n);
+    return bwm_to_constrained(dest, n);
+  return 0;
 }
 
 static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
@@ -2294,8 +2320,13 @@ static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
   if (!bwm_use_transform)
     return bwmfunc_raw(vector_scale_factor);
 
-  double *tmp = alloc_vecd(n + bwm_num_extra_params + 1);
-  np_copy_scale_factor_for_raw(tmp, vector_scale_factor, n);
+  double *tmp = bwm_alloc_transform_tmp(n + bwm_num_extra_params + 1);
+  if (tmp == NULL)
+    return DBL_MAX;
+  if (np_copy_scale_factor_for_raw(tmp, vector_scale_factor, n) != 0) {
+    safe_free(tmp);
+    return DBL_MAX;
+  }
   for (i = 1; i <= bwm_num_extra_params; i++)
     tmp[n + i] = vector_scale_factor[n + i];
   val = bwmfunc_raw(tmp);
@@ -2410,9 +2441,14 @@ static int np_bw_candidate_is_admissible_with_floor(
   int invalid = 0;
 
   if (use_transform) {
-    tmp = alloc_vecd(n + 1);
+    tmp = bwm_alloc_transform_tmp(n + 1);
+    if (tmp == NULL)
+      return 0;
     np_copy_scale_factor(tmp, vector_scale_factor, n);
-    bwm_to_constrained(tmp, n);
+    if (bwm_to_constrained(tmp, n) != 0) {
+      safe_free(tmp);
+      return 0;
+    }
     candidate = tmp;
   }
 
@@ -3105,12 +3141,11 @@ static void np_conditional_density_nomad_shadow_refresh_penalty(void)
       np_conditional_density_nomad_shadow.num_all_var);
 
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = alloc_vecd(np_conditional_density_nomad_shadow.num_all_var + 1);
-      if (tmp != NULL) {
-        np_copy_scale_factor_for_raw(
+      double *tmp = bwm_alloc_transform_tmp(np_conditional_density_nomad_shadow.num_all_var + 1);
+      if (tmp != NULL && np_copy_scale_factor_for_raw(
           tmp,
           np_conditional_density_nomad_shadow.vector_scale_factor,
-          np_conditional_density_nomad_shadow.num_all_var);
+          np_conditional_density_nomad_shadow.num_all_var) == 0) {
         for (i = 1; i <= (np_conditional_density_nomad_shadow.num_var_continuous +
                           np_conditional_density_nomad_shadow.num_reg_continuous); i++)
           tmp[i] *= 2.0;
@@ -10614,8 +10649,11 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   }
 
-  if (bwm_use_transform)
-    bwm_to_unconstrained(vector_scale_factor, num_var);
+  if (bwm_use_transform &&
+      bwm_to_unconstrained(vector_scale_factor, num_var) != 0) {
+    bw_error_msg = "C_np_density_bw: transform buffer allocation failed";
+    goto cleanup_np_density_bw;
+  }
 
   spinner(0);
 
@@ -10657,23 +10695,24 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     if (!R_FINITE(baseline) || baseline == DBL_MAX)
       bwm_invalid_count += 1.0;
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = alloc_vecd(num_var + 1);
-      np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var);
-      for (i = 1; i <= num_reg_continuous_extern; i++)
-        tmp[i] *= 2.0;
-      for (i = 0; i < num_reg_unordered_extern; i++) {
-        int idx = num_reg_continuous_extern + 1 + i;
-        double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
-        tmp[idx] = 0.5*maxbw;
+      double *tmp = bwm_alloc_transform_tmp(num_var + 1);
+      if (tmp != NULL && np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var) == 0) {
+        for (i = 1; i <= num_reg_continuous_extern; i++)
+          tmp[i] *= 2.0;
+        for (i = 0; i < num_reg_unordered_extern; i++) {
+          int idx = num_reg_continuous_extern + 1 + i;
+          double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
+          tmp[idx] = 0.5*maxbw;
+        }
+        for (i = 0; i < num_reg_ordered_extern; i++) {
+          int idx = num_reg_continuous_extern + num_reg_unordered_extern + 1 + i;
+          tmp[idx] = 0.5;
+        }
+        baseline = bwmfunc_raw(tmp);
+        bwm_eval_count += 1.0;
+        if (!R_FINITE(baseline) || baseline == DBL_MAX)
+          bwm_invalid_count += 1.0;
       }
-      for (i = 0; i < num_reg_ordered_extern; i++) {
-        int idx = num_reg_continuous_extern + num_reg_unordered_extern + 1 + i;
-        tmp[idx] = 0.5;
-      }
-      baseline = bwmfunc_raw(tmp);
-      bwm_eval_count += 1.0;
-      if (!R_FINITE(baseline) || baseline == DBL_MAX)
-        bwm_invalid_count += 1.0;
       safe_free(tmp);
     }
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
@@ -10880,8 +10919,11 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
 
 
-      if (bwm_use_transform)
-        bwm_to_unconstrained(vector_scale_factor, num_var);
+      if (bwm_use_transform &&
+          bwm_to_unconstrained(vector_scale_factor, num_var) != 0) {
+        bw_error_msg = "C_np_density_bw: transform buffer allocation failed";
+        goto cleanup_np_density_bw;
+      }
 
       /* Conduct direction set search */
 
@@ -11038,8 +11080,11 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     fret = final_raw;
   }
 
-  if (bwm_use_transform)
-    bwm_to_constrained(vector_scale_factor, num_var);
+  if (bwm_use_transform &&
+      bwm_to_constrained(vector_scale_factor, num_var) != 0) {
+    bw_error_msg = "C_np_density_bw: transform buffer allocation failed";
+    goto cleanup_np_density_bw;
+  }
 
   /* return data to R */
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
@@ -11484,8 +11529,11 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     goto cleanup_np_distribution_bw;
   }
 
-  if (bwm_use_transform)
-    bwm_to_unconstrained(vector_scale_factor, num_var);
+  if (bwm_use_transform &&
+      bwm_to_unconstrained(vector_scale_factor, num_var) != 0) {
+    bw_error_msg = "C_np_distribution_bw: transform buffer allocation failed";
+    goto cleanup_np_distribution_bw;
+  }
 
   spinner(0);
 
@@ -11524,20 +11572,21 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     if (pmult < 1.0) pmult = 1.0;
     baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = alloc_vecd(num_var + 1);
-      np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var);
-      for (i = 1; i <= num_reg_continuous_extern; i++)
-        tmp[i] *= 2.0;
-      for (i = 0; i < num_reg_unordered_extern; i++) {
-        int idx = num_reg_continuous_extern + 1 + i;
-        double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
-        tmp[idx] = 0.5*maxbw;
+      double *tmp = bwm_alloc_transform_tmp(num_var + 1);
+      if (tmp != NULL && np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var) == 0) {
+        for (i = 1; i <= num_reg_continuous_extern; i++)
+          tmp[i] *= 2.0;
+        for (i = 0; i < num_reg_unordered_extern; i++) {
+          int idx = num_reg_continuous_extern + 1 + i;
+          double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
+          tmp[idx] = 0.5*maxbw;
+        }
+        for (i = 0; i < num_reg_ordered_extern; i++) {
+          int idx = num_reg_continuous_extern + num_reg_unordered_extern + 1 + i;
+          tmp[idx] = 0.5;
+        }
+        baseline = bwmfunc_raw(tmp);
       }
-      for (i = 0; i < num_reg_ordered_extern; i++) {
-        int idx = num_reg_continuous_extern + num_reg_unordered_extern + 1 + i;
-        tmp[idx] = 0.5;
-      }
-      baseline = bwmfunc_raw(tmp);
       safe_free(tmp);
     }
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
@@ -11741,8 +11790,11 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
       /* Conduct direction set search */
 
-      if (bwm_use_transform)
-        bwm_to_unconstrained(vector_scale_factor, num_var);
+      if (bwm_use_transform &&
+          bwm_to_unconstrained(vector_scale_factor, num_var) != 0) {
+        bw_error_msg = "C_np_distribution_bw: transform buffer allocation failed";
+        goto cleanup_np_distribution_bw;
+      }
 
       bwm_reset_counters();
 
@@ -11895,8 +11947,11 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     fret = final_raw;
   }
 
-  if (bwm_use_transform)
-    bwm_to_constrained(vector_scale_factor, num_var);
+  if (bwm_use_transform &&
+      bwm_to_constrained(vector_scale_factor, num_var) != 0) {
+    bw_error_msg = "C_np_distribution_bw: transform buffer allocation failed";
+    goto cleanup_np_distribution_bw;
+  }
 
   /* return data to R */
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
@@ -12614,8 +12669,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     }
   }
 
-  if (bwm_use_transform)
-    bwm_to_unconstrained(vector_scale_factor, num_all_var);
+  if (bwm_use_transform &&
+      bwm_to_unconstrained(vector_scale_factor, num_all_var) != 0) {
+    bw_error_msg = "C_np_density_conditional_bw: transform buffer allocation failed";
+    goto cleanup_np_density_conditional_bw;
+  }
 
   spinner(0);
 
@@ -12668,24 +12726,25 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     if (!R_FINITE(baseline) || baseline == DBL_MAX)
       bwm_invalid_count += 1.0;
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = alloc_vecd(num_all_var + 1);
-      np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_all_var);
-      for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
-        tmp[i] *= 2.0;
-      for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
-        int idx = num_var_continuous_extern + num_reg_continuous_extern + 1 + i;
-        double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
-        tmp[idx] = 0.5*maxbw;
+      double *tmp = bwm_alloc_transform_tmp(num_all_var + 1);
+      if (tmp != NULL && np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_all_var) == 0) {
+        for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
+          tmp[i] *= 2.0;
+        for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
+          int idx = num_var_continuous_extern + num_reg_continuous_extern + 1 + i;
+          double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
+          tmp[idx] = 0.5*maxbw;
+        }
+        for (i = 0; i < (num_var_ordered_extern + num_reg_ordered_extern); i++) {
+          int idx = num_var_continuous_extern + num_reg_continuous_extern +
+            num_var_unordered_extern + num_reg_unordered_extern + 1 + i;
+          tmp[idx] = 0.5;
+        }
+        baseline = bwmfunc_raw(tmp);
+        bwm_eval_count += 1.0;
+        if (!R_FINITE(baseline) || baseline == DBL_MAX)
+          bwm_invalid_count += 1.0;
       }
-      for (i = 0; i < (num_var_ordered_extern + num_reg_ordered_extern); i++) {
-        int idx = num_var_continuous_extern + num_reg_continuous_extern +
-          num_var_unordered_extern + num_reg_unordered_extern + 1 + i;
-        tmp[idx] = 0.5;
-      }
-      baseline = bwmfunc_raw(tmp);
-      bwm_eval_count += 1.0;
-      if (!R_FINITE(baseline) || baseline == DBL_MAX)
-        bwm_invalid_count += 1.0;
       safe_free(tmp);
     }
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
@@ -12897,8 +12956,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
       /* Conduct direction set search */
 
-      if (bwm_use_transform)
-        bwm_to_unconstrained(vector_scale_factor, num_all_var);
+      if (bwm_use_transform &&
+          bwm_to_unconstrained(vector_scale_factor, num_all_var) != 0) {
+        bw_error_msg = "C_np_density_conditional_bw: transform buffer allocation failed";
+        goto cleanup_np_density_conditional_bw;
+      }
 
       bwm_reset_counters();
       
@@ -13056,8 +13118,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     fret = final_raw;
   }
 
-  if (bwm_use_transform)
-    bwm_to_constrained(vector_scale_factor, num_all_var);
+  if (bwm_use_transform &&
+      bwm_to_constrained(vector_scale_factor, num_all_var) != 0) {
+    bw_error_msg = "C_np_density_conditional_bw: transform buffer allocation failed";
+    goto cleanup_np_density_conditional_bw;
+  }
 
   /* return data to R */
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
@@ -13784,8 +13849,11 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     goto cleanup_np_distribution_conditional_bw;
   }
 
-  if (bwm_use_transform)
-    bwm_to_unconstrained(vector_scale_factor, num_all_var);
+  if (bwm_use_transform &&
+      bwm_to_unconstrained(vector_scale_factor, num_all_var) != 0) {
+    bw_error_msg = "C_np_distribution_conditional_bw: transform buffer allocation failed";
+    goto cleanup_np_distribution_conditional_bw;
+  }
 
   spinner(0);
 
@@ -13832,21 +13900,22 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     if (pmult < 1.0) pmult = 1.0;
     baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = alloc_vecd(num_all_var + 1);
-      np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_all_var);
-      for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
-        tmp[i] *= 2.0;
-      for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
-        int idx = num_var_continuous_extern + num_reg_continuous_extern + 1 + i;
-        double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
-        tmp[idx] = 0.5*maxbw;
+      double *tmp = bwm_alloc_transform_tmp(num_all_var + 1);
+      if (tmp != NULL && np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_all_var) == 0) {
+        for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
+          tmp[i] *= 2.0;
+        for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
+          int idx = num_var_continuous_extern + num_reg_continuous_extern + 1 + i;
+          double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
+          tmp[idx] = 0.5*maxbw;
+        }
+        for (i = 0; i < (num_var_ordered_extern + num_reg_ordered_extern); i++) {
+          int idx = num_var_continuous_extern + num_reg_continuous_extern +
+            num_var_unordered_extern + num_reg_unordered_extern + 1 + i;
+          tmp[idx] = 0.5;
+        }
+        baseline = bwmfunc_raw(tmp);
       }
-      for (i = 0; i < (num_var_ordered_extern + num_reg_ordered_extern); i++) {
-        int idx = num_var_continuous_extern + num_reg_continuous_extern +
-          num_var_unordered_extern + num_reg_unordered_extern + 1 + i;
-        tmp[idx] = 0.5;
-      }
-      baseline = bwmfunc_raw(tmp);
       safe_free(tmp);
     }
     if (!R_FINITE(baseline) || baseline == DBL_MAX) {
@@ -14200,8 +14269,11 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     fret = final_raw;
   }
 
-  if (bwm_use_transform)
-    bwm_to_constrained(vector_scale_factor, num_all_var);
+  if (bwm_use_transform &&
+      bwm_to_constrained(vector_scale_factor, num_all_var) != 0) {
+    bw_error_msg = "C_np_distribution_conditional_bw: transform buffer allocation failed";
+    goto cleanup_np_distribution_conditional_bw;
+  }
 
   /* return data to R */
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
@@ -16224,8 +16296,11 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     fret = final_raw;
   }
 
-  if (bwm_use_transform)
-    bwm_to_constrained(vector_scale_factor, num_var);
+  if (bwm_use_transform &&
+      bwm_to_constrained(vector_scale_factor, num_var) != 0) {
+    bw_error_msg = "C_np_regression_bw: transform buffer allocation failed";
+    goto cleanup_np_regression_bw_mode;
+  }
 
   /* return data to R */
   if (BANDWIDTH_reg_extern == BW_GEN_NN || 

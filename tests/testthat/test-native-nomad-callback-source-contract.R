@@ -1,11 +1,25 @@
 np_extract_c_function_body <- function(source_text, name) {
-  loc <- regexpr(paste0("\\b", name, "\\s*\\("), source_text, perl = TRUE)
-  if (loc[[1L]] <= 0L)
+  pattern <- paste0("(?m)^\\s*static\\s+[^\\n;{]*\\b", name, "\\s*\\(")
+  locs <- gregexpr(pattern, source_text, perl = TRUE)[[1L]]
+  if (identical(locs, -1L))
     stop("missing C function ", name, call. = FALSE)
 
   chars <- strsplit(source_text, "", fixed = TRUE)[[1L]]
+  definition_locs <- integer()
+  for (loc in locs) {
+    open_try <- regexpr("\\{", substring(source_text, loc), perl = TRUE)[[1L]]
+    semi_try <- regexpr(";", substring(source_text, loc), perl = TRUE)[[1L]]
+    if (open_try > 0L && (semi_try <= 0L || open_try < semi_try))
+      definition_locs <- c(definition_locs, loc)
+  }
+  if (!length(definition_locs))
+    stop("missing C function definition ", name, call. = FALSE)
+  if (length(definition_locs) > 1L)
+    stop("multiple C function definitions ", name, call. = FALSE)
+
+  loc <- definition_locs[[1L]]
   open <- NA_integer_
-  for (i in seq.int(loc[[1L]], length(chars))) {
+  for (i in seq.int(loc, length(chars))) {
     if (identical(chars[[i]], "{")) {
       open <- i
       break
