@@ -756,8 +756,8 @@ npscoefbw.NULL <-
   if (is.null(ref))
     stop("invalid NOMAD smooth-coefficient context: missing remote reference")
 
-  req.base <- 61100L
-  res.base <- 61200L
+  req.base <- .npRmpi_protocol_tag("scoef_req_base")
+  res.base <- .npRmpi_protocol_tag("scoef_res_base")
 
   mc <- substitute({
     get(".npscoefbw_nomad_slave_loop", envir = asNamespace("npRmpi"), inherits = FALSE)(
@@ -787,7 +787,8 @@ npscoefbw.NULL <-
     return(invisible(NULL))
 
   ack.tag <- function(rank) {
-    as.integer(pool$res.base + 1000L + as.integer(rank))
+    .npRmpi_protocol_rank_tag("scoef_ack_base", rank, min_rank = 1L,
+                              where = "npscoefbw NOMAD service stop acknowledgement")
   }
 
   sent <- integer(0)
@@ -862,8 +863,8 @@ npscoefbw.NULL <-
 
 .npscoefbw_nomad_slave_loop <- function(REF,
                                         COMM = 1L,
-                                        REQ_BASE = 61100L,
-                                        RES_BASE = 61200L) {
+                                        REQ_BASE = .npRmpi_protocol_tag("scoef_req_base"),
+                                        RES_BASE = .npRmpi_protocol_tag("scoef_res_base")) {
   rank <- tryCatch(as.integer(mpi.comm.rank(COMM)), error = function(e) 0L)
   if (isTRUE(rank == 0L))
     return(invisible(NULL))
@@ -896,7 +897,9 @@ npscoefbw.NULL <-
         mpi.send.Robj(
           obj = list(type = "stopped", rank = rank),
           dest = 0L,
-          tag = RES_BASE + 1000L + rank,
+          tag = .npRmpi_protocol_rank_tag("scoef_ack_base", rank,
+                                          min_rank = 1L,
+                                          where = "npscoefbw NOMAD service stop acknowledgement"),
           comm = COMM
         ),
         silent = TRUE

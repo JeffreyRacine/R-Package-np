@@ -1294,8 +1294,8 @@ npRmpiNomadSessionServicePlreg <- function(zdat,
     ))
   }
 
-  task.tag <- 57101L
-  result.tag <- 57102L
+  task.tag <- .npRmpi_protocol_tag("plreg_task")
+  result.tag <- .npRmpi_protocol_tag("plreg_result")
   team.comm <- 3L
   use.fullcomm <- TRUE
   use.team <- FALSE

@@ -301,7 +301,11 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 		
 		for (i in 0:(commsize - 1)) {
 			if (i != rank)
-				invisible(mpi.send(x=scmd.arg, type=4, dest=i, tag=50000+i, comm=comm))
+				invisible(mpi.send(x=scmd.arg, type=4, dest=i,
+				                   tag=.npRmpi_protocol_rank_tag("manual_bcast_base", i,
+				                                                  min_rank = 0L,
+				                                                  where = "mpi.bcast.cmd"),
+				                   comm=comm))
 			}
 	      if (caller.execute) {
           .npRmpi_with_manual_bcast_context({
@@ -316,7 +320,11 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
     else {
        # charlen <- mpi.bcast(x=integer(1), type=1, rank=rank, comm=comm)
 		if (!nonblock){
-			mpi.probe(mpi.any.source(), tag=50000+myrank, comm)
+			mpi.probe(mpi.any.source(),
+			          tag=.npRmpi_protocol_rank_tag("manual_bcast_base", myrank,
+			                                         min_rank = 0L,
+			                                         where = "mpi.bcast.cmd"),
+			          comm)
 			srctag <- mpi.get.sourcetag(0)
 			charlen <- mpi.get.count(type=4, 0)
 			#out <- unserialize(mpi.recv(x=raw(charlen), type=4,srctag[1],srctag[2], comm))
@@ -324,7 +332,11 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 
 		} else {
 			repeat {
-				if (mpi.iprobe(mpi.any.source(),tag=50000+myrank,comm)){
+				if (mpi.iprobe(mpi.any.source(),
+				               tag=.npRmpi_protocol_rank_tag("manual_bcast_base", myrank,
+				                                              min_rank = 0L,
+				                                              where = "mpi.bcast.cmd"),
+				               comm)){
 					srctag <- mpi.get.sourcetag()
 					charlen <- mpi.get.count(type=4)
 					#out <- unserialize(mpi.recv(x = raw(charlen), type = 4, srctag[1],srctag[2], comm))
