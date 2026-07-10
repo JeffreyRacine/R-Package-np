@@ -1505,6 +1505,16 @@
   starts
 }
 
+.np_nomad_normalize_user_opts <- function(nomad.opts, where = "NOMAD") {
+  if (is.null(nomad.opts))
+    return(list())
+
+  if (!is.list(nomad.opts))
+    stop(sprintf("%s: 'nomad.opts' must be a list", where), call. = FALSE)
+
+  nomad.opts
+}
+
 .np_nomad_default_opts <- function(random.seed, nomad.opts = list()) {
   base <- list(
     SEED = as.integer(random.seed),

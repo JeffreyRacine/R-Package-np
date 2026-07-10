@@ -465,7 +465,8 @@ These controls set numerical search starts, kernel choices, and support bounds.
   \item{nomad.opts}{
     optional named list of native NOMAD parameters forwarded to the
     \pkg{crs} NOMAD C API for MADS/NOMAD-backed bandwidth searches.
-    Unsupported cache-off callback settings are rejected before solver entry.
+    \code{NULL} is treated as no extra NOMAD options. Non-list values and
+    unsupported cache-off callback settings are rejected before solver entry.
   }
 
   \item{okertype}{

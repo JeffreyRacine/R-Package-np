@@ -178,6 +178,7 @@ npregbw.rbandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            ...){
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     .np_nomad_native_reject_unsupported_options_for_route(
       opts = nomad.opts,
       route = "native npreg NOMAD route",
@@ -3195,6 +3196,7 @@ npregbw.default <-
            transform.bounds = FALSE,
            ukertype,
            ...){
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     .np_nomad_native_reject_unsupported_options_for_route(
       opts = nomad.opts,
       route = "native npreg NOMAD route",
