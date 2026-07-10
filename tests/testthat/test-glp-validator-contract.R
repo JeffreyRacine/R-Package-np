@@ -53,6 +53,51 @@ test_that("dim_basis validates integer-like vectors before coercion", {
   )
 })
 
+test_that("dim_basis rejects capacity overflow before native integer arithmetic", {
+  imax <- .Machine$integer.max
+
+  expect_identical(
+    dim_basis(basis = "additive",
+              kernel = TRUE,
+              degree = 1L,
+              segments = 1L,
+              include = 2L,
+              categories = as.integer(1073741824)),
+    1
+  )
+  expect_error(
+    dim_basis(basis = "additive", degree = imax - 1L, segments = 2L),
+    "basis dimension exceeds supported capacity"
+  )
+  expect_error(
+    dim_basis(basis = "additive", degree = imax, segments = 2L),
+    "basis dimension exceeds supported capacity"
+  )
+  expect_error(
+    dim_basis(basis = "additive",
+              kernel = FALSE,
+              degree = integer(0),
+              include = 2L,
+              categories = as.integer(1073741824)),
+    "basis dimension exceeds supported capacity"
+  )
+})
+
+test_that("dim_basis rejects dimensions beyond supported capacity", {
+  expect_error(
+    dim_basis(basis = "tensor",
+              degree = c(46340L, 46340L),
+              segments = c(1L, 1L)),
+    "basis dimension exceeds supported capacity"
+  )
+  expect_error(
+    dim_basis(basis = "glp",
+              degree = c(65535L, 65535L),
+              segments = c(1L, 1L)),
+    "basis dimension exceeds supported capacity"
+  )
+})
+
 test_that("dimBS compatibility wrapper matches dim_basis", {
   expect_identical(
     dimBS(basis = "tensor", degree = c(2L, 3L), segments = c(1L, 2L)),
