@@ -1261,3 +1261,8 @@ fact constant. */
 	return(0);
 
 }
+
+void np_nn_distance_cache_clear_extern(void)
+{
+	np_nn_distance_cache_clear();
+}

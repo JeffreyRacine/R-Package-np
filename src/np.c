@@ -866,6 +866,7 @@ void np_release_static_buffers(int *unused)
   bwm_nn_cache_free();
   bwm_objective_cache_free();
   np_accel_gauss_release_buffers();
+  np_nn_distance_cache_clear_extern();
 }
 static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;

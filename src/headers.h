@@ -58,6 +58,7 @@ static inline double np_guarded_cvml_contribution(const double fit){
 void np_fastcv_alllarge_hits_reset(void);
 double np_fastcv_alllarge_hits_get(void);
 void np_cont_largeh_cache_clear_extern(void);
+void np_nn_distance_cache_clear_extern(void);
 SEXP C_np_progress_fit_begin(SEXP total);
 SEXP C_np_progress_fit_end(void);
 void np_progress_fit_set_offset(const int offset);
