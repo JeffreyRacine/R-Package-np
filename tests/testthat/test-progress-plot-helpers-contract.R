@@ -365,6 +365,40 @@ test_that("plot engine setup does not open a graphics device on the null device"
   expect_identical(unname(as.integer(dev.cur())), before)
 })
 
+test_that("plot graphics argument discovery does not open a graphics device", {
+  graphics.args <- getFromNamespace(".np_plot_graphics_arg_names", "np")
+
+  skip_if_not(isTRUE(unname(as.integer(dev.cur())) == 1L))
+
+  before <- unname(as.integer(dev.cur()))
+  on.exit({
+    while (!isTRUE(unname(as.integer(dev.cur())) == 1L)) {
+      dev.off()
+    }
+  }, add = TRUE)
+
+  args <- graphics.args()
+  expect_true(all(c("mfrow", "mar", "col", "lwd", "main") %in% args))
+  expect_false(any(c("cin", "cra", "csi", "cxy", "din", "page") %in% args))
+  expect_identical(unname(as.integer(dev.cur())), before)
+})
+
+test_that("plot par restore does not open a graphics device on the null device", {
+  restore.par <- getFromNamespace(".np_plot_restore_par", "np")
+
+  skip_if_not(isTRUE(unname(as.integer(dev.cur())) == 1L))
+
+  before <- unname(as.integer(dev.cur()))
+  on.exit({
+    while (!isTRUE(unname(as.integer(dev.cur())) == 1L)) {
+      dev.off()
+    }
+  }, add = TRUE)
+
+  restore.par(list())
+  expect_identical(unname(as.integer(dev.cur())), before)
+})
+
 test_that("plot helper activity yields the line to nested bounded progress", {
   activity.begin <- getFromNamespace(".np_plot_activity_begin", "np")
   activity.end <- getFromNamespace(".np_plot_activity_end", "np")

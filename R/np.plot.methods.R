@@ -93,10 +93,17 @@ np_render_control <- function(style = c("band", "bar"),
   stop(msg, call. = FALSE)
 }
 
+.np_plot_par_arg_names <- function() {
+  setdiff(
+    get(".Pars", envir = asNamespace("graphics"), inherits = FALSE),
+    c("cin", "cra", "csi", "cxy", "din", "page")
+  )
+}
+
 .np_plot_graphics_arg_names <- function() {
   unique(c(
     setdiff(names(formals(graphics::plot.default)), c("x", "y", "...")),
-    names(graphics::par(no.readonly = TRUE)),
+    .np_plot_par_arg_names(),
     "panel.first", "panel.last", "zlab", "zlim", "theta", "phi", "border",
     "view", "type", "lty", "lwd", "col", "pch", "cex", "main", "sub",
     "xlab", "ylab", "xlim", "ylim"
