@@ -116,6 +116,27 @@ test_that("snake_case plot controls normalize to engine controls", {
   expect_identical(dots$plot.errors.bar.num, 7L)
 })
 
+test_that("plot count controls require positive integer scalar counts", {
+  expect_null(np_boot_control(blocklen = NULL)$blocklen)
+  expect_identical(np_boot_control(blocklen = 1L)$blocklen, 1L)
+  expect_equal(np_boot_control(blocklen = 2)$blocklen, 2)
+  expect_null(np_render_control(bar_num = NULL)$bar_num)
+  expect_identical(np_render_control(bar_num = 1L)$bar_num, 1L)
+  expect_equal(np_render_control(bar_num = 2)$bar_num, 2)
+
+  bad <- list(2.5, 0, -1, NA_real_, NaN, Inf, c(1L, 2L), "2", TRUE)
+  for (value in bad) {
+    expect_error(
+      np_boot_control(blocklen = value),
+      "blocklen must be a positive integer scalar"
+    )
+    expect_error(
+      np_render_control(bar_num = value),
+      "bar_num must be a positive integer scalar"
+    )
+  }
+})
+
 test_that("snake_case plot controls fail cleanly on conflicts", {
   normalize <- getFromNamespace(".np_plot_normalize_public_dots", "np")
 
