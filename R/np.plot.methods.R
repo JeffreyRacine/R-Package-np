@@ -15,15 +15,25 @@
   value
 }
 
+.np_plot_validate_count <- function(value, argname) {
+  if (is.null(value))
+    return(NULL)
+  if (!is.numeric(value) ||
+      length(value) != 1L ||
+      is.na(value) ||
+      !is.finite(value) ||
+      value < 1 ||
+      value != floor(value))
+    stop(sprintf("%s must be a positive integer scalar", argname), call. = FALSE)
+  value
+}
+
 np_boot_control <- function(nonfixed = c("exact", "frozen"),
                             wild = c("rademacher", "mammen"),
                             blocklen = NULL) {
   nonfixed <- match.arg(nonfixed)
   wild <- match.arg(wild)
-  if (!is.null(blocklen) &&
-      (!is.numeric(blocklen) || length(blocklen) != 1L ||
-       is.na(blocklen) || blocklen <= 0))
-    stop("blocklen must be a positive numeric scalar", call. = FALSE)
+  blocklen <- .np_plot_validate_count(blocklen, "blocklen")
   structure(
     list(nonfixed = nonfixed, wild = wild, blocklen = blocklen),
     class = "np_boot_control"
@@ -48,10 +58,7 @@ np_render_control <- function(style = c("band", "bar"),
                               bar_num = NULL) {
   style <- match.arg(style)
   bar <- match.arg(bar)
-  if (!is.null(bar_num) &&
-      (!is.numeric(bar_num) || length(bar_num) != 1L ||
-       is.na(bar_num) || bar_num < 1))
-    stop("bar_num must be a positive numeric scalar", call. = FALSE)
+  bar_num <- .np_plot_validate_count(bar_num, "bar_num")
   structure(
     list(style = style, bar = bar, bar_num = bar_num),
     class = "np_render_control"
