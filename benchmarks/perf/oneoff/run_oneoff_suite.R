@@ -34,9 +34,34 @@ blas_string <- function() {
   as.character(blas[1L])
 }
 
+current_script_file <- function() {
+  frames <- sys.frames()
+  for (i in rev(seq_along(frames))) {
+    ofile <- frames[[i]]$ofile
+    if (!is.null(ofile) && length(ofile) == 1L && nzchar(ofile)) {
+      return(normalizePath(ofile, mustWork = TRUE))
+    }
+  }
+
+  file_arg <- "--file="
+  args <- commandArgs(trailingOnly = FALSE)
+  hit <- args[startsWith(args, file_arg)]
+  if (length(hit) > 0L) {
+    path <- sub(file_arg, "", hit[[1L]], fixed = TRUE)
+    if (nzchar(path) && !identical(path, "-") && file.exists(path)) {
+      return(normalizePath(path, mustWork = TRUE))
+    }
+  }
+
+  stop("Cannot determine one-off suite script path")
+}
+
+oneoff_suite_file <- current_script_file()
+
 main <- function(args = commandArgs(trailingOnly = TRUE)) {
   cfg <- parse_args(args)
-  script <- "/Users/jracine/Development/np-master/benchmarks/perf/oneoff/bench_oneoff_param.R"
+  dir.create(dirname(cfg$out_manifest), recursive = TRUE, showWarnings = FALSE)
+  script <- file.path(dirname(oneoff_suite_file), "bench_oneoff_param.R")
   provenance_file <- paste0(sub("\\.csv$", "", cfg$out_manifest), "_provenance.txt")
 
   real_funs <- c("npcmstest", "npconmode", "npqreg")

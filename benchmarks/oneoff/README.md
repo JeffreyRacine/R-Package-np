@@ -1,6 +1,7 @@
 # One-Off Benchmarks (np)
 
-This directory provides a single benchmark entry-point for one-off `np` methods where we do not vary kernel/method options.
+This legacy compatibility directory delegates to the canonical one-off
+benchmark implementation under `benchmarks/perf/oneoff`.
 
 ## Covered Functions
 
