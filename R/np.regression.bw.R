@@ -1709,6 +1709,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
 
   if (.npregbw_nomad_native_target(template, bwsolver)) {
     .npregbw_nomad_native_require_crs()
+    npObjectiveCacheEnabled()
     native.nmulti <- npValidateNmulti(mads.nmulti)
     native.inner.nmulti <- npValidateNonNegativeInteger(mads.inner.nmulti, "nomad.nmulti")
     native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
@@ -2859,6 +2860,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
       search.result <- eval(mc, envir = environment())
     } else {
+      npObjectiveCacheEnabled()
       # Prime the first spawned-worker broadcast before the rank-wide NOMAD search.
       .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = TRUE)
       search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)

@@ -8,7 +8,14 @@
   setNames(lapply(keys, getOption), keys)
 }
 
+.npRmpi_autodispatch_validate_option_snapshot <- function(snapshot) {
+  if (is.list(snapshot) && "np.objective.cache" %in% names(snapshot))
+    npObjectiveCacheEnabled(snapshot[["np.objective.cache"]])
+  invisible(TRUE)
+}
+
 .npRmpi_autodispatch_should_sync_options <- function(snapshot) {
+  .npRmpi_autodispatch_validate_option_snapshot(snapshot)
   mode <- getOption("npRmpi.autodispatch.option.sync", "onchange")
   if (!is.character(mode) || length(mode) != 1L || is.na(mode))
     mode <- "onchange"
@@ -1941,6 +1948,7 @@
   if (!is.na(rank) && rank != 0L)
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
+  .npRmpi_autodispatch_validate_option_snapshot(.npRmpi_autodispatch_option_snapshot())
   .npRmpi_autodispatch_failfast_formula_data(mc, caller_env = caller_env)
 
   if (!.npRmpi_autodispatch_preflight(comm = comm))

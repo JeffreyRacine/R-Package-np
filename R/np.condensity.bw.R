@@ -2567,6 +2567,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
 
   if (.npcdensbw_fixed_native_target(template, reg.args, bwsolver)) {
     .npcdensbw_nomad_shadow_native_require_crs()
+    npObjectiveCacheEnabled()
     native.regtype.engine <- if (!is.null(reg.args$regtype.engine) && length(reg.args$regtype.engine)) {
       as.character(reg.args$regtype.engine[1L])
     } else if (!is.null(reg.args$regtype) && length(reg.args$regtype)) {
@@ -3434,6 +3435,7 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
     if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
       search.result <- eval(mc, envir = environment())
     } else {
+      npObjectiveCacheEnabled()
       opt.snapshot <- .npRmpi_autodispatch_option_snapshot()
       opt.mc <- substitute(do.call("options", OPTS), list(OPTS = opt.snapshot))
       .npRmpi_bcast_cmd_expr(opt.mc, comm = 1L, caller.execute = FALSE)

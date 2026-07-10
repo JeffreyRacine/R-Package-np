@@ -2590,6 +2590,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
       search.result <- eval(mc, envir = environment())
     } else {
+      npObjectiveCacheEnabled()
       search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
     }
     if (!is.null(search.result$num.feval.total))
