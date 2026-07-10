@@ -795,7 +795,7 @@ or standard-deviation factors.
   controls the inner native \pkg{crs} NOMAD API multistart count used within
   each outer restart. The default \code{nomad.nmulti=0L} preserves the
   current single-start inner NOMAD behavior. Advanced native NOMAD
-  parameters may be supplied through \code{nomad.opts} in \code{...};
+  parameters may be supplied through the explicit \code{nomad.opts} argument;
   invalid or unsupported parameters are rejected by NOMAD rather than
   silently ignored. Routes that evaluate R callbacks require serial
   callback evaluation and reject parallel callback settings such as

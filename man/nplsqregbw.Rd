@@ -35,7 +35,8 @@ nplsqregbw(bws, \dots)
        bandwidth.compute = TRUE,
        delta.bounds = c(1e-4, 1 - 1e-4),
        optim.control = list(maxit = 50L),
-       \dots)
+       \dots,
+       nomad.opts = list())
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
@@ -150,6 +151,13 @@ These arguments control the main check-loss bandwidth and
     logical value indicating whether to use the local-polynomial NOMAD
     route for joint bandwidth, \code{delta}, and continuous degree-vector
     search. Defaults to \code{FALSE}.
+  }
+
+  \item{nomad.opts}{
+    optional named list of native NOMAD parameters forwarded to the
+    \pkg{crs} NOMAD C API for NOMAD-backed bandwidth searches.
+    \code{NULL} is treated as no extra NOMAD options. Non-list values and
+    invalid or unsupported parameters are rejected before solver entry.
   }
 
   \item{bandwidth.compute}{

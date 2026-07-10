@@ -734,9 +734,13 @@ npudistbw.dbandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            eval.only = FALSE,
-           ...){
+           ...,
+           nomad.opts = list()){
 
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudistbw")
     dot.args <- list(...)
+    if (length(nomad.opts))
+      dot.args$nomad.opts <- nomad.opts
     elapsed.start <- proc.time()[3]
 
     dat = toFrame(dat)
@@ -1081,8 +1085,10 @@ npudistbw.default <-
            small,
            tol,
            transform.bounds,
-           ...){
+           ...,
+           nomad.opts = list()){
 
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudistbw")
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
       t.names <- deparse(substitute(dat))

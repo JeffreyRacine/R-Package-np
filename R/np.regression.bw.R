@@ -2519,9 +2519,6 @@ npregbw.default <-
            ukertype,
            ...,
            nomad.opts = list()){
-
-    xdat <- toFrame(xdat)
-    yname <- deparse(substitute(ydat))
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     lp.dot.args <- list(...)
     if (length(nomad.opts))
@@ -2533,6 +2530,9 @@ npregbw.default <-
         search.engine = search.engine,
         bwsolver = bwsolver
       )
+
+    xdat <- toFrame(xdat)
+    yname <- deparse(substitute(ydat))
     if ("remin" %in% names(lp.dot.args)) {
       legacy.remin <- npValidateScalarLogical(lp.dot.args$remin, "remin")
       warning("npregbw: argument 'remin' is deprecated; use 'powell.remin' and 'nomad.remin'",

@@ -177,9 +177,13 @@ npcdistbw.condbandwidth <-
            small = 1.490116e-05,
            tol = 1.490116e-04,
            transform.bounds = FALSE,
-           ...){
+           ...,
+           nomad.opts = list()){
 
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npcdistbw")
     dot.args <- list(...)
+    if (length(nomad.opts))
+      dot.args$nomad.opts <- nomad.opts
     elapsed.start <- proc.time()[3]
 
     ydat = toFrame(ydat)
@@ -2456,8 +2460,10 @@ npcdistbw.default <-
            degree.verify = FALSE,
            bernstein.basis = FALSE,
            ## dummy arguments for condbandwidth() function call
-           ...){
+           ...,
+           nomad.opts = list()){
 
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npcdistbw")
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
 
@@ -2586,6 +2592,8 @@ npcdistbw.default <-
 
     search.mc.names <- names(mc)
     lp.dot.args <- list(...)
+    if (length(nomad.opts))
+      lp.dot.args$nomad.opts <- nomad.opts
     .np_degree_reject_unknown_dots(
       lp.dot.args,
       "npcdistbw",

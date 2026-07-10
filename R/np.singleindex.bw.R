@@ -1375,8 +1375,10 @@ npindexbw.default <-
            scale.factor.init.upper = 2.0,
            scale.factor.init = 0.5,
            scale.factor.search.lower = NULL,
-           ...){
+           ...,
+           nomad.opts = list()){
 
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npindexbw")
     xdat <- toFrame(xdat)
 
     if (!(is.vector(ydat) || is.factor(ydat)))
@@ -1398,6 +1400,8 @@ npindexbw.default <-
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
     dots <- list(...)
+    if (length(nomad.opts))
+      dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npindexbw")
     dot.names <- names(dots)
     nomad.shortcut <- .np_prepare_nomad_shortcut(

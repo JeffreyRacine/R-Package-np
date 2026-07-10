@@ -403,9 +403,13 @@ npscoefbw.scbandwidth <-
            hbd.init = 1.5,
            dfac.init = 1.0,
            scale.factor.search.lower = NULL,
-           ...){
+           ...,
+           nomad.opts = list()){
 
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")
     dots <- list(...)
+    if (length(nomad.opts))
+      dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npscoefbw")
     
     ## Save seed prior to setting
@@ -2191,9 +2195,13 @@ npscoefbw.default <-
            hbd.init = 1.5,
            dfac.init = 1.0,
            scale.factor.search.lower = NULL,
-           ...){
+           ...,
+           nomad.opts = list()){
 
+    nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")
     dots <- list(...)
+    if (length(nomad.opts))
+      dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npscoefbw")
 
     if (!missing(bwmethod) && identical(match.arg(bwmethod, c("cv.ls", "manual")), "manual") &&
