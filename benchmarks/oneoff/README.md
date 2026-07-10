@@ -1,6 +1,7 @@
 # One-Off Benchmarks (npRmpi)
 
-MPI work-alike benchmark entry-point for one-off `npRmpi` methods where we do not vary kernel/method options.
+This legacy compatibility directory delegates to the canonical one-off
+benchmark implementation under `benchmarks/perf/oneoff`.
 
 ## Covered Functions
 
@@ -39,7 +40,8 @@ Default output paths are under `/tmp`.
 ## Example
 
 ```bash
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/oneoff/bench_oneoff_param_nprmpi.R \
+env FI_TCP_IFACE=en0 NP_RMPI_NO_REUSE_SLAVES=1 \
+  script -q /dev/null Rscript /Users/jracine/Development/np-npRmpi/benchmarks/oneoff/bench_oneoff_param_nprmpi.R \
   --fun=npunitest --n=1000 --nslaves=1 --times=5 --seed_policy=varying \
   --out_raw=/tmp/nprmpi_oneoff_npunitest_raw.csv \
   --out_summary=/tmp/nprmpi_oneoff_npunitest_summary.csv
@@ -55,13 +57,10 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/oneoff/run_oneoff_suite.
   --out_manifest=/tmp/nprmpi_oneoff_suite_manifest.csv
 ```
 
-Operational note:
+Compatibility note:
 
-- the suite runner is designed to launch each child benchmark in an isolated
-  MPI process rather than reusing slave state across cases;
-- for custom one-off wrappers, prefer the same pattern: detached child launch,
-  `NP_RMPI_NO_REUSE_SLAVES=1`, and explicit child cleanup/finalization on exit
-  (`npRmpi.quit(force = TRUE)` and, where available, `mpi.finalize()`).
+- the scripts in this directory are thin shims; see
+  `benchmarks/perf/oneoff/README.md` for the canonical operational notes.
 
 ## Canonical Implementation Directive (2026-03-05)
 

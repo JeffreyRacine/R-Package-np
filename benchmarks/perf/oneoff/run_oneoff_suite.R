@@ -38,9 +38,34 @@ blas_string <- function() {
   as.character(blas[1L])
 }
 
+current_script_file <- function() {
+  frames <- sys.frames()
+  for (i in rev(seq_along(frames))) {
+    ofile <- frames[[i]]$ofile
+    if (!is.null(ofile) && length(ofile) == 1L && nzchar(ofile)) {
+      return(normalizePath(ofile, mustWork = TRUE))
+    }
+  }
+
+  file_arg <- "--file="
+  args <- commandArgs(trailingOnly = FALSE)
+  hit <- args[startsWith(args, file_arg)]
+  if (length(hit) > 0L) {
+    path <- sub(file_arg, "", hit[[1L]], fixed = TRUE)
+    if (nzchar(path) && !identical(path, "-") && file.exists(path)) {
+      return(normalizePath(path, mustWork = TRUE))
+    }
+  }
+
+  stop("Cannot determine one-off suite script path")
+}
+
+oneoff_suite_file <- current_script_file()
+
 main <- function(args = commandArgs(trailingOnly = TRUE)) {
   cfg <- parse_args(args)
-  script <- "/Users/jracine/Development/np-npRmpi/benchmarks/perf/oneoff/bench_oneoff_param_nprmpi.R"
+  dir.create(dirname(cfg$out_manifest), recursive = TRUE, showWarnings = FALSE)
+  script <- file.path(dirname(oneoff_suite_file), "bench_oneoff_param_nprmpi.R")
   log_dir <- dirname(cfg$out_manifest)
   provenance_file <- paste0(sub("\\.csv$", "", cfg$out_manifest), "_provenance.txt")
 
@@ -66,7 +91,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
               paste0("--out_summary=", out_sum),
               "--show_progress=FALSE")
 
-    env <- c(sprintf("FI_TCP_IFACE=%s", cfg$iface))
+    env <- c(sprintf("FI_TCP_IFACE=%s", cfg$iface), "NP_RMPI_NO_REUSE_SLAVES=1")
     rc <- system2("env", c(env, "script", "-q", "/dev/null", "Rscript", args), stdout = log_file, stderr = log_file)
     data.frame(fun = fun, n = if (is_real) NA_integer_ else n_value, out_raw = out_raw, out_summary = out_sum, log = log_file, rc = rc, stringsAsFactors = FALSE)
   }

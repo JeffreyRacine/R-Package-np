@@ -41,7 +41,8 @@ Default output paths are under `/tmp`.
 ## Example
 
 ```bash
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/oneoff/bench_oneoff_param_nprmpi.R \
+env FI_TCP_IFACE=en0 NP_RMPI_NO_REUSE_SLAVES=1 \
+  script -q /dev/null Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/oneoff/bench_oneoff_param_nprmpi.R \
   --fun=npunitest --n=1000 --nslaves=1 --times=5 --seed_policy=varying \
   --out_raw=/tmp/nprmpi_oneoff_npunitest_raw.csv \
   --out_summary=/tmp/nprmpi_oneoff_npunitest_summary.csv
@@ -56,6 +57,17 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/oneoff/run_oneoff_s
   --n_values=100,250,500 --nslaves=1 --iface=en0 --times=50 --seed_policy=varying --base_seed=42 \
   --out_manifest=/tmp/nprmpi_oneoff_suite_manifest.csv
 ```
+
+Operational note:
+
+- the suite runner launches each child benchmark in an isolated MPI process
+  rather than reusing slave state across cases;
+- for custom one-off wrappers, prefer the same pattern: per-case child launch,
+  `NP_RMPI_NO_REUSE_SLAVES=1`, and explicit child cleanup on exit
+  (`npRmpi.quit(force = TRUE)`);
+- on hosts where MPI spawn-mode teardown returns a signal status to direct
+  `Rscript`, launch individual child benchmarks through the pseudo-tty wrapper
+  shown above; the suite runner already uses this pattern for child cases.
 
 ## Canonical Implementation Directive (2026-03-05)
 
