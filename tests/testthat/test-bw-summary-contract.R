@@ -50,25 +50,25 @@ test_that("genBwSelStr prints guarded counts alongside split fast counts", {
 test_that("genBwSelStr splits objective-cache hits from remaining fast-route savings", {
   gen_bw_sel <- getFromNamespace("genBwSelStr", "npRmpi")
 
-  s.cache.only <- gen_bw_sel(list(
+  s.cache.only <- gen_bw_sel(structure(list(
     num.feval = 26L,
     num.feval.fast = 3L,
     nn.cache = c(objective.hits = 3L, objective.visits = 10L)
-  ))
-  s.cache.extra <- gen_bw_sel(list(
+  ), class = "bandwidth"))
+  s.cache.extra <- gen_bw_sel(structure(list(
     num.feval = 26L,
     num.feval.fast = 5L,
     nn.cache = c(objective.hits = 3L, objective.visits = 10L)
-  ))
+  ), class = "bandwidth"))
 
   expect_true(grepl(
-    "Powell cache: 3 repeated objective lookups avoided out of 10",
+    "Evaluation cache (Powell): 3 hits / 10 lookups (30.0%)",
     s.cache.only,
     fixed = TRUE
   ))
   expect_false(grepl("Fast CV route:", s.cache.only, fixed = TRUE))
   expect_true(grepl(
-    "Powell cache: 3 repeated objective lookups avoided out of 10",
+    "Evaluation cache (Powell): 3 hits / 10 lookups (30.0%)",
     s.cache.extra,
     fixed = TRUE
   ))
@@ -77,4 +77,69 @@ test_that("genBwSelStr splits objective-cache hits from remaining fast-route sav
     s.cache.extra,
     fixed = TRUE
   ))
+})
+
+test_that("genBwSelStr attributes evaluation caches to the proven search stage", {
+  gen_bw_sel <- getFromNamespace("genBwSelStr", "npRmpi")
+  cache <- c(hits = 3L, visits = 10L)
+
+  s.optim <- gen_bw_sel(structure(list(
+    num.feval = 26L,
+    nn.cache = cache,
+    pomethod = "BFGS"
+  ), class = "scbandwidth"))
+  s.legacy <- gen_bw_sel(list(num.feval = 26L, nn.cache = cache))
+  s.hybrid <- gen_bw_sel(structure(list(
+    num.feval = 26L,
+    nn.cache = cache,
+    pomethod = "Nelder-Mead",
+    degree.search = list(
+      engine = "nomad+powell",
+      restart.results = list(list(native = list(
+        cache_hits = 2L,
+        total_evaluations = 8L
+      )))
+    )
+  ), class = "scbandwidth"))
+
+  expect_true(grepl(
+    "Evaluation cache (R optim: BFGS): 3 hits / 10 lookups (30.0%)",
+    s.optim,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "Evaluation cache: 3 hits / 10 lookups (30.0%)",
+    s.legacy,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "Evaluation cache (NOMAD): 2 hits / 8 lookups (25.0%)",
+    s.hybrid,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "Evaluation cache (R optim: Nelder-Mead): 3 hits / 10 lookups (30.0%)",
+    s.hybrid,
+    fixed = TRUE
+  ))
+})
+
+test_that("genTimingStr attributes nominal Powell timing to family-native R optim", {
+  gen_timing <- getFromNamespace("genTimingStr", "npRmpi")
+
+  core <- gen_timing(structure(list(
+    total.time = 1,
+    nomad.time = 0.6,
+    powell.time = 0.4
+  ), class = "bandwidth"))
+  semiparametric <- gen_timing(structure(list(
+    total.time = 1,
+    nomad.time = 0.6,
+    powell.time = 0.4,
+    pomethod = "CG"
+  ), class = "sibandwidth"))
+
+  expect_true(grepl("NOMAD 0.6s, Powell 0.4s", core, fixed = TRUE))
+  expect_true(grepl("NOMAD 0.6s, R optim: CG 0.4s", semiparametric, fixed = TRUE))
+  expect_false(grepl("Powell 0.4s", semiparametric, fixed = TRUE))
 })

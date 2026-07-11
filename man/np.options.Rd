@@ -68,8 +68,8 @@
 
   \subsection{Search and Objective Caching}{
     \itemize{
-      \item \code{np.objective.cache} (logical): enables package-side objective
-      caching for repeated Powell bandwidth-search candidates. For all Powell
+      \item \code{np.objective.cache} (logical): enables package-side evaluation
+      caching for eligible repeated bandwidth-search candidates. For all Powell
       routes using the shared C optimizer wrapper, exact repeated raw candidate
       vectors within one bandwidth solve reuse the previous objective value,
       including repeated candidates reached by later Powell restarts. For
@@ -77,14 +77,18 @@
       this also enables the existing integer nearest-neighbor objective cache.
       Mixed continuous/categorical rows use only the exact full-candidate cache,
       so categorical smoothing parameters remain part of the cache key. Default
-      is \code{TRUE}. Set \code{options(np.objective.cache = FALSE)} to force
-      repeated Powell candidates through the objective evaluator for diagnostic
-      timing comparisons. This option is synchronized to MPI workers in
+      is \code{TRUE}. Eligible continuous \code{npscoefbw} and \code{npindexbw}
+      routes also use package-side caches around their family-native R
+      \code{\link{optim}} evaluations. Set
+      \code{options(np.objective.cache = FALSE)} to force repeated eligible
+      candidates through the evaluator for diagnostic timing comparisons.
+      This option is synchronized to MPI workers in
       autodispatch sessions. MADS/NOMAD solver caching is separate and is not
       controlled by this option, and the saturated extended-NN distance cache is
       governed by \code{np.extendednn}. Bandwidth summaries keep
       \code{Number of Function Evaluations} as the established cumulative
-      optimizer evaluation count and report NOMAD, Powell, nearest-neighbor,
+      optimizer evaluation count and report NOMAD, Powell, R-\code{optim},
+      nearest-neighbor,
       degree-search, guarded-evaluation, and other fast-CV diagnostics on
       separate lines when the corresponding counters are available. These
       diagnostics describe their own optimizer/cache layer and are not intended

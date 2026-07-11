@@ -30,7 +30,7 @@ test_that("npudens exposes unconditional fast counts in bandwidth summary", {
   }
 
   if (is.finite(cache.hits) && cache.hits > 0)
-    expect_true(grepl("Powell cache:", txt, fixed = TRUE))
+    expect_true(grepl("Evaluation cache (Powell):", txt, fixed = TRUE))
 
   fast.extra <- fast - if (is.finite(cache.hits)) cache.hits else 0
   if (is.finite(fast.extra) && fast.extra > 0) {

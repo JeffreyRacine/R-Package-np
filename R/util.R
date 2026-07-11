@@ -2752,8 +2752,16 @@ genTimingStr <- function(x){
     detail <- character(0)
     if (is.finite(nomad.time))
       detail <- c(detail, paste("NOMAD ", format(nomad.time), "s", sep = ""))
-    if (is.finite(powell.time))
-      detail <- c(detail, paste("Powell ", format(powell.time), "s", sep = ""))
+    if (is.finite(powell.time)) {
+      optim.method <- .np_summary_r_optim_method(x)
+      refinement.label <- if (is.na(optim.method)) {
+        "Powell"
+      } else {
+        paste0("R optim: ", optim.method)
+      }
+      detail <- c(detail, paste0(refinement.label, " ",
+                                 format(powell.time), "s"))
+    }
     if (is.finite(fit.time))
       detail <- c(detail, paste("fit ", format(fit.time), "s", sep = ""))
 
@@ -3171,16 +3179,22 @@ npUsesPolynomialSummaryLabel <- function(x){
          nsmall = 1L, trim = TRUE)
 }
 
-.np_summary_cache_avoided_line <- function(label, hits, requests, request.label) {
+.np_summary_evaluation_cache_line <- function(stage, hits, lookups) {
   if (.np_summary_missing_number(hits) ||
-      .np_summary_missing_number(requests) ||
-      hits <= 0 || requests <= 0 || requests < hits)
+      .np_summary_missing_number(lookups) ||
+      hits <= 0 || lookups <= 0 || lookups < hits)
     return(NULL)
 
-  paste0(label, ": ", .np_summary_format_count(hits),
-         " repeated ", request.label, " avoided out of ",
-         .np_summary_format_count(requests), " (",
-         .np_summary_format_percent(hits, requests), "%)")
+  label <- if (is.null(stage) || !length(stage) || is.na(stage[1L]) ||
+               !nzchar(as.character(stage[1L]))) {
+    "Evaluation cache"
+  } else {
+    paste0("Evaluation cache (", as.character(stage[1L]), ")")
+  }
+
+  paste0(label, ": ", .np_summary_format_count(hits), " hits / ",
+         .np_summary_format_count(lookups), " lookups (",
+         .np_summary_format_percent(hits, lookups), "%)")
 }
 
 .np_summary_fast_route_line <- function(fast, computed) {
@@ -3230,7 +3244,7 @@ npUsesPolynomialSummaryLabel <- function(x){
   list(hits = hits, lookups = lookups)
 }
 
-.np_summary_powell_cache_counts <- function(x) {
+.np_summary_evaluation_cache_counts <- function(x) {
   ds <- x$degree.search
   nn.cache <- if (is.list(ds) && !is.null(ds$nn.cache)) ds$nn.cache else x$nn.cache
   objective.hits <- .np_summary_named_number(nn.cache, "objective.hits")
@@ -3250,42 +3264,78 @@ npUsesPolynomialSummaryLabel <- function(x){
   list(hits = objective.hits, lookups = objective.lookups)
 }
 
+.np_summary_r_optim_method <- function(x) {
+  method <- x$pomethod
+  if (is.null(method) || !length(method))
+    return(NA_character_)
+  method <- as.character(method[1L])
+  if (is.na(method) || !(method %in% c("Nelder-Mead", "BFGS", "CG")))
+    return(NA_character_)
+  method
+}
+
+.np_summary_evaluation_cache_stage <- function(x) {
+  optim.method <- .np_summary_r_optim_method(x)
+  if (!is.na(optim.method))
+    return(paste0("R optim: ", optim.method))
+
+  route <- character()
+  for (field in c("bwsolver", "search.engine")) {
+    value <- x[[field]]
+    if (!is.null(value) && length(value) && !is.na(value[1L]))
+      route <- c(route, as.character(value[1L]))
+  }
+  degree.search <- x$degree.search
+  if (is.list(degree.search)) {
+    for (field in c("mode", "method", "engine")) {
+      value <- degree.search[[field]]
+      if (!is.null(value) && length(value) && !is.na(value[1L]))
+        route <- c(route, as.character(value[1L]))
+    }
+  }
+
+  if (any(route %in% c("powell", "mads+powell")))
+    return("Powell")
+
+  semiparametric <- inherits(x, "scbandwidth") || inherits(x, "sibandwidth")
+  if (any(route %in% c("cell", "nomad+powell")))
+    return(if (semiparametric) NA_character_ else "Powell")
+  if (any(route %in% c("mads", "nomad")))
+    return("NOMAD")
+
+  core.classes <- c("bandwidth", "dbandwidth", "rbandwidth",
+                    "conbandwidth", "condbandwidth", "plbandwidth")
+  if (any(vapply(core.classes, function(class.name) inherits(x, class.name),
+                 logical(1L))))
+    return("Powell")
+
+  NA_character_
+}
+
 .np_bandwidth_eval_accounting_lines <- function(x) {
   lines <- character()
   cache.hits.displayed <- 0
 
   nomad.cache <- .np_summary_nomad_cache_counts(x)
-  line <- .np_summary_cache_avoided_line("NOMAD cache",
-                                         nomad.cache$hits,
-                                         nomad.cache$lookups,
-                                         "point lookups")
+  line <- .np_summary_evaluation_cache_line("NOMAD",
+                                             nomad.cache$hits,
+                                             nomad.cache$lookups)
   has.nomad.cache <- !is.null(line)
   if (has.nomad.cache)
     lines <- c(lines, line)
 
-  ## NOMAD cache hits are whole-parameter point lookups. Powell/fast counts
-  ## below are objective-evaluation-layer lookups, so they are not subtracted
-  ## from one another.
-  powell.cache <- .np_summary_powell_cache_counts(x)
-  degree.search <- x$degree.search
-  degree.engine <- if (is.list(degree.search) && !is.null(degree.search$engine)) {
-    as.character(degree.search$engine[1L])
-  } else {
-    NA_character_
-  }
-  powell.label <- if (isTRUE(has.nomad.cache) ||
-                      (!is.na(degree.engine) && degree.engine %in% c("nomad", "nomad+powell"))) {
-    "Powell refinement cache"
-  } else {
-    "Powell cache"
-  }
-  line <- .np_summary_cache_avoided_line(powell.label,
-                                         powell.cache$hits,
-                                         powell.cache$lookups,
-                                         "objective lookups")
+  ## NOMAD cache hits are whole-parameter point lookups. The package-side
+  ## evaluation-cache and fast-route counts below belong to different layers,
+  ## so they are not subtracted from the NOMAD counts.
+  evaluation.cache <- .np_summary_evaluation_cache_counts(x)
+  line <- .np_summary_evaluation_cache_line(
+    .np_summary_evaluation_cache_stage(x),
+    evaluation.cache$hits,
+    evaluation.cache$lookups
+  )
   if (!is.null(line)) {
     lines <- c(lines, line)
-    cache.hits.displayed <- cache.hits.displayed + powell.cache$hits
+    cache.hits.displayed <- cache.hits.displayed + evaluation.cache$hits
   }
 
   if (!(is.null(x$num.feval.fast) ||
