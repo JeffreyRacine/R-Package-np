@@ -1,13 +1,26 @@
 test_that("attach close helper primitives are stable", {
   tag_fn <- getFromNamespace(".npRmpi_attach_close_ack_tag", "npRmpi")
   release_tag_fn <- getFromNamespace(".npRmpi_attach_close_release_tag", "npRmpi")
+  protocol_rank_tag_fn <- getFromNamespace(".npRmpi_protocol_rank_tag", "npRmpi")
   timeout_fn <- getFromNamespace(".npRmpi_attach_close_ack_timeout", "npRmpi")
   next_sid <- getFromNamespace(".npRmpi_attach_next_session_id", "npRmpi")
 
-  expect_identical(tag_fn(1L), 62001L)
-  expect_identical(tag_fn(3L), 62003L)
-  expect_identical(release_tag_fn(1L), 62101L)
-  expect_identical(release_tag_fn(3L), 62103L)
+  expect_identical(
+    tag_fn(1L),
+    protocol_rank_tag_fn("attach_ack_base", 1L, min_rank = 1L)
+  )
+  expect_identical(
+    tag_fn(3L),
+    protocol_rank_tag_fn("attach_ack_base", 3L, min_rank = 1L)
+  )
+  expect_identical(
+    release_tag_fn(1L),
+    protocol_rank_tag_fn("attach_release_base", 1L, min_rank = 1L)
+  )
+  expect_identical(
+    release_tag_fn(3L),
+    protocol_rank_tag_fn("attach_release_base", 3L, min_rank = 1L)
+  )
 
   withr::local_options(list(npRmpi.attach.close.ack.timeout = 2.5))
   expect_equal(timeout_fn(), 2.5)

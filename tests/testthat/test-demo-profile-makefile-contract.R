@@ -1,9 +1,7 @@
 test_that("profile demo launcher captures the R CMD BATCH transcript explicitly", {
-  makefile <- testthat::test_path("..", "..", "demo", "tools", "makefile")
-  if (!file.exists(makefile)) {
-    makefile <- testthat::test_path("..", "..", "demo", "makefile")
-  }
-  skip_if_not(file.exists(makefile), "demo makefile unavailable in installed test context")
+  makefile <- system.file(
+    "demo_tools", "makefile", package = "npRmpi", mustWork = TRUE
+  )
   lines <- readLines(makefile, warn = FALSE)
   text <- paste(lines, collapse = "\n")
 
