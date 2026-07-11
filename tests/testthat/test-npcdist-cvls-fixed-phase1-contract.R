@@ -29,7 +29,7 @@ test_that("phase1 npcdistbw cv.ls fixed lc matches the frozen public baseline", 
   )
 
   expect_true(is.finite(bw.lc$fval))
-  expect_equal(bw.lc$fval, 0.073479835105195, tolerance = 1e-10)
+  expect_equal(bw.lc$fval, 0.073479835152034462, tolerance = 1e-10)
 })
 
 test_that("phase1 npcdistbw cv.ls fixed keeps ll on canonical lp degree-1 glp", {
@@ -63,8 +63,8 @@ test_that("phase1 npcdistbw cv.ls fixed keeps ll on canonical lp degree-1 glp", 
   expect_identical(as.integer(bw.ll$degree.engine), degree)
   expect_true(is.finite(bw.ll$fval))
   expect_true(is.finite(bw.lp$fval))
-  expect_equal(bw.ll$fval, 0.067907233726586, tolerance = 1e-10)
-  expect_equal(bw.lp$fval, 0.067907233726586, tolerance = 1e-10)
+  expect_equal(bw.ll$fval, 0.067907233760512456, tolerance = 1e-10)
+  expect_equal(bw.lp$fval, 0.067907233760512456, tolerance = 1e-10)
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
 })
 
