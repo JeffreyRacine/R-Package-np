@@ -209,6 +209,12 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   \code{condbandwidth} object, \code{npcdist} estimates with the stored
   bandwidth metadata in that object.
 
+  With finite continuous response bounds, \code{npcdist} uses the
+  observation-centered truncated-kernel CDF documented in
+  \code{\link{np.kernels}}. Each response contribution is exactly zero
+  and one at the declared lower and upper endpoints and has the linear
+  uniform-CDF limit as the response bandwidth diverges.
+
   Argument groups for bandwidth selection are documented on
   \code{\link{npcdistbw}}. The most common workflow is to initialize MPI
   execution if needed, choose data and bandwidth inputs, then bandwidth

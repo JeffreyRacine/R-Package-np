@@ -116,6 +116,12 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   \code{dbandwidth} object, \code{npudist} estimates with the stored
   bandwidth metadata in that object.
 
+  With finite continuous bounds, \code{npudist} uses the
+  observation-centered truncated-kernel CDF documented in
+  \code{\link{np.kernels}}. It is exactly zero and one at the declared
+  lower and upper endpoints and has the linear uniform-CDF limit as the
+  bandwidth diverges.
+
   Argument groups for bandwidth selection are documented on
   \code{\link{npudistbw}}. The most common workflow is to choose data
   and bandwidth inputs first, then bandwidth criterion and

@@ -84,6 +84,19 @@
   corresponding exact half-mass term; two infinite bounds retain the ordinary
   unbounded kernel path.
 
+  For distribution estimation, finite bounds use the distinct
+  observation-centered truncated-kernel CDF
+  \deqn{B_i(y;h)=\frac{G((y-Y_i)/h)-G((a-Y_i)/h)}
+  {G((b-Y_i)/h)-G((a-Y_i)/h)},\quad y\in[a,b].}
+  Thus \eqn{B_i(a;h)=0}, \eqn{B_i(b;h)=1}, and
+  \eqn{B_i(y;h)\to(y-a)/(b-a)} as \eqn{h\to\infty}. The implementation
+  evaluates centered analytic interval masses rather than subtracting
+  nearly equal whole-kernel CDF values. This distribution operator is not the
+  integral of the evaluation-centered bounded density kernel above. For
+  nonnegative second-order kernels each contribution is monotone and lies in
+  \eqn{[0,1]}; higher-order signed kernels retain their usual possible interior
+  nonmonotonicity or overshoot.
+
   Typical bounded-kernel calls:
   \preformatted{
   ## Unconditional density on [0,1]
