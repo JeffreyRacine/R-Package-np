@@ -1,199 +1,106 @@
-# Build (npRmpi)
+# Building and validating npRmpi
 
-## Environment (MPICH via MacPorts)
+The supported 0.70-5 release backend is MPICH. For macOS with MacPorts, follow
+[BUILD_MPICH.md](BUILD_MPICH.md). Open MPI runtime validation is explicitly
+waived for this release.
 
-```bash
-export RMPI_TYPE=MPICH
-export RMPI_INCLUDE=/opt/local/include/mpich-mp
-export RMPI_LIB_PATH=/opt/local/lib/mpich-mp
-export RMPI_LIBS="-L/opt/local/lib/mpich-mp -lmpi"
-export CC=mpicc
-export CXX=mpicxx
-```
+## Portable source-tarball workflow
 
-## One-Command Preflight
+Run from the repository root after configuring a supported MPI implementation:
 
 ```bash
-cd /Users/jracine/Development
-./release_preflight.sh npRmpi
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' DESCRIPTION)
+R CMD build .
+R CMD INSTALL "npRmpi_${VERSION}.tar.gz"
+R CMD check --as-cran "npRmpi_${VERSION}.tar.gz"
 ```
 
-This builds `npRmpi`, runs the shared package/gallery sync audit, and then runs
-the final tarball-first `R CMD check --as-cran`.
+Build from a clean repository. For release validation, install the generated
+tarball into a clean private library and run tests against that installed
+package rather than the live source tree.
 
-For CRAN-ready release claims, use the hardened revdep-aware release gate
-instead of relying on `release_preflight.sh` alone:
+## R compiler and LAPACK/BLAS linkage
 
-```bash
-cd /Users/jracine/Development
-./release_protocol/run_npRmpi_release_gate.sh
-```
-
-This gate builds from source, installs into a private library, verifies startup
-and vignette discovery, runs installed namespace and MPI smokes, runs
-tarball-first `R CMD check --as-cran`, and records the CRAN reverse-dependency
-inventory. It is the `npRmpi` counterpart to the protocol hardened after the
-2026-05-01 `np` bandwidth-dispatch compatibility regression. It also runs the
-containerized `rchk` native-code protection check when feasible
-(`RUN_RCHK=auto` by default).
-
-## LAPACK/BLAS Linkage
-
-Unix MPI builds must keep MPI discovery host-specific while linking
-LAPACK/BLAS through R's portable make variables:
+MPI discovery is host-specific, but npRmpi links LAPACK, BLAS, and the Fortran
+runtime through R's portable make variables:
 
 ```make
 PKG_LIBS = @PKG_LIBS@ $(ARCHLIB) $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
 ```
 
-On Apple Silicon framework R 4.6 hosts, verify the local R configuration before
-release builds:
+Inspect the active R toolchain before building:
 
 ```bash
-/Library/Frameworks/R.framework/Resources/bin/R CMD config FLIBS
+R CMD config CC
+R CMD config CXX
+R CMD config FC
+R CMD config FLIBS
 ```
 
-For the current framework setup, `FLIBS` should resolve to:
+Do not replace R's compilers with MPI wrapper compilers merely to locate MPI.
+Supply MPI type, include, and library paths through the supported configure
+arguments or `RMPI_TYPE`, `RMPI_INCLUDE`, and `RMPI_LIB_PATH`.
 
-```text
-/Library/Frameworks/R.framework/Resources/lib/libgfortran.5.dylib /Library/Frameworks/R.framework/Resources/lib/libquadmath.0.dylib
-```
+## Installed linkage and startup proof
 
-If it instead points at stale `/opt/gfortran/...` paths, refresh the host
-`Makeconf`/user `Makevars` as described in
-`/Users/jracine/Development/SKILLS.md` before running release preflight.
-
-## Build Tarball
+After installation, record the package and MPI runtime identities:
 
 ```bash
-cd /Users/jracine/Development
-R CMD build np-npRmpi
-VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-npRmpi/DESCRIPTION)
+R -q -e 'library(npRmpi); print(npRmpi.session.info(comm = 0L)); sessionInfo()'
 ```
 
-This produces `npRmpi_${VERSION}.tar.gz` in `/Users/jracine/Development`.
+On systems with `otool` or `ldd`, verify that the installed `npRmpi` shared
+library resolves to exactly the intended MPI implementation. A mixed-backend
+build is a hard failure.
 
-## Install
+## Runtime modes
+
+- Interactive/session mode: `npRmpi.init(nslaves = ...)` dynamically spawns a
+  worker pool. On macOS, use `npRmpi.quit(force = TRUE)` when clean teardown is
+  required; the non-force default may retain workers for reuse.
+- Attach mode: prelaunch a world with `mpiexec`, call
+  `npRmpi.init(mode = "attach")`, and close it with
+  `npRmpi.quit(mode = "attach")` on the master.
+- Profile/manual-broadcast mode: launch ranks with the installed `Rprofile`
+  and use explicit `mpi.bcast.*` calls plus `np.mpi.initialize()`.
+
+See the installed `MPI_SETUP.md` for examples.
+
+## MPI examples during package checks
+
+Ordinary `R CMD check --as-cran` skips spawn examples that can destabilize the
+parent check process on some MPI/macOS combinations. To force those examples
+for a dedicated MPI check, use the repository helpers and restore the normal
+Rd state afterward:
 
 ```bash
-cd /Users/jracine/Development
-VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-npRmpi/DESCRIPTION)
-R CMD INSTALL "npRmpi_${VERSION}.tar.gz"
+(cd man && ./run)
+VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' DESCRIPTION)
+R CMD build .
+NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1 \
+  R CMD check --as-cran "npRmpi_${VERSION}.tar.gz"
+(cd man && ./dontrun)
 ```
 
-## Quick Load Check
+Do not leave the live documentation tree in the forced-example state.
 
-```bash
-R -q -e 'library(npRmpi); sessionInfo()'
-```
+## Release-validation expectations
 
-## Timing Provenance
+A CRAN-ready claim requires the enhanced installed-tarball protocol, including:
 
-When collecting timing or regression artifacts, always record:
+- clean source/head and tarball provenance;
+- `R CMD check --as-cran`, examples, vignettes, and categorized tests;
+- demos and configured benchmark sentinels;
+- public estimator-family and S3-surface coverage;
+- session/attach/profile lifecycle, cleanup, and relaunch proof;
+- numerical equivalence with serial np where expected;
+- large-workload MPI scaling at the required worker counts;
+- rchk for native-code protection;
+- reverse-dependency review when configured.
 
-```bash
-R -q -e 'cat("R.version.string =", R.version.string, "\n"); cat("BLAS =", sessionInfo()$BLAS, "\n")'
-```
+If the generic rchk container lacks MPI headers or build tooling, record an
+infrastructure skip; do not describe that as native-code validation.
 
-On macOS CRAN-binary R, `sessionInfo()$BLAS` reflects the active
-`libRblas.dylib` choice. On Apple Silicon, that choice can materially affect
-BLAS-heavy timings, so treat `R.version.string` and `sessionInfo()$BLAS` as
-part of the benchmark environment.
-
-## Check
-
-```bash
-cd /Users/jracine/Development
-./package_gallery_sync_audit.sh
-VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-npRmpi/DESCRIPTION)
-R CMD check --as-cran "npRmpi_${VERSION}.tar.gz"
-```
-
-If a change touches formula interfaces, `...` forwarding, bandwidth
-constructors, compatibility dispatch helpers, MPI materialization of those
-surfaces, exported defaults, warning/error contracts, estimator semantics, or
-object structure, run the revdep-aware release gate and relevant MPI smoke
-lanes before submission.
-
-If a change touches `src/`, registered native interfaces, MPI/native bridge
-payloads, or code that changes the shape/lifetime of objects passed to `.C`,
-`.Call`, or `.Fortran`, require local `rchk` proof when infrastructure is
-available:
-
-```bash
-cd /Users/jracine/Development
-RUN_RCHK=1 ./release_protocol/run_npRmpi_release_gate.sh
-```
-
-Use `RUN_RCHK=auto` for ordinary full release rehearsal; it records a precise
-`SKIP` when Docker/rchk infrastructure is unavailable. If the generic rchk
-container lacks MPI headers or MPI build tooling, classify that as an
-infrastructure SKIP under `auto`, not as package-code proof.
-
-## Release-Surface Audit
-
-When vignette names, startup routing, package help routing, gallery package
-links, or source-tarball vignette packaging change, run the shared audit before
-signoff:
-
-```bash
-cd /Users/jracine/Development
-./release_preflight.sh npRmpi
-```
-
-For `npRmpi`, this audit also checks that the source tarball keeps
-`build/vignette.rds`.
-
-If gallery routing pages also changed, use:
-
-```bash
-cd /Users/jracine/Development
-./release_preflight.sh --render-gallery npRmpi
-```
-
-### MPI Example Modes During Check
-
-- Default `R CMD check --as-cran` behavior:
-  - MPI spawn examples are skipped in check context to avoid MPICH teardown
-    killing the parent check process on some systems.
-- To force MPI spawn examples to run during check, use the exact sequence below.
-
-### Forced MPI Example Check (Exact Sequence)
-
-```bash
-cd /Users/jracine/Development/np-npRmpi/man
-./run
-
-cd /Users/jracine/Development
-R CMD build np-npRmpi
-
-cd /Users/jracine/Development
-VERSION=$(awk -F': *' '/^Version:/{print $2; exit}' np-npRmpi/DESCRIPTION)
-NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1 R CMD check --as-cran "npRmpi_${VERSION}.tar.gz"
-
-cd /Users/jracine/Development/np-npRmpi/man
-./dontrun
-```
-
-## Runtime Modes
-
-- Interactive R session:
-  - `npRmpi.init(nslaves=...)` for session mode (the `spawn` code path)
-- Cluster/batch under `mpiexec`:
-  - start script with `npRmpi.init(mode="attach", autodispatch=TRUE, np.messages=FALSE)`
-  - end script with `npRmpi.quit(mode="attach")`
-- Manual-broadcast/profile mode:
-  - start ranks with `inst/Rprofile` (or `R_PROFILE_USER`) and explicit `mpi.bcast.*` calls
-  - use `np.mpi.initialize()` rather than `npRmpi.init()` as the workflow initializer
-
-## Canonical Implementation Directive (2026-03-05)
-
-This repository follows a strict canonical execution rule:
-
-1. One canonical implementation per method (outside explicit `np.tree` branching).
-2. Unsupported configurations must fail fast with explicit `stop(...)` diagnostics.
-3. No silent remap/coercion of user-selected options (for example `bwmethod`, `regtype`, kernels, `cv.iterate`, or bounds transforms).
-4. No hidden alternate execution paths for the same method semantics.
-5. All fit-defining options (for example `degree`, `basis`, `bernstein.basis`, kernels, and bounds) must be propagated and used by the canonical path.
-6. `np.tree=FALSE` is the default; when `np.tree=TRUE`, behavior must remain semantics-preserving and option-compatible with the canonical path.
-7. Remove or reject legacy/debug compatibility branches that add redundant runtime overhead once canonical behavior exists.
+Timing reports must record `R.version.string`, the active BLAS, MPI version,
+worker count, and backend linkage. A positive release claim must not rely on a
+source-loaded probe or a diagnostic fallback.

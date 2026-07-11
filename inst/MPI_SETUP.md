@@ -1,11 +1,13 @@
-# MPI Setup (Current Workflow)
+# MPI setup and runtime modes
 
-`npRmpi` supports two modern startup modes via `npRmpi.init()`.
+npRmpi 0.70-5 is release-validated with MPICH. Open MPI runtime validation is
+explicitly waived for this release; an Open-MPI-linked build should not be
+treated as having the same supported runtime contract.
 
-## 1) Interactive (spawn mode)
+## 1. Interactive session/spawn mode
 
-Use when working inside an interactive R session and you want `npRmpi` to spawn
-slaves for you.
+Use session mode when working in an interactive R process and allowing npRmpi
+to spawn its worker pool:
 
 ```r
 library(npRmpi)
@@ -13,45 +15,74 @@ npRmpi.init(nslaves = 1)
 
 # ... run np* calls ...
 
-npRmpi.quit()
+npRmpi.quit(force = TRUE)
 ```
 
-## 2) Cluster/Batch (attach mode)
+On macOS, npRmpi enables worker reuse by default. Consequently,
+`npRmpi.quit()` without `force = TRUE` may retain the pool for another call to
+`npRmpi.init()`. Use `force = TRUE` when the R session is finished or when a
+clean lifecycle test is required.
 
-Use when MPI world is pre-launched (e.g. with `mpiexec`).
+`mode = "auto"` selects attach mode when the process is already part of an MPI
+world with more than one rank; otherwise it selects spawn mode.
+
+## 2. Cluster/batch attach mode
+
+Prelaunch the MPI world:
 
 ```bash
-mpiexec -n 128 Rscript foo.R
+mpiexec -n 4 Rscript foo.R
 ```
 
 Inside `foo.R`:
 
 ```r
 library(npRmpi)
-npRmpi.init(mode = "attach")
+is_master <- npRmpi.init(mode = "attach", autodispatch = TRUE,
+                         np.messages = FALSE)
 
-# ... run np* calls ...
-
-npRmpi.quit(mode = "attach")
+if (isTRUE(is_master)) {
+  # ... run np* calls ...
+  npRmpi.quit(mode = "attach")
+}
 ```
 
-## Notes
+Non-master ranks enter the package worker loop. The estimator body and attach
+close belong on the master rank. Use a fresh `mpiexec` launch for each
+independent attach job and verify that no job-scoped MPI/R processes remain.
 
-- `.Rprofile` bootstrap files are not required for the supported
-  `npRmpi.init()` workflow.
-- `mode = "auto"` selects `attach` when `mpi.comm.size(0) > 1`, otherwise
-  `spawn`.
-- On some systems, explicitly setting MPI interface can help, e.g.
-  `FI_TCP_IFACE=en0` (fallback: `FI_TCP_IFACE=lo0`).
+## 3. Profile/manual-broadcast mode
 
-## Canonical Implementation Directive (2026-03-05)
+Profile mode is available for workflows that explicitly broadcast commands.
+Set `R_PROFILE_USER` to the installed npRmpi `Rprofile`, launch the desired MPI
+world, and use `np.mpi.initialize()` plus `mpi.bcast.*` calls in the script.
+Do not also call `npRmpi.init()` inside that profile-managed workflow.
 
-This repository follows a strict canonical execution rule:
+## 4. MPICH network-interface diagnostics
 
-1. One canonical implementation per method (outside explicit `np.tree` branching).
-2. Unsupported configurations must fail fast with explicit `stop(...)` diagnostics.
-3. No silent remap/coercion of user-selected options (for example `bwmethod`, `regtype`, kernels, `cv.iterate`, or bounds transforms).
-4. No hidden alternate execution paths for the same method semantics.
-5. All fit-defining options (for example `degree`, `basis`, `bernstein.basis`, kernels, and bounds) must be propagated and used by the canonical path.
-6. `np.tree=FALSE` is the default; when `np.tree=TRUE`, behavior must remain semantics-preserving and option-compatible with the canonical path.
-7. Remove or reject legacy/debug compatibility branches that add redundant runtime overhead once canonical behavior exists.
+Most local MPICH runs need no interface override. When MPICH/OFI diagnostics
+show that an explicit interface is required, apply it to the command being
+tested rather than treating it as a package default:
+
+```bash
+FI_TCP_IFACE=en0 Rscript your-script.R
+```
+
+Interface names are host-specific. A loopback-only diagnostic can use:
+
+```bash
+FI_TCP_IFACE=lo0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=lo0 \
+  Rscript your-script.R
+```
+
+Loopback settings are not multi-host release evidence.
+
+## 5. Cleanup and positive claims
+
+- Run each backend and independent attach/profile world in a fresh R process.
+- Use `force = TRUE` when a spawned session must leave no reusable pool.
+- After failures or timeouts, identify and clean only route-scoped processes.
+- Do not call a route validated merely because package loading or compilation
+  succeeded; use an installed tarball and substantive runtime sentinels.
+- A teardown exit 137 is ignorable only after substantive pass output and proof
+  that no route-scoped workers remain.
