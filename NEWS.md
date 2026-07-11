@@ -1,5 +1,35 @@
 # np 0.70-5
 
+* Repaired finite-support bounded continuous-kernel normalization for all
+  supported Gaussian, Epanechnikov, uniform, and truncated-Gaussian kernels.
+  The centered normalization now avoids tail cancellation, uses the platform
+  C99 error function where appropriate, and preserves the uniform-density
+  limit as the bandwidth tends to infinity.
+
+* Replaced the bounded distribution operator with the mathematically correct
+  observation-centered truncated-kernel CDF. Analytic centered interval
+  primitives and hoisted invariant work preserve exact support endpoints,
+  numerical accuracy, and the finite-support large-bandwidth uniform limit.
+
+* Corrected `transform.bounds = TRUE` initialization for regression initial
+  starts and multistarts and for later conditional-distribution multistarts.
+  External bandwidth starts are now inverse-mapped before transformed Powell
+  search; the public default remains `FALSE`.
+
+* Clarified optimizer summaries so objective-cache lookups, NOMAD point
+  lookups, family-native R-`optim` refinement, and total function-evaluation
+  accounting are labelled consistently without implying that their
+  denominators are interchangeable.
+
+* Clarified bandwidth-object replay documentation across estimator families.
+  Stored bandwidth objects retain search and fit metadata but do not silently
+  materialize or expand training data; callers must provide data again where
+  the documented replay route requires it.
+
+* Standardized the public `nomad.opts` contract across supported bandwidth
+  selectors and hardened native NOMAD callback cleanup, nearest-neighbor cache
+  release, and native allocation-dimension guards.
+
 * Reworked `npindexbw()` / `npindex()` internals after 0.70-4. Ichimura and
   Klein-Spady single-index objectives now reuse the established `npreg`
   leave-one-out backend where applicable, preserving the public estimator
