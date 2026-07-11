@@ -13562,6 +13562,11 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                matrix_X_continuous_train_extern,
                                matrix_Y_continuous_train_extern);
 
+      if (bwm_use_transform &&
+          bwm_to_unconstrained(vector_scale_factor, num_all_var) != 0) {
+        bw_error_msg = "C_np_distribution_conditional_bw: transform buffer allocation failed";
+        goto cleanup_np_distribution_conditional_bw;
+      }
 
       /* Conduct direction set search */
 
@@ -15474,6 +15479,11 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
     bwm_reserve_transform_buf(n + bwm_num_extra_params + 1);
   }
+  if (bwm_use_transform &&
+      bwm_to_unconstrained(vector_scale_factor, num_var) != 0) {
+    bw_error_msg = "C_np_regression_bw: transform buffer allocation failed";
+    goto cleanup_np_regression_bw_mode;
+  }
   bwm_reset_counters();
 
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
@@ -15689,6 +15699,11 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
           0.25*(lsq_delta_upper - lsq_delta_lower)*MAX(ran3(&delta_seed), DBL_EPSILON);
       }
 
+      if (bwm_use_transform &&
+          bwm_to_unconstrained(vector_scale_factor, num_var) != 0) {
+        bw_error_msg = "C_np_regression_bw: transform buffer allocation failed";
+        goto cleanup_np_regression_bw_mode;
+      }
 
       /* Conduct direction set search */
 
