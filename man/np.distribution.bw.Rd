@@ -278,7 +278,9 @@ These controls choose and parameterize bounded support for continuous kernels.
     character string controlling continuous-kernel support handling.
     Can be set as \code{none} (default kernel on full support),
     \code{range} (use sample min/max), or \code{fixed} (use
-    \code{ckerlb}/\code{ckerub}). The bounded-kernel route reuses the selected continuous kernel and renormalizes it on the chosen support; see \code{\link{np.kernels}}.
+    \code{ckerlb}/\code{ckerub}). For distribution estimation the selected
+    continuous kernel is integrated after observation-centered truncation and
+    normalization on the chosen support; see \code{\link{np.kernels}}.
   }
 
   \item{ckerlb}{
