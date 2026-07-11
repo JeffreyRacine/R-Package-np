@@ -69,6 +69,20 @@
   finite-support normalization principle and is useful when data exhibit
   non-negligible probability mass near boundaries.
 
+  Computationally, let
+  \eqn{H_K(r)=\int_0^r K(t)dt} and
+  \eqn{S_K(r)=H_K(r)/r}, with the continuous value
+  \eqn{S_K(0)=K(0)}. For finite bounds the implementation evaluates the scaled
+  normalization mass directly as
+  \deqn{hD(x,h)=(x-a)S_K((x-a)/h)+(b-x)S_K((b-x)/h).}
+  Each supported kernel uses its analytic centered primitive. This avoids
+  subtracting nearly equal whole-kernel CDF values and avoids constructing a
+  normalization mass that vanishes numerically as \eqn{h} grows. Consequently,
+  on finite \eqn{[a,b]} the bounded density kernel converges to the uniform
+  density \eqn{1/(b-a)} as \eqn{h\to\infty}. One-sided infinite bounds use the
+  corresponding exact half-mass term; two infinite bounds retain the ordinary
+  unbounded kernel path.
+
   Typical bounded-kernel calls:
   \preformatted{
   ## Unconditional density on [0,1]

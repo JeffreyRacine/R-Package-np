@@ -3428,50 +3428,165 @@ static void np_conditional_pop_bounds(const NPConditionalBoundState *saved){
   vector_ckerub_extern = saved->ckerub;
 }
 
-static inline double np_cker_invnorm(const int kernel,
-                                     const double x,
-                                     const double h,
-                                     const double lb,
-                                     const double ub){
-  static double (* const cdfk[])(double) = {
-    np_cdf_gauss2, np_cdf_gauss4, np_cdf_gauss6, np_cdf_gauss8,
-    np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8,
-    np_cdf_rect, np_cdf_tgauss2
-  };
+typedef struct {
+  double inverse_mass;
+  double density_scale;
+} NPCKerBoundedNorm;
+
+static inline double np_cker_halfmass_total(const int k0){
+  const double sqrt5 = 2.23606797749978969640;
+
+  switch(k0){
+  case 0: return 0.5;
+  case 1: return 0.5;
+  case 2: return 0.5;
+  case 3: return 0.500000000025;
+  case 4:
+    return sqrt5*(0.33541019662496845446 +
+                  (-0.067082039324993690892/3.0)*5.0);
+  case 5:
+    return sqrt5*0.008385254916*(75.0-(50.0/3.0)*5.0+(7.0/5.0)*25.0);
+  case 6:
+    return sqrt5*0.33541019662496845446*
+      (2.734375+(-3.828125/3.0)*5.0+(1.378125/5.0)*25.0-
+       (0.144375/7.0)*125.0);
+  case 7:
+    return sqrt5*0.33541019662496845446*
+      (3.5888671875+(-8.61328125/3.0)*5.0+(5.684765625/5.0)*25.0-
+       (1.40765625/7.0)*125.0+(0.1173046875/9.0)*625.0);
+  case 8: return 0.5;
+  case 9:
+    return np_tgauss2_alpha*0.5*erf(0.70710678118654752440*np_tgauss2_b)-
+      np_tgauss2_c0*np_tgauss2_b;
+  default: return R_NaN;
+  }
+}
+
+/* H(r)/r for H(r)=integral_0^r K(t)dt and r >= 0.  Each case is the
+   analytic primitive of the live base-kernel coefficients. */
+static inline double np_cker_halfmass_average(const int k0, const double r){
   static double (* const kbase[])(double) = {
     np_gauss2, np_gauss4, np_gauss6, np_gauss8,
     np_epan2, np_epan4, np_epan6, np_epan8,
     np_rect, np_tgauss2
   };
-  int k0 = kernel % 10;
-  double zu, zl, den, du, zmid;
+  const double sqrt5 = 2.23606797749978969640;
+  double r2, e, gaussian_average;
 
-  if(!(h > 0.0) || !isfinite(h))
-    return 1.0;
-  if(!isfinite(lb) && !isfinite(ub))
-    return 1.0;
+  if((k0 < 0) || (k0 > 9) || !(r >= 0.0) || !isfinite(r))
+    return R_NaN;
+  if(r == 0.0)
+    return kbase[k0](0.0);
 
-  if(k0 < 0 || k0 > 9)
-    k0 = 0;
+  switch(k0){
+  case 0:
+    return 0.5*erf(0.70710678118654752440*r)/r;
+  case 1:
+    r2 = r*r;
+    e = exp(-0.5*r2);
+    gaussian_average = 0.5*erf(0.70710678118654752440*r)/r;
+    return (e == 0.0) ? gaussian_average :
+      gaussian_average + 0.5*ONE_OVER_SQRT_TWO_PI*e;
+  case 2:
+    r2 = r*r;
+    e = exp(-0.5*r2);
+    gaussian_average = 0.5*erf(0.70710678118654752440*r)/r;
+    return (e == 0.0) ? gaussian_average :
+      gaussian_average + ONE_OVER_SQRT_TWO_PI*e*(0.875-0.125*r2);
+  case 3:
+    r2 = r*r;
+    e = exp(-0.5*r2);
+    gaussian_average = 0.500000000025*
+      erf(0.70710678118654752440*r)/r;
+    return (e == 0.0) ? gaussian_average : gaussian_average +
+      ONE_OVER_SQRT_TWO_PI*e*
+      (1.18749999995+r2*(-0.33333333335+0.02083333333*r2));
+  case 4:
+    if(r >= sqrt5) return np_cker_halfmass_total(k0)/r;
+    r2 = r*r;
+    return 0.33541019662496845446+
+      (-0.067082039324993690892/3.0)*r2;
+  case 5:
+    if(r >= sqrt5) return np_cker_halfmass_total(k0)/r;
+    r2 = r*r;
+    return 0.008385254916*
+      (75.0-(50.0/3.0)*r2+(7.0/5.0)*r2*r2);
+  case 6:
+    if(r >= sqrt5) return np_cker_halfmass_total(k0)/r;
+    r2 = r*r;
+    return 0.33541019662496845446*
+      (2.734375+(-3.828125/3.0)*r2+(1.378125/5.0)*r2*r2-
+       (0.144375/7.0)*r2*r2*r2);
+  case 7:
+    if(r >= sqrt5) return np_cker_halfmass_total(k0)/r;
+    r2 = r*r;
+    return 0.33541019662496845446*
+      (3.5888671875+(-8.61328125/3.0)*r2+
+       (5.684765625/5.0)*r2*r2-(1.40765625/7.0)*r2*r2*r2+
+       (0.1173046875/9.0)*r2*r2*r2*r2);
+  case 8:
+    return (r >= 1.0) ? 0.5/r : 0.5;
+  case 9:
+    if(r >= np_tgauss2_b) return np_cker_halfmass_total(k0)/r;
+    return np_tgauss2_alpha*0.5*
+      erf(0.70710678118654752440*r)/r-np_tgauss2_c0;
+  default:
+    return R_NaN;
+  }
+}
 
-  zu = isfinite(ub) ? ((ub - x)/h) : R_PosInf;
-  zl = isfinite(lb) ? ((lb - x)/h) : R_NegInf;
-  du = zu - zl;
-  zmid = 0.5*(zu + zl);
+static inline double np_cker_scaled_halfmass_term(const int k0,
+                                                   const double distance,
+                                                   const double h){
+  const double r = fabs(distance/h);
 
-  if(isfinite(du) && fabs(du) < 1.0e-5) {
-    den = kbase[k0](zmid)*du;
+  if(distance == 0.0)
+    return 0.0;
+  if(isinf(r))
+    return copysign(h*np_cker_halfmass_total(k0), distance);
+  return distance*np_cker_halfmass_average(k0, r);
+}
+
+static inline NPCKerBoundedNorm np_cker_bounded_norm(const int kernel,
+                                                      const double x,
+                                                      const double h,
+                                                      const double lb,
+                                                      const double ub){
+  NPCKerBoundedNorm out = {R_NaN, R_NaN};
+  const int k0 = kernel % 10;
+  const int finite_lb = isfinite(lb);
+  const int finite_ub = isfinite(ub);
+  double scaled_mass = 0.0;
+
+  if(!(h > 0.0) || !isfinite(h) || (k0 < 0) || (k0 > 9))
+    return out;
+
+  if(!finite_lb && !finite_ub){
+    out.inverse_mass = 1.0;
+    out.density_scale = 1.0/h;
+    return out;
+  }
+
+  if(finite_lb){
+    const double distance = x-lb;
+    scaled_mass += np_cker_scaled_halfmass_term(k0, distance, h);
   } else {
-    den = cdfk[k0](zu) - cdfk[k0](zl);
+    scaled_mass += h*np_cker_halfmass_total(k0);
   }
 
-  if(!(den > DBL_MIN) && isfinite(du) && (du > 0.0)) {
-    den = fmax(kbase[k0](zmid)*du, kbase[k0](0.0)*du);
+  if(finite_ub){
+    const double distance = ub-x;
+    scaled_mass += np_cker_scaled_halfmass_term(k0, distance, h);
+  } else {
+    scaled_mass += h*np_cker_halfmass_total(k0);
   }
 
-  den = NZD_POS(den);
+  if(!(scaled_mass > 0.0))
+    return out;
 
-  return 1.0/den;
+  out.density_scale = 1.0/scaled_mass;
+  out.inverse_mass = h*out.density_scale;
+  return out;
 }
 
 static inline double np_cker_base_eval(const int kernel,
@@ -8280,12 +8395,14 @@ const NP_GateOverrideCtx * const gate_override_ctx){
           ((isfinite(vector_ckerlb_extern[i]) && (fabs(vector_ckerlb_extern[i]) < 0.5*DBL_MAX)) ||
            (isfinite(vector_ckerub_extern[i]) && (fabs(vector_ckerub_extern[i]) < 0.5*DBL_MAX)));
         const double invnorm = use_bounds_i ?
-          np_cker_invnorm(KERNEL_reg_np[i], xc[i][j], m[i][jbw],
-                          vector_ckerlb_extern[i], vector_ckerub_extern[i]) : 1.0;
+          np_cker_bounded_norm(KERNEL_reg_np[i], xc[i][j], m[i][jbw],
+                               vector_ckerlb_extern[i],
+                               vector_ckerub_extern[i]).inverse_mass : 1.0;
         const double p_invnorm = use_p_bounds_i ?
-          np_cker_invnorm((do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]),
-                          xc[i][j], m[i][jbw],
-                          vector_ckerlb_extern[i], vector_ckerub_extern[i]) : 1.0;
+          np_cker_bounded_norm((do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]),
+                               xc[i][j], m[i][jbw],
+                               vector_ckerlb_extern[i],
+                               vector_ckerub_extern[i]).inverse_mass : 1.0;
 
         if(operator[l] != OP_CONVOLUTION){
           if(p_nvar == 0){
@@ -20718,7 +20835,7 @@ static int np_conditional_y_scalar_fixed_row_direct(NPConditionalYRowCtx *ctx,
     matrix_Y_continuous_train_extern[0] : NULL;
   const double lb = (vector_cykerlb_extern != NULL) ? vector_cykerlb_extern[0] : R_NegInf;
   const double ub = (vector_cykerub_extern != NULL) ? vector_cykerub_extern[0] : R_PosInf;
-  double h, invnorm;
+  double h, density_scale;
   int all_largeh = 0;
   double max_largeh_abs = 0.0, largeh_k0 = 0.0;
   int j;
@@ -20740,7 +20857,8 @@ static int np_conditional_y_scalar_fixed_row_direct(NPConditionalYRowCtx *ctx,
   if(!(h > 0.0) || !R_FINITE(h) || !R_FINITE(eval_y))
     return 1;
 
-  invnorm = np_cker_invnorm(KERNEL_den_extern, eval_y, h, lb, ub);
+  density_scale = np_cker_bounded_norm(KERNEL_den_extern, eval_y, h, lb, ub).
+    density_scale;
 
   if(np_cont_largeh_kernel_supported(KERNEL_den_extern)){
     const double utol = np_cont_largeh_utol(KERNEL_den_extern, np_cont_largeh_rel_tol());
@@ -20755,11 +20873,11 @@ static int np_conditional_y_scalar_fixed_row_direct(NPConditionalYRowCtx *ctx,
     const double diff = eval_y - train_y[j];
     if(all_largeh && (fabs(diff) > max_largeh_abs))
       all_largeh = 0;
-    row_out[j] = invnorm*np_cker_base_eval(KERNEL_den_extern, diff/h)/h;
+    row_out[j] = density_scale*np_cker_base_eval(KERNEL_den_extern, diff/h);
   }
 
   if(all_largeh){
-    const double kval = invnorm*largeh_k0/h;
+    const double kval = density_scale*largeh_k0;
     for(j = 0; j < num_train; j++)
       row_out[j] = kval;
   }
@@ -22452,22 +22570,28 @@ static int np_density_cvls_bounded_i1_quadrature(const int KERNEL_den,
 
     if((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)){
       const double h = matrix_bandwidth[0][(BANDWIDTH_den == BW_FIXED) ? 0 : m];
-      const double invnorm = np_cker_invnorm(KERNEL_den, grid[m], h, lb, ub);
+      double density_scale;
 
       if(!(h > 0.0) || !isfinite(h))
         goto cleanup_density_bounded_quad;
+      density_scale = np_cker_bounded_norm(KERNEL_den, grid[m], h, lb, ub).
+        density_scale;
       for(int i = 0; i < num_obs; i++)
-        fit += invnorm*np_cker_base_eval(KERNEL_den, (grid[m] - train_x[i])/h)/h;
+        fit += density_scale*
+          np_cker_base_eval(KERNEL_den, (grid[m] - train_x[i])/h);
       fit /= (double)num_obs;
     } else {
       for(int i = 0; i < num_obs; i++){
         const double h = matrix_bandwidth[0][i];
-        const double invnorm = np_cker_invnorm(KERNEL_den, grid[m], h, lb, ub);
+        double density_scale;
 
         if(!(h > 0.0) || !isfinite(h))
           goto cleanup_density_bounded_quad;
-        fit += invnorm*np_cker_base_eval(KERNEL_den, (grid[m] - train_x[i])/h) /
-          ((double)num_obs*h);
+        density_scale = np_cker_bounded_norm(KERNEL_den, grid[m], h, lb, ub).
+          density_scale;
+        fit += density_scale*
+          np_cker_base_eval(KERNEL_den, (grid[m] - train_x[i])/h) /
+          (double)num_obs;
       }
     }
 
@@ -22608,17 +22732,18 @@ static int np_density_cvls_bounded_i1_quadrature_general(const int KERNEL_den,
             ((BANDWIDTH_den == BW_GEN_NN) ? b : i);
           const double h = matrix_bandwidth[d][bw_idx];
           const double eval_x = eval_xcon[d][b];
-          const double invnorm =
-            np_cker_invnorm(KERNEL_den,
-                            eval_x,
-                            h,
-                            vector_ckerlb_extern[d],
-                            vector_ckerub_extern[d]);
+          double density_scale;
 
           if(!(h > 0.0) || !isfinite(h))
             goto cleanup_density_bounded_quad_general;
-          prod *= invnorm*np_cker_base_eval(KERNEL_den,
-                                            (eval_x - matrix_X_continuous[d][i])/h)/h;
+          density_scale =
+            np_cker_bounded_norm(KERNEL_den,
+                                 eval_x,
+                                 h,
+                                 vector_ckerlb_extern[d],
+                                 vector_ckerub_extern[d]).density_scale;
+          prod *= density_scale*np_cker_base_eval(
+            KERNEL_den, (eval_x - matrix_X_continuous[d][i])/h);
         }
 
         for(l = 0; l < nuno; l++)

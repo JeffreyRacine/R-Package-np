@@ -8,7 +8,7 @@
 extern int int_VERBOSE;
 
 /* The following routines (sort, powell, nrerror, vector, free_vector,
-   linmin, brent, mnbrak, f1dim, erfun, ran3), are based on the
+   linmin, brent, mnbrak, f1dim, ran3), are based on the
    routine(s) from the book Numerical Recipes in C (Cambridge
    University Press), Copyright (C) Copyright (C) 1987, 1988 by
    Numerical Recipes Software. Permission to include requested August
@@ -468,21 +468,13 @@ double f1dim(double x)
     return f;
 }
 
-/* This is an approximation to the error function good to 1.2e-07.
-   Compared to erfun() above it yields exact output for CDF
-   estimation, and is substantially faster for computation. Now
-   default replacement as of 10/6/03 */
+/* Keep the historical internal entry point, but use the C99 mathematical
+   primitive so Gaussian-family CDF calculations inherit the platform
+   implementation's accuracy and odd symmetry at the origin. */
 
 double erfun(double x)
 {
-    double t,z,ans;
-
-    z=fabs(x);
-    t=1.0/(1.0+0.5*z);
-    ans=t*exp(-z*z-1.26551223+t*(1.00002368+t*(0.37409196+t*(0.09678418+
-        t*(-0.18628806+t*(0.27886807+t*(-1.13520398+t*(1.48851587+
-        t*(-0.82215223+t*0.17087277)))))))));
-    return(x >= 0.0 ? -(ans-1.0) : (ans-1.0));
+    return erf(x);
 }
 
 #undef SIGN
