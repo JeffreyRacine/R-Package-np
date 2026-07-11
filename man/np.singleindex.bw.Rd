@@ -317,8 +317,9 @@ These arguments control the optional NOMAD direct-search route for local-polynom
     native \pkg{crs} NOMAD API multistarts within each outer restart.
     Returned bandwidth objects retain this normalized preset metadata in
     \code{bw$nomad.shortcut} for a returned object \code{bw}; when
-    available, \code{nomad.time} and \code{powell.time} record the
-    direct-search and Powell-polish timing components.
+    available, \code{nomad.time} records the direct-search component.
+    The legacy field \code{powell.time} records the subsequent family-native
+    R \code{optim} refinement selected by \code{optim.method}.
   }
 
   \item{nomad.nmulti}{
@@ -354,11 +355,14 @@ These arguments control the optional NOMAD direct-search route for local-polynom
   \item{search.engine}{
     character string controlling the automatic local-polynomial search
     backend when \code{regtype="lp"} and
-    \code{degree.select != "manual"}. \code{"nomad+powell"} (default)
+    \code{degree.select != "manual"}. The compatibility value
+    \code{"nomad+powell"} (default)
     performs direct joint search over the index-smoother bandwidth and
-    degree using the native \pkg{crs} NOMAD C API, then applies one Powell hot
-    start from the NOMAD solution. \code{"nomad"} omits the Powell
-    refinement. \code{"cell"} profiles the criterion over the
+    degree using the native \pkg{crs} NOMAD C API, then applies one
+    family-native R \code{optim} hot start from the NOMAD solution using
+    \code{optim.method}. The value is retained for API compatibility;
+    \code{"nomad"} omits this R-optimizer refinement.
+    \code{"cell"} profiles the criterion over the
     admissible degree grid using repeated fixed-degree solves. Direct
     exhaustive degree-grid search is available with
     \code{degree.select="exhaustive"} and \code{search.engine="cell"}.
@@ -379,12 +383,10 @@ These controls set search restart behavior.
   }
 
   \item{powell.remin}{
-    logical flag controlling Powell restart-from-minimum behavior. For
-    ordinary fixed-degree Powell-style search, \code{TRUE} restarts the
-    local search from the located minimum. For \code{search.engine="nomad+powell"},
-    this controls only the final Powell bandwidth-polish step. The default
-    is \code{TRUE} for ordinary Powell routes and \code{FALSE} for the
-    Powell polish after NOMAD unless explicitly supplied.
+    compatibility argument shared with bandwidth families that use the Powell
+    direction-set solver. Single-index fixed-degree and post-NOMAD refinement
+    use R \code{\link{optim}} with \code{optim.method}; consequently, this
+    argument does not alter their refinement behavior.
   }
 
 
@@ -587,9 +589,11 @@ or standard-deviation factors.
   admissible degree grid using cached coordinate-wise or exhaustive
   search. With \code{search.engine="nomad"} or
   \code{"nomad+powell"}, the criterion is optimized directly over the
-  joint degree/bandwidth space using the native \pkg{crs} NOMAD C API;
-  \code{"nomad+powell"} then performs one Powell hot start and retains
-  the better of the direct NOMAD and polished solutions. For the
+  joint degree/bandwidth space using the native \pkg{crs} NOMAD C API.
+  For this family, the compatibility value \code{"nomad+powell"} then
+  performs one family-native R \code{optim} hot start using
+  \code{optim.method} and retains the better of the direct NOMAD and refined
+  solutions. For the
   index-smoother local-polynomial component, this polynomial-adaptive
   joint-search route follows Hall and Racine (2015).
 
@@ -616,7 +620,7 @@ or standard-deviation factors.
   eligible for data-driven resolution when both were not supplied
   explicitly: scalar continuous degree searches use the exhaustive
   degree-grid route, while higher-dimensional degree searches keep the
-  NOMAD/Powell route. Explicit \code{search.engine} or
+  compatibility \code{"nomad+powell"} route. Explicit \code{search.engine} or
   \code{degree.select} choices are honored.
   
 }
