@@ -1,2 +1,2 @@
 family,case,tier,enabled,default_n,floor_n,boot.num,method,why
-npunitest,npunitest_univariate_density_equality,sentinel,TRUE,5000,500,399,summation,univariate_density_equality_bootstrap_sentinel
+npunitest,npunitest_univariate_density_equality,sentinel,TRUE,4000,500,399,summation,minimum_stable_threefold_univariate_density_equality_bootstrap_scaling_sentinel

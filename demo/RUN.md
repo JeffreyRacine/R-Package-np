@@ -184,10 +184,15 @@ Matrix-driven family demos, beginning with `npreg`, accept:
 The `npreg` smoke matrix currently covers `lc`, `ll`, explicit `lp` degree 1,
 `cv.aic`, and NOMAD local-polynomial degree search. The heavier sentinel
 matrix uses larger calibrated defaults for cross-version regression checks.
-Sentinel `default_n` values are calibrated from current timings: rows that
-already track roughly `serial / mpi_size` are left alone even when short, while
-functioning but underpowered rows are increased. Suspicious flat or failing
-rows are not hidden by increasing `n`; keep them visible for debugging.
+Sentinel `default_n` values are calibrated for the smallest useful health
+signal, not an arbitrary elapsed time. A designated strong-scaling row is kept
+at the smallest repeatedly stable size for which serial, one-, two-, and
+three-slave medians are monotone and the three-slave elapsed time is about one
+third of serial or better. Short rows remain short when they already provide
+that evidence. Rows with material serial/optimizer work are retained as
+route-specific correctness or useful-scaling monitors; do not inflate them
+merely to force an ideal ratio. Suspicious flat or failing rows remain visible
+for diagnosis.
 
 The `npcdens` smoke matrix currently covers `lc` least-squares, `lc`
 maximum-likelihood, `ll` least-squares, explicit `lp` degree 1, and NOMAD
@@ -269,7 +274,10 @@ cd /Users/jracine/Development/np-npRmpi/demo
 - Attach outputs: `results/<run-id>/mpi_launch/ranks_02/attach/*.Rout`, etc.
 - Profile outputs: `results/<run-id>/mpi_launch/ranks_02/profile/*.Rout`, etc.
 - Parsed output: `results/<run-id>/timing/demo_results.csv`
-- Wide parsed output: `results/<run-id>/timing/demo_results_wide.csv`
+- Wide parsed output: `results/<run-id>/timing/demo_results_wide.csv`; this has
+  one row per logical demo case. Optional descriptors remain missing when not
+  applicable, while conflicting invariant descriptors or duplicate compute
+  cells fail explicitly instead of silently dropping or splitting cases.
 - Human-readable terminal summary: `results/<run-id>/timing/timing_all.dat`
 - Planned run inventory: `results/<run-id>/RUN_INVENTORY.tsv`
 - Observed mode/rank/slave ledger: `results/<run-id>/RUN_OBSERVED_MATRIX.tsv`

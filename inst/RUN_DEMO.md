@@ -52,12 +52,22 @@ Results are written under:
 - `results/<run-id>/RUN_OBSERVED_MATRIX.tsv`
 - `results/<run-id>/RUN_MATRIX_VALIDATION.tsv`
 - `results/<run-id>/timing/demo_results.csv`
+- `results/<run-id>/timing/demo_results_wide.csv`, with one row per logical
+  demo case; missing optional descriptors remain missing and conflicting
+  invariant descriptors fail explicitly
 
 For release proof, require the full matrix explicitly:
 
 ```bash
 RUNALL_REQUIRE_FULL_MATRIX=true ./runall
 ```
+
+Sentinel sample sizes target the smallest repeatedly stable health signal, not
+an arbitrary elapsed time. Designated strong-scaling rows should remain
+monotone from serial through one, two, and three slaves, with the three-slave
+elapsed time approximately one third of serial or better. Optimizer-limited or
+otherwise serial routes remain correctness/useful-scaling monitors rather than
+being enlarged merely to force ideal scaling.
 
 ## Run a single mode manually
 
