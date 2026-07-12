@@ -334,6 +334,8 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
 test_that("wild fanout fails fast on dispatch timeout when worker replies stall", {
   run_fanout <- getFromNamespace(".npRmpi_bootstrap_run_fanout", "npRmpi")
   withr::local_options(npRmpi.bootstrap.dispatch.timeout.sec = 0.02)
+  quit.state <- new.env(parent = emptyenv())
+  quit.state$calls <- 0L
 
   local_mocked_bindings(
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
@@ -345,6 +347,10 @@ test_that("wild fanout fails fast on dispatch timeout when worker replies stall"
     mpi.bcast.Robj = function(...) invisible(NULL),
     mpi.send.Robj = function(...) invisible(NULL),
     mpi.iprobe = function(source, tag, comm = 1L) FALSE,
+    npRmpi.quit = function(...) {
+      quit.state$calls <- quit.state$calls + 1L
+      invisible(TRUE)
+    },
     .package = "npRmpi"
   )
 
@@ -356,7 +362,7 @@ test_that("wild fanout fails fast on dispatch timeout when worker replies stall"
     matrix(seq_len(as.integer(task$bsz)), nrow = as.integer(task$bsz), ncol = 1L)
   }
 
-  expect_error(
+  err <- tryCatch(
     run_fanout(
       tasks = tasks,
       worker = worker,
@@ -364,6 +370,14 @@ test_that("wild fanout fails fast on dispatch timeout when worker replies stall"
       what = "wild",
       profile.where = "unit.test:dispatch-timeout"
     ),
-    "dispatch timeout waiting on worker results"
+    error = identity
   )
+  expect_s3_class(err, "error")
+  expect_match(conditionMessage(err), "dispatch timeout waiting on worker results")
+  expect_match(
+    conditionMessage(err),
+    "Restart R before performing further MPI-backed computation.",
+    fixed = TRUE
+  )
+  expect_identical(quit.state$calls, 0L)
 })

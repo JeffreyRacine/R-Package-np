@@ -195,10 +195,9 @@ on the master process. In profile/manual-broadcast mode, termination is
 handled explicitly in the script via broadcasted \code{mpi.quit()} calls
 rather than via \code{npRmpi.quit()}.
 
-If an MPI-fanned bootstrap dispatch fails or times out, \pkg{npRmpi}
-force-closes the active worker pool before rethrowing the error. Relaunch
-the pool with \code{npRmpi.init()} before running further MPI-backed
-computations in the same R session.
+If an MPI-fanned bootstrap dispatch fails or times out, the current MPI
+session may no longer be usable. Restart R before performing further
+MPI-backed computations.
 
 Advanced diagnostic option: setting environment variable
 \code{NP_RMPI_SKIP_INIT} to a non-empty value before loading \pkg{npRmpi}
