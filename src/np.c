@@ -362,6 +362,8 @@ static int bwm_progress_last_signal_eval = 0;
 static int bwm_progress_eval_active = 0;
 static int bwm_nn_cache_active = 0;
 static int bwm_nn_cache_key_len = 0;
+static int bwm_nn_cache_bandwidth_key_len = 0;
+static int bwm_nn_cache_integer_extra_params = 0;
 static size_t bwm_nn_cache_capacity = 0;
 static size_t bwm_nn_cache_size = 0;
 static int *bwm_nn_cache_keys = NULL;
@@ -1771,6 +1773,8 @@ static void bwm_nn_cache_configure_for_powell(
   bwm_nn_cache_reset_stats();
   bwm_nn_cache_active = 0;
   bwm_nn_cache_key_len = 0;
+  bwm_nn_cache_bandwidth_key_len = 0;
+  bwm_nn_cache_integer_extra_params = 0;
   bwm_objective_cache_free();
   bwm_objective_cache_reset_stats();
   bwm_objective_cache_active = 0;
@@ -1798,6 +1802,37 @@ static void bwm_nn_cache_configure_for_powell(
     return;
 
   bwm_nn_cache_key_len = num_continuous;
+  bwm_nn_cache_bandwidth_key_len = num_continuous;
+  bwm_nn_cache_active = 1;
+  if (!bwm_nn_cache_alloc_table(2048))
+    return;
+}
+
+static void bwm_nn_cache_configure_for_degree_search(
+  int bandwidth,
+  int eval_only,
+  int degree_params,
+  int num_continuous,
+  int num_unordered,
+  int num_ordered)
+{
+  bwm_nn_cache_configure_for_powell(bandwidth,
+                                    eval_only,
+                                    degree_params,
+                                    num_continuous,
+                                    num_unordered,
+                                    num_ordered);
+
+  if (eval_only || degree_params <= 0 || !bwm_objective_cache_active)
+    return;
+  if (!((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)))
+    return;
+  if (num_continuous <= 0 || num_unordered != 0 || num_ordered != 0)
+    return;
+
+  bwm_nn_cache_bandwidth_key_len = num_continuous;
+  bwm_nn_cache_integer_extra_params = degree_params;
+  bwm_nn_cache_key_len = num_continuous + degree_params;
   bwm_nn_cache_active = 1;
   if (!bwm_nn_cache_alloc_table(2048))
     return;
@@ -1817,8 +1852,11 @@ static int bwm_nn_cache_make_key(double *p, int **key_out, int *stack_key)
     }
   }
 
-  for (i = 0; i < bwm_nn_cache_key_len; i++)
+  for (i = 0; i < bwm_nn_cache_bandwidth_key_len; i++)
     key[i] = np_fround(p[i + 1]);
+  for (i = 0; i < bwm_nn_cache_integer_extra_params; i++)
+    key[bwm_nn_cache_bandwidth_key_len + i] =
+      np_fround(p[bwm_nn_cache_bandwidth_key_len + i + 1]);
 
   key_out[0] = key;
   return 1;
@@ -1844,11 +1882,20 @@ static int bwm_nn_cache_get(double *p, double *value, int **key_out, int *stack_
   if (!bwm_nn_cache_active || bwm_nn_cache_key_len <= 0)
     return 0;
 
-  for (i = 0; i < bwm_nn_cache_key_len; i++) {
+  for (i = 0; i < bwm_nn_cache_bandwidth_key_len; i++) {
     const double value_i = p[i + 1];
     if (!R_FINITE(value_i) ||
         (value_i < 1.0) ||
         (value_i > ((double)INT_MAX / 2.0))) {
+      return 0;
+    }
+  }
+  for (i = 0; i < bwm_nn_cache_integer_extra_params; i++) {
+    const double value_i = p[bwm_nn_cache_bandwidth_key_len + i + 1];
+    if (!R_FINITE(value_i) ||
+        (value_i < 0.0) ||
+        (value_i > ((double)INT_MAX / 2.0)) ||
+        (value_i != (double)np_fround(value_i))) {
       return 0;
     }
   }
@@ -3245,6 +3292,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   int i, j;
   int num_all_var, num_all_cvar, num_all_uvar, num_all_ovar;
   int int_use_starting_values, ibwmfunc, scale_cat, need_y_side;
+  int degree_key_len;
   int dfc_dir;
   int *ipt_X = NULL, *ipt_Y = NULL, *ipt_XY = NULL;
   int *ipt_lookup_X = NULL, *ipt_lookup_Y = NULL, *ipt_lookup_XY = NULL;
@@ -3364,6 +3412,8 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
 
   ibwmfunc = myopti[CBW_MI];
   int_ll_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : LL_LC;
+  degree_key_len = (int_ll_extern == LL_LP) ? num_reg_continuous_extern : 0;
+  bwm_num_extra_params = degree_key_len;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP) ? *glp_bernstein : 0;
   int_glp_basis_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP) ? *glp_basis : 1;
@@ -3402,7 +3452,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   if (BANDWIDTH_den_extern != BW_FIXED)
     bwm_use_transform = 0;
   if (bwm_use_transform)
-    bwm_reserve_transform_buf(num_all_var + 1);
+    bwm_reserve_transform_buf(num_all_var + degree_key_len + 1);
 
   nconfac_extern = myoptd[CBW_NCONFD];
   ncatfac_extern = myoptd[CBW_NCATFD];
@@ -3443,7 +3493,8 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   num_categories_extern_XY = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
                                         num_reg_unordered_extern + num_reg_ordered_extern);
   matrix_y = alloc_matd(num_all_var + 1, num_all_var + 1);
-  np_conditional_density_nomad_shadow.vector_scale_factor = alloc_vecd(num_all_var + 1);
+  np_conditional_density_nomad_shadow.vector_scale_factor =
+    alloc_vecd(num_all_var + degree_key_len + 1);
   vsfh = alloc_vecd(num_all_var + 1);
   matrix_categorical_vals_extern =
     alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern +
@@ -3721,6 +3772,10 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
                                     matrix_X_continuous_train_extern,
                                     matrix_Y_continuous_train_extern);
 
+  for (i = 0; i < degree_key_len; i++)
+    np_conditional_density_nomad_shadow.vector_scale_factor[num_all_var + i + 1] =
+      (double)np_conditional_density_nomad_shadow.glp_degree[i];
+
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,
                                     int_RANDOM_SEED,
@@ -3809,12 +3864,12 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   bwm_num_categories = num_categories_extern;
   /* Shadow evaluators call bwmfunc_wrapper(), so prepare owns a fresh
      bandwidth-objective cache lifecycle just like ordinary searches. */
-  bwm_nn_cache_configure_for_powell(BANDWIDTH_den_extern,
-                                    0,
-                                    0,
-                                    bwm_num_reg_continuous,
-                                    bwm_num_reg_unordered,
-                                    bwm_num_reg_ordered);
+  bwm_nn_cache_configure_for_degree_search(BANDWIDTH_den_extern,
+                                           0,
+                                           degree_key_len,
+                                           bwm_num_reg_continuous,
+                                           bwm_num_reg_unordered,
+                                           bwm_num_reg_ordered);
   bwm_reset_counters();
 
   np_conditional_density_nomad_shadow_refresh_penalty();
@@ -3981,6 +4036,10 @@ static int np_density_conditional_nomad_shadow_eval_native_raw(const double *rbw
 
   for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
     np_conditional_density_nomad_shadow.vector_scale_factor[i + 1] = rbw_work[i];
+  for (i = 0; i < np_conditional_density_nomad_shadow.num_reg_continuous; i++)
+    np_conditional_density_nomad_shadow.vector_scale_factor[
+      np_conditional_density_nomad_shadow.num_all_var + i + 1] =
+      (double)degree_work[i];
 
   if (np_conditional_density_nomad_shadow.penalty_mode == 1) {
     bwm_penalty_mode = 0;
