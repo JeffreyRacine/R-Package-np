@@ -28,9 +28,10 @@
   the documented replay route requires it.
 
 * Hardened MPI lifecycle and protocol handling. Bootstrap fanout timeout or
-  failure now force-closes the affected pool and requires an explicit relaunch;
-  attach close resets pool state, profile communicator metadata remains
-  distinct, and internal protocol tags are allocated portably.
+  failure now reports a hard failure and instructs the user to restart R before
+  further MPI-backed computation; attach close resets pool state, profile
+  communicator metadata remains distinct, and internal protocol tags are
+  allocated portably.
 
 * Standardized the public `nomad.opts` contract across supported bandwidth
   selectors and hardened native NOMAD callback cleanup and allocation guards
