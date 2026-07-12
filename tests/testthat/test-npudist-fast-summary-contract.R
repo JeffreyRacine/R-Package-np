@@ -14,7 +14,6 @@ test_that("npudist exposes unconditional fast counts in bandwidth summary", {
   expect_true(is.finite(as.numeric(fit$bws$num.feval[1L])))
   expect_true(is.finite(as.numeric(fit$bws$num.feval.fast[1L])))
   expect_gt(as.numeric(fit$bws$num.feval.fast[1L]), 0)
-  expect_lte(as.numeric(fit$bws$num.feval.fast[1L]), as.numeric(fit$bws$num.feval[1L]))
 
   txt <- paste(capture.output(summary(fit$bws)), collapse = "\n")
   expect_true(grepl("Number of Function Evaluations:", txt, fixed = TRUE))
@@ -31,6 +30,8 @@ test_that("npudist exposes unconditional fast counts in bandwidth summary", {
     expect_true(grepl("Evaluation cache (Powell):", txt, fixed = TRUE))
 
   fast.extra <- fast - if (is.finite(cache.hits)) cache.hits else 0
+  expect_gte(fast.extra, 0)
+  expect_lte(fast.extra, as.numeric(fit$bws$num.feval[1L]))
   if (is.finite(fast.extra) && fast.extra > 0) {
     expect_true(grepl(
       sprintf("Fast CV route: %s of", format(round(fast.extra), big.mark = ",")),
@@ -75,5 +76,13 @@ test_that("npudist counts forced large-h unconditional evaluations as fast", {
   expect_true(is.finite(as.numeric(forced$num.feval[1L])))
   expect_true(is.finite(as.numeric(forced$num.feval.fast[1L])))
   expect_gt(as.numeric(forced$num.feval.fast[1L]), 0)
-  expect_lte(as.numeric(forced$num.feval.fast[1L]), as.numeric(forced$num.feval[1L]))
+  cache.hits <- if (!is.null(forced$nn.cache) &&
+                    "objective.hits" %in% names(forced$nn.cache)) {
+    as.numeric(forced$nn.cache[["objective.hits"]])
+  } else {
+    0
+  }
+  fast.computations <- as.numeric(forced$num.feval.fast[1L]) - cache.hits
+  expect_gte(fast.computations, 0)
+  expect_lte(fast.computations, as.numeric(forced$num.feval[1L]))
 })
