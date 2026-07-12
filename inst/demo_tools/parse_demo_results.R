@@ -269,17 +269,98 @@ write_wide <- function(results, path) {
   }
 
   wide <- results
+  wide$.input_order <- seq_len(nrow(wide))
   wide$compute <- vapply(seq_len(nrow(wide)), function(i) compute_label(wide[i, ]),
                          character(1L))
-  id_cols <- c("run_id", "family", "case", "tier", "regtype", "bwmethod",
-               "nomad", "degree", "degree.max", "selected.degree", "bwtype",
-               "n", "default_n")
-  id_cols <- id_cols[id_cols %in% names(wide)]
-  wide <- wide[, c(id_cols, "compute", "elapsed"), drop = FALSE]
-  names(wide)[names(wide) == "elapsed"] <- "seconds"
-  out <- reshape(wide, idvar = id_cols, timevar = "compute",
-                 direction = "wide")
+
+  output_cols <- c("run_id", "family", "case", "tier", "regtype", "bwmethod",
+                   "nomad", "degree", "degree.max", "selected.degree", "bwtype",
+                   "n", "default_n")
+  output_cols <- output_cols[output_cols %in% names(wide)]
+
+  is_missing_descriptor <- function(x) {
+    is.na(x) | (is.character(x) & (!nzchar(x) | x == "NA"))
+  }
+
+  logical_case <- wide$case
+  missing_case <- is_missing_descriptor(logical_case)
+  logical_case[missing_case] <- wide$demo[missing_case]
+  if (any(is_missing_descriptor(logical_case)))
+    stop("wide timing rows require case or demo identity", call. = FALSE)
+
+  logical_family <- wide$family
+  missing_family <- is_missing_descriptor(logical_family)
+  logical_family[missing_family] <- ""
+
+  wide$.logical_case <- logical_case
+  wide$.logical_family <- logical_family
+  key_cols <- c("run_id", ".logical_family", ".logical_case", "tier", "n", "default_n")
+  key_cols <- key_cols[key_cols %in% names(wide)]
+  keys <- unique(wide[, key_cols, drop = FALSE])
+  keys$.case_id <- seq_len(nrow(keys))
+
+  keyed <- merge(wide, keys, by = key_cols, all.x = TRUE, sort = FALSE)
+  keyed <- keyed[order(keyed$.input_order), , drop = FALSE]
+  if (nrow(keyed) != nrow(wide) || anyNA(keyed$.case_id))
+    stop("failed to assign exactly one logical case identity to every timing row",
+         call. = FALSE)
+
+  duplicate_cell <- duplicated(keyed[, c(".case_id", "compute"), drop = FALSE])
+  if (any(duplicate_cell)) {
+    bad <- keyed[which(duplicate_cell)[1L], ]
+    stop("duplicate wide timing cell for case=", bad$.logical_case,
+         " compute=", bad$compute, call. = FALSE)
+  }
+
+  case_ids <- keys$.case_id
+  first_rows <- match(case_ids, keyed$.case_id)
+  metadata <- keyed[first_rows, c(".case_id", output_cols), drop = FALSE]
+  validate_cols <- unique(c(output_cols, intersect("method", names(keyed))))
+
+  for (column in validate_cols) {
+    for (i in seq_along(case_ids)) {
+      values <- keyed[[column]][keyed$.case_id == case_ids[[i]]]
+      present <- !is_missing_descriptor(values)
+      distinct <- unique(values[present])
+      if (length(distinct) > 1L) {
+        stop("conflicting wide descriptor ", column,
+             " for case=", keyed$.logical_case[first_rows[[i]]],
+             ": ", paste(distinct, collapse = ", "), call. = FALSE)
+      }
+      if (column %in% output_cols)
+        metadata[[column]][[i]] <- if (length(distinct)) distinct[[1L]] else NA
+    }
+  }
+
+  timing <- keyed[, c(".case_id", "compute", "elapsed"), drop = FALSE]
+  names(timing)[names(timing) == "elapsed"] <- "seconds"
+  timing_wide <- reshape(timing, idvar = ".case_id", timevar = "compute",
+                         direction = "wide")
+  out <- merge(metadata, timing_wide, by = ".case_id", all.x = TRUE, sort = FALSE)
+  out <- out[match(case_ids, out$.case_id), , drop = FALSE]
+
+  if (nrow(out) != nrow(keys) || anyNA(out$.case_id))
+    stop("wide timing output does not contain exactly one row per logical case",
+         call. = FALSE)
+
   names(out) <- sub("^seconds\\.", "seconds_", names(out))
+  for (i in seq_len(nrow(keyed))) {
+    output_row <- match(keyed$.case_id[[i]], out$.case_id)
+    output_column <- paste0("seconds_", keyed$compute[[i]])
+    if (!output_column %in% names(out))
+      stop("wide timing output omitted compute column ", output_column,
+           call. = FALSE)
+    actual <- out[[output_column]][[output_row]]
+    expected <- keyed$elapsed[[i]]
+    if (!((is.na(actual) && is.na(expected)) ||
+          isTRUE(all.equal(actual, expected, tolerance = 0))))
+      stop("wide timing output does not map elapsed values bijectively",
+           call. = FALSE)
+  }
+
+  out$.case_id <- NULL
+  timing_cols <- setdiff(names(out), output_cols)
+  out <- out[, c(output_cols, timing_cols), drop = FALSE]
   write.csv(out, path, row.names = FALSE)
   invisible(TRUE)
 }
