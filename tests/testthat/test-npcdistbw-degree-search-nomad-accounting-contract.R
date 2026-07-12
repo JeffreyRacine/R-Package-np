@@ -14,8 +14,7 @@ test_that("npcdist NOMAD accounting is owner-level on fast-path fits", {
   fit <- npcdist(
     y ~ x,
     nomad = TRUE,
-    search.engine = "nomad",
-    cykerbound = "range"
+    search.engine = "nomad"
   )
 
   expect_gt(as.numeric(fit$bws$num.feval.fast[1L]), 0)
