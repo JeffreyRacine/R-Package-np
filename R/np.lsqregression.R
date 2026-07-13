@@ -871,6 +871,7 @@ nplsqregbw <-
   out$reg.bws <- stats::setNames(lapply(fit.list, `[[`, "reg.bws"), labels)
   out$fit <- stats::setNames(lapply(fit.list, `[[`, "fit"), labels)
   out$tau <- tau
+  out$gradient.order <- first$gradient.order
   out$delta <- bws$delta
   out$quantile <- do.call(cbind, lapply(fit.list, `[[`, "quantile"))
   colnames(out$quantile) <- labels
@@ -1318,7 +1319,8 @@ nplsqregbw.default <-
 
 nplsqreg.formula <-
   function(bws, data = NULL, newdata = NULL, tau = 0.5,
-           gradients = FALSE, residuals = FALSE, subset, na.action, ...) {
+           gradients = FALSE, residuals = FALSE, subset, na.action,
+           gradient.order = 1L, ...) {
 
     tt <- terms(bws)
     dots <- list(...)
@@ -1364,7 +1366,8 @@ nplsqreg.formula <-
                                 dots))
     bw$formula <- bws
     fit.args <- list(bws = bw, txdat = xdat, tydat = ydat,
-                     gradients = gradients, residuals = residuals)
+                     gradients = gradients, residuals = residuals,
+                     gradient.order = gradient.order)
     if (has.eval)
       fit.args$exdat <- exdat
     out <- do.call(nplsqreg, fit.args)
@@ -1440,6 +1443,7 @@ nplsqreg.default <-
            exdat,
            gradients = FALSE,
            residuals = FALSE,
+           gradient.order = 1L,
            ...) {
 
     tau.raw <- .nplsqreg_validate_tau_values(tau)
@@ -1456,7 +1460,8 @@ nplsqreg.default <-
         bw.args$bws <- bws
       bw <- do.call(nplsqregbw, c(bw.args, dots))
       fit.args <- list(bws = bw, txdat = txdat, tydat = tydat,
-                       gradients = gradients, residuals = residuals)
+                       gradients = gradients, residuals = residuals,
+                       gradient.order = gradient.order)
       if (!missing(exdat))
         fit.args$exdat <- exdat
       else if (!is.null(native.newdata))
@@ -1491,7 +1496,8 @@ nplsqreg.default <-
     .nplsqreg_assert_reuse_training_data(bws, txdat, tydat)
 
     fit.args <- list(bws = bws$reg.bws, txdat = txdat, tydat = bws$qdat,
-                     gradients = gradients)
+                     gradients = gradients,
+                     gradient.order = gradient.order)
     eval.present <- !missing(exdat) || !is.null(native.newdata)
     eval.omit <- NULL
     if (!missing(exdat)) {

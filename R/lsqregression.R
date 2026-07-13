@@ -106,7 +106,8 @@ lsqregression <-
            gradients = FALSE,
            residuals = FALSE,
            resid = NA,
-           call = NULL) {
+           call = NULL,
+           gradient.order = fit$gradient.order) {
 
     if (missing(bws) || missing(fit) || missing(xeval) ||
         missing(tau) || missing(delta) || missing(quantile) ||
@@ -163,6 +164,7 @@ lsqregression <-
       ntrain = ntrain,
       trainiseval = trainiseval,
       gradients = gradients,
+      gradient.order = gradient.order,
       residuals = residuals,
       resid = resid,
       objective = bws$objective,
@@ -522,7 +524,8 @@ residuals.lsqregression <- function(object, ...) {
   object$resid
 }
 
-gradients.lsqregression <- function(x, errors = FALSE, ...) {
+gradients.lsqregression <- function(x, errors = FALSE,
+                                    gradient.order = NULL, ...) {
   errors <- npValidateScalarLogical(errors, "errors")
   gout <- if (!errors) x$quantgrad else x$quantgerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
@@ -530,6 +533,16 @@ gradients.lsqregression <- function(x, errors = FALSE, ...) {
       "gradients are not available: fit the model with gradients=TRUE"
     else
       "gradient standard errors are not available: fit the model with gradients=TRUE")
+  if (!is.null(gradient.order)) {
+    fit.list <- if (inherits(x$fit, "npregression")) list(x$fit) else x$fit
+    if (!is.list(fit.list) || !length(fit.list) ||
+        !all(vapply(fit.list, inherits, logical(1L), "npregression"))) {
+      stop("cannot validate requested gradient.order: fitted npregression state is unavailable",
+           call. = FALSE)
+    }
+    invisible(lapply(fit.list, function(fit)
+      gradients(fit, errors = errors, gradient.order = gradient.order)))
+  }
   gout
 }
 
