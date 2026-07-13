@@ -463,10 +463,12 @@ np_render_control <- function(style = c("band", "bar"),
   dots$random.seed <- NULL
 
   # Keep backward compatibility with legacy plot argument aliases.
-  if (!is.null(dots$gradient) && is.null(dots$gradients)) {
-    dots$gradients <- dots$gradient
+  gradient.alias <- dots[["gradient", exact = TRUE]]
+  gradients.alias <- dots[["gradients", exact = TRUE]]
+  if (!is.null(gradient.alias) && is.null(gradients.alias)) {
+    dots[["gradients"]] <- gradient.alias
   }
-  dots$gradient <- NULL
+  dots[["gradient"]] <- NULL
 
   if (!is.null(dots$persp) && is.null(dots$perspective)) {
     dots$perspective <- dots$persp

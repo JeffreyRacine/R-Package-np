@@ -548,6 +548,55 @@ gradients.lsqregression <- function(x, errors = FALSE,
       stop("cannot validate requested gradient.order: fitted npregression state is unavailable",
            call. = FALSE)
     }
+    lp.fit <- vapply(fit.list, function(fit) {
+      bws <- fit[["bws", exact = TRUE]]
+      identical(bws[["regtype", exact = TRUE]], "lp")
+    }, logical(1L))
+    if (any(lp.fit) && !all(lp.fit)) {
+      stop("cannot validate requested gradient.order: fitted npregression states use inconsistent regression types",
+           call. = FALSE)
+    }
+    if (all(lp.fit)) {
+      ncon <- vapply(fit.list, function(fit) {
+        bws <- fit[["bws", exact = TRUE]]
+        as.integer(bws[["ncon", exact = TRUE]])
+      }, integer(1L))
+      if (any(ncon != ncon[[1L]])) {
+        stop("cannot validate requested gradient.order: fitted npregression states use inconsistent continuous dimensions",
+             call. = FALSE)
+      }
+      requested.order <- npValidateGlpGradientOrder(
+        regtype = "lp",
+        gradient.order = gradient.order,
+        ncon = ncon[[1L]]
+      )
+      child.order <- lapply(fit.list, function(fit) {
+        order <- fit[["gradient.order", exact = TRUE]]
+        if (is.null(order))
+          order <- rep.int(1L, ncon[[1L]])
+        npValidateGlpGradientOrder(
+          regtype = "lp",
+          gradient.order = order,
+          ncon = ncon[[1L]]
+        )
+      })
+      stored.order <- x[["gradient.order", exact = TRUE]]
+      if (is.null(stored.order))
+        stored.order <- child.order[[1L]]
+      stored.order <- npValidateGlpGradientOrder(
+        regtype = "lp",
+        gradient.order = stored.order,
+        ncon = ncon[[1L]]
+      )
+      if (!all(vapply(child.order, identical, logical(1L), stored.order))) {
+        stop("cannot validate requested gradient.order: stored lsqregression and child orders are inconsistent",
+             call. = FALSE)
+      }
+      if (!identical(requested.order, stored.order)) {
+        stop("requested gradient.order differs from the derivative order stored in this lsqregression object; refit or predict/evaluate with gradients=TRUE and the desired gradient.order",
+             call. = FALSE)
+      }
+    }
     invisible(lapply(fit.list, function(fit)
       gradients(fit, errors = errors, gradient.order = gradient.order)))
   }
@@ -747,13 +796,15 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
                                          context = "plot.lsqregression")
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
-  if (!is.null(dots$gradient)) {
-    gradients <- dots$gradient
-    dots$gradient <- NULL
+  gradient.alias <- dots[["gradient", exact = TRUE]]
+  if (!is.null(gradient.alias)) {
+    gradients <- gradient.alias
+    dots[["gradient"]] <- NULL
   }
-  if (!is.null(dots$gradients)) {
-    gradients <- dots$gradients
-    dots$gradients <- NULL
+  gradients.alias <- dots[["gradients", exact = TRUE]]
+  if (!is.null(gradients.alias)) {
+    gradients <- gradients.alias
+    dots[["gradients"]] <- NULL
   }
   gradients <- npValidateScalarLogical(gradients, "gradients")
   tau <- if (is.null(tau)) {

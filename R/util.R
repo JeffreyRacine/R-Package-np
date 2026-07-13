@@ -820,7 +820,15 @@ npValidateCategoricalFirstDifferenceGradientOrder <- function(
   order.names <- intersect(c("gradient.order", "gradient_order"), names(dots))
   for (argname in order.names) {
     value <- dots[[argname]]
-    if (is.numeric(value) && any(value > 1L, na.rm = TRUE)) {
+    if (is.null(value))
+      next
+    if (!is.numeric(value) || !length(value) || anyNA(value) ||
+        any(!is.finite(value)) || any(value <= 0) ||
+        any(value != floor(value))) {
+      stop(sprintf("%s must contain finite positive integers", argname),
+           call. = FALSE)
+    }
+    if (any(as.integer(value) != 1L)) {
       stop(sprintf(
         "%s supports only first-order gradients; %s > 1 is not supported",
         where,
