@@ -8,7 +8,6 @@
 \alias{predict.lsqregression}
 \alias{residuals.lsqregression}
 \alias{se.lsqregression}
-\alias{gradients.lsqregression}
 \alias{summary.lsqregression}
 \alias{print.lsqregression}
 \alias{plot.lsqregression}
@@ -26,7 +25,8 @@
 nplsqreg(bws, \dots)
 
 \method{nplsqreg}{formula}(bws, data = NULL, newdata = NULL, tau = 0.5,
-       gradients = FALSE, residuals = FALSE, subset, na.action, \dots)
+       gradients = FALSE, residuals = FALSE, subset, na.action,
+       gradient.order = 1L, \dots)
 
 \method{nplsqreg}{lsqregressionbandwidth}(bws, txdat = NULL, tydat = NULL,
        tau = bws$tau, \dots)
@@ -38,6 +38,7 @@ nplsqreg(bws, \dots)
        exdat,
        gradients = FALSE,
        residuals = FALSE,
+       gradient.order = 1L,
        \dots)
 }
 \arguments{
@@ -102,6 +103,15 @@ fitted quantities are returned.
     should be computed and returned. Defaults to \code{FALSE}.
   }
 
+  \item{gradient.order}{
+    for a final \code{regtype="lp"} fit with \code{gradients=TRUE}, a
+    positive integer scalar or one positive integer per continuous
+    predictor. Each entry requests that coordinate's derivative order;
+    it does not request mixed partial derivatives. The default is the
+    first derivative. Ordered and unordered predictors retain their
+    existing first-difference effect semantics.
+  }
+
   \item{residuals}{
     a logical value indicating whether residuals should be returned for
     training-data fits. Defaults to \code{FALSE}.
@@ -163,7 +173,14 @@ selection, prediction, or plotting route.
   Gradients and categorical effects are those returned by the final
   \code{\link{npreg}} fit on the transformed response. Thus ordered-factor
   effects are finite-difference contrasts and unordered-factor effects
-  follow the corresponding mixed-data regression semantics.
+  follow the corresponding mixed-data regression semantics. For a
+  local-polynomial fit, \code{gradient.order} is applied coordinate by
+  coordinate to continuous predictors and must be supported by the fitted
+  polynomial degree. No mixed partials, Hessians, derivative tensors, or
+  multiple derivative orders are stored. With vector \code{tau}, the
+  existing evaluation-by-coordinate-by-\code{tau} array layout is retained.
+  The \code{\link{gradients}} method extracts the stored order and rejects a
+  different requested order; it does not recompute derivatives after fitting.
 
   Standard errors are the asymptotic standard errors from that final
   transformed-response regression, conditional on the selected
@@ -180,6 +197,8 @@ selection, prediction, or plotting route.
   predictions, residuals when requested, and gradients or categorical
   effects. The functions \code{\link{summary}},
   \code{\link{print}}, and \code{\link{plot}} support objects of this type.
+  Local-polynomial fit objects retain the compact continuous-coordinate
+  derivative order in \code{$gradient.order}.
 }
 \references{
   Fan, J. and Q. Yao (1998), \dQuote{Efficient Estimation of Conditional

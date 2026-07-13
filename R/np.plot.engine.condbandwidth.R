@@ -753,6 +753,7 @@
             tydat = ydat,
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             gradients = gradients,
+            gradient.order = gradient.order,
             tau = tau,
             bws = bws
           )

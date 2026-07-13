@@ -3,6 +3,7 @@
 \alias{gradients}
 \alias{gradients.condensity}
 \alias{gradients.condistribution}
+\alias{gradients.lsqregression}
 \alias{gradients.npregression}
 \alias{gradients.qregression}  
 \alias{gradients.singleindex}
@@ -12,6 +13,8 @@ gradients(x, \dots)
 \method{gradients}{condensity}(x, errors = FALSE, gradient.order = NULL, \dots)
 
 \method{gradients}{condistribution}(x, errors = FALSE, gradient.order = NULL, \dots)
+
+\method{gradients}{lsqregression}(x, errors = FALSE, gradient.order = NULL, \dots)
 
 \method{gradients}{npregression}(x, errors = FALSE, gradient.order = NULL, \dots)
 
@@ -35,8 +38,8 @@ Optional local-polynomial derivative order controls.
 }
 
   \item{gradient.order}{
-    for \code{npregression}, \code{condensity}, and
-    \code{condistribution} objects fitted with \code{regtype="lp"},
+    for \code{npregression}, \code{condensity}, \code{condistribution}, and
+    \code{lsqregression} objects fitted with \code{regtype="lp"},
     optional derivative order request (scalar or one entry per
     continuous predictor). Orders exceeding the fitted polynomial degree
     are returned as \code{NA}. If a different admissible derivative order
@@ -61,8 +64,9 @@ Further method-specific arguments.
 }
 \details{
   This function provides a generic interface for extraction of gradients
-  from objects. For \code{npregression}, \code{condensity}, and
-  \code{condistribution} objects fitted with \code{regtype="lp"},
+  from objects. For \code{npregression}, \code{condensity},
+  \code{condistribution}, and \code{lsqregression} objects fitted with
+  \code{regtype="lp"},
   \code{gradient.order} identifies the stored continuous-predictor
   derivative order to extract; it is not a
   post-fit recomputation control. For \code{qregression} objects,

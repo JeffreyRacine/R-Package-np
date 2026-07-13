@@ -101,7 +101,11 @@ Named options passed via \code{\dots} include:
         gradients/derivatives. For \code{npreg} local-polynomial
         objects, \code{gradient_order} requests the continuous-predictor
         derivative order to generate on the plot evaluation grid; if
-        omitted the first derivative/effect is plotted. For
+        omitted the first derivative/effect is plotted. Location-scale
+        quantile-regression \code{nplsqreg} objects use the same
+        coordinate-wise local-polynomial contract while preserving their
+        existing \code{tau}-indexed output; no mixed partials are generated.
+        For
         \code{npconmode} objects,
         \code{gradients=TRUE} plots stored class-probability gradients/effects
         for the selected response level, computed by
