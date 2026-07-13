@@ -39,6 +39,11 @@
            ...,
            random.seed){
 
+    dots <- list(...)
+    .np_singleindex_reject_higher_gradient_order(
+      dots,
+      where = "plot.sibandwidth"
+    )
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
     on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
@@ -119,7 +124,6 @@
       if (is.null(value)) default else value
     }
 
-    dots <- list(...)
     plot.legend <- if (!is.null(dots$legend)) dots$legend else TRUE
     plot.user.args <- .np_plot_user_args(dots, "plot")
     points.user.args <- .np_plot_user_args(dots, "points")

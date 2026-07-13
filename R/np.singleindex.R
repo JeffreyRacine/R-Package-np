@@ -16,6 +16,7 @@
 npindex <-
   function(bws, ...){
     args <- list(...)
+    .np_singleindex_reject_higher_gradient_order(args, where = "npindex")
 
     if (!missing(bws)){
       if (length(args) > 0L &&
