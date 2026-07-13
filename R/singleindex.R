@@ -135,6 +135,10 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
 se.singleindex <- function(x){ x$merr }
 gradients.singleindex <- function(x, errors = FALSE, ...) {
   errors <- npValidateScalarLogical(errors, "errors")
+  .np_singleindex_reject_higher_gradient_order(
+    list(...),
+    where = "gradients.singleindex"
+  )
   gout <- if (!errors) x$grad else x$gerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
     stop(if (!errors)

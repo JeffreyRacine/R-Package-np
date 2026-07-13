@@ -814,6 +814,23 @@ npValidateCategoricalFirstDifferenceGradientOrder <- function(
   integer(0)
 }
 
+.np_singleindex_reject_higher_gradient_order <- function(
+    dots,
+    where = "npindex") {
+  order.names <- intersect(c("gradient.order", "gradient_order"), names(dots))
+  for (argname in order.names) {
+    value <- dots[[argname]]
+    if (is.numeric(value) && any(value > 1L, na.rm = TRUE)) {
+      stop(sprintf(
+        "%s supports only first-order gradients; %s > 1 is not supported",
+        where,
+        argname
+      ), call. = FALSE)
+    }
+  }
+  invisible(NULL)
+}
+
 npValidateLcGradientOrder <- function(regtype,
                                       gradient.order,
                                       ncon,
