@@ -607,6 +607,16 @@
       tylabE <- if (quantreg) paste(tau, "quantile") else paste("Conditional", if (cdf) "Distribution" else "Density")
       plotOnEstimate <- (plot.errors.center == "estimate")
 
+      conditional_gradient_axis_label <- function(component) {
+        .np_plot_conditional_gradient_axis_label(
+          target = tylabE,
+          predictor = bws$xnames[component],
+          component = component,
+          continuous = bws$ixcon,
+          gradient.order = gradient.order
+        )
+      }
+
       plot.index = 0
       xOrY = "x"
 
@@ -781,7 +791,7 @@
                 plotOnEstimate = plotOnEstimate
               )
             plot.args$xlab <- scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = "")))
-            plot.args$ylab <- scalar_default(ylab, if (gradients) paste("GC", j, "of", tylabE) else tylabE)
+            plot.args$ylab <- scalar_default(ylab, if (gradients) conditional_gradient_axis_label(j) else tylabE)
             if (!xi.factor) {
               plot.args$type <- scalar_default(type, "l")
               plot.args$lty <- scalar_default(lty, par()$lty)
@@ -1035,7 +1045,7 @@
                   plotOnEstimate = plotOnEstimate
                 )
               plot.args$xlab <- scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = "")))
-              plot.args$ylab <- scalar_default(ylab, if (gradients) paste("GC", j, "of", tylabE) else tylabE)
+              plot.args$ylab <- scalar_default(ylab, if (gradients) conditional_gradient_axis_label(j) else tylabE)
               if (!xi.factor) {
                 plot.args$type <- scalar_default(type, "l")
                 plot.args$lty <- scalar_default(lty, par()$lty)
@@ -1198,7 +1208,7 @@
               plot.args$y <- data.eval[,idx]
             plot.args$ylim <- c(y.min, y.max)
             plot.args$xlab <- scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = "")))
-            plot.args$ylab <- scalar_default(ylab, if (gradients) paste("GC", j, "of", tylabE) else tylabE)
+            plot.args$ylab <- scalar_default(ylab, if (gradients) conditional_gradient_axis_label(j) else tylabE)
             if (!xi.factor) {
               plot.args$type <- scalar_default(type, "l")
               plot.args$lty <- scalar_default(lty, par()$lty)

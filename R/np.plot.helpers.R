@@ -6393,6 +6393,66 @@ gen.label = function(label, altlabel){
   paste(if (is.null(label)) altlabel else label)
 }
 
+.np_plot_resolve_axis_label <- function(label, fallback) {
+  missing.label <- is.null(label) || length(label) == 0L ||
+    is.na(label[[1L]]) || !nzchar(as.character(label[[1L]]))
+  if (missing.label)
+    return(as.character(fallback[[1L]]))
+  as.character(label[[1L]])
+}
+
+.np_plot_gradient_axis_label <- function(target,
+                                         predictor,
+                                         order = 1L,
+                                         categorical = FALSE,
+                                         target.fallback = "Conditional Mean",
+                                         predictor.fallback = "X") {
+  target <- .np_plot_resolve_axis_label(target, target.fallback)
+  predictor <- .np_plot_resolve_axis_label(predictor, predictor.fallback)
+
+  if (isTRUE(categorical))
+    return(paste("Delta", target, "/ Delta", predictor))
+
+  if (!is.numeric(order) || length(order) != 1L || is.na(order) ||
+      !is.finite(order) || order < 1 || order > .Machine$integer.max ||
+      order != as.integer(order))
+    stop("internal plot derivative order must be a positive integer",
+         call. = FALSE)
+  order <- as.integer(order)
+
+  if (order == 1L)
+    return(paste("d", target, "/ d", predictor))
+  paste0("d^", order, " ", target, " / d ", predictor, "^", order)
+}
+
+.np_plot_conditional_gradient_axis_label <- function(target,
+                                                     predictor,
+                                                     component,
+                                                     continuous,
+                                                     gradient.order = NULL,
+                                                     predictor.fallback = NULL) {
+  is.continuous <- isTRUE(continuous[component])
+  order <- 1L
+  if (is.continuous && length(gradient.order)) {
+    continuous.position <- match(component, which(continuous))
+    order <- if (length(gradient.order) == 1L) {
+      gradient.order[[1L]]
+    } else {
+      gradient.order[[continuous.position]]
+    }
+  }
+  if (is.null(predictor.fallback))
+    predictor.fallback <- paste0("X", component)
+
+  .np_plot_gradient_axis_label(
+    target = target,
+    predictor = predictor,
+    order = order,
+    categorical = !is.continuous,
+    predictor.fallback = predictor.fallback
+  )
+}
+
 gen.tflabel = function(condition, tlabel, flabel){
   paste(if (isTRUE(condition)) tlabel else flabel)
 }
