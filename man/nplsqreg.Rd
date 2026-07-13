@@ -175,12 +175,16 @@ selection, prediction, or plotting route.
   effects are finite-difference contrasts and unordered-factor effects
   follow the corresponding mixed-data regression semantics. For a
   local-polynomial fit, \code{gradient.order} is applied coordinate by
-  coordinate to continuous predictors and must be supported by the fitted
-  polynomial degree. No mixed partials, Hessians, derivative tensors, or
-  multiple derivative orders are stored. With vector \code{tau}, the
+  coordinate to continuous predictors. Availability follows \code{npreg}:
+  when at least one requested continuous derivative is available, components
+  whose order exceeds their fitted polynomial degree are returned as \code{NA}
+  with a warning; a request with no available continuous derivative component
+  is rejected. No mixed partials, Hessians, derivative tensors, or multiple
+  derivative orders are stored. With vector \code{tau}, the
   existing evaluation-by-coordinate-by-\code{tau} array layout is retained.
-  The \code{\link{gradients}} method extracts the stored order and rejects a
-  different requested order; it does not recompute derivatives after fitting.
+  The \code{\link{gradients}} method extracts exactly the stored order and
+  rejects any different requested order; it does not recompute derivatives
+  after fitting.
 
   Standard errors are the asymptotic standard errors from that final
   transformed-response regression, conditional on the selected
