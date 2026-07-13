@@ -93,6 +93,10 @@
     if(!missing(gradients))
       stop("gradients not supported with partially linear models. Coefficients may be extracted with coef()")
     coef <- isTRUE(coef)
+    response.axis.label <- .np_plot_resolve_axis_label(
+      bws$ynames,
+      "Conditional Mean"
+    )
 
     miss.xyz = c(missing(xdat), missing(ydat), missing(zdat))
     
@@ -810,8 +814,7 @@
             plot.args$ylim <- panel.ylim
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- paste(if (gradients) paste("Gradient Component ", i, " of", sep = "") else "",
-                                  gen.label(bws$ynames, "Conditional Mean"))
+          plot.args$ylab <- scalar_default(ylab, response.axis.label)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
             plot.args$lty <- scalar_default(lty, par()$lty)
@@ -1097,8 +1100,7 @@
                 max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- paste(if (gradients) paste("Gradient Component ", i, " of", sep = "") else "",
-                                  gen.label(bws$ynames, "Conditional Mean"))
+          plot.args$ylab <- scalar_default(ylab, response.axis.label)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
             plot.args$lty <- scalar_default(lty, par()$lty)
@@ -1284,8 +1286,7 @@
           plot.args$ylim <- c(y.min, y.max)
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- paste(if (gradients) paste("Gradient Component ", i, " of", sep = "") else "",
-                                  gen.label(bws$ynames, "Conditional Mean"))
+          plot.args$ylab <- scalar_default(ylab, response.axis.label)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
             plot.args$lty <- scalar_default(lty, par()$lty)

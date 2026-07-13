@@ -204,6 +204,15 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
     also the local marginal-effect ratio relative to \eqn{X_1}. Choose
     the first continuous regressor deliberately when coefficient
     interpretation is important.
+
+    For \eqn{E[Y\mid X]=g(X^\prime\beta)}, the component plotted for
+    predictor \eqn{X_j} is
+    \deqn{\frac{\partial E[Y\mid X]}{\partial X_j}
+      = \beta_j g'(X^\prime\beta)}{d E[Y|X] / d X_j = beta_j g'(X' beta).}
+    Accordingly, \code{plot(..., gradients=TRUE)} displays every component
+    against the common scalar index \eqn{X^\prime\beta}; the y-axis identifies
+    the predictor with respect to which the derivative is taken. These panels
+    are not partial-dependence plots against the individual \eqn{X_j} values.
   }
 
   \subsection{Optimizer Choice When Bandwidths Are Computed}{

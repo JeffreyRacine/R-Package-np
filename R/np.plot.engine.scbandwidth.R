@@ -99,6 +99,21 @@
     if (!is.finite(coef.index) || is.na(coef.index) || coef.index < 1L)
       coef.index <- 1L
     gradient.index <- coef.index
+    response.axis.label <- .np_plot_resolve_axis_label(
+      bws$ynames,
+      "Conditional Mean"
+    )
+    default.value.ylab <- if (coef) {
+      paste("Coefficient", min(coef.index, bws$xndim))
+    } else if (gradients) {
+      .np_plot_gradient_axis_label(
+        target = response.axis.label,
+        predictor = bws$xnames[gradient.index],
+        predictor.fallback = paste0("X", gradient.index)
+      )
+    } else {
+      response.axis.label
+    }
     extract_scoef_value <- function(obj) {
       if (gradients)
         return(.np_scoef_bootstrap_target(
@@ -848,7 +863,7 @@
             plot.args$ylim <- panel.ylim
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- if (coef) paste("Coefficient", min(coef.index, bws$xndim)) else gen.label(bws$ynames, "Conditional Mean")
+          plot.args$ylab <- scalar_default(ylab, default.value.ylab)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
             plot.args$lty <- scalar_default(lty, par()$lty)
@@ -1159,7 +1174,7 @@
               plot.args$ylim <- panel.ylim
             plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                         paste(toupper(xOrZ), i, sep = ""))
-            plot.args$ylab <- if (coef) paste("Coefficient", min(coef.index, bws$xndim)) else gen.label(bws$ynames, "Conditional Mean")
+            plot.args$ylab <- scalar_default(ylab, default.value.ylab)
             if (!xi.factor) {
               plot.args$type <- scalar_default(type, "l")
               plot.args$lty <- scalar_default(lty, par()$lty)
@@ -1424,7 +1439,7 @@
           plot.args$ylim <- c(y.min, y.max)
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- if (coef) paste("Coefficient", min(coef.index, bws$xndim)) else gen.label(bws$ynames, "Conditional Mean")
+          plot.args$ylab <- scalar_default(ylab, default.value.ylab)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
             plot.args$lty <- scalar_default(lty, par()$lty)

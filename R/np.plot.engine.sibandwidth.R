@@ -122,6 +122,12 @@
 
     scalar_default <- .np_plot_scalar_default
 
+    index.axis.label <- "Index, X' beta"
+    response.axis.label <- .np_plot_resolve_axis_label(
+      bws$ynames,
+      "Conditional Mean"
+    )
+
     plot.legend <- if (!is.null(dots$legend)) dots$legend else TRUE
     plot.user.args <- .np_plot_user_args(dots, "plot")
     points.user.args <- .np_plot_user_args(dots, "points")
@@ -314,8 +320,8 @@
                             cex.lab =  scalar_default(cex.lab, par()$cex.lab),
                             cex.main = scalar_default(cex.main, par()$cex.main),
                             cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                            xlab = scalar_default(xlab, "index"),
-                            ylab = scalar_default(ylab, gen.label(bws$ynames, "Conditional Mean")),
+                            xlab = scalar_default(xlab, index.axis.label),
+                            ylab = scalar_default(ylab, response.axis.label),
                             type = scalar_default(type, "l"),
                             lty = scalar_default(lty, par()$lty),
                             col = scalar_default(col, par()$col),
@@ -378,8 +384,8 @@
                             cex.lab =  scalar_default(cex.lab, par()$cex.lab),
                             cex.main = scalar_default(cex.main, par()$cex.main),
                             cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                            xlab = scalar_default(xlab, "Index"),
-                            ylab = scalar_default(ylab, gen.label(bws$ynames, "Conditional Mean")),
+                            xlab = scalar_default(xlab, index.axis.label),
+                            ylab = scalar_default(ylab, response.axis.label),
                             type = scalar_default(type, "l"),
                             lty = scalar_default(lty, par()$lty),
                             col = scalar_default(col, par()$col),
@@ -469,8 +475,15 @@
                               cex.lab =  scalar_default(cex.lab, par()$cex.lab),
                               cex.main = scalar_default(cex.main, par()$cex.main),
                               cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                              xlab = scalar_default(xlab, "index"),
-                              ylab = paste("Gradient Component", i, "of", gen.label(bws$ynames, "Conditional Mean")),
+                              xlab = scalar_default(xlab, index.axis.label),
+                              ylab = scalar_default(
+                                ylab,
+                                .np_plot_gradient_axis_label(
+                                  target = response.axis.label,
+                                  predictor = bws$xnames[i],
+                                  predictor.fallback = paste0("X", i)
+                                )
+                              ),
                               lty = scalar_default(lty, par()$lty),
                               col = scalar_default(col, par()$col),
                               type = scalar_default(type, "l"),
