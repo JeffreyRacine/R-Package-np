@@ -1,5 +1,6 @@
-test_that("plot coef option: npscoef supports coef=TRUE in data mode", {
+test_that("plot coef option: npscoef supports coef=TRUE in plot-data mode", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  withr::local_pdf(NULL)
 
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
@@ -31,6 +32,7 @@ test_that("plot coef option: npscoef supports coef=TRUE in data mode", {
 
 test_that("plot coef option: npplreg supports coef=TRUE plot-data payload", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  withr::local_pdf(NULL)
 
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)

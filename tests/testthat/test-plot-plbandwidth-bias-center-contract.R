@@ -62,14 +62,9 @@ test_that("partially linear bias-corrected plot renders continuous and factor pa
     nmulti = 1L
   )
 
-  pdf.file <- tempfile(fileext = ".pdf")
-  grDevices::pdf(pdf.file)
-  on.exit(grDevices::dev.off(), add = TRUE)
-
-  options(plot.par.mfrow = FALSE)
-  old.par <- graphics::par(no.readonly = TRUE)
-  on.exit(graphics::par(old.par), add = TRUE)
-  graphics::par(mfrow = c(2L, 2L))
+  withr::local_pdf(NULL)
+  withr::local_options(list(plot.par.mfrow = FALSE))
+  withr::local_par(list(mfrow = c(2L, 2L)))
 
   expect_error(
     suppressWarnings(plot(
