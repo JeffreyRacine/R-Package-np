@@ -1,18 +1,42 @@
-# Issue #44: Bvcov in npindex.sibandwidth
+# Issue #44: `Bvcov` in `npindex.sibandwidth`
 
-**Status:** Open (no code change retained)
+**Status:** Resolved for 0.70-5
 
-## Notes
-A proposed change to multiplication order was tested but caused instability in `npindex(..., gradients=TRUE)` (chol failure). Reverted to baseline pending co‑author review and deeper theoretical check.
+## Defect
 
-## Canonical Implementation Directive (2026-03-05)
+For an Ichimura model with more than one free index coefficient, the previous
+expressions multiplied an observation-length vector directly by an
+`r`-by-`n` score matrix. R's column-major recycling therefore applied
+link-gradient and residual weights to the wrong score elements when `r > 1`.
+The special case `r = 1` was already correct.
 
-This repository follows a strict canonical execution rule:
+## Resolution
 
-1. One canonical implementation per method (outside explicit `np.tree` branching).
-2. Unsupported configurations must fail fast with explicit `stop(...)` diagnostics.
-3. No silent remap/coercion of user-selected options (for example `bwmethod`, `regtype`, kernels, `cv.iterate`, or bounds transforms).
-4. No hidden alternate execution paths for the same method semantics.
-5. All fit-defining options (for example `degree`, `basis`, `bernstein.basis`, kernels, and bounds) must be propagated and used by the canonical path.
-6. `np.tree=FALSE` is the default; when `np.tree=TRUE`, behavior must remain semantics-preserving and option-compatible with the canonical path.
-7. Remove or reject legacy/debug compatibility branches that add redundant runtime overhead once canonical behavior exists.
+For observation `i`, let `z_i` be the conditionally centered free-predictor
+vector, `g_i` the link gradient, and `u_i` the residual. The implementation now
+constructs score column `s_i = g_i z_i` and uses
+
+- `A = sum_i s_i s_i'`;
+- `B = sum_i u_i^2 s_i s_i'`;
+- `A^-1 B A^-1` for the free-coefficient covariance.
+
+The gradient and residual vectors are applied observation by observation with
+column-wise `sweep()`. The existing matrix multiplication and direct Cholesky
+contract are retained. No ridge, generalized inverse, silent fallback,
+training-data retention, optimizer change, or public default was introduced.
+
+## Validation
+
+- the two-predictor case is bit-for-bit unchanged;
+- installed three-, four-, and fifteen-predictor fits match an independent
+  literal observation-loop oracle;
+- beta, bandwidth, objective, function-evaluation count, fitted values,
+  residuals, and gradients are exactly unchanged;
+- the fifteen-predictor information matrix remains full rank in the retained
+  provenance example;
+- deliberately rank-deficient information matrices continue to fail Cholesky
+  rather than being masked;
+- `npRmpi` is exactly equivalent to `np` with one and three slaves and changes
+  no MPI payload.
+
+The GitHub issue closeout records the exact resolving commit hashes.
