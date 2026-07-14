@@ -364,6 +364,8 @@ test_that("session npplreg plain fixed lc plot-data completes locally", {
       "tz <- data.frame(x=x)",
       "bw.fix <- npplregbw(xdat=tx, zdat=tz, ydat=y, regtype='lc', bwmethod='cv.ls', bwtype='fixed', nmulti=1)",
       "bw.ann <- npplregbw(xdat=tx, zdat=tz, ydat=y, regtype='lc', bwmethod='cv.ls', bwtype='adaptive_nn', nmulti=1)",
+      "grDevices::pdf(NULL)",
+      "on.exit(grDevices::dev.off(), add=TRUE)",
       "data.out <- suppressWarnings(plot(bw.fix, xdat=tx, ydat=y, zdat=tz, output = 'data', perspective=FALSE, errors='none'))",
       "plot.out <- suppressWarnings(plot(bw.fix, xdat=tx, ydat=y, zdat=tz, output = 'plot-data', perspective=FALSE, errors='none'))",
       "ann.out <- suppressWarnings(plot(bw.ann, xdat=tx, ydat=y, zdat=tz, output = 'data', perspective=FALSE, errors='none'))",
