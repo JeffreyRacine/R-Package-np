@@ -1,5 +1,14 @@
 Changes from Version 0.70-4 to 0.70-5 [12-Jul-2026]
 
+* Corrected the heteroskedasticity-robust Ichimura index-coefficient
+  covariance returned by `vcov(npindex(..., gradients = TRUE))` when the model
+  has more than one free index coefficient. The link-gradient and residual
+  weights are now applied to the centered predictor score observation by
+  observation, matching the published covariance construction. Fits with one
+  free coefficient remain exactly unchanged, as do beta, bandwidth,
+  objective, function-evaluation, fitted-value, residual, and gradient
+  results.
+
 * Repaired finite-support bounded continuous-kernel normalization for all
   supported Gaussian, Epanechnikov, uniform, and truncated-Gaussian kernels.
   The centered normalization avoids tail cancellation, uses the platform C99

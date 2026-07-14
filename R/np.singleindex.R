@@ -763,7 +763,7 @@ npindex.sibandwidth <-
     if (bws$method == "ichimura" && gradients) {
 
       ## First row & column of covariance matrix `Bvcov' are zero due
-      ## to identification condition that beta_1=0. Note the n n^{-1}
+      ## to identification condition that beta_1=1. Note the n n^{-1}
       ## n in V^{-1}\Sigma V^{-1} and the \sqrt{n} in the
       ## normalization of \hat\beta will cancel.
 
@@ -804,20 +804,19 @@ npindex.sibandwidth <-
 
       ## Need to trap case where k-1=1..., sapply will return a
       ## vector, need a 1 x n matrix
-
-      ## Need to trap case where k-1=1..., sapply will return a
-      ## vector, need a 1 x n matrix
       if(is.vector(xmex)) {
-        dg.db.xmex <- matrix(index.tgrad[,1]*xmex,nrow=1,ncol=length(xmex))
-      } else {
-        dg.db.xmex <- index.tgrad[,1]*xmex
+        xmex <- matrix(xmex,nrow=1,ncol=length(xmex))
       }
+
+      dg.db.xmex <- sweep(xmex, 2L, index.tgrad[,1L], `*`)
 
       uhat <- tydat - index.tmean ## Training y and training mean
 
       Vinv <- chol2inv(chol(dg.db.xmex%*%t(dg.db.xmex)))
 
-      Sigma <- (uhat*dg.db.xmex)%*%t(uhat*dg.db.xmex)
+      weighted.score <- sweep(dg.db.xmex, 2L, uhat, `*`)
+
+      Sigma <- weighted.score%*%t(weighted.score)
 
       Bvcov[-1,-1] <- Vinv %*% Sigma %*% Vinv
 
@@ -833,7 +832,7 @@ npindex.sibandwidth <-
       dg.db <- txdat[,-1,drop=FALSE]*index.tgrad[,1]
 
       ## First row & column of covariance matrix are zero due to
-      ## identification condition that beta_1=0. Note the n^{-1} in
+      ## identification condition that beta_1=1. Note the n^{-1} in
       ## the E and the \sqrt{n} in the normalization of \hat\beta will
       ## cancel.
 
