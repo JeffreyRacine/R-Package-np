@@ -550,6 +550,7 @@ test_that("plot contract: default condensity plot call stays scalar-safe", {
 
 test_that("plot contract: npscoef supports coef=TRUE plot path", {
   skip_if_not_installed("np")
+  withr::local_pdf(NULL)
 
   set.seed(105)
   n <- 60
@@ -578,6 +579,7 @@ test_that("plot contract: npscoef supports coef=TRUE plot path", {
 
 test_that("plot contract: npplreg supports coef=TRUE plot-data payload", {
   skip_if_not_installed("np")
+  withr::local_pdf(NULL)
 
   set.seed(106)
   n <- 80

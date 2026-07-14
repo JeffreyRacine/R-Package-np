@@ -48,14 +48,9 @@ test_that("smooth coefficient bias-corrected plot renders center legend", {
     bws = 2
   )
 
-  pdf.file <- tempfile(fileext = ".pdf")
-  grDevices::pdf(pdf.file)
-  on.exit(grDevices::dev.off(), add = TRUE)
-
-  options(plot.par.mfrow = FALSE)
-  old.par <- graphics::par(no.readonly = TRUE)
-  on.exit(graphics::par(old.par), add = TRUE)
-  graphics::par(mfrow = c(1L, 2L))
+  withr::local_pdf(NULL)
+  withr::local_options(list(plot.par.mfrow = FALSE))
+  withr::local_par(list(mfrow = c(1L, 2L)))
 
   expect_error(
     suppressWarnings(plot(
