@@ -1,5 +1,14 @@
 # np 0.70-6
 
+* Restored partial mixed-degree local-polynomial gradient evaluation and
+  plotting across regression, conditional density/distribution, least-squares
+  quantile regression, conditional quantiles, and conditional modes. A
+  continuous derivative requested above that coordinate's fitted degree is
+  retained as `NA` and shown as an empty panel while other supported
+  derivatives and categorical first-difference effects continue to plot.
+  Requests with no available component now fail early with the affected
+  predictor orders and degrees and actionable refitting guidance.
+
 # np 0.70-5
 
 * Corrected the heteroskedasticity-robust Ichimura index-coefficient

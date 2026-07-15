@@ -53,9 +53,6 @@ npreg <-
   grad <- matrix(NA_real_, nrow = nrow.eval, ncol = ncol.x)
   cont.idx <- which(bws$icon)
 
-  if (!length(cont.idx) || !any(available))
-    return(grad)
-
   for (jj in which(available)) {
     svec <- integer(bws$ncon)
     svec[jj] <- as.integer(gradient.order[jj])
@@ -70,6 +67,28 @@ npreg <-
       hat.args$exdat <- exdat
 
     grad[, cont.idx[jj]] <- as.vector(do.call(npreghat, hat.args))
+  }
+
+  cat.idx <- which(bws$iuno | bws$iord)
+  if (length(cat.idx)) {
+    evaldat <- if (is.null(exdat)) txdat else exdat
+    for (jj in cat.idx) {
+      frames <- npCategoricalFirstDifferenceFrames(
+        exdat = evaldat,
+        index = jj,
+        where = "npreg"
+      )
+      eval.hat <- function(z) {
+        as.vector(npreghat(
+          bws = bws,
+          txdat = txdat,
+          exdat = z,
+          y = tydat,
+          output = "apply"
+        ))
+      }
+      grad[, jj] <- eval.hat(frames$upper) - eval.hat(frames$lower)
+    }
   }
 
   grad
@@ -318,9 +337,15 @@ npreg.rbandwidth <-
         gradient.order = glp.gradient.order,
         ncon = bws$ncon
       )
-      if (!any(glp.gradient.available)) {
-        stop("npreg has no available derivative components for the requested gradient.order and fitted polynomial degree",
-             call. = FALSE)
+      if (!any(glp.gradient.available) && (bws$nuno + bws$nord == 0L)) {
+        npStopGlpGradientNoneAvailable(
+          where = "npreg",
+          action = "compute",
+          degree.engine = reg.spec$degree.engine,
+          gradient.order = glp.gradient.order,
+          available = glp.gradient.available,
+          con.names = names(txdat)[bws$icon]
+        )
       }
       glp.gradient.partial <- !lp.degree0.lc.gradient &&
         any(!glp.gradient.available)
@@ -337,9 +362,10 @@ npreg.rbandwidth <-
     }
     if (isTRUE(gradients) &&
         identical(reg.spec$regtype.engine, "lp") &&
-        (bws$ncon > 0L) &&
-        !lp.degree0.lc.gradient &&
-        all(reg.spec$degree.engine == 0L)) {
+      (bws$ncon > 0L) &&
+      !lp.degree0.lc.gradient &&
+      all(reg.spec$degree.engine == 0L) &&
+      (bws$nuno + bws$nord == 0L)) {
       stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
     }
     if (isTRUE(gradients) &&

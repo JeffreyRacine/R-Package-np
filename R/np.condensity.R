@@ -278,9 +278,15 @@ npcdens.conbandwidth <- function(bws,
       gradient.order = glp.gradient.order,
       ncon = bws$xncon
     )
-    if (!any(glp.gradient.available)) {
-      stop("npcdens has no available derivative components for the requested gradient.order and fitted polynomial degree",
-           call. = FALSE)
+    if (!any(glp.gradient.available) && (bws$xnuno + bws$xnord == 0L)) {
+      npStopGlpGradientNoneAvailable(
+        where = "npcdens",
+        action = "compute",
+        degree.engine = degree.engine,
+        gradient.order = glp.gradient.order,
+        available = glp.gradient.available,
+        con.names = colnames(txdat)[bws$ixcon]
+      )
     }
     glp.gradient.partial <- !lp.degree0.lc.gradient &&
       any(!glp.gradient.available)
@@ -298,7 +304,8 @@ npcdens.conbandwidth <- function(bws,
       identical(reg.engine, "lp") &&
       (bws$xncon > 0L) &&
       !lp.degree0.lc.gradient &&
-      all(degree.engine == 0L)) {
+      all(degree.engine == 0L) &&
+      (bws$xnuno + bws$xnord == 0L)) {
     stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
   }
   if (isTRUE(gradients) &&
@@ -452,6 +459,19 @@ npcdens.conbandwidth <- function(bws,
           myout$congerr[, cont.idx[jj]] <- NA_real_
         }
       }
+    }
+    if (glp.gradient.partial && (bws$xnuno + bws$xnord > 0L)) {
+      cat.grad <- npConditionalCategoricalFirstDifferences(
+        hat.fun = npcdenshat,
+        bws = bws,
+        txdat = proper.slice.context$txdat,
+        tydat = proper.slice.context$tydat,
+        exdat = proper.slice.context$exdat,
+        eydat = proper.slice.context$eydat,
+        where = "npcdens"
+      )
+      cat.idx <- which(bws$ixuno | bws$ixord)
+      myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
     }
   } else {
     myout$congrad = NA

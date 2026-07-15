@@ -56,6 +56,45 @@
            ...,
            random.seed){
 
+    plot.gradient.available <- rep.int(TRUE, bws$xndim)
+    if (isTRUE(gradients)) {
+      reg.spec <- npConditionalRegEngineSpec(bws, where = "plot.conbandwidth()")
+      if (identical(reg.spec$reg.engine, "lp") && bws$xncon > 0L) {
+        gradient.order <- npConditionalGradientOrder(
+          bws = bws,
+          reg.engine = reg.spec$reg.engine,
+          gradient.order = gradient.order,
+          where = "plot.conbandwidth()"
+        )
+        available <- npGlpGradientAvailability(
+          regtype.engine = reg.spec$reg.engine,
+          degree.engine = reg.spec$degree.engine,
+          gradient.order = gradient.order,
+          ncon = bws$xncon
+        )
+        plot.gradient.available[which(bws$ixcon)] <- available
+        if (!any(plot.gradient.available)) {
+          npStopGlpGradientNoneAvailable(
+            where = "plot.conbandwidth()",
+            action = "plot",
+            degree.engine = reg.spec$degree.engine,
+            gradient.order = gradient.order,
+            available = available,
+            con.names = bws$xnames[bws$ixcon]
+          )
+        }
+        if (any(!available)) {
+          npWarnGlpGradientPartialAvailability(
+            where = "plot.conbandwidth()",
+            degree.engine = reg.spec$degree.engine,
+            gradient.order = gradient.order,
+            available = available,
+            con.names = bws$xnames[bws$ixcon]
+          )
+        }
+      }
+    }
+
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
     on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
@@ -703,11 +742,13 @@
         }
 
         for (j in seq_len(dsf)){
+          component.available <- !isTRUE(gradients) || plot.gradient.available[j]
+          temp.err[,] <- NA_real_
           temp.boot = list()
           temp.all.err <- NULL
           temp.dens[seq_len(xi.neval)] <- eval.extract(tobj, j)
           
-          if (plot.errors){
+          if (plot.errors && component.available){
             if (plot.errors.method == "asymptotic") {
               terr.j <- err.extract(tobj, j)
               asym.obj <- .np_plot_asymptotic_error_from_se(
@@ -782,14 +823,21 @@
             }
             if (!(xi.factor && plot.bootstrap && plot.bxp))
               plot.args$y <- temp.dens
-            if (plot.errors)
-              plot.args$ylim <- .np_plot_panel_error_range(
+            panel.ylim <- if (plot.errors) {
+              .np_plot_panel_error_range(
                 estimate = temp.dens,
                 err = temp.err,
                 all.err = temp.all.err,
                 plot.errors.type = plot.errors.type,
                 plotOnEstimate = plotOnEstimate
               )
+            } else {
+              range(temp.dens, finite = TRUE)
+            }
+            if (!all(is.finite(panel.ylim)))
+              panel.ylim <- c(-1, 1)
+            panel.ylim <- .np_plot_resolve_requested_ylim(panel.ylim, ylim)
+            plot.args$ylim <- panel.ylim
             plot.args$xlab <- scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = "")))
             plot.args$ylab <- scalar_default(ylab, if (gradients) conditional_gradient_axis_label(j) else tylabE)
             if (!xi.factor) {
@@ -817,7 +865,8 @@
               .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
             ## error plotting evaluation
-            if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
+            if (plot.errors && component.available &&
+                !(xi.factor && plot.bootstrap && plot.bxp)){
               if (plot.errors.type == "all") {
                 draw.all.error.types(
                   ex = as.numeric(ei),
@@ -864,7 +913,12 @@
             err.name <- if (gradients) paste("gc", j, "err", sep = "") else if (quantreg) "quanterr" else "conderr"
             bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
             corrected.name <- if (gradients) paste("gc", j, "bias.corrected", sep = "") else "bias.corrected"
-            plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))
+            plot.out[[plot.index]][[err.name]] <- if (component.available) {
+              na.omit(cbind(-temp.err[, 1], temp.err[, 2]))
+            } else {
+              cbind(-temp.err[seq_len(xi.neval), 1],
+                    temp.err[seq_len(xi.neval), 2])
+            }
             plot.out[[plot.index]] <- .np_plot_add_named_bias_fields(
               plot.out[[plot.index]],
               estimate = temp.dens,
@@ -954,11 +1008,13 @@
           }
 
           for (j in seq_len(dsf)){
+            component.available <- !isTRUE(gradients) || plot.gradient.available[j]
+            temp.err[,] <- NA_real_
             temp.boot = list()
             temp.all.err <- NULL
             temp.dens[seq_len(xi.neval)] <- eval.extract(tobj, j)
             
-            if (plot.errors){
+            if (plot.errors && component.available){
               if (plot.errors.method == "asymptotic") {
                 terr.j <- err.extract(tobj, j)
                 asym.obj <- .np_plot_asymptotic_error_from_se(
@@ -1036,14 +1092,21 @@
               }
               if (!(xi.factor && plot.bootstrap && plot.bxp))
                 plot.args$y <- temp.dens
-              if (plot.errors)
-                plot.args$ylim <- .np_plot_panel_error_range(
+              panel.ylim <- if (plot.errors) {
+                .np_plot_panel_error_range(
                   estimate = temp.dens,
                   err = temp.err,
                   all.err = temp.all.err,
                   plot.errors.type = plot.errors.type,
                   plotOnEstimate = plotOnEstimate
                 )
+              } else {
+                range(temp.dens, finite = TRUE)
+              }
+              if (!all(is.finite(panel.ylim)))
+                panel.ylim <- c(-1, 1)
+              panel.ylim <- .np_plot_resolve_requested_ylim(panel.ylim, ylim)
+              plot.args$ylim <- panel.ylim
               plot.args$xlab <- scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = "")))
               plot.args$ylab <- scalar_default(ylab, if (gradients) conditional_gradient_axis_label(j) else tylabE)
               if (!xi.factor) {
@@ -1071,7 +1134,8 @@
                 .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
               ## error plotting evaluation
-              if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
+              if (plot.errors && component.available &&
+                  !(xi.factor && plot.bootstrap && plot.bxp)){
                 if (plot.errors.type == "all") {
                   draw.all.error.types(
                     ex = as.numeric(ei),
@@ -1118,7 +1182,12 @@
               err.name <- if (gradients) paste("gc", j, "err", sep = "") else if (quantreg) "quanterr" else "conderr"
               bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
               corrected.name <- if (gradients) paste("gc", j, "bias.corrected", sep = "") else "bias.corrected"
-              plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))
+              plot.out[[plot.index]][[err.name]] <- if (component.available) {
+                na.omit(cbind(-temp.err[, 1], temp.err[, 2]))
+              } else {
+                cbind(-temp.err[seq_len(xi.neval), 1],
+                      temp.err[seq_len(xi.neval), 2])
+              }
               plot.out[[plot.index]] <- .np_plot_add_named_bias_fields(
                 plot.out[[plot.index]],
                 estimate = temp.dens,

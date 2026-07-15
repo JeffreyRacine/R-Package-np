@@ -8056,6 +8056,7 @@ plotFactor <- function(f, y, ...){
     plotOnEstimate = plotOnEstimate,
     plot.errors.type = plot.errors.type
   )
+  has.finite.value <- any(is.finite(value))
   y.range <- range(value, finite = TRUE)
   if (!is.null(error.ylim))
     y.range <- range(y.range, error.ylim, finite = TRUE)
@@ -8064,6 +8065,8 @@ plotFactor <- function(f, y, ...){
     y.range <- .np_plot_overlay_range(y.range, overlay.y)
   if (!is.null(ylim))
     y.range <- ylim
+  if (!all(is.finite(y.range)))
+    y.range <- c(-1, 1)
 
   plot.args <- list(
     xlab = xlab.value,
@@ -8112,6 +8115,9 @@ plotFactor <- function(f, y, ...){
     if (xi.factor)
       graphics::axis(1, at = mat.x, labels = as.character(ei[seq_len(nkeep)]))
   }
+
+  if (!has.finite.value)
+    return(invisible(NULL))
 
   .np_plot_draw_multi_tau_errors(
     ei = ei,
@@ -9377,7 +9383,33 @@ plotFactor <- function(f, y, ...){
       gradient.order = glp.gradient.order,
       ncon = bws$xncon
     )
-  if (isTRUE(gradients) && identical(reg.engine, "lp")) {
+  glp.gradient.available <- NULL
+  glp.gradient.partial <- FALSE
+  if (isTRUE(gradients) &&
+      identical(reg.engine, "lp") &&
+      bws$xncon > 0L) {
+    glp.gradient.available <- npGlpGradientAvailability(
+      regtype.engine = reg.engine,
+      degree.engine = degree.engine,
+      gradient.order = glp.gradient.order,
+      ncon = bws$xncon
+    )
+    if (!any(glp.gradient.available) && (bws$xnuno + bws$xnord == 0L)) {
+      npStopGlpGradientNoneAvailable(
+        where = "plot conditional",
+        action = "compute",
+        degree.engine = degree.engine,
+        gradient.order = glp.gradient.order,
+        available = glp.gradient.available,
+        con.names = bws$xnames[bws$ixcon]
+      )
+    }
+    glp.gradient.partial <- !lp.degree0.lc.gradient &&
+      any(!glp.gradient.available)
+  }
+  if (isTRUE(gradients) &&
+      identical(reg.engine, "lp") &&
+      !glp.gradient.partial) {
     npValidateGlpGradientDegree(
       regtype.engine = reg.engine,
       degree.engine = degree.engine,
@@ -9399,6 +9431,7 @@ plotFactor <- function(f, y, ...){
     integer(0)
   }
   basis.code <- as.integer(npLpBasisCode(basis.engine))
+  do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
 
   myopti <- list(
     num_obs_train = tnrow,
@@ -9447,7 +9480,7 @@ plotFactor <- function(f, y, ...){
     num_xord = bws$xnord,
     num_xcon = bws$xncon,
     no.exy = FALSE,
-    gradients = gradients,
+    gradients = do.compiled.gradients,
     ymcv.numRow = attr(bws$ymcv, "num.row"),
     xmcv.numRow = attr(bws$xmcv, "num.row"),
     densOrDist = if (isTRUE(cdf)) NP_DO_DIST else NP_DO_DENS,
@@ -9492,7 +9525,7 @@ plotFactor <- function(f, y, ...){
   if (isTRUE(cdf))
     names(myout)[1L] <- "condist"
 
-  if (isTRUE(gradients)) {
+  if (isTRUE(gradients) && !glp.gradient.partial) {
     xidx <- seq_len(bws$xndim)
     rorder <- numeric(bws$xndim)
     rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
@@ -9523,6 +9556,41 @@ plotFactor <- function(f, y, ...){
           myout$congerr[, cont.idx[jj]] <- NA_real_
         }
       }
+    }
+  } else if (isTRUE(gradients)) {
+    myout$congrad <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
+    myout$congerr <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
+    cont.idx <- which(bws$ixcon)
+    if (any(glp.gradient.available)) {
+      rhs <- rep.int(1.0, nrow(hat.context$xdat))
+      hat.fun <- if (isTRUE(cdf)) npcdisthat else npcdenshat
+      for (jj in which(glp.gradient.available)) {
+        svec <- integer(bws$xncon)
+        svec[jj] <- glp.gradient.order[jj]
+        myout$congrad[, cont.idx[jj]] <- as.vector(hat.fun(
+          bws = bws,
+          txdat = hat.context$xdat,
+          tydat = hat.context$ydat,
+          exdat = hat.context$exdat,
+          eydat = hat.context$eydat,
+          y = rhs,
+          output = "apply",
+          s = svec
+        ))
+      }
+    }
+    if (bws$xnuno + bws$xnord > 0L) {
+      cat.grad <- npConditionalCategoricalFirstDifferences(
+        hat.fun = if (isTRUE(cdf)) npcdisthat else npcdenshat,
+        bws = bws,
+        txdat = hat.context$xdat,
+        tydat = hat.context$ydat,
+        exdat = hat.context$exdat,
+        eydat = hat.context$eydat,
+        where = "plot conditional"
+      )
+      cat.idx <- which(bws$ixuno | bws$ixord)
+      myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
     }
   } else {
     myout$congrad <- NA

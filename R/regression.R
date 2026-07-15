@@ -145,9 +145,15 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
     ncon = x$bws$ncon,
     where = "gradients.npregression"
   )
-  if (!any(available)) {
-    stop("gradients.npregression has no available derivative components for the requested gradient.order and fitted polynomial degree",
-         call. = FALSE)
+  if (!any(available) && (x$bws$nuno + x$bws$nord == 0L)) {
+    npStopGlpGradientNoneAvailable(
+      where = "gradients.npregression",
+      action = "return",
+      degree.engine = x$bws$degree,
+      gradient.order = gorder,
+      available = available,
+      con.names = x$bws$xnames[x$bws$icon]
+    )
   }
   if (any(!available)) {
     npWarnGlpGradientPartialAvailability(
@@ -167,14 +173,11 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
   }
 
   gout.masked <- gout
-  gout.masked[,] <- NA_real_
   cont.idx <- which(x$bws$icon)
   if (length(cont.idx)) {
-    keep.cont <- available
-    if (any(keep.cont)) {
-      keep.idx <- cont.idx[keep.cont]
-      gout.masked[, keep.idx] <- gout[, keep.idx, drop = FALSE]
-    }
+    drop.idx <- cont.idx[!available]
+    if (length(drop.idx))
+      gout.masked[, drop.idx] <- NA_real_
   }
   gout.masked
 }

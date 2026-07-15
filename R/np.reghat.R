@@ -905,9 +905,15 @@ npreghat <-
       gradient.order = glp.gradient.order,
       ncon = bws$ncon
     )
-    if (!any(glp.gradient.available)) {
-      stop(".np_regression_direct has no available derivative components for the requested gradient.order and fitted polynomial degree",
-           call. = FALSE)
+    if (!any(glp.gradient.available) && (bws$nuno + bws$nord == 0L)) {
+      npStopGlpGradientNoneAvailable(
+        where = ".np_regression_direct",
+        action = "compute",
+        degree.engine = reg.spec$degree.engine,
+        gradient.order = glp.gradient.order,
+        available = glp.gradient.available,
+        con.names = bws$xnames[bws$icon]
+      )
     }
     glp.gradient.partial <- !lp.degree0.lc.gradient &&
       any(!glp.gradient.available)
@@ -916,7 +922,8 @@ npreghat <-
       identical(reg.spec$regtype.engine, "lp") &&
       (bws$ncon > 0L) &&
       !lp.degree0.lc.gradient &&
-      all(reg.spec$degree.engine == 0L)) {
+      all(reg.spec$degree.engine == 0L) &&
+      (bws$nuno + bws$nord == 0L)) {
     stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
   }
   if (isTRUE(gradients) &&

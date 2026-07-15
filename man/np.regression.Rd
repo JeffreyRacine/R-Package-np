@@ -128,7 +128,8 @@ These arguments control where the regression is evaluated and which fitted quant
     integer (or integer vector with one entry per continuous predictor)
     specifying derivative order(s). Defaults to \code{1L}. Orders
     exceeding \code{degree} for a variable are returned as
-    \code{NA}. Higher-order derivatives are available for continuous
+    \code{NA}, apart from the established all-degree-zero first-derivative
+    compatibility route. Higher-order derivatives are available for continuous
     predictors when the requested order does not exceed the
     corresponding local-polynomial degree.
   }
@@ -143,6 +144,11 @@ These arguments control where the regression is evaluated and which fitted quant
     unordered predictors the gradient columns are first-order
     effects/contrasts where supported; \code{gradient.order} controls
     derivative order for continuous predictors.
+    Plotting retains one panel per requested predictor: an unavailable
+    continuous derivative is shown as an empty, correctly labelled panel when
+    another continuous derivative or categorical effect is available. A
+    request for which no component is available is rejected with the affected
+    orders and degrees reported.
   }
 
 

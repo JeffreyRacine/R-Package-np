@@ -134,8 +134,12 @@ These arguments control where the fitted conditional density is evaluated and wh
     be supplied per continuous explanatory variable. The default
     \code{1L} returns first derivatives. Higher orders are available
     for continuous explanatory variables only and must not exceed the
-    corresponding local-polynomial degree; unordered and ordered
-    predictors retain their usual first-order discrete effects.
+    corresponding local-polynomial degree, apart from the established
+    all-degree-zero first-derivative compatibility route. An unavailable continuous
+    component is returned as \code{NA}; plotting retains it as an empty panel
+    when another continuous derivative or categorical effect is available.
+    A request for which no component is available is rejected. Unordered and
+    ordered predictors retain their usual first-order discrete effects.
   }
 
 

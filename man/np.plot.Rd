@@ -105,6 +105,13 @@ Named options passed via \code{\dots} include:
         quantile-regression \code{nplsqreg} objects use the same
         coordinate-wise local-polynomial contract while preserving their
         existing \code{tau}-indexed output; no mixed partials are generated.
+        When a requested continuous derivative order exceeds that
+        coordinate's fitted degree, its values remain \code{NA} and its plot
+        panel remains present but empty if another derivative or categorical
+        effect is available. Plotting stops with an informative error only
+        when no requested component is available. Ordered and unordered
+        categorical panels remain first-order finite differences, denoted by
+        \eqn{\Delta} labels.
         For
         \code{npconmode} objects,
         \code{gradients=TRUE} plots stored class-probability gradients/effects

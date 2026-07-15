@@ -44,7 +44,11 @@ Optional local-polynomial derivative order controls.
     continuous predictor). For \code{npregression}, \code{condensity}, and
     \code{condistribution}, unavailable components whose order exceeds the
     fitted polynomial degree are returned as \code{NA} when another requested
-    continuous component remains available. For \code{lsqregression}, a
+    continuous component or categorical first-difference effect remains
+    available. Although the formal derivative of the fitted truncated
+    polynomial is zero above its degree, that zero is not an estimate of the
+    corresponding derivative of the unknown target; \code{NA} records that
+    the derivative was not estimated. For \code{lsqregression}, a
     supplied order must exactly identify the stored order; unavailable stored
     components remain \code{NA}, while any different requested order is
     rejected. If another derivative order is desired, compute the fit,

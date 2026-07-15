@@ -750,6 +750,86 @@ npGlpGradientUnavailableSummary <- function(degree.engine,
           as.integer(degree.engine)[bad])
 }
 
+npStopGlpGradientNoneAvailable <- function(where,
+                                           action = "provide",
+                                           degree.engine,
+                                           gradient.order,
+                                           available,
+                                           con.names = NULL) {
+  if (!length(available) || any(available)) {
+    stop(sprintf("%s received an invalid all-unavailable derivative condition", where),
+         call. = FALSE)
+  }
+
+  unavailable <- npGlpGradientUnavailableSummary(
+    degree.engine = degree.engine,
+    gradient.order = gradient.order,
+    available = available,
+    con.names = con.names
+  )
+  if (!length(unavailable)) {
+    stop(sprintf("%s received incoherent all-unavailable derivative metadata", where),
+         call. = FALSE)
+  }
+
+  stop(sprintf(
+    paste0(
+      "%s cannot %s the requested derivatives because no requested component ",
+      "is available (no available derivative components) at the fitted polynomial ",
+      "degrees: %s. Lower gradient.order ",
+      "for at least one continuous predictor or refit with sufficient polynomial degree."
+    ),
+    where,
+    action,
+    paste(unavailable, collapse = "; ")
+  ), call. = FALSE)
+}
+
+npCategoricalFirstDifferenceFrames <- function(exdat, index, where) {
+  exdat <- toFrame(exdat)
+  index <- as.integer(index)[1L]
+  if (is.na(index) || index < 1L || index > ncol(exdat)) {
+    stop(sprintf("%s received an invalid categorical coordinate", where),
+         call. = FALSE)
+  }
+
+  x <- exdat[[index]]
+  if (!is.factor(x)) {
+    stop(sprintf("%s received a non-categorical coordinate", where),
+         call. = FALSE)
+  }
+
+  lev <- levels(x)
+  if (!length(lev)) {
+    stop(sprintf("%s received a categorical coordinate without levels", where),
+         call. = FALSE)
+  }
+
+  code <- as.integer(x)
+  lower.code <- rep.int(1L, length(code))
+  upper.code <- code
+  if (is.ordered(x)) {
+    if (length(lev) < 2L) {
+      lower.code[] <- 1L
+      upper.code[] <- 1L
+    } else {
+      lower.code <- pmax.int(code - 1L, 1L)
+      first <- !is.na(code) & code == 1L
+      upper.code[first] <- 2L
+    }
+  }
+
+  lower <- upper <- exdat
+  lower[[index]] <- factor(
+    lev[lower.code], levels = lev, ordered = is.ordered(x)
+  )
+  upper[[index]] <- factor(
+    lev[upper.code], levels = lev, ordered = is.ordered(x)
+  )
+
+  list(lower = lower, upper = upper)
+}
+
 npWarnGlpGradientPartialAvailability <- function(where,
                                                  degree.engine,
                                                  gradient.order,

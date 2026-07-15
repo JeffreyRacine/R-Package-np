@@ -677,3 +677,44 @@
 
   H
 }
+npConditionalCategoricalFirstDifferences <- function(hat.fun,
+                                                      bws,
+                                                      txdat,
+                                                      tydat,
+                                                      exdat = NULL,
+                                                      eydat = NULL,
+                                                      where) {
+  if (!is.function(hat.fun))
+    stop(sprintf("%s received an invalid conditional hat evaluator", where),
+         call. = FALSE)
+
+  eval.x <- if (is.null(exdat)) txdat else exdat
+  eval.y <- if (is.null(eydat)) tydat else eydat
+  out <- matrix(NA_real_, nrow = nrow(eval.x), ncol = bws$xndim)
+  cat.idx <- which(bws$ixuno | bws$ixord)
+  if (!length(cat.idx))
+    return(out)
+
+  rhs <- rep.int(1.0, nrow(txdat))
+  eval.hat <- function(z) {
+    as.vector(hat.fun(
+      bws = bws,
+      txdat = txdat,
+      tydat = tydat,
+      exdat = z,
+      eydat = eval.y,
+      y = rhs,
+      output = "apply"
+    ))
+  }
+
+  for (jj in cat.idx) {
+    frames <- npCategoricalFirstDifferenceFrames(
+      exdat = eval.x,
+      index = jj,
+      where = where
+    )
+    out[, jj] <- eval.hat(frames$upper) - eval.hat(frames$lower)
+  }
+  out
+}
