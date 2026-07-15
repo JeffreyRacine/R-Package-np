@@ -176,10 +176,12 @@ selection, prediction, or plotting route.
   follow the corresponding mixed-data regression semantics. For a
   local-polynomial fit, \code{gradient.order} is applied coordinate by
   coordinate to continuous predictors. Availability follows \code{npreg}:
-  when at least one requested continuous derivative is available, components
-  whose order exceeds their fitted polynomial degree are returned as \code{NA}
-  with a warning; a request with no available continuous derivative component
-  is rejected. No mixed partials, Hessians, derivative tensors, or multiple
+  Apart from the established all-degree-zero first-derivative compatibility
+  route, components whose order exceeds their fitted polynomial degree are returned
+  as \code{NA} with a warning whenever another continuous derivative or
+  categorical first-difference effect is available; plots retain those
+  components as empty panels. A request with no available component is
+  rejected. No mixed partials, Hessians, derivative tensors, or multiple
   derivative orders are stored. With vector \code{tau}, the
   existing evaluation-by-coordinate-by-\code{tau} array layout is retained.
   The \code{\link{gradients}} method extracts exactly the stored order and

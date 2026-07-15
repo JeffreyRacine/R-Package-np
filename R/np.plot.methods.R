@@ -859,6 +859,10 @@ np_render_control <- function(style = c("band", "bar"),
   level.idx <- match(level, lev)
 
   if (isTRUE(gradients)) {
+    .np_plot_conmode_gradient_availability(
+      bws = object$bws,
+      where = "plot.conmode"
+    )
     values <- object$probability.gradients
     if (is.null(values))
       stop("class-probability gradients/effects are not available: fit with gradients=TRUE",
@@ -947,6 +951,42 @@ np_render_control <- function(style = c("band", "bar"),
   }
   names(out) <- xnames
   out
+}
+
+.np_plot_conmode_gradient_availability <- function(bws, where) {
+  available <- rep.int(TRUE, bws$xndim)
+  reg.spec <- npConditionalRegEngineSpec(bws, where = where)
+  if (!identical(reg.spec$reg.engine, "lp") || bws$xncon < 1L)
+    return(available)
+
+  order <- rep.int(1L, bws$xncon)
+  continuous.available <- npGlpGradientAvailability(
+    regtype.engine = reg.spec$reg.engine,
+    degree.engine = reg.spec$degree.engine,
+    gradient.order = order,
+    ncon = bws$xncon
+  )
+  available[which(bws$ixcon)] <- continuous.available
+  if (!any(available)) {
+    npStopGlpGradientNoneAvailable(
+      where = where,
+      action = "plot",
+      degree.engine = reg.spec$degree.engine,
+      gradient.order = order,
+      available = continuous.available,
+      con.names = bws$xnames[bws$ixcon]
+    )
+  }
+  if (any(!continuous.available)) {
+    npWarnGlpGradientPartialAvailability(
+      where = where,
+      degree.engine = reg.spec$degree.engine,
+      gradient.order = order,
+      available = continuous.available,
+      con.names = bws$xnames[bws$ixcon]
+    )
+  }
+  available
 }
 
 .np_plot_conmode_cast_like <- function(x, template) {
@@ -1412,6 +1452,14 @@ np_render_control <- function(style = c("band", "bar"),
   ixcon <- object$bws$ixcon
   if (is.null(ixcon) || length(ixcon) != p)
     ixcon <- vapply(xtrain, is.numeric, logical(1L))
+  gradient.available <- if (isTRUE(gradients)) {
+    .np_plot_conmode_gradient_availability(
+      bws = object$bws,
+      where = "plot.conmode"
+    )
+  } else {
+    rep.int(TRUE, p)
+  }
 
   for (j in seq_len(p)) {
     grid <- .np_plot_conmode_grid_values(xtrain[[j]], neval = neval,
@@ -1420,7 +1468,9 @@ np_render_control <- function(style = c("band", "bar"),
     exdat[[j]] <- .np_plot_conmode_cast_like(grid, xtrain[[j]])
 
     if (isTRUE(gradients)) {
-      if (isTRUE(ixcon[j])) {
+      if (!gradient.available[j]) {
+        vals <- rep.int(NA_real_, nrow(exdat))
+      } else if (isTRUE(ixcon[j])) {
         s <- integer(sum(ixcon))
         names(s) <- xnames[ixcon]
         s[xnames[j]] <- 1L
@@ -1435,7 +1485,23 @@ np_render_control <- function(style = c("band", "bar"),
           s = s
         )
       } else {
-        vals <- rep(0, nrow(exdat))
+        frames <- npCategoricalFirstDifferenceFrames(
+          exdat = exdat,
+          index = j,
+          where = "plot.conmode"
+        )
+        eval.level <- function(z) {
+          as.vector(npcdenshat(
+            bws = object$bws,
+            txdat = xtrain,
+            tydat = ytrain,
+            exdat = z,
+            eydat = .np_plot_conmode_level_factor(ytrain, level, nrow(z)),
+            y = rhs,
+            output = "apply"
+          ))
+        }
+        vals <- eval.level(frames$upper) - eval.level(frames$lower)
       }
       out[[j]] <- data.frame(
         variable = xnames[j],
@@ -1777,7 +1843,15 @@ np_render_control <- function(style = c("band", "bar"),
   if (is.null(xlab))
     xlab <- vname
   if (is.null(ylab))
-    ylab <- if (isTRUE(gradients)) "Effect" else "Probability"
+    ylab <- if (isTRUE(gradients)) {
+      .np_plot_gradient_axis_label(
+        target = paste0("Pr(Y=", level, "|X=x)"),
+        predictor = vname,
+        categorical = is.factor(x)
+      )
+    } else {
+      "Probability"
+    }
 
   fixed.grid <- identical(dat$view[1L], "fixed")
   if (is.factor(x) && !is.ordered(x) && !isTRUE(fixed.grid)) {
@@ -1810,6 +1884,8 @@ np_render_control <- function(style = c("band", "bar"),
     args,
     plot.user.args
   )
+  if (!any(is.finite(y)) && is.null(args$ylim))
+    args$ylim <- c(-1, 1)
   if (is.factor(x)) {
     args$xaxt <- "n"
     do.call(graphics::plot, args)

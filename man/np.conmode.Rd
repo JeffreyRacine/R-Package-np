@@ -205,6 +205,12 @@ normalization, and level-specific class-probability effects.
     probability \eqn{\Pr(Y=\ell\mid X=x)}, not the derivative of the
     discrete modal class label. Gradients are stored for one selected response
     level at a time.
+    With a heterogeneous local-polynomial conditional-density degree vector, a
+    degree-zero continuous coordinate has no available first-derivative
+    estimate and is stored as \code{NA}; the established all-degree-zero
+    compatibility route is unchanged. Its plot panel remains present but empty when another derivative
+    or categorical first-difference effect is available; a request with no
+    available component is rejected.
   }
 
   \item{level}{

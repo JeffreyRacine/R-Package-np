@@ -54,6 +54,53 @@
            ...,
            random.seed){
 
+    plot.gradient.order.label <- rep.int(1L, bws$ndim)
+    plot.gradient.available <- rep.int(TRUE, bws$ndim)
+    if (gradients && identical(bws$regtype, "lc")) {
+      npValidateLcGradientOrder(
+        regtype = bws$regtype,
+        gradient.order = gradient.order,
+        ncon = bws$ncon,
+        argname = "gradient_order",
+        where = "plot.rbandwidth()"
+      )
+    }
+    if (gradients && identical(bws$regtype, "lp")) {
+      go <- npValidateGlpGradientOrder(regtype = bws$regtype,
+                                       gradient.order = gradient.order,
+                                       ncon = bws$ncon)
+      if (length(go))
+        plot.gradient.order.label[which(bws$icon)] <- go
+      if (bws$ncon > 0L) {
+        available <- npGlpGradientAvailability(
+          regtype.engine = bws$regtype,
+          degree.engine = bws$degree,
+          gradient.order = go,
+          ncon = bws$ncon
+        )
+        plot.gradient.available[which(bws$icon)] <- available
+        if (!any(plot.gradient.available)) {
+          npStopGlpGradientNoneAvailable(
+            where = "plot.rbandwidth()",
+            action = "plot",
+            degree.engine = bws$degree,
+            gradient.order = go,
+            available = available,
+            con.names = bws$xnames[bws$icon]
+          )
+        }
+        if (any(!available)) {
+          npWarnGlpGradientPartialAvailability(
+            where = "plot.rbandwidth()",
+            degree.engine = bws$degree,
+            gradient.order = go,
+            available = available,
+            con.names = bws$xnames[bws$icon]
+          )
+        }
+      }
+    }
+
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
     on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
@@ -196,45 +243,6 @@
       if (!is.null(s.vec))
         hat.args$s <- as.integer(s.vec)
       as.vector(do.call(npreghat.rbandwidth, hat.args))
-    }
-    plot.gradient.order.label <- rep.int(1L, bws$ndim)
-    if (gradients && identical(bws$regtype, "lc")) {
-      npValidateLcGradientOrder(
-        regtype = bws$regtype,
-        gradient.order = gradient.order,
-        ncon = bws$ncon,
-        argname = "gradient_order",
-        where = "plot.rbandwidth()"
-      )
-    }
-    if (gradients && identical(bws$regtype, "lp")) {
-      go <- npValidateGlpGradientOrder(regtype = bws$regtype,
-                                       gradient.order = gradient.order,
-                                       ncon = bws$ncon)
-      if (length(go)) {
-        plot.gradient.order.label[which(bws$icon)] <- go
-      }
-      if (bws$ncon > 0L) {
-        available <- npGlpGradientAvailability(
-          regtype.engine = bws$regtype,
-          degree.engine = bws$degree,
-          gradient.order = go,
-          ncon = bws$ncon
-        )
-        if (!any(available)) {
-          stop("plot.rbandwidth() has no available derivative components for the requested gradient.order and fitted polynomial degree",
-               call. = FALSE)
-        }
-        if (any(!available)) {
-          npWarnGlpGradientPartialAvailability(
-            where = "plot.rbandwidth()",
-            degree.engine = bws$degree,
-            gradient.order = go,
-            available = available,
-            con.names = bws$xnames[bws$icon]
-          )
-        }
-      }
     }
     if (plot.errors && gradients &&
         identical(plot.errors.method, "asymptotic") &&
@@ -680,6 +688,7 @@
         temp.all.err <- NULL
 
         xi.factor = is.factor(xdat[,i])
+        component.available <- !isTRUE(gradients) || plot.gradient.available[i]
 
         if (xi.factor){
           ei = levels(xdat[,i])
@@ -770,7 +779,7 @@
 
         temp.mean[seq_len(xi.neval)] = if (gradients) tr$grad[, i] else tr$mean
 
-        if (plot.errors){
+        if (plot.errors && component.available){
           if (plot.errors.method == "asymptotic") {
             asym.obj <- .np_plot_asymptotic_error_from_se(
               se = if (gradients) tr$gerr[,i] else tr$merr,
@@ -849,6 +858,8 @@
             )
           else
             panel.ylim <- range(temp.mean, finite = TRUE)
+          if (!all(is.finite(panel.ylim)))
+            panel.ylim <- c(-1, 1)
           if (overlay.ok)
             panel.ylim <- .np_plot_overlay_range(panel.ylim, ydat)
           panel.ylim <- .np_plot_resolve_requested_ylim(panel.ylim, ylim)
@@ -968,7 +979,8 @@
           }
 
           ## error plotting evaluation
-          if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
+          if (plot.errors && component.available &&
+              !(xi.factor && plot.bootstrap && plot.bxp)){
             drew.bias.center <- .np_plot_draw_bias_center_1d(
               x = ei,
               center = temp.err[,3],
@@ -1025,9 +1037,17 @@
                            eval = as.data.frame(subcol(exdat,ei,i)[seq_len(xi.neval),]),
                            mean = tr$mean,
                            merr = tr$merr,
-                           grad = na.omit(temp.mean),
-                           gerr = na.omit(cbind(-temp.err[,1],
-                             temp.err[,2])),
+                           grad = if (component.available) {
+                             na.omit(temp.mean)
+                           } else {
+                             temp.mean[seq_len(xi.neval)]
+                           },
+                           gerr = if (component.available) {
+                             na.omit(cbind(-temp.err[,1], temp.err[,2]))
+                           } else {
+                             cbind(-temp.err[seq_len(xi.neval),1],
+                               temp.err[seq_len(xi.neval),2])
+                           },
                            gradient.order = gradient.order,
                            ntrain = dim(xdat)[1])
             plot.out[[i]] <- .np_plot_add_gradient_bias_fields(

@@ -286,6 +286,14 @@ prediction/evaluation route, or plot route as appropriate.
          {\hat f(\hat q_\tau(x)|x)} .
   }
 
+  In a heterogeneous fitted local-polynomial degree vector, a degree-zero
+  coordinate has no available first-derivative estimate and is returned as
+  \code{NA}; the established all-degree-zero compatibility route is unchanged.
+  Its plot
+  panel remains present but empty when another derivative or categorical
+  first-difference effect is available; a request with no available component
+  is rejected.
+
   When \code{npqreg} is called without an explicit \code{bws} object, it
   first computes conditional distribution bandwidths using
   \code{\link{npcdistbw}} and stores them in the returned object's
