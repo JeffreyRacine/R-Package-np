@@ -1,4 +1,8 @@
-Changes from Version 0.70-5 to 0.70-6 [XX-XXX-XXXX]
+Changes after Version 0.70-5
+
+User-visible changes are maintained in NEWS.md. Detailed implementation
+history is maintained in the Git repository and linked issues. The entries
+below preserve the historical package change log through Version 0.70-5.
 
 Changes from Version 0.70-4 to 0.70-5 [15-Jul-2026]
 
