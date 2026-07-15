@@ -15500,9 +15500,10 @@ compute.all.error.range <- function(center, all.err) {
   upper <- c(center + all.err$pointwise[,2],
              center + all.err$simultaneous[,2],
              center + all.err$bonferroni[,2])
-  rng <- c(min(lower, na.rm = TRUE), max(upper, na.rm = TRUE))
-  if (all(is.finite(rng)))
-    return(rng)
+  lower <- lower[is.finite(lower)]
+  upper <- upper[is.finite(upper)]
+  if (length(lower) && length(upper))
+    return(c(min(lower), max(upper)))
 
   center <- center[is.finite(center)]
   if (!length(center))
@@ -15513,9 +15514,10 @@ compute.all.error.range <- function(center, all.err) {
 compute.default.error.range <- function(center, err) {
   lower <- c(center - err[,1], err[,3] - err[,1])
   upper <- c(center + err[,2], err[,3] + err[,2])
-  rng <- c(min(lower, na.rm = TRUE), max(upper, na.rm = TRUE))
-  if (all(is.finite(rng)))
-    return(rng)
+  lower <- lower[is.finite(lower)]
+  upper <- upper[is.finite(upper)]
+  if (length(lower) && length(upper))
+    return(c(min(lower), max(upper)))
 
   center <- center[is.finite(center)]
   if (!length(center))
@@ -15595,10 +15597,10 @@ compute.default.error.range <- function(center, err) {
     }
   }
 
-  rng <- range(vals, finite = TRUE)
-  if (length(rng) == 2L && all(is.finite(rng)))
-    return(rng)
-  c(NA_real_, NA_real_)
+  vals <- vals[is.finite(vals)]
+  if (!length(vals))
+    return(c(NA_real_, NA_real_))
+  range(vals)
 }
 
 .np_plot_resolve_requested_ylim <- function(panel.ylim, ylim = NULL) {

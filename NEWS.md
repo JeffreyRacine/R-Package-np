@@ -10,6 +10,11 @@
   with the affected predictor orders and degrees and actionable refitting
   guidance. MPI commands and payloads are unchanged.
 
+* Corrected common-scale uncertainty-band rendering for partially available
+  gradient plots. Empty derivative panels now retain their list positions and
+  finite-range calculations no longer emit spurious `min`/`max` warnings;
+  supported estimates, interval bands, and MPI payloads are unchanged.
+
 # npRmpi 0.70-5
 
 * Corrected the heteroskedasticity-robust Ichimura index-coefficient

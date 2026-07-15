@@ -270,3 +270,113 @@ test_that("partial availability spans Bernstein, NN, and interleaved factors", {
   expect_named(plot.data, names(mixed.out))
   expect_true(all(is.na(plot.data[[1L]]$grad)))
 })
+
+test_that("common-scale all-band rendering retains unavailable terminal panels", {
+  old <- options(np.messages = FALSE, np.plot.progress = FALSE)
+  if ("npRmpi" %in% loadedNamespaces())
+    old <- c(old, options(npRmpi.autodispatch = FALSE))
+  on.exit(options(old), add = TRUE)
+
+  capture_warnings <- function(expr) {
+    warnings <- character()
+    value <- withCallingHandlers(
+      force(expr),
+      warning = function(w) {
+        warnings <<- c(warnings, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    )
+    list(value = value, warnings = warnings)
+  }
+
+  expect_availability_only <- function(result, where,
+                                       allow.simultaneous = FALSE) {
+    availability <- grepl("x1.*requested order 2.*degree 1",
+                          result$warnings)
+    simultaneous <- grepl("asymptotic simultaneous confidence bands",
+                          result$warnings)
+    allowed <- availability |
+      (isTRUE(allow.simultaneous) & simultaneous)
+    expect_true(any(availability), info = where)
+    expect_true(all(allowed), info = where)
+    expect_true(!any(grepl("no non-missing arguments to (min|max)",
+                           result$warnings)),
+                info = where)
+  }
+
+  set.seed(20260721)
+  n <- 60L
+  x <- data.frame(
+    group = factor(rep(c("a", "b"), length.out = n)),
+    x2 = runif(n, -1, 1),
+    x1 = runif(n, -1, 1)
+  )
+  y <- 0.4 * (x$group == "b") + x$x1 + x$x2^2 +
+    rnorm(n, sd = 0.05)
+  y.df <- data.frame(y = y)
+  xc <- x[c("x2", "x1")]
+
+  grDevices::pdf(tempfile(fileext = ".pdf"))
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  bw.reg <- np_partial_gradient_local(npregbw(
+    xdat = x, ydat = y, bws = c(0.5, 0.4, 0.4),
+    bandwidth.compute = FALSE, regtype = "lp", degree = c(2L, 1L),
+    basis = "glp"
+  ))
+  if (!"npRmpi" %in% loadedNamespaces()) {
+    reg.boot <- capture_warnings(np_partial_gradient_local(plot(
+      bw.reg, xdat = x, ydat = y, gradients = TRUE,
+      gradient.order = 2L, errors = "bootstrap", band = "all",
+      common.scale = TRUE, B = 79L, neval = 2L
+    )))
+    expect_availability_only(reg.boot, "regression bootstrap common scale")
+  }
+
+  bw.reg.asym <- np_partial_gradient_local(npregbw(
+    xdat = xc, ydat = y, bws = c(0.4, 0.4),
+    bandwidth.compute = FALSE, regtype = "lp", degree = c(2L, 1L),
+    basis = "glp"
+  ))
+  reg.asym <- capture_warnings(np_partial_gradient_local(plot(
+    bw.reg.asym, xdat = xc, ydat = y, gradients = TRUE,
+    gradient.order = 2L, errors = "asymptotic", band = "all",
+    common.scale = TRUE, neval = 2L
+  )))
+  expect_availability_only(reg.asym, "regression asymptotic common scale",
+                           allow.simultaneous = TRUE)
+
+  reg.panel <- capture_warnings(np_partial_gradient_local(plot(
+    bw.reg.asym, xdat = xc, ydat = y, gradients = TRUE,
+    gradient.order = 2L, errors = "asymptotic", band = "all",
+    common.scale = FALSE, neval = 2L, ylim = c(-3, 3)
+  )))
+  expect_availability_only(reg.panel, "regression panel scale",
+                           allow.simultaneous = TRUE)
+
+  bw.cd <- np_partial_gradient_local(npcdensbw(
+    xdat = xc, ydat = y.df, bws = c(0.4, 0.4, 0.4),
+    bandwidth.compute = FALSE, regtype = "lp", degree = c(2L, 1L),
+    basis = "glp"
+  ))
+  cd <- capture_warnings(np_partial_gradient_local(plot(
+    bw.cd, xdat = xc, ydat = y.df, gradients = TRUE,
+    gradient.order = 2L, errors = "asymptotic", band = "all",
+    common.scale = TRUE, neval = 2L, perspective = FALSE
+  )))
+  expect_availability_only(cd, "conditional density",
+                           allow.simultaneous = TRUE)
+
+  bw.dst <- np_partial_gradient_local(npcdistbw(
+    xdat = xc, ydat = y.df, bws = c(0.4, 0.4, 0.4),
+    bandwidth.compute = FALSE, regtype = "lp", degree = c(2L, 1L),
+    basis = "glp"
+  ))
+  dst <- capture_warnings(np_partial_gradient_local(plot(
+    bw.dst, xdat = xc, ydat = y.df, gradients = TRUE,
+    gradient.order = 2L, errors = "asymptotic", band = "all",
+    common.scale = TRUE, neval = 2L, perspective = FALSE
+  )))
+  expect_availability_only(dst, "conditional distribution",
+                           allow.simultaneous = TRUE)
+})
