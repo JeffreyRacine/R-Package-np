@@ -1127,7 +1127,7 @@
 
 .np_nomad_require_crs <- function(version_fn = utils::packageVersion,
                                   load_namespace = loadNamespace,
-                                  minimum_version = "0.15-41") {
+                                  minimum_version = "0.15-46") {
   minimum_version_label <- as.character(minimum_version)[1L]
   minimum_version <- package_version(minimum_version_label)
 
@@ -2128,7 +2128,8 @@
 .np_progress_nomad_native_step_from_c <- function(iteration,
                                                   current.degree,
                                                   best.degree = integer(),
-                                                  best.objective = NA_real_) {
+                                                  best.objective = NA_real_,
+                                                  force = FALSE) {
   state <- .np_progress_runtime$bandwidth_state
   if (is.null(state) || !isTRUE(state$nomad_native_progress)) {
     return(invisible(FALSE))
@@ -2170,10 +2171,62 @@
   state <- .np_degree_progress_step(
     state = state,
     done = iteration,
-    detail = NULL
+    detail = NULL,
+    force = isTRUE(force)
   )
   .np_progress_runtime$bandwidth_state <- state
   invisible(TRUE)
+}
+
+.np_progress_nomad_native_observer_config <- function() {
+  state <- .np_progress_runtime$bandwidth_state
+  interval <- if (!is.null(state$throttle_sec)) {
+    suppressWarnings(as.numeric(state$throttle_sec)[1L])
+  } else {
+    .np_progress_interval_sec(known_total = FALSE, domain = "general")
+  }
+  if (!is.finite(interval) || is.na(interval) || interval < 0) {
+    interval <- .np_progress_interval_sec(known_total = FALSE, domain = "general")
+  }
+
+  c(
+    enabled = as.numeric(!is.null(state) && isTRUE(state$enabled)),
+    interval = interval
+  )
+}
+
+.np_progress_nomad_native_observer_dispatch <- function(iteration,
+                                                         current.degree,
+                                                         best.degree,
+                                                         best.objective) {
+  tryCatch(
+    {
+      state <- .np_progress_runtime$bandwidth_state
+      if (isTRUE(state$nomad_native_progress)) {
+        .np_progress_nomad_native_step_from_c(
+          iteration = iteration,
+          current.degree = current.degree,
+          best.degree = best.degree,
+          best.objective = best.objective,
+          force = TRUE
+        )
+      } else {
+        .np_progress_bandwidth_activity_step(done = iteration, force = TRUE)
+      }
+      list(0L, "")
+    },
+    interrupt = function(e) {
+      list(2L, conditionMessage(e))
+    },
+    error = function(e) {
+      list(1L, conditionMessage(e))
+    }
+  )
+}
+
+.np_progress_nomad_native_observer_report <- function(message) {
+  .np_message("NOMAD progress observer disabled: ", message)
+  invisible(NULL)
 }
 
 .np_nomad_native_progress_restart <- function(handle,

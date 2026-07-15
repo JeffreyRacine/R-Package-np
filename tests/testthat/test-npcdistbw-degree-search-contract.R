@@ -303,6 +303,6 @@ test_that("npcdistbw native NOMAD route has an explicit crs availability guard",
   )
 
   expect_match(require_body, "requireNamespace\\(\"crs\",\\s*quietly = TRUE\\)")
-  expect_true(grepl("packageVersion(\"crs\") < \"0.15.44\"", require_body, fixed = TRUE))
-  expect_true(grepl("native npcdist NOMAD route requires crs >= 0.15-44", require_body, fixed = TRUE))
+  expect_true(grepl("packageVersion(\"crs\") < \"0.15.46\"", require_body, fixed = TRUE))
+  expect_true(grepl("native npcdist NOMAD route requires crs >= 0.15-46", require_body, fixed = TRUE))
 })

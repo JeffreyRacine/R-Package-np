@@ -815,6 +815,31 @@
   val
 }
 
+.np_progress_interval_sec <- function(known_total = FALSE, domain = "general") {
+  default <- if (identical(domain, "plot")) {
+    2.0
+  } else if (isTRUE(known_total)) {
+    0.5
+  } else {
+    2.0
+  }
+
+  option_name <- if (identical(domain, "plot")) {
+    "np.plot.progress.interval.sec"
+  } else if (isTRUE(known_total)) {
+    "np.progress.interval.known.sec"
+  } else {
+    "np.progress.interval.unknown.sec"
+  }
+
+  val <- suppressWarnings(as.numeric(getOption(option_name, default))[1L])
+  if (!is.finite(val) || is.na(val) || val < 0) {
+    val <- default
+  }
+
+  val
+}
+
 .np_progress_bandwidth_enhanced_enabled <- function() {
   isTRUE(getOption("np.progress.bandwidth.enhanced", FALSE))
 }
@@ -1237,7 +1262,7 @@
 
 .np_progress_begin <- function(label, total = NULL, domain = "general", surface = domain) {
   known_total <- !is.null(total)
-  throttle_sec <- if (known_total) 0.5 else 2.0
+  throttle_sec <- .np_progress_interval_sec(known_total = known_total, domain = domain)
   started <- .np_progress_now()
   capability <- .np_progress_capability(domain = domain)
   session_id <- .np_progress_next_id()
@@ -1792,7 +1817,7 @@
   invisible(NULL)
 }
 
-.np_progress_bandwidth_activity_step <- function(done = NULL) {
+.np_progress_bandwidth_activity_step <- function(done = NULL, force = FALSE) {
   state <- .np_progress_runtime$bandwidth_state
 
   if (isTRUE(state$nomad_native_progress)) {
@@ -1806,9 +1831,11 @@
         done <- NULL
       }
     }
-    .np_progress_runtime$bandwidth_state <- .np_progress_step(
+    .np_progress_runtime$bandwidth_state <- .np_progress_step_at(
       state = state,
-      done = done
+      now = .np_progress_now(),
+      done = done,
+      force = isTRUE(force)
     )
     return(invisible(NULL))
   }
@@ -1824,9 +1851,11 @@
     }
   }
 
-  .np_progress_runtime$bandwidth_state <- .np_progress_step(
+  .np_progress_runtime$bandwidth_state <- .np_progress_step_at(
     state = state,
-    done = done
+    now = .np_progress_now(),
+    done = done,
+    force = isTRUE(force)
   )
 
   invisible(NULL)

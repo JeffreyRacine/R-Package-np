@@ -16,7 +16,7 @@ test_that(".np_nomad_require_crs fails fast when crs is missing", {
     ),
     paste(
       "requires the suggested package 'crs'",
-      "\\(>= 0\\.15-41\\) to provide the NOMAD backend;",
+      "\\(>= 0\\.15-46\\) to provide the NOMAD backend;",
       "install\\.packages\\('crs'\\)"
     )
   )
@@ -30,13 +30,13 @@ test_that(".np_nomad_require_crs fails fast when crs is too old", {
 
   expect_error(
     require_crs(
-      version_fn = function(pkg) package_version("0.15-40"),
+      version_fn = function(pkg) package_version("0.15-45"),
       load_namespace = function(pkg) {
         loaded <<- TRUE
         NULL
       }
     ),
-    "requires 'crs' \\(>= 0\\.15-41\\); installed version is 0\\.15\\.40"
+    "requires 'crs' \\(>= 0\\.15-46\\); installed version is 0\\.15\\.45"
   )
 
   expect_false(loaded)
@@ -48,7 +48,7 @@ test_that(".np_nomad_require_crs succeeds when crs version is sufficient", {
 
   observed <- withVisible(
     require_crs(
-      version_fn = function(pkg) package_version("0.15-41"),
+      version_fn = function(pkg) package_version("0.15-46"),
       load_namespace = function(pkg) {
         loaded <<- identical(pkg, "crs")
         baseenv()
@@ -66,9 +66,9 @@ test_that(".np_nomad_require_crs reports namespace load failures after version c
 
   expect_error(
     require_crs(
-      version_fn = function(pkg) package_version("0.15-41"),
+      version_fn = function(pkg) package_version("0.15-46"),
       load_namespace = function(pkg) stop("broken namespace", call. = FALSE)
     ),
-    "requires 'crs' \\(>= 0\\.15-41\\); failed to load installed version 0\\.15\\.41: broken namespace"
+    "requires 'crs' \\(>= 0\\.15-46\\); failed to load installed version 0\\.15\\.46: broken namespace"
   )
 })

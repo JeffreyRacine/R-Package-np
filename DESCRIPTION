@@ -2,10 +2,10 @@ Package: npRmpi
 Version: 0.70-6
 Date: 2026-07-15
 Depends: R (>= 3.5.0)
-Imports: boot, cubature, methods, quadprog, quantreg, stats, parallel, tools, crs (>= 0.15-44)
+Imports: boot, cubature, methods, quadprog, quantreg, stats, parallel, tools, crs (>= 0.15-46)
 SystemRequirements: MPI
 Suggests: MASS, logspline, ks, testthat, np, withr, knitr, rmarkdown, rgl
-LinkingTo: crs (>= 0.15-44)
+LinkingTo: crs (>= 0.15-46)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 RoxygenNote: 0.0.0
