@@ -9,6 +9,11 @@
   Requests with no available component now fail early with the affected
   predictor orders and degrees and actionable refitting guidance.
 
+* Corrected common-scale uncertainty-band rendering for partially available
+  gradient plots. Empty derivative panels now retain their list positions and
+  finite-range calculations no longer emit spurious `min`/`max` warnings;
+  supported estimates and interval bands are unchanged.
+
 # np 0.70-5
 
 * Corrected the heteroskedasticity-robust Ichimura index-coefficient

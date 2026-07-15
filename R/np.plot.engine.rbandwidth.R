@@ -703,7 +703,7 @@
             all.bxp[[i]] = temp.boot
 
             data.err[,c(3*i-2,3*i-1,3*i)] = temp.err
-            data.err.all[[i]] = temp.all.err
+            data.err.all[i] = list(temp.all.err)
           }
         } else if (plot.behavior != "data") {
           plot.layout <- .np_plot_layout_activate(plot.layout)

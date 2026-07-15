@@ -966,7 +966,7 @@
               all.bxp[[plot.index]] = temp.boot
 
               data.err[,seq(3*((plot.index-1)*dsf+j)-2,length=3)] = temp.err
-              data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
+              data.err.all[(plot.index-1)*dsf+j] = list(temp.all.err)
             }
           } else if (plot.behavior == "data" && multi.eval && plot.errors) {
             err.name <- if (gradients) paste("gc", grad.j, "err", sep = "") else "quanterr"
@@ -1308,7 +1308,7 @@
                 all.bxp[[plot.index]] = temp.boot
 
                 data.err[,seq(3*((plot.index-1)*dsf+j)-2,length=3)] = temp.err
-                data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
+                data.err.all[(plot.index-1)*dsf+j] = list(temp.all.err)
               }
             } else if (plot.behavior != "data") {
               plot.layout <- .np_plot_layout_activate(plot.layout)
