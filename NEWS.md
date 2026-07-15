@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* Restored timely progress updates during native NOMAD bandwidth and degree
+  searches, including long compiled objective evaluations. Iteration, current
+  degree, and accepted-best details now follow the package-wide progress
+  interval without changing optimization results or evaluation accounting.
+  This requires `crs` 0.15-46 or later.
+
 * Restored partial mixed-degree local-polynomial gradient evaluation and
   plotting across regression, conditional density/distribution, least-squares
   quantile regression, conditional quantiles, and conditional modes. A

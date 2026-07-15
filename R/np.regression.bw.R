@@ -150,9 +150,9 @@ npregbw.NULL <-
 
 .npregbw_nomad_native_require_crs <- function() {
   if (!requireNamespace("crs", quietly = TRUE))
-    stop("native npreg NOMAD route requires crs >= 0.15-44", call. = FALSE)
-  if (utils::packageVersion("crs") < "0.15.44")
-    stop("native npreg NOMAD route requires crs >= 0.15-44", call. = FALSE)
+    stop("native npreg NOMAD route requires crs >= 0.15-46", call. = FALSE)
+  if (utils::packageVersion("crs") < "0.15.46")
+    stop("native npreg NOMAD route requires crs >= 0.15-46", call. = FALSE)
   invisible(TRUE)
 }
 

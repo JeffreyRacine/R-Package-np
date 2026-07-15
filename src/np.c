@@ -78,6 +78,24 @@ int int_SIMULATION;
 
 int int_RESTART_FROM_MIN;
 
+typedef struct {
+  int degree_offset;
+  int ndegree;
+  const int *best_degree;
+  const double *best_objective;
+  const int *accepted_evaluations;
+} np_nomad_progress_spec;
+
+static crs_nomad_solve_observed_fn np_crs_nomad_solve_observed = NULL;
+static crs_nomad_observer_poll_fn np_crs_nomad_observer_poll = NULL;
+static int nomad_c_callback_active = 0;
+
+static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
+                                        crs_nomad_eval_fn eval,
+                                        void *user_data,
+                                        const np_nomad_progress_spec *progress_spec,
+                                        crs_nomad_result *result);
+
 int int_TREE_X;
 int int_TREE_Y;
 int int_TREE_XY;
@@ -122,7 +140,6 @@ SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
   SEXP x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue;
   SEXP upper_r = R_NilValue, option_names_s = R_NilValue, option_values_s = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue;
-  crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
   crs_nomad_r_callback r_callback;
@@ -173,15 +190,6 @@ SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
     error("native NOMAD R callback search received too many options");
   }
   n_options = (int) XLENGTH(option_names_s);
-
-  np_load_crs_namespace();
-
-  solve = (crs_nomad_solve_fn)
-    R_GetCCallable("crs", "crs_nomad_solve");
-  if (solve == NULL) {
-    UNPROTECT(nprotect);
-    error("failed to resolve crs final native NOMAD callable");
-  }
 
   solution = R_Calloc(n, double);
   if (solution == NULL) {
@@ -236,7 +244,11 @@ SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
   result.outputs = crs_outputs;
   result.outputs_len = 1;
 
-  status = solve(&problem, NULL, &r_callback, &result);
+  status = np_nomad_solve_with_progress(&problem,
+                                        NULL,
+                                        &r_callback,
+                                        NULL,
+                                        &result);
 
   PROTECT(out = allocVector(VECSXP, 13)); nprotect++;
   PROTECT(names = allocVector(STRSXP, 13)); nprotect++;
@@ -580,6 +592,215 @@ static void np_progress_nomad_degree_step(const int current_eval,
   *last_wall = time(NULL);
 }
 
+static int np_nomad_progress_observer_config(double *interval_sec)
+{
+  SEXP package = R_NilValue;
+  SEXP ns = R_NilValue;
+  SEXP fn = R_NilValue;
+  SEXP call = R_NilValue;
+  SEXP value = R_NilValue;
+  SEXP numeric = R_NilValue;
+  int err = 0;
+  int enabled = 0;
+
+  if (interval_sec == NULL)
+    return 0;
+  *interval_sec = 2.0;
+
+  PROTECT(package = Rf_mkString("np"));
+  PROTECT(ns = R_FindNamespace(package));
+  if (ns == R_NilValue ||
+      !R_existsVarInFrame(ns,
+                          Rf_install(".np_progress_nomad_native_observer_config"))) {
+    UNPROTECT(2);
+    return 0;
+  }
+  PROTECT(fn = Rf_findFun(
+    Rf_install(".np_progress_nomad_native_observer_config"), ns));
+  PROTECT(call = Rf_lang1(fn));
+  value = R_tryEvalSilent(call, ns, &err);
+  if (err || value == R_NilValue) {
+    UNPROTECT(4);
+    return 0;
+  }
+  PROTECT(value);
+  PROTECT(numeric = Rf_coerceVector(value, REALSXP));
+  if (XLENGTH(numeric) >= 2) {
+    enabled = R_FINITE(REAL(numeric)[0]) && REAL(numeric)[0] != 0.0;
+    if (R_FINITE(REAL(numeric)[1]) && REAL(numeric)[1] >= 0.0)
+      *interval_sec = REAL(numeric)[1];
+  }
+  UNPROTECT(6);
+  return enabled;
+}
+
+static int np_nomad_progress_observer(
+  const crs_nomad_observer_event *event,
+  void *user_data,
+  char *message,
+  size_t message_size)
+{
+  const np_nomad_progress_spec *spec =
+    (const np_nomad_progress_spec *) user_data;
+  SEXP package = R_NilValue;
+  SEXP ns = R_NilValue;
+  SEXP fn = R_NilValue;
+  SEXP iteration = R_NilValue;
+  SEXP current_degree = R_NilValue;
+  SEXP best_degree = R_NilValue;
+  SEXP best_objective = R_NilValue;
+  SEXP call = R_NilValue;
+  SEXP value = R_NilValue;
+  int nprotect = 0;
+  int err = 0;
+  int status = CRS_NOMAD_OBSERVER_OUTCOME_ERROR;
+  int j;
+
+  if (event == NULL) {
+    if (message != NULL && message_size > 0)
+      snprintf(message, message_size, "np NOMAD progress event is unavailable");
+    return CRS_NOMAD_OBSERVER_OUTCOME_ERROR;
+  }
+
+  PROTECT(package = Rf_mkString("np")); nprotect++;
+  PROTECT(ns = R_FindNamespace(package)); nprotect++;
+  if (ns == R_NilValue ||
+      !R_existsVarInFrame(ns,
+                          Rf_install(".np_progress_nomad_native_observer_dispatch"))) {
+    if (message != NULL && message_size > 0)
+      snprintf(message, message_size, "np NOMAD progress dispatcher is unavailable");
+    UNPROTECT(nprotect);
+    return CRS_NOMAD_OBSERVER_OUTCOME_ERROR;
+  }
+  PROTECT(fn = Rf_findFun(
+    Rf_install(".np_progress_nomad_native_observer_dispatch"), ns)); nprotect++;
+  PROTECT(iteration = Rf_ScalarInteger(event->evaluation)); nprotect++;
+
+  if (spec != NULL && spec->ndegree > 0 && spec->degree_offset >= 0 &&
+      event->x != NULL && spec->degree_offset + spec->ndegree <= event->n) {
+    PROTECT(current_degree = Rf_allocVector(INTSXP, spec->ndegree)); nprotect++;
+    for (j = 0; j < spec->ndegree; j++)
+      INTEGER(current_degree)[j] =
+        (int) nearbyint(event->x[spec->degree_offset + j]);
+  } else {
+    PROTECT(current_degree = Rf_allocVector(INTSXP, 0)); nprotect++;
+  }
+
+  if (spec != NULL && spec->ndegree > 0 && spec->best_degree != NULL &&
+      spec->accepted_evaluations != NULL && *spec->accepted_evaluations > 0) {
+    PROTECT(best_degree = Rf_allocVector(INTSXP, spec->ndegree)); nprotect++;
+    for (j = 0; j < spec->ndegree; j++)
+      INTEGER(best_degree)[j] = spec->best_degree[j];
+  } else {
+    PROTECT(best_degree = Rf_allocVector(INTSXP, 0)); nprotect++;
+  }
+  PROTECT(best_objective = Rf_ScalarReal(
+    spec != NULL && spec->best_objective != NULL &&
+    spec->accepted_evaluations != NULL && *spec->accepted_evaluations > 0 ?
+      *spec->best_objective : NA_REAL)); nprotect++;
+  PROTECT(call = Rf_lang5(fn,
+                          iteration,
+                          current_degree,
+                          best_degree,
+                          best_objective)); nprotect++;
+  value = R_tryEvalSilent(call, ns, &err);
+  if (err || value == R_NilValue || !Rf_isNewList(value) || XLENGTH(value) < 2) {
+    if (message != NULL && message_size > 0)
+      snprintf(message, message_size, "np NOMAD progress dispatcher failed");
+    UNPROTECT(nprotect);
+    return CRS_NOMAD_OBSERVER_OUTCOME_ERROR;
+  }
+  PROTECT(value); nprotect++;
+  status = Rf_asInteger(VECTOR_ELT(value, 0));
+  if (status < CRS_NOMAD_OBSERVER_OUTCOME_OK ||
+      status > CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT)
+    status = CRS_NOMAD_OBSERVER_OUTCOME_ERROR;
+  if (message != NULL && message_size > 0 &&
+      VECTOR_ELT(value, 1) != R_NilValue && XLENGTH(VECTOR_ELT(value, 1)) > 0) {
+    SEXP message_char = Rf_asChar(VECTOR_ELT(value, 1));
+    if (message_char != NA_STRING)
+      snprintf(message, message_size, "%s", CHAR(message_char));
+  }
+  UNPROTECT(nprotect);
+  return status;
+}
+
+static void np_nomad_progress_observer_report(const char *message)
+{
+  SEXP package = R_NilValue;
+  SEXP ns = R_NilValue;
+  SEXP fn = R_NilValue;
+  SEXP message_s = R_NilValue;
+  SEXP call = R_NilValue;
+  int err = 0;
+
+  PROTECT(package = Rf_mkString("np"));
+  PROTECT(ns = R_FindNamespace(package));
+  if (ns == R_NilValue ||
+      !R_existsVarInFrame(
+        ns,
+        Rf_install(".np_progress_nomad_native_observer_report"))) {
+    UNPROTECT(2);
+    return;
+  }
+  PROTECT(fn = Rf_findFun(
+    Rf_install(".np_progress_nomad_native_observer_report"), ns));
+  PROTECT(message_s = Rf_mkString(
+    message != NULL && message[0] != '\0' ? message : "unknown observer error"));
+  PROTECT(call = Rf_lang2(fn, message_s));
+  (void) R_tryEvalSilent(call, ns, &err);
+  UNPROTECT(5);
+}
+
+static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
+                                        crs_nomad_eval_fn eval,
+                                        void *user_data,
+                                        const np_nomad_progress_spec *progress_spec,
+                                        crs_nomad_result *result)
+{
+  crs_nomad_observer observer;
+  double interval_sec = 2.0;
+  int observer_enabled;
+  int previous_callback_state;
+  int status;
+
+  np_load_crs_namespace();
+  if (np_crs_nomad_solve_observed == NULL)
+    np_crs_nomad_solve_observed = (crs_nomad_solve_observed_fn)
+      R_GetCCallable("crs", "crs_nomad_solve_observed");
+  if (np_crs_nomad_observer_poll == NULL)
+    np_crs_nomad_observer_poll = (crs_nomad_observer_poll_fn)
+      R_GetCCallable("crs", "crs_nomad_observer_poll");
+  if (np_crs_nomad_solve_observed == NULL || np_crs_nomad_observer_poll == NULL)
+    error("required crs 0.15-46 native NOMAD observer capability is unavailable");
+
+  observer_enabled = np_nomad_progress_observer_config(&interval_sec);
+  memset(&observer, 0, sizeof(observer));
+  if (observer_enabled) {
+    observer.api_version = CRS_NOMAD_OBSERVER_API_VERSION;
+    observer.struct_size = sizeof(observer);
+    observer.observe = np_nomad_progress_observer;
+    observer.user_data = (void *) progress_spec;
+    observer.interval_sec = interval_sec;
+  }
+
+  previous_callback_state = nomad_c_callback_active;
+  if (problem != NULL && problem->callback_mode == CRS_NOMAD_CALLBACK_C)
+    nomad_c_callback_active = 1;
+  status = np_crs_nomad_solve_observed(problem,
+                                       eval,
+                                       user_data,
+                                       observer_enabled ? &observer : NULL,
+                                       result);
+  nomad_c_callback_active = previous_callback_state;
+
+  if (observer_enabled &&
+      observer.outcome == CRS_NOMAD_OBSERVER_OUTCOME_ERROR)
+    np_nomad_progress_observer_report(observer.message);
+
+  return status;
+}
+
 static int *np_compute_support_counts(int num_obs, int ncon, double **matrix_continuous)
 {
   int j;
@@ -835,8 +1056,6 @@ static int bwm_kernel_unordered = 0;
 static int *bwm_num_categories = NULL;
 static double *bwm_transform_buf = NULL;
 static int bwm_transform_buf_len = 0;
-static int nomad_c_callback_active = 0;
-
 static void bwm_nn_cache_free(void);
 static void bwm_objective_cache_free(void);
 extern void np_accel_gauss_release_buffers(void);
@@ -2006,7 +2225,13 @@ static void bwm_maybe_signal_activity(void)
   if (current_eval < 1)
     return;
 
-  if (nomad_c_callback_active || nomad_degree_progress_active)
+  if (nomad_c_callback_active) {
+    if (np_crs_nomad_observer_poll != NULL)
+      np_crs_nomad_observer_poll();
+    return;
+  }
+
+  if (nomad_degree_progress_active)
     return;
 
   if ((bwm_progress_last_signal_clock > 0) && (now > bwm_progress_last_signal_clock))
@@ -4264,9 +4489,9 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   SEXP option_names_s = R_NilValue;
   SEXP names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_flat = R_NilValue, best_degree = R_NilValue;
-  crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
+  np_nomad_progress_spec progress_spec;
   crs_nomad_option *native_options = NULL;
   int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
   double crs_outputs[1];
@@ -4329,15 +4554,6 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   }
   n_options = (int) XLENGTH(option_names_s);
   objective_cache_enabled = bwm_objective_cache_read_user_enabled();
-
-  np_load_crs_namespace();
-
-  solve = (crs_nomad_solve_fn)
-    R_GetCCallable("crs", "crs_nomad_solve");
-  if (solve == NULL) {
-    UNPROTECT(9);
-    error("failed to resolve crs final native NOMAD callable");
-  }
 
   solution = R_Calloc(n, double);
   best_point = R_Calloc(n, double);
@@ -4423,14 +4639,20 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   result.outputs = crs_outputs;
   result.outputs_len = 1;
 
+  memset(&progress_spec, 0, sizeof(progress_spec));
+  progress_spec.degree_offset = context.nbw_point;
+  progress_spec.ndegree = context.ndegree;
+  progress_spec.best_degree = context.best_degree;
+  progress_spec.best_objective = &context.best_objective;
+  progress_spec.accepted_evaluations = &context.callback_calls;
+
   nomad_degree_progress_active = (context.ndegree > 0);
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
-  nomad_c_callback_active = 1;
-  status = solve(&problem,
-                 np_cdens_native_search_callback,
-                 &context,
-                 &result);
-  nomad_c_callback_active = 0;
+  status = np_nomad_solve_with_progress(&problem,
+                                        np_cdens_native_search_callback,
+                                        &context,
+                                        &progress_spec,
+                                        &result);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
   if (context.ndegree > 0 && context.callback_calls > 0)
@@ -4541,9 +4763,9 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   SEXP option_names_s = R_NilValue;
   SEXP names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_flat = R_NilValue, best_degree = R_NilValue;
-  crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
+  np_nomad_progress_spec progress_spec;
   crs_nomad_option *native_options = NULL;
   int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
   double crs_outputs[1];
@@ -4606,15 +4828,6 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   }
   n_options = (int) XLENGTH(option_names_s);
   objective_cache_enabled = bwm_objective_cache_read_user_enabled();
-
-  np_load_crs_namespace();
-
-  solve = (crs_nomad_solve_fn)
-    R_GetCCallable("crs", "crs_nomad_solve");
-  if (solve == NULL) {
-    UNPROTECT(9);
-    error("failed to resolve crs final native NOMAD callable");
-  }
 
   solution = R_Calloc(n, double);
   best_point = R_Calloc(n, double);
@@ -4703,14 +4916,20 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   result.outputs = crs_outputs;
   result.outputs_len = 1;
 
+  memset(&progress_spec, 0, sizeof(progress_spec));
+  progress_spec.degree_offset = context.nbw_point;
+  progress_spec.ndegree = context.ndegree;
+  progress_spec.best_degree = context.best_degree;
+  progress_spec.best_objective = &context.best_objective;
+  progress_spec.accepted_evaluations = &context.callback_calls;
+
   nomad_degree_progress_active = (context.ndegree > 0);
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
-  nomad_c_callback_active = 1;
-  status = solve(&problem,
-                 np_cdens_native_search_callback,
-                 &context,
-                 &result);
-  nomad_c_callback_active = 0;
+  status = np_nomad_solve_with_progress(&problem,
+                                        np_cdens_native_search_callback,
+                                        &context,
+                                        &progress_spec,
+                                        &result);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
   if (context.ndegree > 0 && context.callback_calls > 0)
@@ -5471,9 +5690,9 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue, decode_scale_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_degree = R_NilValue, first_degree = R_NilValue;
-  crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
+  np_nomad_progress_spec progress_spec;
   crs_nomad_option *native_options = NULL;
   int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
   double crs_outputs[1];
@@ -5545,15 +5764,6 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   }
   n_options = (int) XLENGTH(option_names_s);
   objective_cache_enabled = bwm_objective_cache_read_user_enabled();
-
-  np_load_crs_namespace();
-
-  solve = (crs_nomad_solve_fn)
-    R_GetCCallable("crs", "crs_nomad_solve");
-  if (solve == NULL) {
-    UNPROTECT(17);
-    error("failed to resolve crs final native NOMAD callable");
-  }
 
   solution = R_Calloc(n, double);
   best_point = R_Calloc(n, double);
@@ -5652,14 +5862,20 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   result.outputs = crs_outputs;
   result.outputs_len = 1;
 
+  memset(&progress_spec, 0, sizeof(progress_spec));
+  progress_spec.degree_offset = context.nbw;
+  progress_spec.ndegree = context.ndegree;
+  progress_spec.best_degree = context.best_degree;
+  progress_spec.best_objective = &context.best_objective;
+  progress_spec.accepted_evaluations = &context.callback_calls;
+
   nomad_degree_progress_active = (context.ndegree > 0);
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
-  nomad_c_callback_active = 1;
-  status = solve(&problem,
-                 np_regression_native_search_callback,
-                 &context,
-                 &result);
-  nomad_c_callback_active = 0;
+  status = np_nomad_solve_with_progress(&problem,
+                                        np_regression_native_search_callback,
+                                        &context,
+                                        &progress_spec,
+                                        &result);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
   if (context.ndegree > 0 && context.callback_calls > 0)
@@ -8368,7 +8584,6 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   SEXP upper_r = R_NilValue, option_names_s = R_NilValue, option_values_s = R_NilValue;
   SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
-  crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
   crs_nomad_option *native_options = NULL;
@@ -8423,15 +8638,6 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   }
   n_options = (int) XLENGTH(option_names_s);
   objective_cache_enabled = bwm_objective_cache_read_user_enabled();
-
-  np_load_crs_namespace();
-
-  solve = (crs_nomad_solve_fn)
-    R_GetCCallable("crs", "crs_nomad_solve");
-  if (solve == NULL) {
-    UNPROTECT(14);
-    error("failed to resolve crs final native NOMAD callable");
-  }
 
   solution = R_Calloc(n, double);
   best_point = R_Calloc(n, double);
@@ -8507,12 +8713,11 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   result.outputs_len = 1;
 
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
-  nomad_c_callback_active = 1;
-  status = solve(&problem,
-                 np_udens_native_search_callback,
-                 &context,
-                 &result);
-  nomad_c_callback_active = 0;
+  status = np_nomad_solve_with_progress(&problem,
+                                        np_udens_native_search_callback,
+                                        &context,
+                                        NULL,
+                                        &result);
   bwm_objective_cache_callback_option_end();
 
   PROTECT(out = allocVector(VECSXP, 23));
@@ -8980,7 +9185,6 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   SEXP upper_r = R_NilValue, option_names_s = R_NilValue, option_values_s = R_NilValue;
   SEXP ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
-  crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
   crs_nomad_option *native_options = NULL;
@@ -9038,15 +9242,6 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   }
   n_options = (int) XLENGTH(option_names_s);
   objective_cache_enabled = bwm_objective_cache_read_user_enabled();
-
-  np_load_crs_namespace();
-
-  solve = (crs_nomad_solve_fn)
-    R_GetCCallable("crs", "crs_nomad_solve");
-  if (solve == NULL) {
-    UNPROTECT(17);
-    error("failed to resolve crs final native NOMAD callable");
-  }
 
   solution = R_Calloc(n, double);
   best_point = R_Calloc(n, double);
@@ -9125,12 +9320,11 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   result.outputs_len = 1;
 
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
-  nomad_c_callback_active = 1;
-  status = solve(&problem,
-                 np_udist_native_search_callback,
-                 &context,
-                 &result);
-  nomad_c_callback_active = 0;
+  status = np_nomad_solve_with_progress(&problem,
+                                        np_udist_native_search_callback,
+                                        &context,
+                                        NULL,
+                                        &result);
   bwm_objective_cache_callback_option_end();
 
   PROTECT(out = allocVector(VECSXP, 23));
@@ -9846,9 +10040,9 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   SEXP cxkerlb_r = R_NilValue, cxkerub_r = R_NilValue, cykerlb_r = R_NilValue, cykerub_r = R_NilValue;
   SEXP out = R_NilValue, names = R_NilValue, sol = R_NilValue, best = R_NilValue;
   SEXP best_degree = R_NilValue, first_degree = R_NilValue;
-  crs_nomad_solve_fn solve;
   crs_nomad_problem problem;
   crs_nomad_result result;
+  np_nomad_progress_spec progress_spec;
   crs_nomad_option *native_options = NULL;
   int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
   double crs_outputs[1];
@@ -9919,14 +10113,6 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   }
   n_options = (int) XLENGTH(option_names_s);
   objective_cache_enabled = bwm_objective_cache_read_user_enabled();
-
-  np_load_crs_namespace();
-
-  solve = (crs_nomad_solve_fn) R_GetCCallable("crs", "crs_nomad_solve");
-  if (solve == NULL) {
-    UNPROTECT(23);
-    error("failed to resolve crs final native NOMAD callable");
-  }
 
   solution = R_Calloc(n, double);
   best_point = R_Calloc(n, double);
@@ -10032,11 +10218,20 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   result.outputs = crs_outputs;
   result.outputs_len = 1;
 
+  memset(&progress_spec, 0, sizeof(progress_spec));
+  progress_spec.degree_offset = context.nbw;
+  progress_spec.ndegree = context.ndegree;
+  progress_spec.best_degree = context.best_degree;
+  progress_spec.best_objective = &context.best_objective;
+  progress_spec.accepted_evaluations = &context.callback_calls;
+
   nomad_degree_progress_active = (context.ndegree > 0);
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
-  nomad_c_callback_active = 1;
-  status = solve(&problem, np_cdist_native_search_callback, &context, &result);
-  nomad_c_callback_active = 0;
+  status = np_nomad_solve_with_progress(&problem,
+                                        np_cdist_native_search_callback,
+                                        &context,
+                                        &progress_spec,
+                                        &result);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
   if (context.ndegree > 0 && context.callback_calls > 0)

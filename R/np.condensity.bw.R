@@ -1415,9 +1415,9 @@ npNomadShadowClearConditionalDensity <- function() {
 
 .npcdensbw_nomad_shadow_native_require_crs <- function() {
   if (!requireNamespace("crs", quietly = TRUE))
-    stop("native npcdens NOMAD route requires crs >= 0.15-44", call. = FALSE)
-  if (utils::packageVersion("crs") < "0.15.44")
-    stop("native npcdens NOMAD route requires crs >= 0.15-44", call. = FALSE)
+    stop("native npcdens NOMAD route requires crs >= 0.15-46", call. = FALSE)
+  if (utils::packageVersion("crs") < "0.15.46")
+    stop("native npcdens NOMAD route requires crs >= 0.15-46", call. = FALSE)
   invisible(TRUE)
 }
 
