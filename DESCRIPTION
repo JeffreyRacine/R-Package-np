@@ -1,5 +1,5 @@
 Package: np
-Version: 0.70-5
+Version: 0.70-6
 Date: 2026-07-15
 Depends: R (>= 3.5.0)
 Imports: boot, cubature, methods, quadprog, quantreg, stats, crs (>= 0.15-44)

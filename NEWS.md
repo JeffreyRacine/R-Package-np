@@ -1,3 +1,5 @@
+# np 0.70-6
+
 # np 0.70-5
 
 * Corrected the heteroskedasticity-robust Ichimura index-coefficient
