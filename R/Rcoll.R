@@ -299,21 +299,30 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 		#mpi.bcast(x=length(cmd), type=1, rank=rank, comm=comm)
 		#invisible(mpi.bcast(x=cmd, type=4, rank=rank, comm=comm))
 		
-		for (i in 0:(commsize - 1)) {
-			if (i != rank)
-				invisible(mpi.send(x=scmd.arg, type=4, dest=i,
-				                   tag=.npRmpi_protocol_rank_tag("manual_bcast_base", i,
-				                                                  min_rank = 0L,
-				                                                  where = "mpi.bcast.cmd"),
-				                   comm=comm))
-			}
-	      if (caller.execute) {
-          .npRmpi_with_manual_bcast_context({
-	       if (length(arg) > 0)
-	         do.call(.npRmpi_bcast_cmd_funref(scmd), arg, envir = parent.frame())
-	       else
-	         .npRmpi_eval_scmd(tcmd, envir = parent.frame())
-          })
+		send.command <- function() {
+		  for (i in 0:(commsize - 1)) {
+		    if (i != rank)
+		      invisible(mpi.send(x=scmd.arg, type=4, dest=i,
+		                         tag=.npRmpi_protocol_rank_tag("manual_bcast_base", i,
+		                                                        min_rank = 0L,
+		                                                        where = "mpi.bcast.cmd"),
+		                         comm=comm))
+		  }
+		}
+		if (caller.execute) {
+	        caller.env <- parent.frame()
+	        execute <- function() {
+	          send.command()
+	          .npRmpi_with_manual_bcast_context({
+	            if (length(arg) > 0)
+	              do.call(.npRmpi_bcast_cmd_funref(scmd), arg, envir = caller.env)
+	            else
+	              .npRmpi_eval_scmd(tcmd, envir = caller.env)
+	          })
+	        }
+	        .npRmpi_with_command_interrupt_scope(execute())
+	      } else {
+	        send.command()
 	      }
   
     } 

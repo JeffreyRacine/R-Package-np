@@ -7774,7 +7774,7 @@ static inline void np_hot_loop_check_interrupt(const int pos,
 {
   if((pos == 0) || ((pos + 1) >= total) ||
      ((stride > 0) && ((pos % stride) == 0)))
-    R_CheckUserInterrupt();
+    np_check_user_interrupt();
 }
 
 static int kernel_weighted_sum_np_ctx_ex(
@@ -9825,7 +9825,7 @@ double *cv){
 
     // one improvement would be a flip-flop algorithm where the roles
     // of X_j and X_i are swapped and only a new Y_ji need be generated
-    R_CheckUserInterrupt();
+    np_check_user_interrupt();
 #ifdef MPI2
     for(; (j < num_obs) && (W < Wf); j+=blklen)
 #else

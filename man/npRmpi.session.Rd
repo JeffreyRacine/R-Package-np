@@ -195,6 +195,14 @@ on the master process. In profile/manual-broadcast mode, termination is
 handled explicitly in the script via broadcasted \code{mpi.quit()} calls
 rather than via \code{npRmpi.quit()}.
 
+During an active MPI-backed computation, a master interrupt is deferred until
+the current rank-lockstep operation reaches its existing common completion
+boundary. The master then signals an ordinary R \code{interrupt} condition.
+This prevents a rank-local unwind from stranding workers; if the condition is
+caught, the existing pool remains available for subsequent MPI-backed work.
+Consequently, interrupt delivery may not be immediate during a long objective
+evaluation or solve. This coordination adds no MPI commands or payloads.
+
 If an MPI-fanned bootstrap dispatch fails or times out, the current MPI
 session may no longer be usable. Restart R before performing further
 MPI-backed computations.

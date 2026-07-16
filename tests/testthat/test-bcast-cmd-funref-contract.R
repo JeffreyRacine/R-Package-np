@@ -36,3 +36,21 @@ test_that("mpi.bcast.cmd rejects nested plot calls in canonical SPMD mode", {
     fixed = FALSE
   )
 })
+
+test_that("mpi.bcast.cmd preserves caller-frame evaluation", {
+  bcast.cmd <- getFromNamespace("mpi.bcast.cmd", "npRmpi")
+
+  withr::local_options(npRmpi.runtime.option.sync.active = TRUE)
+  local_mocked_bindings(
+    mpi.comm.rank = function(comm = 1) 0L,
+    mpi.comm.size = function(comm = 1) 1L,
+    .package = "npRmpi"
+  )
+
+  caller <- function() {
+    bcast.cmd(local.value <- 42L, caller.execute = TRUE)
+    local.value
+  }
+
+  expect_identical(caller(), 42L)
+})

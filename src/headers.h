@@ -755,4 +755,6 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define UKERNEL_UAA 0
 #define UKERNEL_ULIR 1
 
+void np_check_user_interrupt(void);
+
 #endif // _NP__

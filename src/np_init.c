@@ -44,6 +44,8 @@ extern SEXP C_np_lsqregression_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP,
 extern SEXP C_np_regression(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_progress_signal(SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_mpi_interrupt_state(SEXP);
+extern SEXP C_np_mpi_interrupt_scope(SEXP);
 extern SEXP C_np_shadow_reset_state(void);
 extern SEXP C_np_set_seed(SEXP);
 extern SEXP C_np_set_tgauss2(SEXP);
@@ -158,6 +160,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_progress_fit_begin",        (DL_FUNC) &C_np_progress_fit_begin,         1},
     {"C_np_progress_fit_end",          (DL_FUNC) &C_np_progress_fit_end,           0},
     {"C_np_progress_signal",           (DL_FUNC) &C_np_progress_signal,            4},
+    {"C_np_mpi_interrupt_state",       (DL_FUNC) &C_np_mpi_interrupt_state,        1},
+    {"C_np_mpi_interrupt_scope",       (DL_FUNC) &C_np_mpi_interrupt_scope,        1},
     {"C_np_quantile_conditional",      (DL_FUNC) &C_np_quantile_conditional,      19},
     {"C_np_regression_bw",             (DL_FUNC) &C_np_regression_bw,             16},
     {"C_np_regression_bw_eval",        (DL_FUNC) &C_np_regression_bw_eval,        16},

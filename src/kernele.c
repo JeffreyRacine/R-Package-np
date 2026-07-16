@@ -450,7 +450,7 @@ double *log_likelihood)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			prod_nh = (double) num_obs_train;
 
 			for(l = 0; l < num_reg_continuous; l++)
@@ -512,7 +512,7 @@ double *log_likelihood)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			prod_nh = (double) num_obs_train;
 
 			for(l = 0; l < num_reg_continuous; l++)
@@ -574,7 +574,7 @@ double *log_likelihood)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = sum_ker_temp = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
@@ -967,7 +967,7 @@ double *cv)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 
 				sum_ker = 0.0;
 
@@ -1012,7 +1012,7 @@ double *cv)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 
 				sum_ker = 0.0;
 
@@ -1052,7 +1052,7 @@ double *cv)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 
 				sum_ker = 0.0;
 
@@ -1104,7 +1104,7 @@ double *cv)
 
 		for(j=0; j < num_obs; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 
 			prod_nh = (double) num_obs;
 
@@ -1163,7 +1163,7 @@ double *cv)
 
 		for(j=0; j < num_obs; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 
 			sum_ker = 0.0;
 
@@ -1617,7 +1617,7 @@ double *cv)
 
 		for(j=0; j < num_obs; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -1689,7 +1689,7 @@ double *cv)
 
 		for(j=0; j < num_obs; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			prod_h = 1.0;
 
 			for(l = 0; l < num_var_continuous; l++)
@@ -1770,7 +1770,7 @@ double *cv)
 
 		for(j=0; j < num_obs; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -2225,7 +2225,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
@@ -2263,7 +2263,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
@@ -2301,7 +2301,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
@@ -2642,7 +2642,7 @@ double *SIGN)
 
 			for(j=0; j < num_obs_eval; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				sum_y_ker = sum_y_sq_ker = 0.0;
 				sum_ker = 0.0;
 
@@ -2743,7 +2743,7 @@ double *SIGN)
 
 			for(j=0; j < num_obs_eval; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				sum_y_ker = sum_y_sq_ker = 0.0;
 				sum_ker = 0.0;
 
@@ -2845,7 +2845,7 @@ double *SIGN)
 
 			for(j=0; j < num_obs_eval; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				sum_y_ker = sum_y_sq_ker = 0.0;
 				sum_ker = 0.0;
 
@@ -2963,7 +2963,7 @@ double *SIGN)
 
 			for (j = 0; j < num_obs_eval; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				/* Initialize values to zero for a given evaluation point */
 				for(k=0; k <= num_reg_cat_cont; k++)
 				{
@@ -3167,7 +3167,7 @@ double *SIGN)
 
 			for (j = 0; j < num_obs_eval; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				/* Initialize values to zero for a given evaluation point */
 				for(k=0; k <= num_reg_cat_cont; k++)
 				{
@@ -3371,7 +3371,7 @@ double *SIGN)
 
 			for (j = 0; j < num_obs_eval; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				/* Initialize values to zero for a given evaluation point */
 				for(k=0; k <= num_reg_cat_cont; k++)
 				{
@@ -10844,7 +10844,7 @@ double *log_likelihood)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			prod_h = 1.0;
 
 			for(l = 0; l < num_var_continuous; l++)
@@ -10930,7 +10930,7 @@ double *log_likelihood)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			prod_h = 1.0;
 
 			for(l = 0; l < num_var_continuous; l++)
@@ -11016,7 +11016,7 @@ double *log_likelihood)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = sum_ker_temp = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -11530,7 +11530,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -11593,7 +11593,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -11656,7 +11656,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -12058,7 +12058,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -12122,7 +12122,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -12186,7 +12186,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -13112,7 +13112,7 @@ double *log_likelihood)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			prod_h = 1.0;
 
 			for(l = 0; l < num_var_continuous; l++)
@@ -13239,7 +13239,7 @@ double *log_likelihood)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			prod_h = 1.0;
 
 			for(l = 0; l < num_var_continuous; l++)
@@ -13367,7 +13367,7 @@ double *log_likelihood)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = sum_ker_temp = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -14584,7 +14584,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -14689,7 +14689,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -14794,7 +14794,7 @@ int itmax)
 
 		for(j=0; j < num_obs_eval; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			sum_ker = 0.0;
 			sum_ker_marginal = 0.0;
 
@@ -15874,7 +15874,7 @@ double *cv)
 
 			for (j = 0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 
 				sum_ker = 0.0;
 				sum_ker_convol = 0.0;
@@ -15908,7 +15908,7 @@ double *cv)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 
 				sum_ker = 0.0;
 				sum_ker_convol = 0.0;
@@ -15960,7 +15960,7 @@ double *cv)
 
 		for(j=0; j < num_obs; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 
 			sum_ker = 0.0;
 			sum_ker_convol = 0.0;
@@ -16010,7 +16010,7 @@ double *cv)
 
 		for(j=0; j < num_obs; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 
 			sum_ker = 0.0;
 			sum_ker_convol = 0.0;
@@ -16395,7 +16395,7 @@ double *cv)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				/* Evaluate at point j */
 
 				sum_ker = 0.0;
@@ -16528,7 +16528,7 @@ double *cv)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				/* Evaluate at point j */
 
 				sum_ker = 0.0;
@@ -16662,7 +16662,7 @@ double *cv)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				/* Evaluate at point j */
 
 				sum_ker = 0.0;
@@ -16835,7 +16835,7 @@ double *cv)
 
 		for(j=0; j < num_obs; j++)
 		{
-		  R_CheckUserInterrupt();
+		  np_check_user_interrupt();
 			/* Evaluate at point j */
 
 			sum_ker = 0.0;
@@ -17569,7 +17569,7 @@ double  initd_dir)
 
 	for(i=0; i < num_obs_eval; i++)
 	{
-	  R_CheckUserInterrupt();
+	  np_check_user_interrupt();
 		for(j = 0; j < num_reg_unordered; j++)
 		{
 			matrix_X_unordered_quantile_extern[j][0] = matrix_X_unordered_eval[j][i];
@@ -17914,7 +17914,7 @@ int *num_categories)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				sum_y_ker = 0.0;
 				sum_ker = 0.0;
 
@@ -17967,7 +17967,7 @@ int *num_categories)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				sum_y_ker = 0.0;
 				sum_ker = 0.0;
 
@@ -18019,7 +18019,7 @@ int *num_categories)
 
 			for(j=0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				sum_y_ker = 0.0;
 				sum_ker = 0.0;
 
@@ -18120,7 +18120,7 @@ int *num_categories)
 
 			for (j = 0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				/* Initialize values to zero for a given evaluation point */
 				for(k=0; k <= num_reg_cat_cont; k++)
 				{
@@ -18294,7 +18294,7 @@ int *num_categories)
 
 			for (j = 0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				/* Initialize values to zero for a given evaluation point */
 				for(k=0; k <= num_reg_cat_cont; k++)
 				{
@@ -18468,7 +18468,7 @@ int *num_categories)
 
 			for (j = 0; j < num_obs; j++)
 			{
-			  R_CheckUserInterrupt();
+			  np_check_user_interrupt();
 				/* Initialize values to zero for a given evaluation point */
 				for(k=0; k <= num_reg_cat_cont; k++)
 				{

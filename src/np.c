@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,7 +14,9 @@
 #include <R_ext/Arith.h>
 #include <R_ext/Memory.h>
 #include <R_ext/Rdynload.h>
+#include <R_ext/Utils.h>
 #include <Rinternals.h>
+#include <Rversion.h>
 #include <stdint.h>
 
 #include <crs_nomad_native.h>
@@ -87,9 +90,12 @@ typedef struct {
   const int *accepted_evaluations;
 } np_nomad_progress_spec;
 
-static crs_nomad_solve_observed_fn np_crs_nomad_solve_observed = NULL;
 static crs_nomad_observer_poll_fn np_crs_nomad_observer_poll = NULL;
 static int nomad_c_callback_active = 0;
+static int np_mpi_interrupt_pending = 0;
+static volatile sig_atomic_t np_mpi_sigint_seen = 0;
+static int np_mpi_sigint_scope_depth = 0;
+static void (*np_mpi_previous_sigint_handler)(int) = SIG_DFL;
 
 static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
                                         crs_nomad_eval_fn eval,
@@ -125,6 +131,17 @@ static void np_load_crs_namespace(void)
   UNPROTECT(2);
 }
 
+static int np_namespace_has(SEXP environment, const char *name)
+{
+  if (environment == R_NilValue || name == NULL)
+    return 0;
+#if R_VERSION >= R_Version(4, 2, 0)
+  return R_existsVarInFrame(environment, Rf_install(name));
+#else
+  return Rf_findVarInFrame(environment, Rf_install(name)) != R_UnboundValue;
+#endif
+}
+
 static int np_mpi_local_regression_mode = 0;
 #ifdef MPI2
 static int np_mpi_local_regression_saved_rank = 0;
@@ -135,6 +152,42 @@ static int np_mpi_active_comm_saved_rank = 0;
 static int np_mpi_active_comm_saved_nproc = 1;
 static MPI_Comm np_mpi_active_comm_saved_comm1 = MPI_COMM_NULL;
 #endif
+
+static int np_mpi_distributed_interrupt_active(void)
+{
+#ifdef MPI2
+  return !np_mpi_local_regression_mode &&
+    comm != NULL && comm[1] != MPI_COMM_NULL && iNum_Processors > 1;
+#else
+  return 0;
+#endif
+}
+
+static void np_mpi_sigint_handler(int signal_number)
+{
+  (void) signal_number;
+  np_mpi_sigint_seen = 1;
+}
+
+static void np_user_interrupt_probe(void *data)
+{
+  (void) data;
+  R_CheckUserInterrupt();
+}
+
+void np_check_user_interrupt(void)
+{
+  if (!np_mpi_distributed_interrupt_active()) {
+    R_CheckUserInterrupt();
+    return;
+  }
+#ifdef MPI2
+  if (my_rank != 0 || np_mpi_interrupt_pending)
+    return;
+  if (!R_ToplevelExec(np_user_interrupt_probe, NULL))
+    np_mpi_interrupt_pending = 1;
+#endif
+}
 static int fit_progress_active = 0;
 static int fit_progress_total = 0;
 static int fit_progress_offset = 0;
@@ -162,7 +215,7 @@ static void np_progress_signal(const char *event, const char *surface, const int
     return;
   }
 
-  if (!R_existsVarInFrame(ns, Rf_install(".np_progress_signal_from_c"))) {
+  if (!np_namespace_has(ns, ".np_progress_signal_from_c")) {
     UNPROTECT(1);
     return;
   }
@@ -239,7 +292,7 @@ static void np_progress_nomad_degree_step(const int current_eval,
     return;
   }
 
-  if (!R_existsVarInFrame(ns, Rf_install(".np_progress_nomad_native_step_from_c"))) {
+  if (!np_namespace_has(ns, ".np_progress_nomad_native_step_from_c")) {
     UNPROTECT(1);
     return;
   }
@@ -280,8 +333,7 @@ static int np_nomad_progress_observer_config(double *interval_sec)
   PROTECT(package = Rf_mkString("npRmpi"));
   PROTECT(ns = R_FindNamespace(package));
   if (ns == R_NilValue ||
-      !R_existsVarInFrame(ns,
-                          Rf_install(".np_progress_nomad_native_observer_config"))) {
+      !np_namespace_has(ns, ".np_progress_nomad_native_observer_config")) {
     UNPROTECT(2);
     return 0;
   }
@@ -335,8 +387,7 @@ static int np_nomad_progress_observer(
   PROTECT(package = Rf_mkString("npRmpi")); nprotect++;
   PROTECT(ns = R_FindNamespace(package)); nprotect++;
   if (ns == R_NilValue ||
-      !R_existsVarInFrame(ns,
-                          Rf_install(".np_progress_nomad_native_observer_dispatch"))) {
+      !np_namespace_has(ns, ".np_progress_nomad_native_observer_dispatch")) {
     if (message != NULL && message_size > 0)
       snprintf(message, message_size, "npRmpi NOMAD progress dispatcher is unavailable");
     UNPROTECT(nprotect);
@@ -385,6 +436,11 @@ static int np_nomad_progress_observer(
   if (status < CRS_NOMAD_OBSERVER_OUTCOME_OK ||
       status > CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT)
     status = CRS_NOMAD_OBSERVER_OUTCOME_ERROR;
+  if (status == CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT &&
+      np_mpi_distributed_interrupt_active()) {
+    np_mpi_interrupt_pending = 1;
+    status = CRS_NOMAD_OBSERVER_OUTCOME_OK;
+  }
   if (message != NULL && message_size > 0 &&
       VECTOR_ELT(value, 1) != R_NilValue && XLENGTH(VECTOR_ELT(value, 1)) > 0) {
     SEXP message_char = Rf_asChar(VECTOR_ELT(value, 1));
@@ -407,9 +463,7 @@ static void np_nomad_progress_observer_report(const char *message)
   PROTECT(package = Rf_mkString("npRmpi"));
   PROTECT(ns = R_FindNamespace(package));
   if (ns == R_NilValue ||
-      !R_existsVarInFrame(
-        ns,
-        Rf_install(".np_progress_nomad_native_observer_report"))) {
+      !np_namespace_has(ns, ".np_progress_nomad_native_observer_report")) {
     UNPROTECT(2);
     return;
   }
@@ -428,6 +482,10 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
                                         const np_nomad_progress_spec *progress_spec,
                                         crs_nomad_result *result)
 {
+  crs_nomad_solve_observed_fn solve_observed;
+  crs_nomad_observer_poll_fn observer_poll;
+  crs_nomad_problem distributed_problem;
+  const crs_nomad_problem *solve_problem = problem;
   crs_nomad_observer observer;
   double interval_sec = 2.0;
   int observer_enabled;
@@ -435,14 +493,19 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
   int status;
 
   np_load_crs_namespace();
-  if (np_crs_nomad_solve_observed == NULL)
-    np_crs_nomad_solve_observed = (crs_nomad_solve_observed_fn)
-      R_GetCCallable("crs", "crs_nomad_solve_observed");
-  if (np_crs_nomad_observer_poll == NULL)
-    np_crs_nomad_observer_poll = (crs_nomad_observer_poll_fn)
-      R_GetCCallable("crs", "crs_nomad_observer_poll");
-  if (np_crs_nomad_solve_observed == NULL || np_crs_nomad_observer_poll == NULL)
+  solve_observed = (crs_nomad_solve_observed_fn)
+    R_GetCCallable("crs", "crs_nomad_solve_observed");
+  observer_poll = (crs_nomad_observer_poll_fn)
+    R_GetCCallable("crs", "crs_nomad_observer_poll");
+  if (solve_observed == NULL || observer_poll == NULL)
     error("required crs 0.15-46 native NOMAD observer capability is unavailable");
+  np_crs_nomad_observer_poll = observer_poll;
+
+  if (problem != NULL && np_mpi_distributed_interrupt_active()) {
+    distributed_problem = *problem;
+    distributed_problem.reserved_int1 = CRS_NOMAD_INTERRUPT_OWNERSHIP_EXTERNAL;
+    solve_problem = &distributed_problem;
+  }
 
   observer_enabled = np_nomad_progress_observer_config(&interval_sec);
 #ifdef MPI2
@@ -459,20 +522,95 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
   }
 
   previous_callback_state = nomad_c_callback_active;
-  if (problem != NULL && problem->callback_mode == CRS_NOMAD_CALLBACK_C)
+  if (solve_problem != NULL &&
+      solve_problem->callback_mode == CRS_NOMAD_CALLBACK_C)
     nomad_c_callback_active = 1;
-  status = np_crs_nomad_solve_observed(problem,
-                                       eval,
-                                       user_data,
-                                       observer_enabled ? &observer : NULL,
-                                       result);
+  status = solve_observed(solve_problem,
+                          eval,
+                          user_data,
+                          observer_enabled ? &observer : NULL,
+                          result);
   nomad_c_callback_active = previous_callback_state;
+  np_crs_nomad_observer_poll = NULL;
 
   if (observer_enabled &&
       observer.outcome == CRS_NOMAD_OBSERVER_OUTCOME_ERROR)
     np_nomad_progress_observer_report(observer.message);
 
   return status;
+}
+
+SEXP C_np_mpi_interrupt_state(SEXP action)
+{
+  const int action_i = Rf_asInteger(action);
+  int pending = np_mpi_interrupt_pending != 0;
+
+  if (action_i == 3)
+    return ScalarLogical(np_mpi_distributed_interrupt_active());
+
+  if (action_i == 4) {
+#ifdef MPI2
+    if (np_mpi_distributed_interrupt_active() && my_rank == 0 &&
+        !np_mpi_interrupt_pending &&
+        !R_ToplevelExec(np_user_interrupt_probe, NULL))
+      np_mpi_interrupt_pending = 1;
+#endif
+    pending = np_mpi_interrupt_pending != 0;
+    np_mpi_interrupt_pending = 0;
+    return ScalarLogical(pending);
+  }
+
+  if (action_i == 2) {
+    if (np_mpi_distributed_interrupt_active())
+      np_mpi_interrupt_pending = 1;
+  } else if (action_i == 1) {
+    np_mpi_interrupt_pending = 0;
+  } else if (action_i != 0) {
+    error("C_np_mpi_interrupt_state: action must be 0 (query), 1 (consume), 2 (set), 3 (active), or 4 (poll and consume)");
+  }
+
+  return ScalarLogical(pending);
+}
+
+SEXP C_np_mpi_interrupt_scope(SEXP action)
+{
+  const int action_i = Rf_asInteger(action);
+  int signaled = 0;
+
+  if (action_i == 1) {
+    if (!np_mpi_distributed_interrupt_active())
+      return ScalarLogical(0);
+#ifdef MPI2
+    if (my_rank != 0)
+      return ScalarLogical(0);
+#endif
+    if (np_mpi_sigint_scope_depth == 0) {
+      void (*previous_handler)(int);
+      np_mpi_sigint_seen = 0;
+      previous_handler = signal(SIGINT, np_mpi_sigint_handler);
+      if (previous_handler == SIG_ERR)
+        error("unable to install the MPI command SIGINT handler");
+      np_mpi_previous_sigint_handler = previous_handler;
+    }
+    np_mpi_sigint_scope_depth++;
+    return ScalarLogical(1);
+  }
+
+  if (action_i == 2) {
+    if (np_mpi_sigint_scope_depth <= 0)
+      return ScalarLogical(0);
+    np_mpi_sigint_scope_depth--;
+    if (np_mpi_sigint_scope_depth == 0) {
+      (void) signal(SIGINT, np_mpi_previous_sigint_handler);
+      signaled = np_mpi_sigint_seen != 0 || np_mpi_interrupt_pending != 0;
+      np_mpi_sigint_seen = 0;
+      np_mpi_interrupt_pending = 0;
+    }
+    return ScalarLogical(signaled);
+  }
+
+  error("C_np_mpi_interrupt_scope: action must be 1 (begin) or 2 (end)");
+  return R_NilValue;
 }
 
 SEXP C_np_progress_signal(SEXP event, SEXP surface, SEXP current, SEXP total)
