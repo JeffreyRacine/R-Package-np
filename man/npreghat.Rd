@@ -72,9 +72,10 @@ These arguments control local-polynomial basis, degree, derivatives, leave-one-o
   \item{basis}{Local polynomial basis: \code{"glp"}, \code{"additive"}, or \code{"tensor"}.}
 
 
-  \item{bernstein.basis}{Logical; select the Bernstein representation for LP
-    terms. See \code{\link{npreg}} for the complete degree-graded GLP
-    definition and the additive/tensor definitions.}
+  \item{bernstein.basis}{Logical; select the stabilized LP representation. For
+    GLP, \code{TRUE} selects the degree-graded, orthonormal shifted-Legendre
+    representation; additive and tensor bases retain their Bernstein
+    representations. See \code{\link{npreg}} for the definitions.}
 
 
   \item{degree}{Optional local polynomial degree vector override (LP path).}

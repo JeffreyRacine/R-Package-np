@@ -286,14 +286,16 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
 
   The optional flag \code{bernstein.basis} controls basis construction:
   \code{FALSE} (default) uses raw local-polynomial powers. For
-  \code{basis="glp"}, \code{TRUE} uses a degree-graded, orthonormalized
-  Bernstein representation. On the unit-scaled support
+  \code{basis="glp"}, the historical selector \code{TRUE} uses a
+  degree-graded, orthonormal shifted-Legendre representation. On the unit-scaled support
   \eqn{u\in[0,1]}{u in [0,1]}, its order-\eqn{k}{k} factor is
   \eqn{\sqrt{2k+1}P_k(2u-1)}{sqrt(2*k+1) P[k](2*u-1)}, where
   \eqn{P_k}{P[k]} is a Legendre polynomial. This is an exact
   degree-\eqn{k}{k} linear combination of Bernstein polynomials and, because
   the GLP multi-index set is downward closed, spans exactly the same
-  heterogeneous polynomial space as the raw representation. Additive and
+  heterogeneous polynomial space as the raw representation. It is evaluated
+  by a deterministic Legendre recurrence, not by sample-dependent
+  Gram--Schmidt or QR orthogonalization. Additive and
   tensor bases retain their fixed-coordinate-degree Bernstein
   representation. The
   homogeneous degree-0 and degree-1 cases remain
@@ -301,7 +303,7 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   predictors, \code{gradients=TRUE} returns the derivative order(s)
   requested by \code{gradient.order}; the associated \code{gerr}
   entries are standard errors for those same derivative orders. Both
-  raw and Bernstein representations report fitted values and derivatives
+  raw and shifted-Legendre representations report fitted values and derivatives
   on the original response/predictor scale. In mixed-data GLP settings,
   unordered and ordered predictors contribute first-order
   effects/contrasts rather than higher-order derivatives.

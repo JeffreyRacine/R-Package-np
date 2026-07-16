@@ -2730,7 +2730,7 @@ npLpBasisRepresentationLabel <- function(bernstein, basis = "glp"){
   if (!isTRUE(bernstein))
     return("Raw")
   if (identical(tolower(basis), "glp"))
-    return("Degree-graded Bernstein (orthonormalized)")
+    return("Shifted Legendre (degree-graded orthonormal)")
   "Bernstein"
 }
 
