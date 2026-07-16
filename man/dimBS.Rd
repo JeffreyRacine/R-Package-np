@@ -58,7 +58,14 @@ Optional categorical-component controls used when \code{kernel = FALSE}.
   \code{dimBS()} is provided for compatibility with \pkg{crs}. In
   \pkg{npRmpi}, the underlying implementation lives in
   \code{dim_basis()}, which is used internally for LP basis-dimension
-  checks and safe NOMAD restart initialization.
+  checks and safe NOMAD restart initialization. For \code{kernel=TRUE},
+  \code{basis="glp"}, and one segment per continuous predictor, the count is
+  the number of non-intercept multi-indices satisfying
+  \eqn{0\leq\alpha_j\leq d_j}{0 <= alpha[j] <= d[j]} and
+  \eqn{\sum_j\alpha_j\leq\max_j d_j}{sum(alpha) <= max(d)}. This unit-segment
+  rule is the local-polynomial contract; non-unit segment and categorical
+  augmentation semantics are unchanged. Counts beyond the supported
+  100,000-term native GLP capacity fail before basis allocation.
 }
 \examples{
 dimBS(basis = "tensor", degree = c(2, 2))

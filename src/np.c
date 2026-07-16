@@ -1618,6 +1618,53 @@ static void np_dim_basis_two_dimen(const int d1, const int d2, double *nd1, doub
   *pd12 = d12;
 }
 
+static double np_complete_lp_count_bounded(const int *degree,
+                                           const int ndegree,
+                                           const double cap)
+{
+  int j, total, value, dmax = 0;
+  double answer = 0.0;
+  double *count = NULL;
+  double *next = NULL;
+  const double ceiling = cap + 1.0;
+
+  if (ndegree <= 0)
+    return 1.0;
+  for (j = 0; j < ndegree; j++)
+    if (degree[j] > dmax) dmax = degree[j];
+
+  count = (double *)calloc((size_t)(dmax + 1), sizeof(double));
+  next = (double *)calloc((size_t)(dmax + 1), sizeof(double));
+  if ((count == NULL) || (next == NULL)) {
+    free(count);
+    free(next);
+    error("np_complete_lp_count_bounded: memory allocation failed");
+  }
+  count[0] = 1.0;
+
+  for (j = 0; j < ndegree; j++) {
+    memset(next, 0, (size_t)(dmax + 1)*sizeof(double));
+    for (total = 0; total <= dmax; total++) {
+      if (count[total] == 0.0) continue;
+      for (value = 0; value <= MIN(degree[j], dmax - total); value++) {
+        const int idx = total + value;
+        next[idx] = MIN(ceiling, next[idx] + count[total]);
+      }
+    }
+    {
+      double *swap = count;
+      count = next;
+      next = swap;
+    }
+  }
+
+  for (total = 0; total <= dmax; total++)
+    answer = MIN(ceiling, answer + count[total]);
+  free(count);
+  free(next);
+  return answer;
+}
+
 void np_dim_basis(int *basis_code,
                   int *kernel,
                   int *degree,
@@ -1658,6 +1705,28 @@ void np_dim_basis(int *basis_code,
       error("np_dim_basis: memory allocation failed");
     for (i = 0; i < ndeg; i++)
       rows[i] = degree[i] + segments[i];
+  }
+
+  if (use_kernel && (basis == 1)) {
+    int unit_segments = 1;
+    for (i = 0; i < ndeg; i++) {
+      if (segments[i] != 1) {
+        unit_segments = 0;
+        break;
+      }
+    }
+    if (unit_segments) {
+      const double full_count =
+        np_complete_lp_count_bounded(degree, ndeg, 100000.0);
+      if (full_count > 100000.0) {
+        free(rows);
+        error("LP basis dimension exceeds supported term capacity (100000)");
+      }
+      ncol_bs = MAX(0.0, full_count - 1.0);
+      free(rows);
+      *result = ncol_bs;
+      return;
+    }
   }
 
   if (use_kernel){

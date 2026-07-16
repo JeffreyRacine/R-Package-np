@@ -270,7 +270,9 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   estimates with respect to continuous explanatory variables. These
   derivatives use the same local-polynomial basis, degree, Bernstein
   option, bandwidths, and kernels as the fitted conditional
-  distribution. Asymptotic standard errors for these higher-order
+  distribution. See \code{\link{npreg}} for the complete heterogeneous
+  GLP multi-index and Bernstein-representation definitions shared by these
+  routes. Asymptotic standard errors for these higher-order
   derivative columns are not currently reported; the corresponding
   entries of \code{congerr} are \code{NA}. Use bootstrap intervals when
   inference on higher-order derivatives is required.

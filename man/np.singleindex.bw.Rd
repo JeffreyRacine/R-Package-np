@@ -268,8 +268,10 @@ These arguments control the index smoother, local-polynomial basis, and fixed de
   }
 
   \item{bernstein.basis}{
-    logical flag used when \code{regtype="lp"}; if \code{TRUE}, use a
-    Bernstein/B-spline basis for local polynomial terms. When automatic
+    logical flag used when \code{regtype="lp"}. For \code{basis="glp"},
+    \code{TRUE} selects the complete degree-graded orthonormalized Bernstein
+    representation defined in \code{\link{npreg}}; additive and tensor bases
+    retain their fixed-coordinate-degree Bernstein representation. When automatic
     degree search is requested and \code{bernstein.basis} is not
     explicitly supplied, the search route defaults to \code{TRUE} for
     numerical stability. Explicit \code{bernstein.basis=FALSE} is

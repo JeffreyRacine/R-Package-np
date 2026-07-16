@@ -187,8 +187,13 @@ These arguments control regression type, local-polynomial specification, and opt
   \item{bernstein.basis}{
     logical flag relevant only when \code{regtype="lp"}. If
     \code{FALSE} (default), the GLP basis uses raw local-polynomial
-    powers (stable for extrapolation). If \code{TRUE}, a Bernstein
-    (B-spline) basis is used for continuous predictors. For
+    powers (stable for extrapolation). If \code{TRUE}, continuous predictors
+    use a Bernstein representation. For \code{basis="glp"}, this is the
+    degree-graded orthonormalized construction described in
+    \code{\link{npreg}}; it has exactly the same complete, coordinate-capped
+    total-degree polynomial span as the raw GLP representation. Additive and
+    tensor bases retain their fixed-coordinate-degree Bernstein
+    representation. For
     \code{bernstein.basis=TRUE}, prediction/evaluation points must lie
     within the training support of each continuous predictor. For
     automatic degree search, if \code{bernstein.basis} is not
@@ -208,7 +213,8 @@ These arguments control regression type, local-polynomial specification, and opt
     continuous predictors (exactly one degree per continuous predictor),
     relevant only when \code{regtype="lp"}. When
     \code{degree.select="manual"}, this must be supplied explicitly.
-    Entries must be non-negative integers in \code{[0,12]}.
+    Entries must be non-negative integers in \code{[0,100]}; values above 25
+    trigger a numerical-stability warning.
     With no continuous predictors, \code{regtype="lp"} is only
     admissible when \code{degree=0}, the local-constant equivalent.
     Bandwidth optimization treats this vector as fixed input and

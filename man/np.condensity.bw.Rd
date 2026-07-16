@@ -543,8 +543,10 @@ These arguments control the local-polynomial estimator, basis, and fixed degree 
   }
 
   \item{bernstein.basis}{
-    logical value controlling Bernstein basis evaluation for
-    \code{regtype="lp"}. When automatic degree search is requested and
+    logical value controlling the Bernstein representation for
+    \code{regtype="lp"}. For \code{basis="glp"}, the complete degree-graded
+    orthonormalized definition is given in \code{\link{npreg}}; additive and
+    tensor bases retain their fixed-coordinate-degree representation. When automatic degree search is requested and
     \code{bernstein.basis} is not explicitly supplied, the search route
     defaults to \code{TRUE} for numerical stability. Explicit
     \code{bernstein.basis=FALSE} is honored, but raw-polynomial search

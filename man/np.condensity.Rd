@@ -255,7 +255,9 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   \code{gradient.order} greater than one expose higher-order derivative
   estimates with respect to continuous explanatory variables. These
   derivatives use the same local-polynomial basis, degree, Bernstein
-  option, bandwidths, and kernels as the fitted conditional density.
+  option, bandwidths, and kernels as the fitted conditional density. See
+  \code{\link{npreg}} for the complete heterogeneous GLP multi-index and
+  Bernstein-representation definitions shared by these routes.
   Asymptotic standard errors for these higher-order derivative columns
   are not currently reported; the corresponding entries of
   \code{congerr} are \code{NA}. Use bootstrap intervals when inference

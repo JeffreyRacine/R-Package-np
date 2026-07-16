@@ -10029,8 +10029,11 @@ static int np_glp_store_term(const int ncon,
                              int *cap,
                              const int *cur){
   int j, k;
+  const int max_terms = 100000;
+  if(*nterms >= max_terms)
+    return 0;
   if(*nterms >= *cap){
-    int newcap = (*cap <= 0) ? 32 : 2*(*cap);
+    int newcap = (*cap <= 0) ? 32 : MIN(max_terms, 2*(*cap));
     int *tmp = (int *)realloc(*terms_ptr, (size_t)newcap*(size_t)ncon*sizeof(int));
     if(tmp == NULL) return 0;
     *terms_ptr = tmp;
@@ -10044,34 +10047,28 @@ static int np_glp_store_term(const int ncon,
 }
 
 static int np_glp_enum_terms_rec(const int idx,
+                                 const int step,
                                  const int ncon,
                                  const int basis_mode,
                                  const int dmax,
+                                 const int total,
                                  const int *deg,
                                  int *cur,
                                  int **terms_ptr,
                                  int *nterms,
                                  int *cap){
   int k;
-  if(idx == ncon){
-    int s = 0;
+  if(((step > 0) && (idx == ncon)) || ((step < 0) && (idx < 0))){
     int nz = 0;
-    for(k = 0; k < ncon; k++)
-      s += cur[k];
     for(k = 0; k < ncon; k++)
       if(cur[k] > 0) nz++;
 
     if(basis_mode == 2){ /* tensor */
-      if(s <= 0) return 1;
+      if(total <= 0) return 1;
     } else if(basis_mode == 0){ /* additive */
-      if((s <= 0) || (nz != 1)) return 1;
+      if((total <= 0) || (nz != 1)) return 1;
     } else { /* glp */
-      if((s <= 0) || (s > dmax)) return 1;
-      for(k = 0; k < ncon; k++){
-        const int dk = deg[k];
-        if((dk > 0) && (dk < dmax) && (s > dk) && (cur[k] == dk))
-          return 1;
-      }
+      if((total <= 0) || (total > dmax)) return 1;
     }
 
     if(!np_glp_store_term(ncon, terms_ptr, nterms, cap, cur))
@@ -10079,10 +10076,14 @@ static int np_glp_enum_terms_rec(const int idx,
     return 1;
   }
 
-  for(k = 0; k <= deg[idx]; k++){
-    cur[idx] = k;
-    if(np_glp_enum_terms_rec(idx + 1, ncon, basis_mode, dmax, deg, cur, terms_ptr, nterms, cap) == 0)
-      return 0;
+  {
+    const int upper = (basis_mode == 1) ? MIN(deg[idx], dmax - total) : deg[idx];
+    for(k = 0; k <= upper; k++){
+      cur[idx] = k;
+      if(np_glp_enum_terms_rec(idx + step, step, ncon, basis_mode, dmax, total + k,
+                               deg, cur, terms_ptr, nterms, cap) == 0)
+        return 0;
+    }
   }
   return 1;
 }
@@ -10095,7 +10096,6 @@ static int np_glp_build_terms(const int ncon,
                               int **terms_out,
                               int *nterms_out){
   int dmax, j;
-  double tcount_bound = 1.0;
   int *terms = NULL;
   int *cur = NULL;
   int *zero = NULL;
@@ -10110,16 +10110,11 @@ static int np_glp_build_terms(const int ncon,
   }
 
   for(j = 0; j < ncon; j++){
-    if((deg[j] < 0) || (deg[j] > 12))
-      return 0;
-    tcount_bound *= (double)(deg[j] + 1);
-    if(tcount_bound > 100000.0)
+    if((deg[j] < 0) || (deg[j] > 100))
       return 0;
   }
 
   dmax = np_glp_max_degree(ncon, deg);
-  if(dmax > 12)
-    return 0;
 
   zero = (int *)calloc((size_t)ncon, sizeof(int));
   if(zero == NULL)
@@ -10137,7 +10132,10 @@ static int np_glp_build_terms(const int ncon,
   }
 
   if(dmax > 0){
-    if(np_glp_enum_terms_rec(0, ncon, basis_mode, dmax, deg, cur, &terms, &nterms, &cap) == 0){
+    const int step = (basis_mode == 1) ? -1 : 1;
+    const int first = (basis_mode == 1) ? ncon - 1 : 0;
+    if(np_glp_enum_terms_rec(first, step, ncon, basis_mode, dmax, 0,
+                             deg, cur, &terms, &nterms, &cap) == 0){
       free(cur);
       free(terms);
       return 0;
@@ -10342,6 +10340,7 @@ static void np_glp_fill_basis_eval_deriv_raw_centered(const int which_var,
 typedef struct {
   int degree;
   int use_basis;
+  int complete_glp;
   int max_deriv;
   double xmin;
   double xmax;
@@ -10349,17 +10348,24 @@ typedef struct {
   gsl_bspline_deriv_workspace *dw;
   gsl_vector *B;
   gsl_matrix *dB;
+  double *graded_B;
+  double *graded_dB;
 } NPGLPBasisCtx;
 
 static void np_glp_basis_ctx_free(NPGLPBasisCtx *ctx);
 
-static int np_glp_basis_ctx_init(NPGLPBasisCtx *ctx, const int degree, const double xmin, const double xmax){
+static int np_glp_basis_ctx_init(NPGLPBasisCtx *ctx,
+                                 const int degree,
+                                 const double xmin,
+                                 const double xmax,
+                                 const int complete_glp){
   const size_t k = (size_t)(degree + 1);
   const size_t nbreak = 2;
   const size_t ncoeff = (size_t)(degree + 1);
   const size_t nderiv = (size_t)(degree + 1);
   ctx->degree = degree;
   ctx->use_basis = (degree > 0) && (xmax > xmin);
+  ctx->complete_glp = (complete_glp != 0);
   ctx->max_deriv = degree;
   ctx->xmin = xmin;
   ctx->xmax = xmax;
@@ -10367,7 +10373,18 @@ static int np_glp_basis_ctx_init(NPGLPBasisCtx *ctx, const int degree, const dou
   ctx->dw = NULL;
   ctx->B = NULL;
   ctx->dB = NULL;
+  ctx->graded_B = NULL;
+  ctx->graded_dB = NULL;
   if(!ctx->use_basis) return 1;
+  if(ctx->complete_glp){
+    ctx->graded_B = (double *)calloc(ncoeff, sizeof(double));
+    ctx->graded_dB = (double *)calloc(ncoeff*(size_t)(ctx->max_deriv + 1), sizeof(double));
+    if((ctx->graded_B == NULL) || (ctx->graded_dB == NULL)){
+      np_glp_basis_ctx_free(ctx);
+      return 0;
+    }
+    return 1;
+  }
   ctx->bw = gsl_bspline_alloc(k, nbreak);
   if(ctx->bw == NULL) return 0;
   if(gsl_bspline_knots_uniform(xmin, xmax, ctx->bw) != GSL_SUCCESS){
@@ -10389,16 +10406,91 @@ static void np_glp_basis_ctx_free(NPGLPBasisCtx *ctx){
   if(ctx->dw != NULL) gsl_bspline_deriv_free(ctx->dw);
   if(ctx->B != NULL) gsl_vector_free(ctx->B);
   if(ctx->bw != NULL) gsl_bspline_free(ctx->bw);
+  free(ctx->graded_dB);
+  free(ctx->graded_B);
+  ctx->graded_dB = NULL;
+  ctx->graded_B = NULL;
   ctx->dB = NULL;
   ctx->dw = NULL;
   ctx->B = NULL;
   ctx->bw = NULL;
 }
 
+static void np_glp_basis_ctx_eval(NPGLPBasisCtx *ctx,
+                                  const double x,
+                                  const int requested_deriv){
+  int k, r;
+  const int rmax = MIN(MAX(0, requested_deriv), ctx->max_deriv);
+  const int stride = ctx->max_deriv + 1;
+  const double xrange = ctx->xmax - ctx->xmin;
+  double z;
+
+  if(!ctx->use_basis)
+    return;
+
+  if(!ctx->complete_glp){
+    gsl_bspline_eval(x, ctx->B, ctx->bw);
+    if((rmax > 0) && (rmax <= ctx->max_deriv))
+      gsl_bspline_deriv_eval(x, rmax, ctx->dB, ctx->bw, ctx->dw);
+    return;
+  }
+
+  memset(ctx->graded_B, 0, (size_t)(ctx->degree + 1)*sizeof(double));
+  memset(ctx->graded_dB, 0,
+         (size_t)(ctx->degree + 1)*(size_t)stride*sizeof(double));
+
+  z = 2.0*(x - ctx->xmin)/xrange - 1.0;
+  ctx->graded_dB[0] = 1.0;
+  if(ctx->degree >= 1){
+    ctx->graded_dB[(size_t)stride] = z;
+    if(rmax >= 1)
+      ctx->graded_dB[(size_t)stride + 1] = 2.0;
+  }
+
+  for(k = 1; k < ctx->degree; k++){
+    const int upper = MIN(rmax, k + 1);
+    for(r = 0; r <= upper; r++){
+      double value = (2.0*(double)k + 1.0)*z*
+        ctx->graded_dB[(size_t)k*(size_t)stride + (size_t)r] -
+        (double)k*ctx->graded_dB[(size_t)(k - 1)*(size_t)stride + (size_t)r];
+      if(r > 0)
+        value += (2.0*(double)k + 1.0)*2.0*(double)r*
+          ctx->graded_dB[(size_t)k*(size_t)stride + (size_t)(r - 1)];
+      ctx->graded_dB[(size_t)(k + 1)*(size_t)stride + (size_t)r] =
+        value/((double)k + 1.0);
+    }
+  }
+
+  for(k = 0; k <= ctx->degree; k++){
+    double scale = sqrt(2.0*(double)k + 1.0);
+    for(r = 0; r <= rmax; r++){
+      if(r > 0)
+        scale /= xrange;
+      ctx->graded_dB[(size_t)k*(size_t)stride + (size_t)r] *= scale;
+    }
+    ctx->graded_B[k] = ctx->graded_dB[(size_t)k*(size_t)stride];
+  }
+}
+
 static inline double np_glp_basis_factor_value(const NPGLPBasisCtx *ctx, const int idx){
   if(idx == 0) return 1.0;
   if((ctx->degree <= 0) || (idx < 1) || (idx > ctx->degree) || !ctx->use_basis) return 0.0;
-  return gsl_vector_get(ctx->B, (size_t)idx);
+  return ctx->complete_glp ? ctx->graded_B[idx] :
+    gsl_vector_get(ctx->B, (size_t)idx);
+}
+
+static inline double np_glp_basis_factor_deriv(const NPGLPBasisCtx *ctx,
+                                               const int idx,
+                                               const int deriv_order){
+  const int stride = ctx->max_deriv + 1;
+  if(deriv_order <= 0)
+    return np_glp_basis_factor_value(ctx, idx);
+  if((idx <= 0) || (idx > ctx->degree) || !ctx->use_basis ||
+     (deriv_order > ctx->max_deriv))
+    return 0.0;
+  return ctx->complete_glp ?
+    ctx->graded_dB[(size_t)idx*(size_t)stride + (size_t)deriv_order] :
+    gsl_matrix_get(ctx->dB, (size_t)idx, (size_t)deriv_order);
 }
 
 static void np_glp_fill_basis_train(const int ncon,
@@ -10409,18 +10501,40 @@ static void np_glp_fill_basis_train(const int ncon,
                                     NPGLPBasisCtx *ctx,
                                     double **basis){
   int t, i, j;
+  double **univ = (double **)calloc((size_t)ncon, sizeof(double *));
+  if(univ == NULL)
+    error("np_glp_fill_basis_train: memory allocation failed");
+  for(j = 0; j < ncon; j++){
+    const int nvalue = ctx[j].degree + 1;
+    univ[j] = (double *)calloc((size_t)num_obs_train*(size_t)nvalue, sizeof(double));
+    if(univ[j] == NULL){
+      for(i = 0; i < j; i++) free(univ[i]);
+      free(univ);
+      error("np_glp_fill_basis_train: memory allocation failed");
+    }
+    for(i = 0; i < num_obs_train; i++){
+      int q;
+      if(ctx[j].use_basis){
+        np_glp_basis_ctx_eval(&ctx[j], matrix_X_continuous_train[j][i], 0);
+        for(q = 0; q < nvalue; q++)
+          univ[j][(size_t)i*(size_t)nvalue + (size_t)q] =
+            np_glp_basis_factor_value(&ctx[j], q);
+      } else {
+        univ[j][(size_t)i*(size_t)nvalue] = 1.0;
+      }
+    }
+  }
   for(t = 0; t < nterms; t++){
     const int *et = terms + t*ncon;
     for(i = 0; i < num_obs_train; i++){
       double b = 1.0;
-      for(j = 0; j < ncon; j++){
-        if(ctx[j].use_basis)
-          gsl_bspline_eval(matrix_X_continuous_train[j][i], ctx[j].B, ctx[j].bw);
-        b *= np_glp_basis_factor_value(&ctx[j], et[j]);
-      }
+      for(j = 0; j < ncon; j++)
+        b *= univ[j][(size_t)i*(size_t)(ctx[j].degree + 1) + (size_t)et[j]];
       basis[t][i] = b;
     }
   }
+  for(j = 0; j < ncon; j++) free(univ[j]);
+  free(univ);
 }
 
 static void np_glp_fill_basis_eval(const int ncon,
@@ -10433,7 +10547,7 @@ static void np_glp_fill_basis_eval(const int ncon,
   int t, j;
   for(j = 0; j < ncon; j++)
     if(ctx[j].use_basis)
-      gsl_bspline_eval(matrix_X_continuous_eval[j][eval_index], ctx[j].B, ctx[j].bw);
+      np_glp_basis_ctx_eval(&ctx[j], matrix_X_continuous_eval[j][eval_index], 0);
   for(t = 0; t < nterms; t++){
     const int *et = terms + t*ncon;
     double b = 1.0;
@@ -10455,33 +10569,20 @@ static void np_glp_fill_basis_eval_deriv(const int which_var,
   int t, j;
   for(j = 0; j < ncon; j++)
     if(ctx[j].use_basis)
-      gsl_bspline_eval(matrix_X_continuous_eval[j][eval_index], ctx[j].B, ctx[j].bw);
-  if((deriv_order > 0) && ctx[which_var].use_basis){
-    if(deriv_order <= ctx[which_var].max_deriv){
-      gsl_bspline_deriv_eval(matrix_X_continuous_eval[which_var][eval_index],
-                             deriv_order,
-                             ctx[which_var].dB,
-                             ctx[which_var].bw,
-                             ctx[which_var].dw);
-    }
-  }
+      np_glp_basis_ctx_eval(&ctx[j], matrix_X_continuous_eval[j][eval_index],
+                            (j == which_var) ? deriv_order : 0);
   for(t = 0; t < nterms; t++){
     const int *et = terms + t*ncon;
     double b = 1.0;
     for(j = 0; j < ncon; j++){
       const int idx = et[j];
       if(j == which_var){
-        if(deriv_order <= 0){
-          b *= np_glp_basis_factor_value(&ctx[j], idx);
-        } else if(idx == 0){
+        const double factor = np_glp_basis_factor_deriv(&ctx[j], idx, deriv_order);
+        if(factor == 0.0){
           b = 0.0;
           break;
-        } else if((ctx[j].degree <= 0) || (idx < 1) || (idx > ctx[j].degree) || !ctx[j].use_basis || (deriv_order > ctx[j].max_deriv)){
-          b = 0.0;
-          break;
-        } else {
-          b *= gsl_matrix_get(ctx[j].dB, (size_t)idx, (size_t)deriv_order);
         }
+        b *= factor;
       } else {
         b *= np_glp_basis_factor_value(&ctx[j], idx);
       }
@@ -10581,7 +10682,8 @@ static int np_glp_cv_cache_prepare(const int int_ll,
         if(xi < xmin) xmin = xi;
         if(xi > xmax) xmax = xi;
       }
-      if(!np_glp_basis_ctx_init(&basis_ctx[l], degree_vec[l], xmin, xmax)){
+      if(!np_glp_basis_ctx_init(&basis_ctx[l], degree_vec[l], xmin, xmax,
+                                basis_mode == 1)){
         for(i = 0; i <= l; i++) np_glp_basis_ctx_free(&basis_ctx[i]);
         free(basis_ctx);
         free_mat(basis, nterms);
@@ -18828,7 +18930,8 @@ double *SIGN){
                 if(xi < xmin) xmin = xi;
                 if(xi > xmax) xmax = xi;
               }
-              if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax)){
+              if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax,
+                                        int_glp_basis_extern == 1)){
                 fast_ok = 0;
                 break;
               }
@@ -19289,7 +19392,8 @@ double *SIGN){
           if(xi < xmin) xmin = xi;
           if(xi > xmax) xmax = xi;
         }
-        if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax))
+        if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax,
+                                  int_glp_basis_extern == 1))
           error("failed to initialize glp Bernstein basis");
       }
 
