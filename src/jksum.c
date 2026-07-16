@@ -10132,6 +10132,8 @@ static int np_glp_build_terms(const int ncon,
   }
 
   if(dmax > 0){
+    /* Recurse from the last GLP coordinate so coordinate 1 varies fastest,
+       matching the R-side npBuildLpTerms() term order. */
     const int step = (basis_mode == 1) ? -1 : 1;
     const int first = (basis_mode == 1) ? ncon - 1 : 0;
     if(np_glp_enum_terms_rec(first, step, ncon, basis_mode, dmax, 0,

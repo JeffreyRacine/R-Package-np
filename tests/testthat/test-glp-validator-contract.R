@@ -94,7 +94,7 @@ test_that("dim_basis rejects dimensions beyond supported capacity", {
     dim_basis(basis = "glp",
               degree = c(65535L, 65535L),
               segments = c(1L, 1L)),
-    "basis dimension exceeds supported capacity"
+    "LP basis dimension exceeds supported term capacity \\(100000\\)"
   )
 })
 

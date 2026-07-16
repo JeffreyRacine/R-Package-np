@@ -269,7 +269,7 @@ These arguments control the index smoother, local-polynomial basis, and fixed de
 
   \item{bernstein.basis}{
     logical flag used when \code{regtype="lp"}. For \code{basis="glp"},
-    \code{TRUE} selects the complete degree-graded orthonormalized Bernstein
+    \code{TRUE} selects the complete degree-graded, orthonormal shifted-Legendre
     representation defined in \code{\link{npreg}}; additive and tensor bases
     retain their fixed-coordinate-degree Bernstein representation. When automatic
     degree search is requested and \code{bernstein.basis} is not

@@ -187,12 +187,13 @@ These arguments control regression type, local-polynomial specification, and opt
   \item{bernstein.basis}{
     logical flag relevant only when \code{regtype="lp"}. If
     \code{FALSE} (default), the GLP basis uses raw local-polynomial
-    powers (stable for extrapolation). If \code{TRUE}, continuous predictors
-    use a Bernstein representation. For \code{basis="glp"}, this is the
-    degree-graded orthonormalized construction described in
+    powers (stable for extrapolation). For \code{basis="glp"}, the historical
+    selector \code{TRUE} uses the degree-graded, orthonormal shifted-Legendre
+    construction described in
     \code{\link{npreg}}; it has exactly the same complete, coordinate-capped
-    total-degree polynomial span as the raw GLP representation. Additive and
-    tensor bases retain their fixed-coordinate-degree Bernstein
+    total-degree polynomial span as the raw GLP representation and is an exact
+    deterministic linear transformation of Bernstein polynomial spaces.
+    Additive and tensor bases retain their fixed-coordinate-degree Bernstein
     representation. For
     \code{bernstein.basis=TRUE}, prediction/evaluation points must lie
     within the training support of each continuous predictor. For

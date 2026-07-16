@@ -5,7 +5,13 @@
   example, `degree = c(2, 1)` now includes the `x1*x2` term. Raw and
   `bernstein.basis = TRUE` GLP fits now use exact representations of the same
   complete polynomial space; the latter uses a deterministic degree-graded,
-  orthonormalized Bernstein representation. Dimension guards, higher-order
+  orthonormal shifted-Legendre representation. Raw heterogeneous GLP results
+  can therefore differ from earlier versions when terms are restored;
+  multivariate `bernstein.basis = TRUE` GLP and automatic degree-search results
+  can also differ because the former fixed-degree Bernstein columns did not
+  span the corrected GLP space once interactions entered. Univariate and
+  maximum-degree-one GLP retain the same polynomial space, although their
+  floating-point paths can differ. Dimension guards, higher-order
   derivatives, fitted values, standard errors, and the serial/MPI native
   evaluators use the same term definition. Local constant, local linear,
   univariate, additive, tensor, and non-local-polynomial semantics are
