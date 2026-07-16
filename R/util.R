@@ -2703,7 +2703,7 @@ genRegEstStr <- function(x){
   bern <- if (!is.null(x$bernstein.basis)) x$bernstein.basis else if (!is.null(x_bws)) x_bws$bernstein.basis else NULL
   est.label <- if (identical(regtype, "lp")) npFormatRegressionType(x) else x$pregtype
   basis.family <- if (identical(regtype, "lp")) npLpBasisFamilyLabel(basis) else NULL
-  basis.rep <- if (identical(regtype, "lp")) npLpBasisRepresentationLabel(bern) else NULL
+  basis.rep <- if (identical(regtype, "lp")) npLpBasisRepresentationLabel(bern, basis) else NULL
   est.prefix <- if (!is.null(x_bws) && npUsesPolynomialSummaryLabel(x_bws))
     "Polynomial Type"
   else
@@ -2726,8 +2726,12 @@ npLpBasisFamilyLabel <- function(basis){
          tools::toTitleCase(b))
 }
 
-npLpBasisRepresentationLabel <- function(bernstein){
-  if (isTRUE(bernstein)) "Bernstein" else "Raw"
+npLpBasisRepresentationLabel <- function(bernstein, basis = "glp"){
+  if (!isTRUE(bernstein))
+    return("Raw")
+  if (identical(tolower(basis), "glp"))
+    return("Degree-graded Bernstein (orthonormalized)")
+  "Bernstein"
 }
 
 npLpBasisNcol <- function(basis = "glp", degree){
@@ -3644,7 +3648,8 @@ mypoly <- function(x,
                    degree,
                    gradient.compute = FALSE,
                    r=0,
-                   Bernstein = TRUE) {
+                   Bernstein = TRUE,
+                   complete.glp = FALSE) {
 
   if(missing(x)) stop(" Error: x required")
   if(missing(degree)) stop(" Error: degree required")
@@ -3671,8 +3676,10 @@ mypoly <- function(x,
       Z <- outer(x,1L:degree,"^")
     }
 
-  } else {
-    ## Bernstein polynomial basis (no interior knots) aligned with C-side LP code.
+  } else if (!isTRUE(complete.glp)) {
+    ## Historical fixed-coordinate-degree Bernstein basis.  It is retained
+    ## byte-for-byte for additive and tensor bases, where the selected columns
+    ## span the requested space.  It is not closed on a sparse GLP lower set.
     x.train <- as.double(x)
     x.use <- if (is.null(ex)) x.train else as.double(ex)
     r <- if (gradient.compute) as.integer(r) else 0L
@@ -3699,12 +3706,56 @@ mypoly <- function(x,
         for (k in 0:r) {
           j <- idx - k
           if (j >= 0L && j <= m) {
-            out <- out + ((-1.0)^(r - k)) * choose(r, k) * choose(m, j) * (u^j) * ((1.0 - u)^(m - j))
+            out <- out + ((-1.0)^(r - k)) * choose(r, k) * choose(m, j) *
+              (u^j) * ((1.0 - u)^(m - j))
           }
         }
         coef.deriv * out
       })
       Z <- do.call(cbind, z.list)
+    }
+  } else {
+    ## Orthonormalized Bernstein representation (shifted Legendre factors),
+    ## aligned with the C-side complete-LP code. For degree k,
+    ## sqrt(2k+1) P_k(2u-1) is an exact linear combination of the degree-k
+    ## Bernstein polynomials and has exact polynomial degree k.
+    x.train <- as.double(x)
+    x.use <- if (is.null(ex)) x.train else as.double(ex)
+    r <- if (gradient.compute) as.integer(r) else 0L
+    if (is.na(r) || r < 0L) stop(" Error: derivative order must be a non-negative integer")
+
+    xmin <- min(x.train)
+    xmax <- max(x.train)
+    xrange <- xmax - xmin
+    if (!is.finite(xrange) || xrange <= 0) {
+      Z <- matrix(0.0, nrow = length(x.use), ncol = degree)
+    } else if (r > degree) {
+      Z <- matrix(0.0, nrow = length(x.use), ncol = degree)
+    } else {
+      u <- (x.use - xmin) / xrange
+      z <- 2.0 * u - 1.0
+      deriv <- array(0.0, dim = c(length(u), degree + 1L, r + 1L))
+      deriv[, 1L, 1L] <- 1.0
+      if (degree >= 1L) {
+        deriv[, 2L, 1L] <- z
+        if (r >= 1L)
+          deriv[, 2L, 2L] <- 2.0
+      }
+      if (degree >= 2L) {
+        for (k in 1L:(degree - 1L)) {
+          for (rr in 0L:min(r, k + 1L)) {
+            value <- (2.0 * k + 1.0) * z * deriv[, k + 1L, rr + 1L] -
+              k * deriv[, k, rr + 1L]
+            if (rr > 0L)
+              value <- value + (2.0 * k + 1.0) * 2.0 * rr * deriv[, k + 1L, rr]
+            deriv[, k + 2L, rr + 1L] <- value / (k + 1.0)
+          }
+        }
+      }
+      Z <- vapply(seq_len(degree), function(k) {
+        deriv[, k + 1L, r + 1L] * sqrt(2.0 * k + 1.0) / (xrange^r)
+      }, numeric(length(u)))
+      Z <- matrix(Z, nrow = length(u), ncol = degree)
     }
   }
 
@@ -3722,24 +3773,38 @@ npBuildLpTerms <- function(degree, basis = c("glp", "additive", "tensor")) {
     return(matrix(integer(0), nrow = 1L, ncol = 0L))
 
   degree <- as.integer(degree)
+  if (identical(basis, "glp")) {
+    dmax <- max(degree)
+    cap <- 100000L
+    current <- integer(k)
+    rows <- vector("list", min(cap, 1024L))
+    nrows <- 0L
+    visit <- function(j, used) {
+      if (j == 0L) {
+        nrows <<- nrows + 1L
+        if (nrows > cap)
+          stop(sprintf("LP basis dimension exceeds supported term capacity (%d)", cap),
+               call. = FALSE)
+        if (nrows > length(rows))
+          length(rows) <<- min(cap, max(nrows, 2L * length(rows)))
+        rows[[nrows]] <<- current
+        return(invisible(NULL))
+      }
+      for (value in 0L:min(degree[j], dmax - used)) {
+        current[j] <<- value
+        visit(j - 1L, used + value)
+      }
+      invisible(NULL)
+    }
+    visit(k, 0L)
+    return(do.call(rbind, rows[seq_len(nrows)]))
+  }
+
   degree.list <- lapply(degree, function(d) 0:d)
   z <- as.matrix(do.call(base::expand.grid, degree.list))
   s <- rowSums(z)
 
-  if (identical(basis, "glp")) {
-    ind <- (s > 0) & (s <= max(degree))
-    z <- z[ind, , drop = FALSE]
-    if (!all(degree == max(degree))) {
-      for (j in seq_along(degree)) {
-        d <- degree[j]
-        if ((d < max(degree)) && (d > 0)) {
-          s <- rowSums(z)
-          dropj <- (s > d) & (z[, j, drop = FALSE] == matrix(d, nrow(z), 1, byrow = TRUE))
-          z <- z[!dropj, , drop = FALSE]
-        }
-      }
-    }
-  } else if (identical(basis, "additive")) {
+  if (identical(basis, "additive")) {
     ind <- (s > 0) & (rowSums(z > 0) == 1L)
     z <- z[ind, , drop = FALSE]
   } else if (identical(basis, "tensor")) {
@@ -3814,7 +3879,8 @@ W.lp <- function(xdat = NULL,
                              degree=degree[1],
                              gradient.compute=gradient.compute,
                              r=gradient.vec[1],
-                             Bernstein=Bernstein))[, 1 + z.noi[, 1]]
+                             Bernstein=Bernstein,
+                             complete.glp=identical(basis, "glp")))[, 1 + z.noi[, 1]]
 
       if(gradient.compute && gradient.vec[1] != 0) res.deriv <- cbind(1,matrix(NA,1,degree[1]))[, 1 + z.noi[, 1],drop=FALSE]
       if(gradient.compute && gradient.vec[1] == 0) res.deriv <- cbind(1,matrix(0,1,degree[1]))[, 1 + z.noi[, 1],drop=FALSE]
@@ -3825,7 +3891,8 @@ W.lp <- function(xdat = NULL,
                                    degree=degree[i],
                                    gradient.compute=gradient.compute,
                                    r=gradient.vec[i],
-                                   Bernstein=Bernstein))[, 1 + z.noi[, i]]
+                                   Bernstein=Bernstein,
+                                   complete.glp=identical(basis, "glp")))[, 1 + z.noi[, i]]
       if(gradient.compute && gradient.vec[i] != 0) res.deriv <- res.deriv * cbind(1,matrix(NA,1,degree[i]))[, 1 + z.noi[, i],drop=FALSE]
       if(gradient.compute && gradient.vec[i] == 0) res.deriv <- res.deriv *cbind(1,matrix(0,1,degree[i]))[, 1 + z.noi[, i],drop=FALSE]
     }

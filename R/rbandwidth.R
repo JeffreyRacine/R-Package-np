@@ -220,7 +220,7 @@ npInsertGlpSummary <- function(txt, basis, degree, bernstein){
     basis <- "glp"
 
   basis.family <- npLpBasisFamilyLabel(basis)
-  basis.rep <- npLpBasisRepresentationLabel(bernstein)
+  basis.rep <- npLpBasisRepresentationLabel(bernstein, basis)
   basis.dim <- npLpBasisNcol(basis = basis, degree = degree)
 
   glp.lines <- c(

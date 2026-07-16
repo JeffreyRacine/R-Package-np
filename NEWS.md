@@ -1,5 +1,15 @@
 # np 0.70-6
 
+* Corrected heterogeneous generalized local-polynomial (GLP) construction to
+  include every coordinate-capped term through the declared total degree. For
+  example, `degree = c(2, 1)` now includes the `x1*x2` term. Raw and
+  `bernstein.basis = TRUE` GLP fits now use exact representations of the same
+  complete polynomial space; the latter uses a deterministic degree-graded,
+  orthonormalized Bernstein representation. Dimension guards, higher-order
+  derivatives, fitted values, standard errors, and the native evaluator use
+  the same term definition. Local constant, local linear, univariate,
+  additive, tensor, and non-local-polynomial semantics are unchanged.
+
 * Hardened native NOMAD observer and interrupt handling. Explicit user
   interruption is now reported as an R `interrupt` condition only after
   native cleanup, ordinary observer errors remain fail-open, native callables

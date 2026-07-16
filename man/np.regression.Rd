@@ -279,15 +279,29 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   multi-indices \eqn{\alpha}{alpha} with
   \eqn{\alpha_j \le d_j}{alpha[j] <= d[j]} and
   \eqn{0<\sum_j \alpha_j \le \max_j d_j}{0<sum(alpha)<=max(d)} plus
-  an intercept. The optional flag \code{bernstein.basis}
-  controls basis construction: \code{FALSE} (default) uses raw
-  local-polynomial powers, while \code{TRUE} uses a Bernstein/B-spline basis. The
+  an intercept. Thus, for \eqn{d=(2,1)}{d=(2,1)}, GLP contains
+  \eqn{1,x_1,x_1^2,x_2,x_1x_2}{1, x1, x1^2, x2, x1*x2}; the additive
+  basis omits \eqn{x_1x_2}{x1*x2}, while the tensor basis additionally
+  contains \eqn{x_1^2x_2}{x1^2*x2}.
+
+  The optional flag \code{bernstein.basis} controls basis construction:
+  \code{FALSE} (default) uses raw local-polynomial powers. For
+  \code{basis="glp"}, \code{TRUE} uses a degree-graded, orthonormalized
+  Bernstein representation. On the unit-scaled support
+  \eqn{u\in[0,1]}{u in [0,1]}, its order-\eqn{k}{k} factor is
+  \eqn{\sqrt{2k+1}P_k(2u-1)}{sqrt(2*k+1) P[k](2*u-1)}, where
+  \eqn{P_k}{P[k]} is a Legendre polynomial. This is an exact
+  degree-\eqn{k}{k} linear combination of Bernstein polynomials and, because
+  the GLP multi-index set is downward closed, spans exactly the same
+  heterogeneous polynomial space as the raw representation. Additive and
+  tensor bases retain their fixed-coordinate-degree Bernstein
+  representation. The
   homogeneous degree-0 and degree-1 cases remain
   equivalent to \code{lc} and \code{ll}, respectively. For continuous
   predictors, \code{gradients=TRUE} returns the derivative order(s)
   requested by \code{gradient.order}; the associated \code{gerr}
   entries are standard errors for those same derivative orders. Both
-  raw and Bernstein/B-spline bases report fitted values and derivatives
+  raw and Bernstein representations report fitted values and derivatives
   on the original response/predictor scale. In mixed-data GLP settings,
   unordered and ordered predictors contribute first-order
   effects/contrasts rather than higher-order derivatives.
@@ -361,9 +375,16 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   are normalized generalized product-kernel weights over the continuous,
   unordered, and ordered components of \eqn{X}. Local-polynomial
   regression replaces this scalar weighted average by a weighted least
-  squares fit in powers of the continuous coordinates around \eqn{x};
-  the fitted intercept is the estimate of \eqn{m(x)} and the fitted
-  slope terms give the reported gradients where available.
+  squares fit in powers \eqn{b(X_i)}{b(X[i])} of the original continuous
+  coordinates, with kernel weights centered at \eqn{x}. If
+  \eqn{\widehat\beta_x}{beta-hat[x]} denotes that local weighted fit, the
+  reported level and derivative are respectively
+  \eqn{b(x)^T\widehat\beta_x}{b(x)' beta-hat[x]} and
+  \eqn{D^\gamma b(x)^T\widehat\beta_x}{D^gamma b(x)' beta-hat[x]}.
+  For the downward-closed GLP space this uncentered representation is
+  numerically equivalent, up to floating-point solution paths, to fitting
+  powers of \eqn{X_i-x}{X[i]-x} and reading the corresponding intercept and
+  derivative coefficients.
 
   For book-length derivations, see Li and Racine (2007), Chapter 2
   \emph{Regression}, especially Sections 2.1, 2.2, 2.4, and 2.5, and
@@ -381,6 +402,14 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   Cheng, M.-Y. and P. Hall and D.M. Titterington (1997), \dQuote{On the
   shrinkage of local linear curve estimators,} Statistics and Computing,
   7, 11-17.
+
+  Cohen, A. and G. Migliorati (2018), \dQuote{Multivariate approximation
+  in downward closed polynomial spaces,} in R. Cools and D. Nuyens (eds.),
+  \emph{Contemporary Computational Mathematics}, Springer, 233-282.
+
+  Dung, D. and T. Ullrich (2011), \dQuote{Whitney type inequalities for
+  local anisotropic polynomial approximation,} Journal of Approximation
+  Theory, 163, 1590-1605.
 
   Fan, J. and I. Gijbels (1996), \emph{Local Polynomial Modelling and
   Its Applications,} Chapman and Hall.
@@ -408,6 +437,9 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of
     regression functions with both categorical and continuous data,}
   Journal of Econometrics, 119, 99-130.
+
+  Ruppert, D. and M.P. Wand (1994), \dQuote{Multivariate locally weighted
+  least squares regression,} The Annals of Statistics, 22, 1346-1370.
 
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
     estimators for discrete distributions,} Biometrika, 68, 301-309.
