@@ -13,6 +13,7 @@
 #include <R_ext/Memory.h>
 #include <R_ext/Rdynload.h>
 #include <Rinternals.h>
+#include <Rversion.h>
 #include <stdint.h>
 
 #include <crs_nomad_native.h>
@@ -86,7 +87,6 @@ typedef struct {
   const int *accepted_evaluations;
 } np_nomad_progress_spec;
 
-static crs_nomad_solve_observed_fn np_crs_nomad_solve_observed = NULL;
 static crs_nomad_observer_poll_fn np_crs_nomad_observer_poll = NULL;
 static int nomad_c_callback_active = 0;
 
@@ -122,6 +122,17 @@ static void np_load_crs_namespace(void)
   PROTECT(call = lang2(install("loadNamespace"), pkg));
   Rf_eval(call, R_GlobalEnv);
   UNPROTECT(2);
+}
+
+static int np_namespace_has(SEXP environment, const char *name)
+{
+  if (environment == R_NilValue || name == NULL)
+    return 0;
+#if R_VERSION >= R_Version(4, 2, 0)
+  return R_existsVarInFrame(environment, Rf_install(name));
+#else
+  return Rf_findVarInFrame(environment, Rf_install(name)) != R_UnboundValue;
+#endif
 }
 
 SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
@@ -492,7 +503,7 @@ static void np_progress_signal(const char *event, const char *surface, const int
     return;
   }
 
-  if (!R_existsVarInFrame(ns, Rf_install(".np_progress_signal_from_c"))) {
+  if (!np_namespace_has(ns, ".np_progress_signal_from_c")) {
     UNPROTECT(1);
     return;
   }
@@ -569,7 +580,7 @@ static void np_progress_nomad_degree_step(const int current_eval,
     return;
   }
 
-  if (!R_existsVarInFrame(ns, Rf_install(".np_progress_nomad_native_step_from_c"))) {
+  if (!np_namespace_has(ns, ".np_progress_nomad_native_step_from_c")) {
     UNPROTECT(1);
     return;
   }
@@ -610,8 +621,7 @@ static int np_nomad_progress_observer_config(double *interval_sec)
   PROTECT(package = Rf_mkString("np"));
   PROTECT(ns = R_FindNamespace(package));
   if (ns == R_NilValue ||
-      !R_existsVarInFrame(ns,
-                          Rf_install(".np_progress_nomad_native_observer_config"))) {
+      !np_namespace_has(ns, ".np_progress_nomad_native_observer_config")) {
     UNPROTECT(2);
     return 0;
   }
@@ -665,8 +675,7 @@ static int np_nomad_progress_observer(
   PROTECT(package = Rf_mkString("np")); nprotect++;
   PROTECT(ns = R_FindNamespace(package)); nprotect++;
   if (ns == R_NilValue ||
-      !R_existsVarInFrame(ns,
-                          Rf_install(".np_progress_nomad_native_observer_dispatch"))) {
+      !np_namespace_has(ns, ".np_progress_nomad_native_observer_dispatch")) {
     if (message != NULL && message_size > 0)
       snprintf(message, message_size, "np NOMAD progress dispatcher is unavailable");
     UNPROTECT(nprotect);
@@ -737,9 +746,7 @@ static void np_nomad_progress_observer_report(const char *message)
   PROTECT(package = Rf_mkString("np"));
   PROTECT(ns = R_FindNamespace(package));
   if (ns == R_NilValue ||
-      !R_existsVarInFrame(
-        ns,
-        Rf_install(".np_progress_nomad_native_observer_report"))) {
+      !np_namespace_has(ns, ".np_progress_nomad_native_observer_report")) {
     UNPROTECT(2);
     return;
   }
@@ -758,6 +765,8 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
                                         const np_nomad_progress_spec *progress_spec,
                                         crs_nomad_result *result)
 {
+  crs_nomad_solve_observed_fn solve_observed;
+  crs_nomad_observer_poll_fn observer_poll;
   crs_nomad_observer observer;
   double interval_sec = 2.0;
   int observer_enabled;
@@ -765,14 +774,13 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
   int status;
 
   np_load_crs_namespace();
-  if (np_crs_nomad_solve_observed == NULL)
-    np_crs_nomad_solve_observed = (crs_nomad_solve_observed_fn)
-      R_GetCCallable("crs", "crs_nomad_solve_observed");
-  if (np_crs_nomad_observer_poll == NULL)
-    np_crs_nomad_observer_poll = (crs_nomad_observer_poll_fn)
-      R_GetCCallable("crs", "crs_nomad_observer_poll");
-  if (np_crs_nomad_solve_observed == NULL || np_crs_nomad_observer_poll == NULL)
+  solve_observed = (crs_nomad_solve_observed_fn)
+    R_GetCCallable("crs", "crs_nomad_solve_observed");
+  observer_poll = (crs_nomad_observer_poll_fn)
+    R_GetCCallable("crs", "crs_nomad_observer_poll");
+  if (solve_observed == NULL || observer_poll == NULL)
     error("required crs 0.15-46 native NOMAD observer capability is unavailable");
+  np_crs_nomad_observer_poll = observer_poll;
 
   observer_enabled = np_nomad_progress_observer_config(&interval_sec);
   memset(&observer, 0, sizeof(observer));
@@ -787,12 +795,13 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
   previous_callback_state = nomad_c_callback_active;
   if (problem != NULL && problem->callback_mode == CRS_NOMAD_CALLBACK_C)
     nomad_c_callback_active = 1;
-  status = np_crs_nomad_solve_observed(problem,
-                                       eval,
-                                       user_data,
-                                       observer_enabled ? &observer : NULL,
-                                       result);
+  status = solve_observed(problem,
+                          eval,
+                          user_data,
+                          observer_enabled ? &observer : NULL,
+                          result);
   nomad_c_callback_active = previous_callback_state;
+  np_crs_nomad_observer_poll = NULL;
 
   if (observer_enabled &&
       observer.outcome == CRS_NOMAD_OBSERVER_OUTCOME_ERROR)

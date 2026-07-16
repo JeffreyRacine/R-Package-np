@@ -1918,15 +1918,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
         option.values = native.option.vectors$values
       )
       native.elapsed <- proc.time()[3L] - native.start
-      if (!identical(as.integer(native$status[1L]), 0L) ||
-          !identical(as.integer(native$result_status[1L]), 0L)) {
-        stop(sprintf(
-          "native npcdens NOMAD route failed (status=%s, result_status=%s): %s",
-          as.integer(native$status[1L]),
-          as.integer(native$result_status[1L]),
-          as.character(native$message[1L])
-        ), call. = FALSE)
-      }
+      .np_nomad_native_status(native, "native npcdens NOMAD route")
       if (is.null(native$best_point) || any(!is.finite(native$best_point)))
         stop("native npcdens NOMAD route did not return a finite best point", call. = FALSE)
 
@@ -2527,15 +2519,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
         option.values = native.option.vectors$values
       )
       native.elapsed <- proc.time()[3L] - native.start
-      if (!identical(as.integer(native$status[1L]), 0L) ||
-          !identical(as.integer(native$result_status[1L]), 0L)) {
-        stop(sprintf(
-          "native npcdens fixed-degree NOMAD route failed (status=%s, result_status=%s): %s",
-          as.integer(native$status[1L]),
-          as.integer(native$result_status[1L]),
-          as.character(native$message[1L])
-        ), call. = FALSE)
-      }
+      .np_nomad_native_status(native, "native npcdens fixed-degree NOMAD route")
       if (is.null(native$best_point) || any(!is.finite(native$best_point)))
         stop("native npcdens fixed-degree NOMAD route did not return a finite best point", call. = FALSE)
       list(

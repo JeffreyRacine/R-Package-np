@@ -1371,15 +1371,7 @@ npregbw.rbandwidth <-
       )
       native.elapsed <- proc.time()[3L] - native.start
       native.nomad.elapsed <- native.nomad.elapsed + native.elapsed
-      if (!identical(as.integer(native.i$status[1L]), 0L) ||
-          !identical(as.integer(native.i$result_status[1L]), 0L)) {
-        stop(sprintf(
-          "native npreg NOMAD route failed (status=%s, result_status=%s): %s",
-          as.integer(native.i$status[1L]),
-          as.integer(native.i$result_status[1L]),
-          as.character(native.i$message[1L])
-        ), call. = FALSE)
-      }
+      .np_nomad_native_status(native.i, "native npreg NOMAD route")
       official.objective.i <- as.numeric(native.i$official_objective[1L])
       objective.i <- as.numeric(native.i$objective[1L])
       native.results[[i]] <- list(
@@ -2081,15 +2073,7 @@ npregbw.rbandwidth <-
         option.values = native.option.vectors$values
       )
       native.elapsed <- proc.time()[3L] - native.start
-      if (!identical(as.integer(native$status[1L]), 0L) ||
-          !identical(as.integer(native$result_status[1L]), 0L)) {
-        stop(sprintf(
-          "native npreg NOMAD degree-search route failed (status=%s, result_status=%s): %s",
-          as.integer(native$status[1L]),
-          as.integer(native$result_status[1L]),
-          as.character(native$message[1L])
-        ), call. = FALSE)
-      }
+      .np_nomad_native_status(native, "native npreg NOMAD degree-search route")
       if (is.null(native$best_point) || any(!is.finite(native$best_point)))
         stop("native npreg NOMAD degree-search route did not return a finite best point", call. = FALSE)
 
