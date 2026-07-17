@@ -107,7 +107,7 @@
   bwtype <- resolve_choice(if (!is.null(args$bwtype)) args$bwtype else source$type,
                            c("fixed", "generalized_nn", "adaptive_nn"))
   ckertype <- resolve_choice(if (!is.null(args$ckertype)) args$ckertype else source$ckertype,
-                             c("gaussian", "truncated gaussian", "epanechnikov", "uniform"))
+                             c("gaussian", "epanechnikov", "uniform"))
   ckerorder <- if (!is.null(args$ckerorder)) args$ckerorder else source$ckerorder
   ckerbound <- resolve_choice(if (!is.null(args$ckerbound)) args$ckerbound else source$ckerbound,
                               c("none", "range", "fixed"))
@@ -272,7 +272,7 @@
   }
 
   bwtype <- resolve_choice(bws$type, c("fixed", "generalized_nn", "adaptive_nn"))
-  ckertype <- resolve_choice(bws$ckertype, c("gaussian", "truncated gaussian", "epanechnikov", "uniform"))
+  ckertype <- resolve_choice(bws$ckertype, c("gaussian", "epanechnikov", "uniform"))
   ckerbound <- resolve_choice(bws$ckerbound, c("none", "range", "fixed"))
   ukertype <- resolve_choice(bws$ukertype, c("aitchisonaitken", "liracine"))
   okertype <- resolve_choice(bws$okertype, c("liracine", "wangvanryzin", "racineliyan", "nliracine"))

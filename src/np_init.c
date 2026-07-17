@@ -48,7 +48,6 @@ extern SEXP C_np_mpi_interrupt_state(SEXP);
 extern SEXP C_np_mpi_interrupt_scope(SEXP);
 extern SEXP C_np_shadow_reset_state(void);
 extern SEXP C_np_set_seed(SEXP);
-extern SEXP C_np_set_tgauss2(SEXP);
 extern SEXP C_np_set_local_regression_mode(SEXP);
 extern SEXP C_np_set_active_comm(SEXP, SEXP);
 extern SEXP C_np_release_static_buffers(void);
@@ -175,7 +174,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,17},
     {"C_np_set_seed",                  (DL_FUNC) &C_np_set_seed,                   1},
     {"C_np_shadow_reset_state",        (DL_FUNC) &C_np_shadow_reset_state,         0},
-    {"C_np_set_tgauss2",               (DL_FUNC) &C_np_set_tgauss2,                1},
     {"C_np_set_local_regression_mode", (DL_FUNC) &C_np_set_local_regression_mode,  1},
     {"C_np_set_active_comm",           (DL_FUNC) &C_np_set_active_comm,            2},
     {"C_np_release_static_buffers",    (DL_FUNC) &C_np_release_static_buffers,     0},

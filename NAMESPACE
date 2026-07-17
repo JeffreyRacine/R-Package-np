@@ -94,7 +94,6 @@ export(b.star
        ,uocquantile
        ,se
        ,gradients
-       ,nptgauss
        )
 
 S3method(print,bandwidth)

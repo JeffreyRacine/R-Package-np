@@ -3,7 +3,7 @@ bandwidth <-
            bwmethod = c("cv.ml","cv.ls","normal-reference"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           ckertype = c("gaussian","truncated gaussian","epanechnikov","uniform"), 
+           ckertype = c("gaussian","epanechnikov","uniform"),
            ckerorder = c(2,4,6,8),
            ckerbound = c("none","range","fixed"),
            ckerlb = NULL,
@@ -45,9 +45,6 @@ bandwidth <-
       if (!any(kord == ckerorder))
         stop("ckerorder must be one of ", paste(kord,collapse=" "))
     }
-
-    if (ckertype == "truncated gaussian" && ckerorder != 2)
-      .np_warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
     if (bwmethod == "normal-reference" && (ckertype != "gaussian" || bwtype != "fixed")){    
       .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")

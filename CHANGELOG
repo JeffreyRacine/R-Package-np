@@ -1,5 +1,11 @@
 Changes after Version 0.70-5
 
+* Removed the experimental truncated-Gaussian R interface, documentation,
+  mutable native configuration, and kernel formulas. Native continuous-kernel
+  slot 9 and its operator-offset counterparts remain reserved tombstones, so
+  Gaussian, Epanechnikov, and uniform code geometry and MPI payloads are
+  unchanged.
+
 User-visible changes are maintained in NEWS.md. Detailed implementation
 history is maintained in the Git repository and linked issues. The entries
 below preserve the historical package change log through Version 0.70-5.

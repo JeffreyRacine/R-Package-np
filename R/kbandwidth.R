@@ -29,7 +29,7 @@ kbandwidth.numeric <-
   function(bw,
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           ckertype = c("gaussian","truncated gaussian","epanechnikov","uniform"),
+           ckertype = c("gaussian","epanechnikov","uniform"),
            ckerorder = c(2,4,6,8),
            ckerbound = c("none","range","fixed"),
            ckerlb = NULL,

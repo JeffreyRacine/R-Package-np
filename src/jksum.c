@@ -1116,13 +1116,20 @@ double *kernel_sum)
 
 }
 
-extern double np_tgauss2_b, np_tgauss2_alpha, np_tgauss2_c0;
-// convolution kernel constants
-extern double np_tgauss2_a0, np_tgauss2_a1, np_tgauss2_a2;
+static double np_reserved_ckernel(const double z){
+  (void)z;
+  error("unsupported continuous kernel code");
+  return R_NaN;
+}
 
-
-double np_tgauss2(const double z){
-  return (fabs(z) >= np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z) - np_tgauss2_c0;
+static double np_reserved_aconvol(const double x, const double y,
+                                  const double hx, const double hy){
+  (void)x;
+  (void)y;
+  (void)hx;
+  (void)hy;
+  error("unsupported continuous kernel code");
+  return R_NaN;
 }
 
 double np_gauss2(const double z){
@@ -2657,8 +2664,7 @@ static int np_disc_profile_cache_get_or_build(const int num_xt,
   if max_i |(x - x_i)/h| <= u_tol, replace K((x-x_i)/h) by K(0) to avoid
   repeated kernel evaluations. This is intentionally limited to Gaussian
   order 2 (0), Epanechnikov order 2 (4), and uniform (8). Higher-order
-  kernels and truncated Gaussian have steeper or shifted near-zero behavior
-  under this tolerance contract.
+  kernels have steeper near-zero behavior under this tolerance contract.
 */
 static inline int np_cont_largeh_kernel_supported(const int kernel){
   return (kernel == 0 || kernel == 4 || kernel == 8);
@@ -2759,7 +2765,7 @@ static inline double np_cont_largeh_k0(const int kernel){
     case 6: return np_epan6(0.0);
     case 7: return np_epan8(0.0);
     case 8: return np_rect(0.0);
-    case 9: return np_tgauss2(0.0);
+    case 9: return np_reserved_ckernel(0.0);
     default: return 0.0;
   }
 }
@@ -2769,7 +2775,7 @@ static inline double np_cont_largeh_utol(const int kernel, const double rel_tol)
     return 0.0;
   const double rt = rel_tol;
   switch(kernel){
-    case 0: case 1: case 2: case 3: case 9:
+    case 0: case 1: case 2: case 3:
       /* For Gaussian-like kernels, relative deviation near 0 is ~ u^2/2. */
       return sqrt(-2.0*log(1.0-rt));
     case 4: case 5: case 6: case 7:
@@ -3289,25 +3295,8 @@ static inline void np_ckernelv_mul_const(const double c,
   }
 }
 
-// not so simple truncated gaussian convolution kernels
-//   In general for our truncated Gaussian kernel the convolution kernel will be a polynomial of the form:
-// z < 0: 
-// a0*erf*(z/2 + b)*exp(-z^2/4) + a1*z +a2*erf(z/sqrt(2) + b/sqrt(2)) + a3
-// z > 0
-// -a0*erf*(z/2 - b)*exp(-z^2/4) - a1*z - a2*erf(z/sqrt(2) - b/sqrt(2)) + a3
 double np_econvol_rect(const double z){
   return ((fabs(z) < 2.0) ? 0.25 : 0.0);
-}
-
-double np_econvol_tgauss2(const double z){
-  const double az = fabs(z);
-  if(az >= 2*np_tgauss2_b)
-    return 0.0;
-  else {
-    return(-np_tgauss2_a0*erfun(0.5*az - np_tgauss2_b)*exp(-0.25*az*az) - np_tgauss2_a1*az -
-           np_tgauss2_a2*erfun(0.7071067810*(az - np_tgauss2_b)) - np_tgauss2_c0);
-
-  }
 }
 
 // the simple convolution kernels
@@ -3432,11 +3421,6 @@ double np_econvol_owang_van_ryzin(const double x, const double y, const double l
 // derivative kernels
 
 
-double np_deriv_tgauss2(const double z){
-  return (fabs(z) >= np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*(-z*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z));
-}
-
-
 double np_deriv_gauss2(const double z){
   return (-z*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z));
 }
@@ -3480,11 +3464,6 @@ double np_deriv_rect(const double z){
 }
 
 // cdf kernels
-
-double np_cdf_tgauss2(const double z){
-  return (z <= -np_tgauss2_b) ? 0.0 : ((z >= np_tgauss2_b) ? 1.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5));
-}
-
 
 double np_cdf_gauss2(const double z){
   return (0.5*erfun(0.7071067810*z)+0.5);
@@ -3578,9 +3557,7 @@ static inline double np_cker_halfmass_total(const int k0){
       (3.5888671875+(-8.61328125/3.0)*5.0+(5.684765625/5.0)*25.0-
        (1.40765625/7.0)*125.0+(0.1173046875/9.0)*625.0);
   case 8: return 0.5;
-  case 9:
-    return np_tgauss2_alpha*0.5*erf(0.70710678118654752440*np_tgauss2_b)-
-      np_tgauss2_c0*np_tgauss2_b;
+  case 9: return np_reserved_ckernel(0.0);
   default: return R_NaN;
   }
 }
@@ -3591,7 +3568,7 @@ static inline double np_cker_halfmass_average(const int k0, const double r){
   static double (* const kbase[])(double) = {
     np_gauss2, np_gauss4, np_gauss6, np_gauss8,
     np_epan2, np_epan4, np_epan6, np_epan8,
-    np_rect, np_tgauss2
+    np_rect, np_reserved_ckernel
   };
   const double sqrt5 = 2.23606797749978969640;
   double r2, e, gaussian_average;
@@ -3650,9 +3627,7 @@ static inline double np_cker_halfmass_average(const int k0, const double r){
   case 8:
     return (r >= 1.0) ? 0.5/r : 0.5;
   case 9:
-    if(r >= np_tgauss2_b) return np_cker_halfmass_total(k0)/r;
-    return np_tgauss2_alpha*0.5*
-      erf(0.70710678118654752440*r)/r-np_tgauss2_c0;
+    return np_reserved_ckernel(r);
   default:
     return R_NaN;
   }
@@ -3728,10 +3703,7 @@ static inline double np_cker_centered_primitive(const int k0,
   case 8:
     return (az >= 1.0) ? copysign(0.5, z) : 0.5*z;
   case 9:
-    if(az >= np_tgauss2_b)
-      return copysign(np_cker_halfmass_total(k0), z);
-    return np_tgauss2_alpha*0.5*erf(0.70710678118654752440*z)-
-      np_tgauss2_c0*z;
+    return np_reserved_ckernel(z);
   default:
     return R_NaN;
   }
@@ -3851,7 +3823,7 @@ static inline double np_cker_base_eval(const int kernel,
   static double (* const kbase[])(double) = {
     np_gauss2, np_gauss4, np_gauss6, np_gauss8,
     np_epan2, np_epan4, np_epan6, np_epan8,
-    np_rect, np_tgauss2
+    np_rect, np_reserved_ckernel
   };
   int k0 = kernel % 10;
 
@@ -5120,107 +5092,11 @@ double np_aconvol_rect(const double x, const double y,const double hx,const doub
   return (fabs(x-y) >= (hx+hy)) ? 0.0 : 0.25/(hx*hy)*(MIN(x+hx,y+hy) - MAX(x-hx,y-hy));
 }
 
-double np_aconvol_tgauss2_total(const double x, const double y,const double hx,const double hy){
-  const double x2 = x*x;
-  const double y2 = y*y;
-
-  const double hx2 = hx*hx;
-  const double hx4 = hx2*hx2;
-
-  const double hy2 = hy*hy;
-  const double hy4 = hy2*hy2;
-
-  const double a = sqrt(2);
-  const double b = sqrt(M_PI);
-  const double c = sqrt(hy2+hx2);
-
-  return(exp(-y2/(2*hy2)-x2/(2*hx2)-9)*
-         (b*hx*hy
-          *exp(hx2*y2/(2*hy4+2*hx2*hy2)
-               +x*y/(hy2+hx2)
-               +hy2*x2/(2*hx2*hy2+2*hx4)
-               +9)
-          *erfun((hx*y-hx*x+(hy2+hx2)*np_tgauss2_b)
-                 /(a*hy*c))
-          -b*hx*hy
-          *exp(hx2*y2/(2*hy4+2*hx2*hy2)
-               +x*y/(hy2+hx2)
-               +hy2*x2/(2*hx2*hy2+2*hx4)
-               +9)
-          *erfun((hx*y-hx*x+(-hy2-hx2)*np_tgauss2_b)
-                 /(a*hy*c))
-          -b*hy*c
-          *exp(y2/(2*hy2)+x2/(2*hx2)+9/2)
-          *erfun((y-x+hx*np_tgauss2_b)/(a*hy))
-          +b*hy*c
-          *exp(y2/(2*hy2)+x2/(2*hx2)+9/2)
-          *erfun((y-x-hx*np_tgauss2_b)/(a*hy))
-          -2*b*hx*c
-          *erfun(np_tgauss2_b/a)
-          *exp(y2/(2*hy2)+x2/(2*hx2)+9/2)
-          +a*2*hx*c*np_tgauss2_b
-          *exp(y2/(2*hy2)+x2/(2*hx2)))
-         /(a*2*M_PI*c*np_tgauss2_alpha*np_tgauss2_alpha));
-}
-
-double np_aconvol_tgauss2_indefinite(const double u, const double x, const double y,const double hx,const double hy){
-  const double x2 = x*x;
-  const double y2 = y*y;
-
-  const double hx2 = hx*hx;
-  const double hx4 = hx2*hx2;
-
-  const double hy2 = hy*hy;
-  const double hy4 = hy2*hy2;
-
-  const double a = sqrt(2);
-  const double b = sqrt(M_PI);
-  const double c = sqrt(hy2+hx2);
-
-  return(-exp(-y2/(2*hy2)-x2/(2*hx2)-19/2)*
-         (b*hx*hy
-          *exp(hx2*y2
-            /(2*hy4+2*hx2*hy2)
-            +x*y/(hy2+hx2)
-            +hy2*x2
-            /(2*hx2*hy2+2*hx4)+19/2)
-          *erfun(
-               (hx2*y+hy2*x
-                +(-hy2-hx2)*u)
-               /(a*hx*hy
-                 *c))
-          -b*hy*c
-          *exp(y2/(2*hy2)+x2/(2*hx2)
-            +5)
-          *erfun((y-u)/(a*hy))
-          -b*hx*c
-          *erfun((x-u)/(a*hx))
-          *exp(y2/(2*hy2)+x2/(2*hx2)
-            +5)
-          -a*c*u
-          *exp(y2/(2*hy2)+x2/(2*hx2)
-            +1/2))
-         /(a*2*M_PI*c*np_tgauss2_alpha*np_tgauss2_alpha));
-}
-
-double np_aconvol_tgauss2(const double x, const double y,const double hx,const double hy){
-  const double a = np_tgauss2_b;
-  const double dxy = fabs(x-y);
-
-  if(dxy >= a*(hx+hy)){
-    return 0;
-  } else if(dxy > a*fabs(hx-hy)){
-    return (np_aconvol_tgauss2_indefinite(MIN(x+a*hx,y+a*hy),x,y,hx,hy) - 
-            np_aconvol_tgauss2_indefinite(MAX(x-a*hx,y-a*hy),x,y,hx,hy));
-  } else {
-    return (np_aconvol_tgauss2_total(x,y,hx,hy));
-  }
-}
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
                                      np_epan2, np_epan4, np_epan6, np_epan8, 
-                                     np_rect, np_tgauss2 };
+                                     np_rect, np_reserved_ckernel };
 double (* const allok[])(double, double, double, double, double) = { np_owang_van_ryzin, np_oli_racine };
 double (* const alluk[])(int, double, int) = { np_uaa, np_unli_racine };
 
@@ -5238,18 +5114,18 @@ double (* const alluk[])(int, double, int) = { np_uaa, np_unli_racine };
 
 double cksup[OP_NCFUN][2] = { {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, 
                               {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5},
-                              {-1.0, 1.0}, {-3.0, 3.0},
+                              {-1.0, 1.0}, {-DBL_MAX, DBL_MAX},
                               {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX},
                               {-SQRT20, SQRT20},{-SQRT20, SQRT20},{-SQRT20, SQRT20},{-SQRT20, SQRT20},
-                              {-2.0, 2.0}, {-6.0, 6.0},
+                              {-2.0, 2.0}, {-DBL_MAX, DBL_MAX},
                               {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX},
                               {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5},
                               {-0.0, 0.0}, // PLEASE DON'T EVER USE THIS
-                              {-3.0, 3.0},
+                              {-DBL_MAX, DBL_MAX},
                               {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, 
                               {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, 
                               {-1.0, DBL_MAX},
-                              {-3.0, DBL_MAX} };
+                              {-DBL_MAX, DBL_MAX} };
 
 /* 
    np_kernelv does weighted products of vectors - this is useful for 
@@ -5324,16 +5200,16 @@ void np_p_ckernelv(const int KERNEL,
 
   double (* const k[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, //ordinary kernels
                                    np_epan2, np_epan4, np_epan6, np_epan8, 
-                                   np_rect, np_tgauss2, 
+                                   np_rect, np_reserved_ckernel,
                                    np_econvol_gauss2, np_econvol_gauss4, np_econvol_gauss6, np_econvol_gauss8, // convolution kernels
                                    np_econvol_epan2, np_econvol_epan4, np_econvol_epan6, np_econvol_epan8,
-                                   np_econvol_rect, np_econvol_tgauss2,
+                                   np_econvol_rect, np_reserved_ckernel,
                                    np_deriv_gauss2, np_deriv_gauss4, np_deriv_gauss6, np_deriv_gauss8, // derivative kernels
                                    np_deriv_epan2, np_deriv_epan4, np_deriv_epan6, np_deriv_epan8, 
-                                   np_deriv_rect, np_deriv_tgauss2,
+                                   np_deriv_rect, np_reserved_ckernel,
                                    np_cdf_gauss2, np_cdf_gauss4, np_cdf_gauss6, np_cdf_gauss8, // cdfative kernels
                                    np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8, 
-                                   np_cdf_rect, np_cdf_tgauss2 };
+                                   np_cdf_rect, np_reserved_ckernel };
   double bounded_lower = 0.0, bounded_denominator = 0.0;
   double p_bounded_lower = 0.0, p_bounded_denominator = 0.0;
 
@@ -6438,7 +6314,7 @@ void np_ckernelv(const int KERNEL,
     case 7: NP_CKERNELV_APPLY(np_epan8); break;
 
     case 8: NP_CKERNELV_APPLY(np_rect); break;
-    case 9: NP_CKERNELV_APPLY(np_tgauss2); break;
+    case 9: NP_CKERNELV_APPLY(np_reserved_ckernel); break;
 
     case 10: NP_CKERNELV_APPLY(np_econvol_gauss2); break;
     case 11: NP_CKERNELV_APPLY(np_econvol_gauss4); break;
@@ -6451,7 +6327,7 @@ void np_ckernelv(const int KERNEL,
     case 17: NP_CKERNELV_APPLY(np_econvol_epan8); break;
 
     case 18: NP_CKERNELV_APPLY(np_econvol_rect); break;
-    case 19: NP_CKERNELV_APPLY(np_econvol_tgauss2); break;
+    case 19: NP_CKERNELV_APPLY(np_reserved_ckernel); break;
 
     case 20: NP_CKERNELV_APPLY(np_deriv_gauss2); break;
     case 21: NP_CKERNELV_APPLY(np_deriv_gauss4); break;
@@ -6464,7 +6340,7 @@ void np_ckernelv(const int KERNEL,
     case 27: NP_CKERNELV_APPLY(np_deriv_epan8); break;
 
     case 28: NP_CKERNELV_APPLY(np_deriv_rect); break;
-    case 29: NP_CKERNELV_APPLY(np_deriv_tgauss2); break;
+    case 29: NP_CKERNELV_APPLY(np_reserved_ckernel); break;
 
     case 30: NP_CKERNELV_APPLY(np_cdf_gauss2); break;
     case 31: NP_CKERNELV_APPLY(np_cdf_gauss4); break;
@@ -6477,22 +6353,22 @@ void np_ckernelv(const int KERNEL,
     case 37: NP_CKERNELV_APPLY(np_cdf_epan8); break;
 
     case 38: NP_CKERNELV_APPLY(np_cdf_rect); break;
-    case 39: NP_CKERNELV_APPLY(np_cdf_tgauss2); break;
+    case 39: NP_CKERNELV_APPLY(np_reserved_ckernel); break;
 
     default: {
       // Defensive: preserve behavior for unexpected kernel codes.
       double (* const k[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8,
                                        np_epan2, np_epan4, np_epan6, np_epan8,
-                                       np_rect, np_tgauss2,
+                                       np_rect, np_reserved_ckernel,
                                        np_econvol_gauss2, np_econvol_gauss4, np_econvol_gauss6, np_econvol_gauss8,
                                        np_econvol_epan2, np_econvol_epan4, np_econvol_epan6, np_econvol_epan8,
-                                       np_econvol_rect, np_econvol_tgauss2,
+                                       np_econvol_rect, np_reserved_ckernel,
                                        np_deriv_gauss2, np_deriv_gauss4, np_deriv_gauss6, np_deriv_gauss8,
                                        np_deriv_epan2, np_deriv_epan4, np_deriv_epan6, np_deriv_epan8,
-                                       np_deriv_rect, np_deriv_tgauss2,
+                                       np_deriv_rect, np_reserved_ckernel,
                                        np_cdf_gauss2, np_cdf_gauss4, np_cdf_gauss6, np_cdf_gauss8,
                                        np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8,
-                                       np_cdf_rect, np_cdf_tgauss2 };
+                                       np_cdf_rect, np_reserved_ckernel };
       const int kernel = (KERNEL >= 0 && KERNEL < (int)(sizeof(k)/sizeof(k[0]))) ? KERNEL : 0;
 
       if(xl == NULL){
@@ -6597,7 +6473,7 @@ void np_convol_ckernelv(const int KERNEL,
   double (* const k[])(double,double,double,double) = { 
     np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
     np_aconvol_epan2, np_aconvol_epan4, np_aconvol_epan6, np_aconvol_epan8,
-    np_aconvol_rect, np_aconvol_tgauss2
+    np_aconvol_rect, np_reserved_aconvol
   };
 
   if(xt_h_is_scalar){

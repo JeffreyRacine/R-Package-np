@@ -52,11 +52,6 @@
   \deqn{K_U(u)=\frac{1}{2}\mathbf{1}(|u|<1)}
   via \code{ckertype="uniform"} (order ignored).
 
-  Truncated-Gaussian (second-order) kernel via
-  \code{ckertype="truncated gaussian"}:
-  \deqn{K_{TG,2}(u)=\left[\alpha\phi(u)-c_0\right]\mathbf{1}(|u|<b)}
-  with defaults \eqn{b=3} and internal constants calibrated in C.
-
   Bounded continuous-kernel normalization (\code{ckerbound} and, for
   conditional objects, \code{cxkerbound}/\code{cykerbound}) reuses the
   selected continuous kernel and renormalizes it on the declared support.

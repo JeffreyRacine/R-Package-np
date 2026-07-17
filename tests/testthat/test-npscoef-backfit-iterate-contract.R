@@ -136,10 +136,6 @@ test_that("npscoef fast large-h gate rejects unsafe kernel metadata and non-fini
     fixture$zdat
   ))
   expect_false(npRmpi:::.npscoefbw_fast_eligible(
-    make_bw(ckertype = "truncated gaussian", ckerorder = 2L),
-    fixture$zdat
-  ))
-  expect_false(npRmpi:::.npscoefbw_fast_eligible(
     make_bw(ckertype = "gaussian", ckerorder = 2L, ckerbound = "range"),
     fixture$zdat
   ))

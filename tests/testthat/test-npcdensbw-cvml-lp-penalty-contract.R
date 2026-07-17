@@ -37,8 +37,7 @@ shadow_conditional_xweights_lp_nprmpi <- function(bw, xdat, ydat, row_index) {
       bw$cxkertype,
       gaussian = npRmpi:::CKER_GAUSS + bw$cxkerorder / 2 - 1,
       epanechnikov = npRmpi:::CKER_EPAN + bw$cxkerorder / 2 - 1,
-      uniform = npRmpi:::CKER_UNI,
-      "truncated gaussian" = npRmpi:::CKER_TGAUSS
+      uniform = npRmpi:::CKER_UNI
     )),
     as.integer(switch(
       bw$uxkertype,

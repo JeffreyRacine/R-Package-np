@@ -300,8 +300,6 @@ npscoefbw.NULL <-
 
   ckertype <- as.character(sbw$ckertype)[1L]
   ckerorder <- as.integer(sbw$ckerorder)[1L]
-  if (identical(ckertype, "truncated gaussian"))
-    return(FALSE)
   if (!identical(ckertype, "uniform") &&
       (!is.finite(ckerorder) || ckerorder != 2L))
     return(FALSE)
@@ -1849,7 +1847,6 @@ npscoefbw.scbandwidth <-
     cont_utol <- switch(
       bws$ckertype,
       gaussian = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
-      "truncated gaussian" = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
       epanechnikov = sqrt(fast_largeh_tol),
       uniform = 1.0 - 32.0 * .Machine$double.eps,
       0.0

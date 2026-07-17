@@ -7757,8 +7757,7 @@
     kerneval = switch(bws$ckertype,
       gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
       epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
-      uniform = CKER_UNI,
-      "truncated gaussian" = CKER_TGAUSS
+      uniform = CKER_UNI
     ),
     ukerneval = switch(bws$ukertype,
       aitchisonaitken = UKER_AIT,
@@ -9138,8 +9137,7 @@
     kerneval = switch(cker.type,
       gaussian = CKER_GAUSS + cker.order / 2 - 1,
       epanechnikov = CKER_EPAN + cker.order / 2 - 1,
-      uniform = CKER_UNI,
-      "truncated gaussian" = CKER_TGAUSS
+      uniform = CKER_UNI
     ),
     ukerneval = switch(uker.type,
       aitchisonaitken = UKER_AIT,
@@ -11303,14 +11301,12 @@ plotFactor <- function(f, y, ...){
     xkerneval = switch(bws$cxkertype,
       gaussian = CKER_GAUSS + bws$cxkerorder / 2 - 1,
       epanechnikov = CKER_EPAN + bws$cxkerorder / 2 - 1,
-      uniform = CKER_UNI,
-      "truncated gaussian" = CKER_TGAUSS
+      uniform = CKER_UNI
     ),
     ykerneval = switch(bws$cykertype,
       gaussian = CKER_GAUSS + bws$cykerorder / 2 - 1,
       epanechnikov = CKER_EPAN + bws$cykerorder / 2 - 1,
-      uniform = CKER_UNI,
-      "truncated gaussian" = CKER_TGAUSS
+      uniform = CKER_UNI
     ),
     uxkerneval = switch(bws$uxkertype,
       aitchisonaitken = UKER_AIT,

@@ -25,10 +25,6 @@ extern  MPI_Status status;
 
 #include <R.h>
 
-extern double np_tgauss2_b, np_tgauss2_alpha, np_tgauss2_c0;
-// convolution kernel constants
-extern double np_tgauss2_a0, np_tgauss2_a1, np_tgauss2_a2;
-extern double np_tgauss2_k, np_tgauss2_k2, np_tgauss2_k22, np_tgauss2_km;
 /*
 
 The following kernel functions are supported.
@@ -50,7 +46,7 @@ convergence rate of the bandwidth.
 
 8 = Rectangular kernel
 
-9 = Truncated Gaussian kernel (second order)
+9 = Reserved (unsupported)
 The following techniques are currently supported.
 
 The technique is input via disk files bandwidth_d.ini and bandwidth_r.ini
@@ -166,9 +162,8 @@ double kernel(int KERNEL, double z)
 
 			break;
 
-  case 9:
-    return_value = (fabs(z) > np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z) - np_tgauss2_c0;
-    break;
+	case 9:
+		error("unsupported continuous kernel code");
 	}
 
 
@@ -330,9 +325,8 @@ double cdf_kernel(int KERNEL, double z)
 
 			break;
 
-  case 9:
-    return_value = (z <= -np_tgauss2_b) ? 0.0 : ((z >= np_tgauss2_b) ? 1.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5));
-    break;
+	case 9:
+		error("unsupported continuous kernel code");
 	}
 
 	return(return_value);
@@ -459,9 +453,8 @@ double kernel_deriv(int KERNEL, double z)
 
 			break;
 
-  case 9:
-    return_value = (fabs(z) > np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*(-z*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z));
-    break;
+	case 9:
+		error("unsupported continuous kernel code");
 	}
 
 	return(return_value);
@@ -600,19 +593,8 @@ double kernel_convol(int KERNEL, int BANDWIDTH, double z, double h1, double h2)
 
 				break;
 
-    case 9:
-      if(fabs(z) > 2*np_tgauss2_b)
-        return_value = 0.0;
-      else {
-        if(z < 0)
-          return_value = (np_tgauss2_a0*erfun(0.5*z + np_tgauss2_b)*exp(-0.25*z*z) + np_tgauss2_a1*z + 
-                          np_tgauss2_a2*erfun(0.7071067810*(z + np_tgauss2_b)) - np_tgauss2_c0);
-        else
-          return_value = (-np_tgauss2_a0*erfun(0.5*z - np_tgauss2_b)*exp(-0.25*z*z) - np_tgauss2_a1*z -
-                          np_tgauss2_a2*erfun(0.7071067810*(z - np_tgauss2_b)) - np_tgauss2_c0);
-        
-      }
-      break;
+		case 9:
+			error("unsupported continuous kernel code");
 
 		}
 
@@ -868,8 +850,8 @@ double kernel_convol(int KERNEL, int BANDWIDTH, double z, double h1, double h2)
 				}
 
 				break;
-    case 9:
-      error("adaptive bandwidths not supported with truncation gaussian."); break;
+			case 9:
+				error("unsupported continuous kernel code");
       
 		}
 
@@ -991,14 +973,8 @@ double *DIFF_KER_PPM)
 
 			break;
 
-    case 9:
-
-			*INT_KERNEL_P = np_tgauss2_k;
-			*K_INT_KERNEL_P = ipow(*INT_KERNEL_P, num_reg_continuous);
-			*INT_KERNEL_PM_HALF = np_tgauss2_km;
-			*DIFF_KER_PPM = 2.0* (*K_INT_KERNEL_P/ *INT_KERNEL_P) * (np_tgauss2_k - np_tgauss2_km);
-
-      break;
+		case 9:
+			error("unsupported continuous kernel code");
 
 	}
 
@@ -1098,10 +1074,8 @@ double *K_INT_KERNEL_P)
 
 			break;
 
-  case 9:
-    *INT_KERNEL_P = np_tgauss2_k;
-    *K_INT_KERNEL_P = ipow(*INT_KERNEL_P, num_var_continuous);
-    break;
+	case 9:
+		error("unsupported continuous kernel code");
 
 	}
 
