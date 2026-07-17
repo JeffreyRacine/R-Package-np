@@ -237,10 +237,6 @@ nplsqregbw <-
   match.arg(tau.search, c("full", "refined"))
 }
 
-.nplsqreg_check_loss <- function(u, tau) {
-  mean(u * (tau - (u < 0)), na.rm = TRUE)
-}
-
 .nplsqreg_validate_scale <- function(scale, n) {
   if (!is.numeric(scale) || length(scale) != n ||
       any(!is.finite(scale)) || any(scale <= 0))

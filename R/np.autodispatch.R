@@ -2065,43 +2065,6 @@
   .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = FALSE)
 }
 
-.npRmpi_bootstrap_make_indices <- function(n,
-                                           boot.num,
-                                           boot.method = c("inid", "fixed", "geom"),
-                                           boot.blocklen = NULL) {
-  boot.method <- match.arg(boot.method)
-
-  if (!is.numeric(n) || length(n) != 1L || is.na(n) || n < 2L)
-    stop("invalid bootstrap sample size")
-  if (!is.numeric(boot.num) || length(boot.num) != 1L || is.na(boot.num) || boot.num < 1L)
-    stop("invalid bootstrap replication count")
-
-  n <- as.integer(n)
-  boot.num <- as.integer(boot.num)
-
-  if (boot.method == "inid") {
-    idx <- matrix(sample.int(n, size = n * boot.num, replace = TRUE),
-                  nrow = boot.num, ncol = n)
-    return(idx)
-  }
-
-  if (is.null(boot.blocklen) || !is.numeric(boot.blocklen) ||
-      length(boot.blocklen) != 1L || is.na(boot.blocklen) || boot.blocklen < 1)
-    stop("invalid block length for bootstrap method")
-
-  boot.blocklen <- as.integer(boot.blocklen)
-  idx.ts <- tsboot(tseries = seq_len(n),
-                   statistic = function(tsb) tsb,
-                   R = boot.num,
-                   l = boot.blocklen,
-                   sim = boot.method)
-  idx <- idx.ts$t
-  if (!is.matrix(idx))
-    idx <- matrix(idx, nrow = boot.num, byrow = TRUE)
-  storage.mode(idx) <- "integer"
-  idx
-}
-
 .npRmpi_bootstrap_compute_payload <- function(payload, comm = 1L) {
   .npRmpi_require_active_slave_pool(
     comm = comm,

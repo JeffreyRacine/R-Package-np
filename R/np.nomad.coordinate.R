@@ -418,15 +418,3 @@
     numeric(1L)
   )
 }
-
-.np_nomad_coordinate_equal <- function(x, y, tolerance = 0) {
-  if (is.null(x) && is.null(y))
-    return(TRUE)
-  if (is.null(x) || is.null(y))
-    return(FALSE)
-  if (length(x) != length(y))
-    return(FALSE)
-  if (isTRUE(tolerance == 0))
-    return(identical(as.numeric(x), as.numeric(y)))
-  isTRUE(all.equal(as.numeric(x), as.numeric(y), tolerance = tolerance, check.attributes = FALSE))
-}

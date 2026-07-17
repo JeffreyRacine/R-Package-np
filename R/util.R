@@ -1532,13 +1532,6 @@ is.monotone.increasing <- function(x) {
 ## just their sorted order Actually, the ord/badord paradigm must go,
 ## in place of levels caching
 
-matrix.sd <- function(x, na.rm=FALSE) {
-  if(is.matrix(x)) apply(x, 2, sd, na.rm=na.rm)
-  else if(is.vector(x)) sd(x, na.rm=na.rm)
-  else if(is.data.frame(x)) sapply(x, sd, na.rm=na.rm)
-  else sd(as.vector(x), na.rm=na.rm)
-}
-
 .np_validate_seed_scalar <- function(seed) {
   if (is.null(seed) || length(seed) != 1L || !is.numeric(seed) || is.na(seed) || !is.finite(seed))
     stop("'seed' must be a single finite numeric value", call. = FALSE)
@@ -2112,24 +2105,6 @@ npContinuousExtendedNnNomadUpper <- function(traindat,
   upper
 }
 
-npRegressionExtendedNnNomadUpper <- function(xdat,
-                                          template,
-                                          cont.idx,
-                                          safety.margin = 1.5,
-                                          hard.upper = .Machine$integer.max / 4) {
-  if (!inherits(template, "rbandwidth"))
-    return(rep.int(as.double(as.integer(NROW(xdat)) - 1L), length(cont.idx)))
-
-  npContinuousExtendedNnNomadUpper(
-    traindat = xdat,
-    bwtype = template$type,
-    ckertype = template$ckertype,
-    cont.idx = cont.idx,
-    safety.margin = safety.margin,
-    hard.upper = hard.upper
-  )
-}
-
 npRegressionHasExtendedNn <- function(bws) {
   if (is.null(bws))
     return(FALSE)
@@ -2591,18 +2566,6 @@ toMatrix <- function(data) {
   tq
 }
 
-## this doesn't just strictly check for the response, but does tell you
-## that evaluating with response fails ... in principle the evaluation
-## could fail without the response too, but then the calling routine is about
-## to die a noisy death anyhow ...
-succeedWithResponse <- function(tt, frame){
-  vars <- attr(tt, "variables")
-  if (is.null(vars))
-    return(FALSE)
-  out <- .np_try_eval_in_frames(vars, eval_env = frame, enclos = NULL, search_frames = FALSE)
-  isTRUE(out$ok)
-}
-
 ## determine whether a bandwidth
 ## matches a data set
 bwMatch <- function(data, dati){
@@ -2674,10 +2637,6 @@ blank <- function(len){
   sapply(len, function(nb){
     paste(rep(' ', times = nb), collapse='')
   })
-}
-
-formatv <- function(v){
-  sapply(seq_along(v), function(j){ format(v[j]) })
 }
 
 ## strings used in various report generating functions
@@ -3781,10 +3740,6 @@ genBwKerStrsXY <- function(x){
   return(t.str)
 }
 
-genBwGOFStrs <- function(x) {
-  ###paste("Residual standard error:", sqrt
-}
-  
 ## statistical functions
 RSQfunc <- function(y,y.pred) {
   y.mean <- mean(y)
@@ -4533,17 +4488,4 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
   assign(token, as.numeric(value), envir = cache$store)
   cache$raw.evals <- cache$raw.evals + 1
   invisible(TRUE)
-}
-
-.np_objective_exact_cache_stats <- function(cache) {
-  if (!is.environment(cache))
-    return(NULL)
-  c(
-    enabled = if (isTRUE(cache$enabled)) 1 else 0,
-    visits = cache$visits,
-    unique = cache$unique,
-    repeats = cache$repeats,
-    raw.evals = cache$raw.evals,
-    hits = cache$hits
-  )
 }

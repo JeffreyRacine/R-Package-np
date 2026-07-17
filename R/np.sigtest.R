@@ -8,24 +8,6 @@
 if (getRversion() >= "2.15.1")
   utils::globalVariables(".npsig_worker")
 
-.npRmpi_npsig_extract_xy_from_npreg <- function(obj) {
-  if (is.null(obj$bws$formula) || is.null(obj$bws$call))
-    stop("unable to extract xdat/ydat from npreg object")
-
-  tt <- terms(obj$bws$formula)
-  m <- match(c("formula", "data", "subset", "na.action"),
-             names(obj$bws$call), nomatch = 0)
-  tmf <- obj$bws$call[c(1, m)]
-  tmf[[1]] <- as.name("model.frame")
-  tmf[["formula"]] <- tt
-  mf.args <- as.list(tmf)[-1L]
-  tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
-
-  ydat <- model.response(tmf)
-  xdat <- tmf[, attr(attr(tmf, "terms"), "term.labels"), drop = FALSE]
-  list(xdat = xdat, ydat = ydat)
-}
-
 .npRmpi_npsig_extract_xy_from_bws <- function(obj) {
   if (!is.null(obj$call)) {
     call.names <- names(obj$call)

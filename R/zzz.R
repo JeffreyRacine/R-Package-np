@@ -63,10 +63,6 @@
   invisible(TRUE)
 }
 
-.npRmpi_reassert_plot_methods <- function() {
-  .npRmpi_reassert_s3_methods("plot")
-}
-
 .npRmpi_after_np_load <- function() {
   tryCatch(.npRmpi_reassert_s3_methods(), error = function(e) invisible(e))
   invisible(TRUE)

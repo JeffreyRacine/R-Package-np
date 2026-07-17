@@ -355,24 +355,6 @@
   formatC(value, digits = 6L, format = "fg", flag = "#")
 }
 
-.np_degree_format_candidate_set <- function(cand) {
-  cand <- as.integer(cand)
-  if (!length(cand))
-    return("c()")
-
-  if (length(cand) >= 2L && all(diff(cand) == 1L))
-    return(sprintf("%s:%s", cand[1L], cand[length(cand)]))
-
-  sprintf("c(%s)", paste(cand, collapse = ","))
-}
-
-.np_degree_format_search_space <- function(candidates) {
-  paste(
-    vapply(candidates, .np_degree_format_candidate_set, character(1L)),
-    collapse = " x "
-  )
-}
-
 .np_degree_coordinate_visit_cap <- function(candidates,
                                             max_cycles,
                                             restart_total) {
@@ -1673,22 +1655,6 @@
   paste(fields, collapse = ", ")
 }
 
-.np_nomad_progress_start_detail <- function(baseline_degree,
-                                            restart_index = 1L,
-                                            nmulti,
-                                            best_record,
-                                            restart_durations = numeric(),
-                                            elapsed = NULL) {
-  .np_nomad_progress_detail(
-    current_degree = baseline_degree,
-    best_record = best_record,
-    restart_index = restart_index,
-    nmulti = nmulti,
-    restart_durations = restart_durations,
-    elapsed = elapsed
-  )
-}
-
 .np_nomad_progress_fields <- function(state,
                                       done = NULL,
                                       detail = NULL,
@@ -1770,10 +1736,6 @@
   invisible(NULL)
 }
 
-.np_nomad_powell_note <- function(degree) {
-  invisible(NULL)
-}
-
 .np_nomad_powell_progress_label <- function() {
   "Refining bandwidth"
 }
@@ -1795,13 +1757,6 @@
   out$powell.remin <- isTRUE(remin)
   out$bwsolver <- "powell"
   out
-}
-
-.np_nomad_powell_context_label <- function(degree) {
-  sprintf(
-    "Refining NOMAD solution with one Powell hot start at degree %s",
-    .np_degree_format_degree(degree)
-  )
 }
 
 .np_nomad_powell_progress_detail <- function(current_degree,

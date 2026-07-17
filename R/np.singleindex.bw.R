@@ -572,11 +572,6 @@ npindexbw.NULL <-
   h >= (diff(range(vals)) / cont_utol)
 }
 
-.npindexbw_is_degree0_policy <- function(policy) {
-  degree <- as.integer(policy$canonical.degree)
-  length(degree) > 0L && all(degree == 0L)
-}
-
 .npindexbw_check_index_bound_contract <- function(bws,
                                                   policy,
                                                   where = "npindexbw") {
