@@ -27,7 +27,12 @@ test_that("session attach loop delegates to shared worker loop helper", {
 
 test_that("mpi.bcast.cmd caller path executes no-arg commands through helper", {
   fn.body <- paste(deparse(body(mpi.bcast.cmd), width.cutoff = 500L), collapse = " ")
-  expect_match(fn.body, "\\.npRmpi_eval_scmd\\(tcmd, envir = parent\\.frame\\(\\)\\)")
+  expect_identical(
+    lengths(regmatches(fn.body, gregexpr("caller\\.env <- parent\\.frame\\(\\)", fn.body))),
+    1L
+  )
+  expect_match(fn.body, "\\.npRmpi_eval_scmd\\(tcmd, envir = caller\\.env\\)")
+  expect_match(fn.body, "do\\.call.*envir = caller\\.env")
 })
 
 test_that(".mpi.worker.exec no longer uses .mpi.err side-channel", {

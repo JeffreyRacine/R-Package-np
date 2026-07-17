@@ -120,7 +120,7 @@ test_that("profile manual-broadcast user-style conditional fixed-bandwidth route
     timeout = 90L,
     env = env_profile
   )
-  if (res$status != 0L) {
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output)) {
     env_profile_fallback <- c(
       env_common,
       sprintf("R_PROFILE_USER=%s", profile.path),

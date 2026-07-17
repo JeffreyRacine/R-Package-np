@@ -268,8 +268,7 @@ run_bandwidth_profile_contract <- function(timeout = 120L) {
   skip_if(!file.exists(profile.path), "npRmpi profile template unavailable in subprocess lib")
 
   script <- tempfile("npRmpi-bandwidth-profile-", fileext = ".R")
-  batch_file <- tempfile("npRmpi-bandwidth-profile-", fileext = ".Rout")
-  on.exit(unlink(c(script, batch_file)), add = TRUE)
+  on.exit(unlink(script), add = TRUE)
   writeLines(c(
     "mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)",
     "mpi.bcast.cmd(options(",
@@ -301,7 +300,7 @@ run_bandwidth_profile_contract <- function(timeout = 120L) {
 
   res <- run_bandwidth_cmd_subprocess(
     mpiexec,
-    args = c("-n", "2", file.path(R.home("bin"), "R"), "CMD", "BATCH", "--no-save", script, batch_file),
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
     timeout = timeout,
     env = c(
       env_common,
@@ -313,10 +312,10 @@ run_bandwidth_profile_contract <- function(timeout = 120L) {
       "FI_SOCKETS_IFACE=en0"
     )
   )
-  if (res$status != 0L) {
+  if (res$status != 0L && bandwidth_is_mpi_init_env_failure(res$output)) {
     res <- run_bandwidth_cmd_subprocess(
       mpiexec,
-      args = c("-n", "2", file.path(R.home("bin"), "R"), "CMD", "BATCH", "--no-save", script, batch_file),
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
       timeout = timeout,
       env = c(
         env_common,
@@ -334,12 +333,10 @@ run_bandwidth_profile_contract <- function(timeout = 120L) {
     skip("MPI runtime interface unavailable in this environment for profile-mode smoke")
   }
 
-  batch_lines <- if (file.exists(batch_file)) readLines(batch_file, warn = FALSE) else character()
-
   list(
     status = res$status,
-    lines = normalize_bandwidth_progress_output(batch_lines),
-    raw = c(batch_lines, res$output)
+    lines = normalize_bandwidth_progress_output(res$output),
+    raw = res$output
   )
 }
 

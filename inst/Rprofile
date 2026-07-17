@@ -49,8 +49,8 @@ if (!invisible(library(npRmpi, logical.return = TRUE))) {
   q(save = "no")
 }
 
-# Profile/manual-broadcast launches should preserve the same direct-call
-# behavior as session/attach master contexts.
+# Profile/manual-broadcast launches keep automatic route selection available
+# inside explicitly broadcast commands.
 options(npRmpi.autodispatch = TRUE)
 options(npRmpi.profile.active = TRUE)
 
@@ -93,10 +93,11 @@ options(error = quote(assign(".mpi.err", FALSE, envir = .GlobalEnv)))
 if (mpi.comm.size(0) > 1)
   invisible(mpi.comm.dup(0, 1))
 
-# Direct profile-mode autodispatch executes only on rank 0 script body, so
-# slave ranks must have the embedded np MPI state primed before entering the
-# worker loop. Canonical demos may still call np.mpi.initialize() explicitly;
-# repeated initialization is tolerated by the embedded backend.
+# Profile/manual-broadcast scripts execute only on the rank 0 script body, so
+# worker ranks need the embedded np MPI state primed before entering their
+# receive/eval loop. Canonical scripts may still broadcast
+# np.mpi.initialize() explicitly; repeated initialization is tolerated by the
+# embedded backend.
 if (mpi.comm.size(0) > 1)
   np.mpi.initialize()
 

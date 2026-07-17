@@ -28,18 +28,30 @@ test_that("native NOMAD status decoding preserves R condition semantics", {
 })
 
 test_that("MPI interrupt state is inactive without a distributed pool", {
-  state <- getFromNamespace(".npRmpi_mpi_interrupt_state", "npRmpi")
-  scope <- getFromNamespace(".npRmpi_mpi_interrupt_scope", "npRmpi")
-  with.scope <- getFromNamespace(
-    ".npRmpi_with_command_interrupt_scope",
-    "npRmpi"
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "subprocess library setup unavailable")
+
+  res <- npRmpi_run_rscript_subprocess(
+    c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "state <- getFromNamespace('.npRmpi_mpi_interrupt_state', 'npRmpi')",
+      "scope <- getFromNamespace('.npRmpi_mpi_interrupt_scope', 'npRmpi')",
+      "with.scope <- getFromNamespace('.npRmpi_with_command_interrupt_scope', 'npRmpi')",
+      "stopifnot(!state(3L), !state(2L), !state(1L), !state(4L))",
+      "stopifnot(!scope(1L), !scope(2L))",
+      "stopifnot(identical(with.scope(42L), 42L))",
+      "err <- tryCatch(with.scope(stop('scope error')), error = conditionMessage)",
+      "stopifnot(identical(err, 'scope error'))",
+      "cat('NO_DISTRIBUTED_POOL_INTERRUPT_STATE_OK\\n')"
+    ),
+    timeout = 45L,
+    env = env
   )
-  expect_false(state(3L))
-  expect_false(state(2L))
-  expect_false(state(1L))
-  expect_false(state(4L))
-  expect_false(scope(1L))
-  expect_false(scope(2L))
-  expect_identical(with.scope(42L), 42L)
-  expect_error(with.scope(stop("scope error")), "scope error")
+
+  expect_identical(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl(
+    "NO_DISTRIBUTED_POOL_INTERRUPT_STATE_OK",
+    res$output,
+    fixed = TRUE
+  )))
 })

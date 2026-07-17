@@ -1575,9 +1575,11 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
     "  stopifnot(inherits(fit.uf, 'npdistribution'))",
     "  stopifnot(inherits(fit.cd, 'condensity'))",
     "  stopifnot(inherits(fit.cf, 'condistribution'))",
-    "  stopifnot(inherits(cop, 'data.frame'))",
-    "  stopifnot(nrow(cop) == 9L)",
-    "  stopifnot(all(is.finite(cop$copula)))",
+    "  stopifnot(inherits(cop, 'npcopula'))",
+    "  cop.data <- as.data.frame(cop)",
+    "  stopifnot(inherits(cop.data, 'data.frame'))",
+    "  stopifnot(nrow(cop.data) == 9L)",
+    "  stopifnot(all(is.finite(cop.data$copula)))",
     "  stopifnot(inherits(fit.cm, 'conmode'))",
     "  cat('ATTACH_NPCONMODE_ROUTE_OK\\n')",
     "  cat('ATTACH_NPCOPULA_ROUTE_OK\\n')",
@@ -2175,9 +2177,11 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
     "  stopifnot(inherits(fit.uf, 'npdistribution'))",
     "  stopifnot(inherits(fit.cd, 'condensity'))",
     "  stopifnot(inherits(fit.cf, 'condistribution'))",
-    "  stopifnot(inherits(cop, 'data.frame'))",
-    "  stopifnot(nrow(cop) == 9L)",
-    "  stopifnot(all(is.finite(cop$copula)))",
+    "  stopifnot(inherits(cop, 'npcopula'))",
+    "  cop.data <- as.data.frame(cop)",
+    "  stopifnot(inherits(cop.data, 'data.frame'))",
+    "  stopifnot(nrow(cop.data) == 9L)",
+    "  stopifnot(all(is.finite(cop.data$copula)))",
     "  stopifnot(inherits(fit.cm, 'conmode'))",
     "  cat('PROFILE_NPCONMODE_ROUTE_OK\\n')",
     "  cat('PROFILE_NPCOPULA_ROUTE_OK\\n')",
@@ -2202,7 +2206,7 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
     timeout = 90L,
     env = env_profile
   )
-  if (res$status != 0L) {
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output)) {
     env_profile_fallback <- c(
       env_common,
       sprintf("R_PROFILE_USER=%s", profile.path),
@@ -2287,7 +2291,7 @@ test_that("profile npindexhat adaptive-nn exact owner route completes under mpie
     timeout = 120L,
     env = env_profile
   )
-  if (res$status != 0L) {
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output)) {
     env_profile_fallback <- c(
       env_common,
       sprintf("R_PROFILE_USER=%s", profile.path),
@@ -2378,7 +2382,7 @@ test_that("profile npindexhat adaptive-nn ll owner route stays exact under mpiex
     timeout = 120L,
     env = env_profile
   )
-  if (res$status != 0L) {
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output)) {
     env_profile_fallback <- c(
       env_common,
       sprintf("R_PROFILE_USER=%s", profile.path),
@@ -2463,7 +2467,7 @@ test_that("profile npindex adaptive-nn public route preserves bwtype semantics u
     timeout = 120L,
     env = env_profile
   )
-  if (res$status != 0L) {
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output)) {
     env_profile_fallback <- c(
       env_common,
       sprintf("R_PROFILE_USER=%s", profile.path),
@@ -2551,7 +2555,7 @@ test_that("profile npindex nearest-neighbor exact route stays green under mpiexe
     timeout = 120L,
     env = env_profile
   )
-  if (res$status != 0L) {
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output)) {
     env_profile_fallback <- c(
       env_common,
       sprintf("R_PROFILE_USER=%s", profile.path),

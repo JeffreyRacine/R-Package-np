@@ -1,4 +1,4 @@
-test_that("profile demo launcher captures the R CMD BATCH transcript explicitly", {
+test_that("profile demo launcher gives every MPI rank a distinct batch transcript", {
   makefile <- system.file(
     "demo_tools", "makefile", package = "npRmpi", mustWork = TRUE
   )
@@ -7,17 +7,22 @@ test_that("profile demo launcher captures the R CMD BATCH transcript explicitly"
 
   expect_match(
     text,
-    "batch_file=\\$\\$\\{out_file\\}\\.batch;",
+    "batch_base=\\$\\$\\{out_file\\}\\.batch;",
     perl = TRUE
   )
   expect_match(
     text,
-    "R CMD BATCH --no-save \\$\\(DEMO_SRC\\)/\\$\\$\\{d\\}_npRmpi_profile\\.R \"\\$\\$batch_file\" > \"\\$\\$tmp_file\" 2>&1",
+    "PMI_RANK.*PMIX_RANK.*OMPI_COMM_WORLD_RANK",
     perl = TRUE
   )
   expect_match(
     text,
-    "\\{ \\$\\(PROVENANCE_CMD\\); cat \"\\$\\$batch_file\"; if test -s \"\\$\\$tmp_file\"; then cat \"\\$\\$tmp_file\"; fi; \\} > \"\\$\\$out_file\";",
+    "R CMD BATCH --no-save.*\\$\\$2\\.rank\\$\\$\\{rank\\}",
+    perl = TRUE
+  )
+  expect_match(
+    text,
+    "master_batch=\\$\\$\\{batch_base\\}\\.rank0;",
     perl = TRUE
   )
 })
