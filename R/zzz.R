@@ -93,17 +93,6 @@ npTreeMode <- function(value = getOption("np.tree", "auto")) {
   stop("option 'np.tree' must be TRUE, FALSE, or \"auto\"", call. = FALSE)
 }
 
-npMacMseriesAccelerateMode <- function(value = getOption("np.macMseries.accelerate", "auto")) {
-  if (isTRUE(value))
-    return("on")
-  if (identical(value, FALSE))
-    return("off")
-  if (is.character(value) && length(value) == 1L &&
-      identical(unname(tolower(value)), "auto"))
-    return("auto")
-  stop("option 'np.macMseries.accelerate' must be TRUE, FALSE, or \"auto\"", call. = FALSE)
-}
-
 npTreeContinuousKernelTypes <- function(bws = NULL, ckertype = NULL) {
   if (!is.null(ckertype))
     return(as.character(ckertype))

@@ -890,10 +890,6 @@
   state
 }
 
-.npscoef_effective_weight_one <- function(state, eval.index) {
-  .npscoef_effective_weight_chunk(state = state, eval.indices = eval.index)[, 1L]
-}
-
 .npscoef_effective_weight_chunk_size <- function(ntrain, neval) {
   chunk.opt <- getOption("np.scoef.weight.chunk.size")
   if (!is.null(chunk.opt)) {
@@ -960,21 +956,6 @@
   if (!is.matrix(ans))
     ans <- matrix(ans, ncol = ncol(yy))
   ans
-}
-
-.npscoef_weight_matrix <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
-  state <- .npscoef_effective_weight_state(
-    bws = bws,
-    tzdat = tzdat,
-    ezdat = ezdat,
-    leave.one.out = leave.one.out
-  )
-  neval <- nrow(state$z.eval)
-  ntrain <- nrow(state$z.train)
-  H <- matrix(0.0, nrow = ntrain, ncol = neval)
-  for (ii in seq_len(neval))
-    H[, ii] <- .npscoef_effective_weight_one(state = state, eval.index = ii)
-  H
 }
 
 npindexhat <-

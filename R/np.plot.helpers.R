@@ -3402,98 +3402,6 @@
   as.double(ydat)
 }
 
-.np_inid_scoef_predict_row <- function(mrow, zrow, rhs, ridge.grid) {
-  A <- .np_inid_lp_unpack_sym_row(mrow = mrow, p = length(rhs))
-  tyw <- as.double(zrow)
-  nc <- ncol(A)
-  ridge.grid <- as.double(ridge.grid)
-  if (!length(ridge.grid) || anyNA(ridge.grid) || any(!is.finite(ridge.grid)) || any(ridge.grid < 0))
-    stop("argument 'ridge.grid' must be a non-empty non-negative finite numeric vector")
-
-  maxPenalty <- sqrt(.Machine$double.xmax)
-  coef.ii <- rep(maxPenalty, nc)
-  for (ridge in ridge.grid) {
-    ridge.val <- ridge * tyw[1L] / NZD(A[1L, 1L])
-    coef.try <- tryCatch(
-      solve(
-        A + diag(rep(ridge, nc)),
-        tyw + c(ridge.val, rep(0, nc - 1L))
-      ),
-      error = function(e) e
-    )
-    if (!(inherits(coef.try, "error") || any(!is.finite(coef.try))))
-      return(sum(as.double(rhs) * as.double(coef.try)))
-  }
-
-  sum(as.double(rhs) * coef.ii)
-}
-
-.np_inid_scoef_predict_chunk <- function(Mvals, Zvals, rhs) {
-  Mvals <- as.matrix(Mvals)
-  Zvals <- as.matrix(Zvals)
-  rhs <- as.double(rhs)
-
-  bsz <- nrow(Mvals)
-  p <- ncol(Zvals)
-  out <- rep(NA_real_, bsz)
-
-  if (p == 1L) {
-    den <- as.double(Mvals[, 1L])
-    good <- is.finite(den) & (abs(den) > .Machine$double.eps)
-    out[good] <- rhs[1L] * as.double(Zvals[good, 1L]) / den[good]
-    return(out)
-  }
-
-  if (p == 2L) {
-    a <- as.double(Mvals[, 1L])
-    b <- as.double(Mvals[, 2L])
-    c <- as.double(Mvals[, 3L])
-    u <- as.double(Zvals[, 1L])
-    v <- as.double(Zvals[, 2L])
-    det <- a * c - b * b
-    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
-    if (any(good)) {
-      invdet <- 1 / det[good]
-      beta1 <- (c[good] * u[good] - b[good] * v[good]) * invdet
-      beta2 <- (a[good] * v[good] - b[good] * u[good]) * invdet
-      out[good] <- rhs[1L] * beta1 + rhs[2L] * beta2
-    }
-    return(out)
-  }
-
-  if (p == 3L) {
-    a <- as.double(Mvals[, 1L])
-    b <- as.double(Mvals[, 2L])
-    c <- as.double(Mvals[, 3L])
-    d <- as.double(Mvals[, 4L])
-    e <- as.double(Mvals[, 5L])
-    f <- as.double(Mvals[, 6L])
-    u <- as.double(Zvals[, 1L])
-    v <- as.double(Zvals[, 2L])
-    w <- as.double(Zvals[, 3L])
-
-    det <- a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d)
-    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
-    if (any(good)) {
-      c11 <- d[good] * f[good] - e[good] * e[good]
-      c12 <- c[good] * e[good] - b[good] * f[good]
-      c13 <- b[good] * e[good] - c[good] * d[good]
-      c22 <- a[good] * f[good] - c[good] * c[good]
-      c23 <- b[good] * c[good] - a[good] * e[good]
-      c33 <- a[good] * d[good] - b[good] * b[good]
-      invdet <- 1 / det[good]
-
-      beta1 <- (c11 * u[good] + c12 * v[good] + c13 * w[good]) * invdet
-      beta2 <- (c12 * u[good] + c22 * v[good] + c23 * w[good]) * invdet
-      beta3 <- (c13 * u[good] + c23 * v[good] + c33 * w[good]) * invdet
-      out[good] <- rhs[1L] * beta1 + rhs[2L] * beta2 + rhs[3L] * beta3
-    }
-    return(out)
-  }
-
-  out
-}
-
 .np_inid_boot_from_scoef_frozen <- function(txdat,
                                             ydat,
                                             tzdat,
@@ -4934,24 +4842,6 @@
   )
 }
 
-.np_boot_matrix_from_ksum <- function(ksum, B, nout, where = "ksum helper path") {
-  if (is.null(dim(ksum))) {
-    if (B == 1L && length(ksum) == nout)
-      return(matrix(as.double(ksum), nrow = 1L))
-    stop(sprintf("%s returned unexpected vector shape", where))
-  }
-
-  km <- as.matrix(ksum)
-  if (nrow(km) == B && ncol(km) == nout)
-    return(km)
-  if (nrow(km) == nout && ncol(km) == B)
-    return(t(km))
-  if (B == 1L && length(km) == nout)
-    return(matrix(as.double(km), nrow = 1L))
-
-  stop(sprintf("%s returned unexpected matrix shape", where))
-}
-
 .np_ksum_unconditional_eval_exact <- function(xdat,
                                               exdat,
                                               bws,
@@ -5001,14 +4891,6 @@
     xdati = untangle(xdat),
     xnames = names(xdat)
   )
-}
-
-.np_unconditional_exact_precomputed_kband_safe <- function(bws, n.train) {
-  if (!identical(bws$type, "adaptive_nn"))
-    return(TRUE)
-
-  bw.max <- suppressWarnings(max(as.integer(bws$bw)))
-  is.finite(bw.max) && !is.na(bw.max) && n.train >= bw.max
 }
 
 .np_operator_matrix_from_ksum <- function(ksum, nrow.out, ncol.out, where) {
@@ -5782,39 +5664,6 @@
   list(t = tmat, t0 = t0)
 }
 
-.np_inid_boot_from_conditional_localpoly_fixed_counts <- function(xdat,
-                                                                  ydat,
-                                                                  exdat,
-                                                                  eydat,
-                                                                  bws,
-                                                                  B,
-                                                                  cdf,
-                                                                  counts) {
-  state <- .np_inid_boot_from_conditional_localpoly_fixed_precompute(
-    xdat = xdat,
-    ydat = ydat,
-    exdat = exdat,
-    eydat = eydat,
-    bws = bws,
-    cdf = cdf
-  )
-  counts.mat <- .np_inid_counts_matrix(n = state$n, B = B, counts = counts)
-  t0 <- numeric(state$neval)
-  tmat <- matrix(NA_real_, nrow = B, ncol = state$neval)
-
-  for (i in seq_len(state$ngroups)) {
-    feat <- .np_inid_boot_from_conditional_localpoly_fixed_group_features(state = state, i = i)
-    t0[feat$rows] <- .np_inid_boot_from_conditional_localpoly_fixed_t0(state = state, feat = feat)
-    tmat[, feat$rows] <- .np_inid_boot_from_conditional_localpoly_fixed_chunk(
-      state = state,
-      feat = feat,
-      counts.chunk = counts.mat
-    )
-  }
-
-  list(t = tmat, t0 = t0)
-}
-
 .np_inid_boot_from_conditional_localpoly_fixed_precompute <- function(xdat,
                                                                       ydat,
                                                                       exdat,
@@ -6453,10 +6302,6 @@ gen.label = function(label, altlabel){
   )
 }
 
-gen.tflabel = function(condition, tlabel, flabel){
-  paste(if (isTRUE(condition)) tlabel else flabel)
-}
-
 draw.error.bands = function(ex, ely, ehy, lty = .np_plot_lty("interval"), col = par("col")){
   lines(ex,ely,lty=lty,col=col)
   lines(ex,ehy,lty=lty,col=col)
@@ -6763,10 +6608,6 @@ plotFactor <- function(f, y, ...){
   value
 }
 
-.np_plot_axis_is_continuous <- function(x) {
-  !is.factor(x)
-}
-
 .np_plot_validate_rug_request <- function(plot.rug,
                                           route,
                                           supported.route = FALSE,
@@ -7049,30 +6890,6 @@ plotFactor <- function(f, y, ...){
   list(
     dtheta = 5.625,
     sleep = 0.24
-  )
-}
-
-.np_plot_format_angle <- function(angle, digits = 0L) {
-  angle <- as.double(angle)[1L]
-  digits <- as.integer(digits)[1L]
-  if (is.na(digits) || digits < 0L)
-    digits <- 0L
-
-  rounded <- round(angle, digits = digits)
-  if (isTRUE(all.equal(rounded, round(rounded)))) {
-    return(format(round(rounded), trim = TRUE, scientific = FALSE))
-  }
-
-  formatC(rounded, format = "f", digits = digits)
-}
-
-.np_plot_theta_phi_label <- function(theta, phi) {
-  paste0(
-    "[theta= ",
-    .np_plot_format_angle(theta),
-    ", phi= ",
-    .np_plot_format_angle(phi),
-    "]"
   )
 }
 
@@ -10360,16 +10177,6 @@ compute.default.error.range <- function(center, err) {
 .np_plot_center_is_oversmoothed <- function(center, plot.errors.boot.method = NULL) {
   identical(center, "bias-corrected") &&
     is.element(plot.errors.boot.method, c("inid", "fixed", "geom"))
-}
-
-.np_plot_bias_center_engine <- function(center, plot.errors.boot.method = NULL) {
-  if (identical(center, "estimate"))
-    return("none")
-  if (!identical(center, "bias-corrected"))
-    stop("unknown bootstrap center", call. = FALSE)
-  if (.np_plot_center_is_oversmoothed(center, plot.errors.boot.method))
-    return("oversmoothed-pilot")
-  "wild-standard"
 }
 
 .np_plot_oversmooth_exponent <- function(p.continuous, kernel.order,
