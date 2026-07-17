@@ -12415,7 +12415,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     const int nrc1 = glp_nterms;
     const int nrc2 = nrc1 + 1;
     const int nrcc22 = nrc2*nrc2;
-    double *PKWM[nrc1], *PXTKY[nrc1], *PXTKX[nrc2];
+    double *PKWM[nrc1], *PXTKY[nrc1];
     double *PXC[MAX(1,num_reg_continuous)];
     double *PXU[MAX(1,num_reg_unordered)];
     double *PXO[MAX(1,num_reg_ordered)];
@@ -12479,9 +12479,6 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     XTKX[0] = vector_Y;
     for(i = 0; i < nrc1; i++)
       XTKX[i+1] = basis[i];
-
-    for(i = 0; i < nrc2; i++)
-      PXTKX[i] = XTKX[i];
 
     for(i = 0; i < nrc1; i++){
       PKWM[i] = KWM[i];
