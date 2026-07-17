@@ -517,8 +517,6 @@ npindexbw.NULL <-
 
   ckertype <- as.character(bws$ckertype)[1L]
   ckerorder <- as.integer(bws$ckerorder)[1L]
-  if (identical(ckertype, "truncated gaussian"))
-    return(FALSE)
   if (!identical(ckertype, "uniform") &&
       (!is.finite(ckerorder) || ckerorder != 2L))
     return(FALSE)

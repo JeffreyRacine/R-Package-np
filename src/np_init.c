@@ -47,7 +47,6 @@ extern SEXP C_np_progress_fit_begin(SEXP);
 extern SEXP C_np_progress_fit_end(void);
 extern SEXP C_np_shadow_reset_state(void);
 extern SEXP C_np_set_seed(SEXP);
-extern SEXP C_np_set_tgauss2(SEXP);
 extern SEXP C_np_release_static_buffers(void);
 
 static const R_CallMethodDef CallEntries[] = {
@@ -93,7 +92,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_lsqregression_bw_eval",     (DL_FUNC) &C_np_lsqregression_bw_eval,     20},
     {"C_np_regression",                (DL_FUNC) &C_np_regression,                24},
     {"C_np_set_seed",                  (DL_FUNC) &C_np_set_seed,                   1},
-    {"C_np_set_tgauss2",               (DL_FUNC) &C_np_set_tgauss2,                1},
     {"C_np_release_static_buffers",    (DL_FUNC) &C_np_release_static_buffers,     0},
     {NULL, NULL, 0}
 };

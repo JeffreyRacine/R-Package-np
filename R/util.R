@@ -1357,44 +1357,6 @@ npseed <- function(seed){
   invisible()
 }
 
-erf <- function(z) { 2 * pnorm(z*sqrt(2)) - 1 }
-
-nptgauss <- function(b){
-
-  rel.tol <- sqrt(.Machine$double.eps)
-
-  b.max <- sqrt(-2*log(.Machine$double.eps))
-
-  if((b < 0) || (b > b.max))
-    stop(paste("b must be between 0 and",b.max))
-
-  alpha <- 1.0/(pnorm(b)-pnorm(-b)-2*b*dnorm(b))
-
-  tgauss <- function(z) {
-    out <- alpha * (dnorm(z) - dnorm(b))
-    out[abs(z) >= b] <- 0.0
-    out
-  }
-
-  c0 <- alpha*dnorm(b)
-
-  k <- integrate(f = function(z) { tgauss(z)^2 }, -b, b)$value
-  k2 <- integrate(f = function(z) { z^2*tgauss(z) }, -b, b)$value
-  k22 <- integrate(f = function(z) { (z*tgauss(z))^2 }, -b, b)$value
-  km <- integrate(f = function(z) { tgauss(z-0.5)*tgauss(z+0.5) }, -b+0.5, b-0.5)$value
-
-  a0 <- (0.5 + 2*b*c0)/integrate(f = function(z){ erf(z/2 + b)*exp(-0.25*z^2) }, -2*b, 0)$value
-  a2 <- (c0 + k - a0*erf(b))/erf(b/sqrt(2))
-  a1 <- -(a2*erf(b/sqrt(2)) + c0)/(2*b)
-
-  int.kernels[CKER_TGAUSS + 1] <- k
-  
-  invisible(.Call("C_np_set_tgauss2",
-                  as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)),
-                  PACKAGE = "np"))
-
-}
-
 numNotIn <- function(x){
   x <- unique(as.numeric(x))
   x <- x[is.finite(x)]
@@ -1866,7 +1828,6 @@ npContinuousExtendedNnNomadUpper <- function(traindat,
     gaussian = sqrt(-2.0 * log(1.0 - rel.tol)),
     epanechnikov = sqrt(rel.tol),
     uniform = 1.0 - 32.0 * .Machine$double.eps,
-    "truncated gaussian" = sqrt(-2.0 * log(1.0 - rel.tol)),
     0.0
   )
 
@@ -3537,8 +3498,7 @@ cktToPrint <- function(s, order = "", kerbound = "none"){
   pck <- switch(s,
                 gaussian = paste(order,"Gaussian"),
                 epanechnikov =  paste(order,"Epanechnikov"),
-                uniform = "Uniform",
-                "truncated gaussian" = "Truncated Gaussian")
+                uniform = "Uniform")
   if (!is.null(kerbound) && !identical(kerbound, "none"))
     pck <- paste0(pck, " (bounded/", kerbound, ")")
   pck
@@ -3904,7 +3864,7 @@ DO_TREE_YES = 1
 CKER_GAUSS = 0
 CKER_EPAN  = 4
 CKER_UNI   = 8
-CKER_TGAUSS = 9
+CKER_RESERVED = 9
 
 UKER_AIT = 0
 UKER_LR = 1
@@ -3957,7 +3917,7 @@ names(PERMUTATION_OPERATORS) <- c("none", "normal", "derivative", "integral")
 ## useful numerical constants of kernel integrals
 int.kernels <- c(0.28209479177387814348, 0.47603496111841936711, 0.62396943688265038571, 0.74785078617543927990,
                  0.26832815729997476357, 0.55901699437494742410, 0.84658823667359826246, 1.1329342579014329689,
-                 0.5, 2.90113075268188e-01)
+                 0.5, NA_real_)
 
 QFAC <- qnorm(.25,lower.tail=FALSE)*2
 

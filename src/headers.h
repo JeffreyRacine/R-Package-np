@@ -361,7 +361,11 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CK_EPAN6 6
 #define CK_EPAN8 7
 #define CK_UNIF 8
-#define CK_TGAUSS2 9
+#define CK_RESERVED 9
+
+#if CK_GAUSS2 != 0 || CK_GAUSS8 != 3 || CK_EPAN2 != 4 || CK_EPAN8 != 7 || CK_UNIF != 8 || CK_RESERVED != 9
+# error "continuous kernel code layout changed"
+#endif
 
 #define ONE_OVER_SQRT_TWO_PI 0.39894228040143267794
 #define SQRT_5 2.236067978
@@ -739,17 +743,6 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CQ_HBD_DIRD 7
 #define CQ_D_DIRD 8
 #define CQ_INITD_DIRD 9
-
-#define TG2_B     0
-#define TG2_ALPHA 1
-#define TG2_C0    2
-#define TG2_A0    3
-#define TG2_A1    4
-#define TG2_A2    5
-#define TG2_K     6
-#define TG2_K2    7
-#define TG2_K22   8
-#define TG2_KM    9
 
 #define KWSNP_ERR_NOEVAL 1
 #define KWSNP_ERR_BADBW 2

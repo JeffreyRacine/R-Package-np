@@ -2,11 +2,8 @@
 define(epanechnikov(Z), 3*(1-(Z**2)/5)/(4*sqrt(5)))$
 define(gaussian(Z), exp(-Z^2/2)/sqrt(2*%pi))$
 
-tb: 3$
-define(utgaussian(Z), (exp(-Z^2/2) - exp(-tb^2/2))/sqrt(2*%pi) )$
-
-kernels: [epanechnikov, gaussian, utgaussian]$
-supports: [sqrt(5), inf, tb]$
+kernels: [epanechnikov, gaussian]$
+supports: [sqrt(5), inf]$
 
 /* working on a slightly fancier automatic higher-order kernel generator
 
@@ -237,4 +234,3 @@ print(ev(pkereighthconvol(Z),numer)),
 print("kernel constants:"),
 print("k = ",kereighth_k_n, ", k2 = ", kereighth_k2_n),
 print("k22 = ", kereighth_k22_n, ", km = ", kereighth_km_n))$
-

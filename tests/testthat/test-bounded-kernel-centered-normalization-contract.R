@@ -13,8 +13,7 @@ test_that("bounded kernels retain the finite-support uniform large-h limit", {
   specs <- rbind(
     data.frame(kernel = "gaussian", order = c(2L, 4L, 6L, 8L)),
     data.frame(kernel = "epanechnikov", order = c(2L, 4L, 6L, 8L)),
-    data.frame(kernel = "uniform", order = 2L),
-    data.frame(kernel = "truncated gaussian", order = 2L)
+    data.frame(kernel = "uniform", order = 2L)
   )
 
   for (i in seq_len(nrow(specs))) {

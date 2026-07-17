@@ -4,14 +4,14 @@ conbandwidth <-
            bwmethod = c("cv.ml","cv.ls","normal-reference", "manual"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           cxkertype = c("gaussian","truncated gaussian","epanechnikov","uniform"), 
+           cxkertype = c("gaussian","epanechnikov","uniform"),
            cxkerorder = c(2,4,6,8),
            cxkerbound = c("none","range","fixed"),
            cxkerlb = NULL,
            cxkerub = NULL,
            uxkertype = c("aitchisonaitken","liracine"),
            oxkertype = c("liracine","wangvanryzin","racineliyan"),
-           cykertype = c("gaussian","truncated gaussian","epanechnikov","uniform"), 
+           cykertype = c("gaussian","epanechnikov","uniform"),
            cykerorder = c(2,4,6,8),
            cykerbound = c("none","range","fixed"),
            cykerlb = NULL,
@@ -74,9 +74,6 @@ conbandwidth <-
       stop("cxkerorder must be one of ", paste(kord,collapse=" "))
   }
 
-  if (cxkertype == "truncated gaussian" && cxkerorder != 2)
-    .np_warning("using truncated gaussian of order 2, higher orders not yet implemented")
-
   if (bwmethod == "normal-reference" && (cxkertype != "gaussian" || bwtype != "fixed")){    
     .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
     bwtype = "fixed"
@@ -92,9 +89,6 @@ conbandwidth <-
     if (!any(kord == cykerorder))
       stop("cykerorder must be one of ", paste(kord,collapse=" "))
   }
-
-  if (cykertype == "truncated gaussian" && cykerorder != 2)
-    .np_warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
   if (bwmethod == "normal-reference" && (cykertype != "gaussian" || bwtype != "fixed")){    
     .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")

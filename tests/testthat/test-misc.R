@@ -9,12 +9,6 @@ test_that("uocquantile basic functionality works", {
   expect_equal(as.character(uocquantile(x_ord, 0.5)), "Medium")
 })
 
-test_that("nptgauss basic functionality works", {
-  # nptgauss is called for its side effect (setting C variables) 
-  # or returns NULL/constants.
-  expect_silent(nptgauss(3.0))
-})
-
 test_that("plot basic functionality works", {
   data("faithful")
   bw <- npudensbw(dat=faithful, bws=c(0.5, 5), bandwidth.compute=FALSE)

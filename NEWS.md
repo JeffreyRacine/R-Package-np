@@ -1,5 +1,10 @@
 # np 0.70-6
 
+* Retired the unused experimental truncated-Gaussian continuous kernel and
+  its `nptgauss()` configuration helper. The supported continuous kernels are
+  Gaussian, Epanechnikov, and uniform; their public interfaces, native codes,
+  and numerical behavior are unchanged.
+
 * Corrected heterogeneous generalized local-polynomial (GLP) construction to
   include every coordinate-capped term through the declared total degree. For
   example, `degree = c(2, 1)` now includes the `x1*x2` term. Raw and

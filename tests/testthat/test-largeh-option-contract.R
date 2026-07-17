@@ -47,9 +47,9 @@ test_that("np.largeh continuous shortcut eligibility rejects unsafe kernels", {
   ydat <- sin(xdat$x) + rnorm(n, sd = 0.05)
   cases <- data.frame(
     ckertype = c("gaussian", "gaussian", "epanechnikov", "epanechnikov",
-                 "uniform", "truncated gaussian"),
-    ckerorder = c(2L, 4L, 2L, 4L, 2L, 2L),
-    expected.fast = c(1L, 0L, 1L, 0L, 1L, 0L),
+                 "uniform"),
+    ckerorder = c(2L, 4L, 2L, 4L, 2L),
+    expected.fast = c(1L, 0L, 1L, 0L, 1L),
     stringsAsFactors = FALSE
   )
 
