@@ -2,6 +2,15 @@
   isTRUE(.npRmpi_autodispatch_called_from_bcast())
 }
 
+.npRmpi_qcms_iid_index_plan <- function(n, boot.num) {
+  index <- matrix(NA_integer_, nrow = boot.num, ncol = n)
+
+  for (ii in seq_len(boot.num))
+    index[ii, ] <- sample.int(n, replace = TRUE)
+
+  index
+}
+
 .npRmpi_qcms_wild_multiplier_plan <- function(n, boot.num, a, b, p.a) {
   mult <- matrix(NA_real_, nrow = boot.num, ncol = n)
 
@@ -43,6 +52,87 @@
   if (!identical(length(chunks), size))
     stop("npqcmstest MPI gather returned malformed atomic output", call. = FALSE)
   chunks
+}
+
+.npRmpi_qcms_collective_iid_bootstrap <- function(plan,
+                                                  model.resid,
+                                                  yhat,
+                                                  model,
+                                                  tau,
+                                                  xdat,
+                                                  bw,
+                                                  pivot,
+                                                  Jn,
+                                                  In,
+                                                  progress = NULL,
+                                                  comm = 1L) {
+  boot.num <- nrow(plan)
+  size <- mpi.comm.size(comm)
+  rank <- mpi.comm.rank(comm)
+
+  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  .npRmpi_bootstrap_transport_trace(
+    what = "npqcmstest",
+    event = "fanout.collective.start",
+    fields = list(rank = rank, size = size, B = boot.num,
+                  local = length(local.idx), method = "iid")
+  )
+
+  local.Sn <- numeric(length(local.idx))
+
+  for (jj in seq_along(local.idx)) {
+    ii <- local.idx[[jj]]
+    y.star <- yhat + model.resid[plan[ii, ]]
+    suppressWarnings(
+      resid <- residuals(
+        rq(y.star ~ model$x - 1, tau = tau),
+        type = "response"
+      )
+    )
+
+    local.Sn[[jj]] <- .npRmpi_with_local_regression(
+      if (pivot) Jn(xdat, resid, bw) else In(xdat, resid, bw)
+    )
+  }
+
+  invisible(gc(FALSE))
+
+  payload <- c(as.numeric(local.idx), local.Sn)
+  gathered <- mpi.gather.Robj(payload, root = 0L, comm = comm)
+
+  if (rank == 0L) {
+    chunks <- .npRmpi_qcms_numeric_chunks(gathered, size = size)
+    Sn.bootstrap <- numeric(boot.num)
+
+    for (rr in seq_len(size)) {
+      vals <- as.numeric(chunks[[rr]])
+      if (!length(vals))
+        next
+      if ((length(vals) %% 2L) != 0L)
+        stop("npqcmstest MPI gather returned malformed bootstrap chunk",
+             call. = FALSE)
+      n.local <- length(vals) / 2L
+      idx <- as.integer(vals[seq_len(n.local)])
+      Sn.bootstrap[idx] <- vals[n.local + seq_len(n.local)]
+    }
+
+    if (!is.null(progress))
+      progress <- .np_progress_step(progress, done = boot.num)
+    .npRmpi_bootstrap_transport_trace(
+      what = "npqcmstest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num, method = "iid")
+    )
+    mpi.bcast.Robj(Sn.bootstrap, rank = 0L, comm = comm)
+    Sn.bootstrap
+  } else {
+    .npRmpi_bootstrap_transport_trace(
+      what = "npqcmstest",
+      event = "fanout.collective.done",
+      fields = list(rank = rank, size = size, B = boot.num, method = "iid")
+    )
+    mpi.bcast.Robj(rank = 0L, comm = comm)
+  }
 }
 
 .npRmpi_qcms_collective_multiplier_bootstrap <- function(plan,
@@ -368,7 +458,28 @@ npqcmstest <- function(formula,
     progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
     collective.bootstrap <- .npRmpi_qcms_collective_context()
 
-    if (collective.bootstrap && identical(boot.method, "wild")) {
+    if (collective.bootstrap && identical(boot.method, "iid")) {
+      plan <- .npRmpi_qcms_iid_index_plan(
+        n = length(model.resid),
+        boot.num = boot.num
+      )
+      post.boot.seed <- get(".Random.seed", envir = .GlobalEnv,
+                            inherits = FALSE)
+      Sn.bootstrap <- .npRmpi_qcms_collective_iid_bootstrap(
+        plan = plan,
+        model.resid = model.resid,
+        yhat = yhat,
+        model = model,
+        tau = tau,
+        xdat = xdat,
+        bw = bw,
+        pivot = pivot,
+        Jn = Jn,
+        In = In,
+        progress = progress
+      )
+      assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+    } else if (collective.bootstrap && identical(boot.method, "wild")) {
       plan <- .npRmpi_qcms_wild_multiplier_plan(
         n = length(model.resid),
         boot.num = boot.num,
