@@ -92,6 +92,21 @@ test_that("weighted dual-power sums preserve expanded-sample semantics", {
   expect_identical(weighted$ksum, scalar1$ksum)
   expect_identical(weighted$ksum.power2, scalar2$ksum)
 
+  undivided <- dual_sum(
+    bws = bw, txdat = x, leave.one.out = TRUE,
+    bandwidth.divide = FALSE
+  )
+  undivided1 <- npksum(
+    bws = bw, txdat = x, leave.one.out = TRUE,
+    bandwidth.divide = FALSE
+  )
+  undivided2 <- npksum(
+    bws = bw, txdat = x, kernel.pow = 2, leave.one.out = TRUE,
+    bandwidth.divide = FALSE
+  )
+  expect_identical(undivided$ksum, undivided1$ksum)
+  expect_identical(undivided$ksum.power2, undivided2$ksum)
+
   expanded <- x[rep(seq_len(nrow(x)), counts), , drop = FALSE]
   expanded_sum <- dual_sum(
     bws = bw, txdat = expanded, leave.one.out = TRUE,
