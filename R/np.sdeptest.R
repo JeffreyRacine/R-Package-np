@@ -3,6 +3,14 @@
 ## Processes By C. W. Granger, E. Maasoumi and J. Racine Journal of
 ## Time Series Analysis (2004), Vol. 25, No. 5, 649-669.
 
+.np_sdeptest_fixed_density <- function(data, bw) {
+  as.numeric(npksum(
+    txdat = data,
+    bws = bw,
+    bandwidth.divide = TRUE
+  )$ksum / NROW(data))
+}
+
 npsdeptest <- function(data = NULL,
                        lag.num = 1,
                        method=c("integration","summation"),
@@ -57,9 +65,9 @@ npsdeptest <- function(data = NULL,
 
       ## Issue of common support points for evaluation
       
-      f.x <- fitted(npudens(tdat=x.dat,bws=bw.x))
-      f.y <- fitted(npudens(tdat=y.dat,bws=bw.y))
-      f.xy <- fitted(npudens(tdat=cbind(x.dat,y.dat),bws=bw.joint))
+      f.x <- .np_sdeptest_fixed_density(x.dat, bw.x)
+      f.y <- .np_sdeptest_fixed_density(y.dat, bw.y)
+      f.xy <- .np_sdeptest_fixed_density(cbind(x.dat, y.dat), bw.joint)
       summand <- f.x*f.y/f.xy
 
       ## In summation version we divide densities which can lead to
