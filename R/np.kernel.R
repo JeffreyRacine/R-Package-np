@@ -150,9 +150,11 @@ npksum.default <-
            return.kernel.weights = FALSE,
            ...){
     dots <- list(...)
+    internal.power12 <- isTRUE(dots$.np.internal.power12)
+    dots$.np.internal.power12 <- NULL
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
     .npRmpi_require_active_slave_pool(where = "npksum()")
-    if (.npRmpi_npksum_should_localize(bws, list(...)) &&
+    if (.npRmpi_npksum_should_localize(bws, dots) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     if (.npRmpi_autodispatch_active())
@@ -170,6 +172,14 @@ npksum.default <-
       operator <- match.arg(operator, choices = names(ALL_OPERATORS), several.ok = TRUE)
 
     permutation.operator <- match.arg(permutation.operator, choices = names(PERMUTATION_OPERATORS) )
+
+    if (internal.power12 &&
+        (!is.null(tydat) || !is.null(weights) ||
+         !identical(as.double(kernel.pow), 1.0) ||
+         compute.ocg || compute.score ||
+         permutation.operator != "none" || return.kernel.weights ||
+         return.derivative.kernel.weights || any(operator != "normal")))
+      stop("invalid use of the internal dual-power kernel-sum route")
     
     txdat = toFrame(txdat)
 
@@ -345,9 +355,13 @@ npksum.default <-
       has.pksum &&
       (p.length.out > 0L)
 
-    return.names <- c("ksum", "kernel.weights", "p.ksum")
-    if (need.pkw)
-      return.names <- c(return.names, "p.kernel.weights")
+    if (internal.power12) {
+      return.names <- c("ksum", "ksum.power2")
+    } else {
+      return.names <- c("ksum", "kernel.weights", "p.ksum")
+      if (need.pkw)
+        return.names <- c(return.names, "p.kernel.weights")
+    }
       
 	    myopti = list(
       num_obs_train = tnrow,
@@ -399,21 +413,39 @@ npksum.default <-
 	   return(result)
    }
 
-    myout <-
-      .Call("C_np_kernelsum",
-            asDouble(tuno), asDouble(tord), asDouble(tcon),
-            asDouble(tydat), asDouble(weights),
-            asDouble(euno), asDouble(eord), asDouble(econ),
-            as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
-            as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-            as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
-            as.integer(myopti), as.double(kernel.pow),
-            as.integer(length.out),
-            as.integer(p.length.out),
-            as.integer(nkw),
-            as.double(cker.bounds.c$lb),
-            as.double(cker.bounds.c$ub),
-            PACKAGE="npRmpi")[return.names]
+    if (internal.power12) {
+      myout <-
+        .Call("C_np_kernelsum_power12",
+              asDouble(tuno), asDouble(tord), asDouble(tcon),
+              asDouble(tydat), asDouble(weights),
+              asDouble(euno), asDouble(eord), asDouble(econ),
+              as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+              as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+              as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
+              as.integer(myopti), as.double(kernel.pow),
+              as.integer(length.out),
+              as.integer(p.length.out),
+              as.integer(nkw),
+              as.double(cker.bounds.c$lb),
+              as.double(cker.bounds.c$ub),
+              PACKAGE="npRmpi")[return.names]
+    } else {
+      myout <-
+        .Call("C_np_kernelsum",
+              asDouble(tuno), asDouble(tord), asDouble(tcon),
+              asDouble(tydat), asDouble(weights),
+              asDouble(euno), asDouble(eord), asDouble(econ),
+              as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+              as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+              as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
+              as.integer(myopti), as.double(kernel.pow),
+              as.integer(length.out),
+              as.integer(p.length.out),
+              as.integer(nkw),
+              as.double(cker.bounds.c$lb),
+              as.double(cker.bounds.c$ub),
+              PACKAGE="npRmpi")[return.names]
+    }
 
     if (dim.out[1] > 1){
       dim(myout[["ksum"]]) <- dim.out
@@ -423,6 +455,18 @@ npksum.default <-
       dim(myout[["ksum"]]) <- dim.out[dim.out > 1]
       if (miss.weights)
         myout[["ksum"]] <- aperm(myout[["ksum"]])
+    }
+
+    if (internal.power12) {
+      if (dim.out[1] > 1){
+        dim(myout[["ksum.power2"]]) <- dim.out
+        if (dim.out[2] < 2)
+          dim(myout[["ksum.power2"]]) <- dim(myout[["ksum.power2"]])[-2]
+      } else if (max(dim.out) > 1) {
+        dim(myout[["ksum.power2"]]) <- dim.out[dim.out > 1]
+        if (miss.weights)
+          myout[["ksum.power2"]] <- aperm(myout[["ksum.power2"]])
+      }
     }
 
     if(return.kernel.weights){
@@ -471,12 +515,26 @@ npksum.default <-
     } else {
       p.myout <- NULL
     }
-    return( npkernelsum(bws = bws,
-                        eval = teval,
-                        ksum = myout[["ksum"]],
-                        kw = kw,
-                        p.ksum = p.myout,
-                        p.kw = p.kw,
-                        ntrain = tnrow, trainiseval = miss.ex) )
+    result <- npkernelsum(bws = bws,
+                          eval = teval,
+                          ksum = myout[["ksum"]],
+                          kw = kw,
+                          p.ksum = p.myout,
+                          p.kw = p.kw,
+                          ntrain = tnrow, trainiseval = miss.ex)
+    if (internal.power12)
+      result$ksum.power2 <- myout[["ksum.power2"]]
+    result
 
   }
+
+.npksum_power12 <- function(bws,
+                            txdat = stop("training data 'txdat' missing"),
+                            exdat,
+                            ...) {
+  call.args <- list(bws = bws, txdat = txdat)
+  if (!missing(exdat))
+    call.args$exdat <- exdat
+  do.call(npksum.default,
+          c(call.args, list(...), list(.np.internal.power12 = TRUE)))
+}

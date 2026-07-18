@@ -6609,6 +6609,19 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                   double * kernel_weights,
                   double * permutation_kernel_weights,
                   double * ckerlb, double * ckerub);
+void np_kernelsum_power12(double * tuno, double * tord, double * tcon,
+                          double * ty, double * weights,
+                          double * euno, double * eord, double * econ,
+                          double * bw,
+                          double * mcv, double * padnum,
+                          int * operator,
+                          int * myopti, double * kpow,
+                          double * weighted_sum,
+                          double * weighted_sum_power2,
+                          double * weighted_p_sum,
+                          double * kernel_weights,
+                          double * permutation_kernel_weights,
+                          double * ckerlb, double * ckerub);
 void np_quantile_conditional(double * tc_con,
                              double * tu_uno, double * tu_ord, double * tu_con,
                              double * eu_uno, double * eu_ord, double * eu_con,
@@ -10096,6 +10109,107 @@ SEXP C_np_kernelsum(SEXP tuno,
   setAttrib(out, R_NamesSymbol, out_names);
 
   UNPROTECT(22);
+  return out;
+}
+
+SEXP C_np_kernelsum_power12(SEXP tuno,
+                            SEXP tord,
+                            SEXP tcon,
+                            SEXP ty,
+                            SEXP weights,
+                            SEXP euno,
+                            SEXP eord,
+                            SEXP econ,
+                            SEXP bw,
+                            SEXP mcv,
+                            SEXP padnum,
+                            SEXP op,
+                            SEXP myopti,
+                            SEXP kpow,
+                            SEXP ksum_len,
+                            SEXP pksum_len,
+                            SEXP kw_len,
+                            SEXP ckerlb,
+                            SEXP ckerub)
+{
+  SEXP tuno_r=R_NilValue, tord_r=R_NilValue, tcon_r=R_NilValue, ty_r=R_NilValue, weights_r=R_NilValue;
+  SEXP euno_r=R_NilValue, eord_r=R_NilValue, econ_r=R_NilValue, bw_r=R_NilValue, mcv_r=R_NilValue;
+  SEXP padnum_r=R_NilValue, op_i=R_NilValue, myopti_i=R_NilValue, kpow_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_ksum=R_NilValue, out_ksum_power2=R_NilValue;
+  int n_ksum = asInteger(ksum_len);
+  int n_pksum = asInteger(pksum_len);
+  int n_kw = asInteger(kw_len);
+  int ncon = 0, nuno = 0, nord = 0, i = 0;
+  double * ckerlb_p = NULL;
+  double * ckerub_p = NULL;
+
+  if(n_ksum < 0)
+    n_ksum = 0;
+
+  PROTECT(tuno_r = coerceVector(tuno, REALSXP));
+  PROTECT(tord_r = coerceVector(tord, REALSXP));
+  PROTECT(tcon_r = coerceVector(tcon, REALSXP));
+  PROTECT(ty_r = coerceVector(ty, REALSXP));
+  PROTECT(weights_r = coerceVector(weights, REALSXP));
+  PROTECT(euno_r = coerceVector(euno, REALSXP));
+  PROTECT(eord_r = coerceVector(eord, REALSXP));
+  PROTECT(econ_r = coerceVector(econ, REALSXP));
+  PROTECT(bw_r = coerceVector(bw, REALSXP));
+  PROTECT(mcv_r = coerceVector(mcv, REALSXP));
+  PROTECT(padnum_r = coerceVector(padnum, REALSXP));
+  PROTECT(op_i = coerceVector(op, INTSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(kpow_r = coerceVector(kpow, REALSXP));
+  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
+  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  if(XLENGTH(myopti_i) <= KWS_SPARI)
+    error("C_np_kernelsum_power12: invalid internal option vector");
+  if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
+    error("C_np_kernelsum_power12: internal route requires kernel.pow = 1");
+
+  ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
+  nuno = (int)INTEGER(myopti_i)[KWS_NUNOI];
+  nord = (int)INTEGER(myopti_i)[KWS_NORDI];
+  if(n_pksum != 0 || n_kw != 0 ||
+     INTEGER(myopti_i)[KWS_YNCOLI] != 0 ||
+     INTEGER(myopti_i)[KWS_WNCOLI] != 0 ||
+     INTEGER(myopti_i)[KWS_RKWI] != 0 ||
+     INTEGER(myopti_i)[KWS_POPI] != OP_NOOP ||
+     INTEGER(myopti_i)[KWS_PSCOREI] != 0 ||
+     INTEGER(myopti_i)[KWS_POCGI] != 0)
+    error("C_np_kernelsum_power12: unsupported internal kernel-sum configuration");
+  if(XLENGTH(op_i) != (R_xlen_t)(ncon + nuno + nord))
+    error("C_np_kernelsum_power12: invalid operator vector length");
+  for(i = 0; i < ncon + nuno + nord; i++)
+    if(INTEGER(op_i)[i] != OP_NORMAL)
+      error("C_np_kernelsum_power12: only ordinary kernel operators are supported");
+
+  resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
+
+  PROTECT(out_ksum = allocVector(REALSXP, n_ksum));
+  PROTECT(out_ksum_power2 = allocVector(REALSXP, n_ksum));
+
+  np_kernelsum_power12(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
+                       REAL(ty_r), REAL(weights_r),
+                       REAL(euno_r), REAL(eord_r), REAL(econ_r),
+                       REAL(bw_r),
+                       REAL(mcv_r), REAL(padnum_r),
+                       INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
+                       REAL(out_ksum), REAL(out_ksum_power2),
+                       NULL, NULL, NULL,
+                       ckerlb_p, ckerub_p);
+
+  PROTECT(out = allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(out, 0, out_ksum);
+  SET_VECTOR_ELT(out, 1, out_ksum_power2);
+
+  PROTECT(out_names = allocVector(STRSXP, 2));
+  SET_STRING_ELT(out_names, 0, mkChar("ksum"));
+  SET_STRING_ELT(out_names, 1, mkChar("ksum.power2"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(20);
   return out;
 }
 
@@ -16871,23 +16985,25 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   return;
 }
 
-void np_kernelsum(double * tuno, double * tord, double * tcon, 
-                  double * ty, double * weights,
-                  double * euno, double * eord, double * econ, 
-                  double * bw,
-                  double * mcv, double * padnum, 
-                  int * operator,
-                  int * myopti, double * kpow, 
-                  double * weighted_sum, double * weighted_p_sum,
-                  double * kernel_weights,
-                  double * permutation_kernel_weights,
-                  double * ckerlb, double * ckerub){
+static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
+                                double * ty, double * weights,
+                                double * euno, double * eord, double * econ,
+                                double * bw,
+                                double * mcv, double * padnum,
+                                int * operator,
+                                int * myopti, double * kpow,
+                                double * weighted_sum,
+                                double * weighted_sum_power2,
+                                double * weighted_p_sum,
+                                double * kernel_weights,
+                                double * permutation_kernel_weights,
+                                double * ckerlb, double * ckerub){
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
       
   /* the ys are the weights */
 
-  double * vector_scale_factor, * ksum, * p_ksum = NULL, pad_num, * kw = NULL, * pkw = NULL;
+  double * vector_scale_factor, * ksum, * ksum2 = NULL, * p_ksum = NULL, pad_num, * kw = NULL, * pkw = NULL;
   int i,j,k, num_var, num_obs_eval_alloc;
   int no_y, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
@@ -16897,7 +17013,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int use_tree = 0;
   int allocated_X_train = 1, allocated_X_eval = 1;
   int allocated_Y = 1, allocated_W = 1;
-  int ksum_is_output = 0, pksum_is_output = 0, kw_is_output = 0, pkw_is_output = 0;
+  int ksum_is_output = 0, ksum2_is_output = 0, pksum_is_output = 0, kw_is_output = 0, pkw_is_output = 0;
 
   struct th_table * otabs = NULL;
   struct th_entry * ret = NULL;
@@ -17024,6 +17140,17 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     if(np_int_product_overflows(num_obs_eval_alloc, sum_element_length))
       error("C_np_kernelsum: requested kernel-sum buffer is too large");
     ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length);
+  }
+
+  if(weighted_sum_power2 != NULL){
+    if(!use_tree && (num_obs_eval_alloc == num_obs_eval_extern)){
+      ksum2 = weighted_sum_power2;
+      ksum2_is_output = 1;
+    } else {
+      if(np_int_product_overflows(num_obs_eval_alloc, sum_element_length))
+        error("C_np_kernelsum_power12: requested power-two kernel-sum buffer is too large");
+      ksum2 = alloc_vecd(num_obs_eval_alloc*sum_element_length);
+    }
   }
 
   if((p_operator != OP_NOOP) || do_ocg){
@@ -17314,7 +17441,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
   
   
-  npks_err = kernel_weighted_sum_np(kernel_c,
+  if(weighted_sum_power2 != NULL){
+    npks_err = kernel_weighted_sum_np_power12(kernel_c,
                                       kernel_u,
                                       kernel_o,
                                       BANDWIDTH_reg_extern,
@@ -17325,7 +17453,6 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       num_reg_continuous_extern,
                                       leave_one_out,
                                       0,
-                                      (int)(*kpow),
                                       do_divide_bw,
                                       (BANDWIDTH_reg_extern == BW_ADAP_NN) ? do_divide_bw : 0,
                                       0, //not symmetric
@@ -17361,9 +17488,60 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       matrix_categorical_vals_extern,
                                       matrix_ordered_indices,
                                       ksum,
+                                      ksum2,
                                       p_ksum,
                                       kw,
                                       pkw);
+  } else {
+    npks_err = kernel_weighted_sum_np(kernel_c,
+                                      kernel_u,
+                                      kernel_o,
+                                      BANDWIDTH_reg_extern,
+                                      num_obs_train_extern,
+                                      num_obs_eval_extern,
+                                      num_reg_unordered_extern,
+                                      num_reg_ordered_extern,
+                                      num_reg_continuous_extern,
+                                      leave_one_out,
+                                      0,
+                                      (int)(*kpow),
+                                      do_divide_bw,
+                                      (BANDWIDTH_reg_extern == BW_ADAP_NN) ? do_divide_bw : 0,
+                                      0, //not symmetric
+                                      0, //disable 'twisting'
+                                      0, // do not drop train
+                                      0, // do not drop train
+                                      operator,
+                                      p_operator,
+                                      do_score,
+                                      do_ocg,
+                                      bpso,
+                                      suppress_parallel_ksum,
+                                      ncol_Y,
+                                      ncol_W,
+                                      int_TREE_X,
+                                      0,
+                                      kdt_extern_X,
+                                      NULL, NULL, NULL,
+                                      matrix_X_unordered_train_extern,
+                                      matrix_X_ordered_train_extern,
+                                      matrix_X_continuous_train_extern,
+                                      matrix_X_unordered_eval_extern,
+                                      matrix_X_ordered_eval_extern,
+                                      matrix_X_continuous_eval_extern,
+                                      matrix_Y_continuous_train_extern,
+                                      matrix_Y_ordered_train_extern,
+                                      NULL,
+                                      &vector_scale_factor[1],
+                                      0,NULL,NULL,NULL,
+                                      num_categories_extern,
+                                      matrix_categorical_vals_extern,
+                                      matrix_ordered_indices,
+                                      ksum,
+                                      p_ksum,
+                                      kw,
+                                      pkw);
+  }
   if(npks_err != 0){
     error("kernel_weighted_sum_np failed with code %d", npks_err);
   }
@@ -17374,6 +17552,12 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
       for(j = 0; j < num_obs_eval_extern; j++)
         for(i = 0; i < sum_element_length; i++)
           weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
+    }
+
+    if((weighted_sum_power2 != NULL) && (use_tree || !ksum2_is_output)){
+      for(j = 0; j < num_obs_eval_extern; j++)
+        for(i = 0; i < sum_element_length; i++)
+          weighted_sum_power2[ipe[j]*sum_element_length + i] = ksum2[j*sum_element_length+i];
     }
 
     if(return_kernel_weights){
@@ -17446,6 +17630,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   safe_free(vector_scale_factor);
   if(!ksum_is_output)
     safe_free(ksum);
+  if((ksum2 != NULL) && !ksum2_is_output)
+    safe_free(ksum2);
 
   if(!kw_is_output)
     safe_free(kw);
@@ -17490,6 +17676,46 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   num_obs_eval_extern = 0;
 
   return;
+}
+
+void np_kernelsum(double * tuno, double * tord, double * tcon,
+                  double * ty, double * weights,
+                  double * euno, double * eord, double * econ,
+                  double * bw,
+                  double * mcv, double * padnum,
+                  int * operator,
+                  int * myopti, double * kpow,
+                  double * weighted_sum, double * weighted_p_sum,
+                  double * kernel_weights,
+                  double * permutation_kernel_weights,
+                  double * ckerlb, double * ckerub){
+  np_kernelsum_common(tuno, tord, tcon, ty, weights,
+                      euno, eord, econ, bw, mcv, padnum,
+                      operator, myopti, kpow,
+                      weighted_sum, NULL, weighted_p_sum,
+                      kernel_weights, permutation_kernel_weights,
+                      ckerlb, ckerub);
+}
+
+void np_kernelsum_power12(double * tuno, double * tord, double * tcon,
+                          double * ty, double * weights,
+                          double * euno, double * eord, double * econ,
+                          double * bw,
+                          double * mcv, double * padnum,
+                          int * operator,
+                          int * myopti, double * kpow,
+                          double * weighted_sum,
+                          double * weighted_sum_power2,
+                          double * weighted_p_sum,
+                          double * kernel_weights,
+                          double * permutation_kernel_weights,
+                          double * ckerlb, double * ckerub){
+  np_kernelsum_common(tuno, tord, tcon, ty, weights,
+                      euno, eord, econ, bw, mcv, padnum,
+                      operator, myopti, kpow,
+                      weighted_sum, weighted_sum_power2, weighted_p_sum,
+                      kernel_weights, permutation_kernel_weights,
+                      ckerlb, ckerub);
 }
 
 
