@@ -85,30 +85,15 @@ npdeptest <- function(data.x = NULL,
       lo.default <- c(min(x.dat)-10.0*IQR(x.dat),min(y.dat)-10.0*IQR(y.dat))
       up.default <- c(max(x.dat)+10.0*IQR(x.dat),max(y.dat)+10.0*IQR(y.dat))
       
-      Srho.integrand <- function(xy) {
-        
-        ## We code this up by hand using a second order gaussian
-        ## kernel. The multidimensional integration routines for some
-        ## reason crawl to almost a halt if we call the functions in the
-        ## np package. Good to have noticed this at this juncture, bad
-        ## to not have general code though could branch at this point?
-        
-        ##      f.x <- fitted(npudens(tdat=x.dat,edat=xy[1],bws=bw.x))
-        ##      f.y <- fitted(npudens(tdat=y.dat,edat=xy[2],bws=bw.y))
-        ##      f.xy <- fitted(npudens(tdat=cbind(x.dat,y.dat),edat=cbind(xy[1],xy[2]),bws=bw.joint))
-        
-        f.x <- mean(dnorm((xy[1]-x.dat)/bw.x))/bw.x
-        f.y <- mean(dnorm((xy[2]-y.dat)/bw.y))/bw.y
-        f.xy <- mean(dnorm((xy[1]-x.dat)/bw.joint[1])*dnorm((xy[2]-y.dat)/bw.joint[2])
-                    / (bw.joint[1]*bw.joint[2]))
-        
-        return((sqrt(f.xy)-sqrt(f.x)*sqrt(f.y))**2)
-        
-      }
-      
-      return(0.5*adaptIntegrate(Srho.integrand,
-                                lowerLimit=lo.default,
-                                upperLimit=up.default)$integral)
+      return(.np_entropy_bivariate_integral(
+        x.dat = x.dat,
+        y.dat = y.dat,
+        bw.x = bw.x,
+        bw.y = bw.y,
+        bw.joint = bw.joint,
+        lower = lo.default,
+        upper = up.default
+      ))
       
     }
 

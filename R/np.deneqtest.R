@@ -45,21 +45,27 @@ npdeneqtest <- function(x = NULL,
 
     ## First, compute the In statistic
 
-    sum.1 <- sum(npksum(txdat=x,
-                        bws=bw.x,
-                        leave.one.out=TRUE,
-                        bandwidth.divide=TRUE)$ksum)
-    
-    sum.2 <- sum(npksum(txdat=y,
-                        bws=bw.y,
-                        leave.one.out=TRUE,
-                        bandwidth.divide=TRUE)$ksum)
-    
-    sum.3 <- sum(npksum(txdat=x,
-                        exdat=y,
-                        bws=bw.x,
-                        leave.one.out=FALSE,
-                        bandwidth.divide=TRUE)$ksum)
+    ksum.1 <- .npksum_power12(txdat=x,
+                              bws=bw.x,
+                              leave.one.out=TRUE,
+                              bandwidth.divide=TRUE)
+    sum.1 <- sum(ksum.1$ksum)
+    sum2.1 <- sum(ksum.1$ksum.power2)
+
+    ksum.2 <- .npksum_power12(txdat=y,
+                              bws=bw.y,
+                              leave.one.out=TRUE,
+                              bandwidth.divide=TRUE)
+    sum.2 <- sum(ksum.2$ksum)
+    sum2.2 <- sum(ksum.2$ksum.power2)
+
+    ksum.3 <- .npksum_power12(txdat=x,
+                              exdat=y,
+                              bws=bw.x,
+                              leave.one.out=FALSE,
+                              bandwidth.divide=TRUE)
+    sum.3 <- sum(ksum.3$ksum)
+    sum2.3 <- sum(ksum.3$ksum.power2)
 
     ## sum.4 and sum.3 are identical...
     
@@ -67,28 +73,9 @@ npdeneqtest <- function(x = NULL,
 
     ## Next, compute sigma^2_n
 
-    sum.1 <- sum(npksum(txdat=x,
-                        bws=bw.x,
-                        kernel.pow=2,
-                        leave.one.out=TRUE,
-                        bandwidth.divide=TRUE)$ksum)
-    
-    sum.2 <- sum(npksum(txdat=y,
-                        bws=bw.y,
-                        kernel.pow=2,
-                        leave.one.out=TRUE,
-                        bandwidth.divide=TRUE)$ksum)
-    
-    sum.3 <- sum(npksum(txdat=x,
-                        exdat=y,
-                        bws=bw.x,
-                        kernel.pow=2,
-                        leave.one.out=FALSE,
-                        bandwidth.divide=TRUE)$ksum)
-    
     ## sum.4 and sum.3 are identical
 
-    sigma2.n<- 2*(sum.1/(n1^2*(n1-1)^2)+sum.2/(n2^2*(n2-1)^2)+2*sum.3/(n1^2*n2^2))
+    sigma2.n<- 2*(sum2.1/(n1^2*(n1-1)^2)+sum2.2/(n2^2*(n2-1)^2)+2*sum2.3/(n1^2*n2^2))
 
     ## Finally, compute Tn, the standardized statistic
 

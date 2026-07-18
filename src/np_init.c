@@ -34,6 +34,7 @@ extern SEXP C_np_distribution_conditional_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP,
 extern SEXP C_np_distribution_conditional_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_distribution_conditional_nomad_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_kernelsum(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_kernelsum_power12(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_quantile_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -79,6 +80,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_distribution_conditional_bw_eval",(DL_FUNC) &C_np_distribution_conditional_bw_eval,24},
     {"C_np_distribution_conditional_nomad_native_search",(DL_FUNC) &C_np_distribution_conditional_nomad_native_search,31},
     {"C_np_kernelsum",                 (DL_FUNC) &C_np_kernelsum,                 19},
+    {"C_np_kernelsum_power12",         (DL_FUNC) &C_np_kernelsum_power12,         19},
     {"C_np_progress_fit_begin",        (DL_FUNC) &C_np_progress_fit_begin,         1},
     {"C_np_progress_fit_end",          (DL_FUNC) &C_np_progress_fit_end,           0},
     {"C_np_progress_signal",           (DL_FUNC) &C_np_progress_signal,            4},

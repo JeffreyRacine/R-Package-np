@@ -7412,6 +7412,11 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 static double * kernel_weighted_sum_pkw_extern = NULL;
 static int kernel_weighted_sum_pkw_nvar_extern = 0;
 
+typedef struct {
+  double *weighted_sum;
+  int kernel_pow;
+} NP_DualPowerCtx;
+
 static int np_hot_loop_interrupt_stride(const int total)
 {
   if(total <= 16)
@@ -7432,7 +7437,7 @@ static inline void np_hot_loop_check_interrupt(const int pos,
     R_CheckUserInterrupt();
 }
 
-int kernel_weighted_sum_np_ctx(
+static int kernel_weighted_sum_np_ctx_ex(
 int * KERNEL_reg,
 int * KERNEL_unordered_reg,
 int * KERNEL_ordered_reg,
@@ -7485,7 +7490,8 @@ int ** matrix_ordered_indices,
 double * const weighted_sum,
 double * const weighted_permutation_sum,
 double * const kw,
-const NP_GateOverrideCtx * const gate_override_ctx){
+const NP_GateOverrideCtx * const gate_override_ctx,
+const NP_DualPowerCtx * const dual_power_ctx){
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
   const NP_GateOverrideCtx gate_ctx_empty = {0};
@@ -7567,9 +7573,12 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   int lod = 0;
 
   const int nws = (weighted_sum == NULL);
+  const int do_dual_power =
+    (dual_power_ctx != NULL) && (dual_power_ctx->weighted_sum != NULL);
   
   assert(!(do_score && do_ocg));
   assert(!(gather_scatter && is_adaptive));
+  assert(!(do_dual_power && nws));
 
   for(i = 0; (i < (num_reg_unordered + num_reg_ordered + num_reg_continuous)); i++){
     any_convolution |= (operator[i] == OP_CONVOLUTION);
@@ -7635,7 +7644,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
 
   double *lambda = NULL, **matrix_bandwidth = NULL, **matrix_alt_bandwidth = NULL, **m = NULL;
-  double *tprod = NULL, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
+  double *tprod = NULL, dband, *ws, *ws2 = NULL, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
   double *perm_kbuf = NULL;
   double **bounded_cdf_lower_fixed = NULL;
   double **bounded_cdf_den_fixed = NULL;
@@ -8137,6 +8146,11 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       weighted_sum[i] = 0.0;
     }
 
+  if(!gather_scatter && do_dual_power)
+    for(i = 0; i < num_obs_eval_alloc*sum_element_length; i++){
+      dual_power_ctx->weighted_sum[i] = 0.0;
+    }
+
   if(!gather_scatter){
     for(i = 0; i < num_obs_eval_alloc*sum_element_length*p_nvar; i++){
       weighted_permutation_sum[i] = 0.0;
@@ -8150,6 +8164,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       je = MIN(num_obs_eval - 1, js + stride - 1);
 
       ws = nws ? NULL : weighted_sum + js*sum_element_length;
+      ws2 = do_dual_power ?
+        dual_power_ctx->weighted_sum + js*sum_element_length : NULL;
 
       if(weighted_permutation_sum != NULL){
         p_ws = weighted_permutation_sum +js*sum_element_length;
@@ -8181,6 +8197,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       js = 0;
       je = num_obs_eval - 1;
       ws = weighted_sum;
+      ws2 = do_dual_power ? dual_power_ctx->weighted_sum : NULL;
       p_ws = weighted_permutation_sum;
 
       for(ii = 0; ii < iNum_Processors; ii++){
@@ -8192,6 +8209,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     js = 0;
     je = num_obs_eval - 1;
     ws = weighted_sum;
+    ws2 = do_dual_power ? dual_power_ctx->weighted_sum : NULL;
     p_ws = weighted_permutation_sum;
 #endif
     
@@ -8202,6 +8220,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       js = stride * my_rank;
       je = MIN(num_obs_train - 1, js + stride - 1);
       ws = weighted_sum;
+      ws2 = do_dual_power ? dual_power_ctx->weighted_sum : NULL;
       p_ws = weighted_permutation_sum;
 
       for(ii = 0; ii < iNum_Processors; ii++){
@@ -8213,6 +8232,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       js = 0;
       je = num_obs_train - 1;
       ws = weighted_sum;
+      ws2 = do_dual_power ? dual_power_ctx->weighted_sum : NULL;
       p_ws = weighted_permutation_sum;
 
       for(ii = 0; ii < iNum_Processors; ii++){
@@ -8225,6 +8245,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     js = 0;
     je = num_obs_train - 1;
     ws = weighted_sum;
+    ws2 = do_dual_power ? dual_power_ctx->weighted_sum : NULL;
     p_ws = weighted_permutation_sum;
 #endif
   }
@@ -8316,7 +8337,10 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   const int interrupt_stride = np_hot_loop_interrupt_stride(interrupt_total);
 
     /* do sums */
-  for(j=js; j <= je; j++, ws = (ws==NULL ? NULL : ws+ws_step), p_ws=(p_ws == NULL ? NULL : p_ws+ws_step)){
+  for(j=js; j <= je; j++,
+      ws = (ws==NULL ? NULL : ws+ws_step),
+      ws2 = (ws2==NULL ? NULL : ws2+ws_step),
+      p_ws=(p_ws == NULL ? NULL : p_ws+ws_step)){
     if(((j - js) & 31) == 0)
       np_progress_bandwidth_loop_step();
 
@@ -8866,6 +8890,20 @@ const NP_GateOverrideCtx * const gate_override_ctx){
                               blas_Apack);
       }
 
+      if(do_dual_power){
+        np_outer_weighted_sum(matrix_W, sgn, ncol_W,
+                              matrix_Y, ncol_Y,
+                              tprod, num_xt,
+                              leave_or_drop, lod,
+                              dual_power_ctx->kernel_pow,
+                              do_psum, j,
+                              symmetric,
+                              gather_scatter,
+                              1, dband,
+                              ws2, pxl,
+                              blas_Apack);
+      }
+
 
         for(ii = 0; ii < p_nvar; ii++){
           np_outer_weighted_sum(matrix_W, sgn, ncol_W, 
@@ -8919,6 +8957,18 @@ const NP_GateOverrideCtx * const gate_override_ctx){
         MPI_Allgather(MPI_IN_PLACE, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);
       } else if(BANDWIDTH_reg == BW_ADAP_NN){
         MPI_Allreduce(MPI_IN_PLACE, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
+      }
+    }
+
+    if(do_dual_power){
+      if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
+        MPI_Allgather(MPI_IN_PLACE, stride * sum_element_length, MPI_DOUBLE,
+                      dual_power_ctx->weighted_sum, stride * sum_element_length,
+                      MPI_DOUBLE, comm[1]);
+      } else if(BANDWIDTH_reg == BW_ADAP_NN){
+        MPI_Allreduce(MPI_IN_PLACE, dual_power_ctx->weighted_sum,
+                      num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM,
+                      comm[1]);
       }
     }
 
@@ -9018,6 +9068,242 @@ cleanup:
 
 
   return(status);
+}
+
+int kernel_weighted_sum_np_ctx(
+int * KERNEL_reg,
+int * KERNEL_unordered_reg,
+int * KERNEL_ordered_reg,
+const int BANDWIDTH_reg,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+const int leave_one_out,
+const int leave_one_out_offset,
+const int kernel_pow,
+const int bandwidth_divide,
+const int bandwidth_divide_weights,
+const int symmetric,
+const int gather_scatter,
+const int drop_one_train,
+const int drop_which_train,
+const int * const operator,
+const int permutation_operator,
+int do_score,
+int do_ocg,
+int * bpso,
+const int suppress_parallel,
+const int ncol_Y,
+const int ncol_W,
+const int int_TREE,
+const int do_partial_tree,
+KDT * const kdt,
+NL * const inl,
+int * const nld,
+int * const idx,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_continuous_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double **matrix_X_continuous_eval,
+double **matrix_Y,
+double **matrix_W,
+double * sgn,
+double *vector_scale_factor,
+int bandwidth_provided,
+double ** matrix_bw_train,
+double ** matrix_bw_eval,
+double * lambda_pre,
+int *num_categories,
+double **matrix_categorical_vals,
+int ** matrix_ordered_indices,
+double * const weighted_sum,
+double * const weighted_permutation_sum,
+double * const kw,
+const NP_GateOverrideCtx * const gate_override_ctx){
+  return kernel_weighted_sum_np_ctx_ex(
+    KERNEL_reg,
+    KERNEL_unordered_reg,
+    KERNEL_ordered_reg,
+    BANDWIDTH_reg,
+    num_obs_train,
+    num_obs_eval,
+    num_reg_unordered,
+    num_reg_ordered,
+    num_reg_continuous,
+    leave_one_out,
+    leave_one_out_offset,
+    kernel_pow,
+    bandwidth_divide,
+    bandwidth_divide_weights,
+    symmetric,
+    gather_scatter,
+    drop_one_train,
+    drop_which_train,
+    operator,
+    permutation_operator,
+    do_score,
+    do_ocg,
+    bpso,
+    suppress_parallel,
+    ncol_Y,
+    ncol_W,
+    int_TREE,
+    do_partial_tree,
+    kdt,
+    inl,
+    nld,
+    idx,
+    matrix_X_unordered_train,
+    matrix_X_ordered_train,
+    matrix_X_continuous_train,
+    matrix_X_unordered_eval,
+    matrix_X_ordered_eval,
+    matrix_X_continuous_eval,
+    matrix_Y,
+    matrix_W,
+    sgn,
+    vector_scale_factor,
+    bandwidth_provided,
+    matrix_bw_train,
+    matrix_bw_eval,
+    lambda_pre,
+    num_categories,
+    matrix_categorical_vals,
+    matrix_ordered_indices,
+    weighted_sum,
+    weighted_permutation_sum,
+    kw,
+    gate_override_ctx,
+    NULL);
+}
+
+int kernel_weighted_sum_np_power12(
+int * KERNEL_reg,
+int * KERNEL_unordered_reg,
+int * KERNEL_ordered_reg,
+const int BANDWIDTH_reg,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+const int leave_one_out,
+const int leave_one_out_offset,
+const int bandwidth_divide,
+const int bandwidth_divide_weights,
+const int symmetric,
+const int gather_scatter,
+const int drop_one_train,
+const int drop_which_train,
+const int * const operator,
+const int permutation_operator,
+int do_score,
+int do_ocg,
+int * bpso,
+const int suppress_parallel,
+const int ncol_Y,
+const int ncol_W,
+const int int_TREE,
+const int do_partial_tree,
+KDT * const kdt,
+NL * const inl,
+int * const nld,
+int * const idx,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_continuous_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double **matrix_X_continuous_eval,
+double **matrix_Y,
+double **matrix_W,
+double * sgn,
+double *vector_scale_factor,
+int bandwidth_provided,
+double ** matrix_bw_train,
+double ** matrix_bw_eval,
+double * lambda_pre,
+int *num_categories,
+double **matrix_categorical_vals,
+int ** matrix_ordered_indices,
+double * const weighted_sum,
+double * const weighted_sum_power2,
+double * const weighted_permutation_sum,
+double * const kw,
+double * const pkw){
+  double * old_pkw = kernel_weighted_sum_pkw_extern;
+  int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
+  int status = 0;
+  const NP_DualPowerCtx dual_power_ctx = {weighted_sum_power2, 2};
+
+  kernel_weighted_sum_pkw_extern = pkw;
+  kernel_weighted_sum_pkw_nvar_extern = (pkw == NULL) ? 0 :
+    (((permutation_operator != OP_NOOP) ? num_reg_continuous : 0) +
+     ((do_score || do_ocg) ? num_reg_unordered + num_reg_ordered : 0));
+
+  status = kernel_weighted_sum_np_ctx_ex(
+    KERNEL_reg,
+    KERNEL_unordered_reg,
+    KERNEL_ordered_reg,
+    BANDWIDTH_reg,
+    num_obs_train,
+    num_obs_eval,
+    num_reg_unordered,
+    num_reg_ordered,
+    num_reg_continuous,
+    leave_one_out,
+    leave_one_out_offset,
+    1,
+    bandwidth_divide,
+    bandwidth_divide_weights,
+    symmetric,
+    gather_scatter,
+    drop_one_train,
+    drop_which_train,
+    operator,
+    permutation_operator,
+    do_score,
+    do_ocg,
+    bpso,
+    suppress_parallel,
+    ncol_Y,
+    ncol_W,
+    int_TREE,
+    do_partial_tree,
+    kdt,
+    inl,
+    nld,
+    idx,
+    matrix_X_unordered_train,
+    matrix_X_ordered_train,
+    matrix_X_continuous_train,
+    matrix_X_unordered_eval,
+    matrix_X_ordered_eval,
+    matrix_X_continuous_eval,
+    matrix_Y,
+    matrix_W,
+    sgn,
+    vector_scale_factor,
+    bandwidth_provided,
+    matrix_bw_train,
+    matrix_bw_eval,
+    lambda_pre,
+    num_categories,
+    matrix_categorical_vals,
+    matrix_ordered_indices,
+    weighted_sum,
+    weighted_permutation_sum,
+    kw,
+    NULL,
+    &dual_power_ctx);
+
+  kernel_weighted_sum_pkw_extern = old_pkw;
+  kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
+  return status;
 }
 
 int kernel_weighted_sum_np(
