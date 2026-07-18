@@ -127,6 +127,9 @@ npksum.default <-
     dots <- list(...)
     internal.power12 <- isTRUE(dots$.np.internal.power12)
     dots$.np.internal.power12 <- NULL
+    internal.power12.weighted <-
+      isTRUE(dots$.np.internal.power12.weighted)
+    dots$.np.internal.power12.weighted <- NULL
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
 
     miss.ty <- missing(tydat)
@@ -142,8 +145,17 @@ npksum.default <-
 
     permutation.operator <- match.arg(permutation.operator, choices = names(PERMUTATION_OPERATORS) )
 
+    if (internal.power12.weighted && !internal.power12)
+      stop("invalid use of the internal weighted dual-power kernel-sum route")
+
+    invalid.power12.response <- if (internal.power12.weighted) {
+      is.null(tydat) || !is.null(weights)
+    } else {
+      !is.null(tydat) || !is.null(weights)
+    }
+
     if (internal.power12 &&
-        (!is.null(tydat) || !is.null(weights) ||
+        (invalid.power12.response ||
          !identical(as.double(kernel.pow), 1.0) ||
          compute.ocg || compute.score ||
          permutation.operator != "none" || return.kernel.weights ||
@@ -171,6 +183,12 @@ npksum.default <-
         bws = kbandwidth(bws, ...)
       }
     }
+
+    if (internal.power12.weighted &&
+        (!identical(bws[["type", exact = TRUE]], "fixed") ||
+         !is.matrix(tydat) || ncol(tydat) != 1L ||
+         !is.numeric(tydat)))
+      stop("invalid use of the internal weighted dual-power kernel-sum route")
 
     if (!miss.ex){
       exdat = toFrame(exdat)
@@ -505,4 +523,25 @@ npksum.default <-
     call.args$exdat <- exdat
   do.call(npksum.default,
           c(call.args, list(...), list(.np.internal.power12 = TRUE)))
+}
+
+.npksum_power12_weighted <- function(bws,
+                                     txdat = stop("training data 'txdat' missing"),
+                                     counts,
+                                     exdat,
+                                     ...) {
+  if (!is.numeric(counts) || length(counts) != NROW(txdat) ||
+      any(!is.finite(counts)) || any(counts <= 0))
+    stop("'counts' must be a positive finite numeric vector matching 'txdat'")
+
+  call.args <- list(bws = bws, txdat = txdat, tydat = as.numeric(counts))
+  if (!missing(exdat))
+    call.args$exdat <- exdat
+  do.call(
+    npksum.default,
+    c(call.args, list(...), list(
+      .np.internal.power12 = TRUE,
+      .np.internal.power12.weighted = TRUE
+    ))
+  )
 }

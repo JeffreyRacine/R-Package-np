@@ -4,6 +4,26 @@
 ## Categorical and Continuous Data," Journal of Econometrics, Volume
 ## 148, pp 186-200.
 
+.npdeneq_count_plan <- function(index, pool.n) {
+  counts <- tabulate(index, nbins = pool.n)
+  support <- which(counts > 0L)
+  list(index = support, counts = as.numeric(counts[support]))
+}
+
+.npdeneq_count_compression_eligible <- function(bw) {
+  if (is.numeric(bw) || is.integer(bw))
+    return(TRUE)
+
+  kbw <- tryCatch(kbandwidth(bw), error = function(e) NULL)
+  if (is.null(kbw) ||
+      !identical(kbw[["type", exact = TRUE]], "fixed"))
+    return(FALSE)
+
+  lower <- kbw[["ckerlb", exact = TRUE]]
+  upper <- kbw[["ckerub", exact = TRUE]]
+  !any(is.finite(lower) | is.finite(upper))
+}
+
 npdeneqtest <- function(x = NULL,
                         y = NULL,
                         bw.x = NULL,
@@ -85,16 +105,100 @@ npdeneqtest <- function(x = NULL,
     
   } ## End of test statistic
 
+  teststat.counted <- function(z, x.count, y.count, bw.x, bw.y, n1, n2) {
+    x.support <- z[x.count$index, , drop = FALSE]
+    y.support <- z[y.count$index, , drop = FALSE]
+
+    ksum.1 <- .npksum_power12_weighted(
+      txdat = x.support,
+      counts = x.count$counts,
+      bws = bw.x,
+      bandwidth.divide = TRUE
+    )
+    sum.1 <- sum(x.count$counts *
+                 (as.numeric(ksum.1$ksum) -
+                  as.numeric(self.diagonal.x$ksum)))
+    sum2.1 <- sum(x.count$counts *
+                  (as.numeric(ksum.1$ksum.power2) -
+                   as.numeric(self.diagonal.x$ksum.power2)))
+
+    ksum.2 <- .npksum_power12_weighted(
+      txdat = y.support,
+      counts = y.count$counts,
+      bws = bw.y,
+      bandwidth.divide = TRUE
+    )
+    sum.2 <- sum(y.count$counts *
+                 (as.numeric(ksum.2$ksum) -
+                  as.numeric(self.diagonal.y$ksum)))
+    sum2.2 <- sum(y.count$counts *
+                  (as.numeric(ksum.2$ksum.power2) -
+                   as.numeric(self.diagonal.y$ksum.power2)))
+
+    ksum.3 <- .npksum_power12_weighted(
+      txdat = x.support,
+      counts = x.count$counts,
+      exdat = y.support,
+      bws = bw.x,
+      bandwidth.divide = TRUE
+    )
+    sum.3 <- sum(y.count$counts * as.numeric(ksum.3$ksum))
+    sum2.3 <- sum(y.count$counts * as.numeric(ksum.3$ksum.power2))
+
+    In <- sum.1 / (n1 * (n1 - 1)) +
+      sum.2 / (n2 * (n2 - 1)) -
+      2 * sum.3 / (n1 * n2)
+    sigma2.n <- 2 * (
+      sum2.1 / (n1^2 * (n1 - 1)^2) +
+      sum2.2 / (n2^2 * (n2 - 1)^2) +
+      2 * sum2.3 / (n1^2 * n2^2)
+    )
+
+    list(Tn = In / sqrt(sigma2.n), In = In)
+  }
+
+  compress.bootstrap <-
+    .npdeneq_count_compression_eligible(bw.x) &&
+    .npdeneq_count_compression_eligible(bw.y)
+  bootstrap.pool <- data.frame(rbind(x, y))
+  self.diagonal.x <- self.diagonal.y <- NULL
+  if (compress.bootstrap) {
+    self.diagonal.x <- .npksum_power12(
+      txdat = bootstrap.pool[1L, , drop = FALSE],
+      bws = bw.x,
+      bandwidth.divide = TRUE
+    )
+    self.diagonal.y <- .npksum_power12(
+      txdat = bootstrap.pool[1L, , drop = FALSE],
+      bws = bw.y,
+      bandwidth.divide = TRUE
+    )
+  }
+
   ## Now write a bootstrap function for the test statistic
   
   teststat.boot <- function(x,y,bw.x,bw.y) {
     n1 <- nrow(x)
     n2 <- nrow(y)
     ## Resample from pooled data
-    z <- data.frame(rbind(x,y))
-    x.bootstrap <- data.frame(z[sample.int(nrow(z), size = n1, replace = TRUE), ])      
-    y.bootstrap <- data.frame(z[sample.int(nrow(z), size = n2, replace = TRUE), ])      
-    output.boot <- teststat(x.bootstrap,y.bootstrap,bw.x,bw.y)
+    z <- bootstrap.pool
+    x.index <- sample.int(nrow(z), size = n1, replace = TRUE)
+    y.index <- sample.int(nrow(z), size = n2, replace = TRUE)
+    output.boot <- if (compress.bootstrap) {
+      teststat.counted(
+        z = z,
+        x.count = .npdeneq_count_plan(x.index, nrow(z)),
+        y.count = .npdeneq_count_plan(y.index, nrow(z)),
+        bw.x = bw.x,
+        bw.y = bw.y,
+        n1 = n1,
+        n2 = n2
+      )
+    } else {
+      x.bootstrap <- data.frame(z[x.index, , drop = FALSE])
+      y.bootstrap <- data.frame(z[y.index, , drop = FALSE])
+      teststat(x.bootstrap, y.bootstrap, bw.x, bw.y)
+    }
     return(list(Tn=output.boot$Tn,
                 In=output.boot$In))
   }

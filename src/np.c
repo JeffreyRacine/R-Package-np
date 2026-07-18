@@ -10522,7 +10522,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   nuno = (int)INTEGER(myopti_i)[KWS_NUNOI];
   nord = (int)INTEGER(myopti_i)[KWS_NORDI];
   if(n_pksum != 0 || n_kw != 0 ||
-     INTEGER(myopti_i)[KWS_YNCOLI] != 0 ||
+     INTEGER(myopti_i)[KWS_YNCOLI] > 1 ||
      INTEGER(myopti_i)[KWS_WNCOLI] != 0 ||
      INTEGER(myopti_i)[KWS_RKWI] != 0 ||
      INTEGER(myopti_i)[KWS_POPI] != OP_NOOP ||
