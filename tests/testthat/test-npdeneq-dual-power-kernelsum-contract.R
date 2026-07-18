@@ -71,3 +71,76 @@ test_that("dual-power entry rejects unsupported kernel-sum configurations", {
     "invalid use"
   )
 })
+
+test_that("weighted dual-power sums preserve expanded-sample semantics", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+  local_eval <- getFromNamespace(".npRmpi_with_local_regression", "npRmpi")
+
+  set.seed(20260720)
+  x <- data.frame(
+    c = rnorm(24),
+    u = factor(rep(c("a", "b", "c", "a"), 6),
+               levels = c("a", "b", "c")),
+    o = ordered(rep(c(1, 2, 3, 2), 6), levels = 1:3)
+  )
+  counts <- c(1, 3, 2, 4, rep(1, 20))
+  bw <- c(0.6, 0.2, 0.3)
+  weighted_sum <- getFromNamespace(".npksum_power12_weighted", "npRmpi")
+  dual_sum <- getFromNamespace(".npksum_power12", "npRmpi")
+
+  weighted <- local_eval(weighted_sum(
+    bws = bw, txdat = x, counts = counts,
+    bandwidth.divide = TRUE
+  ))
+  scalar1 <- local_eval(npksum(
+    bws = bw, txdat = x, tydat = counts,
+    bandwidth.divide = TRUE
+  ))
+  scalar2 <- local_eval(npksum(
+    bws = bw, txdat = x, tydat = counts, kernel.pow = 2,
+    bandwidth.divide = TRUE
+  ))
+  expect_identical(weighted$ksum, scalar1$ksum)
+  expect_identical(weighted$ksum.power2, scalar2$ksum)
+
+  expanded <- x[rep(seq_len(nrow(x)), counts), , drop = FALSE]
+  expanded_sum <- local_eval(dual_sum(
+    bws = bw, txdat = expanded, leave.one.out = TRUE,
+    bandwidth.divide = TRUE
+  ))
+  diagonal <- local_eval(dual_sum(
+    bws = bw, txdat = x[1L, , drop = FALSE],
+    bandwidth.divide = TRUE
+  ))
+  compressed1 <- sum(counts *
+    (as.numeric(weighted$ksum) - as.numeric(diagonal$ksum)))
+  compressed2 <- sum(counts *
+    (as.numeric(weighted$ksum.power2) -
+     as.numeric(diagonal$ksum.power2)))
+  expect_equal(compressed1, sum(expanded_sum$ksum), tolerance = 1e-12)
+  expect_equal(compressed2, sum(expanded_sum$ksum.power2), tolerance = 1e-12)
+
+  expect_error(
+    weighted_sum(bws = bw, txdat = x, counts = c(counts[-1L], 0)),
+    "positive finite"
+  )
+  expect_error(
+    local_eval(weighted_sum(
+      bws = 6, txdat = x["c"], counts = counts,
+      bwtype = "generalized_nn"
+    )),
+    "invalid use"
+  )
+})
+
+test_that("count compression accepts numeric fixed bandwidths only by default", {
+  eligible <- getFromNamespace(
+    ".npdeneq_count_compression_eligible",
+    "npRmpi"
+  )
+  expect_true(eligible(0.2))
+  expect_false(eligible(structure(list(), class = "not-a-bandwidth")))
+})
