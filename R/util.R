@@ -1804,9 +1804,6 @@ npValidateBetaKernelSpecification <- function(ckertype,
   if (!(bwtype %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("beta kernels require a recognized fixed or nearest-neighbor bandwidth mode",
          call. = FALSE)
-  if (isTRUE(bandwidth.compute))
-    stop(where, " does not yet support automatic bandwidth selection; supply a manual bandwidth",
-         call. = FALSE)
   if (!identical(ckerbound, "fixed"))
     stop("beta kernels require ckerbound = \"fixed\" with finite ckerlb and ckerub",
          call. = FALSE)
@@ -1819,9 +1816,13 @@ npValidateBetaKernelSpecification <- function(ckertype,
   if (any(!is.finite(ckerlb[icon])) || any(!is.finite(ckerub[icon])))
     stop("beta kernels require finite lower and upper bounds for every continuous variable",
          call. = FALSE)
-  if (any(!is.finite(bw[icon])) ||
-      (identical(bwtype, "fixed") && any(bw[icon] <= 0)) ||
-      (!identical(bwtype, "fixed") && any(bw[icon] < 1))) {
+  bw.continuous <- bw[icon]
+  automatic.zero.start <- isTRUE(bandwidth.compute) &&
+    length(bw.continuous) > 0L && all(bw.continuous == 0)
+  if (!automatic.zero.start &&
+      (any(!is.finite(bw.continuous)) ||
+       (identical(bwtype, "fixed") && any(bw.continuous <= 0)) ||
+       (!identical(bwtype, "fixed") && any(bw.continuous < 1)))) {
     if (identical(bwtype, "fixed"))
       stop("beta kernel bandwidths must be finite and strictly positive", call. = FALSE)
     stop("beta nearest-neighbor bandwidths must be finite and at least 1",
@@ -4225,6 +4226,21 @@ CKER_FAMILY_LEGACY = 0L
 CKER_FAMILY_BETA = 1L
 CKER_COORDINATE = -1L
 
+npContinuousKernelCode <- function(bws) {
+  ckertype <- bws[["ckertype", exact = TRUE]]
+  ckerorder <- bws[["ckerorder", exact = TRUE]]
+
+  if (identical(ckertype, "beta"))
+    return(CKER_COORDINATE)
+
+  switch(ckertype,
+    gaussian = CKER_GAUSS + ckerorder / 2 - 1,
+    epanechnikov = CKER_EPAN + ckerorder / 2 - 1,
+    uniform = CKER_UNI,
+    stop("invalid internal continuous-kernel type", call. = FALSE)
+  )
+}
+
 npContinuousKernelDescriptorOptions <- function(bws) {
   ckertype <- bws[["ckertype", exact = TRUE]]
   ckerorder <- bws[["ckerorder", exact = TRUE]]
@@ -4261,6 +4277,9 @@ npValidateConditionalBetaBandwidthObject <- function(bws,
     identical(bws[["cykertype", exact = TRUE]], "beta")
   if (!has.beta)
     return(invisible(FALSE))
+  if (isTRUE(bandwidth.compute))
+    stop(where, " does not yet support automatic bandwidth selection; supply a manual bandwidth",
+         call. = FALSE)
 
   npValidateBetaKernelSpecification(
     ckertype = bws[["cxkertype", exact = TRUE]],

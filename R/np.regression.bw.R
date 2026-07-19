@@ -389,11 +389,7 @@ npregbw.rbandwidth <-
         bwmethod = switch(bws$method,
           cv.aic = BWM_CVAIC,
           cv.ls = BWM_CVLS),
-        kerneval = switch(bws$ckertype,
-          gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
-          epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-          uniform = CKER_UNI
-),
+        kerneval = npContinuousKernelCode(bws),
         ukerneval = switch(bws$ukertype,
           aitchisonaitken = UKER_AIT,
           liracine = UKER_LR),
@@ -409,6 +405,7 @@ npregbw.rbandwidth <-
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
+      myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
 
       myoptd = list(ftol=ftol, tol=tol, small=small,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir,
@@ -704,11 +701,7 @@ npregbw.rbandwidth <-
     bwmethod = if (identical(objective, "ks")) RBWM_CVKS else switch(bws$method,
       cv.aic = BWM_CVAIC,
       cv.ls = BWM_CVLS),
-    kerneval = switch(bws$ckertype,
-      gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-      uniform = CKER_UNI
-),
+    kerneval = npContinuousKernelCode(bws),
     ukerneval = switch(bws$ukertype,
       aitchisonaitken = UKER_AIT,
       liracine = UKER_LR),
@@ -725,6 +718,7 @@ npregbw.rbandwidth <-
     dfc.dir = dfc.dir,
     transform.bounds = transform.bounds
   )
+  myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
 
   myoptd <- list(
     ftol = ftol,
@@ -1310,11 +1304,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     bwmethod = switch(bws$method,
       cv.aic = BWM_CVAIC,
       cv.ls = BWM_CVLS),
-    kerneval = switch(bws$ckertype,
-      gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-      uniform = CKER_UNI
-),
+    kerneval = npContinuousKernelCode(bws),
     ukerneval = switch(bws$ukertype,
       aitchisonaitken = UKER_AIT,
       liracine = UKER_LR),
@@ -1331,6 +1321,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     dfc.dir = 0,
     transform.bounds = FALSE
   )
+  myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
 
   myoptd <- list(
     ftol = 0,
@@ -1499,7 +1490,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    bandwidth.compute = FALSE,
+    bandwidth.compute = TRUE,
     reg.args = reg.args,
     yname = yname
   )

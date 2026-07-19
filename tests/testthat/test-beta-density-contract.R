@@ -67,15 +67,9 @@ test_that("manual beta density supports formulas, objects, and dimensions", {
   expect_equal(se(object_fit), se(direct), tolerance = 2e-12)
 })
 
-test_that("beta density keeps unsupported selection and operator routes closed", {
+test_that("beta density keeps unsupported bounded routes closed", {
   training <- data.frame(x = c(0, 0.05, 0.25, 0.6, 1))
 
-  expect_error(
-    suppressWarnings(npudens(tdat = training, ckertype = "beta", ckerorder = 2,
-                             ckerbound = "fixed", ckerlb = 0, ckerub = 1)),
-    "does not yet support automatic bandwidth selection",
-    fixed = TRUE
-  )
   expect_error(
     suppressWarnings(npudens(tdat = training, bws = 0.1, ckertype = "beta",
                              ckerbound = "range")),

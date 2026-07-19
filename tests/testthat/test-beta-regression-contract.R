@@ -135,15 +135,6 @@ test_that("unsupported beta regression surfaces fail explicitly", {
 
   expect_error(
     suppressWarnings(npreg(
-      txdat = training, tydat = response,
-      ckertype = "beta", ckerorder = 2,
-      ckerbound = "fixed", ckerlb = 0, ckerub = 1
-    )),
-    "does not yet support automatic bandwidth selection",
-    fixed = TRUE
-  )
-  expect_error(
-    suppressWarnings(npreg(
       bws = 0.1, txdat = training, tydat = response,
       ckertype = "beta", ckerbound = "range"
     )),

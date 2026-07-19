@@ -417,6 +417,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define RBW_SCATI 18
 #define RBW_DFC_DIRI 19
 #define RBW_TBNDI 20
+#define RBW_CKFAMILYI 21
+#define RBW_CKORDERI 22
 
 #define RBW_FTOLD  0
 #define RBW_TOLD   1
@@ -462,6 +464,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define BW_SCATI 18
 #define BW_DFC_DIRI 19
 #define BW_TBNDI 20
+#define BW_CKFAMILYI 21
+#define BW_CKORDERI 22
 
 #define BW_FTOLD  0
 #define BW_TOLD   1
@@ -507,6 +511,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define DBW_SCATI 19
 #define DBW_DFC_DIRI 20
 #define DBW_TBNDI 21
+#define DBW_CKFAMILYI 22
+#define DBW_CKORDERI 23
 
 #define DBW_FTOLD  0
 #define DBW_TOLD   1

@@ -73,14 +73,6 @@ test_that("unsupported beta distribution surfaces fail explicitly", {
 
   expect_error(
     suppressWarnings(npudist(
-      tdat = training, ckertype = "beta", ckerorder = 2,
-      ckerbound = "fixed", ckerlb = 0, ckerub = 1
-    )),
-    "does not yet support automatic bandwidth selection",
-    fixed = TRUE
-  )
-  expect_error(
-    suppressWarnings(npudist(
       bws = 0.1, tdat = training, ckertype = "beta",
       ckerbound = "range"
     )),
