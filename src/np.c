@@ -55,6 +55,17 @@ np_continuous_kernel_descriptor_or_error(int family,
                                          int order,
                                          const char *where);
 
+static np_continuous_kernel_descriptor
+np_bandwidth_kernel_descriptor_or_error(int family,
+                                        int code,
+                                        int order,
+                                        int ncon,
+                                        int nuno,
+                                        int nord,
+                                        const double *lower,
+                                        const double *upper,
+                                        const char *where);
+
 // categorical hashing
 #include "hash.h"
 
@@ -2929,6 +2940,7 @@ int KERNEL_reg_ordered_extern=0;
 int KERNEL_den_extern=0;
 int KERNEL_den_unordered_extern=0;
 int KERNEL_den_ordered_extern=0;
+int np_beta_bw_order_extern=2;
 int BANDWIDTH_reg_extern;
 int BANDWIDTH_den_extern;
 
@@ -5253,6 +5265,9 @@ static SEXP C_np_regression_bw_common(SEXP runo,
 
   if (XLENGTH(myoptd_r) <= RBW_SFLOORD)
     error("C_np_regression_bw: myoptd is missing scale.factor.lower.bound");
+  if (XLENGTH(myopti_i) <= RBW_CKORDERI &&
+      INTEGER(myopti_i)[RBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
+    error("C_np_regression_bw: continuous-kernel descriptor is missing");
 
   ncon = (int)INTEGER(myopti_i)[REG_NCONI];
   ckerlb_p = REAL(ckerlb_r);
@@ -8609,6 +8624,9 @@ static SEXP C_np_density_bw_common(SEXP myuno,
 
   if (XLENGTH(myoptd_r) <= BW_SFLOORD)
     error("C_np_density_bw: myoptd is missing scale.factor.lower.bound");
+  if (XLENGTH(myopti_i) <= BW_CKORDERI &&
+      INTEGER(myopti_i)[BW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
+    error("C_np_density_bw: continuous-kernel descriptor is missing");
 
   ncon = (int)INTEGER(myopti_i)[BW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
@@ -8788,6 +8806,10 @@ SEXP C_np_density_nomad_native_fixed_eval(SEXP myuno,
   PROTECT(bw_r = coerceVector(bw, REALSXP));
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  if (XLENGTH(myopti_i) <= BW_CKORDERI &&
+      INTEGER(myopti_i)[BW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
+    error("native npudens NOMAD evaluator: continuous-kernel descriptor is missing");
 
   if (XLENGTH(myoptd_r) <= BW_SFLOORD) {
     UNPROTECT(9);
@@ -9259,6 +9281,10 @@ static SEXP C_np_distribution_bw_common(SEXP myuno,
   PROTECT(bw_r = coerceVector(bw, REALSXP));
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  if (XLENGTH(myopti_i) <= DBW_CKORDERI &&
+      INTEGER(myopti_i)[DBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
+    error("C_np_distribution_bw: continuous-kernel descriptor is missing");
 
   ncon = (int)INTEGER(myopti_i)[DBW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
@@ -10776,6 +10802,38 @@ np_continuous_kernel_descriptor_or_error(int family,
 }
 
 static np_continuous_kernel_descriptor
+np_bandwidth_kernel_descriptor_or_error(int family,
+                                        int code,
+                                        int order,
+                                        int ncon,
+                                        int nuno,
+                                        int nord,
+                                        const double *lower,
+                                        const double *upper,
+                                        const char *where)
+{
+  np_continuous_kernel_descriptor descriptor =
+    np_continuous_kernel_descriptor_or_error(family, code, order, where);
+
+  if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    int dimension;
+
+    if(ncon <= 0 || nuno != 0 || nord != 0)
+      error("%s: beta bandwidth selection requires continuous variables only",
+            where);
+    if(lower == NULL || upper == NULL)
+      error("%s: beta bandwidth selection requires finite fixed bounds", where);
+    for(dimension = 0; dimension < ncon; ++dimension) {
+      if(!R_FINITE(lower[dimension]) || !R_FINITE(upper[dimension]) ||
+         !(upper[dimension] > lower[dimension]))
+        error("%s: beta bandwidth selection requires valid finite bounds", where);
+    }
+  }
+
+  return descriptor;
+}
+
+static np_continuous_kernel_descriptor
 np_kernelsum_descriptor_or_error(SEXP options, const char *where)
 {
   if(XLENGTH(options) <= KWS_CKORDERI)
@@ -11331,6 +11389,13 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   KERNEL_den_extern = myopti[BW_CKRNEVI];
   KERNEL_den_unordered_extern = myopti[BW_UKRNEVI];
   KERNEL_den_ordered_extern = myopti[BW_OKRNEVI];
+  np_beta_bw_order_extern = 2;
+  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+    np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+      myopti[BW_CKFAMILYI], KERNEL_den_extern, myopti[BW_CKORDERI],
+      num_reg_continuous_extern, num_reg_unordered_extern,
+      num_reg_ordered_extern, ckerlb, ckerub,
+      "C_np_density_bw").order;
 
   int_use_starting_values= myopti[BW_USTARTI];
   int_LARGE_SF=myopti[BW_LSFI];
@@ -11343,6 +11408,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   old_bw=myopti[BW_OLDBW];
   int_TREE_X = myopti[BW_DOTREEI];
   int_TREE_PROFILE_X = myopti[BW_DOTREEI];
+  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
+    int_TREE_X = 0;
+    int_TREE_PROFILE_X = 0;
+  }
   scale_cat = myopti[BW_SCATI];
   bwm_use_transform = myopti[BW_TBNDI];
   if (BANDWIDTH_den_extern != BW_FIXED)
@@ -12162,6 +12231,13 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   KERNEL_den_extern = myopti[DBW_CKRNEVI];
   KERNEL_den_unordered_extern = myopti[DBW_UKRNEVI];
   KERNEL_den_ordered_extern = myopti[DBW_OKRNEVI];
+  np_beta_bw_order_extern = 2;
+  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+    np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+      myopti[DBW_CKFAMILYI], KERNEL_den_extern, myopti[DBW_CKORDERI],
+      num_reg_continuous_extern, num_reg_unordered_extern,
+      num_reg_ordered_extern, ckerlb, ckerub,
+      "C_np_distribution_bw").order;
 
   int_use_starting_values= myopti[DBW_USTARTI];
   int_LARGE_SF=myopti[DBW_LSFI];
@@ -12174,6 +12250,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   int_TREE_X = myopti[DBW_DOTREEI];
   int_TREE_PROFILE_X = myopti[DBW_DOTREEI];
+  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
+    int_TREE_X = 0;
+    int_TREE_PROFILE_X = 0;
+  }
   scale_cat = myopti[DBW_SCATI];
   bwm_use_transform = myopti[DBW_TBNDI];
   if (BANDWIDTH_den_extern != BW_FIXED)
@@ -16482,6 +16562,13 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   vector_ckerlb_extern = ckerlb;
   vector_ckerub_extern = ckerub;
   int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
+  np_beta_bw_order_extern = 2;
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE)
+    np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+      myopti[RBW_CKFAMILYI], KERNEL_reg_extern, myopti[RBW_CKORDERI],
+      num_reg_continuous_extern, num_reg_unordered_extern,
+      num_reg_ordered_extern, ckerlb, ckerub,
+      "C_np_regression_bw").order;
 
   int_use_starting_values= myopti[RBW_USTARTI];
   int_LARGE_SF=myopti[RBW_LSFI];
@@ -16497,6 +16584,9 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int_MINIMIZE_IO = myopti[RBW_MINIOI];
 
   int_ll_extern = myopti[RBW_LL];
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE &&
+     (int_ll_extern != LL_LC || lsq_check_mode))
+    error("C_np_regression_bw: beta bandwidth selection supports only local-constant mean regression");
   vector_glp_degree_extern = glp_degree;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = *glp_bernstein;
@@ -16504,6 +16594,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   int_TREE_PROFILE_X = myopti[RBW_DOTREEI];
   int_TREE_X = myopti[RBW_DOTREEI];
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE) {
+    int_TREE_X = 0;
+    int_TREE_PROFILE_X = 0;
+  }
   scale_cat = myopti[RBW_SCATI];
   bwm_use_transform = myopti[RBW_TBNDI];
   if (BANDWIDTH_reg_extern != BW_FIXED)

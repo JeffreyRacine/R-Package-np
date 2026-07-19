@@ -251,11 +251,7 @@ npudensbw.NULL <-
     bwmethod = switch(bws$method,
       cv.ml = BWM_CVML,
       cv.ls = BWM_CVLS),
-    ckerneval = switch(bws$ckertype,
-      gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-      uniform = CKER_UNI
-),
+    ckerneval = npContinuousKernelCode(bws),
     ukerneval = switch(bws$ukertype,
       aitchisonaitken = UKER_AIT,
       liracine = UKER_LR),
@@ -275,6 +271,7 @@ npudensbw.NULL <-
     dfc.dir = 3L,
     transform.bounds = FALSE
   )
+  myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
 
   myoptd <- list(
     ftol = ftol,
@@ -804,11 +801,7 @@ npudensbw.bandwidth <-
         itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE), 
         int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE, 
         bwmethod = .npudensbw_method_code(bws, where = "npudensbw"),
-        ckerneval = switch(bws$ckertype,
-          gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
-          epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-          uniform = CKER_UNI
-),
+        ckerneval = npContinuousKernelCode(bws),
         ukerneval = switch(bws$ukertype,
           aitchisonaitken = UKER_AIT,
           liracine = UKER_LR),
@@ -827,6 +820,7 @@ npudensbw.bandwidth <-
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
+      myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
 
       
       myoptd = list(ftol=ftol, tol=tol, small=small,
