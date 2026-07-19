@@ -787,6 +787,19 @@ npudistbw.dbandwidth <-
       stop(paste("length of bandwidth vector does not match number of columns of",
            "'dat'"))
 
+    npValidateBetaKernelSpecification(
+      ckertype = bws[["ckertype", exact = TRUE]],
+      ckerorder = bws[["ckerorder", exact = TRUE]],
+      bwtype = bws[["type", exact = TRUE]],
+      ckerbound = bws[["ckerbound", exact = TRUE]],
+      ckerlb = bws[["ckerlb", exact = TRUE]],
+      ckerub = bws[["ckerub", exact = TRUE]],
+      dati = bws[["xdati", exact = TRUE]],
+      bw = bws[["bw", exact = TRUE]],
+      bandwidth.compute = bandwidth.compute,
+      where = "beta distribution"
+    )
+
     if ((any(bws$icon) &&
          !all(vapply(as.data.frame(dat[, bws$icon]), inherits, logical(1), c("integer", "numeric")))) ||
         (any(bws$iord) &&

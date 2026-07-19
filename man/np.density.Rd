@@ -117,6 +117,34 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   \code{bandwidth} object, \code{npudens} estimates with the stored
   bandwidth metadata in that object.
 
+  The second-order beta associated density described in
+  \code{\link{np.kernels}} is available when a manual metric bandwidth is
+  supplied. It currently requires continuous data only,
+  \code{ckertype="beta"}, \code{ckerorder=2}, \code{bwtype="fixed"}, and
+  \code{ckerbound="fixed"} with finite lower and upper bounds covering every
+  training and evaluation value. For example:
+  \preformatted{
+    fhat <- npudens(tdat=data.frame(x), edat=data.frame(x=x.eval),
+                    bws=0.12, ckertype="beta", ckerorder=2,
+                    ckerbound="fixed", ckerlb=0, ckerub=1)
+  }
+  The beta contribution already includes its complete original-scale density
+  normalization. No additional division by the bandwidth is performed.
+  Automatic beta bandwidth selection, nearest-neighbor bandwidths, empirical
+  range support, categorical products, and higher beta orders are not yet
+  available and fail explicitly.
+
+  Because an associated beta kernel has target-dependent shape and roughness,
+  its reported standard error does not substitute a translation-invariant
+  \eqn{R(K)} constant. If \eqn{K_i(x)} denotes the full multivariate beta
+  contribution, the implementation reports the ordinary standard error of
+  their sample mean,
+  \deqn{\widehat{\mathrm{se}}\{\hat f(x)\}=
+    \sqrt{\frac{1}{n}\,\frac{1}{n-1}
+    \sum_{i=1}^n\{K_i(x)-\hat f(x)\}^2},}
+  with zero reported when \eqn{n=1}. This contribution-based expression
+  automatically respects the changing boundary shape.
+
   Argument groups for bandwidth selection are documented on
   \code{\link{npudensbw}}. The most common workflow is to choose data
   and bandwidth inputs first, then bandwidth criterion and
@@ -265,6 +293,10 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
 
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth estimators
     for discrete distributions,}  Biometrika, 68, 301-309.
+
+  Chen, S.X. (1999), \dQuote{Beta kernel estimators for density functions,}
+  Computational Statistics & Data Analysis, 31(2), 131--145.
+  doi:10.1016/S0167-9473(99)00010-9.
 }
 \author{
     Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine

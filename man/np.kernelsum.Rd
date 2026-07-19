@@ -393,6 +393,17 @@ den.ksum <- npksum(txdat=x, exdat=x.eval, bws=bw$bw,
 
 den.ksum
 
+## A beta associated kernel includes its original-scale normalization.
+## The target/centre is supplied in exdat and the observation-coordinate
+## trace in txdat; return.kernel.weights exposes the individual curve.
+
+z <- seq(0, 1, length.out=101)
+beta.trace <- npksum(txdat=z, exdat=0.08, bws=0.12,
+                    ckertype="beta", ckerorder=2,
+                    ckerbound="fixed", ckerlb=0, ckerub=1,
+                    return.kernel.weights=TRUE)$kw[, 1]
+plot(z, beta.trace, type="l", xlab="z", ylab="Beta kernel")
+
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.
 

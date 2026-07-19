@@ -150,7 +150,9 @@ These arguments identify the data and whether bandwidths are supplied or compute
     a logical value which specifies whether to do a numerical search for
     bandwidths or not. If set to \code{FALSE}, a \code{rbandwidth} object
     will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
+    in \code{bws}. Defaults to \code{TRUE}. The beta associated-kernel route
+    currently requires \code{bandwidth.compute=FALSE} and explicit
+    bandwidths.
   }
 
 \subsection{Local-Polynomial And NOMAD Controls}{
@@ -167,7 +169,8 @@ These arguments control regression type, local-polynomial specification, and opt
     \code{degree.select != "manual"}. \code{ll} and positive-degree
     \code{lp} require at least one continuous predictor; for
     categorical-only predictors use \code{lc} or \code{lp} with
-    \code{degree=0}. Defaults to \code{lc}.
+    \code{degree=0}. The beta associated-kernel route currently requires
+    \code{regtype="lc"}. Defaults to \code{lc}.
   }
 
   \item{basis}{
@@ -411,7 +414,8 @@ These controls set numerical search starts, kernel choices, and support bounds.
   \item{ckertype}{
     character string used to specify the continuous kernel type.
     Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
+    \code{uniform}; \code{beta} is additionally available under the restricted
+    manual local-constant contract in Details. Defaults to \code{gaussian}.
   }
 
   \item{ckerub}{

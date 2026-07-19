@@ -122,6 +122,32 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   lower and upper endpoints and has the linear uniform-CDF limit as the
   bandwidth diverges.
 
+  The order-2 beta associated CDF is available with explicit metric
+  bandwidths by setting \code{ckertype="beta"}, \code{ckerorder=2},
+  \code{bwtype="fixed"}, \code{ckerbound="fixed"}, and finite
+  \code{ckerlb}/\code{ckerub}. The data must be continuous and all training
+  and evaluation values must lie within their declared supports. Automatic
+  bandwidth selection, nearest-neighbor bandwidths, sample-range support,
+  categorical products, and higher beta orders are not yet available and
+  fail explicitly.
+
+  For observation \eqn{x_i}, target \eqn{x}, support \eqn{[a,b]},
+  \eqn{L=b-a}, \eqn{z_i=(x_i-a)/L}, \eqn{t=(x-a)/L}, and
+  \eqn{\tau=(L/h)^2}, the contribution is
+  \deqn{I_t(1+z_i\tau,1+(1-z_i)\tau).}
+  The returned estimate is the sample mean of these contributions; its
+  reported standard error is the sample standard deviation of the
+  multivariate contribution divided by \eqn{\sqrt{n}}. The implementation
+  accumulates this variance in centered form to avoid cancellation near zero
+  or one. This beta CDF is observation-centered and is not the target-variable
+  integral of Chen's evaluation-centered beta density kernel. See
+  \code{\link{np.kernels}} for the design rationale and references.
+
+  Order-2 beta CDF estimates are proper CDFs on the declared support.
+  Existing signed higher-order kernel CDFs can overshoot \eqn{[0,1]} or be
+  locally nonmonotone and are not silently clamped. The same user-beware rule
+  will apply if signed higher-order beta CDFs are introduced.
+
   Argument groups for bandwidth selection are documented on
   \code{\link{npudistbw}}. The most common workflow is to choose data
   and bandwidth inputs first, then bandwidth criterion and
@@ -256,6 +282,15 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   Datatype Bandwidth Selection for Nonparametric Cumulative
   Distribution/Survivor Functions,} Econometric Reviews, \bold{36},
   970-987.
+
+  Chen, S.X. (1999), \dQuote{Beta kernel estimators for density functions,}
+  Computational Statistics & Data Analysis, 31(2), 131--145.
+  doi:10.1016/S0167-9473(99)00010-9.
+
+  Mansouri, E., Rastin, S., and Mombeni, H.A. (2024),
+  \dQuote{A new beta kernel estimator of the distribution function for
+  bounded data,} Journal of Sciences, Islamic Republic of Iran.
+  doi:10.22059/jsciences.2024.367933.1007836.
 
   Ouyang, D. and Q. Li and J.S. Racine (2006), \dQuote{Cross-validation
     and the estimation of probability distributions with categorical

@@ -113,7 +113,9 @@ These arguments identify the data, formula interface, and whether bandwidths are
     a logical value which specifies whether to do a numerical search for
     bandwidths or not. If set to \code{FALSE}, a \code{bandwidth} object
     will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
+    in \code{bws}. Defaults to \code{TRUE}. The current beta-kernel
+    implementation requires \code{bandwidth.compute = FALSE} and explicit
+    bandwidths.
   }
 
 
@@ -332,7 +334,9 @@ These controls choose continuous, unordered, and ordered kernels.
   \item{ckertype}{
     character string used to specify the continuous kernel type.
     Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
+    \code{uniform}. For manual fixed-bandwidth density estimation on known
+    finite supports it may also be set to \code{beta}; see Details.
+    Defaults to \code{gaussian}.
   }
 
   \item{okertype}{
@@ -554,6 +558,17 @@ or standard-deviation factors.
   density at the point \eqn{x}. Generalized nearest-neighbor bandwidths change
   with the point at which the density is estimated, \eqn{x}. Fixed bandwidths
   are constant over the support of \eqn{x}.
+
+  The order-2 Chen beta kernel is available for manual fixed-bandwidth
+  estimation of continuous variables on explicitly supplied finite supports.
+  Set \code{ckertype = "beta"}, \code{ckerorder = 2},
+  \code{ckerbound = "fixed"}, supply finite \code{ckerlb} and
+  \code{ckerub}, positive metric-scale \code{bws}, and set
+  \code{bandwidth.compute = FALSE}. Automatic bandwidth selection,
+  nearest-neighbor bandwidths, mixed continuous/categorical products, and
+  beta orders 4, 6, and 8 are not yet exposed. The bandwidth \eqn{h_j} is in
+  the units of coordinate \eqn{j}; internally the beta precision is
+  \eqn{\tau_j=((b_j-a_j)/h_j)^2}{tau[j]=((b[j]-a[j])/h[j])^2}.
 
   \code{npudensbw} may be invoked \emph{either} with a formula-like
   symbolic description of variables on which bandwidth selection is to

@@ -3,7 +3,7 @@ dbandwidth <-
            bwmethod = c("cv.cdf","normal-reference"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           ckertype = c("gaussian","epanechnikov","uniform"),
+           ckertype = c("gaussian","epanechnikov","uniform","beta"),
            ckerorder = c(2,4,6,8),
            ckerbound = c("none","range","fixed"),
            ckerlb = NULL,
@@ -47,6 +47,10 @@ dbandwidth <-
         stop("ckerorder must be one of ", paste(kord,collapse=" "))
     }
 
+    if (bwmethod == "normal-reference" && identical(ckertype, "beta"))
+      stop("beta distribution estimation does not support normal-reference bandwidth selection; supply a manual bandwidth",
+           call. = FALSE)
+
     if (bwmethod == "normal-reference" && (ckertype != "gaussian" || bwtype != "fixed")){    
       .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
       bwtype = "fixed"
@@ -63,6 +67,18 @@ dbandwidth <-
       kerlb = ckerlb,
       kerub = ckerub,
       argprefix = "cker")
+    npValidateBetaKernelSpecification(
+      ckertype = ckertype,
+      ckerorder = ckerorder,
+      bwtype = bwtype,
+      ckerbound = cbounds$bound,
+      ckerlb = cbounds$lb,
+      ckerub = cbounds$ub,
+      dati = xdati,
+      bw = bw,
+      bandwidth.compute = bandwidth.compute,
+      where = "beta distribution"
+    )
     bounded_nonfixed_supported <- bwtype %in% c("generalized_nn", "adaptive_nn")
     if (bwtype != "fixed" &&
         cbounds$bound != "none" &&

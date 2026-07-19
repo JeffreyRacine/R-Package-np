@@ -4,14 +4,14 @@ conbandwidth <-
            bwmethod = c("cv.ml","cv.ls","normal-reference", "manual"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           cxkertype = c("gaussian","epanechnikov","uniform"),
+           cxkertype = c("gaussian","epanechnikov","uniform","beta"),
            cxkerorder = c(2,4,6,8),
            cxkerbound = c("none","range","fixed"),
            cxkerlb = NULL,
            cxkerub = NULL,
            uxkertype = c("aitchisonaitken","liracine"),
            oxkertype = c("liracine","wangvanryzin","racineliyan"),
-           cykertype = c("gaussian","epanechnikov","uniform"),
+           cykertype = c("gaussian","epanechnikov","uniform","beta"),
            cykerorder = c(2,4,6,8),
            cykerbound = c("none","range","fixed"),
            cykerlb = NULL,
@@ -74,6 +74,9 @@ conbandwidth <-
       stop("cxkerorder must be one of ", paste(kord,collapse=" "))
   }
 
+  if (bwmethod == "normal-reference" && identical(cxkertype, "beta"))
+    stop("beta conditional density does not support normal-reference bandwidth selection",
+         call. = FALSE)
   if (bwmethod == "normal-reference" && (cxkertype != "gaussian" || bwtype != "fixed")){    
     .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
     bwtype = "fixed"
@@ -90,6 +93,9 @@ conbandwidth <-
       stop("cykerorder must be one of ", paste(kord,collapse=" "))
   }
 
+  if (bwmethod == "normal-reference" && identical(cykertype, "beta"))
+    stop("beta conditional density does not support normal-reference bandwidth selection",
+         call. = FALSE)
   if (bwmethod == "normal-reference" && (cykertype != "gaussian" || bwtype != "fixed")){    
     .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
     bwtype = "fixed"
@@ -118,6 +124,22 @@ conbandwidth <-
     kerlb = cykerlb,
     kerub = cykerub,
     argprefix = "cyker")
+  beta.prototype <- list(
+    cxkertype = cxkertype, cxkerorder = cxkerorder,
+    cxkerbound = cxbounds$bound, cxkerlb = cxbounds$lb,
+    cxkerub = cxbounds$ub, cykertype = cykertype,
+    cykerorder = cykerorder, cykerbound = cybounds$bound,
+    cykerlb = cybounds$lb, cykerub = cybounds$ub,
+    type = bwtype, xbw = xbw, ybw = ybw,
+    xdati = xdati, ydati = ydati,
+    xnuno = sum(xdati$iuno), xnord = sum(xdati$iord),
+    ynuno = sum(ydati$iuno), ynord = sum(ydati$iord),
+    regtype = regtype
+  )
+  npValidateConditionalBetaBandwidthObject(
+    beta.prototype, where = "conditional density",
+    bandwidth.compute = bandwidth.compute
+  )
   bounded_nonfixed_supported <- bwtype %in% c("generalized_nn", "adaptive_nn")
   if (bwtype != "fixed" &&
       (cxbounds$bound != "none" || cybounds$bound != "none") &&

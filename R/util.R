@@ -1785,6 +1785,53 @@ npKernelBoundsCheckEval <- function(evaldat,
   invisible(TRUE)
 }
 
+npValidateBetaKernelSpecification <- function(ckertype,
+                                              ckerorder,
+                                              bwtype,
+                                              ckerbound,
+                                              ckerlb,
+                                              ckerub,
+                                              dati,
+                                              bw,
+                                              bandwidth.compute = FALSE,
+                                              where = "beta kernel",
+                                              regtype = NULL) {
+  if (!identical(ckertype, "beta"))
+    return(invisible(FALSE))
+
+  if (!(as.integer(ckerorder) %in% c(2L, 4L, 6L, 8L)))
+    stop("beta kernels require ckerorder in 2, 4, 6, or 8", call. = FALSE)
+  if (!(bwtype %in% c("fixed", "generalized_nn", "adaptive_nn")))
+    stop("beta kernels require a recognized fixed or nearest-neighbor bandwidth mode",
+         call. = FALSE)
+  if (isTRUE(bandwidth.compute))
+    stop(where, " does not yet support automatic bandwidth selection; supply a manual bandwidth",
+         call. = FALSE)
+  if (!identical(ckerbound, "fixed"))
+    stop("beta kernels require ckerbound = \"fixed\" with finite ckerlb and ckerub",
+         call. = FALSE)
+
+  icon <- dati$icon
+  if (is.null(icon) || !any(icon))
+    stop("beta kernels require at least one continuous variable", call. = FALSE)
+  if (any(dati$iuno) || any(dati$iord))
+    stop("beta kernels currently support continuous variables only", call. = FALSE)
+  if (any(!is.finite(ckerlb[icon])) || any(!is.finite(ckerub[icon])))
+    stop("beta kernels require finite lower and upper bounds for every continuous variable",
+         call. = FALSE)
+  if (any(!is.finite(bw[icon])) ||
+      (identical(bwtype, "fixed") && any(bw[icon] <= 0)) ||
+      (!identical(bwtype, "fixed") && any(bw[icon] < 1))) {
+    if (identical(bwtype, "fixed"))
+      stop("beta kernel bandwidths must be finite and strictly positive", call. = FALSE)
+    stop("beta nearest-neighbor bandwidths must be finite and at least 1",
+         call. = FALSE)
+  }
+  if (!is.null(regtype) && !identical(regtype, "lc"))
+    stop(where, " currently supports only regtype = \"lc\"", call. = FALSE)
+  invisible(TRUE)
+}
+
 npKernelBoundsMarshal <- function(kerlb, kerub) {
   lb <- as.double(kerlb)
   ub <- as.double(kerub)
@@ -3806,7 +3853,8 @@ cktToPrint <- function(s, order = "", kerbound = "none"){
   pck <- switch(s,
                 gaussian = paste(order,"Gaussian"),
                 epanechnikov =  paste(order,"Epanechnikov"),
-                uniform = "Uniform")
+                uniform = "Uniform",
+                beta = paste(order, "Beta associated"))
   if (!is.null(kerbound) && !identical(kerbound, "none"))
     pck <- paste0(pck, " (bounded/", kerbound, ")")
   pck
@@ -4172,6 +4220,80 @@ CKER_GAUSS = 0
 CKER_EPAN  = 4
 CKER_UNI   = 8
 CKER_RESERVED = 9
+
+CKER_FAMILY_LEGACY = 0L
+CKER_FAMILY_BETA = 1L
+CKER_COORDINATE = -1L
+
+npContinuousKernelDescriptorOptions <- function(bws) {
+  ckertype <- bws[["ckertype", exact = TRUE]]
+  ckerorder <- bws[["ckerorder", exact = TRUE]]
+
+  if (is.null(ckertype) || length(ckertype) != 1L ||
+      is.null(ckerorder) || length(ckerorder) != 1L ||
+      !is.finite(ckerorder))
+    stop("invalid internal continuous-kernel descriptor")
+
+  list(
+    continuous.kernel.family = if (identical(ckertype, "beta"))
+      CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.kernel.order = as.integer(ckerorder)
+  )
+}
+
+npConditionalKernelDescriptorOptions <- function(bws) {
+  list(
+    continuous.x.kernel.family = if (identical(bws[["cxkertype", exact = TRUE]],
+                                                "beta"))
+      CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.x.kernel.order = as.integer(bws[["cxkerorder", exact = TRUE]]),
+    continuous.y.kernel.family = if (identical(bws[["cykertype", exact = TRUE]],
+                                                "beta"))
+      CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.y.kernel.order = as.integer(bws[["cykerorder", exact = TRUE]])
+  )
+}
+
+npValidateConditionalBetaBandwidthObject <- function(bws,
+                                                      where,
+                                                      bandwidth.compute = FALSE) {
+  has.beta <- identical(bws[["cxkertype", exact = TRUE]], "beta") ||
+    identical(bws[["cykertype", exact = TRUE]], "beta")
+  if (!has.beta)
+    return(invisible(FALSE))
+
+  npValidateBetaKernelSpecification(
+    ckertype = bws[["cxkertype", exact = TRUE]],
+    ckerorder = bws[["cxkerorder", exact = TRUE]],
+    bwtype = bws[["type", exact = TRUE]],
+    ckerbound = bws[["cxkerbound", exact = TRUE]],
+    ckerlb = bws[["cxkerlb", exact = TRUE]],
+    ckerub = bws[["cxkerub", exact = TRUE]],
+    dati = bws[["xdati", exact = TRUE]],
+    bw = bws[["xbw", exact = TRUE]],
+    bandwidth.compute = bandwidth.compute,
+    where = paste(where, "explanatory beta kernel"),
+    regtype = bws[["regtype", exact = TRUE]]
+  )
+  npValidateBetaKernelSpecification(
+    ckertype = bws[["cykertype", exact = TRUE]],
+    ckerorder = bws[["cykerorder", exact = TRUE]],
+    bwtype = bws[["type", exact = TRUE]],
+    ckerbound = bws[["cykerbound", exact = TRUE]],
+    ckerlb = bws[["cykerlb", exact = TRUE]],
+    ckerub = bws[["cykerub", exact = TRUE]],
+    dati = bws[["ydati", exact = TRUE]],
+    bw = bws[["ybw", exact = TRUE]],
+    bandwidth.compute = bandwidth.compute,
+    where = paste(where, "dependent beta kernel")
+  )
+  if ((bws[["xnuno", exact = TRUE]] + bws[["xnord", exact = TRUE]] +
+       bws[["ynuno", exact = TRUE]] + bws[["ynord", exact = TRUE]]) > 0L)
+    stop(where, " beta kernels currently require all X and Y variables to be continuous",
+         call. = FALSE)
+
+  invisible(TRUE)
+}
 
 UKER_AIT = 0
 UKER_LR = 1
