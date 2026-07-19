@@ -276,6 +276,24 @@ npreg.rbandwidth <-
     if (length(bws$bw) != length(txdat))
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
+    beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
+    npValidateBetaKernelSpecification(
+      ckertype = bws[["ckertype", exact = TRUE]],
+      ckerorder = bws[["ckerorder", exact = TRUE]],
+      bwtype = bws[["type", exact = TRUE]],
+      ckerbound = bws[["ckerbound", exact = TRUE]],
+      ckerlb = bws[["ckerlb", exact = TRUE]],
+      ckerub = bws[["ckerub", exact = TRUE]],
+      dati = bws[["xdati", exact = TRUE]],
+      bw = bws[["bw", exact = TRUE]],
+      bandwidth.compute = FALSE,
+      where = "beta regression",
+      regtype = bws[["regtype", exact = TRUE]]
+    )
+    if (beta.kernel && gradients)
+      stop("beta regression gradients are not yet available; use gradients = FALSE",
+           call. = FALSE)
+
     npValidateRegressionNnLowerBound(bws, where = "npreg")
     npValidateRegressionExtendedNn(
       bws,
@@ -554,7 +572,8 @@ npreg.rbandwidth <-
       kerneval = switch(bws$ckertype,
         gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
         epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-        uniform = CKER_UNI
+        uniform = CKER_UNI,
+        beta = CKER_COORDINATE
 ),
       ukerneval = switch(bws$ukertype,
         aitchisonaitken = UKER_AIT,
@@ -568,8 +587,10 @@ npreg.rbandwidth <-
       regtype = reg.c$code,
       no.ex = no.ex,
       mcv.numRow = attr(bws$xmcv, "num.row"),
-      int_do_tree = .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+      int_do_tree = if (beta.kernel) DO_TREE_NO else
+        .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
       old.reg = FALSE)
+    myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
 
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     

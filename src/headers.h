@@ -674,6 +674,10 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CD_XMLEVI 20
 #define CD_DODENI 21
 #define CD_TREEI 22
+#define CD_CXFAMILYI 23
+#define CD_CXORDERI 24
+#define CD_CYFAMILYI 25
+#define CD_CYORDERI 26
 
 #define DEN_TNOBSI   0
 #define DEN_ENOBSI   1
@@ -691,6 +695,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define DEN_DODENI 13
 #define DEN_OLDI 14
 #define DEN_TREEI 15
+#define DEN_CKFAMILYI 16
+#define DEN_CKORDERI 17
 
 #define REG_TNOBSI   0
 #define REG_ENOBSI   1
@@ -710,6 +716,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define REG_MLEVI 15
 #define REG_DOTREEI 16
 #define REG_OLDREGI 17
+#define REG_CKFAMILYI 18
+#define REG_CKORDERI 19
 
 #define KWS_TNOBSI   0
 #define KWS_ENOBSI 1
@@ -733,6 +741,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define KWS_POPI 19
 #define KWS_PSCOREI 20
 #define KWS_POCGI 21
+#define KWS_CKFAMILYI 22
+#define KWS_CKORDERI 23
 
 #define CQ_TNOBSI 0
 #define CQ_ENOBSI   1

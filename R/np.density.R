@@ -100,6 +100,20 @@ npudens.bandwidth <-
   if (length(bws$bw) != length(tdat))
     stop("length of bandwidth vector does not match number of columns of 'tdat'")
 
+  beta.kernel <- identical(bws$ckertype, "beta")
+  npValidateBetaKernelSpecification(
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    bwtype = bws$type,
+    ckerbound = bws$ckerbound,
+    ckerlb = bws$ckerlb,
+    ckerub = bws$ckerub,
+    dati = bws$xdati,
+    bw = bws$bw,
+    bandwidth.compute = FALSE,
+    where = "beta density"
+  )
+
   if ((any(bws$icon) &&
        !all(vapply(as.data.frame(tdat[, bws$icon]), inherits, logical(1), c("integer", "numeric")))) ||
       (any(bws$iord) &&
@@ -182,7 +196,8 @@ npudens.bandwidth <-
     ckerneval = switch(bws$ckertype,
       gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
       epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-      uniform = CKER_UNI
+      uniform = CKER_UNI,
+      beta = CKER_COORDINATE
 ),
     ukerneval = switch(bws$ukertype,
       aitchisonaitken = UKER_AIT,
@@ -195,7 +210,11 @@ npudens.bandwidth <-
     mcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DENS,
       old.dens = FALSE,
-      int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$ncon, ncat = bws$nuno + bws$nord, bws = bws))
+      int_do_tree = if (beta.kernel) DO_TREE_NO else
+        npDoTreeOrCategoricalCompress(ncon = bws$ncon,
+                                      ncat = bws$nuno + bws$nord,
+                                      bws = bws))
+  myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
   myout <- .np_with_compiled_fit_progress(

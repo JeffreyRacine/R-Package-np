@@ -1,15 +1,10 @@
 test_that("continuous kernel choices expose the supported kernel set", {
-  supported <- c("gaussian", "epanechnikov", "uniform")
+  legacy_supported <- c("gaussian", "epanechnikov", "uniform")
+  beta_supported <- c(legacy_supported, "beta")
   constructors <- list(
-    bandwidth = "ckertype",
-    dbandwidth = "ckertype",
-    rbandwidth = "ckertype",
     plbandwidth = "ckertype",
     sibandwidth = "ckertype",
-    scbandwidth = "ckertype",
-    conbandwidth = c("cxkertype", "cykertype"),
-    condbandwidth = c("cxkertype", "cykertype"),
-    kbandwidth.numeric = "ckertype"
+    scbandwidth = "ckertype"
   )
 
   for (constructor in names(constructors)) {
@@ -18,7 +13,38 @@ test_that("continuous kernel choices expose the supported kernel set", {
     for (argument in constructors[[constructor]]) {
       expect_identical(
         eval(defaults[[argument]], envir = baseenv()),
-        supported,
+        legacy_supported,
+        info = paste(constructor, argument)
+      )
+    }
+  }
+
+  expect_identical(
+    eval(formals(getFromNamespace("dbandwidth", "np"))$ckertype,
+         envir = baseenv()),
+    beta_supported
+  )
+  expect_identical(
+    eval(formals(getFromNamespace("rbandwidth", "np"))$ckertype,
+         envir = baseenv()),
+    beta_supported
+  )
+  expect_identical(
+    eval(formals(getFromNamespace("kbandwidth.numeric", "np"))$ckertype,
+         envir = baseenv()),
+    beta_supported
+  )
+  expect_identical(
+    eval(formals(getFromNamespace("bandwidth", "np"))$ckertype,
+         envir = baseenv()),
+    beta_supported
+  )
+  for (constructor in c("conbandwidth", "condbandwidth")) {
+    defaults <- formals(getFromNamespace(constructor, "np"))
+    for (argument in c("cxkertype", "cykertype")) {
+      expect_identical(
+        eval(defaults[[argument]], envir = baseenv()),
+        beta_supported,
         info = paste(constructor, argument)
       )
     }

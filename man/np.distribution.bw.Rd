@@ -382,7 +382,9 @@ These controls choose continuous, unordered, and ordered kernels.
   \item{ckertype}{
     character string used to specify the continuous kernel type.
     Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
+    \code{uniform}. The value \code{beta} is additionally accepted for the
+    manual order-2 fixed-known-support route described in Details. Defaults to
+    \code{gaussian}.
   }
 
   \item{okertype}{
@@ -596,6 +598,19 @@ or standard-deviation factors.
   kernel. Ordered data types use a variation of the Wang and van Ryzin
   (1981) kernel.
 
+  The order-2 beta associated CDF can be configured only as an explicit
+  bandwidth object: supply \code{bws}, set
+  \code{bandwidth.compute=FALSE}, \code{ckertype="beta"},
+  \code{ckerorder=2}, \code{bwtype="fixed"}, and
+  \code{ckerbound="fixed"}, and provide finite \code{ckerlb} and
+  \code{ckerub} for every continuous coordinate. Data must be continuous and
+  lie within those supports. Automatic selection, nearest-neighbor bandwidths,
+  sample-range bounds, categorical products, and higher beta orders are not
+  yet available. Unsupported specifications fail explicitly. The bandwidth
+  \eqn{h} remains in the coordinate's original units and maps to beta
+  precision \eqn{((b-a)/h)^2}. See \code{\link{np.kernels}} and
+  \code{\link{npudist}} for the exact observation-centered CDF contribution.
+
   The optimizer invoked for search is Powell's conjugate direction
   method which requires the setting of (non-random) initial values and
   search directions for bandwidths, and when restarting, random values
@@ -656,7 +671,9 @@ or standard-deviation factors.
 
   Higher-order continuous CDF kernels can yield estimates that are not
   globally monotone and may fall outside \eqn{[0,1]} at some evaluation
-  points. Returned values are not silently clamped.
+  points. Returned values are not silently clamped. The implemented order-2
+  beta CDF remains monotone and in \eqn{[0,1]}; the same user-beware behavior
+  will apply if signed higher-order beta CDFs are later exposed.
 
   For book-length derivations, see Li and Racine (2007), Chapter 1
   \emph{Density Estimation}, especially Sections 1.4 and 1.5, and Chapter

@@ -125,7 +125,9 @@ These arguments identify the data, formula interface, and whether bandwidths are
     a logical value which specifies whether to do a numerical search for
     bandwidths or not. If set to \code{FALSE}, a \code{rbandwidth} object
     will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
+    in \code{bws}. Defaults to \code{TRUE}. The beta associated-kernel route
+    currently requires \code{bandwidth.compute=FALSE} and explicit
+    bandwidths.
   }
 
   \item{bws}{
@@ -399,7 +401,8 @@ These controls choose continuous, unordered, and ordered kernels.
   \item{ckertype}{
     character string used to specify the continuous kernel type.
     Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
+    \code{uniform}; \code{beta} is additionally available under the restricted
+    manual local-constant contract in Details. Defaults to \code{gaussian}.
   }
 
   \item{okertype}{
@@ -480,7 +483,8 @@ These arguments control the local-polynomial estimator, basis, and fixed degree 
     \code{degree.select != "manual"}. \code{ll} and positive-degree
     \code{lp} require at least one continuous predictor; for
     categorical-only predictors use \code{lc} or \code{lp} with
-    \code{degree=0}. Defaults to \code{lc}.
+    \code{degree=0}. The beta associated-kernel route currently requires
+    \code{regtype="lc"}. Defaults to \code{lc}.
   }
 
 \subsection{NOMAD Search Controls}{
@@ -739,9 +743,22 @@ or standard-deviation factors.
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and eighth
   order Gaussian and Epanechnikov kernels, and the uniform
-  kernel. Unordered discrete data types use a variation on Aitchison and
+  kernel. A second-order beta associated kernel is additionally available
+  for manual local-constant bandwidth objects. Unordered discrete data types
+  use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
+
+  The current beta contract is deliberately narrow: use
+  \code{ckertype="beta"}, \code{ckerorder=2}, \code{regtype="lc"},
+  \code{bwtype="fixed"}, \code{ckerbound="fixed"}, explicit finite
+  \code{ckerlb}/\code{ckerub}, continuous predictors only,
+  \code{bandwidth.compute=FALSE}, and an explicit \code{bws} vector.
+  Automatic search, nearest-neighbour bandwidths, sample-range support,
+  categorical predictors, and local-linear/local-polynomial regression are
+  not silently approximated; unsupported combinations fail explicitly. See
+  \code{\link{npreg}} and \code{\link{np.kernels}} for the exact beta weight,
+  bandwidth convention, ratio estimator, and standard-error definition.
 
   When \code{regtype="lp"} and \code{degree.select != "manual"},
   \code{npregbw} can jointly determine the continuous-predictor degree
@@ -877,6 +894,12 @@ or standard-deviation factors.
   Cheng, M.-Y. and P. Hall and D.M. Titterington (1997), \dQuote{On the
   shrinkage of local linear curve estimators,} Statistics and Computing,
   7, 11-17.
+
+  Chen, S.X. (1999), \dQuote{Beta kernel estimators for density functions,}
+  Computational Statistics and Data Analysis, 31, 131-145.
+
+  Chen, S.X. (2000), \dQuote{Beta kernel smoothers for regression curves,}
+  Statistica Sinica, 10, 73-91.
 
   Fan, J. and I. Gijbels (1996), \emph{Local Polynomial Modelling and
   Its Applications,} Chapman and Hall.

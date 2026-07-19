@@ -250,10 +250,74 @@ Further arguments passed to the default kernel-sum method.
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and
   eighth order Gaussian and Epanechnikov kernels, and the uniform
-  kernel. Unordered discrete data types use a variation on Aitchison and
+  kernel. A second-order beta associated kernel is also available on the
+  restricted fixed-known-support route described below. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of
   the Wang and van Ryzin (1981) kernel (see \code{\link{np}} for
   details).
+
+  For \code{ckertype="beta"}, \code{npksum} evaluates Chen's second-order
+  associated PDF kernel on each declared interval.  If \eqn{L=b-a}, its
+  per-observation contribution is
+  \deqn{\frac{1}{L}\,\mathrm{BetaPDF}\left(
+    \frac{x_i-a}{L};
+    1+\frac{x-a}{L}\left(\frac{L}{h}\right)^2,
+    1+\frac{b-x}{L}\left(\frac{L}{h}\right)^2\right).}
+  The complete density scaling \eqn{1/L} is part of this contribution.
+  Consequently, a univariate beta density estimate is
+  \code{npksum(...)$ksum/n}, not \code{npksum(...)$ksum/(n*h)}.
+  Local-constant regression uses the ordinary ratio of beta-weighted response
+  and unit sums.  Do not set \code{bandwidth.divide=TRUE}; that legacy
+  normalization is intentionally rejected for beta kernels.
+
+  For \code{operator="integral"}, the univariate beta contribution is
+  \deqn{I_{(x-a)/L}\left(1+\frac{x_i-a}{L}\left(\frac{L}{h}\right)^2,
+    1+\frac{b-x_i}{L}\left(\frac{L}{h}\right)^2\right).}
+  This observation-centered analytic CDF is not the integral of the
+  evaluation-centered PDF contribution with respect to \eqn{x}. It is exactly
+  zero and one at the declared endpoints, is monotone for order 2, and has the
+  uniform-CDF limit as \eqn{h} diverges. In several dimensions,
+  \code{operator} may mix \code{"normal"}, \code{"integral"}, and
+  \code{"convolution"} beta factors coordinate by coordinate.
+
+  For \code{operator="convolution"}, the training and evaluation values are
+  interpreted as the centers of two associated beta weights in the common
+  observation coordinate. If their shapes are
+  \eqn{(\alpha_1,\beta_1)} and \eqn{(\alpha_2,\beta_2)}, the returned factor is
+  \deqn{\frac{1}{L}\frac{B(\alpha_1+\alpha_2-1,
+                                  \beta_1+\beta_2-1)}
+                             {B(\alpha_1,\beta_1)B(\alpha_2,\beta_2)}.}
+  This symmetric analytic \eqn{L^2} overlap includes its complete
+  original-scale \eqn{1/L} normalization. Its diagonal is the local beta
+  roughness. It is neither a translation convolution nor the
+  target-coordinate integrated-square term used by bounded density
+  \code{cv.ls}; those objectives retain their existing quadrature of the
+  actual estimator. Beta PDF, CDF, and overlap factors may be mixed across
+  dimensions.
+
+  This beta surface requires continuous \code{txdat},
+  \code{ckerorder=2},
+  \code{ckerbound="fixed"}, finite lower and upper bounds for every
+  dimension, \code{operator="normal"}, \code{operator="integral"}, and/or
+  \code{operator="convolution"}, and \code{kernel.pow=1}. It supports
+  multiple continuous dimensions, response and case-weight columns,
+  leave-one-out sums, and returned kernel weights. All three operators support
+  \code{bwtype="fixed"}. The PDF, CDF, and convolution operators additionally support
+  \code{bwtype="generalized_nn"} and \code{bwtype="adaptive_nn"}; their
+  evaluation-specific and observation-specific metric bandwidths are the
+  distances returned by the existing observation-support nearest-neighbor
+  implementation, including its tie and extended-NN policy. Generalized
+  overlap evaluates generalized-NN distances at both centers. Adaptive
+  overlap keeps adaptive bandwidths attached to training centers; a genuinely
+  new evaluation center uses the established generalized-NN auxiliary
+  bandwidth. Fixed and adaptive order-2 CDF factors are monotone in their
+  target. Generalized-NN CDF factors remain in \eqn{[0,1]} with exact
+  endpoints, but their target-varying bandwidth can produce local
+  nonmonotonicity; no clipping or monotone repair is applied. Derivative,
+  sample-range support, categorical-product, score, OCG, permutation, and
+  higher-order beta operations are not yet available and fail with an
+  explicit condition. See \code{\link{np.kernels}}
+  for the bandwidth convention, orientation, and references.
 
   The option \code{operator=} can be used to \sQuote{mix and match}
   operator strings to create a \sQuote{hybrid} kernel provided they
@@ -334,7 +398,11 @@ Further arguments passed to the default kernel-sum method.
   Hall.
 
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
-  estimators for discrete distributions,} Biometrika, 68, 301-309.  }
+  estimators for discrete distributions,} Biometrika, 68, 301-309.
+
+  Chen, S.X. (1999), \dQuote{Beta kernel estimators for density functions,}
+  Computational Statistics & Data Analysis, 31(2), 131-145.
+  doi:10.1016/S0167-9473(99)00010-9.  }
 
 \author{
   Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine
@@ -582,6 +650,38 @@ kernel <- npksum(txdat=x,exdat=x.eval,bws=1,
 
 plot(x.eval,kernel,type="l",xlab="X",ylab="Kernel Function") 
 abline(0,0)
+
+# EXAMPLE 6: The beta associated kernel for bounded data.  Its complete
+# original-scale normalization is already included, so divide the sum by n,
+# not by n*h.  The same weights can be used directly in a local-constant
+# numerator/denominator ratio.
+
+x <- c(0, 0.01, 0.04, 0.15, 0.4, 0.75, 1)
+x.eval <- seq(0, 1, length.out=101)
+h <- 0.12
+
+beta.args <- list(txdat=data.frame(x=x),
+                  exdat=data.frame(x=x.eval),
+                  bws=h,
+                  ckertype="beta",
+                  ckerorder=2,
+                  ckerbound="fixed",
+                  ckerlb=0,
+                  ckerub=1)
+
+beta.density <- do.call(npksum, beta.args)$ksum/length(x)
+
+y <- sqrt(x)
+beta.mean <- do.call(npksum, c(beta.args, list(tydat=y)))$ksum/
+             do.call(npksum, beta.args)$ksum
+
+beta.cdf <- do.call(npksum,
+                    c(beta.args,
+                      list(operator="integral")))$ksum/length(x)
+
+beta.overlap <- do.call(npksum,
+                        c(beta.args,
+                          list(operator="convolution")))$ksum
 } % enddontrun
 }
 \keyword{ nonparametric }

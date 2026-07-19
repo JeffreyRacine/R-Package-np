@@ -148,7 +148,8 @@ These arguments control where the regression is evaluated and which fitted quant
     continuous derivative is shown as an empty, correctly labelled panel when
     another continuous derivative or categorical effect is available. A
     request for which no component is available is rejected with the affected
-    orders and degrees reported.
+    orders and degrees reported. Gradients are not currently available with
+    \code{ckertype="beta"}.
   }
 
 
@@ -264,9 +265,50 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and eighth
   order Gaussian and Epanechnikov kernels, and the uniform
-  kernel. Unordered discrete data types use a variation on Aitchison and
+  kernel. A second-order beta associated kernel is also available for the
+  manual, fixed-bandwidth local-constant route described below. Unordered
+  discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
+
+  For \code{ckertype="beta"}, suppose continuous predictor \eqn{j} has
+  declared finite support \eqn{[a_j,b_j]}, width
+  \eqn{L_j=b_j-a_j}, public metric bandwidth \eqn{h_j}, evaluation coordinate
+  \eqn{x_j}, and observation \eqn{X_{ij}}. Define
+  \deqn{t_j=(x_j-a_j)/L_j,\quad z_{ij}=(X_{ij}-a_j)/L_j,\quad
+        \tau_j=(L_j/h_j)^2.}
+  The local-constant product weight is
+  \deqn{K_i(x)=\prod_j \left\{\frac{1}{L_j}
+    \frac{z_{ij}^{t_j\tau_j}(1-z_{ij})^{(1-t_j)\tau_j}}
+    {B(1+t_j\tau_j,1+(1-t_j)\tau_j)}\right\},}
+  and the fitted conditional mean is the Nadaraya--Watson ratio
+  \deqn{\widehat m(x)=\frac{\sum_i K_i(x)Y_i}{\sum_i K_i(x)}.}
+  This uses Chen's evaluation-centred beta associated-kernel contribution
+  inside the established \pkg{np} local-constant ratio. It should not be
+  confused with the Gasser--Muller beta regression smoother studied by Chen
+  (2000). The support scale is already present in each contribution, and the
+  implementation applies neither the legacy \eqn{1/h_j} factor nor the generic
+  bounded-kernel normalizer. Although that normalizer cancels from ordinary
+  local-constant numerator/denominator ratios, the beta kernel is not merely
+  such a correction: its shape parameters change with the evaluation point.
+
+  Products and ratios are evaluated in the log domain, so representable beta
+  regression results are retained even when every unscaled product would
+  underflow to zero. If \eqn{\ell_i=K_i/\sum_r K_r}, the reported beta-route
+  standard error is
+  \deqn{\left\{\left[\sum_i \ell_i(Y_i-\widehat m)^2\right]
+                    \left[\sum_i \ell_i^2\right]\right\}^{1/2},}
+  preserving the established uncorrected local-variance convention while
+  using the exact effective-sample factor for these associated weights.
+
+  The present beta regression route requires \code{regtype="lc"},
+  \code{ckerorder=2}, \code{bwtype="fixed"},
+  \code{ckerbound="fixed"}, explicit finite \code{ckerlb}/\code{ckerub},
+  continuous predictors only, manual bandwidths, and
+  \code{gradients=FALSE}. Automatic bandwidth selection,
+  nearest-neighbour bandwidths, sample-range support, categorical predictors,
+  and local-linear/local-polynomial fits fail explicitly. An evaluation point
+  with no supported observation weight also produces an explicit error.
 
   When bandwidths are obtained with \code{regtype="lp"}, C-level
   \code{npreg} supports heterogeneous continuous polynomial degrees via
@@ -404,6 +446,12 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   Cheng, M.-Y. and P. Hall and D.M. Titterington (1997), \dQuote{On the
   shrinkage of local linear curve estimators,} Statistics and Computing,
   7, 11-17.
+
+  Chen, S.X. (1999), \dQuote{Beta kernel estimators for density functions,}
+  Computational Statistics and Data Analysis, 31, 131-145.
+
+  Chen, S.X. (2000), \dQuote{Beta kernel smoothers for regression curves,}
+  Statistica Sinica, 10, 73-91.
 
   Cohen, A. and G. Migliorati (2018), \dQuote{Multivariate approximation
   in downward closed polynomial spaces,} in R. Cools and D. Nuyens (eds.),

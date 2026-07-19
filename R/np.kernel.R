@@ -213,6 +213,30 @@ npksum.default <-
     
     operator.num <- ALL_OPERATORS[operator]
     poperator.num <- PERMUTATION_OPERATORS[permutation.operator]
+
+    beta.kernel <- identical(bws$ckertype, "beta")
+    if (beta.kernel) {
+      if (!(bws$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
+        stop("beta kernel sums require a recognized bandwidth mode")
+      if (!(as.integer(bws$ckerorder) %in% c(2L, 4L, 6L, 8L)))
+        stop("beta kernel sums require order 2, 4, 6, or 8")
+      if (!identical(bws$ckerbound, "fixed") ||
+          any(!is.finite(bws$ckerlb[bws$icon])) ||
+          any(!is.finite(bws$ckerub[bws$icon])))
+        stop("beta kernel sums require finite fixed bounds")
+      if (bws$nuno != 0L || bws$nord != 0L)
+        stop("beta kernel sums currently support continuous variables only")
+      if (any(!operator %in% c("normal", "convolution", "integral")))
+        stop("beta kernel sums currently support only operator = \"normal\", \"convolution\", or \"integral\"")
+      if (!identical(as.double(kernel.pow), 1.0))
+        stop("beta kernel sums currently require kernel.pow = 1")
+      if (isTRUE(bandwidth.divide))
+        stop("bandwidth.divide = TRUE is not defined for beta kernels")
+      if (compute.score || compute.ocg || permutation.operator != "none")
+        stop("beta kernel sums do not yet support permutation, score, or OCG operators")
+      if (internal.power12)
+        stop("beta kernels do not support the internal dual-power route")
+    }
     
     if ((any(bws$icon) &&
          !all(vapply(txdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
@@ -365,7 +389,8 @@ npksum.default <-
       kerneval = switch(bws$ckertype,
         gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
         epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-        uniform = CKER_UNI
+        uniform = CKER_UNI,
+        beta = CKER_COORDINATE
 ),
       ukerneval = switch(bws$ukertype,
         aitchisonaitken = UKER_AIT,
@@ -386,6 +411,7 @@ npksum.default <-
       permutation.operator = poperator.num,
 	      compute.score = compute.score,
 	      compute.ocg = compute.ocg)
+      myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
 
 	    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     

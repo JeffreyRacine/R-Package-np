@@ -7,7 +7,7 @@ rbandwidth <-
            bwmethod = c("cv.ls","cv.aic"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           ckertype = c("gaussian","epanechnikov","uniform"),
+           ckertype = c("gaussian","epanechnikov","uniform","beta"),
            ckerorder = c(2,4,6,8),
            ckerbound = c("none","range","fixed"),
            ckerlb = NULL,
@@ -65,6 +65,19 @@ rbandwidth <-
     kerlb = ckerlb,
     kerub = ckerub,
     argprefix = "cker")
+  npValidateBetaKernelSpecification(
+    ckertype = ckertype,
+    ckerorder = ckerorder,
+    bwtype = bwtype,
+    ckerbound = cbounds$bound,
+    ckerlb = cbounds$lb,
+    ckerub = cbounds$ub,
+    dati = xdati,
+    bw = bw,
+    bandwidth.compute = bandwidth.compute,
+    where = "beta regression",
+    regtype = regtype
+  )
   bounded_nonfixed_supported <- bwtype %in% c("generalized_nn", "adaptive_nn")
   if (bwtype != "fixed" &&
       cbounds$bound != "none" &&

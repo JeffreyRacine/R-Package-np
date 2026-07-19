@@ -5373,6 +5373,7 @@
     compute.score = FALSE,
     compute.ocg = FALSE
   )
+  myopti <- c(myopti, npContinuousKernelDescriptorOptions(state$bws))
 
   asDouble <- function(data) {
     if (is.null(data)) {

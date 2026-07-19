@@ -51,6 +51,107 @@
   \deqn{K_U(u)=\frac{1}{2}\mathbf{1}(|u|<1)}
   via \code{ckertype="uniform"} (order ignored).
 
+  The second-order beta associated kernel is available through
+  \code{npksum} for continuous data with known finite support.  For an
+  evaluation point \eqn{x}, observation \eqn{x_i}, fixed support
+  \eqn{[a,b]}, \eqn{L=b-a}, and public metric bandwidth \eqn{h}, define
+  \deqn{t=\frac{x-a}{L},\quad z_i=\frac{x_i-a}{L},\quad
+        \tau=\left(\frac{L}{h}\right)^2.}
+  The implemented PDF contribution is Chen's simple beta kernel
+  \deqn{K_{\mathit{Beta},2}(x_i;x,h,a,b)=
+    \frac{1}{L}\frac{z_i^{t\tau}(1-z_i)^{(1-t)\tau}}
+    {B(1+t\tau,1+(1-t)\tau)}.}
+  Thus \code{ckertype="beta"} uses the evaluation-centered associated-kernel
+  orientation: the beta shape parameters depend on \eqn{x}, and the density
+  is evaluated at \eqn{x_i}.  The bandwidth convention is deliberately
+  metric-compatible with other continuous kernels: Chen's smoothing
+  parameter is \eqn{\rho=(h/L)^2}.  The factor \eqn{1/L} is already included,
+  so callers must not apply either an additional \eqn{1/h} factor or the
+  generic bounded-kernel normalization below.
+
+  In the present implementation this beta option is available through
+  \code{npksum}, manual-bandwidth \code{npudens}, manual-bandwidth
+  \code{npudist}, and manual-bandwidth local-constant \code{npreg} with
+  \code{ckerorder=2}, \code{bwtype="fixed"},
+  \code{ckerbound="fixed"}, finite \code{ckerlb}/\code{ckerub}, continuous
+  variables only, and \code{operator="normal"} or
+  \code{operator="integral"} as appropriate.  \code{npreg} additionally
+  requires \code{regtype="lc"} and \code{gradients=FALSE}. It requires
+  \code{bandwidth.divide=FALSE} and \code{kernel.pow=1}.  Integral/CDF,
+  operations are available in \code{npksum} and \code{npudist}, and analytic
+  beta-weight overlap is available through
+  \code{npksum(operator="convolution")}.  In addition,
+  \code{npksum(operator="normal")} and
+  \code{npksum(operator="convolution")} support
+  \code{bwtype="generalized_nn"} and \code{bwtype="adaptive_nn"}; the
+  existing observation-support nearest-neighbor engine supplies the
+  evaluation-specific metric bandwidth \eqn{h(x)} or observation-specific
+  metric bandwidth \eqn{h_i}, after which the same beta concentration
+  mapping is used.
+  For overlap, generalized bandwidths are evaluated at both centers;
+  adaptive bandwidths remain attached to training centers, while a genuinely
+  new evaluation center receives the established generalized-NN auxiliary
+  bandwidth. The CDF operator supports both NN modes as well. Other beta
+  estimator routes remain fixed-bandwidth only. Derivative, sample-range
+  support, mixed-data, automatic
+  bandwidth selection, and higher-order beta routes are not yet exposed.
+  Unsupported combinations
+  fail explicitly rather than falling through a legacy kernel code.  See
+  \code{\link{npksum}} for the exact kernel-sum normalization and
+  \code{\link{npudens}} and \code{\link{npudist}} for estimator-specific
+  standard errors and examples.
+
+  The implemented beta CDF factor intentionally uses the complementary
+  observation-centered orientation.  With the notation above,
+  \deqn{H_{\mathit{Beta},2}(x;x_i,h,a,b)=
+    I_t(1+z_i\tau,1+(1-z_i)\tau),}
+  where \eqn{I_t(\alpha,\beta)} is the regularized incomplete beta function.
+  It is evaluated as an analytic incomplete-beta probability, with a
+  symmetry transformation in the upper tail. Thus every second-order
+  contribution is in \eqn{[0,1]}, and with fixed or adaptive bandwidth is
+  nondecreasing in \eqn{x}; it is exactly
+  zero at \eqn{a}, exactly one at \eqn{b}, and tends to
+  \eqn{(x-a)/(b-a)} as \eqn{h\to\infty}. Multivariate CDFs use products of
+  these factors; \code{npksum} may also mix beta PDF and CDF factors across
+  dimensions.
+
+  This observation-centered beta CDF is not the integral, with respect to
+  \eqn{x}, of the evaluation-centered Chen PDF contribution. It is also not
+  the target-centered bounded-CDF estimator of Mansouri, Rastin, and Mombeni
+  (2024). The orientation was selected because it preserves the essential
+  empirical-CDF contribution limit as \eqn{h\to0}, exact endpoint behavior,
+  monotonicity for order 2, and a direct analytic implementation suitable for
+  the existing kernel-sum architecture. Signed higher-order beta CDFs, if
+  enabled in a later release, may overshoot \eqn{[0,1]} or be locally
+  nonmonotone, just as existing higher-order distribution kernels may; values
+  will not be silently clamped.
+
+  With \code{bwtype="generalized_nn"}, the CDF bandwidth changes with the
+  target. Every returned order-2 contribution remains an incomplete-beta
+  probability in \eqn{[0,1]} with exact support endpoints, but the resulting
+  curve need not be monotone. A deterministic boundary-heavy comparison was
+  monotone across the recorded chi-square(1), beta-boundary, U-shaped, and
+  uniform designs, while a seeded 300-design adversarial search found local
+  decreases as large as approximately \eqn{8.6\times 10^{-5}}. The
+  implementation neither clips nor monotonizes those values. Inversion-based
+  uses therefore remain outside this generalized-NN CDF contract.
+
+  The beta \code{"convolution"} operator is the analytic overlap of two
+  associated beta density weights in their common observation coordinate. If
+  the two centers and bandwidths give shapes
+  \eqn{(\alpha_1,\beta_1)} and \eqn{(\alpha_2,\beta_2)}, then
+  \deqn{\mathcal O=
+    \frac{1}{L}\frac{B(\alpha_1+\alpha_2-1,
+                             \beta_1+\beta_2-1)}
+                        {B(\alpha_1,\beta_1)B(\alpha_2,\beta_2)}.}
+  The diagonal is the exact location- and bandwidth-dependent roughness.
+  This is an \eqn{L^2} overlap, is symmetric, has units \eqn{L^{-1}}, and is
+  evaluated analytically in C with stable log-gamma ratios. It is not a
+  translation convolution and is not Chen's target-coordinate integrated
+  square. In particular, bounded \code{cv.ls} density and conditional-density
+  objectives continue to integrate the actual bounded estimator by their
+  existing quadrature route; they do not substitute this public overlap.
+
   Bounded continuous-kernel normalization (\code{ckerbound} and, for
   conditional objects, \code{cxkerbound}/\code{cykerbound}) reuses the
   selected continuous kernel and renormalizes it on the declared support.
@@ -162,6 +263,28 @@
   \dQuote{Kernel Smoothed Probability Mass Functions for Ordered Datatypes,}
   \emph{Journal of Nonparametric Statistics}, \bold{32}(3), 563--586.
   doi:10.1080/10485252.2020.1759595
+
+  Chen, S. X. (1999),
+  \dQuote{Beta kernel estimators for density functions,}
+  \emph{Computational Statistics & Data Analysis}, \bold{31}(2), 131--145.
+  doi:10.1016/S0167-9473(99)00010-9
+
+  Jones, M. C. and Henderson, D. A. (2007),
+  \dQuote{Kernel-type density estimation on the unit interval,}
+  \emph{Biometrika}, \bold{94}(4), 977--984.
+  doi:10.1093/biomet/asm068
+
+  Igarashi, G. and Kakizawa, Y. (2020),
+  \dQuote{Higher-order bias corrections for asymmetric kernel density
+  estimators,}
+  \emph{Journal of Nonparametric Statistics}, \bold{32}(3), 716--752.
+  doi:10.1080/10485252.2020.1770754
+
+  Mansouri, E., Rastin, S., and Mombeni, H. A. (2024),
+  \dQuote{A new beta kernel estimator of the distribution function for
+  bounded data,}
+  \emph{Journal of Sciences, Islamic Republic of Iran}.
+  doi:10.22059/jsciences.2024.367933.1007836
 
   Hall, P., Racine, J. S., and Li, Q. (2004),
   \dQuote{Cross-validation and the estimation of conditional probability

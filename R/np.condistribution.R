@@ -133,6 +133,13 @@ npcdist.condbandwidth <-
     if (length(bws$ybw) != length(tydat))
       stop("length of bandwidth vector does not match number of columns of 'tydat'")
 
+    beta.kernel <- identical(bws[["cxkertype", exact = TRUE]], "beta") ||
+      identical(bws[["cykertype", exact = TRUE]], "beta")
+    npValidateConditionalBetaBandwidthObject(bws, where = "npcdist")
+    if (beta.kernel && gradients)
+      stop("beta conditional-distribution gradients are not yet available; use gradients = FALSE",
+           call. = FALSE)
+
     if ((any(bws$ixcon) &&
          !all(vapply(txdat[, bws$ixcon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
         (any(bws$ixord) &&
@@ -346,12 +353,14 @@ npcdist.condbandwidth <-
         xkerneval = switch(bws$cxkertype,
             gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
             epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
-            uniform = CKER_UNI
+            uniform = CKER_UNI,
+            beta = CKER_COORDINATE
 ),
         ykerneval = switch(bws$cykertype,
             gaussian = CKER_GAUSS + bws$cykerorder/2 - 1,
             epanechnikov = CKER_EPAN + bws$cykerorder/2 - 1,
-            uniform = CKER_UNI
+            uniform = CKER_UNI,
+            beta = CKER_COORDINATE
 ),
         uxkerneval = switch(bws$uxkertype,
             aitchisonaitken = UKER_AIT,
@@ -378,10 +387,11 @@ npcdist.condbandwidth <-
         ymcv.numRow = attr(bws$ymcv, "num.row"),
         xmcv.numRow = attr(bws$xmcv, "num.row"),
         densOrDist = NP_DO_DIST,
-        int_do_tree = .npcdistbw_tree_code(
+        int_do_tree = if (beta.kernel) DO_TREE_NO else .npcdistbw_tree_code(
           bws = bws,
           ncon = bws$yncon + bws$xncon,
           ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord))
+    myopti <- c(myopti, npConditionalKernelDescriptorOptions(bws))
 
     cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
     cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])

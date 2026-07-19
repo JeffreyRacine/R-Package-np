@@ -42,7 +42,18 @@ extern MPI_Comm	*comm;
 /* headers.h has all definitions of routines used by main() and related modules */
 
 #include "headers.h"
+#include "beta_kernelsum.h"
+#include "beta_bandwidth.h"
+#include "beta_regression.h"
+#include "beta_conditional.h"
+#include "kernel_registry.h"
 #include "tree.h"
+
+static np_continuous_kernel_descriptor
+np_continuous_kernel_descriptor_or_error(int family,
+                                         int code,
+                                         int order,
+                                         const char *where);
 
 // categorical hashing
 #include "hash.h"
@@ -6234,9 +6245,14 @@ SEXP C_np_regression(SEXP tuno,
   int nc = asInteger(ncol);
   int do_grad = asLogical(gradients);
   int ncon = 0;
+  int num_train = 0;
+  int num_eval = 0;
+  int train_is_eval = 0;
+  int ey_is_ty = 0;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
   R_xlen_t gsize;
+  np_continuous_kernel_descriptor descriptor;
 
   if (en < 0) en = 0;
   if (nc < 0) nc = 0;
@@ -6265,7 +6281,19 @@ SEXP C_np_regression(SEXP tuno,
   PROTECT(ckerlb_r = duplicate(coerceVector(ckerlb, REALSXP)));
   PROTECT(ckerub_r = duplicate(coerceVector(ckerub, REALSXP)));
 
+  if(XLENGTH(myopti_i) <= REG_CKORDERI)
+    error("C_np_regression: continuous-kernel descriptor is missing");
+  descriptor = np_continuous_kernel_descriptor_or_error(
+    INTEGER(myopti_i)[REG_CKFAMILYI],
+    INTEGER(myopti_i)[REG_CKRNEVI],
+    INTEGER(myopti_i)[REG_CKORDERI],
+    "C_np_regression");
+
   ncon = (int)INTEGER(myopti_i)[REG_NCONI];
+  num_train = (int)INTEGER(myopti_i)[REG_TNOBSI];
+  num_eval = (int)INTEGER(myopti_i)[REG_ENOBSI];
+  train_is_eval = (int)INTEGER(myopti_i)[REG_TISEI];
+  ey_is_ty = (int)INTEGER(myopti_i)[REG_EY];
   ckerlb_p = REAL(ckerlb_r);
   ckerub_p = REAL(ckerub_r);
   if ((XLENGTH(ckerlb_r) == 0 || XLENGTH(ckerub_r) == 0) && ncon > 0) {
@@ -6284,14 +6312,124 @@ SEXP C_np_regression(SEXP tuno,
   PROTECT(out_gerr = allocVector(REALSXP, gsize));
   PROTECT(out_xtra = allocVector(REALSXP, 6));
 
-  np_regression(REAL(tuno_r), REAL(tord_r), REAL(tcon_r), REAL(ty_r),
-                REAL(euno_r), REAL(eord_r), REAL(econ_r), REAL(ey_r),
-                REAL(rbw_r), REAL(mcv_r), REAL(padnum_r),
-                REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
-                INTEGER(myopti_i),
-                INTEGER(degree_i), INTEGER(gradient_order_i), &bern, &basis,
-                REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr), REAL(out_xtra),
-                ckerlb_p, ckerub_p);
+  if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    np_beta_regression_status beta_status;
+    np_beta_status scalar_status = NP_BETA_OK;
+    np_beta_bandwidth_mode beta_bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
+    const double *beta_bandwidth_eval = REAL(rbw_r);
+    const double *beta_bandwidth_train = REAL(rbw_r);
+    const int beta_bandwidth_code = INTEGER(myopti_i)[REG_BWI];
+    const double *truth = NULL;
+    int bad_evaluation = -1;
+    int bad_dimension = -1;
+    int i;
+
+    if(INTEGER(myopti_i)[REG_NUNOI] != 0 ||
+       INTEGER(myopti_i)[REG_NORDI] != 0)
+      error("C_np_regression: beta regression currently supports continuous predictors only");
+    if(beta_bandwidth_code != BW_FIXED &&
+       beta_bandwidth_code != BW_GEN_NN &&
+       beta_bandwidth_code != BW_ADAP_NN)
+      error("C_np_regression: invalid beta bandwidth mode");
+    if(INTEGER(myopti_i)[REG_LL] != LL_LC)
+      error("C_np_regression: beta regression currently supports only local-constant fitting");
+    if(do_grad || INTEGER(myopti_i)[REG_GRAD] != 0)
+      error("C_np_regression: beta regression gradients are not yet available");
+    if(num_train <= 0 || num_eval <= 0 || en != num_eval ||
+       ncon <= 0 || nc != ncon)
+      error("C_np_regression: invalid beta regression dimensions");
+    if(XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
+       (!train_is_eval &&
+        XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
+       XLENGTH(ty_r) < num_train || XLENGTH(rbw_r) < ncon ||
+       XLENGTH(ckerlb_r) < ncon || XLENGTH(ckerub_r) < ncon)
+      error("C_np_regression: beta regression input buffer is too short");
+    if(train_is_eval && num_eval != num_train)
+      error("C_np_regression: beta train/evaluation dimensions are inconsistent");
+    if(!ey_is_ty && XLENGTH(ey_r) < num_eval)
+      error("C_np_regression: beta evaluation-response buffer is too short");
+
+    if(beta_bandwidth_code != BW_FIXED) {
+      const int need_eval = beta_bandwidth_code == BW_GEN_NN;
+      const int need_train = beta_bandwidth_code == BW_ADAP_NN;
+      double *bandwidth_eval_storage = need_eval ?
+        (double *)R_alloc((size_t)ncon * (size_t)num_eval,
+                          sizeof(double)) : NULL;
+      double *bandwidth_train_storage = need_train ?
+        (double *)R_alloc((size_t)ncon * (size_t)num_train,
+                          sizeof(double)) : NULL;
+      np_beta_bandwidth_prepare_status bandwidth_status;
+
+      beta_bandwidth_mode = (beta_bandwidth_code == BW_GEN_NN) ?
+        NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
+      bandwidth_status = np_beta_bandwidth_prepare(
+        beta_bandwidth_mode,
+        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(rbw_r),
+        num_train, num_eval, ncon, train_is_eval,
+        need_eval, need_train, 0,
+        bandwidth_eval_storage, bandwidth_train_storage);
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+        error("C_np_regression: %s",
+              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+
+      beta_bandwidth_eval = bandwidth_eval_storage;
+      beta_bandwidth_train = bandwidth_train_storage;
+    }
+
+    beta_status = np_beta_regression_lc(
+      REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(ty_r),
+      beta_bandwidth_eval, beta_bandwidth_train, ckerlb_p, ckerub_p,
+      beta_bandwidth_mode,
+      descriptor.order,
+      num_train, num_eval, ncon, train_is_eval,
+      REAL(out_mean), REAL(out_merr),
+      &bad_evaluation, &bad_dimension, &scalar_status,
+      np_progress_fit_loop_step);
+    if(beta_status == NP_BETA_REGRESSION_ERR_KERNEL)
+      error("C_np_regression: beta regression failed at evaluation %d, continuous dimension %d: %s",
+            bad_evaluation + 1, bad_dimension + 1,
+            np_beta_status_message(scalar_status));
+    if(beta_status == NP_BETA_REGRESSION_ERR_ZERO_WEIGHT)
+      error("C_np_regression: all beta regression weights are zero at evaluation %d",
+            bad_evaluation + 1);
+    if(beta_status != NP_BETA_REGRESSION_OK) {
+      if(bad_evaluation >= 0)
+        error("C_np_regression: %s at evaluation %d",
+              np_beta_regression_status_message(beta_status),
+              bad_evaluation + 1);
+      error("C_np_regression: %s",
+            np_beta_regression_status_message(beta_status));
+    }
+
+    REAL(out_g)[0] = 0.0;
+    REAL(out_gerr)[0] = 0.0;
+    if(!ey_is_ty)
+      truth = REAL(ey_r);
+    else if(train_is_eval)
+      truth = REAL(ty_r);
+
+    if(truth != NULL) {
+      REAL(out_xtra)[0] = fGoodness_of_Fit(num_eval, (double *)truth,
+                                           REAL(out_mean));
+      REAL(out_xtra)[1] = fMSE(num_eval, (double *)truth, REAL(out_mean));
+      REAL(out_xtra)[2] = fMAE(num_eval, (double *)truth, REAL(out_mean));
+      REAL(out_xtra)[3] = fMAPE(num_eval, (double *)truth, REAL(out_mean));
+      REAL(out_xtra)[4] = fCORR(num_eval, (double *)truth, REAL(out_mean));
+      REAL(out_xtra)[5] = fSIGN(num_eval, (double *)truth, REAL(out_mean));
+    } else {
+      for(i = 0; i < 6; ++i)
+        REAL(out_xtra)[i] = 0.0;
+    }
+  } else {
+    np_regression(REAL(tuno_r), REAL(tord_r), REAL(tcon_r), REAL(ty_r),
+                  REAL(euno_r), REAL(eord_r), REAL(econ_r), REAL(ey_r),
+                  REAL(rbw_r), REAL(mcv_r), REAL(padnum_r),
+                  REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+                  INTEGER(myopti_i),
+                  INTEGER(degree_i), INTEGER(gradient_order_i), &bern, &basis,
+                  REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr),
+                  REAL(out_xtra), ckerlb_p, ckerub_p);
+  }
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_mean);
@@ -6339,6 +6477,7 @@ SEXP C_np_density(SEXP tuno,
   int ncon = 0;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
+  np_continuous_kernel_descriptor descriptor;
 
   if (en < 0) en = 0;
 
@@ -6361,18 +6500,134 @@ SEXP C_np_density(SEXP tuno,
   ncon = (int)INTEGER(myopti_i)[DEN_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
+  if(XLENGTH(myopti_i) <= DEN_CKORDERI)
+    error("C_np_density: continuous-kernel descriptor is missing");
+  descriptor = np_continuous_kernel_descriptor_or_error(
+    INTEGER(myopti_i)[DEN_CKFAMILYI],
+    INTEGER(myopti_i)[DEN_CKRNEVI],
+    INTEGER(myopti_i)[DEN_CKORDERI],
+    "C_np_density");
+
   PROTECT(out_dens = allocVector(REALSXP, en));
   PROTECT(out_derr = allocVector(REALSXP, en));
   PROTECT(out_ll = allocVector(REALSXP, 1));
 
-  np_density(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
-             REAL(euno_r), REAL(eord_r), REAL(econ_r),
-             REAL(rbw_r),
-             REAL(mcv_r), REAL(padnum_r),
-             REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
-             INTEGER(myopti_i),
-             REAL(out_dens), REAL(out_derr), REAL(out_ll),
-             ckerlb_p, ckerub_p);
+  if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    const int num_train = INTEGER(myopti_i)[DEN_TNOBSI];
+    const int num_eval = INTEGER(myopti_i)[DEN_ENOBSI];
+    const int train_is_eval = INTEGER(myopti_i)[DEN_TISEI];
+    const int dens_or_dist = INTEGER(myopti_i)[DEN_DODENI];
+    double *kernel_square_sum;
+    double *kernel_centered_m2 = NULL;
+    np_beta_operator *beta_operators = NULL;
+    np_beta_kernelsum_status beta_status;
+    np_beta_status scalar_status = NP_BETA_OK;
+    np_beta_bandwidth_mode beta_bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
+    const double *beta_bandwidth_eval = REAL(rbw_r);
+    const double *beta_bandwidth_train = REAL(rbw_r);
+    const int beta_bandwidth_code = INTEGER(myopti_i)[DEN_DENI];
+    int bad_dimension = -1;
+    int i;
+
+    if(INTEGER(myopti_i)[DEN_NUNOI] != 0 ||
+       INTEGER(myopti_i)[DEN_NORDI] != 0)
+      error("C_np_density: beta density/distribution currently supports continuous variables only");
+    if(beta_bandwidth_code != BW_FIXED &&
+       beta_bandwidth_code != BW_GEN_NN &&
+       beta_bandwidth_code != BW_ADAP_NN)
+      error("C_np_density: invalid beta bandwidth mode");
+    if(dens_or_dist != NP_DO_DENS && dens_or_dist != NP_DO_DIST)
+      error("C_np_density: invalid beta density/distribution operator");
+    if(num_train <= 0 || num_eval <= 0 || ncon <= 0 || en != num_eval)
+      error("C_np_density: invalid beta density/distribution dimensions");
+    if(XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
+       (!train_is_eval &&
+        XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
+       XLENGTH(rbw_r) < ncon || XLENGTH(ckerlb_r) < ncon ||
+       XLENGTH(ckerub_r) < ncon)
+      error("C_np_density: beta density/distribution input buffer is too short");
+
+    if(beta_bandwidth_code != BW_FIXED) {
+      const int need_eval = beta_bandwidth_code == BW_GEN_NN;
+      const int need_train = beta_bandwidth_code == BW_ADAP_NN;
+      double *bandwidth_eval_storage = need_eval ?
+        (double *)R_alloc((size_t)ncon * (size_t)num_eval,
+                          sizeof(double)) : NULL;
+      double *bandwidth_train_storage = need_train ?
+        (double *)R_alloc((size_t)ncon * (size_t)num_train,
+                          sizeof(double)) : NULL;
+      np_beta_bandwidth_prepare_status bandwidth_status;
+
+      beta_bandwidth_mode = (beta_bandwidth_code == BW_GEN_NN) ?
+        NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
+      bandwidth_status = np_beta_bandwidth_prepare(
+        beta_bandwidth_mode,
+        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(rbw_r),
+        num_train, num_eval, ncon, train_is_eval,
+        need_eval, need_train, 0,
+        bandwidth_eval_storage, bandwidth_train_storage);
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+        error("C_np_density: %s",
+              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+
+      beta_bandwidth_eval = bandwidth_eval_storage;
+      beta_bandwidth_train = bandwidth_train_storage;
+    }
+
+    kernel_square_sum = (double *)R_alloc((size_t)num_eval, sizeof(double));
+    if(dens_or_dist == NP_DO_DIST) {
+      beta_operators = (np_beta_operator *)R_alloc((size_t)ncon,
+                                                   sizeof(np_beta_operator));
+      for(i = 0; i < ncon; ++i)
+        beta_operators[i] = NP_BETA_OPERATOR_CDF;
+      kernel_centered_m2 = (double *)R_alloc((size_t)num_eval,
+                                             sizeof(double));
+    }
+    beta_status = np_beta_kernelsum(
+      REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
+      NULL, NULL, beta_bandwidth_eval, beta_bandwidth_train,
+      ckerlb_p, ckerub_p, beta_operators, beta_bandwidth_mode,
+      descriptor.order,
+      num_train, num_eval, ncon, 0, 0,
+      train_is_eval, 0, 0,
+      REAL(out_dens), NULL, kernel_square_sum,
+      kernel_centered_m2,
+      &bad_dimension, &scalar_status, np_progress_fit_loop_step);
+    if(beta_status == NP_BETA_KERNELSUM_ERR_KERNEL)
+      error("C_np_density: beta scalar operator failed in continuous dimension %d: %s",
+            bad_dimension + 1, np_beta_status_message(scalar_status));
+    if(beta_status != NP_BETA_KERNELSUM_OK)
+      error("C_np_density: %s",
+            np_beta_kernelsum_status_message(beta_status));
+
+    REAL(out_ll)[0] = 0.0;
+    for(i = 0; i < num_eval; ++i) {
+      const double estimate = REAL(out_dens)[i] / (double)num_train;
+      const double second_moment = kernel_square_sum[i] / (double)num_train;
+      double variance = (dens_or_dist == NP_DO_DIST) ?
+        kernel_centered_m2[i] / (double)num_train :
+        fma(-estimate, estimate, second_moment);
+
+      if(!R_FINITE(estimate) || !R_FINITE(variance))
+        error("C_np_density: beta density/distribution produced a non-finite estimate or variance");
+      if(variance < 0.0)
+        variance = 0.0;
+      REAL(out_dens)[i] = estimate;
+      REAL(out_derr)[i] = (num_train > 1) ?
+        sqrt(variance / (double)(num_train - 1)) : 0.0;
+      if(dens_or_dist == NP_DO_DENS)
+        REAL(out_ll)[0] += log((estimate < DBL_MIN) ? DBL_MIN : estimate);
+    }
+  } else {
+    np_density(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
+               REAL(euno_r), REAL(eord_r), REAL(econ_r),
+               REAL(rbw_r),
+               REAL(mcv_r), REAL(padnum_r),
+               REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+               INTEGER(myopti_i),
+               REAL(out_dens), REAL(out_derr), REAL(out_ll),
+               ckerlb_p, ckerub_p);
+  }
 
   PROTECT(out = allocVector(VECSXP, 3));
   SET_VECTOR_ELT(out, 0, out_dens);
@@ -6439,6 +6694,9 @@ SEXP C_np_density_conditional(SEXP tyuno,
   double * cxkerub_p = NULL;
   double * cykerlb_p = NULL;
   double * cykerub_p = NULL;
+  np_continuous_kernel_descriptor x_descriptor;
+  np_continuous_kernel_descriptor y_descriptor;
+  int has_kernel_descriptors = 0;
   R_xlen_t gsize;
 
   if (en < 0) en = 0;
@@ -6479,6 +6737,19 @@ SEXP C_np_density_conditional(SEXP tyuno,
   ncon_y = (int)INTEGER(myopti_i)[CD_CNCONI];
   resolve_bounds_or_default(ckerlbx_r, ckerubx_r, ncon_x, &cxkerlb_p, &cxkerub_p);
   resolve_bounds_or_default(ckerlby_r, ckeruby_r, ncon_y, &cykerlb_p, &cykerub_p);
+  if(XLENGTH(myopti_i) > CD_CYORDERI) {
+    x_descriptor = np_continuous_kernel_descriptor_or_error(
+      INTEGER(myopti_i)[CD_CXFAMILYI],
+      INTEGER(myopti_i)[CD_CXKRNEVI],
+      INTEGER(myopti_i)[CD_CXORDERI],
+      "C_np_density_conditional x kernel");
+    y_descriptor = np_continuous_kernel_descriptor_or_error(
+      INTEGER(myopti_i)[CD_CYFAMILYI],
+      INTEGER(myopti_i)[CD_CYKRNEVI],
+      INTEGER(myopti_i)[CD_CYORDERI],
+      "C_np_density_conditional y kernel");
+    has_kernel_descriptors = 1;
+  }
 
   int_ll_extern = asInteger(regtype_i);
   if ((int_ll_extern == LL_LP) && (ncon_x > 0)) {
@@ -6499,16 +6770,134 @@ SEXP C_np_density_conditional(SEXP tyuno,
   PROTECT(out_gerr = allocVector(REALSXP, gsize));
   PROTECT(out_ll = allocVector(REALSXP, 1));
 
-  np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r),
-                         REAL(txuno_r), REAL(txord_r), REAL(txcon_r),
-                         REAL(eyuno_r), REAL(eyord_r), REAL(eycon_r),
-                         REAL(exuno_r), REAL(exord_r), REAL(excon_r),
-                         REAL(rbw_r),
-                         REAL(ymcv_r), REAL(ypadnum_r), REAL(xmcv_r), REAL(xpadnum_r),
-                         REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
-                         INTEGER(myopti_i),
-                         REAL(out_cond), REAL(out_cderr), REAL(out_grad), REAL(out_gerr), REAL(out_ll),
-                         cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
+  if(has_kernel_descriptors &&
+     (x_descriptor.family == NP_CKERNEL_FAMILY_BETA ||
+      y_descriptor.family == NP_CKERNEL_FAMILY_BETA)) {
+    const int num_train = INTEGER(myopti_i)[CD_TNOBSI];
+    const int num_eval = INTEGER(myopti_i)[CD_ENOBSI];
+    const int train_is_eval = INTEGER(myopti_i)[CD_TISEI];
+    const int bandwidth_code = INTEGER(myopti_i)[CD_DENI];
+    const int do_distribution = INTEGER(myopti_i)[CD_DODENI] == NP_DO_DIST;
+    np_beta_bandwidth_mode bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
+    const double *bandwidth_eval_x = REAL(rbw_r);
+    const double *bandwidth_train_x = REAL(rbw_r);
+    const double *bandwidth_eval_y = REAL(rbw_r) + ncon_x;
+    const double *bandwidth_train_y = REAL(rbw_r) + ncon_x;
+    np_beta_conditional_status conditional_status;
+    np_beta_status scalar_status = NP_BETA_OK;
+    int bad_evaluation = -1;
+    int bad_dimension = -1;
+    int i;
+
+    if(INTEGER(myopti_i)[CD_CNUNOI] != 0 ||
+       INTEGER(myopti_i)[CD_CNORDI] != 0 ||
+       INTEGER(myopti_i)[CD_UNUNOI] != 0 ||
+       INTEGER(myopti_i)[CD_UNORDI] != 0)
+      error("C_np_density_conditional: beta conditional estimators currently support continuous X and Y variables only");
+    if(ncon_x <= 0 || ncon_y <= 0 || num_train <= 0 || num_eval <= 0 ||
+       en != num_eval || xd != ncon_x)
+      error("C_np_density_conditional: invalid beta conditional-estimator dimensions");
+    if(int_ll_extern != LL_LC)
+      error("C_np_density_conditional: beta conditional estimators currently support only local-constant fitting");
+    if(INTEGER(myopti_i)[CD_GRAD] != 0)
+      error("C_np_density_conditional: beta conditional gradients are not yet available");
+    if(bandwidth_code != BW_FIXED && bandwidth_code != BW_GEN_NN &&
+       bandwidth_code != BW_ADAP_NN)
+      error("C_np_density_conditional: invalid beta bandwidth mode");
+    if(XLENGTH(txcon_r) < (R_xlen_t)num_train * ncon_x ||
+       XLENGTH(tycon_r) < (R_xlen_t)num_train * ncon_y ||
+       (!train_is_eval &&
+        (XLENGTH(excon_r) < (R_xlen_t)num_eval * ncon_x ||
+         XLENGTH(eycon_r) < (R_xlen_t)num_eval * ncon_y)) ||
+       XLENGTH(rbw_r) < ncon_x + ncon_y)
+      error("C_np_density_conditional: beta conditional-estimator input buffer is too short");
+
+    if(bandwidth_code != BW_FIXED) {
+      const int need_eval = bandwidth_code == BW_GEN_NN;
+      const int need_train = bandwidth_code == BW_ADAP_NN;
+      double *bandwidth_eval_x_storage = need_eval ?
+        (double *)R_alloc((size_t)ncon_x * (size_t)num_eval,
+                          sizeof(double)) : NULL;
+      double *bandwidth_train_x_storage = need_train ?
+        (double *)R_alloc((size_t)ncon_x * (size_t)num_train,
+                          sizeof(double)) : NULL;
+      double *bandwidth_eval_y_storage = need_eval ?
+        (double *)R_alloc((size_t)ncon_y * (size_t)num_eval,
+                          sizeof(double)) : NULL;
+      double *bandwidth_train_y_storage = need_train ?
+        (double *)R_alloc((size_t)ncon_y * (size_t)num_train,
+                          sizeof(double)) : NULL;
+      np_beta_bandwidth_prepare_status bandwidth_status;
+
+      bandwidth_mode = (bandwidth_code == BW_GEN_NN) ?
+        NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
+      bandwidth_status = np_beta_bandwidth_prepare(
+        bandwidth_mode, REAL(txcon_r),
+        train_is_eval ? NULL : REAL(excon_r), REAL(rbw_r),
+        num_train, num_eval, ncon_x, train_is_eval,
+        need_eval, need_train, 0,
+        bandwidth_eval_x_storage, bandwidth_train_x_storage);
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+        error("C_np_density_conditional: x-side %s",
+              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+      bandwidth_status = np_beta_bandwidth_prepare(
+        bandwidth_mode, REAL(tycon_r),
+        train_is_eval ? NULL : REAL(eycon_r), REAL(rbw_r) + ncon_x,
+        num_train, num_eval, ncon_y, train_is_eval,
+        need_eval, need_train, 0,
+        bandwidth_eval_y_storage, bandwidth_train_y_storage);
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+        error("C_np_density_conditional: y-side %s",
+              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+
+      bandwidth_eval_x = bandwidth_eval_x_storage;
+      bandwidth_train_x = bandwidth_train_x_storage;
+      bandwidth_eval_y = bandwidth_eval_y_storage;
+      bandwidth_train_y = bandwidth_train_y_storage;
+    }
+
+    conditional_status = np_beta_conditional_lc(
+      REAL(txcon_r), REAL(tycon_r),
+      train_is_eval ? NULL : REAL(excon_r),
+      train_is_eval ? NULL : REAL(eycon_r),
+      bandwidth_eval_x, bandwidth_train_x,
+      bandwidth_eval_y, bandwidth_train_y,
+      cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
+      x_descriptor.family, x_descriptor.legacy_code, x_descriptor.order,
+      y_descriptor.family, y_descriptor.legacy_code, y_descriptor.order,
+      bandwidth_mode, do_distribution,
+      num_train, num_eval, ncon_x, ncon_y, train_is_eval,
+      REAL(out_cond), REAL(out_cderr), REAL(out_ll),
+      &bad_evaluation, &bad_dimension, &scalar_status,
+      np_progress_fit_loop_step);
+    if(conditional_status == NP_BETA_CONDITIONAL_ERR_KERNEL)
+      error("C_np_density_conditional: scalar kernel failed at evaluation %d, continuous dimension %d: %s",
+            bad_evaluation + 1, bad_dimension + 1,
+            np_beta_status_message(scalar_status));
+    if(conditional_status != NP_BETA_CONDITIONAL_OK) {
+      if(bad_evaluation >= 0)
+        error("C_np_density_conditional: %s at evaluation %d",
+              np_beta_conditional_status_message(conditional_status),
+              bad_evaluation + 1);
+      error("C_np_density_conditional: %s",
+            np_beta_conditional_status_message(conditional_status));
+    }
+    for(i = 0; i < (int)gsize; ++i) {
+      REAL(out_grad)[i] = 0.0;
+      REAL(out_gerr)[i] = 0.0;
+    }
+  } else {
+    np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r),
+                           REAL(txuno_r), REAL(txord_r), REAL(txcon_r),
+                           REAL(eyuno_r), REAL(eyord_r), REAL(eycon_r),
+                           REAL(exuno_r), REAL(exord_r), REAL(excon_r),
+                           REAL(rbw_r),
+                           REAL(ymcv_r), REAL(ypadnum_r), REAL(xmcv_r), REAL(xpadnum_r),
+                           REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+                           INTEGER(myopti_i),
+                           REAL(out_cond), REAL(out_cderr), REAL(out_grad), REAL(out_gerr), REAL(out_ll),
+                           cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
+  }
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_cond);
@@ -10367,6 +10756,38 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   return out;
 }
 
+static np_continuous_kernel_descriptor
+np_continuous_kernel_descriptor_or_error(int family,
+                                         int code,
+                                         int order,
+                                         const char *where)
+{
+  np_continuous_kernel_descriptor descriptor;
+  np_continuous_kernel_descriptor_status status;
+
+  status = np_continuous_kernel_descriptor_init(
+    family, code, order,
+    &descriptor);
+  if(status != NP_CKERNEL_DESCRIPTOR_OK)
+    error("%s: %s", where,
+          np_continuous_kernel_descriptor_status_message(status));
+
+  return descriptor;
+}
+
+static np_continuous_kernel_descriptor
+np_kernelsum_descriptor_or_error(SEXP options, const char *where)
+{
+  if(XLENGTH(options) <= KWS_CKORDERI)
+    error("%s: continuous-kernel descriptor is missing", where);
+
+  return np_continuous_kernel_descriptor_or_error(
+    INTEGER(options)[KWS_CKFAMILYI],
+    INTEGER(options)[KWS_CKRNEVI],
+    INTEGER(options)[KWS_CKORDERI],
+    where);
+}
+
 SEXP C_np_kernelsum(SEXP tuno,
                     SEXP tord,
                     SEXP tcon,
@@ -10398,6 +10819,7 @@ SEXP C_np_kernelsum(SEXP tuno,
   R_xlen_t n_pkw = 0;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
+  np_continuous_kernel_descriptor descriptor;
 
   if(n_ksum < 0) n_ksum = 0;
   if(n_pksum < 0) n_pksum = 0;
@@ -10420,6 +10842,8 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  descriptor = np_kernelsum_descriptor_or_error(myopti_i, "C_np_kernelsum");
+
   ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
   nuno = (int)INTEGER(myopti_i)[KWS_NUNOI];
   nord = (int)INTEGER(myopti_i)[KWS_NORDI];
@@ -10436,14 +10860,132 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(out_kw = allocVector(REALSXP, n_kw));
   PROTECT(out_pkw = allocVector(REALSXP, n_pkw));
 
-  np_kernelsum(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
-               REAL(ty_r), REAL(weights_r),
-               REAL(euno_r), REAL(eord_r), REAL(econ_r),
-               REAL(bw_r),
-               REAL(mcv_r), REAL(padnum_r),
-               INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
-               REAL(out_ksum), REAL(out_pksum), REAL(out_kw), REAL(out_pkw),
-               ckerlb_p, ckerub_p);
+  if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    const int num_train = INTEGER(myopti_i)[KWS_TNOBSI];
+    const int num_eval = INTEGER(myopti_i)[KWS_ENOBSI];
+    const int num_response_columns = INTEGER(myopti_i)[KWS_YNCOLI];
+    const int num_weight_columns = INTEGER(myopti_i)[KWS_WNCOLI];
+    const int train_is_eval = INTEGER(myopti_i)[KWS_TISEI];
+    const int leave_one_out = INTEGER(myopti_i)[KWS_LOOI];
+    const int response_extent = (num_response_columns > 0) ?
+      num_response_columns : 1;
+    const int weight_extent = (num_weight_columns > 0) ?
+      num_weight_columns : 1;
+    const R_xlen_t expected_sum = (R_xlen_t)num_eval *
+      (R_xlen_t)response_extent * (R_xlen_t)weight_extent;
+    const R_xlen_t expected_weights = (R_xlen_t)num_train *
+      (R_xlen_t)num_eval;
+    np_beta_kernelsum_status beta_status;
+    np_beta_status scalar_status = NP_BETA_OK;
+    np_beta_operator *beta_operators;
+    np_beta_bandwidth_mode beta_bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
+    const double *beta_bandwidth_eval = REAL(bw_r);
+    const double *beta_bandwidth_train = REAL(bw_r);
+    int beta_bandwidth_code = INTEGER(myopti_i)[KWS_BWI];
+    int bad_dimension = -1;
+    int has_overlap = 0;
+    int i;
+
+    if(nuno != 0 || nord != 0)
+      error("C_np_kernelsum: beta kernels currently support continuous variables only");
+    if(beta_bandwidth_code != BW_FIXED &&
+       beta_bandwidth_code != BW_GEN_NN &&
+       beta_bandwidth_code != BW_ADAP_NN)
+      error("C_np_kernelsum: invalid beta bandwidth mode");
+    if(INTEGER(myopti_i)[KWS_BDIVI] != 0)
+      error("C_np_kernelsum: bandwidth.divide = TRUE is not defined for beta kernels");
+    if(p_operator != OP_NOOP || do_score || do_ocg || n_pksum != 0 || n_pkw != 0)
+      error("C_np_kernelsum: beta kernels do not yet support permutation or score operators");
+    if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
+      error("C_np_kernelsum: beta kernels currently require kernel.pow = 1");
+    if(XLENGTH(op_i) != ncon)
+      error("C_np_kernelsum: beta operator vector has the wrong length");
+    beta_operators = (np_beta_operator *)R_alloc((size_t)ncon,
+                                                 sizeof(np_beta_operator));
+    for(i = 0; i < ncon; ++i) {
+      if(INTEGER(op_i)[i] == OP_NORMAL)
+        beta_operators[i] = NP_BETA_OPERATOR_PDF;
+      else if(INTEGER(op_i)[i] == OP_CONVOLUTION) {
+        beta_operators[i] = NP_BETA_OPERATOR_OVERLAP;
+        has_overlap = 1;
+      }
+      else if(INTEGER(op_i)[i] == OP_INTEGRAL)
+        beta_operators[i] = NP_BETA_OPERATOR_CDF;
+      else
+        error("C_np_kernelsum: beta kernels currently support only 'normal', 'convolution', and 'integral' operators");
+    }
+    if(num_train <= 0 || num_eval <= 0 || ncon <= 0 ||
+       num_response_columns < 0 || num_weight_columns < 0)
+      error("C_np_kernelsum: invalid beta kernel-sum dimensions");
+    if(XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
+       (!train_is_eval &&
+        XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
+       XLENGTH(bw_r) < ncon || XLENGTH(ckerlb_r) < ncon ||
+       XLENGTH(ckerub_r) < ncon ||
+       (num_response_columns > 0 &&
+        XLENGTH(ty_r) < (R_xlen_t)num_train * num_response_columns) ||
+       (num_weight_columns > 0 &&
+        XLENGTH(weights_r) < (R_xlen_t)num_train * num_weight_columns))
+      error("C_np_kernelsum: beta kernel-sum input buffer is too short");
+    if(beta_bandwidth_code != BW_FIXED) {
+      const int need_eval = (beta_bandwidth_code == BW_GEN_NN) || has_overlap;
+      const int need_train = (beta_bandwidth_code == BW_ADAP_NN) || has_overlap;
+      double *bandwidth_eval_storage = need_eval ?
+        (double *)R_alloc((size_t)ncon * (size_t)num_eval,
+                          sizeof(double)) : NULL;
+      double *bandwidth_train_storage = need_train ?
+        (double *)R_alloc((size_t)ncon * (size_t)num_train,
+                          sizeof(double)) : NULL;
+      np_beta_bandwidth_prepare_status bandwidth_status;
+
+      beta_bandwidth_mode = (beta_bandwidth_code == BW_GEN_NN) ?
+        NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
+      bandwidth_status = np_beta_bandwidth_prepare(
+        beta_bandwidth_mode,
+        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(bw_r),
+        num_train, num_eval, ncon, train_is_eval,
+        need_eval, need_train, 0,
+        bandwidth_eval_storage, bandwidth_train_storage);
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+        error("C_np_kernelsum: %s",
+              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+
+      beta_bandwidth_eval = bandwidth_eval_storage;
+      beta_bandwidth_train = bandwidth_train_storage;
+    }
+    if(n_ksum != expected_sum)
+      error("C_np_kernelsum: beta kernel-sum output buffer has the wrong length");
+    if(return_kernel_weights && n_kw != expected_weights)
+      error("C_np_kernelsum: beta kernel-weight buffer has the wrong length");
+
+    beta_status = np_beta_kernelsum(
+      REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
+      REAL(ty_r), REAL(weights_r), beta_bandwidth_eval,
+      beta_bandwidth_train, ckerlb_p, ckerub_p, beta_operators,
+      beta_bandwidth_mode,
+      descriptor.order,
+      num_train, num_eval, ncon, num_response_columns, num_weight_columns,
+      train_is_eval, leave_one_out, return_kernel_weights,
+      REAL(out_ksum), return_kernel_weights ? REAL(out_kw) : NULL,
+      NULL,
+      NULL,
+      &bad_dimension, &scalar_status, NULL);
+    if(beta_status == NP_BETA_KERNELSUM_ERR_KERNEL)
+      error("C_np_kernelsum: beta scalar operator failed in continuous dimension %d: %s",
+            bad_dimension + 1, np_beta_status_message(scalar_status));
+    if(beta_status != NP_BETA_KERNELSUM_OK)
+      error("C_np_kernelsum: %s",
+            np_beta_kernelsum_status_message(beta_status));
+  } else {
+    np_kernelsum(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
+                 REAL(ty_r), REAL(weights_r),
+                 REAL(euno_r), REAL(eord_r), REAL(econ_r),
+                 REAL(bw_r),
+                 REAL(mcv_r), REAL(padnum_r),
+                 INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
+                 REAL(out_ksum), REAL(out_pksum), REAL(out_kw), REAL(out_pkw),
+                 ckerlb_p, ckerub_p);
+  }
 
   PROTECT(out = allocVector(VECSXP, 4));
   SET_VECTOR_ELT(out, 0, out_ksum);
@@ -10492,6 +11034,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   int ncon = 0, nuno = 0, nord = 0, i = 0;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
+  np_continuous_kernel_descriptor descriptor;
 
   if(n_ksum < 0)
     n_ksum = 0;
@@ -10513,7 +11056,12 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
-  if(XLENGTH(myopti_i) <= KWS_POCGI)
+  descriptor = np_kernelsum_descriptor_or_error(myopti_i,
+                                                "C_np_kernelsum_power12");
+  if(descriptor.family != NP_CKERNEL_FAMILY_LEGACY)
+    error("C_np_kernelsum_power12: beta kernels do not support the internal dual-power route");
+
+  if(XLENGTH(myopti_i) <= KWS_CKORDERI)
     error("C_np_kernelsum_power12: invalid internal option vector");
   if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
     error("C_np_kernelsum_power12: internal route requires kernel.pow = 1");
