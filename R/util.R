@@ -4270,6 +4270,22 @@ npConditionalKernelDescriptorOptions <- function(bws) {
   )
 }
 
+npConditionalContinuousKernelCode <- function(bws, side = c("x", "y")) {
+  side <- match.arg(side)
+  type <- bws[[paste0("c", side, "kertype"), exact = TRUE]]
+  order <- bws[[paste0("c", side, "kerorder"), exact = TRUE]]
+
+  if (identical(type, "beta"))
+    return(CKER_COORDINATE)
+
+  switch(type,
+    gaussian = CKER_GAUSS + order / 2 - 1,
+    epanechnikov = CKER_EPAN + order / 2 - 1,
+    uniform = CKER_UNI,
+    stop("invalid internal conditional continuous-kernel type", call. = FALSE)
+  )
+}
+
 npValidateConditionalBetaBandwidthObject <- function(bws,
                                                       where,
                                                       bandwidth.compute = FALSE) {
@@ -4277,9 +4293,6 @@ npValidateConditionalBetaBandwidthObject <- function(bws,
     identical(bws[["cykertype", exact = TRUE]], "beta")
   if (!has.beta)
     return(invisible(FALSE))
-  if (isTRUE(bandwidth.compute))
-    stop(where, " does not yet support automatic bandwidth selection; supply a manual bandwidth",
-         call. = FALSE)
 
   npValidateBetaKernelSpecification(
     ckertype = bws[["cxkertype", exact = TRUE]],

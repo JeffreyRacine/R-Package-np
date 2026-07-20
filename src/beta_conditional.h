@@ -14,6 +14,20 @@ typedef enum {
 } np_beta_conditional_status;
 
 np_beta_conditional_status
+np_beta_conditional_scalar_log(np_continuous_kernel_family family,
+                               int kernel_code,
+                               int order,
+                               int do_cdf,
+                               double evaluation,
+                               double observation,
+                               double bandwidth,
+                               double lower,
+                               double upper,
+                               double *log_absolute,
+                               int *sign,
+                               np_beta_status *kernel_status);
+
+np_beta_conditional_status
 np_beta_conditional_lc(const double *train_x,
                        const double *train_y,
                        const double *eval_x,

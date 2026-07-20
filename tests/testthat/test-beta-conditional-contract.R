@@ -235,18 +235,10 @@ test_that("conditional beta supports formula objects and prediction", {
                tolerance = 3e-10)
 })
 
-test_that("conditional beta guards unsupported automatic and gradient routes", {
+test_that("conditional beta guards unsupported gradient routes", {
   training_x <- data.frame(x = c(0.02, 0.12, 0.34, 0.68, 0.94))
   training_y <- data.frame(y = c(0.03, 0.2, 0.4, 0.75, 0.97))
 
-  expect_error(
-    suppressWarnings(npcdensbw(
-      xdat = training_x, ydat = training_y,
-      cxkertype = "beta", cxkerbound = "fixed",
-      cxkerlb = 0, cxkerub = 1
-    )),
-    "does not yet support automatic bandwidth selection"
-  )
   bw <- npcdensbw(
     xdat = training_x, ydat = training_y, bws = c(0.15, 0.15),
     bandwidth.compute = FALSE,

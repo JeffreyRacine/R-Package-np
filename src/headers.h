@@ -192,6 +192,22 @@ int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor,
 int np_regression_lp_apply_matrix(double *vector_scale_factor, double **rhs_cols, int n_rhs, double *fitted_out);
 int np_bounded_cvls_conditional_quad_context_prepare_extern(void);
 void np_bounded_cvls_conditional_quad_context_clear_extern(void);
+int np_bounded_cvls_build_conditional_grid_1d_extern(
+  const double *train_y,
+  int num_obs,
+  double lower,
+  double upper,
+  int target_points,
+  double *grid,
+  double *weights,
+  int *actual_points);
+int np_shadow_proof_conditional_x_weights_dense(double *vector_scale_factor, double *weights_out);
+int np_shadow_proof_conditional_x_weight_row_fixed(double *vector_scale_factor, int eval_idx, double *row_out);
+int np_shadow_proof_conditional_x_weight_row_full(double *vector_scale_factor, int eval_idx, double *row_out);
+int np_shadow_proof_conditional_y_row_stream(double *vector_scale_factor, int eval_idx, int operator_code, double *row_out);
+int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
+int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);
+int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor, double *cv);
 void np_bwm_set_deferred_error(const char *msg);
 const char *np_bwm_get_deferred_error(void);
 void np_bwm_clear_deferred_error(void);
@@ -565,6 +581,10 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CBW_TBNDI 26
 #define CBW_CVLS_QUAD_GRIDI 27
 #define CBW_CVLS_QUAD_POINTSI 28
+#define CBW_CXFAMILYI 29
+#define CBW_CXORDERI 30
+#define CBW_CYFAMILYI 31
+#define CBW_CYORDERI 32
 
 #define CBW_FTOLD  0
 #define CBW_TOLD   1
@@ -628,6 +648,10 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CDBW_SCATI 25
 #define CDBW_DFC_DIRI 26
 #define CDBW_TBNDI 27
+#define CDBW_CXFAMILYI 28
+#define CDBW_CXORDERI 29
+#define CDBW_CYFAMILYI 30
+#define CDBW_CYORDERI 31
 
 #define CDBW_FTOLD  0
 #define CDBW_TOLD   1

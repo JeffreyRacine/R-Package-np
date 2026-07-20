@@ -8,6 +8,7 @@
 #include <R_ext/Arith.h>
 
 #include "headers.h"
+#include "beta_conditional.h"
 #include "beta_kernel.h"
 #include "beta_objectives.h"
 
@@ -123,6 +124,33 @@ static int np_beta_objective_prepare_bandwidth(
     NULL,
     matrix_bandwidth,
     NULL);
+}
+
+static int np_beta_objective_prepare_bandwidth_offset(
+  int bandwidth_mode,
+  int num_train,
+  int num_eval,
+  int num_continuous,
+  int standard_deviation_offset,
+  double **train_continuous,
+  double **eval_continuous,
+  const double *candidate,
+  double **matrix_bandwidth)
+{
+  extern double *vector_continuous_stddev_extern;
+  double *saved_standard_deviation = vector_continuous_stddev_extern;
+  int status;
+
+  if(standard_deviation_offset < 0)
+    return 1;
+  if(saved_standard_deviation != NULL)
+    vector_continuous_stddev_extern =
+      saved_standard_deviation + standard_deviation_offset;
+  status = np_beta_objective_prepare_bandwidth(
+    bandwidth_mode, num_train, num_eval, num_continuous,
+    train_continuous, eval_continuous, candidate, matrix_bandwidth);
+  vector_continuous_stddev_extern = saved_standard_deviation;
+  return status;
 }
 
 static double np_beta_objective_bandwidth(
@@ -718,5 +746,483 @@ double np_beta_objective_regression_lc(
 
 cleanup_regression:
   free_mat(matrix_bandwidth, num_continuous);
+  return R_FINITE(objective) ? objective : DBL_MAX;
+}
+
+static np_continuous_kernel_family
+np_beta_objective_conditional_family(int kernel_code)
+{
+  return (kernel_code == NP_CKERNEL_COORDINATE_CODE) ?
+    NP_CKERNEL_FAMILY_BETA : NP_CKERNEL_FAMILY_LEGACY;
+}
+
+static int np_beta_objective_conditional_product_log(
+  int do_cdf,
+  int bandwidth_mode,
+  int kernel_code,
+  int order,
+  int num_dimensions,
+  double **train,
+  double **evaluation,
+  double **matrix_bandwidth,
+  const double *lower,
+  const double *upper,
+  int evaluation_index,
+  int observation_index,
+  double *log_absolute,
+  int *sign)
+{
+  const np_continuous_kernel_family family =
+    np_beta_objective_conditional_family(kernel_code);
+  double log_product = 0.0;
+  int product_sign = 1;
+  int dimension;
+
+  if(num_dimensions <= 0 || train == NULL || evaluation == NULL ||
+     matrix_bandwidth == NULL || lower == NULL || upper == NULL ||
+     log_absolute == NULL || sign == NULL)
+    return 1;
+
+  for(dimension = 0; dimension < num_dimensions; ++dimension) {
+    const double bandwidth = np_beta_objective_bandwidth(
+      bandwidth_mode, matrix_bandwidth, dimension,
+      evaluation_index, observation_index);
+    double scalar_log = -INFINITY;
+    int scalar_sign = 0;
+    np_beta_status beta_status = NP_BETA_OK;
+
+    if(np_beta_conditional_scalar_log(
+         family, kernel_code, order, do_cdf,
+         evaluation[dimension][evaluation_index],
+         train[dimension][observation_index], bandwidth,
+         lower[dimension], upper[dimension],
+         &scalar_log, &scalar_sign, &beta_status) !=
+       NP_BETA_CONDITIONAL_OK)
+      return 1;
+    if(scalar_sign == 0 || scalar_log == -INFINITY) {
+      *log_absolute = -INFINITY;
+      *sign = 0;
+      return 0;
+    }
+    log_product += scalar_log;
+    product_sign *= scalar_sign;
+    if(!R_FINITE(log_product))
+      return 1;
+  }
+
+  *log_absolute = log_product;
+  *sign = product_sign;
+  return 0;
+}
+
+static int np_beta_objective_conditional_sums(
+  int do_cdf_y,
+  int bandwidth_mode,
+  int kernel_code_x,
+  int order_x,
+  int kernel_code_y,
+  int order_y,
+  int num_obs,
+  int num_x,
+  int num_y,
+  double **train_x,
+  double **train_y,
+  double **eval_x,
+  double **eval_y,
+  double **bandwidth_x,
+  double **bandwidth_y,
+  const double *lower_x,
+  const double *upper_x,
+  const double *lower_y,
+  const double *upper_y,
+  int evaluation_x,
+  int evaluation_y,
+  int omitted_observation,
+  double *denominator_log,
+  int *denominator_sign,
+  double *numerator_log,
+  int *numerator_sign)
+{
+  np_beta_log_sum denominator;
+  np_beta_log_sum numerator;
+  int observation_index;
+
+  np_beta_log_sum_init(&denominator);
+  np_beta_log_sum_init(&numerator);
+  for(observation_index = 0; observation_index < num_obs;
+      ++observation_index) {
+    double x_log = -INFINITY;
+    double y_log = -INFINITY;
+    int x_sign = 0;
+    int y_sign = 0;
+
+    if(observation_index == omitted_observation)
+      continue;
+    if(np_beta_objective_conditional_product_log(
+         0, bandwidth_mode, kernel_code_x, order_x, num_x,
+         train_x, eval_x, bandwidth_x, lower_x, upper_x,
+         evaluation_x, observation_index, &x_log, &x_sign) != 0)
+      return 1;
+    np_beta_log_sum_add(&denominator, x_log, x_sign);
+    if(x_sign == 0)
+      continue;
+    if(np_beta_objective_conditional_product_log(
+         do_cdf_y, bandwidth_mode, kernel_code_y, order_y, num_y,
+         train_y, eval_y, bandwidth_y, lower_y, upper_y,
+         evaluation_y, observation_index, &y_log, &y_sign) != 0)
+      return 1;
+    np_beta_log_sum_add(&numerator, x_log + y_log, x_sign * y_sign);
+  }
+
+  if(np_beta_log_sum_finish(&denominator,
+                            denominator_log, denominator_sign) != 0 ||
+     np_beta_log_sum_finish(&numerator,
+                            numerator_log, numerator_sign) != 0 ||
+     *denominator_sign == 0)
+    return 1;
+  return 0;
+}
+
+static int np_beta_objective_conditional_layout_ok(int bandwidth_mode,
+                                                    int order_x,
+                                                    int order_y,
+                                                    int num_obs,
+                                                    int num_x,
+                                                    int num_y,
+                                                    double **train_x,
+                                                    double **train_y,
+                                                    const double *candidate,
+                                                    const double *lower_x,
+                                                    const double *upper_x,
+                                                    const double *lower_y,
+                                                    const double *upper_y)
+{
+  return num_obs >= 2 && num_x > 0 && num_y > 0 &&
+    train_x != NULL && train_y != NULL && candidate != NULL &&
+    lower_x != NULL && upper_x != NULL &&
+    lower_y != NULL && upper_y != NULL &&
+    np_beta_order_supported(order_x) && np_beta_order_supported(order_y) &&
+    np_beta_objective_bandwidth_rows(bandwidth_mode, num_obs, num_obs) > 0;
+}
+
+double np_beta_objective_conditional_density_ml(
+  int bandwidth_mode,
+  int kernel_code_x,
+  int order_x,
+  int kernel_code_y,
+  int order_y,
+  int num_obs,
+  int num_x,
+  int num_y,
+  double **train_x,
+  double **train_y,
+  const double *candidate,
+  const double *lower_x,
+  const double *upper_x,
+  const double *lower_y,
+  const double *upper_y)
+{
+  double **bandwidth_x = NULL;
+  double **bandwidth_y = NULL;
+  double objective = DBL_MAX;
+  double sum = 0.0;
+  int bandwidth_rows;
+  int evaluation_index;
+
+  if(!np_beta_objective_conditional_layout_ok(
+       bandwidth_mode, order_x, order_y, num_obs, num_x, num_y,
+       train_x, train_y, candidate, lower_x, upper_x, lower_y, upper_y))
+    return DBL_MAX;
+  bandwidth_rows = np_beta_objective_bandwidth_rows(
+    bandwidth_mode, num_obs, num_obs);
+  bandwidth_x = alloc_matd(bandwidth_rows, num_x);
+  bandwidth_y = alloc_matd(bandwidth_rows, num_y);
+  if(bandwidth_x == NULL || bandwidth_y == NULL)
+    goto cleanup_conditional_density_ml;
+  if(np_beta_objective_prepare_bandwidth_offset(
+       bandwidth_mode, num_obs, num_obs, num_x,
+       0, train_x, train_x, candidate, bandwidth_x) != 0 ||
+     np_beta_objective_prepare_bandwidth_offset(
+       bandwidth_mode, num_obs, num_obs, num_y, num_x,
+       train_y, train_y, candidate + num_x, bandwidth_y) != 0)
+    goto cleanup_conditional_density_ml;
+
+  for(evaluation_index = 0; evaluation_index < num_obs; ++evaluation_index) {
+    double denominator_log = -INFINITY;
+    double numerator_log = -INFINITY;
+    int denominator_sign = 0;
+    int numerator_sign = 0;
+    int fit_sign;
+
+    if((evaluation_index & 31) == 0)
+      np_progress_bandwidth_loop_step();
+    if(np_beta_objective_conditional_sums(
+         0, bandwidth_mode, kernel_code_x, order_x,
+         kernel_code_y, order_y, num_obs, num_x, num_y,
+         train_x, train_y, train_x, train_y,
+         bandwidth_x, bandwidth_y,
+         lower_x, upper_x, lower_y, upper_y,
+         evaluation_index, evaluation_index, evaluation_index,
+         &denominator_log, &denominator_sign,
+         &numerator_log, &numerator_sign) != 0)
+      goto cleanup_conditional_density_ml;
+    fit_sign = denominator_sign * numerator_sign;
+    sum += np_beta_objective_cvml_contribution(
+      numerator_log - denominator_log, fit_sign, 1);
+    if(!R_FINITE(sum))
+      goto cleanup_conditional_density_ml;
+  }
+  objective = sum;
+
+cleanup_conditional_density_ml:
+  if(bandwidth_x != NULL)
+    free_mat(bandwidth_x, num_x);
+  if(bandwidth_y != NULL)
+    free_mat(bandwidth_y, num_y);
+  return R_FINITE(objective) ? objective : DBL_MAX;
+}
+
+double np_beta_objective_conditional_distribution_ls(
+  int bandwidth_mode,
+  int kernel_code_x,
+  int order_x,
+  int kernel_code_y,
+  int order_y,
+  int num_obs_train,
+  int num_obs_eval,
+  int num_x,
+  int num_y,
+  int cdf_on_train,
+  double **train_x,
+  double **train_y,
+  double **eval_y,
+  const double *candidate,
+  const double *lower_x,
+  const double *upper_x,
+  const double *lower_y,
+  const double *upper_y)
+{
+  double **bandwidth_x = NULL;
+  double **bandwidth_y = NULL;
+  double objective = DBL_MAX;
+  double sum = 0.0;
+  int bandwidth_rows_x;
+  int bandwidth_rows_y;
+  int observation_index;
+  int evaluation_index;
+
+  if(!np_beta_objective_conditional_layout_ok(
+       bandwidth_mode, order_x, order_y, num_obs_train, num_x, num_y,
+       train_x, train_y, candidate, lower_x, upper_x, lower_y, upper_y) ||
+     num_obs_eval <= 0 || eval_y == NULL)
+    return DBL_MAX;
+  bandwidth_rows_x = np_beta_objective_bandwidth_rows(
+    bandwidth_mode, num_obs_train, num_obs_train);
+  bandwidth_rows_y = np_beta_objective_bandwidth_rows(
+    bandwidth_mode, num_obs_train, num_obs_eval);
+  bandwidth_x = alloc_matd(bandwidth_rows_x, num_x);
+  bandwidth_y = alloc_matd(bandwidth_rows_y, num_y);
+  if(bandwidth_x == NULL || bandwidth_y == NULL)
+    goto cleanup_conditional_distribution_ls;
+  if(np_beta_objective_prepare_bandwidth_offset(
+       bandwidth_mode, num_obs_train, num_obs_train, num_x,
+       0, train_x, train_x, candidate, bandwidth_x) != 0 ||
+     np_beta_objective_prepare_bandwidth_offset(
+       bandwidth_mode, num_obs_train, num_obs_eval, num_y, num_x,
+       train_y, eval_y, candidate + num_x, bandwidth_y) != 0)
+    goto cleanup_conditional_distribution_ls;
+
+  for(observation_index = 0; observation_index < num_obs_train;
+      ++observation_index) {
+    if((observation_index & 15) == 0)
+      np_progress_bandwidth_loop_step();
+    for(evaluation_index = 0; evaluation_index < num_obs_eval;
+        ++evaluation_index) {
+      double denominator_log = -INFINITY;
+      double numerator_log = -INFINITY;
+      double fitted = 0.0;
+      double indicator = 1.0;
+      double difference;
+      int denominator_sign = 0;
+      int numerator_sign = 0;
+      int dimension;
+
+      if(cdf_on_train && evaluation_index == observation_index)
+        continue;
+      if(np_beta_objective_conditional_sums(
+           1, bandwidth_mode, kernel_code_x, order_x,
+           kernel_code_y, order_y, num_obs_train, num_x, num_y,
+           train_x, train_y, train_x, eval_y,
+           bandwidth_x, bandwidth_y,
+           lower_x, upper_x, lower_y, upper_y,
+           observation_index, evaluation_index, observation_index,
+           &denominator_log, &denominator_sign,
+           &numerator_log, &numerator_sign) != 0 ||
+         np_beta_objective_ratio(
+           numerator_log, numerator_sign,
+           denominator_log, denominator_sign, &fitted) != 0)
+        goto cleanup_conditional_distribution_ls;
+      for(dimension = 0; dimension < num_y; ++dimension)
+        indicator *= train_y[dimension][observation_index] <=
+          eval_y[dimension][evaluation_index] ? 1.0 : 0.0;
+      difference = indicator - fitted;
+      sum += difference * difference;
+      if(!R_FINITE(sum))
+        goto cleanup_conditional_distribution_ls;
+    }
+  }
+  objective = sum / ((double)num_obs_train * (double)num_obs_eval);
+
+cleanup_conditional_distribution_ls:
+  if(bandwidth_x != NULL)
+    free_mat(bandwidth_x, num_x);
+  if(bandwidth_y != NULL)
+    free_mat(bandwidth_y, num_y);
+  return R_FINITE(objective) ? objective : DBL_MAX;
+}
+
+double np_beta_objective_conditional_density_ls(
+  int bandwidth_mode,
+  int kernel_code_x,
+  int order_x,
+  int kernel_code_y,
+  int order_y,
+  int quadrature_points,
+  int num_obs,
+  int num_x,
+  int num_y,
+  double **train_x,
+  double **train_y,
+  const double *candidate,
+  const double *lower_x,
+  const double *upper_x,
+  const double *lower_y,
+  const double *upper_y)
+{
+  double **grid_y = NULL;
+  double **bandwidth_x = NULL;
+  double **bandwidth_y_train = NULL;
+  double **bandwidth_y_grid = NULL;
+  double *weights = NULL;
+  double objective = DBL_MAX;
+  double sum = 0.0;
+  int total_points = 1;
+  int bandwidth_rows_train;
+  int bandwidth_rows_grid;
+  int actual_points;
+  int observation_index;
+  int dimension;
+
+  if(!np_beta_objective_conditional_layout_ok(
+       bandwidth_mode, order_x, order_y, num_obs, num_x, num_y,
+       train_x, train_y, candidate, lower_x, upper_x, lower_y, upper_y) ||
+     num_y > 2 || quadrature_points < 2)
+    return DBL_MAX;
+  for(dimension = 0; dimension < num_y; ++dimension) {
+    if(total_points > INT_MAX / quadrature_points)
+      return DBL_MAX;
+    total_points *= quadrature_points;
+  }
+
+  bandwidth_rows_train = np_beta_objective_bandwidth_rows(
+    bandwidth_mode, num_obs, num_obs);
+  grid_y = alloc_matd(total_points, num_y);
+  weights = alloc_vecd(total_points);
+  bandwidth_x = alloc_matd(bandwidth_rows_train, num_x);
+  bandwidth_y_train = alloc_matd(bandwidth_rows_train, num_y);
+  if(grid_y == NULL || weights == NULL || bandwidth_x == NULL ||
+     bandwidth_y_train == NULL)
+    goto cleanup_conditional_density_ls;
+  actual_points = total_points;
+  if(((num_y == 1) ?
+       np_bounded_cvls_build_conditional_grid_1d_extern(
+         train_y[0], num_obs, lower_y[0], upper_y[0],
+         quadrature_points, grid_y[0], weights, &actual_points) :
+       np_beta_objective_fill_grid(num_y, lower_y, upper_y,
+                                   quadrature_points, grid_y, weights)) != 0)
+    goto cleanup_conditional_density_ls;
+
+  total_points = actual_points;
+  bandwidth_rows_grid = np_beta_objective_bandwidth_rows(
+    bandwidth_mode, num_obs, total_points);
+  bandwidth_y_grid = alloc_matd(bandwidth_rows_grid, num_y);
+  if(bandwidth_y_grid == NULL ||
+     np_beta_objective_prepare_bandwidth_offset(
+       bandwidth_mode, num_obs, num_obs, num_x,
+       0, train_x, train_x, candidate, bandwidth_x) != 0 ||
+     np_beta_objective_prepare_bandwidth_offset(
+       bandwidth_mode, num_obs, num_obs, num_y, num_x,
+       train_y, train_y, candidate + num_x, bandwidth_y_train) != 0 ||
+     np_beta_objective_prepare_bandwidth_offset(
+       bandwidth_mode, num_obs, total_points, num_y, num_x,
+       train_y, grid_y, candidate + num_x, bandwidth_y_grid) != 0)
+    goto cleanup_conditional_density_ls;
+  for(observation_index = 0; observation_index < num_obs;
+      ++observation_index) {
+    double denominator_log = -INFINITY;
+    double cross_numerator_log = -INFINITY;
+    double cross_fit = 0.0;
+    double integrated_square = 0.0;
+    int denominator_sign = 0;
+    int cross_numerator_sign = 0;
+    int grid_index;
+
+    if((observation_index & 7) == 0)
+      np_progress_bandwidth_loop_step();
+    if(np_beta_objective_conditional_sums(
+         0, bandwidth_mode, kernel_code_x, order_x,
+         kernel_code_y, order_y, num_obs, num_x, num_y,
+         train_x, train_y, train_x, train_y,
+         bandwidth_x, bandwidth_y_train,
+         lower_x, upper_x, lower_y, upper_y,
+         observation_index, observation_index, observation_index,
+         &denominator_log, &denominator_sign,
+         &cross_numerator_log, &cross_numerator_sign) != 0 ||
+       np_beta_objective_ratio(
+         cross_numerator_log, cross_numerator_sign,
+         denominator_log, denominator_sign, &cross_fit) != 0)
+      goto cleanup_conditional_density_ls;
+
+    for(grid_index = 0; grid_index < total_points; ++grid_index) {
+      double ignored_denominator_log = -INFINITY;
+      double grid_numerator_log = -INFINITY;
+      double fitted = 0.0;
+      int ignored_denominator_sign = 0;
+      int grid_numerator_sign = 0;
+
+      if(np_beta_objective_conditional_sums(
+           0, bandwidth_mode, kernel_code_x, order_x,
+           kernel_code_y, order_y, num_obs, num_x, num_y,
+           train_x, train_y, train_x, grid_y,
+           bandwidth_x, bandwidth_y_grid,
+           lower_x, upper_x, lower_y, upper_y,
+           observation_index, grid_index, observation_index,
+           &ignored_denominator_log, &ignored_denominator_sign,
+           &grid_numerator_log, &grid_numerator_sign) != 0 ||
+         np_beta_objective_ratio(
+           grid_numerator_log, grid_numerator_sign,
+           denominator_log, denominator_sign, &fitted) != 0)
+        goto cleanup_conditional_density_ls;
+      integrated_square += weights[grid_index] * fitted * fitted;
+      if(!R_FINITE(integrated_square))
+        goto cleanup_conditional_density_ls;
+    }
+    sum += integrated_square - 2.0 * cross_fit;
+    if(!R_FINITE(sum))
+      goto cleanup_conditional_density_ls;
+  }
+  objective = sum / (double)num_obs;
+
+cleanup_conditional_density_ls:
+  if(grid_y != NULL)
+    free_mat(grid_y, num_y);
+  if(bandwidth_x != NULL)
+    free_mat(bandwidth_x, num_x);
+  if(bandwidth_y_train != NULL)
+    free_mat(bandwidth_y_train, num_y);
+  if(bandwidth_y_grid != NULL)
+    free_mat(bandwidth_y_grid, num_y);
+  if(weights != NULL)
+    free(weights);
   return R_FINITE(objective) ? objective : DBL_MAX;
 }
