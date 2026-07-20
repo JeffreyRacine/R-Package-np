@@ -1190,9 +1190,18 @@ npudistbw.default <-
     if (length(dotted.arg.names)) {
       bwsel.args[dotted.arg.names] <- dots[dotted.arg.names]
     }
+    selection.start <- proc.time()[3L]
     tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting distribution bandwidth",
-      do.call(npudistbw.dbandwidth, bwsel.args)
+      {
+        ordinary <- do.call(npudistbw.dbandwidth, bwsel.args)
+        npBetaRangeCertifySelector(
+          ordinary = ordinary, args = bwsel.args,
+          selector = npudistbw.dbandwidth, method = "cv.cdf",
+          direction = "min", elapsed.start = selection.start,
+          where = "beta range distribution CDF certification"
+        )
+      }
     )
 
     mc <- match.call(expand.dots = FALSE)

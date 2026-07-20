@@ -614,7 +614,7 @@ or standard-deviation factors.
   (1981) kernel.
 
   The beta associated CDF supports orders 2, 4, 6, and 8, explicit bandwidth
-  objects and automatic \code{cv.ls} selection, and fixed, generalized-NN,
+  objects and automatic \code{cv.cdf} selection, and fixed, generalized-NN,
   and adaptive-NN bandwidths. Set \code{ckertype="beta"} and use
   \code{ckerbound="fixed"} with finite \code{ckerlb}/\code{ckerub}, or
   \code{ckerbound="range"}. Data must be continuous and lie within those
@@ -623,6 +623,11 @@ or standard-deviation factors.
   \eqn{h} remains in the coordinate's original units and maps to beta
   precision \eqn{((b-a)/h)^2}. See \code{\link{np.kernels}} and
   \code{\link{npudist}} for the exact observation-centered CDF contribution.
+  For univariate order-2 fixed-bandwidth beta \code{ckerbound="range"} CDF
+  searches with Powell, the ordinary result is also checked against the
+  deterministic uniform-limit certificate documented in
+  \code{\link{np.kernels}}. This does not replace or reduce the user's
+  \code{nmulti} search.
 
   The optimizer invoked for search is Powell's conjugate direction
   method which requires the setting of (non-random) initial values and
@@ -651,6 +656,11 @@ or standard-deviation factors.
   \item{bw}{ bandwidth(s), scale factor(s) or nearest neighbours for the
     data, \code{dat} }
   \item{fval}{ objective function value at minimum }
+  \item{beta.range.certification}{for an eligible automatic beta range CDF
+    search, a list recording the uniform-limit probe, trigger decision,
+    optional support-width refinement, and selected source; absent otherwise}
+  \item{num.feval.certified}{number of function evaluations attributable to
+    that certification and optional refinement; absent otherwise}
 
   if \code{bwtype} is set to \code{fixed}, an object containing
   bandwidths, of class \code{bandwidth}
