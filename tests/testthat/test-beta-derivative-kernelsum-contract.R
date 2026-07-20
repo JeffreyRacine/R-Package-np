@@ -80,3 +80,25 @@ test_that("beta scalar endpoint derivative signs are explicit", {
   expect_identical(sign(fit$kw[cbind(c(1L, 4L), c(1L, 2L))]), c(-1, 1))
   expect_identical(fit$kw[cbind(c(4L, 1L), c(1L, 2L))], c(0, 0))
 })
+
+test_that("beta endpoint derivatives without matching observations are one-sided", {
+  training <- data.frame(x = c(.07, .19, .38, .61, .83, .94))
+  step <- 2e-6
+
+  for (order in c(2L, 4L, 6L, 8L)) {
+    evaluate <- function(x, operator = "normal") {
+      as.double(npksum(
+        bws = .16, txdat = training, exdat = data.frame(x = x),
+        operator = operator, ckertype = "beta", ckerorder = order,
+        ckerbound = "fixed", ckerlb = 0, ckerub = 1
+      )$ksum)
+    }
+    derivative <- evaluate(c(0, 1), "derivative")
+    oracle <- c(
+      (evaluate(step) - evaluate(0)) / step,
+      (evaluate(1) - evaluate(1 - step)) / step
+    )
+    expect_true(all(is.finite(derivative)))
+    expect_equal(derivative, oracle, tolerance = 3e-4)
+  }
+})
