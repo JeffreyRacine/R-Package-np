@@ -554,7 +554,11 @@ or standard-deviation factors.
   Higher orders use the signed multiscale coefficients documented in
   \code{\link{np.kernels}}. Bounded density \code{cv.ls} uses numerical
   target-coordinate quadrature of the estimator rather than the public
-  observation-coordinate overlap.
+  observation-coordinate overlap. For univariate order-2 fixed-bandwidth beta
+  \code{ckerbound="range"} CVLS searches with Powell, the ordinary result is
+  also checked against the deterministic uniform-limit certificate documented
+  in \code{\link{np.kernels}}. This does not replace or reduce the user's
+  \code{nmulti} search.
 
   \code{npudensbw} may be invoked \emph{either} with a formula-like
   symbolic description of variables on which bandwidth selection is to
@@ -610,6 +614,11 @@ or standard-deviation factors.
   \item{bw}{ bandwidth(s), scale factor(s) or nearest neighbours for the
     data, \code{dat} }
   \item{fval}{ objective function value at minimum }
+  \item{beta.range.certification}{for an eligible automatic beta range CVLS
+    search, a list recording the uniform-limit probe, trigger decision,
+    optional support-width refinement, and selected source; absent otherwise}
+  \item{num.feval.certified}{number of function evaluations attributable to
+    that certification and optional refinement; absent otherwise}
 
   if \code{bwtype} is set to \code{fixed}, an object containing
   bandwidths, of class \code{bandwidth}

@@ -106,6 +106,22 @@
   endpoint. Non-beta \code{ckerbound="range"} continues to use exact sample
   minima and maxima. Rounded or atomic variables should be modelled with the
   package's discrete kernels rather than made continuous by range padding.
+
+  Automatic univariate order-2 fixed-bandwidth beta range searches have an
+  additional basin certificate for density CVLS and distribution CDF
+  criteria when Powell is the selected solver. If \eqn{L^*=B^*-A^*}, the
+  official criterion is evaluated once at
+  \eqn{h_{tail}=L^*2^{26}}, where the beta concentration
+  \eqn{(L^*/h_{tail})^2} equals \code{.Machine$double.eps}. If this uniform-
+  limit candidate materially improves the ordinary result, one deterministic
+  Powell refinement starts at \eqn{h=L^*}; the best materially distinct
+  official objective among the ordinary, tail, and refined candidates is
+  returned. The ordinary search uses the user's unchanged \code{nmulti}; the
+  certification and any refinement are separately counted in the bandwidth
+  summary. This safeguard does not apply to explicit fixed bounds, CVML,
+  orders 4--8, nearest-neighbour or multivariate searches, or non-Powell
+  solvers.
+
   The beta routes currently require continuous variables only. Regression and
   conditional estimators additionally require \code{regtype="lc"}; if either
   conditional side uses beta, all X and Y coordinates must be continuous.

@@ -20,6 +20,16 @@
   bounds remain literal, while every non-beta range route continues to use
   exact sample minima and maxima.
 
+* Automatic univariate second-order beta range searches now certify fixed-
+  bandwidth density CVLS and distribution CDF solutions against the
+  double-precision uniform-limit objective. A material improvement triggers
+  one deterministic Powell refinement from the resolved support width, and
+  the best material candidate is retained. The user's ordinary search and
+  \code{nmulti} setting are unchanged; summaries report the additional
+  certification evaluations. Explicit fixed bounds, CVML, higher beta orders,
+  nearest-neighbour modes, multivariate searches, and non-Powell solvers are
+  unchanged.
+
 * Corrected recursive fitted-value centering in `npregivderiv()` so both
   empirical terms of the Equation (14) adjoint use the same fitted
   conditional-residual vector. The recursive path had instead centered its

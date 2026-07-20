@@ -1075,9 +1075,18 @@ npudensbw.default <-
     if (length(dotted.arg.names)) {
       bwsel.args[dotted.arg.names] <- dots[dotted.arg.names]
     }
+    selection.start <- proc.time()[3L]
     tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting density bandwidth",
-      do.call(npudensbw.bandwidth, bwsel.args)
+      {
+        ordinary <- do.call(npudensbw.bandwidth, bwsel.args)
+        npBetaRangeCertifySelector(
+          ordinary = ordinary, args = bwsel.args,
+          selector = npudensbw.bandwidth, method = "cv.ls",
+          direction = "max", elapsed.start = selection.start,
+          where = "beta range density CVLS certification"
+        )
+      }
     )
 
     mc <- match.call(expand.dots = FALSE)

@@ -1660,6 +1660,198 @@ npKernelBoundsCheckEval <- function(evaldat,
   invisible(TRUE)
 }
 
+npBetaRangeCertificationEligible <- function(bws,
+                                             method,
+                                             bwsolver,
+                                             bandwidth.compute = TRUE,
+                                             eval.only = FALSE) {
+  isTRUE(bandwidth.compute) && !isTRUE(eval.only) &&
+    identical(as.character(bwsolver)[1L], "powell") &&
+    identical(bws[["ckertype", exact = TRUE]], "beta") &&
+    identical(bws[["ckerbound", exact = TRUE]], "range") &&
+    identical(bws[["type", exact = TRUE]], "fixed") &&
+    identical(as.integer(bws[["ckerorder", exact = TRUE]])[1L], 2L) &&
+    identical(as.integer(bws[["ncon", exact = TRUE]])[1L], 1L) &&
+    identical(as.integer(bws[["ndim", exact = TRUE]])[1L], 1L) &&
+    identical(as.character(bws[["method", exact = TRUE]])[1L], method)
+}
+
+npBetaRangeCertificationBandwidths <- function(bws, where) {
+  icon <- which(bws[["icon", exact = TRUE]])
+  if (length(icon) != 1L)
+    stop(where, " requires exactly one continuous beta coordinate",
+         call. = FALSE)
+
+  lower <- as.double(bws[["ckerlb", exact = TRUE]][icon])
+  upper <- as.double(bws[["ckerub", exact = TRUE]][icon])
+  width <- upper - lower
+  if (length(width) != 1L || !is.finite(width) || width <= 0)
+    stop(where, " requires a finite positive resolved beta support width",
+         call. = FALSE)
+
+  metric.to.raw <- 1
+  if (isTRUE(bws[["scaling", exact = TRUE]])) {
+    sdev <- as.double(bws[["sdev", exact = TRUE]])
+    nconfac <- as.double(bws[["nconfac", exact = TRUE]])
+    metric.to.raw <- sdev[[1L]] * nconfac[[1L]]
+    if (!is.finite(metric.to.raw) || metric.to.raw <= 0)
+      stop(where, " cannot convert metric and scale-factor bandwidths",
+           call. = FALSE)
+  }
+
+  bridge.metric <- width
+  tail.metric <- width * 2^26
+  bridge.raw <- bridge.metric / metric.to.raw
+  tail.raw <- tail.metric / metric.to.raw
+  if (!is.finite(bridge.raw) || bridge.raw <= 0 ||
+      !is.finite(tail.raw) || tail.raw <= 0) {
+    stop(where, " asymptotic certification bandwidth is not representable",
+         call. = FALSE)
+  }
+
+  bridge <- as.double(bws[["bw", exact = TRUE]])
+  tail <- bridge
+  bridge[icon] <- bridge.raw
+  tail[icon] <- tail.raw
+  list(
+    bridge = bridge,
+    tail = tail,
+    bridge.metric = bridge.metric,
+    tail.metric = tail.metric
+  )
+}
+
+npBetaRangeObjectiveBetter <- function(candidate,
+                                       incumbent,
+                                       direction = c("min", "max")) {
+  direction <- match.arg(direction)
+  candidate <- as.double(candidate)[1L]
+  incumbent <- as.double(incumbent)[1L]
+  if (!is.finite(candidate))
+    return(FALSE)
+  if (!is.finite(incumbent))
+    return(TRUE)
+  tolerance <- sqrt(.Machine$double.eps) *
+    (1 + abs(candidate) + abs(incumbent))
+  if (identical(direction, "min"))
+    candidate < incumbent - tolerance
+  else
+    candidate > incumbent + tolerance
+}
+
+npBetaRangeCertifySearch <- function(ordinary,
+                                     evaluate,
+                                     refine,
+                                     direction = c("min", "max"),
+                                     elapsed.start,
+                                     where) {
+  direction <- match.arg(direction)
+  candidate.bw <- npBetaRangeCertificationBandwidths(ordinary, where = where)
+  tail <- evaluate(candidate.bw$tail)
+  triggered <- npBetaRangeObjectiveBetter(
+    tail[["fval", exact = TRUE]], ordinary[["fval", exact = TRUE]],
+    direction = direction
+  )
+  refinement <- NULL
+  if (triggered)
+    refinement <- refine(candidate.bw$bridge)
+
+  selected <- ordinary
+  selected.source <- "ordinary"
+  if (npBetaRangeObjectiveBetter(
+        tail[["fval", exact = TRUE]], selected[["fval", exact = TRUE]],
+        direction = direction)) {
+    selected <- tail
+    selected.source <- "asymptotic"
+  }
+  if (!is.null(refinement) && npBetaRangeObjectiveBetter(
+        refinement[["fval", exact = TRUE]],
+        selected[["fval", exact = TRUE]], direction = direction)) {
+    selected <- refinement
+    selected.source <- "refinement"
+  }
+
+  payloads <- Filter(Negate(is.null), list(ordinary, tail, refinement))
+  count <- function(name, entries = payloads) {
+    values <- vapply(entries, function(x) {
+      value <- suppressWarnings(as.double(x[[name, exact = TRUE]])[1L])
+      if (length(value) && is.finite(value)) value else 0
+    }, numeric(1L))
+    sum(values)
+  }
+  append.history <- function(name) {
+    unlist(lapply(payloads, function(x) x[[name, exact = TRUE]]),
+           use.names = FALSE)
+  }
+
+  selected[["num.feval"]] <- count("num.feval")
+  selected[["num.feval.fast"]] <- count("num.feval.fast")
+  selected[["num.feval.certified"]] <-
+    count("num.feval", entries = payloads[-1L])
+  selected[["fval.history"]] <- append.history("fval.history")
+  selected[["eval.history"]] <- append.history("eval.history")
+  selected[["invalid.history"]] <- append.history("invalid.history")
+  selected[["total.time"]] <- proc.time()[3L] - elapsed.start
+  selected[["beta.range.certification"]] <- list(
+    version = 1L,
+    concentration = .Machine$double.eps,
+    tail.metric = candidate.bw$tail.metric,
+    tail.objective = as.double(tail[["fval", exact = TRUE]])[1L],
+    triggered = triggered,
+    bridge.metric = if (triggered) candidate.bw$bridge.metric else NA_real_,
+    refinement.objective = if (is.null(refinement)) NA_real_ else
+      as.double(refinement[["fval", exact = TRUE]])[1L],
+    selected = selected.source
+  )
+  selected
+}
+
+npBetaRangeCertifySelector <- function(ordinary,
+                                       args,
+                                       selector,
+                                       method,
+                                       direction = c("min", "max"),
+                                       elapsed.start,
+                                       where) {
+  direction <- match.arg(direction)
+  resolved.bwsolver <- if (is.null(args$bwsolver)) {
+    "powell"
+  } else {
+    npValidateBwsolver(args$bwsolver)
+  }
+  resolved.compute <- if (is.null(args$bandwidth.compute)) {
+    TRUE
+  } else {
+    isTRUE(args$bandwidth.compute)
+  }
+  resolved.eval.only <- !is.null(args$eval.only) && isTRUE(args$eval.only)
+
+  if (!npBetaRangeCertificationEligible(
+        ordinary, method = method, bwsolver = resolved.bwsolver,
+        bandwidth.compute = resolved.compute,
+        eval.only = resolved.eval.only)) {
+    return(ordinary)
+  }
+
+  run <- function(candidate.bw, eval.only) {
+    candidate.args <- args
+    candidate <- ordinary
+    candidate$bw <- candidate.bw
+    candidate.args$bws <- candidate
+    candidate.args$bandwidth.compute <- TRUE
+    candidate.args$eval.only <- eval.only
+    candidate.args$nmulti <- 1L
+    candidate.args$bwsolver <- "powell"
+    do.call(selector, candidate.args)
+  }
+  npBetaRangeCertifySearch(
+    ordinary = ordinary,
+    evaluate = function(candidate.bw) run(candidate.bw, TRUE),
+    refine = function(candidate.bw) run(candidate.bw, FALSE),
+    direction = direction, elapsed.start = elapsed.start, where = where
+  )
+}
+
 npValidateBetaKernelSpecification <- function(ckertype,
                                               ckerorder,
                                               bwtype,
@@ -3215,6 +3407,15 @@ npUsesPolynomialSummaryLabel <- function(x){
     if (is.finite(guarded) && guarded > 0)
       lines <- c(lines, paste0("Guarded evaluations: ",
                                .np_summary_format_count(guarded)))
+  }
+
+  if (!(is.null(x$num.feval.certified) ||
+        (length(x$num.feval.certified) == 1L &&
+         is.na(x$num.feval.certified)))) {
+    certified <- suppressWarnings(as.numeric(x$num.feval.certified[1L]))
+    if (is.finite(certified) && certified > 0)
+      lines <- c(lines, paste0("Beta-range certification evaluations: ",
+                               .np_summary_format_count(certified)))
   }
 
   lines
