@@ -156,7 +156,12 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
 }
 
   \item{...}{ 
-    additional arguments supplied to \code{\link{npreg}} and \code{\link{npksum}}.
+    additional arguments supplied to \code{\link{npreg}} and
+    \code{\link{npksum}}. The private integral kernel sum in the empirical
+    adjoint always uses \code{bandwidth.divide = TRUE}, as required for the
+    ordinary CDF normalization; a \code{bandwidth.divide} value in
+    \code{...} continues to be supplied to \code{npreg} but does not override
+    this internal normalization.
   }
 
 }

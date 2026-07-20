@@ -246,16 +246,31 @@ npregivderiv <- function(y,
 
   mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 
+  ## Equation (14) requires an ordinary CDF-weighted average. Keep
+  ## bandwidth.divide in ... available to the regression calls above, but do
+  ## not allow it to change the normalization of this private adjoint.
+
+  npksum.dots <- list(...)
+  if("bandwidth.divide" %in% names(npksum.dots)) {
+    npksum.dots <- npksum.dots[names(npksum.dots) != "bandwidth.divide"]
+  }
+
+  cdf.weighted.average.apply <- function(rhs) {
+    do.call(npksum,
+            c(list(txdat=z,
+                   exdat=zeval,
+                   tydat=as.matrix(rhs),
+                   operator="integral",
+                   ukertype="liracine",
+                   okertype="liracine",
+                   bws=bw$bw,
+                   bandwidth.divide=TRUE),
+              npksum.dots))$ksum/length(y)
+  }
+
   ## Now we compute T^* applied to mu
 
-  cdf.weighted.average <- npksum(txdat=z,
-                                 exdat=zeval,
-                                 tydat=as.matrix(predicted.E.mu.w),
-                                 operator="integral",
-                                 ukertype="liracine",
-                                 okertype="liracine",
-                                 bws=bw$bw,
-                                 ...)$ksum/length(y)
+  cdf.weighted.average <- cdf.weighted.average.apply(predicted.E.mu.w)
 
   survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
 
@@ -345,14 +360,7 @@ npregivderiv <- function(y,
 
     ## Now we compute T^* applied to mu
 
-    cdf.weighted.average <- npksum(txdat=z,
-                                   exdat=zeval,
-                                   tydat=as.matrix(predicted.E.mu.w),
-                                   operator="integral",
-                                   ukertype="liracine",
-                                   okertype="liracine",
-                                   bws=bw$bw,
-                                   ...)$ksum/length(y)
+    cdf.weighted.average <- cdf.weighted.average.apply(predicted.E.mu.w)
 
     survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
 
@@ -377,7 +385,8 @@ npregivderiv <- function(y,
     ## N^0.5. Note that derivative estimation seems to require more
     ## iterations hence the heuristic sqrt(N)
 
-    if(j > round(sqrt(nrow(z))) && !is.monotone.increasing(norm.stop)) {
+    if(j > round(sqrt(nrow(z))) &&
+       !is.monotone.increasing(norm.stop[seq_len(j)])) {
 
       ## If stopping rule criterion increases or we are below stopping
       ## tolerance then break

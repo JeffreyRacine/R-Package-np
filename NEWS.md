@@ -1,5 +1,15 @@
 # npRmpi 0.70-6
 
+* Corrected the empirical adjoint in `npregivderiv()` to use the ordinary
+  kernel CDF required by Equation (14) of Florens, Centorrino, and Racine.
+  The integral kernel sum had retained an extra continuous-bandwidth factor,
+  which could make the Landweber-Fridman stopping norm increase and bias the
+  recovered conditional mean. The private adjoint now owns its required
+  normalization, while public `npksum()` defaults, regression argument
+  forwarding, and MPI payloads remain unchanged. The iteration guard also
+  examines only the computed prefix of the preallocated stopping vector. This
+  mirrors the serial `np` repair and resolves issue #57.
+
 * Retired the unused experimental truncated-Gaussian continuous kernel and
   its `nptgauss()` configuration helper. The supported continuous kernels are
   Gaussian, Epanechnikov, and uniform; their public interfaces, native codes,
