@@ -1,5 +1,15 @@
 # np 0.70-6
 
+* Corrected Landweber-Fridman state indexing in `npregivderiv()`. Iteration
+  `N` now consistently denotes `N` completed derivative updates: column `N`
+  of `phi.prime.mat` and `phi.mat`, `norm.stop[N]`, `num.iterations`, and the
+  returned derivative/function now identify the same state. The initialization
+  remains state zero, and evaluated stopping-rule overshoots remain available
+  in the iteration matrices while `num.iterations` identifies the selected
+  state. This can change the selected iteration and estimates because the
+  stopping criterion is now evaluated as `N` times the residual norm at state
+  `N`, as described by Florens, Centorrino, and Racine.
+
 * Corrected the empirical adjoint in `npregivderiv()` to use the ordinary
   kernel CDF required by Equation (14) of Florens, Centorrino, and Racine.
   The integral kernel sum had retained an extra continuous-bandwidth factor,

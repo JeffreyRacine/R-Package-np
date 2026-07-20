@@ -68,7 +68,7 @@ test_that("npregivderiv monotonicity guard uses only computed norms", {
 
   expect_match(
     src,
-    "is\\.monotone\\.increasing\\(norm\\.stop\\[seq_len\\(j\\)\\]\\)",
+    "is\\.monotone\\.increasing\\(norm\\.stop\\[seq_len\\(N\\)\\]\\)",
     perl = TRUE
   )
   expect_false(grepl(

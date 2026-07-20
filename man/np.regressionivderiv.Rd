@@ -101,8 +101,9 @@ These arguments control derivative iteration and reproducibility settings.
 
 
   \item{iterate.max}{
-    an integer indicating the maximum number of iterations permitted
-    before termination occurs for Landweber-Fridman iteration.
+    an integer indicating the maximum number of complete positive
+    Landweber-Fridman states to evaluate. The initialization state is
+    numbered zero and does not consume this budget.
   }
 
 
@@ -136,11 +137,10 @@ These arguments control residual smoothing and the initial derivative path.
   be overridden by providing \code{starting.values} below)
 }  
 
-\item{starting.values}{ a value indicating whether to commence
-  Landweber-Fridman assuming
-  \eqn{\varphi'_{-1}=starting.values}{phi'[-1]=starting.values} (proper
-  Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
-  \code{NULL}, see details below)
+\item{starting.values}{ an optional vector supplying the derivative
+  immediately before the first reported Landweber-Fridman update. When
+  omitted, the initialization derivative is obtained from \code{start.from}
+  (see details below).
 }
 
   \item{stop.on.increase}{
@@ -169,18 +169,19 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
 
-  Note that Landweber-Fridman iteration presumes that
-  \eqn{\varphi_{-1}=0}{phi[-1]=0}, and so for derivative estimation we
-  commence iterating from a model having derivatives all equal to
-  zero. Given this starting point it may require a fairly large number
-  of iterations in order to converge. Other perhaps more reasonable
-  starting values might present themselves. When \code{start.phi.zero}
-  is set to \code{FALSE} iteration will commence instead using
-  derivatives from the conditional mean model \eqn{E(y|z)}. Should the
-  default iteration terminate quickly or you are concerned about your
-  results, it would be prudent to verify that this alternative starting
-  value produces the same result. Also, check the norm.stop vector for
-  any anomalies (such as the error criterion increasing immediately).
+  Let \eqn{\varphi'_0}{phi'[0]} denote the initialization derivative,
+  obtained from \code{start.from} or supplied directly through
+  \code{starting.values}. Its integrated and centered curve is
+  \eqn{\varphi_0}{phi[0]}. This state is retained in
+  \code{starting.values.phi.prime} and \code{starting.values.phi}; it is
+  not a column of the positive-iteration matrices. For \eqn{N=1,2,\ldots},
+  iteration \eqn{N} means exactly \eqn{N} completed residual-correction
+  updates after this initialization. Column \eqn{N} of
+  \code{phi.prime.mat} and \code{phi.mat} therefore contains the coherent
+  pair \eqn{(\varphi'_N,\varphi_N)}{(phi'[N],phi[N])}, and
+  \code{norm.stop[N]} is evaluated at that same state using the multiplier
+  \eqn{N}. Check the stopping vector for anomalies such as an immediate
+  increase.
   
   Landweber-Fridman iteration uses an optimal stopping rule based upon
   \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2 }{||E(y|w)-E(phi(z,x)|w)||^2
@@ -219,8 +220,12 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
     \code{\link{plot}} support objects of this type.
 
   \code{npregivderiv} returns a list with components \code{phi.prime},
-  \code{phi}, \code{num.iterations}, \code{norm.stop} and
-  \code{convergence}.
+  \code{phi}, \code{phi.prime.mat}, \code{phi.mat},
+  \code{num.iterations}, \code{norm.stop}, \code{convergence}, and the
+  initialization components \code{starting.values.phi.prime} and
+  \code{starting.values.phi}. \code{num.iterations} is the selected state
+  returned in \code{phi.prime} and \code{phi}; the number of states evaluated,
+  including any stopping-rule overshoot, is \code{length(norm.stop)}.
   
 }
 
