@@ -22,7 +22,9 @@
 ## phi: the IV estimator of phi(z)
 ## convergence: a character string indicating whether/why iteration terminated
 
-npregiv <- function(y,
+npregiv <- function(y, ...) UseMethod("npregiv")
+
+npregiv.default <- function(y,
                     z,
                     w,
                     x=NULL,
@@ -56,10 +58,27 @@ npregiv <- function(y,
                     start.from=c("Eyz","EEywz"),
                     starting.values=NULL,
                     stop.on.increase=TRUE,
+                    regtype=NULL,
+                    degree=NULL,
+                    nomad=FALSE,
                     ...) {
 
   ptm.start <- proc.time()
+  p.missing <- missing(p)
   cl <- match.call()
+  cl[[1L]] <- quote(npregiv)
+  if(any(c("data", "newdata", "subset", "na.action") %in% names(cl)))
+    stop("data, newdata, subset, and na.action require the formula interface",
+         call. = FALSE)
+  smoothing.spec <- .np_iv_resolve_npregiv_smoothing(
+    p = p,
+    p.missing = p.missing,
+    regtype = regtype,
+    degree = degree,
+    nomad = nomad
+  )
+  p <- smoothing.spec$p
+  trainiseval <- is.null(zeval)
   if(!is.null(nmulti)) nmulti <- npValidateNmulti(nmulti)
 
   ## This function was constructed initially by Samuele Centorrino
@@ -1109,6 +1128,20 @@ npregiv <- function(y,
   if(missing(w)) stop("You must provide w")
   if(NCOL(y) > 1) stop("y must be univariate")
   if(NROW(y) != NROW(z) || NROW(y) != NROW(w)) stop("y, z, and w have differing numbers of rows")
+  if(!is.null(x) && NROW(y) != NROW(x)) stop("y and x have differing numbers of rows")
+  if(is.null(x) && !is.null(xeval))
+    stop("xeval requires exogenous training data x", call. = FALSE)
+  if(!is.null(x)) {
+    if(is.null(zeval) && !is.null(xeval)) zeval <- z
+    if(!is.null(zeval) && is.null(xeval)) {
+      if(NROW(zeval) != NROW(x))
+        stop("xeval must be supplied when zeval has a different number of rows than x",
+             call. = FALSE)
+      xeval <- x
+    }
+    if(!is.null(zeval) && NROW(zeval) != NROW(xeval))
+      stop("zeval and xeval have differing numbers of rows", call. = FALSE)
+  }
   if(iterate.max < 2) stop("iterate.max must be at least 2")
   if(iterate.diff.tol < 0) stop("iterate.diff.tol must be non-negative")
   if(constant <= 0 || constant >=1) stop("constant must lie in (0,1)")
@@ -1529,6 +1562,17 @@ npregiv <- function(y,
                 zeval=zeval,
                 xeval=xeval,
                 p=p,
+                bws=list(E.y.w=bw.E.y.w,
+                         E.E.y.w.z=bw.E.E.y.w.z,
+                         E.phi.w=bw.E.phi.w,
+                         E.E.phi.w.z=bw.E.E.phi.w.z),
+                smoothing.spec=smoothing.spec,
+                stage.specs=list(
+                  w=list(regtype=smoothing.spec$effective$regtype,
+                         degree=rep.int(p, num.w.numeric)),
+                  z=list(regtype=smoothing.spec$effective$regtype,
+                         degree=rep.int(p, num.z.numeric))),
+                trainiseval=trainiseval,
                 nmulti=nmulti,
                 method=method,
                 ptm=proc.time() - ptm.start)
@@ -2432,6 +2476,17 @@ npregiv <- function(y,
                 zeval=zeval,
                 xeval=xeval,
                 p=p,
+                bws=list(E.y.w=bw.E.y.w,
+                         E.y.z=bw.E.y.z,
+                         resid.w=as.matrix(bw.resid.w),
+                         resid.fitted.w.z=as.matrix(bw.resid.fitted.w.z)),
+                smoothing.spec=smoothing.spec,
+                stage.specs=list(
+                  w=list(regtype=smoothing.spec$effective$regtype,
+                         degree=rep.int(p, num.w.numeric)),
+                  z=list(regtype=smoothing.spec$effective$regtype,
+                         degree=rep.int(p, num.z.numeric))),
+                trainiseval=trainiseval,
                 nmulti=nmulti,
                 method=method,
                 ptm=proc.time() - ptm.start)
@@ -2444,66 +2499,14 @@ npregiv <- function(y,
 }
 
 print.npregiv <- function(x, ...) {
-  summary.npregiv(x, ...)
+  print(summary.npregiv(x, ...))
   invisible(x)
 }
 
 summary.npregiv <- function(object, ...) {
-  format_bw <- function(bw, label, names = NULL) {
-    if(is.null(bw)) return()
-    if(is.matrix(bw)) bw <- bw[nrow(bw), , drop = TRUE]
-    bw <- as.numeric(bw)
-    if(!is.null(names) && length(names) == length(bw)) {
-      vals <- paste(paste(names, formatC(bw, digits=8, format="g"), sep=": "), collapse=", ")
-    } else {
-      vals <- paste(formatC(bw, digits=8, format="g"), collapse=", ")
-    }
-    cat(paste("\n", label, " ", vals, sep=""))
-  }
-
-  cat("Call:\n")
-  print(object$call)
-
-  if(is.null(object$alpha))
-    cat("\nNonparametric Instrumental Kernel Regression\n",sep="")
-  else
-    cat("\nNonparametric Instrumental Kernel Regression (Tikhonov)\n",sep="")
-
-  cat(paste("\nNumber of continuous endogenous predictors: ",format(NCOL(object$z)),sep=""),sep="")
-  cat(paste("\nNumber of continuous instruments: ",format(NCOL(object$w)),sep=""),sep="")
-  if(!is.null(object$x)) cat(paste("\nNumber of continuous exogenous predictors: ",format(NCOL(object$x)),sep=""),sep="")
-
-  cat(paste("\nLocal polynomial order (p): ", format(object$p), sep=""))
-  cat(paste("\nTraining observations: ", format(NROW(object$y)), sep=""))
-
-  if(!is.null(object$alpha)) {
-    cat(paste("\n\nRegularization method: Tikhonov",sep=""))
-    cat(paste("\nTikhonov parameter (alpha): ", format(object$alpha,digits=8), sep=""))
-    if(!is.null(object$alpha.iter)) cat(paste("\nIterated Tikhonov parameter (alpha.iter): ", format(object$alpha.iter,digits=8), sep=""))
-  } else {
-    cat(paste("\n\nRegularization method: Landweber-Fridman",sep=""))
-    cat(paste("\nNumber of iterations: ", format(object$norm.index), sep=""))
-    cat(paste("\nStopping rule value: ", format(object$norm.stop[length(object$norm.stop)],digits=8), sep=""))
-  }
-
-  w.names <- if(!is.null(object$w)) colnames(object$w) else NULL
-  z.names <- if(!is.null(object$z)) colnames(object$z) else NULL
-
-  if(is.null(object$alpha)) {
-    format_bw(object$bw.E.y.w, "Bandwidth for E(y|w):", w.names)
-    format_bw(object$bw.E.y.z, "Bandwidth for E(y|z):", z.names)
-    format_bw(object$bw.resid.w, "Bandwidth for E(y-phi(z)|w):", w.names)
-    format_bw(object$bw.resid.fitted.w.z, "Bandwidth for E(E(y-phi(z)|w)|z):", z.names)
-  } else {
-    format_bw(object$bw.E.y.w, "Bandwidth for E(y|w):", w.names)
-    format_bw(object$bw.E.E.y.w.z, "Bandwidth for E(E(y|w)|z):", z.names)
-    format_bw(object$bw.E.phi.w, "Bandwidth for E(phi(z)|w):", w.names)
-    format_bw(object$bw.E.E.phi.w.z, "Bandwidth for E(E(phi(z)|w)|z):", z.names)
-  }
-
-  cat(paste("\nNumber of multistarts: ", format(object$nmulti), sep=""))
-  cat(paste("\nEstimation time: ", formatC(object$ptm[1],digits=1,format="f"), " seconds",sep=""))
-  cat("\n\n")
+  ans <- .np_iv_summary_payload(object, derivative = FALSE)
+  class(ans) <- "summary.npregiv"
+  ans
 }
 
 .np_plot_validate_npregiv_call <- function(call,
@@ -2546,7 +2549,8 @@ plot.npregiv <- function(x,
   ## We only support univariate endogenous predictor z
   if(NCOL(object$z) > 1) stop(" only univariate z is supported")
 
-  z <- object$z[,1]
+  z.eval <- if (is.null(object$zeval)) object$z else object$zeval
+  z <- z.eval[,1]
   y <- object$y
   phi <- object$phi
 
@@ -2569,6 +2573,9 @@ plot.npregiv <- function(x,
   } else {
 
     if(plot.data) {
+      if (!.np_iv_object_trainiseval(object))
+        stop("plot.data=TRUE is available only for training-row evaluation",
+             call. = FALSE)
       plot.type <- take_arg("type", "p")
       plot.xlab <- take_arg("xlab", zname)
       plot.ylab <- take_arg("ylab", yname)

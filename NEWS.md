@@ -1,5 +1,17 @@
 # np 0.70-6
 
+* Modernized the public `npregiv()` and `npregivderiv()` interfaces while
+  preserving their established numerical defaults. Both now support explicit
+  IV formulas (`y ~ z | w`, with optional `| x` where the estimator supports
+  it), `data`, `subset`, `na.action`, fit-time `newdata`, fixed
+  `regtype = "lc"`/`"ll"`/`"lp"` and scalar `degree` controls, structured
+  summaries, and `fitted()`, `gradients()`, and training-row `residuals()`.
+  Objects retain compact bandwidth, smoothing, and stage metadata. Legacy
+  `p` remains supported by `npregiv()` with unchanged default behavior.
+  Unsupported post-fit prediction, derivative `x`, and automatic-degree
+  NOMAD routes are documented and fail explicitly instead of being silently
+  accepted or approximated.
+
 * Corrected recursive fitted-value centering in `npregivderiv()` so both
   empirical terms of the Equation (14) adjoint use the same fitted
   conditional-residual vector. The recursive path had instead centered its
