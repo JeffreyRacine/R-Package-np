@@ -4039,6 +4039,16 @@ npcdensbw.default <-
           .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
           parent.frame()))
     }
+    npWarnIgnoredUniformKernelOrder(
+      call.names = mc.names,
+      kernel.type = if ("cxkertype" %in% mc.names) cxkertype else "gaussian",
+      order.arg = "cxkerorder"
+    )
+    npWarnIgnoredUniformKernelOrder(
+      call.names = mc.names,
+      kernel.type = if ("cykertype" %in% mc.names) cykertype else "gaussian",
+      order.arg = "cykerorder"
+    )
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(mc)

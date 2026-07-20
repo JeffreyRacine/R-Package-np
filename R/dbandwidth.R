@@ -39,9 +39,7 @@ dbandwidth <-
 
     if(missing(ckerorder))
       ckerorder = 2
-    else if (ckertype == "uniform")
-      .np_warning("ignoring kernel order specified with uniform kernel type")
-    else {
+    else if (ckertype != "uniform") {
       kord = c(2,4,6,8) 
       if (!any(kord == ckerorder))
         stop("ckerorder must be one of ", paste(kord,collapse=" "))

@@ -3210,6 +3210,12 @@ npregbw.default <-
         .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
         parent.frame()))
 
+    npWarnIgnoredUniformKernelOrder(
+      call.names = mc.names,
+      kernel.type = if ("ckertype" %in% mc.names) ckertype else "gaussian",
+      order.arg = "ckerorder"
+    )
+
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
 

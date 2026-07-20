@@ -1833,6 +1833,23 @@ npValidateBetaKernelSpecification <- function(ckertype,
   invisible(TRUE)
 }
 
+npWarnIgnoredUniformKernelOrder <- function(call.names,
+                                            kernel.type,
+                                            order.arg = "ckerorder") {
+  if (!(order.arg %in% call.names))
+    return(invisible(FALSE))
+
+  kernel.type <- match.arg(
+    kernel.type,
+    c("gaussian", "epanechnikov", "uniform", "beta")
+  )
+  if (!identical(kernel.type, "uniform"))
+    return(invisible(FALSE))
+
+  .np_warning("ignoring kernel order specified with uniform kernel type")
+  invisible(TRUE)
+}
+
 npKernelBoundsMarshal <- function(kerlb, kerub) {
   lb <- as.double(kerlb)
   ub <- as.double(kerub)

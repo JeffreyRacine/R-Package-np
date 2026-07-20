@@ -1133,6 +1133,13 @@ npudistbw.default <-
     if (anyNA(dat) && !any(stats::complete.cases(dat)))
       stop("Data has no rows without NAs")
 
+    uniform.call.names <- names(match.call(expand.dots = FALSE))
+    npWarnIgnoredUniformKernelOrder(
+      call.names = uniform.call.names,
+      kernel.type = if ("ckertype" %in% uniform.call.names) ckertype else "gaussian",
+      order.arg = "ckerorder"
+    )
+
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
     ## bandwidth() call
 
