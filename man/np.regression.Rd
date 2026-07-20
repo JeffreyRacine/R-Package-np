@@ -316,7 +316,10 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   normalized numerator/denominator jumps are cancelled first. A genuine
   estimator jump is returned as a signed infinity with \code{gerr=NA}; an
   indeterminate numerical cancellation is returned as \code{NA} with a
-  warning. Manual and
+  warning. This extended-real gradient is retained in fitted and plot-data
+  objects. Plot methods omit the non-finite coordinate only from their
+  temporary drawing geometry, so an endpoint singularity breaks the plotted
+  line without changing the returned estimate. Manual and
   cross-validated bandwidth objects support fixed, generalized-NN, and
   adaptive-NN modes. Categorical predictors and local-linear/local-polynomial
   fits fail explicitly. An evaluation point

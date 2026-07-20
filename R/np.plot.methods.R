@@ -1790,6 +1790,7 @@ np_render_control <- function(style = c("band", "bar"),
                                    ylab = NULL) {
   x <- dat$x
   y <- if (isTRUE(gradients)) dat$effect else dat$probability
+  y <- .np_plot_geometry_values(y)
   vname <- dat$variable[1L]
   if (is.null(main))
     main <- if (isTRUE(gradients)) {

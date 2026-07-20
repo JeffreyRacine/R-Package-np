@@ -78,6 +78,12 @@
   \eqn{(1)}, \eqn{(2,-1)}, \eqn{(3,-3,1)}, and
   \eqn{(4,-6,4,-1)}. The construction preserves unit mass and the original
   support while deliberately producing signed kernels above order 2.
+  The Igarashi--Kakizawa higher-order bias result is a deterministic/fixed-
+  bandwidth result. The generalized- and adaptive-nearest-neighbour routes
+  below implement the same validated multiscale construction conditional on
+  their realized bandwidths; their availability is an implementation and
+  numerical-validation contract, not a claim that the fixed-bandwidth bias
+  theorem automatically extends to random NN bandwidths.
 
   In the present implementation orders 2, 4, 6, and 8 are available through
   \code{npksum}, \code{npudens}, \code{npudist}, local-constant
@@ -87,6 +93,10 @@
   \code{"adaptive_nn"}. Bounds may be explicit
   (\code{ckerbound="fixed"}) or the exact training-sample range
   (\code{ckerbound="range"}); all active beta bounds must be finite.
+  With sample-range bounds, training extrema lie exactly on the declared
+  endpoints. Ordinary PDF/CDF estimation uses the analytic endpoint branches;
+  PDF derivatives at a matching endpoint therefore follow the extended-real
+  convention described below rather than moving the support outward.
   The beta routes currently require continuous variables only. Regression and
   conditional estimators additionally require \code{regtype="lc"}; if either
   conditional side uses beta, all X and Y coordinates must be continuous.
@@ -114,7 +124,8 @@
   its matching scalar PDF contribution jump downward (upward) when the target
   crosses that endpoint. The scalar derivative is consequently reported as
   \eqn{-\infty} at a matching lower endpoint and \eqn{+\infty} at a matching
-  upper endpoint; nonmatching endpoint contributions have derivative zero.
+  upper endpoint. An observation at the opposite endpoint contributes zero;
+  observations strictly inside the support have finite one-sided derivatives.
   Local-constant regression and conditional estimators cancel numerator and
   denominator jumps before classifying their gradient, so a normalized ratio
   may still have a finite derivative (and a constant response or constant Y
@@ -122,6 +133,11 @@
   infinity. Numerically indeterminate cancellation is returned as \code{NA}
   with a warning. Derivative hat matrices cannot encode response-specific
   cancellation and therefore mark an affected endpoint row \code{NA}.
+  These distinctions follow R's numeric semantics: signed infinity denotes a
+  proper mathematical limit, whereas \code{NA_real_} denotes an unavailable
+  value. Plot methods preserve the returned values and replace non-finite
+  coordinates only in their temporary drawing geometry; see
+  \code{\link{plot.np}}.
 
   For nearest-neighbor modes, the
   existing observation-support nearest-neighbor engine supplies the
