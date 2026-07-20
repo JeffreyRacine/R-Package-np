@@ -883,6 +883,315 @@ static int np_beta_objective_conditional_sums(
   return 0;
 }
 
+static int np_beta_objective_conditional_x_cache(
+  int bandwidth_mode,
+  int kernel_code_x,
+  int order_x,
+  int num_obs,
+  int num_x,
+  double **train_x,
+  double **eval_x,
+  double **bandwidth_x,
+  const double *lower_x,
+  const double *upper_x,
+  int evaluation_x,
+  int omitted_observation,
+  double *x_log,
+  int *x_sign,
+  double *denominator_log,
+  int *denominator_sign)
+{
+  np_beta_log_sum denominator;
+  int observation_index;
+
+  if(x_log == NULL || x_sign == NULL || denominator_log == NULL ||
+     denominator_sign == NULL)
+    return 1;
+
+  np_beta_log_sum_init(&denominator);
+  for(observation_index = 0; observation_index < num_obs;
+      ++observation_index) {
+    x_log[observation_index] = -INFINITY;
+    x_sign[observation_index] = 0;
+    if(observation_index == omitted_observation)
+      continue;
+    if(np_beta_objective_conditional_product_log(
+         0, bandwidth_mode, kernel_code_x, order_x, num_x,
+         train_x, eval_x, bandwidth_x, lower_x, upper_x,
+         evaluation_x, observation_index,
+         &x_log[observation_index], &x_sign[observation_index]) != 0)
+      return 1;
+    np_beta_log_sum_add(&denominator,
+                        x_log[observation_index],
+                        x_sign[observation_index]);
+  }
+
+  if(np_beta_log_sum_finish(&denominator,
+                            denominator_log, denominator_sign) != 0 ||
+     *denominator_sign == 0)
+    return 1;
+  return 0;
+}
+
+static int np_beta_objective_conditional_numerator_from_x_cache(
+  int do_cdf_y,
+  int bandwidth_mode,
+  int kernel_code_y,
+  int order_y,
+  int num_obs,
+  int num_y,
+  double **train_y,
+  double **eval_y,
+  double **bandwidth_y,
+  const double *lower_y,
+  const double *upper_y,
+  int evaluation_y,
+  const double *x_log,
+  const int *x_sign,
+  double *numerator_log,
+  int *numerator_sign)
+{
+  np_beta_log_sum numerator;
+  int observation_index;
+
+  if(x_log == NULL || x_sign == NULL || numerator_log == NULL ||
+     numerator_sign == NULL)
+    return 1;
+
+  np_beta_log_sum_init(&numerator);
+  for(observation_index = 0; observation_index < num_obs;
+      ++observation_index) {
+    double y_log = -INFINITY;
+    int y_sign = 0;
+
+    if(x_sign[observation_index] == 0)
+      continue;
+    if(np_beta_objective_conditional_product_log(
+         do_cdf_y, bandwidth_mode, kernel_code_y, order_y, num_y,
+         train_y, eval_y, bandwidth_y, lower_y, upper_y,
+         evaluation_y, observation_index, &y_log, &y_sign) != 0)
+      return 1;
+    np_beta_log_sum_add(&numerator,
+                        x_log[observation_index] + y_log,
+                        x_sign[observation_index] * y_sign);
+  }
+
+  return np_beta_log_sum_finish(&numerator,
+                                numerator_log, numerator_sign);
+}
+
+static int np_beta_objective_legacy_y_is_unbounded(
+  int kernel_code_y,
+  int num_y,
+  const double *lower_y,
+  const double *upper_y)
+{
+  int dimension;
+
+  if(kernel_code_y == NP_CKERNEL_COORDINATE_CODE ||
+     num_y <= 0 || lower_y == NULL || upper_y == NULL)
+    return 0;
+  for(dimension = 0; dimension < num_y; ++dimension) {
+    if(lower_y[dimension] > -0.5 * DBL_MAX ||
+       upper_y[dimension] < 0.5 * DBL_MAX)
+      return 0;
+  }
+  return 1;
+}
+
+static int np_beta_objective_legacy_y_overlap_log(
+  int bandwidth_mode,
+  int kernel_code_y,
+  int num_y,
+  double **train_y,
+  double **bandwidth_y,
+  int first_observation,
+  int second_observation,
+  double *log_absolute,
+  int *sign)
+{
+  double log_product = 0.0;
+  int product_sign = 1;
+  int dimension;
+
+  if(num_y <= 0 || train_y == NULL || bandwidth_y == NULL ||
+     log_absolute == NULL || sign == NULL)
+    return 1;
+
+  for(dimension = 0; dimension < num_y; ++dimension) {
+    const double first_bandwidth = np_beta_objective_bandwidth(
+      bandwidth_mode, bandwidth_y, dimension,
+      first_observation, first_observation);
+    const double second_bandwidth = np_beta_objective_bandwidth(
+      bandwidth_mode, bandwidth_y, dimension,
+      second_observation, second_observation);
+    const double difference =
+      train_y[dimension][first_observation] -
+      train_y[dimension][second_observation];
+    double standardized_difference;
+    double divisor;
+    double value;
+
+    if(!R_FINITE(first_bandwidth) || !R_FINITE(second_bandwidth) ||
+       first_bandwidth <= 0.0 || second_bandwidth <= 0.0)
+      return 1;
+    /* Preserve the established kernel_convol() orientation for each package
+       bandwidth mode.  This is the exact unbounded-Y overlap used by the
+       legacy conditional CVLS objective, with beta permitted only on X. */
+    if(bandwidth_mode == BW_ADAP_NN) {
+      standardized_difference = difference / second_bandwidth;
+      divisor = second_bandwidth;
+      value = kernel_convol(kernel_code_y, bandwidth_mode,
+                            standardized_difference,
+                            first_bandwidth, second_bandwidth) / divisor;
+    } else {
+      standardized_difference = difference / first_bandwidth;
+      divisor = first_bandwidth;
+      value = kernel_convol(kernel_code_y, bandwidth_mode,
+                            standardized_difference,
+                            second_bandwidth, first_bandwidth) / divisor;
+    }
+    if(!R_FINITE(value))
+      return 1;
+    if(value == 0.0) {
+      *log_absolute = -INFINITY;
+      *sign = 0;
+      return 0;
+    }
+    log_product += log(fabs(value));
+    product_sign *= (value > 0.0) ? 1 : -1;
+    if(!R_FINITE(log_product))
+      return 1;
+  }
+
+  *log_absolute = log_product;
+  *sign = product_sign;
+  return 0;
+}
+
+static double np_beta_objective_conditional_density_ls_unbounded_legacy_y(
+  int bandwidth_mode,
+  int kernel_code_x,
+  int order_x,
+  int kernel_code_y,
+  int order_y,
+  int num_obs,
+  int num_x,
+  int num_y,
+  double **train_x,
+  double **train_y,
+  const double *candidate,
+  const double *lower_x,
+  const double *upper_x,
+  const double *lower_y,
+  const double *upper_y)
+{
+  double **bandwidth_x = NULL;
+  double **bandwidth_y = NULL;
+  double *x_log = NULL;
+  int *x_sign = NULL;
+  double objective = DBL_MAX;
+  double sum = 0.0;
+  int bandwidth_rows;
+  int evaluation_index;
+
+  bandwidth_rows = np_beta_objective_bandwidth_rows(
+    bandwidth_mode, num_obs, num_obs);
+  bandwidth_x = alloc_matd(bandwidth_rows, num_x);
+  bandwidth_y = alloc_matd(bandwidth_rows, num_y);
+  x_log = alloc_vecd(num_obs);
+  x_sign = alloc_vecu(num_obs);
+  if(bandwidth_x == NULL || bandwidth_y == NULL ||
+     x_log == NULL || x_sign == NULL)
+    goto cleanup_unbounded_legacy_y;
+  if(np_beta_objective_prepare_bandwidth_offset(
+       bandwidth_mode, num_obs, num_obs, num_x,
+       0, train_x, train_x, candidate, bandwidth_x) != 0 ||
+     np_beta_objective_prepare_bandwidth_offset(
+       bandwidth_mode, num_obs, num_obs, num_y, num_x,
+       train_y, train_y, candidate + num_x, bandwidth_y) != 0)
+    goto cleanup_unbounded_legacy_y;
+
+  for(evaluation_index = 0; evaluation_index < num_obs;
+      ++evaluation_index) {
+    np_beta_log_sum overlap_sum;
+    double denominator_log = -INFINITY;
+    double cross_numerator_log = -INFINITY;
+    double overlap_log = -INFINITY;
+    double cross_fit = 0.0;
+    double integrated_square = 0.0;
+    int denominator_sign = 0;
+    int cross_numerator_sign = 0;
+    int overlap_sign = 0;
+    int first_observation;
+
+    if((evaluation_index & 7) == 0)
+      np_progress_bandwidth_loop_step();
+    if(np_beta_objective_conditional_x_cache(
+         bandwidth_mode, kernel_code_x, order_x,
+         num_obs, num_x, train_x, train_x, bandwidth_x,
+         lower_x, upper_x, evaluation_index, evaluation_index,
+         x_log, x_sign, &denominator_log, &denominator_sign) != 0 ||
+       np_beta_objective_conditional_numerator_from_x_cache(
+         0, bandwidth_mode, kernel_code_y, order_y,
+         num_obs, num_y, train_y, train_y, bandwidth_y,
+         lower_y, upper_y, evaluation_index, x_log, x_sign,
+         &cross_numerator_log, &cross_numerator_sign) != 0 ||
+       np_beta_objective_ratio(
+         cross_numerator_log, cross_numerator_sign,
+         denominator_log, denominator_sign, &cross_fit) != 0)
+      goto cleanup_unbounded_legacy_y;
+
+    np_beta_log_sum_init(&overlap_sum);
+    for(first_observation = 0; first_observation < num_obs;
+        ++first_observation) {
+      int second_observation;
+
+      if(x_sign[first_observation] == 0)
+        continue;
+      for(second_observation = 0; second_observation < num_obs;
+          ++second_observation) {
+        double pair_log = -INFINITY;
+        int pair_sign = 0;
+
+        if(x_sign[second_observation] == 0)
+          continue;
+        if(np_beta_objective_legacy_y_overlap_log(
+             bandwidth_mode, kernel_code_y, num_y,
+             train_y, bandwidth_y,
+             first_observation, second_observation,
+             &pair_log, &pair_sign) != 0)
+          goto cleanup_unbounded_legacy_y;
+        np_beta_log_sum_add(
+          &overlap_sum,
+          x_log[first_observation] + x_log[second_observation] + pair_log,
+          x_sign[first_observation] * x_sign[second_observation] * pair_sign);
+      }
+    }
+    if(np_beta_log_sum_finish(&overlap_sum,
+                              &overlap_log, &overlap_sign) != 0 ||
+       np_beta_log_signed_value(
+         overlap_log - 2.0 * denominator_log,
+         overlap_sign, &integrated_square) != 0)
+      goto cleanup_unbounded_legacy_y;
+    sum += integrated_square - 2.0 * cross_fit;
+    if(!R_FINITE(sum))
+      goto cleanup_unbounded_legacy_y;
+  }
+  objective = sum / (double)num_obs;
+
+cleanup_unbounded_legacy_y:
+  if(bandwidth_x != NULL)
+    free_mat(bandwidth_x, num_x);
+  if(bandwidth_y != NULL)
+    free_mat(bandwidth_y, num_y);
+  if(x_log != NULL)
+    free(x_log);
+  if(x_sign != NULL)
+    free(x_sign);
+  return R_FINITE(objective) ? objective : DBL_MAX;
+}
+
 static int np_beta_objective_conditional_layout_ok(int bandwidth_mode,
                                                     int order_x,
                                                     int order_y,
@@ -1004,6 +1313,8 @@ double np_beta_objective_conditional_distribution_ls(
 {
   double **bandwidth_x = NULL;
   double **bandwidth_y = NULL;
+  double *x_log = NULL;
+  int *x_sign = NULL;
   double objective = DBL_MAX;
   double sum = 0.0;
   int bandwidth_rows_x;
@@ -1022,7 +1333,10 @@ double np_beta_objective_conditional_distribution_ls(
     bandwidth_mode, num_obs_train, num_obs_eval);
   bandwidth_x = alloc_matd(bandwidth_rows_x, num_x);
   bandwidth_y = alloc_matd(bandwidth_rows_y, num_y);
-  if(bandwidth_x == NULL || bandwidth_y == NULL)
+  x_log = alloc_vecd(num_obs_train);
+  x_sign = alloc_vecu(num_obs_train);
+  if(bandwidth_x == NULL || bandwidth_y == NULL ||
+     x_log == NULL || x_sign == NULL)
     goto cleanup_conditional_distribution_ls;
   if(np_beta_objective_prepare_bandwidth_offset(
        bandwidth_mode, num_obs_train, num_obs_train, num_x,
@@ -1034,29 +1348,32 @@ double np_beta_objective_conditional_distribution_ls(
 
   for(observation_index = 0; observation_index < num_obs_train;
       ++observation_index) {
+    double denominator_log = -INFINITY;
+    int denominator_sign = 0;
+
     if((observation_index & 15) == 0)
       np_progress_bandwidth_loop_step();
+    if(np_beta_objective_conditional_x_cache(
+         bandwidth_mode, kernel_code_x, order_x,
+         num_obs_train, num_x, train_x, train_x, bandwidth_x,
+         lower_x, upper_x, observation_index, observation_index,
+         x_log, x_sign, &denominator_log, &denominator_sign) != 0)
+      goto cleanup_conditional_distribution_ls;
     for(evaluation_index = 0; evaluation_index < num_obs_eval;
         ++evaluation_index) {
-      double denominator_log = -INFINITY;
       double numerator_log = -INFINITY;
       double fitted = 0.0;
       double indicator = 1.0;
       double difference;
-      int denominator_sign = 0;
       int numerator_sign = 0;
       int dimension;
 
       if(cdf_on_train && evaluation_index == observation_index)
         continue;
-      if(np_beta_objective_conditional_sums(
-           1, bandwidth_mode, kernel_code_x, order_x,
-           kernel_code_y, order_y, num_obs_train, num_x, num_y,
-           train_x, train_y, train_x, eval_y,
-           bandwidth_x, bandwidth_y,
-           lower_x, upper_x, lower_y, upper_y,
-           observation_index, evaluation_index, observation_index,
-           &denominator_log, &denominator_sign,
+      if(np_beta_objective_conditional_numerator_from_x_cache(
+           1, bandwidth_mode, kernel_code_y, order_y,
+           num_obs_train, num_y, train_y, eval_y, bandwidth_y,
+           lower_y, upper_y, evaluation_index, x_log, x_sign,
            &numerator_log, &numerator_sign) != 0 ||
          np_beta_objective_ratio(
            numerator_log, numerator_sign,
@@ -1078,6 +1395,10 @@ cleanup_conditional_distribution_ls:
     free_mat(bandwidth_x, num_x);
   if(bandwidth_y != NULL)
     free_mat(bandwidth_y, num_y);
+  if(x_log != NULL)
+    free(x_log);
+  if(x_sign != NULL)
+    free(x_sign);
   return R_FINITE(objective) ? objective : DBL_MAX;
 }
 
@@ -1104,6 +1425,10 @@ double np_beta_objective_conditional_density_ls(
   double **bandwidth_y_train = NULL;
   double **bandwidth_y_grid = NULL;
   double *weights = NULL;
+  double *x_log = NULL;
+  int *x_sign = NULL;
+  double quadrature_lower[2] = {0.0, 0.0};
+  double quadrature_upper[2] = {0.0, 0.0};
   double objective = DBL_MAX;
   double sum = 0.0;
   int total_points = 1;
@@ -1118,6 +1443,14 @@ double np_beta_objective_conditional_density_ls(
        train_x, train_y, candidate, lower_x, upper_x, lower_y, upper_y) ||
      num_y > 2 || quadrature_points < 2)
     return DBL_MAX;
+  if(np_beta_objective_legacy_y_is_unbounded(
+       kernel_code_y, num_y, lower_y, upper_y))
+    /* Bounded target quadrature is neither necessary nor valid on R^d. */
+    return np_beta_objective_conditional_density_ls_unbounded_legacy_y(
+      bandwidth_mode, kernel_code_x, order_x,
+      kernel_code_y, order_y, num_obs, num_x, num_y,
+      train_x, train_y, candidate,
+      lower_x, upper_x, lower_y, upper_y);
   for(dimension = 0; dimension < num_y; ++dimension) {
     if(total_points > INT_MAX / quadrature_points)
       return DBL_MAX;
@@ -1130,15 +1463,20 @@ double np_beta_objective_conditional_density_ls(
   weights = alloc_vecd(total_points);
   bandwidth_x = alloc_matd(bandwidth_rows_train, num_x);
   bandwidth_y_train = alloc_matd(bandwidth_rows_train, num_y);
+  x_log = alloc_vecd(num_obs);
+  x_sign = alloc_vecu(num_obs);
   if(grid_y == NULL || weights == NULL || bandwidth_x == NULL ||
-     bandwidth_y_train == NULL)
+     bandwidth_y_train == NULL || x_log == NULL || x_sign == NULL)
     goto cleanup_conditional_density_ls;
+  np_bounded_cvls_conditional_effective_integration_bounds_extern(
+    num_y, train_y, num_obs, lower_y, upper_y,
+    quadrature_lower, quadrature_upper);
   actual_points = total_points;
   if(((num_y == 1) ?
        np_bounded_cvls_build_conditional_grid_1d_extern(
-         train_y[0], num_obs, lower_y[0], upper_y[0],
+         train_y[0], num_obs, quadrature_lower[0], quadrature_upper[0],
          quadrature_points, grid_y[0], weights, &actual_points) :
-       np_beta_objective_fill_grid(num_y, lower_y, upper_y,
+       np_beta_objective_fill_grid(num_y, quadrature_lower, quadrature_upper,
                                    quadrature_points, grid_y, weights)) != 0)
     goto cleanup_conditional_density_ls;
 
@@ -1169,14 +1507,15 @@ double np_beta_objective_conditional_density_ls(
 
     if((observation_index & 7) == 0)
       np_progress_bandwidth_loop_step();
-    if(np_beta_objective_conditional_sums(
-         0, bandwidth_mode, kernel_code_x, order_x,
-         kernel_code_y, order_y, num_obs, num_x, num_y,
-         train_x, train_y, train_x, train_y,
-         bandwidth_x, bandwidth_y_train,
-         lower_x, upper_x, lower_y, upper_y,
-         observation_index, observation_index, observation_index,
-         &denominator_log, &denominator_sign,
+    if(np_beta_objective_conditional_x_cache(
+         bandwidth_mode, kernel_code_x, order_x,
+         num_obs, num_x, train_x, train_x, bandwidth_x,
+         lower_x, upper_x, observation_index, observation_index,
+         x_log, x_sign, &denominator_log, &denominator_sign) != 0 ||
+       np_beta_objective_conditional_numerator_from_x_cache(
+         0, bandwidth_mode, kernel_code_y, order_y,
+         num_obs, num_y, train_y, train_y, bandwidth_y_train,
+         lower_y, upper_y, observation_index, x_log, x_sign,
          &cross_numerator_log, &cross_numerator_sign) != 0 ||
        np_beta_objective_ratio(
          cross_numerator_log, cross_numerator_sign,
@@ -1184,20 +1523,14 @@ double np_beta_objective_conditional_density_ls(
       goto cleanup_conditional_density_ls;
 
     for(grid_index = 0; grid_index < total_points; ++grid_index) {
-      double ignored_denominator_log = -INFINITY;
       double grid_numerator_log = -INFINITY;
       double fitted = 0.0;
-      int ignored_denominator_sign = 0;
       int grid_numerator_sign = 0;
 
-      if(np_beta_objective_conditional_sums(
-           0, bandwidth_mode, kernel_code_x, order_x,
-           kernel_code_y, order_y, num_obs, num_x, num_y,
-           train_x, train_y, train_x, grid_y,
-           bandwidth_x, bandwidth_y_grid,
-           lower_x, upper_x, lower_y, upper_y,
-           observation_index, grid_index, observation_index,
-           &ignored_denominator_log, &ignored_denominator_sign,
+      if(np_beta_objective_conditional_numerator_from_x_cache(
+           0, bandwidth_mode, kernel_code_y, order_y,
+           num_obs, num_y, train_y, grid_y, bandwidth_y_grid,
+           lower_y, upper_y, grid_index, x_log, x_sign,
            &grid_numerator_log, &grid_numerator_sign) != 0 ||
          np_beta_objective_ratio(
            grid_numerator_log, grid_numerator_sign,
@@ -1224,5 +1557,9 @@ cleanup_conditional_density_ls:
     free_mat(bandwidth_y_grid, num_y);
   if(weights != NULL)
     free(weights);
+  if(x_log != NULL)
+    free(x_log);
+  if(x_sign != NULL)
+    free(x_sign);
   return R_FINITE(objective) ? objective : DBL_MAX;
 }
