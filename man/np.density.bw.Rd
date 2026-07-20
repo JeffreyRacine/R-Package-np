@@ -637,8 +637,20 @@ or standard-deviation factors.
   element \eqn{i} corresponding to column \eqn{i} of input data
   \code{dat}.
 
-  The functions  \code{\link{predict}}, \code{\link{summary}} and \code{\link{plot}} support
-  objects of type \code{bandwidth}.
+  Prediction follows a two-stage contract. Calling \code{predict(bw)}
+  on the returned bandwidth object is a convenience forwarder for
+  \code{npudens(bws = bw)} and returns a fitted \code{npdensity}
+  object; it does not return a numeric vector of density estimates.
+  Call \code{fitted(fit)} or \code{predict(fit, newdata = ...)} on that
+  fitted object to obtain numeric results. The canonical workflow is
+  \preformatted{
+    bw <- npudensbw(~ x, data = mydata)
+    fit <- predict(bw)             # equivalent to npudens(bws = bw)
+    fitted(fit)
+    predict(fit, newdata = newdata)
+  }
+  The functions \code{\link{summary}} and \code{\link{plot}} also
+  support \code{bandwidth} objects.
 }
 \section{Book And Method Pointers}{
   \code{npudensbw} selects bandwidths for the unconditional density
