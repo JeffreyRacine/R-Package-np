@@ -162,6 +162,8 @@ test_that("conditional beta endpoint gradients have finite one-sided limits", {
 })
 
 test_that("beta derivative plot-data routes retain native kernel descriptors", {
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
   x <- data.frame(x = c(.04, .1, .18, .29, .43, .58, .7, .82, .91, .97))
   y <- sin(2.7 * x$x) + .2 * x$x^2
   cy <- data.frame(y = c(.07, .2, .13, .38, .49, .45, .73, .66, .86, .94))
